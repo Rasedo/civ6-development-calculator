@@ -64,7 +64,7 @@ CTX_FIELDS = (
 PER_CITY = 10
 # THE WORLD CONGRESS block: this seat's ballot currency and the slate that is
 # STANDING — what the last session passed and on whom. A net votes off this;
-# the ladder's own vote reads the sim directly, the way the route verb does.
+# the ladder's own vote reads the observation's `congress` group instead.
 CONGRESS = 20
 CONGRESS_FIELDS = (
     "favor",          # diplomatic favor / 100

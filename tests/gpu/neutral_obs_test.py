@@ -17,7 +17,11 @@ preference (a session turn is forced, forty turns never reach one), and the
 `gp` group the standing offers. Every unit row lists exactly the unit mask's
 open columns, and the driver rebuilds that mask from them; a forced war
 lists the enemy's improvements and cities, and the driver marches every
-unit where a candidate-by-candidate scan would.
+unit where a candidate-by-candidate scan would. The head carries the engine
+turn and the RL vector value for value. The diplomatic table (`geo_obs`)
+matches the raw pair planes cell by cell, a denouncement, an offer and a
+captive spy forced in; the static value built from rules.json and the world
+file alone equals every sim attribute the driver used to read.
 
 Driven for a stretch first, over two worlds at once, so the seats hold
 cities and the buy candidates are live rather than all -1.
@@ -189,16 +193,16 @@ def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
     return live
 
 
-def check_driver_units(sim, row: int, nobs: list, mask: torch.Tensor) -> int:
+def check_driver_units(sim, st, row: int, nobs: list, mask: torch.Tensor) -> int:
     """The driver's reads of the `units` rows and war targets against the
     sim: the rebuilt mask IS `_seat_unit_mask`, and every unit's war-march
     destination from where it stands is `march_ref`'s. Returns the number
     of units that had a destination."""
-    um = drive._obs_unit_mask(nobs, len(sim._act_names), sim.device)
+    um = drive._obs_unit_mask(st, nobs)
     assert torch.equal(um, mask), f"seat {row}: the rebuilt unit mask differs from _seat_unit_mask"
-    present, tiles, *_r = drive._obs_units(nobs, sim.device)
-    war = drive._obs_war(nobs, sim.T, sim.device)
-    tgt, hi, hc = drive._march_targets(sim, war, tiles.clamp(min=0))
+    present, tiles, *_r = drive._obs_units(st, nobs)
+    war = drive._obs_war(st, nobs)
+    tgt, hi, hc = drive._march_targets(st, war, tiles.clamp(min=0))
     marched = 0
     for b, ob in enumerate(nobs):
         tg = ob["targets"]
@@ -210,12 +214,147 @@ def check_driver_units(sim, row: int, nobs: list, mask: torch.Tensor) -> int:
     return marched
 
 
+# the sim attribute each unit action column the driver names stood in
+ACT_ATTRS = {
+    "SPREAD_HERE": "_A_SPREAD", "FOUND_CITY": "_A_FOUND", "EXCAVATE": "_A_EXCAVATE", "PARK": "_A_PARK",
+    "PROMOTE_0": "_A_PROMOTE", "CONDEMN_0": "_A_CONDEMN", "REMOVE_HERESY": "_A_HERESY",
+    "LAUNCH_INQUISITION": "_A_INQUISITION", "CONVERT_HEATHEN": "_A_HEATHEN", "AIR_STRIKE_0": "_A_AIR_STRIKE",
+    "REBASE_0": "_A_REBASE", "SPY_TRAVEL_0": "_A_SPY_TRAVEL", "SPY_MISSION_0": "_A_SPY_MISSION",
+    "BUILD_ROAD": "_A_ROAD", "BUILD_RAILROAD": "_A_RAIL", "FINISH_DISTRICT": "_A_FINISH", "ACTIVATE_GP": "_A_GP",
+    "BOOST_PROJECT": "_A_BOOST", "FORM_UP_0": "_A_FORM_UP", "HARVEST": "_A_HARVEST", "WONDER_CHARGE": "_A_WONDER_CHARGE",
+}
+
+
+def check_static(sim, st, twin) -> None:
+    """The static value, built from rules.json and the world file alone,
+    against the sim attributes the driver used to read: every table, index
+    and layout constant equal. `twin` is `static_for(sim)`, which must be
+    the same value."""
+    for f in neutral.STATIC_FIELDS:
+        assert hasattr(st, f), f"the schema's static field {f} is not on Static"
+    for f in st.__dataclass_fields__:
+        a, b = getattr(st, f), getattr(twin, f)
+        same = torch.equal(a, b) if torch.is_tensor(a) else a == b
+        assert same, f"static_of and static_for disagree on {f}"
+    for name, a in (("neigh", sim.neigh), ("ring2", sim.ring2), ("pair_dist", sim.pair_dist)):
+        assert torch.equal(getattr(st, name), a), f"static {name} differs from the sim's"
+    want = {
+        "T": sim.T, "n_majors": sim.n_majors, "S": sim.S, "RC": sim.RC, "NT": sim.civ_techs.shape[2],
+        "NC": sim.civ_civics.shape[2], "NB": sim.NB, "NU": sim.NU, "max_cities": int(sim.rules.seats.get("maxCities", 6)),
+        "unit_slots": simbase.UNIT_SLOTS, "spec_keep": simbase.SPEC_KEEP,
+        "unit_base": sim.UNIT_BASE, "district_base": sim.DISTRICT_BASE, "form_base": sim.FORM_BASE, "prod_w": sim.PROD_W,
+        "districts_on": sim.districts_on, "n_wonders": sim._wond_n, "n_projects": len(sim._proj_rows),
+        "improvements_on": sim.improvements_on, "builder": sim._builder_idx, "engineer": sim._eng_idx,
+        "missionary": sim._missionary_idx, "apostle": sim._apostle_idx, "settler": sim._settler_idx,
+        "archaeologist": sim._archaeologist_idx, "naturalist": sim._naturalist_idx,
+        "act_w": len(sim._act_names), "a_pillage": sim._A_PILLAGE, "a_snipe": sim._A_SNIPE, "a_snipe3": sim._A_SNIPE3,
+        "a_repair": sim._A_REPAIR, "a_imp": list(sim._A_IMP), "promo_cols": sim.rules.promo_cols,
+        "air_strike_cols": sim._air_strike_cols, "air_rebase_cols": sim._air_rebase_cols,
+        "spy_missions": sim._n_spy_missions, "spy_travel_cols": sim._spy_travel_cols,
+        "spy_counterspy": sim._spy_m_counterspy, "npol": sim._npol,
+        "war_min_turns": int(sim.rules.seats["warMinTurns"]), "open_borders_civic": sim._open_borders_civic,
+        "alliance_civic": sim._alliance_civic, "embassy_civic": sim._embassy_civic,
+        "joint_war_civic": sim._joint_war_civic, "embassy_cost": sim._embassy_cost,
+        "delegation_cost": sim._deleg_cost, "deal_items": sim._deal_items, "comp_aid": sim._comp_aid,
+        "deal_kind": {"GOLD": sim._deal_k_gold, "FAVOR": sim._deal_k_favor, "RESOURCE": sim._deal_k_res,
+                      "SPY": sim._deal_k_spy, "OPEN_BORDERS": sim._deal_k_borders, "JOINT_WAR": sim._deal_k_joint},
+        "scaffold": [sim.districts_cat[di].get("id") for di, *_r in sim._scaffold] if sim.districts_on else st.scaffold,
+    }
+    for f, w in want.items():
+        assert getattr(st, f) == w, f"static {f} = {getattr(st, f)!r}, the sim's {w!r}"
+    assert len(st.scaffold) == len(sim._scaffold), "static scaffold rows"
+    for name, attr in ACT_ATTRS.items():
+        assert st.col(name) == getattr(sim, attr), f"static column {name} = {st.col(name)}, sim {attr} = {getattr(sim, attr)}"
+    if sim._npol:
+        assert torch.equal(st.pol_kind, sim._pol_kind), "static pol_kind"
+        assert torch.equal(st.pol_legacy, sim._pol_legacy >= 0), "static pol_legacy"
+        assert torch.equal(st.pol_dark, sim._pol_dark_lo >= 0), "static pol_dark"
+    assert len(sim._gw_cls) == 3, "the great work kinds are writing, art and music"
+
+
+def check_geo(sim, geos: list) -> Counter:
+    """The diplomatic table against the planes it reads, cell by cell off the
+    raw state: a denouncement runs while its stamp is younger than the
+    agreement term, the proximity is the least centre-to-centre distance, a
+    joint war stays open while no war, alliance, friendship or treaty binds."""
+    n = sim.n_majors
+    live: Counter = Counter()
+    rstr = sim._seat_strengths()
+    turn = int(sim.turn)
+    assert len(geos) == sim.B, "one diplomatic table per game"
+    for b, g in enumerate(geos):
+        where = f"geo game {b}"
+        assert list(g) == [f for f, _k in neutral.GEO_FIELDS] and plain(g), f"{where}: fields {list(g)}"
+        assert json.loads(json.dumps(g)) == g, f"{where}: JSON does not round-trip it"
+        cities = [[int(sim.city_center[b, r, j]) for j in range(sim.RC) if bool(sim.city_alive[b, r, j])] for r in range(n)]
+        for r in range(n):
+            assert g["alive"][r] == int(sim.civ_alive[b, r]), f"{where}: alive {r}"
+            assert g["cities"][r] == len(cities[r]), f"{where}: cities {r}"
+            assert g["strength"][r] == int(rstr[b, r]) and float(rstr[b, r]) == g["strength"][r], f"{where}: strength {r}"
+            assert g["treasury"][r] == math.floor(float(sim.civ_treasury[b, r])), f"{where}: treasury {r}"
+            assert g["favor"][r] == int(sim.civ_diplo_favor[b, r]), f"{where}: favor {r}"
+            assert g["civics"][r] == [k for k in range(sim.civ_civics.shape[2]) if bool(sim.civ_civics[b, r, k])], f"{where}: civics {r}"
+            assert g["stockpile"][r] == sim.civ_stockpile[b, r].tolist(), f"{where}: stockpile {r}"
+            for k in range(3):
+                objs = sim._gw_kind_objs(k)
+                held = sum(int(o) in objs for j in range(sim.RC) if bool(sim.city_alive[b, r, j])
+                           for o in sim.city_gw_obj[b, r, j].tolist())
+                assert g["great_works"][r][k] == held, f"{where}: great works {r} kind {k}"
+                live["great_works"] += held
+            assert g["comp_member"][r] == int(sim.comp_member[b, r]), f"{where}: comp_member {r}"
+            live["civics"] += len(g["civics"][r])
+        assert (g["comp_kind"], g["comp_target"]) == (int(sim.comp_kind[b]), int(sim.comp_target[b])), f"{where}: competition"
+        for a in range(n):
+            for x in range(n):
+                cell = f"{where} [{a}][{x}]"
+                other = a != x
+                assert g["war"][a][x] == int(sim.war[b, a, x]), f"{cell} war"
+                assert g["war_turns"][a][x] == int(sim.war_turns[b, a, x]), f"{cell} war_turns"
+                dt = int(sim.seat_denounced[b, a, x])
+                den = other and dt >= 0 and sim._agreement_turns - (turn - dt) > 0
+                assert g["denounce"][a][x] == int(den), f"{cell} denounce"
+                for f, plane in (("friend_turns", sim.seat_friend_turns), ("ally_turns", sim.seat_ally_turns),
+                                 ("borders_turns", sim.seat_borders_turns), ("delegation", sim.seat_delegation),
+                                 ("grievance", sim.civ_grievance), ("offer_left", sim.deal_offer_left)):
+                    assert g[f][a][x] == int(plane[b, a, x]), f"{cell} {f}"
+                    live[f] += int(g[f][a][x] != 0)
+                d = min((int(sim.pair_dist[c, e]) for c in cities[a] for e in cities[x]), default=999)
+                assert g["proximity"][a][x] == (d if other else 0), f"{cell} proximity {g['proximity'][a][x]} vs {d}"
+                jo = (other and not bool(sim.war[b, a, x]) and int(sim.seat_ally_turns[b, a, x]) == 0
+                      and int(sim.seat_friend_turns[b, a, x]) == 0 and int(sim.treaty_turns[b, a, x]) == 0)
+                assert g["joint_open"][a][x] == int(jo), f"{cell} joint_open"
+                assert g["spies_held"][a][x] == int(sim.seat_spy_held[b, a, x].sum()), f"{cell} spies_held"
+                assert g["offer_ask"][a][x] == sim.deal_offer_ask[b, a, x].flatten().tolist(), f"{cell} offer_ask"
+                live["war"] += g["war"][a][x]
+                live["denounce"] += g["denounce"][a][x]
+                live["proximity"] += int(other and d < 999)
+    return live
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()[:2]
-    env = BatchEnv([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64)
+    fixtures = [load_fixture(p) for p in paths]
+    env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
     sim = env.sim
+    st = neutral.static_of(rules, fixtures[0])
+    check_static(sim, st, neutral.static_for(sim))
     records.drive_batched(env, TURNS, seats=list(range(sim.n_majors)))
+    # the diplomatic table after the drive, then with a denouncement, an
+    # offer on the table and a spy held forced in, so every pair plane holds
+    # something to read
+    live_geo = check_geo(sim, neutral.geo_obs(sim))
+    poked = ("seat_denounced", "deal_offer_left", "deal_offer_ask", "seat_spy_held")
+    keep = {p: getattr(sim, p).clone() for p in poked}
+    sim.seat_denounced[:, 0, 1] = int(sim.turn) - 1
+    sim.deal_offer_left[:, 1, 0] = 2
+    sim.deal_offer_ask[:, 1, 0, 0] = torch.tensor([sim._deal_k_gold, 30, 0])
+    sim.seat_spy_held[:, 0, 1, 0] = 1
+    live_geo += check_geo(sim, neutral.geo_obs(sim))
+    assert live_geo["denounce"] > 0 and live_geo["offer_left"] > 0 and live_geo["proximity"] > 0, (
+        f"the diplomatic table never filled: {dict(live_geo)}")
+    for p, v in keep.items():
+        getattr(sim, p).copy_(v)
     # the drive leaves every queue full; EMPTY the even seats' so their
     # production columns and district plots are open to read
     for row in range(0, sim.n_majors, 2):
@@ -226,7 +365,8 @@ def main() -> None:
     live_tgt: Counter = Counter()
     live_units = 0
     for row in range(sim.n_majors):
-        nobs = neutral.seat_obs(sim, row)
+        vec = env.observe(row)
+        nobs = neutral.seat_obs(sim, row, vec)
         pmask = sim._seat_production_mask(row)
         spec_slots = sim._city_spec_slots(row) if len(sim.districts_cat) else None
         win_t, win_v = sim._work_window(row)
@@ -234,9 +374,13 @@ def main() -> None:
         tgt_ctx = target_ctx(sim, row)
         assert len(nobs) == sim.B, f"seat {row}: {len(nobs)} observations for {sim.B} games"
         for b, ob in enumerate(nobs):
-            assert plain(ob), f"seat {row} game {b}: the observation holds a non-plain value"
+            # `vec` is the one float field: the RL vector, value for value
+            assert plain({k: v for k, v in ob.items() if k != "vec"}), f"seat {row} game {b}: the observation holds a non-plain value"
+            assert all(type(x) is float for x in ob["vec"]) and ob["vec"] == vec[b].tolist(), f"seat {row} game {b}: vec"
+            assert ob["turn"] == int(sim.turn), f"seat {row} game {b}: turn {ob['turn']} vs {int(sim.turn)}"
             assert json.loads(json.dumps(ob)) == ob, f"seat {row} game {b}: JSON does not round-trip it"
-            assert list(ob) == [*neutral.SEAT_GROUPS, "cities", "targets", "units"], f"seat {row} game {b}: groups {list(ob)}"
+            assert list(ob) == [*neutral.SEAT_GROUPS, "cities", "targets", "units", *(f for f, _k in neutral.HEAD_FIELDS)], \
+                f"seat {row} game {b}: groups {list(ob)}"
             centres = {int(c) for c, a in zip(sim.city_center[b, row].tolist(), sim.city_alive[b, row].tolist()) if a}
             for g, fields in neutral.SEAT_GROUPS.items():
                 assert list(ob[g]) == [f for f, _k in fields], f"seat {row} game {b}: {g} fields out of schema order"
@@ -367,7 +511,7 @@ def main() -> None:
                 assert not bool(pmask[b].any()), f"{where}: no living city, yet a production column is open"
             live_tgt += check_targets(sim, row, b, ob, tgt_ctx)
             live_units += len(ob["units"])
-        check_driver_units(sim, row, nobs, tgt_ctx["mask"])
+        check_driver_units(sim, st, row, nobs, tgt_ctx["mask"])
     # A SESSION TURN, forced: forty turns never reach the Congress, so the
     # schedule is made to announce the first two resolutions with the
     # Diplomatic Victory vote, and every seat's preference is read back
@@ -399,7 +543,7 @@ def main() -> None:
         for b, ob in enumerate(nobs):
             assert ob["war"]["at_war"], f"seat {row} game {b}: the forced war is not in war.at_war"
             live_war += check_targets(sim, row, b, ob, tgt_ctx)
-        marched += check_driver_units(sim, row, nobs, tgt_ctx["mask"])
+        marched += check_driver_units(sim, st, row, nobs, tgt_ctx["mask"])
     assert live_war["warCities"] > 0 and marched > 0, (
         f"the forced war listed no enemy city or marched nobody: {dict(live_war)}, {marched} marching")
     assert live > 0, "no seat held a city — the scene never exercised the city fields"
@@ -411,7 +555,7 @@ def main() -> None:
         and live_tgt["goody"] + live_tgt["foundOk"] > 0, (
             f"the unit rows or tile planes never filled: {live_units} units, {dict(live_tgt)}")
     print(f"NEUTRAL OBS OK ({sim.n_majors} seats x {sim.B} games after {TURNS} turns, {live} with a spawn city, "
-          f"{live_units} unit rows, target tiles {dict(live_tgt)}, "
+          f"{live_units} unit rows, target tiles {dict(live_tgt)}, the diplomatic table {dict(live_geo)}, "
           f"{live_research} open items, {live_cards} cards, {live_declare} open declarations, "
           f"{live_cols} open production columns, {live_sites} district plots, {live_work} workable plots, "
           f"{live_swap} claimable plots, {live_gp} Great Person offers, {live_pref} congress preferences; "

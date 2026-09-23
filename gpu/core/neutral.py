@@ -19,13 +19,20 @@ holds that it may claim. Then `targets`: the tile planes the unit planner
 walks toward (builder and engineer jobs, religious spread, founding, digs,
 park anchors, Great Person sites, villages), each emitted only for a game
 whose seat holds a unit that walks toward it, and the war march's targets
-(enemy improvements and cities) for a game whose seat is at war. Last
+(enemy improvements and cities) for a game whose seat is at war. Then
 `units`: one row per living unit in the seat's array order, with the unit
-action columns it may take.
+action columns it may take. Last the `head`: the engine turn and `vec`, the
+RL observation vector.
+
+Two values ride beside the per-seat observation: `geo_obs`, ONE per game —
+the diplomatic table every seat's agreements and deals are decided from at
+once — and `static_of`, ONE per game — the rules and map facts the driver
+reads (`Static`), built from rules.json and the world's dimensions alone.
 """
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import torch
@@ -38,6 +45,171 @@ SEAT_GROUPS: dict = {g: [(f[0], f[1]) for f in fields] for g, fields in SCHEMA["
 CITY_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["city"]]
 TARGET_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["targets"]]
 UNIT_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["unit"]]
+HEAD_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["head"]]
+GEO_FIELDS: list = [(f[0], f[1]) for f in SCHEMA["geo"]]
+STATIC_FIELDS: list = [f[0] for f in SCHEMA["static"]]
+
+
+@dataclass(frozen=True)
+class Static:
+    """The facts of one game that never change, as the driver reads them —
+    every field named and meant in the schema's `static` section. Integers,
+    lists and dicts of them, and three geometry tables as tensors."""
+    device: str
+    T: int
+    neigh: torch.Tensor
+    ring2: torch.Tensor
+    pair_dist: torch.Tensor
+    n_majors: int
+    S: int
+    RC: int
+    NT: int
+    NC: int
+    NB: int
+    NU: int
+    max_cities: int
+    unit_slots: int
+    spec_keep: int
+    units: list
+    unit_base: int
+    district_base: int
+    form_base: int
+    prod_w: int
+    districts_on: bool
+    scaffold: list
+    n_wonders: int
+    n_projects: int
+    improvements_on: bool
+    builder: int
+    engineer: int
+    missionary: int
+    apostle: int
+    settler: int
+    archaeologist: int
+    naturalist: int
+    act: dict
+    act_w: int
+    a_pillage: int
+    a_snipe: int
+    a_snipe3: int
+    a_repair: int
+    a_imp: list
+    promo_cols: int
+    air_strike_cols: int
+    air_rebase_cols: int
+    spy_missions: int
+    spy_travel_cols: int
+    spy_counterspy: int
+    npol: int
+    pol_kind: torch.Tensor
+    pol_legacy: torch.Tensor
+    pol_dark: torch.Tensor
+    dow_proximity: int
+    war_min_turns: int
+    open_borders_civic: int
+    alliance_civic: int
+    embassy_civic: int
+    joint_war_civic: int
+    embassy_cost: int
+    delegation_cost: int
+    deal_items: int
+    deal_kind: dict
+    comp_aid: int
+
+    def col(self, name: str) -> int:
+        """The unit action column called `name`, -1 where the layout has none."""
+        return self.act.get(name, -1)
+
+
+def _whole(x) -> int:
+    """A rules number the driver compares a floored quantity against: it must
+    be whole, or flooring the other side would move the comparison."""
+    assert float(x) == int(x), f"{x} is not a whole number"
+    return int(x)
+
+
+def static_of(rules, world: dict, device: str = "cpu") -> Static:
+    """The game's `Static`, from rules.json (`rules`, as `load_rules` reads
+    it) and its world file (`world`, as `load_fixture` reads it). Reads no
+    engine state."""
+    return _static(rules, int(world["width"]), int(world["height"]), len(world["civs"]),
+                   int(world.get("cityStateMax", 0)), device)
+
+
+def static_for(sim) -> Static:
+    """`static_of` for a caller that holds a sim and no world file: the
+    sim's rules and the world's four dimensions, which is all `static_of`
+    reads from the world."""
+    return _static(sim.rules, sim.W, sim.H, sim.n_majors, sim.S, sim.device)
+
+
+def _static(rules, width: int, height: int, n_majors: int, n_citystates: int, device: str) -> Static:
+    T = width * height
+    neigh = simbase.neighbor_table(width, height).to(device)
+    pair_dist = simbase.pair_distances(width, height).to(device)
+    # the distance-2 ring, each row ascending and padded -1: the tiles two
+    # steps out, in tile-index order
+    ar = torch.arange(T, device=device).expand(T, -1)
+    ring2 = torch.where(pair_dist == 2, ar, torch.full_like(ar, T)).sort(dim=1).values[:, :12]
+    ring2 = torch.where(ring2 < T, ring2, torch.full_like(ring2, -1))
+    units = list(rules.units or [{"id": "WARRIOR"}])
+    ids = [u.get("id") for u in units]
+    NB, NU = len(rules.b_cost), len(units)
+    imp = rules.improvements or {}
+    bel = rules.beliefs or {}
+    districts = list(rules.districts or [])
+    place = list((rules.district_scaffold or {}).get("place", []))
+    n_wonders = len((rules.wonders or {}).get("rows", []))
+    n_projects = len((rules.projects or {}).get("rows", []))
+    unit_base = NB + 2
+    district_base = unit_base + NU
+    form_base = district_base + len(place) + n_wonders + n_projects
+    names = list((rules.actions or {}).get("unit", []))
+    assert names, "rules.actions.unit missing — the unit action layout is the exporter's"
+    act = {n: i for i, n in enumerate(names)}
+    sp = rules.eras["espionage"]
+    mids = [str(m["id"]) for m in sp["missions"]]
+    pols = list(rules.policies or [])
+    kinds = [str(k) for k in rules.eras["dealItemKinds"]]
+    comps = [c["id"] for c in rules.eras["competitions"]]
+    seats = rules.seats
+    return Static(
+        device=device, T=T, neigh=neigh, ring2=ring2, pair_dist=pair_dist,
+        n_majors=n_majors, S=n_citystates, RC=int(seats.get("citySlots", 24)),
+        NT=len(rules.t_cost), NC=len(rules.c_cost), NB=NB, NU=NU,
+        max_cities=int(seats.get("maxCities", 6)),
+        unit_slots=simbase.UNIT_SLOTS, spec_keep=simbase.SPEC_KEEP, units=units,
+        unit_base=unit_base, district_base=district_base, form_base=form_base, prod_w=form_base + 2 * NU,
+        districts_on=bool(districts),
+        scaffold=[districts[int(p["idx"])].get("id") if districts else None for p in place],
+        n_wonders=n_wonders, n_projects=n_projects,
+        improvements_on=bool(imp.get("ids", [])),
+        builder=int(imp.get("builderIdx", -1)), engineer=int(imp.get("engineerIdx", -1)),
+        missionary=int(bel.get("missionaryIdx", -1)), apostle=int(bel.get("apostleIdx", -1)),
+        settler=next((i for i, u in enumerate(units) if bool(u.get("settler", 0))), -1),
+        archaeologist=ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1,
+        naturalist=next((i for i, u in enumerate(units) if bool(u.get("naturalist", 0))), -1),
+        act=act, act_w=len(names),
+        a_pillage=act["PILLAGE"], a_snipe=act.get("SNIPE_0", act["PILLAGE"] + 1),
+        a_snipe3=act.get("SNIPE3_0", -1), a_repair=act["REPAIR"],
+        a_imp=[act.get(f"BUILD_{n}", -1) for n in imp.get("ids", [])],
+        promo_cols=int(rules.promo_cols),
+        air_strike_cols=sum(1 for n in names if n.startswith("AIR_STRIKE_")),
+        air_rebase_cols=sum(1 for n in names if n.startswith("REBASE_")),
+        spy_missions=len(mids), spy_travel_cols=int(sp["travelCols"]),
+        spy_counterspy=mids.index("COUNTERSPY"),
+        npol=len(pols),
+        pol_kind=torch.tensor([int(p["kind"]) for p in pols], dtype=torch.long, device=device),
+        pol_legacy=torch.tensor([int(p.get("legacy", -1)) >= 0 for p in pols], dtype=torch.bool, device=device),
+        pol_dark=torch.tensor([int(p.get("dark", [-1, -1])[0]) >= 0 for p in pols], dtype=torch.bool, device=device),
+        dow_proximity=int(seats.get("dowProximity", 9)), war_min_turns=int(seats["warMinTurns"]),
+        open_borders_civic=int(seats["openBordersCivic"]), alliance_civic=int(seats["allianceCivic"]),
+        embassy_civic=int(rules.eras["embassyCivic"]), joint_war_civic=int(seats["jointWarCivic"]),
+        embassy_cost=_whole(rules.eras["embassyCost"]), delegation_cost=_whole(rules.eras["delegationCost"]),
+        deal_items=int(rules.eras["dealItems"]),
+        deal_kind={k: kinds.index(k) for k in ("GOLD", "FAVOR", "RESOURCE", "SPY", "OPEN_BORDERS", "JOINT_WAR")},
+        comp_aid=comps.index("AID_REQUEST") if "AID_REQUEST" in comps else -1,
+    )
 
 
 def living_order(alive: torch.Tensor) -> torch.Tensor:
@@ -517,13 +689,15 @@ def _unit_rows(present: torch.Tensor, cols: dict, mask: torch.Tensor) -> list:
     return out
 
 
-def seat_obs(sim, row: int) -> list:
+def seat_obs(sim, row: int, vec: torch.Tensor | None = None) -> list:
     """Seat `row`'s observation, one dict per game of the batch (index = b):
     {group: {field: int | bool | list[int]}} over `SEAT_GROUPS`, then
     "cities": [{field: ...} over `CITY_FIELDS`, one per living city in array
-    order], "targets": {field: ...} over `TARGET_FIELDS` and "units":
-    [{field: ...} over `UNIT_FIELDS`, one per living unit in array order].
-    Reads only."""
+    order], "targets": {field: ...} over `TARGET_FIELDS`, "units":
+    [{field: ...} over `UNIT_FIELDS`, one per living unit in array order],
+    then the `HEAD_FIELDS`: "turn" and "vec", the seat's RL observation
+    (`vec` [B, F], the caller's `env.observe(row)`; an empty list where the
+    caller rendered none). Reads only."""
     cities = _city_rows(sim, row)
     present, ucols = _unit_cols(sim, row)
     targets = _targets(sim, row, present, ucols)
@@ -535,6 +709,8 @@ def seat_obs(sim, row: int) -> list:
     widths = [m.shape[1] for m in mats]
     # ONE transfer for the whole seat
     rows = torch.cat(mats, dim=1).tolist()
+    turn = int(sim.turn)
+    vecs = vec.tolist() if vec is not None else [[] for _b in range(sim.B)]
     out = []
     for b in range(sim.B):
         ob: dict = {g: {} for g in SEAT_GROUPS}
@@ -549,5 +725,54 @@ def seat_obs(sim, row: int) -> list:
         ob["cities"] = cities[b]
         ob["targets"] = targets[b]
         ob["units"] = units[b]
+        ob["turn"] = turn
+        ob["vec"] = vecs[b]
         out.append(ob)
+    return out
+
+
+def geo_obs(sim) -> list:
+    """The diplomatic table, one dict per game keyed by `GEO_FIELDS`: per
+    major seat (index = seat) its standing, and per ordered pair of majors
+    ([a][b]) what stands between them. Every seat's agreements and deal
+    tables are decided from it at once — a pair's decision reads the other
+    seat's side and a third seat's (the joint war), so it is one table, not
+    a row per seat. Reads only."""
+    B, n = sim.B, sim.n_majors
+    alive = sim.city_alive[:, :n]
+    zero = torch.zeros(B, n, n, dtype=torch.long, device=sim.device)
+    den, jw, prox = zero.clone(), zero.clone(), zero.clone()
+    for a in range(n):
+        for b in range(n):
+            if a != b:
+                den[:, a, b] = sim._denounce_active(a, b).long()
+                jw[:, a, b] = sim._joint_war_open(a, b).long()
+                prox[:, a, b] = sim._seat_proximity(a, b)
+    gw = torch.stack([torch.stack([(sim._gw_kind_count(r, k) * alive[:, r].long()).sum(dim=1)
+                                   for k in range(len(sim._gw_cls))], dim=1)
+                      for r in range(n)], dim=1)                        # [B, n, kinds]
+    ask = sim.deal_offer_ask[:, :n, :n]
+    cols = {
+        "alive": sim.civ_alive[:, :n].long(), "cities": alive.sum(dim=2),
+        "strength": _as_long(sim._seat_strengths()), "treasury": _floored(sim.civ_treasury[:, :n]),
+        "favor": _floored(sim.civ_diplo_favor[:, :n]), "stockpile": _as_long(sim.civ_stockpile[:, :n]),
+        "great_works": gw, "comp_kind": sim.comp_kind, "comp_target": sim.comp_target,
+        "comp_member": sim.comp_member[:, :n].long(),
+        "war": sim.war[:, :n, :n].long(), "war_turns": sim.war_turns[:, :n, :n],
+        "denounce": den, "friend_turns": sim.seat_friend_turns[:, :n, :n],
+        "ally_turns": sim.seat_ally_turns[:, :n, :n], "borders_turns": sim.seat_borders_turns[:, :n, :n],
+        "delegation": sim.seat_delegation[:, :n, :n], "grievance": sim.civ_grievance[:, :n, :n],
+        "proximity": prox, "joint_open": jw,
+        "spies_held": sim.seat_spy_held[:, :n, :n].sum(dim=3),
+        "offer_left": sim.deal_offer_left[:, :n, :n], "offer_ask": ask.reshape(B, n, n, -1),
+    }
+    lists = {f: v.tolist() for f, v in cols.items()}
+    civics = sim.civ_civics[:, :n]
+    held = [[row.nonzero(as_tuple=True)[0].tolist() for row in civics[b]] for b in range(B)]
+    out = []
+    for b in range(B):
+        g: dict = {}
+        for f, _k in GEO_FIELDS:
+            g[f] = held[b] if f == "civics" else lists[f][b]
+        out.append(g)
     return out

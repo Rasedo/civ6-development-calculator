@@ -129,22 +129,24 @@ def stash_units(sim, row: int, seq: torch.Tensor) -> None:
     sim._driven_useq[row] = seq
 
 
-def decide_and_apply(env, sim, row: int, nobs: list, roster: dict, classes: dict, max_steps: int = 4,
-                     seeds=None, turn=None, pre: dict | None = None) -> tuple:
+def decide_and_apply(sim, st, row: int, nobs: list, roster: dict, classes: dict, max_steps: int = 4,
+                     seeds=None, pre: dict | None = None) -> tuple:
     """One seat's turn: decide, stash the decisions, then plan and stash the
     units — the unit plan is taken AFTER the seat's other decisions are
     stashed, the order the step has always seen. `nobs` is the seat's
-    `neutral.seat_obs`. Returns the positional record in
-    `drive.DECIDE_FIELDS` order."""
-    dec = drive.decide_seat(env, sim, row, nobs, roster, classes, seeds=seeds, turn=turn, pre=pre)
+    `neutral.seat_obs`, `st` the game's `neutral.static_of`. Returns the
+    positional record in `drive.DECIDE_FIELDS` order."""
+    dec = drive.decide_seat(st, row, nobs, roster, classes, seeds=seeds, pre=pre)
     apply_decisions(sim, row, dec)
-    dec["seq"] = drive.plan_units(sim, row, nobs, max_steps, pre=pre)
+    dec["seq"] = drive.plan_units(st, row, nobs, max_steps, pre=pre)
     stash_units(sim, row, dec["seq"])
     return tuple(dec[f] for f in drive.DECIDE_FIELDS)
 
 
-def geo_decide_and_apply(sim, seeds=None):
-    geo = drive.decide_geo(sim, seeds)
+def geo_decide_and_apply(sim, st, seeds=None):
+    """Every seat's diplomatic intents, decided off the game's diplomatic
+    table (`neutral.geo_obs`) and stashed for `_geo_agreements`."""
+    geo = drive.decide_geo(st, neutral.geo_obs(sim), seeds)
     den, frd, ally, bord, gift, deleg, off, acc, ally_ty = geo
     for row in range(sim.n_majors):
         sim.apply_geo(row, denounce=den[:, row], friend=frd[:, row], ally=ally[:, row],
@@ -510,17 +512,15 @@ def drive_batched(env, turns: int, seats=None, seeds=None) -> list:
     sim = env.sim
     B = sim.B
     seats = list(range(1, sim.n_majors)) if seats is None else list(seats)
-    NB = sim.rules_dev.b_cost.shape[0]
-    classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
-    rj = json.loads((simbase.FIXTURES / "rules.json").read_text(encoding="utf-8"))
-    roster = ladder.unit_roster(rj["units"])
+    st = neutral.static_for(sim)
+    roster, classes = drive.tables(st)
     for row in seats:
         take_seat(sim, row)
     logs = [[] for _ in range(B)]
     game_seeds = list(seeds) if seeds is not None else list(range(B))
     for t in range(turns):
-        per_seat = {row: decide_and_apply(env, sim, row, neutral.seat_obs(sim, row), roster, classes,
-                                          seeds=game_seeds, turn=t) for row in seats}
+        per_seat = {row: decide_and_apply(sim, st, row, neutral.seat_obs(sim, row, env.observe(row)),
+                                          roster, classes, seeds=game_seeds) for row in seats}
         for b in range(B):
             turn_rec = {"turn": t}
             for row in seats:

@@ -130,12 +130,9 @@ def main() -> None:
     env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
     sim = env.sim
     seats = list(range(sim.n_majors))
-    NB = sim.rules_dev.b_cost.shape[0]
-    classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold),
-                                  sim._wond_n if sim.districts_on else 0,
-                                  len(sim._proj_rows) if sim.districts_on else 0)
+    st = neutral.static_of(rules, fixtures[0])
+    roster, classes = drive.tables(st)
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
-    roster = ladder.unit_roster(rj["units"])
     for row in seats:
         records.take_seat(sim, row)
 
@@ -182,11 +179,11 @@ def main() -> None:
     for t in range(args.turns):
         # The DIPLOMATIC verbs are decided outside the seat decide, so a probe
         # that skips this measures a table with no agreements in it.
-        records.geo_decide_and_apply(sim, seeds)
+        records.geo_decide_and_apply(sim, st, seeds)
         gw_before = [sim._gw_kind_count_all(k)[:, :sim.n_majors].clone() for k in range(3)]
         for row in seats:
-            rec = records.decide_and_apply(env, sim, row, neutral.seat_obs(sim, row), roster, classes,
-                                           seeds=seeds, turn=t)
+            rec = records.decide_and_apply(sim, st, row, neutral.seat_obs(sim, row, env.observe(row)),
+                                           roster, classes, seeds=seeds)
             # the seat's record, BY NAME. It used to be read by position
             # under a comment warning that a new column shifts everything
             # after it; one did, and this probe raised IndexError for as long

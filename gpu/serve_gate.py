@@ -301,10 +301,10 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     # EVERY major row, seat 0 first — the order `_seat_phase` walks and the
     # order TS's seatPhase applies records in.
     seats = list(range(sim.n_majors))
-    NB = sim.rules_dev.b_cost.shape[0]
-    classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
-    rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
-    roster = ladder.unit_roster(rj["units"])
+    # the game's STATIC facts, built once from rules.json and the world: the
+    # driver reads them and the observations, never the sim
+    st = neutral.static_of(rules, fixtures[0])
+    roster, classes = drive.tables(st)
     sc_man = statecompare.load_manifest()
     statecompare.check_extractors(sc_man)
     dig_dumped = False
@@ -427,17 +427,17 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 # inputs (geo_decide_and_apply only STASHES). The BUY, ROUTE,
                 # JOB and SPREAD tripwires read it against the TS driver's
                 # pre-turn twins, EVERY seat, row 0 included.
-                nobs_seat[seat] = neutral.seat_obs(sim, seat)
+                nobs_seat[seat] = neutral.seat_obs(sim, seat, gobs_all)
                 # Every seat's unit rows ride `_seat_slot_map` — this seat's
                 # LIVING units in slot order, which IS the TS array order it
                 # emits per unit.
-                gj_t = drive._builder_jobs(sim, nobs_seat[seat])
-                gs_t = drive._spread_targets(sim, nobs_seat[seat])
+                gj_t = drive._builder_jobs(st, nobs_seat[seat])
+                gs_t = drive._spread_targets(st, nobs_seat[seat])
                 gj_all = gj_t.tolist()
                 gs_all = gs_t.tolist()
                 gb_all = _buy_rows(nobs_seat[seat])
                 # the decide pass reuses the other pre-decide reads verbatim
-                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "obs": gobs_all}
+                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t}
                 for b, msg in enumerate(msgs):
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
@@ -478,9 +478,9 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             if bad:
                 break
             _t = _pc()
-            geo = records.geo_decide_and_apply(sim, seeds)
+            geo = records.geo_decide_and_apply(sim, st, seeds)
             # ONE decide body, ONE record shape, every major row, seat 0 first.
-            per_seat = {row: records.decide_and_apply(env, sim, row, nobs_seat[row], roster, classes, seeds=seeds, turn=t,
+            per_seat = {row: records.decide_and_apply(sim, st, row, nobs_seat[row], roster, classes, seeds=seeds,
                                                       pre=pre_seat[row]) for row in seats}
             prof["decide (policy on GPU)"] += _pc() - _t
             _t = _pc()
@@ -639,10 +639,8 @@ def main() -> None:
     env = BatchEnv([fx], rules, device="cpu", dtype=torch.float64)
     sim = env.sim
     seats = list(range(sim.n_majors))
-    NB = sim.rules_dev.b_cost.shape[0]
-    classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
-    rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
-    roster = ladder.unit_roster(rj["units"])
+    st = neutral.static_of(rules, fx)
+    roster, classes = drive.tables(st)
     sc_man = statecompare.load_manifest()
     statecompare.check_extractors(sc_man)
     dig_dumped = False
@@ -728,15 +726,15 @@ def main() -> None:
         pre_seat: dict = {}
         nobs_seat: dict = {}
         for seat in seats:
-            nobs_seat[seat] = neutral.seat_obs(sim, seat)
-            gj_t = drive._builder_jobs(sim, nobs_seat[seat])
-            gs_t = drive._spread_targets(sim, nobs_seat[seat])
+            nobs_seat[seat] = neutral.seat_obs(sim, seat, obs_seat[seat])
+            gj_t = drive._builder_jobs(st, nobs_seat[seat])
+            gs_t = drive._spread_targets(st, nobs_seat[seat])
             gj = gj_t[0].tolist()
             gs = gs_t[0].tolist()
             tj = msg.get("jobs", {}).get(str(seat), [])
             ts_ = msg.get("spreads", {}).get(str(seat), [])
             if True:
-                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "obs": obs_seat[seat]}
+                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t}
                 gb = _buy_rows(nobs_seat[seat])[0]
                 tb = msg.get("buys", {}).get(str(seat), [])
                 if tb and gb != tb:
@@ -784,8 +782,8 @@ def main() -> None:
                         break
         if obs_bails:
             break
-        geo = records.geo_decide_and_apply(sim, [args.seed])
-        per_seat = {row: records.decide_and_apply(env, sim, row, nobs_seat[row], roster, classes, seeds=[args.seed], turn=t,
+        geo = records.geo_decide_and_apply(sim, st, [args.seed])
+        per_seat = {row: records.decide_and_apply(sim, st, row, nobs_seat[row], roster, classes, seeds=[args.seed],
                                                   pre=pre_seat[row]) for row in seats}
         recs = {str(row): {**records.extract_record(sim, row, *per_seat[row], 0),
                            **records.extract_geo(geo, row, 0)} for row in seats}

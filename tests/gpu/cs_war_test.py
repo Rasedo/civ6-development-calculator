@@ -234,12 +234,13 @@ def main() -> None:
     here = next(int(t) for t in range(s5.T)
                 if int(s5.pair_dist[ctr5, t]) == 5 and not bool(s5.water[0, t]))
     hc = torch.full((s5.B, 1), here, dtype=torch.long, device=s5.device)
+    st5 = neutral.static_for(s5)
 
     def march():
         """Seat 0's war-march destination from `here`, as the driver takes
         it off the observation's war targets."""
-        war = drive._obs_war(neutral.seat_obs(s5, 0), s5.T, s5.device)
-        return tuple(x[:, 0] for x in drive._march_targets(s5, war, hc))
+        war = drive._obs_war(st5, neutral.seat_obs(s5, 0))
+        return tuple(x[:, 0] for x in drive._march_targets(st5, war, hc))
 
     s5.war[:, 0, :] = False
     s5.war[:, :, 0] = False

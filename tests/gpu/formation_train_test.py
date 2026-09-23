@@ -280,7 +280,9 @@ def test_the_fold_touches_only_the_form_block(rules, path) -> None:
 def test_the_driver_swap_lands_only_on_offered_columns(rules, path) -> None:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
     from drive import _maybe_form_tier
+    from core import neutral
     sim = build(rules, path)
+    st = neutral.static_for(sim)
     j = a_city(sim)
     ui = a_land_chassis(sim, j)
     grant(sim, j, ma=True, civ1=True)  # corps offered, army NOT (no MOBILIZATION)
@@ -291,7 +293,7 @@ def test_the_driver_swap_lands_only_on_offered_columns(rules, path) -> None:
     prod0[B0, j] = sim.UNIT_BASE + ui
     swaps = 0
     for turn in range(60):
-        out = _maybe_form_tier(sim, ROW, m, prod0.clone(), [42], turn)
+        out = _maybe_form_tier(st, ROW, m, prod0.clone(), [42], turn)
         got = int(out[B0, j])
         assert got in (sim.UNIT_BASE + ui, corps), \
             f"turn {turn}: the swap landed on {got} — the army column is not offered"

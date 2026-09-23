@@ -70,12 +70,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy")
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.simbase import BARB_SEAT
 from warmup import settle_all, works_of
-from core import records
+from core import neutral, records
 
 
-# The agreement pass: the ported scans decide, the engine arm re-validates.
+# The agreement pass: the ported scans decide off the diplomatic table, the
+# engine arm re-validates.
 def geo_denounce(sim) -> None:
-    records.geo_decide_and_apply(sim)
+    records.geo_decide_and_apply(sim, neutral.static_for(sim))
     sim._geo_agreements()
 
 
