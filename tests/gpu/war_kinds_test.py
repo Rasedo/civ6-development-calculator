@@ -178,10 +178,10 @@ def poke_default_kind(rules, path):
     sim.city_founder[0, 1, 0] = 0
     sim.civ_civics[0, 0, sim._war_kinds[RECONQUEST][0]] = True
     assert int(sim._default_war_kind(sim._war_kinds_allowed(0, 1))[0]) == RECONQUEST
-    # the driver's pick is the validator's own default
-    col = torch.zeros(sim.B, dtype=torch.long, device=sim.device)  # column 0 of row 0 = row 1
-    assert sim.war_targets(0)[0] == 1
-    assert int(sim._war_kind_pick(0, col)[0]) == RECONQUEST
+    # the observation's kind table is the validator's own default
+    declare = torch.ones(sim.B, sim.n_majors - 1, dtype=torch.bool, device=sim.device)
+    assert sim.war_targets(0)[0] == 1  # column 0 of row 0 = row 1
+    assert int(sim._war_kind_table(0, declare)[0][0, 0]) == RECONQUEST
     g0 = float(sim.civ_grievance[0, 1, 0])
     sim._declare_war_major(0, 1, one(sim))  # no kind named: the default
     assert int(sim._war_kind_code(0, 1)[0]) == RECONQUEST

@@ -1,5 +1,5 @@
 {
-  "doc": "The NEUTRAL OBSERVATION the decision server reads: one plain object per game per seat, integers and booleans only. Every group is an object keyed by its field names in the order listed. Field kinds: bool = a flag; int = a plain integer (a table index, a tile index, a count, a price); city = one of THIS seat's living cities named by its CENTRE tile, -1 where none. Emitters: gpu/core/neutral.py (GPU).",
+  "doc": "The NEUTRAL OBSERVATION the decision server reads: one plain object per game per seat, integers and booleans only. Every group is an object keyed by its field names in the order listed. Field kinds: bool = a flag; int = a plain integer (a table index, a tile index, a count, a price); city = one of THIS seat's living cities named by its CENTRE tile, -1 where none; list = a list of plain integers, laid out as its meaning says (a dense list indexed by a table index, or ascending indices). Every price is an exact integer: no field carries a fraction. Emitters: gpu/core/neutral.py (GPU).",
   "seat": {
     "buy": [
       ["bldg_city", "city", "the city holding the cheapest completable gold-buyable building"],
@@ -54,6 +54,25 @@
     "nuke": [
       ["device", "int", "the WMD device index a silo would launch, -1 where none"],
       ["tile", "int", "the target tile, -1 where none"]
+    ],
+    "research": [
+      ["tech_cost", "list", "per tech table index: its effective research cost (`effectiveResearchCostIn`: the base cost, boosted and js-rounded — a whole number), -1 where the tech is not open (`availableTechsIn`)"],
+      ["civic_cost", "list", "per civic table index: the same for civics (`availableCivicsIn`)"]
+    ],
+    "policy": [
+      ["unlocked", "list", "the policy card table indices this seat may slot now (`unlockedPolicyIds`), ascending; empty without a government"],
+      ["slots", "list", "the adopted government's slots by kind (`fitPolicies`' governmentSlots, wonder extras included): [military, economic, diplomatic, wildcard]; all 0 without a government"]
+    ],
+    "war": [
+      ["targets", "int", "the war head's width (`warTargets`): every other major in ascending seat order, then the whole city-state roster in index order; a war COLUMN below is a position in that list"],
+      ["declare", "list", "the target columns this seat may declare war on now, ascending"],
+      ["sue", "list", "the target columns it may sue for peace with now, ascending"],
+      ["kind_default", "list", "per MAJOR target column (the war head's leading columns, one per other major): the war kind a declaration there takes by default (`defaultWarKind`: the cheapest casus belli held), -1 where none is held or the column is not in `declare`"],
+      ["kind_own", "list", "per MAJOR target column: the leader's own buffed kind where it is allowed (`WAR_BUFF_ROWS`), else the default; -1 likewise"]
+    ],
+    "envoy": [
+      ["avail", "int", "envoys in this seat's bank"],
+      ["held", "list", "per city-state index (the roster index, fixed for the game): the envoys this seat holds there, -1 where it has not met the city-state or the city-state is gone"]
     ]
   }
 }

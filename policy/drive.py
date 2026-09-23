@@ -15,11 +15,26 @@ _SCHEMA = json.loads((Path(__file__).resolve().parents[1] / "shared" / "decide.s
 
 
 def _obs_group(nobs: list, group: str, device) -> dict:
-    """One schema group of the per-game observations (`nobs[b]`) as [B]
-    tensors: `bool` fields as bool, every other field as long."""
-    fields = _SCHEMA["seat"][group]
+    """The SCALAR fields of one schema group of the per-game observations
+    (`nobs[b]`) as [B] tensors: `bool` fields as bool, the rest as long."""
+    fields = [f for f in _SCHEMA["seat"][group] if f[1] != "list"]
     t = torch.tensor([[o[group][f[0]] for f in fields] for o in nobs], dtype=torch.long, device=device)
     return {f[0]: (t[:, i] != 0 if f[1] == "bool" else t[:, i]) for i, f in enumerate(fields)}
+
+
+def _obs_dense(nobs: list, group: str, field: str, device) -> torch.Tensor:
+    """[B, w] long — a dense `list` field, one row per game."""
+    return torch.tensor([o[group][field] for o in nobs], dtype=torch.long, device=device).reshape(len(nobs), -1)
+
+
+def _obs_members(nobs: list, group: str, field: str, width: int, device) -> torch.Tensor:
+    """[B, width] bool — an ascending-index `list` field as a membership mask."""
+    m = torch.zeros(len(nobs), width, dtype=torch.bool)
+    for b, o in enumerate(nobs):
+        idx = o[group][field]
+        if idx:
+            m[b, idx] = True
+    return m.to(device)
 
 
 # The per-seat STYLE assignment. None = today's behaviour exactly: every
@@ -654,18 +669,20 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     return orders0, job_t, spread_t, settle_t, um, uo
 
 
-def _seat_envoys(sim, seat: int):
+def _seat_envoys(nobs: list, device):
     """The ENVOY verb, seat-generic: the scripted greedy sequence — spend the
     BANK, neediest re-ranked after every pick. Conversion influence->bank is
     an eager RULE at the CS phase for EVERY seat (real Civ 6 grants the envoy
-    the moment the meter fills), so this verb is bank-only — ONE text, no
-    influence fork and no seat-shaped line: `seat` IS the row of every plane
-    it reads. Zero draws. Returns [B, K] CS indices (-1 pad) or None."""
-    if sim.S <= 0:
+    the moment the meter fills), so this verb is bank-only and reads the
+    observation's `envoy` group alone. Zero draws. Returns [B, K] CS indices
+    (-1 pad) or None."""
+    held = _obs_dense(nobs, "envoy", "held", device)
+    S = held.shape[1]
+    if S <= 0:
         return None
-    avail_e = sim.civ_envoys_avail[:, seat].clone()
-    met_live_e = sim.seat_citystate_met[:, seat, : sim.S] & sim.citystate_alive[:, : sim.S]
-    mine6_e = sim.seat_citystate_envoys[:, seat, : sim.S].double() / 6.0
+    avail_e = _obs_group(nobs, "envoy", device)["avail"]
+    met_live_e = held >= 0
+    mine6_e = held.clamp(min=0).double() / 6.0
     picks_e = []
     for _ke in range(6):
         can_e = met_live_e.any(dim=1) & (avail_e > 0)
@@ -679,8 +696,21 @@ def _seat_envoys(sim, seat: int):
         picks_e.append(p_e)
         hit_e = p_e >= 0
         avail_e = torch.where(hit_e, avail_e - 1, avail_e)
-        mine6_e = mine6_e + torch.nn.functional.one_hot(p_e.clamp(min=0), sim.S).double() * hit_e.unsqueeze(1).double() / 6.0
+        mine6_e = mine6_e + torch.nn.functional.one_hot(p_e.clamp(min=0), S).double() * hit_e.unsqueeze(1).double() / 6.0
     return torch.stack(picks_e, dim=1) if picks_e else None
+
+
+def _war_kind_of(war: torch.Tensor, kinds: torch.Tensor) -> torch.Tensor:
+    """[B] long — the kind the war column `war` declares under, read off the
+    observation's per-major table `kinds` [B, n_majors - 1]; -1 on a sue, a
+    minor or no column."""
+    n_opp = kinds.shape[1]
+    w = war.to(torch.long)
+    on = (w >= 0) & (w < n_opp)
+    if n_opp == 0 or not bool(on.any()):
+        return torch.full_like(w, -1)
+    pick = kinds.gather(1, w.clamp(min=0, max=n_opp - 1).unsqueeze(1)).squeeze(1)
+    return torch.where(on, pick, torch.full_like(pick, -1))
 
 
 def _war_ctx(blocks: dict) -> dict:
@@ -1180,12 +1210,13 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
     """Seat `row`'s turn decisions, every DECIDE_FIELDS entry but the unit
     plan, keyed by name. Writes nothing. `nobs` is the seat's neutral
     observation, one dict per game (shared/decide.schema.json)."""
-    m = sim.seat_masks(row)
+    dev = sim.device
+    prod_mask = sim._seat_production_mask(row)
     blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
     style = _seat_style(row)
-    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row),
+    prod = ladder.pick_production(prod_mask, classes, roster, _prod_ctx(blocks, sim, row),
                                   tier_order=style["tier_order"])
-    prod = _maybe_form_tier(sim, row, m["production"], prod, seeds, turn)
+    prod = _maybe_form_tier(sim, row, prod_mask, prod, seeds, turn)
     dtile = _district_tiles(sim, row, prod)
     # turn 0 keeps the draw PERSISTENT: a seat's style is fixed for the game.
     if style["deep"] is not None:
@@ -1193,12 +1224,19 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
     else:
         deep = (_policy_rng(sim, seeds, 0, row, 4) < ladder.DEEP_SHARE
                 if seeds is not None else None)
-    tech = ladder.pick_research(blocks, m["tech"], "tech", deep) if bool(m["tech"].any()) else None
-    civic = ladder.pick_research(blocks, m["civic"], "civic", deep) if bool(m["civic"].any()) else None
+    # RESEARCH off the observation's prices: an open item carries its whole
+    # effective cost, a shut one -1
+    tech_cost = _obs_dense(nobs, "research", "tech_cost", dev)
+    civic_cost = _obs_dense(nobs, "research", "civic_cost", dev)
+    tech = (ladder.pick_research(tech_cost, tech_cost >= 0, deep)
+            if bool((tech_cost >= 0).any()) else None)
+    civic = (ladder.pick_research(civic_cost, civic_cost >= 0, deep)
+             if bool((civic_cost >= 0).any()) else None)
     # the SLOTTED CARDS — a decision every turn the seat has a government;
     # None when no card is on offer, which the wire reads as "no decision"
     policies = None
-    if "policies" in m and bool(m["policies"].any()):
+    pol_open = _obs_members(nobs, "policy", "unlocked", sim._npol, dev)
+    if bool(pol_open.any()):
         # the seat's CARD STYLE: pinned by its style preset, else one persistent
         # draw per game (turn 0, salt 10) — a coherent player, not a coin per turn
         if style["cards"] is not None:
@@ -1207,26 +1245,30 @@ def decide_seat(env, sim, row: int, nobs: list, roster: dict, classes: dict, see
             cstyle = ladder.card_style_of(_policy_rng(sim, seeds, 0, row, 10))
         else:
             cstyle = None
-        policies = ladder.pick_policies(m["policies"], sim._seat_policy_slots(row), sim._pol_kind,
+        policies = ladder.pick_policies(pol_open, _obs_dense(nobs, "policy", "slots", dev), sim._pol_kind,
                                         legacy=sim._pol_legacy >= 0, style=cstyle,
                                         dark=sim._pol_dark_lo >= 0)
     war = None
+    war_kind = None
     if seeds is not None and turn is not None:
         rng_w = {
             "dow": _policy_rng(sim, seeds, turn, row, 1),
             "peace": _policy_rng(sim, seeds, turn, row, 2),
             "raid": _policy_rng(sim, seeds, turn, row, 3),
         }
-        war = ladder.pick_war(m["war"], _war_ctx(blocks), rng_w, style=style)
-    # THE KIND the column declares under — the engine's own validator picks it
-    # (the cheapest casus belli held, or the leader's buffed kind under the
-    # style), so the record can never name a kind the applier refuses.
-    war_kind = None
-    if war is not None:
-        war_kind = sim._war_kind_pick(row, war, prefer_own=(style or {}).get("war_kind") == "own")
+        n_tgt = int(nobs[0]["war"]["targets"])
+        war_mask = torch.cat([_obs_members(nobs, "war", "declare", n_tgt, dev),
+                              _obs_members(nobs, "war", "sue", n_tgt, dev)], dim=1)
+        war = ladder.pick_war(war_mask, _war_ctx(blocks), rng_w, style=style)
+        # THE KIND the column declares under, off the observation's table —
+        # the engine's own validator built it (the cheapest casus belli held,
+        # or the leader's buffed kind under the style), so the record can
+        # never name a kind the applier refuses.
+        kinds = _obs_dense(nobs, "war", "kind_own" if style["war_kind"] == "own" else "kind_default", dev)
+        war_kind = _war_kind_of(war, kinds)
     env_seq = None
-    if seeds is not None and turn is not None and sim.S > 0:
-        env_seq = _seat_envoys(sim, row)
+    if seeds is not None and turn is not None:
+        env_seq = _seat_envoys(nobs, dev)
     buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist = _decide_buys(_obs_group(nobs, "buy", sim.device))
     route = _decide_route(_obs_group(nobs, "route", sim.device))
     # THE SILO LAUNCH: take the observation's candidate whenever one exists,

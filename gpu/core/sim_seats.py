@@ -460,7 +460,6 @@ class SimSeats:
         return {"production": self._seat_production_mask(row),
                 "tech": self._seat_tech_mask(row),
                 "civic": self._seat_civic_mask(row),
-                "envoy": self._seat_envoy_mask(row),
                 "policies": self._seat_policy_mask(row),
                 "war": self._seat_war_mask(row)}
 
@@ -849,12 +848,14 @@ class SimSeats:
         other = torch.arange(NM, device=self.device).view(1, -1) != row
         return (ally & war_t & other).any(dim=1)
 
-    def _war_kinds_allowed(self, row: int, tgt: int) -> torch.Tensor:
+    def _war_kinds_allowed(self, row: int, tgt: int, civic_ok: list | None = None) -> torch.Tensor:
         """[B, K] bool — `warKindAllowed` for every kind: the civic (or its
-        roster override), the denouncement age, then the requirement column."""
+        roster override), the denouncement age, then the requirement column.
+        `civic_ok` is the per-kind civic term, target-free, when the caller
+        already holds it for this row."""
         cols = []
         for k, (_civic, dturns, cond, _p0, _p1, _p2) in enumerate(self._war_kinds):
-            ok = self._war_kind_civic_ok(row, k)
+            ok = self._war_kind_civic_ok(row, k) if civic_ok is None else civic_ok[k]
             if dturns >= 0:
                 ok = ok & self._war_denounce_held(row, tgt, dturns)
             cols.append(ok & self._war_condition(row, tgt, cond))
@@ -870,27 +871,31 @@ class SimSeats:
         best = torch.where(allowed, key, big).argmin(dim=1)
         return torch.where(allowed.any(dim=1), best, torch.full_like(best, -1))
 
-    def _war_kind_pick(self, row: int, war: torch.Tensor, prefer_own: bool = False) -> torch.Tensor:
-        """[B] long — the KIND the driver records for its war column: the
-        default (cheapest) kind against the major the column declares on, or,
-        with `prefer_own`, the leader's own buffed kind when it is allowed
-        (`WAR_BUFF_ROWS`); -1 on a sue, a minor or no column. The driver's
-        twin of the record validator, built from the validator itself."""
-        out = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-        targets = self.war_targets(row)
-        w = war.to(torch.long)
-        for k, tgt in enumerate(targets[: self.n_majors - 1]):
-            sel = w == k
-            if not bool(sel.any()):
+    def _war_kind_table(self, row: int, declare: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B, n_majors - 1], same) long — per MAJOR war column of `row`, the
+        kind a declaration there takes: the default (cheapest casus belli
+        held), and the leader's own buffed kind where it is allowed
+        (`WAR_BUFF_ROWS`), else that default. -1 where none is held or
+        `declare` [B, n_majors - 1] leaves the column shut. Built from the
+        record validator itself, so a recorded kind is one it accepts."""
+        n_opp = self.n_majors - 1
+        dfl = torch.full((self.B, n_opp), -1, dtype=torch.long, device=self.device)
+        own = dfl.clone()
+        buffs = civic_ok = None
+        for k, (tgt, live) in enumerate(zip(self.war_targets(row)[:n_opp], declare.any(dim=0).tolist())):
+            if not live:
                 continue
-            allowed = self._war_kinds_allowed(row, tgt)
+            if buffs is None:
+                buffs = self._war_buff_rows_of(row)
+                civic_ok = [self._war_kind_civic_ok(row, q) for q in range(len(self._war_kinds))]
+            sel = declare[:, k]
+            allowed = self._war_kinds_allowed(row, tgt, civic_ok)
             pick = self._default_war_kind(allowed)
-            if prefer_own:
-                for _k, _cs, _mv, _pp, _ov, who in self._war_buff_rows_of(row):
-                    own = who & allowed[:, _k]
-                    pick = torch.where(own, torch.full_like(pick, _k), pick)
-            out = torch.where(sel, pick, out)
-        return out
+            dfl[:, k] = torch.where(sel, pick, dfl[:, k])
+            for _k, _cs, _mv, _pp, _ov, who in buffs:
+                pick = torch.where(who & allowed[:, _k], torch.full_like(pick, _k), pick)
+            own[:, k] = torch.where(sel, pick, own[:, k])
+        return dfl, own
 
     def _war_buff_live(self, row: int, kind: int) -> torch.Tensor:
         """[B] bool — `warBuffLive`: is this row inside the `_war_buff_turns`

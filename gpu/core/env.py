@@ -87,7 +87,7 @@ class BatchEnv:
             "tech": m["tech"],
             "civic": m["civic"],
             "units": s._seat_unit_mask(row),
-            "envoy": m["envoy"],
+            "envoy": s._seat_envoy_mask(row),
         }
 
     def step(

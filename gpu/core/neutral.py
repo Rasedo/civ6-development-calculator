@@ -5,7 +5,10 @@ engine can emit the same value. The field names, kinds and meanings live in
 `shared/decide.schema.json`, the one spec every emitter matches.
 
 The groups: `buy` (every purchase candidate the seat has), `route` (the
-trade route it would open) and `nuke` (the silo launch it would take).
+trade route it would open), `nuke` (the silo launch it would take),
+`research` (the open techs and civics with their prices), `policy` (the cards
+it may slot and the slots), `war` (the open war columns and the kind each
+declaration takes) and `envoy` (the bank and the courtship per city-state).
 """
 from __future__ import annotations
 
@@ -92,14 +95,27 @@ def _as_long(v: torch.Tensor) -> torch.Tensor:
     return v.to(torch.long)
 
 
-def seat_obs(sim, row: int) -> list:
-    """Seat `row`'s observation, one dict per game of the batch (index = b):
-    {group: {field: int | bool}} over `SEAT_GROUPS`. Reads only."""
-    B, RC = sim.B, sim.RC
+def _open_cost(sim, row: int, civic: bool) -> torch.Tensor:
+    """[B, n] long — every item's effective research cost, -1 where the item
+    is not open. The cost is `_eff_cost`'s: a base cost, boosted and
+    js-rounded, so a whole number and exact as an integer."""
+    base = sim.rules_dev.c_cost if civic else sim.rules_dev.t_cost
+    B = sim.B
+    boosted = sim.civ_civic_boosted[:, row] if civic else sim.civ_tech_boosted[:, row]
+    cost = _as_long(sim._eff_cost(base.unsqueeze(0).expand(B, -1), boosted, row, is_civic=civic))
+    open_ = sim._seat_civic_mask(row) if civic else sim._seat_tech_mask(row)
+    return torch.where(open_, cost, torch.full_like(cost, -1))
+
+
+def _columns(sim, row: int) -> dict:
+    """Every field of seat `row` as a [B, w] long tensor keyed (group, name):
+    w = 1 for a scalar, the list's width for a `list` (a 0/1 membership row
+    where the list holds ascending indices)."""
+    B, RC, dev = sim.B, sim.RC, sim.device
     ctr = sim.city_center[:, row]
     alive = sim.city_alive[:, row]
+    out: dict = {}
     bc = _buy_ctx(sim, row)
-    cols = []
     for name, kind in SEAT_GROUPS["buy"]:
         v = _as_long(bc[name])
         if kind == "city":
@@ -108,18 +124,51 @@ def seat_obs(sim, row: int) -> list:
             j = v.clamp(min=0, max=RC - 1).unsqueeze(1)
             ok = (v >= 0) & (v < RC) & alive.gather(1, j).squeeze(1)
             v = torch.where(ok, ctr.gather(1, j).squeeze(1), torch.full_like(v, -1))
-        cols.append(v)
-    frm, dst = sim._seat_route_candidate(row)
-    kd, tl = sim._seat_nuke_candidate(row)
-    cols += [_as_long(frm), _as_long(dst), _as_long(kd), _as_long(tl)]
+        out["buy", name] = v
+    out["route", "from"], out["route", "dest"] = sim._seat_route_candidate(row)
+    out["nuke", "device"], out["nuke", "tile"] = sim._seat_nuke_candidate(row)
+    out["research", "tech_cost"] = _open_cost(sim, row, civic=False)
+    out["research", "civic_cost"] = _open_cost(sim, row, civic=True)
+    out["policy", "unlocked"] = sim._seat_policy_mask(row)[:, : sim._npol]
+    out["policy", "slots"] = (sim._seat_policy_slots(row) if sim._ngov
+                              else torch.zeros(B, 4, dtype=torch.long, device=dev))
+    wm = sim._seat_war_mask(row)
+    n = wm.shape[1] // 2
+    declare = wm[:, :n]
+    out["war", "targets"] = torch.full((B,), n, dtype=torch.long, device=dev)
+    out["war", "declare"], out["war", "sue"] = declare, wm[:, n:]
+    out["war", "kind_default"], out["war", "kind_own"] = sim._war_kind_table(row, declare[:, : sim.n_majors - 1])
+    out["envoy", "avail"] = sim.civ_envoys_avail[:, row]
+    met_live = sim.seat_citystate_met[:, row, : sim.S] & sim.citystate_alive[:, : sim.S]
+    held = sim.seat_citystate_envoys[:, row, : sim.S]
+    out["envoy", "held"] = torch.where(met_live, _as_long(held), torch.full_like(held, -1, dtype=torch.long))
+    return out
+
+
+# the `list` fields that hold ASCENDING INDICES; every other list is dense
+_INDEX_LISTS = {("policy", "unlocked"), ("war", "declare"), ("war", "sue")}
+
+
+def seat_obs(sim, row: int) -> list:
+    """Seat `row`'s observation, one dict per game of the batch (index = b):
+    {group: {field: int | bool | list[int]}} over `SEAT_GROUPS`. Reads only."""
+    cols = _columns(sim, row)
+    order = [(g, name, kind) for g in SEAT_GROUPS for name, kind in SEAT_GROUPS[g]]
+    assert [(g, n) for g, n, _k in order] == list(cols), "the schema and the emitted columns disagree"
+    mats = [_as_long(v).reshape(sim.B, -1) for v in cols.values()]
+    widths = [m.shape[1] for m in mats]
     # ONE transfer for the whole seat
-    rows = torch.stack(cols, dim=1).tolist()
-    order = [(g, name, kind) for g in ("buy", "route", "nuke") for name, kind in SEAT_GROUPS[g]]
-    assert len(order) == len(cols), "the schema and the emitted columns disagree"
+    rows = torch.cat(mats, dim=1).tolist()
     out = []
-    for b in range(B):
+    for b in range(sim.B):
         ob: dict = {g: {} for g in SEAT_GROUPS}
-        for (g, name, kind), x in zip(order, rows[b]):
-            ob[g][name] = bool(x) if kind == "bool" else int(x)
+        i = 0
+        for (g, name, kind), w in zip(order, widths):
+            xs = rows[b][i:i + w]
+            i += w
+            if kind == "list":
+                ob[g][name] = [k for k, x in enumerate(xs) if x] if (g, name) in _INDEX_LISTS else [int(x) for x in xs]
+            else:
+                ob[g][name] = bool(xs[0]) if kind == "bool" else int(xs[0])
         out.append(ob)
     return out

@@ -2,9 +2,12 @@
 
 `gpu/core/neutral.py` hands the decision server one dict per game per seat.
 Any engine must be able to emit the same value, so it carries no tensor and
-no sim: Python ints and bools only, every field `shared/decide.schema.json`
-names and nothing else, in the schema's order, and a city named by the
-CENTRE tile of one of the seat's living cities (-1 where none).
+no sim: Python ints, bools and lists of ints only, every field
+`shared/decide.schema.json` names and nothing else, in the schema's order, and
+a city named by the CENTRE tile of one of the seat's living cities (-1 where
+none). The list groups are laid out as their meanings say: one research price
+per catalog row, ascending card and war-column indices, a war kind only where
+a declaration is open, one envoy row per city-state.
 
 Driven for a stretch first, over two worlds at once, so the seats hold
 cities and the buy candidates are live rather than all -1.
@@ -42,7 +45,7 @@ def main() -> None:
     env = BatchEnv([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64)
     sim = env.sim
     records.drive_batched(env, TURNS, seats=list(range(sim.n_majors)))
-    live = 0
+    live = live_research = live_cards = live_declare = 0
     for row in range(sim.n_majors):
         nobs = neutral.seat_obs(sim, row)
         assert len(nobs) == sim.B, f"seat {row}: {len(nobs)} observations for {sim.B} games"
@@ -57,13 +60,43 @@ def main() -> None:
                     v = ob[g][f]
                     if kind == "bool":
                         assert type(v) is bool, f"{g}.{f} = {v!r} is not a bool"
+                    elif kind == "list":
+                        assert type(v) is list and all(type(x) is int for x in v), f"{g}.{f} = {v!r} is not a list of ints"
                     else:
                         assert type(v) is int, f"{g}.{f} = {v!r} is not an int"
                     if kind == "city":
                         assert v == -1 or v in centres, f"seat {row} game {b}: {g}.{f} = {v} names no living city"
+            where = f"seat {row} game {b}"
+            # RESEARCH: one whole price per catalog row, -1 exactly where the
+            # item is shut
+            for f, mask in (("tech_cost", sim._seat_tech_mask(row)[b]), ("civic_cost", sim._seat_civic_mask(row)[b])):
+                cost = ob["research"][f]
+                assert len(cost) == mask.shape[0], f"{where}: research.{f} has {len(cost)} rows for {mask.shape[0]} items"
+                assert [c >= 0 for c in cost] == mask.tolist(), f"{where}: research.{f} is open where the mask is not"
+                live_research += sum(c >= 0 for c in cost)
+            # POLICY: ascending card indices and four slot counts
+            pol = ob["policy"]["unlocked"]
+            assert pol == sorted(set(pol)) and all(0 <= k < sim._npol for k in pol), f"{where}: policy.unlocked {pol}"
+            assert len(ob["policy"]["slots"]) == 4, f"{where}: policy.slots {ob['policy']['slots']}"
+            live_cards += len(pol)
+            # WAR: columns inside the head, a kind only where a declaration is open
+            w = ob["war"]
+            assert w["targets"] == len(sim.war_targets(row)), f"{where}: war.targets {w['targets']}"
+            for f in ("declare", "sue"):
+                assert w[f] == sorted(set(w[f])) and all(0 <= k < w["targets"] for k in w[f]), f"{where}: war.{f} {w[f]}"
+            for f in ("kind_default", "kind_own"):
+                assert len(w[f]) == sim.n_majors - 1, f"{where}: war.{f} has {len(w[f])} rows"
+                assert all(k == -1 or c in w["declare"] for c, k in enumerate(w[f])), f"{where}: war.{f} names a shut column"
+            live_declare += len(w["declare"])
+            # ENVOY: one row per city-state
+            assert len(ob["envoy"]["held"]) == sim.S, f"{where}: envoy.held has {len(ob['envoy']['held'])} rows"
+            assert all(x >= -1 for x in ob["envoy"]["held"]), f"{where}: envoy.held {ob['envoy']['held']}"
             live += int(ob["buy"]["spawn_city"] >= 0)
     assert live > 0, "no seat held a city — the scene never exercised the city fields"
-    print(f"NEUTRAL OBS OK ({sim.n_majors} seats x {sim.B} games after {TURNS} turns, {live} with a spawn city)")
+    assert live_research > 0 and live_cards > 0 and live_declare > 0, (
+        f"a list group never filled: {live_research} open items, {live_cards} cards, {live_declare} declarations")
+    print(f"NEUTRAL OBS OK ({sim.n_majors} seats x {sim.B} games after {TURNS} turns, {live} with a spawn city, "
+          f"{live_research} open items, {live_cards} cards, {live_declare} open declarations)")
 
 
 if __name__ == "__main__":
