@@ -11,6 +11,7 @@ mirrors it turn-exactly. Never widen tolerances.
 
 ## Procedure
 
+0. **Skim `.claude/skills/parity-hunt/LESSONS.md` first** — the cross-engine traps past stages paid for, each with the check that catches it.
 1. **Scope on paper first.** Name the slices; each slice must be
    independently gateable. Fidelity gaps live in `docs/AUDIT.md` (the only
    gap list — a closed entry is DELETED with its row in the same commit);

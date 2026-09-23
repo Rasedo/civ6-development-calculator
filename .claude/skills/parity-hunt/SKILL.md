@@ -11,6 +11,8 @@ disagree — then fix the engine that is WRONG. TS is the spec, unless TS
 itself is farther from real Civ 6 than the GPU (owner rule): then fix TS,
 against the install or the live game, never against memory.
 
+Skim `LESSONS.md` (beside this file) first: past hunts' traps by class, each with the check that catches it.
+
 ## Step 0 — read what the gate already told you
 
 The gate bails at the CAUSAL turn and names the failure's kind:
