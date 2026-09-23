@@ -334,16 +334,18 @@ export function buildingVariantFeatureYields(state: GameState, city: City): Part
   return out;
 }
 
-/** CIV6 (Stave Church): the yields a civilization's unique building pays on
- *  every Coast tile of the city that carries a resource, summed over the
- *  buildings the city holds. */
-export function buildingVariantCoastYields(state: GameState, city: City): Partial<Yields> | null {
+/** CIV6 (STAVE_CHURCH_SEA_RESOURCE_REQUIREMENTS — the Stave Church's
+ *  production, the Aquarium's science): the yields the city's buildings pay
+ *  on every Coast tile of the city carrying a resource its owner can see,
+ *  summed over a base row's clause and a unique row's. */
+export function buildingCoastYields(state: GameState, city: City): Partial<Yields> | null {
   let out: Partial<Yields> | null = null;
   for (const id of city.buildings) {
-    const y = civVariantOf(state, city.seat, BUILDINGS[id]?.civVariants)?.coastResourceYields;
-    if (!y) continue;
-    out = out ?? {};
-    for (const k of Object.keys(y) as (keyof Yields)[]) out[k] = (out[k] ?? 0) + (y[k] ?? 0);
+    for (const y of [BUILDINGS[id]?.coastResourceYields, civVariantOf(state, city.seat, BUILDINGS[id]?.civVariants)?.coastResourceYields]) {
+      if (!y) continue;
+      out = out ?? {};
+      for (const k of Object.keys(y) as (keyof Yields)[]) out[k] = (out[k] ?? 0) + (y[k] ?? 0);
+    }
   }
   return out;
 }
@@ -1086,12 +1088,16 @@ export function computeCityStats(
   const hasLighthouse = city.buildings.includes('LIGHTHOUSE');
   const lighthouseBonus = (t: Tile) => {
     if (hasLighthouse && (t.terrain === 'COAST' || t.terrain === 'LAKE')) tiles.food += 1;
-    // CIV6 (Stave Church, REQUIRES_PLOT_HAS_VISIBLE_RESOURCE): "+1 Production
-    // to each coastal resource tile in this city" — a Coast tile carrying a
-    // resource the city's owner can SEE, the same way.
+    // CIV6 (Stave Church, Aquarium; REQUIRES_PLOT_HAS_VISIBLE_RESOURCE): "+1
+    // Production / Science to each coastal resource tile in this city" — a
+    // Coast tile carrying a resource the city's owner can SEE, the same way.
     if (coastResY && t.terrain === 'COAST' && t.resource !== null && !hiddenRes.has(t.resource)) addYields(tiles, coastResY);
+    // CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): "+1 Science to each Reef
+    // tile in this city" — a plot yield, the same way.
+    for (const f of featPlotY) if (t.feature === f.feature) addYields(tiles, f.yields);
   };
-  const coastResY = buildingVariantCoastYields(state, city);
+  const coastResY = buildingCoastYields(state, city);
+  const featPlotY = city.buildings.flatMap((id) => BUILDINGS[id]?.plotFeatureYields ?? []);
   const hiddenRes = hiddenResourcesFor(state, city.seat);
   // CIV6 (Marae): "+1 Culture and Faith to all of this city's tiles with a
   // passable feature or natural wonder" — a plot yield, so only a WORKED tile

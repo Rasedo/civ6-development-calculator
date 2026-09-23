@@ -44,7 +44,7 @@ re-adds them.
 | C-16 the spy's second half | 1 | the escape's scale (ask 14) |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL — the modifier carries no arguments |
 | C-22 Preserve housing table | 1 | middle bands stylized; the row is not in this install |
-| C-26 civilization abilities, the residue | 1 | three unread DLL clauses; the visibility gate's three requirement sets |
+| C-26 civilization abilities, the residue | 1 | three unread DLL clauses |
 | C-34 air combat's second half | 1 | Patrol and Priority Target carry no data |
 | C-38 a city-state's city | 1 | what it SPENDS gold and faith on (ask 9); its grid (C-1) |
 | C-41 Volcanic Soil | 1 | the proportion painted per severity, and the severity roll itself (LAB) |
@@ -104,7 +104,6 @@ close in the same commit.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   The census is `docs/roster_ledger.json`, read as `docs/ROSTER.md` says (`shipped` on 341 of 343 modifiers, two `AI:` rows — the game's diplomatic-action preferences, outside an engine model).
   - DLL, recorded: whether Trajan's grant fires on a CONQUERED city (`TRAIT_ADJUST_NON_CAPITAL_FREE_CHEAPEST_BUILDING` is `MODIFIER_PLAYER_CITIES_GRANT_CHEAPEST_BUILDING_IN_CITY`, Amount 1, no requirement set — founding ships); whether Iteru's flood avoid also skips the fertility half (the trait's modifiers are fourteen `TRAIT_FLOODPLAINS_VALID_*` placement rows and two `TRAIT_RIVER_FASTER_BUILDTIME_*` — NO modifier carries the avoid at all); whether the Knarr's Ocean clause reaches a Trader's course (`ABILITY_KNARR_IGNORE_EMBARK_DISEMBARK_COST` IS tagged onto `CLASS_LANDCIVILIAN`, which `UNIT_TRADER` carries, so the open half is only whether `MODIFIER_PLAYER_UNIT_ADJUST_IGNORE_SHORES` — no arguments — reaches a trade route's water path; `tradeWaterLevel` stays Cartography-gated).
-  - BUILD, the residue: resource VISIBILITY ships for the seven strategics (`Resources.PrereqTech` — `hiddenResourcesFor` / `_res_hidden`: no tile yield, no improvement forced or offered, no access, no accrual, no Grand Bazaar count, and the Stave Church counts only the coastal resources its owner can see). A district or wonder may stand on a hidden strategic (the install allows it; the resource is lost). The adjacency and belief improvement clauses still read the resource whether or not the seat can see it on BOTH engines — and that is NOT a DLL question: `REQUIREMENT_PLOT_RESOURCE_VISIBLE` exists and is written EXPLICITLY into the three sets that want it (`PLOT_HAS_STRATEGIC_MINE_REQUIREMENTS` in `Beliefs.xml`, `STAVE_CHURCH_SEA_RESOURCE_REQUIREMENTS` in `Buildings.xml`, `PLOT_HAS_STRATEGIC_RESOURCE` in `Expansion1_Governors.xml`), so a requirement set that does not name it reads the resource regardless. Gate those three and nothing else. The two artifact resources' `PrereqCivic` gates have no reader (no archaeology here).
   - Recorded allowlist: a CITY's own ranged strike composes its defender without the roster's rows (`cityStrikeStrength`'s block in `seatPhase`; the site census in `combat-rows.test.ts` / `combat_rows_test.py` names it).
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 1.
   - DLL: PATROL is not a data row (no `UNITOPERATION_PATROL`, no command, no promotion in any layer, re-grepped) — it is the UI's name for a fighter sitting ready, and the live game exposes no stance to enter.

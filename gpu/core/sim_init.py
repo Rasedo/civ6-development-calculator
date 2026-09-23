@@ -2932,9 +2932,18 @@ class SimInit:
             for bi, vs in enumerate(rules.b_variants) for v in vs if int(v["adjDist"]) >= 0]
         for _bv in self._bvar_adj:
             assert _bv[3] == "WOODS", f"a building's adjacency source the GPU cannot count: {_bv[3]}"
-        self._bvar_coast: list[tuple[int, int, torch.Tensor]] = [
+        # CIV6 (STAVE_CHURCH_SEA_RESOURCE_REQUIREMENTS): the coast-resource
+        # clause, a base row's (civ None — every seat) and a unique row's.
+        self._b_coast: list[tuple[int, int | None, torch.Tensor]] = [
+            (bi, None, torch.tensor([float(x) for x in b["coastResY"]], dtype=dtype, device=device))
+            for bi, b in enumerate(rules.buildings) if any(float(x) for x in b["coastResY"])] + [
             (bi, int(v["civ"]), torch.tensor([float(x) for x in v["coastResY"]], dtype=dtype, device=device))
             for bi, vs in enumerate(rules.b_variants) for v in vs if any(float(x) for x in v["coastResY"])]
+        # CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): a base row's yields on
+        # every tile of its city carrying one feature — (building, feature, y6).
+        self._b_feat_plot: list[tuple[int, int, torch.Tensor]] = [
+            (bi, int(b["plotFeat"]), torch.tensor([float(x) for x in b["plotFeatY"]], dtype=dtype, device=device))
+            for bi, b in enumerate(rules.buildings) if int(b["plotFeat"]) >= 0]
         # The COLUMN overrides a unique building carries (`effectiveBuilding`'s
         # `BUILDING_VARIANT_COLUMNS`): (building idx, civ idx, the variant row).
         # -1 in a scalar column, an all-zero `hasYields`, means "take the base

@@ -49,7 +49,8 @@ export interface BuildingVariant {
   trainXpClasses?: readonly PromoClass[];
   /** EFFECT_FEATURE_ADJACENCY: one more adjacency rule for a district of the city */
   districtAdjacency?: { district: DistrictId; source: AdjacencySource; amount: number };
-  /** extra yields on every Coast tile of the city that carries a resource */
+  /** extra yields on every Coast tile of the city carrying a resource its
+   *  owner can see (STAVE_CHURCH_SEA_RESOURCE_REQUIREMENTS) */
   coastResourceYields?: Partial<Yields>;
   /** CIV6 (Marae, "Has no Great Work slots"): this seat's copy of the row
    *  holds none of the slots the base row declares. */
@@ -172,6 +173,14 @@ export interface BuildingDef {
    *  within 9 tiles" — a REGIONAL row whose reach is its own, not the
    *  6-tile default. */
   regionalRange?: number;
+  /** CIV6 (Aquarium, AQUARIUM_SEARESOURCE_SCIENCE under
+   *  STAVE_CHURCH_SEA_RESOURCE_REQUIREMENTS): yields on every Coast tile of
+   *  the city carrying a resource its owner can SEE — the Stave Church's
+   *  clause, paid by a base row. */
+  coastResourceYields?: Partial<Yields>;
+  /** CIV6 (Aquarium, AQUARIUM_REEF_SCIENCE under AQUARIUM_REEF_REQUIREMENTS):
+   *  yields on every tile of the city carrying this feature. */
+  plotFeatureYields?: { feature: FeatureId; yields: Partial<Yields> };
   /** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors" — over
    *  every city the OWNING SEAT holds, not just the building's own. */
   loyaltyWithoutGovernor?: number;
@@ -890,7 +899,12 @@ const rawList: BuildingDef[] = [
     },
   },
   { id: 'AQUARIUM', name: 'Aquarium', district: 'WATER_PARK', cost: 360, requiresAny: ['FERRIS_WHEEL'], maintenance: 2, amenities: 1, regional: true, regionalRange: 9,
+    coastResourceYields: { science: 1 },
+    plotFeatureYields: { feature: 'REEF', yields: { science: 1 } },
     src: {
+      'coastResourceYields.science': xml('ModifierArguments', 'ModifierId=AQUARIUM_SEARESOURCE_SCIENCE&Name=Amount', 'Value'),
+      'plotFeatureYields.feature': xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_HAS_REEF&Name=FeatureType', 'Value', { expect: 'FEATURE_REEF' }),
+      'plotFeatureYields.yields.science': xml('ModifierArguments', 'ModifierId=AQUARIUM_REEF_SCIENCE&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_AQUARIUM', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_AQUARIUM', 'PrereqDistrict', { expect: 'DISTRICT_WATER_ENTERTAINMENT_COMPLEX' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_AQUARIUM', 'Maintenance'),

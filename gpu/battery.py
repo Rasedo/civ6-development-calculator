@@ -727,6 +727,7 @@ def _main() -> int:
                 ("war_weariness", [py, "tests/gpu/war_weariness_test.py"], 4),
                 ("space_race", [py, "tests/gpu/space_race_test.py"], 4),
                 ("project_governor", [py, "tests/gpu/project_governor_test.py"], 4),  # Arms Race Proponent and Space Initiative, per project
+                ("sea_resource_visible", [py, "tests/gpu/sea_resource_visible_test.py"], 2),  # the Stave Church's and Aquarium's coast-resource clause on a seen resource only; the Aquarium's Reef
                 ("research_switch", [py, "tests/gpu/research_switch_test.py"], 4),  # switching research keeps the abandoned item's science
                 ("district_wire", [py, "tests/gpu/district_wire_test.py"], 4),  # the district TILE rides the wire; no engine scans for a plot
                 ("culture_victory", [py, "tests/gpu/culture_victory_test.py"], 4),  # the culture win, which the serve gate never reaches

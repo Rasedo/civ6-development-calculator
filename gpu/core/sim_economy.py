@@ -5082,20 +5082,23 @@ class SimEconomy:
             tiles_y[:, :, 0] = (tiles_y[:, :, 0]
                                 + ((wet_w & take) & has_lh.unsqueeze(2)).sum(dim=2).double()
                                 + (wet_c & has_lh).double())
-        # CIV6 (Stave Church): "+1 Production to each coastal resource tile in
-        # this city" — a Coast tile carrying a resource, worked or the centre,
-        # the Lighthouse's way (`buildingVariantCoastYields`).
-        for _bi, _civ, _y6 in self._bvar_coast:
-            _pm = self._row_plays_idx(row, _civ)
-            if not bool(_pm.any()):
-                continue
-            sv = bldg[:, :, _bi] & _pm.reshape(-1, *([1] * (bldg.dim() - 2)))
+        # CIV6 (Stave Church, Aquarium): "+1 Production / Science to each
+        # coastal resource tile in this city" — a Coast tile carrying a
+        # resource, worked or the centre, the Lighthouse's way
+        # (`buildingCoastYields`). A base row's clause pays every seat.
+        for _bi, _civ, _y6 in self._b_coast:
+            sv = bldg[:, :, _bi]
+            if _civ is not None:
+                _pm = self._row_plays_idx(row, _civ)
+                if not bool(_pm.any()):
+                    continue
+                sv = sv & _pm.reshape(-1, *([1] * (bldg.dim() - 2)))
             if not (sv.numel() and bool(sv.any())):
                 continue
             _tw = self.terrain.gather(1, stf).reshape(B, n, M)
-            # CIV6 (Stave Church): "+1 Production to each coastal RESOURCE
-            # tile" — and a Harbor or Water Park paves a bonus SEA resource
-            # away, so the tile stops carrying one (`t.resource !== null`).
+            # CIV6: "each coastal RESOURCE tile" — and a Harbor or Water Park
+            # paves a bonus SEA resource away, so the tile stops carrying one
+            # (`t.resource !== null`).
             _rlive = self._res_live() & ~self._res_hidden(row)   # REQUIRES_PLOT_HAS_VISIBLE_RESOURCE
             _rw = _rlive.gather(1, stf).reshape(B, n, M)
             _tc = self.terrain.gather(1, ctr)
@@ -5103,6 +5106,17 @@ class SimEconomy:
             _hw = ((_tw == self._coast_terr) & _rw & take & sv.unsqueeze(2)).sum(dim=2).double()
             _hc = ((_tc == self._coast_terr) & _rc & sv).double()
             tiles_y = tiles_y + (_hw + _hc).unsqueeze(2) * _y6.double().view(1, 1, 6)
+        # CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): "+1 Science to each Reef
+        # tile in this city" — a plot yield, worked or the centre, the same way.
+        for _pbi, _pfid, _py6 in self._b_feat_plot:
+            _psv = bldg[:, :, _pbi]
+            if not (_psv.numel() and bool(_psv.any())):
+                continue
+            _pfw = (self.feat_id.gather(1, stf) == _pfid) & ~self.feat_stripped.gather(1, stf)
+            _pfc = (self.feat_id.gather(1, ctr) == _pfid) & ~self.feat_stripped.gather(1, ctr)
+            _pnw = (_pfw.reshape(B, n, M) & take & _psv.unsqueeze(2)).sum(dim=2).double()
+            _pnc = (_pfc & _psv).double()
+            tiles_y = tiles_y + (_pnw + _pnc).unsqueeze(2) * _py6.double().view(1, 1, 6)
         # CIV6 (Marae): "+1 Culture and Faith to all of this city's tiles with
         # a passable feature or natural wonder" — a PLOT yield, so only a
         # worked tile (or the centre) materializes it, the Lighthouse's way.

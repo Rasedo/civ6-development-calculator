@@ -2165,6 +2165,10 @@ export function buildRules() {
       yields: YIELD_KEYS.map((k) => b.yields?.[k] ?? 0),
       housing: b.housing ?? 0,
       amenities: b.amenities ?? 0,
+      // the row's own plot clauses (`buildingCoastYields`, `plotFeatureYields`)
+      coastResY: YIELD_KEYS.map((k) => b.coastResourceYields?.[k] ?? 0),
+      plotFeat: b.plotFeatureYields ? FEAT_IDS.indexOf(b.plotFeatureYields.feature) : -1,
+      plotFeatY: YIELD_KEYS.map((k) => b.plotFeatureYields?.yields[k] ?? 0),
       // a civilization's UNIQUE BUILDING standing in for this row. The
       // OVERRIDE half mirrors `effectiveBuilding`: -1 (or an empty yield
       // vector, or -1 amenities/housing) means "take the base row's".
