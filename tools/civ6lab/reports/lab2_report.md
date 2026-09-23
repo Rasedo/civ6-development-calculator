@@ -119,7 +119,7 @@ does not carry it; the DB hash does.)
 Draw 6 is draw 5 with one more Protestant spread: same city, same 1-1 follower tie,
 pressure order reversed — and the majority flips to the religion with the **higher id**
 (8 vs 2) which also reached f=1 **later**. So the tie-break is **pressure**, not the
-lower religion id and not arrival order. C-64 is answered on both halves.
+lower religion id and not arrival order. The majority question is answered on both halves.
 
 **Civ-wide:** `GetReligionInMajorityOfCities()` needs **strictly more than half** of the
 player's cities.

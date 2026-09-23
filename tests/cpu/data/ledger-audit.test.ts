@@ -34,7 +34,8 @@ describe('the roster ledger and the audit agree', () => {
     // a floor of ONE: the AUDIT shrinks by design (training waits on an empty
     // file), and this guard is against a parse that found nothing, not a size
     expect(itemIds.size).toBeGreaterThan(0);
-    expect(openRows.length).toBeGreaterThan(0);
+    // the ledger is read at all: every row carries one of the three states
+    expect(Object.keys(ledger).length).toBeGreaterThan(0);
   });
 
   it('gives every OPEN row an audit item to name its blocker', () => {

@@ -1,7 +1,7 @@
 
 import type { City, GameState, QueueItem, Seat } from './types';
 import { logPopWrite } from './difflog';
-import { seatOf, civsAtWar, allianceLevelWith, alliedAtLevel } from './seats';
+import { seatOf, civsAtWar, allianceLevelWith, alliedAtLevel, dominantReligionOf } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { takeItemBank } from './prodLayout';
@@ -206,15 +206,3 @@ function bankTourismPerRival(
   }
 }
 
-/** The religion MORE THAN HALF of a seat's cities follow, or -1 — religion
- *  ids are founder seat ids, so at most one can pass the bar. */
-export function dominantReligionOf(s: { cities: { followedReligion?: number | null }[] }): number {
-  const n = s.cities.length;
-  const count = new Map<number, number>();
-  for (const c of s.cities) {
-    if (c.followedReligion == null || c.followedReligion < 0) continue;
-    count.set(c.followedReligion, (count.get(c.followedReligion) ?? 0) + 1);
-  }
-  for (const [g, k] of count) if (k * 2 > n) return g;
-  return -1;
-}

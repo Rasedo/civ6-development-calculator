@@ -2682,7 +2682,8 @@ class SimInit:
         self._envoys_all_cache = None
         self._suz_all_cache = None
         self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
-        self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
+        self._bel_add_memo = None        # (_bel_stamp(), {(fn,key,r): tensor})
+        self._dom_rel_memo = None        # (_rel_stamp(), [B, n_majors]) — `_dominant_religion`
         self._gov_pol_cache = None       # {row: (ver, civ, slots, dark, era, mods)}
         # `_gov_mods` memoises an answer the government CATALOG feeds, and
         # the catalog is written once at load. Anything that rewrites a
@@ -3676,6 +3677,14 @@ class SimInit:
         # city whose loyalty collapses under this seat's pull joins it at once
         self._skip_free_city_rows: list[tuple[int, int]] = [
             tuple(int(x) for x in r) for r in _uq["skipFreeCity"]]  # type: ignore[misc]
+        # [civ, leaderRow, amount] — CIV6 (MODIFIER_PLAYER_ADJUST_DUPLICATE_INFLUENCE_TOKEN_WHEN_SAME_RELIGION):
+        # an envoy to a minor following this seat's majority religion counts as `amount` more
+        self._envoy_same_religion_rows: list[tuple[int, int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["envoySameReligion"]]  # type: ignore[misc]
+        # [civ, leaderRow] — CIV6 (MODIFIER_PLAYER_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION):
+        # the founder belief of the religion more than half of this seat's cities follow
+        self._majority_founder_rows: list[tuple[int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["majorityFounder"]]  # type: ignore[misc]
         # CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES, LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY)
         self._free_city_loyalty = float(rules.seats["freeCityLoyaltyPerTurn"])
         self._loyalty_after_cultural = float(rules.seats["loyaltyAfterCulturalTransfer"])

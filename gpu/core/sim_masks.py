@@ -1295,6 +1295,13 @@ class SimMasks:
             elif when == 6:
                 # CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
                 who = who & self._seat_on_home_continent(seat, tc.reshape(seat.shape))
+            elif when == 7:
+                # CIV6 (El Escorial, REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION): the
+                # foe's PLAYER follows a majority religion other than this
+                # seat's — both exist and differ (`_seat_majority_religion`)
+                _om = self._seat_majority_religion(seat)
+                _fm = self._seat_majority_religion(foe_seat)
+                who = who & (_om >= 0) & (_fm >= 0) & (_fm != _om)
             elif when != 0:
                 # `always` is the only arm that filters nothing. A `when`
                 # this chain does not know must pay NOTHING rather than

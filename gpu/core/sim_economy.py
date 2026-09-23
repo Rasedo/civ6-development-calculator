@@ -2934,7 +2934,7 @@ class SimEconomy:
         """`_district_adj_floor` for a district type some belief pays extra
         adjacency on — the belief's sources join the SUM, so the floor closes
         over them, and the result is this seat's alone."""
-        key = ("bel", self._bel_version, row, di)
+        key = ("bel", self._bel_stamp(), row, di)
         if self._dadj_cache is None or self._dadj_cache[0] != self._eff_version:
             self._dadj_cache = (self._eff_version, {})
         v = self._dadj_cache[1].get(key)

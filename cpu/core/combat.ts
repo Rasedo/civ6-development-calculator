@@ -51,7 +51,7 @@ import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promot
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
 import { civOf, seatsAllied } from './seats';
-import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent } from './seats';
+import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent, majorityReligionOf } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
@@ -1169,6 +1169,8 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       : r.when === 'foeGolden' ? isCiv(foeSeat) && (seatOf(state, foeSeat)?.age ?? 0) === AGE_GOLDEN
       // CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
       : r.when === 'onHomeContinent' ? onHomeContinent(state, own.seat, own.tileIndex)
+      // CIV6 (El Escorial): the foe's player follows another majority religion
+      : r.when === 'foeOtherReligion' ? foeOtherReligion(state, own.seat, foeSeat)
       // CIV6 (Terrains.xml): the install's Coast terrain is "Coast and Lake" —
       // a lake is shallow water to a hull. Spelled out rather than left as the
       // chain's fallback: a `when` that reached no arm used to inherit THIS
@@ -2376,18 +2378,28 @@ function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City):
 
 /** CIV6 (Conquistador): "If this unit captures a city or is adjacent to a
  *  city when it's captured, the city will automatically convert to the
- *  Conquistador player's majority Religion." The captor's OWN founded
- *  religion is what this engine can name today — a per-seat MAJORITY read is
- *  its own open item, and until it lands a seat that founded nothing converts
- *  nothing. */
+ *  Conquistador player's majority Religion." The captor's MAJORITY
+ *  (`majorityReligionOf`: more than half of its cities), which need not be a
+ *  religion it founded; a seat with none converts nothing. */
 export function conquistadorConvert(state: GameState, captor: Unit, city: City): void {
-  const own = seatOf(state, captor.seat);
-  if (!own?.religion.founded) return;
+  const dom = majorityReligionOf(state, captor.seat);
+  if (dom < 0) return;
   const here = state.map.tiles[city.centerIndex];
   const near = [here, ...neighbors(state.map, here)];
   const has = state.units.some((u) => u.seat === captor.seat && u.hp > 0
     && UNITS[u.type]?.captureConverts && near.some((t) => t.index === u.tileIndex));
-  if (has) city.followedReligion = captor.seat;
+  if (has) city.followedReligion = dom;
+}
+
+/** CIV6 (El Escorial, REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION): the foe's
+ *  PLAYER holds a majority religion other than this seat's own — both exist
+ *  and differ (`majorityReligionOf`: a major's or the Free Cities'
+ *  more-than-half rule, a minor's one city). */
+function foeOtherReligion(state: GameState, seat: number, foeSeat: number): boolean {
+  const own = majorityReligionOf(state, seat);
+  if (own < 0) return false;
+  const foe = majorityReligionOf(state, foeSeat);
+  return foe >= 0 && foe !== own;
 }
 
 function attackCityState(state: GameState, attacker: Unit, cityState: CityState): void {

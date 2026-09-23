@@ -1,6 +1,6 @@
 
-import { HOLY_CITY_FOUNDING_PRESSURE_PER_POP } from '../data/religion';
-import type { City, GameState, Seat, Tile, Unit } from './types';
+import { HOLY_CITY_FOUNDING_PRESSURE_PER_POP, followedReligionOf } from '../data/religion';
+import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
 import { ENKIDU_WAR_CS, ENKIDU_ALLIED_WAR_DISCOUNT, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
 import { WAR_KIND_SURPRISE } from '../data/warKinds';
@@ -750,4 +750,36 @@ export function routeIntercontinental(state: GameState, fromTile: number, toTile
   const a = state.map.tiles[fromTile]?.continent ?? -1;
   const b = state.map.tiles[toTile]?.continent ?? -1;
   return a >= 0 && b >= 0 && a !== b;
+}
+
+/** The religion MORE THAN HALF of a seat's cities follow, or -1 — religion
+ *  ids are founder seat ids, so at most one can pass the bar. Measured (lab 2
+ *  scene E, `GetReligionInMajorityOfCities`): a city with no majority still
+ *  counts in the denominator, and a seat that founded nothing can hold one. */
+export function dominantReligionOf(s: { cities: { followedReligion?: number | null }[] }): number {
+  const n = s.cities.length;
+  const count = new Map<number, number>();
+  for (const c of s.cities) {
+    if (c.followedReligion == null || c.followedReligion < 0) continue;
+    count.set(c.followedReligion, (count.get(c.followedReligion) ?? 0) + 1);
+  }
+  for (const [g, k] of count) if (k * 2 > n) return g;
+  return -1;
+}
+
+/** A PLAYER's majority religion by seat id — the ONE composer its readers
+ *  share (the conquistador's convert, Philip II's clause, Tamar's token,
+ *  Mvemba's founder belief): `dominantReligionOf` for a major and for the
+ *  Free Cities; a minor's one city's own majority, composed from its pressure
+ *  row because neither engine stores a minor's followed religion
+ *  (`followedReligionOf`, the city rule); -1 for none, the barbarians and an
+ *  unknown seat. */
+export function majorityReligionOf(state: GameState, seat: number): number {
+  if (isCityStateSeat(seat)) {
+    const cs = seatOf(state, seat) as CityState | undefined;
+    return cs ? followedReligionOf(cs.religionPressure ?? [], cs.population) : -1;
+  }
+  if (isBarbSeat(seat)) return -1;
+  const s = seatOf(state, seat);
+  return s ? dominantReligionOf(s) : -1;
 }

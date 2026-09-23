@@ -209,6 +209,7 @@ const COMBAT_CS_SRC: readonly (SrcMap | undefined)[] = [
     classes: mtype('TRAIT_SIEGE_ABILITY', 'MODIFIER_PLAYER_UNITS_GRANT_ABILITY') },
   { amount: ma('TRAIT_TOQUI_COMBAT_BONUS_VS_GOLDEN_AGE_CIV'), when: mreq('TRAIT_TOQUI_COMBAT_BONUS_VS_GOLDEN_AGE_CIV', 'OPPONENT_IS_IN_GOLDEN_AGE_FREE_CITY_REQUIREMENTS') },
   { amount: ma('ROOSEVELT_COMBAT_BONUS_HOME_CONTINENT'), when: mreq('ROOSEVELT_COMBAT_BONUS_HOME_CONTINENT', 'REQUIREMENTS_UNIT_ON_HOME_CONTINENT') },
+  { amount: ma('PHILIP_II_COMBAT_BONUS_OTHER_RELIGION'), when: mreq('PHILIP_II_COMBAT_BONUS_OTHER_RELIGION', 'REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION') },
 ];
 
 const POST_KILL_HEAL_SRC: readonly (SrcMap | undefined)[] = [
@@ -940,7 +941,10 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
 /** CIV6: `foeGolden` is Swift Hawk's "civilizations that are in a Golden or
  *  Heroic Age" — a HEROIC age IS a golden one on both engines, so the test is
  *  the age alone. Its "or Free Cities" half waits on a Free City existing. */
-export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden' | 'onHomeContinent';
+/** `foeOtherReligion` is El Escorial's REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION:
+ *  the foe's PLAYER holds a majority religion other than this seat's own
+ *  (`majorityReligionOf` on both sides — both exist and differ). */
+export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden' | 'onHomeContinent' | 'foeOtherReligion';
 /** CIV6 (Thermopylae, ABILITY_GORGO_POLICY_SLOT_COMBAT_BONUS): "+1 Combat
  *  Strength for every Military Policy slotted" — the row's amount is paid ONCE
  *  PER slotted policy of the named kind instead of flat. */
@@ -970,6 +974,10 @@ export const COMBAT_CS_ROWS: readonly CombatCsRow[] = withSrc([
   // home continent" — REQUIREMENTS_UNIT_ON_HOME_CONTINENT, the ORIGINAL
   // capital's landmass.
   { leader: 'T_ROOSEVELT', amount: 5, when: 'onHomeContinent' },
+  // CIV6 (El Escorial, PHILIP_II_COMBAT_BONUS_OTHER_RELIGION Amount 5,
+  // REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION): against a player of another
+  // majority religion
+  { leader: 'PHILIP_II', amount: 5, when: 'foeOtherReligion' },
 ], COMBAT_CS_SRC);
 
 /** CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_HEAL, Tomyris): "Heal after
@@ -2262,6 +2270,31 @@ export interface SkipFreeCityRow {
 export const SKIP_FREE_CITY_ROWS: readonly SkipFreeCityRow[] = [
   { leader: 'ELEANOR_ENGLAND' },
   { leader: 'ELEANOR_FRANCE' },
+];
+
+/** CIV6 (Tamar, MODIFIER_PLAYER_ADJUST_DUPLICATE_INFLUENCE_TOKEN_WHEN_SAME_RELIGION,
+ *  Amount 1): an envoy sent to a city-state whose city follows this seat's
+ *  MAJORITY religion counts as `amount` more. Read at the SEND
+ *  (`sameReligionToken`); on the wire as `envoySameReligion`. */
+export interface EnvoySameReligionRow {
+  civ?: CivId;
+  leader?: LeaderId;
+  amount: number;
+}
+export const ENVOY_SAME_RELIGION_ROWS: readonly EnvoySameReligionRow[] = withSrc([
+  { leader: 'TAMAR', amount: 1 },
+], [{ amount: ma('TRAIT_CITY_STATE_TOKEN_SAME_RELIGION') }]);
+
+/** CIV6 (Mvemba, MODIFIER_PLAYER_GAINS_FOUNDER_BELIEF_MAJORITY_RELIGION): the
+ *  seat is paid the FOUNDER belief of the religion more than half of its cities
+ *  follow — the founding seat's own claim (`founderBeliefOf`); on the wire as
+ *  `majorityFounder`. */
+export interface MajorityFounderRow {
+  civ?: CivId;
+  leader?: LeaderId;
+}
+export const MAJORITY_FOUNDER_ROWS: readonly MajorityFounderRow[] = [
+  { leader: 'MVEMBA' },
 ];
 
 /** CIV6 (Toqui): "+10% experience in combat towards all units trained in this

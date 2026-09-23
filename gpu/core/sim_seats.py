@@ -1111,6 +1111,15 @@ class SimSeats:
                             _hb2 = _hb[rows].gather(1, _sc).squeeze(1)
                             _diff = (_ha[rows] != _hb2) | (_ha[rows] & _hb2 & (_ga[rows] != _gb2))
                             _n = _n + (_tw & _diff).to(_n.dtype)
+                    # CIV6 (Tamar, MODIFIER_PLAYER_ADJUST_DUPLICATE_INFLUENCE_TOKEN_WHEN_SAME_RELIGION
+                    # Amount 1): one more when the minor's city follows the sender's
+                    # MAJORITY religion — both exist and agree (`sameReligionToken`)
+                    for _tc, _tl, _ta in self._live_rows(row, self._envoy_same_religion_rows):
+                        _tr = self._row_is(row, _tc, _tl)[rows]
+                        if bool(_tr.any()):
+                            _own = self._dominant_religion()[rows, row]
+                            _mrl = self._minor_followed()[rows, ei[rows]]
+                            _n = _n + (_tr & (_own >= 0) & (_mrl == _own)).to(_n.dtype) * _ta
                     self.seat_citystate_envoys[rows, row, ei[rows]] += _n
                     self._cs_resolve_suzerain()
                     self._minor_envoy_tiles()  # the influence LANDS: a plot per envoy (`addEnvoys`)
@@ -4594,20 +4603,93 @@ class SimSeats:
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
         return winner
 
+    def _rel_stamp(self) -> tuple:
+        """the two planes a seat's majority religion reads, by identity and
+        in-place write counter — the memo stamp of `_dominant_religion` and,
+        while a MAJORITY_FOUNDER row plays, of the belief memos too."""
+        cf, ca = self.city_followed, self.city_alive
+        return (id(cf), cf._version, id(ca), ca._version)
+
+    def _dominant_rows(self, alive: torch.Tensor, fol: torch.Tensor) -> torch.Tensor:
+        """[B, R] — the religion MORE THAN HALF of each row's cities follow, -1
+        none; at most one id can pass the bar, so the ascending scan is exact."""
+        n = alive.sum(dim=2)
+        out = torch.full(n.shape, -1, dtype=torch.long, device=self.device)
+        for g in range(self.n_majors):
+            nf = (alive & (fol == g)).sum(dim=2)
+            out = torch.where((out < 0) & (2 * nf > n), torch.full_like(out, g), out)
+        return out
+
     def _dominant_religion(self) -> torch.Tensor:
         """[B, n_majors] — the religion MORE THAN HALF of each seat's cities
         follow (religion ids are founder seat ids), -1 none — the
         `dominantReligionOf` twin, `_religious_victor`'s count read per seat.
-        At most one id can pass the bar, so the ascending scan is exact."""
+        Memoised under `_rel_stamp` (the combat mask asks per fight)."""
+        st = self._rel_stamp()
+        m = self._dom_rel_memo
+        if m is not None and m[0] == st:
+            return m[1]
         nrow = self.n_majors
-        alive = self.city_alive[:, :nrow]
-        fol = self.city_followed[:, :nrow, : self.RC]
-        n = alive.sum(dim=2)
-        out = torch.full((self.B, nrow), -1, dtype=torch.long, device=self.device)
-        for g in range(nrow):
-            nf = (alive & (fol == g)).sum(dim=2)
-            out = torch.where((out < 0) & (2 * nf > n), torch.full_like(out, g), out)
+        out = self._dominant_rows(self.city_alive[:, :nrow], self.city_followed[:, :nrow, : self.RC])
+        self._dom_rel_memo = (st, out)
         return out
+
+    def _minor_followed(self) -> torch.Tensor:
+        """[B, S] long — a minor's one city's followed religion, composed from
+        its pressure row (`followedReligionOf(cs.religionPressure,
+        cs.population)`): the resolver writes `city_followed` for the majors
+        and the Free row only, so a minor's is read from the rule itself."""
+        M0, S = self._CITY_MINOR0, self.S
+        return self._followed_religion(self.city_pressure[:, M0:M0 + S, 0], self.citystate_pop[:, :S])
+
+    def _seat_majority_religion(self, seat: torch.Tensor) -> torch.Tensor:
+        """`majorityReligionOf` per absolute seat, `seat`'s shape — the ONE
+        composer its readers share: a major's `_dominant_religion`, the Free
+        Cities' by the same rule over their row, a minor's composed city; -1
+        for none, the barbarians and no seat."""
+        B = self.B
+        sh = seat.reshape(B, -1)
+        out = torch.full(sh.shape, -1, dtype=torch.long, device=self.device)
+        maj = (sh >= 0) & (sh < self.n_majors)
+        out = torch.where(maj, self._dominant_religion().gather(1, sh.clamp(min=0, max=self.n_majors - 1)), out)
+        if self.S > 0:
+            mn = (sh >= 100) & (sh < 100 + self.S)
+            if bool(mn.any()):
+                mf = self._minor_followed().gather(1, (sh - 100).clamp(min=0, max=self.S - 1))
+                out = torch.where(mn, mf, out)
+        free = sh == FREE_SEAT
+        if bool(free.any()):
+            fr = self._dominant_rows(self.city_alive[:, self.FREE_ROW:self.FREE_ROW + 1],
+                                     self.city_followed[:, self.FREE_ROW:self.FREE_ROW + 1, : self.RC])
+            out = torch.where(free, fr.expand_as(sh), out)
+        return out.reshape(seat.shape)
+
+    def _eff_founder(self, row: int) -> torch.Tensor:
+        """[B] long — `founderBeliefOf`'s twin: the founder belief a seat is
+        PAID. Its own claim (`civ_founder`) when it holds one; else, for a
+        MAJORITY_FOUNDER row (Mvemba), the founding seat's claim for the
+        religion more than half of its cities follow; -1 none."""
+        own = self.civ_founder[:, row]
+        if row >= self.n_majors:
+            return own
+        live = self._live_rows(row, self._majority_founder_rows)
+        if not live:
+            return own
+        mv = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for _c, _l in live:
+            mv = mv | self._row_is(row, _c, _l)
+        dom = self._dominant_religion()[:, row]
+        other = self.civ_founder.gather(1, dom.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return torch.where(own >= 0, own, torch.where(mv & (dom >= 0), other, own))
+
+    def _bel_stamp(self):
+        """what the belief memos are keyed on: the claim counter alone, plus
+        the majority's planes while some game plays a MAJORITY_FOUNDER row
+        (its founder belief moves with its cities' religion)."""
+        if not self._majority_founder_rows or not any(
+                self._live_rows(r, self._majority_founder_rows) for r in range(self.n_majors)):
+            return self._bel_version
+        return (self._bel_version,) + self._rel_stamp()
 
     def _tourism_intl_pct(self, frm: int, to: int) -> torch.Tensor:
         """[B] long — CIV6 (Tourism, "International Modifiers"): "further
@@ -7157,13 +7239,15 @@ class SimSeats:
 
     def _seat_has_beliefs(self, row: int) -> bool:
         # only a major founds a pantheon or a religion; a minor's and the Free
-        # row's cities follow one but claim none
+        # row's cities follow one but claim none — Mvemba's borrowed founder
+        # belief (`_eff_founder`) counts like a claim
         return self._bel_any and row < self.n_majors \
-            and bool(((self.civ_pantheon[:, row] >= 0) | (self.civ_follower[:, row] >= 0)).any())
+            and bool(((self.civ_pantheon[:, row] >= 0) | (self.civ_follower[:, row] >= 0)
+                      | (self._eff_founder(row) >= 0)).any())
 
     def _bel_add(self, key: str, row: int) -> torch.Tensor:
-        if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_version:
-            self._bel_add_memo = (self._bel_version, {})
+        if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_stamp():
+            self._bel_add_memo = (self._bel_stamp(), {})
         d = self._bel_add_memo[1]
         mk = ("add", key, row)
         v = d.get(mk)
@@ -7171,7 +7255,7 @@ class SimSeats:
             v = (
                 self._bel["pan"][key][self.civ_pantheon[:, row] + 1]
                 + self._bel["fol"][key][self.civ_follower[:, row] + 1]
-                + self._bel["fou"][key][self.civ_founder[:, row] + 1]
+                + self._bel["fou"][key][self._eff_founder(row) + 1]
             )
             d[mk] = v
         return v
@@ -7180,19 +7264,19 @@ class SimSeats:
         return (
             self._bel["pan"][key][self.civ_pantheon[:, row] + 1]
             * self._bel["fol"][key][self.civ_follower[:, row] + 1]
-            * self._bel["fou"][key][self.civ_founder[:, row] + 1]
+            * self._bel["fou"][key][self._eff_founder(row) + 1]
         )
 
     def _bel_add_pf(self, key: str, row: int) -> torch.Tensor:
-        if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_version:
-            self._bel_add_memo = (self._bel_version, {})
+        if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_stamp():
+            self._bel_add_memo = (self._bel_stamp(), {})
         d = self._bel_add_memo[1]
         mk = ("pf", key, row)
         v = d.get(mk)
         if v is None:
             v = (
                 self._bel["pan"][key][self.civ_pantheon[:, row] + 1]
-                + self._bel["fou"][key][self.civ_founder[:, row] + 1]
+                + self._bel["fou"][key][self._eff_founder(row) + 1]
             )
             d[mk] = v
         return v
@@ -7398,7 +7482,7 @@ class SimSeats:
         mutation sites. All consumers read-only."""
         # ...and the row's TECHS: a revealed resource starts paying its yield
         # (`_res_hidden`); the plane's version counter is the stamp
-        key = (row, self._eff_version, self._bel_version, self.civ_techs._version)
+        key = (row, self._eff_version, self._bel_stamp(), self.civ_techs._version)
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
         suz = self._imp_adjacency(row)
@@ -7830,7 +7914,7 @@ class SimSeats:
             # a MINOR's one city is still a destination — Democracy's "+4 Food
             # and +4 Production for BOTH CITIES" on its suzerain's route in
             return self._incoming_ally_route(row) if row < self.FREE_ROW else None
-        key = (self.turn, row, self._eff_version, self._rp_kill_version, self._bel_version)
+        key = (self.turn, row, self._eff_version, self._rp_kill_version, self._bel_stamp())
         if self._seat_route_cache is not None and self._seat_route_cache[0] == key:
             return self._seat_route_cache[1]
         rr = self.seat_routes[:, row]
@@ -12134,13 +12218,15 @@ class SimSeats:
         """`conquistadorConvert`'s twin. CIV6 (Conquistador): "If this unit
         captures a city or is adjacent to a city when it's captured, the city
         will automatically convert to the Conquistador player's majority
-        Religion." The captor's OWN founded religion is what this engine can
-        name today; a seat that founded nothing converts nothing."""
+        Religion." The captor's MAJORITY (`_dominant_religion`: more than half
+        of its cities), which need not be a religion it founded; a seat with
+        none converts nothing."""
         if not bool(self._type_capture_converts.any()):
             return
         if not (0 <= captor_row < self.n_majors) or ctr < 0:
             return
-        if not bool(self.civ_religion_done[b, captor_row]):
+        dom = int(self._dominant_religion()[b, captor_row])
+        if dom < 0:
             return
         near = self.pair_dist[ctr] <= 1                                   # [T]
         hit = (self.major_unit_alive[b] & (self.major_unit_hp[b] > 0)
@@ -12151,7 +12237,7 @@ class SimSeats:
             return
         col = (self.city_center[b, captor_row] == ctr).long().argmax()
         if bool(self.city_alive[b, captor_row, col]):
-            self.city_followed[b, captor_row, col] = captor_row
+            self.city_followed[b, captor_row, col] = dom
 
     def _melee_city(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """The battle in `_assault_city`, then the aftermath the ATTACKER's
