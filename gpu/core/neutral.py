@@ -777,7 +777,10 @@ def geo_obs(sim) -> list:
     gw = torch.stack([torch.stack([(sim._gw_kind_count(r, k) * alive[:, r].long()).sum(dim=1)
                                    for k in range(len(sim._gw_cls))], dim=1)
                       for r in range(n)], dim=1)                        # [B, n, kinds]
-    ask = sim.deal_offer_ask[:, :n, :n]
+    # an offer that no longer stands asks for nothing: the table keeps the
+    # accepted or expired bundle behind a zero clock, TS drops the offer
+    ask = torch.where((sim.deal_offer_left[:, :n, :n] > 0).reshape(B, n, n, 1, 1),
+                      sim.deal_offer_ask[:, :n, :n], torch.full_like(sim.deal_offer_ask[:, :n, :n], -1))
     cols = {
         "alive": sim.civ_alive[:, :n].long(), "cities": alive.sum(dim=2),
         "strength": _as_long(sim._seat_strengths()), "treasury": _floored(sim.civ_treasury[:, :n]),

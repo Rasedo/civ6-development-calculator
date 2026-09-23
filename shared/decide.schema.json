@@ -153,7 +153,7 @@
     ["joint_open", "matrix", "[a][b]: 1 where a may still declare war on b at all (not at war, not allied or friends, no peace treaty binding)"],
     ["spies_held", "matrix", "[a][b]: a's spies b holds captive"],
     ["offer_left", "matrix", "[a][b]: the turns a's standing deal offer to b still stands, 0 none"],
-    ["offer_ask", "matrix", "[a][b]: that offer's ASK bundle, dealItems slots of [kind, x, y] laid end to end, kind -1 in an empty slot"]
+    ["offer_ask", "matrix", "[a][b]: that offer's ASK bundle, dealItems slots of [kind, x, y] laid end to end, kind -1 in an empty slot; every value -1 where no offer stands"]
   ],
   "world": [
     ["turn", "int", "the engine turn the coming step plays (`state.turn`), the head's `turn`"],
