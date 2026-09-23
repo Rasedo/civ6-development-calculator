@@ -212,6 +212,63 @@ def neutral_diff(path: str, g, t) -> str | None:
 
 
 
+def ts_seat_obs(msg: dict, seat: int) -> dict:
+    """Seat `seat`'s neutral observation built from the TS child's message
+    alone: its registered per-seat groups, the turn, and its RL vector — the
+    shape `neutral.seat_obs` builds from the GPU."""
+    return {**((msg.get("neutral") or {}).get(str(seat)) or {}),
+            "turn": int(msg["world"]["turn"]), "vec": msg["obs"][str(seat)]}
+
+
+def decision_diff(path: str, g, t, b: int) -> str | None:
+    """The first place game `b`'s two decisions differ — tensors (batch
+    first), tuples, lists and dicts of them — as `path: GPU x vs TS y`."""
+    if isinstance(g, dict):
+        for k in g:
+            d = decision_diff(f"{path}.{k}", g[k], t[k], b)
+            if d:
+                return d
+        return None
+    if isinstance(g, (tuple, list)):
+        for i, (x, y) in enumerate(zip(g, t)):
+            d = decision_diff(f"{path}[{i}]", x, y, b)
+            if d:
+                return d
+        return None
+    if torch.is_tensor(g):
+        x, y = g[b], t[b]
+        if x.shape != y.shape or not bool(torch.equal(x, y)):
+            ne = (x != y).nonzero().tolist() if x.shape == y.shape else []
+            at = f" at {ne[0]}" if ne else f" shape {tuple(x.shape)} vs {tuple(y.shape)}"
+            return f"{path}{at}: GPU {x.tolist()!r:.200} vs TS {y.tolist()!r:.200}"
+        return None
+    return None if g == t else f"{path}: GPU {g!r} vs TS {t!r}"
+
+
+def dual_decide(st, seats: list, decs: dict, geo_dec, msgs: list, roster: dict, classes: dict,
+                seeds: list) -> list[tuple[int, str]]:
+    """THE DUAL DECIDE. The driver decides again from the TS engine's own
+    observation — the per-seat groups, the diplomatic table, the RL vector
+    — and every decision must equal the one taken from the GPU's. Returns
+    (game, first difference) per game that differs."""
+    reds: dict[int, str] = {}
+    geo_ts = drive.decide_geo(st, [m["geo"] for m in msgs], seeds)
+    for b in range(len(msgs)):
+        d = decision_diff("geo", geo_dec, geo_ts, b)
+        if d:
+            reds.setdefault(b, d)
+    for row in seats:
+        dec_ts = records.decide(st, row, [ts_seat_obs(m, row) for m in msgs], roster, classes, seeds=seeds)
+        for b in range(len(msgs)):
+            if b in reds:
+                continue
+            d = decision_diff(f"seat{row}", {f: decs[row][f] for f in drive.DECIDE_FIELDS},
+                              {f: dec_ts[f] for f in drive.DECIDE_FIELDS}, b)
+            if d:
+                reds[b] = d
+    return sorted(reds.items())
+
+
 def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> str:
     if i < ladder.EMP:
         return f"empire.{ladder.EMP_FIELDS[i]}"
@@ -433,15 +490,18 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 if d:
                     flag(f"seed {seeds[b]} turn {t + 1}: NEUTRAL {d}")
                 world_checked += 1
-            pre_seat: dict = {}
+            # ...and the diplomatic table, which the geo decide reads
+            geo_obs = neutral.geo_obs(sim)
+            for b, (gg, msg) in enumerate(zip(geo_obs, msgs)):
+                d = neutral_diff("geo", gg, msg.get("geo"))
+                if d:
+                    flag(f"seed {seeds[b]} turn {t + 1}: NEUTRAL {d}")
             nobs_seat: dict = {}
             for seat in seats:
                 gobs_all = env.observe(seat)
                 # THE NEUTRAL OBSERVATION the decide pass reads, taken here
                 # pre-decide: nothing between here and the decide mutates its
-                # inputs (geo_decide_and_apply only STASHES). The BUY, ROUTE,
-                # JOB and SPREAD tripwires read it against the TS driver's
-                # pre-turn twins, EVERY seat, row 0 included.
+                # inputs (the decide only STASHES).
                 nobs_seat[seat] = neutral.seat_obs(sim, seat, gobs_all)
                 # ...and every per-seat group the TS child emitted for this seat
                 for b, msg in enumerate(msgs):
@@ -454,13 +514,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                         for _ln in diff_pairs(sim._diff_events.get(b, []), msg.get("dl", [])):
                             print(_ln)
                     groups_checked += _n
-                # Every seat's unit rows ride `_seat_slot_map` — this seat's
-                # LIVING units in slot order, which IS the TS array order it
-                # emits per unit.
-                gj_t = drive._builder_jobs(st, nobs_seat[seat])
-                gs_t = drive._spread_targets(st, nobs_seat[seat])
-                # the decide pass reuses the other pre-decide reads verbatim
-                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t}
                 for b, msg in enumerate(msgs):
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
@@ -475,11 +528,18 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             if bad:
                 break
             _t = _pc()
-            geo = records.geo_decide_and_apply(sim, st, seeds)
+            geo = records.geo_decide_and_apply(sim, st, geo_obs, seeds)
             # ONE decide body, ONE record shape, every major row, seat 0 first.
-            per_seat = {row: records.decide_and_apply(sim, st, row, nobs_seat[row], roster, classes, seeds=seeds,
-                                                      pre=pre_seat[row]) for row in seats}
+            decs = {row: records.decide(st, row, nobs_seat[row], roster, classes, seeds=seeds) for row in seats}
             prof["decide (policy on GPU)"] += _pc() - _t
+            _t = _pc()
+            for b, d in dual_decide(st, seats, decs, geo, msgs, roster, classes, seeds):
+                flag(f"seed {seeds[b]} turn {t + 1}: DUAL DECIDE {d}")
+            prof["dual decide (policy on the TS observation)"] += _pc() - _t
+            if bad:
+                break
+            _t = _pc()
+            per_seat = {row: records.apply(sim, row, decs[row]) for row in seats}
             _t = _pc()
             for b, ch in enumerate(children):
                 recs = {str(row): {**records.extract_record(sim, row, *per_seat[row], b),
@@ -573,8 +633,9 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         print(f"SERVE GATE (BATCHED) RED — first: {first}")
         sys.exit(1)
     print(f"SERVE GATE (BATCHED) OK — {len(seeds)} games x {turns} turns in one batch: "
-          f"obs + unit targets equal everywhere, the neutral world group equal on {world_checked} "
-          f"(game, turn) pairs and {groups_checked} per-seat groups, state digests agree on every group")
+          f"obs equal everywhere, the neutral world group and diplomatic table equal on {world_checked} "
+          f"(game, turn) pairs and {groups_checked} per-seat groups, every decision equal from either observation, "
+          f"state digests agree on every group")
 
 
 def main() -> None:
@@ -697,13 +758,15 @@ def main() -> None:
     for t in range(t0, args.turns):
         msg = read_msg()
         assert msg.get("t") == t + 1, f"turn frame skew: TS says {msg.get('t')}, orchestrator at {t + 1}"
-        d = neutral_diff("world", neutral.world_obs(sim)[0], msg.get("world"))
-        if d:
-            rep = f"turn {t + 1}: NEUTRAL {d}"
-            print(rep)
-            if first_report is None:
-                first_report = rep
-            obs_bails += 1
+        geo_obs = neutral.geo_obs(sim)
+        for d in (neutral_diff("world", neutral.world_obs(sim)[0], msg.get("world")),
+                  neutral_diff("geo", geo_obs[0], msg.get("geo"))):
+            if d:
+                rep = f"turn {t + 1}: NEUTRAL {d}"
+                print(rep)
+                if first_report is None:
+                    first_report = rep
+                obs_bails += 1
         world_checked += 1
         obs_seat: dict = {}
         for seat in seats:
@@ -727,11 +790,6 @@ def main() -> None:
                 if first_report is None:
                     first_report = rep
                 obs_bails += 1
-        # Per-unit obs twins: the GPU extractors against the TS arrays, per
-        # slot-map row (TS rows = live units in mirrored order; GPU rows beyond
-        # the live count must be -1). EVERY seat rides `_seat_slot_map` now,
-        # so no seat needs a compaction of its own.
-        pre_seat: dict = {}
         nobs_seat: dict = {}
         for seat in seats:
             nobs_seat[seat] = neutral.seat_obs(sim, seat, obs_seat[seat])
@@ -743,15 +801,19 @@ def main() -> None:
                     first_report = rep
                 obs_bails += 1
             groups_checked += _n
-            gj_t = drive._builder_jobs(st, nobs_seat[seat])
-            gs_t = drive._spread_targets(st, nobs_seat[seat])
-            if True:
-                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t}
         if obs_bails:
             break
-        geo = records.geo_decide_and_apply(sim, st, [args.seed])
-        per_seat = {row: records.decide_and_apply(sim, st, row, nobs_seat[row], roster, classes, seeds=[args.seed],
-                                                  pre=pre_seat[row]) for row in seats}
+        geo = records.geo_decide_and_apply(sim, st, geo_obs, [args.seed])
+        decs = {row: records.decide(st, row, nobs_seat[row], roster, classes, seeds=[args.seed]) for row in seats}
+        for _b, d in dual_decide(st, seats, decs, geo, [msg], roster, classes, [args.seed]):
+            rep = f"turn {t + 1}: DUAL DECIDE {d}"
+            print(rep)
+            if first_report is None:
+                first_report = rep
+            obs_bails += 1
+        if obs_bails:
+            break
+        per_seat = {row: records.apply(sim, row, decs[row]) for row in seats}
         recs = {str(row): {**records.extract_record(sim, row, *per_seat[row], 0),
                            **records.extract_geo(geo, row, 0)} for row in seats}
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
@@ -798,7 +860,7 @@ def main() -> None:
         print(f"SERVE GATE RED — first: {first_report}")
         sys.exit(1)
     print(f"SERVE GATE OK — seed {args.seed}, {args.turns} turns: obs equal on every (turn, seat), "
-          f"the neutral world group equal on {world_checked} turns and {groups_checked} per-seat groups, "
+          f"the neutral world group and diplomatic table equal on {world_checked} turns and {groups_checked} per-seat groups, every decision equal from either observation, "
           "state digests agree on every group")
 
 

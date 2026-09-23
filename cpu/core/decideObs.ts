@@ -2,9 +2,11 @@
  * THE NEUTRAL OBSERVATION, TS side: what the decision server reads, emitted
  * by this engine as plain integers, in the shape `shared/decide.schema.json`
  * names and `gpu/core/neutral.py` emits. The gate compares the two every
- * turn before the decide; the driver still decides from the GPU's.
+ * turn before the decide, and decides from each: every decision taken from
+ * this engine's observation must equal the one taken from the GPU's.
  *
- * So far the `world` group: the facts every seat sees alike.
+ * This module: the `world` group (the facts every seat sees alike) and the
+ * per-seat registries; `decideObsGeo.ts` emits the diplomatic table.
  */
 import type { GameState } from './types';
 import { cityHolders } from './seats';

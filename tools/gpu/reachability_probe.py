@@ -179,7 +179,7 @@ def main() -> None:
     for t in range(args.turns):
         # The DIPLOMATIC verbs are decided outside the seat decide, so a probe
         # that skips this measures a table with no agreements in it.
-        records.geo_decide_and_apply(sim, st, seeds)
+        records.geo_decide_and_apply(sim, st, neutral.geo_obs(sim), seeds)
         gw_before = [sim._gw_kind_count_all(k)[:, :sim.n_majors].clone() for k in range(3)]
         for row in seats:
             rec = records.decide_and_apply(sim, st, row, neutral.seat_obs(sim, row, env.observe(row)),

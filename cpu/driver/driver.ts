@@ -20,6 +20,7 @@ import { cityHolders } from '../core/seats';
 import { endTurn } from '../core/game';
 import { observeSeat } from '../core/observe';
 import { worldObs, seatGroups } from '../core/decideObs';
+import { geoObs } from '../core/decideObsGeo';
 import { stateDigest, groupDump } from '../core/statecompare';
 
 export interface DriverOpts {
@@ -95,16 +96,17 @@ for (let t = 0; t < N_TURNS; t++) {
     const obs: Record<string, number[]> = {};
     for (let seat = 0; seat < N_MAJORS; seat++) obs[String(seat)] = observeSeat(state, seat, CITY_MAX, o.horizon, CITY_STATE_MAX);
     // the DECOMPOSITION rides this message too, not the dump alone: a
-    // driver-twin check fires HERE, and evidence that arrives one message
-    // later is evidence the failing comparison never sees.
+    // group red fires HERE, and evidence that arrives one message later is
+    // evidence the failing comparison never sees.
     const dlT = (globalThis as { __diffLog?: string[] }).__diffLog;
-    // `world` is the neutral observation's world group and `neutral` its
-    // registered per-seat groups, by seat id: the gate compares each with the
-    // GPU's before the decide, and nothing on this side reads them
+    // `world` is the neutral observation's world group, `geo` its diplomatic
+    // table and `neutral` its registered per-seat groups, by seat id: the
+    // gate compares each with the GPU's before the decide, and nothing on
+    // this side reads them
     const neutralSeats: Record<number, Record<string, unknown>> = {};
     for (const s of state.seats) neutralSeats[s.seat] = seatGroups(state, s.seat);
     o.send({
-      t: state.turn, obs, world: worldObs(state), neutral: neutralSeats,
+      t: state.turn, obs, world: worldObs(state), geo: geoObs(state), neutral: neutralSeats,
       ...(dlT ? { dl: trimByKind(dlT) } : {}),
     });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };

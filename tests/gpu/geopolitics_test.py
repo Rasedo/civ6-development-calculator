@@ -76,7 +76,7 @@ from core import neutral, records
 # The agreement pass: the ported scans decide off the diplomatic table, the
 # engine arm re-validates.
 def geo_denounce(sim) -> None:
-    records.geo_decide_and_apply(sim, neutral.static_for(sim))
+    records.geo_decide_and_apply(sim, neutral.static_for(sim), neutral.geo_obs(sim))
     sim._geo_agreements()
 
 

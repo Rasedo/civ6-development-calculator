@@ -439,7 +439,7 @@ def _park_targets(st, nobs: list, units=None) -> torch.Tensor:
     return _nearest(st, anchors, rows_all, tiles, out, st.T)
 
 
-def _seat_unit_orders(st, seat: int, nobs: list, job_t=None, spread_t=None):
+def _seat_unit_orders(st, seat: int, nobs: list):
     # ONE read of the observation's units for the whole pass, shared by every
     # target table below; a unit's rank is its row of the mask.
     turn, _t = _turns(nobs)
@@ -449,12 +449,8 @@ def _seat_unit_orders(st, seat: int, nobs: list, job_t=None, spread_t=None):
     war = _obs_war(st, nobs)
     view = _unit_view(st, nobs, present, tiles, war)
     orders0 = ladder.pick_unit_orders(um, view, a_pillage=st.a_pillage, a_snipe=st.a_snipe, a_snipe3=st.a_snipe3)
-    # the serve tripwire computes both target tables pre-decide at the same
-    # state; passing them here skips the recomputation (pure reads either way)
-    if job_t is None:
-        job_t = _builder_jobs(st, nobs, units=units)
-    if spread_t is None:
-        spread_t = _spread_targets(st, nobs, units=units)
+    job_t = _builder_jobs(st, nobs, units=units)
+    spread_t = _spread_targets(st, nobs, units=units)
     settle_t, found_ok = _settle_targets(st, nobs, units=units)
     dig_t = _dig_targets(st, nobs, units=units)
     park_t = _park_targets(st, nobs, units=units)
@@ -1249,8 +1245,7 @@ DECIDE_FIELDS = (
 )
 
 
-def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=None,
-                pre: dict | None = None) -> dict:
+def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=None) -> dict:
     """Seat `row`'s turn decisions, every DECIDE_FIELDS entry but the unit
     plan, keyed by name. Writes nothing. `nobs` is the seat's neutral
     observation, one dict per game (shared/decide.schema.json). `prod` is
@@ -1337,7 +1332,7 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
             "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "policies": policies}
 
 
-def plan_units(st, row: int, nobs: list, max_steps: int = 4, pre: dict | None = None) -> torch.Tensor:
+def plan_units(st, row: int, nobs: list, max_steps: int = 4) -> torch.Tensor:
     """[B, N, K] — the seat's unit orders, one rank per step a unit takes.
 
     The draw order: the driver PLANS, the PHASE executes. Applying steps
@@ -1349,10 +1344,7 @@ def plan_units(st, row: int, nobs: list, max_steps: int = 4, pre: dict | None = 
     Non-move verbs end the turn at rank 0, exactly like the scripted walkers.
     The phase executes the stash at the walkers' position and RE-VALIDATES
     every rank: an illegal later step refuses, never substitutes."""
-    orders0, job_t, spread_t, settle_t, cur, at_war_rows, war = _seat_unit_orders(
-        st, row, nobs,
-        job_t=None if pre is None else pre.get("jobs"),
-        spread_t=None if pre is None else pre.get("spreads"))
+    orders0, job_t, spread_t, settle_t, cur, at_war_rows, war = _seat_unit_orders(st, row, nobs)
     B2, N2 = orders0.shape
     ranks = [orders0]
     # the march targets are chosen ONCE, off the rank-0 positions, and the

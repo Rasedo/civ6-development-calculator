@@ -129,24 +129,36 @@ def stash_units(sim, row: int, seq: torch.Tensor) -> None:
     sim._driven_useq[row] = seq
 
 
-def decide_and_apply(sim, st, row: int, nobs: list, roster: dict, classes: dict, max_steps: int = 4,
-                     seeds=None, pre: dict | None = None) -> tuple:
-    """One seat's turn: decide, stash the decisions, then plan and stash the
-    units — the unit plan is taken AFTER the seat's other decisions are
-    stashed, the order the step has always seen. `nobs` is the seat's
-    `neutral.seat_obs`, `st` the game's `neutral.static_of`. Returns the
+def decide(st, row: int, nobs: list, roster: dict, classes: dict, max_steps: int = 4,
+           seeds=None) -> dict:
+    """One seat's turn decisions, the unit plan (`seq`) included, keyed by
+    `drive.DECIDE_FIELDS`. Pure: `nobs` is the seat's neutral observation,
+    one dict per game — the GPU's `neutral.seat_obs` or the TS engine's — and
+    `st` the game's `neutral.static_of`."""
+    dec = drive.decide_seat(st, row, nobs, roster, classes, seeds=seeds)
+    dec["seq"] = drive.plan_units(st, row, nobs, max_steps)
+    return dec
+
+
+def apply(sim, row: int, dec: dict) -> tuple:
+    """Stash one seat's decisions and its unit plan for the step. Returns the
     positional record in `drive.DECIDE_FIELDS` order."""
-    dec = drive.decide_seat(st, row, nobs, roster, classes, seeds=seeds, pre=pre)
     apply_decisions(sim, row, dec)
-    dec["seq"] = drive.plan_units(st, row, nobs, max_steps, pre=pre)
     stash_units(sim, row, dec["seq"])
     return tuple(dec[f] for f in drive.DECIDE_FIELDS)
 
 
-def geo_decide_and_apply(sim, st, seeds=None):
+def decide_and_apply(sim, st, row: int, nobs: list, roster: dict, classes: dict, max_steps: int = 4,
+                     seeds=None) -> tuple:
+    """`decide`, then `apply`."""
+    return apply(sim, row, decide(st, row, nobs, roster, classes, max_steps, seeds=seeds))
+
+
+def geo_decide_and_apply(sim, st, geos: list, seeds=None):
     """Every seat's diplomatic intents, decided off the game's diplomatic
-    table (`neutral.geo_obs`) and stashed for `_geo_agreements`."""
-    geo = drive.decide_geo(st, neutral.geo_obs(sim), seeds)
+    table (`geos`, one `neutral.geo_obs` per game) and stashed for
+    `_geo_agreements`."""
+    geo = drive.decide_geo(st, geos, seeds)
     den, frd, ally, bord, gift, deleg, off, acc, ally_ty = geo
     for row in range(sim.n_majors):
         sim.apply_geo(row, denounce=den[:, row], friend=frd[:, row], ally=ally[:, row],
@@ -519,6 +531,7 @@ def drive_batched(env, turns: int, seats=None, seeds=None) -> list:
     logs = [[] for _ in range(B)]
     game_seeds = list(seeds) if seeds is not None else list(range(B))
     for t in range(turns):
+        geo_decide_and_apply(sim, st, neutral.geo_obs(sim), game_seeds)
         per_seat = {row: decide_and_apply(sim, st, row, neutral.seat_obs(sim, row, env.observe(row)),
                                           roster, classes, seeds=game_seeds) for row in seats}
         for b in range(B):
