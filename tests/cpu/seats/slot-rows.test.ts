@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, holdWorks } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
-import { getModifiers, wonderExtraSlots, slotFavorOf, greatWorkLoyalty } from '../../../cpu/core/effects';
+import { getModifiers, wonderExtraSlots, slotFavorOf, greatWorkLoyalty, governmentSlots } from '../../../cpu/core/effects';
 import { cityHasPark } from '../../../cpu/core/city';
 import { cityAppealResolver, emptyGovernors } from '../../../cpu/core/governors';
 import { trainXpPct } from '../../../cpu/core/combat';
@@ -90,6 +90,13 @@ describe('Founding Fathers', () => {
     const p = wonderExtraSlots(plain, 0);
     expect(a.diplomatic).toBe(p.diplomatic - g.dip);
     expect(a.wildcard).toBe(p.wildcard + g.dip);
+    // ...and the SLOTS the seat holds lose the Diplomatic ones as the
+    // Wildcards arrive: a negative delta removes, it does not merely add nothing
+    const count = (st: GameState, k: string) => governmentSlots(st, 0).filter((x) => x === k).length;
+    expect(count(plain, 'diplomatic')).toBeGreaterThan(0);
+    expect(count(america, 'diplomatic')).toBe(Math.max(0, count(plain, 'diplomatic') - g.dip));
+    expect(count(america, 'wildcard')).toBe(count(plain, 'wildcard') + g.dip);
+    expect(governmentSlots(america, 0).length).toBe(governmentSlots(plain, 0).length);
   });
 
   it('pays a Favor per Wildcard slot, counting the converted ones', () => {

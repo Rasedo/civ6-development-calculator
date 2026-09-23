@@ -1869,6 +1869,17 @@ export function governmentSlots(state: GameState, seat: number): SlotKind[] {
   if (!gov) return [];
   const slots = [...gov.slots];
   const xs = wonderExtraSlots(state, seat);
+  // a NEGATIVE delta removes that many of the kind (CIV6, Founding Fathers:
+  // "All Diplomatic policy slots in the current government are converted to
+  // Wildcard slots" — the diplomatic slots go as the wildcards arrive),
+  // never below none; the GPU clamps the per-kind sum at 0 the same way
+  for (const k of SLOT_KINDS) {
+    for (let i = 0; i < -xs[k]; i++) {
+      const at = slots.lastIndexOf(k);
+      if (at < 0) break;
+      slots.splice(at, 1);
+    }
+  }
   for (const k of SLOT_KINDS) for (let i = 0; i < xs[k]; i++) slots.push(k);
   return slots;
 }
