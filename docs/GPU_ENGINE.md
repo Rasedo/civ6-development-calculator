@@ -77,8 +77,9 @@ export. Per (turn, seat):
 1. **Obs equality** — both engines render the seat's observation; the
    raw context block must be EXACT (mismatches are field-named via the
    ladder layout).
-2. **Decisions once** — `policy/drive.py::_decide_turn` computes every
-   seat's decisions from the GPU masks; the resulting record
+2. **Decisions once** — `policy/drive.py` computes every seat's
+   decisions from the GPU masks and `gpu/core/records.py` stashes them
+   in the sim and encodes them; the resulting record
    (`SeatActionRecord` in `cpu/core/types.ts`) IS the wire format,
    fanned to both engines, each of which re-validates and executes at
    its own rule positions.

@@ -5,7 +5,7 @@ enter. Every docs/AUDIT.md entry names the lane that REACHES its mechanic;
 where none does, the claim was prose. This driver counts them.
 
 GPU-only and driven exactly as the serve gate drives it (the same
-`_decide_turn` over the same seat order), because reachability is a property
+`records.decide_and_apply` over the same seat order), because reachability is a property
 of the DRIVEN GAME, not of the comparison. What it answers, in order:
 
   apostleBuy    the driver emitting faith-buy kind 6 (a latent faith-buy needs it)
@@ -74,6 +74,7 @@ from core import BatchEnv, load_rules, load_fixture, fixture_paths, FIXTURES  # 
 from core.simbase import js_round  # noqa: E402
 import drive  # noqa: E402
 import ladder  # noqa: E402
+from core import records  # noqa: E402
 
 # The district columns worth counting: the pop-gated Neighborhood and the six
 # whose unlocks sit in the Industrial era or later.
@@ -136,7 +137,7 @@ def main() -> None:
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
     roster = ladder.unit_roster(rj["units"])
     for row in seats:
-        drive.take_seat(sim, row)
+        records.take_seat(sim, row)
 
     def civic_at(name: str) -> int:
         i = next((k for k, c in enumerate(rj["civics"]) if c["id"] == name), -1)
@@ -179,13 +180,13 @@ def main() -> None:
     _F = {n: i for i, n in enumerate(drive.DECIDE_FIELDS)}
     gw_before = None
     for t in range(args.turns):
-        # The DIPLOMATIC verbs are decided outside `_decide_turn`, so a probe
+        # The DIPLOMATIC verbs are decided outside the seat decide, so a probe
         # that skips this measures a table with no agreements in it.
-        drive.geo_decide_and_apply(sim, seeds)
+        records.geo_decide_and_apply(sim, seeds)
         gw_before = [sim._gw_kind_count_all(k)[:, :sim.n_majors].clone() for k in range(3)]
         for row in seats:
-            rec = drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t)
-            # `_decide_turn`'s record, BY NAME. It used to be read by position
+            rec = records.decide_and_apply(env, sim, row, roster, classes, seeds=seeds, turn=t)
+            # the seat's record, BY NAME. It used to be read by position
             # under a comment warning that a new column shifts everything
             # after it; one did, and this probe raised IndexError for as long
             # as that took to notice.

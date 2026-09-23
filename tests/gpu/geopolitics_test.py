@@ -7,7 +7,7 @@ war-weariness accrual, seat-to-seat city transfer hygiene).
     $env:PYTHONUTF8='1'; python tests/gpu/geopolitics_test.py
 
 Every poke builds a BatchSim from a fixture, forces the state in-memory, then
-drives the EXACT engine surface: drive._geo_turn decides the five agreement
+drives the EXACT engine surface: drive.decide_geo decides the five agreement
 scans and `_geo_agreements` re-validates and executes them, while DECLARING
 and SUING ride `_apply_war_column` — each seat's own war head, the one entry;
 plus _seat_phase and _transfer_city. Thresholds come from rules.json (never
@@ -70,12 +70,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy")
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.simbase import BARB_SEAT
 from warmup import settle_all, works_of
-import drive
+from core import records
 
 
 # The agreement pass: the ported scans decide, the engine arm re-validates.
 def geo_denounce(sim) -> None:
-    drive.geo_decide_and_apply(sim)
+    records.geo_decide_and_apply(sim)
     sim._geo_agreements()
 
 

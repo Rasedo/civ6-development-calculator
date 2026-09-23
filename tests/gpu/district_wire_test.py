@@ -14,8 +14,8 @@ What this lane holds:
     validating rather than choosing;
   * the removable-feature TECH gate: a district paves its tile, so a feature
     still standing on it must be one this seat could clear;
-  * the record round-trips — `_extract_record` writes the tile as the pair's
-    third element and `replay_seat` puts it back on the plane;
+  * the record round-trips — `records.extract_record` writes the tile as the pair's
+    third element and `records.replay_seat` puts it back on the plane;
   * a REPEATABLE district (`allowMultiple`) goes down twice in one city and
     both are counted, where a plain one is refused the second time.
 """
@@ -35,6 +35,7 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
 from warmup import settle_all
 import drive  # noqa: E402
 import ladder  # noqa: E402
+from core import records  # noqa: E402
 
 
 _BASE: dict = {}
@@ -193,10 +194,10 @@ def main() -> None:
     # every decision slot by NAME: the record grows a slot most rounds, and a
     # positional call here broke on two of them in one week
     import inspect
-    kw = {name: None for name in inspect.signature(drive._extract_record).parameters}
+    kw = {name: None for name in inspect.signature(records.extract_record).parameters}
     kw.update(sim=rec_sim, row=row, prod=prod6, dtile=dt6,
               seq=torch.full((1, 1, 1), -1, dtype=torch.long), b=0)
-    rec = drive._extract_record(**kw)
+    rec = records.extract_record(**kw)
     ent = next(e for e in rec["production"] if int(e[1]) == rec_sim.DISTRICT_BASE + si)
     assert len(ent) == 3, f"a district entry must carry its tile, got {ent}"
     assert int(ent[2]) == t6, f"the record wrote tile {ent[2]}, the policy chose {t6}"
@@ -205,7 +206,7 @@ def main() -> None:
     back = build(rules, path)
     back.seat_ext[0, row] = True
     back.city_current[0, row, j, 0] = -1
-    drive.replay_seat(back, row, {"production": rec["production"], "tech": None, "civic": None, "units": []})
+    records.replay_seat(back, row, {"production": rec["production"], "tech": None, "civic": None, "units": []})
     back._seat_record_apply(row, torch.ones(1, dtype=torch.bool))
     assert int(back.city_dist_tile[0, row, j, di]) == t6, \
         "the replay put the district somewhere other than the recorded tile"

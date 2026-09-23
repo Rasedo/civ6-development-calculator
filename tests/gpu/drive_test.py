@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
 from core import load_rules, load_fixture, fixture_paths
 from core.env import BatchEnv
-import drive
+from core import records
 
 
 TURNS = 120
@@ -44,7 +44,7 @@ def main() -> None:
     # the driver's doing, so the floors are ABSOLUTE (there is no scripted
     # reference to compare against; an undriven seat stays at 0/2/0/0 forever).
     b = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    log = drive.drive(b, TURNS, seats=[1])
+    log = records.drive_single(b, TURNS, seats=[1])
     got = seat_state(b.sim)
 
     assert len(log) == TURNS, f"driver logged {len(log)} turns, expected {TURNS}"
@@ -72,7 +72,7 @@ def main() -> None:
     #    the ladder anything, no other engine could reproduce the trajectory
     #    from the file.
     c = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    drive.replay(c, log, seats=[1])
+    records.replay(c, log, seats=[1])
     rep = seat_state(c.sim)
     assert rep == got, f"replay diverged from the driven run: {rep} vs {got}"
     assert bool((b.sim.major_unit_tile == c.sim.major_unit_tile).all()), "replay put units on different tiles"

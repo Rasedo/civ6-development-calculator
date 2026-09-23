@@ -1,7 +1,7 @@
 /** THE FILE IS THE INTERFACE, TypeScript half.
  *
  * `gpu/drive.py` records a driven seat's decisions as mask COLUMNS and
- * `gpu/drive.replay` proves a replay reproduces a GPU run exactly. For the
+ * `gpu/core/records.replay` proves a replay reproduces a GPU run exactly. For the
  * transcription in `phase.ts` to be DELETED rather than merely duplicated, this
  * engine has to reach the same state from the same file.
  *

@@ -28,10 +28,10 @@ def developed(rules, path, turns=40, seats=None, dtype=torch.float64):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
     from core.env import BatchEnv
     from core import load_fixture
-    import drive
+    from core import records
 
     env = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=dtype)
-    drive.drive(env, turns, seats=seats if seats is not None else list(range(env.sim.n_majors)))
+    records.drive_single(env, turns, seats=seats if seats is not None else list(range(env.sim.n_majors)))
     return env.sim
 
 

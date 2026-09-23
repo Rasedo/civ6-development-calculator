@@ -37,6 +37,7 @@ from core import statecompare  # noqa: E402
 from core.env import BatchEnv  # noqa: E402
 import drive  # noqa: E402
 import ladder  # noqa: E402
+from core import records  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -316,7 +317,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     if os.environ.get("CIV6_DIFFLOG"):
         sim._log_diff = True
     for row in seats:
-        drive.take_seat(sim, row)
+        records.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
     ctx_lo = env.observe(0).shape[1] - ladder.CTX_SEAT
 
@@ -438,7 +439,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 # SAME reads feed the policy below.
                 gr_f, gr_d = sim._seat_route_candidate(seat)
                 # the decide pass reuses these pre-decide reads verbatim —
-                # nothing between here and _decide_turn mutates their inputs
+                # nothing between here and the decide mutates their inputs
                 # (geo_decide_and_apply only STASHES; observe reads none of it)
                 pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "bctx": bc, "obs": gobs_all,
                                   "route": (gr_f, gr_d)}
@@ -481,19 +482,14 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             if bad:
                 break
             _t = _pc()
-            geo = drive.geo_decide_and_apply(sim, seeds)
+            geo = records.geo_decide_and_apply(sim, seeds)
             # ONE decide body, ONE record shape, every major row, seat 0 first.
-            # Seat 0 rides `_decide_turn` like the rest, which also hands it the
-            # MULTI-RANK unit plan every other row already had (its own block
-            # only ever emitted rank 0) and the `denounce`/`ally` record fields
-            # its block never carried at all — the GPU has been applying row 0's
-            # geo intents while the wire told the TS child nothing about them.
-            per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t, pre=pre_seat.get(row)) for row in seats}
+            per_seat = {row: records.decide_and_apply(env, sim, row, roster, classes, seeds=seeds, turn=t, pre=pre_seat.get(row)) for row in seats}
             prof["decide (policy on GPU)"] += _pc() - _t
             _t = _pc()
             for b, ch in enumerate(children):
-                recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], b),
-                                   **drive._extract_geo(geo, row, b)} for row in seats}
+                recs = {str(row): {**records.extract_record(sim, row, *per_seat[row], b),
+                                   **records.extract_geo(geo, row, b)} for row in seats}
                 _log_recs(seeds[b], t + 1, recs)
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
@@ -662,7 +658,7 @@ def main() -> None:
     if os.environ.get("CIV6_DIFFLOG"):
         sim._log_diff = True
     for row in seats:
-        drive.take_seat(sim, row)
+        records.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
     ctx_lo = env.observe(0).shape[1] - ladder.CTX_SEAT
 
@@ -791,10 +787,10 @@ def main() -> None:
                         break
         if obs_bails:
             break
-        geo = drive.geo_decide_and_apply(sim, [args.seed])
-        per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=[args.seed], turn=t, pre=pre_seat.get(row)) for row in seats}
-        recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], 0),
-                           **drive._extract_geo(geo, row, 0)} for row in seats}
+        geo = records.geo_decide_and_apply(sim, [args.seed])
+        per_seat = {row: records.decide_and_apply(env, sim, row, roster, classes, seeds=[args.seed], turn=t, pre=pre_seat.get(row)) for row in seats}
+        recs = {str(row): {**records.extract_record(sim, row, *per_seat[row], 0),
+                           **records.extract_geo(geo, row, 0)} for row in seats}
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         _log_recs(args.seed, t + 1, recs)

@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT / "gpu"))
 sys.path.insert(0, str(ROOT / "policy"))
 from core import load_rules, load_fixture, fixture_paths  # noqa: E402
 from core.env import BatchEnv  # noqa: E402
-import drive  # noqa: E402
+from core import records  # noqa: E402
 
 READINGS = {
     "A engine":  dict(lump=10,  theo=15.0,  condemn=7,   pop_stream=False),
@@ -86,7 +86,7 @@ def run_one(path: Path, r: dict, turns: int) -> dict:
     reverts = 0
     first = None
     for t in range(1, turns + 1):
-        drive.drive_batched(env, 1, list(range(nm)))
+        records.drive_batched(env, 1, list(range(nm)))
         cur = sim.city_followed[0, :nm]
         changed = (cur != prev) & (cur >= 0)
         for row, col in changed.nonzero().tolist():
