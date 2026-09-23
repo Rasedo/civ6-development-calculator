@@ -128,10 +128,11 @@ def main() -> None:
     sim.civ_civics[0, rome, uc] = True
     assert not bool(ok(rome, SX)[0, t]), "Rome's never does"
     assert not bool(ok(egypt, ZG).any()) and not bool(ok(rome, ZG).any()), "no row plays Sumeria"
-    # a water tile and a resourced tile answer their own rows, never a unique
-    # (`validImprovementsIn` leaves before its catalog loop on both)
+    # a water tile and a tile with a resource the seat sees answer their own
+    # rows, never a unique (`validImprovementsIn` leaves before its catalog
+    # loop on both); an unseen strategic is plain ground
     assert not bool((ok(egypt, SX) & sim.water).any()), "a Sphinx on water"
-    assert not bool((ok(egypt, SX) & (sim.res_imp >= 0)).any()), "a Sphinx on a resourced tile"
+    assert not bool((ok(egypt, SX) & ~sim._res_bare(egypt)).any()), "a Sphinx on a seen resource"
     wood = own_tile_where(sim, egypt, lambda x: int(sim.feat_id[0, x]) in sim._woods_feats.tolist()
                           and not bool(sim.feat_stripped[0, x]) and not bool(sim.water[0, x]))
     if wood >= 0:

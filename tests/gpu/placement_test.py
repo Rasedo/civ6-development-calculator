@@ -153,7 +153,7 @@ def main() -> None:
     ok = sim._suz_improvement_ok(row, k)[0]
     # the row's own clause on a Builder's plain ground — a resourced or water
     # tile answers its own rows (`validImprovementsIn` leaves before the loop)
-    ground = sim._imp_ground_ok(k)[0] & sim._builder_ground()[0]
+    ground = sim._imp_ground_ok(k)[0] & sim._builder_ground(row)[0]
     assert bool((ok == ground).all()), (
         "with the suzerainty held, the offer is exactly the ground clause")
     assert bool(ground.any()) and not bool(ground.all()), (
