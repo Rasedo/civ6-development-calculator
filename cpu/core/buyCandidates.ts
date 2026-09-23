@@ -8,30 +8,29 @@
  * Cities are named by CENTRE tile, -1 where none; the field names are the
  * `buy` and `route` groups of `shared/decide.schema.json`.
  */
-import type { City, DistrictId, GameState, Seat, Tile } from './types';
-import { civsAtWar, seatOf, tileBelongsTo } from './seats';
+import type { City, DistrictId, GameState, Seat } from './types';
+import { civOf, civsAtWar, seatOf } from './seats';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, CITY_WORK_RADIUS } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routeInRange, routePostGold } from './trade';
 import { isExplored } from './fog';
 import {
   buildingFaithCost, faithBuyableClass, faithBuysLandUnits, goldAffordable, naturalistCost, rockBandCost,
-  settlerCost, tilePurchaseCost, unitFaithCost, unitPurchaseCost, unitsAcquired, wallsGoldBlocked,
-} from './game';
+  settlerCost, tilePurchaseCost, unitFaithCost, unitPurchaseCost, unitsAcquired, wallsGoldBlocked, buildingPurchaseCost } from './game';
 import { goldenDedication, monumentalityBuyMult } from './eras';
 import { builderCost, goldBuyableUnits, purchaseSpotBlocked, trainableUnits } from './units';
 import { hasMet, isSuzerain } from './cityStates';
 import { pickBorderTile } from './city';
 import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
-import { availableBuildings, buildingCompletable, canPlaceDistrictIn, goldPurchasableBuildings } from './rules';
+import { availableBuildings, buildingCompletable, goldPurchasableBuildings } from './rules';
 import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from './effects';
 import { congressUdtBlockedDistrict } from './congress';
-import { districtSiteCost, levyGoldCost } from './phase';
+import { districtSiteCost, districtSiteLegal, levyGoldCost } from './phase';
 import { patronageCost } from './greatPeople';
 import { governorFlag } from './governors';
 import { prodLayout } from './prodLayout';
 import { UNITS } from '../data/units';
-import { BUILDINGS } from '../data/buildings';
+import { effectiveBuilding } from '../data/buildings';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { GP_CLASSES } from '../data/greatPeople';
 import { LEVY_COOLDOWN } from '../data/cityStates';
@@ -131,15 +130,19 @@ function bIdx(id: string): number {
  *  city, in the seat's array order): the lowest price, then the lower layout
  *  row, then the earlier city. */
 function cheapestBuilding(
-  actor: Seat, offers: (city: City) => { id: string; cost: number }[],
+  state: GameState, actor: Seat, offers: (city: City) => { id: string }[],
 ): { city: City; id: string } | null {
+  // ordered by the SEAT's own row cost (a unique building's own Cost), the
+  // GPU's `_b_cols` key
+  const civ = civOf(state, actor.seat);
   let best: { city: City; id: string; cost: number; b: number } | null = null;
   for (const city of actor.cities) {
     for (const def of offers(city)) {
       const b = bIdx(def.id);
       if (b < 0) continue;
-      if (!best || def.cost < best.cost || (def.cost === best.cost && b < best.b)) {
-        best = { city, id: def.id, cost: def.cost, b };
+      const cost = effectiveBuilding(civ, def.id)?.cost ?? 0;
+      if (!best || cost < best.cost || (cost === best.cost && b < best.b)) {
+        best = { city, id: def.id, cost, b };
       }
     }
   }
@@ -152,17 +155,11 @@ function cheapestBuilding(
  *  layout row 0 in the first city at that row's price, with `can` false —
  *  the GPU observation's value for an empty candidate set. */
 export function goldBuildingCandidate(state: GameState, actor: Seat): { city: number; bldg: number; can: boolean; price: number } {
-  const best = cheapestBuilding(actor, (city) => goldPurchasableBuildings(state, city).filter((def) =>
+  const best = cheapestBuilding(state, actor, (city) => goldPurchasableBuildings(state, city).filter((def) =>
     !def.worship && !def.noPurchase && !wallsGoldBlocked(state, actor.seat, def.id)
     && buildingCompletable(state, city, def.id)));
-  if (!best) {
-    const id0 = prodLayout().buildings[0];
-    return {
-      city: actor.cities[0]?.centerIndex ?? -1, bldg: 0, can: false,
-      price: goldPrice(state, actor.seat, (BUILDINGS[id0]?.cost ?? 0) * GOLD_PURCHASE_MULT),
-    };
-  }
-  const price = goldPrice(state, actor.seat, BUILDINGS[best.id].cost * GOLD_PURCHASE_MULT);
+  if (!best) return { city: -1, bldg: -1, can: false, price: 0 };
+  const price = goldPrice(state, actor.seat, buildingPurchaseCost(state, actor.seat, best.id));
   const can = Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + PEACE_GOLD_COST(0)) * 1000);
   return { city: best.city.centerIndex, bldg: bIdx(best.id), can, price };
 }
@@ -172,7 +169,7 @@ export function goldBuildingCandidate(state: GameState, actor: Seat): { city: nu
  *  city's list, completable, the cheapest one affordable in faith. */
 export function faithClassCandidate(state: GameState, actor: Seat): { ok: boolean; city: number; bldg: number } {
   const none = { ok: false, city: -1, bldg: -1 };
-  const best = cheapestBuilding(actor, (city) => availableBuildings(state, city).filter((def) =>
+  const best = cheapestBuilding(state, actor, (city) => availableBuildings(state, city).filter((def) =>
     faithBuyableClass(state, actor.seat, def.id) && buildingCompletable(state, city, def.id)));
   if (!best) return none;
   const cost = faithPrice(state, actor.seat, buildingFaithCost(state, actor.seat, best.id));
@@ -280,9 +277,9 @@ export function districtBuyCandidate(state: GameState, actor: Seat, viaFaith: bo
     if (!goldAffordable(purse, price)) continue;
     for (const city of gated) {
       const ctr = state.map.tiles[city.centerIndex];
-      const owns = (t: Tile) => tileBelongsTo(t, city);
+      // the site test the purchase applier re-validates (`districtSiteLegal`)
       const sites = tilesWithin(state.map, ctr.col, ctr.row, CITY_WORK_RADIUS)
-        .filter((t) => !t.improvement && canPlaceDistrictIn(state, city, id, t.index, { unlocks, ownsTile: owns }).ok)
+        .filter((t) => districtSiteLegal(state, city, id, unlocks, t.index))
         .map((t) => t.index);
       if (sites.length) return { ok: true, tile: Math.min(...sites), row: si };
     }
@@ -431,24 +428,3 @@ export function buyContext(state: GameState, seat: number): BuyContext {
   return out;
 }
 
-/** The BUY tripwire row, read off `buyContext` in the shape the gate's
- *  `_buy_row` reads the GPU's: [centre, bIdx, settlerOk, unitOk, tileOk,
- *  tile, tileCentre, worshipCentre, religKind, religCentre, levyIdx,
- *  monuKind, monuCentre, natKind, natCentre]; the religious unit is the
- *  missionary, else the apostle, else the inquisitor, and the Monumentality
- *  civilian the settler, else the builder. */
-export function buyCandidateRow(state: GameState, actor: Seat): number[] {
-  const b = buyContext(state, actor.seat);
-  const [rk, rc] = b.missionary_ok ? [5, b.missionary_city]
-    : b.apostle_ok ? [6, b.apostle_city]
-      : b.inquisitor_ok ? [11, b.inquisitor_city] : [-1, -1];
-  const mk = b.monu_settler_ok ? 9 : b.monu_builder_ok ? 8 : -1;
-  return [
-    b.can_building ? b.bldg_city : -1, b.can_building ? b.bldg : -1,
-    b.settler_ok ? 1 : 0, b.unit_ok ? 1 : 0, b.tile_ok ? 1 : 0,
-    b.tile_ok ? b.tile : -1, b.tile_ok ? b.tile_city : -1,
-    b.worship_ok ? b.worship_city : -1, rk, rc,
-    b.levy_ok ? b.levy_cs : -1, mk, mk >= 0 ? b.spawn_city : -1,
-    b.nat_ok ? 10 : -1, b.nat_ok ? b.nat_city : -1,
-  ];
-}

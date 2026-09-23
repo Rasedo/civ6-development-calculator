@@ -18,7 +18,6 @@ import { writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Tile } from '../core/types';
 import { allCities, campTiles, cityHolders, seatOf, tileOwnedByCiv } from '../core/seats';
 import { endTurn, engineerFinishCity } from '../core/game';
-import { buyCandidateRow, routeCandidateRow } from '../core/buyCandidates';
 import { observeSeat } from '../core/observe';
 import { worldObs, seatGroups } from '../core/decideObs';
 import { stateDigest, groupDump } from '../core/statecompare';
@@ -106,8 +105,6 @@ for (let t = 0; t < N_TURNS; t++) {
     // (d*(T+1) + centreIndex key), religious charge-carriers only.
     const jobsMsg: Record<string, number[]> = {};
     const spreadsMsg: Record<string, number[]> = {};
-    const buysMsg: Record<string, number[]> = {};
-    const routesMsg: Record<string, number[]> = {};
     const nT = state.map.tiles.length;
     for (let seat = 0; seat < N_MAJORS; seat++) {
       const actor = seatOf(state, seat);
@@ -181,8 +178,6 @@ for (let t = 0; t < N_TURNS; t++) {
           }
           sr.push(st);
         }
-        buysMsg[String(seat)] = buyCandidateRow(state, actor);
-        routesMsg[String(seat)] = routeCandidateRow(state, actor);
       }
       jobsMsg[String(seat)] = jr;   // seat-keyed wire
       spreadsMsg[String(seat)] = sr;
@@ -197,7 +192,7 @@ for (let t = 0; t < N_TURNS; t++) {
     const neutralSeats: Record<number, Record<string, unknown>> = {};
     for (const s of state.seats) neutralSeats[s.seat] = seatGroups(state, s.seat);
     o.send({
-      t: state.turn, obs, world: worldObs(state), neutral: neutralSeats, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg, routes: routesMsg,
+      t: state.turn, obs, world: worldObs(state), neutral: neutralSeats, jobs: jobsMsg, spreads: spreadsMsg,
       ...(dlT ? { dl: trimByKind(dlT) } : {}),
     });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };

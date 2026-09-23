@@ -230,20 +230,32 @@ def _buy_ctx(sim, row: int) -> dict:
     alive_row = sim.city_alive[:, row]
     n_cities = alive_row.sum(dim=1)
     active = sim.seat_ext[:, row] & (n_cities > 0) & sim.civ_alive[:, row]
-    jj, bb, can_b, price, _ = sim._seat_buy_candidates(row, active)
+    jj, bb, can_b, price, elig_b = sim._seat_buy_candidates(row, active)
+    # no eligible building at all: the candidate is NONE (-1, -1, price 0),
+    # not the argmin of an all-infinite key (slot 0, building 0)
+    has_b = active & elig_b.reshape(elig_b.shape[0], -1).any(dim=1)
+    jj = torch.where(has_b, jj, torch.full_like(jj, -1))
+    bb = torch.where(has_b, bb, torch.full_like(bb, -1))
+    price = torch.where(has_b, price, torch.zeros_like(price))
     # `settlerCost` counts every settler on order, at any depth in any queue
     _sq = (alive_row.unsqueeze(2) & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=(1, 2))
     sett_base = (sim.rules.settler_base + sim.rules.settler_per_city
                  * (n_cities - 1 + sim._seat_settlers(row) + _sq).clamp(min=0).double())
     mon_g = sim._golden_ded(row, sim._ded_monumentality)
-    sett_cost = sim._gold_price(row, sett_base * sim.rules.gold_purchase_mult)
-    sett_cost = torch.where(mon_g, sett_cost * 0.7, sett_cost)
+    # the 0.7 before the five-step floor, as the buy arm prices it
+    _sb = sett_base * sim.rules.gold_purchase_mult
+    sett_cost = sim._gold_price(row, torch.where(mon_g, _sb * 0.7, _sb))
     # the buy SPAWNS a unit at the capital (else first city), which must have
     # the pop to pay — the TS driver's tripwire mirrors this exactly.
     _cap_is = sim.city_is_cap[:, row]
     _spawn_slot = torch.where(_cap_is.any(dim=1), _cap_is.long().argmax(dim=1), alive_row.long().argmax(dim=1))
     _spawn_pop = sim.city_pop[:, row].gather(1, _spawn_slot.unsqueeze(1)).squeeze(1)
-    settler_ok = active & (_spawn_pop >= sim.rules.settler_pop_gate) & sim._afford(sim.civ_treasury[:, row], sett_cost)
+    # ...and a civilian may stand there (`purchaseSpotBlocked`): the buy arm
+    # only lands the settler on a free centre, and the candidate says so
+    _spawn_ctr = sim.city_center[:, row].gather(1, _spawn_slot.unsqueeze(1)).clamp(min=0)
+    _spot_free = ~sim._blocked_for(_spawn_ctr, row, is_civilian=True)[:, 0]
+    settler_ok = active & (_spawn_pop >= sim.rules.settler_pop_gate) & _spot_free \
+        & sim._afford(sim.civ_treasury[:, row], sett_cost)
     cand_u = sim._seat_buy_unit_candidates(row, sim._seat_trainable_units(row))
     unit_ok = active & (sim._seat_army_count(row) < 2 * n_cities) & cand_u.any(dim=1)
     tile_j, tile_t, _tile_cost, tile_ok = sim._seat_tile_buy_candidate(row, active)

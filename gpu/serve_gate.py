@@ -211,44 +211,6 @@ def neutral_diff(path: str, g, t) -> str | None:
     return None
 
 
-def _buy_row(o: dict, rk: int, rc: int, mk: int) -> list:
-    """One game's row of the BUY-candidate tripwire, read off the neutral
-    observation in the TS driver twin's exact shape — shared by the batched
-    and single-seed paths so the two cannot drift: [centre, bIdx, settlerOk,
-    unitOk, tileOk, tile, tileCentre, worshipCentre, religKind, religCentre,
-    levyIdx, monuKind, monuCentre, natKind, natCentre]."""
-    bu = o["buy"]
-    return [
-        bu["bldg_city"] if bu["can_building"] else -1,
-        bu["bldg"] if bu["can_building"] else -1,
-        int(bu["settler_ok"]), int(bu["unit_ok"]), int(bu["tile_ok"]),
-        bu["tile"] if bu["tile_ok"] else -1,
-        bu["tile_city"] if bu["tile_ok"] else -1,
-        bu["worship_city"] if bu["worship_ok"] else -1,
-        rk,
-        rc,
-        bu["levy_cs"] if bu["levy_ok"] else -1,
-        mk,
-        bu["spawn_city"] if mk >= 0 else -1,
-        10 if bu["nat_ok"] else -1,
-        bu["nat_city"] if bu["nat_ok"] else -1,
-    ]
-
-
-def _buy_rows(nobs: list) -> list:
-    """The tripwire rows of one seat, one per game. The TS twin picks the
-    religious unit among missionary, apostle and inquisitor only."""
-    bc = drive._obs_group(nobs, "buy", "cpu")
-    _, rk = ladder.pick_faith(bc["worship_ok"], bc["missionary_ok"], bc["apostle_ok"],
-                              bc["inquisitor_ok"])
-    rc = torch.where(rk == 5, bc["missionary_city"],
-                     torch.where(rk == 6, bc["apostle_city"],
-                                 torch.where(rk == 11, bc["inquisitor_city"],
-                                             torch.full_like(rk, -1))))
-    mk = ladder.pick_monu(bc["monu_builder_ok"], bc["monu_settler_ok"])
-    rk_l, rc_l, mk_l = rk.tolist(), rc.tolist(), mk.tolist()
-    return [_buy_row(o, rk_l[b], rc_l[b], mk_l[b]) for b, o in enumerate(nobs)]
-
 
 def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> str:
     if i < ladder.EMP:
@@ -486,6 +448,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     _reds, _n = neutral_seat_diffs(seat, nobs_seat[seat][b], msg)
                     for _d in _reds:
                         flag(f"seed {seeds[b]} turn {t + 1}: NEUTRAL {_d}")
+                    # the DECOMPOSITION belongs to whatever flagged: a group
+                    # red never reaches a digest dump, so its evidence prints here
+                    if _reds and sim._log_diff:
+                        for _ln in diff_pairs(sim._diff_events.get(b, []), msg.get("dl", [])):
+                            print(_ln)
                     groups_checked += _n
                 # Every seat's unit rows ride `_seat_slot_map` — this seat's
                 # LIVING units in slot order, which IS the TS array order it
@@ -494,7 +461,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 gs_t = drive._spread_targets(st, nobs_seat[seat])
                 gj_all = gj_t.tolist()
                 gs_all = gs_t.tolist()
-                gb_all = _buy_rows(nobs_seat[seat])
                 # the decide pass reuses the other pre-decide reads verbatim
                 pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t}
                 for b, msg in enumerate(msgs):
@@ -515,24 +481,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                             if gv != tv:
                                 flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: {name.upper()} row {i}: GPU {gv} vs TS {tv}")
                                 break
-                    if True:
-                        tb = msg.get("buys", {}).get(str(seat), [])
-                        if tb and gb_all[b] != tb:
-                            flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC,natKind,natC]: GPU {gb_all[b]} vs TS {tb}")
-                        tr = msg.get("routes", {}).get(str(seat), [])
-                        _rt = nobs_seat[seat][b]["route"]
-                        gr_b = [_rt["from"], _rt["dest"]]
-                        if tr and gr_b != tr:
-                            flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: ROUTE [from,dest]: GPU {gr_b} vs TS {tr}")
-                            # the DECOMPOSITION belongs to whatever flagged,
-                            # not to the keyed diff alone: a driver-twin
-                            # failure never reaches a group dump, and printing
-                            # nothing there is how the route pair went three
-                            # runs without its own evidence.
-                            if sim._log_diff:
-                                for _ln in diff_pairs(sim._diff_events.get(b, []),
-                                                      msg.get("dl", [])):
-                                    print(_ln)
             prof["obs+targets compare (GPU obs, buys, jobs)"] += _pc() - _t
             if bad:
                 break
@@ -813,23 +761,6 @@ def main() -> None:
             ts_ = msg.get("spreads", {}).get(str(seat), [])
             if True:
                 pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t}
-                gb = _buy_rows(nobs_seat[seat])[0]
-                tb = msg.get("buys", {}).get(str(seat), [])
-                if tb and gb != tb:
-                    rep = f"turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC,natKind,natC]: GPU {gb} vs TS {tb}"
-                    print(rep)
-                    if first_report is None:
-                        first_report = rep
-                    obs_bails += 1
-                tr = msg.get("routes", {}).get(str(seat), [])
-                _rt = nobs_seat[seat][0]["route"]
-                gr_b = [_rt["from"], _rt["dest"]]
-                if tr and gr_b != tr:
-                    rep = f"turn {t + 1} seat {seat}: ROUTE [from,dest]: GPU {gr_b} vs TS {tr}"
-                    print(rep)
-                    if first_report is None:
-                        first_report = rep
-                    obs_bails += 1
             for name, ga, ta in (("job", gj, tj), ("spread", gs, ts_)):
                 for i in range(max(len(ga), len(ta))):
                     gv = ga[i] if i < len(ga) else -1

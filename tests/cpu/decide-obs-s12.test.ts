@@ -11,7 +11,7 @@ import { foundCity } from '../../cpu/core/game';
 import { emptySeat, setWar } from '../../cpu/core/seats';
 import { seatGroups } from '../../cpu/core/decideObs';
 import { SEAT_GROUPS } from '../../cpu/core/decideObsBuy';
-import { buyCandidateRow, patronageCandidate } from '../../cpu/core/buyCandidates';
+import { patronageCandidate } from '../../cpu/core/buyCandidates';
 import { GP_CLASSES } from '../../cpu/data/greatPeople';
 import { UNITS } from '../../cpu/data/units';
 import type { CityState, GameState } from '../../cpu/core/types';
@@ -127,12 +127,4 @@ describe('purchase and route groups', () => {
     expect([b.ucls_ok, b.ucls_city, b.ucls_unit, b.cls_ok, b.cls_bldg]).toEqual([false, -1, -1, false, -1]);
   });
 
-  it('the tripwire row reads the group', () => {
-    const state = scene();
-    state.seats[0].cities[0].population = 2;
-    state.seats[0].treasury = 10_000;
-    const row = buyCandidateRow(state, state.seats[0]);
-    expect(row).toHaveLength(15);
-    expect(row[2]).toBe(1);
-  });
 });

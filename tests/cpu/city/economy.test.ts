@@ -26,7 +26,7 @@ describe('gold & faith purchases', () => {
   it('buys a building outright at 4x production cost', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
-    const cost = buildingPurchaseCost('MONUMENT');
+    const cost = buildingPurchaseCost(state, 0, 'MONUMENT');
     expect(cost).toBeGreaterThan(0);
     seatOf(state, 0)!.treasury = purchaseStep(cost) + 10;
     const r = purchaseBuilding(state, city.id, 'MONUMENT', 0);
@@ -57,7 +57,7 @@ describe('gold & faith purchases', () => {
     expect(goldPurchasableBuildings(state, city).map((b) => b.id)).toContain('MONUMENT');
 
     const bank = city.productionBank ?? 0;
-    seatOf(state, 0)!.treasury = buildingPurchaseCost('MONUMENT');
+    seatOf(state, 0)!.treasury = buildingPurchaseCost(state, 0, 'MONUMENT');
     expect(purchaseBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
     expect(city.buildings).toContain('MONUMENT');
     expect(city.queue.some((q) => q.kind === 'building' && q.building === 'MONUMENT')).toBe(false);

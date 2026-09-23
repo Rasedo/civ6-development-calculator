@@ -2571,10 +2571,13 @@ class SimSeats:
         if kind is not None and self._settler_idx >= 0:
             # CIV6 (GS Civilopedia, Monumentality, Golden face): "Builders and
             # Settlers are 30% cheaper to purchase with Faith and Gold."
-            # Literal 0.7 applied LAST, like the TS twin (1.0 - 0.3 != 0.7 in f64).
-            sett_price = self._gold_price(row, self._seat_settler_cost(row) * mult)
+            # The literal 0.7 multiplies the price BEFORE the five-step floor,
+            # which every purchase takes last (`goldPrice`; the TS twin
+            # multiplies settlerCost x GOLD_PURCHASE_MULT x 0.7 in that order;
+            # 1.0 - 0.3 != 0.7 in f64)
             mon = self._golden_ded(row, self._ded_monumentality)
-            sett_price = torch.where(mon, sett_price * 0.7, sett_price)
+            _sc = self._seat_settler_cost(row) * mult
+            sett_price = self._gold_price(row, torch.where(mon, _sc * 0.7, _sc))
             ctr_s = self.city_center[bidx, row, spawn_slot].clamp(min=0)
             pop_s = self.city_pop[bidx, row, spawn_slot]
             want_s = (kind == 1) & active & ext & ~bought & (n_cities > 0) \

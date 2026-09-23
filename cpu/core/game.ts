@@ -41,7 +41,7 @@ import type { FeatureId } from '../../world/types';
 import { isWater, deriveContinents, deriveMountainRanges } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
@@ -650,9 +650,11 @@ export function queueProject(state: GameState, cityId: number, projectId: string
 }
 
 
-/** Gold price to buy a building outright (Civ 6's 4× production cost). */
-export function buildingPurchaseCost(buildingId: string): number {
-  return (BUILDINGS[buildingId]?.cost ?? 0) * GOLD_PURCHASE_MULT;
+/** Gold price to buy a building outright (Civ 6's 4× production cost), at
+ *  the SEAT's own row: a unique building costs its own `Buildings.Cost`
+ *  (`effectiveBuilding`; the GPU's `_b_cols`). Before the five-step floor. */
+export function buildingPurchaseCost(state: GameState, seat: number, buildingId: string): number {
+  return (effectiveBuilding(civOf(state, seat), buildingId)?.cost ?? 0) * GOLD_PURCHASE_MULT;
 }
 
 /** Faith price of a worship building. CIV6 (GS Civilopedia, Cathedral):
@@ -669,7 +671,8 @@ export function buildingFaithCost(state: GameState, seat: number, buildingId: st
   // `VALLETTA_WALLS_DISCOUNT_PCT` off, and by that suzerain alone.
   const cut = (BUILDINGS[buildingId]?.walls ?? 0) > 0 && suzerainEffect(state, seat, 'faithBuildings')
     ? VALLETTA_WALLS_DISCOUNT_PCT : 0;
-  return Math.round((BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT * (100 - cut) / 100);
+  // the SEAT's own row: a unique building costs its own Cost (the GPU's `_b_cols`)
+  return Math.round((effectiveBuilding(civOf(state, seat), buildingId)?.cost ?? 0) * FAITH_PURCHASE_MULT * (100 - cut) / 100);
 }
 
 /**
@@ -791,7 +794,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
       if (!goldAffordable(buyer.faith, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
       buyer.faith -= cost;
     } else {
-      const cost = goldPrice(state, seat, buildingPurchaseCost(buildingId));
+      const cost = goldPrice(state, seat, buildingPurchaseCost(state, seat, buildingId));
       if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
       buyer.treasury -= cost;
     }
