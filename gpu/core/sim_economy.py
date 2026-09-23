@@ -3737,6 +3737,12 @@ class SimEconomy:
             _conv = (_fol1 == _g) & (was != _g) & liv
             if bool(_conv.any()):
                 self._dedication_event(_g, 3, _conv.reshape(B, -1).sum(dim=1))
+                # CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_CONVERT): each of a
+                # major's cities that came to follow another major's religion
+                # this turn is one conversion
+                for _a in range(M):
+                    if _a != _g:
+                        self._promise_incursion(_a, _g, self.PROMISE_CONVERT, _conv[:, _a].sum(dim=1))
 
     def _route_pressure_share(self, base: float, pct: torch.Tensor) -> torch.Tensor:
         """[B] long — `routePressureShare`'s twin: a per-turn route amount's

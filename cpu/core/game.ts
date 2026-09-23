@@ -26,6 +26,8 @@ import { placeCityStates, cityStatePhase, resolveSuzerains, suzerainEffect, suze
 import { minorPhase } from './minorBuild';
 import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
+import { promiseIncursion } from './grievance';
+import { PROMISE_CONVERT } from '../data/promises';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { gpPermOf } from '../data/greatPeople';
@@ -2101,6 +2103,7 @@ function spreadReligiousPressure(state: GameState): void {
     ? state.seats.filter((o) => o.seat !== sx.seat && founded[o.seat]
       && alliedAtLevel(state, sx.seat, o.seat, ALLIANCE_RELIGIOUS, 3)).map((o) => o.seat)
     : []);
+  const converted = new Map<string, number>();
   for (const city of cities) {
     let pres = city.religionPressure;
     if (!pres || pres.length !== nRel) {
@@ -2137,7 +2140,16 @@ function spreadReligiousPressure(state: GameState): void {
     const best = followedReligionOf(pres, city.population);
     const wasFollowed = city.followedReligion ?? -1;
     city.followedReligion = best >= 0 ? best : null;
-    if (best >= 0 && best !== wasFollowed) dedicationEvent(state, best, DED_EXODUS);
+    if (best >= 0 && best !== wasFollowed) {
+      dedicationEvent(state, best, DED_EXODUS);
+      converted.set(`${city.seat}>${best}`, (converted.get(`${city.seat}>${best}`) ?? 0) + 1);
+    }
+  }
+  // CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_CONVERT): each of a major's cities
+  // that came to follow another major's religion this turn is one conversion
+  for (const [key, n] of converted) {
+    const [victim, actor] = key.split('>').map(Number);
+    promiseIncursion(state, victim, actor, PROMISE_CONVERT, n);
   }
 }
 

@@ -34,6 +34,7 @@ import {
 import { grantStockpile, spendStockpile, stockOf, stockpileCap } from './stockpile';
 import { spawnUnit } from './units';
 import { declareWar, transferCity } from './phase';
+import { tickPromises } from './grievance';
 
 /** The offer `from` has standing with `to`, if any. */
 export function dealOfferOf(state: GameState, from: number, to: number): DealOffer | undefined {
@@ -336,5 +337,6 @@ export function dealPhase(state: GameState): void {
   for (const [key, o] of Object.entries(state.dealOffers ?? {}).sort(byPair)) {
     o.left -= 1;
     if (o.left <= 0) delete state.dealOffers![key];
-  }
+  }  // CIV6: "All Deals, Demands, and Promises last for 30 turns".
+  tickPromises(state);
 }

@@ -425,6 +425,24 @@ def _deal_line(clock: str, planes: tuple):
     return get
 
 
+def _promise_line(sim, b, rows):
+    """THE PROMISE LEDGER from the asker's side: [promiser, the signed turns
+    per promise kind, the retribution window, ...] for every promiser with
+    anything standing, ascending. Majors-only, so the row IS the seat."""
+    pr = sim.seat_promise[b].tolist()
+    br = sim.seat_promise_broken[b].tolist()
+    out = []
+    for c in rows:
+        line: list[int] = []
+        for j in range(sim.n_majors):
+            if j == c:
+                continue
+            if br[c][j] > 0 or any(v != 0 for v in pr[c][j]):
+                line += [j, *[int(v) for v in pr[c][j]], int(br[c][j])]
+        out.append(line)
+    return out
+
+
 def _seat_pair_clock(plane: str):
     """A DIPLOMATIC AGREEMENT clock read the flat way the war and treaty clocks
     are: [opponentSeat, turnsLeft, ...] over the majors it still runs with, in
@@ -648,6 +666,7 @@ SEAT = {
     "spyHeldLevels": _spy_held_levels,
     "dealOffers": _deal_line("deal_offer_left", ("deal_offer_give", "deal_offer_ask")),
     "dealTerms": _deal_line("deal_term_left", ("deal_term_item",)),
+    "promises": _promise_line,
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
 }
 

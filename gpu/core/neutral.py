@@ -118,6 +118,7 @@ class Static:
     deal_items: int
     deal_kind: dict
     comp_aid: int
+    promise_cost: list
 
     def col(self, name: str) -> int:
         """The unit action column called `name`, -1 where the layout has none."""
@@ -212,6 +213,7 @@ def _static(rules, width: int, height: int, n_majors: int, n_citystates: int, de
         deal_items=int(rules.eras["dealItems"]),
         deal_kind={k: kinds.index(k) for k in ("GOLD", "FAVOR", "RESOURCE", "SPY", "OPEN_BORDERS", "JOINT_WAR")},
         comp_aid=comps.index("AID_REQUEST") if "AID_REQUEST" in comps else -1,
+        promise_cost=[_whole(p[0]) for p in rules.eras["promises"]],
     )
 
 
@@ -777,6 +779,10 @@ def geo_obs(sim) -> list:
     gw = torch.stack([torch.stack([(sim._gw_kind_count(r, k) * alive[:, r].long()).sum(dim=1)
                                    for k in range(len(sim._gw_cls))], dim=1)
                       for r in range(n)], dim=1)                        # [B, n, kinds]
+    # [a][b]: a's living cities following b's religion
+    fol = sim.city_followed[:, :n, :alive.shape[2], None]
+    conv = ((fol == torch.arange(n, device=sim.device)) & alive[:, :, :, None]).sum(dim=2)
+    conv = conv * (1 - torch.eye(n, dtype=torch.long, device=sim.device))
     # an offer that no longer stands asks for nothing: the table keeps the
     # accepted or expired bundle behind a zero clock, TS drops the offer
     ask = torch.where((sim.deal_offer_left[:, :n, :n] > 0).reshape(B, n, n, 1, 1),
@@ -794,6 +800,8 @@ def geo_obs(sim) -> list:
         "proximity": prox, "joint_open": jw,
         "spies_held": sim.seat_spy_held[:, :n, :n].sum(dim=3),
         "offer_left": sim.deal_offer_left[:, :n, :n], "offer_ask": ask.reshape(B, n, n, -1),
+        "promise": sim.seat_promise[:, :n, :n],
+        "converted": conv,
     }
     lists = {f: v.tolist() for f, v in cols.items()}
     civics = sim.civ_civics[:, :n]

@@ -73,8 +73,7 @@ export type WarCondition =
   /** CIV6 (Golden Age War): "while you are in a Golden Age with a 'To Arms!' Dedication" */
   | 'toArms'
   /** CIV6 (War of Retribution): "a player who has broken a promise to you
-   *  within the past 30 turns" — neither engine holds a promise, so no seat
-   *  ever meets it (docs/AUDIT.md). */
+   *  within the past 30 turns" (`RequiresBrokenPromise`) */
   | 'brokenPromise'
   /** CIV6 (Ideological War): "a player who is in a different Tier 3 government" */
   | 'differentLateGovernment'

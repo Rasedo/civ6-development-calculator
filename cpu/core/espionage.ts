@@ -45,6 +45,8 @@ import { nextRandom } from './rand';
 import { drawPromoOffer, promoFlag, promoValue, promoValueFor } from './promotions';
 import { disbandUnit, spawnUnit } from './units';
 import { congressPactBanned, congressPactLevels } from './congress';
+import { promiseIncursion } from './grievance';
+import { PROMISE_SPY } from '../data/promises';
 import type { City, CityState, GameState, Seat, Unit } from './types';
 
 export function isSpy(type: string): boolean {
@@ -506,6 +508,9 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
   const lvl = effectiveLevel(state, unit, here.city, m);
   const out = def.certain ? MISSION_SUCCESS_UNDETECTED
     : missionOutcome(missionRoll(state), missionThreshold(def, lvl));
+  // CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_SPY): an offensive operation run in
+  // the city is the spying the promise forbids, whatever its outcome
+  if (def.offensive) promiseIncursion(state, here.seat.seat, unit.seat, PROMISE_SPY, 1);
   if (out <= MISSION_SUCCESS_MUST_ESCAPE) {
     applyMission(state, unit, m, here.city, here.seat.seat, lvl);
     if (def.offensive) {

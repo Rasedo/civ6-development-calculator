@@ -12,7 +12,8 @@
  * against one seat), so no caller ever touches the key.
  */
 import type { GameState } from './types';
-import { warKindWith, citiesOf, civsAtWar, friendTurnsWith, seatOf, seatsAllied, warClockKey, alliedWarDiscount } from './seats';
+import { warKindWith, citiesOf, civsAtWar, friendTurnsWith, grantKey, isCiv, seatOf, seatsAllied, warClockKey, alliedWarDiscount } from './seats';
+import { PROMISES, PROMISE_BROKEN_GRIEVANCE, PROMISE_TURNS, RETRIBUTION_TURNS } from '../data/promises';
 import { WAR_KINDS, WAR_KIND_SURPRISE } from '../data/warKinds';
 import { worldEraIndex } from './eras';
 import { congressGrievanceMult } from './congress';
@@ -235,5 +236,113 @@ function spreadGrievance(state: GameState, victim: number, transgressor: number,
       ? GRIEVANCE_ALLY_SHARE
       : friendTurnsWith(state, s.seat, victim) > 0 ? GRIEVANCE_FRIEND_SHARE : 0;
     if (share > 0) addGrievance(state, s.seat, transgressor, Math.floor((n * share) / 100));
+  }
+}
+
+/**
+ * THE PROMISE LEDGER (GS, `DiplomaticActions_XP2`). Per ordered pair (asker,
+ * promiser) and per promise kind: the turns left on a KEPT promise
+ * (positive), on a REFUSED one (negative), 0 where neither stands. The GPU
+ * twin is `seat_promise`.
+ */
+export function promiseWith(state: GameState, asker: number, promiser: number, kind: number): number {
+  if (asker === promiser) return 0;
+  return state.promises?.[grantKey(asker, promiser)]?.[kind] ?? 0;
+}
+
+function setPromiseWith(state: GameState, asker: number, promiser: number, kind: number, v: number): void {
+  const key = grantKey(asker, promiser);
+  const row = (state.promises ??= {})[key] ?? PROMISES.map(() => 0);
+  row[kind] = v;
+  if (row.every((x) => x === 0)) delete state.promises[key];
+  else state.promises[key] = row;
+}
+
+/** Turns left on the War of Retribution window `promiser`'s last broken
+ *  promise to `asker` opened; 0 where none runs. */
+export function promiseBrokenWith(state: GameState, asker: number, promiser: number): number {
+  if (asker === promiser) return 0;
+  return state.promiseBroken?.[grantKey(asker, promiser)] ?? 0;
+}
+
+/** May `asker` ask `promiser` for promise `kind` now? Two living majors not
+ *  at war, nothing of that kind standing between them, and the asker holding
+ *  the row's `FavorCost`. */
+export function promiseAskable(state: GameState, asker: number, promiser: number, kind: number): boolean {
+  if (kind < 0 || kind >= PROMISES.length || asker === promiser) return false;
+  if (!isCiv(asker) || !isCiv(promiser)) return false;
+  const a = seatOf(state, asker);
+  const p = seatOf(state, promiser);
+  if (!a || !p || a.cities.length === 0 || p.cities.length === 0) return false;
+  if (civsAtWar(state, asker, promiser)) return false;
+  if (promiseWith(state, asker, promiser, kind) !== 0) return false;
+  return (a.diplomaticFavor ?? 0) >= PROMISES[kind].favorCost;
+}
+
+/**
+ * One turn at the table: every ask the records name, then every answer, then
+ * the refusal of what nobody answered. `asks` and `keeps` are [seat, other,
+ * kind] in record order — an ask is (asker, promiser, kind), a keep is
+ * (promiser, asker, kind).
+ *
+ * The asker pays `FavorCost` to ask; CIV6 (World Congress, Favor): "on a
+ * Promise Request that is rejected by the target, then the player gets their
+ * full amount refunded", so a refusal hands it back and the asker holds
+ * `GrievancesForRefusal` against the refuser.
+ */
+export function settlePromises(
+  state: GameState, asks: readonly [number, number, number][], keeps: readonly [number, number, number][],
+): void {
+  const open: [number, number, number][] = [];
+  for (const [asker, promiser, kind] of asks) {
+    if (!promiseAskable(state, asker, promiser, kind)) continue;
+    if (open.some(([a, p, k]) => a === asker && p === promiser && k === kind)) continue;
+    const s = seatOf(state, asker)!;
+    s.diplomaticFavor = (s.diplomaticFavor ?? 0) - PROMISES[kind].favorCost;
+    open.push([asker, promiser, kind]);
+  }
+  const kept = new Set<number>();
+  for (const [promiser, asker, kind] of keeps) {
+    const i = open.findIndex(([a, p, k]) => a === asker && p === promiser && k === kind);
+    if (i < 0 || kept.has(i)) continue;
+    kept.add(i);
+    setPromiseWith(state, asker, promiser, kind, PROMISE_TURNS);
+  }
+  open.forEach(([asker, promiser, kind], i) => {
+    if (kept.has(i)) return;
+    const s = seatOf(state, asker)!;
+    s.diplomaticFavor = (s.diplomaticFavor ?? 0) + PROMISES[kind].favorCost;
+    setPromiseWith(state, asker, promiser, kind, -PROMISE_TURNS);
+    addGrievance(state, asker, promiser, PROMISES[kind].refusal);
+  });
+}
+
+/**
+ * `actor` did `n` times what promise `kind` forbids, to `victim`. A KEPT
+ * promise is BROKEN — CIV6 "Promise Broken" (100 Grievances), the promise
+ * ends and the War of Retribution window opens; a REFUSED one earns
+ * `GrievancesPerIncursion` for each incursion.
+ */
+export function promiseIncursion(state: GameState, victim: number, actor: number, kind: number, n: number): void {
+  if (n <= 0 || victim === actor || !isCiv(victim) || !isCiv(actor)) return;
+  const v = promiseWith(state, victim, actor, kind);
+  if (v > 0) {
+    setPromiseWith(state, victim, actor, kind, 0);
+    (state.promiseBroken ??= {})[grantKey(victim, actor)] = RETRIBUTION_TURNS;
+    addGrievance(state, victim, actor, PROMISE_BROKEN_GRIEVANCE);
+  } else if (v < 0) {
+    addGrievance(state, victim, actor, PROMISES[kind].incursion * n);
+  }
+}
+
+/** Every promise, refusal and retribution window runs one turn toward 0. */
+export function tickPromises(state: GameState): void {
+  for (const [key, row] of Object.entries(state.promises ?? {})) {
+    for (let k = 0; k < row.length; k++) row[k] -= Math.sign(row[k]);
+    if (row.every((x) => x === 0)) delete state.promises![key];
+  }
+  for (const [key, left] of Object.entries(state.promiseBroken ?? {})) {
+    if (left <= 1) delete state.promiseBroken![key];
+    else state.promiseBroken![key] = left - 1;
   }
 }

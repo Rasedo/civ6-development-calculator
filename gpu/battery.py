@@ -726,6 +726,7 @@ def _main() -> int:
                 ("gp_verbs", [py, "tests/gpu/gp_verbs_test.py"], 4),  # the three Great Person VERB clauses: Raffles, Boudica, Tupac Amaru
                 ("war_weariness", [py, "tests/gpu/war_weariness_test.py"], 4),
                 ("space_race", [py, "tests/gpu/space_race_test.py"], 4),
+                ("promises", [py, "tests/gpu/promises_test.py"], 4),  # the promise ledger: ask, keep, refuse, the incursion, the War of Retribution
                 ("project_governor", [py, "tests/gpu/project_governor_test.py"], 4),  # Arms Race Proponent and Space Initiative, per project
                 ("sea_resource_visible", [py, "tests/gpu/sea_resource_visible_test.py"], 2),  # the Stave Church's and Aquarium's coast-resource clause on a seen resource only; the Aquarium's Reef
                 ("research_switch", [py, "tests/gpu/research_switch_test.py"], 4),  # switching research keeps the abandoned item's science

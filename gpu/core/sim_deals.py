@@ -18,6 +18,11 @@ import torch
 class SimDeals:
     """The table, the clock and the cell."""
 
+    # the promise kinds, in the `eras.promises` order (cpu/data/promises.ts)
+    PROMISE_SPY = 0
+    PROMISE_CONVERT = 1
+    PROMISE_DIG = 2
+
     # ------------------------------------------------------------- the cell
     def _spies_held_of(self, row: int) -> torch.Tensor:
         """[B] — how many of this row's spies are sitting in someone's cell.
@@ -331,6 +336,86 @@ class SimDeals:
                 stale = self.deal_offer_left[:, a, b]
                 if bool((stale > 0).any()):
                     self.deal_offer_left[:, a, b] = (stale - 1).clamp(min=0)
+        # CIV6: "All Deals, Demands, and Promises last for 30 turns" -
+        # `tickPromises`: every promise, refusal and retribution window runs
+        # one turn toward 0.
+        self.seat_promise -= torch.sign(self.seat_promise)
+        self.seat_promise_broken.sub_(1).clamp_(min=0)
+
+    # ----------------------------------------------------------- the promise
+    def _promise_askable(self, asker: int, promiser: int, kind: int) -> torch.Tensor:
+        """[B] bool — `promiseAskable`: two living majors not at war, nothing
+        of the kind standing between them, and the asker holding the row's
+        `FavorCost`."""
+        nrow = self.n_majors
+        live = self.civ_alive[:, :nrow] & self.city_alive[:, :nrow].any(dim=2)
+        return (live[:, asker] & live[:, promiser] & ~self.war[:, asker, promiser]
+                & (self.seat_promise[:, asker, promiser, kind] == 0)
+                & (self.civ_diplo_favor[:, asker] >= self._promises[kind][0]))
+
+    def _settle_promises(self, asks: dict, keeps: dict) -> None:
+        """`settlePromises`: every ask, then every answer, then the refusal of
+        what nobody answered. `asks[a]` is [B, n_majors, kinds] — the promises
+        row `a` asks of each seat; `keeps[p]` likewise the asks row `p`
+        answers with its promise. The asker pays `FavorCost`; a refusal hands
+        it back and earns `GrievancesForRefusal`."""
+        nrow, nk = self.n_majors, len(self._promises)
+        open_ = torch.zeros(self.B, nrow, nrow, nk, dtype=torch.bool, device=self.device)
+        for a in sorted(asks.keys()):
+            want = asks[a]
+            for p in range(nrow):
+                if p == a:
+                    continue
+                for k in range(nk):
+                    if not bool(want[:, p, k].any()):
+                        continue
+                    go = want[:, p, k] & self._promise_askable(a, p, k)
+                    if not bool(go.any()):
+                        continue
+                    open_[:, a, p, k] = go
+                    self.civ_diplo_favor[:, a] = self.civ_diplo_favor[:, a] - torch.where(
+                        go, self._promises[k][0], 0).to(self.civ_diplo_favor.dtype)
+        kept = torch.zeros_like(open_)
+        for p in sorted(keeps.keys()):
+            kept[:, :, p] |= keeps[p] & open_[:, :, p]
+        if not bool(open_.any()):
+            return
+        self.seat_promise[kept] = self._promise_turns
+        refused = open_ & ~kept
+        if not bool(refused.any()):
+            return
+        self.seat_promise[refused] = -self._promise_turns
+        for a in range(nrow):
+            for p in range(nrow):
+                for k in range(nk):
+                    r = refused[:, a, p, k]
+                    if not bool(r.any()):
+                        continue
+                    self.civ_diplo_favor[:, a] = self.civ_diplo_favor[:, a] + torch.where(
+                        r, self._promises[k][0], 0).to(self.civ_diplo_favor.dtype)
+                    self._add_grievance(a, p, self._promises[k][1], r)
+
+    def _promise_incursion(self, victim: int, actor: int, kind: int, n: torch.Tensor) -> None:
+        """`promiseIncursion`: `actor` did `n` [B] times what promise `kind`
+        forbids, to `victim`. A KEPT promise is BROKEN - 100 Grievances, the
+        promise ends, the War of Retribution window opens; a REFUSED one earns
+        `GrievancesPerIncursion` for each incursion."""
+        nrow = self.n_majors
+        if victim == actor or victim >= nrow or actor >= nrow:
+            return
+        hit = n > 0
+        if not bool(hit.any()):
+            return
+        v = self.seat_promise[:, victim, actor, kind]
+        broke = hit & (v > 0)
+        cont = hit & (v < 0)
+        if bool(broke.any()):
+            self.seat_promise[:, victim, actor, kind] = torch.where(broke, 0, v)
+            self.seat_promise_broken[:, victim, actor] = torch.where(
+                broke, self._retribution_turns, self.seat_promise_broken[:, victim, actor])
+            self._add_grievance(victim, actor, self._promise_broken_griev, broke)
+        if bool(cont.any()):
+            self._add_grievance(victim, actor, n.long() * self._promises[kind][2], cont)
 
     def _deal_end_term(self, giver: int, taker: int, items: torch.Tensor, done: torch.Tensor) -> None:
         """CIV6: "Resources and gold per turn ... are temporary, and once the

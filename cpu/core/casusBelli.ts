@@ -13,6 +13,7 @@ import {
   citiesOf, civOf, civsAtWar, friendTurnsWith, isCiv, leaderOf, seatOf, seatsAllied,
   warDenounceHeld, warTurnsWith, allyAtWarWith } from './seats';
 import { goldenDedication } from './eras';
+import { promiseBrokenWith } from './grievance';
 import { isSuzerain } from './cityStates';
 import { civEraIndex } from './city';
 import { seatGovernmentId } from './seatTurn';
@@ -102,10 +103,9 @@ export function warConditionHolds(state: GameState, seat: number, target: number
       // Arms!' Dedication"
       return goldenDedication(state, seat, DED_TO_ARMS);
     case 'brokenPromise':
-      // neither engine holds a promise: a promise is a two-sided diplomatic
-      // action the scripted driver never makes (the grievance numbers wait
-      // in docs/AUDIT.md)
-      return false;
+      // CIV6 (War of Retribution): "a player who has broken a promise to you
+      // within the past 30 turns" — the window the break opened
+      return promiseBrokenWith(state, seat, target) > 0;
     case 'differentLateGovernment': {
       // CIV6 (Ideological War): "a player who is in a different Tier 3
       // government" — both LATE, and not the same one

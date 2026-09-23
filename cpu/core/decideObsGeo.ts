@@ -3,7 +3,7 @@ import {
   allyTurnsWith, borderTurnsFrom, citiesOf, civsAtWar, delegationWith, denounceActive, friendTurnsWith, isCiv,
   treatyTurnsWith, warTurnsWith,
 } from './seats';
-import { grievanceWith } from './grievance';
+import { grievanceWith, promiseWith } from './grievance';
 import { dealOfferOf, spyHeldWith } from './deals';
 import { seatProximity, seatStrength } from './phase';
 import { gwCountKind } from './greatWorks';
@@ -12,6 +12,7 @@ import { CIVICS } from '../data/civics';
 import { GW_KINDS } from '../data/greatWorks';
 import { DEAL_ITEMS } from '../data/seats';
 import { emptyStockpile } from '../data/constants';
+import { PROMISES } from '../data/promises';
 
 /**
  * THE DIPLOMATIC TABLE (`geo`), TS side: one per game, by the field names of
@@ -66,5 +67,7 @@ export function geoObs(state: GameState): Record<string, unknown> {
       }
       return out;
     })),
+    promise: ids.map((a) => ids.map((b) => PROMISES.map((_p, k) => (a === b ? 0 : promiseWith(state, a, b, k))))),
+    converted: pair((a, b) => citiesOf(state, a).filter((c) => c.followedReligion === b).length),
   };
 }

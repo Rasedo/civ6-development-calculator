@@ -159,17 +159,22 @@ def geo_decide_and_apply(sim, st, geos: list, seeds=None):
     table (`geos`, one `neutral.geo_obs` per game) and stashed for
     `_geo_agreements`."""
     geo = drive.decide_geo(st, geos, seeds)
-    den, frd, ally, bord, gift, deleg, off, acc, ally_ty = geo
+    den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p = geo
     for row in range(sim.n_majors):
         sim.apply_geo(row, denounce=den[:, row], friend=frd[:, row], ally=ally[:, row],
                       ally_type=ally_ty[:, row], borders=bord[:, row], gift=gift[:, :, row],
-                      delegation=deleg[:, row], offer=off[:, row], accept=acc[:, row])
+                      delegation=deleg[:, row], offer=off[:, row], accept=acc[:, row],
+                      ask_promise=ask_p[:, row], keep_promise=keep_p[:, row])
     return geo
 
 
 def extract_geo(geo, row: int, b: int) -> dict:
-    den, frd, ally, bord, gift, deleg, off, acc, ally_ty = geo
+    den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p = geo
     out = {}
+    for name, want in (("askPromise", ask_p), ("keepPromise", keep_p)):
+        pl = [[int(j), int(k)] for j, k in want[b, row].nonzero(as_tuple=False).tolist()]
+        if pl:
+            out[name] = pl
     for name, want in (("denounce", den), ("friend", frd), ("ally", ally), ("borders", bord),
                        ("delegation", deleg)):
         tl = want[b, row].nonzero(as_tuple=True)[0].tolist()
@@ -475,6 +480,13 @@ def replay_seat(sim, row: int, rec: dict) -> None:
                 for _c in range(3):
                     _blob[:, _base + _s * 3 + _c] = int(_it[_c])
         geo_kwargs["offer"] = _blob
+    for _name, _verb in (("askPromise", "ask_promise"), ("keepPromise", "keep_promise")):
+        if rec.get(_name):
+            _pm = torch.zeros(sim.B, sim.n_majors, len(sim._promises), dtype=torch.bool, device=dev)
+            for _j, _k in rec[_name]:
+                if 0 <= int(_j) < sim.n_majors and 0 <= int(_k) < len(sim._promises):
+                    _pm[:, int(_j), int(_k)] = True
+            geo_kwargs[_verb] = _pm
     if rec.get("gift"):
         _g = torch.zeros(sim.B, ladder.GW_KINDS, sim.n_majors, dtype=torch.bool, device=dev)
         for _k, _j in rec["gift"]:

@@ -829,6 +829,12 @@ class SimSeats:
             # target civilization" — the other player read as an ALLY (see
             # `WarCondition` in warKinds.ts).
             return self._ally_at_war_with(row, tgt)
+        if cond == 8:
+            # CIV6 (War of Retribution): "a player who has broken a promise to
+            # you within the past 30 turns" - the window the break opened
+            if row >= NM or tgt >= NM:
+                return zero
+            return self.seat_promise_broken[:, row, tgt] > 0
         if cond == 9:
             # CIV6 (Ideological War): "a player who is in a different Tier 3
             # government" — both LATE, and not the same one
@@ -837,7 +843,6 @@ class SimSeats:
             g1, h1 = self._adopted_gov(self.civ_civics[:, row])
             g2, h2 = self._adopted_gov(self.civ_civics[:, tgt])
             return h1 & h2 & (g1 != g2) & (self._gov_tier[g1] >= 3) & (self._gov_tier[g2] >= 3)
-        # 8: a broken promise — neither engine holds a promise
         # 11: the JOINT agreement — not a fact of the state; only the deal's
         # move declares under it (`_declare_war_major`'s `agreed`)
         return zero
@@ -10821,6 +10826,13 @@ class SimSeats:
         # clear whichever dig was worked
         lr = rows[land]
         wr = rows[~land]
+        # CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_DIG_ARTIFACTS): a dig worked on
+        # another major's ground is the digging the promise forbids
+        owner = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        owner[rows] = self.tile_seat[rows, tc[rows]].long()
+        for _v in range(self.n_majors):
+            if _v != row:
+                self._promise_incursion(_v, row, self.PROMISE_DIG, (go & (owner == _v)).long())
         if lr.numel():
             self.antiquity[lr, tc[lr]] = False
             self.antiquity_era[lr, tc[lr]] = -1
@@ -14207,7 +14219,8 @@ class SimSeats:
     def apply_geo(self, row: int, **verbs) -> None:
         """Park one row's DIPLOMATIC intents for `_geo_agreements` to drain.
         Every verb is a [B, n_majors] want-mask over target rows, except
-        `gift`, which is [B, GW kinds, n_majors]."""
+        `gift`, which is [B, GW kinds, n_majors], and `ask_promise` /
+        `keep_promise`, which are [B, n_majors, promise kinds]."""
         for name, want in verbs.items():
             assert name in GEO_VERBS, f"no such diplomatic verb: {name}"
             if want is not None:
@@ -14365,4 +14378,12 @@ class SimSeats:
                 peace = go & was_war
                 if bool(peace.any()):
                     self._make_peace(b, a, peace)
+
+        # THE PROMISES: every ask, then every answer, then the refusal of what
+        # nobody answered - one turn settles each ask (`_settle_promises`).
+        asks, keeps = dict(stashes["ask_promise"]), dict(stashes["keep_promise"])
+        stashes["ask_promise"].clear()
+        stashes["keep_promise"].clear()
+        if asks:
+            self._settle_promises(asks, keeps)
 

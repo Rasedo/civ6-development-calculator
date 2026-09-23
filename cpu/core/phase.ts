@@ -103,7 +103,7 @@ import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUEN
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
-import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
+import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
@@ -2116,6 +2116,17 @@ export function seatPhase(state: GameState): void {
       // seat out of the FOUND verb, the one verb that would give it a city.
       // CIV6: a civ is eliminated when it holds neither a city nor a settler.
       // CIV6 (Kupe's Voyage): "+2 Science and +2 Culture per turn before you
+  // THE PROMISES: every ask, then every answer, then the refusal of what
+  // nobody answered — one turn settles each ask (`settlePromises`).
+  const promiseAsks: [number, number, number][] = [];
+  const promiseKeeps: [number, number, number][] = [];
+  for (const actor of state.seats) {
+    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
+    const recP = state.seatActions?.[state.turn - 1]?.[actor.seat];
+    for (const [tj, k] of recP?.askPromise ?? []) promiseAsks.push([actor.seat, tj, k]);
+    for (const [fj, k] of recP?.keepPromise ?? []) promiseKeeps.push([actor.seat, fj, k]);
+  }
+  settlePromises(state, promiseAsks, promiseKeeps);
       // settle your first city" — the only yield a city-less seat makes, so it
       // banks here, above the economy block; it completes with the turn the
       // first city gives the seat.

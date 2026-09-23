@@ -477,6 +477,16 @@ class SimInit:
         self.deal_offer_ask = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
         self.deal_term_left = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.deal_term_item = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
+        # THE PROMISE LEDGER, keyed asker -> promiser, per promise kind (the
+        # `eras.promises` rows): the turns left on a KEPT promise (positive) or
+        # a REFUSED one (negative), 0 none; and the turns left on the War of
+        # Retribution window a broken promise opened.
+        self._promises = [tuple(int(x) for x in r) for r in rules.eras["promises"]]
+        self._promise_turns = int(rules.eras["promiseTurns"])
+        self._promise_broken_griev = int(rules.eras["promiseBrokenGrievance"])
+        self._retribution_turns = int(rules.eras["retributionTurns"])
+        self.seat_promise = torch.zeros(B, _pw, _pw, len(self._promises), dtype=torch.long, device=device)
+        self.seat_promise_broken = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         # CIV6: a captured spy is "imprisoned, but not killed" — keyed
         # owner -> captor, and still counted against the owner's capacity.
         # ...as COUNTS BY LEVEL, so the spy that is traded back is the one that

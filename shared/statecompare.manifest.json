@@ -1250,6 +1250,19 @@
           "note": "DIRECTED giver -> receiver: what a running deal still owes, and the turns left on its 30."
         },
         {
+          "name": "promises",
+          "compare": "exact",
+          "covers": [
+            "GameState.promises",
+            "GameState.promiseBroken"
+          ],
+          "planes": [
+            "seat_promise",
+            "seat_promise_broken"
+          ],
+          "note": "DIRECTED asker -> promiser: [promiser, per promise kind the signed turns left (kept +, refused -), the turns left on the War of Retribution window a break opened] for every promiser with anything standing, ascending."
+        },
+        {
           "name": "co2",
           "compare": "milli",
           "covers": [

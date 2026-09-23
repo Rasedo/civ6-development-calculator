@@ -153,7 +153,9 @@
     ["joint_open", "matrix", "[a][b]: 1 where a may still declare war on b at all (not at war, not allied or friends, no peace treaty binding)"],
     ["spies_held", "matrix", "[a][b]: a's spies b holds captive"],
     ["offer_left", "matrix", "[a][b]: the turns a's standing deal offer to b still stands, 0 none"],
-    ["offer_ask", "matrix", "[a][b]: that offer's ASK bundle, dealItems slots of [kind, x, y] laid end to end, kind -1 in an empty slot; every value -1 where no offer stands"]
+    ["offer_ask", "matrix", "[a][b]: that offer's ASK bundle, dealItems slots of [kind, x, y] laid end to end, kind -1 in an empty slot; every value -1 where no offer stands"],
+    ["promise", "matrix", "[a][b]: per promise kind (rules.json eras.promises order: don't spy, don't convert, don't dig, don't settle near), the turns left on b's promise to a (positive) or on b's refusal of a's ask (negative), 0 none"],
+    ["converted", "matrix", "[a][b]: a's living cities following b's religion"]
   ],
   "world": [
     ["turn", "int", "the engine turn the coming step plays (`state.turn`), the head's `turn`"],
@@ -198,6 +200,7 @@
     ["open_borders_civic", "the civic each agreement needs: open_borders_civic, alliance_civic, embassy_civic, joint_war_civic"],
     ["embassy_cost", "the gold an embassy costs; delegation_cost a delegation's (whole numbers)"],
     ["deal_items", "the slots of one deal bundle; deal_kind names each deal item kind's code"],
-    ["comp_aid", "the Aid Request's competition index, -1 none"]
+    ["comp_aid", "the Aid Request's competition index, -1 none"],
+    ["promise_cost", "per promise kind (rules.json eras.promises order): the favor an ask costs the asker"]
   ]
 }

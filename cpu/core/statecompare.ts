@@ -46,7 +46,8 @@ import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './t
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
 import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
-import { grievanceWith } from './grievance';
+import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
+import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
 import { ROUTE_CHAIN_MAX } from './trade';
@@ -595,6 +596,15 @@ const SEAT: Record<string, Extractor> = {
   }),
   dealOffers: overSeats((s, state) => dealOfferLine(state, s.seat)),
   dealTerms: overSeats((s, state) => dealTermLine(state, s.seat)),
+  promises: overSeats((s, state) => {
+    const out: number[] = [];
+    for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+      const row = PROMISES.map((_p, k) => promiseWith(state, s.seat, other, k));
+      const broken = promiseBrokenWith(state, s.seat, other);
+      if (broken > 0 || row.some((v) => v !== 0)) out.push(other, ...row, broken);
+    }
+    return out;
+  }),
   tilesPurchased: overSeats((s) => s.tilesPurchased),
 };
 

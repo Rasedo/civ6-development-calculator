@@ -62,6 +62,8 @@ import { revealAround, nearestUnexplored, unitSight, unitSeesThrough } from './f
 import { drawGoodyReward } from './goodyHuts';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
+import { promiseIncursion } from './grievance';
+import { PROMISE_DIG } from '../data/promises';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
@@ -1403,9 +1405,8 @@ export function artifactHome(state: GameState, seat: number): City | undefined {
 
 /**
  * EXCAVATE a dig into an Artifact. The Archaeologist must stand on
- * an ANTIQUITY SITE or a SHIPWRECK, hold a charge, and the tile must be its
- * own or unclaimed — real Civ 6 additionally allows foreign territory under
- * an OPEN BORDERS treaty, which neither engine has any concept of. The
+ * an ANTIQUITY SITE or a SHIPWRECK, hold a charge, and stand on ground its
+ * seat may enter (`borderClosedTo`). The
  * artifact lands in the LOWEST-id own city with an open slot that takes an
  * Artifact and carries its PROVENANCE (the era it was buried in, and whose
  * event buried it) into that slot, where the theming rule reads it. The dig is consumed. With no free slot
@@ -1436,6 +1437,9 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
   // CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
   // extracted."
   dedicationEvent(state, unit.seat, DED_WISH);
+  // CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_DIG_ARTIFACTS): a dig worked on
+  // another major's ground is the digging the promise forbids
+  promiseIncursion(state, tile.ownerSeat, unit.seat, PROMISE_DIG, 1);
   if (kind === 'antiquity') {
     tile.antiquity = false;
     tile.antiquityEra = undefined;

@@ -327,6 +327,10 @@ def check_geo(sim, geos: list) -> Counter:
                 assert g["joint_open"][a][x] == int(jo), f"{cell} joint_open"
                 assert g["spies_held"][a][x] == int(sim.seat_spy_held[b, a, x].sum()), f"{cell} spies_held"
                 assert g["offer_ask"][a][x] == sim.deal_offer_ask[b, a, x].flatten().tolist(), f"{cell} offer_ask"
+                assert g["promise"][a][x] == sim.seat_promise[b, a, x].tolist(), f"{cell} promise"
+                cv = sum(1 for j in range(sim.RC) if bool(sim.city_alive[b, a, j])
+                         and int(sim.city_followed[b, a, j]) == x) if other else 0
+                assert g["converted"][a][x] == cv, f"{cell} converted"
                 live["war"] += g["war"][a][x]
                 live["denounce"] += g["denounce"][a][x]
                 live["proximity"] += int(other and d < 999)

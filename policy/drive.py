@@ -914,7 +914,7 @@ def _geo_civic(st, geos: list, civic: int) -> torch.Tensor:
 
 
 def decide_geo(st, geos: list, seeds=None):
-    """The five DIPLOMATIC want-masks and the deal tables, every seat at once,
+    """The five DIPLOMATIC want-masks, the deal tables and the promises, every seat at once,
     off `geos` (one diplomatic table per game, `neutral.geo_obs`).
 
     TWO STYLES, drawn once per (game seed, seat) and fixed for the game, the
@@ -935,8 +935,10 @@ def decide_geo(st, geos: list, seeds=None):
     _di = st.deal_items
     off = torch.full((B, nrow, 1 + 2 * _di * 3), -1, dtype=torch.long, device=dev)
     acc = torch.zeros_like(den)
+    ask_p = torch.zeros(B, nrow, nrow, len(st.promise_cost), dtype=torch.bool, device=dev)
+    keep_p = torch.zeros_like(ask_p)
     if nrow < 2:
-        return den, frd, ally, bord, gift, deleg, off, acc, ally_ty
+        return den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p
     g = {f: _geo_t(geos, f, dev) for f in (
         "alive", "cities", "strength", "treasury", "war", "denounce", "friend_turns", "ally_turns",
         "borders_turns", "delegation", "grievance", "proximity", "great_works")}
@@ -1002,7 +1004,39 @@ def decide_geo(st, geos: list, seeds=None):
             for kind in range(ladder.GW_KINDS):
                 gift[:, kind, a, b] = quiet & diplo[:, a] & trusted & (gw[:, a, kind] > gw[:, b, kind])
     _deal_turn(st, geos, g, off, acc, alive_row, rstr, prox, prox_max)
-    return den, frd, ally, bord, gift, deleg, off, acc, ally_ty
+    _promise_turn(st, geos, g, ask_p, keep_p, alive_row, rstr)
+    return den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p
+
+
+def _promise_turn(st, geos: list, g: dict, ask_p, keep_p, alive_row, rstr) -> None:
+    """THE PROMISES each seat asks and makes. One ask per seat per turn, to
+    the lowest-numbered rival and the first kind that qualifies: a promise
+    not to SPY of a rival whose spy this seat holds in its cell, not to
+    CONVERT of a rival whose religion one of its cities follows, not to DIG of
+    a rival it holds grievances against - with the favor to pay for it and
+    nothing of the kind standing. Don't-settle-near is never asked: no row
+    gives it an incursion. The rival makes the promise when the asker is the
+    stronger, and refuses otherwise."""
+    B, dev, nrow = len(geos), st.device, st.n_majors
+    cost = st.promise_cost
+    promise = _geo_t(geos, "promise", dev)                           # [B, n, n, kinds]
+    converted = _geo_t(geos, "converted", dev)
+    spies_held = _geo_t(geos, "spies_held", dev)
+    favor = _geo_t(geos, "favor", dev)
+    war = g["war"] > 0
+    taken = torch.zeros(B, nrow, dtype=torch.bool, device=dev)
+    for a in range(nrow):
+        for p in range(nrow):
+            if a == p:
+                continue
+            quiet = alive_row[:, a] & alive_row[:, p] & ~war[:, a, p]
+            signal = (spies_held[:, p, a] > 0, converted[:, a, p] > 0, g["grievance"][:, a, p] > 0)
+            for k, why in enumerate(signal):
+                sel = (quiet & why & ~taken[:, a] & (favor[:, a] >= cost[k])
+                       & (promise[:, a, p, k] == 0))
+                ask_p[:, a, p, k] = sel
+                keep_p[:, p, a, k] = sel & (rstr[:, a] > rstr[:, p])
+                taken[:, a] |= sel
 
 
 # The driver's own PRICES. No source publishes what the AI thinks a deal is

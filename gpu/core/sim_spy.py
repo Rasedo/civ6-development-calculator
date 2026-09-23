@@ -458,6 +458,13 @@ class SimSpy:
         lvl = self._spy_effective_level(row, b, v, m, hr, hc)
         out = (self.M_SUCCESS_UNDETECTED if bool(mdef["certain"])
                else self._mission_outcome(self._mission_roll(b), self._mission_threshold(m, lvl)))
+        if mdef["offensive"]:
+            # CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_SPY): an offensive operation
+            # run in the city is the spying the promise forbids, whatever its
+            # outcome
+            n = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            n[b] = 1
+            self._promise_incursion(hr, row, self.PROMISE_SPY, n)
         if out <= self.M_SUCCESS_MUST_ESCAPE:
             self._apply_mission(row, b, v, m, hr, hc, lvl)
             if mdef["offensive"]:

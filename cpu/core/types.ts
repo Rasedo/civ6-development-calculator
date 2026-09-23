@@ -239,6 +239,13 @@ export interface SeatActionRecord {
    *  the works are counts, not identities, so both engines take the giver's
    *  first city holding one and the receiver's first with a free slot. */
   gift?: [number, number][];
+  /** PROMISES ASKED: [promiser seat, promise kind] each. The asker pays the
+   *  kind's favor; an ask the promiser does not `keepPromise` this turn is
+   *  refused. */
+  askPromise?: [number, number][];
+  /** PROMISES MADE: [asker seat, promise kind] each — this seat answers an ask
+   *  standing this turn with its promise. */
+  keepPromise?: [number, number][];
   /** CITIZEN ASSIGNMENT for the district SLOTS: [centreTile, districtIndex,
    * count] — how many citizens this city pins into that district. A negative
    * count hands the slot back to the automatic rule. */
@@ -370,6 +377,13 @@ export interface GameState {
    *  seat is handing over for the rest of the 30 turns, and what comes back
    *  when the clock runs out. */
   dealTerms?: Record<string, DealTerm>;
+  /** THE PROMISE LEDGER, keyed `${asker}>${promiser}`: per promise kind
+   *  (PROMISES order) the turns left on the promiser's promise (positive) or
+   *  on its refusal (negative), 0 where neither stands. */
+  promises?: Record<string, number[]>;
+  /** Turns left on the War of Retribution window a BROKEN promise opened,
+   *  keyed `${asker}>${promiser}` — the asker's casus belli. */
+  promiseBroken?: Record<string, number>;
   /** CAPTURED SPIES, keyed owner -> captor: the LEVELS of the owner's spies
    *  that captor is holding, one entry per spy. They are "imprisoned, but not
    *  killed", still count against the owner's capacity, and come home at the
