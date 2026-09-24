@@ -2152,9 +2152,9 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
 /** The most advanced strategic resource this seat can actually use.
  *
  * CIV6 (GOODY_MILITARY_ADJUST_STRATEGIC_RESOURCES): "20 of the most advanced
- * strategic resource." The real game means the most advanced one REVEALED,
- * and neither engine models resource reveal — so this reads "the most
- * advanced one the seat has a live source of", falling back to the first
+ * strategic resource." The real game means the most advanced one REVEALED;
+ * this reads "the most advanced one the seat has a live source of" (a
+ * resource the seat cannot see is no source), falling back to the first
  * slot. `STRATEGIC_IDS` is already in ascending era order, so the most
  * advanced is the last match. THE ONE MODEL CHOICE in the goody-hut table, recorded in docs/AUDIT.md.
  */
