@@ -25,8 +25,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import load_rules, fixture_paths
+from warmup import warm_base, opened
 
 ACTIVE = torch.ones(1, dtype=torch.bool)  # the eliminated-actor gate: these seats hold cities
 
@@ -35,19 +35,10 @@ ACTIVE = torch.ones(1, dtype=torch.bool)  # the eliminated-actor gate: these sea
 # milliseconds — instead of a fixture load, a settle and N steps. Every plane
 # these pokes write is in `_MUTABLE`, so the restore is the whole job; `slot`
 # keys a SECOND base for a scene that holds two live sims at once.
-_BASE: dict = {}
 
 
 def fresh(rules, path, turns=25, slot: int = 0):
-    key = (str(path), turns, slot)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(turns):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+    return warm_base((str(path), turns, slot), lambda: opened(rules, path, turns))
 
 
 def main() -> None:
@@ -208,18 +199,6 @@ def main() -> None:
     assert int(sim7.city_current[0, r5 + 1, j5, 0]) == sim7.PROJECT_BASE + 0, "project code must queue"
     assert float(sim7.city_cost[0, r5 + 1, j5, 0]) > 0, "project cost must lock"
     print("  4 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
-
-    # -- 5: ONE production mask — seat 0 reads the same body, same width ----
-    # `production_mask()` IS `_seat_production_mask(0)`, so the seat-0 head and
-    # a civ head are the same layout: a net trained on one drives the other, and
-    # env.masks needs no padding between them.
-    assert sim7.production_mask().shape[2] == W, (
-        f"seat 0's production head is {sim7.production_mask().shape[2]} wide, civ heads are {W}"
-    )
-    assert torch.equal(sim7.production_mask(), sim7._seat_production_mask(0)), (
-        "production_mask() must BE the row-generic body, not a second copy"
-    )
-    print("  5 one production mask: seat 0 and civ rows share the body and the width")
 
     print("PREF APPLY OK")
 

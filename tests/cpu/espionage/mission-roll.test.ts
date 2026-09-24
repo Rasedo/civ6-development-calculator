@@ -1,5 +1,5 @@
 /**
- * THE SPY MISSION ROLL — C-16, measured in the live game on 2026-09-13
+ * THE SPY MISSION ROLL, measured in the live game
  * (`tools/civ6lab/spy_probe.lua` over the tuner socket; the GPU twin is
  * tests/gpu/spy_roll_test.py).
  *

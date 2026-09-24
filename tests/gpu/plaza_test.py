@@ -32,8 +32,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import load_rules, fixture_paths, FIXTURES
+from warmup import warm_base, opened
 
 ROW = 1  # a civ row: every body below is seat-generic
 RJ = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -48,20 +48,10 @@ SCF = RJ["districtScaffold"]
 # `conquest_turns`, the unit pool, the city queue, the district planes).
 # `_bvar_col_cache` is keyed by ROW alone rather than by a version counter, so
 # it is emptied by hand the way a fresh build leaves it.
-_BASE: dict = {}
 
 
 def fresh(rules, path, turns=20):
-    key = (str(path), turns)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(turns):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bvar_col_cache.clear()
-    return sim
+    return warm_base((str(path), turns), lambda: opened(rules, path, turns))
 
 
 def bidx_of(sim, row):

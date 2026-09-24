@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
+from . import simbase
 
 
 class SimInit:
@@ -21,9 +21,9 @@ class SimInit:
         # each. There are NO family views: every reader indexes the base by
         # ROW, because a second name for a row is a second way to write a
         # body that only serves one seat.
-        #     seat 0:      city_x[:, 0]
-        #     civ seats:   city_x[:, 1:n_majors]
-        #     city-states: city_x[:, n_majors:, 0]   (carved out further below)
+        #     the majors:  city_x[:, :n_majors]      (the row IS the seat)
+        #     city-states: city_x[:, n_majors:FREE_ROW, 0]   (carved out further below)
+        #     Free Cities: city_x[:, FREE_ROW]
         # ONE COLUMN WIDTH for every seat row: the block is RC wide on every
         # row, so no body carries a `cols = ... if row == 0` and row 0 can
         # receive the uncapped loyalty flip its own rules allow.
@@ -33,7 +33,7 @@ class SimInit:
         # 0 — which is a FILL, not a fork: every reader is the same expression.
         # ------------------------------------------------------------------
         # THE MAJOR ROSTER WIDTH, read off THE ROSTER: `civs[]` is seat-keyed
-        # and holds one entry per major, seat 0 among them. A separate scalar
+        # and holds one entry per major. A separate scalar
         # wire key for the width would be a second source of truth that could
         # disagree with the array right beside it. An opponent count, where
         # one is genuinely meant (the war head's columns, the observation's
@@ -49,11 +49,10 @@ class SimInit:
         # 0 the head, -1 an empty slot. `_q_*` is the only way in or out.
         self.QD = max(int(rules.seats.get("productionQueueMax", 1)), 1)
         self.S = int(f0.get("cityStateMax", 0))
-        # FOG IS LIVE in units mode (fogOfWar rides the fixture; older
-        # fixtures predate the key and fall back to unitsMode — the creation
-        # rule). Reveals gate on this exactly as TS's revealAround gates on
-        # state.fogOfWar, so a fog-off world accrues NO explored state.
-        self.fog_of_war = bool(f0.get("fogOfWar", f0.get("unitsMode", 0)))
+        # FOG rides the fixture (`fogOfWar`). Reveals gate on this exactly as
+        # TS's revealAround gates on state.fogOfWar, so a fog-off world
+        # accrues NO explored state.
+        self.fog_of_war = bool(f0["fogOfWar"])
         _rcp, _sp = self.RC, max(self.S, 1)
         self._CITY_MINOR0 = self.n_majors
         # THE CITY PLANES' ROWS: the majors, the city-state pad, then ONE row
@@ -89,7 +88,8 @@ class SimInit:
             ("gw_seat", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
             ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
             # the members of `city_bldg` standing PILLAGED — dark until the
-            # city's own queue repairs them; read through `_bldg_dark` alone
+            # city's own queue repairs them; `_bldg_dark` folds them with the
+            # district's own pillage, `_building_pillaged` reads them alone
             ("bldg_pillaged", torch.bool, False, None, max(len(rules.b_cost), 1)),
             ("gp_perm", dtype, 0, None, max(len((rules.seats or {}).get("gpCityPermKeys", [])), 1)),
         ):
@@ -187,8 +187,8 @@ class SimInit:
                                   if "CIV6_RECLAIM_AT" in _os.environ else None)
 
         # --- city-states: static, placed at game creation ----------------------
-        # THE ONE SURVIVING PAD, and it is not the major axis's: seat 0 always
-        # exists, so the major width needs no floor and can never come out zero. `S == 0` genuinely means NO
+        # THE ONE SURVIVING PAD, and it is not the major axis's: the major
+        # roster is never empty, so the major width needs no floor and can never come out zero. `S == 0` genuinely means NO
         # city-state rows, so dropping THIS one would: `seat_citystate_*`
         # becomes `[B, n_majors, 0]`, and a reduction over an empty dim raises
         # where a reduction over a dead row returns the identity. The guards
@@ -328,8 +328,7 @@ class SimInit:
         self._suz_route_cul = float(_suz["routeCulture"])
         self._suz_route_gold = float(_suz["routeGold"])
         # Geneva / Bologna / Nan Madol / Amsterdam / Zanzibar / Hunza / Hong Kong /
-        # Ngazargamu / Buenos Aires — the nine rows that used to ride a flat
-        # capital channel, each now its own rule.
+        # Ngazargamu / Buenos Aires — nine rows, each its own rule.
         self._suz_sci_pct = float(_suz["sciencePct"])
         self._suz_dist_gpp = float(_suz["districtGpp"])
         _gb = _suz["gppBuildingIdx"]
@@ -949,8 +948,8 @@ class SimInit:
         #     [ 0 .. MAJOR_POOL_MAX )                        EVERY major seat
         #     [ MAJOR_POOL_MAX .. MAJOR_POOL_MAX+BARB_POOL_MAX )  barbarians
         #
-        # A unit's OWNER is `unit_seat`, NEVER the range it landed in — seat 0
-        # spawns through the same cursor into the same range as every civ seat,
+        # A unit's OWNER is `unit_seat`, NEVER the range it landed in — every
+        # major seat spawns through the same cursor into the same range,
         # exactly as TS pushes every seat's unit onto one `state.units`. A
         # RANGE only says which CLASS of actor lives there, which is what the
         # barbarian split is for.
@@ -995,7 +994,7 @@ class SimInit:
             # Sweeping Wind is the only row that buys a second.
             ("attacks", torch.long),
             # The OWNER of whatever sits in this slot, in the absolute seat
-            # space TS uses (0 seat 0, 1..99 civs, 100+ city-states, 200 barbs)
+            # space TS uses (0..99 the majors, 100+ city-states, 200 barbs)
             # — a value you can gather and compare without already knowing which
             # pool range you are looking at. Checked by _check_seat_invariant.
             ("seat", torch.long),
@@ -1110,9 +1109,8 @@ class SimInit:
         # seat's religion.
         self._b18_couple = bool(rr.get("followerCoupling", False))
         self.holy_tile = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
-        # ONE religion plane pair over every seat row — seat 0 is a row like any
-        # other, matching TS's single `allCities(state)` loop over one
-        # religionPressure field.
+        # ONE religion plane pair over every seat row, matching TS's single
+        # `allCities(state)` loop over one religionPressure field.
         self.city_pressure = torch.zeros(B, self.CITY_ROWS, civ_city_pad, self.n_majors, dtype=torch.long, device=device)
         # A FREE CITY's race — the loyalty pressure each major has put on it
         # "since the Free City became independent" (`City.freePressure`),
@@ -1473,8 +1471,6 @@ class SimInit:
             else [[[0] * _blw] * _maxN for _ in range(n_gp)], dtype=torch.bool, device=device)
         self._gp_class_unit = torch.tensor(
             rr.get("gpClassUnitIdx", [-1] * n_gp), dtype=torch.long, device=device)
-        self._gp_work_class = [bool(x) for x in rr.get("gpWorkClasses", [0] * n_gp)]
-        self._gp_any_fx = bool((self._gp_effects != 0).any()) if self._gp_effects.numel() else False
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
         # CIV6 (Expansion2_Emergencies.xml): the World's Fair scores eight
         # `WORLDS_FAIR_SCORE_GPP_*` rows — every Great Person class but the
@@ -1625,7 +1621,6 @@ class SimInit:
         self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
-        self._off1 = tiles_within_offsets(1).to(device)
         # `STORM_DISC`: the radius-2 disc in ONE canonical order shared with
         # TS — centre, ring 1, ring 2, each ring in ascending tile index (dr,
         # then dq); a storm's footprint is its first `hexes` slots
@@ -1634,12 +1629,9 @@ class SimInit:
         self._storm_offs = torch.tensor(_d2, dtype=torch.long).to(device)  # [19, 2]
         ids = [u["id"] for u in (rules.units or [])]
         self._spearman_idx = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
-        self._horseman_idx = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
-        self._slinger_idx = ids.index("SLINGER") if "SLINGER" in ids else -1
         self._archaeologist_idx = ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1
         self._naturalist_idx = next((i for i, u in enumerate(rules.units or []) if bool(u.get("naturalist", 0))), -1)
         self._band_idx = next((i for i, u in enumerate(rules.units or []) if u.get("id") == "ROCK_BAND"), -1)
-        self._archer_idx = ids.index("ARCHER") if "ARCHER" in ids else -1
 
         self.disasters = bool(f0.get("disasters", 0))
         self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -1676,126 +1668,86 @@ class SimInit:
         # The unit-action enum, exported from cpu/core/unitActions.ts
         # (unitActionNames). Every dispatch indexes BY NAME, never by a
         # hardcoded column number.
-        self._act_names = list((rules.actions or {}).get("unit", []))
+        self._act_names = list(rules.actions["unit"])
         self._act = {n: i for i, n in enumerate(self._act_names)}
-        if self._act_names:
-            self._snipe_on = "SNIPE_0" in self._act
-            self._snipe3_on = "SNIPE3_0" in self._act
-            self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # religious spread head
-            self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
-            self._A_EXCAVATE = self._act.get("EXCAVATE", -1)  # the archaeologist's
-            self._A_PARK = self._act.get("PARK", -1)          # the naturalist's
-            self._A_PROMOTE = self._act.get("PROMOTE_0", -1)  # the level-up head
-            self._A_CONDEMN = self._act.get("CONDEMN_0", -1)  # vs an adjacent religious unit
-            self._A_HERESY = self._act.get("REMOVE_HERESY", -1)
-            self._A_INQUISITION = self._act.get("LAUNCH_INQUISITION", -1)
-            self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
-            self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
-            self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
-            self._A_NUKE = self._act.get("NUKE_0_0", -1)   # one head per device row
-            self._A_AIR_PILLAGE = self._act.get("AIR_PILLAGE_0", -1)
-            self._A_REBASE = self._act.get("REBASE_0", -1)
-            self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
-            self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
-            self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
-            self._A_RAIL = self._act.get("BUILD_RAILROAD", -1)       # ...and its second route
-            self._A_CLEAN = self._act.get("CLEAN_FALLOUT", -1)       # a build charge against the fallout
-            self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
-            self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
-            self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
-            self._A_BOOST = self._act.get("BOOST_PROJECT", -1)       # the Royal Society's
-            self._A_FORM_UP = self._act.get("FORM_UP_0", -1)          # merge into a same-type neighbour
-            self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
-            self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
-            self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
-            # CIV6 (Builder): the resource goes for its own lump
-            self._A_HARVEST = self._act.get("HARVEST", -1)
-            # CIV6 (The First Emperor): a charge into the wonder underfoot
-            self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
-            # CIV6 (Mountain Tunnel): the portal step, 2 Movement
-            self._A_PORTAL = self._act.get("PORTAL", -1)
-            self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
-            _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
-            assert _apc in (0, self._air_strike_cols), (
-                f"the air pillage head is {_apc} wide, the strike head {self._air_strike_cols}")
-            self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
-            self._nuke_cols = int((rules.nuclear or {}).get("nukeCols", 0))
-            _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
-            assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
-                f"the nuclear head is {_nkc} columns over a width of {self._nuke_cols}")
-            _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
-            _smc = sum(1 for n in self._act_names if n.startswith("SPY_MISSION_"))
-            assert _stc == self._spy_travel_cols and _smc == self._n_spy_missions, (
-                f"spy heads are {_stc}/{_smc} wide, the wire says "
-                f"{self._spy_travel_cols}/{self._n_spy_missions}")
-            _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) \
-                + (18 if self._snipe3_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
-                + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
-                + (1 if self._A_PARK >= 0 else 0) \
-                + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
-                + (6 if self._A_CONDEMN >= 0 else 0) \
-                + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
-                + (1 if self._A_UPGRADE >= 0 else 0) \
-                + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
-                + (1 if self._A_RAIL >= 0 else 0) \
-                + (1 if self._A_CLEAN >= 0 else 0) \
-                + (1 if self._A_REMOVE_IMP >= 0 else 0) \
-                + (1 if self._A_HARVEST >= 0 else 0) \
-                + (1 if self._A_WONDER_CHARGE >= 0 else 0) \
-                + (1 if self._A_PORTAL >= 0 else 0) \
-                + (1 if self._A_GP >= 0 else 0) \
-                + (1 if self._A_PERFORM >= 0 else 0) \
-                + (1 if self._A_BOOST >= 0 else 0) \
-                + (6 if self._A_FORM_UP >= 0 else 0) \
-                + (1 if self._A_ESCORT >= 0 else 0) \
-                + (1 if self._A_UNESCORT >= 0 else 0) \
-                + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc
-            assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
-            self._A_CHOP = self._act["CHOP"]
-            self._A_REPAIR = self._act["REPAIR"]
-            self._A_PILLAGE = self._act["PILLAGE"]
-            self._A_SNIPE = self._act.get("SNIPE_0", self._A_PILLAGE + 1)
-            self._A_SNIPE3 = self._act.get("SNIPE3_0", -1)
-            self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
-        else:
-            self._A_CHOP, self._A_REPAIR = 16, 17
-            self._A_PILLAGE = 13 + len(ids) + 2
-            self._A_SNIPE = self._A_PILLAGE + 1
-            self._A_SPREAD = -1  # no names -> no spread columns
-            self._A_FOUND = -1  # no names -> no FOUND column
-            self._A_EXCAVATE = -1
-            self._A_PARK = -1
-            self._A_REMOVE_IMP = -1
-            self._A_HARVEST = -1
-            self._A_WONDER_CHARGE = -1
-            self._A_PORTAL = -1
-            self._A_PERFORM = -1
-            self._A_BOOST = -1
-            self._A_FORM_UP = -1
-            self._A_ESCORT = -1
-            self._A_UNESCORT = -1
-            self._A_PROMOTE = -1
-            self._A_CONDEMN = -1
-            self._A_HERESY = -1
-            self._A_INQUISITION = -1
-            self._A_HEATHEN = -1
-            self._A_UPGRADE = -1
-            self._A_AIR_STRIKE = -1
-            self._A_NUKE = -1
-            self._nuke_cols = 0
-            self._A_AIR_PILLAGE = -1
-            self._A_REBASE = -1
-            self._A_SPY_TRAVEL = -1
-            self._A_SPY_MISSION = -1
-            self._A_ROAD = -1
-            self._A_FINISH = -1
-            self._A_GP = -1
-            self._air_strike_cols = 0
-            self._air_rebase_cols = 0
-            self._snipe_on = False
-            self._snipe3_on = False
-            self._A_SNIPE3 = -1
-            self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
+        self._snipe_on = "SNIPE_0" in self._act
+        self._snipe3_on = "SNIPE3_0" in self._act
+        self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # religious spread head
+        self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
+        self._A_EXCAVATE = self._act.get("EXCAVATE", -1)  # the archaeologist's
+        self._A_PARK = self._act.get("PARK", -1)          # the naturalist's
+        self._A_PROMOTE = self._act.get("PROMOTE_0", -1)  # the level-up head
+        self._A_CONDEMN = self._act.get("CONDEMN_0", -1)  # vs an adjacent religious unit
+        self._A_HERESY = self._act.get("REMOVE_HERESY", -1)
+        self._A_INQUISITION = self._act.get("LAUNCH_INQUISITION", -1)
+        self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
+        self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
+        self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
+        self._A_NUKE = self._act.get("NUKE_0_0", -1)   # one head per device row
+        self._A_AIR_PILLAGE = self._act.get("AIR_PILLAGE_0", -1)
+        self._A_REBASE = self._act.get("REBASE_0", -1)
+        self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
+        self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
+        self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
+        self._A_RAIL = self._act.get("BUILD_RAILROAD", -1)       # ...and its second route
+        self._A_CLEAN = self._act.get("CLEAN_FALLOUT", -1)       # a build charge against the fallout
+        self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
+        self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
+        self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
+        self._A_BOOST = self._act.get("BOOST_PROJECT", -1)       # the Royal Society's
+        self._A_FORM_UP = self._act.get("FORM_UP_0", -1)          # merge into a same-type neighbour
+        self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
+        self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
+        self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
+        # CIV6 (Builder): the resource goes for its own lump
+        self._A_HARVEST = self._act.get("HARVEST", -1)
+        # CIV6 (The First Emperor): a charge into the wonder underfoot
+        self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
+        # CIV6 (Mountain Tunnel): the portal step, 2 Movement
+        self._A_PORTAL = self._act.get("PORTAL", -1)
+        self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
+        _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
+        assert _apc in (0, self._air_strike_cols), (
+            f"the air pillage head is {_apc} wide, the strike head {self._air_strike_cols}")
+        self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
+        self._nuke_cols = int((rules.nuclear or {}).get("nukeCols", 0))
+        _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
+        assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
+            f"the nuclear head is {_nkc} columns over a width of {self._nuke_cols}")
+        _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
+        _smc = sum(1 for n in self._act_names if n.startswith("SPY_MISSION_"))
+        assert _stc == self._spy_travel_cols and _smc == self._n_spy_missions, (
+            f"spy heads are {_stc}/{_smc} wide, the wire says "
+            f"{self._spy_travel_cols}/{self._n_spy_missions}")
+        _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) \
+            + (18 if self._snipe3_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
+            + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
+            + (1 if self._A_PARK >= 0 else 0) \
+            + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
+            + (6 if self._A_CONDEMN >= 0 else 0) \
+            + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
+            + (1 if self._A_UPGRADE >= 0 else 0) \
+            + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
+            + (1 if self._A_RAIL >= 0 else 0) \
+            + (1 if self._A_CLEAN >= 0 else 0) \
+            + (1 if self._A_REMOVE_IMP >= 0 else 0) \
+            + (1 if self._A_HARVEST >= 0 else 0) \
+            + (1 if self._A_WONDER_CHARGE >= 0 else 0) \
+            + (1 if self._A_PORTAL >= 0 else 0) \
+            + (1 if self._A_GP >= 0 else 0) \
+            + (1 if self._A_PERFORM >= 0 else 0) \
+            + (1 if self._A_BOOST >= 0 else 0) \
+            + (6 if self._A_FORM_UP >= 0 else 0) \
+            + (1 if self._A_ESCORT >= 0 else 0) \
+            + (1 if self._A_UNESCORT >= 0 else 0) \
+            + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc
+        assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
+        self._A_CHOP = self._act["CHOP"]
+        self._A_REPAIR = self._act["REPAIR"]
+        self._A_PILLAGE = self._act["PILLAGE"]
+        self._A_SNIPE = self._act.get("SNIPE_0", self._A_PILLAGE + 1)
+        self._A_SNIPE3 = self._act.get("SNIPE3_0", -1)
+        self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
@@ -1809,7 +1761,6 @@ class SimInit:
         self._imp_plun_amt = torch.tensor(
             [int(r.get("plun", [0, 0])[1]) for r in imp.get("rows", [])] or [0], dtype=torch.long, device=device)
         self._farm_food = float(imp.get("farmFood", 1))
-        self._farm_housing = float(imp.get("farmHousing", 0.5))
         self._mine_prod = float(imp.get("mineProd", 1))       # base MINE production
         self._lumber_prod = float(imp.get("lumberProd", 1))   # LUMBER_MILL production (no tech boost)
         self._builder_idx = int(imp.get("builderIdx", -1))
@@ -1937,7 +1888,6 @@ class SimInit:
         # that governor stays. Two columns because the install writes two
         # modifiers: the gate is on the build, the payment on the plot.
         self._imp_gov_promo = [int(r.get("govPromo", -1)) for r in imp["rows"]]
-        self._imp_gov_any = any(p >= 0 for p in self._imp_gov_promo)
         self._imp_gov_yield = [r.get("govY") for r in imp["rows"]]
         self._imp_gov_yield_any = any(g is not None for g in self._imp_gov_yield)
         # amenities the row pays its city for standing beside water
@@ -2069,9 +2019,9 @@ class SimInit:
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._harbor_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._harbor_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
-        # The seat-0 diplomacy head (declareWar / sueForPeace on a civ). While
-        # False, war_mask() is all-False and step(war=…) is ignored, so nothing
-        # samples or applies it; scripted/parity paths never pass war=.
+        # The diplomacy head (declareWar / sueForPeace), the same for every
+        # seat row. While False, every row's `_seat_war_mask` is all-False, so
+        # the head offers no war verb to any seat.
         self._rl_war_active = True
         self._log_combat_b: int | None = None
         # CIV6_DIFFLOG collects the amenity decomposition for EVERY game, a
@@ -2743,15 +2693,14 @@ class SimInit:
         # city's PERSISTENT id within that seat, -1 for none. Settler starts
         # mean no major holds a tile at t0, so `ownerInit` is all -1 and
         # `ownerSeatInit` carries only the city-state rings; but the pair is the
-        # contract, and reading only seat 0's half is how a civ's ring would be
-        # dropped on load.
+        # contract, and reading only one half of it is how a major's ring would
+        # be dropped on load.
         self.tile_city = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
         # Bumped by EVERY write to tile_seat / tile_city; keys the derived
         # views below. Not a tensor — python state, so it is not in _MUTABLE.
         self._tile_owner_ver = 0
         self._citystate_at_ver = -1
         self._citystate_at_cache: torch.Tensor | None = None
-        self._civ_at_cache: torch.Tensor | None = None
         self._city_slot_cache: dict[int, tuple[int, torch.Tensor]] = {}
         self.tile_seat = torch.tensor(
             [f["ownerSeatInit"] for f in fixtures], dtype=torch.long, device=device)
@@ -2844,7 +2793,6 @@ class SimInit:
         self._nuke_silo_def = float(_nuc["siloDefense"])
         self._nuke_sub_def = float(_nuc["subDefense"])
         self._nuke_int_dmg = int(_nuc["interceptDamage"])
-        self._fallout_clean_charges = int(_nuc["cleanCharges"])
         self._silo_iid = int(_nuc["siloIid"])
         self._ww_wmd_launched = float(_nuc["wwLaunched"])
         self._emg_nuclear = int(_nuc["emergencyNuclear"])
@@ -3003,8 +2951,8 @@ class SimInit:
         self._shrine_bidx = int(rules.shrine_bidx)  # missionary buy gate
         self._workshop_bidx = int(rules.workshop_bidx)  # Leonardo's culture perm
         # The completion-overflow / chop bank on the city-block seat axis
-        # (row 0 = seat 0, rows 1.. = the civ seats, then the city-state rows
-        # for family-shape consistency; every city starts with an empty bank,
+        # (one row per major seat, then the city-state rows and the Free Cities
+        # row for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=dtype, device=device)
         # CIV6: production is never lost — a CANCELLED item keeps its own
@@ -3137,7 +3085,7 @@ class SimInit:
         # FORM trains the unit AS A FORMATION — the corps block then the army
         # block — and it CLOSES the layout. There is no promote block: the
         # queue is one deep, so there is never an entry behind the head to
-        # bring forward (owner ruling 2026-09-08, `PRODUCTION_QUEUE_MAX`).
+        # bring forward (owner ruling, `PRODUCTION_QUEUE_MAX`).
         self.FORM_BASE = self.PROJECT_BASE + len(self._proj_rows)
         self.PROD_W = self.FORM_BASE + 2 * self.NU
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
@@ -3273,7 +3221,6 @@ class SimInit:
         # THE UNIQUE UNITS (`uniqueTo` / `replaces` and the chassis terms only
         # a unique carries): `_civ_unit_ok` hands each to its civilization.
         self._type_uniq = torch.tensor([int(u["uniq"]) for u in ru], dtype=torch.long, device=device)
-        self._type_repl = torch.tensor([int(u["repl"]) for u in ru], dtype=torch.long, device=device)
         # a LEADER unique's pair index (`uniqueLeader`), -1 for a civilization's
         self._type_uniq_leader = torch.tensor([int(u["uniqLeader"]) for u in ru], dtype=torch.long, device=device)
         self._type_chariot = torch.tensor([bool(u["chariot"]) for u in ru], dtype=torch.bool, device=device)
@@ -3756,9 +3703,9 @@ class SimInit:
         self._rcy_cache = None
         self._bld_cache: dict = {}  # (row, complete) -> (_eff_version, mask); one entry per seat row
         # The WIRE's spending intents, parked between decide-time and the
-        # gold block's phase position. Keyed by ABSOLUTE seat row — seat 0
-        # stashes through step(), the civ rows through apply_seat_actions,
-        # and _seat_buy_ladder drains whichever row it is running.
+        # gold block's phase position. Keyed by ABSOLUTE seat row — every row
+        # stashes through apply_seat_actions (`_stash_buy`), and
+        # _seat_buy_ladder drains whichever row it is running.
         self._driven_buy: dict = {}
         self._driven_buy_worship: dict = {}
         self._driven_buy_relig: dict = {}
@@ -3785,14 +3732,13 @@ class SimInit:
         # One stash per DIPLOMATIC verb, allocated once and drained in place —
         # a per-verb attribute would have to be rebound to exist.
         self._driven_geo: dict = {v: {} for v in GEO_VERBS}
-        self._arangeNB = torch.arange(NB, device=device)
 
         # EVERY seat's t0 units seed the pool HERE, through ONE body — after
         # the roster tables and the pool planes exist, which is why the load is
         # split in two passes rather than by seat. charges/MP mirror
         # `_spawn_unit`'s writes minus the spot search (the file tile is the
-        # tile); the civ arm this replaced wrote neither, so every civ started
-        # with a 0-charge builder and 0 movesLeft until the first refresh.
+        # tile), so a builder starts with its charges and every unit with its
+        # movesLeft.
         #
         # ORDER: civ rows in fixture order, then row 0. The pool is compared
         # POSITIONALLY against TS's `state.units`, so the append order is a

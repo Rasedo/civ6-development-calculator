@@ -42,12 +42,12 @@ const TARGET_CLASSES = [
 export const CLASS_BIT: Readonly<Record<string, number>> = Object.fromEntries(
   TARGET_CLASSES.map((c, i) => [c, 1 << i]),
 );
-export const MASK_LAND = CLASS_BIT.RECON | CLASS_BIT.MELEE | CLASS_BIT.RANGED
+const MASK_LAND = CLASS_BIT.RECON | CLASS_BIT.MELEE | CLASS_BIT.RANGED
   | CLASS_BIT.ANTICAV | CLASS_BIT.LIGHT_CAV | CLASS_BIT.HEAVY_CAV | CLASS_BIT.SIEGE;
 /** CIV6 groups every hull under "naval units", the raider included. */
 export const MASK_NAVAL = CLASS_BIT.NAVAL_MELEE | CLASS_BIT.NAVAL_RANGED
   | CLASS_BIT.NAVAL_RAIDER | CLASS_BIT.NAVAL_CARRIER;
-export const MASK_CAVALRY = CLASS_BIT.LIGHT_CAV | CLASS_BIT.HEAVY_CAV;
+const MASK_CAVALRY = CLASS_BIT.LIGHT_CAV | CLASS_BIT.HEAVY_CAV;
 export const MASK_AIR = CLASS_BIT.AIR_FIGHTER | CLASS_BIT.AIR_BOMBER;
 
 /** CIV6 (Rock Band promotions, Expansion2_UnitPromotions): the VENUE KINDS
@@ -147,7 +147,7 @@ export const PROMO_KINDS = [
 ] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
-export interface PromoEffect {
+interface PromoEffect {
   kind: PromoKind;
   v?: number;
   mask?: number;
@@ -1286,9 +1286,3 @@ export function classBitOf(unitType: string): number {
   const c = UNIT_PROMO_CLASS[unitType];
   return (c && CLASS_BIT[c]) ?? 0;
 }
-
-/** the catalog index of a promotion id — the bit it occupies in a unit's
- *  `promotions` mask, shared by both engines through the rules export. */
-export const PROMO_INDEX: Readonly<Record<string, number>> = Object.fromEntries(
-  PROMOTIONS.map((p, i) => [p.id, i]),
-);

@@ -171,8 +171,8 @@ describe('the escort formation', () => {
 //
 // CIV6: sight belongs to a UNIT, and a formation's members all stand on the
 // same tile — so a Drone (BaseSightRange 5) escorted by a Warrior (2) sees
-// five tiles out from wherever the Warrior walks. The engine used to reveal at
-// the MOVER's sight alone, which threw the Drone's whole purpose away.
+// five tiles out from wherever the Warrior walks. Revealing at the MOVER's
+// sight alone would throw the Drone's whole purpose away.
 // ---------------------------------------------------------------------------
 describe('the rider\u2019s sight', () => {
   const seen = (state: GameState, tile: number): boolean =>

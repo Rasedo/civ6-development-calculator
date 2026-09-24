@@ -102,20 +102,20 @@ def print_hunt_reminder() -> None:
 # The TS children cost nothing: profiled at under 1% of the serve lane, whose
 # wall is the gate's own process — sim.step, the decide pass and the digest
 # extract — which is also why the gate runs as two processes at all.
-# Nine, measured against six at 8a0d6bb0 / b340b29b: the wall was 372 s
-# both ways (serve 352 vs 353) — the pool's contention no longer sets the
-# serve lane, so the pool may as well finish sooner (193 s vs 261 s).
+# Nine, measured against six: the wall was 372 s both ways (serve 352 vs
+# 353), since the pool's contention does not set the serve lane, so the pool
+# may as well finish sooner (193 s vs 261 s).
 POKE_WORKERS = 9
 # Serve shards at full fan-out. A shard pays a fixed per-turn dispatch price
 # plus a per-seed one that is near-LINEAR in B (the driven games are
 # data-dependent Python loops), so 24 seeds over 12 two-seed shards beat 8
-# three-seed ones on a 24-core box: measured at 6588d518, one seed 216 s,
-# three seeds 332 s, and the battery's 8-shard lane 501 s. The memory
-# planner narrows this when the box cannot hold 12 + POKE_WORKERS lanes.
-# MEASURED, both ways. Twelve two-seed shards with nine workers: 428 s at
-# 8dfbcb6d (serve 408, pool 287). Sixteen shards with eight workers asked
-# for 24 lanes, the planner had room for 21 (826 MB a lane), and 14/7 ran
-# 434 s at a96e1c2a (serve 415, pool 340): the two-seed shards sit near
+# three-seed ones on a 24-core box: measured, one seed 216 s, three seeds
+# 332 s, and the battery's 8-shard lane 501 s. The memory planner narrows
+# this when the box cannot hold 12 + POKE_WORKERS lanes.
+# MEASURED, both ways. Twelve two-seed shards with nine workers: 428 s
+# (serve 408, pool 287). Sixteen shards with eight workers asked for 24
+# lanes, the planner had room for 21 (826 MB a lane), and 14/7 ran 434 s
+# (serve 415, pool 340): the two-seed shards sit near
 # 400 s inside the battery whichever way the seeds are cut, against ~250 s
 # alone — the lane is CONTENTION-bound (24 TS children + the shards + the
 # pool on 24 cores), not dispatch-bound, so narrower shards buy nothing.
@@ -142,12 +142,12 @@ SLOW_TIER = frozenset({
     "governor_roster", "occupancy", "centre_defence", "advance_borders",
     "citystate_war", "seat", "controlled", "snapshot", "citystate_bonus",
     "formation_train",
-    # 2026-09-14 (owner: "trim tests"): the eight lanes the battery's own
-    # record named as never having caught anything in 189 runs, 475 s of
-    # the pool between them — demoted, not deleted
+    # (owner: "trim tests"): the eight lanes the battery's own record names
+    # as never having caught anything in 189 runs, 475 s of the pool between
+    # them; demoted, not deleted
     "trade2", "culture_victory", "districts_new", "climate", "war_weariness",
     "bankruptcy", "sourced_rows", "spawn_reclaim",
-    # 2026-09-14 evening, the same record at 196 rows: the twenty-four lanes
+    # the same record at 196 rows: the twenty-four lanes
     # of fifteen seconds or more that have NEVER appeared in failed_lanes,
     # 512 s of the 2,225 s pool. The box is 12 physical cores under 24
     # logical ones, so every second of pool work is contention on the serve
@@ -164,7 +164,7 @@ SLOW_TIER = frozenset({
 # ---------------------------------------------------------------- memory --
 # The battery is the heaviest thing in this repo and the box is the OWNER's,
 # often with a VM on it. It must never be able to take the machine down: when
-# memory is short it runs FEWER lanes for LONGER (#230).
+# memory is short it runs FEWER lanes for LONGER.
 #
 # `MEM_RESERVE_MB` is what we leave for whatever else is running; the pool is
 # sized out of what remains. `MEM_LOW_WATER_MB` is where the watchdog stops
@@ -172,8 +172,8 @@ SLOW_TIER = frozenset({
 # anything on a shared box is forbidden.
 # 3 GB: twelve two-seed shards + nine poke workers at ~835 MB a lane is
 # 17.5 GB, and the box opens a battery with ~21 GB free — 4 GB reserved
-# narrowed the fan-out to eleven shards (25866347: room for 20 lanes, not
-# 21) while the run's floor stayed at 5.0 GB free. The low-water watch
+# narrows the fan-out to eleven shards (room for 20 lanes, not 21) while
+# the run's floor stays at 5.0 GB free. The low-water watch
 # (2 GB) still holds new lanes back if the owner's own work grows.
 MEM_RESERVE_MB = 3072
 MEM_LOW_WATER_MB = 2048
@@ -323,7 +323,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
 import test_stats as _stats  # noqa: E402
 import battery_live as _live  # noqa: E402
 
-# NO LANE OUTLIVES THE RUN. A hung lane used to sit there until the box was
+# NO LANE OUTLIVES THE RUN. A hung lane would sit there until the box was
 # rebooted, holding its memory and a core; past this many seconds it is killed
 # with its whole tree and reported red. Six times the slowest lane, so a
 # healthy run can never reach it.
@@ -428,7 +428,7 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
             for ln in p.stdout.strip().splitlines()[-_n:]:
                 print(f"    | {ln}", flush=True)
         if p.returncode != 0 and looks_oom(p.stdout + p.stderr):
-            # #230: the box ran out of memory. Report it as its own thing —
+            # the box ran out of memory. Report it as its own thing —
             # a red here would blame the code for the machine.
             results[-1] = (name, dt, -5)
             oom.set()
@@ -458,7 +458,7 @@ def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads
 
     def worker(idx: int = 0) -> None:
         while True:
-            # #230: under memory pressure the pool stops ADMITTING work and
+            # under memory pressure the pool stops ADMITTING work and
             # the running lanes drain. Worker 0 never waits, so the pool
             # cannot deadlock and the run always finishes — later.
             while idx > 0 and mem_tight.is_set() and not failed.is_set():
@@ -516,7 +516,7 @@ def main() -> int:
 
 
 def _main() -> int:
-    # OWNER RULE (2026-09-08, was FOUR): the battery runs every FIVE commits, not every
+    # OWNER RULE: the battery runs every FIVE commits, not every
     # round — batched hunts run at ~15 min/bug where isolated ones paid ~80
     # (stats/battery.jsonl audit). The per-commit bar is the compile bar plus
     # a single-seed smoke serve. A RED run never resets the clock (only a
@@ -584,7 +584,7 @@ def _main() -> int:
         # THE CONSTANTS AGAINST THE REAL GAME. `export` just wrote
         # provenance.json; the checker re-reads every tagged constant from
         # the install and compares. The ledger (docs/PROVENANCE.md) already
-        # knows today's disagreements and #264 burns them down, so the step
+        # knows the standing disagreements, so the step
         # is a RATCHET: red only on a NEW disagreement or a tag that stopped
         # resolving. A box without the install prints SKIPPED and passes.
         ("provenance", [py, "tools/civ6lab/xml_check.py", "check", "--baseline", "docs/PROVENANCE.md"]),
@@ -622,7 +622,7 @@ def _main() -> int:
             _gone = [s for s in _want if s not in _seeds]
             assert not _gone, f"--seeds names no fixture: {_gone}; have {_seeds}"
             _seeds = _want
-        # #230: how wide this run may fan out, given the memory this box
+        # how wide this run may fan out, given the memory this box
         # actually has free right now. Never a refusal — a narrower run, which
         # is a LONGER run.
         _k, _pokes, _why = plan_pool(min(MAX_SHARDS, len(_seeds)))
@@ -722,7 +722,7 @@ def _main() -> int:
                 ("neutral_obs", [py, "tests/gpu/neutral_obs_test.py"], 4),  # the decision server's observation is a plain value
                 ("drive_purity", [py, "tests/gpu/drive_purity_test.py"], 2),  # nothing under policy/ reads an engine: no sim, no env, no core import
                 ("religion_gp", [py, "tests/gpu/religion_gp_test.py"], 4),
-                ("gp_channels", [py, "tests/gpu/gp_channels_test.py"], 4),  # the seven Great Person CHANNEL clauses (B-61r batch A)
+                ("gp_channels", [py, "tests/gpu/gp_channels_test.py"], 4),  # the seven Great Person CHANNEL clauses
                 ("gp_verbs", [py, "tests/gpu/gp_verbs_test.py"], 4),  # the three Great Person VERB clauses: Raffles, Boudica, Tupac Amaru
                 ("war_weariness", [py, "tests/gpu/war_weariness_test.py"], 4),
                 ("space_race", [py, "tests/gpu/space_race_test.py"], 4),
@@ -795,7 +795,7 @@ def _main() -> int:
                 ("mountain_tunnel", [py, "tests/gpu/mountain_tunnel_test.py"], 7),  # the portal on a mountain range
                 ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # the levy mark and its 75% discount
                 ("government_bonus", [py, "tests/gpu/government_bonus_test.py"], 6),  # the GS flat government bonus and what a legacy card pays
-                ("battery_memory", [py, "tests/gpu/battery_memory_test.py"], 1),  # #230 the harness narrows instead of taking the box down
+                ("battery_memory", [py, "tests/gpu/battery_memory_test.py"], 1),  # the harness narrows instead of taking the box down
                 ("narrow_batch_xp", [py, "tests/gpu/narrow_batch_xp_test.py"], 2),  # a narrowed XP award must read its own game
                 ("incoming_route", [py, "tests/gpu/incoming_route_test.py"], 2),  # a route coming in is paid with none going out
                 ("bankruptcy_tie", [py, "tests/gpu/bankruptcy_tie_test.py"], 2),  # a bankruptcy tie goes to the earliest-spawned unit
@@ -918,8 +918,8 @@ def _main() -> int:
               f"  |  serve {_srv:.0f}s over {len(_serve_names)} shards"
               f"  vs  pokes {sum(_pk):.0f}s/{_pokes} workers = {_pool:.0f}s"
               f"  ->  {'SERVE' if _srv >= _pool else 'POKES'} is the wall")
-        # THE TRIPWIRE. The trim of 2026-09-08 put the wall on the serve lane;
-        # lanes get added and the pool creeps back, so the day it returns the
+        # THE TRIPWIRE. The wall belongs on the serve lane; lanes get added
+        # and the pool creeps back, so the day the pool is the wall the
         # battery says so itself. A WARNING, never a refusal: blocking a run
         # because its own suite got slow punishes it for a fault it did not
         # cause, and the only thing worse than a slow battery is one nobody
@@ -958,7 +958,7 @@ def _main() -> int:
     # tools/gpu/test_stats.py. Which lanes ever catch anything is a
     # question for data, not for memory.
     # What this run COST in memory, so the next one can size itself from a
-    # measurement rather than the pessimistic default (#230).
+    # measurement rather than the pessimistic default.
     _peak = max(0.0, _mem_free_start - mem_min_free[0]) if _mem_free_start < 10 ** 9 else 0.0
     _mem = {"free_start_mb": round(_mem_free_start, 1) if _mem_free_start < 10 ** 9 else None,
             "free_min_mb": round(mem_min_free[0], 1) if mem_min_free[0] < 10 ** 9 else None,

@@ -3,45 +3,23 @@ from __future__ import annotations
 import sys
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers
-from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
+from . import simbase
 
 
 class SimMasks:
-    def production_mask(self) -> torch.Tensor:
-        """[B, RC, W] valid production actions for seat 0's idle cities.
-
-        Seat 0's row of `_seat_production_mask` — the ONE body every seat row
-        asks, in the ONE production layout (cpu/core/prodLayout.ts). Seat 0 has
-        no mask of its own: a second body is how a seat quietly acquires its own
-        legality."""
-        return self._seat_production_mask(0)
-
     def _seat_tech_mask(self, row: int) -> torch.Tensor:
         # EVERY available tech, whether or not one is already underway: real
         # Civ 6 lets a seat switch research at any moment, and `availableTechsIn`
-        # never consulted the current selection either. The old
-        # `cur_tech == -1` term made the whole tech head illegal for as long as
-        # anything was being researched — measured at t60 of seed 9002, a seat
-        # with 9 techs had 0 of 68 legal — so "switch research" was a move no
-        # policy could express and none could learn.
+        # never consults the current selection either, so "switch research" is
+        # a move every seat can make.
         return self._available_mask(self.civ_techs[:, row], self._prereq_t)
 
     def _seat_civic_mask(self, row: int) -> torch.Tensor:
         return self._available_mask(self.civ_civics[:, row], self._prereq_c)
 
-    def tech_mask(self) -> torch.Tensor:
-        return self._seat_tech_mask(0)
-
-    def civic_mask(self) -> torch.Tensor:
-        return self._seat_civic_mask(0)
-
     def _seat_envoy_mask(self, row: int) -> torch.Tensor:
         return (self.citystate_alive & self.seat_citystate_met[:, row]
                 & (self.civ_envoys_avail[:, row] > 0).unsqueeze(1))
-
-    def envoy_mask(self) -> torch.Tensor:
-        return self._seat_envoy_mask(0)
 
     def war_targets(self, row: int) -> list[int]:
         """The seat ROWS this row's war head addresses: every OTHER major in
@@ -215,7 +193,7 @@ class SimMasks:
         # target tile, c = the rng counter BEFORE the draw (absolute stream
         # position, so draws align even when sequences slip). A reordered or
         # extra roll shows as a mismatched CB line, invisible to the rng column.
-        b = getattr(self, "_log_combat_b", None)
+        b = self._log_combat_b
         log_hit = b is not None and bool(mask[b])
         c0 = int(self.rng_state[b]) if log_hit else 0
         r = self._next_random(mask)
@@ -250,7 +228,7 @@ class SimMasks:
         an even fight is a coin flip, and the chance moves linearly to certain
         at +base and to nothing at -base. One draw from the seat's stream, in
         the slot right after the two damage rolls on both engines."""
-        b = getattr(self, "_log_combat_b", None)
+        b = self._log_combat_b
         log_hit = b is not None and bool(mask[b])
         c0 = int(self.rng_state[b]) if log_hit else 0
         r = self._next_random(mask)
@@ -849,8 +827,8 @@ class SimMasks:
         rel = torch.zeros_like(occ, dtype=torch.bool)
         oc = occ.clamp(min=0)
         t = self.unit_type.gather(1, oc)
-        for i in (getattr(self, "_missionary_idx", -1), getattr(self, "_apostle_idx", -1),
-                  getattr(self, "_inquisitor_idx", -1)):
+        for i in (self._missionary_idx, self._apostle_idx,
+                  self._inquisitor_idx):
             if i >= 0:
                 rel = rel | (t == i)
         return torch.where((occ >= 0) & rel, occ, torch.full_like(occ, -1))
@@ -986,8 +964,8 @@ class SimMasks:
         `bankXp` returns before touching it. That is not the same as clamping
         it to the requirement, and the difference is reachable: a goody hut's
         grant and a corps merge's inheritance both write the pool without the
-        clamp, so a unit can legitimately stand ABOVE its threshold, and this
-        used to drag it back down the next time it banked anything at all.
+        clamp, so a unit can legitimately stand ABOVE its threshold, and the
+        next bank leaves it there.
         """
         need = self._xp_to_next(level)
         held = (need <= 0) | (xp >= need)
@@ -1709,7 +1687,7 @@ class SimMasks:
                 + self._promo_val(utype, promos, "RELIG_CS")
                 + self._congress_relig_cs(seat)
                 + (_card + _gov).to(self._rel_strength.dtype))
-        if getattr(self, "_inquisitor_idx", -1) < 0:
+        if self._inquisitor_idx < 0:
             return base
         home = (utype == self._inquisitor_idx) & _home_t
         return base + home.long() * self._inquisitor_home_strength
@@ -2101,7 +2079,7 @@ class SimMasks:
         `seat` is an ABSOLUTE seat; anything outside the major rows (a barbarian, a
         city-state, NO_SEAT) holds no tech, and a `tech` the rules table does
         not define is False everywhere. The research planes are the merged
-        `civ_techs[:, row]` block, so seat 0 needs no arm of its own."""
+        `civ_techs[:, row]` block, so no seat needs an arm of its own."""
         if tech < 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         rows = seat.clamp(min=0, max=self.n_majors - 1)
@@ -2248,7 +2226,7 @@ class SimMasks:
         self.barb_unit_mp_full[rows, slot] = _m
         self.barb_unit_attacks[rows, slot] = 1
         self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _sb in rows.tolist():
                 self._diff_events.setdefault(_sb, []).append(
                     f"sp:{BARB_SEAT}:{int(self.turn)}"
@@ -2312,15 +2290,13 @@ class SimMasks:
         WIRED — the full TS reveal-site set: t0 fixture load (r2/unit), the
         three major spawn bodies (r2), both founding bodies (r3), every walk
         hop through _step_verb's one tile write (r2 — all movers route
-        there), tile acquisition r1 at all three sites (seat-0 border
-        growth, civ border growth, the driven tile buy), and the captor's
-        r3 at all five capture bodies (seat-0/civ city captures + transfers,
-        both CS conquests). NOT reveals on either engine: the melee
-        advance-into-freed-tile and unit capture/transfers (TS writes
-        tileIndex directly — no stepUnit, no reveal). The old FOG-DEBT note
-        here named a goody-hut MAPS reward with no twin; both halves of it are
-        gone — the mechanic ships and the install's own reward table
-        carries no maps arm, that was the unsourced stub's invention."""
+        there), tile acquisition r1 at both sites (border growth on every
+        seat row, the driven tile buy), and the captor's r3 at every capture
+        body (`_transfer_city` for city captures and transfers,
+        `_capture_city_state` for both CS conquests). NOT reveals on either
+        engine: the melee advance-into-freed-tile and unit capture/transfers
+        (TS writes tileIndex directly — no stepUnit, no reveal), and a goody
+        hut, whose reward table in the install carries no maps arm."""
         if not self.fog_of_war or rows.numel() == 0:
             return
         # `see_through` names a UNIT's look (revealAround's `los`): the disk is
@@ -2454,10 +2430,10 @@ class SimMasks:
         # named none of them, which is the same gap the pop and xp logs had
         # before their writer joined the key. Read off the frame rather than
         # threaded through every call site: it cannot fall out of date.
-        _why = sys._getframe(1).f_code.co_name if getattr(self, "_log_diff", False) else ""
+        _why = sys._getframe(1).f_code.co_name if self._log_diff else ""
         can = mask & found
         # ...and the REFUSALS, the rows that WANTED a unit and got no tile.
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _sb in (mask & ~found).nonzero(as_tuple=True)[0].tolist():
                 self._diff_events.setdefault(_sb, []).append(
                     f"sp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
@@ -2465,7 +2441,7 @@ class SimMasks:
         if not bool(can.any()):
             return can
         rows = can.nonzero(as_tuple=True)[0]
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _sb in rows.tolist():
                 _rank = int((self.unit_alive[_sb] & (self.unit_seat[_sb] == row)).sum())
                 self._diff_events.setdefault(_sb, []).append(
@@ -2556,13 +2532,11 @@ class SimMasks:
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
         getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx, at_tile)[rows]
         off = self.POOL_LO[pre]
-        # ONE occupancy writer, the one every other caller uses. This used to
-        # hand-roll two arms off `_type_civilian` — the NONCOMBAT set, not the
-        # civilian STACKING CLASS — so a support chassis was born into the
-        # wrong plane: the Military Engineer (charges, no combat) among the
-        # civilians, the Battering Ram among the military. `_occ_set` makes
-        # the three-way split, and it reads the type and the embarked flag
-        # this body has already written.
+        # ONE occupancy writer, the one every other caller uses. `_occ_set`
+        # makes the three-way split on the stacking class (`_type_civilian` is
+        # the NONCOMBAT set, which would put the Military Engineer among the
+        # civilians and the Battering Ram among the military), and it reads
+        # the type and the embarked flag this body has already written.
         # An AIRCRAFT and a SPY hold no plot at all (`no_hold`), so they are
         # still kept out of every plane.
         _hold = rows[~no_hold[rows]]
@@ -2712,7 +2686,7 @@ class SimMasks:
         CIV6 (Archaeologist): "Archaeologists cannot enter another
         civilization's territory without an Open Borders treaty" — ENTRY is
         what the rule gates, so the dig asks the same question the step did."""
-        if getattr(self, "_archaeologist_idx", -1) < 0:
+        if self._archaeologist_idx < 0:
             return torch.zeros_like(tc, dtype=torch.bool)
         return (
             (utype == self._archaeologist_idx)
@@ -2831,7 +2805,7 @@ class SimMasks:
                     promos: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — the PERFORM column: CIV6 "Rock Bands must always
         perform in foreign lands", on a tile carrying a venue."""
-        if getattr(self, "_band_idx", -1) < 0:
+        if self._band_idx < 0:
             return torch.zeros_like(tc, dtype=torch.bool)
         owner = self.tile_seat.gather(1, tc)
         foreign = (owner >= 0) & (owner < self.n_majors) & (owner != row)
@@ -2842,7 +2816,7 @@ class SimMasks:
         """[B, N] bool — the BOOST column: CIV6 (Royal Society) "Builders gain
         the ability to use all of their charges to provide bonus Production to a
         District Project. Once per city per turn"."""
-        if getattr(self, "_builder_idx", -1) < 0 or not self._project_charge_live:
+        if self._builder_idx < 0 or not self._project_charge_live:
             return torch.zeros_like(tc, dtype=torch.bool)
         pct = self._bsum_by_row("projcharge", self._b_project_charge)[:, row]
         col = self._project_boost_slot(row, tc)
@@ -2855,7 +2829,7 @@ class SimMasks:
         anchors at least one legal rhombus."""
         _u0 = utype.clamp(min=0, max=self.NU - 1)
         _may = self._type_park_builder[_u0]
-        if getattr(self, "_naturalist_idx", -1) >= 0:
+        if self._naturalist_idx >= 0:
             _may = _may | (utype == self._naturalist_idx)
         if not bool(_may.any()):
             return torch.zeros_like(tc, dtype=torch.bool)
@@ -3077,7 +3051,7 @@ class SimMasks:
         `meleeAttack`'s cityStateTarget: a DECLARED war on the minor itself,
         or a war with ANY seat that is its SUZERAIN (contesting the suzerain
         drags its minor in). Row-generic — the suzerain clause loops the major
-        rows rather than naming seat 0."""
+        rows rather than naming one."""
         S = max(self.S, 1)
         cs_row0 = self.n_majors
         out = self.war[:, row, cs_row0:cs_row0 + S][:, :self.S] if self.S > 0 else torch.zeros(self.B, 0, dtype=torch.bool, device=self.device)
@@ -3170,10 +3144,8 @@ class SimMasks:
         if self.TUNNEL >= 0:
             terr = terr | (self.improvement.gather(1, nbc).reshape(B, N, 6) == self.TUNNEL)
         _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
-        # ONE call with the mover's own class flags. It used to be two, chosen
-        # by a `where`, to skip building the civilian plane on military-only
-        # ranks; a third class would have made that three, and the flags are
-        # per-unit tensors the rule already accepts.
+        # ONE call with the mover's own class flags: the flags are per-unit
+        # tensors the rule already accepts, so no class needs a call of its own.
         _blk = self._blocked_for(
             nbc, row, is_naval=_nav6,
             is_civilian=is_civ.expand(B, N, 6).reshape(B, -1),
@@ -3487,7 +3459,7 @@ class SimMasks:
         pillage = pillage.unsqueeze(2)
 
         _sn: list[torch.Tensor] = []
-        if getattr(self, "_snipe_on", False):
+        if self._snipe_on:
             rngd = (self._type_ranged_strength[ut] > 0) & (self._type_ranged_range[ut] >= 2)
             ring = self.ring2[tc]
             ringc = ring.clamp(min=0).reshape(B, -1)
@@ -3521,39 +3493,39 @@ class SimMasks:
             ]
 
         _sp: list[torch.Tensor] = []
-        if getattr(self, "_A_SPREAD", -1) >= 0:
+        if self._A_SPREAD >= 0:
             _relig = torch.zeros_like(present)
             if self._missionary_idx >= 0:
                 _relig = _relig | (utype == self._missionary_idx)
-            if getattr(self, "_apostle_idx", -1) >= 0:
+            if self._apostle_idx >= 0:
                 _relig = _relig | (utype == self._apostle_idx)
             _sp_ok = present & _relig & (u_charges > 0) & self.civ_religion_done[:, row].unsqueeze(1)
             _sp = [_sp_ok.unsqueeze(2).expand(-1, -1, 7)]
 
         _fd: list[torch.Tensor] = []
-        if getattr(self, "_A_FOUND", -1) >= 0:
+        if self._A_FOUND >= 0:
             _fd = [(present & (utype == self._settler_idx)).unsqueeze(2)
                    if self._settler_idx >= 0
                    else torch.zeros(B, N, 1, dtype=torch.bool, device=dev)]
 
         _ex: list[torch.Tensor] = []
-        if getattr(self, "_A_EXCAVATE", -1) >= 0:
+        if self._A_EXCAVATE >= 0:
             _ex = [(present & self._excavate_ok(row, tc, utype, u_charges)).unsqueeze(2)]
 
         _pk: list[torch.Tensor] = []
-        if getattr(self, "_A_PARK", -1) >= 0:
+        if self._A_PARK >= 0:
             _pk = [(present & self._park_ok(row, tc, utype)).unsqueeze(2)]
 
         _pc: list[torch.Tensor] = []
-        if getattr(self, "_A_PERFORM", -1) >= 0:
+        if self._A_PERFORM >= 0:
             _pc = [(present & self._perform_ok(row, tc, utype, self.unit_promos.gather(1, sc))).unsqueeze(2)]
 
         _bp: list[torch.Tensor] = []
-        if getattr(self, "_A_BOOST", -1) >= 0:
+        if self._A_BOOST >= 0:
             _bp = [(present & self._boost_ok(row, tc, utype, u_charges)).unsqueeze(2)]
 
         _fu: list[torch.Tensor] = []
-        if getattr(self, "_A_FORM_UP", -1) >= 0:
+        if self._A_FORM_UP >= 0:
             # CIV6 (Formations): two military units of the same type make a
             # Corps once Nationalism is in and three an Army once Mobilization
             # is — a Fleet and an Armada at sea. A tier holds `tier + 1` units,
@@ -3585,22 +3557,22 @@ class SimMasks:
                    & _civ_ok]
 
         _ec: list[torch.Tensor] = []
-        if getattr(self, "_A_ESCORT", -1) >= 0:
+        if self._A_ESCORT >= 0:
             # `escortable`: a passenger at sea, or `unitIsNoncombat` — which
             # is the civilian AND the support class, not the civilian alone.
             _ec = [alive & (is_civ | is_sup | u_emb.unsqueeze(2)) & (tile >= 0).unsqueeze(2)
                    & ~_u_esc & _esc_here & ~_rider_here.unsqueeze(2)]
 
         _ue: list[torch.Tensor] = []
-        if getattr(self, "_A_UNESCORT", -1) >= 0:
+        if self._A_UNESCORT >= 0:
             _ue = [alive & in_esc]
 
         _pr: list[torch.Tensor] = []
-        if getattr(self, "_A_PROMOTE", -1) >= 0:
+        if self._A_PROMOTE >= 0:
             _pr = [present.unsqueeze(2) & self._promo_offer_mask(sc, utype)]
 
         _cd: list[torch.Tensor] = []
-        if getattr(self, "_A_CONDEMN", -1) >= 0:
+        if self._A_CONDEMN >= 0:
             # CIV6 (Condemn Heretic): "Must be at war with the owner of the
             # religious unit" — a MILITARY unit's verb on an adjacent tile, and
             # a WAR is what it asks for, not the wider hostility relation.
@@ -3613,17 +3585,17 @@ class SimMasks:
                    & on_map & _hw.reshape(B, N, 6)]
 
         _rh: list[torch.Tensor] = []
-        if getattr(self, "_A_HERESY", -1) >= 0 and getattr(self, "_inquisitor_idx", -1) >= 0:
+        if self._A_HERESY >= 0 and self._inquisitor_idx >= 0:
             _rh = [(present & (utype == self._inquisitor_idx) & (u_charges > 0)
                     & (self.centre_slot_at.gather(1, tc) >= 0)
                     & (self.tile_seat.gather(1, tc) == row)).unsqueeze(2)]
-        elif getattr(self, "_A_HERESY", -1) >= 0:
+        elif self._A_HERESY >= 0:
             _rh = [torch.zeros(B, N, 1, dtype=torch.bool, device=dev)]
 
         _li: list[torch.Tensor] = []
-        if getattr(self, "_A_INQUISITION", -1) >= 0:
+        if self._A_INQUISITION >= 0:
             _ok = torch.zeros(B, N, dtype=torch.bool, device=dev)
-            if getattr(self, "_apostle_idx", -1) >= 0:
+            if self._apostle_idx >= 0:
                 _ok = (present & (utype == self._apostle_idx)
                        & (u_charges >= self._launch_inquisition_charges)
                        & (self.tile_seat.gather(1, tc) == row)
@@ -3631,7 +3603,7 @@ class SimMasks:
             _li = [_ok.unsqueeze(2)]
 
         _hc: list[torch.Tensor] = []
-        if getattr(self, "_A_HEATHEN", -1) >= 0:
+        if self._A_HEATHEN >= 0:
             # CIV6 (Heathen Conversion): "Can convert all adjacent Barbarians to
             # your side by using a religious charge."
             _bs = self._barb_unit_plane()
@@ -3640,28 +3612,28 @@ class SimMasks:
                     & (on_map & _bs.gather(1, nbc).reshape(B, N, 6)).any(dim=2)).unsqueeze(2)]
 
         _ug: list[torch.Tensor] = []
-        if getattr(self, "_A_UPGRADE", -1) >= 0:
+        if self._A_UPGRADE >= 0:
             _ug = [(present & self._upgrade_ok(row, sc, tc, utype)).unsqueeze(2)]
 
         _as: list[torch.Tensor] = []
-        if getattr(self, "_A_AIR_STRIKE", -1) >= 0:
+        if self._A_AIR_STRIKE >= 0:
             _as = [present.unsqueeze(2) & self._air_target_mask(row, sc, tc, utype)]
         _nk: list[torch.Tensor] = []
-        if getattr(self, "_A_NUKE", -1) >= 0:
+        if self._A_NUKE >= 0:
             _nk = [present.unsqueeze(2) & self._nuke_mask(row, sc, tc, utype)]
 
         _ap: list[torch.Tensor] = []
-        if getattr(self, "_A_AIR_PILLAGE", -1) >= 0:
+        if self._A_AIR_PILLAGE >= 0:
             _ap = [present.unsqueeze(2) & self._air_pillage_mask(row, sc, tc, utype)]
         _rb: list[torch.Tensor] = []
-        if getattr(self, "_A_REBASE", -1) >= 0:
+        if self._A_REBASE >= 0:
             _rb = [present.unsqueeze(2) & self._rebase_mask(row, sc, tc, utype)]
 
         _st: list[torch.Tensor] = []
-        if getattr(self, "_A_SPY_TRAVEL", -1) >= 0:
+        if self._A_SPY_TRAVEL >= 0:
             _st = [present.unsqueeze(2) & self._spy_travel_mask(row, sc, tc, utype)]
         _sm: list[torch.Tensor] = []
-        if getattr(self, "_A_SPY_MISSION", -1) >= 0:
+        if self._A_SPY_MISSION >= 0:
             _sm = [present.unsqueeze(2) & self._spy_mission_mask(row, sc, tc, utype)]
 
         # CIV6 (Military Engineer): "Can construct Roads ... (uses 1 charge)"
@@ -3669,7 +3641,7 @@ class SimMasks:
         # "Can spend a charge to complete 20% of an engineering type of
         # district ... and Flood Barrier building" (`engineerFinishCity`).
         _rd: list[torch.Tensor] = []
-        if getattr(self, "_A_ROAD", -1) >= 0:
+        if self._A_ROAD >= 0:
             _rd = [(eng_ground & ~self.road.gather(1, tc)).unsqueeze(2)]
         # CIV6 (Railroad): "Can only be constructed by Military Engineers.
         # Does not cost a charge, but does cost 1 Iron and 1 Coal", once Steam
@@ -3678,7 +3650,7 @@ class SimMasks:
         # is not one of its conditions, so it rides `eng_ground` rather than
         # `eng_here`.
         _rr: list[torch.Tensor] = []
-        if getattr(self, "_A_RAIL", -1) >= 0:
+        if self._A_RAIL >= 0:
             _rrok = torch.ones(B, 1, dtype=torch.bool, device=dev)
             if self._railroad_tech >= 0:
                 _rrok = techs[:, self._railroad_tech].unsqueeze(1)
@@ -3696,14 +3668,14 @@ class SimMasks:
         # and no territory clause — the charge and the fallout are the whole
         # gate.
         _cf: list[torch.Tensor] = []
-        if getattr(self, "_A_CLEAN", -1) >= 0:
+        if self._A_CLEAN >= 0:
             _cf = [(present & (u_charges > 0)
                     & self._fallout().gather(1, tc)).unsqueeze(2)]
         # REMOVE_IMPROVEMENT — CIV6 (Builder / Military Engineer): "Can
         # Remove Tile Improvements (costs no charge)", both pages verbatim.
         # An OWN tile holding one; the turn is spent, never a charge.
         _ri: list[torch.Tensor] = []
-        if getattr(self, "_A_REMOVE_IMP", -1) >= 0:
+        if self._A_REMOVE_IMP >= 0:
             _rm_u = torch.zeros_like(present)
             if self._builder_idx >= 0:
                 _rm_u = _rm_u | (utype == self._builder_idx)
@@ -3716,7 +3688,7 @@ class SimMasks:
         # harvested, and the seat must hold the improvement that works it —
         # `harvestGrant`'s three tests, plus Mana's ban (`SEAT_BAN_ROWS`).
         _hv: list[torch.Tensor] = []
-        if getattr(self, "_A_HARVEST", -1) >= 0:
+        if self._A_HARVEST >= 0:
             _rid = self.res_id.gather(1, tc)
             _nres = int(self._res_harvest_y.numel())
             _ridc = _rid.clamp(min=0, max=max(_nres - 1, 0))
@@ -3744,7 +3716,7 @@ class SimMasks:
         # site and the era band are `_wonder_charge_slot`'s, which the applier
         # asks too — one reader, so a legal column cannot land in no arm.
         _wc: list[torch.Tensor] = []
-        if getattr(self, "_A_WONDER_CHARGE", -1) >= 0:
+        if self._A_WONDER_CHARGE >= 0:
             _wc = [(present
                     & ((utype == self._builder_idx) if self._builder_idx >= 0
                        else torch.zeros_like(present))
@@ -3756,12 +3728,12 @@ class SimMasks:
         # The applier asks `_portal_exit` too, so a legal column cannot land in
         # no arm.
         _pt: list[torch.Tensor] = []
-        if getattr(self, "_A_PORTAL", -1) >= 0:
+        if self._A_PORTAL >= 0:
             _pex = self._portal_exit(tc.reshape(-1)).reshape(tc.shape)
             _pt = [(present & (_pex >= 0)
                     & (self.unit_mp.gather(1, sc) >= self._portal_mp * self._mp_scale)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []
-        if getattr(self, "_A_FINISH", -1) >= 0:
+        if self._A_FINISH >= 0:
             _fi = [(present
                     & ((utype == self._eng_idx) if self._eng_idx >= 0 else torch.zeros_like(present))
                     & (u_charges > 0)
@@ -3771,11 +3743,11 @@ class SimMasks:
         # ability may be spent. Which person is acting is the chassis and its
         # queue position, never a column of its own.
         _gp: list[torch.Tensor] = []
-        if getattr(self, "_A_GP", -1) >= 0:
+        if self._A_GP >= 0:
             _gp = [(present & self._gp_site_ok(row, sc, tc)).unsqueeze(2)]
 
         _sn3: list[torch.Tensor] = []
-        if getattr(self, "_snipe3_on", False):
+        if self._snipe3_on:
             # CIV6: distance 3 needs ATTACK RANGE 3 — chassis range plus the
             # RANGE promotion, which is what `unitAttackRange` sums on TS.
             _rt3 = self._promo_val(ut, self.unit_promos.gather(1, sc), "RANGE")
@@ -3969,7 +3941,7 @@ class SimMasks:
         B, N = tc.shape
         W, D = self._nuke_cols, self._n_devices
         out = torch.full((B, N, W * D), -1, dtype=torch.long, device=self.device)
-        if W == 0 or D == 0 or getattr(self, "_A_NUKE", -1) < 0:
+        if W == 0 or D == 0 or self._A_NUKE < 0:
             return out
         ti = utype.clamp(min=0, max=self.NU - 1)
         carry = (utype >= 0) & (self._type_nuke_carry[ti] > 0)

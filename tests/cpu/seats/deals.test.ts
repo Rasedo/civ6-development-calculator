@@ -266,7 +266,7 @@ describe('the things a deal can name', () => {
   });
 
   it('a captured spy goes home at the level it was caught at, the highest first', () => {
-    // STYLIZED (owner ruling 2026-09-04): the cell holds LEVELS, and when it
+    // STYLIZED (owner ruling): the cell holds LEVELS, and when it
     // holds several the highest goes first — the GPU twin is
     // tests/gpu/spy_release_level_test.py
     const state = table();

@@ -145,9 +145,8 @@ export interface UnitDef {
   /** a building the TRAINING city must already hold (the Military Engineer's
    *  Armory). Per-CITY, so it is enforced in `trainableUnits`. */
   requiresBuilding?: string;
-  /** a NAVAL unit lives on water natively (never `embarked`). No naval
-   * units exist yet (N2 adds GALLEY/QUADRIREME) — the field is plumbed now so
-   * passability/spawn/combat can branch on it. Default false. */
+  /** a NAVAL unit lives on water natively (never `embarked`);
+   * passability/spawn/combat branch on it. Default false. */
   naval?: boolean;
   /** CIV 6 unit class: LIGHT cavalry (Horseman) and HEAVY cavalry (Knight).
    * The pair real suzerain/policy text addresses as "light and heavy
@@ -3709,9 +3708,6 @@ export function unitHasClass(def: UnitDef, cls: UnitClass): boolean {
   }
 }
 
-/** the ERA a unit first becomes available — the era index of the tech or civic
- *  that unlocks it (0 = trainable from the start). The production cards'
- *  "Ancient and Classical era ... units" clause reads this. */
 /** the catalog POSITION of each chassis — the index every per-type plane is
  *  keyed by on both engines, since the exporter writes the unit rows in this
  *  same order. */
@@ -3719,6 +3715,9 @@ export const UNIT_INDEX: Record<string, number> = Object.fromEntries(
   Object.keys(UNITS).map((id, i) => [id, i]),
 );
 
+/** the ERA a unit first becomes available — the era index of the tech or civic
+ *  that unlocks it (0 = trainable from the start). The production cards'
+ *  "Ancient and Classical era ... units" clause reads this. */
 export const UNIT_ERA_INDEX: Record<string, number> = Object.fromEntries(
   Object.values(UNITS).map((u) => {
     const t = u.requiresTech ? TECHS[u.requiresTech] : undefined;
@@ -3731,9 +3730,9 @@ export const UNIT_ERA_INDEX: Record<string, number> = Object.fromEntries(
 export const UNIT_HP = 100;
 export const CITY_MAX_HP = 200;
 /** flat per-turn city heal when unbesieged, war or not (real
- * Civ 6) — the rate `barbarianPhase` applies to seat-0 cities (combat.ts)
- * and `seatPhase` to foreign cities; the GPU reads it as the exported
- * `cityHealPerTurn` rules field. */
+ * Civ 6) — the rate `seatPhase` applies to every seat's cities and
+ * encampments and `freeCitiesPhase` to the Free Cities; the GPU reads it as
+ * the exported `cityHealPerTurn` rules field. */
 export const CITY_HEAL_PER_TURN = 20;
 /**
  * The ENCAMPMENT garrison pool. Real Civ 6: the Encampment fights
@@ -3840,7 +3839,7 @@ export const ROCK_BAND_MAX_LEVEL = 4;
  * an upgrade is the SEAT's tech, empire-wide, and no per-unit state stands
  * behind it. Catalog order is the wire order.
  */
-export interface GdrUpgradeDef {
+interface GdrUpgradeDef {
   id: string;
   name: string;
   tech: string;

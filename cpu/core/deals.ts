@@ -47,7 +47,7 @@ export function setDealOffer(state: GameState, from: number, to: number, o: Deal
   (state.dealOffers ??= {})[grantKey(from, to)] = o;
 }
 
-export function clearDealOffer(state: GameState, from: number, to: number): void {
+function clearDealOffer(state: GameState, from: number, to: number): void {
   if (state.dealOffers) delete state.dealOffers[grantKey(from, to)];
 }
 
@@ -242,7 +242,7 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
 
 /** Every item on one side, checked against one giver. A deal is atomic: the
  *  table confirms whole or not at all. */
-export function dealBundleOk(state: GameState, giver: number, receiver: number, items: DealItem[]): boolean {
+function dealBundleOk(state: GameState, giver: number, receiver: number, items: DealItem[]): boolean {
   if (items.length > DEAL_ITEMS) return false;
   return items.every((it) => dealItemPayable(state, giver, receiver, it));
 }
@@ -307,8 +307,7 @@ export function dealPhase(state: GameState): void {
   // Two terms between one pair can end on the same turn and move the same
   // lump through a CAPPED bank in opposite directions, and the order decides
   // where the bank sits when this turn's new deals land (seed 9261 t247: the
-  // GPU walks the pairs in index order and took seat 1's lump, insertion
-  // order here left seat 0 at its cap and took none).
+  // GPU walks the pairs in index order too).
   const byPair = ([a]: [string, unknown], [b]: [string, unknown]): number => {
     const [a0, a1] = a.split('>').map(Number);
     const [b0, b1] = b.split('>').map(Number);

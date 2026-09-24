@@ -1,4 +1,4 @@
-"""THE APPLIER READS OWNERSHIP LIVE, RANK BY RANK (AUDIT A-5).
+"""THE APPLIER READS OWNERSHIP LIVE, RANK BY RANK.
 
     python tests/gpu/applier_live_ownership_test.py
 
@@ -26,15 +26,12 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
-from warmup import settle_all  # noqa: E402
+from core import load_rules, fixture_paths  # noqa: E402
+from warmup import opened  # noqa: E402
 
 
 def fresh(rules, path, turns=30):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
-    return sim
+    return opened(rules, path, turns)
 
 
 def live_units(sim, row):
@@ -148,7 +145,7 @@ def main() -> int:
 
     sim, farm = run(rules, path, settler_first=True)
     assert int(sim.improvement[0, farm]) == sim.FARM, (
-        "A-5: the Builder at the later rank was refused the tile its own seat's "
+        "the Builder at the later rank was refused the tile its own seat's "
         "founding claimed one rank earlier — ownership was read once, before the loop")
     print("  1 settler then builder OK — the Farm lands on ground claimed this same turn")
 

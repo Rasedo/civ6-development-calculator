@@ -32,17 +32,14 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import opened
 
 B0, ROW = 0, 0
 
 
 def build(rules, path) -> BatchSim:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(8):
-        sim.step()
-    return sim
+    return opened(rules, path, 8)
 
 
 def a_city(sim) -> int:
@@ -108,28 +105,28 @@ def test_the_building_and_the_civic_gate_the_columns(rules, path) -> None:
     corps, army = sim.FORM_BASE + ui, sim.FORM_BASE + sim.NU + ui
 
     grant(sim, j)  # nothing standing, nothing in
-    m = sim.production_mask()[B0, j]
+    m = sim._seat_production_mask(0)[B0, j]
     assert not bool(m[sim.FORM_BASE:sim.PROD_W].any()), \
         "a formation column lit with no enabling building and no civic"
 
     grant(sim, j, ma=True)  # the building alone
-    m = sim.production_mask()[B0, j]
+    m = sim._seat_production_mask(0)[B0, j]
     assert not bool(m[corps]) and not bool(m[army]), \
         "the Academy offered a formation before its civic was in"
 
     grant(sim, j, ma=True, civ1=True)  # + the corps civic
-    m = sim.production_mask()[B0, j]
+    m = sim._seat_production_mask(0)[B0, j]
     assert bool(m[corps]), "the corps column stayed dark with the Academy standing and its civic in"
     assert not bool(m[army]), "the army column lit without its own civic"
 
     grant(sim, j, ma=True, civ1=True, civ2=True)  # + the army civic
-    m = sim.production_mask()[B0, j]
+    m = sim._seat_production_mask(0)[B0, j]
     assert bool(m[corps]) and bool(m[army]), "both civics in, both tiers must stand"
 
     # the LAND building unlocks nothing at sea — a Seaport alone leaves the
     # land chassis dark
     grant(sim, j, sp=True, civ1=True, civ2=True)
-    m = sim.production_mask()[B0, j]
+    m = sim._seat_production_mask(0)[B0, j]
     assert not bool(m[corps]), "a Seaport offered a LAND formation"
     print("  1 gates OK — building then civic, tier by tier, and never across the shoreline")
 
@@ -286,8 +283,8 @@ def test_the_driver_swap_lands_only_on_offered_columns(rules, path) -> None:
     j = a_city(sim)
     ui = a_land_chassis(sim, j)
     grant(sim, j, ma=True, civ1=True)  # corps offered, army NOT (no MOBILIZATION)
-    m = sim.production_mask().unsqueeze(0) if sim.production_mask().dim() == 2 \
-        else sim.production_mask()
+    m = sim._seat_production_mask(0).unsqueeze(0) if sim._seat_production_mask(0).dim() == 2 \
+        else sim._seat_production_mask(0)
     corps = sim.FORM_BASE + ui
     prod0 = torch.full((sim.B, sim.RC), -1, dtype=torch.long)
     prod0[B0, j] = sim.UNIT_BASE + ui

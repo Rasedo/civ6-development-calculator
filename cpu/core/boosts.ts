@@ -12,8 +12,6 @@ import { TECHS } from '../data/techs';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { isCoastalLand, naturalWonderAt } from '../../world/query';
 
-export { BOOST_FRACTION };
-
 export function effectiveResearchCostIn(
   rsr: ResearchState,
   id: string,

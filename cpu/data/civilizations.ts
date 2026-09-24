@@ -814,7 +814,7 @@ export const PROD_MULT_ROWS: readonly ProdMultRow[] = withSrc([
 /** CIV6 (EFFECT_DISTRICT_ADJACENCY, Meiji Restoration): "+1 standard adjacency
  *  bonus to all districts from adjacent districts" — the district's own yield,
  *  +amount per adjacent district. */
-export interface DistrictAdjRow {
+interface DistrictAdjRow {
   civ?: CivId;
   leader?: LeaderId;
   district: DistrictId;
@@ -892,7 +892,7 @@ export const DOMESTIC_ROUTE_YIELD_ROWS: readonly RouteYieldRow[] = withSrc([
 /** CIV6 (EFFECT_ADJUST_TRADE_ROUTE_CAPACITY): +1 Trade Route capacity under a
  *  clause — a tech held with a capital standing (Nîhithaw), the Government
  *  Plaza and each of its building tiers (Founder of Carthage). */
-export interface RouteCapacityRow {
+interface RouteCapacityRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -920,6 +920,17 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
   return row.civ !== undefined ? row.civ === civ : row.leader === leader;
 }
 
+/** CIV6: `foeGolden` is Swift Hawk's "civilizations that are in a Golden or
+ *  Heroic Age" — a HEROIC age IS a golden one on both engines, so the test is
+ *  the age alone. Its "or Free Cities" half is not modeled.
+ *  `foeOtherReligion` is El Escorial's REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION:
+ *  the foe's PLAYER holds a majority religion other than this seat's own
+ *  (`majorityReligionOf` on both sides — both exist and differ). */
+export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden' | 'onHomeContinent' | 'foeOtherReligion';
+/** CIV6 (Thermopylae, ABILITY_GORGO_POLICY_SLOT_COMBAT_BONUS): "+1 Combat
+ *  Strength for every Military Policy slotted" — the row's amount is paid ONCE
+ *  PER slotted policy of the named kind instead of flat. */
+type CombatCsPer = 'militaryPolicy';
 /**
  * CIV6 (EFFECT_GRANT_ABILITY -> MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH): a flat
  * Combat Strength a civilization's or leader's units carry under a clause —
@@ -929,18 +940,7 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
  * district (the Great Turkish Bombard). `classes` names TARGET_CLASSES; an
  * empty list is every combat unit.
  */
-/** CIV6: `foeGolden` is Swift Hawk's "civilizations that are in a Golden or
- *  Heroic Age" — a HEROIC age IS a golden one on both engines, so the test is
- *  the age alone. Its "or Free Cities" half waits on a Free City existing. */
-/** `foeOtherReligion` is El Escorial's REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION:
- *  the foe's PLAYER holds a majority religion other than this seat's own
- *  (`majorityReligionOf` on both sides — both exist and differ). */
-export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden' | 'onHomeContinent' | 'foeOtherReligion';
-/** CIV6 (Thermopylae, ABILITY_GORGO_POLICY_SLOT_COMBAT_BONUS): "+1 Combat
- *  Strength for every Military Policy slotted" — the row's amount is paid ONCE
- *  PER slotted policy of the named kind instead of flat. */
-export type CombatCsPer = 'militaryPolicy';
-export interface CombatCsRow {
+interface CombatCsRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -973,7 +973,7 @@ export const COMBAT_CS_ROWS: readonly CombatCsRow[] = withSrc([
 
 /** CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_HEAL, Tomyris): "Heal after
  *  defeating a unit" — on the same hook the War Department's heal rides. */
-export interface PostKillHealRow {
+interface PostKillHealRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -986,7 +986,7 @@ export const POST_KILL_HEAL_ROWS: readonly PostKillHealRow[] = withSrc([
  *  capture defeated enemy cavalry class units" — a melee loser of one of the
  *  named classes, beaten by an attacker of one of them, may change hands
  *  instead of dying (`captureRoll`). The classes gate BOTH chassis. */
-export interface CaptureRow {
+interface CaptureRow {
   civ?: CivId;
   leader?: LeaderId;
   classes: readonly string[];
@@ -1097,7 +1097,7 @@ export const GREAT_WORK_YIELD_ROWS: readonly GreatWorkYieldRow[] = withSrc([
 
 /** CIV6 (Nkisi, EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): "Receive 50% more
  *  Great Artist, Great Musician, and Great Merchant points." */
-export interface GppClassRow {
+interface GppClassRow {
   civ?: CivId;
   leader?: LeaderId;
   cls: string;
@@ -1112,7 +1112,7 @@ export const GPP_CLASS_ROWS: readonly GppClassRow[] = withSrc([
 /** CIV6 (Workshop of the World, EFFECT_ADJUST_CITY_YIELD_FROM_POWERED_BUILDING):
  *  "Buildings that provide additional yields when Powered receive +4 of that
  *  yield" — one row per yield the install names. */
-export interface PoweredYieldRow {
+interface PoweredYieldRow {
   civ?: CivId;
   leader?: LeaderId;
   yield: YieldKey;
@@ -1325,7 +1325,7 @@ export const HAPPY_GPP_ROWS: readonly HappyGppRow[] = withSrc([
 /** CIV6 (EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE): a policy slot of one kind
  *  in every government — Plato's Republic's Wildcard, the Holy Roman
  *  Emperor's Military. */
-export interface PolicySlotRow {
+interface PolicySlotRow {
   civ?: CivId;
   leader?: LeaderId;
   kind: 'military' | 'economic' | 'diplomatic' | 'wildcard';
@@ -1356,7 +1356,7 @@ export const POST_COMBAT_YIELD_ROWS: readonly PostCombatYieldRow[] = withSrc([
 /** CIV6 (Mit'a, EFFECT_ADJUST_PLAYER_TERRAIN_WORK_IMPASSABLE_MODIFIER):
  *  "Citizens may work Mountain tiles." The install names its five mountain
  *  terrains one by one; this engine's MOUNTAIN elevation is all five. */
-export interface WorkImpassableRow {
+interface WorkImpassableRow {
   civ?: CivId;
   leader?: LeaderId;
   mountain: true;
@@ -1494,7 +1494,7 @@ export const GPP_BUILDING_ROWS: readonly GppBuildingRow[] = withSrc([
 
 /** CIV6 (Nobel Prize): "gains 50 Diplomatic Favor when earning a Great Person
  *  (on Standard Speed)." */
-export interface GreatPersonFavorRow {
+interface GreatPersonFavorRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -1505,7 +1505,7 @@ export const GP_FAVOR_ROWS: readonly GreatPersonFavorRow[] = withSrc([
 
 /** CIV6 (Mana, EFFECT_GRANT_PLAYER_SPECIFIC_TECHNOLOGY): "Begin the game with
  *  the Sailing and Shipbuilding technologies unlocked." */
-export interface StartTechRow {
+interface StartTechRow {
   civ?: CivId;
   leader?: LeaderId;
   tech: string;
@@ -1521,7 +1521,7 @@ export const START_TECH_ROWS: readonly StartTechRow[] = withSrc([
 export type SeatBan = 'harvest' | 'greatWriter' | 'holySite' | 'greatProphet' | 'foundReligion';
 /** the WIRE's index space for a ban — both engines address one by position. */
 export const SEAT_BANS: readonly SeatBan[] = ['harvest', 'greatWriter', 'holySite', 'greatProphet', 'foundReligion'];
-export interface SeatBanRow {
+interface SeatBanRow {
   civ?: CivId;
   leader?: LeaderId;
   ban: SeatBan;
@@ -1590,7 +1590,6 @@ export const DISTRICT_UNIT_ROWS: readonly DistrictUnitRow[] = withSrc([
 export interface ExtraUnitCopyRow {
   civ?: CivId;
   leader?: LeaderId;
-  /** the unit CLASS the copy follows */
   /** the CLASS a row copies, or '' when it names one chassis instead. */
   cls: string;
   /** CIV6 (TRAIT_EXTRASAKAHORSEARCHER,
@@ -1609,11 +1608,10 @@ export const EXTRA_UNIT_COPY_ROWS: readonly ExtraUnitCopyRow[] = withSrc([
   { civ: 'SCYTHIA', cls: '', unit: 'SAKA_HORSE_ARCHER', amount: 1 },
 ], EXTRA_UNIT_COPY_SRC);
 
-
 /** CIV6 (Great Turkish Bombard, EFFECT_ADJUST_POPULATION_AFTER_CONQUEST):
  *  "Conquered cities do not lose Population" — the PERCENTAGE of the
  *  captured city's population this row keeps, over the usual loss. */
-export interface ConquestPopRow {
+interface ConquestPopRow {
   civ?: CivId;
   leader?: LeaderId;
   /** 100 = the whole population survives */
@@ -1642,7 +1640,7 @@ export const NOT_FOUNDED_ROWS: readonly NotFoundedRow[] = withSrc([
 /** CIV6 (Free Imperial Cities, EFFECT_ADJUST_CITY_EXTRA_DISTRICTS): "Each city
  *  can build one more district than usual (exceeding the normal limit based on
  *  Population)." */
-export interface ExtraDistrictRow {
+interface ExtraDistrictRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -1654,7 +1652,7 @@ export const EXTRA_DISTRICT_ROWS: readonly ExtraDistrictRow[] = withSrc([
 /** CIV6 (Mother Russia, EFFECT_ADJUST_PLAYER_CITY_TILES): "Extra territory
  *  upon founding cities" — the install's Amount is 5, not the eight the
  *  civilopedia's prose suggests. */
-export interface CityTilesRow {
+interface CityTilesRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -1719,7 +1717,7 @@ export const DISTRICT_PREREQ_ROWS: readonly DistrictPrereqRow[] = withSrc([
  *  receive double the war weariness for fighting against Gandhi" — the
  *  install's Amount is 100 with Enemy true, so it is a PERCENTAGE added to
  *  the enemy's accrual. */
-export interface WarWearinessRow {
+interface WarWearinessRow {
   civ?: CivId;
   leader?: LeaderId;
   /** added to what a seat AT WAR WITH this row accrues */
@@ -1732,7 +1730,7 @@ export const WAR_WEARINESS_ROWS: readonly WarWearinessRow[] = withSrc([
 /** CIV6 (Satyagraha, EFFECT_ADJUST_PLAYER_FAITH_PEACEFUL_FOUNDERS): "+5 Faith
  *  for each civilization (including India) they have met that has founded a
  *  Religion and is not currently at war." */
-export interface PeacefulFounderRow {
+interface PeacefulFounderRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -1768,7 +1766,7 @@ export const GOVERNOR_TITLE_GRANT_ROWS: readonly GovernorTitleGrantRow[] = withS
 /** CIV6 (Magnanimous, EFFECT_ADJUST_GREAT_PERSON_POINTS_REFUND_PERCENT):
  *  "After recruiting or patronizing a Great Person, 20% of its Great Person
  *  point cost is refunded." */
-export interface GpRefundRow {
+interface GpRefundRow {
   civ?: CivId;
   leader?: LeaderId;
   pct: number;
@@ -1780,7 +1778,7 @@ export const GP_REFUND_ROWS: readonly GpRefundRow[] = withSrc([
 /** CIV6 (El Escorial, EFFECT_ADJUST_UNIT_EVICT_PERCENT): "Inquisitors
  *  eliminate 100% of the presence of other Religions" — the install adds 25
  *  PERCENTAGE POINTS to the base Remove Heresy share. */
-export interface EvictPctRow {
+interface EvictPctRow {
   civ?: CivId;
   leader?: LeaderId;
   points: number;
@@ -1807,7 +1805,7 @@ export const RELIGION_AMENITY_ROWS: readonly ReligionAmenityRow[] = withSrc([
 
 /** CIV6 (Dharma, EFFECT_ADJUST_GAINS_ALL_FOLLOWER_BELIEFS): "Receives Follower
  *  Belief bonuses in a city from each Religion that has at least 1 Follower." */
-export interface AllFollowerBeliefsRow {
+interface AllFollowerBeliefsRow {
   civ?: CivId;
   leader?: LeaderId;
 }
@@ -1820,7 +1818,7 @@ export const ALL_FOLLOWER_BELIEFS_ROWS: readonly AllFollowerBeliefsRow[] = [
  *  as EFFECT_ADJUST_IMPROVEMENT_GOODY_HUT, mapping IMPROVEMENT_BARBARIAN_CAMP
  *  to IMPROVEMENT_GOODY_HUT — so it is the SAME draw, not a reward of its own
  *. */
-export interface CampGoodyRow {
+interface CampGoodyRow {
   civ?: CivId;
   leader?: LeaderId;
 }
@@ -1850,7 +1848,7 @@ export const FEATURE_APPEAL_ROWS: readonly FeatureAppealRow[] = withSrc([
  *  ally each see what the other uncovers. The DISCOVERY event stays the
  *  discoverer's own — an ally shown a natural wonder earns no era score for
  *  it. */
-export interface AllianceSharedVisRow {
+interface AllianceSharedVisRow {
   civ?: CivId;
   leader?: LeaderId;
 }
@@ -1889,7 +1887,7 @@ export const FOREIGN_FOLLOWER_YIELD_ROWS: readonly ForeignFollowerYieldRow[] = w
 /** CIV6 (The Last Prophet, EFFECT_ADJUST_GREAT_PERSON_GUARANTEE):
  *  "Automatically receive the final Great Prophet when the next-to-last one is
  *  claimed (if you have not earned a Great Prophet already)." */
-export interface GreatPersonGuaranteeRow {
+interface GreatPersonGuaranteeRow {
   civ?: CivId;
   leader?: LeaderId;
   cls: string;
@@ -1900,7 +1898,7 @@ export const GP_GUARANTEE_ROWS: readonly GreatPersonGuaranteeRow[] = withSrc([
 
 /** CIV6 (Songs of the Jeli, EFFECT_ENABLE_BUILDING_FAITH_PURCHASE): "May
  *  purchase Commercial Hub district buildings with Faith." */
-export interface FaithPurchaseDistrictRow {
+interface FaithPurchaseDistrictRow {
   civ?: CivId;
   leader?: LeaderId;
   district: DistrictId;
@@ -1911,7 +1909,7 @@ export const FAITH_PURCHASE_DISTRICT_ROWS: readonly FaithPurchaseDistrictRow[] =
 
 /** CIV6 (Mediterranean Colonies, EFFECT_GRANT_PLAYER_SPECIFIC_TECH_BOOST):
  *  "Begin the game with the Writing technology Eureka." */
-export interface StartBoostRow {
+interface StartBoostRow {
   civ?: CivId;
   leader?: LeaderId;
   tech: string;
@@ -1957,7 +1955,7 @@ export const LEVY_ROWS: readonly LevyRow[] = withSrc([
 
 /** CIV6 (Radio Oranje, EFFECT_ADJUST_PLAYER_IDENTITY_PER_TURN_FOR_DOMESTIC_TRADE_ROUTE_ORIGIN):
  *  "+2 Loyalty per turn in the ORIGIN city of a domestic Trade Route." */
-export interface DomesticRouteLoyaltyRow {
+interface DomesticRouteLoyaltyRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -1999,7 +1997,7 @@ export const WONDER_ERA_PROD_ROWS: readonly WonderEraProdRow[] = withSrc([
 /** CIV6 (France, EFFECT_ADJUST_CITY_TOURISM): "Tourism from wonders of any era
  *  is +100%" — the install's ScalingFactor is 200, so the row carries the
  *  ADDED percentage. */
-export interface WonderTourismRow {
+interface WonderTourismRow {
   civ?: CivId;
   leader?: LeaderId;
   pct: number;
@@ -2023,7 +2021,7 @@ export const RIVER_CROSS_PROD_ROWS: readonly RiverCrossProdRow[] = withSrc([
 
 /** CIV6 (Ortoo, EFFECT_ADJUST_PLAYER_IMMEDIATE_TRADING_POST): "Starting a
  *  Trade Route immediately creates a Trading Post in the destination city." */
-export interface ImmediatePostRow {
+interface ImmediatePostRow {
   civ?: CivId;
   leader?: LeaderId;
 }
@@ -2061,7 +2059,7 @@ export const DIPLO_VIS_ROWS: readonly DiploVisRow[] = withSrc([
 export type WarBan = 'surpriseByMe' | 'surpriseOnMe' | 'onCityState';
 /** the WIRE's index space for a war ban — both engines address one by position. */
 export const WAR_BANS: readonly WarBan[] = ['surpriseByMe', 'surpriseOnMe', 'onCityState'];
-export interface WarBanRow {
+interface WarBanRow {
   civ?: CivId;
   leader?: LeaderId;
   ban: WarBan;
@@ -2087,7 +2085,7 @@ export const TOURISM_FAVOR_ROWS: readonly TourismFavorRow[] = withSrc([
 /** CIV6 (Faces of Peace, EFFECT_ADJUST_PLAYER_EMERGENCY_FAVOR_MODIFIER):
  *  "+100% Diplomatic Favor from successfully completing an Emergency or Scored
  *  Competition" — as a MEMBER of it. */
-export interface EmergencyFavorRow {
+interface EmergencyFavorRow {
   civ?: CivId;
   leader?: LeaderId;
   pct: number;
@@ -2101,7 +2099,7 @@ export const EMERGENCY_FAVOR_ROWS: readonly EmergencyFavorRow[] = withSrc([
  *  Dedications at the beginning of a Golden Age or Heroic Age, receive the
  *  Normal Age bonus towards improving Era Score in addition to the other
  *  bonus." */
-export interface GoldenDedicationRow {
+interface GoldenDedicationRow {
   civ?: CivId;
   leader?: LeaderId;
   count: number;
@@ -2129,7 +2127,7 @@ export const INTL_ROUTE_TERRAIN_ROWS: readonly IntlRouteTerrainRow[] = withSrc([
 
 /** CIV6 (Sahel Merchants, EFFECT_GRANT_GOLDEN_AGE_TRADE_ROUTE_CAPACITY):
  *  "Receive +1 Trade Capacity every time you enter a Golden Age." */
-export interface GoldenRouteCapacityRow {
+interface GoldenRouteCapacityRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -2141,7 +2139,7 @@ export const GOLDEN_ROUTE_CAPACITY_ROWS: readonly GoldenRouteCapacityRow[] = wit
 /** CIV6 (The Grand Embassy, EFFECT_ADJUST_PLAYER_PROGRESS_DIFF_TRADE_BONUS):
  *  "Receives Science or Culture from Trade Routes to civilizations that are
  *  more advanced than Russia. +1 per 3 technologies or civics ahead." */
-export interface ProgressTradeRow {
+interface ProgressTradeRow {
   civ?: CivId;
   leader?: LeaderId;
   /** how many techs (or civics) ahead one point of yield costs */
@@ -2202,7 +2200,7 @@ export const SLOT_FAVOR_ROWS: readonly SlotFavorRow[] = withSrc([
 
 /** CIV6 (Founder of Carthage, EFFECT_ADJUST_ALL_DISTRICT_PRODUCTION_MODIFIER):
  *  "+50% Production toward districts in the city with the Government Plaza." */
-export interface PlazaDistrictProdRow {
+interface PlazaDistrictProdRow {
   civ?: CivId;
   leader?: LeaderId;
   pct: number;
@@ -2230,7 +2228,7 @@ export const GREAT_WORK_LOYALTY_ROWS: readonly GreatWorkLoyaltyRow[] = withSrc([
  *  leaves another civilization due to a loss of Loyalty and is currently
  *  receiving the most Loyalty per turn from Eleanor's civilization skips the
  *  Free City step to join this civilization." */
-export interface SkipFreeCityRow {
+interface SkipFreeCityRow {
   civ?: CivId;
   leader?: LeaderId;
 }
@@ -2245,7 +2243,7 @@ export const SKIP_FREE_CITY_ROWS: readonly SkipFreeCityRow[] = [
  *  Amount 1): an envoy sent to a city-state whose city follows this seat's
  *  MAJORITY religion counts as `amount` more. Read at the SEND
  *  (`sameReligionToken`); on the wire as `envoySameReligion`. */
-export interface EnvoySameReligionRow {
+interface EnvoySameReligionRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -2258,7 +2256,7 @@ export const ENVOY_SAME_RELIGION_ROWS: readonly EnvoySameReligionRow[] = withSrc
  *  seat is paid the FOUNDER belief of the religion more than half of its cities
  *  follow — the founding seat's own claim (`founderBeliefOf`); on the wire as
  *  `majorityFounder`. */
-export interface MajorityFounderRow {
+interface MajorityFounderRow {
   civ?: CivId;
   leader?: LeaderId;
 }
@@ -2284,7 +2282,7 @@ export const GOVERNOR_XP_ROWS: readonly GovernorXpRow[] = withSrc([
 /** CIV6 (Isibongo, EFFECT_ADD_PLAYER_UPGRADE_MILITARY_FORMATION_ON_CITY_CONQUEST):
  *  "Conquering a city with a unit will upgrade it into a Corps or Army, if the
  *  proper Civics are unlocked." */
-export interface ConquestFormationRow {
+interface ConquestFormationRow {
   civ?: CivId;
   leader?: LeaderId;
 }
@@ -2295,7 +2293,7 @@ export const CONQUEST_FORMATION_ROWS: readonly ConquestFormationRow[] = [
 /** CIV6 (Flying Squadron): "All spies start as Agents with a free promotion."
  *  The install's Amount is -1, which is its own marker for "one promotion",
  *  not an experience figure. */
-export interface SpyPromoRow {
+interface SpyPromoRow {
   civ?: CivId;
   leader?: LeaderId;
   promotions: number;
@@ -2304,7 +2302,7 @@ export interface SpyPromoRow {
  *  tiles in a city with a National Park." A per-CITY appeal add, which is what
  *  `cityAppealResolver` / `_gp_appeal_plane` already carry for the Great
  *  Person perk. */
-export interface ParkAppealRow {
+interface ParkAppealRow {
   civ?: CivId;
   leader?: LeaderId;
   amount: number;
@@ -2318,7 +2316,7 @@ export const PARK_APPEAL_ROWS: readonly ParkAppealRow[] = withSrc([
  *  of a Cree City come under Cree control when a Trader first moves into
  *  them" — the radius is measured from the CITY, not from the path or the
  *  route's ends. */
-export interface TradeGainTileRow {
+interface TradeGainTileRow {
   civ?: CivId;
   leader?: LeaderId;
   radius: number;

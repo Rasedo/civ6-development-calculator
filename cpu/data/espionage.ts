@@ -41,7 +41,7 @@ export const SPY_CAPACITY_MAX = srcConst('eras.espionage.capacityMax', 6, {
 /** CIV6 (Espionage): "In ascending order, the levels are as follows: Recruit,
  *  Agent, Secret Agent, Master Spy" — and "a Spy that reaches the Master Spy
  *  level stops gaining experience." */
-export const SPY_LEVELS = srcConst('espionage.SPY_LEVELS',
+const SPY_LEVELS = srcConst('espionage.SPY_LEVELS',
   ['RECRUIT', 'AGENT', 'SECRET_AGENT', 'MASTER_SPY'] as const, {
     derived: 'the ESPIONAGE_MAX_LEVEL levels the GS Espionage page names in ascending order '
       + '(Recruit, Agent, Secret Agent, Master Spy)',
@@ -84,8 +84,8 @@ export interface SpyMissionDef {
   citystate?: boolean;
   /** CIV6 (Spy): the mission's own duration, from the chassis' mission table. */
   turns: number;
-  /** CIV6 (UnitOperations.BaseProbability, measured 2026-09-13 over the
-   *  tuner socket): the THRESHOLD the mission's one 3d6 roll is read
+  /** CIV6 (UnitOperations.BaseProbability, measured over the tuner
+   *  socket): the THRESHOLD the mission's one 3d6 roll is read
    *  against — 13 Siphon Funds / Foment Unrest / Fabricate Scandal, 14
    *  Sabotage Production / Steal Tech Boost / Neutralize Governor, 15
    *  Great Work Heist / Disrupt Rocketry / Breach Dam, 16 Recruit
@@ -103,7 +103,7 @@ export interface SpyMissionDef {
 
 /**
  * PROVENANCE (cpu/data/provenance.ts). `baseProbability` is the install's own
- * `UnitOperations.BaseProbability` (measured 2026-09-13 over the tuner socket
+ * `UnitOperations.BaseProbability` (measured over the tuner socket
  * and agreeing with the table); `district`, the shape flags and the duration
  * are the chassis' published mission table, which the install writes as an
  * operation's requirement set rather than as a column a checker can read.
@@ -179,8 +179,7 @@ export const SPY_M_COUNTERSPY = mi('COUNTERSPY');
 export const SPY_M_FABRICATE_SCANDAL = mi('FABRICATE_SCANDAL');
 
 /** how many destinations the TRAVEL head offers — district tiles, nearest
- *  first. A city is several tiles now, so the head is three times the eight
- *  centres it once held (a MODEL width). */
+ *  first (a MODEL width). */
 export const SPY_TRAVEL_COLS = srcConst<number>('eras.espionage.travelCols', 24, {
   stylized: 'a MODEL width — how many district tiles the TRAVEL head offers, nearest first; '
     + 'real Civ 6 offers every revealed city',
@@ -196,7 +195,7 @@ export const SPY_SURVEILLANCE_REACH = srcConst('eras.espionage.surveilReach', 1,
 // below); the ESCAPE's terms are the install's and its shape is measured
 // (the police guess, then the score against the base, below).
 // ---------------------------------------------------------------------------
-/** CIV6 (measured 2026-09-13, `tools/civ6lab/spy_probe.lua`): every mission
+/** CIV6 (measured, `tools/civ6lab/spy_probe.lua`): every mission
  *  is ONE roll of 3d6 read against `baseProbability - k`, and a fresh
  *  Recruit — the install's level 1, this engine's level 0 — reads k = 2
  *  before any level term (`LevelProbChange` 1 per level). */
@@ -286,7 +285,7 @@ export const SPY_CAPTURE_PCT = srcConst('eras.espionage.capturePct', 29, {
  * Listed FASTEST first: the driver's spy takes the first route whose district
  * stands — soonest back in service.
  */
-export interface SpyEscapeRoute {
+interface SpyEscapeRoute {
   id: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;

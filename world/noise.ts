@@ -1,15 +1,15 @@
 
-import { mulberry32, deriveSeed } from './rng';
+import { deriveSeed } from './rng';
 
 function smoothstep(t: number): number {
   return t * t * (3 - 2 * t);
 }
 
-export interface Noise2D {
+interface Noise2D {
   (x: number, y: number): number; // -> [0, 1)
 }
 
-export function valueNoise(seed: number): Noise2D {
+function valueNoise(seed: number): Noise2D {
   const base = seed >>> 0;
   function lattice(ix: number, iy: number): number {
     let h = base;
@@ -52,14 +52,5 @@ export function fbm(seed: number, octaves = 4, lacunarity = 2, gain = 0.5): Nois
       freq *= lacunarity;
     }
     return sum / norm;
-  };
-}
-
-export function jitter(seed: number): (i: number) => number {
-  const rng = mulberry32(seed);
-  const cache: number[] = [];
-  return (i: number) => {
-    while (cache.length <= i) cache.push(rng());
-    return cache[i];
   };
 }

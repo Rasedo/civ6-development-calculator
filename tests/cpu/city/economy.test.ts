@@ -81,7 +81,7 @@ describe('gold & faith purchases', () => {
   });
 
   it('a purchased land unit lands on the centre, and a unit of its class already there refuses it', () => {
-    // CIV6 (measured 2026-09-13): "too many units of one class here" — the
+    // CIV6 (measured in the live game): "too many units of one class here" — the
     // purchase does not spill to a neighbour the way a trained unit does.
     const state = makeState();
     state.unitsMode = true;

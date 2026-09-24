@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core import simbase
-from core.engine import _MUTABLE
+from core.simbase import _MUTABLE
 from warmup import plant_city, settle_all, hold_works, works_of, clear_works
 
 RELIC = 7

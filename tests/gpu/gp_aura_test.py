@@ -143,12 +143,12 @@ def poke_exclusion(rules, rj, path):
     gi, ai = sim._general_unit_idx, sim._admiral_unit_idx
     assert gi >= 0 and ai >= 0, "general/admiral roster indices missing from the export"
     assert bool(sim._type_spawn_only[gi]) and bool(sim._type_spawn_only[ai]), "spawn_only flag not set"
-    # production_mask: the unit-train columns start at UNIT_BASE.
-    pm = sim.production_mask()  # [B, C, NCODES]
+    # the production mask: the unit-train columns start at UNIT_BASE.
+    pm = sim._seat_production_mask(0)  # [B, C, NCODES]
     base = sim.UNIT_BASE
     for uidx, nm in ((gi, "GENERAL"), (ai, "ADMIRAL")):
         col = base + uidx
-        assert not bool(pm[:, :, col].any()), f"{nm} offered in production_mask (col {col})"
+        assert not bool(pm[:, :, col].any()), f"{nm} offered in the production mask (col {col})"
     print("  1 exclusion OK — GENERAL/ADMIRAL never reach a train column (spawn_only)")
 
 

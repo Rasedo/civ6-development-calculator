@@ -11,7 +11,7 @@ import { researchObs, policyObs, warObs, SEAT_GROUPS } from '../../cpu/core/deci
 import { TECHS } from '../../cpu/data/techs';
 import { CIVICS } from '../../cpu/data/civics';
 import { POLICY_LIST } from '../../cpu/data/policies';
-import { BOOST_FRACTION } from '../../cpu/core/boosts';
+import { BOOST_FRACTION } from '../../cpu/data/boosts';
 import { WAR_MIN_TURNS, PEACE_GOLD_COST } from '../../cpu/data/seats';
 import { WAR_KIND_SURPRISE } from '../../cpu/data/warKinds';
 import { addEnvoys, placeCityStateAt } from '../../cpu/core/cityStates';

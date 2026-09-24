@@ -102,9 +102,9 @@ export function grantCivics(state: GameState, ...ids: string[]): void {
   for (const id of ids) {
     if (!seatOf(state, 0)!.research.civics.includes(id)) seatOf(state, 0)!.research.civics.push(id);
   }
-  // the slotted cards are a DRIVER decision now (a stored set, not a fill the
+  // the slotted cards are a DRIVER decision (a stored set, not a fill the
   // engine computes); a scene that grants civics by hand takes the greedy
-  // reference into the store, which is what the engine used to compute itself
+  // reference into the store
   // ...unless the scene hand-picked a government (`setGovernment`), in which
   // case it manages its own cards through `setPolicy`
   if (seatOf(state, 0)!.government.current === null) slotGreedily(state, 0);

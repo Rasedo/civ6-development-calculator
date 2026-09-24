@@ -379,7 +379,7 @@ class SimSpy:
 
     @staticmethod
     def _mission_outcome(r: int, t: int) -> int:
-        """`missionOutcome`'s twin. CIV6 (measured 2026-09-13 over the tuner
+        """`missionOutcome`'s twin. CIV6 (measured in the live game over the tuner
         socket): every mission is ONE roll R of 3d6 read against
         T = BaseProbability - k, in six bands by the margin d = R - T:
         d >= 2 success undetected; {0, 1} success, must escape; -1 fail

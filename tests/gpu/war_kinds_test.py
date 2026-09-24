@@ -28,8 +28,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import load_rules, fixture_paths
+from warmup import warm_base, opened
 
 SURPRISE, FORMAL, LIBERATION, RECONQUEST, TERRITORIAL, GOLDEN = 0, 1, 3, 4, 7, 8  # WAR_KINDS codes
 
@@ -59,15 +59,11 @@ def lead(sim, row: int, leader: str | None) -> None:
 # two of these live at once, so one base serves all six.
 _STATIC = ("row_civ", "row_leader")
 _ATTRS = ("_pressure_per_turn",)
-_BASE: dict = {}
 
 
 def build(rules, path):
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(12):
-            sim.step()
+    def make():
+        sim = opened(rules, path, 12)
         nrow = sim.n_majors
         sim.war[:, :nrow, :nrow] = False
         sim.sync_war()
@@ -78,19 +74,8 @@ def build(rules, path):
         sim.seat_ally_turns[:, :nrow, :nrow] = 0
         sim.treaty_turns[:, :nrow, :nrow] = 0
         sim.civ_grievance.zero_()
-        _BASE[key] = (sim, sim.snapshot(),
-                      {k: getattr(sim, k).clone() for k in _STATIC},
-                      {k: getattr(sim, k) for k in _ATTRS})
-    sim, snap, stat, at = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    for k, v in at.items():
-        setattr(sim, k, v)
-    sim._eff_version += 1
-    sim._gen_ver += 1
-    sim._bldg_version += 1
-    return sim
+        return sim
+    return warm_base(str(path), make, _STATIC, _ATTRS)
 
 
 def one(sim) -> torch.Tensor:

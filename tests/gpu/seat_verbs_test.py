@@ -21,8 +21,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import load_rules, fixture_paths
+from warmup import warm_base, opened
 
 
 # THE WARMED BASE, ONE PER (fixture, turns). A scene pays a `restore` —
@@ -30,19 +30,10 @@ from warmup import settle_all
 # these pokes write is in `_MUTABLE`, so the restore is the whole job, and no
 # scene holds two live sims: 5b's probe loop hands its two ints out before the
 # sim it steers is restored, so ONE base serves the whole lane.
-_BASE: dict = {}
 
 
 def fresh(rules, path, turns=30):
-    key = (str(path), turns)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(turns):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+    return warm_base((str(path), turns), lambda: opened(rules, path, turns))
 
 
 def a_civ_builder(sim, row):

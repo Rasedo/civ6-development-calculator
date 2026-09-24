@@ -2,7 +2,7 @@
 import type { DistrictId, GreatPersonClass } from '../core/types';
 import { srcConst, xml, type SrcMap } from './provenance';
 import { LUXURY_AMENITY_CITIES } from './constants';
-import { GW_KIND_ART, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
+import { GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
 
 export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   SCIENTIST: 'CAMPUS',
@@ -17,18 +17,6 @@ export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   // so PROPHET stays index 3.
   WRITER: 'THEATER_SQUARE',
   MUSICIAN: 'THEATER_SQUARE',
-};
-
-export const GP_CLASS_NAMES: Record<GreatPersonClass, string> = {
-  SCIENTIST: 'Great Scientist',
-  ENGINEER: 'Great Engineer',
-  MERCHANT: 'Great Merchant',
-  PROPHET: 'Great Prophet',
-  ARTIST: 'Great Artist',
-  ADMIRAL: 'Great Admiral',
-  GENERAL: 'Great General',
-  WRITER: 'Great Writer',
-  MUSICIAN: 'Great Musician',
 };
 
 /**
@@ -81,9 +69,9 @@ export function gpCost(cls: GreatPersonClass, personEra: number, worldEra: numbe
  * belongs to. The roster below supplies the names, the classes and the eras —
  * the magnitude is this model's own.
  */
-export type GpLumpKey = 'science' | 'culture' | 'faith' | 'gold' | 'productionToCapital';
+type GpLumpKey = 'science' | 'culture' | 'faith' | 'gold' | 'productionToCapital';
 
-export const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
+const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
   SCIENTIST: 'science',
   ENGINEER: 'productionToCapital',
   MERCHANT: 'gold',
@@ -95,7 +83,7 @@ export const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
   MUSICIAN: 'culture',
 };
 
-export function gpEffect(cls: GreatPersonClass, era: number): GpEffect {
+function gpEffect(cls: GreatPersonClass, era: number): GpEffect {
   const lump = GP_ERA_GPP[Math.min(Math.max(era, 0), GP_ERA_GPP.length - 1)];
   return { [GP_CURRENCY[cls]]: lump };
 }
@@ -112,7 +100,6 @@ export interface GreatPersonDef {
   era: number;
   effect: GpEffect;
 }
-
 
 /** the install's own era id, indexed by this engine's era number. */
 const GP_ERA_ID: readonly string[] = [
@@ -457,7 +444,6 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
 };
 export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
 
-
 /**
  * GREAT WORKS. A claimed WRITER, ARTIST or MUSICIAN makes the works
  * `personWorkObjects` names, each seeking an open slot that takes it
@@ -470,11 +456,6 @@ export const GW_WORKS_PER_PERSON = srcConst('seats.gwWorksByKind', [2, 3, 2] as 
     + 'Works of Writing, an Artist 3 Works of Art, a Musician 2 Works of Music',
   inputs: [xml('GreatWorks', 'GreatWorkType=GREATWORK_DONATELLO_1', 'GreatWorkObjectType')],
 });
-export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
-  WRITER: GW_KIND_WRITING,
-  ARTIST: GW_KIND_ART,
-  MUSICIAN: GW_KIND_MUSIC,
-};
 export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'ARTIST', 'MUSICIAN']);
 
 export const ARCHAEOLOGIST_CHARGES = srcConst('greatPeople.ARCHAEOLOGIST_CHARGES', 3, {
@@ -538,7 +519,6 @@ export const GW_PRINTING_WRITING_MULT = srcConst('seats.gwPrintingWritingMult', 
     + 'Writing (the culture is untouched); the install writes it as a modifier',
 });
 
-/** Specialist yields per district type (Civ 6-ish; only these take specialists). */
 /** CIV6 (wiki "Specialists (Civ6)", GS values): base yields per specialist
  * by district — Scientists +2 science, Priests +2 faith, Merchants +4 gold,
  * Captains +1 food +2 gold, Artists +2 culture, Engineers +2 production,
@@ -643,7 +623,7 @@ export const GP_CITY_PERM = [
   // Tourism — Science, Culture and Production at 100%, Gold and Faith at 50%.
   'adjTourism',
 ] as const;
-export type GpCityPermKey = (typeof GP_CITY_PERM)[number];
+type GpCityPermKey = (typeof GP_CITY_PERM)[number];
 
 /** PERMANENT per-TILE channels, same contract — the DISTRICT the charge was
  *  spent on keeps them (the install's ATTACHMENT_TARGET_DISTRICT_IN_TILE). */
@@ -652,7 +632,7 @@ export const GP_TILE_PERM = [
   'regionalProduction',  // CIV6 (Tesla): ...and each provides +2 Production
   'regionalAmenities',   // CIV6 (Paxton): ...and each provides +1 Amenity
 ] as const;
-export type GpTilePermKey = (typeof GP_TILE_PERM)[number];
+type GpTilePermKey = (typeof GP_TILE_PERM)[number];
 
 /** CIV6 (Kenzo Tange): the share of a district's ADJACENCY yield the city
  *  counts as Tourism — Science, Culture and Production whole, Gold and
@@ -669,7 +649,7 @@ export const GP_BUILDING_TOURISM: readonly { perm: GpPermKey; building: string; 
   { perm: 'aquaticsTourism', building: 'AQUATICS_CENTER', district: 'WATER_PARK' },
 ];
 
-export type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
+type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
 
 export function gpPermOf(seat: { gpPerm?: number[] } | undefined, key: GpPermKey): number {
   return seat?.gpPerm?.[GP_PERM.indexOf(key)] ?? 0;
@@ -799,7 +779,7 @@ export const GP_SITES: readonly GpSite[] = [
   'suzerainCityState', 'adjacentBarbarian', 'enemyTerritory',
 ];
 
-export interface GpAbility extends GpEffect {
+interface GpAbility extends GpEffect {
   site?: GpSite;
   siteDistrict?: DistrictId;
   charges?: number;

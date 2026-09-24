@@ -68,9 +68,9 @@ def main() -> int:
     elif grand != sum(rows.values()):
         faults.append(f"OPEN, TOTAL says {grand}, every row sums {sum(rows.values())}")
 
-    # THE SHAPE. The file is a list of open work and has twice grown into a
-    # work log that its owner could no longer read. Two ceilings stop the
-    # regrowth: the whole file, and any one bullet. History goes to git log.
+    # THE SHAPE. The file is a list of open work, never a work log. Two
+    # ceilings keep it readable: the whole file, and any one bullet. History
+    # goes to git log.
     if len(lines) > MAX_LINES:
         faults.append(f"the file is {len(lines)} lines (cap {MAX_LINES}): trim history "
                       "prose, delete resolved text — git log keeps it")

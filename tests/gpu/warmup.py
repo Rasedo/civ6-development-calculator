@@ -18,6 +18,36 @@ from pathlib import Path
 
 import torch
 
+_BASES: dict = {}
+
+
+def opened(rules, path, turns: int = 0, dtype=torch.float64):
+    from core import BatchSim, load_fixture
+    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype), turns)
+
+
+def _own(v):
+    return list(v) if isinstance(v, list) else v
+
+
+def warm_base(key, make, static=(), attrs=()):
+    slot = (make.__module__, make.__qualname__, key)
+    if slot not in _BASES:
+        sim = make()
+        _BASES[slot] = (sim, sim.snapshot(),
+                        {k: getattr(sim, k).clone() for k in static},
+                        {k: _own(getattr(sim, k)) for k in attrs})
+    sim, snap, planes, values = _BASES[slot]
+    sim.restore(snap)
+    for k, v in planes.items():
+        getattr(sim, k).copy_(v)
+    for k, v in values.items():
+        setattr(sim, k, _own(v))
+    sim._eff_version += 1
+    sim._gen_ver += 1
+    sim._bldg_version += 1
+    return sim
+
 
 def developed(rules, path, turns=40, seats=None, dtype=torch.float64):
     """A world that has DEVELOPED: every major seat driven by the ladder for

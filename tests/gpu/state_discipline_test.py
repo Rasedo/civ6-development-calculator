@@ -34,8 +34,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from core.engine import _MUTABLE
-from warmup import settle_all
+from core.simbase import _MUTABLE
+from warmup import settle_all, warm_base
 
 
 # THE WARMED BASE, ONE PER FIXTURE PAIR. Standing a B=2 engine up costs ~3 s
@@ -46,7 +46,6 @@ from warmup import settle_all
 # precisely the poison the scene exists to demonstrate — so it keeps a build
 # of its own (`fresh=True`). The steps stay in the scenes: each wants its own
 # horizon, and a base per horizon would build as often as before.
-_BASE: dict = {}
 
 
 def _stand_up(paths, rules):
@@ -56,14 +55,7 @@ def _stand_up(paths, rules):
 def build(paths, rules, fresh: bool = False):
     if fresh:
         return _stand_up(paths, rules)
-    key = tuple(str(p) for p in paths[:2])
-    if key not in _BASE:
-        sim = _stand_up(paths, rules)
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+    return warm_base(tuple(str(p) for p in paths[:2]), lambda: _stand_up(paths, rules))
 
 
 def main() -> None:

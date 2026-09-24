@@ -1,4 +1,4 @@
-"""The Great Person VERB clauses (AUDIT B-61r, batch B) — gate-unreachable.
+"""The Great Person VERB clauses — gate-unreachable.
 
     python tests/gpu/gp_verbs_test.py
 
@@ -24,18 +24,15 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from core import load_rules, fixture_paths, FIXTURES
 from core.simbase import BARB_SEAT
-from warmup import settle_all
+from warmup import opened
 
 B0 = 0
 
 
 def build(rules, path, steps: int = 8):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(steps):
-        sim.step()
-    return sim
+    return opened(rules, path, steps)
 
 
 def main() -> None:

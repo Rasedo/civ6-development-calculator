@@ -1,5 +1,5 @@
 /**
- * ONE-SHOT AST CODEMODS — the CLI over the ts-morph harness (#80), for the
+ * ONE-SHOT AST CODEMODS — the CLI over the ts-morph harness, for the
  * jobs this repo actually repeats. Authored scripts (import { codemod } from
  * './harness') remain the tool for multi-step surgery; this covers the cases
  * where writing a script is why the regex shortcut kept getting taken.

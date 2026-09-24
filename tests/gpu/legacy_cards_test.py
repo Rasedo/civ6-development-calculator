@@ -31,8 +31,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import warm_base, opened
 
 B0, ROW = 0, 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
@@ -45,19 +45,10 @@ CIVICS = [c["id"] for c in RULES["civics"]]
 # THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
 # instead of a fixture load and a settle. Every plane these pokes write is in
 # `_MUTABLE`, so a restore is the whole reset.
-_BASE: dict = {}
 
 
 def fresh(rules, path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                                  dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+    return warm_base(str(path), lambda: opened(rules, path))
 
 
 def civics_for(sim, target: str) -> list[int]:

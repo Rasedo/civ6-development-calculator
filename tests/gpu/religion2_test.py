@@ -26,7 +26,7 @@ Covered (all gate-unreachable):
   6. ITINERANT_PREACHERS presR — widens the religion's spread range by exactly 3.
   7. Enhancer COMBAT CS — JUST_WAR near (atk+def +10), DEFENDER of the faith on
      following territory (def +5). (CRUSADE and MESSENGER_OF_THE_GODS are not in
-     the install and left the pool with #264; their wire columns read 0.)
+     the install and are not in the pool; their wire columns read 0.)
   8. RELIGIOUS_COMMUNITY (follower, GS) — +2 gold per Holy Site / Shrine /
      Temple / worship building of a following ORIGIN city on an INTERNATIONAL
      route; nothing on a domestic leg, nothing from a non-following origin.
@@ -50,7 +50,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from warmup import settle_all, warm_base
 
 
 # ------------------------------------------------------------------ helpers ---
@@ -60,21 +60,15 @@ from warmup import settle_all
 # (they are not in `_MUTABLE`), so the helper puts those back by hand as well;
 # `slot` keys a SECOND base for any scene that holds two live sims at once.
 _STATIC = ("hills",)
-_BASE: dict = {}
 
 
 def build(rules, path, steps: int = 20, dtype=torch.float64, slot: int = 0):
-    key = (str(path), steps, str(dtype), slot)
-    if key not in _BASE:
+    def make():
         sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
         for _ in range(steps):
             sim.step()
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    return sim
+        return sim
+    return warm_base((str(path), steps, str(dtype), slot), make, _STATIC)
 
 
 def enh_rows(sim) -> dict:

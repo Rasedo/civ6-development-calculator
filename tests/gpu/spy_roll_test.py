@@ -3,7 +3,7 @@ is the TS twin).
 
     python tests/gpu/spy_roll_test.py
 
-C-16, measured in the live game on 2026-09-13: every mission is ONE 3d6 roll
+Measured in the live game: every mission is ONE 3d6 roll
 R against T = BaseProbability - k, six bands by margin, and the UI's tables
 are floor(p x 256)/256 of those bands. This lane pins `_mission_outcome` and
 `_mission_threshold` against the two tables the lab wrote down.

@@ -43,8 +43,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import load_rules, fixture_paths
+from warmup import warm_base, opened
 
 
 # ------------------------------------------------------------------ helpers ---
@@ -54,21 +54,10 @@ from warmup import settle_all
 # `_MUTABLE`), so the helper puts those back by hand as well; `slot` keys a
 # SECOND base for any scene that holds two live sims at once.
 _STATIC = ("ocean_tile", "cliff_mask", "river_mask")
-_BASE: dict = {}
 
 
 def build(rules, path, steps: int = 0, slot: int = 0):
-    key = (str(path), steps, slot)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(steps):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    return sim
+    return warm_base((str(path), steps, slot), lambda: opened(rules, path, steps), _STATIC)
 
 
 def idx(rules, name: str) -> int:
@@ -82,9 +71,6 @@ def clear_tile(sim, t: int) -> None:
     sim.military_at[0, t] = -1
     sim.civilian_at[0, t] = -1
     sim.embarked_at[0, t] = -1
-
-
-
 
 
 def place_mil(sim, seat: int, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:

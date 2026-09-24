@@ -309,7 +309,7 @@ describe('the spend', () => {
   });
 });
 
-// AUDIT B-61r: the seven persons whose page clause is a CHANNEL an existing
+// The seven persons whose page clause is a CHANNEL an existing
 // composer reads — the install's DISTRICT_IN_TILE, CITY and PLAYER attachments.
 describe('the channel clauses', () => {
   const found = (id: string) => {
@@ -445,7 +445,7 @@ describe('the channel clauses', () => {
   });
 });
 
-// AUDIT B-61r: the three persons whose page clause is a VERB.
+// The three persons whose page clause is a VERB.
 describe('the verb clauses', () => {
   const found = (id: string) => {
     for (const c of GP_CLASSES) {

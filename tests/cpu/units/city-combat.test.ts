@@ -107,7 +107,7 @@ describe('a city under attack', () => {
     expect(lost).toBeLessThanOrEqual(12);
   });
 
-  it('a RANGED attack reaches the perimeter too — it used to bypass it', () => {
+  it('a RANGED attack reaches the perimeter too', () => {
     const { state, city } = war();
     city.buildings.push('ANCIENT_WALLS');
     city.outerHp = WALLS_HP;

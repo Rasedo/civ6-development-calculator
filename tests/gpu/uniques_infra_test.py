@@ -60,29 +60,20 @@ def play(sim, row: int, name):
 # terrain pokes rewrite. The helper puts them back by hand and re-bumps
 # exactly the versions `play` bumps.
 _STATIC = ("row_civ", "row_leader", "terrain", "hills")
-_BASE: dict = {}
 
 
 def fresh(rules, path):
     """The scene's trio — Rome, Egypt, Norway at rows 0-2 — seated BEFORE the
     capitals settle, so the founding clauses land as the old fixtures had them."""
     from core import BatchSim, load_fixture
-    from warmup import settle_all
-    key = str(path)
-    if key not in _BASE:
+    from warmup import settle_all, warm_base
+
+    def make():
         sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
         for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
             play(sim, r, name)
-        sim = settle_all(sim)
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._eff_version += 1
-    sim._gen_ver += 1
-    sim._bldg_version += 1
-    return sim
+        return settle_all(sim)
+    return warm_base(str(path), make, _STATIC)
 
 
 def stand_builder(sim, row, tile):

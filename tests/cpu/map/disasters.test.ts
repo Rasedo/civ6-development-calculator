@@ -3,14 +3,13 @@ import { setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { disasterPhase, riverReach, FERTILITY_CAP } from '../../../cpu/core/disasters';
-// OWNER RULING 2026-09-04: the flood rate is the install's MODERATE 4.5 per 500-turn
-// game, ~5x rarer than the stylized 0.05 these scenes were written against.
-// Every loop below is a WAIT for a roll to land, so the budgets grew with the
-// rarity; no assertion changed.
+// OWNER RULING: the flood rate is the install's MODERATE 4.5 per 500-turn
+// game. Every loop below is a WAIT for a roll to land, so its budget is sized
+// for that rarity.
 //
 // And STORMS run eight draws a turn (56 per game across the families) and
-// PERSIST three turns each: a scene that read "this tile got pillaged" as "a
-// flood or an eruption reached it" now sees a tornado first. `stormFree` runs
+// PERSIST three turns each: a scene that reads "this tile got pillaged" as "a
+// flood or an eruption reached it" can see a tornado first. `stormFree` runs
 // one phase and says whether any storm was live during it — one already
 // raging or one that formed — so a scene about floods can put a storm's
 // scorch back and wait on.

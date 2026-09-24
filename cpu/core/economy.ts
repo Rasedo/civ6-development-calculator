@@ -52,14 +52,13 @@ export function progressScale(r: ResearchState | undefined): number {
   return 1 + 9 * Math.max((r?.techs.length ?? 0) / 67, (r?.civics.length ?? 0) / 50);
 }
 
-/** CIV6: the base 20 of a feature chop, on the progression above, times the
- *  Groundbreaker's "+50% yields from plot harvests and feature removals in
- *  city" where the worked tile belongs to a city that holds it. */
 /** CIV6: a chop or a harvest pays a lump that scales with game PROGRESS.
  *  `base` is the table's own figure — a feature chop's 20, or the resource's
  *  own `harvestAmount` (`Resource_Harvests.Amount`: 20 for Food and
  *  Production, 40 for the two Gold ones). Required, not defaulted: a caller
- *  that forgot it would quietly pay a chop's rate for a harvest. */
+ *  that forgot it would quietly pay a chop's rate for a harvest. The lump is
+ *  times the Groundbreaker's "+50% yields from plot harvests and feature
+ *  removals in city" where the worked tile belongs to a city that holds it. */
 export function chopValue(state: GameState, seat: number, at: Tile | undefined, base: number): number {
   const mult = at ? governorTileMult(state, at, (e) => e.harvestMult) : 1;
   return Math.round(base * progressScale(seatOf(state, seat)?.research) * mult);
@@ -136,7 +135,7 @@ export function pillagePlunder(
   }
 }
 
-export interface LumpGrant {
+interface LumpGrant {
   key: YieldKey;
   amount: number;
 }

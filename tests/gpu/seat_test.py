@@ -106,32 +106,6 @@ def main() -> None:
     print("  civ observation reads live state (treasury/influence/"
           "envoys/loyalty/settlers) OK")
 
-    # The POST-HOC PROTAGONIST pick — a finished game reads from whichever
-    # seat earned the horizon, so no single seat's fate invalidates a seed.
-    e3 = BatchEnv([load_fixture(fixture_paths()[0])], rules,
-                  device="cpu", dtype=torch.float64)
-    s3 = e3.sim
-    # (a) an explicit winner overrides every other consideration
-    s3.winner[0] = 2
-    assert int(s3.protagonist()[0]) == 2, "the winner must be the protagonist"
-    s3.winner[0] = -1
-    # (b) with no winner and NOBODY holding a city (a t0 world), the pick
-    # falls back to the plain score leader — the same deterministic
-    # first_argmax tie-break, so the two reads must agree exactly
-    assert not bool(s3.city_alive[0, 0].any()) and not bool(s3.city_alive[0, 1:s3.n_majors].any()), (
-        "t0 fixture grew cities — re-derive this scenario"
-    )
-    assert int(s3.protagonist()[0]) == int(s3.leader()[0]), (
-        "cityless world: protagonist must fall back to leader()"
-    )
-    # (c) seat 0 cityless while a civ holds a city: the pick fences on
-    # holding a city, so the surviving civ wins REGARDLESS of raw score
-    s3.city_alive[0, 1, 0] = True
-    assert int(s3.protagonist()[0]) == 1, (
-        "a dead seat 0 must yield the protagonist to the surviving civ"
-    )
-    print("  protagonist OK (winner first, city fence, leader fallback)")
-
     print("C2 SEAT SURFACE OK")
 
 

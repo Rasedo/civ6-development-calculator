@@ -19,10 +19,17 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all, works_of, clear_works
+from warmup import settle_all, works_of, clear_works, warm_base
 from city_rows_test import play
 
 SCULPTURE, PORTRAIT, LANDSCAPE, RELIGIOUS, ARTIFACT, WRITING, MUSIC, RELIC = range(8)
+
+
+def city_totals(sim, row: int):
+    tier_idx, growth_f, yield_f, _lux = sim._seat_amenity(row)
+    maint, housing = sim._seat_housing(row)
+    total = sim._seat_city_walk(row, amen_yf=yield_f, maint=maint)
+    return total.to(sim.dtype), housing.to(sim.dtype), growth_f.to(sim.dtype), tier_idx
 
 
 def slots_of(sim, h: int) -> list[int]:
@@ -48,12 +55,10 @@ def place(sim, row: int, col: int, obj: int, maker: int = -1, era: int = -1, sea
 # (`city_bldg`, `city_wonder`, `built_wonder_complete`, `city_bldg_pillaged`,
 # the `city_gw_*` slots) is `_MUTABLE` and rides the snapshot. No scene holds
 # two of these engines live at once.
-_BASE: dict = {}
 
 
 def fresh(rules, path, names=("ROME", "EGYPT", "NORWAY"), keep_palace=False):
-    key = (str(path), tuple(names), bool(keep_palace))
-    if key not in _BASE:
+    def make():
         sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
         for r, name in enumerate(names):
             play(sim, r, name)
@@ -61,10 +66,8 @@ def fresh(rules, path, names=("ROME", "EGYPT", "NORWAY"), keep_palace=False):
         if not keep_palace:
             sim.city_is_cap[:, :, :] = False
         clear_works(sim)
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+        return sim
+    return warm_base((str(path), tuple(names), bool(keep_palace)), make)
 
 
 def main() -> None:
@@ -183,10 +186,10 @@ def main() -> None:
         s = fresh(rules, path, names)
         s.city_bldg[0, 0, 0, museum] = True
         s._eff_version += 1
-        base = s._city_totals()[0][0, 0].clone()  # [6]: food, production, gold, science, culture, faith
+        base = city_totals(s, 0)[0][0, 0].clone()  # [6]: food, production, gold, science, culture, faith
         for maker in (2, 14, 16):
             assert place(s, 0, 0, SCULPTURE, maker=maker) >= 0
-        return s._city_totals()[0][0, 0] - base
+        return city_totals(s, 0)[0][0, 0] - base
 
     kongo = sculpture_delta(("KONGO", "EGYPT", "NORWAY"))
     plain = sculpture_delta(("ROME", "EGYPT", "NORWAY"))

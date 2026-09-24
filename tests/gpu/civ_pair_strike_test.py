@@ -31,7 +31,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, warm_base
 
 STRIKER = 0  # the walled civ: acts FIRST in the phase
 VICTIM = 1  # its enemy: acts after, so it cannot step away pre-strike
@@ -41,21 +41,17 @@ VICTIM = 1  # its enemy: acts after, so it cannot step away pre-strike
 # milliseconds — instead of a fixture load, a settle and forty steps. Every
 # plane the two scenes write is in `_MUTABLE` or a view of one (the
 # `major_unit_*` planes are range views of the merged `unit_*` bases).
-_BASE: dict = {}
 
 
 def build():
     paths = fixture_paths()[:1]
-    key = tuple(str(p) for p in paths)
-    if key not in _BASE:
+    def make():
         rules = load_rules()
         sim = settle_all(BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64))
         for _ in range(40):  # far enough in that both civs hold a city
             sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
+        return sim
+    sim = warm_base(tuple(str(p) for p in paths), make)
     assert sim.n_majors > 2, "this lane needs two civs"
     return sim
 

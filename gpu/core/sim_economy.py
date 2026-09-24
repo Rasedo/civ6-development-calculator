@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
+from . import simbase
 
 #: the work-ranking key a LOCKED plot takes. An exact f64 integer four decades
 #: above the widest score key, so `base - tileIndex` stays exact and the
@@ -100,7 +99,7 @@ class SimEconomy:
         # the multiplier has to clear any id this engine can mint: need is
         # tens at most and halves at worst, so 2**20 leaves a 2**19 gap
         # between adjacent need levels and stays exact in f64.
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _rb in range(B):
                 _rr = [self._lux_k] * int(rounds[_rb])
                 _rr += [int(gp_reach[_rb, _i]) for _i in range(int(gp_n[_rb]))]
@@ -146,8 +145,8 @@ class SimEconomy:
     #     WWP = (EraBase * Location) + Death
     #
     # scored PER BATTLE, by both sides, "without any discrimination". There is
-    # one function per rule and every one of them takes a SEAT ROW: seat 0 is
-    # row 0, civ index r is row r+1, exactly as the war matrix indexes them.
+    # one function per rule and every one of them takes a SEAT ROW: the row
+    # IS the seat, exactly as the war matrix indexes them.
     # ------------------------------------------------------------------
 
     def _ww_audit(self) -> None:
@@ -1179,7 +1178,7 @@ class SimEconomy:
         self._eff_version += 1
 
     def _storm_walk(self, walk: torch.Tensor, centre: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
-        """`stormWalk` — CIV6 (`Movement 8`, measured 2026-09-13 over 31 storms):
+        """`stormWalk` — CIV6 (`Movement 8`, measured in the live game over 31 storms):
         `_st_movement` unit steps in the one turn, each step's heading drawn
         from the `PrevailingWinds` band of the centre's CURRENT latitude
         (`_wind_band`, `_wind_w`), and the step DROPPED where the storm's own
@@ -2905,7 +2904,7 @@ class SimEconomy:
                                  amt, _pl))
                     acc = acc + amt * _pl
                 v = torch.floor(acc)
-                if getattr(self, "_log_diff", False):
+                if self._log_diff:
                     _nm3 = self.districts_cat[di].get('id')
                     for _b in range(self.B):
                         for _t in (self.district[_b] == di).nonzero().flatten().tolist():
@@ -3635,10 +3634,8 @@ class SimEconomy:
         founded = self.holy_tile >= 0  # [B, O]
         # THE ROW AXIS IS NOT THE RELIGION AXIS. `O` counts RELIGIONS (each is
         # keyed by its founder's major row); `NSC` counts the CITY ROWS this
-        # walk covers, which since the free row joined is the majors PLUS the Free Cities
-        # row. They were the same number for as long as the walk was
-        # majors-only, and three sites below read one where they meant the
-        # other.
+        # walk covers, the majors PLUS the Free Cities row. The two differ by
+        # one, so every site below names the axis it means.
         M = self.n_majors
         NSC = M + 1
         _rw = self._relig_rows
@@ -4450,8 +4447,7 @@ class SimEconomy:
         unit and asks `generalAuraMP(state, unit)`, which reads that unit's
         owner. It runs TWICE a turn on the majors, exactly as TS does: once
         here at the refreshUnits mirror and again at the seatPhase reset that
-        establishes every isCiv seat's real budget (seat 0 included — `isCiv`
-        covers it).
+        establishes every isCiv seat's real budget.
 
         Barbarians never own a GENERAL/ADMIRAL, so the barb window has no
         plane (mirrors `unit_xp`). Civilians are screened here (TS
@@ -4982,11 +4978,11 @@ class SimEconomy:
         pop_t = pop - spec_d.sum(dim=2)
         take = (torch.arange(M, device=dev).reshape(1, 1, M) < pop_t.unsqueeze(2)) & (top_vals > -1e17)
         takef = take.double()
-        # the PICK, exposed. It was computed here and thrown away, so a
-        # divergence in WHICH tiles a city works could only surface indirectly
-        # as a yield difference, and the nuclear strike's "citizens 'working' the affected
-        # tiles are eliminated" had nothing to read. Stashed rather than
-        # recomputed, so this stays the ONE place the pick is made.
+        # the PICK, exposed: a divergence in WHICH tiles a city works surfaces
+        # directly rather than as a yield difference, and the nuclear strike's
+        # "citizens 'working' the affected tiles are eliminated" reads it.
+        # Stashed rather than recomputed, so this stays the ONE place the pick
+        # is made.
         if j is None and record:
             self.city_worked[:, row, :n].copy_(
                 torch.where(take, tiles.gather(2, top_idx), torch.full_like(top_idx, -1)))
@@ -5163,7 +5159,7 @@ class SimEconomy:
             adjv = self._district_adj_seat(row, di).gather(1, t_d.clamp(min=0)).double()  # (memoised)
             add = torch.where(dlive[:, :, di], adjv, torch.zeros_like(adjv))
             dist_y[:, :, yc] = dist_y[:, :, yc] + add
-            if getattr(self, "_log_diff", False):
+            if self._log_diff:
                 # the PRE-FLOOR sum at the same tile+type key TS prints, from
                 # the WALK where the tile is known — the type-only helper
                 # could not name a tile and its log never paired.
@@ -5177,7 +5173,7 @@ class SimEconomy:
                             continue
                         self._diff_events.setdefault(_b, []).append(
                             f"dr:{_t}:{_nm2} raw{float(_raw[_b, _t]):.3f}")
-            if getattr(self, "_log_diff", False):
+            if self._log_diff:
                 _nm = dd.get('id')
                 _yn = ('food', 'production', 'gold', 'science', 'culture', 'faith')[yc]
                 for _b in range(B):
@@ -5300,7 +5296,7 @@ class SimEconomy:
                 if fol_live:
                     bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", selbf, self._fol_tab_for("bldgY", row, sl))
             if self.S > 0 and row < self.n_majors:  # only a major sends envoys
-                env, acs, nB = self._seat_envoys(row), self.citystate_alive.double(), selb.shape[2]
+                env, acs, nB = self._envoys_here(row), self.citystate_alive.double(), selb.shape[2]
                 csf = torch.zeros(B, nB * 6, dtype=F64, device=dev)
                 for _bar, _tidx in ((3, self._citystate_t1idx), (6, self._citystate_t2idx)):
                     _perk = (env >= _bar).double() * self._citystate_district_bonus * acs
@@ -5438,7 +5434,7 @@ class SimEconomy:
             b_city = b_city + _gcity.double()
             b_cap = b_cap + _gcap.double()
         if self.S > 0 and row < self.n_majors:  # only a major sends envoys or holds a suzerain
-            _env, _acs = self._seat_envoys(row), self.citystate_alive
+            _env, _acs = self._envoys_here(row), self.citystate_alive
             b_cap = b_cap.scatter_add(
                 1, self._citystate_yidx,
                 ((_env >= 1) & _acs).double() * float(self.rules.citystate.get("capitalBonus", 2)))
@@ -5623,8 +5619,8 @@ class SimEconomy:
         read two different economies.
 
         THIS is the walk that records the worked-tile pick, and the
-        only one: `seat_score` and `_city_totals` ride the same body at other
-        points in the turn, and a pick stashed from the SCORE walk would be
+        only one: `seat_score` rides the same body at another point in the
+        turn, and a pick stashed from the SCORE walk would be
         the post-growth one while the turn itself ran on the snapshot — a
         difference in the INSTRUMENT, not in the engines. `seatPhase` records
         from its loop-top snapshot for exactly the same reason."""
@@ -5672,26 +5668,19 @@ class SimEconomy:
         need = torch.floor(15 + 8 * (pop - 1) + (pop - 1).clamp(min=0) ** 1.5)
         return total, eff, need, tier_idx
 
-    def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        tier_idx, growth_f, yield_f, _lux = self._seat_amenity(0)
-        maint, housing = self._seat_housing(0)
-        total = self._seat_city_walk(0, amen_yf=yield_f, maint=maint)
-        return total.to(self.dtype), housing.to(self.dtype), growth_f.to(self.dtype), tier_idx
-
     def seat_score(self, row: int) -> torch.Tensor:
-        """[B] — empireScore(state, seat, 'balanced') for ANY seat row, in the
-        TS ASSOCIATION: per city, pop×popWeight first, then the six yields in
-        key order. Science rides non-dyadic 0.7s, so the sum ORDER is worth a
-        real ±1 ulp — enough to flip the leader.
+        """[B] — the balanced empire score (`rules.score`) for ANY seat row, in
+        one fixed ASSOCIATION: per city, pop×popWeight first, then the six
+        yields in key order. Science rides non-dyadic 0.7s, so the sum ORDER is
+        worth a real ±1 ulp, enough to flip the leader.
 
-        TS iterates state.cities in ARRAY order (splice on death, push on
-        found), which is slot order under append+reclaim; the living-first sort
-        keeps that true even mid-step, and dead columns add exact 0.0
-        (association-neutral).
+        Cities are summed in slot order, living first, so the order holds even
+        mid-step, and dead columns add exact 0.0 (association-neutral).
 
-        Accumulates in f64 like the TS doubles it mirrors, then casts once —
-        one body, one precision, so an f32 lane cannot have `leader()` compare
-        a rounded row against an unrounded one."""
+        Accumulates in f64, then casts once: one body, one precision, so an
+        f32 lane cannot have `leader()` compare a rounded row against an
+        unrounded one. The TS engine computes no score, so the turn-limit
+        winner this feeds has no TS twin."""
         rd = self.rules_dev
         w = rd.score_yield_weights
         pw = float(self.rules.score_pop_weight)
@@ -5721,14 +5710,6 @@ class SimEconomy:
         unspecified)."""
         cols = [self.seat_score(row) for row in range(self.n_majors)]
         return first_argmax(torch.stack(cols, dim=1))
-
-    def protagonist(self) -> torch.Tensor:
-        cols = [self.seat_score(row) for row in range(self.n_majors)]
-        scores = torch.stack(cols, dim=1)  # [B, n_majors]
-        has_city = self.city_alive[:, : self.n_majors].any(dim=2)  # [B, n_majors]
-        fenced = torch.where(has_city, scores, torch.full_like(scores, float("-inf")))
-        pick = torch.where(has_city.any(dim=1), first_argmax(fenced), first_argmax(scores))
-        return torch.where(self.winner >= 0, self.winner, pick)
 
     def _domination(self) -> torch.Tensor:
         B, dev = self.B, self.device

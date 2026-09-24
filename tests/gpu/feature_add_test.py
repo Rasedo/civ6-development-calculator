@@ -28,8 +28,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import warm_base, opened
 
 B0 = 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
@@ -43,19 +43,10 @@ FEATS = [f for f in RULES["improvements"]["featNatural"]]
 # `_MUTABLE`, so a restore is the whole reset. `slot` keys a SECOND base for
 # the one sim that stays live across the others: step 6 reads `sim2`'s planted
 # tile after steps 4, 5 and 5b have built theirs.
-_BASE: dict = {}
 
 
 def fresh(rules, path, slot: int = 0) -> BatchSim:
-    key = (str(path), slot)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                                  dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+    return warm_base((str(path), slot), lambda: opened(rules, path))
 
 
 def one_at(sim, tile: int) -> tuple[torch.Tensor, torch.Tensor]:

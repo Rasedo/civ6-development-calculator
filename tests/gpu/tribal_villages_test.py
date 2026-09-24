@@ -20,7 +20,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, warm_base
 
 B0 = 0
 ROW = 0
@@ -36,23 +36,13 @@ ROW = 0
 # ROW alone rather than by a version counter, so it is emptied the way a fresh
 # build leaves it.
 _STATIC = ("row_civ", "row_leader")
-_BASE: dict = {}
 
 
 def build(path, games: int = 1) -> BatchSim:
-    key = (str(path), games)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path) for _ in range(games)], load_rules(),
-                                  device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot(),
-                      {k: getattr(sim, k).clone() for k in _STATIC}, sim._goody_sub)
-    sim, snap, stat, subs = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._goody_sub = subs
-    sim._bvar_col_cache.clear()
-    return sim
+    return warm_base((str(path), games),
+                     lambda: settle_all(BatchSim([load_fixture(path) for _ in range(games)], load_rules(),
+                                                 device="cpu", dtype=torch.float64)),
+                     _STATIC, ("_goody_sub",))
 
 
 def _hut_with_unit(sim):

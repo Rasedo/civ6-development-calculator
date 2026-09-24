@@ -128,7 +128,7 @@ describe('wonder effects, sourced', () => {
     expect(after.food - before.food).toBe(after.culture - before.culture);
   });
 
-  it('Petra rides the same channel it used to have to itself', () => {
+  it('Petra rides the shared tile-yield channel', () => {
     expect(BUILT_WONDERS.PETRA.effects?.tileYields).toEqual([
       { terrain: 'DESERT', excludeFeature: 'FLOODPLAINS', yields: { food: 2, gold: 2, production: 1 } },
     ]);

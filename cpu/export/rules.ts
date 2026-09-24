@@ -1,13 +1,9 @@
 /**
  * RULES.JSON — the rule tables both engines share, compiled from cpu/data.
  *
- * Moved out of the old seeder whole: the seeder produces WORLDS and may not
- * know what a building costs; this file is engine-side and exists solely to
- * ship the catalogs to the GPU. The trace column tables ride along in
- * `rules.trace` (see cpu/driver/trace.ts) until the state-compare digest
- * retires them.
+ * The seeder produces WORLDS and may not know what a building costs; this
+ * file is engine-side and exists solely to ship the catalogs to the GPU.
  */
-
 
 import { TURN_LIMIT, DISTRICT_SPECIALTY_COST } from '../core/game';
 import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
@@ -253,16 +249,11 @@ import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PE
 import { GOODY_KINDS, GOODY_PAYLOAD_KINDS, GOODY_SUBTYPES } from '../data/goodyHuts';
 import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, PILLAGE_BUILDING_REPAIR_PERCENT, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, PURCHASE_DIVISOR, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
 
-// The GPU improvement index space (tile.improvement values, build codes 13-15).
-// the roster grew — indices 0-2 stay stable (every existing
-// plane/consumer keys on them); the resource-only improvements append.
-// FISHING_BOATS stays OUT: water-only, and a land builder can never stand
-// on the tile (unreachable in both engines).
-// SEASIDE_RESORT appended LAST — this array's order IS the GPU's
-// improvement index, so anything but an append renumbers every other row.
-import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned (order is the column index; FORT appended LAST)
+// The GPU improvement index space (tile.improvement values): this array's
+// order IS the GPU's improvement index, so anything but an append renumbers
+// every other row.
+import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned (order is the column index)
 
- 
 import { RESOURCES } from '../../world/resources';
 import type { Era } from '../data/techs';
 import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS } from './catalog';
@@ -275,13 +266,13 @@ import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_P
 import { AMENITY_TIERS, CITY_POP_PER_AMENITY, amenityTierIndex } from '../data/constants';
 import { CIV_LEVELS, CIV_LEVEL_ORDER } from '../data/civLevels';
 
-/** The REAL settler rule now: a 1-pop city may not train or buy one.
- *  Exported to the GPU as scenario.settlerPopGate. */
 // CIV6 (Pillaging): the shared plunder-kind enum — 0 none, 1 heal, 2 gold,
 // 3 faith, 4 science, 5 culture — over `PlunderRow`.
 const PLUNDER_KIND_IDX = { heal: 1, gold: 2, faith: 3, science: 4, culture: 5 } as const;
 const plunRow = (p?: PlunderRow): number[] => (p ? [PLUNDER_KIND_IDX[p.kind], p.amount] : [0, 0]);
 
+/** The settler rule: a 1-pop city may not train or buy one.
+ *  Exported to the GPU as scenario.settlerPopGate. */
 const SETTLER_POP_GATE = 2;
 
 const beliefRow = (def: { effects: BeliefEffects }) => ({
@@ -332,7 +323,6 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   })(),
 });
 
-
 const boostRows: object[] = [];
 for (const [id, def] of Object.entries(BOOSTS)) {
   if (!def.check) continue;
@@ -353,14 +343,9 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     if (t !== undefined) row = { kind: 'tech', t };
   } else if (c.kind === 'nearNaturalWonder') row = { kind: 'nearNaturalWonder' };
   else if (c.kind === 'improvement') {
-    // Improvement eurekas for every improvement in the grown roster (a
-    // gate catch, seed 9066 t57 rTechProg1: seat 1's first QUARRY at t48
-    // fired MASONRY's eureka in TS only — the old FARM/MINE/LUMBER
-    // hardcode left quarry/pasture rows unexported, so the GPU's research
-    // stream forked on the boosted cost). MASONRY (quarry) and
-    // HORSEBACK_RIDING (pasture) are live now; CELESTIAL_NAVIGATION
-    // (FISHING_BOATS) stays out — the improvement is out of roster,
-    // water-unreachable in both engines.
+    // Improvement eurekas for every improvement in the roster: an
+    // unexported row fires in TS only and forks the GPU's research stream
+    // on the boosted cost (seed 9066 t57, MASONRY's quarry eureka).
     const imp = IMPROVEMENT_IDS.indexOf(c.id);
     if (imp >= 0) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
   } else if (c.kind === 'anyWonderBuilt') {
@@ -368,10 +353,9 @@ for (const [id, def] of Object.entries(BOOSTS)) {
   } else if (c.kind === 'district') {
     // District eurekas/inspirations (STATE_WORKFORCE: any specialty district;
     // MATHEMATICS: 3; per-type ones). distinctTypes conditions
-    // (CIVIL_ENGINEERING: 7 different specialty districts) export now — the
-    // full specialty catalog is scaffold-placeable, so both civs can satisfy
-    // them (the old "wait for D3" skip made the GPU miss a live inspiration:
-    // rng 2026006131 t248).
+    // (CIVIL_ENGINEERING: 7 different specialty districts) export too: the
+    // full specialty catalog is placeable, so every seat can satisfy them
+    // (rng 2026006131 t248).
     const dtype = c.type ? PLACEABLE_DISTRICTS.indexOf(c.type) : -1;
     row = { kind: 'district', dtype, count: c.count, distinct: c.distinctTypes ? 1 : 0 };
   } else if (c.kind === 'greatPeople') {
@@ -382,18 +366,15 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     if (!c.class) row = { kind: 'greatPeople', cls: -1, count: c.count };
     else if (cls >= 0 && cls < 5) row = { kind: 'greatPeople', cls, count: c.count };
   } else if (c.kind === 'policies') {
-    // the "run N policy cards" inspiration (MEDIEVAL_FAIRES,
-    // count 4). Dormant until the new-card unlockPolicy wiring let the scripted
-    // seat 0 fill 4+ slots in-gate; the GPU counts SEAT 0's slotted-policy
-    // mask (`_gov_policy_mods`). Seat-0 only: the civ-seat boost detector has
-    // no arm for this kind (civ governments carry no slotted-policy count).
+    // the "run N policy cards" inspiration (MEDIEVAL_FAIRES, count 4): every
+    // seat's slotted cards count, in the boost detector and on the GPU
+    // (`_seat_slotted`).
     row = { kind: 'policies', count: c.count };
   } else if (c.kind === 'alliance') {
     row = { kind: 'alliance', level: c.level };
   }
   if (row) boostRows.push({ target, idx, ...row });
 }
-
 
 /** [row, improvement, yield] — what each research row adds to an
  *  improvement's own yields, the `improvementYields` effect summed. */
@@ -422,7 +403,6 @@ const SCRIPTED_CAMPUS = true;
 const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3, flat: 4, dam: 5, canal: 6 } as const;
 
 const SLOT_KIND_IDX: Record<SlotKind, number> = { military: 0, economic: 1, diplomatic: 2, wildcard: 3 };
-
 
 /** ONE person's dense effect record, in `GP_FX` order with the two permanent
  *  runs appended. Every magnitude is the sourced row's own. */
@@ -834,10 +814,9 @@ export function buildRules() {
         // Buenos Aires: reach of a bonus resource turned luxury
         bonusAmenities: BUENOS_AIRES_AMENITIES,
       },
-      // CIV-SEAT levy — a militaristic CS's suzerain (a civ seat) at war
+      // the levy: a militaristic CS's suzerain at war
       // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown
-      // per CS shared across seats. (Seat-0 levy is UI-only, absent from the
-      // scripted reference, so the GPU only mirrors the civ-seat path.)
+      // per CS shared across seats.
       levyUnits: LEVY_UNITS,
       levyGoldCost: LEVY_GOLD_COST,
       levyCooldown: LEVY_COOLDOWN,
@@ -995,13 +974,11 @@ export function buildRules() {
       generalAuraCs: GENERAL_AURA_CS,
       generalAuraRange: GENERAL_AURA_RANGE,
       generalAuraMp: GENERAL_AURA_MP,
-      admiralMarchLive: ADMIRAL_MARCH_LIVE, // inert pending its hunt // the aura's movement half
+      admiralMarchLive: ADMIRAL_MARCH_LIVE, // the aura's movement half
       pantheonPool: Object.keys(PANTHEONS).length,
       followerPool: Object.keys(FOLLOWER_BELIEFS).length,
       founderPool: Object.keys(FOUNDER_BELIEFS).length,
-      // Enhancer pool size. The GPU does not yet race enhancers (civ-seat
-      // enhancer claiming + the mirrored draw are a deferred follow-up); this
-      // documents the slot for that work.
+      // Enhancer pool size: the pool the enhancer race draws from.
       enhancerPool: Object.keys(ENHANCER_BELIEFS).length,
       pressureRange: RELIGION_PRESSURE_RANGE,
       pressurePerTurn: RELIGION_PRESSURE_PER_TURN,
@@ -1024,7 +1001,7 @@ export function buildRules() {
       apostleIdx: Object.values(UNITS).findIndex((u) => u.id === 'APOSTLE'),
       apostleCap: APOSTLE_CAP,
       relStrength: Object.values(UNITS).map((u) => u.religiousStrength ?? 0),
-      cityReligionAdderLive: CITY_RELIGION_ADDER_LIVE, // DEBT-2: inert pending its hunt
+      cityReligionAdderLive: CITY_RELIGION_ADDER_LIVE,
       theoPressureSwing: THEO_PRESSURE_SWING,
       theoPressureRange: THEO_PRESSURE_RANGE,
       religiousHealPerFaith: RELIGIOUS_HEAL_PER_FAITH,
@@ -1054,9 +1031,7 @@ export function buildRules() {
       pantheons: Object.values(PANTHEONS).map(beliefRow),
       followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
       founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
-      // Enhancer effect rows (all inert this round). Exported so the
-      // deferred GPU enhancer race has the table ready; the engine currently
-      // builds only pan/fol/fou tables and ignores this key.
+      // Enhancer effect rows.
       enhancers: Object.values(ENHANCER_BELIEFS).map(beliefRow),
     },
     wonders: {
@@ -1404,7 +1379,7 @@ export function buildRules() {
       formationResourceMult: [...FORMATION_RESOURCE_MULT],
       formationTrainDiscount: FORMATION_TRAIN_DISCOUNT,
       encampHp: ENCAMPMENT_HP, // the ENCAMPMENT garrison pool cap
-      barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE, // inert pending its hunt
+      barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE,
       barbLadder: [
         'WARRIOR',
         'SPEARMAN',
@@ -1502,10 +1477,9 @@ export function buildRules() {
       cost: u.cost,
       combat: u.combat,
       maintenance: u.maintenance,
-      // CHARGES AND NO COMBAT, and nothing wider — this comment used to
-      // claim `unitIsNoncombat`'s set "the nine SUPPORT rows included", which
-      // the formula has never made: the seven support chassis that carry no
-      // build charges read 0 here. The noncombat set is `military` below,
+      // CHARGES AND NO COMBAT, and nothing wider: this is not
+      // `unitIsNoncombat`'s set, and a support chassis that carries no build
+      // charges reads 0 here. The noncombat set is `military` below,
       // negated; the stacking slot is `support`.
       civilian: u.charges !== undefined && !((u.combat ?? 0) > 0) ? 1 : 0,
       // CIV6 (`FormationClass="FORMATION_CLASS_SUPPORT"`): a stacking slot of

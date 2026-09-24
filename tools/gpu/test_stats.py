@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 LOG = ROOT / "stats" / "battery.jsonl"
 
 _OK, _SKIP, _BAIL = 0, -1, -3
-# #230: a lane the BOX killed for memory. Not a red — it says nothing
+# a lane the BOX killed for memory. Not a red — it says nothing
 # about the code — and not a green, because the lane never ran.
 _OOM = -5
 
@@ -82,7 +82,7 @@ def record(results, wall: float, ok: bool, mem: dict | None = None,
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "head": head,
             "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
-            # #230: three outcomes, not two. `oom` never counts as a pass,
+            # three outcomes, not two. `oom` never counts as a pass,
             # so the cadence clock does not advance on one.
             "result": "oom" if oom else "pass" if ok else "fail",
             "mem": mem,

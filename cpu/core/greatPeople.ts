@@ -64,10 +64,6 @@ export function ensureGpOffer(state: GameState, cls: GreatPersonClass): void {
   state.gpPrice[i] = gpCost(cls, roster[at].era, worldEraIndex(state));
 }
 
-/** CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle if
- *  no Prophets are available)" — religion founded or the class spent pays
- *  an Apostle; a standing Prophet with no religion pays nothing; otherwise
- *  the class's offer is claimed FREE (`_grant_free_prophet`). */
 /** CIV6 (The Last Prophet): "Automatically receive the final Great Prophet
  *  when the next-to-last one is claimed (if you have not earned a Great
  *  Prophet already)." Called after every claim, for every seat that names the
@@ -91,10 +87,14 @@ export function grantGuaranteedGreatPeople(state: GameState, seat: number): void
 /** How many of a CLASS this seat itself has been awarded — the GPU keeps it
  *  as the `civ_gp_earned` plane, since the global `gp_earned` answers a
  *  different question (how many ANYONE has claimed). */
-export function greatPeopleEarnedBy(owner: Seat, cls: GreatPersonClass): number {
+function greatPeopleEarnedBy(owner: Seat, cls: GreatPersonClass): number {
   return (owner.gpEarned ?? []).filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
 }
 
+/** CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle if
+ *  no Prophets are available)" — religion founded or the class spent pays
+ *  an Apostle; a standing Prophet with no religion pays nothing; otherwise
+ *  the class's offer is claimed FREE (`_grant_free_prophet`). */
 export function grantFreeProphet(state: GameState, seat: number, centre: number): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
@@ -231,7 +231,7 @@ export function greatPersonPointsPerTurn(
  * district of this class — the site the person's own charge will need —
  * lowest centre tile first, and the capital when no city has one.
  */
-export function gpSpawnTile(state: GameState, seat: number, cls: GreatPersonClass): number {
+function gpSpawnTile(state: GameState, seat: number, cls: GreatPersonClass): number {
   const district = GP_CLASS_DISTRICT[cls];
   let best = -1;
   for (const c of citiesOf(state, seat)) {

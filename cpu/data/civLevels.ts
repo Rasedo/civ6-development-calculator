@@ -43,7 +43,6 @@ export interface CivLevelDef {
   readonly ignoresUnitStrategicResourceRequirements: boolean;
 }
 
-
 /** PROVENANCE (cpu/data/provenance.ts): every column of this table is the
  *  install's own `CivilizationLevels` column of the same name. */
 const civLevelSrc = (id: CivLevelId): SrcMap => {

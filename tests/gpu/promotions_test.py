@@ -60,7 +60,7 @@ def test_catalog(sim) -> None:
         assert rows <= rd.promo_cols, f"class {rd.promo_classes[c]} overflows the PROMOTE head"
     # every civilian chassis but the Apostle's and the Rock Band's promotes from nothing
     for t in range(sim.NU):
-        if bool(sim._type_civilian[t]) and t not in (sim._apostle_idx, getattr(sim, "_inquisitor_idx", -1), sim._band_idx):
+        if bool(sim._type_civilian[t]) and t not in (sim._apostle_idx, sim._inquisitor_idx, sim._band_idx):
             assert int(rd.u_promo_class[t]) < 0, f"unit type {t} is a civilian with a promotion tree"
     print(f"  catalog OK — {n} classes, {int(rd.promo_rows.sum())} rows, head {rd.promo_cols} wide")
 
@@ -224,9 +224,9 @@ def test_bank_over_threshold(sim) -> None:
     to the requirement. The difference is reachable because two writers move
     the pool without the clamp — a tribal village's experience grant and a
     corps merge's inheritance — so a level-1 unit can legitimately stand
-    above 15, and this used to drag it back to 15 the next time it banked
-    anything (seed 9196 turn 165: GPU 15 against TS 28, on a flat +2 for
-    surviving a city strike)."""
+    above 15, and a clamp here would drag it back to 15 the next time it
+    banked anything (seed 9196 turn 165: a flat +2 for surviving a city
+    strike on a pool of 26)."""
     per = int(sim._promo_xp_per_level)
     lvl1 = torch.ones(1, dtype=torch.long)
     over = torch.full((1,), per + 13, dtype=torch.long)

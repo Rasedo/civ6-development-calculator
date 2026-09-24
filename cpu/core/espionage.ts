@@ -32,7 +32,7 @@ import {
   type SpyMissionDef,
 } from '../data/espionage';
 import { envoysOf, resolveSuzerain, suzerainOf } from './cityStates';
-import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
+import { BARB_SEAT, citiesOf, seatOf, seatsAllied, tileSeat } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
 import { getModifiers } from './effects';
 import { goldenDedication, dedicationEvent, worldEraIndex } from './eras';
@@ -156,7 +156,7 @@ export function spyIdle(unit: Unit): boolean {
   return (unit.spyMission ?? SPY_IDLE) === SPY_IDLE;
 }
 
-export function canTravelTo(state: GameState, unit: Unit, tileIndex: number): boolean {
+function canTravelTo(state: GameState, unit: Unit, tileIndex: number): boolean {
   if (!isSpy(unit.type) || !spyIdle(unit)) return false;
   return spyDestinations(state, unit).includes(tileIndex);
 }
@@ -361,7 +361,7 @@ export function cityCounterLevels(state: GameState, city: City, atTile?: number)
 }
 
 /** CIV6 (Neutralize Governor): "can only be performed in a city with a
- *  Governor" — the holder's roster answers directly now. */
+ *  Governor" — the holder's roster answers directly. */
 function hasGovernor(state: GameState, holder: Seat, city: City): boolean {
   return holder.cities.includes(city) && cityHasGovernor(state, city);
 }
@@ -443,7 +443,7 @@ export const MISSION_CAPTURED = 4;
 export const MISSION_KILLED = 5;
 
 /**
- * CIV6 (measured 2026-09-13, `tools/civ6lab/spy_probe.lua` over the tuner
+ * CIV6 (measured with `tools/civ6lab/spy_probe.lua` over the tuner
  * socket): every mission is ONE roll R of 3d6 read against a threshold
  * T = BaseProbability - k, in six bands by the margin d = R - T:
  *   d >= 2 success undetected; d in {0, 1} success, must escape;
@@ -564,9 +564,9 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
  * per level (Ace Driver "+4 levels" among them) + the police term on a right
  * guess + the counterspy term per level of the post guarding the district,
  * and the spy gets away when the mission roll's 3d6 lands at or under it. A
- * failed escape is the
- * catch: "imprisoned, but not killed" where a MAJOR runs the prison — a minor
- * keeps no cell, so its catch ends the career — or the spy is killed.
+ * failed escape is the catch: "imprisoned, but not killed" where a MAJOR runs
+ * the prison — a minor keeps no cell, so its catch ends the career — or the
+ * spy is killed.
  */
 function spyEscape(state: GameState, unit: Unit,
                    districts: { type: string; tileIndex: number }[], jailer: number,
@@ -765,5 +765,3 @@ function partisanChassis(state: GameState): string | undefined {
 export function spyIsCounterspy(unit: Unit): boolean {
   return isSpy(unit.type) && unit.spyMission === SPY_M_COUNTERSPY;
 }
-
-export { isCiv };

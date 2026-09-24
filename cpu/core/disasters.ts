@@ -334,7 +334,7 @@ export function disasterPhase(state: GameState): void {
 }
 
 /**
- * THE STORM'S WALK — CIV6 (`Movement 8`, measured 2026-09-13 over 31 storms):
+ * THE STORM'S WALK — CIV6 (`Movement 8`, measured over 31 storms):
  * eight UNIT STEPS in the one turn, each step's heading drawn from the
  * `PrevailingWinds` band of the centre's CURRENT latitude, and the step
  * DROPPED where the storm's own terrain rule fails at the destination (a

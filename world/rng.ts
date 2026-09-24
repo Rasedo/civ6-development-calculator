@@ -16,10 +16,6 @@ export function randInt(rng: Rng, n: number): number {
   return Math.floor(rng() * n);
 }
 
-export function pick<T>(rng: Rng, arr: T[]): T {
-  return arr[randInt(rng, arr.length)];
-}
-
 export function shuffle<T>(rng: Rng, arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = randInt(rng, i + 1);

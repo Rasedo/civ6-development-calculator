@@ -20,8 +20,8 @@ import torch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
-from warmup import settle_all  # noqa: E402
+from core import BatchSim, load_rules, fixture_paths  # noqa: E402
+from warmup import opened  # noqa: E402
 
 B0 = 0
 
@@ -66,7 +66,7 @@ ROWS = {
 
 
 def build(rules, path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    return opened(rules, path)
 
 
 def main() -> int:

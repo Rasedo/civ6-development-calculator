@@ -3,13 +3,12 @@
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/production_queue_test.py
 
-OWNER RULING 2026-09-08: the queue collapsed to depth 1 — the "queue" is the
-current build. The deeper slots were never a mechanic. Only the HEAD ever
-accrued (every `progress +=` reads slot 0), so an entry behind it held an id
-and a permanent zero; what makes hammers survive a switch is `city_prod_bank`
-and the per-item ledger, both of which are independent of depth. What the
-slots did cost was Q-1 promote columns per city, legal every turn, asking a
-policy to reorder a list the observation never showed it.
+OWNER RULING: the queue is depth 1, and the "queue" is the current build.
+Only the HEAD accrues (every `progress +=` reads slot 0); what makes hammers
+survive a switch is `city_prod_bank` and the per-item ledger, both of which
+are independent of depth. Deeper slots would be no mechanic, only promote
+columns per city asking a policy to reorder a list the observation never
+shows it.
 
 `city_current`, `city_progress`, `city_cost` and `city_qtile` stay dense over
 the queue so the storage keeps one shape; QD is simply 1.
@@ -36,8 +35,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import warm_base, opened
 
 B0, ROW = 0, 0
 
@@ -46,20 +45,10 @@ B0, ROW = 0, 0
 # instead of a fixture load, a settle and eight steps. Every plane these pokes
 # write is in `_MUTABLE`, so the restore is the whole of it; the building
 # version moves because `restore` rewrites `city_bldg` in place.
-_BASE: dict = {}
 
 
 def build(rules, path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(8):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+    return warm_base(str(path), lambda: opened(rules, path, 8))
 
 
 def a_city(sim) -> int:
@@ -104,7 +93,7 @@ def test_the_depth_is_shared(rules, path) -> None:
     assert sim.FORM_BASE == sim.PROJECT_BASE + len(sim._proj_rows),         "the formation block must open right after the projects"
     assert sim.PROD_W == sim.FORM_BASE + 2 * sim.NU,         "the formation block does not close the production layout"
     assert not hasattr(sim, "PROMOTE_BASE"), "a promote block survived the collapse"
-    assert sim.production_mask().shape[2] == sim.PROD_W,         "the mask is wider than the layout — a dead block is still addressed"
+    assert sim._seat_production_mask(0).shape[2] == sim.PROD_W,         "the mask is wider than the layout — a dead block is still addressed"
     print(f"  1 depth OK — one slot on four planes, layout closes at {sim.PROD_W}")
 
 def test_only_the_head_accrues(rules, path) -> None:
@@ -137,14 +126,14 @@ def test_a_busy_city_is_offered_nothing(rules, path) -> None:
     j = a_city(sim)
     load_queue(sim, j, [unit(sim, 0)], costs=[10_000])
     sim._eff_version += 1
-    m = sim.production_mask()[B0, j]
+    m = sim._seat_production_mask(0)[B0, j]
     assert m.shape[0] == sim.PROD_W, "the mask is wider than the layout"
     assert not bool(m.any()), "a busy city was still offered something"
     # ...and an IDLE city is offered plenty
     sim._q_drop(torch.tensor([B0]), ROW, j,
                 torch.ones(1, sim.QD, dtype=torch.bool))
     sim._eff_version += 1
-    assert bool(sim.production_mask()[B0, j].any()), "an idle city was offered nothing"
+    assert bool(sim._seat_production_mask(0)[B0, j].any()), "an idle city was offered nothing"
     print("  5 busy OK — building something means no column; idle means a choice")
 
 def test_a_queued_building_is_not_offered_twice(rules, path) -> None:

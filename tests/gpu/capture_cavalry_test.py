@@ -7,7 +7,7 @@ The TS twin is tests/cpu/units/capture-cavalry.test.ts.
 CIV6 (Mongol Horde): cavalry gains "a chance to capture defeated enemy
 cavalry class units". The install publishes the PERMISSION and one number
 beside it, COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE 20; the curve through it
-is this model's (STYLIZED, owner ruling 2026-09-04): an even fight is a coin
+is this model's (STYLIZED, owner ruling): an even fight is a coin
 flip, certain at +20 Combat Strength, nothing at -20. The roll is ONE draw
 right after the two damage rolls, on both engines, and only when the capture
 is possible at all — so the stream is the parity contract this lane pins:

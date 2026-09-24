@@ -116,7 +116,7 @@ export function nukeVictims(state: GameState, seat: number, tiles: readonly Tile
  * rounded `woundPenalty`. 0 where nobody qualifies. `_nuke_intercept_strength`
  * is the twin.
  */
-export function nukeInterceptors(state: GameState, seat: number, tileIndex: number): Unit[] {
+function nukeInterceptors(state: GameState, seat: number, tileIndex: number): Unit[] {
   const at = state.map.tiles[tileIndex];
   if (!at) return [];
   const out: Unit[] = [];

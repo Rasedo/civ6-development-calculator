@@ -29,9 +29,9 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core import load_rules, fixture_paths
 from core.simbase import HIT_MELEE, HIT_RANGED, HIT_BOMBARD, ASSIST_RAM, ASSIST_TOWER
-from warmup import settle_all
+from warmup import warm_base, opened
 
 
 # THE WARMED BASE, ONE PER (fixture, turns). A scene pays a `restore` —
@@ -39,19 +39,10 @@ from warmup import settle_all
 # the bodies below write (the city pools, the merged unit pool, the occupancy
 # planes, `civ_techs`, `unit_next`) is in `_MUTABLE`, so `restore` carries all
 # of it back; no scene here holds two of these sims live at once.
-_BASE: dict = {}
 
 
 def build(rules, path, turns: int = 8):
-    key = (str(path), turns)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(turns):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+    return warm_base((str(path), turns), lambda: opened(rules, path, turns))
 
 
 def L(sim, x) -> torch.Tensor:

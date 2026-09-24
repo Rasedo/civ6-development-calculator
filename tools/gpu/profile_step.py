@@ -39,16 +39,16 @@ def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
     pslots = torch.arange(sim._seat_unit_mask(0).shape[1], dtype=torch.int64).view(1, -1)
     for _ in range(turns):
         turn = sim.turn
-        pa = masked_choice(sim.production_mask(), game_seed.view(B, 1), slots, turn, HEAD_PROD)
-        ta = masked_choice(sim.tech_mask(), game_seed, turn, HEAD_TECH)
-        ca = masked_choice(sim.civic_mask(), game_seed, turn, HEAD_CIVIC)
+        pa = masked_choice(sim._seat_production_mask(0), game_seed.view(B, 1), slots, turn, HEAD_PROD)
+        ta = masked_choice(sim._seat_tech_mask(0), game_seed, turn, HEAD_TECH)
+        ca = masked_choice(sim._seat_civic_mask(0), game_seed, turn, HEAD_CIVIC)
         um = sim._seat_unit_mask(0)
         na = um.shape[2]
         has_attack = um[:, :, 6:12].any(dim=2, keepdim=True)
         um = um & ~(has_attack & (torch.arange(na).view(1, 1, na) < 6))
         um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack
         ua = masked_choice(um, game_seed.view(B, 1), pslots, turn, HEAD_UNIT)
-        ea = masked_choice(sim.envoy_mask(), game_seed, turn, HEAD_ENVOY)
+        ea = masked_choice(sim._seat_envoy_mask(0), game_seed, turn, HEAD_ENVOY)
         sim.apply_seat_actions(0, production=pa, tech=ta, civic=ca, envoys=ea)
         sim._apply_seat_unit_actions(0, ua)
         sim.step()

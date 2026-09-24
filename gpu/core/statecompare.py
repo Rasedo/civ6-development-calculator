@@ -37,10 +37,7 @@ import json
 import math
 from pathlib import Path
 
-try:  # the census must stay importable with no numpy on the path
-    import numpy as _np
-except ImportError:  # pragma: no cover
-    _np = None
+import numpy as _np
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "shared" / "statecompare.manifest.json"
@@ -49,7 +46,7 @@ ENGINE_PATH = Path(__file__).resolve().parent / "simbase.py"
 _MASK = 0xFFFFFFFF
 _2_32 = 1 << 32
 # the row floor below which the scalar fold beats the numpy one. Measured
-# 2026-09-14 on a turn-220 state: 16 and 32 beat 64 at B=1 and through
+# on a turn-220 state: 16 and 32 beat 64 at B=1 and through
 # `fold_rows_multi` at B=3; 8 loses (the 9-row seat and city-state groups
 # go vector and pay numpy's per-op overhead). The check at the bottom of the
 # file sets it to 0 to exercise the arithmetic on every group.
@@ -248,11 +245,10 @@ GAME = {
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
     "congressSlate": lambda sim, b, rows: [[int(x) for x in sim.congress_slate[b].tolist()]],
     # ONE row, so ONE outer list. The game group has a single row and the
-    # fold reads `vals[0]`: these four used to hand the fold a FLAT list and
-    # only its first element was ever compared (the competition's kind, the
-    # first resolution's id, the first emergency's kind, the first class's
-    # claimed list). Found 2026-09-14 when the vector fold refused a 1-row
-    # group; `fold_rows` now refuses the shape on both engines.
+    # fold reads `vals[0]`: a FLAT list would compare only its first element
+    # (the competition's kind, the first resolution's id, the first
+    # emergency's kind, the first class's claimed list), so `fold_rows`
+    # refuses that shape on both engines.
     "competition": lambda sim, b, rows: [(
         [int(sim.comp_kind[b]), int(sim.comp_left[b]), int(sim.comp_target[b])]
         + [float(sim.comp_score[b, r]) for r in range(sim.n_majors)]
@@ -281,14 +277,6 @@ def _gov_row(plane: str):
     def get(sim, b, rows):
         t = getattr(sim, plane)[b]
         return [[int(t[c, g]) for g in range(sim.n_governors)] for c in rows]
-    return get
-
-
-def _civ_vec(plane: str):
-    """One per-seat VECTOR plane, in the catalog's own order."""
-    def get(sim, b, rows):
-        t = getattr(sim, plane)[b]
-        return [[int(x) for x in t[c].tolist()] for c in rows]
     return get
 
 
@@ -386,8 +374,8 @@ def _civ_only(plane: str, absent):
 
 def _seat_pair_relation(plane: str, live):
     """A seat<->seat [n_majors, n_majors] relation read as a per-seat set of ABSOLUTE
-    opponent seats. One index space: the row IS the seat, so seat 0 answers
-    like any other and the TS side's `overSeats` walker lines up with it
+    opponent seats. One index space: the row IS the seat, so every seat
+    answers alike and the TS side's `overSeats` walker lines up with it
     without a hole."""
     def get(sim, b, rows):
         m = getattr(sim, plane)[b].tolist()
@@ -737,16 +725,9 @@ CITY_STATE = {
 def _gw_rows(sim, b, rows):
     """every layout slot's work — object, maker, era, civilization; -1s for
     an empty slot — exactly like the TS extractor: per city, slot-major, the
-    four planes in that order. One fancy-index per plane; the 0-d reads it
-    replaced were the costliest extractor by far."""
+    four planes in that order. One fancy-index per plane."""
     if not rows:
         return []
-    if _np is None:  # pragma: no cover — numpy rides with torch
-        return [
-            [int(x) for i in range(sim.GW_W)
-             for x in (sim.city_gw_obj[b, c, s, i], sim.city_gw_maker[b, c, s, i], sim.city_gw_era[b, c, s, i], sim.city_gw_seat[b, c, s, i])]
-            for c, s in rows
-        ]
     ci = _np.asarray([c for c, _ in rows], dtype=_np.int64)
     si = _np.asarray([s for _, s in rows], dtype=_np.int64)
     planes = [getattr(sim, p)[b].numpy()[ci, si] for p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat")]
@@ -879,10 +860,7 @@ CITY = {
 
 def _unit(plane: str):
     def get(sim, b, rows):
-        if _np is not None:
-            return getattr(sim, plane)[b].numpy()[_np.asarray(rows, dtype=_np.int64)]
-        t = getattr(sim, plane)[b].tolist()  # pragma: no cover — numpy rides with torch
-        return [t[i] for i in rows]
+        return getattr(sim, plane)[b].numpy()[_np.asarray(rows, dtype=_np.int64)]
     return get
 
 
@@ -923,9 +901,7 @@ def _tile(plane: str):
     # the sim mutates again, and it skips boxing 1144 values per field per
     # game per turn into a Python list only to array them right back.
     def get(sim, b, rows):
-        if _np is not None:
-            return getattr(sim, plane)[b].numpy()
-        return getattr(sim, plane)[b].tolist()  # pragma: no cover
+        return getattr(sim, plane)[b].numpy()
     return get
 
 
@@ -942,12 +918,8 @@ def _owner_city(sim, b, rows):
     # a major's or a FREE CITY's tile names its city; a minor's and nobody's
     # is -1 (TS `setTileOwner`)
     free = int(sim._ROW_SEAT[sim.FREE_ROW])
-    if _np is not None:
-        seat = sim.tile_seat[b].numpy()
-        return _np.where(((seat >= 0) & (seat < 100)) | (seat == free), sim.tile_city[b].numpy(), -1)
-    seat = sim.tile_seat[b].tolist()
-    city = sim.tile_city[b].tolist()
-    return [city[t] if (0 <= seat[t] < 100 or seat[t] == free) else -1 for t in rows]
+    seat = sim.tile_seat[b].numpy()
+    return _np.where(((seat >= 0) & (seat < 100)) | (seat == free), sim.tile_city[b].numpy(), -1)
 
 
 TILE = {
@@ -1091,8 +1063,6 @@ def _acc_hex(h_seg) -> str:
 def _fold_rows_np(keys, cols) -> dict | None:
     """`fold_rows` with the rows in parallel — `_chain_np` plus the summed
     accumulators."""
-    if _np is None:
-        return None
     # Below the floor the per-op numpy overhead LOSES to the scalar loop
     # (the game / seat / city-state groups); the vector path exists for the
     # tile group's 1144 rows, the unit group's mid-game hundreds, the city
@@ -1110,14 +1080,12 @@ def fold_rows_multi(per_b) -> list | None:
     """`fold_rows` for EVERY game of a batch in one vector pass. A row's
     chain never reads the game, so the games' rows concatenate into one
     `_chain_np` call and each game's accumulators are its contiguous
-    segment's sums — same bits as `fold_rows` per game. None (numpy absent,
-    too few total rows, or a value type the chain declines) means: take the
-    per-game path instead.
+    segment's sums — same bits as `fold_rows` per game. None (too few total
+    rows, or a value type the chain declines) means: take the per-game path
+    instead.
 
     `per_b[b]` is `(keys, cols)` exactly as `fold_rows` takes them, every
     game over the SAME column list (one manifest group)."""
-    if _np is None:
-        return None
     lens = [len(k) for k, _ in per_b]
     if sum(lens) < _VEC_MIN_ROWS:
         return None
@@ -1160,8 +1128,8 @@ def fold_rows(keys, cols) -> dict:
     ROW order is not, because the per-row hashes are summed.
 
     Groups above the row floor take `_fold_rows_np` (the tile group is 1144
-    rows x 16 fields, every turn, every game — the scalar loop was half the
-    serve lane's wall); small groups keep the loop below, unless a whole
+    rows x 16 fields, every turn, every game — the scalar loop would be half
+    the serve lane's wall); small groups keep the loop below, unless a whole
     batch folds at once through `fold_rows_multi`. Same bits every way.
     """
     for i, (_, vals) in enumerate(cols):
@@ -1236,11 +1204,10 @@ def _py(v):
     """Plain-Python view of an extractor value — the extractors return numpy
     scalars/arrays (the fold path's zero-copy contract) and this dump path is
     the one consumer that must json-serialize them."""
-    if _np is not None:
-        if isinstance(v, _np.ndarray):
-            return v.tolist()
-        if isinstance(v, _np.generic):
-            return v.item()
+    if isinstance(v, _np.ndarray):
+        return v.tolist()
+    if isinstance(v, _np.generic):
+        return v.item()
     if isinstance(v, (list, tuple)):
         return [_py(x) for x in v]
     return v
@@ -1307,8 +1274,6 @@ def _fold_ab_check() -> list[str]:
     negatives, floats on both scales, bools, empty row sets, values above
     2^32. One digest arithmetic, two implementations; any split is a bug in
     the numpy path, never a manifest problem."""
-    if _np is None:
-        return []
     cases = [
         ([0], [("exact", [0])]),
         ([3, 7, 11], [("exact", [-1, 0, 2]), ("milli", [0.05, -2.5, 1e6]),

@@ -14,25 +14,21 @@ import { UNITS, UNIT_HP, GDR_DRONE_AA } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { citiesOf, isTerritorial, seatOf, tileSeat } from './seats';
+import { citiesOf, isTerritorial, tileSeat } from './seats';
 import { cityAtIndex, gdrHas, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import { promoFlag, promoValue } from './promotions';
 import { governorTileSum } from './governors';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
-export const CITY_CENTER_AIR_SLOTS = 1;
+const CITY_CENTER_AIR_SLOTS = 1;
 export const AERODROME_AIR_SLOTS = 4;
 
 export function isAirUnit(type: string): boolean {
   return UNITS[type]?.air !== undefined;
 }
 
-export function airUnitsOf(state: GameState, seat: number): Unit[] {
-  return state.units.filter((u) => u.seat === seat && isAirUnit(u.type));
-}
-
 /** every air unit standing at this tile — its base's occupancy. */
-export function airUnitsAt(state: GameState, tileIndex: number): Unit[] {
+function airUnitsAt(state: GameState, tileIndex: number): Unit[] {
   return unitsAt(state, tileIndex).filter((u) => isAirUnit(u.type));
 }
 
@@ -201,17 +197,6 @@ export function airStrikeReaches(state: GameState, unit: Unit, tileIndex: number
   return hexDistance(a.col, a.row, b.col, b.row) <= airRange(unit);
 }
 
-/**
- * What answers an air strike. CIV6: "the attacking unit's Ranged Strength will
- * be matched against the defending unit's Anti-Air Strength (even if its
- * Combat Strength is higher) or Combat Strength if it doesn't have any
- * Anti-Air Strength."
- */
-/**
- * The tiles an air strike may be pointed at, ordered by TILE INDEX ascending
- * and cut to the head's width — the same rule the ring heads use, so both
- * engines agree on what column k means without shipping a list.
- */
 /** CIV6 (Bomber): a bomber "may attack tile improvements and districts",
  *  and what it wrecks is what the ground verb wrecks — the Encampment and a
  *  city centre are the two districts a pillage never reaches. */
@@ -243,6 +228,11 @@ export function airPillageTargets(state: GameState, unit: Unit, width: number): 
   return out;
 }
 
+/**
+ * The tiles an air strike may be pointed at, ordered by TILE INDEX ascending
+ * and cut to the head's width — the same rule the ring heads use, so both
+ * engines agree on what column k means without shipping a list.
+ */
 export function airStrikeTargets(state: GameState, unit: Unit, width: number): number[] {
   const out: number[] = [];
   const here = state.map.tiles[unit.tileIndex];
@@ -348,6 +338,12 @@ export function airCoverAgainst(state: GameState, striker: Unit, tileIndex: numb
   return best;
 }
 
+/**
+ * What answers an air strike. CIV6: "the attacking unit's Ranged Strength will
+ * be matched against the defending unit's Anti-Air Strength (even if its
+ * Combat Strength is higher) or Combat Strength if it doesn't have any
+ * Anti-Air Strength."
+ */
 export function airDefenseOf(
   state: GameState, unit: { type: string; seat: number; tileIndex?: number },
 ): number {
@@ -362,18 +358,4 @@ export function airDefenseOf(
   const t = state.map.tiles[unit.tileIndex];
   if (!t || tileSeat(t) !== unit.seat) return base;
   return base + governorTileSum(state, t, (e) => e.airDefenseCS);
-}
-
-/** the seat's own count of based aircraft, for the training gate's message. */
-export function airCapacityOf(state: GameState, seat: number): { used: number; total: number } {
-  const bases = airBasesOf(state, seat);
-  const total = bases.reduce((n, t) => n + airSlotsAt(state, seat, t), 0);
-  return { used: airUnitsOf(state, seat).length, total };
-}
-
-export function seatAirIsOverbased(state: GameState, seat: number): boolean {
-  const s = seatOf(state, seat);
-  if (!s) return false;
-  const c = airCapacityOf(state, seat);
-  return c.used > c.total;
 }

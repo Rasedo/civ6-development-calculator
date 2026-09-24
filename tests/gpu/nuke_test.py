@@ -34,8 +34,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths, FIXTURES
+from warmup import warm_base, opened
 
 
 # THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
@@ -43,19 +43,10 @@ from warmup import settle_all
 # `_MUTABLE` or a view of one (the `major_unit_*` planes are range views of the
 # merged `unit_*` bases), and the driver's nuke intent is popped by the ladder
 # that reads it, so the restore is the whole of it.
-_BASE: dict = {}
 
 
 def fresh(rules, path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                                  dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+    return warm_base(str(path), lambda: opened(rules, path))
 
 
 def place_mil(sim, seat: int, t: int, type_idx: int, hp: int = 100) -> int:

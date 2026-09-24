@@ -68,9 +68,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   const tileRec = (t: (typeof map.tiles)[number]) => {
     // the static plane ships UNPAVED yields — what the tile would
     // yield without its district — because paving is a runtime mask in every
-    // GPU consumer, and civ-seat centers need their real (district-nulled)
-    // yields live (tileYieldsForCenter). Only t=0 district tiles (capitals)
-    // differ from the old export.
+    // GPU consumer, and city centers need their real (district-nulled)
+    // yields live (tileYieldsForCenter).
     const y = tileYields(ctx, t.district ? { ...t, district: null } : t);
     return {
       y: YIELD_KEYS.map((k) => Math.round(y[k] * 1000) / 1000),
@@ -319,8 +318,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   const ownerInit = map.tiles.map((t) => tileCity(t));
 
   return {
-    // 4: `du` no longer refuses floodplains (GS builds districts on them), so
-    // a format-3 fixture would silently hold a narrower placement surface.
+    // 4: `du` admits floodplains (GS builds districts on them), a wider
+    // placement surface than a format-3 fixture holds.
     format: 4,
     seed: world.gen.seed,
     width: map.width,

@@ -54,7 +54,7 @@ const CLEARABLE_FEATURES = clearableFeatures();
 interface Vote { seat: number; outcome: number; target: number; weight: number }
 
 /** Mercenary Companies names a CURRENCY, in this order on both engines. */
-export const CONGRESS_CURRENCIES = ['gold', 'faith'] as const;
+const CONGRESS_CURRENCIES = ['gold', 'faith'] as const;
 export const CONGRESS_CUR_GOLD = 0;
 export const CONGRESS_CUR_FAITH = 1;
 
@@ -74,10 +74,8 @@ export interface CongressVoterCtx {
 
 /** The DIPLOMATIC VICTORY resolution's slot in the vote head — the always-3rd
  * resolution, which stands outside the two-slot rotating slate. */
-export const CONGRESS_DV_SLOT = 2;
+const CONGRESS_DV_SLOT = 2;
 
-/** Argmax with ties to the LOWER index — the shared tie rule of every
- * congress scan on both engines. */
 /** every device a seat holds, across the catalog — what Arms Control compares
  *  when it names a target. */
 function wmdTotal(sx: Seat): number {
@@ -103,6 +101,8 @@ function armsControl(state: GameState, outcome: number, target: number): void {
   }
 }
 
+/** Argmax with ties to the LOWER index — the shared tie rule of every
+ * congress scan on both engines. */
 function argmaxLow(counts: readonly number[]): number {
   let best = -Infinity, at = 0;
   for (let i = 0; i < counts.length; i++) if (counts[i] > best) { best = counts[i]; at = i; }

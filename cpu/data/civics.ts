@@ -554,7 +554,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockGovernment', government: 'FASCISM' },
     ]),
 
-
     C('MILITARY_TRAINING', 'Military Training', 'Classical', 120, ['MILITARY_TRADITION', 'GAMES_AND_RECREATION'], [
       { kind: 'unlockPolicy', policy: 'VETERANCY' },
     ]),
@@ -590,8 +589,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'LEVEE_EN_MASSE' },
     ]),
     // Expansion2_Policies.xml: ECONOMIC_UNION and FIVE_YEAR_PLAN both carry
-    // PrereqCivic CIVIC_IDEOLOGY — not Suffrage and Class Struggle, where this
-    // catalog hung them until #264.
+    // PrereqCivic CIVIC_IDEOLOGY, not Suffrage or Class Struggle.
     C('IDEOLOGY', 'Ideology', 'Modern', 1640, ['MASS_MEDIA', 'MOBILIZATION'], [
       { kind: 'unlockPolicy', policy: 'ECONOMIC_UNION' },
       { kind: 'unlockPolicy', policy: 'FIVE_YEAR_PLAN' },

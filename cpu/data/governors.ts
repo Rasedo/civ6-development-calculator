@@ -21,7 +21,7 @@ type Yields = Partial<Record<YieldKey, number>>;
 
 export type GovernorId = 'REYNA' | 'VICTOR' | 'AMANI' | 'MAGNUS' | 'MOKSHA' | 'LIANG' | 'PINGALA';
 
-export interface GovernorDef {
+interface GovernorDef {
   id: GovernorId;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
@@ -221,7 +221,7 @@ export const promotionBitValue = (index: number): number => 2 ** index;
 export const promotionBit = (mask: number, index: number): boolean =>
   Math.floor(mask / 2 ** index) % 2 === 1;
 
-export interface GovernorPromotionDef {
+interface GovernorPromotionDef {
   id: string;
   name: string;
   governor: GovernorId;
@@ -700,7 +700,6 @@ export const GOVERNOR_DEFAULT_PROMOTION: readonly number[] = GOVERNORS.map((g) =
 
 /**
  * CIV6 (Governor): the thirteen civics that "will grant 1 Governor Title".
- * The ladder they replace was this model's own invention.
  */
 export const GOVERNOR_TITLE_CIVICS: readonly string[] = [
   'STATE_WORKFORCE', 'EARLY_EMPIRE', 'DEFENSIVE_TACTICS', 'RECORDED_HISTORY',

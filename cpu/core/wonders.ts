@@ -6,7 +6,7 @@ import type { City, GameState } from './types';
  *  table is in, which is the order the GPU folds its per-wonder products in. */
 const WONDER_CATALOG_ORDER = new Map(Object.keys(BUILT_WONDERS).map((id, i) => [id, i]));
 
-export interface HeldWonder {
+interface HeldWonder {
   def: BuiltWonderDef;
   tileIndex: number;
   idx: number;

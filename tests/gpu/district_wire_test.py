@@ -31,14 +31,11 @@ import torch
 _ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_ROOT / "gpu"))
 sys.path.insert(0, str(_ROOT / "policy"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
-from warmup import settle_all
+from core import load_rules, fixture_paths  # noqa: E402
+from warmup import warm_base, opened
 import drive  # noqa: E402
 import ladder  # noqa: E402
 from core import records  # noqa: E402
-
-
-_BASE: dict = {}
 
 
 def build(rules, path, turns=25):
@@ -47,12 +44,8 @@ def build(rules, path, turns=25):
     milliseconds, and `restore` round-trips every `_MUTABLE` plane — which is
     everything these scenes write except `tile_ftu` (section 5 puts that one
     back by hand)."""
-    key = (str(path), turns)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        # Unlock the scaffold for every row: districts gate on techs/civics and an
-        # undriven world researches nothing — the TILE WIRE, not the unlock, is
-        # what this lane proves.
+    def make():
+        sim = opened(rules, path)
         for _di, ut, uc, _plc, _fc in sim._scaffold:
             if ut >= 0:
                 sim.civ_techs[:, :, ut] = True
@@ -60,10 +53,8 @@ def build(rules, path, turns=25):
                 sim.civ_civics[:, :, uc] = True
         for _ in range(turns):
             sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+        return sim
+    return warm_base((str(path), turns), make)
 
 
 def _live_city(sim):

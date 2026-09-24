@@ -258,7 +258,7 @@ describe('the Space Station', () => {
   });
 });
 
-// AUDIT B-22r: the World Games' and the Space Station's EXTRA rewards ride the
+// The World Games' and the Space Station's EXTRA rewards ride the
 // seat's permanent run — CIV6 (EmergencyRewards): the winner's own row, then
 // the top quarter's (the winner included) and the next quarter's.
 describe("the podium's permanent rewards", () => {

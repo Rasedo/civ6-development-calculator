@@ -36,18 +36,15 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 import json
 
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths, FIXTURES
+from warmup import opened
 
 B0 = 0
 RESEARCH, CULTURAL, ECONOMIC, MILITARY, RELIGIOUS = 0, 1, 2, 3, 4
 
 
 def build(rules, path) -> BatchSim:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(4):
-        sim.step()
-    return sim
+    return opened(rules, path, 4)
 
 
 def ally_pair(sim, a: int, b: int, ty: int, qp: int = 0) -> None:

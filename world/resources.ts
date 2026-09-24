@@ -96,12 +96,6 @@ export const RESOURCES: Record<string, ResourceDef> = {
   WHALES: { id: 'WHALES', name: 'Whales', category: 'luxury', yields: { production: 1, gold: 1 }, improvement: 'FISHING_BOATS', terrains: ['COAST'], elevations: FLAT },
 };
 
-export const RESOURCE_CATEGORY_COLORS: Record<ResourceCategory, string> = {
-  bonus: '#c8d6b9',
-  luxury: '#8e6fb0',
-  strategic: '#c97a4a',
-};
-
 /** the LUXURY rows in catalog order — the one shared order every luxury
  *  index rides: the tile plane's `lux`, and the Congress target space. */
 export const LUXURY_IDS = Object.values(RESOURCES)

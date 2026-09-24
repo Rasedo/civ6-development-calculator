@@ -1,4 +1,4 @@
-"""The Great Person CHANNEL clauses (AUDIT B-61r, batch A) — gate-unreachable.
+"""The Great Person CHANNEL clauses — gate-unreachable.
 
     python tests/gpu/gp_channels_test.py
 
@@ -24,17 +24,14 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import load_rules, fixture_paths, FIXTURES
+from warmup import opened
 
 B0 = 0
 
 
 def build(rules, path, steps: int = 8):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(steps):
-        sim.step()
-    return sim
+    return opened(rules, path, steps)
 
 
 def put_district(sim, row: int, j: int, di: int, within: int = 2) -> int:

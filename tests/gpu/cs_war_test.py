@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
 import drive
 from core import BatchSim, load_rules, load_fixture, fixture_paths, neutral
-from core.engine import _MUTABLE
+from core.simbase import _MUTABLE
 from warmup import settle_all
 
 

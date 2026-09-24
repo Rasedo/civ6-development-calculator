@@ -58,7 +58,7 @@ def main() -> None:
     assert rr["prophetCls"] == 3, f"prophetCls must stay 3, got {rr['prophetCls']}"
 
     # --- belief catalog counts + Enhancer slot -----------------------------
-    # the pools after #264: Oral Tradition, Church Property, Crusade and
+    # the pools: Oral Tradition, Church Property, Crusade and
     # Messenger of the Gods are not in the Gathering Storm install
     assert rr["pantheonPool"] == 24, f"pantheons: {rr['pantheonPool']}"
     assert rr["followerPool"] == 9, f"followers: {rr['followerPool']}"
@@ -85,7 +85,7 @@ def main() -> None:
     assert sim.civ_enhancer_done[:, 1:].shape == sim.civ_religion_done[:, 1:].shape
     assert bool((sim.civ_enhancer[:, 1:] == -1).all()) and int(sim.claimed_e_n.sum()) == 0, "fresh: no enhancer claimed"
     # The k-th-open picker (the exact inline arithmetic of the enhancer claim):
-    # the pool is five rows after #264: with idx 1 & 4 pre-claimed the open
+    # the pool is five rows: with idx 1 & 4 pre-claimed the open
     # ids are {0,2,3}; a draw giving k = 1 selects the 2nd open id = idx 2.
     ec = sim.enh_claimed.clone()
     ec[0, 1] = True

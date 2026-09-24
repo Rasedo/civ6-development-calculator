@@ -156,7 +156,7 @@ def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
         assert u["mask"] == ctx["mask"][b, k].nonzero(as_tuple=True)[0].tolist(), \
             f"{where}: unit {k}.mask {u['mask']} vs the unit mask's open columns"
         live["mask"] += len(u["mask"])
-        cls = int(sim._gp_cls_of(torch.tensor([u["type"]]))[0]) if getattr(sim, "_A_GP", -1) >= 0 else -1
+        cls = int(sim._gp_cls_of(torch.tensor([u["type"]]))[0]) if sim._A_GP >= 0 else -1
         if cls >= 0 and u["gpAt"] >= 0:
             at = min(u["gpAt"], sim._gp_site.shape[1] - 1)
             assert (u["gpSite"], u["gpArg"]) == (int(sim._gp_site[cls, at]), int(sim._gp_site_district[cls, at])), \

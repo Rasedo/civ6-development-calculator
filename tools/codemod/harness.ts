@@ -1,17 +1,14 @@
 /**
- * ts-morph codemod harness (task #56).
+ * ts-morph codemod harness.
  *
- * WHY THIS EXISTS. Codemods here were `str.replace` scripts that asserted an
- * anchor count and wrote the file. Two failure modes cost real gate time:
+ * WHY AN AST HARNESS and not `str.replace` scripts. Two failure modes:
  *
- *   1. DEFERRED WRITE + EAGER PRINT. Scripts that edit one big file accumulate
- *      into a string and write once at the end. A later anchor missed (a
- *      non-ASCII arrow), the assert raised, NOTHING was written — but the
- *      earlier edits had already PRINTED as applied. A 10-minute parity gate
- *      then failed on a bug whose fix was never on disk.
+ *   1. DEFERRED WRITE + EAGER PRINT. A script that edits one big file
+ *      accumulates into a string and writes once at the end. An anchor miss
+ *      half-way raises before the write, and the edits that already PRINTED
+ *      as applied were never on disk.
  *   2. TEXT ANCHORS. A 400-character import line is a terrible anchor: it
- *      changes every time anyone adds a symbol, so half these scripts carried
- *      a full copy of it as `old` and another as `new`.
+ *      changes every time anyone adds a symbol.
  *
  * THE RULE THIS HARNESS ENFORCES: the word "applied" is only ever printed by
  * `commit()`, after the bytes have been written AND read back AND compared.

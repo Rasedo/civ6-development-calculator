@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
+from . import simbase
 
 
 class SimOrders:
@@ -28,8 +27,8 @@ class SimOrders:
         # TS replays a seat's orders one unit at a time against LIVE state
         # (`applySeatUnitOrders` -> `foundCity` writes `ownerSeat`, and the
         # next unit's improvement verb reads it), so a founding, a culture
-        # bomb or a capture at rank k must be ownership at rank k+1. Read
-        # once before the loop it was not (AUDIT A-5; poke
+        # bomb or a capture at rank k must be ownership at rank k+1, which
+        # one read before the loop is not (poke
         # tests/gpu/applier_live_ownership_test.py).
         # Which RANKS are worth opening at all, decided once over the whole
         # [B, UNIT_SLOTS] block: the slot map and the action block are both
@@ -58,40 +57,40 @@ class SimOrders:
         # guard-sync storm into this ONE sync.
         _ab = torch.where(_cmd, actions[:, :_n], torch.full_like(actions[:, :_n], -1))
         _no = torch.zeros_like(_cmd)
-        _fc = getattr(self, "_A_FOUND", -1)
-        _sn = getattr(self, "_A_SNIPE", -1) if getattr(self, "_snipe_on", False) else -1
-        _sn3 = getattr(self, "_A_SNIPE3", -1) if getattr(self, "_snipe3_on", False) else -1
-        _sp = getattr(self, "_A_SPREAD", -1)
-        _xc = getattr(self, "_A_EXCAVATE", -1)
-        _pk = getattr(self, "_A_PARK", -1)
-        _pm = getattr(self, "_A_PROMOTE", -1)
-        _cn = getattr(self, "_A_CONDEMN", -1)
-        _hx = getattr(self, "_A_HERESY", -1)
-        _lq = getattr(self, "_A_INQUISITION", -1)
-        _hn = getattr(self, "_A_HEATHEN", -1)
-        _ug = getattr(self, "_A_UPGRADE", -1)
-        _ar = getattr(self, "_A_AIR_STRIKE", -1)
-        _apc = getattr(self, "_A_AIR_PILLAGE", -1)
-        _rbc = getattr(self, "_A_REBASE", -1)
+        _fc = self._A_FOUND
+        _sn = self._A_SNIPE if self._snipe_on else -1
+        _sn3 = self._A_SNIPE3 if self._snipe3_on else -1
+        _sp = self._A_SPREAD
+        _xc = self._A_EXCAVATE
+        _pk = self._A_PARK
+        _pm = self._A_PROMOTE
+        _cn = self._A_CONDEMN
+        _hx = self._A_HERESY
+        _lq = self._A_INQUISITION
+        _hn = self._A_HEATHEN
+        _ug = self._A_UPGRADE
+        _ar = self._A_AIR_STRIKE
+        _apc = self._A_AIR_PILLAGE
+        _rbc = self._A_REBASE
         _asw = self._air_strike_cols
         _rbw = self._air_rebase_cols
-        _stc = getattr(self, "_A_SPY_TRAVEL", -1)
-        _smc = getattr(self, "_A_SPY_MISSION", -1)
-        _rdc = getattr(self, "_A_ROAD", -1)
-        _rrc = getattr(self, "_A_RAIL", -1)
-        _cfc = getattr(self, "_A_CLEAN", -1)
-        _nkc = getattr(self, "_A_NUKE", -1)
-        _hvc = getattr(self, "_A_HARVEST", -1)
-        _wcc = getattr(self, "_A_WONDER_CHARGE", -1)
-        _ptc = getattr(self, "_A_PORTAL", -1)
+        _stc = self._A_SPY_TRAVEL
+        _smc = self._A_SPY_MISSION
+        _rdc = self._A_ROAD
+        _rrc = self._A_RAIL
+        _cfc = self._A_CLEAN
+        _nkc = self._A_NUKE
+        _hvc = self._A_HARVEST
+        _wcc = self._A_WONDER_CHARGE
+        _ptc = self._A_PORTAL
         _nkw = self._nuke_cols * self._n_devices
-        _fnc = getattr(self, "_A_FINISH", -1)
-        _gpc = getattr(self, "_A_GP", -1)
-        _pfc = getattr(self, "_A_PERFORM", -1)
-        _bpc = getattr(self, "_A_BOOST", -1)
-        _fuc = getattr(self, "_A_FORM_UP", -1)
-        _ecc = getattr(self, "_A_ESCORT", -1)
-        _uec = getattr(self, "_A_UNESCORT", -1)
+        _fnc = self._A_FINISH
+        _gpc = self._A_GP
+        _pfc = self._A_PERFORM
+        _bpc = self._A_BOOST
+        _fuc = self._A_FORM_UP
+        _ecc = self._A_ESCORT
+        _uec = self._A_UNESCORT
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
@@ -101,10 +100,10 @@ class SimOrders:
         # arriving mid-call still rebuilds it.
         _cart_fp = torch.zeros(0, dtype=torch.bool, device=dev)
         _cart = _cart_fp
-        _ic = [c for c in getattr(self, "_A_IMP", []) if c >= 0]
-        if getattr(self, "_A_REPAIR", -1) >= 0:
+        _ic = [c for c in self._A_IMP if c >= 0]
+        if self._A_REPAIR >= 0:
             _ic.append(self._A_REPAIR)
-        if getattr(self, "_A_REMOVE_IMP", -1) >= 0:
+        if self._A_REMOVE_IMP >= 0:
             _ic.append(self._A_REMOVE_IMP)
         _tab = torch.stack([
             _held.any(dim=0),
@@ -114,7 +113,7 @@ class SimOrders:
             ((_ab == _fc) if _fc >= 0 else _no).any(dim=0),                     # found
             ((((_ab >= _sn) & (_ab < _sn + 12)) if _sn >= 0 else _no)
              | (((_ab >= _sn3) & (_ab < _sn3 + 18)) if _sn3 >= 0 else _no)).any(dim=0),  # snipe
-            ((_ab == getattr(self, "_A_CHOP", -1)) if getattr(self, "_A_CHOP", -1) >= 0 else _no).any(dim=0),
+            ((_ab == self._A_CHOP) if self._A_CHOP >= 0 else _no).any(dim=0),
             (torch.isin(_ab, torch.tensor(_ic, dtype=_ab.dtype, device=dev)) if _ic else _no).any(dim=0),
             ((_ab == self._A_PILLAGE) if self._act_names and self._A_PILLAGE > 0 else _no).any(dim=0),
             (((_ab >= _sp) & (_ab < _sp + 7)) if _sp >= 0 else _no).any(dim=0),  # spread
@@ -339,7 +338,7 @@ class SimOrders:
                     if bool(okc.any()):
                         self._condemn_heretic(row, okc, ctc, rel, sc)
 
-            if _rk_heresy[n] and _hx >= 0 and getattr(self, "_inquisitor_idx", -1) >= 0:
+            if _rk_heresy[n] and _hx >= 0 and self._inquisitor_idx >= 0:
                 _cslot = self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1)
                 hxm = (act & (a == _hx) & (utp == self._inquisitor_idx) & (u_charges > 0)
                        & (_cslot >= 0)
@@ -366,7 +365,7 @@ class SimOrders:
                     self.unit_charges[hr, sc[hr]] -= 1
                     self.unit_mp[hr, sc[hr]] = 0
 
-            if _rk_inquis[n] and _lq >= 0 and getattr(self, "_apostle_idx", -1) >= 0:
+            if _rk_inquis[n] and _lq >= 0 and self._apostle_idx >= 0:
                 lqm = (act & (a == _lq) & (utp == self._apostle_idx)
                        & (u_charges >= self._launch_inquisition_charges)
                        & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row)
@@ -654,10 +653,8 @@ class SimOrders:
                 dirs = a.clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
-                # ONE call with the mover's own class flags. It used to be two,
-                # chosen by a `where`, to skip the civilian plane on ranks with
-                # no civilian moving; a third class would have made that three,
-                # and the rule already takes per-unit tensors.
+                # ONE call with the mover's own class flags: the rule takes
+                # per-unit tensors, so no class needs a call of its own.
                 is_nav = self.unit_naval[ut]
                 blocked = self._blocked_for(
                     tgt.unsqueeze(1), row, is_naval=is_nav,
@@ -673,8 +670,7 @@ class SimOrders:
                 _wet = self.wpass.gather(1, _tc1).squeeze(1)
                 # ONE enterable-water plane for both readers: a HULL floats
                 # over it and through a Canal's passage, and an embarked LAND
-                # unit takes the same water without the passage. It used to be
-                # gathered and re-ANDed twice.
+                # unit takes the same water without the passage.
                 _water = _wet & (~self.ocean_tile.gather(1, _tc1).squeeze(1) | cart)
                 # CIV6 (Leif Erikson): the HULL's ocean gate widens, the embarked
                 # land unit's does not — read live, a spend at an earlier rank
@@ -715,7 +711,7 @@ class SimOrders:
                 # that body at all, so a log inside it can only ever print the
                 # steps that succeeded. This is where `ok` is decided, and it
                 # is the twin of the `tileFreeForUnit` gate TS logs at.
-                if getattr(self, "_log_diff", False):
+                if self._log_diff:
                     for _sb in range(self.B):
                         if not bool(mv[_sb]) or int(tgt[_sb]) < 0 or int(here[_sb]) < 0:
                             continue
@@ -853,7 +849,7 @@ class SimOrders:
                         # when it fired.
                         self._hostile_ranged_strike(one, tgt_s, "major", v, row=row)
 
-                if getattr(self, "_A_SNIPE3", -1) >= 0:
+                if self._A_SNIPE3 >= 0:
                     snp3 = act & (a >= self._A_SNIPE3) & (a < self._A_SNIPE3 + 18) & ~is_civ
                     if bool(snp3.any()):
                         tgt_3 = self.ring3[hc].gather(1, (a - self._A_SNIPE3).clamp(min=0, max=17).unsqueeze(1)).squeeze(1)
@@ -1124,9 +1120,9 @@ class SimOrders:
                 # REMOVE_IMPROVEMENT — CIV6 (Builder / Military Engineer):
                 # "Can Remove Tile Improvements (costs no charge)". GONE, not
                 # pillaged; based aircraft scatter; the turn is spent.
-                if getattr(self, "_A_REMOVE_IMP", -2) in _acmd:
+                if self._A_REMOVE_IMP in _acmd:
                     _rmv = (
-                        act & (a == getattr(self, "_A_REMOVE_IMP", -2))
+                        act & (a == self._A_REMOVE_IMP)
                         & (((utp == self._builder_idx) if self._builder_idx >= 0
                             else torch.zeros_like(act))
                            | ((utp == self._eng_idx) if self._eng_idx >= 0
@@ -1334,7 +1330,7 @@ class SimOrders:
                     _relig = torch.zeros_like(spx)
                     if self._missionary_idx >= 0:
                         _relig = _relig | (utp == self._missionary_idx)
-                    if getattr(self, "_apostle_idx", -1) >= 0:
+                    if self._apostle_idx >= 0:
                         _relig = _relig | (utp == self._apostle_idx)
                     dsp = (a - self._A_SPREAD).clamp(min=0)
                     tgt_sp = torch.where(
@@ -1504,7 +1500,7 @@ class SimOrders:
             self._grievance_cs_taken(
                 row, torch.full_like(_one, int(self.city_alive[b, row].sum()) >= max_cities), _one)
             # A route dies with its endpoint, for WHICHEVER seat holds it — the
-            # minor is encoded -(2+s) in every row's dest column, seat 0's too.
+            # minor is encoded -(2+s) in every row's dest column.
             dead_cs = self.seat_routes[b, :, :, 1] == -(2 + s)  # [NS, K]
             self.seat_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.seat_routes[b], -1), self.seat_routes[b])
             self.seat_route_dseat[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dseat[b], -1), self.seat_route_dseat[b])
@@ -1656,7 +1652,7 @@ class SimOrders:
         mine = self.unit_alive & (self.unit_seat == row)
         upkeep = (self._unit_upkeep(row, self.unit_type) * mine.to(self.dtype)).sum(dim=1)
         upkeep = upkeep + self._wmd_upkeep(row)
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _b in range(self.B):
                 self._diff_events.setdefault(_b, []).append(
                     f"up:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
@@ -1882,10 +1878,11 @@ class SimOrders:
             rows = any_near.nonzero(as_tuple=True)[0]
             guard[rows, first[rows]] = True
 
-        # Raiders act in unit order: attack something adjacent (a seat-0 city,
-        # any hostile unit, or a civ city; lowest tile index first, as
-        # attackTargets scans the map), else march toward the nearest seat-0
-        # city. Slots resolve sequentially like the TS loop, so a second raider
+        # Raiders act in unit order: attack something adjacent (any city
+        # centre, major or minor, any non-barbarian unit, or an Encampment;
+        # lowest tile index first, as attackTargets scans the map), else
+        # pillage where they stand, else march toward the nearest city of any
+        # seat. Slots resolve sequentially like the TS loop, so a second raider
         # hitting the same target sees the first one's damage.
         u_high = int(self.next_slot.max().item())
         arange6 = torch.arange(6, device=dev)
@@ -2014,18 +2011,17 @@ class SimOrders:
             # A RANGED raider strikes instead: hostileUnitAct routes any
             # UNITS[type].ranged attacker through hostileRangedStrike — ONE
             # roll, no retaliation, no advance, civilians take the roll, and a
-            # seat-0 city floors at 1 HP and is never captured. The method
-            # spends the turn itself; a row that reaches only an ungarrisoned
-            # CIV centre (TS `enemyCity` resolves to seat-0 cities only) spends
-            # nothing, but `attack` still HOLDS the unit, because TS returns
-            # from hostileUnitAct before the pillage/march branches.
+            # city centre floors at 1 HP and is never captured. The method
+            # spends the turn itself; a row whose strike resolves no target
+            # spends nothing, but `attack` still HOLDS the unit, because TS
+            # returns from hostileUnitAct before the pillage/march branches.
             rng_att = attack & rngd
             if any_rngd and bool(rng_att.any()):
                 self._hostile_ranged_strike(rng_att, ttc, "barb", u)
 
             # `isTerritorial` — owned by any major OR city-state. ONE read for
             # both wreck arms: only `pillaged` is written between them, never
-            # `tile_seat`, so the two reads were always the same answer.
+            # `tile_seat`, so both arms read the same answer.
             _h_seat = self.tile_seat.gather(1, _here1).squeeze(1)
             # `isTerritorial`: a major's, a city-state's OR the Free Cities' ground
             # (seed 9092 t137: a raider beside a Free City's Campus)

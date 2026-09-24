@@ -18,28 +18,18 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import load_rules, fixture_paths
+from warmup import warm_base, opened
 
 
 # THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
 # instead of a fixture load, a settle and three steps. Every plane these pokes
 # write is in `_MUTABLE`, so the restore is the whole of it.
-_BASE: dict = {}
 
 
 def build(rules):
     path = fixture_paths()[0]
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules,
-                                  device="cpu", dtype=torch.float64))
-        for _ in range(3):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
+    sim = warm_base(str(path), lambda: opened(rules, path, 3))
     assert sim.S > 0, "fixture has no city-state"
     return sim
 

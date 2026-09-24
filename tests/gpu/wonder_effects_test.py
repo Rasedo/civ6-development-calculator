@@ -21,8 +21,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import load_rules, fixture_paths, FIXTURES
+from warmup import warm_base, opened
 
 
 def _find(rows, pred, what):
@@ -45,24 +45,16 @@ def plant(sim, row: int, col: int, wi: int) -> int:
     return tile
 
 
-# THE WARMED BASE, ONE PER FIXTURE. Every block below used to build an engine
-# of its own — a fixture load and a settle apiece — where a `restore` costs
-# milliseconds. Everything the blocks write (`city_wonder`, `built_wonder`,
+# THE WARMED BASE, ONE PER FIXTURE. Every block below pays a `restore`, which
+# costs milliseconds, instead of a fixture load and a settle apiece. Everything the blocks write (`city_wonder`, `built_wonder`,
 # `built_wonder_complete`, the district registry, `improvement` / `pillaged`,
 # `civ_techs` / `civ_civics` / `civ_tech_boosted`, `civ_gpp`, the city queue
 # and the merged unit pool) is `_MUTABLE` and rides the snapshot, and no block
 # reads an earlier block's engine once the next one is asked for.
-_BASE: dict = {}
 
 
 def build(rules, path):
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+    return warm_base(str(path), lambda: opened(rules, path))
 
 
 def main() -> None:

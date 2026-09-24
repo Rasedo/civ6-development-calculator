@@ -14,7 +14,7 @@
   "pythonVersion": "3.14",
   "typeCheckingMode": "basic",
   "reportMissingImports": "warning",
-  "//": "ADOPTED as a battery lane (#79, 2026-08-09), basic mode, 0 errors enforced. Silenced families, each a documented idiom not a bug class: reportAttributeAccessIssue (BatchSim's setattr-created tensor planes), reportArgumentType (the Rules(**{...}) splat + tensor kwargs), reportOperatorIssue (the conceded conditionally-bound-locals limitation - the task text itself notes pyright cannot see them), reportOptional* (the lazy-None-cache idiom + subprocess PIPE stdin), reportReturnType/reportCallIssue/reportAssignmentType (tensor-typing gaps). Everything else - undefined names, self/cls, redeclarations, index issues - is LIVE and red turns the battery red.",
+  "//": "A battery lane: basic mode, 0 errors enforced. Silenced families, each a documented idiom not a bug class: reportAttributeAccessIssue (BatchSim's setattr-created tensor planes), reportArgumentType (the Rules(**{...}) splat + tensor kwargs), reportOperatorIssue (conditionally-bound locals, which pyright cannot see), reportOptional* (the lazy-None-cache idiom + subprocess PIPE stdin), reportReturnType/reportCallIssue/reportAssignmentType (tensor-typing gaps). Everything else - undefined names, self/cls, redeclarations, index issues - is LIVE and red turns the battery red.",
   "reportAttributeAccessIssue": "none",
   "reportArgumentType": "none",
   "reportOperatorIssue": "none",

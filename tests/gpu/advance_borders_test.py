@@ -34,18 +34,15 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import opened
 
 B0 = 0
 ATT, OWNER = 0, 1          # attacker seat row, and the seat that owns the ground
 
 
 def build(rules, path) -> BatchSim:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(12):
-        sim.step()
-    return sim
+    return opened(rules, path, 12)
 
 
 def place(sim, tile: int, seat: int, utype: int = 2, hp: int = 100, civilian: bool = False) -> int:

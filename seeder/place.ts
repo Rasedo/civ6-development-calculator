@@ -1,7 +1,7 @@
 /**
  * PLACEMENT — where the civs and city-states START. Policy "spaced-balanced@1".
  *
- * Civ 6 shape (#71): a major civ starts with a SETTLER and a WARRIOR on its
+ * Civ 6 shape: a major civ starts with a SETTLER and a WARRIOR on its
  * start tile, NOT a pre-founded capital. City-states stay founded cities.
  *
  * The rules, and nothing else:

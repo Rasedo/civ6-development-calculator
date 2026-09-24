@@ -16,7 +16,7 @@ import { captureCityStateFor } from './combat';
 import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
-  gpChargesOf, gpEffectOf, gpSiteOf, personWorkObjects,
+  gpEffectOf, gpSiteOf, personWorkObjects,
   type GpEffect, type GpSite, type GreatPersonDef,
 } from '../data/greatPeople';
 import { gwCountsByObj, gwHasRoom, placeGreatWork } from './greatWorks';
@@ -39,7 +39,7 @@ import { xpToNextLevel } from './promotions';
 import { logXpWrite } from './difflog';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
-export function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
+function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
   return (GP_CLASSES as readonly string[]).includes(unit.type)
     ? (unit.type as GreatPersonClass)
     : undefined;
@@ -52,7 +52,7 @@ export function gpPersonOf(unit: { type: string; gpAt?: number }): GreatPersonDe
 
 /** the seat's city that owns this tile, falling back to its capital — the
  *  city an ability scoped to "this city" applies to. */
-export function gpCityAt(state: GameState, seat: number, tile: Tile): City | undefined {
+function gpCityAt(state: GameState, seat: number, tile: Tile): City | undefined {
   const own = cityAtTile(state, tile);
   if (own && own.seat === seat) return own;
   return citiesOf(state, seat).find((c) => c.isCapital);
@@ -435,5 +435,3 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   if ((unit.charges ?? 0) <= 0) disbandUnit(state, unit.id);
   return true;
 }
-
-export { gpChargesOf };

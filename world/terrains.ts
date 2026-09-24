@@ -7,7 +7,7 @@
 
 import type { TerrainId, Yields } from './types';
 
-export interface TerrainDef {
+interface TerrainDef {
   id: TerrainId;
   name: string;
   water: boolean;
@@ -81,4 +81,3 @@ export const TERRAINS: Record<TerrainId, TerrainDef> = {
 };
 
 export const HILLS_YIELDS: Partial<Yields> = { production: 1 };
-export const MOUNTAIN_COLOR = '#8b8b82';

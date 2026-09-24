@@ -8,7 +8,7 @@
 import type { GameState, Tile, Unit } from './types';
 import { neighbors } from '../../world/hex';
 import {
-  PROMOTIONS, PROMO_INDEX, PROMO_OFFER_DRAW, UNIT_PROMO_CLASS, classBitOf, promoRows,
+  PROMO_OFFER_DRAW, UNIT_PROMO_CLASS, classBitOf, promoRows,
   type PromoDef, type PromoKind,
 } from '../data/promotions';
 import { UNIT_HP, UNITS } from '../data/units';
@@ -41,7 +41,6 @@ export const XP_INITIATOR = 1;
 export const XP_CITY_ATTACK = 3;
 export const XP_CITY_DEFEND = 2;
 export const XP_CITY_FELLED = 10;
-export const XP_CITY_CAPTURE = 10;
 /** CIV6: fighting Barbarians "only obeys the XP rules up until the units
  *  reach level 2... Afterward, every battle against Barbarians and Free City
  *  units only grants 1 XP". */
@@ -156,7 +155,7 @@ export function promoReady(unit: { level?: number; xp?: number; type: string }):
   return need > 0 && (unit.xp ?? 0) >= need;
 }
 
-export function hasPromo(unit: { promos?: number; type: string }, id: string): boolean {
+function hasPromo(unit: { promos?: number; type: string }, id: string): boolean {
   const rows = unitPromoRows(unit);
   const k = rows.findIndex((p) => p.id === id);
   return k >= 0 && ((unit.promos ?? 0) & (1 << k)) !== 0;
@@ -388,10 +387,3 @@ export function takePromotion(unit: Unit, k: number): boolean {
   }
   return true;
 }
-
-/** the catalog index a promotion id occupies, for the rules export. */
-export function promoCatalogIndex(id: string): number {
-  return PROMO_INDEX[id] ?? -1;
-}
-
-export { PROMOTIONS };

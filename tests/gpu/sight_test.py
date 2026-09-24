@@ -3,7 +3,7 @@ LOS scenes are the TS twin).
 
     python tests/gpu/sight_test.py
 
-Measured 2026-09-13 in the live game (ask 11): a tile on the ray hides
+Measured in the live game (ask 11): a tile on the ray hides
 everything behind it iff its SightThroughModifier sum EXCEEDS the observer's
 SightModifier; a hill adds height, never range; Sentry sees through features.
 """

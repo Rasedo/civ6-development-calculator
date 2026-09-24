@@ -63,7 +63,7 @@ describe('fog of war', () => {
 });
 
 describe('sight is occlusion by elevation (ask 11)', () => {
-  // measured 2026-09-13 in the live game: a tile on the ray hides everything
+  // measured in the live game: a tile on the ray hides everything
   // behind it iff its SightThroughModifier sum EXCEEDS the observer's own
   // SightModifier; a hill adds height, never range; Sentry sees through features
   function flatRow() {

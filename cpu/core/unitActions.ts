@@ -23,7 +23,6 @@ export const AIR_REBASE_COLS = 6;
  *  index ascending — the AIR_STRIKE head's contract, one head per device. */
 export const NUKE_COLS = 12;
 
-
 export function unitActionNames(improvementIds: readonly string[]): string[] {
   const names: string[] = [];
   for (let d = 0; d < 6; d++) names.push(`MOVE_${d}`); // 0-5
@@ -149,13 +148,7 @@ export function unitActionIndex(improvementIds: readonly string[]): Record<strin
   return out;
 }
 
+/** the BUILD column of improvement `i` (its index in IMPROVEMENT_IDS). */
 export function buildColumnOf(i: number): number {
   return i < DEDICATED_IMPROVEMENTS ? 13 + i : 18 + (i - DEDICATED_IMPROVEMENTS);
-}
-
-export function improvementOfColumn(a: number, nImp: number): number {
-  if (a >= 13 && a < 13 + DEDICATED_IMPROVEMENTS) return a - 13;
-  const hi = 18 + (nImp - DEDICATED_IMPROVEMENTS);
-  if (a >= 18 && a < hi) return DEDICATED_IMPROVEMENTS + (a - 18);
-  return -1;
 }

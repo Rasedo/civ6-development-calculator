@@ -23,7 +23,7 @@ import { xml, type SrcMap } from './provenance';
 /** CIV6 (BuildingReplaces): a civilization's UNIQUE BUILDING standing in for
  *  this row — the same building in storage, plus the clauses only it
  *  carries (the Stave Church). */
-export interface BuildingVariant {
+interface BuildingVariant {
   civ: CivId;
   name: string;
   /**
@@ -560,9 +560,8 @@ const rawList: BuildingDef[] = [
   // CIV6: the install writes the Lighthouse NO Building_YieldChanges row at
   // all. Its Food is the LIGHTHOUSE_COAST_FOOD plot modifier (YIELD_FOOD
   // Amount 1 under PLOT_HAS_COAST_REQUIREMENTS) — the `special` below, paid
-  // per WORKED Coast/Lake tile in city.ts. The flat `food: 1` this row used to
-  // carry was that same fact a second time, and the `gold: 1` beside it had no
-  // install row of any kind.
+  // per WORKED Coast/Lake tile in city.ts, so the row itself carries no flat
+  // yield.
   { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, housing: 1, special: 'LIGHTHOUSE', maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'Cost', { scale: GAME_SPEED }),
@@ -1155,7 +1154,6 @@ export const BUILDING_ERA_INDEX: Record<string, number> = (() => {
   }
   return out;
 })();
-
 
 const EFFECTIVE_BUILDING_CACHE = new Map<string, BuildingDef>();
 

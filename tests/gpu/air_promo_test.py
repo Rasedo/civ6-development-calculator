@@ -19,11 +19,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
-
-
-_BASE: dict = {}
+from core import load_rules, fixture_paths
+from warmup import warm_base, opened
 
 
 def fresh(rules, path, turns=30):
@@ -32,15 +29,7 @@ def fresh(rules, path, turns=30):
     milliseconds, and `restore` round-trips every `_MUTABLE` plane — which is
     all these scenes write (the unit pool and its promotions, the district
     registry, the tile planes, the age/dedication picks, the purses)."""
-    key = (str(path), turns)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(turns):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+    return warm_base((str(path), turns), lambda: opened(rules, path, turns))
 
 
 def a_city(sim, row):

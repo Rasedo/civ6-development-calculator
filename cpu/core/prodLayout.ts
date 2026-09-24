@@ -4,7 +4,7 @@
  * means, forever. One derivation, imported by everything that needs it — a
  * second copy would rot the file format silently.
  *
- * Layout, shared by `production_mask` and `seat_masks`:
+ * Layout, shared by `_seat_production_mask` and `seat_masks`:
  *     [0, NB)            queue that City Center building
  *     NB                 SETTLER
  *     NB + 1             IDLE (queue nothing)
@@ -29,7 +29,7 @@ import { UNITS } from '../data/units';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
 
-export const BUILDING_DISTRICTS: Set<string> = new Set<string>([
+const BUILDING_DISTRICTS: Set<string> = new Set<string>([
   'CITY_CENTER',
   ...SCAFFOLD_DISTRICTS.map((d) => d.id),
 ]);
@@ -51,11 +51,11 @@ export function wonderIds(): string[] {
   return Object.values(BUILT_WONDERS).map((w) => w.id);
 }
 
-export function projectIds(): string[] {
+function projectIds(): string[] {
   return Object.values(PROJECTS).map((p) => p.id);
 }
 
-export interface ProdLayout {
+interface ProdLayout {
   NB: number;
   NU: number;
   buildings: string[];

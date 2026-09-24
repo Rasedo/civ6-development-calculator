@@ -45,10 +45,10 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from core.engine import _MUTABLE
+from core import BatchSim, load_rules, fixture_paths, FIXTURES
+from core.simbase import _MUTABLE
 from core.simbase import js_round
-from warmup import settle_all
+from warmup import warm_base, opened
 
 
 # THE WARMED BASE, ONE PER (fixture, slot). A scene pays a `restore` —
@@ -57,20 +57,10 @@ from warmup import settle_all
 # scenes force, so `_ATTRS` hands that one back by hand. `slot` keys a further
 # base for the three sims section 3b holds live side by side.
 _ATTRS = ("fog_of_war",)
-_BASE: dict = {}
 
 
 def _warm(rules, path, slot: int = 0) -> BatchSim:
-    key = (str(path), slot)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k) for k in _ATTRS})
-    sim, snap, at = _BASE[key]
-    sim.restore(snap)
-    for k, v in at.items():
-        setattr(sim, k, v)
-    sim._bldg_version += 1
-    return sim
+    return warm_base((str(path), slot), lambda: opened(rules, path), (), _ATTRS)
 
 
 def main() -> None:

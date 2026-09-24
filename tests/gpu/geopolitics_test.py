@@ -69,7 +69,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.simbase import BARB_SEAT
-from warmup import settle_all, works_of
+from warmup import settle_all, works_of, warm_base
 from core import neutral, records
 
 
@@ -101,7 +101,6 @@ def head_war(sim, row: int, tgt: int, sue: bool = False) -> None:
 # so the helper puts them back by hand and re-bumps the versions a re-seating
 # bumps — which is what lets the visibility poke share the default base.
 _STATIC = ("row_civ", "row_leader")
-_BASE: dict = {}
 
 
 def build(rules, path, steps: int = 18, dtype=torch.float64, slot: int = 0):
@@ -112,19 +111,12 @@ def build(rules, path, steps: int = 18, dtype=torch.float64, slot: int = 0):
 
     `slot` keys a SECOND engine for the one scene that holds two live sims at
     once: the World Congress twin (`s8b`, compared against `s8`)."""
-    key = (str(path), steps, str(dtype), slot)
-    if key not in _BASE:
+    def make():
         sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
         for _ in range(steps):
             sim.step()
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._eff_version += 1
-    sim._gen_ver += 1
-    return sim
+        return sim
+    return warm_base((str(path), steps, str(dtype), slot), make, _STATIC)
 
 
 def clear_pairs(sim):
@@ -732,13 +724,12 @@ def poke_transfer(rules, path):
 def poke_float32(rules, path):
     """h. The pair planes' dtypes are construction facts (bool / int8 / long),
     not facts of the build's float dtype — asserted on the lane's own warm
-    base. The 30-turn float32 walk that used to carry them here is
+    base. The 30-turn float32 walk is
     district_breadth_test's `poke_float32_dtype` claim (the same build, the
     same engine step, the same walk), and one lane pays for it."""
     sim = build(rules, path)
     assert sim.war.dtype == torch.bool and sim.seat_warkind.dtype == torch.int8 and sim.seat_denounced.dtype == torch.long
     print("  h pair tensors dtype-stable OK (bool / int8 / long; the float32 walk is district_breadth's)")
-
 
 
 def _round_trips(name: str, mut) -> bool:
@@ -1083,7 +1074,7 @@ def main() -> None:
 
 
     # --- the grievance ledger ------------------------------------------------
-    from core.engine import _MUTABLE as _MUT2
+    from core.simbase import _MUTABLE as _MUT2
     # `civ_grievance [B, NS, NS]` is ONE plane and the BASE is what carries the
     # state through a snapshot.
     assert "civ_grievance" in _MUT2, "civ_grievance must be registered in _MUTABLE"
@@ -1324,7 +1315,6 @@ def main() -> None:
         s9.civ_diplo_points[:, 1] = s9._dvp_win
         assert int(s9._diplomatic_victor()[0]) == 1, "a civ wins at the threshold"
     print("world congress OK — schedule, announced slate, combo DVP, DV curve+refunds, effect readers, UDT ban, victory")
-
 
 
 if __name__ == "__main__":

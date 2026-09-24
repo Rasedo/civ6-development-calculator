@@ -23,7 +23,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, warm_base
 
 B0 = 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
@@ -50,25 +50,16 @@ def play(sim, row: int, name):
 # `_MUTABLE`), so the helper puts them back by hand — the base is already
 # seated ROME/EGYPT/NORWAY — and re-bumps exactly the versions `play` bumps.
 _STATIC = ("row_civ", "row_leader")
-_BASE: dict = {}
 
 
 def fresh(rules, path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
+    def make():
         sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
         for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
             play(sim, r, name)
         sim = settle_all(sim)
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._eff_version += 1
-    sim._gen_ver += 1
-    sim._bldg_version += 1
-    return sim
+        return sim
+    return warm_base(str(path), make, _STATIC)
 
 
 def T(*xs) -> torch.Tensor:
