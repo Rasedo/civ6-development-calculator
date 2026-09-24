@@ -61,12 +61,10 @@ interface AppealTier {
 }
 
 /**
- * The Preserve's housing by appeal band. CIV6 publishes only "Grants up to 3
- * Housing based on tile's Appeal" and, on the strategy half, that a low-appeal
- * region "will rarely gain more than 1 Housing from it" — the per-band table
- * is on no page, so THIS BLOCK IS THIS MODEL'S OWN: the published ceiling at
- * Breathtaking, the published floor of about one at Average, and nothing below
- * Uninviting. Both engines read it from the wire.
+ * The Preserve's housing by appeal band: the district's `Housing` 1 plus its
+ * `AppealHousingChanges` row, +2 / +1 / 0 / -1 / -1 from Breathtaking down
+ * (`DLC/KublaiKhan_Vietnam/Data/KublaiKhan_Vietnam_Districts.xml`). Both
+ * engines read it from the wire.
  */
 export const PRESERVE_APPEAL_HOUSING = [3, 2, 1, 0, 0];
 
