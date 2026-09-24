@@ -5645,19 +5645,18 @@ class SimEconomy:
         return total, eff, need, tier_idx
 
     def seat_score(self, row: int) -> torch.Tensor:
-        """[B] — empireScore(state, seat, 'balanced') for ANY seat row, in the
-        TS ASSOCIATION: per city, pop×popWeight first, then the six yields in
-        key order. Science rides non-dyadic 0.7s, so the sum ORDER is worth a
-        real ±1 ulp — enough to flip the leader.
+        """[B] — the balanced empire score (`rules.score`) for ANY seat row, in
+        one fixed ASSOCIATION: per city, pop×popWeight first, then the six
+        yields in key order. Science rides non-dyadic 0.7s, so the sum ORDER is
+        worth a real ±1 ulp, enough to flip the leader.
 
-        TS iterates state.cities in ARRAY order (splice on death, push on
-        found), which is slot order under append+reclaim; the living-first sort
-        keeps that true even mid-step, and dead columns add exact 0.0
-        (association-neutral).
+        Cities are summed in slot order, living first, so the order holds even
+        mid-step, and dead columns add exact 0.0 (association-neutral).
 
-        Accumulates in f64 like the TS doubles it mirrors, then casts once —
-        one body, one precision, so an f32 lane cannot have `leader()` compare
-        a rounded row against an unrounded one."""
+        Accumulates in f64, then casts once: one body, one precision, so an
+        f32 lane cannot have `leader()` compare a rounded row against an
+        unrounded one. The TS engine computes no score, so the turn-limit
+        winner this feeds has no TS twin."""
         rd = self.rules_dev
         w = rd.score_yield_weights
         pw = float(self.rules.score_pop_weight)
