@@ -26,18 +26,9 @@ class SimMasks:
     def _seat_civic_mask(self, row: int) -> torch.Tensor:
         return self._available_mask(self.civ_civics[:, row], self._prereq_c)
 
-    def tech_mask(self) -> torch.Tensor:
-        return self._seat_tech_mask(0)
-
-    def civic_mask(self) -> torch.Tensor:
-        return self._seat_civic_mask(0)
-
     def _seat_envoy_mask(self, row: int) -> torch.Tensor:
         return (self.citystate_alive & self.seat_citystate_met[:, row]
                 & (self.civ_envoys_avail[:, row] > 0).unsqueeze(1))
-
-    def envoy_mask(self) -> torch.Tensor:
-        return self._seat_envoy_mask(0)
 
     def war_targets(self, row: int) -> list[int]:
         """The seat ROWS this row's war head addresses: every OTHER major in

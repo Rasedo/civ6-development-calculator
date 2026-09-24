@@ -39,6 +39,13 @@ from core.simbase import _MUTABLE
 from warmup import settle_all
 
 
+def city_totals(sim, row: int):
+    tier_idx, growth_f, yield_f, _lux = sim._seat_amenity(row)
+    maint, housing = sim._seat_housing(row)
+    total = sim._seat_city_walk(row, amen_yf=yield_f, maint=maint)
+    return total.to(sim.dtype), housing.to(sim.dtype), growth_f.to(sim.dtype), tier_idx
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text())
@@ -628,7 +635,7 @@ def main() -> None:
     s16._eff_version += 1
     a0, d0 = s16._routes_ending_at(0)
     base_all, base_dom = int(a0[0, 0]), int(d0[0, 0])
-    tot_a, _, _, _ = s16._city_totals()
+    tot_a, _, _, _ = city_totals(s16, 0)
     sci_a, fai_a = float(tot_a[0, 0, 3]), float(tot_a[0, 0, 5])
     s16.seat_routes[0, 1, 0, 0] = cap1
     s16.seat_routes[0, 1, 0, 1] = -1
@@ -642,7 +649,7 @@ def main() -> None:
         f"incoming counts read {int(a1[0, 0])}/{int(d1[0, 0])}"
     # the walk: +2 sci per incoming (x2), +1 faith on the domestic one — the
     # amenity tier scales the columns, so band the deltas like the TS tests
-    tot_b, _, _, _ = s16._city_totals()
+    tot_b, _, _, _ = city_totals(s16, 0)
     dsci = float(tot_b[0, 0, 3]) - sci_a
     dfai = float(tot_b[0, 0, 5]) - fai_a
     assert 4.0 <= dsci < 5.0, f"the incoming science moved {dsci}, want ~4"

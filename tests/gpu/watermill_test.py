@@ -29,6 +29,13 @@ from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import plant_city, settle_all
 
 
+def city_totals(sim, row: int):
+    tier_idx, growth_f, yield_f, _lux = sim._seat_amenity(row)
+    maint, housing = sim._seat_housing(row)
+    total = sim._seat_city_walk(row, amen_yf=yield_f, maint=maint)
+    return total.to(sim.dtype), housing.to(sim.dtype), growth_f.to(sim.dtype), tier_idx
+
+
 def build(rules, path, steps=40):
     """Two live cities on row 0 through the engine's own FOUND verb, then
     `steps` turns of growth (food and pop accrue without decisions)."""
@@ -40,7 +47,7 @@ def build(rules, path, steps=40):
 
 
 def food_of(sim, c):
-    return float(sim._city_totals()[0][0, c, 0])
+    return float(city_totals(sim, 0)[0][0, c, 0])
 
 
 def main() -> None:

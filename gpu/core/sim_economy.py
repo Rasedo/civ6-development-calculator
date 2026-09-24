@@ -5595,8 +5595,8 @@ class SimEconomy:
         read two different economies.
 
         THIS is the walk that records the worked-tile pick, and the
-        only one: `seat_score` and `_city_totals` ride the same body at other
-        points in the turn, and a pick stashed from the SCORE walk would be
+        only one: `seat_score` rides the same body at another point in the
+        turn, and a pick stashed from the SCORE walk would be
         the post-growth one while the turn itself ran on the snapshot — a
         difference in the INSTRUMENT, not in the engines. `seatPhase` records
         from its loop-top snapshot for exactly the same reason."""
@@ -5644,12 +5644,6 @@ class SimEconomy:
         need = torch.floor(15 + 8 * (pop - 1) + (pop - 1).clamp(min=0) ** 1.5)
         return total, eff, need, tier_idx
 
-    def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        tier_idx, growth_f, yield_f, _lux = self._seat_amenity(0)
-        maint, housing = self._seat_housing(0)
-        total = self._seat_city_walk(0, amen_yf=yield_f, maint=maint)
-        return total.to(self.dtype), housing.to(self.dtype), growth_f.to(self.dtype), tier_idx
-
     def seat_score(self, row: int) -> torch.Tensor:
         """[B] — empireScore(state, seat, 'balanced') for ANY seat row, in the
         TS ASSOCIATION: per city, pop×popWeight first, then the six yields in
@@ -5693,14 +5687,6 @@ class SimEconomy:
         unspecified)."""
         cols = [self.seat_score(row) for row in range(self.n_majors)]
         return first_argmax(torch.stack(cols, dim=1))
-
-    def protagonist(self) -> torch.Tensor:
-        cols = [self.seat_score(row) for row in range(self.n_majors)]
-        scores = torch.stack(cols, dim=1)  # [B, n_majors]
-        has_city = self.city_alive[:, : self.n_majors].any(dim=2)  # [B, n_majors]
-        fenced = torch.where(has_city, scores, torch.full_like(scores, float("-inf")))
-        pick = torch.where(has_city.any(dim=1), first_argmax(fenced), first_argmax(scores))
-        return torch.where(self.winner >= 0, self.winner, pick)
 
     def _domination(self) -> torch.Tensor:
         B, dev = self.B, self.device
