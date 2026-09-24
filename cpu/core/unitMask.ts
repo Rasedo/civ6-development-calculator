@@ -412,7 +412,7 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   // CONVERT_HEATHEN: a charge, the promotion, and a barbarian (military or
   // civilian occupant) in the ring.
   if (charges > 0 && promoFlag(u, 'HEATHEN') && neighbors(state.map, here).some((n) =>
-    [ctx.occ.military.get(n.index), ctx.occ.civilian.get(n.index)].some((o) => !!o && o.seat >= BARB_SEAT))) {
+    [ctx.occ.military.get(n.index), ctx.occ.civilian.get(n.index)].some((o) => !!o && o.seat === BARB_SEAT))) {
     out.add(A_CONVERT_HEATHEN);
   }
   // UPGRADE
