@@ -45,9 +45,3 @@ def masked_choice(mask: torch.Tensor, *keys) -> torch.Tensor:
     r = torch.where(mask, r, torch.tensor(torch.iinfo(torch.int64).min, device=mask.device))
     choice = r.argmax(dim=-1)
     return torch.where(mask.any(dim=-1), choice, torch.full_like(choice, -1))
-
-
-def uniform(shape_like: torch.Tensor, *keys) -> torch.Tensor:
-    h = hash_keys(*keys)
-    bits = _lsr(h, 11).to(torch.float64)
-    return (bits / float(1 << 53)).to(shape_like.dtype if shape_like.is_floating_point() else torch.float64)

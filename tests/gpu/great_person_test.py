@@ -276,7 +276,6 @@ def poke_spend(rules, path):
     sim._gp_charges[cls, at] = 1
     sim._gp_effects[cls, at, :] = 0
     sim._gp_effects[cls, at, k] = 250
-    sim._gp_any_fx = True
     bare = own_bare(sim, ROW)
     v = make_person(sim, ROW, cls, at, bare)
     sci0 = float(sim.civ_tech_prog[0, ROW])
@@ -302,7 +301,6 @@ def poke_perm(rules, path):
     sim._gp_effects[cls, at, :] = 0
     sim._gp_effects[cls, at, sim._GP_PERM0] = 7
     sim._gp_effects[cls, at, sim._GP_CPERM0] = 3
-    sim._gp_any_fx = True
     ctr = int(sim.city_center[0, ROW, 0])
     assert ctr >= 0, "row has no city to spend in"
     v = make_person(sim, ROW, cls, at, ctr)
@@ -348,7 +346,6 @@ def poke_wonder_buyout(rules, path):
     sim._gp_charges[cls, at] = 1
     sim._gp_effects[cls, at, :] = 0
     sim._gp_effects[cls, at, k] = 1
-    sim._gp_any_fx = True
     ctr = int(sim.city_center[0, ROW, 0])
     assert ctr >= 0, "row has no city to spend in"
 
@@ -391,7 +388,6 @@ def poke_grant_drops_queue(rules, path):
     sim._gp_site[cls, at] = 1
     sim._gp_charges[cls, at] = 1
     sim._gp_effects[cls, at, :] = 0
-    sim._gp_any_fx = True
     bidx = 0
     # the seat's first live city, producing building 0 with hammers on it
     col = int(sim.city_alive[bidx, ROW].long().argmax())

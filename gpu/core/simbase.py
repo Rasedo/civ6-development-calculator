@@ -643,37 +643,19 @@ BARB_SEAT = 200  # the barbarians — cpu/core/seats.ts BARB_SEAT
 # row in the city planes is `FREE_ROW`, its tiles carry this id.
 FREE_SEAT = 300
 
-# WHAT A SEAT MAY DO — the twin of cpu/data/seats.ts, same two bits. See that
-# file for the ADMISSIBILITY RULE that keeps the set this small: a bit earns a
-# place only when the empty/zero data value is not already the right answer.
+# WHAT A POOL'S SEATS MAY DO: the `xp` bit of cpu/data/seats.ts SEAT_CAPS for
+# the two classes a unit pool holds (`POOL_CLASS`). See that file for the
+# ADMISSIBILITY RULE that keeps the set this small. Its other bit,
+# `alwaysHostile`, is spelled on the seat ids in `_hostile_table`.
 #
-#   xp             this seat's units accrue experience and promote.
-#   always_hostile hostile to everyone with NO war state — the one thing the
-#                  war matrix cannot say, since an all-false row means peace.
+#   xp   this seat's units accrue experience and promote.
 SEAT_CAPS = {
-    "major": {"xp": True, "always_hostile": False},   # every major seat
-    "minor": {"xp": True, "always_hostile": False},   # city-states
-    "hostile": {"xp": False, "always_hostile": True},  # barbarians
-    # CIV6: a Free City "will seek to defend themselves from military
-    # intrusion" and may be taken by anyone — the barbarians' hostility bit,
-    # though a Free City fields no unit of its own here
-    "free": {"xp": False, "always_hostile": True},
+    "major": {"xp": True},     # every major seat
+    "hostile": {"xp": False},  # barbarians
 }
 
 POOL_CLASS = {"major": "major", "barb": "hostile"}
 
-
-def seat_class(seat: int) -> str:
-    """Which kind of actor an ABSOLUTE seat id is — the twin of
-    cpu/core/seats.ts `seatClass`. The id space encodes it, so nothing stores a
-    duplicate."""
-    if seat == BARB_SEAT:
-        return "hostile"
-    if seat == FREE_SEAT:
-        return "free"
-    if 100 <= seat < BARB_SEAT:
-        return "minor"
-    return "major"
 NO_SEAT = -1  # "nobody" — the cpu/core/seats.ts NO_SEAT twin
 # `civ_age`: 0 a Dark Age, 1 Normal, 2 Golden. A HEROIC age is a Golden one
 # reached out of a Dark one and carries this same code, which is why every
@@ -789,8 +771,6 @@ def tiles_from_offsets(centers: torch.Tensor, offsets: torch.Tensor, width: int,
     idx = tr * width + tcol
     return torch.where(ok, idx, torch.full_like(idx, -1))
 
-
-PATROL_DIR_PERM = [3, 4, 2, 5, 1, 0]
 
 # CIV6_ALIAS_CHECK=1 turns on the per-step state-discipline assertions (alias
 # storage + _MUTABLE shape/dtype). Off by default so the gates keep their

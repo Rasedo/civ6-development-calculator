@@ -1459,8 +1459,6 @@ class SimInit:
             else [[[0] * _blw] * _maxN for _ in range(n_gp)], dtype=torch.bool, device=device)
         self._gp_class_unit = torch.tensor(
             rr.get("gpClassUnitIdx", [-1] * n_gp), dtype=torch.long, device=device)
-        self._gp_work_class = [bool(x) for x in rr.get("gpWorkClasses", [0] * n_gp)]
-        self._gp_any_fx = bool((self._gp_effects != 0).any()) if self._gp_effects.numel() else False
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
         # CIV6 (Expansion2_Emergencies.xml): the World's Fair scores eight
         # `WORLDS_FAIR_SCORE_GPP_*` rows — every Great Person class but the
@@ -1611,7 +1609,6 @@ class SimInit:
         self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
-        self._off1 = tiles_within_offsets(1).to(device)
         # `STORM_DISC`: the radius-2 disc in ONE canonical order shared with
         # TS — centre, ring 1, ring 2, each ring in ascending tile index (dr,
         # then dq); a storm's footprint is its first `hexes` slots
@@ -1620,12 +1617,9 @@ class SimInit:
         self._storm_offs = torch.tensor(_d2, dtype=torch.long).to(device)  # [19, 2]
         ids = [u["id"] for u in (rules.units or [])]
         self._spearman_idx = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
-        self._horseman_idx = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
-        self._slinger_idx = ids.index("SLINGER") if "SLINGER" in ids else -1
         self._archaeologist_idx = ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1
         self._naturalist_idx = next((i for i, u in enumerate(rules.units or []) if bool(u.get("naturalist", 0))), -1)
         self._band_idx = next((i for i, u in enumerate(rules.units or []) if u.get("id") == "ROCK_BAND"), -1)
-        self._archer_idx = ids.index("ARCHER") if "ARCHER" in ids else -1
 
         self.disasters = bool(f0.get("disasters", 0))
         self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -1755,7 +1749,6 @@ class SimInit:
         self._imp_plun_amt = torch.tensor(
             [int(r.get("plun", [0, 0])[1]) for r in imp.get("rows", [])] or [0], dtype=torch.long, device=device)
         self._farm_food = float(imp.get("farmFood", 1))
-        self._farm_housing = float(imp.get("farmHousing", 0.5))
         self._mine_prod = float(imp.get("mineProd", 1))       # base MINE production
         self._lumber_prod = float(imp.get("lumberProd", 1))   # LUMBER_MILL production (no tech boost)
         self._builder_idx = int(imp.get("builderIdx", -1))
@@ -1883,7 +1876,6 @@ class SimInit:
         # that governor stays. Two columns because the install writes two
         # modifiers: the gate is on the build, the payment on the plot.
         self._imp_gov_promo = [int(r.get("govPromo", -1)) for r in imp["rows"]]
-        self._imp_gov_any = any(p >= 0 for p in self._imp_gov_promo)
         self._imp_gov_yield = [r.get("govY") for r in imp["rows"]]
         self._imp_gov_yield_any = any(g is not None for g in self._imp_gov_yield)
         # amenities the row pays its city for standing beside water
@@ -2697,7 +2689,6 @@ class SimInit:
         self._tile_owner_ver = 0
         self._citystate_at_ver = -1
         self._citystate_at_cache: torch.Tensor | None = None
-        self._civ_at_cache: torch.Tensor | None = None
         self._city_slot_cache: dict[int, tuple[int, torch.Tensor]] = {}
         self.tile_seat = torch.tensor(
             [f["ownerSeatInit"] for f in fixtures], dtype=torch.long, device=device)
@@ -2790,7 +2781,6 @@ class SimInit:
         self._nuke_silo_def = float(_nuc["siloDefense"])
         self._nuke_sub_def = float(_nuc["subDefense"])
         self._nuke_int_dmg = int(_nuc["interceptDamage"])
-        self._fallout_clean_charges = int(_nuc["cleanCharges"])
         self._silo_iid = int(_nuc["siloIid"])
         self._ww_wmd_launched = float(_nuc["wwLaunched"])
         self._emg_nuclear = int(_nuc["emergencyNuclear"])
@@ -3210,7 +3200,6 @@ class SimInit:
         # THE UNIQUE UNITS (`uniqueTo` / `replaces` and the chassis terms only
         # a unique carries): `_civ_unit_ok` hands each to its civilization.
         self._type_uniq = torch.tensor([int(u["uniq"]) for u in ru], dtype=torch.long, device=device)
-        self._type_repl = torch.tensor([int(u["repl"]) for u in ru], dtype=torch.long, device=device)
         # a LEADER unique's pair index (`uniqueLeader`), -1 for a civilization's
         self._type_uniq_leader = torch.tensor([int(u["uniqLeader"]) for u in ru], dtype=torch.long, device=device)
         self._type_chariot = torch.tensor([bool(u["chariot"]) for u in ru], dtype=torch.bool, device=device)
@@ -3722,7 +3711,6 @@ class SimInit:
         # One stash per DIPLOMATIC verb, allocated once and drained in place —
         # a per-verb attribute would have to be rebound to exist.
         self._driven_geo: dict = {v: {} for v in GEO_VERBS}
-        self._arangeNB = torch.arange(NB, device=device)
 
         # EVERY seat's t0 units seed the pool HERE, through ONE body — after
         # the roster tables and the pool planes exist, which is why the load is

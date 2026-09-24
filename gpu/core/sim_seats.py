@@ -710,12 +710,6 @@ class SimSeats:
         age = int(self.turn) - dt
         return (dt >= 0) & (age >= turns) & (age < self._agreement_turns)
 
-    def _denounce_casus_belli(self, a: int, b: int) -> torch.Tensor:
-        """CIV6: "Five turns after denouncing a rival, you gain a Formal War
-        Casus Belli against them" - and it expires with the denouncement that
-        opened it. `denounceCasusBelli`'s twin."""
-        return self._denounce_aged(a, b, self._formal_war_min)
-
     def _war_denounce_held(self, a: int, b: int, turns: int) -> torch.Tensor:
         """CIV6 (Formal War): "a player that Denounced you or that you have
         Denounced at least 5 turns ago" — a kind's DenouncementTurnsRequired
@@ -1712,14 +1706,6 @@ class SimSeats:
         for civ, lead, which in self._live_rows(row, self._seat_ban_rows):
             if which == ban:
                 out = out | self._row_is(row, civ, lead)
-        return out
-
-    def _seat_banned(self, seat: torch.Tensor, ban: int) -> torch.Tensor:
-        """bool, `seat`'s shape — `_row_banned` per absolute seat."""
-        out = torch.zeros_like(seat, dtype=torch.bool)
-        for civ, lead, which in self._seat_ban_rows:
-            if which == ban:
-                out = out | self._seat_is(seat, civ, lead)
         return out
 
     def _who_tile_plane(self, civ: int, leader: int) -> torch.Tensor:
@@ -4860,11 +4846,6 @@ class SimSeats:
         if row >= self.n_majors:
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         return self._suzerain_mask(row)[:, : self.S].double().sum(dim=1)
-
-    def _suz_live_mask(self, row: int) -> torch.Tensor:
-        """[B, S] — the minors whose SUZERAIN bonus actually pays this row.
-        Sovereignty outcome B silences a whole city-state TYPE."""
-        return self._suzerain_mask(row)[:, : self.S] & ~self._congress_suz_bonus_blocked()
 
     def _suz_effect_rows(self, code: int) -> torch.Tensor:
         """`suzerainEffect` for every major row at once — [B, n_majors] bool,
