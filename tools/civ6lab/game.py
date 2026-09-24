@@ -15,8 +15,8 @@ Automation_DailySmokeTest.lua):
   OnLoadGameViewStateDone), so both paths call
   `Automation.SetAutoStartEnabled(true)` first;
 * a new game: the setup is `GameConfiguration` / `MapConfiguration` written
-  from the FrontEnd state, then `Network.HostGame(ServerType.SERVER_TYPE_NONE)`
-  — the smoke test's own call;
+  from the FrontEnd state, then `Network.HostGame` with no server type — the
+  smoke test's own call;
 * a load: `UI.QuerySaveGameList` names the save and `Network.LoadGame` takes
   it (the smoke test's LoadGame test).
 
