@@ -675,7 +675,8 @@ class SimSpy:
             self._eff_version += 1
             one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             one[b] = True
-            self._flood_river(one, torch.full((self.B,), dt, dtype=torch.long, device=self.device))
+            self._flood_river(one, torch.full((self.B,), dt, dtype=torch.long, device=self.device),
+                              self._flood_severity_draw(one))
 
     def _congress_pact_ban(self) -> torch.Tensor:
         """[B] long — CIV6 (Espionage Pact, outcome B): "Target Operation is

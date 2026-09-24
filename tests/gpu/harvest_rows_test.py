@@ -172,6 +172,39 @@ def test_strip_is_total(rules, path) -> None:
     print("  4 the strip OK —", moved, "baked planes took their resource-free value")
 
 
+def test_stripped_feature(rules, path) -> None:
+    """The resource-free values carry the STARTING feature. On a plot whose
+    Woods was chopped or painted over, the harvest leaves the job flags of the
+    bare ground — mine and farm open, the Lumber Mill refused — the way TS's
+    live `bareGround` reads it."""
+    sim = fresh(rules, path)
+    row = 1
+    at = _wheat_tile(sim, row)
+    bare = dict(sim._nr_planes)
+    # the plot as it started: Woods on a hill, so its resource-free value
+    # offers the Lumber Mill and neither a mine nor a farm
+    keep = {p: bare[p][B0, at].clone() for p in ("lumber_ok", "mine_ok", "farm_hill",
+                                                 "_mi_c", "_fa_h_c")}
+    try:
+        bare["lumber_ok"][B0, at] = True
+        bare["mine_ok"][B0, at] = False
+        bare["farm_hill"][B0, at] = False
+        bare["_mi_c"][B0, at] = True
+        bare["_fa_h_c"][B0, at] = True
+        sim._strip_feature_at(torch.tensor([B0]), torch.tensor([at]))
+        assert bool(sim.feat_stripped[B0, at])
+        slot = _standing_builder(sim, row, at)
+        _harvest(sim, row, slot)
+        assert bool(sim.res_stripped[B0, at]), "the harvest did not happen"
+        assert not bool(sim.lumber_ok[B0, at]), "the chopped plot offers a Lumber Mill again"
+        assert bool(sim.mine_ok[B0, at]), "the chopped hill refuses the mine"
+        assert bool(sim.farm_hill[B0, at]), "the chopped hill refuses the farm"
+    finally:
+        for p, v in keep.items():
+            bare[p][B0, at] = v
+    print("  4b the stripped plot OK — the harvest reads the ground as it stands")
+
+
 def test_harvested_planes_are_mutable(rules, path) -> None:
     """Every plane the harvest writes must be in `_MUTABLE`, or a restore
     leaks a harvested tile into the next game on that lane."""
@@ -249,6 +282,7 @@ def main() -> int:
     test_catalog(rules, path)
     test_mask(rules, path)
     test_strip_is_total(rules, path)
+    test_stripped_feature(rules, path)
     test_harvested_planes_are_mutable(rules, path)
     test_pays_the_acting_seat(rules, path)
     test_charge_is_spent(rules, path)

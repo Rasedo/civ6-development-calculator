@@ -207,6 +207,46 @@ def test_minor_conversion(rules) -> None:
     print("  minor conversion OK: the minor city row carries pressure and a majority")
 
 
+def test_minor_army(rules) -> None:
+    """CIV6 (Eras.xml `BonusMinorStartingUnits`): an Ancient start gives every
+    minor two Warriors. They ride the majors' pool under the minor's seat id,
+    first on its centre and then on its ring; they hold where they spawned,
+    heal as a unit in a city on the centre, and leave the map with the minor's
+    conquest. The TS twin is tests/cpu/minors/minor-army.test.ts."""
+    sim = build(rules)
+    b = 0
+    alive = sim.major_unit_alive[b]
+    for s in range(sim.S):
+        if not bool(sim.citystate_alive[b, s]):
+            continue
+        army = (alive & (sim.major_unit_seat[b] == 100 + s)).nonzero(as_tuple=True)[0]
+        assert len(army) == 2, f"minor {s} fields {len(army)} units, not its two Warriors"
+        assert all(int(sim.major_unit_type[b, i]) == sim._warrior_idx for i in army.tolist())
+        ctr = int(sim.citystate_center[b, s])
+        tiles = [int(sim.major_unit_tile[b, i]) for i in army.tolist()]
+        assert tiles[0] == ctr, "the first Warrior does not hold the centre"
+        assert int(sim.pair_dist[ctr, tiles[1]]) == 1, "the second Warrior is off the ring"
+        assert all(int(sim.military_at[b, t]) == int(i) for t, i in zip(tiles, army.tolist())), \
+            "a Warrior does not hold its plot"
+        assert all(int(sim.major_unit_fortify[b, i]) >= 1 for i in army.tolist()), \
+            "a Warrior that never moved has not dug in"
+    s0 = next(s for s in range(sim.S) if bool(sim.citystate_alive[b, s]))
+    army = (alive & (sim.major_unit_seat[b] == 100 + s0)).nonzero(as_tuple=True)[0]
+    heal = sim._seat_heal("major")[b]
+    assert int(heal[army[0]]) == 20 and int(heal[army[1]]) == 15, (
+        f"centre/ring heal {int(heal[army[0]])}/{int(heal[army[1]])}, not 20/15")
+    held = [int(sim.major_unit_tile[b, i]) for i in army.tolist()]
+    others = int((alive & (sim.major_unit_seat[b] >= 100) & (sim.major_unit_seat[b] != 100 + s0)).sum())
+    sim._capture_city_state(torch.tensor([b]), torch.full((sim.B,), s0, dtype=torch.long), 0)
+    assert not bool((sim.major_unit_alive[b] & (sim.major_unit_seat[b] == 100 + s0)).any()), \
+        "the conquered minor's army outlived it"
+    assert all(int(sim.military_at[b, t]) < 0 or int(sim.unit_seat[b, int(sim.military_at[b, t])]) != 100 + s0
+               for t in held), "a removed Warrior still holds its plot"
+    assert int((sim.major_unit_alive[b] & (sim.major_unit_seat[b] >= 100)).sum()) == others, \
+        "the conquest took another minor's army"
+    print(f"  minor army OK: two Warriors per minor, centre and ring, dug in, 20/15 heal, gone with the minor")
+
+
 def main() -> None:
     rules = load_rules()
     print(f"minor_record_test on {fixture_paths()[0].name}:")
@@ -216,6 +256,7 @@ def main() -> None:
     test_minor_border(rules)
     test_containment(rules)
     test_minor_conversion(rules)
+    test_minor_army(rules)
     print("MINOR RECORD OK")
 
 

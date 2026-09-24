@@ -12,15 +12,18 @@ class SimMinors:
         # each minor in turn: its city's yields, then the research they buy,
         # then the build they pay for — the `minorPhase` order, one minor at a
         # time because a district one minor lands may lend a neighbour's
-        # district adjacency across the border
+        # district adjacency across the border — and then its city's ranged
+        # strikes, the majors' own body (`cityStrikes`)
+        col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
             if not bool(self.citystate_alive[:, s].any()):
                 continue
-            self._minor_accrue(s)
+            prod = self._minor_accrue(s)
             self._minor_research(s)
-            self._minor_build(s)
+            self._minor_build(s, prod)
+            self._city_strikes(self._CITY_MINOR0 + s, col0, self.citystate_alive[:, s])
 
-    def _minor_accrue(self, s: int) -> None:
+    def _minor_accrue(self, s: int) -> torch.Tensor:
         """THE MINOR'S CITY PAYS ITS YIELDS, AND THEN GROWS AND CLAIMS ON THEM.
 
         CIV6 (City-state): a city-state's city is an ordinary city — its Campus
@@ -31,15 +34,16 @@ class SimMinors:
         bodies called on it, and `citystate_pop` is a VIEW of `city_pop` — the
         growth write moves it with no mirror of its own.
 
-        Science and Culture also feed the two research pots and Production the
-        build pot; Gold and Faith are banked (`citystate_treasury` /
-        `citystate_faith`) and nothing spends either — what the install lets a
-        city-state SPEND them on is DLL AI with no data behind it."""
+        Science and Culture also feed the two research pots; Gold and Faith are
+        banked (`citystate_treasury` / `citystate_faith`) and nothing spends
+        either — what the install lets a city-state SPEND them on is DLL AI
+        with no data behind it. The [B] Production is returned for
+        `_minor_build`, which pays it into the pot under the rows of the item
+        it goes toward."""
         row = self._CITY_MINOR0 + s
         keep = self.citystate_alive[:, s].double()
         total, eff, need, _tier = self._seat_city_stats(row)
         tot = total[:, 0]  # [B, 6], zero where the city is dead
-        self.citystate_prod[:, s] += tot[:, 1] * keep
         self.citystate_treasury[:, s] += tot[:, 2] * keep
         self.citystate_tech_prog[:, s] += tot[:, 3] * keep
         self.citystate_civic_prog[:, s] += tot[:, 4] * keep
@@ -48,6 +52,7 @@ class SimMinors:
         act = self.citystate_alive[:, s]
         self._seat_city_growth(row, col, act, eff[:, 0], need[:, 0])
         self._seat_border_growth(row, col, act, tot[:, 4] * keep)
+        return tot[:, 1] * keep
 
     def _minor_envoy_tiles(self) -> None:
         """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`.
@@ -165,6 +170,15 @@ class SimMinors:
                                                    torch.zeros_like(tier)))
         return tier
 
+    def _minor_centre_cs(self, s: int) -> torch.Tensor:
+        """[B] long — `minorCityCS`: the minor's centre strength, 15 plus its
+        population, +6 for a militaristic minor, and its walls tier's adder.
+        Its city's ranged strike leaves from it."""
+        mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
+        return (15 + self.citystate_pop[:, s].long()
+                + (self.citystate_type[:, s] == mil_idx).long() * 6
+                + self._walls_tier_cs[self._minor_walls_tier(s)].long())
+
     def _minor_district_site(self, s: int) -> torch.Tensor:
         """[B, T] `canPlaceDistrictIn`'s city half for the minor's one city —
         `_district_elig_site` with the minor's OWN ownership (its seat id is
@@ -188,16 +202,21 @@ class SimMinors:
         elig[torch.arange(B, device=dev), center] = False
         return elig
 
-    def _minor_build(self, only: int | None = None) -> None:
+    def _minor_build(self, only: int | None = None, prod: torch.Tensor | None = None) -> None:
         """`minorBuild` — CIV6 (City-state): a city-state "will build a
         district within their territory that corresponds to their type", a
-        Harbor when it sits on the coast, and walls. The pot is the city's
-        own Production (`_minor_accrue`), and the ladder's first buildable
-        item completes when the pot covers it, at most one a turn. The ladder
-        order is the model's; each item's own gates — the minor's researched
-        unlock, a legal plot, an intact perimeter under a higher wall — are
-        the rules a major pays. `only` narrows the walk to one minor."""
-        if self.S == 0 or not self.districts_on:
+        Harbor when it sits on the coast, and walls. The ladder's first
+        buildable item is the one the turn's Production (`prod`, [B], the
+        `only` minor's `_minor_accrue`; none is zero) goes toward: the pot
+        takes it under the minor's percent on its city's Production and that
+        item's toward-row (walls +200%, the Harbor and the type's district
+        +500% — the MINOR_CIV rows of Leaders.xml), and the item completes
+        when the pot covers it, at most one a turn; with no buildable item
+        the pot takes it under the percent alone. The ladder order is the
+        model's; each item's own gates — the minor's researched unlock, a
+        legal plot, an intact perimeter under a higher wall — are the rules a
+        major pays. `only` narrows the walk to one minor."""
+        if self.S == 0:
             return
         rd = self.rules_dev
         dcp = self.rules.district_cost
@@ -209,11 +228,25 @@ class SimMinors:
         nT_c = max(int(rd.t_cost.shape[0]), 1)
         nC_c = max(int(rd.c_cost.shape[0]), 1)
         ones_b = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        cs_rules = self.rules.citystate
+        pen = (100 + float(cs_rules["productionPct"])) / 100
+        walls_pct = float(cs_rules["wallsProdPct"])
+        harbor_pct = float(cs_rules["harborProdPct"])
+        type_pct = torch.tensor([float(x) for x in cs_rules["typeDistrictProdPct"]],
+                                dtype=torch.float64, device=self.device)
+        zero_b = torch.zeros(self.B, dtype=torch.float64, device=self.device)
         for s in (range(self.S) if only is None else (only,)):
             row = self._CITY_MINOR0 + s
             alive = alive_all[:, s]
             if not bool(alive.any()):
                 continue
+            turn = prod if prod is not None else zero_b
+
+            def toward(avail: torch.Tensor, pct, s: int = s, turn: torch.Tensor = turn) -> None:
+                # `minorProduction`: the city's Production under the minor's
+                # percent, then the item's toward-row, paid where it is the target
+                self.citystate_prod[:, s] += torch.where(avail, turn * pen * ((100 + pct) / 100), zero_b)
+
             halt = ~alive
             t_pct = self.citystate_techs[:, s].sum(dim=1).double() / float(nT_c)
             c_pct = self.citystate_civics[:, s].sum(dim=1).double() / float(nC_c)
@@ -223,13 +256,16 @@ class SimMinors:
             d_fac = 1 + dcp.get("scale", 9) * _mprog
             d_per = dcp.get("perDistrict") or []
             _d_pg = dcp.get("progressGame") or []
-            site_s = self._minor_district_site(s)
-            ladder: list[tuple[str, object]] = [("b", walls_by_tier[0] if walls_by_tier else -1),
-                                                ("d", self._citystate_didx[:, s]),
-                                                ("t", self._citystate_t1b[:, s]),
-                                                ("d", int(self._harbor_didx))]
-            ladder += [("b", bi) for bi in walls_by_tier[1:]]
-            for kind, code in ladder:
+            # each rung with its toward-row percent
+            ladder: list[tuple[str, object, object]] = []
+            if self.districts_on:
+                site_s = self._minor_district_site(s)
+                ladder = [("b", walls_by_tier[0] if walls_by_tier else -1, walls_pct),
+                          ("d", self._citystate_didx[:, s], type_pct[self.citystate_type[:, s].clamp(min=0)]),
+                          ("t", self._citystate_t1b[:, s], 0.0),
+                          ("d", int(self._harbor_didx), harbor_pct)]
+                ladder += [("b", bi, walls_pct) for bi in walls_by_tier[1:]]
+            for kind, code, pct in ladder:
                 if bool(halt.all()):
                     break
                 if kind == "b":
@@ -246,6 +282,7 @@ class SimMinors:
                     prev_ok = tier_now >= int(rd.b_walls[bi]) - 1
                     intact = self.city_outer_hp[:, row, 0] == self._walls_tier_hp[tier_now]
                     avail = ~halt & ~self.city_bldg[:, row, 0, bi] & unlock & prev_ok & intact
+                    toward(avail, pct)
                     pay = avail & (self.citystate_prod[:, s] >= float(rd.b_cost[bi]))
                     if bool(pay.any()):
                         rr = pay.nonzero(as_tuple=True)[0]
@@ -276,6 +313,7 @@ class SimMinors:
                         dt2 = self.city_dist_tile[:, row, 0].gather(1, dvt2.clamp(min=0).unsqueeze(1)).squeeze(1)
                         held_d = (dt2 >= 0) & self.district_complete.gather(1, dt2.clamp(min=0).unsqueeze(1)).squeeze(1)
                         avail = gate & ~self.city_bldg[:, row, 0, bi] & unlock & held_d
+                        toward(avail, pct)
                         pay = avail & (self.citystate_prod[:, s] >= float(rd.b_cost[bi]))
                         if bool(pay.any()):
                             rr2 = pay.nonzero(as_tuple=True)[0]
@@ -307,6 +345,7 @@ class SimMinors:
                     if plc == 3:
                         splane = splane & (self._adj_center_count() == 0)
                     avail = gate & ~held & unlock & cap_ok & splane.any(dim=1)
+                    toward(avail, pct)
                     _b_dv = float(d_per[dv]) if dv < len(d_per) else float(dcp.get("base", 32))
                     # the row's OWN cost model — a minor builds real districts
                     # and the GAME_PROGRESS rows climb differently.
@@ -337,6 +376,7 @@ class SimMinors:
                         self.citystate_prod[rr, s] -= d_cost[rr]
                         self._eff_version += 1
                     halt = halt | avail
+            toward(~halt, 0.0)
 
     def _wonder_base_ok(self, row: int, j: int) -> torch.Tensor:
         """[B, T] wonder-tile base predicate for seat row `row`'s city slot j —

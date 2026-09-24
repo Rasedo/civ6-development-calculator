@@ -24,7 +24,7 @@ import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum, cityGovernorEffects } from './governors';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
-import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
+import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT, FREE_CITY_DEFENSE } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, unitReligious } from './units';
@@ -50,7 +50,7 @@ import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
-import { civOf, seatsAllied } from './seats';
+import { civOf, isFreeSeat, seatsAllied } from './seats';
 import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent, majorityReligionOf } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
@@ -1010,12 +1010,20 @@ export function rangedCityPenalty(unitType: string, outerHp: number): number {
   return outerHp > 0 ? RANGED_CITY_PENALTY : 0;
 }
 
+/** The strength a seat's city and Encampment stand at before walls and
+ *  garrison: its best melee unit, floored at 15 — and for the Free Cities
+ *  player a flat base of its own, measured at 72 with no walls standing. */
+function holderStrength(state: GameState, seat: number): number {
+  if (isFreeSeat(seat)) return FREE_CITY_DEFENSE;
+  return Math.max(15, seatOf(state, seat)?.bestMeleeCS ?? 0);
+}
+
 function cityBaseStrength(state: GameState, city: City): number {
   const garrison = unitsAt(state, city.centerIndex).find(
     (u) => u.seat === city.seat && unitDomain(u.type) === 'military',
   );
   // CIV6: each pre-modern walls tier is "+3 Combat Strength" and they stack.
-  return Math.max(15, seatOf(state, city.seat)?.bestMeleeCS ?? 0)
+  return holderStrength(state, city.seat)
     + (WALLS_TIER_CS[wallsTier(state, city)] ?? 0)
     + (garrison ? 5 : 0);
 }
@@ -1033,6 +1041,15 @@ export function cityDefenseStrength(state: GameState, city: City): number {
 export function cityStrikeStrength(state: GameState, city: City): number {
   return cityBaseStrength(state, city) + getModifiers(state, city.seat).cityRanged
     + governorSum(state, city, (e) => e.cityDefense);
+}
+
+/** A CITY-STATE's centre strength: 15, its population, +6 for a militaristic
+ *  minor, and its walls tier's adder. The minor's city defends at it, its
+ *  Encampment fights at it, and its ranged strike leaves from it. */
+export function minorCityCS(state: GameState, cityState: CityState): number {
+  const shape = { buildings: cityState.buildings ?? [], seat: cityState.seat };
+  return 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0)
+    + (WALLS_TIER_CS[wallsTier(state, shape)] ?? 0);
 }
 
 /** CIV6 (Discipline): "+5 Combat Strength when fighting Barbarians." A
@@ -1324,7 +1341,7 @@ function cityAssault(
   if ((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CIV6_BATTLE_PROBE) {
     console.log(`TS-BATTLE seed=${state.map.seed} t=${state.turn} tgt=${city.centerIndex} atkCS=${atkCS} defCS=${defCS} ` +
       `combat=${UNITS[attacker.type]?.combat ?? 0} wound=${woundPenalty(attacker)} xp=${attacker.xp ?? 0} ` +
-      `best=${Math.max(15, seatOf(state, city.seat)?.bestMeleeCS ?? 0)}`);
+      `best=${holderStrength(state, city.seat)}`);
   }
   const dmgToCity = damageRoll(state, atkCS - defCS, kCity, city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, kAttacker, city.centerIndex);
@@ -1500,11 +1517,7 @@ export function encampmentDefense(
   if (isCityStateSeat(tileSeat(tile))) {
     const cs = state.cityStates?.find((c) => c.seat === tileSeat(tile));
     if (!cs) return null;
-    const csShape = { buildings: cs.buildings ?? [], seat: cs.seat };
-    return {
-      defCS: 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0)
-        + (WALLS_TIER_CS[wallsTier(state, csShape)] ?? 0),
-    };
+    return { defCS: minorCityCS(state, cs) };
   }
   const owner = seatOf(state, tileSeat(tile));
   if (!owner) return null;
@@ -1514,7 +1527,7 @@ export function encampmentDefense(
   // below.
   const held = cityAtTile(state, tile);
   return {
-    defCS: Math.max(15, owner.bestMeleeCS ?? 0)
+    defCS: holderStrength(state, owner.seat)
       + (held ? WALLS_TIER_CS[wallsTier(state, held)] ?? 0 : 0),
   };
 }
@@ -1956,8 +1969,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     // their share of the hit first, through the majors' own split.
     const csShape = { buildings: cityState.buildings ?? [], seat: cityState.seat, outerHp: cityState.outerHp };
     const csOuter = outerPool(state, csShape);
-    const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0)
-      + (WALLS_TIER_CS[wallsTier(state, csShape)] ?? 0);
+    const defCS = minorCityCS(state, cityState);
     const csRoll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, cityState.seat, null, true)) - defCS, 'rngcs', targetIndex);
     const csSplit = cityDamageSplit(csOuter, wallsMax(state, csShape), csRoll, cityHitClass(attacker.type, true));
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
@@ -2059,8 +2071,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (csHere && csHere.centerIndex === targetIndex && cityStateAttackable(state, csHere, unitSeat(attacker))) {
     const csShape = { buildings: csHere.buildings ?? [], seat: csHere.seat, outerHp: csHere.outerHp };
     const csOuter = outerPool(state, csShape);
-    const defCS = 15 + csHere.population + (csHere.type === 'militaristic' ? 6 : 0)
-      + (WALLS_TIER_CS[wallsTier(state, csShape)] ?? 0);
+    const defCS = minorCityCS(state, csHere);
     const roll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, csHere.seat, null, true)) - defCS, 'vrngcs', targetIndex);
     const split = cityDamageSplit(csOuter, wallsMax(state, csShape), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
@@ -2397,8 +2408,7 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
   // city rides the majors' own split, siege support included.
   const csShape = { buildings: cityState.buildings ?? [], seat: cityState.seat, outerHp: cityState.outerHp };
   const csTier = wallsTier(state, csShape);
-  const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0)
-    + (WALLS_TIER_CS[csTier] ?? 0);
+  const defCS = minorCityCS(state, cityState);
   const csOuter = outerPool(state, csShape);
   const csRoll = damageRoll(state, atkCS - defCS, 'csty', cityState.centerIndex);
   const csSplit = cityDamageSplit(csOuter, wallsMax(state, csShape), csRoll,
@@ -2437,10 +2447,17 @@ function csPatrons(state: GameState, cityState: CityState, captor: number): numb
   return out;
 }
 
+/** CIV6: a conquered city-state is ELIMINATED, and its units leave the map
+ *  with it — removed, not killed, so no death leaves a dig. */
+function disbandMinorArmy(state: GameState, cityState: CityState): void {
+  state.units = state.units.filter((u) => u.seat !== cityState.seat);
+}
+
 export function captureCityState(state: GameState, cityState: CityState, seat: number): void {
   grievanceCityStateTaken(state, seat, (seatOf(state, seat)?.cities.length ?? 0) >= MAX_CITIES_PER_SEAT);
   // an annexed minor was founded by nobody who keeps a ledger
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
+  disbandMinorArmy(state, cityState);
   for (const sx of state.seats) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }
@@ -2502,6 +2519,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
 export function captureCityStateFor(state: GameState, actor: Seat, cityState: CityState): void {
   grievanceCityStateTaken(state, actor.seat, actor.cities.length >= MAX_CITIES_PER_SEAT);
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
+  disbandMinorArmy(state, cityState);
   for (const sx of state.seats) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }

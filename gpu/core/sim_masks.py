@@ -2191,13 +2191,17 @@ class SimMasks:
         return torch.where(self.unit_water_walk[ut],
                            land_ok | self.wpass.gather(1, dc).squeeze(1), out)
 
-    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False, ladder: bool = True) -> None:
+    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False, ladder: bool = True,
+                    seat: int = BARB_SEAT) -> None:
+        """Spawn into the HOSTILE pool — the barbarians' and the Free Cities'
+        (`seat`), the two classes that earn no experience and that no driven
+        seat walks."""
         if not bool(mask.any()):
             return
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
         # exactly as TS's spawnUnit branches on UNITS[type].naval.
         _nm = torch.ones(self.B, dtype=torch.bool, device=self.device) if naval else None
-        found, spot = self._first_free_spot(at_tile, BARB_SEAT, naval_mask=_nm)
+        found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm)
         can = mask & found
         if not bool(can.any()):
             return
@@ -2205,6 +2209,7 @@ class SimMasks:
         slot = self.next_slot[rows]
         assert int(slot.max()) < simbase.BARB_POOL_MAX, "barbarian slot pool exhausted — raise simbase.BARB_POOL_MAX"
         self.barb_unit_alive[rows, slot] = True
+        self.barb_unit_seat[rows, slot] = seat
         self.barb_unit_type[rows, slot] = int(self._barb_ladder[unit_type]) if ladder else unit_type
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
@@ -2229,7 +2234,7 @@ class SimMasks:
         if self._log_diff:
             for _sb in rows.tolist():
                 self._diff_events.setdefault(_sb, []).append(
-                    f"sp:{BARB_SEAT}:{int(self.turn)}"
+                    f"sp:{seat}:{int(self.turn)}"
                     f":{int(at_tile[_sb])}:{int(unit_type)}"
                     f" at{int(spot[_sb])}")
         self.next_slot[rows] += 1

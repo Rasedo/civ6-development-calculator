@@ -168,23 +168,15 @@ export const LOWLAND_MAX_BAND = srcConst('climate.lowlandMaxBand', 3, {
 });
 
 /**
- * How much likelier a disaster is, and how much likelier it is to arrive at
- * its worst severity, once the world has warmed.
+ * How much likelier a disaster is to arrive at its worst severity once the
+ * world has warmed.
  *
- * MODEL — but a narrow one. The page states the escalation twice ("a general
- * increase in the chance for disasters to occur", "a greater chance the
- * disasters will be of the most destructive strength") and quantifies neither.
- * Rather than invent a second ladder, both ride the ONE warming curve the page
- * does publish, `CLIMATE_PHASES[p].iceMelt`: the per-turn chance is scaled by
- * `1 + iceMelt`, and that same fraction of the lowest severity band's
- * probability moves to the highest. Phase 0 leaves both untouched.
+ * MODEL — but a narrow one. The page states "a greater chance the disasters
+ * will be of the most destructive strength" and does not quantify it, so it
+ * rides the ONE warming curve the page does publish,
+ * `CLIMATE_PHASES[p].iceMelt`: that fraction of the mildest row's weight in
+ * the turn's one event draw moves onto the worst. Below Phase I nothing moves.
  */
-export function disasterRateMult(phase: number): number {
-  return phase < 0 ? 1 : 1 + CLIMATE_PHASES[phase].iceMelt;
-}
-
-/** The severity split at this phase: `iceMelt` of the mildest band's mass
- *  moved onto the worst. `base` is left untouched at phase 0. */
 export function severitySplit(base: readonly number[], phase: number): number[] {
   const out = [...base];
   if (phase < 0 || out.length < 2) return out;

@@ -9,60 +9,55 @@ import { srcConst, xml, type SrcMap } from './provenance';
  */
 
 /**
- * CIV6 (`RandomEvent_Frequencies`, REALISM_SETTING_MODERATE): every disaster
- * has a published `OccurrencesPerGame` at each of five Realism settings.
- * OWNER RULING: this engine models MODERATE, and a per-game
- * count becomes a per-turn chance by dividing by the STANDARD game length —
- * Civ 6's 500 turns, the span the install's count is written over. This
- * engine plays 250 of those turns and so sees half a game's worth, which is
- * what half a game should see.
- *
- * These four replaced constants that admitted in their own comments to being
- * invented. The wiki page they were read from publishes no numbers; the
- * install does.
+ * THE TURN'S ONE RANDOM EVENT. CIV6 (`RandomEvent_Frequencies`,
+ * REALISM_SETTING_MODERATE — OWNER RULING: this engine models MODERATE):
+ * every event row carries an `OccurrencesPerGame`, and MEASURED in a natural
+ * 251-turn game (`tools/civ6lab/runs/event_history_lab4_20260923T135005Z.txt`)
+ * the game fires at most ONE event a turn, drawn over the eligible (event,
+ * site) pairs with that column as the pair's WEIGHT: floods and eruptions ran
+ * about ten times their column (one weight per river, per volcano), storms
+ * and droughts near theirs (one weight per event). `disasterPhase` makes the
+ * draw; every weight below is the column itself.
  */
-const STANDARD_GAME_TURNS = srcConst('disasters.STANDARD_GAME_TURNS', 500, {
-  pedia: 'the GS standard-speed game length, 500 turns — the span RandomEvent_Frequencies writes '
-    + 'its OccurrencesPerGame over (owner ruling 2026-09-04)',
-});
-
 const freq = (ev: string) => xml('RandomEvent_Frequencies',
   `RandomEventType=RANDOM_EVENT_${ev}&RealismSettingType=REALISM_SETTING_MODERATE`,
   'OccurrencesPerGame');
 
-/** MODERATE floods: FLOOD_MODERATE 2, FLOOD_MAJOR 1.5, FLOOD_1000_YEAR 1 per
- *  game — 4.5 in all, split by severity in that proportion. */
-const FLOOD_PER_GAME = [2, 1.5, 1] as const;
-const FLOOD_TOTAL = FLOOD_PER_GAME[0] + FLOOD_PER_GAME[1] + FLOOD_PER_GAME[2];
-export const FLOOD_SEVERITY_P = srcConst('disasters.floodSeverityP', [
-  FLOOD_PER_GAME[0] / FLOOD_TOTAL, FLOOD_PER_GAME[1] / FLOOD_TOTAL, FLOOD_PER_GAME[2] / FLOOD_TOTAL,
-] as const, {
-  derived: 'each flood row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE over their sum '
-    + '(2 / 1.5 / 1 of 4.5)',
-  inputs: [freq('FLOOD_MODERATE'), freq('FLOOD_MAJOR'), freq('FLOOD_1000_YEAR')],
-});
-export const FLOOD_CHANCE = srcConst('disasters.floodChance', FLOOD_TOTAL / STANDARD_GAME_TURNS, {
-  derived: 'the three flood rows\' OccurrencesPerGame at REALISM_SETTING_MODERATE, summed, over '
-    + 'STANDARD_GAME_TURNS (owner ruling 2026-09-04)',
+/** One weight per severity row, MODERATE / MAJOR / 1000_YEAR: 2 / 1.5 / 1,
+ *  each counted once per flooding river. Every flood array below is indexed
+ *  by that severity. */
+export const FLOOD_WEIGHT = srcConst('disasters.floodWeight', [2, 1.5, 1] as const, {
+  derived: 'each flood row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE, in severity order',
   inputs: [freq('FLOOD_MODERATE'), freq('FLOOD_MAJOR'), freq('FLOOD_1000_YEAR')],
 });
 
-/** MODERATE droughts: DROUGHT_MAJOR 23 + DROUGHT_EXTREME 5. This engine has
- *  ONE drought kind, so the two are summed — the EXTREME severity is the storm table's
- *  sibling gap, not a magnitude this line invents. */
-export const DROUGHT_CHANCE = srcConst('disasters.droughtChance', (23 + 5) / STANDARD_GAME_TURNS, {
-  derived: 'DROUGHT_MAJOR + DROUGHT_EXTREME OccurrencesPerGame at REALISM_SETTING_MODERATE over '
-    + 'STANDARD_GAME_TURNS — this engine has ONE drought kind, so the two rows are summed',
+/** DROUGHT_MAJOR / DROUGHT_EXTREME: weights 23 / 5, each counted once; the
+ *  footprint is `Hexes` 7 (the first seven `STORM_DISC` slots, the centre and
+ *  its ring) and the dry spell lasts `Duration` 5 / 10 turns. */
+const drought = (ev: string, col: string) => xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${ev}`, col);
+export const DROUGHT_WEIGHT = srcConst('disasters.droughtWeight', [23, 5] as const, {
+  derived: 'the two drought rows\' OccurrencesPerGame at REALISM_SETTING_MODERATE, MAJOR then EXTREME',
   inputs: [freq('DROUGHT_MAJOR'), freq('DROUGHT_EXTREME')],
 });
+export const DROUGHT_DURATION = srcConst('disasters.droughtDuration', [5, 10] as const, {
+  derived: 'the two drought rows\' RandomEvents.Duration, MAJOR then EXTREME',
+  inputs: [drought('DROUGHT_MAJOR', 'Duration'), drought('DROUGHT_EXTREME', 'Duration')],
+});
+export const DROUGHT_HEXES = srcConst('disasters.droughtHexes', 7, drought('DROUGHT_MAJOR', 'Hexes'));
+
+/** CIV6 (`RandomEvent_Terrains`): a drought starts on Plains or Grassland,
+ *  flat or hills — the four rows both drought events list. */
+export function droughtCandidate(t: { terrain: string; elevation: string }): boolean {
+  return (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation !== 'MOUNTAIN';
+}
 
 /**
  * THE EIGHT STORMS, one row each from the install's `RandomEvents`,
  * `RandomEvent_Terrains`, `RandomEvent_Frequencies` (MODERATE),
  * `RandomEvent_Damages` and `RandomEvent_Yields`, in the `RandomEvents` table
  * order. Every percentage is the row's own; a damage column the row lacks is
- * ZERO, not inherited. `chance` is OccurrencesPerGame over the standard game
- * (the ruling above). `hexes` is the footprint (the first N slots of the
+ * ZERO, not inherited. `weight` is OccurrencesPerGame, the row's weight in the
+ * turn's one draw, counted once. `hexes` is the footprint (the first N slots of the
  * canonical radius-2 disc, `STORM_DISC`), `duration` the turns it persists.
  *
  * CIV6 (`RandomEvent_Damages`, `Percentage` beside `MinHP`/`MaxHP`): the share
@@ -167,8 +162,8 @@ export interface StormEvent {
   family: StormFamily;
   /** the install's Severity, 1 or 2 — the climate ramp moves mass onto 2 */
   severity: 1 | 2;
-  /** per-turn base chance: OccurrencesPerGame (MODERATE) / STANDARD_GAME_TURNS */
-  chance: number;
+  /** the weight in the turn's one draw: OccurrencesPerGame (MODERATE) */
+  weight: number;
   hexes: number;
   duration: number;
   impPill: number;
@@ -225,12 +220,8 @@ const stormSrc = (id: string, d: Partial<StormEvent>): SrcMap => {
     severity: xml('RandomEvents', ev, 'Severity'),
     hexes: xml('RandomEvents', ev, 'Hexes'),
     duration: xml('RandomEvents', ev, 'Duration'),
-    chance: {
-      derived: 'OccurrencesPerGame at REALISM_SETTING_MODERATE / STANDARD_GAME_TURNS (owner ruling '
-        + '2026-09-04)',
-      inputs: [xml('RandomEvent_Frequencies',
-        `${ev}&RealismSettingType=REALISM_SETTING_MODERATE`, 'OccurrencesPerGame')],
-    },
+    weight: xml('RandomEvent_Frequencies',
+      `${ev}&RealismSettingType=REALISM_SETTING_MODERATE`, 'OccurrencesPerGame'),
     impPill: pct('IMPROVEMENT_PILLAGED'),
     impDest: pct('IMPROVEMENT_DESTROYED'),
     distPill: pct('DISTRICT_PILLAGED'),
@@ -254,7 +245,7 @@ const storm = (
   id: string, family: StormFamily, severity: 1 | 2, perGame: number, hexes: number,
   d: Partial<StormEvent>,
 ): StormEvent => ({
-  id, family, severity, chance: perGame / STANDARD_GAME_TURNS, hexes, duration: 3,
+  id, family, severity, weight: perGame, hexes, duration: 3,
   src: stormSrc(id, d),
   impPill: 0, impDest: 0, distPill: 0, bldgPill: 0, pop: 0, civKill: 0,
   landP: 0, navalP: 0, landLo: 0, landHi: 0, navalLo: 0, navalHi: 0,
@@ -379,16 +370,13 @@ const RAW_STORM_UNIT_ROWS: readonly StormUnitRow[] = [
 export const STORM_UNIT_ROWS: readonly StormUnitRow[] =
   RAW_STORM_UNIT_ROWS.map((r) => ({ ...r, src: stormUnitSrc(r) }));
 
-/** NOT covered by the per-GAME-counts ruling: the install counts eruptions per GAME
- *  (VOLCANO_GENTLE 4, CATASTROPHIC 2.5, MEGACOLOSSAL 1.5 at MODERATE) where
- *  this engine rolls per VOLCANO, and the conversion needs the map's volcano
- *  count. The rate stays stylized, an open question. */
-export const ERUPTION_CHANCE_PER_VOLCANO = srcConst('disasters.eruptionChance', 0.02, {
-  stylized: 'the install counts eruptions per GAME (VOLCANO_GENTLE 4 / CATASTROPHIC 2.5 / '
-    + 'MEGACOLOSSAL 1.5 at MODERATE) where this engine rolls per VOLCANO, and the conversion '
-    + 'needs the map\'s volcano count — still the old stylization, still an open question',
+/** One weight per eruption severity, GENTLE / CATASTROPHIC / MEGACOLOSSAL:
+ *  4 / 2.5 / 1.5, each counted once per volcano. Every eruption array below
+ *  is indexed by that severity. */
+export const ERUPTION_WEIGHT = srcConst('disasters.eruptionWeight', [4, 2.5, 1.5] as const, {
+  derived: 'each eruption row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE, in severity order',
+  inputs: [freq('VOLCANO_GENTLE'), freq('VOLCANO_CATASTROPHIC'), freq('VOLCANO_MEGACOLOSSAL')],
 });
-export const DROUGHT_LENGTH = 8;
 
 /** CIV6 (`RandomEvent_Yields`, `ReplaceFeature="true"`): the FEATURE_VOLCANIC_SOIL
  *  YIELD_FOOD row of each eruption severity, GENTLE / CATASTROPHIC /
@@ -402,14 +390,34 @@ export const SOIL_PAINT_P = srcConst('disasters.soilPaintP', [0.35, 0.5, 0.75] a
     + '(tools/civ6lab/runs/volcano_20260923T191337Z.jsonl)',
   inputs: [soilRow('GENTLE'), soilRow('CATASTROPHIC'), soilRow('MEGACOLOSSAL')],
 });
-/** The severity every eruption takes: the engine rolls none, so each one is
- *  GENTLE, the first row of `SOIL_PAINT_P`. */
-export const ERUPTION_SEVERITY = 0;
 /** The features an eruption's soil REPLACES — Woods and Rainforest (the
  *  install's FOREST and JUNGLE), measured replaced at 6/28, 11/28, 18/28;
  *  Floodplains and Geothermal Fissure are never painted (0/18). */
 export const SOIL_REPLACES: readonly string[] = srcConst('disasters.soilReplaces', ['WOODS', 'RAINFOREST'], {
   lab: 'runs/volcano_20260923T191337Z.jsonl',
+});
+
+/** KILIMANJARO's eruptions, GENTLE / CATASTROPHIC: rows of their own
+ *  (`RandomEvents.NaturalWonder` FEATURE_KILIMANJARO, this engine's
+ *  MOUNT_KILIMANJARO), between the floods and the volcanoes in the table's
+ *  order. Weights 4 / 2.5, each counted once per Kilimanjaro plot; their
+ *  FEATURE_VOLCANIC_SOIL YIELD_FOOD rows, 50 / 50, are the per-plot paint
+ *  chance on the wonder's ring, read as the volcanoes' are. */
+export const KILIMANJARO_FEATURE = srcConst('disasters.kilimanjaroFeature', 'MOUNT_KILIMANJARO', {
+  derived: 'the engine feature id of the rows\' NaturalWonder FEATURE_KILIMANJARO',
+  inputs: [xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_KILIMANJARO_GENTLE', 'NaturalWonder'),
+    xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_KILIMANJARO_CATASTROPHIC', 'NaturalWonder')],
+});
+export const KILIMANJARO_WEIGHT = srcConst('disasters.kilimanjaroWeight', [4, 2.5] as const, {
+  derived: 'the two Kilimanjaro rows\' OccurrencesPerGame at REALISM_SETTING_MODERATE, GENTLE then CATASTROPHIC',
+  inputs: [freq('KILIMANJARO_GENTLE'), freq('KILIMANJARO_CATASTROPHIC')],
+});
+const kiliSoilRow = (ev: string) => xml('RandomEvent_Yields',
+  `RandomEventType=RANDOM_EVENT_KILIMANJARO_${ev}&YieldType=YIELD_FOOD`, 'Percentage');
+export const KILIMANJARO_SOIL_P = srcConst('disasters.kilimanjaroSoilP', [0.5, 0.5] as const, {
+  derived: 'Percentage/100 of each Kilimanjaro row\'s FEATURE_VOLCANIC_SOIL YIELD_FOOD row (50 / 50), '
+    + 'read as the per-plot paint chance SOIL_PAINT_P reads',
+  inputs: [kiliSoilRow('GENTLE'), kiliSoilRow('CATASTROPHIC')],
 });
 
 /** "Improvement — Pillaged: 100%; Destroyed: 50% / 80%". A flood always
@@ -475,3 +483,49 @@ export function floodTerrainColumn(terrain: string): number {
   if (terrain === 'GRASSLAND') return 1;
   return 2;
 }
+
+/**
+ * THE NUCLEAR ACCIDENT, one row per severity MINOR / MAJOR / CATASTROPHIC
+ * (`RANDOM_EVENT_NUCLEAR_ACCIDENT_*`, Severity 0 / 1 / 2). Its site is a city
+ * whose Nuclear Power Plant has stood `MinTurnAtRisk` turns (10 / 20 / 30, the
+ * city's `reactorAge`), one weight per such city at `OccurrencesPerGame` 1.
+ * MEASURED over 75 forced accidents (`tools/civ6lab/runs/reactor_20260923T192129Z.jsonl`):
+ * the `RandomEvent_Damages` Percentages are PER-ACCIDENT CHANCES — the
+ * Industrial Zone is pillaged at DISTRICT_PILLAGED's 0 / 50 / 100, one citizen
+ * is lost at POPULATION_LOSS's 0 / 0 / 80 — and RADIATION_LEAKED's
+ * `FalloutDuration` 2 / 10 / 20 lies on the reactor's own plot alone. The
+ * plant stays and goes on ageing.
+ */
+const accident = (sev: string) => `RandomEventType=RANDOM_EVENT_NUCLEAR_ACCIDENT_${sev}`;
+const ACCIDENT_SEVS = ['MINOR', 'MAJOR', 'CATASTROPHIC'] as const;
+const accidentDmg = (kind: string, col = 'Percentage') =>
+  ACCIDENT_SEVS.map((s) => xml('RandomEvent_Damages', `${accident(s)}&DamageType=${kind}`, col));
+export const ACCIDENT_WEIGHT = srcConst('disasters.accidentWeight', [1, 1, 1] as const, {
+  derived: 'each accident row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE, in severity order',
+  inputs: ACCIDENT_SEVS.map((s) => freq(`NUCLEAR_ACCIDENT_${s}`)),
+});
+export const ACCIDENT_MIN_TURN = srcConst('disasters.accidentMinTurn', [10, 20, 30] as const, {
+  derived: 'each accident row\'s RandomEvents.MinTurnAtRisk, in severity order',
+  inputs: ACCIDENT_SEVS.map((s) => xml('RandomEvents', accident(s), 'MinTurnAtRisk')),
+});
+export const ACCIDENT_FALLOUT = srcConst('disasters.accidentFallout', [2, 10, 20] as const, {
+  derived: 'each accident row\'s RADIATION_LEAKED FalloutDuration, in severity order — the turns '
+    + 'the reactor\'s own plot stays irradiated (measured, runs/reactor_20260923T192129Z.jsonl)',
+  inputs: accidentDmg('RADIATION_LEAKED', 'FalloutDuration'),
+});
+export const ACCIDENT_DISTRICT_P = srcConst('disasters.accidentDistrictP', [0, 0.5, 1] as const, {
+  derived: 'Percentage/100 of each accident row\'s DISTRICT_PILLAGED row (MINOR carries none), the '
+    + 'chance the Industrial Zone is pillaged (measured 0/25, 13/25, 25/25)',
+  inputs: [
+    xml('RandomEvent_Damages', `${accident('MINOR')}&DamageType=DISTRICT_PILLAGED`, 'Percentage', { absent: true }),
+    ...accidentDmg('DISTRICT_PILLAGED').slice(1),
+  ],
+});
+export const ACCIDENT_POP_P = srcConst('disasters.accidentPopP', [0, 0, 0.8] as const, {
+  derived: 'Percentage/100 of each accident row\'s POPULATION_LOSS row (only CATASTROPHIC carries '
+    + 'one), the chance the city loses ONE citizen (measured 22/25)',
+  inputs: [
+    ...accidentDmg('POPULATION_LOSS').slice(0, 2).map((x) => ({ ...x, absent: true })),
+    accidentDmg('POPULATION_LOSS')[2],
+  ],
+});

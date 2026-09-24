@@ -294,6 +294,107 @@ def test_heal_and_pressure(rules, path) -> None:
     print("  6 the heal and the pressure OK — and three full turns with a Free City")
 
 
+def free_units(sim) -> list[tuple[int, int, int]]:
+    """(slot, type, tile) of every living Free Cities unit, in slot order."""
+    al = sim.unit_alive[B0] & (sim.unit_seat[B0] == FREE_SEAT)
+    return [(int(s), int(sim.unit_type[B0, s]), int(sim.unit_tile[B0, s]))
+            for s in al.nonzero(as_tuple=True)[0].tolist()]
+
+
+def test_grants(rules, path) -> None:
+    sim = fresh(rules, path)
+    t0 = int(sim.turn)
+    centre = revolt(sim)
+    col = free_slot(sim, centre)
+    F = sim.FREE_ROW
+    maa, xbow = UNI.index("MAN_AT_ARMS"), UNI.index("CROSSBOWMAN")
+    assert (sim._free_grant_melee, sim._free_grant_melee_n, sim._free_grant_ranged, sim._free_grant_turns) \
+        == (maa, 2, xbow, 5), "the wire's grant rows"
+    assert int(sim.city_freed_turn[B0, F, col]) == t0
+    # the melee pair exists on the flip turn itself, on the first free land
+    # tiles beside the centre in direction order, in the hostile pool
+    units = free_units(sim)
+    assert [u[1] for u in units] == [maa, maa], units
+    nbs = [int(n) for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n])]
+    assert [u[2] for u in units] == nbs[:2], (units, nbs)
+    lo = sim.POOL_LO["barb"]
+    assert all(s >= lo for s, _t, _p in units), "a Free Cities unit left the hostile pool"
+    assert all(int(sim.unit_xp[B0, s]) == 0 for s, _t, _p in units)
+    sim._check_seat_invariant()
+    # it trains nothing: nothing arrives until the grant falls due, then once
+    for k in range(1, 5):
+        sim.turn = t0 + k
+        sim._free_cities_phase()
+        assert len(free_units(sim)) == 2, (k, free_units(sim))
+    sim.turn = t0 + 5
+    sim._free_cities_phase()
+    got = free_units(sim)
+    assert sorted(u[1] for u in got) == sorted([maa, maa, xbow]), got
+    sim.turn = t0 + 6
+    sim._free_cities_phase()
+    assert len(free_units(sim)) == 3
+    # no barbarian rule walks them: the raid never moves a Free Cities unit
+    before = free_units(sim)
+    sim._barbarian_phase()
+    assert free_units(sim) == before, "a barbarian walk moved a Free Cities unit"
+    print("  7 the grants OK — two Men-at-Arms on the flip turn, a Crossbowman five turns later, never walked")
+
+
+def test_defence_and_strike(rules, path) -> None:
+    sim = fresh(rules, path)
+    centre = revolt(sim)
+    col = free_slot(sim, centre)
+    F = sim.FREE_ROW
+    hrow = torch.tensor([F])
+    hcol = torch.tensor([col])
+    no = torch.zeros(1, dtype=torch.long)
+    assert int(sim._city_defense_cs(hrow, hcol, no)[0][B0]) == 72, "the Free City's flat base is 72"
+    assert int(sim._city_defense_cs(torch.tensor([0]), torch.tensor([0]), no)[0][B0]) != 72
+    # an unwalled Free City fires nothing; a walled one strikes a hostile
+    # unit beside it
+    for walled in (False, True):
+        s = fresh(rules, path)
+        c = revolt(s)
+        j = free_slot(s, c)
+        if walled:
+            wi = RULES["buildings"].index(next(b for b in RULES["buildings"] if b["id"] == "ANCIENT_WALLS"))
+            s.city_bldg[B0, F, j, wi] = True
+            s._bldg_version += 1
+            s.city_outer_hp[B0, F, j] = int(s._walls_max_at(torch.tensor([F]), torch.tensor([j]))[B0])
+            base = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]), no)[0][B0])
+            assert base == 72 + int(s._walls_tier_cs[1]), base
+        nb = next(int(n) for n in s.neigh[c].tolist()
+                  if n >= 0 and bool(s.passable[B0, n]) and int(s.military_at[B0, n]) < 0)
+        u = put(s, 1, nb, "WARRIOR")
+        s._free_cities_phase()
+        hp = int(s.major_unit_hp[B0, u])
+        assert (hp < 100) if walled else (hp == 100), (walled, hp)
+    print("  8 the defence OK — a flat 72, walls on top; a walled Free City strikes")
+
+
+def test_free_unit_defends(rules, path) -> None:
+    sim = fresh(rules, path)
+    centre = revolt(sim)
+    s0, _t, tile = free_units(sim)[0]
+    # a major's warrior beside the Man-at-Arms may attack it without a war,
+    # and the defender banks no experience
+    nb = next(int(n) for n in sim.neigh[tile].tolist()
+              if n >= 0 and n != centre and bool(sim.passable[B0, n]) and int(sim.military_at[B0, n]) < 0
+              and int(sim.civilian_at[B0, n]) < 0)
+    u = put(sim, 1, nb, "WARRIOR")
+    assert bool(sim._seats_hostile(1, torch.tensor([[FREE_SEAT]]))[B0, 0])
+    hp0 = int(sim.unit_hp[B0, s0])
+    sim._hostile_vs_unit(torch.tensor([True]), torch.tensor([tile]), "major", u)
+    assert int(sim.unit_hp[B0, s0]) < hp0, "the attack did not land on the Free Cities unit"
+    assert int(sim.unit_xp[B0, s0]) == 0, "a Free Cities unit banked experience"
+    sim._check_seat_invariant()
+    # and whole turns run with the grants standing
+    for _ in range(3):
+        sim.step()
+    sim._check_seat_invariant()
+    print("  9 the defenders OK — attackable by anyone, no experience, whole turns run")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -303,6 +404,9 @@ def main() -> int:
     test_free_city_loyalty_and_join(rules, path)
     test_anyone_may_attack(rules, path)
     test_heal_and_pressure(rules, path)
+    test_grants(rules, path)
+    test_defence_and_strike(rules, path)
+    test_free_unit_defends(rules, path)
     print("BATTERY OK free_city")
     return 0
 

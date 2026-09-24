@@ -174,7 +174,7 @@ class Rules:
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — eureka/inspiration conditions
     combat: dict  # barbarian constants + the JS-computed damage-base table
-    disasters: dict  # the Flood (Civ6) severity tables + the base per-turn chances
+    disasters: dict  # the Flood (Civ6) severity tables + the weights of the turn's one event draw
     climate: dict  # the Climate (Civ6) arc: carbon rates, the seven phases, the deforestation bands
     units: list  # trainable roster [{id, cost, combat, maintenance, civilian, requiresTech}]
     uniques: dict  # {civs, openTerrains, coastTerrain} — the unique-unit wire (cpu/export/rules.ts)
@@ -653,7 +653,7 @@ FREE_SEAT = 300
 #   xp   this seat's units accrue experience and promote.
 SEAT_CAPS = {
     "major": {"xp": True},     # every major seat
-    "hostile": {"xp": False},  # barbarians
+    "hostile": {"xp": False},  # the barbarians, and the Free Cities' granted units
 }
 
 POOL_CLASS = {"major": "major", "barb": "hostile"}
@@ -821,6 +821,7 @@ _MUTABLE = [
     "city_amen_tier",  # the amenity tier the walk ran on — a city plane, same reason
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
     "city_free_press", "free_next_city_id",  # a FREE CITY's race per major, and the Free Cities seat's city-id counter
+    "city_freed_turn",  # the turn a Free City became free, which its ranged grant counts from
     # THE GOVERNOR ROSTER — one slot per catalog governor per major row
     "civ_gov_appointed", "civ_gov_city", "civ_gov_minor", "civ_gov_establish", "civ_gov_out", "civ_gov_promos",
     "antiquity",  # ANTIQUITY SITES (bool tile plane)

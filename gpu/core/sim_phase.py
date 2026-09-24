@@ -57,27 +57,30 @@ class SimPhase:
         lowest tile index; one roll at the city's defense strength against the
         target's, no retaliation, never captures.
 
-        Hostility is `_seats_hostile` on the row's own line of the war matrix —
-        `unitsHostile` asked of the whole map at once — so barbarians, at-war
-        majors and at-war city-states all answer through one lookup and no seat
-        gets a hand-written hostility set of its own."""
+        Hostility is `_seats_hostile` on the city's SEAT line of the war
+        matrix — `unitsHostile` asked of the whole map at once — so
+        barbarians, at-war majors and at-war city-states all answer through
+        one lookup and no seat gets a hand-written hostility set of its own.
+        A city-state's row fires from its own centre strength
+        (`_minor_centre_cs`, `minorCityCS`)."""
         Bn, Tn, dev2 = self.B, self.T, self.device
         if not bool(fire.any()):
             return
         bidx = self._bidx
+        seat = int(self._ROW_SEAT[row])
         ctr = self.city_center[bidx, row, col].clamp(min=0)  # [B]
         # CIV6: the Encampment conducts a ranged strike of its OWN — the scan
         # measures from the district's tile, the centre's otherwise.
         org = ctr if origin is None else origin.clamp(min=0)
         dist = self.pair_dist[org].to(torch.long)  # [B, T]
-        _mil, _civ = self._visible_military_at(row), self._civclass_plane()
+        _mil, _civ = self._visible_military_at(seat), self._civclass_plane()
         _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
         _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
         _emb = self.embarked_at
         _eseat = torch.where(_emb >= 0, self.unit_seat.gather(1, _emb.clamp(min=0)), torch.full_like(_emb, -1))
-        hm = self._seats_hostile(row, _mseat)
-        hc = self._seats_hostile(row, _cseat)
-        he = self._seats_hostile(row, _eseat)
+        hm = self._seats_hostile(seat, _mseat)
+        hc = self._seats_hostile(seat, _cseat)
+        he = self._seats_hostile(seat, _eseat)
         valid = fire.unsqueeze(1) & (hm | hc | he) & (dist >= 1) & (dist <= 2)
         arangeT = torch.arange(Tn, device=dev2)
         k = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
@@ -89,13 +92,14 @@ class SimPhase:
         _okm, _okc = hm[bidx, tt], hc[bidx, tt]
         # a city strike is a SHOT, so `stackDefender`'s higher-chassis arm picks
         _ms_t, _mq_t, _okm, _cs_t, _cq_t, _okc = self._stack_fold(
-            tt, row, _mil[bidx, tt], _mseat[bidx, tt], _okm,
+            tt, seat, _mil[bidx, tt], _mseat[bidx, tt], _okm,
             _civ[bidx, tt], _cseat[bidx, tt], _okc, ranged=True)
         d_slot = torch.where(_okm, _ms_t, torch.where(_okc, _cs_t, torch.full_like(tt, -1)))
         d_seat = torch.where(_okm, _mq_t, torch.where(_okc, _cq_t, torch.full_like(tt, -1)))
         ds0 = d_slot.clamp(min=0)
-        # A MILITARY target whose seat class earns xp — never a barbarian.
-        is_vet_mil = _okm & (d_seat != BARB_SEAT)
+        # A MILITARY target whose seat class earns xp — never a barbarian and
+        # never the Free Cities' own.
+        is_vet_mil = _okm & (d_seat != BARB_SEAT) & (d_seat != FREE_SEAT)
         d_type = self.unit_type[bidx, ds0]
         _t = torch.ones_like(tt, dtype=torch.bool)
         def_promo = self._promo_cs(
@@ -108,19 +112,28 @@ class SimPhase:
         d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
         if bool(d_emb.any()):
             def_cs = torch.where(d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
-        gslot = self.military_at[bidx, ctr]
-        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)).long()
-        bm = self.civ_best_melee[:, row]
-        atk_cs = (torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
-                  + self._walls_tier_cs[self._walls_tier_row(row, col)])
-        if self._gov_has_effects:
-            atk_cs = atk_cs + self._gov_mods(row)[12]["crng"].to(atk_cs.dtype)
-        # CIV6 (Redoubt): "Increase city garrison Combat Strength by 5" — this
-        # model fires a strike from the same base it defends with, so the
-        # governor's adder rides both.
-        if self.n_governors:
-            atk_cs = atk_cs + self._governor_city_defense(
-                torch.full_like(col, row), col).to(atk_cs.dtype)
+        if row == self.FREE_ROW:
+            # the Free Cities player's flat base, its garrison and its walls
+            gslot = self.military_at[bidx, ctr]
+            gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == seat)).long()
+            atk_cs = (self._free_def + gar * 5
+                      + self._walls_tier_cs[self._walls_tier_row(row, col)])
+        elif row >= self.n_majors:
+            atk_cs = self._minor_centre_cs(row - self._CITY_MINOR0)
+        else:
+            gslot = self.military_at[bidx, ctr]
+            gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)).long()
+            bm = self.civ_best_melee[:, row]
+            atk_cs = (torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
+                      + self._walls_tier_cs[self._walls_tier_row(row, col)])
+            if self._gov_has_effects:
+                atk_cs = atk_cs + self._gov_mods(row)[12]["crng"].to(atk_cs.dtype)
+            # CIV6 (Redoubt): "Increase city garrison Combat Strength by 5" —
+            # this model fires a strike from the same base it defends with, so
+            # the governor's adder rides both.
+            if self.n_governors:
+                atk_cs = atk_cs + self._governor_city_defense(
+                    torch.full_like(col, row), col).to(atk_cs.dtype)
         # a SURVIVED Military Emergency pays its target +2 CS on every City
         # Strike against a member, forever
         _emg_s = torch.zeros(Bn, dtype=torch.float64, device=dev2)
@@ -607,6 +620,30 @@ class SimPhase:
                     self._transfer_city(b, row, j, win, conquest=False)
                 else:
                     self._transfer_city(b, row, j, self.FREE_ROW, conquest=False)
+                    # the revolt GRANTS the Free City its melee pair on the flip
+                    # turn itself (`flipCity`)
+                    one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                    one[b] = True
+                    fcol = self.centre_slot_at[:, int(here[b])].clamp(min=0)
+                    for _k in range(self._free_grant_melee_n):
+                        self._grant_free_unit(one, fcol, self._free_grant_melee)
+
+    def _grant_free_unit(self, mask: torch.Tensor, col: torch.Tensor, unit_type: int) -> None:
+        """`grantFreeCityUnit` for the Free City in column `col` [B] of the
+        free row, in the games of `mask` [B]. The Free Cities player trains no
+        unit, yet a revolt hands it defenders: each stands on the first free
+        land tile beside the centre, in direction order, and with none free it
+        is not granted. The unit lands in the hostile pool under FREE_SEAT,
+        where no walker moves it: it defends, blocks and heals."""
+        if unit_type < 0 or not bool(mask.any()):
+            return
+        ctr = self.city_center[self._bidx, self.FREE_ROW, col.clamp(min=0)].clamp(min=0)
+        nb = self.neigh[ctr]  # [B, 6], direction order
+        nbc = nb.clamp(min=0)
+        ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, FREE_SEAT)
+        first = torch.where(ok, torch.arange(6, device=self.device), 6).min(dim=1).values
+        spot = nbc.gather(1, first.clamp(max=5).unsqueeze(1)).squeeze(1)
+        self._spawn_barb(mask & (first < 6), spot, unit_type, ladder=False, seat=FREE_SEAT)
 
     def _free_cities_phase(self) -> None:
         """The FREE CITIES player's turn, after every major's — the
@@ -614,8 +651,10 @@ class SimPhase:
         first, off one loop-top `_seat_amenity` over the free row: the full
         need of its population and the supply the Free Cities seat holds (its
         own luxuries, buildings and districts; no government, policy or
-        governor). Then each heals as any unbesieged city does and runs its
-        loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
+        governor). Then each takes its ranged grant on the turn it falls due
+        (`city_freed_turn` + `_free_grant_turns`), fires the ranged strikes any
+        walled city fires (`_city_strikes`), heals as any unbesieged city does
+        and runs its loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
         the flat base, the pressure term with every Free City's citizens on
         its own side and every major's (at that major's age factor) against,
         and the flat loyalty of what stands in it — no amenity, governor,
@@ -645,6 +684,10 @@ class SimPhase:
             if not bool(act.any()):
                 continue
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
+            # the ranged grant falls due a fixed count of turns after the revolt
+            due = act & (self.city_freed_turn[:, row, j] + self._free_grant_turns == int(self.turn))
+            self._grant_free_unit(due, jc, self._free_grant_ranged)
+            self._city_strikes(row, jc, act)
             self._city_heal(row, jc, act)
             here = self.city_center[bidx, row, jc].clamp(min=0)
             own = self._citizen_pressure_from(here, row)
@@ -1580,34 +1623,7 @@ class SimPhase:
         has one."""
         bidx = self._bidx
         heal = int(self.rules.combat.get("cityHealPerTurn", 20))
-        # CIV6: walls give a city its ranged strike, and once the Outer Defense
-        # "has been completely destroyed, its ranged strike again becomes
-        # unavailable". "Building any level of Walls in the city will supply
-        # both" the centre and its Encampment — each with its OWN pool — so
-        # the district strikes only while ITS defenses are still up.
-        # The pool size is read ONCE: a city strike damages units and never
-        # captures, so nothing between here and the Encampment's own gate
-        # below can move this city's walls.
-        wmax = self._walls_max_at(torch.full_like(col, row), col)
-        walled = act & (wmax > 0)
-        perimeter = walled & (self.city_outer_hp[bidx, row, col] > 0)
-        extra = (self._gov_chan(row, "sum", "extraStrikes")[bidx, col].long()
-                 if self.n_governors else torch.zeros_like(col))
-        n_strike = 1 + int(extra.max())
-        for _sk in range(n_strike):
-            self._seat_city_strike(row, col, perimeter & (extra >= _sk), "cstk")
-        enc_reg = e0 = None
-        if self._encamp_didx >= 0 and self.districts_on:
-            # the city's OWN registry, which a capture clears — the districts
-            # walk TS makes.
-            enc_reg = self.city_dist_tile[bidx, row, col, self._encamp_didx]  # [B]
-            e0 = enc_reg.clamp(min=0)
-            enc_live = (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
-            _eperim = walled & (torch.minimum(
-                self.encamp_outer_hp[bidx, e0], wmax) > 0)
-            _efire = _eperim & enc_live & (self.encamp_hp[bidx, e0] > 0)
-            for _sk in range(n_strike):
-                self._seat_city_strike(row, col, _efire & (extra >= _sk), "estk", origin=e0)
+        enc_reg, e0 = self._city_strikes(row, col, act)
         ok = self._city_heal(row, col, act)
         if e0 is not None:
             # "This is an automatic action, which happens if its tile is not
@@ -1624,6 +1640,44 @@ class SimPhase:
                    & ~self.district_pillaged[bidx, e0] & ~(self.tile_fallout[bidx, e0] > 0))
             cur = self.encamp_hp[bidx, e0]
             self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
+
+    def _city_strikes(self, row: int, col: torch.Tensor, act: torch.Tensor):
+        """ONE city's ranged strikes for the turn — the centre's, then the
+        Encampment's — for any row of the city block: a major's from its seat
+        turn, a city-state's from its own (`cityStrikes`). Answers the
+        Encampment's registry entry and its clamped tile (None, None without
+        districts) for the heal that follows a major's strikes."""
+        bidx = self._bidx
+        # CIV6: walls give a city its ranged strike, and once the Outer Defense
+        # "has been completely destroyed, its ranged strike again becomes
+        # unavailable". "Building any level of Walls in the city will supply
+        # both" the centre and its Encampment — each with its OWN pool — so
+        # the district strikes only while ITS defenses are still up.
+        # The pool size is read ONCE: a city strike damages units and never
+        # captures, so nothing between here and the Encampment's own gate
+        # below can move this city's walls.
+        wmax = self._walls_max_at(torch.full_like(col, row), col)
+        walled = act & (wmax > 0)
+        perimeter = walled & (self.city_outer_hp[bidx, row, col] > 0)
+        # a city-state seats no governor
+        extra = (self._gov_chan(row, "sum", "extraStrikes")[bidx, col].long()
+                 if self.n_governors and row < self.n_majors else torch.zeros_like(col))
+        n_strike = 1 + int(extra.max())
+        for _sk in range(n_strike):
+            self._seat_city_strike(row, col, perimeter & (extra >= _sk), "cstk")
+        enc_reg = e0 = None
+        if self._encamp_didx >= 0 and self.districts_on:
+            # the city's OWN registry, which a capture clears — the districts
+            # walk TS makes.
+            enc_reg = self.city_dist_tile[bidx, row, col, self._encamp_didx]  # [B]
+            e0 = enc_reg.clamp(min=0)
+            enc_live = (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
+            _eperim = walled & (torch.minimum(
+                self.encamp_outer_hp[bidx, e0], wmax) > 0)
+            _efire = _eperim & enc_live & (self.encamp_hp[bidx, e0] > 0)
+            for _sk in range(n_strike):
+                self._seat_city_strike(row, col, _efire & (extra >= _sk), "estk", origin=e0)
+        return enc_reg, e0
 
     def _bank_tourism_per_rival(self, row: int, active: torch.Tensor,
                                 general: torch.Tensor, religious: torch.Tensor,

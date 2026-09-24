@@ -30,6 +30,9 @@ because a gate lane reaches an Industrial-era grid only by accident:
   9. THE STOCKPILE the plants burn — `_seat_accrue_stockpile` per improved
      source and its ceiling, `_charge_unit_resource` at the train, and the
      heal `_res_starved` denies a unit whose source the seat has lost.
+ 10. THE ACCIDENT — `_nuclear_accident`'s two draws and its measured
+     payloads, and `_random_event` opening a reactor's rows only past each
+     MinTurnAtRisk (the TS twin is tests/cpu/map/disasters.test.ts).
 """
 
 from __future__ import annotations
@@ -531,6 +534,70 @@ def test_reactor_age(sim) -> None:
     print("  reactor OK: the age ticks, the project resets it, and both halves of its gate")
 
 
+STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
+
+
+def test_reactor_accident(sim) -> None:
+    """10. THE ACCIDENT — MEASURED over 75 forced accidents: the damage rows'
+    Percentages are per-accident CHANCES. Two draws, always; the Industrial
+    Zone pillaged at 0 / 50 / 100, one citizen lost at 0 / 0 / 80, fallout
+    on the reactor's own plot alone for 2 / 10 / 20 turns, the plant kept.
+    And the site: a reactor is one only past each row's MinTurnAtRisk."""
+    row, j = a_city(sim)
+    izt = put_district(sim, row, j, sim._iz_idx)
+    nuc = sim._nuclear_bidx
+    sim.city_bldg[0, row, j, nuc] = True
+    centre = int(sim.city_center[0, row, j])
+    hit = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+    hit[0] = True
+    at = torch.full((sim.B,), centre, dtype=torch.long, device=sim.device)
+    assert sim._accident_min_turn == [10, 20, 30]
+    assert sim._accident_fallout.tolist() == [2, 10, 20]
+    assert sim._accident_weight == [1, 1, 1]
+    N = 1500
+    for sev, (dp, pp) in enumerate(((0.0, 0.0), (0.5, 0.0), (1.0, 0.8))):
+        pillaged = lost = 0
+        for _ in range(N):
+            sim.district_pillaged[0, izt] = False
+            sim.tile_fallout[0] = 0
+            sim.city_pop[0, row, j] = 12
+            s0 = int(sim.rng_state[0])
+            sim._nuclear_accident(hit, at, sev)
+            assert (s0 + 2 * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), "an accident draws twice"
+            assert int(sim.tile_fallout[0, izt]) == int(sim._accident_fallout[sev])
+            assert int((sim.tile_fallout[0] > 0).sum()) == 1, "fallout on the reactor's plot alone"
+            pop = int(sim.city_pop[0, row, j])
+            assert pop in (11, 12), "an accident takes one citizen at most"
+            pillaged += int(bool(sim.district_pillaged[0, izt]))
+            lost += int(pop == 11)
+        assert bool(sim.city_bldg[0, row, j, nuc]), "the plant stays"
+        assert abs(pillaged / N - dp) < 0.04, f"severity {sev}: zone pillaged {pillaged}/{N}"
+        assert abs(lost / N - pp) < 0.04, f"severity {sev}: citizen lost {lost}/{N}"
+    sim.tile_fallout[0] = 0
+    sim.district_pillaged[0, izt] = False
+    # the site: ages 9 / 10 / 25 / 30 open no row / MINOR / MINOR+MAJOR / all
+    seen: set[int] = set()
+    sim._nuclear_accident = lambda h, c, s: seen.add(s) if bool(h[0]) and int(c[0]) == centre else None
+    sim._flood_river = lambda h, t, s: None
+    sim._erupt = lambda h, v, s: None
+    w0 = sim._accident_weight
+    sim._accident_weight = [60.0, 60.0, 60.0]   # make the accident a common draw
+    strip = sim._desertification_live()
+    for age, want in ((9, set()), (10, {0}), (25, {0, 1}), (30, {0, 1, 2})):
+        seen.clear()
+        sim.city_reactor_age[0, row, j] = age
+        for _ in range(600):
+            sim.storm_left.zero_()
+            sim._random_event(strip)
+        assert seen == want, f"reactor age {age} opened {sorted(seen)}, not {sorted(want)}"
+    del sim._nuclear_accident, sim._flood_river, sim._erupt
+    sim._accident_weight = w0
+    sim.city_reactor_age[0, row, j] = -1
+    sim.city_bldg[0, row, j, nuc] = False
+    print("  accident OK: two draws, the zone and one citizen at the rows' chances, fallout on the "
+          "reactor's plot alone, the plant kept, a site only past each MinTurnAtRisk")
+
+
 def test_spec_tier(sim) -> None:
     iz = sim._iz_idx
     tier = sim._spec_tb[iz]
@@ -547,14 +614,15 @@ def main() -> None:
     for fn in (test_demand, test_plant_reach, test_cardiff, test_powered_yields,
                test_regional_powered, test_fuel, test_accrual, test_unit_charge,
                test_upkeep, test_starved_heal, test_renewables, test_generator_ground,
-               test_reactor_age, test_spec_tier):
+               test_reactor_age, test_reactor_accident, test_spec_tier):
         fn(build(rules, path))
     print("power_test OK — demand (buildings + stations, dark under pillage), the plant's reach, "
           "Cardiff's renewable supply, all-or-nothing, the powered halves (local, regional, "
           "amenities), the Coal plant's adjacency, the FUEL it converts, the stockpile accrual "
           "and its ceiling, the unit charge, the per-turn FUEL upkeep, the heal a lost "
           "source denies, the two renewable generators with the Biosphere over them, the "
-          "reactor's age and the project that resets it, and the three-plant specialist tier")
+          "reactor's age and the project that resets it, its accident, and the three-plant "
+          "specialist tier")
 
 
 if __name__ == "__main__":

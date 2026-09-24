@@ -36,12 +36,9 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
 };
 
 /**
- * MINOR `xp` IS UNREACHED, NOT UNVERIFIED-BY-CHOICE. Neither engine gives a
- * city-state units yet, so no unit carries a minor seat and this cell is never
- * read. It holds `true` because barbarians are the only class the XP award
- * ever refused, so the table changes no behaviour. The day minors get units,
- * this cell needs a Civ 6 source before it is trusted; it is called out here
- * rather than left to be discovered as a silent default.
+ * MINOR `xp`: a city-state's units bank experience by the rule every unit
+ * does — the install writes no experience column per player class — and
+ * nothing spends it, because no driver promotes a minor's unit.
  */
 
 // ---------------------------------------------------------------------------
@@ -112,6 +109,36 @@ export const FREE_CITY_LOYALTY_PER_TURN = srcConst('seats.freeCityLoyaltyPerTurn
  *  Free City's later joining alike. */
 export const LOYALTY_AFTER_CULTURAL_TRANSFER = srcConst('seats.loyaltyAfterCulturalTransfer', 100,
   gp('LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY'));
+
+/** THE FREE CITY'S DEFENCE. No install row carries it (the Free Cities
+ *  leader's trait has no modifier and `GlobalParameters` no city-strength
+ *  cell), so every magnitude here is the live game's own, read off one real
+ *  revolt watched for ten turns. The watch file names the city, the turn and
+ *  every unit within two tiles. */
+const FREE_CITY_WATCH = 'tools/civ6lab/runs/freecity_watch_20260921T001500Z.jsonl';
+/** The Free Cities player's own strength floor: its centre and its
+ *  Encampment stood at 72 on every turn of the watch with no walls standing
+ *  (the same city read 53 under its founder WITH walls and 43 under its
+ *  captor) — where every other seat's floor is 15 or its best melee unit. */
+export const FREE_CITY_DEFENSE = srcConst('seats.freeCityDefense', 72, {
+  lab: `${FREE_CITY_WATCH}: centre and Encampment "def" 72 on turns 115-124, walls false`,
+});
+/** The defenders a revolt GRANTS: two of this melee unit exist on the flip
+ *  turn itself, on free tiles beside the centre. */
+export const FREE_CITY_GRANT_MELEE = srcConst('seats.freeCityGrantMelee', 'MAN_AT_ARMS', {
+  lab: `${FREE_CITY_WATCH}: two UNIT_MAN_AT_ARMS of player 62 beside the centre on the flip turn (115)`,
+});
+export const FREE_CITY_GRANT_MELEE_COUNT = srcConst('seats.freeCityGrantMeleeCount', 2, {
+  lab: `${FREE_CITY_WATCH}: two UNIT_MAN_AT_ARMS on turn 115, ids 65536 and 131073`,
+});
+/** ...and one ranged unit this many turns after the flip, while the build
+ *  queue holds buildings: a grant, not production. */
+export const FREE_CITY_GRANT_RANGED = srcConst('seats.freeCityGrantRanged', 'CROSSBOWMAN', {
+  lab: `${FREE_CITY_WATCH}: a UNIT_CROSSBOWMAN of player 62 beside the centre on turn 120, the Cathedral in the queue`,
+});
+export const FREE_CITY_GRANT_RANGED_TURNS = srcConst('seats.freeCityGrantRangedTurns', 5, {
+  lab: `${FREE_CITY_WATCH}: the flip on turn 115, the Crossbowman first read on turn 120`,
+});
 /** Max per-turn swing from population pressure. Real Civ 6 ±20. */
 export const LOYALTY_PRESSURE_SCALE = srcConst('seats.loyaltyScale', 20,
   gp('LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_MAX_LOYALTY'));

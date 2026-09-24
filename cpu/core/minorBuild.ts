@@ -11,7 +11,9 @@
  * Square, a militaristic one an Encampment — a Harbor when it sits on the
  * coast, and walls. The city's own yields drive all of it: `computeCityStats`
  * over `minorCity` pays Science and Culture into the two research pots,
- * Production into the build pot, and banks Gold and Faith, which nothing
+ * Production into the build pot under the minor's production rows (half its
+ * yield, and +200% toward walls, +500% toward the Harbor and toward the
+ * type's district), and banks Gold and Faith, which nothing
  * spends yet. The ladder itself is a MODEL choice (walls first, then the
  * type's district and its tier-1 building, the Harbor, the higher walls);
  * what each item needs — the minor's own researched unlock, a legal plot, an
@@ -21,11 +23,15 @@ import type { CityState, DistrictId, GameState, Tile } from './types';
 import { BUILDINGS } from '../data/buildings';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
-import { CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1 } from '../data/cityStates';
+import {
+  CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, MINOR_HARBOR_PROD_PCT, MINOR_PRODUCTION_PCT,
+  MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT,
+} from '../data/cityStates';
 import { ENCAMPMENT_HP } from '../data/units';
 import { canPlaceDistrictIn, outerPool, wallsMax } from './rules';
 import { seatGrowth } from './seatTurn';
-import { cityBorderGrowth } from './phase';
+import { cityBorderGrowth, cityStrikes } from './phase';
+import { minorCityCS } from './combat';
 import { districtScaledBase, districtProgressAdd } from './game';
 import { computeCityStats } from './city';
 import { minorCity } from './cityStates';
@@ -66,12 +72,15 @@ function minorDistrictSite(state: GameState, cityState: CityState, district: Dis
 }
 
 /** One minor at a time — a district one minor lands may lend a neighbour's
- *  district adjacency across the border, so the next minor's yields read it. */
+ *  district adjacency across the border, so the next minor's yields read it.
+ *  Its turn ends with its city's ranged strikes, the majors' own body fired
+ *  from the minor's centre strength. */
 export function minorPhase(state: GameState): void {
   for (const cityState of state.cityStates) {
-    minorAccrue(state, cityState);
+    const production = minorAccrue(state, cityState);
     minorResearch(cityState);
-    minorBuild(state, cityState);
+    minorBuild(state, cityState, production);
+    cityStrikes(state, minorCity(cityState), minorCityCS(state, cityState));
   }
 }
 
@@ -86,13 +95,14 @@ export function minorPhase(state: GameState): void {
  * every call — so the results are written back.
  *
  * Its Gold and Faith still only bank: what the install lets a city-state
- * SPEND them on is DLL AI with no data behind it (question ledger).
+ * SPEND them on is DLL AI with no data behind it (question ledger). Its
+ * Production is returned for `minorBuild`, which pays it into the pot under
+ * the rows of the item it goes toward.
  */
-function minorAccrue(state: GameState, cityState: CityState): void {
+function minorAccrue(state: GameState, cityState: CityState): number {
   const city = minorCity(cityState);
   const stats = computeCityStats(state, city);
   const y = stats.total;
-  cityState.prodProgress = (cityState.prodProgress ?? 0) + y.production;
   cityState.treasury += y.gold;
   cityState.research.techProgress += y.science;
   cityState.research.civicProgress += y.culture;
@@ -103,6 +113,13 @@ function minorAccrue(state: GameState, cityState: CityState): void {
   cityState.foodBox = city.foodBox;
   cityState.cultureBox = city.cultureBox;
   cityState.tilesAcquired = city.tilesAcquired;
+  return y.production;
+}
+
+/** What the turn's Production puts toward an item: the city's yield under the
+ *  minor's own percent (`MINOR_PRODUCTION_PCT`), then the item's toward-row. */
+function minorProduction(production: number, towardPct: number): number {
+  return production * ((100 + MINOR_PRODUCTION_PCT) / 100) * ((100 + towardPct) / 100);
 }
 
 /** The cheapest available row completes (table order on a price tie), at most
@@ -134,10 +151,16 @@ function cheapestAvailable(
   return best;
 }
 
-/** The ladder's first buildable item completes when the pot covers it, at
- *  most one a turn. */
-function minorBuild(state: GameState, cityState: CityState): void {
-  const pot = cityState.prodProgress ?? 0;
+/** The ladder's first buildable item is the one the turn's Production goes
+ *  toward — the pot takes it under that item's rows (`minorProduction`) — and
+ *  it completes when the pot covers it, at most one a turn. With no buildable
+ *  item the pot takes it under the city's percent alone. */
+function minorBuild(state: GameState, cityState: CityState, production: number): void {
+  let pot = cityState.prodProgress ?? 0;
+  const toward = (pct: number) => {
+    pot += minorProduction(production, pct);
+    cityState.prodProgress = pot;
+  };
   const unlocks = computeUnlocksIn(cityState.research, []); // a MINOR carries no roster row
   const held = cityState.buildings ?? [];
   for (const item of minorLadder(cityState)) {
@@ -150,6 +173,7 @@ function minorBuild(state: GameState, cityState: CityState): void {
       // levels of Walls."
       const shape = { buildings: held, seat: cityState.seat, outerHp: cityState.outerHp };
       if (outerPool(state, shape) !== wallsMax(state, shape)) continue;
+      toward(MINOR_WALLS_PROD_PCT);
       if (pot < def.cost) return;
       cityState.prodProgress = pot - def.cost;
       cityState.buildings = [...held, item.id];
@@ -168,6 +192,7 @@ function minorBuild(state: GameState, cityState: CityState): void {
       // the building wants its own COMPLETE district standing
       if (!(cityState.districts ?? []).some(
         (d) => d.type === def.district && state.map.tiles[d.tileIndex]?.districtComplete)) continue;
+      toward(0);
       if (pot < def.cost) return;
       cityState.prodProgress = pot - def.cost;
       cityState.buildings = [...held, item.id];
@@ -179,6 +204,8 @@ function minorBuild(state: GameState, cityState: CityState): void {
     // districts too and the install prices an Aqueduct at 36
     const cost = districtScaledBase(cityState.research, item.district)
       + districtProgressAdd(cityState.research, item.district);
+    toward(item.district === 'HARBOR' ? MINOR_HARBOR_PROD_PCT
+      : item.district === CITY_STATE_TYPE_DISTRICT[cityState.type] ? MINOR_TYPE_DISTRICT_PROD_PCT[cityState.type] : 0);
     // the MINOR's own price and the pool it is judged against. A minor's
     // district feeds its suzerain's yields, so a build one turn apart is a
     // small, permanent drift in a MAJOR's purse with no other symptom.
@@ -199,4 +226,5 @@ function minorBuild(state: GameState, cityState: CityState): void {
     }
     return;
   }
+  toward(0);
 }

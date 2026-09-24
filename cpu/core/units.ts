@@ -1969,7 +1969,9 @@ export function refreshUnits(state: GameState): void {
       const naval = !!UNITS[unit.type]?.naval;
       const table = religious ? religiousHeal(state, unit, yctx(unit.seat))
         : naval ? navalHeal(state, unit, home, tileSeat(tile) === NO_SEAT)
-        : home && tile.district === 'CITY_CENTER' ? 20
+        // a city-state's centre carries no CITY_CENTER district, and is a city
+        : home && (tile.district === 'CITY_CENTER'
+          || state.cityStates.some((c) => c.centerIndex === tile.index)) ? 20
         : home ? 15
         : onCamp ? 20
         : tileSeat(tile) === NO_SEAT ? 10

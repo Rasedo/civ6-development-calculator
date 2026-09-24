@@ -99,7 +99,7 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_GRANT_MELEE, FREE_CITY_GRANT_MELEE_COUNT, FREE_CITY_GRANT_RANGED, FREE_CITY_GRANT_RANGED_TURNS, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
@@ -658,7 +658,23 @@ export function flipCity(state: GameState, city: City): void {
     transferCity(state, city.seat, winner, city, 'loyalty collapsed');
     return;
   }
-  transferCity(state, city.seat, freeSeatOf(state), city, 'revolted');
+  const free = freeSeatOf(state);
+  transferCity(state, city.seat, free, city, 'revolted');
+  const freed = free.cities[free.cities.length - 1];
+  for (let k = 0; k < FREE_CITY_GRANT_MELEE_COUNT; k++) grantFreeCityUnit(state, freed, FREE_CITY_GRANT_MELEE);
+}
+
+/** A FREE CITY's granted defender. The Free Cities player trains no unit —
+ *  its queue holds buildings — yet a revolt hands it `FREE_CITY_GRANT_MELEE`
+ *  twice on the flip turn itself and `FREE_CITY_GRANT_RANGED` a fixed number
+ *  of turns later. Each stands on the first free land tile beside the centre,
+ *  in direction order; with none free it is not granted. The units stand
+ *  where they are put: they defend, block and heal, and never move. */
+function grantFreeCityUnit(state: GameState, city: City, unitType: string): void {
+  const probe = { type: unitType, seat: FREE_SEAT };
+  const spot = neighbors(state.map, state.map.tiles[city.centerIndex])
+    .find((t) => tileFreeForUnit(state, t.index, FREE_SEAT, probe));
+  if (spot) spawnUnit(state, unitType, spot.index, FREE_SEAT);
 }
 
 /** A Free City at 0 loyalty JOINS a seat. CIV6: "it will join the
@@ -687,9 +703,10 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  need of its population, the supply of what that seat holds (its own
  *  luxuries, buildings and districts; no government, policy or governor) —
  *  and the tier is recorded off a loop-top snapshot of every Free City. Then
- *  each heals as any unbesieged city does and runs `freeCityLoyaltyDelta`;
- *  the ones that reach 0 join their race's winner, in array order, after the
- *  walk. It fields no units and runs no strike of its own. */
+ *  each takes its ranged grant on the turn it falls due, fires the ranged
+ *  strikes any walled city fires, heals as any unbesieged city does and runs
+ *  `freeCityLoyaltyDelta`; the ones that reach 0 join their race's winner, in
+ *  array order, after the walk. */
 export function freeCitiesPhase(state: GameState): void {
   const free = state.freeSeat;
   if (!free || free.cities.length === 0) return;
@@ -699,6 +716,11 @@ export function freeCitiesPhase(state: GameState): void {
   free.cities.forEach((city, i) => { city.amenityTier = tiers[i]; });
   const joiners: City[] = [];
   for (const city of [...free.cities]) {
+    // `foundedTurn` is the revolt's turn: the transfer that made it Free wrote it
+    if (state.turn === city.foundedTurn + FREE_CITY_GRANT_RANGED_TURNS) {
+      grantFreeCityUnit(state, city, FREE_CITY_GRANT_RANGED);
+    }
+    cityStrikes(state, city, cityStrikeStrength(state, city));
     const centre = state.map.tiles[city.centerIndex];
     if (!encircled(state, centre, FREE_SEAT) && !irradiated(centre)) {
       city.hp = Math.min(CITY_MAX_HP, city.hp + CITY_HEAL_PER_TURN);
@@ -1899,6 +1921,71 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
   }
 }
 
+/**
+ * ONE city's ranged strikes for the turn, in its owner's turn — the centre's
+ * and then the Encampment's. A major's city calls this from `seatPhase`, a
+ * city-state's from `minorPhase`, each with the strength its own centre
+ * fights at. The target is the nearest unit hostile to the city's seat at
+ * range 1-2, the lowest tile index on a tie; one roll, no retaliation, no
+ * capture.
+ */
+export function cityStrikes(state: GameState, city: City, strikeCS: number): void {
+  const striker = { seat: city.seat };
+  // CIV6: walls give a city its ranged strike, and "if the Outer Defense of
+  // a city or defensible district has been completely destroyed, its ranged
+  // strike again becomes unavailable".
+  const perimeter = outerPool(state, city) > 0;
+  // CIV6 (Embrasure): "City gains an additional Ranged Strike per turn" —
+  // it reaches every district of the city that has one, so the centre and
+  // the Encampment each fire the extra shot, re-scanning for a target.
+  const strikes = 1 + governorSum(state, city, (e) => e.extraStrikes);
+  const shoot = (origin: Tile, key: 'cstk' | 'estk'): void => {
+    let bestTile = -1;
+    let bestDist = 99;
+    for (const t of state.map.tiles) {
+      const d = hexDistance(origin.col, origin.row, t.col, t.row);
+      if (d < 1 || d > 2) continue;
+      // ANY unit hostile to the city's seat: a city's strike picks its target
+      // by distance, never by which enemy the unit belongs to.
+      if (visibleHostilesAt(state, t.index, striker).length === 0) continue;
+      if (d < bestDist) {
+        bestDist = d;
+        bestTile = t.index;
+      }
+    }
+    if (bestTile < 0) return;
+    const defender = stackDefender(state, visibleHostilesAt(state, bestTile, striker), true); // a city strike is a SHOT
+    const defCSa = cityStrikeDefenderCS(state, defender, state.map.tiles[bestTile]);
+    // a survived Military Emergency pays its target +2 CS on every City
+    // Strike against a member, forever. CIV6 (Expansion1_Emergencies.xml):
+    // the reward is gated on COMBAT_DISTRICT_VS_UNIT, so the Encampment's
+    // shot pays it too.
+    const atkCS = strikeCS + emergencyStrikeCS(state, city.seat, defender.seat);
+    defender.hp -= damageRoll(state, atkCS - defCSa, key, bestTile);
+    awardDefenseXp(state, defender); // +2 to a surviving military defender (attacker is the city)
+    warWearinessBattle(state, city.seat, defender.seat, bestTile, { dDied: defender.hp <= 0, city: true });
+    // The STRIKER is the city, so the dig's era gate is its owner's — the GPU
+    // passes `striker_row` at the same site.
+    if (defender.hp <= 0) {
+      unitKillEvent(state, city.seat, undefined, defender);
+      killUnit(state, defender);
+    }
+  };
+  for (let sk = 0; perimeter && sk < strikes; sk++) shoot(state.map.tiles[city.centerIndex], 'cstk');
+  // CIV6: "building any level of Walls in the city will supply both" the
+  // centre and the Encampment — each with its OWN pool — and the district
+  // strikes on its own only "while its Wall defenses are still up". It
+  // conducts a ranged strike of its OWN: the scan measures from its tile.
+  for (let sk = 0; sk < strikes; sk++) {
+    const encD = city.districts.find((dd) => {
+      const edt = state.map.tiles[dd.tileIndex];
+      return encampmentIntact(edt) && encampOuterPool(state, city, edt) > 0;
+    });
+    if (!encD) break;
+    shoot(state.map.tiles[encD.tileIndex], 'estk');
+  }
+}
+
 export function seatPhase(state: GameState): void {
 
   // Seat units get their movement in this phase (like barbarians).
@@ -2715,98 +2802,7 @@ export function seatPhase(state: GameState): void {
       }
       cityBorderGrowth(state, civCity, actor.seat, culC);
       const civCityCenter = state.map.tiles[civCity.centerIndex];
-      // CIV6: walls give a city its ranged strike, and "if the Outer Defense of
-      // a city or defensible district has been completely destroyed, its ranged
-      // strike again becomes unavailable".
-      const perimeter = outerPool(state, civCity) > 0;
-      // CIV6 (Embrasure): "City gains an additional Ranged Strike per turn" —
-      // it reaches every district of the city that has one, so the centre and
-      // the Encampment each fire the extra shot, re-scanning for a target.
-      const strikes = 1 + governorSum(state, civCity, (e) => e.extraStrikes);
-      for (let sk = 0; perimeter && sk < strikes; sk++) {
-        let bestTile = -1;
-        let bestDist = 99;
-        for (const t of state.map.tiles) {
-          const d = hexDistance(civCityCenter.col, civCityCenter.row, t.col, t.row);
-          if (d < 1 || d > 2) continue;
-          // ANY unit hostile to this civ. A city's strike picks its
-          // target by distance and combat strength, never by which enemy the
-          // unit belongs to.
-          if (visibleHostilesAt(state, t.index, actor).length === 0) continue;
-          if (d < bestDist) {
-            bestDist = d;
-            bestTile = t.index;
-          }
-        }
-        if (bestTile >= 0) {
-          const hostiles = visibleHostilesAt(state, bestTile, actor);
-          const defender = stackDefender(state, hostiles, true);  // a city strike is a SHOT
-          const tt = state.map.tiles[bestTile];
-          const defCSa = cityStrikeDefenderCS(state, defender, tt);
-          // a survived Military Emergency pays its target +2 CS on every
-          // City Strike against a member, forever
-          const atkCS = cityStrikeStrength(state, civCity)
-            + emergencyStrikeCS(state, civCity.seat, defender.seat);
-          defender.hp -= damageRoll(state, atkCS - defCSa, 'cstk', bestTile);
-          awardDefenseXp(state, defender); // +2 to a surviving military defender (attacker is the city)
-          warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
-            { dDied: defender.hp <= 0, city: true });
-          // The STRIKER is the city, so the dig's era gate is its owner's —
-          // the GPU passes `striker_row` at the same site.
-          if (defender.hp <= 0) {
-            unitKillEvent(state, civCity.seat, undefined, defender);
-            killUnit(state, defender);
-          }
-        }
-      }
-      // CIV6: "building any level of Walls in the city will supply both" the
-      // centre and the Encampment — each with its OWN pool — and the district
-      // strikes on its own only "while its Wall defenses are still up".
-      for (let sk = 0; sk < strikes; sk++) {
-        const encD = civCity.districts.find((dd) => {
-          const edt = state.map.tiles[dd.tileIndex];
-          return encampmentIntact(edt) && encampOuterPool(state, civCity, edt) > 0;
-        });
-        if (!encD) break;
-        // CIV6: the Encampment conducts a ranged strike of its OWN — the scan
-        // measures from the district's tile, not the centre's.
-        const encT = state.map.tiles[encD.tileIndex];
-        let bestTile = -1;
-        let bestDist = 99;
-        for (const t of state.map.tiles) {
-          const d = hexDistance(encT.col, encT.row, t.col, t.row);
-          if (d < 1 || d > 2) continue;
-          // ANY unit hostile to this civ. A city's strike picks its
-          // target by distance and combat strength, never by which enemy the
-          // unit belongs to.
-          if (visibleHostilesAt(state, t.index, actor).length === 0) continue;
-          if (d < bestDist) {
-            bestDist = d;
-            bestTile = t.index;
-          }
-        }
-        if (bestTile >= 0) {
-          const hostiles = visibleHostilesAt(state, bestTile, actor);
-          const defender = stackDefender(state, hostiles, true);  // a city strike is a SHOT
-          const tt = state.map.tiles[bestTile];
-          const defCSa = cityStrikeDefenderCS(state, defender, tt); // the cstk composer
-          // CIV6 (Expansion1_Emergencies.xml): the target's City Strike reward
-          // is gated on COMBAT_DISTRICT_VS_UNIT — the Encampment's shot is a
-          // district's too, so it pays the same +2 the centre's does.
-          const atkCS = cityStrikeStrength(state, civCity)
-            + emergencyStrikeCS(state, civCity.seat, defender.seat);
-          defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);
-          awardDefenseXp(state, defender);
-          warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
-            { dDied: defender.hp <= 0, city: true });
-          // The STRIKER is the city, so the dig's era gate is its owner's —
-          // the GPU passes `striker_row` at the same site.
-          if (defender.hp <= 0) {
-            unitKillEvent(state, civCity.seat, undefined, defender);
-            killUnit(state, defender);
-          }
-        }
-      }
+      cityStrikes(state, civCity, cityStrikeStrength(state, civCity));
       // CIV6: "the city will automatically regain 20 HP per turn", war or
       // not — until it is ENCIRCLED, at which point "it will no longer be
       // able to repair the damage it suffers". The outer defenses are NOT on

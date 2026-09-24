@@ -45,7 +45,7 @@ import { fileURLToPath } from 'node:url';
 import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
-import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
+import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, isFreeSeat, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
 import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
@@ -734,6 +734,9 @@ const CITY: Record<string, Extractor> = {
     const p = r.city.freePressure ?? [];
     return civSeats(st).map((_s, g) => p[g] ?? 0);
   }),
+  // the turn a FREE CITY revolted, which its ranged grant counts from; -1 for
+  // a city that is not Free
+  freedTurn: overCities((r) => (isFreeSeat(r.city.seat) ? r.city.foundedTurn : -1)),
   // every layout slot's work — object, maker, era, civilization; -1s for an
   // empty slot — which is what the theming rules and the yields read.
   greatWorks: overCities((r) => {

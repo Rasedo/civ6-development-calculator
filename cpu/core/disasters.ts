@@ -3,7 +3,7 @@ import type { City, GameState, Tile } from './types';
 import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
-import { neighborTile, neighbors, tilesWithin, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
+import { neighborTile, neighbors, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv } from './seats';
@@ -19,10 +19,12 @@ import { pillageBuilding } from './yields';
 import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
-import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P } from '../data/disasters';
-import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, DROUGHT_LENGTH, SOIL_PAINT_P, ERUPTION_SEVERITY, SOIL_REPLACES } from '../data/disasters';
+import { FLOOD_WEIGHT, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P } from '../data/disasters';
+import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_DURATION, DROUGHT_HEXES, droughtCandidate, SOIL_PAINT_P, SOIL_REPLACES } from '../data/disasters';
+import { KILIMANJARO_FEATURE, KILIMANJARO_WEIGHT, KILIMANJARO_SOIL_P } from '../data/disasters';
+import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P } from '../data/disasters';
 import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
-import { disasterRateMult, severitySplit } from '../data/climate';
+import { severitySplit } from '../data/climate';
 import { defertilize, desertificationLive, fertilityLive } from './climate';
 import { governorTileFlag } from './governors';
 
@@ -167,16 +169,56 @@ export function riverShielded(reach: Tile[]): boolean {
   return false;
 }
 
-export function floodRiver(state: GameState, start: Tile): Tile[] {
-  const rSev = nextRandom(state);
-  // A warmed world reaches its worst severities more often.
-  const sevP = severitySplit(FLOOD_SEVERITY_P, state.climateIdx ?? -1);
-  let sev = 0;
-  for (let i = 0, acc = 0; i < sevP.length; i++) {
-    acc += sevP[i];
-    if (rSev < acc) { sev = i; break; }
-    sev = i;
+/** The three flood weights at this climate phase: a warmed world moves mass
+ *  from the mildest row onto the worst (`severitySplit`). */
+export function floodWeights(phase: number): number[] {
+  return severitySplit(FLOOD_WEIGHT, phase);
+}
+
+/** A flood that no draw chose — the spy's breached Dam: ONE draw names the
+ *  severity by the flood rows' weights at this climate phase. */
+export function floodSeverity(state: GameState): number {
+  const w = floodWeights(state.climateIdx ?? -1);
+  let total = 0;
+  for (const x of w) total += x;
+  const at = nextRandom(state) * total;
+  let cum = 0;
+  for (let i = 0; i < w.length; i++) {
+    cum += w[i];
+    if (at < cum) return i;
   }
+  return w.length - 1;
+}
+
+/**
+ * The FLOOD SITES: one per river carrying Floodplains, named by its
+ * lowest-index Floodplains tile, and one per Floodplains tile no river
+ * touches — the plots a flood can start from, in ascending tile order. The
+ * river walk is `riverReach`'s.
+ */
+export function floodSites(map: GameMap): Tile[] {
+  const seen = new Uint8Array(map.tiles.length);
+  const out: Tile[] = [];
+  for (const t of map.tiles) {
+    if (t.feature !== 'FLOODPLAINS' || seen[t.index]) continue;
+    out.push(t);
+    seen[t.index] = 1;
+    const stack = [t];
+    while (stack.length) {
+      const u = stack.pop()!;
+      for (let d = 0; d < 6; d++) {
+        if (!(u.riverMask & (1 << d))) continue;
+        const n = neighborTile(map, u, d);
+        if (!n || seen[n.index]) continue;
+        seen[n.index] = 1;
+        stack.push(n);
+      }
+    }
+  }
+  return out;
+}
+
+export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
   const reach = riverReach(state.map, start);
   const shielded = riverShielded(reach);
   for (const t of reach) floodTile(state, t, sev, shielded);
@@ -265,10 +307,207 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
   }
 }
 
+/** The families of the turn's one draw. */
+export type EventFamily = 'flood' | 'kilimanjaro' | 'volcano' | 'storm' | 'accident' | 'drought';
+
+/** One row of the turn's draw: its family, the severity (or, for a storm, the
+ *  `STORM_EVENTS` index) and the weight each of its sites carries. */
+export interface EventRow {
+  family: EventFamily;
+  sev: number;
+  weight: number;
+}
+
+/**
+ * THE DRAW'S ROWS, in the install's `RandomEvents` table order — the three
+ * floods, Kilimanjaro's two eruptions, the three eruptions, the eight storms,
+ * the three nuclear accidents, the two droughts — at this climate phase. A
+ * warmed world moves weight from the mildest flood row onto the worst and from
+ * each storm family's milder row onto its worse (`severitySplit`).
+ */
+export function eventRows(phase: number): EventRow[] {
+  const rows: EventRow[] = [];
+  floodWeights(phase).forEach((weight, sev) => rows.push({ family: 'flood', sev, weight }));
+  KILIMANJARO_WEIGHT.forEach((weight, sev) => rows.push({ family: 'kilimanjaro', sev, weight }));
+  ERUPTION_WEIGHT.forEach((weight, sev) => rows.push({ family: 'volcano', sev, weight }));
+  stormWeights(phase).forEach((weight, sev) => rows.push({ family: 'storm', sev, weight }));
+  ACCIDENT_WEIGHT.forEach((weight, sev) => rows.push({ family: 'accident', sev, weight }));
+  DROUGHT_WEIGHT.forEach((weight, sev) => rows.push({ family: 'drought', sev, weight }));
+  return rows;
+}
+
+/** A city whose reactor can melt down, and its seat. */
+interface ReactorSite {
+  seat: number;
+  city: City;
+}
+
+/** The sites every row can strike this turn. A storm or a drought is ONE site
+ *  when its terrain exists anywhere (the centre is drawn after); a flood has
+ *  one per river (`floodSites`), Kilimanjaro's eruption one per Kilimanjaro
+ *  plot, an eruption one per volcano, an accident one per city whose reactor
+ *  has reached the row's `MinTurnAtRisk`, in ascending centre order. */
+interface EventSites {
+  flood: Tile[];
+  kilimanjaro: Tile[];
+  volcano: Tile[];
+  storm: Tile[][];      // per family, the live start plots
+  drought: Tile[];
+  accident: ReactorSite[][];  // per severity
+}
+
+function eventSites(state: GameState): EventSites {
+  const map = state.map;
+  const reactors: ReactorSite[] = [];
+  for (const s of state.seats) {
+    for (const city of s.cities) {
+      if (city.reactorAge !== undefined) reactors.push({ seat: s.seat, city });
+    }
+  }
+  reactors.sort((a, b) => a.city.centerIndex - b.city.centerIndex);
+  return {
+    flood: floodSites(map),
+    kilimanjaro: map.tiles.filter((t) => t.feature === KILIMANJARO_FEATURE),
+    volcano: map.tiles.filter((t) => t.volcano),
+    storm: STORM_FAMILIES.map((f) => map.tiles.filter((t) => stormFamilyAt(t) === f)),
+    drought: map.tiles.filter((t) => droughtCandidate(t)),
+    accident: ACCIDENT_MIN_TURN.map((gate) => reactors.filter((r) => (r.city.reactorAge ?? 0) >= gate)),
+  };
+}
+
+function siteCount(sites: EventSites, row: EventRow): number {
+  switch (row.family) {
+    case 'flood': return sites.flood.length;
+    case 'kilimanjaro': return sites.kilimanjaro.length;
+    case 'volcano': return sites.volcano.length;
+    case 'storm': return sites.storm[STORM_FAMILIES.indexOf(STORM_EVENTS[row.sev].family)].length > 0 ? 1 : 0;
+    case 'accident': return sites.accident[row.sev].length;
+    case 'drought': return sites.drought.length > 0 ? 1 : 0;
+  }
+}
+
+/**
+ * THE TURN'S ONE RANDOM EVENT — MEASURED (lab 4, a natural 251-turn game):
+ * the game fires at most one event a turn, drawn over the eligible (row,
+ * site) pairs with each row's `OccurrencesPerGame` as the pair's weight.
+ * ONE draw `x = r * total` walks the rows in table order: the row whose
+ * cumulative weight first exceeds `x` fires, at site
+ * `floor((x - weight before it) / row weight)`. Nothing eligible, nothing
+ * fires; the draw is spent every turn either way. The storm's and the
+ * drought's centre is a second draw over their start plots.
+ */
+function randomEvent(state: GameState, strip: boolean): void {
+  const rows = eventRows(state.climateIdx ?? -1);
+  const sites = eventSites(state);
+  const count = rows.map((row) => siteCount(sites, row));
+  const cum: number[] = [];
+  let total = 0;
+  for (let i = 0; i < rows.length; i++) {
+    total += rows[i].weight * count[i];
+    cum.push(total);
+  }
+  const at = nextRandom(state) * total;
+  for (let i = 0; i < rows.length; i++) {
+    if (count[i] <= 0 || rows[i].weight <= 0 || at >= cum[i]) continue;
+    const before = i > 0 ? cum[i - 1] : 0;
+    const k = Math.max(0, Math.min(count[i] - 1, Math.floor((at - before) / rows[i].weight)));
+    fireEvent(state, rows[i], sites, k, strip);
+    return;
+  }
+}
+
+function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number, strip: boolean): void {
+  const map = state.map;
+  switch (row.family) {
+    case 'flood': {
+      const start = sites.flood[k];
+      const reach = floodRiver(state, start, row.sev);
+      log(state, `Flood at (${start.col}, ${start.row}) — ${reach.length} floodplain tiles along the river.`);
+      return;
+    }
+    case 'kilimanjaro': {
+      erupt(state, sites.kilimanjaro[k], KILIMANJARO_SOIL_P[row.sev]);
+      return;
+    }
+    case 'volcano': {
+      erupt(state, sites.volcano[k], SOIL_PAINT_P[row.sev]);
+      return;
+    }
+    case 'storm': {
+      const ev = STORM_EVENTS[row.sev];
+      const center = pick(state, sites.storm[STORM_FAMILIES.indexOf(ev.family)]);
+      // a centre already under a storm takes no second one
+      if (!center || (center.stormTurns ?? 0) > 0) return;
+      center.stormEvent = row.sev;
+      center.stormTurns = ev.duration;
+      log(state, `Storm: ${ev.id} at (${center.col}, ${center.row}) — ${ev.hexes} tiles for ${ev.duration} turns.`);
+      return;
+    }
+    case 'drought': {
+      const center = pick(state, sites.drought);
+      if (!center) return;
+      const turns = DROUGHT_DURATION[row.sev];
+      for (const t of stormFootprint(map, center, DROUGHT_HEXES)) {
+        if (isWater(t)) continue;
+        t.droughtTurns = Math.max(t.droughtTurns, turns);
+        if (strip) defertilize(t);
+      }
+      log(state, `Drought around (${center.col}, ${center.row}) — food suffers for ${turns} turns.`);
+      return;
+    }
+    case 'accident': {
+      const site = sites.accident[row.sev][k];
+      nuclearAccident(state, site.seat, site.city, row.sev);
+      return;
+    }
+  }
+}
+
+/**
+ * AN ERUPTION of a volcano or of Kilimanjaro. CIV6 (`RandomEvent_Yields`
+ * FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): one draw per eligible ring plot,
+ * in ring order, at the row's paint chance `paintP`; then the ring is
+ * scorched and fertilized.
+ */
+export function erupt(state: GameState, volcano: Tile, paintP: number): void {
+  const ring = neighbors(state.map, volcano);
+  for (const n of ring) {
+    if (soilPaintable(n) && nextRandom(state) < paintP) paintVolcanicSoil(n);
+  }
+  for (const n of ring) {
+    scorch(state, n);
+    fertilize(state, n);
+  }
+  log(state, `Volcanic eruption at (${volcano.col}, ${volcano.row}) — slopes scorched, soil enriched.`);
+}
+
+/**
+ * A NUCLEAR ACCIDENT at one severity, in one city — MEASURED over 75 forced
+ * accidents. TWO draws, always: the Industrial Zone is pillaged at the row's
+ * district chance, and ONE citizen is lost at its population chance (never
+ * the last). Fallout lies on the reactor's own plot, the Industrial Zone, for
+ * the row's turns. No building is destroyed, no ring improvement pillaged,
+ * and the plant stays, ageing on.
+ */
+export function nuclearAccident(state: GameState, seat: number, city: City, sev: number): void {
+  const rDistrict = nextRandom(state);
+  const rPop = nextRandom(state);
+  const iz = city.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
+  if (iz) {
+    const t = state.map.tiles[iz.tileIndex];
+    t.falloutTurns = Math.max(t.falloutTurns ?? 0, ACCIDENT_FALLOUT[sev]);
+    if (rDistrict < ACCIDENT_DISTRICT_P[sev]) pillageDistrict(state, t);
+  }
+  if (rPop < ACCIDENT_POP_P[sev] && city.population > 1) {
+    city.population -= 1;
+    logPopWrite(state, city, 'ds');
+    (state.aidHit ??= []).push(seat);  // CIV6 (Aid Request trigger)
+  }
+  log(state, `Nuclear accident in ${city.name} — severity ${sev}.`);
+}
+
 export function disasterPhase(state: GameState): void {
   const map = state.map;
-  // A warming world runs every one of these draws more often.
-  const rate = disasterRateMult(state.climateIdx ?? -1);
   const strip = desertificationLive(state);
 
   for (const t of map.tiles) {
@@ -278,61 +517,7 @@ export function disasterPhase(state: GameState): void {
     if ((t.falloutTurns ?? 0) > 0) t.falloutTurns = (t.falloutTurns ?? 0) - 1;
   }
 
-  if (nextRandom(state) < FLOOD_CHANCE * rate) {
-    const target = pick(state, map.tiles.filter((t) => t.feature === 'FLOODPLAINS'));
-    if (target) {
-      const reach = floodRiver(state, target);
-      log(state, `Flood at (${target.col}, ${target.row}) — ${reach.length} floodplain tiles along the river.`);
-    }
-  }
-
-  for (const volcano of map.tiles) {
-    if (!volcano.volcano) continue;
-    if (nextRandom(state) >= ERUPTION_CHANCE_PER_VOLCANO * rate) continue;
-    const ring = neighbors(map, volcano);
-    // CIV6 (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): one
-    // draw per eligible ring plot, in ring order, at the severity's chance.
-    for (const n of ring) {
-      if (soilPaintable(n) && nextRandom(state) < SOIL_PAINT_P[ERUPTION_SEVERITY]) paintVolcanicSoil(n);
-    }
-    for (const n of ring) {
-      scorch(state, n);
-      fertilize(state, n);
-    }
-    log(state, `Volcanic eruption at (${volcano.col}, ${volcano.row}) — slopes scorched, soil enriched.`);
-  }
-
-  if (nextRandom(state) < DROUGHT_CHANCE * rate) {
-    const center = pick(
-      state,
-      map.tiles.filter(
-        (t) => (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT',
-      ),
-    );
-    if (center) {
-      for (const t of tilesWithin(map, center.col, center.row, 2)) {
-        if (isWater(t)) continue;
-        t.droughtTurns = Math.max(t.droughtTurns, DROUGHT_LENGTH);
-        if (strip) defertilize(t);
-      }
-      log(state, `Drought around (${center.col}, ${center.row}) — food suffers for ${DROUGHT_LENGTH} turns.`);
-    }
-  }
-
-  // THE EIGHT STORMS: one draw per event per turn, in table order. Each
-  // family's two severities share the flood's climate ramp — the phase's melt
-  // fraction moved from the milder row onto the worse, then every draw scaled.
-  const chance = stormChances(state.climateIdx ?? -1, rate);
-  for (let e = 0; e < STORM_EVENTS.length; e++) {
-    if (nextRandom(state) >= chance[e]) continue;
-    const ev = STORM_EVENTS[e];
-    const center = pick(state, map.tiles.filter((t) => stormFamilyAt(t) === ev.family));
-    // a centre already under a storm takes no second one
-    if (!center || (center.stormTurns ?? 0) > 0) continue;
-    center.stormEvent = e;
-    center.stormTurns = ev.duration;
-    log(state, `Storm: ${ev.id} at (${center.col}, ${center.row}) — ${ev.hexes} tiles for ${ev.duration} turns.`);
-  }
+  randomEvent(state, strip);
   // CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
   // storm lives three turns. ENTRY: the footprint at the strike plot.
   // MOVEMENT: the centre walks `STORM_MOVEMENT` unit steps, then the
@@ -389,15 +574,15 @@ export function stormWalk(state: GameState, center: Tile, ev: StormEvent): Tile 
   return center;
 }
 
-/** [8] per-turn chances at this climate phase: `severitySplit` over each
- *  family's (severity 1, severity 2) pair, then `disasterRateMult` on all. */
-export function stormChances(phase: number, rate: number): number[] {
-  const out = STORM_EVENTS.map((ev) => ev.chance);
+/** [8] the storm rows' weights at this climate phase: `severitySplit` over
+ *  each family's (severity 1, severity 2) pair. */
+export function stormWeights(phase: number): number[] {
+  const out = STORM_EVENTS.map((ev) => ev.weight);
   for (const fam of STORM_FAMILIES) {
     const [a, b] = stormFamilyPair(fam);
-    const sp = severitySplit([STORM_EVENTS[a].chance, STORM_EVENTS[b].chance], phase);
-    out[a] = sp[0] * rate;
-    out[b] = sp[1] * rate;
+    const sp = severitySplit([STORM_EVENTS[a].weight, STORM_EVENTS[b].weight], phase);
+    out[a] = sp[0];
+    out[b] = sp[1];
   }
   return out;
 }

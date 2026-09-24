@@ -18,6 +18,7 @@ import { buildingPillaged, pillageBuilding } from '../../../cpu/core/yields';
 import { trainXpPct } from '../../../cpu/core/combat';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { CITIZEN_SCIENCE } from '../../../cpu/data/constants';
+import { MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
 
@@ -80,7 +81,9 @@ describe("the minor's city rides the yield walk", () => {
     minorPhase(state);
     expect(cs.research.techProgress).toBe(y.science);
     expect(cs.research.civicProgress).toBe(y.culture);
-    expect(cs.prodProgress).toBe(y.production);
+    // nothing on its ladder is buildable, so the pot takes the city's
+    // Production under the minor's own percent alone
+    expect(cs.prodProgress).toBe(y.production * ((100 + MINOR_PRODUCTION_PCT) / 100) * 1);
     expect(cs.treasury).toBe(y.gold);
     expect(cs.faith).toBe(y.faith);
     expect(cs.research.techs).toEqual([]);

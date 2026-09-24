@@ -8,8 +8,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
-import { disasterPhase, paintVolcanicSoil, soilPaintable } from '../../../cpu/core/disasters';
-import { ERUPTION_SEVERITY, SOIL_PAINT_P } from '../../../cpu/data/disasters';
+import { disasterPhase, erupt, paintVolcanicSoil, soilPaintable } from '../../../cpu/core/disasters';
+import { SOIL_PAINT_P } from '../../../cpu/data/disasters';
 import { bareGround, validImprovementsIn } from '../../../cpu/core/rules';
 import { tileYields } from '../../../cpu/core/yields';
 import { neighbors } from '../../../world/hex';
@@ -100,19 +100,19 @@ describe('Volcanic Soil', () => {
   });
 
   it('an eruption paints each eligible ring plot at the severity\'s chance', () => {
-    // sixteen volcanoes four apart, their rings disjoint: each ring is reset
-    // before every phase, and an eruption shows as the fertility it lays down
+    // sixteen volcanoes four apart, their rings disjoint; every ring is reset
+    // before each round and every volcano erupts at the severity under test
     const state: GameState = makeState(makeMap(16, 16));
-    state.disasters = true;
-    const rings: Tile[][] = [];
+    const volcanoes: Tile[] = [];
     for (let i = 0; i < 4; i++) {
       for (let j = 0; j < 4; j++) {
         const v = tileAtCoords(state.map, 2 + 4 * i, 2 + 4 * j);
         v.elevation = 'MOUNTAIN';
         v.volcano = true;
-        rings.push(neighbors(state.map, v));
+        volcanoes.push(v);
       }
     }
+    const rings = volcanoes.map((v) => neighbors(state.map, v));
     // half the rings stand in Woods under a Lumber Mill; one plot of every
     // ring is Floodplains, never painted
     const reset = () => rings.forEach((ring, k) => ring.forEach((t, d) => {
@@ -121,31 +121,63 @@ describe('Volcanic Soil', () => {
       t.pillaged = false;
       t.fertility = 0;
     }));
+    for (let sev = 0; sev < SOIL_PAINT_P.length; sev++) {
+      let plots = 0;
+      let painted = 0;
+      let woodsPlots = 0;
+      let woodsPainted = 0;
+      for (let round = 0; round < 40; round++) {
+        reset();
+        volcanoes.forEach((v) => erupt(state, v, SOIL_PAINT_P[sev]));
+        rings.forEach((ring, k) => {
+          expect(ring[0].feature).toBe('FLOODPLAINS');
+          for (const t of ring.slice(1)) {
+            plots += 1;
+            if (k % 2) woodsPlots += 1;
+            if (t.feature !== 'VOLCANIC_SOIL') continue;
+            painted += 1;
+            if (k % 2) {
+              woodsPainted += 1;
+              expect(t.improvement).toBeNull();
+            }
+          }
+        });
+      }
+      const p = SOIL_PAINT_P[sev];
+      expect(Math.abs(painted / plots - p)).toBeLessThan(0.05);
+      expect(Math.abs(woodsPainted / woodsPlots - p)).toBeLessThan(0.07);
+    }
+  });
+
+  it('the turn\'s draw picks the eruption\'s severity by the rows\' weights', () => {
+    // a sea with one volcano ringed by desert: an eruption or a dust storm is
+    // all the turn's draw can name. Over the phases that erupted, the
+    // severity is GENTLE / CATASTROPHIC / MEGACOLOSSAL in proportion to
+    // 4 / 2.5 / 1.5 — read off how often a bare ring plot is painted, the
+    // weighted mean of the three paint chances.
+    const state: GameState = makeState(makeMap(16, 16, 'COAST'));
+    state.disasters = true;
+    const v = tileAtCoords(state.map, 8, 8);
+    v.terrain = 'DESERT';
+    v.elevation = 'MOUNTAIN';
+    v.volcano = true;
+    const ring = neighbors(state.map, v);
     let plots = 0;
     let painted = 0;
-    let woodsPlots = 0;
-    let woodsPainted = 0;
-    for (let guard = 0; guard < 20000 && plots < 1200; guard++) {
-      reset();
+    let eruptions = 0;
+    for (let i = 0; i < 3000; i++) {
+      for (const t of ring) { t.terrain = 'DESERT'; t.elevation = 'FLAT'; t.feature = null; }
+      state.eventLog = [];
       disasterPhase(state);
-      rings.forEach((ring, k) => {
-        if (!ring.some((t) => t.fertility > 0)) return;
-        expect(ring[0].feature).toBe('FLOODPLAINS');
-        for (const t of ring.slice(1)) {
-          plots += 1;
-          if (k % 2) woodsPlots += 1;
-          if (t.feature !== 'VOLCANIC_SOIL') continue;
-          painted += 1;
-          if (k % 2) {
-            woodsPainted += 1;
-            expect(t.improvement).toBeNull();
-          }
-        }
-      });
+      if (!state.eventLog.some((e) => e.includes('eruption'))) continue;
+      eruptions += 1;
+      plots += ring.length;
+      painted += ring.filter((t) => t.feature === 'VOLCANIC_SOIL').length;
     }
-    const p = SOIL_PAINT_P[ERUPTION_SEVERITY];
-    expect(plots).toBeGreaterThanOrEqual(1200);
-    expect(Math.abs(painted / plots - p)).toBeLessThan(0.05);
-    expect(Math.abs(woodsPainted / woodsPlots - p)).toBeLessThan(0.07);
+    // the volcano's 8 against the dust storms' 8 + 2
+    expect(Math.abs(eruptions / 3000 - 8 / 18)).toBeLessThan(0.03);
+    const w = [4, 2.5, 1.5];
+    const mean = w.reduce((a, x, s) => a + x * SOIL_PAINT_P[s], 0) / 8;
+    expect(Math.abs(painted / plots - mean)).toBeLessThan(0.03);
   });
 });

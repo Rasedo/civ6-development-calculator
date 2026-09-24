@@ -9548,6 +9548,7 @@ class SimSeats:
         self.city_followed[b, row, col] = -1
         self.city_pressure[b, row, col, :] = 0
         self.city_free_press[b, row, col, :] = 0
+        self.city_freed_turn[b, row, col] = -1
 
     def _city_col_at(self, row: int, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """`cityAtTile` in COLUMN space — the column of seat row `row`'s
@@ -9761,6 +9762,8 @@ class SimSeats:
         # the race a FREE CITY runs starts at nothing "since the Free City
         # became independent"; any other arrival carries none
         self.city_free_press[b, dst_row, col, :] = 0
+        # ...and the turn it became Free, which its ranged grant counts from
+        self.city_freed_turn[b, dst_row, col] = int(self.turn) if dst_row == self.FREE_ROW else -1
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
         self.city_lasers[b, dst_row, col] = old_lz  # the stations ride the flip with the Spaceport that holds them
@@ -11051,6 +11054,13 @@ class SimSeats:
         return torch.where(ctr_seat == FREE_SEAT, torch.full_like(ctr_seat, self.FREE_ROW),
                            ctr_seat.clamp(min=0, max=self.n_majors - 1))
 
+    def _holder_base(self, hrow: torch.Tensor, best: torch.Tensor) -> torch.Tensor:
+        """`holderStrength`: the strength a city and its Encampment stand at
+        before walls and garrison — the holder's best melee unit floored at 15,
+        and on the Free Cities row a flat base of its own (`_free_def`)."""
+        return torch.where(hrow == self.FREE_ROW, torch.full_like(best, self._free_def),
+                           torch.maximum(best, torch.full_like(best, 15)))
+
     def _city_defense_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
                          gar: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`cityDefenseStrength` for whichever row holds the city, [B] each:
@@ -11058,14 +11068,15 @@ class SimSeats:
         tier (each pre-modern tier "+3 Combat Strength", stacking), and — for a
         MAJOR — its government's city-defense effect and CIV6 (Redoubt):
         "Increase city garrison Combat Strength by 5." The Free Cities seat
-        trains nothing and seats nobody, so its city stands at the floor plus
-        its walls. Returns `(def_cs, walls_tier)`."""
+        seats nobody: its city stands on its own flat base (`_free_def`, the
+        live game's 72), plus its garrison and its walls. Returns
+        `(def_cs, walls_tier)`."""
         bidx = torch.arange(self.B, device=self.device)
         major = hrow < self.n_majors
         h0 = hrow.clamp(max=self.n_majors - 1)
         best = torch.where(major, self.civ_best_melee[bidx, h0], torch.zeros_like(hrow))
         wtier = self._walls_tier_at(hrow, hcol)
-        def_cs = torch.maximum(best, torch.full_like(best, 15)) + gar * 5 + self._walls_tier_cs[wtier]
+        def_cs = (self._holder_base(hrow, best) + gar * 5 + self._walls_tier_cs[wtier])
         if self._gov_has_effects:
             def_cs = def_cs + torch.where(major, self._fx_at_seat("cdef", h0).to(def_cs.dtype),
                                           torch.zeros_like(def_cs))
@@ -11439,11 +11450,11 @@ class SimSeats:
         hcol = self._owner_city_col(hseat, tc)
         wtier = self._walls_tier_at(hrow, hcol)
         held = hcol >= 0
-        # the Free Cities seat trains nothing: its district stands at the floor
+        # the Free Cities seat's district stands on its city's flat base
         _major = hrow < self.n_majors
         _best = torch.where(_major, self.civ_best_melee[bidx, hrow.clamp(max=self.n_majors - 1)],
                             torch.zeros_like(hrow))
-        def_cs = (torch.maximum(_best, torch.full_like(hrow, 15))
+        def_cs = (self._holder_base(hrow, _best)
                   + torch.where(held, self._walls_tier_cs[wtier],
                                 torch.zeros_like(self._walls_tier_cs[wtier])))
         # a CITY-STATE's Encampment fights at the minor's own centre
@@ -12055,7 +12066,10 @@ class SimSeats:
             _dsc = d_slot.clamp(min=0)
             self._share_joint_xp(ok & (d_slot >= 0), getattr(self, f"{a_kind}_unit_tile")[:, u], a_seat,
                                  self.unit_seat[self._bidx, _dsc], gain)
-        okd = live & ~d_died & ~d_is_barb & (d_slot >= 0) & self._xp_eligible(d_type)
+        # the defender's seat class must earn xp: never a barbarian, never the
+        # Free Cities' own (`capsOf(seat).xp`)
+        okd = (live & ~d_died & ~d_is_barb & (d_slot >= 0) & self._xp_eligible(d_type)
+               & (self.unit_seat[self._bidx, d_slot.clamp(min=0)] != FREE_SEAT))
         rows = okd.nonzero(as_tuple=True)[0]
         if len(rows) == 0:
             return

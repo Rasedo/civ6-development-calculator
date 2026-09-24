@@ -7,7 +7,7 @@ import { civOf, emptySeat, leaderOf } from '../core/seats';
 import { spawnUnit } from '../core/units';
 import { CIV_LEADERS } from '../data/seats';
 import { START_TECH_ROWS, START_BOOST_ROWS, rowIsFor } from '../data/civilizations';
-import { CITY_STATE_TYPES } from '../data/cityStates';
+import { CITY_STATE_TYPES, MINOR_STARTING_UNIT, MINOR_STARTING_UNITS } from '../data/cityStates';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -102,6 +102,16 @@ export function loadWorld(world: WorldFile): GameState {
       }
     }
   });
+
+  // CIV6 (BonusMinorStartingUnits): every minor starts beside its city with
+  // its Ancient-era army, spawned by the ordinary rule on its centre and then
+  // its ring — after every civ's units, which is the order `state.units`
+  // holds them in and the order the GPU seeds its pool.
+  for (const cityState of state.cityStates) {
+    for (let k = 0; k < MINOR_STARTING_UNITS; k++) {
+      spawnUnit(state, MINOR_STARTING_UNIT, cityState.centerIndex, cityState.seat);
+    }
+  }
 
   return state;
 }

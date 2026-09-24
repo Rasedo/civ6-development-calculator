@@ -29,7 +29,7 @@ from __future__ import annotations
 import torch
 
 from .engine import BatchSim
-from .simbase import Rules, UNIT_SLOTS
+from .simbase import BARB_SEAT, Rules, UNIT_SLOTS
 from .neutral import living_order
 
 def n_unit_acts(rules: Rules) -> int:
@@ -192,7 +192,7 @@ class BatchEnv:
                 s.civ_envoys_avail[:, row].to(d) / 5.0,
                 s.civ_influence[:, row].to(d) / 100.0,
                 s.n_camps.to(d) / 5.0,
-                s.barb_unit_alive.sum(dim=1).to(d) / 10.0,
+                (s.barb_unit_alive & (s.barb_unit_seat == BARB_SEAT)).sum(dim=1).to(d) / 10.0,
                 mine.sum(dim=1).to(d) / 10.0,
                 # Army COMPOSITION: the ladder trains ranged while the army
                 # holds melee, so a bare COUNT cannot express the decision.

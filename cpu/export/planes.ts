@@ -22,7 +22,7 @@ import { terrainMp, unitPassable } from '../core/units';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater, naturalWonderAt } from '../../world/query';
 import { neighbors } from '../../world/hex';
 import { UNITS } from '../data/units';
-import { stormFamilyAt, STORM_FAMILIES } from '../data/disasters';
+import { stormFamilyAt, STORM_FAMILIES, droughtCandidate } from '../data/disasters';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -38,8 +38,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   // NOBODY's modifiers: the fixture's tile plane is what a tile yields before
   // any seat's research, and the GPU applies each row's own on top.
   const ctx = baseYieldCtx(state);
+  const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));
 
-  const suzCodeOf = (name: string): number => {
+  const suzCodeOf =(name: string): number => {
     const rule = CITY_STATE_SUZERAIN_BONUS[name]?.suz;
     return rule ? SUZ_EFFECTS.indexOf(rule) : -1;
   };
@@ -55,9 +56,11 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     suzImp: IMPROVEMENT_IDS.indexOf(
       Object.values(IMPROVEMENTS).find((i) => i.suzerainOf === cityState.name)?.id ?? '',
     ),
+    // its starting army, in `state.units` order (`loadWorld`)
+    units: state.units
+      .filter((u) => u.seat === cityState.seat)
+      .map((u) => ({ type: unitRosterIdx.get(u.type) ?? 0, tile: u.tileIndex })),
   }));
-
-  const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));
 
   // Every flag below that reads `t.resource` is baked ONCE here, but TS
   // recomputes it live — and a HARVEST is the only mutation that takes a
@@ -294,7 +297,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // belongs to, -1 off a mountain. Static, so it bakes.
       mrange: t.mountainRange ?? -1,
       fp: t.feature === 'FLOODPLAINS' ? 1 : 0,
-      dc: (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT' ? 1 : 0,
+      dc: droughtCandidate(t) ? 1 : 0,
       // the storm FAMILY that may start here (`STORM_FAMILIES` index), -1 none
       sf: (() => { const f = stormFamilyAt(t); return f ? STORM_FAMILIES.indexOf(f) : -1; })(),
       fz: !isWater(t) && t.elevation !== 'MOUNTAIN' ? 1 : 0,

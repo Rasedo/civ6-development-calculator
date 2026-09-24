@@ -17,7 +17,7 @@
  */
 
 import type { CityStateType, DistrictId, YieldKey } from '../core/types';
-import { type SrcMap } from './provenance';
+import { type SrcMap, srcConst, xml } from './provenance';
 
 export const CITY_STATE_TYPES: CityStateType[] = [
   'scientific',
@@ -293,6 +293,54 @@ export const SUZERAIN_ENVOYS = 3;
 export const QUEST_COOLDOWN = 12;
 export const QUEST_ENVOYS = 1;
 export const CITY_STATE_MAX_HP = 150;
+/** CIV6 (Eras.xml `BonusMinorStartingUnits`, "Additional Starting Units for
+ *  Minor Civilizations in addition to their Settler"): an Ancient-era start
+ *  gives every minor two Warriors — the Quantity 2 row; the third Warrior is
+ *  the Emperor-and-up row. Lab 4's twelve-minor watch saw every minor start
+ *  with its city and two Warriors. */
+export const MINOR_STARTING_UNIT = srcConst('cityState.startingUnit', 'WARRIOR',
+  xml('BonusMinorStartingUnits', 'Era=ERA_ANCIENT&Unit=UNIT_WARRIOR', 'Unit', { expect: 'UNIT_WARRIOR' }));
+export const MINOR_STARTING_UNITS = srcConst('cityState.startingUnits', 2, {
+  lab: 'C-38',
+  note: 'BonusMinorStartingUnits ERA_ANCIENT UNIT_WARRIOR Quantity 2 (Base Eras.xml); the checker keys '
+    + 'the table on Era&Unit and so folds the Emperor-only row over it',
+});
+
+/** CIV6 (Leaders.xml, MINOR_CIV_DEFAULT_TRAIT, which every minor's leader
+ *  inherits): the minor's production rows. `MINOR_CIV_PRODUCTION_PENALTY` is
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_CITY_YIELD_MODIFIER` YIELD_PRODUCTION -50 —
+ *  a percent on its city's Production; `MINOR_CIV_PRODUCTION_WALLS` is
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_PRODUCTION` +200 toward
+ *  BUILDING_WALLS, BUILDING_CASTLE and BUILDING_STAR_FORT (this engine's
+ *  three walls rows); `MINOR_CIV_PRODUCTION_HARBORS` is
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_DISTRICT_PRODUCTION` +500 toward
+ *  DISTRICT_HARBOR. The trait's Builder (+200), military-unit (+200 under
+ *  PLAYER_HAS_SMALL_MILITARY) and upgrade-discount rows reach nothing while a
+ *  minor trains no unit. No difficulty row touches a minor: the
+ *  HIGH_DIFFICULTY_* scaling rows attach to TRAIT_LEADER_MAJOR_CIV alone. */
+export const MINOR_PRODUCTION_PCT = srcConst('cityState.productionPct', -50,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_PRODUCTION_PENALTY&Name=Amount', 'Value'));
+export const MINOR_WALLS_PROD_PCT = srcConst('cityState.wallsProdPct', 200,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_PRODUCTION_WALLS&Name=Amount', 'Value'));
+export const MINOR_HARBOR_PROD_PCT = srcConst('cityState.harborProdPct', 500,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_PRODUCTION_HARBORS&Name=Amount', 'Value'));
+/** CIV6 (Leaders.xml, the six MINOR_CIV_<TYPE>_TRAIT rows, inherited by every
+ *  named minor of the type): `MODIFIER_PLAYER_CITIES_ADJUST_DISTRICT_PRODUCTION`
+ *  toward the type's own district (`CITY_STATE_TYPE_DISTRICT`). */
+export const MINOR_TYPE_DISTRICT_PROD_PCT: Record<CityStateType, number> = {
+  scientific: srcConst('cityState.typeDistrictProdPct.scientific', 500,
+    xml('ModifierArguments', 'ModifierId=MINOR_CIV_SCIENTIFIC_CAMPUS_PRODUCTION&Name=Amount', 'Value')),
+  cultural: srcConst('cityState.typeDistrictProdPct.cultural', 500,
+    xml('ModifierArguments', 'ModifierId=MINOR_CIV_CULTURAL_THEATER_PRODUCTION&Name=Amount', 'Value')),
+  trade: srcConst('cityState.typeDistrictProdPct.trade', 500,
+    xml('ModifierArguments', 'ModifierId=MINOR_CIV_TRADE_COMMERCIAL_HUB_PRODUCTION&Name=Amount', 'Value')),
+  industrial: srcConst('cityState.typeDistrictProdPct.industrial', 500,
+    xml('ModifierArguments', 'ModifierId=MINOR_CIV_INDUSTRIAL_INDUSTRIAL_ZONE_PRODUCTION&Name=Amount', 'Value')),
+  militaristic: srcConst('cityState.typeDistrictProdPct.militaristic', 500,
+    xml('ModifierArguments', 'ModifierId=MINOR_CIV_MILITARISTIC_ENCAMPMENT_PRODUCTION&Name=Amount', 'Value')),
+  religious: srcConst('cityState.typeDistrictProdPct.religious', 500,
+    xml('ModifierArguments', 'ModifierId=MINOR_CIV_RELIGIOUS_HOLY_SITE_PRODUCTION&Name=Amount', 'Value')),
+};
 export const LEVY_UNITS = 2;
 export const LEVY_GOLD_COST = 120;
 export const LEVY_COOLDOWN = 20;

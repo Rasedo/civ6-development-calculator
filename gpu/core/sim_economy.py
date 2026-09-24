@@ -818,17 +818,9 @@ class SimEconomy:
                 out |= self.climate_idx == p
         return out
 
-    def _disaster_rate(self) -> torch.Tensor:
-        """[B] — the per-turn chance multiplier: 1 + the phase's published
-        polar-melt fraction (`disasterRateMult`)."""
-        out = torch.ones(self.B, dtype=torch.float64, device=self.device)
-        for p, melt in enumerate(self._cl_ice_melt):
-            out = torch.where(self.climate_idx == p, torch.full_like(out, 1.0 + melt), out)
-        return out
-
     def _severity_split(self, base: list) -> torch.Tensor:
-        """[B, n] — the flood severity split at each game's phase: that same
-        melt fraction of the mildest band's mass moved onto the worst
+        """[B, n] — a family's row weights at each game's phase: the phase's
+        polar-melt fraction of the mildest row's weight moved onto the worst
         (`severitySplit`)."""
         p = torch.zeros(self.B, len(base), dtype=torch.float64, device=self.device)
         for i, v in enumerate(base):
@@ -1073,89 +1065,13 @@ class SimEconomy:
         # CIV6: fallout lasts 10 turns from a Nuclear Device and 20 from a
         # Thermonuclear one, and the tile is clean when the timer expires.
         self.tile_fallout.copy_((self.tile_fallout - 1).clamp(min=0))
-        every = torch.ones(B, dtype=torch.bool, device=dev)
-        # A warming world runs every one of these draws more often, and its
-        # storms and droughts take fertility off instead of laying it down.
-        rate = self._disaster_rate()
+        # A warmed world's storms and droughts take fertility off instead of
+        # laying it down.
         strip = self._desertification_live()
         # CIV6 (Aid Request trigger): the rows whose city loses population this phase
         self._aid_hit = torch.zeros(B, self.n_majors, dtype=torch.bool, device=dev)
 
-        r = self._next_random(every)
-        hit, tile = self._pick_static(r < self._flood_chance * rate, self._flood_list)
-        self._flood_river(hit, tile)
-
-        for k in range(self.volcano_tile.shape[1]):
-            volc = self.volcano_tile[:, k]
-            active = volc >= 0
-            if not bool(active.any()):
-                continue
-            rv = self._next_random(active)
-            erupt = active & (rv < self._eruption_chance * rate)
-            if not bool(erupt.any()):
-                continue
-            nb = self.neigh[volc.clamp(min=0)]  # [B, 6], -1 off the map
-            # CIV6 (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL, `ReplaceFeature`):
-            # one draw per eligible ring plot, in ring order, at the chance of
-            # the severity every eruption takes.
-            for d in range(6):
-                nd = torch.where(erupt, nb[:, d], torch.full_like(volc, -1))
-                elig = self._soil_paintable(nd)
-                rs = self._next_random(elig)
-                paint = elig & (rs < self._soil_paint_p)
-                if bool(paint.any()):
-                    pr = paint.nonzero(as_tuple=True)[0]
-                    self._paint_soil(pr, nd[pr])
-            rows = erupt.nonzero(as_tuple=True)[0]
-            row6 = rows.unsqueeze(1).expand(-1, 6).reshape(-1)
-            nbf = nb[rows].reshape(-1)
-            on = nbf >= 0
-            self._scorch(row6[on], nbf[on])
-            _live = self._fertility_live()[row6[on]]
-            self._fertilize_counted(row6[on][_live], nbf[on][_live])
-
-        r = self._next_random(every)
-        hit, tile = self._pick_static(r < self._drought_chance * rate, self._droughtc_list)
-        if bool(hit.any()):
-            rows = hit.nonzero(as_tuple=True)[0]
-            area = tiles_from_offsets(tile[rows], self._off2, self.W, self.H)
-            M = area.shape[1]
-            rowm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
-            af = area.reshape(-1)
-            on = (af >= 0) & ~self.water[rowm, af.clamp(min=0)]
-            flat = self.drought.reshape(-1)
-            gi = rowm[on] * self.T + af[on]
-            flat.scatter_reduce_(0, gi, torch.full_like(gi, self._drought_length), reduce="amax")
-            dry = on & strip[rowm]
-            self._defertilize(rowm[dry], af[dry])
-
-        # THE EIGHT STORMS: one draw per event per turn, in table order. Each
-        # family's two severities share the flood's climate ramp — the melt
-        # fraction moved from the milder row onto the worse, then `rate` on
-        # every draw (`stormChances`).
-        chance = torch.zeros(B, len(self._st_chance), dtype=torch.float64, device=dev)
-        for a, b in self._st_pairs:
-            sp = self._severity_split([self._st_chance[a], self._st_chance[b]])
-            chance[:, a] = sp[:, 0] * rate
-            chance[:, b] = sp[:, 1] * rate
-        # `stormFamilyAt` is null on a SUBMERGED tile: while nothing has
-        # drowned the static per-family lists are the live sets; after a
-        # sea-level rise the pick counts the k-th candidate over the live
-        # mask, the same index arithmetic (one sync per phase, not per storm)
-        _drowned = bool(self.tile_submerged.any())
-        for e in range(len(self._st_chance)):
-            r = self._next_random(every)
-            if _drowned:
-                hit, tile = self._pick_live(r < chance[:, e], (self.storm_fam == int(self._st_family[e])) & ~self.tile_submerged)
-            else:
-                hit, tile = self._pick_static(r < chance[:, e], self._storm_lists[self._st_family[e]])
-            # a centre already under a storm takes no second one
-            busy = self.storm_left.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1) > 0
-            free = hit & ~busy
-            if bool(free.any()):
-                rows = free.nonzero(as_tuple=True)[0]
-                self.storm_event[rows, tile[rows]] = e
-                self.storm_left[rows, tile[rows]] = int(self._st_duration[e])
+        self._random_event(strip)
         # CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
         # storm lives three turns — ENTRY (the footprint at the strike plot),
         # MOVEMENT (the centre walks `_st_movement` unit steps, then the
@@ -1193,6 +1109,282 @@ class SimEconomy:
         self._raise_aid_request(self._aid_hit)
         self._aid_hit = None
         self._eff_version += 1
+
+    # ---- THE TURN'S ONE RANDOM EVENT ---------------------------------------
+
+    # the draw's families (`EventFamily`)
+    _EV_FLOOD, _EV_KILIMANJARO, _EV_VOLCANO, _EV_STORM, _EV_ACCIDENT, _EV_DROUGHT = range(6)
+
+    def _event_rows(self) -> list[tuple[int, int, torch.Tensor]]:
+        """`eventRows` — (family, severity or `STORM_EVENTS` index, [B] weight
+        per site) for every row of the turn's draw, in the install's
+        `RandomEvents` table order: the three floods, Kilimanjaro's two
+        eruptions, the three eruptions, the eight storms, the three accidents,
+        the two droughts. A warmed world moves weight from the mildest flood
+        row onto the worst and from each storm family's milder row onto its
+        worse (`_severity_split`)."""
+        B, dev = self.B, self.device
+        rows: list[tuple[int, int, torch.Tensor]] = []
+        fw = self._severity_split(self._flood_weight)
+        for s in range(fw.shape[1]):
+            rows.append((self._EV_FLOOD, s, fw[:, s]))
+        for s, w in enumerate(self._kilimanjaro_weight):
+            rows.append((self._EV_KILIMANJARO, s, torch.full((B,), w, dtype=torch.float64, device=dev)))
+        for s, w in enumerate(self._eruption_weight):
+            rows.append((self._EV_VOLCANO, s, torch.full((B,), w, dtype=torch.float64, device=dev)))
+        sw = [torch.full((B,), w, dtype=torch.float64, device=dev) for w in self._st_weight]
+        for a, b in self._st_pairs:
+            sp = self._severity_split([self._st_weight[a], self._st_weight[b]])
+            sw[a], sw[b] = sp[:, 0], sp[:, 1]
+        for e, w in enumerate(sw):
+            rows.append((self._EV_STORM, e, w))
+        for s, w in enumerate(self._accident_weight):
+            rows.append((self._EV_ACCIDENT, s, torch.full((B,), w, dtype=torch.float64, device=dev)))
+        for s, w in enumerate(self._drought_weight):
+            rows.append((self._EV_DROUGHT, s, torch.full((B,), w, dtype=torch.float64, device=dev)))
+        return rows
+
+    def _build_flood_sites(self) -> None:
+        """`floodSites` — the plots a flood can start from, in ascending tile
+        order: one per river carrying Floodplains, named by its lowest-index
+        Floodplains plot, and each Floodplains plot no river touches. Static:
+        neither rivers nor Floodplains move. `(idx, n)` in `_pick_static`'s
+        list shape."""
+        B, T, dev = self.B, self.T, self.device
+        tiles = torch.arange(T, device=dev).unsqueeze(0).expand(B, T)
+        comp = self.river_comp
+        on_river = self.floodplain & (comp >= 0)
+        n_comp = max(int(comp.max()) + 1, 1)
+        first = torch.full((B, n_comp), T, dtype=torch.long, device=dev)
+        first.scatter_reduce_(1, comp.clamp(min=0), torch.where(on_river, tiles, torch.full_like(tiles, T)),
+                              reduce="amin")
+        lead = first.gather(1, comp.clamp(min=0)) == tiles
+        site = self.floodplain & ((comp < 0) | lead)
+        n = site.sum(dim=1)
+        width = max(int(n.max()), 1)
+        idx = torch.argsort((~site).to(torch.int8), dim=1, stable=True)[:, :width]
+        self._flood_sites = (idx, n)
+
+    def _reactor_plane(self) -> torch.Tensor:
+        """[B, T] — the reactor age of the major city centred on each tile, -1
+        elsewhere: the accident's sites, read in ascending centre order
+        (`eventSites`)."""
+        out = torch.full((self.B, self.T), -1, dtype=torch.long, device=self.device)
+        if self._nuclear_bidx < 0:
+            return out
+        R = self.n_majors
+        age = self.city_reactor_age[:, :R]
+        ok = self.city_alive[:, :R, :age.shape[2]] & (age >= 0)
+        if not bool(ok.any()):
+            return out
+        b, r, c = ok.nonzero(as_tuple=True)
+        out[b, self.city_center[b, r, c]] = age[b, r, c]
+        return out
+
+    def _random_event(self, strip: torch.Tensor) -> None:
+        """`randomEvent` — THE TURN'S ONE RANDOM EVENT, MEASURED (lab 4, a
+        natural 251-turn game): at most one event a turn, drawn over the
+        eligible (row, site) pairs with each row's `OccurrencesPerGame` as the
+        pair's weight. ONE draw `at = r * total` walks the rows in table
+        order: the row whose cumulative weight first exceeds `at` fires, at
+        site `floor((at - weight before it) / row weight)`. A storm or a
+        drought is ONE site when its terrain exists anywhere, and its centre
+        is a second draw; a flood has one site per river, Kilimanjaro's
+        eruption one per Kilimanjaro plot (ascending tile order), an eruption
+        one per volcano, an accident one per major city whose reactor has reached the
+        row's `MinTurnAtRisk`. The draw is spent every turn, eligible or not."""
+        B, dev = self.B, self.device
+        every = torch.ones(B, dtype=torch.bool, device=dev)
+        rows = self._event_rows()
+        # `stormFamilyAt` is null on a SUBMERGED tile: while nothing has
+        # drowned the static per-family lists are the live sets; after a
+        # sea-level rise the count and the pick read the live mask
+        drowned = bool(self.tile_submerged.any())
+        fam_n = [(((self.storm_fam == f) & ~self.tile_submerged).sum(dim=1) if drowned else self._storm_lists[f][1])
+                 for f in range(len(self._storm_lists))]
+        reactor = self._reactor_plane()
+        acc_sites = [reactor >= g for g in self._accident_min_turn]
+        kili = (self.feat_id == self._kilimanjaro_fid) & ~self.feat_stripped
+        counts: list[torch.Tensor] = []
+        for fam, s, _w in rows:
+            if fam == self._EV_FLOOD:
+                counts.append(self._flood_sites[1])
+            elif fam == self._EV_KILIMANJARO:
+                counts.append(kili.sum(dim=1))
+            elif fam == self._EV_VOLCANO:
+                counts.append(self._volc_n)
+            elif fam == self._EV_STORM:
+                counts.append((fam_n[self._st_family[s]] > 0).long())
+            elif fam == self._EV_ACCIDENT:
+                counts.append(acc_sites[s].sum(dim=1))
+            else:
+                counts.append((self._droughtc_list[1] > 0).long())
+        cum: list[torch.Tensor] = []
+        total = torch.zeros(B, dtype=torch.float64, device=dev)
+        for (_f, _s, w), n in zip(rows, counts):
+            total = total + w * n.double()
+            cum.append(total)
+        at = self._next_random(every) * total
+        ev = torch.full((B,), -1, dtype=torch.long, device=dev)
+        k = torch.zeros(B, dtype=torch.long, device=dev)
+        done = torch.zeros(B, dtype=torch.bool, device=dev)
+        before = torch.zeros(B, dtype=torch.float64, device=dev)
+        for i, ((_f, _s, w), n) in enumerate(zip(rows, counts)):
+            take = ~done & (n > 0) & (w > 0) & (at < cum[i])
+            w1 = torch.where(w > 0, w, torch.ones_like(w))
+            kk = torch.floor((at - before) / w1).to(torch.long)
+            kk = torch.minimum(kk, n - 1).clamp(min=0)
+            ev = torch.where(take, torch.full_like(ev, i), ev)
+            k = torch.where(take, kk, k)
+            done = done | take
+            before = cum[i]
+        if not bool(done.any()):
+            return
+        fam_of = torch.tensor([f for f, _s, _w in rows], dtype=torch.long, device=dev)
+        sev_of = torch.tensor([s for _f, s, _w in rows], dtype=torch.long, device=dev)
+        evc = ev.clamp(min=0)
+        fam = torch.where(done, fam_of[evc], torch.full_like(ev, -1))
+        sev = sev_of[evc]
+
+        hit = fam == self._EV_FLOOD
+        if bool(hit.any()):
+            idx = self._flood_sites[0]
+            tile = idx.gather(1, k.clamp(max=idx.shape[1] - 1).unsqueeze(1)).squeeze(1)
+            self._flood_river(hit, tile, sev)
+
+        hit = fam == self._EV_KILIMANJARO
+        if bool(hit.any()):
+            rank = kili.long().cumsum(dim=1)
+            tile = ((rank == (k + 1).unsqueeze(1)) & kili).long().argmax(dim=1)
+            self._erupt(hit, tile, self._kilimanjaro_soil_p[sev.clamp(min=0, max=len(self._kilimanjaro_weight) - 1)])
+
+        hit = fam == self._EV_VOLCANO
+        if bool(hit.any()):
+            vt = self.volcano_tile
+            tile = vt.gather(1, k.clamp(max=vt.shape[1] - 1).unsqueeze(1)).squeeze(1)
+            self._erupt(hit, tile, self._soil_paint_p[sev.clamp(min=0, max=len(self._eruption_weight) - 1)])
+
+        for e in range(len(self._st_weight)):
+            hit = (fam == self._EV_STORM) & (sev == e)
+            if not bool(hit.any()):
+                continue
+            f = int(self._st_family[e])
+            if drowned:
+                got, tile = self._pick_live(hit, (self.storm_fam == f) & ~self.tile_submerged)
+            else:
+                got, tile = self._pick_static(hit, self._storm_lists[f])
+            # a centre already under a storm takes no second one
+            busy = self.storm_left.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1) > 0
+            free = got & ~busy
+            if bool(free.any()):
+                fr = free.nonzero(as_tuple=True)[0]
+                self.storm_event[fr, tile[fr]] = e
+                self.storm_left[fr, tile[fr]] = int(self._st_duration[e])
+
+        hit = fam == self._EV_DROUGHT
+        if bool(hit.any()):
+            got, tile = self._pick_static(hit, self._droughtc_list)
+            gr = got.nonzero(as_tuple=True)[0]
+            if gr.numel():
+                area = tiles_from_offsets(tile[gr], self._storm_offs[: self._drought_hexes], self.W, self.H)
+                M = area.shape[1]
+                rowm = gr.unsqueeze(1).expand(-1, M).reshape(-1)
+                turns = self._drought_duration[sev[gr]].unsqueeze(1).expand(-1, M).reshape(-1)
+                af = area.reshape(-1)
+                on = (af >= 0) & ~self.water[rowm, af.clamp(min=0)]
+                flat = self.drought.reshape(-1)
+                gi = rowm[on] * self.T + af[on]
+                flat.scatter_reduce_(0, gi, turns[on], reduce="amax")
+                dry = on & strip[rowm]
+                self._defertilize(rowm[dry], af[dry])
+
+        for s in range(len(self._accident_min_turn)):
+            hit = (fam == self._EV_ACCIDENT) & (sev == s)
+            if not bool(hit.any()):
+                continue
+            plane = acc_sites[s]
+            rank = plane.long().cumsum(dim=1)
+            centre = ((rank == (k + 1).unsqueeze(1)) & plane).long().argmax(dim=1)
+            self._nuclear_accident(hit, centre, s)
+
+    def _flood_severity_draw(self, hit: torch.Tensor) -> torch.Tensor:
+        """[B] `floodSeverity` — a flood no draw chose (the spy's breached
+        Dam): ONE draw names the severity by the flood rows' weights at each
+        game's climate phase."""
+        w = self._severity_split(self._flood_weight)
+        total = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for i in range(w.shape[1]):
+            total = total + w[:, i]
+        at = self._next_random(hit) * total
+        sev = torch.full((self.B,), w.shape[1] - 1, dtype=torch.long, device=self.device)
+        done = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        cum = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for i in range(w.shape[1]):
+            cum = cum + w[:, i]
+            take = ~done & (at < cum)
+            sev = torch.where(take, torch.full_like(sev, i), sev)
+            done = done | take
+        return sev
+
+    def _erupt(self, hit: torch.Tensor, volc: torch.Tensor, p: torch.Tensor) -> None:
+        """`erupt` — an eruption of a volcano or of Kilimanjaro. CIV6
+        (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): one
+        draw per eligible ring plot, in ring order, at each game's paint
+        chance `p` [B]; then the ring is scorched and fertilized."""
+        nb = self.neigh[volc.clamp(min=0)]  # [B, 6], -1 off the map
+        for d in range(6):
+            nd = torch.where(hit, nb[:, d], torch.full_like(volc, -1))
+            elig = self._soil_paintable(nd)
+            rs = self._next_random(elig)
+            paint = elig & (rs < p)
+            if bool(paint.any()):
+                pr = paint.nonzero(as_tuple=True)[0]
+                self._paint_soil(pr, nd[pr])
+        rows = hit.nonzero(as_tuple=True)[0]
+        row6 = rows.unsqueeze(1).expand(-1, 6).reshape(-1)
+        nbf = nb[rows].reshape(-1)
+        on = nbf >= 0
+        self._scorch(row6[on], nbf[on])
+        _live = self._fertility_live()[row6[on]]
+        self._fertilize_counted(row6[on][_live], nbf[on][_live])
+
+    def _nuclear_accident(self, hit: torch.Tensor, centre: torch.Tensor, sev: int) -> None:
+        """`nuclearAccident` — a nuclear accident at severity `sev` in the
+        major city centred on `centre`, MEASURED over 75 forced accidents.
+        TWO draws, always: the Industrial Zone is pillaged at the row's
+        district chance, and ONE citizen is lost at its population chance
+        (never the last). Fallout lies on the reactor's own plot, the
+        Industrial Zone, for the row's turns. No building is destroyed, no
+        ring improvement pillaged, and the plant stays, ageing on."""
+        r_district = self._next_random(hit)
+        r_pop = self._next_random(hit)
+        rows = hit.nonzero(as_tuple=True)[0]
+        c = centre[rows]
+        row_of = self.tile_seat[rows, c]    # a major's seat is its row
+        slot = self.centre_slot_at[rows, c]
+        if self._iz_idx >= 0:
+            iz = self.city_dist_tile[rows, row_of.clamp(min=0), slot.clamp(min=0), self._iz_idx]
+            has = iz >= 0
+            rr, tt = rows[has], iz[has]
+            if rr.numel():
+                self.tile_fallout[rr, tt] = torch.maximum(
+                    self.tile_fallout[rr, tt], self._accident_fallout[sev].expand_as(tt))
+                pil = r_district[rr] < self._accident_district_p[sev]
+                self._pillage_district(rr[pil], tt[pil])
+        lose = r_pop[rows] < self._accident_pop_p[sev]
+        for R in range(self.n_majors):
+            sel = lose & (row_of == R)
+            if not bool(sel.any()):
+                continue
+            b, sl = rows[sel], slot[sel]
+            pop = self.city_pop[b, R, sl]
+            ok = pop > 1
+            b, sl = b[ok], sl[ok]
+            if b.numel():
+                self.city_pop[b, R, sl] = self.city_pop[b, R, sl] - 1
+                self._log_pop(b, R, sl, "ds")
+                if getattr(self, "_aid_hit", None) is not None:
+                    self._aid_hit[b, R] = True   # CIV6 (Aid Request trigger)
 
     def _storm_walk(self, walk: torch.Tensor, centre: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
         """`stormWalk` — CIV6 (`Movement 8`, measured in the live game over 31 storms):
@@ -1404,23 +1596,13 @@ class SimEconomy:
             r2, t2 = pr2[ok], tc[pr2][ok]
             self.fertility_prod[r2, t2] = (self.fertility_prod[r2, t2] + 1).clamp(max=3)
 
-    def _flood_river(self, hit: torch.Tensor, tile: torch.Tensor) -> None:
+    def _flood_river(self, hit: torch.Tensor, tile: torch.Tensor, sev: torch.Tensor) -> None:
         """`floodRiver` — CIV6 (Flood): "The level of the water rises, flooding
         all Floodplains tiles found along the River, and then recedes on the
-        next turn." ONE severity for the whole flood, then every Floodplains
-        tile the river reaches takes the effects at that severity, in ascending
-        tile order so the draw stream is the TS walk's."""
+        next turn." ONE severity for the whole flood (`sev` per game), then
+        every Floodplains tile the river reaches takes the effects at that
+        severity, in ascending tile order so the draw stream is the TS walk's."""
         B, dev = self.B, self.device
-        r_sev = self._next_random(hit)
-        # A warmed world reaches its worst severities more often, so the split
-        # is per GAME now, not one scalar ladder.
-        sp = self._severity_split(self._flood_sev_p)
-        sev = torch.zeros(B, dtype=torch.long, device=dev)
-        acc = torch.zeros(B, dtype=torch.float64, device=dev)
-        for i in range(sp.shape[1]):
-            lo, acc = acc, acc + sp[:, i]
-            sev = torch.where((r_sev >= lo) & (r_sev < acc), torch.full_like(sev, i), sev)
-        sev = torch.where(r_sev >= acc, torch.full_like(sev, sp.shape[1] - 1), sev)
         if not bool(hit.any()):
             return
         tc = tile.clamp(min=0)
@@ -1460,7 +1642,7 @@ class SimEconomy:
     def _flood_tile(self, hit: torch.Tensor, tile: torch.Tensor, sev: torch.Tensor,
                     mit: torch.Tensor) -> None:
         """`floodTile` — ONE river flood on one Floodplains tile, at the
-        severity its whole flood rolled.
+        severity its whole flood carries.
 
         CIV6: a flood "damages or destroys Districts, improvements, and units on
         the Floodplains tiles near the River. This may also include a City
@@ -2975,7 +3157,10 @@ class SimEconomy:
         mine_ok / lumber_ok / _sr_c; where the row cannot see the resource
         (`_res_hidden`) the flag takes its resource-free value — the `nr`
         value the harvest copies in — so flat Niter is plain grassland to a
-        row without Military Engineering (9287 t35: the applier mined it)."""
+        row without Military Engineering (9287 t35: the applier mined it).
+        The `nr` value carries the STARTING feature, so on a plot whose
+        feature is gone the job flags read the bare ground's variant
+        (`_bare_ground_jobs`)."""
         live = getattr(self, name)
         bare = self._nr_bare.get(name)
         if bare is None:
@@ -2983,6 +3168,14 @@ class SimEconomy:
         hid = self._res_hidden(row)
         if not bool(hid.any()):
             return live
+        if name in ("farm_flat", "farm_hill", "mine_ok", "lumber_ok"):
+            gone = self.feat_stripped
+            if name == "lumber_ok":
+                bare = bare & ~gone
+            else:
+                cut = self._nr_bare[{"farm_flat": "_fa_f_c", "farm_hill": "_fa_h_c",
+                                     "mine_ok": "_mi_c"}[name]]
+                bare = torch.where(gone, cut, bare)
         return torch.where(hid, bare, live)
 
     def _res_hidden_yields(self, row: int) -> torch.Tensor | None:
@@ -4032,6 +4225,10 @@ class SimEconomy:
         # A city CENTRE here — any seat's; `home` already restricts it to this
         # one, and the one-owner invariant makes a centre tile its own seat's.
         center = self.centre_slot_at.gather(1, t) >= 0
+        # ...and a living city-state's centre, which is a city too
+        if self.S:
+            center = center | ((self.citystate_center.unsqueeze(2) == t.unsqueeze(1))
+                               & self.citystate_alive.unsqueeze(2)).any(dim=1)
         camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "barb" else None
         heal = torch.where(home & center, torch.full_like(t, 20),
                torch.where(home, torch.full_like(t, 15),

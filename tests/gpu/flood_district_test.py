@@ -69,7 +69,7 @@ def main() -> None:
     at = torch.full((sim.B,), t, dtype=torch.long)
     before = int(sim.tile_flood_ct[0, t])
     for _ in range(200):
-        sim._flood_river(hit, at)
+        sim._flood_river(hit, at, sim._flood_severity_draw(hit))
     assert int(sim.tile_flood_ct[0, t]) - before == 200, "the flood did not land on the tile every time"
     assert not bool(sim.district_pillaged[0, t]), "a district still building was pillaged"
     print("  an unfinished district is left alone")

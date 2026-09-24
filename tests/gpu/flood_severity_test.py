@@ -9,9 +9,10 @@ a nearby city... Can fertilize affected tiles." The severity decides every
 magnitude; a Dam or Great Bath along the river cancels the damage half for
 every tile that river floods and halves the silt.
 
-Disasters are off in most fixtures and the flood picks one tile out of every
-floodplain on the map, so the driven gate reaches this at a rate no run can be
-counted on for — the lane pokes the phase directly.
+The turn's one event draw names a flood beside every other event and the
+flood strikes one river of several, so the driven gate reaches a given
+severity on a given tile at a rate no run can be counted on for — the lane
+pokes the phase directly.
 """
 
 from __future__ import annotations
@@ -46,21 +47,23 @@ def floodplain(sim) -> int:
 
 
 def solo(sim, t: int) -> None:
-    """Make `t` the ONLY floodplain the picker can reach AND the only one its
-    river reaches, so a flood driven through the whole disaster phase lands
-    where the assertions read. The reach itself is poke `f`."""
-    idx, cnt = sim._flood_list
+    """Make `t` the ONLY flood site AND the only floodplain its river
+    reaches, so a flood driven through the whole disaster phase lands where
+    the assertions read. The reach itself is poke `f`."""
+    idx, cnt = sim._flood_sites
     idx[0, :] = t
     cnt[0] = 1
     sim.river_comp[0, :] = -1
 
 
 def flood(sim, t: int) -> None:
-    """One flood on `t`, with the 5% gate and the picker taken out — the storm
-    and the eruption in the same phase scorch too, and would be read as the
-    river's work. `_flood_river` rolls the severity the whole flood shares."""
-    sim._flood_river(torch.ones(sim.B, dtype=torch.bool, device=sim.device),
-                     torch.full((sim.B,), t, dtype=torch.long, device=sim.device))
+    """One flood on `t`, the turn's draw taken out — the storm and the
+    eruption it might name scorch too, and would be read as the river's
+    work. The severity is one draw by the flood rows' weights
+    (`_flood_severity_draw`, the breached Dam's)."""
+    one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    sim._flood_river(one, torch.full((sim.B,), t, dtype=torch.long, device=sim.device),
+                     sim._flood_severity_draw(one))
 
 
 def main() -> None:
@@ -68,9 +71,9 @@ def main() -> None:
     t = floodplain(sim)
     solo(sim, t)
 
-    # THE DRAW COUNT IS FIXED. One severity roll plus seven per REACHED tile,
-    # whatever stands on it — TS spends the same, so a bare floodplain and a
-    # built-up one cannot slide the two streams apart.
+    # THE DRAW COUNT IS FIXED. Eight per REACHED tile, whatever stands on it —
+    # TS spends the same, so a bare floodplain and a built-up one cannot slide
+    # the two streams apart.
     seed = int(sim.rng_state[0])
     sim.improvement[0, t] = -1
     sim._disaster_phase()
@@ -193,7 +196,7 @@ def poke_river_reach() -> None:
     """f. CIV6 (Flood): "The level of the water rises, flooding all Floodplains
     tiles found along the River". One severity for the whole flood; every
     Floodplains tile of the struck river takes it, nothing off that river
-    does, and the draw stream is one severity roll plus seven per tile."""
+    does, and the draw stream is eight per tile."""
     rules = load_rules()
     best = None
     for p in fixture_paths():
@@ -219,7 +222,8 @@ def poke_river_reach() -> None:
         sim.pillaged[0, t] = False
     seed = int(sim.rng_state[0])
     sim._flood_river(torch.ones(1, dtype=torch.bool, device=sim.device),
-                     torch.tensor([reach[0]], dtype=torch.long, device=sim.device))
+                     torch.tensor([reach[0]], dtype=torch.long, device=sim.device),
+                     torch.tensor([2], dtype=torch.long, device=sim.device))
     spent = 0
     st = torch.tensor([seed], dtype=sim.rng_state.dtype, device=sim.device)
     probe = sim.rng_state.clone()
@@ -228,8 +232,9 @@ def poke_river_reach() -> None:
         sim._next_random(torch.ones(1, dtype=torch.bool, device=sim.device))
         spent += 1
     # destroy, district, BUILDING, damage, civilian, population, and the two
-    # fertility yields — eight columns a tile, after the one severity draw
-    assert spent == 1 + 8 * n, f"a {n}-tile flood spent {spent} draws, not 1 + 8 x {n}"
+    # fertility yields — eight columns a tile; the severity is the turn's
+    # draw's, not the river's
+    assert spent == 8 * n, f"a {n}-tile flood spent {spent} draws, not 8 x {n}"
     for t in reach:
         assert bool(sim.pillaged[0, t]) or int(sim.improvement[0, t]) < 0, \
             f"tile {t} is on the flooded river and kept its improvement whole"
@@ -237,6 +242,17 @@ def poke_river_reach() -> None:
         assert not bool(sim.pillaged[0, t]) and int(sim.improvement[0, t]) >= 0, \
             f"tile {t} is on ANOTHER river and the flood reached it"
     print(f"  f river reach OK — {n} floodplains flooded together, {len(off)} off-river spared")
+
+    # THE FLOOD SITES (`floodSites`): the turn's draw weighs each flood row
+    # once per RIVER carrying Floodplains, named by its lowest Floodplains
+    # plot, and once per Floodplains plot no river touches — ascending.
+    rivers = {int(c) for c in rc[fp].tolist() if int(c) >= 0}
+    alone = [t for t in (fp & (rc < 0)).nonzero(as_tuple=True)[0].tolist()]
+    lead = [int(((rc == c) & fp).nonzero(as_tuple=True)[0].min()) for c in rivers]
+    idx, cnt = sim._flood_sites
+    got = idx[0, : int(cnt[0])].tolist()
+    assert got == sorted(lead + alone), f"flood sites {got} against {sorted(lead + alone)}"
+    print(f"  g flood sites OK — {len(rivers)} rivers and {len(alone)} lone floodplains, one site each")
 
 
 if __name__ == "__main__":

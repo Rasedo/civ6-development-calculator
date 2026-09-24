@@ -41,7 +41,7 @@ import { seatBuildingSum } from './city';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { governorSum } from './governors';
-import { floodRiver } from './disasters';
+import { floodRiver, floodSeverity } from './disasters';
 import { nextRandom } from './rand';
 import { drawPromoOffer, promoFlag, promoValue, promoValueFor } from './promotions';
 import { disbandUnit, spawnUnit } from './units';
@@ -660,7 +660,7 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
       if (!dam) return;
       const dt = state.map.tiles[dam.tileIndex];
       dt.districtPillaged = true;
-      floodRiver(state, dt);
+      floodRiver(state, dt, floodSeverity(state));
       return;
     }
     case SPY_M_GAIN_SOURCES: {

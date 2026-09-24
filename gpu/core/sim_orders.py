@@ -477,6 +477,12 @@ class SimOrders:
                     self.res_stripped[_r, _t] = True
                     for _p, _bare in self._nr_planes:
                         getattr(self, _p)[_r, _t] = _bare[_r, _t]
+                    # the resource-free values carry the STARTING feature; a
+                    # plot whose feature is already gone takes its job flags
+                    # from the ground as it stands
+                    _gone = self.feat_stripped[_r, _t]
+                    if bool(_gone.any()):
+                        self._bare_ground_jobs(_r[_gone], _t[_gone])
                     # a sea resource also lends SEA_RESOURCE adjacency, and
                     # that read is live on TS
                     self._withdraw_sea_adj(_r, _t)
@@ -1493,6 +1499,12 @@ class SimOrders:
             c_t = int(self.citystate_center[b, s])
             pop = max(1, (int(self.citystate_pop[b, s]) * 3) // 4)
             self.citystate_alive[b, s] = False
+            # CIV6: the minor is ELIMINATED and its units leave the map with it
+            # — removed, not killed (`disbandMinorArmy`)
+            _army = (self.major_unit_alive[b] & (self.major_unit_seat[b] == 100 + s)).nonzero(as_tuple=True)[0]
+            if len(_army):
+                self._vacate("major", torch.full_like(_army, b), _army)
+                self.major_unit_alive[b, _army] = False
             # CIV6: "City-state conquered: 50 (all civs gain Grievances against
             # you)", and "City-state razed: 100" when the captor is at its cap.
             _one = torch.zeros(self.B, dtype=torch.bool, device=dev)
@@ -1597,12 +1609,7 @@ class SimOrders:
             lm = self.improvement[rows, tiles] == self.LUMBER
             if bool(lm.any()):
                 self.improvement[rows[lm], tiles[lm]] = -1
-            self.lumber_ok[rows, tiles] = False  # no WOODS -> no LUMBER_MILL buildable (TS gates on live tile.feature==='WOODS')
-        # chopping the feature ENABLES farm/mine on the now-bare terrain (TS's
-        # live gate) — switch the static masks to their post-chop variants.
-        self.farm_flat[rows, tiles] = self._fa_f_c[rows, tiles]
-        self.farm_hill[rows, tiles] = self._fa_h_c[rows, tiles]
-        self.mine_ok[rows, tiles] = self._mi_c[rows, tiles]
+        self._bare_ground_jobs(rows, tiles)
         # Withdraw BOTH feature classes: every TS strip site that reaches this
         # function nulls ANY feature (queueDistrict paves a REEF too). A tile
         # has one feature, so exactly one of the two planes is nonzero.
@@ -1615,6 +1622,18 @@ class SimOrders:
                 om = on_map.nonzero(as_tuple=True)[0]
                 self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
         self._eff_version += 1
+
+    def _bare_ground_jobs(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """The farm / mine / lumber job flags of a plot whose removable
+        feature is gone (chopped, paved or painted over by Volcanic Soil):
+        TS's live gates read the bare ground (`bareGround`), so farm and mine
+        take their feature-free variants and the Lumber Mill, which needs
+        WOODS, is refused. A harvest on such a plot calls this after copying
+        the resource-free values in, which carry the starting feature."""
+        self.lumber_ok[rows, tiles] = False
+        self.farm_flat[rows, tiles] = self._fa_f_c[rows, tiles]
+        self.farm_hill[rows, tiles] = self._fa_h_c[rows, tiles]
+        self.mine_ok[rows, tiles] = self._mi_c[rows, tiles]
 
     def _withdraw_sea_adj(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """Withdraw the SEA_RESOURCE adjacency a paved-over water tile lent.
@@ -1712,10 +1731,13 @@ class SimOrders:
         Deliberately NOT `_reset_mp`: TS writes movesLeft ONLY, so movesFull
         keeps refreshUnits' embark-aware value — which is what stepUnit's
         afford rule and next turn's "spent no MP" gate both read — and it uses
-        the plain type pool, not the embark one.
+        the plain type pool, not the embark one. The hostile pool also holds
+        the Free Cities' units, which are no barbarians and keep theirs.
         """
-        self.barb_unit_mp.copy_(
-            self._mp_scale * self._type_moves[self.barb_unit_type.clamp(min=0, max=self.NU - 1)])
+        self.barb_unit_mp.copy_(torch.where(
+            self.barb_unit_seat == BARB_SEAT,
+            self._mp_scale * self._type_moves[self.barb_unit_type.clamp(min=0, max=self.NU - 1)],
+            self.barb_unit_mp))
 
     def _barbarian_phase(self) -> None:
         cb, B, T, dev = self.rules.combat, self.B, self.T, self.device
@@ -1793,8 +1815,11 @@ class SimOrders:
         # stood BEFORE this loop (TS snapshots `barbs` first); the cap check
         # recounts live (TS calls barbUnits() fresh inside the condition).
         # The camp↔unit distance matrix is hoisted: camps don't move, and units
-        # spawned mid-loop are invisible to the pre_alive mask.
-        pre_alive = self.barb_unit_alive.clone()
+        # spawned mid-loop are invisible to the pre_alive mask. `_barbs` is the
+        # barbarian seat's own units (`barbUnits`): the hostile pool also holds
+        # the Free Cities', which no camp counts, guards with or sends raiding.
+        _barbs = lambda: self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)  # noqa: E731
+        pre_alive = _barbs()
         any_camp = bool((self.camp_tile >= 0).any())
         _k_live: list[int] = []
         if any_camp:
@@ -1823,7 +1848,7 @@ class SimOrders:
             _rg = active & ~near_any
             self._spawn_barb(_rg & horse, camp, cav_type)
             self._spawn_barb(_rg & ~horse, camp, melee_type)
-            can_grow = active & near_any & (self.barb_unit_alive.sum(dim=1) < self.n_camps * cb.get("maxBarbPerCamp", 3))
+            can_grow = active & near_any & (_barbs().sum(dim=1) < self.n_camps * cb.get("maxBarbPerCamp", 3))
             r = self._next_random(can_grow)
             _raid = can_grow & (r < cb.get("garrisonGrowChance", 0.1))
             # The raid ROTATES: the camp's CLASS unit, then ranged, then melee,
@@ -1872,7 +1897,7 @@ class SimOrders:
         for k in _k_live:
             camp = self.camp_tile[:, k]
             active = camp >= 0
-            near = self.barb_unit_alive & (du_g[:, k] <= 1) & ~guard & active.unsqueeze(1)
+            near = _barbs() & (du_g[:, k] <= 1) & ~guard & active.unsqueeze(1)
             any_near = near.any(dim=1)
             first = near.long().argmax(dim=1)
             rows = any_near.nonzero(as_tuple=True)[0]
@@ -1889,8 +1914,8 @@ class SimOrders:
         # Iterate only slots alive in SOME game: deaths can only shrink the set
         # mid-loop and nothing spawns barbarians here, so the snapshot is a
         # superset; ascending order (and thus the TS unit order) is unchanged.
-        u_live = self.barb_unit_alive[:, :u_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if u_high else []
-        u_rngd_all = self.barb_unit_alive & (self._type_ranged_strength[self.barb_unit_type.clamp(min=0, max=self.NU - 1)] > 0)
+        u_live = _barbs()[:, :u_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if u_high else []
+        u_rngd_all = _barbs() & (self._type_ranged_strength[self.barb_unit_type.clamp(min=0, max=self.NU - 1)] > 0)
         any_rngd = bool(u_rngd_all.any())
         # The RANGE promotion is a whole-POOL read, and the ranged arm below
         # asked for the whole pool once per raider only to take one column of
@@ -1902,7 +1927,7 @@ class SimOrders:
         _rng_pfp = torch.zeros(0, dtype=self.barb_unit_promos.dtype, device=dev)
         _rng_tfp = torch.zeros(0, dtype=self.barb_unit_type.dtype, device=dev)
         for u in u_live:
-            act = self.barb_unit_alive[:, u] & ~guard[:, u]
+            act = self.barb_unit_alive[:, u] & (self.barb_unit_seat[:, u] == BARB_SEAT) & ~guard[:, u]
             if not bool(act.any()):
                 continue
             here = self.barb_unit_tile[:, u]

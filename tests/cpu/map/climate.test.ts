@@ -8,9 +8,9 @@ import {
 } from '../../../cpu/core/climate';
 import {
   CLIMATE_PHASES, CO2_PER_POINT, CARBON_PER_POWER, climatePhase, deforestationModifier,
-  disasterRateMult, severitySplit, pollutionPoints, FLOOD_BARRIER_PER_TILE,
+  severitySplit, pollutionPoints, FLOOD_BARRIER_PER_TILE,
 } from '../../../cpu/data/climate';
-import { FLOOD_SEVERITY_P } from '../../../cpu/data/disasters';
+import { FLOOD_WEIGHT } from '../../../cpu/data/disasters';
 import { availableBuildings, buildingCostIn } from '../../../cpu/core/rules';
 import { availableProjects } from '../../../cpu/core/game';
 import { completeQueueItem } from '../../../cpu/core/production';
@@ -333,20 +333,18 @@ describe('the Flood Barrier', () => {
 });
 
 describe('what a warmed world does to its weather', () => {
-  it('the disaster rate and the severity split ride the published melt curve', () => {
-    // MODEL, asserted for SHAPE: both escalate, monotonically, off the ONE
-    // curve the page publishes, and phase 0 leaves each untouched.
-    expect(disasterRateMult(-1)).toBe(1);
-    expect(disasterRateMult(0)).toBeCloseTo(1.1, 9);
-    expect(disasterRateMult(6)).toBeCloseTo(1.85, 9);
+  it('the severity split rides the published melt curve', () => {
+    // MODEL, asserted for SHAPE: the worst row gains weight monotonically
+    // off the ONE curve the page publishes, below Phase I nothing moves, and
+    // the family's total weight is kept.
+    expect(severitySplit(FLOOD_WEIGHT, -1)).toEqual([...FLOOD_WEIGHT]);
+    const worst = severitySplit(FLOOD_WEIGHT, 6);
+    expect(worst[0]).toBeLessThan(FLOOD_WEIGHT[0]);
+    expect(worst[2]).toBeGreaterThan(FLOOD_WEIGHT[2]);
+    expect(worst.reduce((a, b) => a + b, 0)).toBeCloseTo(4.5, 9);
     for (let p = 1; p < CLIMATE_PHASES.length; p++) {
-      expect(disasterRateMult(p)).toBeGreaterThan(disasterRateMult(p - 1));
+      expect(severitySplit(FLOOD_WEIGHT, p)[2]).toBeGreaterThan(severitySplit(FLOOD_WEIGHT, p - 1)[2]);
     }
-    expect(severitySplit(FLOOD_SEVERITY_P, -1)).toEqual([...FLOOD_SEVERITY_P]);
-    const worst = severitySplit(FLOOD_SEVERITY_P, 6);
-    expect(worst[0]).toBeLessThan(FLOOD_SEVERITY_P[0]);
-    expect(worst[2]).toBeGreaterThan(FLOOD_SEVERITY_P[2]);
-    expect(worst.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
   });
 
   it('fertility stops at Phase IV and reverses at Phase V', () => {

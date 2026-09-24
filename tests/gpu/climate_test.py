@@ -17,7 +17,7 @@ Proven here:
   * a phase floods its own lowland band, a FLOOD BARRIER holds the sea off
     its city's tiles, and one built late repairs what already went under;
   * `_melt_ice` takes the published fraction off the front of the map;
-  * `_disaster_rate` and `_severity_split` ride the melt curve, and
+  * `_severity_split` rides the melt curve, and
     `_fertility_live` / `_desertification_live` flip at IV and V;
   * `_pollution_favor_penalty` is -1 per 3 points over average, capped at 20;
   * `_flood_barrier_cost` is the published formula and `_seat_buildable`
@@ -316,19 +316,17 @@ def main() -> int:
 
     # --- 9) a warmed world's weather --------------------------------------
     s9 = fresh(rules, paths[0])
-    assert float(s9._disaster_rate()[b]) == 1.0
     assert bool(s9._fertility_live()[b]) and not bool(s9._desertification_live()[b])
-    base = s9._flood_sev_p
+    base = s9._flood_weight
     assert s9._severity_split(base)[b].tolist() == list(base)
-    prev = 1.0
+    prev = base[-1]
     for p in range(7):
         s9.climate_idx[b] = p
-        r = float(s9._disaster_rate()[b])
-        assert r > prev, f"phase {p} must run its draws more often than {p - 1}"
-        prev = r
         sp = s9._severity_split(base)[b].tolist()
+        assert sp[-1] > prev, f"phase {p} must weigh the worst flood above phase {p - 1}"
+        prev = sp[-1]
         assert sp[0] < base[0] and sp[-1] > base[-1]
-        assert abs(sum(sp) - 1.0) < 1e-12
+        assert abs(sum(sp) - sum(base)) < 1e-12
     s9.climate_idx[b] = 3  # Phase IV
     assert not bool(s9._fertility_live()[b]) and not bool(s9._desertification_live()[b])
     s9.climate_idx[b] = 4  # Phase V
@@ -342,7 +340,7 @@ def main() -> int:
     assert int(s9.fertility[b, 0]) == 1 and int(s9.fertility_prod[b, 0]) == 0
     s9._defertilize(r9, t9)
     assert int(s9.fertility[b, 0]) == 0 and int(s9.fertility_prod[b, 0]) == 0
-    print("  9 rate + severity + fertility gates OK")
+    print("  9 severity + fertility gates OK")
 
     # --- 10) what pollution costs in the Congress -------------------------
     s10 = fresh(rules, paths[0])

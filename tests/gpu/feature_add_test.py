@@ -16,8 +16,11 @@ Proven here:
   * a painted Woods reads exactly as a chopped one (yields, appeal, the
     bare-ground jobs, its Lumber Mill gone), with the soil's name live
     (`featureId`), and nothing can strip or chop the soil back;
-  * the eruption draws once per eligible ring plot and paints at
-    `_soil_paint_p`, never an ineligible plot.
+  * the eruption draws once per eligible ring plot and paints at its
+    severity's `_soil_paint_p`, never an ineligible plot, and the turn's draw
+    names the severity in proportion to the three rows' weights;
+  * Kilimanjaro erupts on its own two rows, 4 / 2.5 once per Kilimanjaro
+    plot, at that plot, with its own paint chance.
 """
 
 from __future__ import annotations
@@ -36,6 +39,7 @@ from warmup import warm_base, opened  # noqa: E402
 B0 = 0
 # FEAT_IDS: WOODS 0, RAINFOREST 1, MARSH 2, FLOODPLAINS 3, ..., GEOTHERMAL_FISSURE 7, VOLCANIC_SOIL 8
 WOODS, RAINFOREST, MARSH, FLOODPLAINS, GEO, SOIL = 0, 1, 2, 3, 7, 8
+STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
 
 
 def fresh(rules, path, slot: int = 0):
@@ -120,33 +124,98 @@ def main() -> None:
     assert torch.equal(adj, paint.d_static_adj)
     print("  2 painted Woods OK — reads as chopped, Lumber Mill gone, soil live and permanent")
 
-    # 3 — the eruption: one draw per eligible ring plot, the chance on the painted
+    # 3 — the eruption: one draw per eligible ring plot, at its SEVERITY's
+    # chance (GENTLE / CATASTROPHIC / MEGACOLOSSAL 35 / 50 / 75)
     sim3 = fresh(rules, path, slot=3)
     volc = [int(v) for v in sim3.volcano_tile[B0].tolist() if int(v) >= 0]
     assert volc, "the fixture carries no volcano"
-    plots = painted = 0
-    for it in range(400):
-        sim3 = fresh(rules, path, slot=3)
-        sim3._eruption_chance = 1.0
-        sim3.rng_state[B0] = 7919 * (it + 1)
-        ring = [int(n) for v in volc for n in sim3.neigh[v].tolist() if int(n) >= 0]
-        elig = {n for n in ring if paintable(sim3, n)}
-        before = sim3.feat_id[B0].clone()
-        sim3._disaster_phase()
-        for n in ring:
-            if n in elig:
-                plots += 1
-                painted += int(int(sim3.feat_id[B0, n]) == SOIL)
-            else:
-                assert int(sim3.feat_id[B0, n]) == int(before[n]), f"ineligible plot {n} was painted"
-        if plots >= 1500:
-            break
-    p = float(sim3._soil_paint_p)
-    assert abs(p - 0.35) < 1e-12, "every eruption paints at GENTLE's 35"
-    assert plots >= 300, f"only {plots} eligible ring plots over the runs"
-    rate = painted / plots
-    assert abs(rate - p) < 0.05, f"painted {painted}/{plots} = {rate:.3f} against {p}"
-    print(f"  3 eruption paint OK — {painted}/{plots} = {rate:.3f} against {p}")
+    assert sim3._soil_paint_p.tolist() == [0.35, 0.5, 0.75]
+    assert sim3._eruption_weight == [4, 2.5, 1.5]
+    hit = torch.zeros(sim3.B, dtype=torch.bool)
+    hit[B0] = True
+    for sev in range(3):
+        plots = painted = 0
+        for it in range(400):
+            sim3 = fresh(rules, path, slot=3)
+            sim3.rng_state[B0] = 7919 * (it + 1) + sev
+            v = volc[it % len(volc)]
+            ring = [int(n) for n in sim3.neigh[v].tolist() if int(n) >= 0]
+            elig = {n for n in ring if paintable(sim3, n)}
+            before = sim3.feat_id[B0].clone()
+            s0 = int(sim3.rng_state[B0])
+            sim3._erupt(hit, torch.full((sim3.B,), v, dtype=torch.long),
+                        sim3._soil_paint_p[torch.full((sim3.B,), sev, dtype=torch.long)])
+            assert (s0 + len(elig) * STEP) & 0xFFFFFFFF == int(sim3.rng_state[B0]), \
+                "an eruption draws once per eligible ring plot"
+            for n in ring:
+                if n in elig:
+                    plots += 1
+                    painted += int(int(sim3.feat_id[B0, n]) == SOIL)
+                else:
+                    assert int(sim3.feat_id[B0, n]) == int(before[n]), f"ineligible plot {n} was painted"
+            if plots >= 1200:
+                break
+        p = float(sim3._soil_paint_p[sev])
+        assert plots >= 300, f"only {plots} eligible ring plots over the runs"
+        rate = painted / plots
+        assert abs(rate - p) < 0.05, f"severity {sev}: painted {painted}/{plots} = {rate:.3f} against {p}"
+        print(f"  3 eruption paint OK — severity {sev}: {painted}/{plots} = {rate:.3f} against {p}")
+
+    # 4 — the turn's draw names the severity: over the eruptions it fires,
+    # GENTLE / CATASTROPHIC / MEGACOLOSSAL come in proportion to 4 / 2.5 / 1.5
+    sim4 = fresh(rules, path, slot=3)
+    kili_w, sim4._kilimanjaro_weight = sim4._kilimanjaro_weight, [0.0, 0.0]
+    seen = [0, 0, 0]
+    sev_of_p = {float(p): s for s, p in enumerate(sim4._soil_paint_p.tolist())}
+    sim4._erupt = lambda hit, volc, p: [seen.__setitem__(sev_of_p[float(x)], seen[sev_of_p[float(x)]] + 1)
+                                        for x in p[hit].tolist()]
+    sim4._flood_river = lambda hit, tile, sev: None
+    strip = sim4._desertification_live()
+    for _ in range(3000):
+        sim4.storm_left.zero_()
+        sim4._random_event(strip)
+    del sim4._erupt, sim4._flood_river
+    sim4._kilimanjaro_weight = kili_w
+    n = sum(seen)
+    assert n > 300, f"only {n} eruptions in 3000 draws"
+    for s, w in enumerate((4, 2.5, 1.5)):
+        assert abs(seen[s] / n - w / 8) < 0.05, f"severity {s}: {seen[s]}/{n} against {w}/8"
+    print(f"  4 eruption severity OK — {seen} over {n} eruptions against 4 / 2.5 / 1.5")
+
+    # 5 — KILIMANJARO: its own two rows, 4 / 2.5 once per Kilimanjaro plot,
+    # each painting the wonder's ring at its own 50 / 50; with every other
+    # row's weight zeroed the draw fires Kilimanjaro alone, at its plot
+    sim5 = fresh(rules, path, slot=4)
+    kf = sim5._kilimanjaro_fid
+    assert kf >= 0 and sim5._kilimanjaro_weight == [4, 2.5]
+    assert sim5._kilimanjaro_soil_p.tolist() == [0.5, 0.5]
+    sim5.feat_id[sim5.feat_id == kf] = -1
+    kt = bare_land(sim5)
+    sim5.feat_id[B0, kt] = kf
+    sim5._flood_weight = [0.0] * len(sim5._flood_weight)
+    sim5._eruption_weight = [0.0] * len(sim5._eruption_weight)
+    sim5._st_weight = [0.0] * len(sim5._st_weight)
+    sim5._accident_weight = [0.0] * len(sim5._accident_weight)
+    sim5._drought_weight = [0.0] * len(sim5._drought_weight)
+    sim5._kilimanjaro_soil_p = torch.tensor([0.1, 0.2], dtype=torch.float64)  # tell the rows apart
+    rows_seen = [0, 0]
+    tiles_seen: set[int] = set()
+
+    def spy(hit, volc, p):
+        assert bool(hit[B0]), "only Kilimanjaro can fire"
+        rows_seen[int(round(float(p[B0]) * 10)) - 1] += 1
+        tiles_seen.add(int(volc[B0]))
+
+    sim5._erupt = spy
+    strip = sim5._desertification_live()
+    for _ in range(3000):
+        sim5._random_event(strip)
+    del sim5._erupt
+    assert tiles_seen == {kt}, f"Kilimanjaro erupted at {tiles_seen}, its plot is {kt}"
+    n = sum(rows_seen)
+    assert n == 3000, f"{n} of 3000 draws fired Kilimanjaro"
+    assert abs(rows_seen[0] / n - 4 / 6.5) < 0.03, f"GENTLE {rows_seen[0]}/{n} against 4/6.5"
+    print(f"  5 Kilimanjaro OK — {rows_seen} over {n} draws against 4 / 2.5, at its plot")
 
     print("VOLCANIC SOIL OK — the envelope, the replacement, the per-plot chance")
 

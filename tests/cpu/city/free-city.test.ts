@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
-import { tilesWithin } from '../../../world/hex';
+import { neighbors, tilesWithin } from '../../../world/hex';
 import { flipCity, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
-import { meleeAttack, attackTargets } from '../../../cpu/core/combat';
-import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
-import { FREE_SEAT, atWarWithAny, emptySeat, isTerritorial, seatOf, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
-import { CIV_LEADERS, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
-import { CITY_MAX_HP } from '../../../cpu/data/units';
+import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
+import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
+import { FREE_SEAT, atWarWithAny, emptySeat, isBarbSeat, isTerritorial, seatOf, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
+import { CIV_LEADERS, FREE_CITY_DEFENSE, FREE_CITY_GRANT_MELEE, FREE_CITY_GRANT_MELEE_COUNT, FREE_CITY_GRANT_RANGED, FREE_CITY_GRANT_RANGED_TURNS, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
+import { CITY_MAX_HP, WALLS_TIER_CS } from '../../../cpu/data/units';
+import { isWater } from '../../../world/query';
 import type { GameState, City, Seat } from '../../../cpu/core/types';
 
 const leaderRow = (leader: string) => CIV_LEADERS.findIndex((l) => l.leader === leader);
@@ -140,6 +141,8 @@ describe('the Free City step', () => {
     border.loyalty = 0;
     flipCity(state, border);
     const city = state.freeSeat!.cities[0];
+    // the granted defenders stand aside: this scene is about the centre
+    for (const u of state.units.filter((x) => x.seat === FREE_SEAT)) disbandUnit(state, u.id);
     expect(atWarWithAny(state, rival.seat)).toBe(false);
     expect(declareWar(state, rival.seat, FREE_SEAT).ok).toBe(false);
     expect(unitsHostile(state, { seat: rival.seat }, { seat: FREE_SEAT })).toBe(true);
@@ -151,6 +154,67 @@ describe('the Free City step', () => {
     expect(meleeAttack(state, warrior.id, city.centerIndex, rival.seat).ok).toBe(true);
     expect(city.hp).toBeLessThan(hp0);
     expect(atWarWithAny(state, rival.seat)).toBe(false);
+  });
+
+  it('a revolt grants the melee pair beside the centre, the ranged unit five turns later', () => {
+    const { state, border } = scene(30);
+    border.loyalty = 0;
+    flipCity(state, border);
+    const city = state.freeSeat!.cities[0];
+    const centre = state.map.tiles[city.centerIndex];
+    const free = () => state.units.filter((u) => u.seat === FREE_SEAT);
+    // CIV6 (the live watch): two Men-at-Arms exist on the flip turn itself, on
+    // the first free tiles beside the centre in direction order
+    const want = neighbors(state.map, centre).filter((t) => !isWater(t)).slice(0, FREE_CITY_GRANT_MELEE_COUNT);
+    expect(free().map((u) => u.type)).toEqual(Array(FREE_CITY_GRANT_MELEE_COUNT).fill(FREE_CITY_GRANT_MELEE));
+    expect(free().map((u) => u.tileIndex)).toEqual(want.map((t) => t.index));
+    expect(city.foundedTurn).toBe(state.turn);
+    // it trains nothing: nothing arrives until the grant falls due...
+    for (let k = 1; k < FREE_CITY_GRANT_RANGED_TURNS; k++) {
+      state.turn = city.foundedTurn + k;
+      freeCitiesPhase(state);
+      expect(free().length).toBe(FREE_CITY_GRANT_MELEE_COUNT);
+    }
+    // ...and then the Crossbowman, once
+    state.turn = city.foundedTurn + FREE_CITY_GRANT_RANGED_TURNS;
+    freeCitiesPhase(state);
+    expect(free().filter((u) => u.type === FREE_CITY_GRANT_RANGED).length).toBe(1);
+    state.turn += 1;
+    freeCitiesPhase(state);
+    expect(free().length).toBe(FREE_CITY_GRANT_MELEE_COUNT + 1);
+    // the Free Cities' units are no barbarians: no camp counts or walks them
+    expect(free().every((u) => !isBarbSeat(u.seat) && u.xp === undefined)).toBe(true);
+  });
+
+  it('a Free City stands on its own flat base, 72 with no walls', () => {
+    const { state, border } = scene(30);
+    const before = cityDefenseStrength(state, border);
+    border.loyalty = 0;
+    flipCity(state, border);
+    const city = state.freeSeat!.cities[0];
+    expect(before).toBe(15);
+    expect(cityDefenseStrength(state, city)).toBe(FREE_CITY_DEFENSE);
+    expect(FREE_CITY_DEFENSE).toBe(72);
+    city.buildings.push('ANCIENT_WALLS');
+    expect(cityDefenseStrength(state, city)).toBe(FREE_CITY_DEFENSE + WALLS_TIER_CS[1]);
+  });
+
+  it('a walled Free City strikes a hostile unit beside it; an unwalled one does not', () => {
+    for (const walled of [false, true]) {
+      const { state, border, rival } = scene(30);
+      border.loyalty = 0;
+      flipCity(state, border);
+      const city = state.freeSeat!.cities[0];
+      for (const u of state.units.filter((x) => x.seat === FREE_SEAT)) disbandUnit(state, u.id);
+      if (walled) city.buildings.push('ANCIENT_WALLS');
+      const centre = state.map.tiles[city.centerIndex];
+      const spot = neighbors(state.map, centre).find((t) => !isWater(t))!;
+      const warrior = spawnUnit(state, 'WARRIOR', spot.index, rival.seat)!;
+      expect(warrior.tileIndex).toBe(spot.index);
+      freeCitiesPhase(state);
+      if (walled) expect(warrior.hp).toBeLessThan(100);
+      else expect(warrior.hp).toBe(100);
+    }
   });
 
   it('a Free City heals in its own phase and survives a full turn', () => {

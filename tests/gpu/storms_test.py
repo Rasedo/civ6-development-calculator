@@ -62,9 +62,9 @@ def play(sim, row: int, name) -> None:
 # instead of a fixture load and a settle. `_STATIC` names the planes these
 # pokes write that `snapshot`/`restore` does not carry (they are not in
 # `_MUTABLE`), and `_ATTRS` the plain attributes a scene REPLACES outright
-# (`disasters`, the storm chances) — the helper puts both back by hand.
+# (`disasters`, the storm weights) — the helper puts both back by hand.
 _STATIC = ("row_civ", "row_leader")
-_ATTRS = ("disasters", "_st_chance")
+_ATTRS = ("disasters", "_st_weight")
 
 
 def fresh(rules) -> BatchSim:
@@ -153,7 +153,7 @@ def main() -> int:
     assert ids == ["BLIZZARD_SIGNIFICANT", "BLIZZARD_CRIPPLING", "DUST_STORM_GRADIENT", "DUST_STORM_HABOOB",
                    "TORNADO_FAMILY", "TORNADO_OUTBREAK", "HURRICANE_CAT_4", "HURRICANE_CAT_5"], ids
     assert sim._st_hexes.tolist() == [7, 19, 3, 7, 1, 3, 7, 19]
-    assert [round(c * 500) for c in sim._st_chance] == [8, 2, 8, 2, 15, 3, 15, 3]
+    assert sim._st_weight == [8, 2, 8, 2, 15, 3, 15, 3]
     assert sim._st_pairs == [(0, 1), (2, 3), (4, 5), (6, 7)]
     offs = sim._storm_offs.tolist()
     assert len(offs) == 19 and offs[0] == [0, 0]
@@ -238,7 +238,7 @@ def main() -> int:
     c = free_tile(sim2, False)
     sim2.storm_event[0, c] = TOR1
     sim2.storm_left[0, c] = 3
-    sim2._st_chance = [0.0] * len(sim2._st_chance)  # no second storm forms in this scene
+    sim2._st_weight = [0.0] * len(sim2._st_weight)  # no second storm forms in this scene
     # the record MOVES with the walk on its second and third turns: follow it
     lefts, count = [], []
     for _ in range(3):
@@ -311,6 +311,51 @@ def main() -> int:
     end3 = int(sim9._storm_walk(torch.tensor([False]), torch.tensor([sea]), torch.tensor([CAT4_]))[0])
     assert end3 == sea and int(sim9.rng_state[0]) == s0
     print("  9 walk OK — eight draws per walk, the record travels, the ocean and other storms bound it")
+    # -- 10: THE TURN'S ONE RANDOM EVENT — MEASURED (lab 4): at most one event
+    # a turn, drawn over the eligible (row, site) pairs with each row's
+    # OccurrencesPerGame as the pair's weight. A flood weighs once per river,
+    # an eruption once per volcano (Kilimanjaro once per its plot), a storm
+    # or a drought once when its terrain exists. Each family's firing is
+    # counted here with its effect taken out, so the shares read the draw
+    # alone.
+    sim10 = fresh(rules)
+    fired = {"flood": 0, "volcano": 0, "storm": 0, "drought": 0, "accident": 0}
+    turn = {}
+    sim10._flood_river = lambda hit, tile, sev: turn.__setitem__("flood", bool(hit[0]))
+    sim10._erupt = lambda hit, volc, sev: turn.__setitem__("volcano", bool(hit[0]))
+    sim10._nuclear_accident = lambda hit, centre, sev: turn.__setitem__("accident", bool(hit[0]))
+    strip = sim10._desertification_live()
+    N = 4000
+    for _ in range(N):
+        turn.clear()
+        sim10.storm_left.zero_()
+        sim10.storm_event.fill_(-1)
+        sim10.drought.zero_()
+        s0 = int(sim10.rng_state[0])
+        sim10._random_event(strip)
+        turn["storm"] = bool((sim10.storm_left[0] > 0).any())
+        turn["drought"] = bool((sim10.drought[0] > 0).any())
+        n_fired = sum(1 for v in turn.values() if v)
+        assert n_fired == 1, f"the turn fired {n_fired} events: {turn}"
+        # the event draw, then the storm's or the drought's centre pick
+        spent = draws(s0, int(sim10.rng_state[0]))
+        assert spent == (2 if turn["storm"] or turn["drought"] else 1), (spent, turn)
+        for k, v in turn.items():
+            fired[k] += int(v)
+    del sim10._flood_river, sim10._erupt, sim10._nuclear_accident
+    fams = {int(f) for f in range(len(sim10._storm_lists)) if int(sim10._storm_lists[f][1][0]) > 0}
+    w = {
+        "flood": 4.5 * int(sim10._flood_sites[1][0]),
+        "volcano": 8.0 * int(sim10._volc_n[0]) + 6.5 * int(((sim10.feat_id[0] == sim10._kilimanjaro_fid)
+                                                          & ~sim10.feat_stripped[0]).sum()),
+        "storm": sum(sim10._st_weight[e] for e in range(8) if sim10._st_family[e] in fams),
+        "drought": 28.0 if int(sim10._droughtc_list[1][0]) > 0 else 0.0,
+        "accident": 0.0,
+    }
+    total = sum(w.values())
+    for k in fired:
+        assert abs(fired[k] / N - w[k] / total) < 0.03, f"{k}: {fired[k]}/{N} against {w[k]}/{total}"
+    print(f"  10 one event a turn OK — {fired} over {N} turns against weights {w}")
     print("BATTERY OK storms")
     return 0
 

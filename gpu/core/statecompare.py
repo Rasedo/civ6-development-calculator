@@ -854,6 +854,7 @@ CITY = {
     "freePressure": lambda sim, b, rows: [
         [float(x) for x in sim.city_free_press[b, c, s].tolist()] for c, s in rows
     ],
+    "freedTurn": _cty("city_freed_turn"),
     # every layout slot's work — object, maker, era, civilization; -1s for an
     # empty slot — exactly like the TS extractor.
     "greatWorks": lambda sim, b, rows: _gw_rows(sim, b, rows),

@@ -950,13 +950,15 @@ class SimInit:
         # plane:
         #
         #     [ 0 .. MAJOR_POOL_MAX )                        EVERY major seat
-        #     [ MAJOR_POOL_MAX .. MAJOR_POOL_MAX+BARB_POOL_MAX )  barbarians
+        #     [ MAJOR_POOL_MAX .. MAJOR_POOL_MAX+BARB_POOL_MAX )  the hostile class
         #
         # A unit's OWNER is `unit_seat`, NEVER the range it landed in — every
         # major seat spawns through the same cursor into the same range,
         # exactly as TS pushes every seat's unit onto one `state.units`. A
-        # RANGE only says which CLASS of actor lives there, which is what the
-        # barbarian split is for.
+        # RANGE only says which CLASS of actor lives there: the hostile range
+        # holds the barbarians and the Free Cities' granted units, the two
+        # seats that earn no experience and that no driven seat walks, and
+        # every barbarian rule asks `unit_seat == BARB_SEAT`.
         #
         # `major_unit_*` / `barb_unit_*` are VIEWS, so every write must be in
         # place. tests/gpu/inplace_discipline_test.py enforces that statically
@@ -1120,6 +1122,10 @@ class SimInit:
         # "since the Free City became independent" (`City.freePressure`),
         # accrued by `_free_cities_phase`; zeros for any other city.
         self.city_free_press = torch.zeros(B, self.CITY_ROWS, civ_city_pad, self.n_majors, dtype=dtype, device=device)
+        # the turn a city became FREE — the revolt's turn on the free row, -1
+        # on every other city (TS's `foundedTurn`, which the transfer writes).
+        # The ranged grant falls due off it.
+        self.city_freed_turn = torch.full((B, self.CITY_ROWS, civ_city_pad), -1, dtype=torch.long, device=device)
         # the Free Cities seat's own persistent city-id counter — the twin of
         # `civ_next_city_id` for a row that has no civ block
         self.free_next_city_id = torch.zeros(B, dtype=torch.long, device=device)
@@ -2443,20 +2449,36 @@ class SimInit:
         self._trader_cost_prog = int(_tr["traderCostProg"])
         # RIVER FLOOD, the Flood (Civ6) tables by severity.
         _ds = rules.disasters
-        self._flood_sev_p = [float(x) for x in _ds["floodSeverityP"]]
-        # the per-turn base chances the climate phase scales
-        self._flood_chance = float(_ds["floodChance"])
-        self._eruption_chance = float(_ds["eruptionChance"])
-        # the per-plot Volcanic Soil chance of an eruption, and what the soil replaces
-        self._soil_paint_p = float(_ds["soilPaintP"])
+        # THE TURN'S ONE DRAW (`eventRows`): each row's weight per site, in
+        # severity order — floods, Kilimanjaro's eruptions, eruptions,
+        # accidents, droughts; the storms' ride their own records below
+        self._flood_weight = [float(x) for x in _ds["floodWeight"]]
+        self._kilimanjaro_weight = [float(x) for x in _ds["kilimanjaroWeight"]]
+        self._eruption_weight = [float(x) for x in _ds["eruptionWeight"]]
+        self._accident_weight = [float(x) for x in _ds["accidentWeight"]]
+        self._drought_weight = [float(x) for x in _ds["droughtWeight"]]
+        # the nuclear accident by severity: the reactor age that opens the
+        # row, the fallout turns, the district and population chances
+        self._accident_min_turn = [int(x) for x in _ds["accidentMinTurn"]]
+        self._accident_fallout = torch.tensor([int(x) for x in _ds["accidentFallout"]], dtype=torch.long, device=device)
+        self._accident_district_p = torch.tensor([float(x) for x in _ds["accidentDistrictP"]], dtype=torch.float64, device=device)
+        self._accident_pop_p = torch.tensor([float(x) for x in _ds["accidentPopP"]], dtype=torch.float64, device=device)
+        # the per-plot Volcanic Soil chance by eruption severity, and what the soil replaces
+        self._soil_paint_p = torch.tensor([float(x) for x in _ds["soilPaintP"]], dtype=torch.float64, device=device)
         self._soil_replaces = [int(x) for x in _ds["soilReplaces"] if int(x) >= 0]
-        self._drought_chance = float(_ds["droughtChance"])
-        self._drought_length = int(_ds["droughtLength"])
+        # Kilimanjaro's eruptions: the paint chance by row, and the feature
+        # whose plots are their sites
+        self._kilimanjaro_soil_p = torch.tensor([float(x) for x in _ds["kilimanjaroSoilP"]],
+                                                dtype=torch.float64, device=device)
+        self._kilimanjaro_fid = int(_ds["kilimanjaroFid"])
+        # a drought's turns by severity, and its footprint's `STORM_DISC` slots
+        self._drought_duration = torch.tensor([int(x) for x in _ds["droughtDuration"]], dtype=torch.long, device=device)
+        self._drought_hexes = int(_ds["droughtHexes"])
         # THE EIGHT STORMS (`STORM_EVENTS`), one column per row in table order
         _st = _ds["storms"]
         self._st_ids = [str(e["id"]) for e in _st]
         self._st_family = [int(e["family"]) for e in _st]
-        self._st_chance = [float(e["chance"]) for e in _st]
+        self._st_weight = [float(e["weight"]) for e in _st]
         # CIV6 (`PrevailingWinds`, `PREVAILING_WINDS`): the weighted heading per
         # latitude band, [8 bands, 6 hex directions E NE NW W SW SE]; and the
         # band of every tile's row (`windBand`, the same integer comparisons)
@@ -2664,8 +2686,12 @@ class SimInit:
             width = max(int(n.max()), 1)
             idx = torch.argsort((~cand).to(torch.int8), dim=1, stable=True)[:, :width]
             return idx, n
-        self._flood_list = cand_list(self.floodplain)
+        # the flood sites (`floodSites`): one plot per river carrying
+        # Floodplains, and each riverless Floodplains plot
+        self._build_flood_sites()
         self._droughtc_list = cand_list(self.drought_cand)
+        # the volcanoes each game holds (`volcano_tile` is packed from 0)
+        self._volc_n = (self.volcano_tile >= 0).sum(dim=1)
         # one start-tile list per storm family (`stormFamilyAt`)
         self._storm_lists = [cand_list(self.storm_fam == f) for f in range(max(self._st_family) + 1)]
         # Yields sum the picked tiles sequentially to mirror the TS reduce. When
@@ -3653,6 +3679,14 @@ class SimInit:
         # CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES, LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY)
         self._free_city_loyalty = float(rules.seats["freeCityLoyaltyPerTurn"])
         self._loyalty_after_cultural = float(rules.seats["loyaltyAfterCulturalTransfer"])
+        # the Free Cities player's own strength floor, and the defenders a
+        # revolt grants it: the melee pair on the flip turn, the ranged one
+        # `_free_grant_turns` later (`FREE_CITY_*`, measured in the live game)
+        self._free_def = int(rules.seats["freeCityDefense"])
+        self._free_grant_melee = int(rules.seats["freeCityGrantMelee"])
+        self._free_grant_melee_n = int(rules.seats["freeCityGrantMeleeCount"])
+        self._free_grant_ranged = int(rules.seats["freeCityGrantRanged"])
+        self._free_grant_turns = int(rules.seats["freeCityGrantRangedTurns"])
         self._captured_hp = int(rules.combat["capturedHp"])
         self._capture_base_diff = int(rules.combat["captureBaseDiff"])
         self._embark_move_rows: list[tuple[int, int, int, int]] = [
@@ -3748,12 +3782,15 @@ class SimInit:
         # movesLeft.
         #
         # ORDER: the fixture's civs in fixture order, each civ's units in its
-        # own order — TS `loadWorld`'s spawn order, so slot order is
-        # `state.units` array order for the walks that cross seats.
+        # own order, then every city-state's starting army in roster order —
+        # TS `loadWorld`'s spawn order, so slot order is `state.units` array
+        # order for the walks that cross seats. A minor's unit rides the
+        # majors' pool under its own seat id, 100 + its roster id.
         for b, f in enumerate(fixtures):
-            for cv in f["civs"]:
-                seat = int(cv["seat"])
-                for u_ in cv["units"]:
+            _owners = [(int(cv["seat"]), cv["units"]) for cv in f["civs"]]
+            _owners += [(100 + int(cs_["id"]), cs_.get("units", [])) for cs_ in f.get("cityStates", [])]
+            for seat, _units in _owners:
+                for u_ in _units:
                     i = int(self.unit_next[b])
                     ti = int(u_["type"])
                     self.major_unit_alive[b, i] = True
@@ -3774,10 +3811,10 @@ class SimInit:
                         self.civilian_at[(b, int(u_["tile"]))] = i
                     else:
                         self.military_at[(b, int(u_["tile"]))] = i
-                    if self.fog_of_war:
+                    if self.fog_of_war and seat < self.n_majors:
                         # spawnUnit's revealAround: the chassis's own sight,
                         # cut by occlusion (ask 11) — a fresh unit sees
-                        # through nothing
+                        # through nothing; a minor keeps no fog
                         _s0 = int(self._type_sight[ti]) or 2
                         _bb = torch.tensor([b], dtype=torch.long, device=device)
                         self.seat_explored[b, seat] |= self._los_disk(
@@ -3888,10 +3925,14 @@ class SimInit:
         seat = self.unit_seat
         v, u = self.POOL_LO["major"], self.POOL_LO["barb"]
         ve, ue = self.POOL_HI["major"], self.POOL_HI["barb"]
-        if not bool(((seat[:, v:ve] >= 0) & (seat[:, v:ve] < self.n_majors)).all()):
-            raise AssertionError("SEAT DRIFT: a MAJOR slot's seat is not a major seat")
-        if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
-            raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
+        _ms = seat[:, v:ve]
+        _civ = (_ms >= 0) & (_ms < self.n_majors)
+        _minor = (_ms >= 100) & (_ms < 100 + self.S)
+        if not bool((_civ | _minor).all()):
+            raise AssertionError("SEAT DRIFT: a MAJOR-pool slot's seat is neither a major's nor a city-state's")
+        # the hostile pool holds the barbarians and the Free Cities' granted units
+        if not bool(((seat[:, u:ue] == BARB_SEAT) | (seat[:, u:ue] == FREE_SEAT) | ~al[:, u:ue]).all()):
+            raise AssertionError(f"SEAT DRIFT: a living BARB slot carries neither seat {BARB_SEAT} nor {FREE_SEAT}")
         # `caps.xp` is FALSE for the hostile class, and the TS twin enforces it
         # by never giving a barbarian unit an `xp` field at all
         # (cpu/core/units.ts spawnUnit). A dense plane cannot leave a field out,

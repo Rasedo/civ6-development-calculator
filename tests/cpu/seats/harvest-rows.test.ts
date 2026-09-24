@@ -6,6 +6,7 @@ import { harvestGrant, CHOP_BASE, chopValue } from '../../../cpu/core/economy';
 import { unitActionNames } from '../../../cpu/core/unitActions';
 import { IMPROVEMENT_IDS } from '../../../cpu/core/unitActions';
 import { RESOURCES } from '../../../world/resources';
+import { validImprovements } from '../../../cpu/core/rules';
 import { CULTURE_BOMB_ROWS, SEAT_BAN_ROWS } from '../../../cpu/data/civilizations';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { TECHS } from '../../../cpu/data/techs';
@@ -104,6 +105,25 @@ describe('the harvest', () => {
     expect(bare).toBeTruthy();
     at.resource = bare!;
     expect(harvestGrant(state, at, 1)).toBeNull();
+  });
+
+  it('a plot whose Woods is gone offers the bare ground\'s jobs after the harvest', () => {
+    // the chop and the Volcanic Soil paint both take the Woods; the harvest
+    // then leaves the plot as it stands, never as it started
+    for (const now of [null, 'VOLCANIC_SOIL'] as const) {
+      const { state, at } = scene();
+      at.elevation = 'HILLS';
+      at.feature = 'WOODS';
+      at.resource = 'DEER';
+      researchAll(state, 1);
+      at.feature = now;
+      const u = spawnUnit(state, 'BUILDER', at.index, 1);
+      expect(builderHarvest(state, u!.id).ok, String(now)).toBe(true);
+      const jobs = validImprovements(state, at, 1);
+      expect(jobs, String(now)).toContain('MINE');
+      expect(jobs, String(now)).toContain('FARM');
+      expect(jobs, String(now)).not.toContain('LUMBER_MILL');
+    }
   });
 
   it('every harvestable resource is BONUS, so none provides a luxury it keeps', () => {

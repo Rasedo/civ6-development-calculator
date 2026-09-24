@@ -3,10 +3,9 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
-import { disasterPhase, stormChances, stormFootprint, stormTile, stormWalk } from '../../../cpu/core/disasters';
+import { disasterPhase, stormWeights, eventRows, stormFootprint, stormTile, stormWalk } from '../../../cpu/core/disasters';
 import { hexDistance } from '../../../world/hex';
 import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, PREVAILING_WINDS, WIND_BAND_LO, windBand } from '../../../cpu/data/disasters';
-import { disasterRateMult } from '../../../cpu/data/climate';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { tileYields } from '../../../cpu/core/yields';
 import type { GameState, Tile } from '../../../cpu/core/types';
@@ -65,8 +64,8 @@ describe('the eight storms are the install\'s table', () => {
     ]);
     expect(STORM_EVENTS.map((e) => e.hexes)).toEqual([7, 19, 3, 7, 1, 3, 7, 19]);
     expect(STORM_EVENTS.every((e) => e.duration === 3)).toBe(true);
-    // OccurrencesPerGame at MODERATE over the 500-turn standard game
-    expect(STORM_EVENTS.map((e) => Math.round(e.chance * 500))).toEqual([8, 2, 8, 2, 15, 3, 15, 3]);
+    // OccurrencesPerGame at MODERATE, each row's weight in the turn's one draw
+    expect(STORM_EVENTS.map((e) => e.weight)).toEqual([8, 2, 8, 2, 15, 3, 15, 3]);
     for (const f of STORM_FAMILIES) {
       const [a, b] = stormFamilyPair(f);
       expect(STORM_EVENTS[a].severity).toBe(1);
@@ -129,8 +128,11 @@ describe('the eight storms are the install\'s table', () => {
     expect(first).toBeDefined();
     expect(STORM_EVENTS[first!.stormEvent!].family).toBe('BLIZZARD');
     expect(state.eventLog.some((e) => e.startsWith('Storm: BLIZZARD'))).toBe(true);
-    // the storm was applied once already (its spawn turn) and counts down —
-    // on a tile that MOVES with the walk, so follow the live record
+    // A blizzard is drawn every turn the board has snow; make the struck
+    // plot the ONLY snow left, so every later draw lands on it, finds it
+    // busy and forms nothing, and the one storm cannot walk off it.
+    for (const t of state.map.tiles) if (t !== first) t.terrain = 'COAST';
+    // the storm was applied once already (its spawn turn) and counts down
     const live = () => state.map.tiles.filter((t) => (t.stormTurns ?? 0) > 0);
     const ev0 = first!.stormEvent;
     expect(first!.stormTurns).toBe(2);
@@ -195,40 +197,30 @@ describe('the eight storms are the install\'s table', () => {
   it('a storm damages on its first two turns and walks on its last two', () => {
     // ENTRY: the footprint at the strike plot, no walk. MOVEMENT: walk, then
     // the footprint. DISSIPATION: walk, no footprint. Read off the draws a
-    // phase makes: a tornado on the board's one PLAINS HILL (no drought or
-    // flood candidate anywhere, so a fired roll picks from nothing and draws
-    // nothing more) can never leave its tile, so every step is a dropped
-    // draw and the footprint is one tile's eleven.
-    const scene = (seed: number) => {
-      const state = board(null, 'SNOW');
-      const c = tileAtCoords(state.map, 8, 8);
-      c.terrain = 'PLAINS';
-      c.elevation = 'HILLS';
-      c.stormEvent = STORM_EVENTS.findIndex((e) => e.id === 'TORNADO_FAMILY');
-      c.stormTurns = 3;
-      state.rngState = seed;
-      const counts: number[] = [];
-      for (let i = 0; i < 3; i++) {
-        const s0 = state.rngState;
-        disasterPhase(state);
-        let k = 0;
-        for (; k < 80; k++) if (((s0 + k * STEP) >>> 0) === (state.rngState >>> 0)) break;
-        counts.push(k);
-      }
-      return { state, c, counts };
-    };
-    for (let seed = 1; seed < 100; seed++) {
-      const { state, c, counts } = scene(seed);
-      // a blizzard that formed on the snow adds its own draws — another seed
-      if (state.eventLog.some((e) => e.startsWith('Storm:'))) continue;
-      // the flood roll, the drought roll, the eight formation rolls, one per volcano
-      const base = 10 + state.map.tiles.filter((t) => t.volcano).length;
-      expect(counts).toEqual([base + 11, base + 8 + 11, base + 8]);
-      expect(c.stormTurns).toBe(0);
-      expect(c.stormEvent).toBe(-1);
-      return;
+    // phase makes: a tornado on the board's one PLAINS HILL in a sea can
+    // never leave its tile, so every step is a dropped draw and the
+    // footprint is one tile's eleven. That hill is the board's only
+    // tornado and drought plot, so the turn's event draw names a tornado
+    // (whose centre pick lands on the busy hill) or a drought (whose centre
+    // pick is the hill): two draws a turn, whichever fires.
+    const state = board(null, 'COAST');
+    const c = tileAtCoords(state.map, 8, 8);
+    c.terrain = 'PLAINS';
+    c.elevation = 'HILLS';
+    c.stormEvent = STORM_EVENTS.findIndex((e) => e.id === 'TORNADO_FAMILY');
+    c.stormTurns = 3;
+    const counts: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const s0 = state.rngState;
+      disasterPhase(state);
+      let k = 0;
+      for (; k < 80; k++) if (((s0 + k * STEP) >>> 0) === (state.rngState >>> 0)) break;
+      counts.push(k);
     }
-    throw new Error('every seed formed a blizzard');
+    expect(state.eventLog.some((e) => e.startsWith('Storm:'))).toBe(false);
+    expect(counts).toEqual([2 + 11, 2 + 8 + 11, 2 + 8]);
+    expect(c.stormTurns).toBe(0);
+    expect(c.stormEvent).toBe(-1);
   });
 
   it('the canonical disc is centre, ring 1, ring 2, each ring by tile index', () => {
@@ -308,17 +300,23 @@ describe('the eight storms are the install\'s table', () => {
     expect(city.pillagedBuildings ?? []).toEqual(before);
   });
 
-  it('the climate ramp is the flood\'s: mass moves to the worse severity, then every draw scales', () => {
-    const base = stormChances(-1, 1);
-    expect(base).toEqual(STORM_EVENTS.map((e) => e.chance));
-    const rate = disasterRateMult(2);
-    const warm = stormChances(2, rate);
+  it('the climate ramp is the flood\'s: weight moves to the worse severity, the family\'s total kept', () => {
+    const base = stormWeights(-1);
+    expect(base).toEqual(STORM_EVENTS.map((e) => e.weight));
+    const warm = stormWeights(2);
     for (const f of STORM_FAMILIES) {
       const [a, b] = stormFamilyPair(f);
-      expect(warm[a]).toBeLessThan(base[a] * rate);
-      expect(warm[b]).toBeGreaterThan(base[b] * rate);
-      expect(warm[a] + warm[b]).toBeCloseTo((base[a] + base[b]) * rate, 12);
+      expect(warm[a]).toBeLessThan(base[a]);
+      expect(warm[b]).toBeGreaterThan(base[b]);
+      expect(warm[a] + warm[b]).toBeCloseTo(base[a] + base[b], 12);
     }
+    // ...and the draw reads exactly these rows, in the install's table order
+    const rows = eventRows(2);
+    expect(rows.filter((r) => r.family === 'storm').map((r) => r.weight)).toEqual(warm);
+    expect(rows.map((r) => r.family)).toEqual([
+      'flood', 'flood', 'flood', 'kilimanjaro', 'kilimanjaro', 'volcano', 'volcano', 'volcano',
+      ...STORM_EVENTS.map(() => 'storm'), 'accident', 'accident', 'accident', 'drought', 'drought',
+    ]);
   });
 });
 

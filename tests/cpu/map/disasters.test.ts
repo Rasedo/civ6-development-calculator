@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, FERTILITY_CAP } from '../../../cpu/core/disasters';
-// OWNER RULING: the flood rate is the install's MODERATE 4.5 per 500-turn
-// game. Every loop below is a WAIT for a roll to land, so its budget is sized
-// for that rarity.
+import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodSites } from '../../../cpu/core/disasters';
+import { ACCIDENT_FALLOUT } from '../../../cpu/data/disasters';
+// The turn draws ONE random event over every eligible (row, site) pair, so a
+// board's floods, eruptions and storms share the turn: a loop below WAITS for
+// its event to land.
 //
-// And STORMS run eight draws a turn (56 per game across the families) and
-// PERSIST three turns each: a scene that reads "this tile got pillaged" as "a
+// STORMS PERSIST three turns each: a scene that reads "this tile got pillaged" as "a
 // flood or an eruption reached it" can see a tornado first. `stormFree` runs
 // one phase and says whether any storm was live during it — one already
 // raging or one that formed — so a scene about floods can put a storm's
@@ -28,7 +28,7 @@ function stormFree(state: GameState, watched: Tile[]): boolean {
   }
   return !stormed;
 }
-import { neighborTile } from '../../../world/hex';
+import { neighborTile, neighbors } from '../../../world/hex';
 import type { GameState, Tile } from '../../../cpu/core/types';
 import { disbandUnit, spawnUnit } from '../../../cpu/core/units';
 import { tileYields } from '../../../cpu/core/yields';
@@ -110,10 +110,14 @@ describe('disasters', () => {
     t.droughtTurns = 3;
     expect(tileYields(bareCtx(map), t).food).toBe(3);
 
-    const state = makeState(map);
+    // the clock ticks a turn — on a sea, where no drought can strike again
+    const sea = makeMap(10, 10, 'COAST');
+    const dry = tileAtCoords(sea, 5, 5);
+    dry.droughtTurns = 3;
+    const state = makeState(sea);
     state.disasters = true;
     disasterPhase(state);
-    expect(t.droughtTurns).toBe(2);
+    expect(dry.droughtTurns).toBe(2);
   });
 
   it('is reproducible and inert when toggled off', () => {
@@ -141,7 +145,7 @@ describe('disasters', () => {
   });
 
   // The Flood page's two tables, poked one severity at a time. `disasterPhase`
-  // rolls the severity itself, so the assertions are about the BAND every
+  // draws the severity itself, so the assertions are about the BAND every
   // outcome must sit in, driven until each one has been seen.
   const floodBoard = () => {
     const state = makeState(makeMap(18, 18));
@@ -187,14 +191,16 @@ describe('disasters', () => {
       const pop = city.population;
       const centre = state.map.tiles[city.centerIndex];
       centre.feature = 'FLOODPLAINS';
-      disasterPhase(state);
-      if (city.population < pop) popLost++;
-      if (city.hp < 200) { centreHit++; city.hp = 200; }
+      // a storm's damage would stack on the flood's: read calm phases only
+      const calm = stormFree(state, []);
+      if (calm && city.population < pop) popLost++;
+      if (calm && city.hp < 200) centreHit++;
+      city.hp = 200;
       const alive = state.units.find((x) => x.id === u.id);
       if (alive) {
-        if (alive.hp < 100) seen.add(100 - alive.hp);
+        if (calm && alive.hp < 100) seen.add(100 - alive.hp);
         disbandUnit(state, u.id);
-      } else {
+      } else if (calm) {
         seen.add(100);
       }
       city.population = 6;
@@ -353,5 +359,167 @@ describe('the flood reaches the whole river', () => {
     }
     expect(rivers).toBeGreaterThanOrEqual(3);
     expect(alone).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('the turn\'s one random event', () => {
+  /** a sea holding two volcanoes (their rings water, so no storm starts
+   *  there) and one river of two Grassland floodplains plus a lone one */
+  const eventBoard = () => {
+    const state = makeState(makeMap(18, 18, 'COAST'));
+    state.disasters = true;
+    for (const [c, r] of [[4, 4], [12, 12]]) {
+      const v = tileAtCoords(state.map, c, r);
+      v.terrain = 'GRASSLAND';
+      v.elevation = 'MOUNTAIN';
+      v.volcano = true;
+    }
+    const a = tileAtCoords(state.map, 8, 4);
+    const b = neighborTile(state.map, a, 0)!;
+    a.riverMask |= 1 << 0;
+    b.riverMask |= 1 << 3;
+    const lone = tileAtCoords(state.map, 8, 12);
+    for (const t of [a, b, lone]) {
+      t.terrain = 'GRASSLAND';
+      t.feature = 'FLOODPLAINS';
+    }
+    return { state, a, b, lone };
+  };
+
+  it('a river is one flood site, a riverless floodplain another', () => {
+    const { state, a, lone } = eventBoard();
+    expect(floodSites(state.map).map((t) => t.index)).toEqual([a.index, lone.index].sort((x, y) => x - y));
+  });
+
+  it('fires at most one event a turn, each row weighted once per site', () => {
+    // sites: 2 flood sites x 4.5, 2 volcanoes x 8, and the Grassland's one
+    // tornado pair (15 + 3) and drought pair (23 + 5): 9 + 16 + 18 + 28 = 71
+    const { state } = eventBoard();
+    const N = 6000;
+    let floods = 0;
+    let eruptions = 0;
+    let droughts = 0;
+    for (let i = 0; i < N; i++) {
+      state.eventLog = [];
+      disasterPhase(state);
+      expect(state.eventLog.length).toBeLessThanOrEqual(1);
+      if (state.eventLog.some((e) => e.startsWith('Flood'))) floods++;
+      if (state.eventLog.some((e) => e.includes('eruption'))) eruptions++;
+      if (state.eventLog.some((e) => e.startsWith('Drought'))) droughts++;
+    }
+    expect(Math.abs(floods / N - 9 / 71)).toBeLessThan(0.02);
+    expect(Math.abs(eruptions / N - 16 / 71)).toBeLessThan(0.02);
+    expect(Math.abs(droughts / N - 28 / 71)).toBeLessThan(0.02);
+  });
+
+  it('Kilimanjaro erupts on its own two rows, 4 + 2.5, painting its ring at 50%', () => {
+    // the board above plus one Mount Kilimanjaro ringed by bare Grassland (the
+    // tornado and drought sites already stand): 71 + 6.5 = 77.5
+    const { state } = eventBoard();
+    const k = tileAtCoords(state.map, 14, 4);
+    k.terrain = 'GRASSLAND';
+    k.elevation = 'MOUNTAIN';
+    k.feature = 'MOUNT_KILIMANJARO';
+    const ring = neighbors(state.map, k);
+    const N = 6000;
+    let kili = 0;
+    let eruptions = 0;
+    let plots = 0;
+    let painted = 0;
+    for (let i = 0; i < N; i++) {
+      for (const t of ring) {
+        t.terrain = 'GRASSLAND';
+        t.elevation = 'FLAT';
+        t.feature = null;
+      }
+      state.eventLog = [];
+      disasterPhase(state);
+      if (!state.eventLog.some((e) => e.includes('eruption'))) continue;
+      eruptions++;
+      if (!state.eventLog.some((e) => e.includes(`(${k.col}, ${k.row})`))) continue;
+      kili++;
+      plots += ring.length;
+      painted += ring.filter((t) => t.feature === 'VOLCANIC_SOIL').length;
+    }
+    expect(Math.abs(kili / N - 6.5 / 77.5)).toBeLessThan(0.015);
+    expect(Math.abs((eruptions - kili) / N - 16 / 77.5)).toBeLessThan(0.02);
+    expect(Math.abs(painted / plots - 0.5)).toBeLessThan(0.04);
+    expect(k.feature).toBe('MOUNT_KILIMANJARO');
+  });
+
+  it('a drought is seven plots for 5 or 10 turns', () => {
+    const { state } = eventBoard();
+    const lengths = new Set<number>();
+    for (let i = 0; i < 400; i++) {
+      for (const t of state.map.tiles) t.droughtTurns = 0;
+      state.eventLog = [];
+      disasterPhase(state);
+      if (!state.eventLog.some((e) => e.startsWith('Drought'))) continue;
+      const dry = state.map.tiles.filter((t) => t.droughtTurns > 0);
+      // the footprint is the centre and its ring, water skipped
+      expect(dry.length).toBeGreaterThan(0);
+      expect(dry.length).toBeLessThanOrEqual(7);
+      for (const t of dry) lengths.add(t.droughtTurns);
+    }
+    expect([...lengths].sort((x, y) => x - y)).toEqual([5, 10]);
+  });
+});
+
+describe('the nuclear accident', () => {
+  /** a city on a sea island with a Nuclear Power Plant in its Industrial Zone */
+  const reactorBoard = (age: number) => {
+    const state = makeState(makeMap(18, 18, 'COAST'));
+    state.disasters = true;
+    const centre = tileAtCoords(state.map, 9, 9);
+    const izTile = neighborTile(state.map, centre, 0)!;
+    for (const t of [centre, izTile]) t.terrain = 'DESERT';
+    const city = settleAt(state, centre.index);
+    izTile.district = 'INDUSTRIAL_ZONE';
+    izTile.districtComplete = true;
+    setTileOwner(izTile, 0);
+    izTile.ownerCity = city.id;
+    city.districts.push({ type: 'INDUSTRIAL_ZONE', tileIndex: izTile.index });
+    city.buildings.push('NUCLEAR_POWER_PLANT');
+    city.reactorAge = age;
+    city.population = 12;
+    return { state, city, izTile };
+  };
+
+  it('its payloads are per-accident chances: the zone, one citizen, fallout on the zone alone', () => {
+    const N = 2000;
+    for (let sev = 0; sev < 3; sev++) {
+      const { state, city, izTile } = reactorBoard(40);
+      let pillaged = 0;
+      let lost = 0;
+      for (let i = 0; i < N; i++) {
+        izTile.districtPillaged = false;
+        izTile.falloutTurns = 0;
+        city.population = 12;
+        nuclearAccident(state, 0, city, sev);
+        expect(izTile.falloutTurns).toBe(ACCIDENT_FALLOUT[sev]);
+        expect(city.population === 12 || city.population === 11).toBe(true);
+        if (izTile.districtPillaged) pillaged++;
+        if (city.population === 11) lost++;
+      }
+      expect(state.map.tiles.filter((t) => (t.falloutTurns ?? 0) > 0)).toEqual([izTile]);
+      expect(city.buildings).toContain('NUCLEAR_POWER_PLANT');
+      expect(Math.abs(pillaged / N - [0, 0.5, 1][sev])).toBeLessThan(0.04);
+      expect(Math.abs(lost / N - [0, 0, 0.8][sev])).toBeLessThan(0.04);
+    }
+  });
+
+  it('a reactor is a site only past each severity\'s MinTurnAtRisk', () => {
+    const sevOf = (state: GameState) =>
+      state.eventLog.filter((e) => e.startsWith('Nuclear accident')).map((e) => Number(e.slice(-2, -1)));
+    for (const [age, want] of [[9, []], [10, [0]], [25, [0, 1]], [30, [0, 1, 2]]] as const) {
+      const { state } = reactorBoard(age);
+      const seen = new Set<number>();
+      for (let i = 0; i < 1500; i++) {
+        state.eventLog = [];
+        disasterPhase(state);
+        for (const s of sevOf(state)) seen.add(s);
+      }
+      expect([...seen].sort()).toEqual([...want]);
+    }
   });
 });

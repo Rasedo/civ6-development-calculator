@@ -132,7 +132,12 @@ def test_clock(rules, path) -> None:
     sim._city_state_phase()
     assert abs(float(sim.citystate_tech_prog[B0, s]) - tot[3]) < 1e-9, "the tech pot did not take the walk's Science"
     assert abs(float(sim.citystate_civic_prog[B0, s]) - tot[4]) < 1e-9, "the civic pot did not take the Culture"
-    assert abs(float(sim.citystate_prod[B0, s]) - tot[1]) < 1e-9, "the build pot did not take the Production"
+    # the build pot takes it under the minor's production rows — half the
+    # yield, times the toward-row of whichever item it goes to (1, 3 or 6;
+    # `minor_builds_test::test_the_production_rows` pins which)
+    took = float(sim.citystate_prod[B0, s]) / (tot[1] * 0.5)
+    assert any(abs(took - m) < 1e-9 for m in (1.0, 3.0, 6.0)), \
+        f"the build pot did not take the Production ({took} x half the yield)"
     assert abs(float(sim.citystate_treasury[B0, s]) - tot[2]) < 1e-9, "the Gold did not bank"
     assert abs(float(sim.citystate_faith[B0, s]) - tot[5]) < 1e-9, "the Faith did not bank"
     # a dead minor accrues nothing
