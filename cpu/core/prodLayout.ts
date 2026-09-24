@@ -4,7 +4,7 @@
  * means, forever. One derivation, imported by everything that needs it — a
  * second copy would rot the file format silently.
  *
- * Layout, shared by `production_mask` and `seat_masks`:
+ * Layout, shared by `_seat_production_mask` and `seat_masks`:
  *     [0, NB)            queue that City Center building
  *     NB                 SETTLER
  *     NB + 1             IDLE (queue nothing)
