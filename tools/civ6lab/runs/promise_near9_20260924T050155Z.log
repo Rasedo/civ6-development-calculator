@@ -1,0 +1,12 @@
+{"kind":"promise","turn":113,"a":1,"b":0}
+{"kind":"grievance","turn":113,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":113,"a":5,"b":4,"g":-138}
+turn 113
+{"kind":"promise","turn":114,"a":1,"b":0}
+{"kind":"grievance","turn":114,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":114,"a":5,"b":4,"g":-138}
+turn 114
+{"kind":"promise","turn":115,"a":1,"b":0}
+{"kind":"grievance","turn":115,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":115,"a":5,"b":4,"g":-138}
+turn 115

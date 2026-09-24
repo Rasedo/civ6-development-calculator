@@ -1,0 +1,13 @@
+{"kind":"promise","turn":119,"a":1,"b":0}
+{"kind":"grievance","turn":119,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":119,"a":5,"b":4,"g":-138}
+turn 119
+{"kind":"promise","turn":120,"a":1,"b":0}
+{"kind":"grievance","turn":120,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":120,"a":5,"b":4,"g":-138}
+turn 120
+session p4 sid 4 FromPlayer=4 ToPlayer=0 -> POSITIVE
+{"kind":"promise","turn":121,"a":1,"b":0}
+{"kind":"grievance","turn":121,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":121,"a":5,"b":4,"g":-138}
+turn 121

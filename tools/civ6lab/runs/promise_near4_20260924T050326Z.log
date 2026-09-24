@@ -1,0 +1,24 @@
+{"kind":"grievance","turn":125,"a":0,"b":1,"g":-19}
+{"kind":"promise","turn":125,"a":1,"b":0}
+{"kind":"grievance","turn":125,"a":1,"b":0,"g":19}
+{"kind":"grievance","turn":125,"a":2,"b":3,"g":150}
+{"kind":"grievance","turn":125,"a":3,"b":2,"g":-150}
+{"kind":"grievance","turn":125,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":125,"a":5,"b":4,"g":-138}
+turn 125
+{"kind":"grievance","turn":126,"a":0,"b":1,"g":-13}
+{"kind":"promise","turn":126,"a":1,"b":0}
+{"kind":"grievance","turn":126,"a":1,"b":0,"g":13}
+{"kind":"grievance","turn":126,"a":2,"b":3,"g":150}
+{"kind":"grievance","turn":126,"a":3,"b":2,"g":-150}
+{"kind":"grievance","turn":126,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":126,"a":5,"b":4,"g":-138}
+turn 126
+{"kind":"grievance","turn":127,"a":0,"b":1,"g":-7}
+{"kind":"promise","turn":127,"a":1,"b":0}
+{"kind":"grievance","turn":127,"a":1,"b":0,"g":7}
+{"kind":"grievance","turn":127,"a":2,"b":3,"g":150}
+{"kind":"grievance","turn":127,"a":3,"b":2,"g":-150}
+{"kind":"grievance","turn":127,"a":4,"b":5,"g":138}
+{"kind":"grievance","turn":127,"a":5,"b":4,"g":-138}
+turn 127
