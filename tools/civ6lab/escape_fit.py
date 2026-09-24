@@ -101,6 +101,7 @@ def main(paths: list[str]) -> int:
     by_level = {1: Counter(), 2: Counter(), 3: Counter(), 4: Counter()}
     by_route = {}
     by_lag = {}
+    by_n = {}
     for k, d in rows.items():
         init = RAW.get(int(d.get("InitialResult", -1)), "?")
         res = RAW.get(int(d.get("EscapeResult", -1)), "?")
@@ -114,6 +115,7 @@ def main(paths: list[str]) -> int:
         by_level.setdefault(lvl, Counter())[out] += 1
         by_route.setdefault((route, lvl), Counter())[out] += 1
         by_lag.setdefault(min(lag, 3), Counter())[out] += 1
+        by_n.setdefault(route.split(" of ")[-1] if " of " in route else "?", Counter())[out] += 1
     n = sum(v for k, v in esc.items() if k != "pending")
     print(f"missions parsed: {len(rows)}; must-escape: {sum(esc.values())}; resolved: {n}; pending: {esc['pending']}")
     print("outcomes:", dict(esc))
@@ -128,6 +130,12 @@ def main(paths: list[str]) -> int:
         m = sum(v for k, v in c.items() if k != "pending")
         if m:
             print(f"  lag {lag:2d}: escaped {c['escaped']}/{m} = {c['escaped']/m:.2f}  (captured {c['captured']}, killed {c['killed']})")
+    print("by the number of routes the city offered (a uniform police guess predicts 1 - 1/n):")
+    for n_, c in sorted(by_n.items()):
+        m = sum(v for k, v in c.items() if k != "pending")
+        if m:
+            print(f"  {n_} route(s): escaped {c['escaped']}/{m} = {c['escaped']/m:.2f}"
+                  f"  (captured {c['captured']}, killed {c['killed']})")
     print("by route and level:")
     for (route, lvl), c in sorted(by_route.items()):
         m = sum(v for k, v in c.items() if k != "pending")

@@ -512,24 +512,28 @@ class SimSpy:
                     cs: int = -1) -> None:
         """CIV6 (Espionage): a discovered spy "will need to escape from the
         target city" — by Airplane, Boat, Vehicle or on Foot, gated on the
-        city's own districts, the faster the ride the likelier the catch, and
-        a survivor reappears in the CAPITAL after the route's ride home. The
-        spy takes the FASTEST route whose district stands (a recorded model
-        choice where the real game asks the player), and (Ace Driver) "have a
-        much higher chance of escape (+4 levels)" rides the missions' own
-        per-level term. A failed escape is the catch: "imprisoned, but not
-        killed" where a MAJOR runs the prison — a minor keeps no cell, so its
-        catch ends the career (`spyEscape`)."""
+        city's own districts, and a survivor reappears in the CAPITAL after
+        the route's ride home. The spy takes the FASTEST route whose district
+        stands (the driver's choice where the real game asks the player). The
+        police guess one of the offered routes, uniformly; the score is the
+        install's base + a level term per level (Ace Driver "+4 levels" among
+        them) + the police term on a right guess + the counterspy term per
+        level of the post guarding the district, and the spy gets away when
+        the mission roll's 3d6 lands at or under it. A failed escape is the
+        catch: "imprisoned,
+        but not killed" where a MAJOR runs the prison — a minor keeps no cell,
+        so its catch ends the career — or the spy is killed (`spyEscape`)."""
         rr = hr if hr >= 0 else self._CITY_MINOR0 + max(cs, 0)
         cc = hc if hr >= 0 else 0
         rrT = torch.full((1, 1), rr, dtype=torch.long, device=self.device)
         ccT = torch.full((1, 1), cc, dtype=torch.long, device=self.device)
-        route = self._spy_escape_routes[-1]
-        for r in self._spy_escape_routes:
-            if r["district"] < 0 or bool(self._district_live(
-                    self._city_district_tile(rrT, ccT, r["district"]))[0, 0]):
-                route = r
-                break
+        offered = [r for r in self._spy_escape_routes
+                   if r["district"] < 0 or bool(self._district_live(
+                       self._city_district_tile(rrT, ccT, r["district"]))[0, 0])]
+        route = offered[0]
+        one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        one[b] = True
+        guessed = offered[int(self._next_random(one)[b] * len(offered))] is route
         posted = torch.zeros(0, dtype=torch.long, device=self.device)
         if hr >= 0:
             # CIV6: "when enemy Spies are performing missions in those
@@ -537,10 +541,13 @@ class SimSpy:
             # will be caught" — the post guarding the district the spy worked
             # from leans on the ESCAPE (`counterspiesGuarding`).
             posted = self._counterspies_guarding(b, hr, hc, int(self.unit_tile[b, v]))
-        lvl = int(self.unit_spy_level[b, v]) + self._spy_promo_sum(b, v, "SPY_ESCAPE_LEVEL")
-        pct = (route["basePct"] + self._spy_success_per_level * lvl
-               - (self._spy_counterspy_pct if posted.numel() else 0))
-        if self._spy_roll(b, pct):
+        score = (self._spy_escape_base
+                 + self._spy_escape_level * (int(self.unit_spy_level[b, v]) + 1
+                                             + self._spy_promo_sum(b, v, "SPY_ESCAPE_LEVEL"))
+                 + (self._spy_escape_police if guessed else 0)
+                 + (self._spy_escape_counter_level * (int(self.unit_spy_level[b, int(posted[0])]) + 1)
+                    if posted.numel() else 0))
+        if self._mission_roll(b) <= score:
             cap = self.city_is_cap[b, row]
             alv = self.city_alive[b, row]
             if not bool(alv.any()):

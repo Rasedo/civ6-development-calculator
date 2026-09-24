@@ -499,18 +499,27 @@ margin, k = 2 for a fresh spy, +2 under Gain Sources; district, pillage,
 garrison and a counterspy do not enter. The band table ships as
 `missionOutcome` (cpu/core/espionage.ts) / `_mission_outcome`.
 
-### The escape roll (ask 14) — what crashes and what does not
+### The escape — `spy_loop.py`
 
-`spy_start.lua` puts every idle spy of the local player standing on a
-foreign city centre onto OPNAME (socket-spawned spies CAN start missions
-where they stand; one mission per city per player). `spy_history.lua`
-reads `GetRecentMissions` and the spies' operations; `escape_fit.py`
-turns a run log into escape rates. The mission roll ran clean for fifteen
-turns; the crash boundary is in the failure table above — the short of it
-is that a socket-spawned spy must never reach a CAPTURED or KILLED escape
-route. Train and travel real spies for this measurement. A spy can be
-BOUGHT for gold in one call, and gold set with `SetGoldBalance`, so the
-only remaining cost is the number of runs.
+    python tools/civ6lab/spy_loop.py --host 127.0.0.1 --save lab4_t100 --turns 100 --extra 12
+    python tools/civ6lab/escape_fit.py tools/civ6lab/runs/escape_lab4_*.log
+
+Spies are BOUGHT in a city of the human seat (a socket-SPAWNED spy crashes
+the game when its escape ends in capture or death). The loop grants the seat
+the four spy civics and `--extra` more copies of `CIVIC_GRANT_SPY` (they do
+raise the capacity), then each turn runs `spy_turn.lua` (buy up to `--cap`,
+send idle spies to foreign majors' centres, start `--op`, take an offered
+promotion other than Ace Driver) and ends the turn through `unblock.lua`.
+That resolver answers an escape prompt FIRST, found by its notification —
+a city that keeps asking for production otherwise stays the first blocker
+and the prompt is never answered — with a route the city offers, rotated by
+the spy's id, and logs the route, the routes on offer, the city and the
+pursuer. `escape_fit.py` pairs each must-escape mission with its prompt and
+splits the outcomes by level, route, routes on offer and prompt lag.
+
+RESULT (129 escapes): the police guess one offered route uniformly; the spy
+gets away when 3d6 lands at or under 10 + level - 4 on a right guess. The
+counterspy's term is unmeasured (every pursuer was the police).
 
 ### Results log (2026-09-13, session 1, turns 1-74)
 

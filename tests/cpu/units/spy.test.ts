@@ -460,9 +460,10 @@ describe('what a finished mission does', () => {
    *  walks seeds: a fresh spy per seed until one lands in a must-escape
    *  band; a spy the roll kept in place is disbanded, one it took off the
    *  map is left where it fell (a success's effects are not the subject). */
-  function runUntilEscape(state: GameState, city: City, m: number) {
+  function runUntilEscape(state: GameState, city: City, m: number, promos = 0) {
     for (let seed = 1; seed < 400; seed++) {
       const spy = spyAt(state, 0, city);
+      spy.promos = promos;
       state.rngState = seed;
       run(state, spy, m);
       if (spy.spyMission === SPY_TRAVELLING) return spy;
@@ -493,19 +494,50 @@ describe('what a finished mission does', () => {
     expect(spy.spyLevel).toBe(1);
   });
 
-  /** shut every escape route: a spy the roll sends running is caught or
-   *  killed. The roll itself is the measured 3d6, so the scenes walk seeds. */
-  function pinFailure<T>(body: () => T): T {
-    const rates = SPY_ESCAPE_ROUTES.map((r) => r.basePct);
-    for (const r of SPY_ESCAPE_ROUTES) (r as { basePct: number }).basePct = -1000;
+  /** of the spies the roll sends running over a seed walk, how many get
+   *  away from a city with all four routes — or with the three district
+   *  routes struck off the table, FOOT alone, which the police guess every
+   *  time. */
+  function escapeRate(promos: number, footOnly: boolean): number {
+    const gates = SPY_ESCAPE_ROUTES.map((r) => r.district);
+    if (footOnly) for (const r of SPY_ESCAPE_ROUTES) if (r.district !== null) (r as { district: string }).district = 'NO_SUCH_DISTRICT';
     try {
-      return body();
+      let ran = 0;
+      let away = 0;
+      const { state, theirs } = spyState();
+      for (const d of ['AERODROME', 'HARBOR', 'COMMERCIAL_HUB']) district(state, theirs, d);
+      for (let seed = 1; seed < 600; seed++) {
+        const spy = spyAt(state, 0, theirs);
+        spy.promos = promos;
+        state.rngState = seed;
+        const before = spiesHeldOf(state, 0);
+        run(state, spy, SPY_M_FOMENT_UNREST);
+        const alive = state.units.some((u) => u.id === spy.id);
+        if (spy.spyMission === SPY_TRAVELLING) { ran++; away++; }
+        else if (!alive || spiesHeldOf(state, 0) > before) ran++;
+        if (alive) disbandUnit(state, spy.id);
+      }
+      return away / ran;
     } finally {
-      SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { basePct: number }).basePct = rates[i]; });
+      SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { district: string | null }).district = gates[i]; });
     }
   }
 
-  it('a lost escape splits the career: the cell, or the grave', () => pinFailure(() => {
+  it('the police guess one offered route; the escape is 3d6 against 10 + level, -4 on a right guess', () => {
+    // measured: one-route cities, where the guess is certain, let 10 of 54
+    // spies away; a Recruit's right-guessed score is 7 (3d6 <= 7: 16%)
+    const guessed = escapeRate(0, true);
+    expect(guessed).toBeGreaterThan(0.05);
+    expect(guessed).toBeLessThan(0.3);
+    // Ace Driver's four levels: 11 (62%) on the same certain guess
+    expect(escapeRate(spyBit('ACE_DRIVER'), true)).toBeGreaterThan(guessed + 0.25);
+    // four routes standing, the guess misses three times in four: a Recruit
+    // reads 11 (62%) then (every rate here is diluted alike by the roll's own
+    // CAPTURED and KILLED bands, which never reach the escape)
+    expect(escapeRate(0, false)).toBeGreaterThan(guessed + 0.15);
+  });
+
+  it('a lost escape splits the career: the cell, or the grave', () => {
     // CIV6: captured spies "are imprisoned, but not killed" — off the map and
     // held by the seat whose city made the catch — and the other half of the
     // split simply ends the career. Both halves surface under a seed walk.
@@ -532,9 +564,9 @@ describe('what a finished mission does', () => {
       }
     }
     expect(celled && killed).toBe(true);
-  }));
+  });
 
-  it('the counterspy that makes the catch earns the level', () => pinFailure(() => {
+  it('the counterspy that makes the catch earns the level', () => {
     // CIV6 (Spies and Espionage): a spy "may gain levels from successful
     // offensive operations, or capturing an enemy Spy".
     for (let seed = 1; seed < 200; seed++) {
@@ -553,32 +585,26 @@ describe('what a finished mission does', () => {
       }
     }
     throw new Error('no seed landed the capture half of the split');
-  }));
+  });
 
   it('the escape takes the fastest standing route home to the capital', () => {
     // CIV6 (Espionage): a discovered spy "will need to escape from the target
     // city" — by Airplane (an Aerodrome, 1 turn), Boat (a Harbor, 2), Vehicle
     // (a Commercial Hub, 3) or on Foot (always, 4), a survivor reappearing in
-    // the CAPITAL.
-    const rates = SPY_ESCAPE_ROUTES.map((r) => r.basePct);
-    for (const r of SPY_ESCAPE_ROUTES) (r as { basePct: number }).basePct = 1000;
-    try {
-      const { state, theirs, mine } = spyState();
-      const aero = district(state, theirs, 'AERODROME');
-      const spy = runUntilEscape(state, theirs, SPY_M_FOMENT_UNREST);
-      expect(spy.spyMission).toBe(SPY_TRAVELLING);
-      expect(spy.spyTarget).toBe(mine.centerIndex);
-      expect(spy.spyTurns).toBe(1);
-      tickSpies(state, 0);
-      expect(spy.tileIndex).toBe(mine.centerIndex);
-      expect(spy.spyMission).toBe(SPY_IDLE);
-      // the Aerodrome dark, the same failure walks out on FOOT
-      state.map.tiles[aero].districtPillaged = true;
-      const spy2 = runUntilEscape(state, theirs, SPY_M_FOMENT_UNREST);
-      expect(spy2.spyTurns).toBe(4);
-    } finally {
-      SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { basePct: number }).basePct = rates[i]; });
-    }
+  // the CAPITAL. Ace Driver's four levels outrun even a right guess.
+    const { state, theirs, mine } = spyState();
+    const aero = district(state, theirs, 'AERODROME');
+    const spy = runUntilEscape(state, theirs, SPY_M_FOMENT_UNREST, spyBit('ACE_DRIVER'));
+    expect(spy.spyMission).toBe(SPY_TRAVELLING);
+    expect(spy.spyTarget).toBe(mine.centerIndex);
+    expect(spy.spyTurns).toBe(1);
+    tickSpies(state, 0);
+    expect(spy.tileIndex).toBe(mine.centerIndex);
+    expect(spy.spyMission).toBe(SPY_IDLE);
+    // the Aerodrome dark, the same failure walks out on FOOT
+    state.map.tiles[aero].districtPillaged = true;
+    const spy2 = runUntilEscape(state, theirs, SPY_M_FOMENT_UNREST, spyBit('ACE_DRIVER'));
+    expect(spy2.spyTurns).toBe(4);
   });
 
   it('Fabricate Scandal strips every rival stake at the minor', () => {

@@ -130,13 +130,11 @@ const spyMissionSrc = (m: SpyMissionDef): SrcMap => {
 };
 
 /** PROVENANCE: the escape ROUTES and their return times are the Espionage
- *  page's; each route's base escape RATE is this model's own (ask 14). */
+ *  page's. */
 const spyEscapeSrc: SrcMap = {
   district: { pedia: 'the GS Espionage page escape routes (Airplane/Boat/Vehicle/Foot and the '
     + 'district each needs)' },
   turns: { pedia: 'the GS Espionage page escape return times (1/2/3/4 turns)' },
-  basePct: { stylized: 'this model chose the per-route base escape rate under the sourced '
-    + 'ordering; the source names no number (ask 14)' },
 };
 
 const RAW_SPY_MISSIONS: readonly SpyMissionDef[] = [
@@ -195,9 +193,8 @@ export const SPY_SURVEILLANCE_REACH = srcConst('eras.espionage.surveilReach', 1,
 // ---------------------------------------------------------------------------
 // THE MODEL. Each mission's DURATION is the Spy chassis' own published table
 // (above) and its ROLL is measured (`baseProbability` and the 3d6 constants
-// below). What the source does not publish is the ESCAPE: the per-route base
-// rates and what a level adds to them (ask 14). Those are this model's own;
-// everything else here is sourced.
+// below); the ESCAPE's terms are the install's and its shape is measured
+// (the police guess, then the score against the base, below).
 // ---------------------------------------------------------------------------
 /** CIV6 (measured 2026-09-13, `tools/civ6lab/spy_probe.lua`): every mission
  *  is ONE roll of 3d6 read against `baseProbability - k`, and a fresh
@@ -213,15 +210,6 @@ export const SPY_ROLL_LEVEL_BASE = srcConst('eras.espionage.rollLevelBase', 2, s
 export const SPY_TRAVEL_TURNS_MIN = 1;
 export const SPY_TRAVEL_TILES_PER_TURN = 8;
 export const SPY_TRAVEL_TURNS_MAX = 5;
-/** what each level adds to an ESCAPE route's base rate — the mission roll
- *  itself is the measured 3d6 above; the escape's scale is ask 14. */
-export const SPY_SUCCESS_PER_LEVEL_PCT = srcConst('eras.espionage.successPerLevel', 10, {
-  stylized: 'what a level adds to an ESCAPE route\'s base rate — ask 14: the source names the '
-    + 'ordering, never a number (the install\'s ESPIONAGE_ESCAPE_LEVEL_BOOST is a 1-point roll '
-    + 'modifier on a different curve)',
-});
-/** on a failure, the chance the spy is caught rather than merely turned back. */
-export const SPY_CAPTURE_PCT = 50;
 
 /** CIV6 (Bodyguard of Lies, Golden face): "Spies take no time to establish
  *  presence in an enemy city. Time to complete all offensive spy operations
@@ -266,22 +254,37 @@ const partisans = {
 };
 export const SPY_PARTISANS_MIN = srcConst('eras.espionage.partisansMin', 2, partisans);
 export const SPY_PARTISANS_MAX = srcConst('eras.espionage.partisansMax', 4, partisans);
-/** MODEL: "there is a much higher chance than normal that they will be
- *  caught" — the source names the effect, not the number. */
-export const SPY_COUNTERSPY_CATCH_PCT = srcConst('eras.espionage.counterspyPct', 30, {
-  stylized: 'the source names the effect ("a much higher chance than normal that they will be '
-    + 'caught"), never a number',
+/**
+ * THE ESCAPE. The police guess one of the routes the city offers, uniformly;
+ * the escape's score is ESPIONAGE_ESCAPE_BASE_CHANCE + LEVEL_BOOST per level
+ * (the install's levels, 1 for a Recruit) + the spy's escape promotion
+ * levels + POLICE_CORRECT_MODIFIER when the guess names the route taken +
+ * COUNTERSPY_LEVEL_MODIFIER per level of the counterspy posted there, and
+ * the spy gets away when the mission roll's 3d6 lands at or under the score.
+ * The guess and the dice are measured (tools/civ6lab/spy_loop.py, 129
+ * escapes of bought spies: one-route cities, where the guess is certain, let
+ * 10 of 54 away, two-route cities 41 of 63), the terms the install's.
+ */
+export const SPY_ESCAPE_BASE = srcConst('eras.espionage.escapeBase', 10,
+  gp('ESPIONAGE_ESCAPE_BASE_CHANCE'));
+export const SPY_ESCAPE_LEVEL = srcConst('eras.espionage.escapeLevel', 1,
+  gp('ESPIONAGE_ESCAPE_LEVEL_BOOST'));
+export const SPY_ESCAPE_POLICE = srcConst('eras.espionage.escapePolice', -4,
+  gp('ESPIONAGE_ESCAPE_POLICE_CORRECT_MODIFIER'));
+export const SPY_ESCAPE_COUNTERSPY_LEVEL = srcConst('eras.espionage.escapeCounterspyLevel', -1,
+  gp('ESPIONAGE_ESCAPE_COUNTERSPY_LEVEL_MODIFIER'));
+/** a lost escape ends in the cell this often, else the spy is killed. */
+export const SPY_CAPTURE_PCT = srcConst('eras.espionage.capturePct', 29, {
+  lab: 'C-16 — tools/civ6lab/spy_loop.py: 34 of 117 lost escapes ended CAPTURED, the rest KILLED',
 });
 
 /**
  * CIV6 (Espionage): a discovered spy "will need to escape from the target
  * city" — by Airplane (needs an Aerodrome), Boat (a Harbor), Vehicle (a
- * Commercial Hub) or on Foot, the faster the ride the likelier the catch,
- * and a survivor reappears in the CAPITAL after the ride home. The gates and
- * the return times (1/2/3/4 turns) are sourced; each route's base escape
- * rate is a MODEL value under that sourced ordering. Listed FASTEST first:
- * the model spy takes the first route whose district stands — soonest back
- * in service, a recorded model choice where the real game asks the player.
+ * Commercial Hub) or on Foot, and a survivor reappears in the CAPITAL after
+ * the ride home. The gates and the return times (1/2/3/4 turns) are sourced.
+ * Listed FASTEST first: the driver's spy takes the first route whose district
+ * stands — soonest back in service.
  */
 export interface SpyEscapeRoute {
   id: string;
@@ -289,13 +292,12 @@ export interface SpyEscapeRoute {
   src?: SrcMap;
   district: DistrictId | null;
   turns: number;
-  basePct: number;
 }
 export const SPY_ESCAPE_ROUTES: readonly SpyEscapeRoute[] = [
-  { id: 'AIRPLANE', district: 'AERODROME', turns: 1, basePct: 40, src: spyEscapeSrc },
-  { id: 'BOAT', district: 'HARBOR', turns: 2, basePct: 50, src: spyEscapeSrc },
-  { id: 'VEHICLE', district: 'COMMERCIAL_HUB', turns: 3, basePct: 60, src: spyEscapeSrc },
-  { id: 'FOOT', district: null, turns: 4, basePct: 70, src: spyEscapeSrc },
+  { id: 'AIRPLANE', district: 'AERODROME', turns: 1, src: spyEscapeSrc },
+  { id: 'BOAT', district: 'HARBOR', turns: 2, src: spyEscapeSrc },
+  { id: 'VEHICLE', district: 'COMMERCIAL_HUB', turns: 3, src: spyEscapeSrc },
+  { id: 'FOOT', district: null, turns: 4, src: spyEscapeSrc },
 ];
 
 /** CIV6 (ESPIONAGE_FABRICATE_SCANDAL_BASE_ENVOYS_REMOVED 2, LEVEL 1). */

@@ -323,12 +323,9 @@ def main() -> None:
     # rather than rolled — the mission cannot succeed and the catch cannot
     # miss — so the poke reads the award, not the dice.
     _cap0 = sim._spy_capture_pct
-    _per0 = sim._spy_success_per_level
-    _rt0 = [r["basePct"] for r in sim._spy_escape_routes]
-    sim._spy_success_per_level = 0   # ...so no LEVEL can lift the escape's rate
+    _eb0 = sim._spy_escape_base
     sim._spy_capture_pct = 100
-    for _r in sim._spy_escape_routes:
-        _r["basePct"] = -1000        # ...and no route can save the spy
+    sim._spy_escape_base = -1000   # ...and no escape can save the spy
     # the post guards the district it stands on — the Zone the saboteur works from
     w = spawn_spy(sim, row, iz)
     guard = spawn_spy(sim, foe, iz)
@@ -348,10 +345,8 @@ def main() -> None:
     assert not bool(sim.city_bldg_pillaged[0, foe, theirs, wk]), "a pinned FAILURE wrecked the Workshop"
     assert int(sim.unit_spy_level[0, guard]) == 1, "the captor earned nothing"
     sim.unit_alive[0, guard] = False
-    sim._spy_success_per_level = _per0
     sim._spy_capture_pct = _cap0
-    for _r, _b in zip(sim._spy_escape_routes, _rt0):
-        _r["basePct"] = _b
+    sim._spy_escape_base = _eb0
 
     # -- 14: the espionage promotion pool -----------------------------------
     # CIV6 (Spy): the seventeen promotions are one flat pool with no
@@ -486,13 +481,9 @@ def main() -> None:
     # CIV6 (Espionage): a discovered spy "will need to escape from the target
     # city" — by Airplane (an Aerodrome, 1 turn), Boat (a Harbor, 2), Vehicle
     # (a Commercial Hub, 3) or on Foot (always, 4), a survivor reappearing in
-    # the CAPITAL. The gates and the times are sourced; the base rates are
-    # model values under the sourced "faster = more dangerous" ordering.
-    _pl, _pc = sim._spy_success_per_level, sim._spy_capture_pct
-    _rb = [r["basePct"] for r in sim._spy_escape_routes]
-    sim._spy_success_per_level = 0
-    for _r in sim._spy_escape_routes:
-        _r["basePct"] = 1000  # every escape succeeds
+    # the CAPITAL. The gates and the times are sourced.
+    _pc, _eb, _el = sim._spy_capture_pct, sim._spy_escape_base, sim._spy_escape_level
+    sim._spy_escape_base = 1000  # every escape succeeds
     assert sim._spy_escape_routes[0]["turns"] == 1 and sim._spy_escape_routes[-1]["turns"] == 4
     aero_di = sim._spy_escape_routes[0]["district"]
     assert aero_di >= 0
@@ -531,8 +522,7 @@ def main() -> None:
     print("  17 escape OK — air out in one turn, foot in four, both to the capital")
 
     # -- 18: a lost escape splits the career: the cell, or the grave --------
-    for _r in sim._spy_escape_routes:
-        _r["basePct"] = -1000
+    sim._spy_escape_base = -1000
     sim._spy_capture_pct = 100
     held_cell = sim.seat_spy_held[0, row, foe].clone()
     held0 = int(held_cell.sum())
@@ -554,13 +544,25 @@ def main() -> None:
 
     # -- 19: ACE DRIVER moves the escape and nothing else -------------------
     # CIV6 (Ace Driver): "If caught on a mission, have a much higher chance of
-    # escape (+4 levels)" — with the per-level worth pinned huge, the promoted
-    # spy always makes it and the bare one never does.
-    sim._spy_success_per_level = 1000
+    # escape (+4 levels)". Every route district is still dark, so FOOT is the
+    # only route and the police guess it every time. With the base pinned at
+    # -3 and a level worth 5, the bare Recruit's score (-3 + 5 - 4 = -2) is
+    # under any 3d6 and the promoted one's (+20 = 18) over every one.
+    sim._spy_escape_base = -3
+    sim._spy_escape_level = 5
+    sim._spy_capture_pct = 100
     # the Gain Sources clock would lift the MISSION roll too — clear it so
     # the failure is certain and only the escape carries a level
     sim.city_spy_sources[0, foe, theirs, row] = 0
     ace_bit = 1 << pcol("SPY_ESCAPE_LEVEL")
+    w19a = spawn_spy(sim, row, ctr_t)
+    sim.unit_spy_mission[0, w19a] = sim._spy_m_unrest
+    sim.unit_spy_turns[0, w19a] = 1
+    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE}, city_threshold(sim, row, w19a, sim._spy_m_unrest, foe, theirs))
+    held19 = sim.seat_spy_held[0, row, foe].clone()
+    sim._tick_spies(row)
+    assert not bool(sim.unit_alive[0, w19a]), "a Recruit outran a right guess"
+    sim.seat_spy_held[0, row, foe] = held19
     w19 = spawn_spy(sim, row, ctr_t)
     sim.unit_promos[0, w19] = ace_bit
     sim.unit_spy_mission[0, w19] = sim._spy_m_unrest
@@ -569,15 +571,12 @@ def main() -> None:
     sim._tick_spies(row)
     assert int(sim.unit_spy_mission[0, w19]) == sim._spy_travelling, "Ace Driver did not lift the escape"
     sim.unit_alive[0, w19] = False
-    sim._spy_success_per_level = 0
     sim._spy_capture_pct = _pc
-    for _r, _b in zip(sim._spy_escape_routes, _rb):
-        _r["basePct"] = _b
-    sim._spy_success_per_level = _pl
+    sim._spy_escape_base, sim._spy_escape_level = _eb, _el
     for _dt in _dark17:
         sim.district_pillaged[0, _dt] = False
     sim._eff_version += 1
-    print("  19 ace OK — the promotion rides the escape roll's own level term")
+    print("  19 ace OK — a right guess holds a Recruit, Ace Driver's four levels outrun it")
 
     # -- 20: FABRICATE SCANDAL — the minor, the gate, the strip -------------
     # CIV6: performed "in a City-State that you are not Suzerain over"; on

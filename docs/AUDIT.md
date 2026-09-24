@@ -41,7 +41,7 @@ re-adds them.
 | **B. Fidelity vs real Civ 6** | **3** | |
 | C-1 power | 1 | the accident's gates and payloads (measured), one LAB line on the damage table; a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 1 | ask 18: what "near" is for Don't Settle Near Me; the broken-promise multiplier's operand (DLL) |
-| C-16 the spy's second half | 1 | the escape's scale (ask 14) |
+| C-16 the spy's second half | 1 | the counterspy's escape term (LAB) |
 | C-20 Mountain Tunnel's route multiplier | 1 | DLL — the modifier carries no arguments |
 | C-22 Preserve housing table | 1 | middle bands stylized; the row is not in this install |
 | C-26 civilization abilities, the residue | 1 | three unread DLL clauses |
@@ -64,7 +64,6 @@ scenes cite them), so the gaps are closed asks.
 
 | ask | entry | the question | where the answer comes from |
 |---|---|---|---|
-| 14 | C-16 | the spy's ESCAPE: the install's terms are all levels (`ESPIONAGE_ESCAPE_BASE_CHANCE` 10, `_LEVEL_BOOST` +1, `_COUNTERSPY_LEVEL_MODIFIER` -1, `_POLICE_CORRECT_MODIFIER` -4, Ace Driver 4) and no row gives the SCALE or a route term; this engine's base is per route (Airplane 40 / Boat 50 / Vehicle 60 / Foot 70). One measured point (level 2, on foot, escaped) rules nothing out | LAB (a spy BOUGHT in a city travels in; gold and spies are both one socket call now) |
 | 18 | C-2 | DON'T SETTLE NEAR ME's reach: how near a new city must be to the asker's to break the promise. No row carries a distance (the AI modifier `STANDARD_DIPLOMACY_SETTLED_CITIES` has none, the congress discussion types have no columns); the warning's text reads "We settled too near their border" | LAB (found a city at 4, 6 and 8 tiles from a promisee's border and read the grievance log) |
 
 ## A. Engine vs engine
@@ -99,7 +98,8 @@ close in the same commit.
   - DLL: `GRIEVANCE_MULTIPLIER_FOR_BROKEN_PROMISE` 200 (Expansion2_GlobalParameters.xml) names no operand. Both engines charge the notification's literal figure (`LOC_NOTIFICATION_DIPLO_PROMISE_FROM_BROKEN_SUMMARY`: "has been broken (100 Grievances generated)").
   - Model lines, identical on both engines and kept as notes: a luxury has no lump to trade (the install trades ACCESS, never an amount); the intel bonus is unit-against-unit only; one running deal per ordered pair, `DEAL_ITEMS` a side, an offer standing two turns; a war does not end a standing deal or promise; the Third Party War's "another player" is read as an ALLY; a refused ask stands the pedia's 30 turns ("All Deals, Demands, and Promises last for 30 turns"); the refused asker's favor comes back at the refusal, where the pedia says "refunded for the next session"; an offensive mission is an incursion whatever its outcome; an ask is answered in the turn it is made; an ask the asker cannot make (at war, unpaid, one standing) is dropped, neither paid nor refused.
 - **C-16. THE SPY'S SECOND HALF.** Weight 1.
-  - ASK 14: the escape's SCALE and route. Re-read: `ESPIONAGE_ESCAPE_BASE_CHANCE` 10, `_ESCAPE_LEVEL_BOOST` 1, `_ESCAPE_COUNTERSPY_LEVEL_MODIFIER` -1 and `_ESCAPE_POLICE_CORRECT_MODIFIER` -4 are every escape row the install has and every one of them is a LEVEL; no row gives a scale or a route term. The mission roll itself is settled and correct: the UI's own band table is 3d6 against `BaseProbability - 2` for a fresh spy, to within the truncation of 8-bit fixed point, which is what `missionOutcome` / `_mission_outcome` ship.
+  - The escape ships on both engines as measured (`spyEscape` / `_spy_escape`; lab 4, `tools/civ6lab/spy_loop.py`, 129 escapes of spies BOUGHT in a city, every prompt answered the turn it came): the police guess one of the routes the city offers, uniformly, and the spy gets away when the mission's 3d6 lands at or under 10 + its level (Ace Driver's +4 among them) - 4 on a right guess. One-route cities, where the guess is certain, let 10 of 54 away (the rule predicts 14.4); two-route cities 41 of 63 (32.9); a lost escape ended in the cell 34 times in 117, else the spy was killed. An earlier batch whose prompts sat behind another blocker read 0 of 28 in one-route cities; the rule does not explain that batch.
+  - LAB, the COUNTERSPY's term. All 234 prompts named the police as the pursuer; `_COUNTERSPY_LEVEL_MODIFIER` -1 per level of the post is applied as the install writes it, unmeasured. A scene posts a counterspy (the AI's own, or one bought for a second human seat) in the target city and reads `GetPursuingSpyName` at the prompt.
 - **C-20. THE MOUNTAIN TUNNEL'S ROUTE MULTIPLIER.** Weight 1.
   - DLL: the pedia's "Trade Routes traveling through it can multiply the Gold they get from districts at their destination" has one XML carrier, `MOUNTAIN_PORTAL` of type `MODIFIER_MOUNTAIN_PORTAL`, and re-read across all three layers that modifier has NO `ModifierArguments` row anywhere — only the type, `COLLECTION_OWNER`, `EFFECT_MOUNTAIN_PORTAL` and three attachments. Not "unpublished pending a look": looked at, no number to find.
 - **C-22. THE PRESERVE'S HOUSING TABLE.** Weight 1.

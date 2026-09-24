@@ -18,8 +18,9 @@ import {
   SPY_UNIT, SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX,
   SPY_MAX_LEVEL, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS, SPY_TRAVEL_COLS,
   SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN,
-  SPY_TRAVEL_TURNS_MAX, SPY_SUCCESS_PER_LEVEL_PCT, SPY_ROLL_DICE, SPY_ROLL_FACES, SPY_ROLL_LEVEL_BASE,
-  SPY_CAPTURE_PCT, SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
+  SPY_TRAVEL_TURNS_MAX, SPY_ROLL_DICE, SPY_ROLL_FACES, SPY_ROLL_LEVEL_BASE,
+  SPY_CAPTURE_PCT, SPY_ESCAPE_BASE, SPY_ESCAPE_LEVEL, SPY_ESCAPE_POLICE, SPY_ESCAPE_COUNTERSPY_LEVEL,
+  BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
   SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
   SPY_PARTISANS_MIN, SPY_PARTISANS_MAX,
@@ -556,13 +557,16 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
 /**
  * CIV6 (Espionage): a discovered spy "will need to escape from the target
  * city" — by Airplane, Boat, Vehicle or on Foot, gated on the city's own
- * districts, the faster the ride the likelier the catch, and a survivor
- * reappears in the CAPITAL after the route's ride home. The spy takes the
- * FASTEST route whose district stands (a recorded model choice where the
- * real game asks the player), and (Ace Driver) "have a much higher chance
- * of escape (+4 levels)" rides the missions' own per-level term. A failed
- * escape is the old catch: "imprisoned, but not killed" where a MAJOR runs
- * the prison — a minor keeps no cell, so its catch ends the career.
+ * districts, and a survivor reappears in the CAPITAL after the route's ride
+ * home. The spy takes the FASTEST route whose district stands (the driver's
+ * choice where the real game asks the player). The police guess one of the
+ * offered routes, uniformly; the score is the install's base + a level term
+ * per level (Ace Driver "+4 levels" among them) + the police term on a right
+ * guess + the counterspy term per level of the post guarding the district,
+ * and the spy gets away when the mission roll's 3d6 lands at or under it. A
+ * failed escape is the
+ * catch: "imprisoned, but not killed" where a MAJOR runs the prison — a minor
+ * keeps no cell, so its catch ends the career — or the spy is killed.
  */
 function spyEscape(state: GameState, unit: Unit,
                    districts: { type: string; tileIndex: number }[], jailer: number,
@@ -572,16 +576,18 @@ function spyEscape(state: GameState, unit: Unit,
     const dt = state.map.tiles[d.tileIndex];
     if (dt?.districtComplete && !dt.districtPillaged) live.add(d.type);
   }
-  const route = SPY_ESCAPE_ROUTES.find((r) => r.district === null || live.has(r.district))
-    ?? SPY_ESCAPE_ROUTES[SPY_ESCAPE_ROUTES.length - 1];
+  const offered = SPY_ESCAPE_ROUTES.filter((r) => r.district === null || live.has(r.district));
+  const route = offered[0];
+  const guessed = offered[Math.floor(nextRandom(state) * offered.length)] === route;
   // CIV6: "when enemy Spies are performing missions in those districts, there
   // is a much higher chance than normal that they will be caught" — the post
   // guarding the district the spy worked from leans on the ESCAPE.
   const posted = jailer >= 0 && city ? counterspiesGuarding(state, jailer, city, unit.tileIndex) : [];
-  const lvl = spyLevel(unit) + promoValue(unit, 'SPY_ESCAPE_LEVEL');
-  const pct = route.basePct + SPY_SUCCESS_PER_LEVEL_PCT * lvl
-    - (posted.length > 0 ? SPY_COUNTERSPY_CATCH_PCT : 0);
-  if (roll(state, pct)) {
+  const score = SPY_ESCAPE_BASE
+    + SPY_ESCAPE_LEVEL * (spyLevel(unit) + 1 + promoValue(unit, 'SPY_ESCAPE_LEVEL'))
+    + (guessed ? SPY_ESCAPE_POLICE : 0)
+    + (posted.length > 0 ? SPY_ESCAPE_COUNTERSPY_LEVEL * (spyLevel(posted[0]) + 1) : 0);
+  if (missionRoll(state) <= score) {
     const home = citiesOf(state, unit.seat).find((c) => c.isCapital)
       ?? citiesOf(state, unit.seat)[0];
     if (!home) {

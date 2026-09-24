@@ -135,10 +135,11 @@ describe('the counterspy defends the district it stands on', () => {
   });
 
   it('a post on the centre catches nobody on the Hub — until Surveillance extends it', () => {
-    // every escape shut and the roll the measured 3d6, so over a seed walk
-    // whether the post GUARDS the Hub decides whether it ever earns the level
-    const rates = SPY_ESCAPE_ROUTES.map((r) => r.basePct);
-    for (const r of SPY_ESCAPE_ROUTES) (r as { basePct: number }).basePct = -1000;
+    // FOOT the only route (the police's guess certain, every escape lost) and
+    // the roll the measured 3d6, so over a seed walk whether the post GUARDS
+    // the Hub decides whether it ever earns the level
+    const gates = SPY_ESCAPE_ROUTES.map((r) => r.district);
+    for (const r of SPY_ESCAPE_ROUTES) if (r.district !== null) (r as { district: string }).district = 'NO_SUCH_DISTRICT';
     try {
       const run = (surveil: boolean): boolean => {
         for (let seed = 1; seed < 200; seed++) {
@@ -158,7 +159,7 @@ describe('the counterspy defends the district it stands on', () => {
       expect(run(false)).toBe(false);
       expect(run(true)).toBe(true);
     } finally {
-      SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { basePct: number }).basePct = rates[i]; });
+      SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { district: string | null }).district = gates[i]; });
     }
   });
 });
