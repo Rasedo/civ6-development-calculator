@@ -83,7 +83,7 @@ stats/    battery.jsonl — every recorded run, which the battery sizes itself f
 - `docs/ROSTER.md` — the roster census: which trait modifiers ship,
   against `docs/roster_ledger.json`.
 - `tools/civ6lab/README.md` — the live-game lab (FireTuner) and what it
-  has measured; `tools/civ6lab/SESSION2.md` is the next scene list.
+  has measured; `tools/civ6lab/SESSION5.md` is the next scene list.
 
 Historical plans, round logs and design notes are deleted; recover them
 from git history if ever needed.

@@ -551,5 +551,5 @@ modifier's arguments and what attaches it.
 
 ## What to ask next
 
-`SESSION2.md` is the remaining scene list — only what is still OPEN after
-sessions 2 and 3.
+`SESSION5.md` is the remaining scene list — every LAB line open in AUDIT, as
+automated scenes, cheapest instrument first.

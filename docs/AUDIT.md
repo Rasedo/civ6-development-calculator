@@ -8,7 +8,7 @@ every bullet is one of four things and says which:
 - **BUILD** — buildable now from a sourced rule; names the symbols.
 - **BLOCKER** — waits on another entry; names it.
 - **ASK** — the source under-determines it; the owner rules (the ledger below).
-- **LAB** — the live game answers it (`tools/civ6lab/SESSION2.md`, scene named).
+- **LAB** — the live game answers it (`tools/civ6lab/SESSION5.md`, scene named).
   A rule the install carries no number for is inferred from what the live game
   does: a scene that varies its inputs and fits the observed outcome.
 
