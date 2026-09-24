@@ -49,7 +49,7 @@ ENGINE_PATH = Path(__file__).resolve().parent / "simbase.py"
 _MASK = 0xFFFFFFFF
 _2_32 = 1 << 32
 # the row floor below which the scalar fold beats the numpy one. Measured
-# 2026-09-14 on a turn-220 state: 16 and 32 beat 64 at B=1 and through
+# on a turn-220 state: 16 and 32 beat 64 at B=1 and through
 # `fold_rows_multi` at B=3; 8 loses (the 9-row seat and city-state groups
 # go vector and pay numpy's per-op overhead). The check at the bottom of the
 # file sets it to 0 to exercise the arithmetic on every group.
@@ -248,11 +248,10 @@ GAME = {
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
     "congressSlate": lambda sim, b, rows: [[int(x) for x in sim.congress_slate[b].tolist()]],
     # ONE row, so ONE outer list. The game group has a single row and the
-    # fold reads `vals[0]`: these four used to hand the fold a FLAT list and
-    # only its first element was ever compared (the competition's kind, the
-    # first resolution's id, the first emergency's kind, the first class's
-    # claimed list). Found 2026-09-14 when the vector fold refused a 1-row
-    # group; `fold_rows` now refuses the shape on both engines.
+    # fold reads `vals[0]`: a FLAT list would compare only its first element
+    # (the competition's kind, the first resolution's id, the first
+    # emergency's kind, the first class's claimed list), so `fold_rows`
+    # refuses that shape on both engines.
     "competition": lambda sim, b, rows: [(
         [int(sim.comp_kind[b]), int(sim.comp_left[b]), int(sim.comp_target[b])]
         + [float(sim.comp_score[b, r]) for r in range(sim.n_majors)]
@@ -386,8 +385,8 @@ def _civ_only(plane: str, absent):
 
 def _seat_pair_relation(plane: str, live):
     """A seat<->seat [n_majors, n_majors] relation read as a per-seat set of ABSOLUTE
-    opponent seats. One index space: the row IS the seat, so seat 0 answers
-    like any other and the TS side's `overSeats` walker lines up with it
+    opponent seats. One index space: the row IS the seat, so every seat
+    answers alike and the TS side's `overSeats` walker lines up with it
     without a hole."""
     def get(sim, b, rows):
         m = getattr(sim, plane)[b].tolist()

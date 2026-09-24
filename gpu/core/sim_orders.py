@@ -28,8 +28,8 @@ class SimOrders:
         # TS replays a seat's orders one unit at a time against LIVE state
         # (`applySeatUnitOrders` -> `foundCity` writes `ownerSeat`, and the
         # next unit's improvement verb reads it), so a founding, a culture
-        # bomb or a capture at rank k must be ownership at rank k+1. Read
-        # once before the loop it was not (AUDIT A-5; poke
+        # bomb or a capture at rank k must be ownership at rank k+1, which
+        # one read before the loop is not (poke
         # tests/gpu/applier_live_ownership_test.py).
         # Which RANKS are worth opening at all, decided once over the whole
         # [B, UNIT_SLOTS] block: the slot map and the action block are both
@@ -654,10 +654,8 @@ class SimOrders:
                 dirs = a.clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
-                # ONE call with the mover's own class flags. It used to be two,
-                # chosen by a `where`, to skip the civilian plane on ranks with
-                # no civilian moving; a third class would have made that three,
-                # and the rule already takes per-unit tensors.
+                # ONE call with the mover's own class flags: the rule takes
+                # per-unit tensors, so no class needs a call of its own.
                 is_nav = self.unit_naval[ut]
                 blocked = self._blocked_for(
                     tgt.unsqueeze(1), row, is_naval=is_nav,
@@ -673,8 +671,7 @@ class SimOrders:
                 _wet = self.wpass.gather(1, _tc1).squeeze(1)
                 # ONE enterable-water plane for both readers: a HULL floats
                 # over it and through a Canal's passage, and an embarked LAND
-                # unit takes the same water without the passage. It used to be
-                # gathered and re-ANDed twice.
+                # unit takes the same water without the passage.
                 _water = _wet & (~self.ocean_tile.gather(1, _tc1).squeeze(1) | cart)
                 # CIV6 (Leif Erikson): the HULL's ocean gate widens, the embarked
                 # land unit's does not — read live, a spend at an earlier rank
@@ -1504,7 +1501,7 @@ class SimOrders:
             self._grievance_cs_taken(
                 row, torch.full_like(_one, int(self.city_alive[b, row].sum()) >= max_cities), _one)
             # A route dies with its endpoint, for WHICHEVER seat holds it — the
-            # minor is encoded -(2+s) in every row's dest column, seat 0's too.
+            # minor is encoded -(2+s) in every row's dest column.
             dead_cs = self.seat_routes[b, :, :, 1] == -(2 + s)  # [NS, K]
             self.seat_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.seat_routes[b], -1), self.seat_routes[b])
             self.seat_route_dseat[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dseat[b], -1), self.seat_route_dseat[b])
@@ -1882,10 +1879,11 @@ class SimOrders:
             rows = any_near.nonzero(as_tuple=True)[0]
             guard[rows, first[rows]] = True
 
-        # Raiders act in unit order: attack something adjacent (a seat-0 city,
-        # any hostile unit, or a civ city; lowest tile index first, as
-        # attackTargets scans the map), else march toward the nearest seat-0
-        # city. Slots resolve sequentially like the TS loop, so a second raider
+        # Raiders act in unit order: attack something adjacent (any city
+        # centre, major or minor, any non-barbarian unit, or an Encampment;
+        # lowest tile index first, as attackTargets scans the map), else
+        # pillage where they stand, else march toward the nearest city of any
+        # seat. Slots resolve sequentially like the TS loop, so a second raider
         # hitting the same target sees the first one's damage.
         u_high = int(self.next_slot.max().item())
         arange6 = torch.arange(6, device=dev)
@@ -2014,18 +2012,17 @@ class SimOrders:
             # A RANGED raider strikes instead: hostileUnitAct routes any
             # UNITS[type].ranged attacker through hostileRangedStrike — ONE
             # roll, no retaliation, no advance, civilians take the roll, and a
-            # seat-0 city floors at 1 HP and is never captured. The method
-            # spends the turn itself; a row that reaches only an ungarrisoned
-            # CIV centre (TS `enemyCity` resolves to seat-0 cities only) spends
-            # nothing, but `attack` still HOLDS the unit, because TS returns
-            # from hostileUnitAct before the pillage/march branches.
+            # city centre floors at 1 HP and is never captured. The method
+            # spends the turn itself; a row whose strike resolves no target
+            # spends nothing, but `attack` still HOLDS the unit, because TS
+            # returns from hostileUnitAct before the pillage/march branches.
             rng_att = attack & rngd
             if any_rngd and bool(rng_att.any()):
                 self._hostile_ranged_strike(rng_att, ttc, "barb", u)
 
             # `isTerritorial` — owned by any major OR city-state. ONE read for
             # both wreck arms: only `pillaged` is written between them, never
-            # `tile_seat`, so the two reads were always the same answer.
+            # `tile_seat`, so both arms read the same answer.
             _h_seat = self.tile_seat.gather(1, _here1).squeeze(1)
             # `isTerritorial`: a major's, a city-state's OR the Free Cities' ground
             # (seed 9092 t137: a raider beside a Free City's Campus)

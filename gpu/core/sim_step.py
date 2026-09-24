@@ -80,9 +80,8 @@ class SimStep:
         # compacts whenever it holds a HOLE, so the layout stays the dense
         # array TS keeps by splicing `seat.cities` on every death. High-water
         # = last-alive slot + 1, which is where the next append lands. ONE
-        # trigger, ONE body, every row — the seat whose deaths compact
-        # EAGERLY and the seat that waits for a threshold were the same rule
-        # written twice, and only the eager one is TS's.
+        # trigger, ONE body, every row: every seat compacts EAGERLY, as TS
+        # does.
         # ...the Free Cities row too, whose holes a joining city leaves
         _alive_m = torch.cat((self.city_alive[:, :self.n_majors],
                               self.city_alive[:, self.FREE_ROW:self.FREE_ROW + 1]), dim=1)

@@ -146,8 +146,8 @@ class SimEconomy:
     #     WWP = (EraBase * Location) + Death
     #
     # scored PER BATTLE, by both sides, "without any discrimination". There is
-    # one function per rule and every one of them takes a SEAT ROW: seat 0 is
-    # row 0, civ index r is row r+1, exactly as the war matrix indexes them.
+    # one function per rule and every one of them takes a SEAT ROW: the row
+    # IS the seat, exactly as the war matrix indexes them.
     # ------------------------------------------------------------------
 
     def _ww_audit(self) -> None:
@@ -1179,7 +1179,7 @@ class SimEconomy:
         self._eff_version += 1
 
     def _storm_walk(self, walk: torch.Tensor, centre: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
-        """`stormWalk` — CIV6 (`Movement 8`, measured 2026-09-13 over 31 storms):
+        """`stormWalk` — CIV6 (`Movement 8`, measured in the live game over 31 storms):
         `_st_movement` unit steps in the one turn, each step's heading drawn
         from the `PrevailingWinds` band of the centre's CURRENT latitude
         (`_wind_band`, `_wind_w`), and the step DROPPED where the storm's own
@@ -3635,10 +3635,8 @@ class SimEconomy:
         founded = self.holy_tile >= 0  # [B, O]
         # THE ROW AXIS IS NOT THE RELIGION AXIS. `O` counts RELIGIONS (each is
         # keyed by its founder's major row); `NSC` counts the CITY ROWS this
-        # walk covers, which since the free row joined is the majors PLUS the Free Cities
-        # row. They were the same number for as long as the walk was
-        # majors-only, and three sites below read one where they meant the
-        # other.
+        # walk covers, the majors PLUS the Free Cities row. The two differ by
+        # one, so every site below names the axis it means.
         M = self.n_majors
         NSC = M + 1
         _rw = self._relig_rows
@@ -4440,8 +4438,7 @@ class SimEconomy:
         unit and asks `generalAuraMP(state, unit)`, which reads that unit's
         owner. It runs TWICE a turn on the majors, exactly as TS does: once
         here at the refreshUnits mirror and again at the seatPhase reset that
-        establishes every isCiv seat's real budget (seat 0 included — `isCiv`
-        covers it).
+        establishes every isCiv seat's real budget.
 
         Barbarians never own a GENERAL/ADMIRAL, so the barb window has no
         plane (mirrors `unit_xp`). Civilians are screened here (TS
@@ -4972,11 +4969,11 @@ class SimEconomy:
         pop_t = pop - spec_d.sum(dim=2)
         take = (torch.arange(M, device=dev).reshape(1, 1, M) < pop_t.unsqueeze(2)) & (top_vals > -1e17)
         takef = take.double()
-        # the PICK, exposed. It was computed here and thrown away, so a
-        # divergence in WHICH tiles a city works could only surface indirectly
-        # as a yield difference, and the nuclear strike's "citizens 'working' the affected
-        # tiles are eliminated" had nothing to read. Stashed rather than
-        # recomputed, so this stays the ONE place the pick is made.
+        # the PICK, exposed: a divergence in WHICH tiles a city works surfaces
+        # directly rather than as a yield difference, and the nuclear strike's
+        # "citizens 'working' the affected tiles are eliminated" reads it.
+        # Stashed rather than recomputed, so this stays the ONE place the pick
+        # is made.
         if j is None and record:
             self.city_worked[:, row, :n].copy_(
                 torch.where(take, tiles.gather(2, top_idx), torch.full_like(top_idx, -1)))

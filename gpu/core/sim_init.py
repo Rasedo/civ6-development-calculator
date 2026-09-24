@@ -21,9 +21,9 @@ class SimInit:
         # each. There are NO family views: every reader indexes the base by
         # ROW, because a second name for a row is a second way to write a
         # body that only serves one seat.
-        #     seat 0:      city_x[:, 0]
-        #     civ seats:   city_x[:, 1:n_majors]
-        #     city-states: city_x[:, n_majors:, 0]   (carved out further below)
+        #     the majors:  city_x[:, :n_majors]      (the row IS the seat)
+        #     city-states: city_x[:, n_majors:FREE_ROW, 0]   (carved out further below)
+        #     Free Cities: city_x[:, FREE_ROW]
         # ONE COLUMN WIDTH for every seat row: the block is RC wide on every
         # row, so no body carries a `cols = ... if row == 0` and row 0 can
         # receive the uncapped loyalty flip its own rules allow.
@@ -33,7 +33,7 @@ class SimInit:
         # 0 — which is a FILL, not a fork: every reader is the same expression.
         # ------------------------------------------------------------------
         # THE MAJOR ROSTER WIDTH, read off THE ROSTER: `civs[]` is seat-keyed
-        # and holds one entry per major, seat 0 among them. A separate scalar
+        # and holds one entry per major. A separate scalar
         # wire key for the width would be a second source of truth that could
         # disagree with the array right beside it. An opponent count, where
         # one is genuinely meant (the war head's columns, the observation's
@@ -89,7 +89,8 @@ class SimInit:
             ("gw_seat", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
             ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
             # the members of `city_bldg` standing PILLAGED — dark until the
-            # city's own queue repairs them; read through `_bldg_dark` alone
+            # city's own queue repairs them; `_bldg_dark` folds them with the
+            # district's own pillage, `_building_pillaged` reads them alone
             ("bldg_pillaged", torch.bool, False, None, max(len(rules.b_cost), 1)),
             ("gp_perm", dtype, 0, None, max(len((rules.seats or {}).get("gpCityPermKeys", [])), 1)),
         ):
@@ -187,8 +188,8 @@ class SimInit:
                                   if "CIV6_RECLAIM_AT" in _os.environ else None)
 
         # --- city-states: static, placed at game creation ----------------------
-        # THE ONE SURVIVING PAD, and it is not the major axis's: seat 0 always
-        # exists, so the major width needs no floor and can never come out zero. `S == 0` genuinely means NO
+        # THE ONE SURVIVING PAD, and it is not the major axis's: the major
+        # roster is never empty, so the major width needs no floor and can never come out zero. `S == 0` genuinely means NO
         # city-state rows, so dropping THIS one would: `seat_citystate_*`
         # becomes `[B, n_majors, 0]`, and a reduction over an empty dim raises
         # where a reduction over a dead row returns the identity. The guards
@@ -328,8 +329,7 @@ class SimInit:
         self._suz_route_cul = float(_suz["routeCulture"])
         self._suz_route_gold = float(_suz["routeGold"])
         # Geneva / Bologna / Nan Madol / Amsterdam / Zanzibar / Hunza / Hong Kong /
-        # Ngazargamu / Buenos Aires — the nine rows that used to ride a flat
-        # capital channel, each now its own rule.
+        # Ngazargamu / Buenos Aires — nine rows, each its own rule.
         self._suz_sci_pct = float(_suz["sciencePct"])
         self._suz_dist_gpp = float(_suz["districtGpp"])
         _gb = _suz["gppBuildingIdx"]
@@ -937,8 +937,8 @@ class SimInit:
         #     [ 0 .. MAJOR_POOL_MAX )                        EVERY major seat
         #     [ MAJOR_POOL_MAX .. MAJOR_POOL_MAX+BARB_POOL_MAX )  barbarians
         #
-        # A unit's OWNER is `unit_seat`, NEVER the range it landed in — seat 0
-        # spawns through the same cursor into the same range as every civ seat,
+        # A unit's OWNER is `unit_seat`, NEVER the range it landed in — every
+        # major seat spawns through the same cursor into the same range,
         # exactly as TS pushes every seat's unit onto one `state.units`. A
         # RANGE only says which CLASS of actor lives there, which is what the
         # barbarian split is for.
@@ -983,7 +983,7 @@ class SimInit:
             # Sweeping Wind is the only row that buys a second.
             ("attacks", torch.long),
             # The OWNER of whatever sits in this slot, in the absolute seat
-            # space TS uses (0 seat 0, 1..99 civs, 100+ city-states, 200 barbs)
+            # space TS uses (0..99 the majors, 100+ city-states, 200 barbs)
             # — a value you can gather and compare without already knowing which
             # pool range you are looking at. Checked by _check_seat_invariant.
             ("seat", torch.long),
@@ -1098,9 +1098,8 @@ class SimInit:
         # seat's religion.
         self._b18_couple = bool(rr.get("followerCoupling", False))
         self.holy_tile = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
-        # ONE religion plane pair over every seat row — seat 0 is a row like any
-        # other, matching TS's single `allCities(state)` loop over one
-        # religionPressure field.
+        # ONE religion plane pair over every seat row, matching TS's single
+        # `allCities(state)` loop over one religionPressure field.
         self.city_pressure = torch.zeros(B, self.CITY_ROWS, civ_city_pad, self.n_majors, dtype=torch.long, device=device)
         # A FREE CITY's race — the loyalty pressure each major has put on it
         # "since the Free City became independent" (`City.freePressure`),
@@ -2057,9 +2056,9 @@ class SimInit:
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._harbor_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._harbor_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
-        # The seat-0 diplomacy head (declareWar / sueForPeace on a civ). While
-        # False, war_mask() is all-False and step(war=…) is ignored, so nothing
-        # samples or applies it; scripted/parity paths never pass war=.
+        # The diplomacy head (declareWar / sueForPeace), the same for every
+        # seat row. While False, every row's `_seat_war_mask` is all-False, so
+        # the head offers no war verb to any seat.
         self._rl_war_active = True
         self._log_combat_b: int | None = None
         # CIV6_DIFFLOG collects the amenity decomposition for EVERY game, a
@@ -2731,8 +2730,8 @@ class SimInit:
         # city's PERSISTENT id within that seat, -1 for none. Settler starts
         # mean no major holds a tile at t0, so `ownerInit` is all -1 and
         # `ownerSeatInit` carries only the city-state rings; but the pair is the
-        # contract, and reading only seat 0's half is how a civ's ring would be
-        # dropped on load.
+        # contract, and reading only one half of it is how a major's ring would
+        # be dropped on load.
         self.tile_city = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
         # Bumped by EVERY write to tile_seat / tile_city; keys the derived
         # views below. Not a tensor — python state, so it is not in _MUTABLE.
@@ -2982,8 +2981,8 @@ class SimInit:
         self._shrine_bidx = int(rules.shrine_bidx)  # missionary buy gate
         self._workshop_bidx = int(rules.workshop_bidx)  # Leonardo's culture perm
         # The completion-overflow / chop bank on the city-block seat axis
-        # (row 0 = seat 0, rows 1.. = the civ seats, then the city-state rows
-        # for family-shape consistency; every city starts with an empty bank,
+        # (one row per major seat, then the city-state rows and the Free Cities
+        # row for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=dtype, device=device)
         # CIV6: production is never lost — a CANCELLED item keeps its own
@@ -3116,7 +3115,7 @@ class SimInit:
         # FORM trains the unit AS A FORMATION — the corps block then the army
         # block — and it CLOSES the layout. There is no promote block: the
         # queue is one deep, so there is never an entry behind the head to
-        # bring forward (owner ruling 2026-09-08, `PRODUCTION_QUEUE_MAX`).
+        # bring forward (owner ruling, `PRODUCTION_QUEUE_MAX`).
         self.FORM_BASE = self.PROJECT_BASE + len(self._proj_rows)
         self.PROD_W = self.FORM_BASE + 2 * self.NU
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
@@ -3735,9 +3734,9 @@ class SimInit:
         self._rcy_cache = None
         self._bld_cache: dict = {}  # (row, complete) -> (_eff_version, mask); one entry per seat row
         # The WIRE's spending intents, parked between decide-time and the
-        # gold block's phase position. Keyed by ABSOLUTE seat row — seat 0
-        # stashes through step(), the civ rows through apply_seat_actions,
-        # and _seat_buy_ladder drains whichever row it is running.
+        # gold block's phase position. Keyed by ABSOLUTE seat row — every row
+        # stashes through apply_seat_actions (`_stash_buy`), and
+        # _seat_buy_ladder drains whichever row it is running.
         self._driven_buy: dict = {}
         self._driven_buy_worship: dict = {}
         self._driven_buy_relig: dict = {}
@@ -3770,8 +3769,8 @@ class SimInit:
         # the roster tables and the pool planes exist, which is why the load is
         # split in two passes rather than by seat. charges/MP mirror
         # `_spawn_unit`'s writes minus the spot search (the file tile is the
-        # tile); the civ arm this replaced wrote neither, so every civ started
-        # with a 0-charge builder and 0 movesLeft until the first refresh.
+        # tile), so a builder starts with its charges and every unit with its
+        # movesLeft.
         #
         # ORDER: civ rows in fixture order, then row 0. The pool is compared
         # POSITIONALLY against TS's `state.units`, so the append order is a

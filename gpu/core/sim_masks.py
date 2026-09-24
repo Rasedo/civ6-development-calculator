@@ -20,11 +20,8 @@ class SimMasks:
     def _seat_tech_mask(self, row: int) -> torch.Tensor:
         # EVERY available tech, whether or not one is already underway: real
         # Civ 6 lets a seat switch research at any moment, and `availableTechsIn`
-        # never consulted the current selection either. The old
-        # `cur_tech == -1` term made the whole tech head illegal for as long as
-        # anything was being researched — measured at t60 of seed 9002, a seat
-        # with 9 techs had 0 of 68 legal — so "switch research" was a move no
-        # policy could express and none could learn.
+        # never consults the current selection either, so "switch research" is
+        # a move every seat can make.
         return self._available_mask(self.civ_techs[:, row], self._prereq_t)
 
     def _seat_civic_mask(self, row: int) -> torch.Tensor:
@@ -984,8 +981,8 @@ class SimMasks:
         `bankXp` returns before touching it. That is not the same as clamping
         it to the requirement, and the difference is reachable: a goody hut's
         grant and a corps merge's inheritance both write the pool without the
-        clamp, so a unit can legitimately stand ABOVE its threshold, and this
-        used to drag it back down the next time it banked anything at all.
+        clamp, so a unit can legitimately stand ABOVE its threshold, and the
+        next bank leaves it there.
         """
         need = self._xp_to_next(level)
         held = (need <= 0) | (xp >= need)
@@ -2093,7 +2090,7 @@ class SimMasks:
         `seat` is an ABSOLUTE seat; anything outside the major rows (a barbarian, a
         city-state, NO_SEAT) holds no tech, and a `tech` the rules table does
         not define is False everywhere. The research planes are the merged
-        `civ_techs[:, row]` block, so seat 0 needs no arm of its own."""
+        `civ_techs[:, row]` block, so no seat needs an arm of its own."""
         if tech < 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         rows = seat.clamp(min=0, max=self.n_majors - 1)
@@ -2304,15 +2301,13 @@ class SimMasks:
         WIRED — the full TS reveal-site set: t0 fixture load (r2/unit), the
         three major spawn bodies (r2), both founding bodies (r3), every walk
         hop through _step_verb's one tile write (r2 — all movers route
-        there), tile acquisition r1 at all three sites (seat-0 border
-        growth, civ border growth, the driven tile buy), and the captor's
-        r3 at all five capture bodies (seat-0/civ city captures + transfers,
-        both CS conquests). NOT reveals on either engine: the melee
-        advance-into-freed-tile and unit capture/transfers (TS writes
-        tileIndex directly — no stepUnit, no reveal). The old FOG-DEBT note
-        here named a goody-hut MAPS reward with no twin; both halves of it are
-        gone — the mechanic ships and the install's own reward table
-        carries no maps arm, that was the unsourced stub's invention."""
+        there), tile acquisition r1 at both sites (border growth on every
+        seat row, the driven tile buy), and the captor's r3 at every capture
+        body (`_transfer_city` for city captures and transfers,
+        `_capture_city_state` for both CS conquests). NOT reveals on either
+        engine: the melee advance-into-freed-tile and unit capture/transfers
+        (TS writes tileIndex directly — no stepUnit, no reveal), and a goody
+        hut, whose reward table in the install carries no maps arm."""
         if not self.fog_of_war or rows.numel() == 0:
             return
         # `see_through` names a UNIT's look (revealAround's `los`): the disk is
@@ -2547,13 +2542,11 @@ class SimMasks:
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
         getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx, at_tile)[rows]
         off = self.POOL_LO[pre]
-        # ONE occupancy writer, the one every other caller uses. This used to
-        # hand-roll two arms off `_type_civilian` — the NONCOMBAT set, not the
-        # civilian STACKING CLASS — so a support chassis was born into the
-        # wrong plane: the Military Engineer (charges, no combat) among the
-        # civilians, the Battering Ram among the military. `_occ_set` makes
-        # the three-way split, and it reads the type and the embarked flag
-        # this body has already written.
+        # ONE occupancy writer, the one every other caller uses. `_occ_set`
+        # makes the three-way split on the stacking class (`_type_civilian` is
+        # the NONCOMBAT set, which would put the Military Engineer among the
+        # civilians and the Battering Ram among the military), and it reads
+        # the type and the embarked flag this body has already written.
         # An AIRCRAFT and a SPY hold no plot at all (`no_hold`), so they are
         # still kept out of every plane.
         _hold = rows[~no_hold[rows]]
@@ -3068,7 +3061,7 @@ class SimMasks:
         `meleeAttack`'s cityStateTarget: a DECLARED war on the minor itself,
         or a war with ANY seat that is its SUZERAIN (contesting the suzerain
         drags its minor in). Row-generic — the suzerain clause loops the major
-        rows rather than naming seat 0."""
+        rows rather than naming one."""
         S = max(self.S, 1)
         cs_row0 = self.n_majors
         out = self.war[:, row, cs_row0:cs_row0 + S][:, :self.S] if self.S > 0 else torch.zeros(self.B, 0, dtype=torch.bool, device=self.device)
@@ -3161,10 +3154,8 @@ class SimMasks:
         if self.TUNNEL >= 0:
             terr = terr | (self.improvement.gather(1, nbc).reshape(B, N, 6) == self.TUNNEL)
         _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
-        # ONE call with the mover's own class flags. It used to be two, chosen
-        # by a `where`, to skip building the civilian plane on military-only
-        # ranks; a third class would have made that three, and the flags are
-        # per-unit tensors the rule already accepts.
+        # ONE call with the mover's own class flags: the flags are per-unit
+        # tensors the rule already accepts, so no class needs a call of its own.
         _blk = self._blocked_for(
             nbc, row, is_naval=_nav6,
             is_civilian=is_civ.expand(B, N, 6).reshape(B, -1),
@@ -4102,8 +4093,7 @@ class SimMasks:
             * self.rules.gold_purchase_mult
         # CIV6 (The Raven King,
         # EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_PERCENT): a LEVIED
-        # unit upgrades at 75% off. The row shipped long ago and nothing read
-        # it until now.
+        # unit upgrades at 75% off.
         if self._levy_rows:
             _lpct = 0
             for _lc, _ll, _ld, _le, _lm, _lcs in self._live_rows(row, self._levy_rows):
@@ -4131,7 +4121,8 @@ class SimMasks:
         "mp", "charges", "is_civilian",        # 13-15
         # the WAR half: the march destination is a FIXED enemy target — nearest
         # unpillaged enemy improvement/district within 13, else the nearest
-        # enemy city (seat 0 wins ties). The rule that CHOOSES between them is
+        # enemy city (ties by the owner's seat id, then the centre tile, as
+        # `_war_march_targets` keys them). The rule that CHOOSES between them is
         # policy and lives in the ladder; the observation carries the
         # distances, 1-hop like d_home.
         "at_war",                              # 16

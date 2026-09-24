@@ -602,7 +602,7 @@ RESEARCH_LOOPS = 40  # > tree size: completes every ready tech/civic in one turn
 #
 # EVERY MAJOR SEAT SHARES ONE POOL, the twin of TS's single `state.units`
 # array: a unit's owner is `unit_seat`, never the slot range it landed in, so
-# seat 0 has no window of its own to be different in. The barbarians keep a
+# no seat has a window of its own to be different in. The barbarians keep a
 # separate one only because nothing indexes them by seat row.
 MAJOR_POOL_MAX = 512
 #: how many INVENTED luxuries one seat can hold. Four Great Merchants make
@@ -623,7 +623,7 @@ WW_BATTLE_KEYS = frozenset({
     "mel",      # melee vs a unit - a MAJOR attacker or a hostile one
     "rng",      # p_ ranged vs a unit or a lone civilian
     "vrng",     # hostile ranged vs a unit
-    "csty",     # melee vs a city-state centre - seat 0 AND a civ seat
+    "csty",     # melee vs a city-state centre - by ANY major seat
     "rcty",     # melee assault on ANY seat's city - the one cityAssault
     "enc",      # melee assault on ANY seat's Encampment district
     "vrngc",    # hostile ranged vs ANY seat's city
@@ -651,7 +651,7 @@ FREE_SEAT = 300
 #   always_hostile hostile to everyone with NO war state — the one thing the
 #                  war matrix cannot say, since an all-false row means peace.
 SEAT_CAPS = {
-    "major": {"xp": True, "always_hostile": False},   # seat 0 and the civ seats
+    "major": {"xp": True, "always_hostile": False},   # every major seat
     "minor": {"xp": True, "always_hostile": False},   # city-states
     "hostile": {"xp": False, "always_hostile": True},  # barbarians
     # CIV6: a Free City "will seek to defend themselves from military
@@ -725,7 +725,7 @@ ASSIST_TOWER = 2
 
 # --- ONE INDEX SPACE ---------------------------------------------------------
 # A fixture's `civs[]` is SEAT-KEYED — the exporter writes `state.seats` in seat
-# order, seat 0 among them, each entry carrying its own absolute `seat` — and
+# order, each entry carrying its own absolute `seat` — and
 # that id IS the entry's row in every merged plane. City-states (100+) and
 # barbarians (200) stay outside the major numbering. There is no second index
 # space, so no signature below converts between one and another.
@@ -845,16 +845,16 @@ _MUTABLE = [
     "shipwreck", "shipwreck_era", "shipwreck_seat",  # the WATER dig
     "park",  # NATIONAL PARK tiles
     # CIV6 (Coastal Lowlands): the sea takes ground, so every tile fact it
-    # moves is state now, not map generation (`_submerge`).
+    # moves is state, not map generation (`_submerge`).
     "tile_submerged", "water", "wpass", "passable", "work_ok", "settle_ok",
     "d_usable", "d_usable0", "camp_ok", "coastal_land", "coastal_water", "_sr_c", "tile_wh",
     "tile_yields", "wok", "res_id", "res_cat", "res_priority", "lux_id",
     "lux_req", "res_imp", "tile_lowland",
     # the Aqueduct's source and the atom it derives from: a drowned OASIS
-    # stops sourcing a neighbour, so both moved from map generation to state.
+    # stops sourcing a neighbour, so both are state, not map generation.
     "aqsrc", "aq_own",
     # CIV6 (Builder): a HARVEST takes the resource off a tile that stays
-    # workable, so every baked flag that read `t.resource` is state now —
+    # workable, so every baked flag that reads `t.resource` is state —
     # the harvest copies each one's resource-free value in (`_nr_planes`).
     "site_q3", "tile_ftr", "farm_flat", "farm_hill", "mine_ok", "lumber_ok",
     "_fa_f_c", "_fa_h_c", "_mi_c",

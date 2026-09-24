@@ -390,8 +390,9 @@ class SimPhase:
         mask is rebuilt, the object differs, this misses). The entry holds a
         reference to the mask, so a freed tensor's id can never be reused
         under a live key. The per-city walk asks four of these channels of
-        every column of every seat, and each one used to pay its own einsum or
-        product over [B, RC, NP] for an answer that moves a few times a game.
+        every column of every seat, and without the memo each one pays its own
+        einsum or product over [B, RC, NP] for an answer that moves a few times
+        a game.
 
         Callers never write into the returned tensor — the same object is
         handed to every city."""
@@ -695,8 +696,9 @@ class SimPhase:
         reads exactly what the first one did. Everything that reads `cur`, the
         column's plot, buildings, governor or queue stays per-city, in order.
 
-        Each `_row_is` mask used to be rebuilt, and its `.any()` synced, once
-        per ROW per CITY; each channel `.any()` once per city."""
+        Each `_row_is` mask is built, and its `.any()` synced, once per ROW
+        here rather than once per ROW per CITY; each channel `.any()` likewise
+        once here rather than once per city."""
         pre: dict = {}
         gm = self._gov_mods(row) if self._gov_has_effects else None
         pre["gm"] = gm
