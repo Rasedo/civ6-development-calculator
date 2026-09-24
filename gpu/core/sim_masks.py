@@ -7,15 +7,6 @@ from . import simbase
 
 
 class SimMasks:
-    def production_mask(self) -> torch.Tensor:
-        """[B, RC, W] valid production actions for seat 0's idle cities.
-
-        Seat 0's row of `_seat_production_mask` — the ONE body every seat row
-        asks, in the ONE production layout (cpu/core/prodLayout.ts). Seat 0 has
-        no mask of its own: a second body is how a seat quietly acquires its own
-        legality."""
-        return self._seat_production_mask(0)
-
     def _seat_tech_mask(self, row: int) -> torch.Tensor:
         # EVERY available tech, whether or not one is already underway: real
         # Civ 6 lets a seat switch research at any moment, and `availableTechsIn`
