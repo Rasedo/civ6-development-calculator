@@ -1,0 +1,65 @@
+save lab4_t50
+turn 50 cities 0
+save lab4_t75
+turn 75 cities 0
+save lab4_t100
+turn 100 cities 0
+save lab4_t125
+turn 125 cities 0
+save lab4_t150
+turn 150 cities 0
+save lab4_t175
+turn 175 cities 0
+save lab4_t200
+city p62 free=true LOC_CITY_NAME_NGARUAWAHIA pop 13 amen 1 sum 1 residue 0 need 7 tier 1 | FromLuxuries=1
+city p62 free=true LOC_CITY_NAME_MEXICO_CITY pop 9 amen 1 sum 1 residue 0 need 5 tier 2 | FromLuxuries=1
+turn 200 cities 2
+save lab4_t225
+city p62 free=true LOC_CITY_NAME_NGARUAWAHIA pop 13 amen 0 sum 0 residue 0 need 7 tier 0 | 
+turn 225 cities 1
+save lab4_t250
+city p62 free=true LOC_CITY_NAME_NGARUAWAHIA pop 13 amen 0 sum 0 residue 0 need 7 tier 0 | 
+turn 250 cities 1
+save obs1_t100
+turn 101 cities 0
+save obs1_t150
+city p62 free=true LOC_CITY_NAME_CHENGDU pop 12 amen 0 sum 0 residue 0 need 6 tier 1 | FromLuxuries=1 LostFromBankruptcy=1
+turn 150 cities 1
+save obs1_t200
+turn 200 cities 0
+save obs2_t100
+turn 101 cities 0
+save obs2_t150
+city p62 free=true LOC_CITY_DA_LAT pop 1 amen -1 sum -1 residue 0 need 1 tier 3 | LostFromBankruptcy=1
+turn 150 cities 1
+save obs2_t200
+turn 200 cities 0
+save obs2_t250
+turn 250 cities 0
+save obs3_t100
+turn 101 cities 0
+save obs3_t150
+turn 150 cities 0
+save obs3_t200
+turn 200 cities 0
+save obs3_t250
+city p62 free=true LOC_CITY_NAME_BRANTFORD pop 14 amen 3 sum 3 residue 0 need 7 tier 2 | FromLuxuries=2 FromImprovements=1
+turn 250 cities 1
+save obs4_t100
+turn 101 cities 0
+save obs4_t150
+turn 151 cities 0
+save obs4_t200
+turn 200 cities 0
+save obs4_t250
+turn 250 cities 0
+save obs5_t100
+turn 101 cities 0
+save obs5_t150
+turn 150 cities 0
+save obs5_t200
+turn 200 cities 0
+save obs6_t100
+turn 101 cities 0
+save obs6_t150
+turn 151 cities 0
