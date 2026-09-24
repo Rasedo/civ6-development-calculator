@@ -10611,7 +10611,7 @@ class SimSeats:
             # (the barbarians field no support chassis, so that plane holds none)
             for occ in (self.military_at, self.civilian_at):
                 src = torch.where(tgt >= 0, occ[rows, tgt.clamp(min=0)], torch.full_like(tgt, -1))
-                hit = (src >= 0) & (self.unit_seat[rows, src.clamp(min=0)] >= BARB_SEAT)
+                hit = (src >= 0) & (self.unit_seat[rows, src.clamp(min=0)] == BARB_SEAT)
                 if not bool(hit.any()):
                     continue
                 hr = rows[hit]

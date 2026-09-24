@@ -1250,7 +1250,9 @@ class SimEconomy:
         if bool(hit.any()):
             idx = self._flood_sites[0]
             tile = idx.gather(1, k.clamp(max=idx.shape[1] - 1).unsqueeze(1)).squeeze(1)
-            self._flood_river(hit, tile, sev)
+            # the flood tables are read for every game of the batch, so a game
+            # whose row is another family's reads a clamped (unused) index
+            self._flood_river(hit, tile, sev.clamp(min=0, max=self._flood_dmg_lo.numel() - 1))
 
         hit = fam == self._EV_KILIMANJARO
         if bool(hit.any()):

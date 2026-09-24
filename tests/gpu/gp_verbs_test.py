@@ -103,7 +103,8 @@ def main() -> None:
         if int(sim.military_at[B0, t]) >= 0 or int(sim.civilian_at[B0, t]) >= 0:
             continue
         nbs = [int(n) for n in sim.neigh[t].tolist() if n >= 0 and bool(sim.passable[B0, n])
-               and int(sim.military_at[B0, n]) < 0 and int(sim.district[B0, n]) < 0]
+               and int(sim.military_at[B0, n]) < 0 and int(sim.civilian_at[B0, n]) < 0
+               and int(sim.district[B0, n]) < 0]
         if len(nbs) >= 2:
             plot = (t, nbs[:2])
             break
