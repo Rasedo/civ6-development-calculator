@@ -62,7 +62,7 @@ def main(paths: list[str]) -> int:
             m = ROUTE.search(line)
             if m:
                 routes.setdefault((path, m.group(4)), []).append(
-                    (int(m.group(6)), int(m.group(3)), m.group(1), int(m.group(5))))
+                    (int(m.group(6)), int(m.group(3)), f"{m.group(1)} of {m.group(2)}", int(m.group(5))))
                 continue
             # only the RAW history lines (they carry PlotIndex); the summary
             # lines some run scripts sed down lose fields and would double count
@@ -96,10 +96,11 @@ def main(paths: list[str]) -> int:
             queue.pop(0)
         if queue:
             p = queue.pop(0)
-            route_of[k] = (p[2], p[4])
+            route_of[k] = (p[2], p[4], p[0] - ct)
     esc = Counter()
     by_level = {1: Counter(), 2: Counter(), 3: Counter(), 4: Counter()}
     by_route = {}
+    by_lag = {}
     for k, d in rows.items():
         init = RAW.get(int(d.get("InitialResult", -1)), "?")
         res = RAW.get(int(d.get("EscapeResult", -1)), "?")
@@ -107,11 +108,12 @@ def main(paths: list[str]) -> int:
             continue
         # the level the spy HAS at the prompt (a promotion is only a level
         # once taken; LevelAfter counts it as soon as it is earned)
-        route, lvl = route_of.get(k, ("unlogged", int(d.get("LevelAfter", 1))))
+        route, lvl, lag = route_of.get(k, ("unlogged", int(d.get("LevelAfter", 1)), -1))
         out = {"FAIL_MUST_ESCAPE": "escaped", "CAPTURED": "captured", "KILLED": "killed", "NO_RESULT": "pending"}.get(res, res)
         esc[out] += 1
         by_level.setdefault(lvl, Counter())[out] += 1
         by_route.setdefault((route, lvl), Counter())[out] += 1
+        by_lag.setdefault(min(lag, 3), Counter())[out] += 1
     n = sum(v for k, v in esc.items() if k != "pending")
     print(f"missions parsed: {len(rows)}; must-escape: {sum(esc.values())}; resolved: {n}; pending: {esc['pending']}")
     print("outcomes:", dict(esc))
@@ -121,11 +123,16 @@ def main(paths: list[str]) -> int:
             print(f"  level {lvl}: escaped {c['escaped']}/{m} = {c['escaped']/m:.2f}  (captured {c['captured']}, killed {c['killed']})")
     if n:
         print(f"overall escaped {esc['escaped']}/{n} = {esc['escaped']/n:.2f}")
+    print("by the prompt's lag after CompletionTurn (3 = 3 or more, -1 = unlogged):")
+    for lag, c in sorted(by_lag.items()):
+        m = sum(v for k, v in c.items() if k != "pending")
+        if m:
+            print(f"  lag {lag:2d}: escaped {c['escaped']}/{m} = {c['escaped']/m:.2f}  (captured {c['captured']}, killed {c['killed']})")
     print("by route and level:")
     for (route, lvl), c in sorted(by_route.items()):
         m = sum(v for k, v in c.items() if k != "pending")
         if m:
-            print(f"  {route:26s} level {lvl}: escaped {c['escaped']}/{m} = {c['escaped']/m:.2f}"
+            print(f"  {route:31s} level {lvl}: escaped {c['escaped']}/{m} = {c['escaped']/m:.2f}"
                   f"  (captured {c['captured']}, killed {c['killed']})")
     print("\ncandidate readings (level 1 / level 2):")
     print(f"  percent 10+level              : {0.11:.2f} / {0.12:.2f}")

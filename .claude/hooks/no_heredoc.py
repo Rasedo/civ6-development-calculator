@@ -1,4 +1,6 @@
-r"""PreToolUse guard: no HEREDOCS, no SLEEP, no `python -`.
+r"""PreToolUse guard: no HEREDOCS, no SLEEP, no `python -`, no `cd` below a
+checkout root (the hooks are root-relative paths; a persisted `cd` breaks
+every call after it).
 
 Both are owner bans (`sleep` 2026-09-08, heredocs 2026-09-09) and both were
 first written as `permissions.deny` globs like `Bash(*<<*)`. Those never
@@ -21,12 +23,15 @@ a file and run `python <path>` / `git commit -F <path>`.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 
 # `<<` opens a heredoc; `<<<` is a here-STRING and is fine, as is a shift.
 HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*[\"']?[A-Za-z_][A-Za-z0-9_]*")
 PS_HERESTRING = re.compile(r"@[\"']\s*$", re.M)
+# `cd <dir>` / `Set-Location <dir>` anywhere in the command
+CD = re.compile(r"(^|[;&|(]\s*)(?:cd|Set-Location|sl|pushd)\s+(\"[^\"]+\"|'[^']+'|[^\s;&|)]+)", re.I)
 # `python -` / `python3 -X utf8 -`: the script on stdin
 PY_STDIN = re.compile(r"(^|[;&|(]\s*)python3?(\s+-X\s+\S+)*\s+-(\s|$)")
 SLEEP = re.compile(r"(^|[;&|(]\s*)sleep\s+[\d.]|Start-Sleep", re.I)
@@ -45,6 +50,17 @@ def main() -> int:
             "script to a file with the Write tool and run `python <path>`; for "
             "a commit message, Write it and use `git commit -F <path>`.\n")
         return 2
+    for m in CD.finditer(cmd):
+        target = os.path.expanduser(m.group(2).strip("'\""))
+        if re.match(r"^/[a-zA-Z]/", target):  # Git Bash /c/... -> C:/...
+            target = target[1] + ":" + target[2:]
+        if not os.path.isdir(os.path.join(target, ".claude", "hooks")):
+            sys.stderr.write(
+                f"BLOCKED: `cd {m.group(2)}` leaves the checkout root. The shell's "
+                "directory persists, and every hook is a path relative to the root, "
+                "so every later call fails. Name paths instead: `python "
+                "tools/x.py runs/y.log`, `ls tools/civ6lab/runs`.\n")
+            return 2
     if PY_STDIN.search(cmd):
         sys.stderr.write(
             "BLOCKED: `python -` reads the script from stdin, and with no stdin "

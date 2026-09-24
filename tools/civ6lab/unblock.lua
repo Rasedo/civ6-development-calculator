@@ -1,5 +1,5 @@
--- InGame: resolve the ONE blocker the game reports, the way the UI would,
--- then request the end of turn. Blocker-driven on purpose: calling the
+-- InGame: resolve the ONE blocker the game reports (a pending escape prompt
+-- first), the way the UI would, then request the end of turn. Blocker-driven on purpose: calling the
 -- escape-route query or a forced end turn outside their UI context crashed
 -- the game to desktop twice (2026-09-13, dumps 7C1DF660 / B31A4D66).
 local me = Game.GetLocalPlayer()
@@ -9,6 +9,18 @@ local b = NotificationManager.GetFirstEndTurnBlocking(me)
 local bname = tostring(b)
 for k, v in pairs(EndTurnBlockingTypes) do if v == b then bname = k end end
 local did = "nothing"
+-- an escape prompt can sit BEHIND another blocker (a city that keeps asking
+-- for production) and then is never the first one; its notification says
+-- it is there, the way the notification panel finds it
+local escaping = false
+for _, nid in ipairs(NotificationManager.GetList(me) or {}) do
+  local n = NotificationManager.Find(me, nid)
+  if n ~= nil and n:GetType() == NotificationTypes.SPY_CHOOSE_ESCAPE_ROUTE then escaping = true end
+end
+if escaping then
+  b = EndTurnBlockingTypes.ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE
+  bname = "ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE"
+end
 if b == EndTurnBlockingTypes.ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE then
   -- the routes the escape popup offers (EspionageEscape.lua): a district the
   -- city has, the city centre always; the spy's id picks one, so a batch
@@ -26,8 +38,12 @@ if b == EndTurnBlockingTypes.ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE then
     local t = {}
     t[PlayerOperations.PARAM_DISTRICT_TYPE] = GameInfo.Districts[pick].Index
     UI.RequestPlayerOperation(me, PlayerOperations.SET_ESCAPE_ROUTE, t)
+    local pursuer = spy:GetPursuingSpyName()
     did = "escape route " .. pick .. " of " .. #routes .. " for spy " .. id .. " " .. spy:GetName()
       .. " level " .. spy:GetExperience():GetLevel() .. " turn " .. Game.GetCurrentGameTurn()
+      .. " city " .. (city ~= nil and (city:GetName() .. " p" .. city:GetOwner()) or "none")
+      .. " at " .. spy:GetX() .. ":" .. spy:GetY()
+      .. " pursuer " .. ((pursuer == nil or pursuer == "") and "police" or pursuer)
   else
     did = "escape blocker but no escaping spy id"
   end
