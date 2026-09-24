@@ -25,6 +25,13 @@ from city_rows_test import play
 SCULPTURE, PORTRAIT, LANDSCAPE, RELIGIOUS, ARTIFACT, WRITING, MUSIC, RELIC = range(8)
 
 
+def city_totals(sim, row: int):
+    tier_idx, growth_f, yield_f, _lux = sim._seat_amenity(row)
+    maint, housing = sim._seat_housing(row)
+    total = sim._seat_city_walk(row, amen_yf=yield_f, maint=maint)
+    return total.to(sim.dtype), housing.to(sim.dtype), growth_f.to(sim.dtype), tier_idx
+
+
 def slots_of(sim, h: int) -> list[int]:
     return (sim._gw_slot_holder == h).nonzero(as_tuple=True)[0].tolist()
 
@@ -179,10 +186,10 @@ def main() -> None:
         s = fresh(rules, path, names)
         s.city_bldg[0, 0, 0, museum] = True
         s._eff_version += 1
-        base = s._city_totals()[0][0, 0].clone()  # [6]: food, production, gold, science, culture, faith
+        base = city_totals(s, 0)[0][0, 0].clone()  # [6]: food, production, gold, science, culture, faith
         for maker in (2, 14, 16):
             assert place(s, 0, 0, SCULPTURE, maker=maker) >= 0
-        return s._city_totals()[0][0, 0] - base
+        return city_totals(s, 0)[0][0, 0] - base
 
     kongo = sculpture_delta(("KONGO", "EGYPT", "NORWAY"))
     plain = sculpture_delta(("ROME", "EGYPT", "NORWAY"))

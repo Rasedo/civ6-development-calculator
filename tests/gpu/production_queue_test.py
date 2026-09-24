@@ -93,7 +93,7 @@ def test_the_depth_is_shared(rules, path) -> None:
     assert sim.FORM_BASE == sim.PROJECT_BASE + len(sim._proj_rows),         "the formation block must open right after the projects"
     assert sim.PROD_W == sim.FORM_BASE + 2 * sim.NU,         "the formation block does not close the production layout"
     assert not hasattr(sim, "PROMOTE_BASE"), "a promote block survived the collapse"
-    assert sim.production_mask().shape[2] == sim.PROD_W,         "the mask is wider than the layout — a dead block is still addressed"
+    assert sim._seat_production_mask(0).shape[2] == sim.PROD_W,         "the mask is wider than the layout — a dead block is still addressed"
     print(f"  1 depth OK — one slot on four planes, layout closes at {sim.PROD_W}")
 
 def test_only_the_head_accrues(rules, path) -> None:
@@ -126,14 +126,14 @@ def test_a_busy_city_is_offered_nothing(rules, path) -> None:
     j = a_city(sim)
     load_queue(sim, j, [unit(sim, 0)], costs=[10_000])
     sim._eff_version += 1
-    m = sim.production_mask()[B0, j]
+    m = sim._seat_production_mask(0)[B0, j]
     assert m.shape[0] == sim.PROD_W, "the mask is wider than the layout"
     assert not bool(m.any()), "a busy city was still offered something"
     # ...and an IDLE city is offered plenty
     sim._q_drop(torch.tensor([B0]), ROW, j,
                 torch.ones(1, sim.QD, dtype=torch.bool))
     sim._eff_version += 1
-    assert bool(sim.production_mask()[B0, j].any()), "an idle city was offered nothing"
+    assert bool(sim._seat_production_mask(0)[B0, j].any()), "an idle city was offered nothing"
     print("  5 busy OK — building something means no column; idle means a choice")
 
 def test_a_queued_building_is_not_offered_twice(rules, path) -> None:

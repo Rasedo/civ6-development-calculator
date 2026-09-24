@@ -1073,7 +1073,7 @@ def main() -> None:
 
 
     # --- the grievance ledger ------------------------------------------------
-    from core.engine import _MUTABLE as _MUT2
+    from core.simbase import _MUTABLE as _MUT2
     # `civ_grievance [B, NS, NS]` is ONE plane and the BASE is what carries the
     # state through a snapshot.
     assert "civ_grievance" in _MUT2, "civ_grievance must be registered in _MUTABLE"

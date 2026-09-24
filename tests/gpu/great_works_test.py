@@ -34,6 +34,13 @@ WRITING, MUSIC, ARTIFACT, RELIC = 5, 6, 4, 7
 ART = (0, 1, 2, 3)
 
 
+def city_totals(sim, row: int):
+    tier_idx, growth_f, yield_f, _lux = sim._seat_amenity(row)
+    maint, housing = sim._seat_housing(row)
+    total = sim._seat_city_walk(row, amen_yf=yield_f, maint=maint)
+    return total.to(sim.dtype), housing.to(sim.dtype), growth_f.to(sim.dtype), tier_idx
+
+
 def holder(sim, gw, hid: str) -> int:
     return [h["id"] for h in gw["holders"]].index(hid)
 
@@ -112,22 +119,22 @@ def main() -> None:
 
     # --- yield coupling: per-work culture, linear, and NO gold ------------
     clear_works(sim)
-    _t0 = sim._city_totals()[0]
+    _t0 = city_totals(sim, 0)[0]
     base = _t0[:, 0, 4].clone()
     base_g = _t0[:, 0, 2].clone()
     hold_works(sim, 0, 0, 0, WRITING, 1)
-    _t1 = sim._city_totals()[0]
+    _t1 = city_totals(sim, 0)[0]
     d1 = _t1[:, 0, 4] - base
     assert bool((d1 > 0).all()), "a slotted work must raise the city's culture yield"
     hold_works(sim, 0, 0, 0, WRITING, 1)
-    d2 = sim._city_totals()[0][:, 0, 4] - base
+    d2 = city_totals(sim, 0)[0][:, 0, 4] - base
     assert bool(((d2 - 2 * d1).abs() < 1e-9).all()), "the work yield must be linear (2 works = 2 x 1 work)"
     assert bool(((_t1[:, 0, 2] - base_g).abs() < 1e-9).all()), "a Great Work must pay NO gold"
 
     # --- a MUSIC work pays DOUBLE a writing work's culture (4 vs 2) --------
     clear_works(sim)
     hold_works(sim, 0, 0, 0, MUSIC, 1)
-    dm = sim._city_totals()[0][:, 0, 4] - base
+    dm = city_totals(sim, 0)[0][:, 0, 4] - base
     assert bool(((dm - 2 * d1).abs() < 1e-9).all()), f"a music work must pay 2x a writing work ({float(dm[0])} vs {float(d1[0])})"
 
     # --- MUSIC uses the BROADCAST CENTER (one slot): a Musician's 2 works

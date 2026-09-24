@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
+from . import simbase
 
 
 class SimPhase:
@@ -390,8 +389,9 @@ class SimPhase:
         mask is rebuilt, the object differs, this misses). The entry holds a
         reference to the mask, so a freed tensor's id can never be reused
         under a live key. The per-city walk asks four of these channels of
-        every column of every seat, and each one used to pay its own einsum or
-        product over [B, RC, NP] for an answer that moves a few times a game.
+        every column of every seat, and without the memo each one pays its own
+        einsum or product over [B, RC, NP] for an answer that moves a few times
+        a game.
 
         Callers never write into the returned tensor — the same object is
         handed to every city."""
@@ -675,7 +675,7 @@ class SimPhase:
         self.city_growth[bidx, row, col] = torch.where(act, nxt, old).to(old.dtype)
         pop = self.city_pop[bidx, row, col] + grow.long()
         self.city_pop[bidx, row, col] = torch.where(starve, (pop - 1).clamp(min=1), pop)
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _t, _m in (("gr", grow), ("sv", starve)):
                 _w = _m.nonzero(as_tuple=True)[0]
                 if _w.numel():
@@ -695,8 +695,9 @@ class SimPhase:
         reads exactly what the first one did. Everything that reads `cur`, the
         column's plot, buildings, governor or queue stays per-city, in order.
 
-        Each `_row_is` mask used to be rebuilt, and its `.any()` synced, once
-        per ROW per CITY; each channel `.any()` once per city."""
+        Each `_row_is` mask is built, and its `.any()` synced, once per ROW
+        here rather than once per ROW per CITY; each channel `.any()` likewise
+        once here rather than once per city."""
         pre: dict = {}
         gm = self._gov_mods(row) if self._gov_has_effects else None
         pre["gm"] = gm
@@ -1455,7 +1456,7 @@ class SimPhase:
                     self._spawn_unit(row, _vw, _vat, _vu)
                 if _vnav:
                     _hull = self._best_trainable_naval(row)
-                    if getattr(self, "_log_diff", False):
+                    if self._log_diff:
                         for _hb in _vw.nonzero(as_tuple=True)[0].tolist():
                             self._diff_events.setdefault(_hb, []).append(
                                 f"nv:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
@@ -1761,7 +1762,7 @@ class SimPhase:
                     _ok = _ok & ~self.war[:, row, _o]
                 _n = _n + _ok.double()
             faith_sum = faith_sum + _pw.double() * _n * _pa
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _b in range(self.B):
                 self._diff_events.setdefault(_b, []).append(
                     f"fi:{int(self._ROW_SEAT[row])}:{int(self.turn)}"

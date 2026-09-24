@@ -28,7 +28,8 @@ from __future__ import annotations
 
 import torch
 
-from .engine import BatchSim, Rules, UNIT_SLOTS
+from .engine import BatchSim
+from .simbase import Rules, UNIT_SLOTS
 from .neutral import living_order
 
 def n_unit_acts(rules: Rules) -> int:

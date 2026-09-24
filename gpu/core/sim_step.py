@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
+from . import simbase  # `_ALIAS_CHECK` is patched by tests/gpu/state_discipline_test.py, so it is read live
 
 
 class SimStep:
@@ -80,9 +79,8 @@ class SimStep:
         # compacts whenever it holds a HOLE, so the layout stays the dense
         # array TS keeps by splicing `seat.cities` on every death. High-water
         # = last-alive slot + 1, which is where the next append lands. ONE
-        # trigger, ONE body, every row — the seat whose deaths compact
-        # EAGERLY and the seat that waits for a threshold were the same rule
-        # written twice, and only the eager one is TS's.
+        # trigger, ONE body, every row: every seat compacts EAGERLY, as TS
+        # does.
         # ...the Free Cities row too, whose holes a joining city leaves
         _alive_m = torch.cat((self.city_alive[:, :self.n_majors],
                               self.city_alive[:, self.FREE_ROW:self.FREE_ROW + 1]), dim=1)
@@ -197,7 +195,7 @@ class SimStep:
         # Cities row, and so does this. It rode the amenity walk once, which
         # never reaches a Free City on either engine, and therefore agreed
         # about every city except the one that differed.
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             _rows = list(range(self.n_majors)) + [self.FREE_ROW]
             for _b in range(self.B):
                 _ev = self._diff_events.setdefault(_b, [])

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
 
 
 class SimMinors:
@@ -315,7 +313,7 @@ class SimMinors:
                     _g_dv = float(_d_pg[dv]) if dv < len(_d_pg) else 0.0
                     d_cost = (torch.full_like(d_fac, _b_dv) + torch.floor(_g_dv * _mprog)
                               if _g_dv > 0 else torch.floor(_b_dv * d_fac))
-                    if getattr(self, "_log_diff", False):
+                    if self._log_diff:
                         _nm = self.districts_cat[dv].get('id')
                         for _b in range(self.B):
                             if not bool(avail[_b]):

@@ -108,6 +108,17 @@ ALLOWLIST: dict[str, str] = {
                 "`unlockDistrict` effect (cpu/core/rules.ts:495), and the exporter resolves this "
                 "column into the `unlockTech`/`unlockCivic` indices the GPU reads",
     "unlockKind": "the same scaffold source column — which of the two indices the exporter fills",
+    "farmHousing": "the FARM's housing is its improvement row's own `housing` column, read by "
+                   "TS as `idef.housing` (cpu/core/city.ts computeHousing) and by the GPU as "
+                   "`_imp_housing` (gpu/core/sim_init.py); this scalar is the same install fact "
+                   "transcribed a second time",
+    "gpWorkClasses": "the Great Work classes are read by TS as GW_WORK_CLASSES "
+                     "(cpu/core/gpAbility.ts activateGreatPerson) and by the GPU as the wire's "
+                     "`gwClsByKind` (gpu/core/sim_init.py `_gw_cls`); this column is the same set "
+                     "transcribed a second time",
+    "cleanCharges": "CLEAN_FALLOUT spends exactly one build charge through each engine's shared "
+                    "charge spend (cpu/core/units.ts cleanFallout -> spendCharge, "
+                    "gpu/core/sim_orders.py `_spend_build_charge`), which is this constant's value",
     "unlockCivic": "the Madrasa's PrereqCivic: the live gate is BUILDING_PREREQ_ROWS, read at "
                    "cpu/core/effects.ts:120 and gpu/core/sim_economy.py:1632; the building "
                    "variant's own column is the same install row transcribed twice",

@@ -22,7 +22,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import load_rules, fixture_paths
-from core.engine import UNIT_SLOTS, MAJOR_POOL_MAX, pool_view
+from core.simbase import UNIT_SLOTS, MAJOR_POOL_MAX, pool_view
 from warmup import opened
 
 HOLD = 12

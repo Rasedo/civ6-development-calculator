@@ -200,18 +200,6 @@ def main() -> None:
     assert float(sim7.city_cost[0, r5 + 1, j5, 0]) > 0, "project cost must lock"
     print("  4 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
 
-    # -- 5: ONE production mask — seat 0 reads the same body, same width ----
-    # `production_mask()` IS `_seat_production_mask(0)`, so the seat-0 head and
-    # a civ head are the same layout: a net trained on one drives the other, and
-    # env.masks needs no padding between them.
-    assert sim7.production_mask().shape[2] == W, (
-        f"seat 0's production head is {sim7.production_mask().shape[2]} wide, civ heads are {W}"
-    )
-    assert torch.equal(sim7.production_mask(), sim7._seat_production_mask(0)), (
-        "production_mask() must BE the row-generic body, not a second copy"
-    )
-    print("  5 one production mask: seat 0 and civ rows share the body and the width")
-
     print("PREF APPLY OK")
 
 
