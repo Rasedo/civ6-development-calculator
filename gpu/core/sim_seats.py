@@ -3956,8 +3956,8 @@ class SimSeats:
         """[B, T] — the ground `validImprovementsIn` reaches its catalog rows
         on for seat row `row`: a resourced tile offers its resource's
         improvement alone, a water tile the water-only rows alone, and
-        impassable ground nothing."""
-        return ~self.water & self.passable & self._res_bare(row)
+        impassable ground or a natural wonder nothing."""
+        return ~self.water & self.passable & ~self.nwonder & self._res_bare(row)
 
     def _suz_improvement_ok(self, row: int, k: int) -> torch.Tensor:
         """[B, T] — may seat row `row` build suzerain improvement `k` here?
