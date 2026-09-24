@@ -2965,11 +2965,9 @@ class SimMasks:
 
         `row` is the ACTING seat's row, which is a DIFFERENT seat from the
         mover when a suzerain walks a levied unit: `clearCampFor` banks the
-        gold to the unit's seat and stamps the dig with the order's seat.
-
-        KNOWN CORNER vs TS: a LEVIED city-state unit banks nothing here. TS
-        credits `seatOf(unit.seat)` whoever that is and a city-state carries a
-        treasury; the GPU's treasury plane has major rows only."""
+        gold to the unit's seat and stamps the dig with the order's seat. A
+        city-state's unit (a levied one) banks to that city-state's
+        treasury, as `seatOf` resolves a city-state seat in TS."""
         if not bool(mask.any()):
             return
         hit = mask & (self.camp_tile == tile.unsqueeze(1)).any(dim=1)
@@ -2988,6 +2986,8 @@ class SimMasks:
             _s = int(seat[b])
             if 0 <= _s < self.n_majors:
                 self.civ_treasury[b, _s] += float(reward)
+            elif 100 <= _s < 100 + self.citystate_treasury.shape[1]:
+                self.citystate_treasury[b, _s - 100] += float(reward)
                 # CIV6 (Epic Quest): "Receive a Tribal Village reward each time
                 # you capture a barbarian outpost" — the install maps the camp
                 # to a goody hut, so it is the SAME draw (`_camp_goody_rows`)

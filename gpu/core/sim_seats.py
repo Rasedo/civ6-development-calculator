@@ -13728,6 +13728,14 @@ class SimSeats:
             # CIV6 (Francis Drake, Ching Shih): a permanent percentage on top.
             _gold = _gold * (1 + self._gp_perm_at(hr[mj], "routePlunderPct", hb[mj]).double() / 100)
             self.civ_treasury.index_put_((hb[mj], hr[mj]), _gold, accumulate=True)
+        # a city-state raider banks the plain gold into its own treasury (it
+        # carries no government or Great Person rows)
+        cs = (hr >= 100) & (hr < 100 + self.citystate_treasury.shape[1])
+        if bool(cs.any()):
+            self.citystate_treasury.index_put_(
+                (hb[cs], hr[cs] - 100),
+                torch.full((int(cs.sum()),), float(self._trade_plunder_gold), dtype=torch.float64, device=dev),
+                accumulate=True)
         self.seat_routes[hb, row, hk] = -1
         self.seat_route_dseat[hb, row, hk] = -1
         self.seat_route_dcity[hb, row, hk] = -1

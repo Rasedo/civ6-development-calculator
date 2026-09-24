@@ -2538,9 +2538,8 @@ export function seatPhase(state: GameState): void {
         else if (r.walkLeg === 1 && r.walkTile === originC) r.walkLeg = 0;
       }
       // PLUNDER, real Civ 6: a unit hostile to the route's owner standing on
-      // the Trader's tile destroys the route AND its Trader, and a MAJOR
-      // raider banks the gold (a barbarian or city-state raider has no
-      // treasury here — seatOf answers majors only).
+      // the Trader's tile destroys the route AND its Trader, and the raider's
+      // seat banks the gold — a major, or a city-state into its own treasury.
       {
         const plundered = new Set<TradeRoute>();
         for (const r of routes) {
