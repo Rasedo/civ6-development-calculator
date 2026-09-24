@@ -6155,15 +6155,13 @@ class SimSeats:
         return int(at[0]) if at.numel() else -1
 
     def _most_advanced_strategic(self, b: int, row: int) -> int:
-        """The most advanced strategic this seat can actually use.
-
-        CIV6 says the most advanced REVEALED, and neither engine models
-        resource reveal, so this reads "the most advanced one with a live
-        source", falling back to slot 0. The stockpile's slot order IS era
-        order. `mostAdvancedStrategic`'s twin, and the ONE model choice in
-        the install's own subtype table."""
+        """The most advanced strategic this seat can actually use: the most
+        advanced one with a live, improved source it can SEE (`_res_hidden`,
+        the revealing tech), falling back to slot 0. The stockpile's slot
+        order IS era order. `mostAdvancedStrategic`'s twin, and the ONE model
+        choice in the install's own subtype table."""
         owned = ((self.tile_seat[b] == row) & ~self.pillaged[b]
-                 & (self.improvement[b] == self.res_imp[b]))
+                 & (self.improvement[b] == self.res_imp[b]) & ~self._res_hidden(row)[b])
         slot = 0
         for k, rid in enumerate(self._strat_rid):
             if k >= self.civ_stockpile.shape[2]:

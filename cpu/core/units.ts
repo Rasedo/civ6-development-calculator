@@ -45,7 +45,7 @@ import {
   attacksLeftOf, attacksPerTurn, drawPromoOffer, promoCount, promoFirstUse, promoFlag, promoReady,
   promoValue, promoValueFor, stepAttacksLeft, XP_PER_LEVEL,
 } from './promotions';
-import { logXpWrite, logPopWrite } from './difflog';
+import { logXpWrite, logPopWrite, logStockWrite } from './difflog';
 import { dedicationEvent, goldenMoveBonus } from './eras';
 import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -2353,6 +2353,7 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
       const slot = mostAdvancedStrategic(state, unit.seat);
       const bank = (owner.stockpile ??= emptyStockpile());
       bank[slot] = (bank[slot] ?? 0) + p.amount;
+      logStockWrite(state.turn, unit.seat, slot, 'gh', bank[slot]);
       break;
     }
   }
