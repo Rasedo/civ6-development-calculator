@@ -60,7 +60,7 @@ def test_catalog(sim) -> None:
         assert rows <= rd.promo_cols, f"class {rd.promo_classes[c]} overflows the PROMOTE head"
     # every civilian chassis but the Apostle's and the Rock Band's promotes from nothing
     for t in range(sim.NU):
-        if bool(sim._type_civilian[t]) and t not in (sim._apostle_idx, getattr(sim, "_inquisitor_idx", -1), sim._band_idx):
+        if bool(sim._type_civilian[t]) and t not in (sim._apostle_idx, sim._inquisitor_idx, sim._band_idx):
             assert int(rd.u_promo_class[t]) < 0, f"unit type {t} is a civilian with a promotion tree"
     print(f"  catalog OK — {n} classes, {int(rd.promo_rows.sum())} rows, head {rd.promo_cols} wide")
 

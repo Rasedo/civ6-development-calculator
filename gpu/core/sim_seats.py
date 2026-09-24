@@ -256,7 +256,7 @@ class SimSeats:
             has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
             has_q_e = (self._q_holds(row, self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
             ovr.append((self._eng_idx, ~(has_alive_e | has_q_e) & self._seat_engineer_job_mask(row).any(dim=1)))
-        if getattr(self, "_archaeologist_idx", -1) >= 0:
+        if self._archaeologist_idx >= 0:
             # `_trainable_units` already asks for the museum's free slot; the
             # queue is what it cannot see, so refuse a second one in flight.
             has_alive_a = (self.major_unit_alive & (self.major_unit_seat == row)
@@ -1674,7 +1674,7 @@ class SimSeats:
         does not is exactly what one number hides. `disc` is post-DISCOUNT and
         pre-VARIANT on BOTH engines: a printed term the two sides spell
         differently shows a disagreement neither of them has."""
-        if not getattr(self, "_log_diff", False):
+        if not self._log_diff:
             return
         for _b in range(self.B):
             _d, _v, _a = float(disc[_b]), float(varied[_b]), float(add[_b])
@@ -2089,7 +2089,7 @@ class SimSeats:
             acost = self._faith_price(row, self._unit_faith_cost(row, self._apostle_idx))
             a_ok = founded & (n_a < self._apostle_cap) & self._afford(self.civ_faith[:, row], acost) & elig_t.any(dim=1)
             a_j = torch.where(a_ok, first_t, a_j)
-        if getattr(self, "_inquisitor_idx", -1) >= 0:
+        if self._inquisitor_idx >= 0:
             n_q = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._inquisitor_idx)).sum(dim=1)
             qcost = self._faith_price(row, self._unit_faith_cost(row, self._inquisitor_idx))
             q_ok = (founded & self.civ_inquisition[:, row] & (n_q < self._inquisitor_cap)
@@ -2206,7 +2206,7 @@ class SimSeats:
         B, dev = self.B, self.device
         ok = torch.zeros(B, dtype=torch.bool, device=dev)
         slot = torch.full((B,), -1, dtype=torch.long, device=dev)
-        if getattr(self, "_naturalist_idx", -1) < 0:
+        if self._naturalist_idx < 0:
             return ok, slot
         civ_i = int(self._type_civic[self._naturalist_idx])
         if civ_i < 0:
@@ -2234,7 +2234,7 @@ class SimSeats:
         B, dev = self.B, self.device
         ok = torch.zeros(B, dtype=torch.bool, device=dev)
         slot = torch.full((B,), -1, dtype=torch.long, device=dev)
-        if getattr(self, "_band_idx", -1) < 0:
+        if self._band_idx < 0:
             return ok, slot
         civ_i = int(self._type_civic[self._band_idx])
         if civ_i < 0:
@@ -2671,7 +2671,7 @@ class SimSeats:
                     self._offer_apostle_promos(row, landed_a)
                     self._patron_saint(row, landed_a, jr)
                     bought_relig = bought_relig | landed_a
-            if getattr(self, "_inquisitor_idx", -1) >= 0:
+            if self._inquisitor_idx >= 0:
                 n_live_q = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._inquisitor_idx)).sum(dim=1)
                 qcost = self._faith_price(row, self._unit_faith_cost(row, self._inquisitor_idx))
                 buy_q = (base_t & (rel_kind == 11) & ~bought_relig & self.civ_inquisition[:, row]
@@ -2719,7 +2719,7 @@ class SimSeats:
                     _pop_m = self.city_pop[bidx, row, jm]
                     self.city_pop[bidx, row, jm] = torch.where(landed_sl, (_pop_m - 1).clamp(min=1), _pop_m)
         n_kind, n_j = self._driven_buy_nat.pop(row) if row in self._driven_buy_nat else (None, None)
-        if n_kind is not None and n_j is not None and getattr(self, "_naturalist_idx", -1) >= 0:
+        if n_kind is not None and n_j is not None and self._naturalist_idx >= 0:
             # CIV6: the Naturalist "can only be purchased with Faith in any
             # city" — its own cost IS the faith price, like the religious
             # units', with no Holy Site and no dedication in the way.
@@ -2740,7 +2740,7 @@ class SimSeats:
             # buys ride BESIDE the one gold purchase, never inside it.
             _dt, _dsi = self._driven_buy_dist.pop(row)
             self._purchase_district(row, active & ext & (_dt >= 0) & (_dsi >= 0), _dt, _dsi, True)
-        if row in self._driven_buy_band and getattr(self, "_band_idx", -1) >= 0:
+        if row in self._driven_buy_band and self._band_idx >= 0:
             b_j = self._driven_buy_band.pop(row)
             # CIV6 (Rock Band): FAITH only, behind the Cold War civic, at a
             # PROGRESSIVE price — each band already bought raises the next.
@@ -3717,7 +3717,7 @@ class SimSeats:
                                       * self._power_cells(row))
         self.civ_fuel_short[:, row] = bill > stock
         stock.copy_((stock - bill).clamp(min=0))
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _k in range(stock.shape[1]):
                 self._log_stock(range(self.B), row, _k, "up")
 
@@ -4417,7 +4417,7 @@ class SimSeats:
             return
         rs = self._rel_strength
         nrow = self.n_majors
-        _initiators = [i for i in (self._apostle_idx, getattr(self, "_inquisitor_idx", -1)) if i >= 0]
+        _initiators = [i for i in (self._apostle_idx, self._inquisitor_idx) if i >= 0]
         sw = int(self._theo_swing)
         # Only slots that hold a live APOSTLE somewhere in the batch can open a
         # fight, and nothing spawns one mid-pass — so this set is a superset of
@@ -8912,7 +8912,7 @@ class SimSeats:
                 self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_rate)
         cap = self._stockpile_cap(row).unsqueeze(1)
         bank.copy_(torch.minimum(bank, cap))
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _k in range(bank.shape[1]):
                 self._log_stock(range(self.B), row, _k, "ac")
 
@@ -9414,7 +9414,7 @@ class SimSeats:
         # ...and the MINOR section is out: its cities carry id -1 by
         # construction and `computeCityStats` never walks them, so a line
         # from here can only print against `(no line)`.
-        if getattr(self, "_log_diff", False) and row < self.n_majors:
+        if self._log_diff and row < self.n_majors:
             _wwv = self._ww_penalty(row, torch.float64)
             for _ab in range(self.B):
                 _ww1 = float(_wwv[_ab])
@@ -10801,7 +10801,7 @@ class SimSeats:
         Value / 100) + (Album Sales / 100))", the burst landing on the
         civilization "within whose borders it takes place". The two best tiers
         promote the band, the two worst end it."""
-        if not bool(mask.any()) or getattr(self, "_band_idx", -1) < 0:
+        if not bool(mask.any()) or self._band_idx < 0:
             return
         tc = tile.clamp(min=0)
         s1 = slot.unsqueeze(1)
@@ -10906,7 +10906,7 @@ class SimSeats:
         legal rhombus in the anchor's neighbour order (by TILE index, which is
         the order TS sorts them in) is taken, its four tiles join the park,
         and the chassis spends a ParkCharge (consumed at 0)."""
-        if not bool(mask.any()) or getattr(self, "_naturalist_idx", -1) < 0:
+        if not bool(mask.any()) or self._naturalist_idx < 0:
             return
         tc = tile.clamp(min=0).unsqueeze(1)                 # [B, 1]
         quad = self._park_cluster(tc)                       # [B, 1, 6, 4]
@@ -11888,7 +11888,7 @@ class SimSeats:
         """`logStockWrite`'s twin — WHICH writer moved this seat's strategic
         bank, keyed on the seat, the turn and the SLOT (the `rid` order both
         engines share). `rows` are batch rows, `slot` one int or per-row."""
-        if not getattr(self, "_log_diff", False):
+        if not self._log_diff:
             return
         _r = rows.reshape(-1).tolist() if torch.is_tensor(rows) else list(rows)
         _s = slot.reshape(-1).tolist() if torch.is_tensor(slot) else [int(slot)]
@@ -11905,7 +11905,7 @@ class SimSeats:
         """`logPopWrite`'s twin — WHICH writer moved this city's count, keyed
         on the CENTRE TILE, the one name both engines share for a city (an id
         is a per-seat counter and the two engines number slots differently)."""
-        if not getattr(self, "_log_diff", False):
+        if not self._log_diff:
             return
         _r = rows.reshape(-1).tolist() if torch.is_tensor(rows) else [int(rows)]
         _c = cols.reshape(-1).tolist() if torch.is_tensor(cols) else [int(cols)]
@@ -11925,7 +11925,7 @@ class SimSeats:
         """`logXpWrite`'s twin — WHICH writer moved this pool, keyed on (seat,
         turn, tile, chassis) so the two engines pair on the unit rather than on
         a slot they number differently. `slots` are MERGED slots."""
-        if not getattr(self, "_log_diff", False):
+        if not self._log_diff:
             return
         _r = rows.reshape(-1).tolist() if torch.is_tensor(rows) else [int(rows)]
         _s = slots.reshape(-1).tolist() if torch.is_tensor(slots) else [int(slots)]
@@ -14038,7 +14038,7 @@ class SimSeats:
             # city-state candidate that PASSED the gates, so a disagreeing pair
             # names the term. A candidate one engine prints and the other does
             # not is a gate, not a magnitude.
-            if getattr(self, "_log_diff", False):
+            if self._log_diff:
                 _met_cs = self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]
                 _rch_cs = reach.gather(2, csc.unsqueeze(1).expand(B, RC, S))
                 for _rb in range(B):

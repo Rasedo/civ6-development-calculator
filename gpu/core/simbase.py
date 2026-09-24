@@ -515,7 +515,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         war_weariness=r.get("warWeariness", {}),
         trade=r.get("trade", {}),
         eras=r.get("eras", {}),
-        actions=r.get("actions", {}),
+        actions=r["actions"],
     )
 
 

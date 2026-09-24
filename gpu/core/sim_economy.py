@@ -99,7 +99,7 @@ class SimEconomy:
         # the multiplier has to clear any id this engine can mint: need is
         # tens at most and halves at worst, so 2**20 leaves a 2**19 gap
         # between adjacent need levels and stays exact in f64.
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _rb in range(B):
                 _rr = [self._lux_k] * int(rounds[_rb])
                 _rr += [int(gp_reach[_rb, _i]) for _i in range(int(gp_n[_rb]))]
@@ -2904,7 +2904,7 @@ class SimEconomy:
                                  amt, _pl))
                     acc = acc + amt * _pl
                 v = torch.floor(acc)
-                if getattr(self, "_log_diff", False):
+                if self._log_diff:
                     _nm3 = self.districts_cat[di].get('id')
                     for _b in range(self.B):
                         for _t in (self.district[_b] == di).nonzero().flatten().tolist():
@@ -5135,7 +5135,7 @@ class SimEconomy:
             adjv = self._district_adj_seat(row, di).gather(1, t_d.clamp(min=0)).double()  # (memoised)
             add = torch.where(dlive[:, :, di], adjv, torch.zeros_like(adjv))
             dist_y[:, :, yc] = dist_y[:, :, yc] + add
-            if getattr(self, "_log_diff", False):
+            if self._log_diff:
                 # the PRE-FLOOR sum at the same tile+type key TS prints, from
                 # the WALK where the tile is known — the type-only helper
                 # could not name a tile and its log never paired.
@@ -5149,7 +5149,7 @@ class SimEconomy:
                             continue
                         self._diff_events.setdefault(_b, []).append(
                             f"dr:{_t}:{_nm2} raw{float(_raw[_b, _t]):.3f}")
-            if getattr(self, "_log_diff", False):
+            if self._log_diff:
                 _nm = dd.get('id')
                 _yn = ('food', 'production', 'gold', 'science', 'culture', 'faith')[yc]
                 for _b in range(B):

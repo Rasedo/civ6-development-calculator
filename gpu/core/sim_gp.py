@@ -677,7 +677,7 @@ class SimGp:
             # THE GRANT, stamped. `gpLuxuries` compares clean at the dump
             # while the walk reads different counts, so what the log still
             # has to separate is a whole-turn offset from a double grant.
-            if getattr(self, "_log_diff", False):
+            if self._log_diff:
                 for _gb in r.tolist():
                     self._diff_events.setdefault(_gb, []).append(
                         f"g:{int(self._ROW_SEAT[row])} t{int(self.turn)}"

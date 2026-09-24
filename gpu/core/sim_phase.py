@@ -675,7 +675,7 @@ class SimPhase:
         self.city_growth[bidx, row, col] = torch.where(act, nxt, old).to(old.dtype)
         pop = self.city_pop[bidx, row, col] + grow.long()
         self.city_pop[bidx, row, col] = torch.where(starve, (pop - 1).clamp(min=1), pop)
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _t, _m in (("gr", grow), ("sv", starve)):
                 _w = _m.nonzero(as_tuple=True)[0]
                 if _w.numel():
@@ -1456,7 +1456,7 @@ class SimPhase:
                     self._spawn_unit(row, _vw, _vat, _vu)
                 if _vnav:
                     _hull = self._best_trainable_naval(row)
-                    if getattr(self, "_log_diff", False):
+                    if self._log_diff:
                         for _hb in _vw.nonzero(as_tuple=True)[0].tolist():
                             self._diff_events.setdefault(_hb, []).append(
                                 f"nv:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
@@ -1762,7 +1762,7 @@ class SimPhase:
                     _ok = _ok & ~self.war[:, row, _o]
                 _n = _n + _ok.double()
             faith_sum = faith_sum + _pw.double() * _n * _pa
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _b in range(self.B):
                 self._diff_events.setdefault(_b, []).append(
                     f"fi:{int(self._ROW_SEAT[row])}:{int(self.turn)}"

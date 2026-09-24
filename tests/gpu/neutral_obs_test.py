@@ -101,7 +101,7 @@ def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
         assert list(u) == [f for f, _k in neutral.UNIT_FIELDS] and plain(u), f"{where}: unit row {u}"
         for f in ("tile", "type", "charges", "gpAt"):
             assert u[f] == int(ctx[f][b, k]), f"{where}: unit {k}.{f} = {u[f]} vs {int(ctx[f][b, k])}"
-        cls = int(sim._gp_cls_of(torch.tensor([u["type"]]))[0]) if getattr(sim, "_A_GP", -1) >= 0 else -1
+        cls = int(sim._gp_cls_of(torch.tensor([u["type"]]))[0]) if sim._A_GP >= 0 else -1
         if cls >= 0 and u["gpAt"] >= 0:
             at = min(u["gpAt"], sim._gp_site.shape[1] - 1)
             assert (u["gpSite"], u["gpArg"]) == (int(sim._gp_site[cls, at]), int(sim._gp_site_district[cls, at])), \

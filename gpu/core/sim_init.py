@@ -49,11 +49,10 @@ class SimInit:
         # 0 the head, -1 an empty slot. `_q_*` is the only way in or out.
         self.QD = max(int(rules.seats.get("productionQueueMax", 1)), 1)
         self.S = int(f0.get("cityStateMax", 0))
-        # FOG IS LIVE in units mode (fogOfWar rides the fixture; older
-        # fixtures predate the key and fall back to unitsMode — the creation
-        # rule). Reveals gate on this exactly as TS's revealAround gates on
-        # state.fogOfWar, so a fog-off world accrues NO explored state.
-        self.fog_of_war = bool(f0.get("fogOfWar", f0.get("unitsMode", 0)))
+        # FOG rides the fixture (`fogOfWar`). Reveals gate on this exactly as
+        # TS's revealAround gates on state.fogOfWar, so a fog-off world
+        # accrues NO explored state.
+        self.fog_of_war = bool(f0["fogOfWar"])
         _rcp, _sp = self.RC, max(self.S, 1)
         self._CITY_MINOR0 = self.n_majors
         # THE CITY PLANES' ROWS: the majors, the city-state pad, then ONE row
@@ -1663,126 +1662,86 @@ class SimInit:
         # The unit-action enum, exported from cpu/core/unitActions.ts
         # (unitActionNames). Every dispatch indexes BY NAME, never by a
         # hardcoded column number.
-        self._act_names = list((rules.actions or {}).get("unit", []))
+        self._act_names = list(rules.actions["unit"])
         self._act = {n: i for i, n in enumerate(self._act_names)}
-        if self._act_names:
-            self._snipe_on = "SNIPE_0" in self._act
-            self._snipe3_on = "SNIPE3_0" in self._act
-            self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # religious spread head
-            self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
-            self._A_EXCAVATE = self._act.get("EXCAVATE", -1)  # the archaeologist's
-            self._A_PARK = self._act.get("PARK", -1)          # the naturalist's
-            self._A_PROMOTE = self._act.get("PROMOTE_0", -1)  # the level-up head
-            self._A_CONDEMN = self._act.get("CONDEMN_0", -1)  # vs an adjacent religious unit
-            self._A_HERESY = self._act.get("REMOVE_HERESY", -1)
-            self._A_INQUISITION = self._act.get("LAUNCH_INQUISITION", -1)
-            self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
-            self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
-            self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
-            self._A_NUKE = self._act.get("NUKE_0_0", -1)   # one head per device row
-            self._A_AIR_PILLAGE = self._act.get("AIR_PILLAGE_0", -1)
-            self._A_REBASE = self._act.get("REBASE_0", -1)
-            self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
-            self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
-            self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
-            self._A_RAIL = self._act.get("BUILD_RAILROAD", -1)       # ...and its second route
-            self._A_CLEAN = self._act.get("CLEAN_FALLOUT", -1)       # a build charge against the fallout
-            self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
-            self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
-            self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
-            self._A_BOOST = self._act.get("BOOST_PROJECT", -1)       # the Royal Society's
-            self._A_FORM_UP = self._act.get("FORM_UP_0", -1)          # merge into a same-type neighbour
-            self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
-            self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
-            self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
-            # CIV6 (Builder): the resource goes for its own lump
-            self._A_HARVEST = self._act.get("HARVEST", -1)
-            # CIV6 (The First Emperor): a charge into the wonder underfoot
-            self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
-            # CIV6 (Mountain Tunnel): the portal step, 2 Movement
-            self._A_PORTAL = self._act.get("PORTAL", -1)
-            self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
-            _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
-            assert _apc in (0, self._air_strike_cols), (
-                f"the air pillage head is {_apc} wide, the strike head {self._air_strike_cols}")
-            self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
-            self._nuke_cols = int((rules.nuclear or {}).get("nukeCols", 0))
-            _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
-            assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
-                f"the nuclear head is {_nkc} columns over a width of {self._nuke_cols}")
-            _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
-            _smc = sum(1 for n in self._act_names if n.startswith("SPY_MISSION_"))
-            assert _stc == self._spy_travel_cols and _smc == self._n_spy_missions, (
-                f"spy heads are {_stc}/{_smc} wide, the wire says "
-                f"{self._spy_travel_cols}/{self._n_spy_missions}")
-            _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) \
-                + (18 if self._snipe3_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
-                + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
-                + (1 if self._A_PARK >= 0 else 0) \
-                + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
-                + (6 if self._A_CONDEMN >= 0 else 0) \
-                + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
-                + (1 if self._A_UPGRADE >= 0 else 0) \
-                + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
-                + (1 if self._A_RAIL >= 0 else 0) \
-                + (1 if self._A_CLEAN >= 0 else 0) \
-                + (1 if self._A_REMOVE_IMP >= 0 else 0) \
-                + (1 if self._A_HARVEST >= 0 else 0) \
-                + (1 if self._A_WONDER_CHARGE >= 0 else 0) \
-                + (1 if self._A_PORTAL >= 0 else 0) \
-                + (1 if self._A_GP >= 0 else 0) \
-                + (1 if self._A_PERFORM >= 0 else 0) \
-                + (1 if self._A_BOOST >= 0 else 0) \
-                + (6 if self._A_FORM_UP >= 0 else 0) \
-                + (1 if self._A_ESCORT >= 0 else 0) \
-                + (1 if self._A_UNESCORT >= 0 else 0) \
-                + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc
-            assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
-            self._A_CHOP = self._act["CHOP"]
-            self._A_REPAIR = self._act["REPAIR"]
-            self._A_PILLAGE = self._act["PILLAGE"]
-            self._A_SNIPE = self._act.get("SNIPE_0", self._A_PILLAGE + 1)
-            self._A_SNIPE3 = self._act.get("SNIPE3_0", -1)
-            self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
-        else:
-            self._A_CHOP, self._A_REPAIR = 16, 17
-            self._A_PILLAGE = 13 + len(ids) + 2
-            self._A_SNIPE = self._A_PILLAGE + 1
-            self._A_SPREAD = -1  # no names -> no spread columns
-            self._A_FOUND = -1  # no names -> no FOUND column
-            self._A_EXCAVATE = -1
-            self._A_PARK = -1
-            self._A_REMOVE_IMP = -1
-            self._A_HARVEST = -1
-            self._A_WONDER_CHARGE = -1
-            self._A_PORTAL = -1
-            self._A_PERFORM = -1
-            self._A_BOOST = -1
-            self._A_FORM_UP = -1
-            self._A_ESCORT = -1
-            self._A_UNESCORT = -1
-            self._A_PROMOTE = -1
-            self._A_CONDEMN = -1
-            self._A_HERESY = -1
-            self._A_INQUISITION = -1
-            self._A_HEATHEN = -1
-            self._A_UPGRADE = -1
-            self._A_AIR_STRIKE = -1
-            self._A_NUKE = -1
-            self._nuke_cols = 0
-            self._A_AIR_PILLAGE = -1
-            self._A_REBASE = -1
-            self._A_SPY_TRAVEL = -1
-            self._A_SPY_MISSION = -1
-            self._A_ROAD = -1
-            self._A_FINISH = -1
-            self._A_GP = -1
-            self._air_strike_cols = 0
-            self._air_rebase_cols = 0
-            self._snipe_on = False
-            self._snipe3_on = False
-            self._A_SNIPE3 = -1
-            self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
+        self._snipe_on = "SNIPE_0" in self._act
+        self._snipe3_on = "SNIPE3_0" in self._act
+        self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # religious spread head
+        self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
+        self._A_EXCAVATE = self._act.get("EXCAVATE", -1)  # the archaeologist's
+        self._A_PARK = self._act.get("PARK", -1)          # the naturalist's
+        self._A_PROMOTE = self._act.get("PROMOTE_0", -1)  # the level-up head
+        self._A_CONDEMN = self._act.get("CONDEMN_0", -1)  # vs an adjacent religious unit
+        self._A_HERESY = self._act.get("REMOVE_HERESY", -1)
+        self._A_INQUISITION = self._act.get("LAUNCH_INQUISITION", -1)
+        self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
+        self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
+        self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
+        self._A_NUKE = self._act.get("NUKE_0_0", -1)   # one head per device row
+        self._A_AIR_PILLAGE = self._act.get("AIR_PILLAGE_0", -1)
+        self._A_REBASE = self._act.get("REBASE_0", -1)
+        self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
+        self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
+        self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
+        self._A_RAIL = self._act.get("BUILD_RAILROAD", -1)       # ...and its second route
+        self._A_CLEAN = self._act.get("CLEAN_FALLOUT", -1)       # a build charge against the fallout
+        self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
+        self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
+        self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
+        self._A_BOOST = self._act.get("BOOST_PROJECT", -1)       # the Royal Society's
+        self._A_FORM_UP = self._act.get("FORM_UP_0", -1)          # merge into a same-type neighbour
+        self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
+        self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
+        self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
+        # CIV6 (Builder): the resource goes for its own lump
+        self._A_HARVEST = self._act.get("HARVEST", -1)
+        # CIV6 (The First Emperor): a charge into the wonder underfoot
+        self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
+        # CIV6 (Mountain Tunnel): the portal step, 2 Movement
+        self._A_PORTAL = self._act.get("PORTAL", -1)
+        self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
+        _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
+        assert _apc in (0, self._air_strike_cols), (
+            f"the air pillage head is {_apc} wide, the strike head {self._air_strike_cols}")
+        self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
+        self._nuke_cols = int((rules.nuclear or {}).get("nukeCols", 0))
+        _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
+        assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
+            f"the nuclear head is {_nkc} columns over a width of {self._nuke_cols}")
+        _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
+        _smc = sum(1 for n in self._act_names if n.startswith("SPY_MISSION_"))
+        assert _stc == self._spy_travel_cols and _smc == self._n_spy_missions, (
+            f"spy heads are {_stc}/{_smc} wide, the wire says "
+            f"{self._spy_travel_cols}/{self._n_spy_missions}")
+        _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) \
+            + (18 if self._snipe3_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
+            + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
+            + (1 if self._A_PARK >= 0 else 0) \
+            + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
+            + (6 if self._A_CONDEMN >= 0 else 0) \
+            + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
+            + (1 if self._A_UPGRADE >= 0 else 0) \
+            + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
+            + (1 if self._A_RAIL >= 0 else 0) \
+            + (1 if self._A_CLEAN >= 0 else 0) \
+            + (1 if self._A_REMOVE_IMP >= 0 else 0) \
+            + (1 if self._A_HARVEST >= 0 else 0) \
+            + (1 if self._A_WONDER_CHARGE >= 0 else 0) \
+            + (1 if self._A_PORTAL >= 0 else 0) \
+            + (1 if self._A_GP >= 0 else 0) \
+            + (1 if self._A_PERFORM >= 0 else 0) \
+            + (1 if self._A_BOOST >= 0 else 0) \
+            + (6 if self._A_FORM_UP >= 0 else 0) \
+            + (1 if self._A_ESCORT >= 0 else 0) \
+            + (1 if self._A_UNESCORT >= 0 else 0) \
+            + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc
+        assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
+        self._A_CHOP = self._act["CHOP"]
+        self._A_REPAIR = self._act["REPAIR"]
+        self._A_PILLAGE = self._act["PILLAGE"]
+        self._A_SNIPE = self._act.get("SNIPE_0", self._A_PILLAGE + 1)
+        self._A_SNIPE3 = self._act.get("SNIPE3_0", -1)
+        self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1

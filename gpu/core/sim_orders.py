@@ -57,40 +57,40 @@ class SimOrders:
         # guard-sync storm into this ONE sync.
         _ab = torch.where(_cmd, actions[:, :_n], torch.full_like(actions[:, :_n], -1))
         _no = torch.zeros_like(_cmd)
-        _fc = getattr(self, "_A_FOUND", -1)
-        _sn = getattr(self, "_A_SNIPE", -1) if getattr(self, "_snipe_on", False) else -1
-        _sn3 = getattr(self, "_A_SNIPE3", -1) if getattr(self, "_snipe3_on", False) else -1
-        _sp = getattr(self, "_A_SPREAD", -1)
-        _xc = getattr(self, "_A_EXCAVATE", -1)
-        _pk = getattr(self, "_A_PARK", -1)
-        _pm = getattr(self, "_A_PROMOTE", -1)
-        _cn = getattr(self, "_A_CONDEMN", -1)
-        _hx = getattr(self, "_A_HERESY", -1)
-        _lq = getattr(self, "_A_INQUISITION", -1)
-        _hn = getattr(self, "_A_HEATHEN", -1)
-        _ug = getattr(self, "_A_UPGRADE", -1)
-        _ar = getattr(self, "_A_AIR_STRIKE", -1)
-        _apc = getattr(self, "_A_AIR_PILLAGE", -1)
-        _rbc = getattr(self, "_A_REBASE", -1)
+        _fc = self._A_FOUND
+        _sn = self._A_SNIPE if self._snipe_on else -1
+        _sn3 = self._A_SNIPE3 if self._snipe3_on else -1
+        _sp = self._A_SPREAD
+        _xc = self._A_EXCAVATE
+        _pk = self._A_PARK
+        _pm = self._A_PROMOTE
+        _cn = self._A_CONDEMN
+        _hx = self._A_HERESY
+        _lq = self._A_INQUISITION
+        _hn = self._A_HEATHEN
+        _ug = self._A_UPGRADE
+        _ar = self._A_AIR_STRIKE
+        _apc = self._A_AIR_PILLAGE
+        _rbc = self._A_REBASE
         _asw = self._air_strike_cols
         _rbw = self._air_rebase_cols
-        _stc = getattr(self, "_A_SPY_TRAVEL", -1)
-        _smc = getattr(self, "_A_SPY_MISSION", -1)
-        _rdc = getattr(self, "_A_ROAD", -1)
-        _rrc = getattr(self, "_A_RAIL", -1)
-        _cfc = getattr(self, "_A_CLEAN", -1)
-        _nkc = getattr(self, "_A_NUKE", -1)
-        _hvc = getattr(self, "_A_HARVEST", -1)
-        _wcc = getattr(self, "_A_WONDER_CHARGE", -1)
-        _ptc = getattr(self, "_A_PORTAL", -1)
+        _stc = self._A_SPY_TRAVEL
+        _smc = self._A_SPY_MISSION
+        _rdc = self._A_ROAD
+        _rrc = self._A_RAIL
+        _cfc = self._A_CLEAN
+        _nkc = self._A_NUKE
+        _hvc = self._A_HARVEST
+        _wcc = self._A_WONDER_CHARGE
+        _ptc = self._A_PORTAL
         _nkw = self._nuke_cols * self._n_devices
-        _fnc = getattr(self, "_A_FINISH", -1)
-        _gpc = getattr(self, "_A_GP", -1)
-        _pfc = getattr(self, "_A_PERFORM", -1)
-        _bpc = getattr(self, "_A_BOOST", -1)
-        _fuc = getattr(self, "_A_FORM_UP", -1)
-        _ecc = getattr(self, "_A_ESCORT", -1)
-        _uec = getattr(self, "_A_UNESCORT", -1)
+        _fnc = self._A_FINISH
+        _gpc = self._A_GP
+        _pfc = self._A_PERFORM
+        _bpc = self._A_BOOST
+        _fuc = self._A_FORM_UP
+        _ecc = self._A_ESCORT
+        _uec = self._A_UNESCORT
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
@@ -100,10 +100,10 @@ class SimOrders:
         # arriving mid-call still rebuilds it.
         _cart_fp = torch.zeros(0, dtype=torch.bool, device=dev)
         _cart = _cart_fp
-        _ic = [c for c in getattr(self, "_A_IMP", []) if c >= 0]
-        if getattr(self, "_A_REPAIR", -1) >= 0:
+        _ic = [c for c in self._A_IMP if c >= 0]
+        if self._A_REPAIR >= 0:
             _ic.append(self._A_REPAIR)
-        if getattr(self, "_A_REMOVE_IMP", -1) >= 0:
+        if self._A_REMOVE_IMP >= 0:
             _ic.append(self._A_REMOVE_IMP)
         _tab = torch.stack([
             _held.any(dim=0),
@@ -113,7 +113,7 @@ class SimOrders:
             ((_ab == _fc) if _fc >= 0 else _no).any(dim=0),                     # found
             ((((_ab >= _sn) & (_ab < _sn + 12)) if _sn >= 0 else _no)
              | (((_ab >= _sn3) & (_ab < _sn3 + 18)) if _sn3 >= 0 else _no)).any(dim=0),  # snipe
-            ((_ab == getattr(self, "_A_CHOP", -1)) if getattr(self, "_A_CHOP", -1) >= 0 else _no).any(dim=0),
+            ((_ab == self._A_CHOP) if self._A_CHOP >= 0 else _no).any(dim=0),
             (torch.isin(_ab, torch.tensor(_ic, dtype=_ab.dtype, device=dev)) if _ic else _no).any(dim=0),
             ((_ab == self._A_PILLAGE) if self._act_names and self._A_PILLAGE > 0 else _no).any(dim=0),
             (((_ab >= _sp) & (_ab < _sp + 7)) if _sp >= 0 else _no).any(dim=0),  # spread
@@ -338,7 +338,7 @@ class SimOrders:
                     if bool(okc.any()):
                         self._condemn_heretic(row, okc, ctc, rel, sc)
 
-            if _rk_heresy[n] and _hx >= 0 and getattr(self, "_inquisitor_idx", -1) >= 0:
+            if _rk_heresy[n] and _hx >= 0 and self._inquisitor_idx >= 0:
                 _cslot = self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1)
                 hxm = (act & (a == _hx) & (utp == self._inquisitor_idx) & (u_charges > 0)
                        & (_cslot >= 0)
@@ -365,7 +365,7 @@ class SimOrders:
                     self.unit_charges[hr, sc[hr]] -= 1
                     self.unit_mp[hr, sc[hr]] = 0
 
-            if _rk_inquis[n] and _lq >= 0 and getattr(self, "_apostle_idx", -1) >= 0:
+            if _rk_inquis[n] and _lq >= 0 and self._apostle_idx >= 0:
                 lqm = (act & (a == _lq) & (utp == self._apostle_idx)
                        & (u_charges >= self._launch_inquisition_charges)
                        & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row)
@@ -711,7 +711,7 @@ class SimOrders:
                 # that body at all, so a log inside it can only ever print the
                 # steps that succeeded. This is where `ok` is decided, and it
                 # is the twin of the `tileFreeForUnit` gate TS logs at.
-                if getattr(self, "_log_diff", False):
+                if self._log_diff:
                     for _sb in range(self.B):
                         if not bool(mv[_sb]) or int(tgt[_sb]) < 0 or int(here[_sb]) < 0:
                             continue
@@ -849,7 +849,7 @@ class SimOrders:
                         # when it fired.
                         self._hostile_ranged_strike(one, tgt_s, "major", v, row=row)
 
-                if getattr(self, "_A_SNIPE3", -1) >= 0:
+                if self._A_SNIPE3 >= 0:
                     snp3 = act & (a >= self._A_SNIPE3) & (a < self._A_SNIPE3 + 18) & ~is_civ
                     if bool(snp3.any()):
                         tgt_3 = self.ring3[hc].gather(1, (a - self._A_SNIPE3).clamp(min=0, max=17).unsqueeze(1)).squeeze(1)
@@ -1120,9 +1120,9 @@ class SimOrders:
                 # REMOVE_IMPROVEMENT — CIV6 (Builder / Military Engineer):
                 # "Can Remove Tile Improvements (costs no charge)". GONE, not
                 # pillaged; based aircraft scatter; the turn is spent.
-                if getattr(self, "_A_REMOVE_IMP", -2) in _acmd:
+                if self._A_REMOVE_IMP in _acmd:
                     _rmv = (
-                        act & (a == getattr(self, "_A_REMOVE_IMP", -2))
+                        act & (a == self._A_REMOVE_IMP)
                         & (((utp == self._builder_idx) if self._builder_idx >= 0
                             else torch.zeros_like(act))
                            | ((utp == self._eng_idx) if self._eng_idx >= 0
@@ -1330,7 +1330,7 @@ class SimOrders:
                     _relig = torch.zeros_like(spx)
                     if self._missionary_idx >= 0:
                         _relig = _relig | (utp == self._missionary_idx)
-                    if getattr(self, "_apostle_idx", -1) >= 0:
+                    if self._apostle_idx >= 0:
                         _relig = _relig | (utp == self._apostle_idx)
                     dsp = (a - self._A_SPREAD).clamp(min=0)
                     tgt_sp = torch.where(
@@ -1652,7 +1652,7 @@ class SimOrders:
         mine = self.unit_alive & (self.unit_seat == row)
         upkeep = (self._unit_upkeep(row, self.unit_type) * mine.to(self.dtype)).sum(dim=1)
         upkeep = upkeep + self._wmd_upkeep(row)
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             for _b in range(self.B):
                 self._diff_events.setdefault(_b, []).append(
                     f"up:{int(self._ROW_SEAT[row])}:{int(self.turn)}"

@@ -195,7 +195,7 @@ class SimStep:
         # Cities row, and so does this. It rode the amenity walk once, which
         # never reaches a Free City on either engine, and therefore agreed
         # about every city except the one that differed.
-        if getattr(self, "_log_diff", False):
+        if self._log_diff:
             _rows = list(range(self.n_majors)) + [self.FREE_ROW]
             for _b in range(self.B):
                 _ev = self._diff_events.setdefault(_b, [])
