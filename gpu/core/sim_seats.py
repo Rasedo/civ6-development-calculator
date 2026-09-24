@@ -1389,10 +1389,7 @@ class SimSeats:
     def _row_plays(self, row: int, civ: str) -> torch.Tensor:
         """[B] bool — `civOf(state, seat) === civ` for one seat row, per game
         (the seeder draws each world's roster)."""
-        i = self._civ_idx(civ)
-        if i < 0 or row >= self.n_majors:
-            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        return self.row_civ[:, row] == i
+        return self._row_plays_idx(row, self._civ_idx(civ))
 
     def _b_cols(self, row: int) -> dict[str, torch.Tensor]:
         """The BUILDING COLUMNS one seat row actually builds, per game: the
@@ -1466,12 +1463,7 @@ class SimSeats:
     def _seat_plays(self, seat: torch.Tensor, civ: str) -> torch.Tensor:
         """bool, `seat`'s shape ([B] or [B, U]) — `_row_plays` per absolute
         seat; anything outside the major rows plays nothing."""
-        i = self._civ_idx(civ)
-        if i < 0:
-            return torch.zeros_like(seat, dtype=torch.bool)
-        r = seat.clamp(min=0, max=self.n_majors - 1).reshape(self.B, -1)
-        civ_at = self.row_civ.gather(1, r).reshape(seat.shape)
-        return (seat >= 0) & (seat < self.n_majors) & (civ_at == i)
+        return self._seat_plays_civ_idx(seat, self._civ_idx(civ))
 
     def _seat_plays_civ_idx(self, seat: torch.Tensor, civ: int) -> torch.Tensor:
         """`_seat_plays` by civilization INDEX rather than by name."""
@@ -7270,11 +7262,6 @@ class SimSeats:
         if row < self.n_majors:
             return self.civ_policies[:, row]
         return torch.zeros(self.B, self.civ_policies.shape[2], dtype=torch.bool, device=self.device)
-
-    def _seat_envoys(self, row: int) -> torch.Tensor:
-        """[B, S] long — what the 1/3/6 bonus tiers weigh, which is the
-        EFFECTIVE count (`envoysHere`), not the store."""
-        return self._envoys_here(row)
 
     def _seat_has_beliefs(self, row: int) -> bool:
         # only a major founds a pantheon or a religion; a minor's and the Free
@@ -13312,11 +13299,6 @@ class SimSeats:
             mb = mar_t[b]
             sb = bool(sea[b])
             sea_t = torch.where(mb, torch.full_like(land_t, self._trade_sea_range), land_t)
-
-            def leg_ok(a: int, c: int) -> bool:
-                rng = self._trade_sea_range if sb and bool(mb[a]) and bool(mb[c]) else self._trade_range
-                return int(self.pair_dist[a, c]) <= rng
-
             for i in range(RC):
                 if not bool(self.city_alive[b, row, i]):
                     continue
@@ -13330,7 +13312,7 @@ class SimSeats:
                     if depth[a] >= self._route_chain_max:
                         continue
                     for p in use:
-                        if p not in depth and leg_ok(a, p):
+                        if p not in depth and self._trade_leg_ok(a, p, sb, mb):
                             depth[p] = depth[a] + 1
                             reached.append(p)
                             frontier.append(p)
@@ -13338,6 +13320,10 @@ class SimSeats:
                     rp = sea_t if sb and bool(mb[p]) else land_t
                     ok[b, i] |= self.pair_dist[p].to(torch.long) <= rp
         return ok
+
+    def _trade_leg_ok(self, a: int, c: int, sb: bool, mb: torch.Tensor) -> bool:
+        rng = self._trade_sea_range if sb and bool(mb[a]) and bool(mb[c]) else self._trade_range
+        return int(self.pair_dist[a, c]) <= rng
 
     def _route_chain_of(self, b: int, row: int, origin: int, dest: int) -> list[int]:
         """`routeChain` for ONE game row — the FIFO walk over the seat's own
@@ -13349,17 +13335,12 @@ class SimSeats:
                  if int(p) != origin]
         mb = self._centre_maritime_map()[b]
         sb = bool(self._trade_water_level(row)[b] > 0)
-
-        def leg_ok(a: int, c: int) -> bool:
-            rng = self._trade_sea_range if sb and bool(mb[a]) and bool(mb[c]) else self._trade_range
-            return int(self.pair_dist[a, c]) <= rng
-
         parent = {origin: -1}
         depth = {origin: 0}
         queue = [origin]
         while queue:
             a = queue.pop(0)
-            if leg_ok(a, dest):
+            if self._trade_leg_ok(a, dest, sb, mb):
                 chain: list[int] = []
                 x = a
                 while x != origin:
@@ -13369,7 +13350,7 @@ class SimSeats:
             if depth[a] >= self._route_chain_max:
                 continue
             for p in posts:
-                if p not in parent and leg_ok(a, p):
+                if p not in parent and self._trade_leg_ok(a, p, sb, mb):
                     parent[p] = a
                     depth[p] = depth[a] + 1
                     queue.append(p)
