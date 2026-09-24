@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from .simbase import *  # noqa: F401,F403 — the public module surface
-from .simbase import _MUTABLE  # noqa: F401
 from .sim_init import SimInit
 from .sim_economy import SimEconomy
 from .sim_masks import SimMasks

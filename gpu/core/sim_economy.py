@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
+from . import simbase
 
 #: the work-ranking key a LOCKED plot takes. An exact f64 integer four decades
 #: above the widest score key, so `base - tileIndex` stays exact and the

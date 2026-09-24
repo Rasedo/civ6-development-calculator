@@ -3,8 +3,7 @@ from __future__ import annotations
 import sys
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers
-from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
+from . import simbase
 
 
 class SimMasks:

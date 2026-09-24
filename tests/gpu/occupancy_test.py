@@ -15,7 +15,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from core.engine import BARB_SEAT  # seat-keyed occupancy
+from core.simbase import BARB_SEAT  # seat-keyed occupancy
 from warmup import developed, settle_all
 
 

@@ -35,7 +35,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.simbase import BARB_SEAT
-from core.engine import UNIT_SLOTS, js_round, FLANKING_CS, SUPPORT_CS
+from core.simbase import UNIT_SLOTS, js_round, FLANKING_CS, SUPPORT_CS
 from warmup import settle_all
 
 HOLD = 12
