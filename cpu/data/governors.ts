@@ -19,9 +19,9 @@ type Yields = Partial<Record<YieldKey, number>>;
  * every other one.
  */
 
-export type GovernorId = 'REYNA' | 'VICTOR' | 'AMANI' | 'MAGNUS' | 'MOKSHA' | 'LIANG' | 'PINGALA';
+type GovernorId = 'REYNA' | 'VICTOR' | 'AMANI' | 'MAGNUS' | 'MOKSHA' | 'LIANG' | 'PINGALA';
 
-export interface GovernorDef {
+interface GovernorDef {
   id: GovernorId;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
@@ -192,7 +192,7 @@ export const promotionBitValue = (index: number): number => 2 ** index;
 export const promotionBit = (mask: number, index: number): boolean =>
   Math.floor(mask / 2 ** index) % 2 === 1;
 
-export interface GovernorPromotionDef {
+interface GovernorPromotionDef {
   id: string;
   name: string;
   governor: GovernorId;

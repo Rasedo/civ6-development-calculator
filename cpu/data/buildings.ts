@@ -23,7 +23,7 @@ import { xml, type SrcMap } from './provenance';
 /** CIV6 (BuildingReplaces): a civilization's UNIQUE BUILDING standing in for
  *  this row — the same building in storage, plus the clauses only it
  *  carries (the Stave Church). */
-export interface BuildingVariant {
+interface BuildingVariant {
   civ: CivId;
   name: string;
   /**

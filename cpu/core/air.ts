@@ -20,7 +20,7 @@ import { promoFlag, promoValue } from './promotions';
 import { governorTileSum } from './governors';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
-export const CITY_CENTER_AIR_SLOTS = 1;
+const CITY_CENTER_AIR_SLOTS = 1;
 export const AERODROME_AIR_SLOTS = 4;
 
 export function isAirUnit(type: string): boolean {
@@ -28,7 +28,7 @@ export function isAirUnit(type: string): boolean {
 }
 
 /** every air unit standing at this tile — its base's occupancy. */
-export function airUnitsAt(state: GameState, tileIndex: number): Unit[] {
+function airUnitsAt(state: GameState, tileIndex: number): Unit[] {
   return unitsAt(state, tileIndex).filter((u) => isAirUnit(u.type));
 }
 

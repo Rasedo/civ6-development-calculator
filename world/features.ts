@@ -7,7 +7,7 @@
 
 import type { TerrainId, YieldKey, Yields } from './types';
 
-export interface FeatureDef {
+interface FeatureDef {
   id: string;
   name: string;
   yields: Partial<Yields>;

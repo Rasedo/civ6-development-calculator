@@ -83,7 +83,7 @@ export function gwCountsByObj(city: { greatWorks?: GreatWork[] }): number[] {
 
 /** what one city's holders currently offer: presence, openness and the
  *  seat's extra slots per holder — built once per question */
-export interface WorkContext {
+interface WorkContext {
   present: boolean[];
   open: boolean[];
   extra: number[];

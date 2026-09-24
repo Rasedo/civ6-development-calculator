@@ -77,7 +77,7 @@ export const CARBON_RECAPTURE_FAVOR = srcConst('climate.recaptureFavor', 30, {
 
 import { srcConst, xml, type SrcMap } from './provenance';
 
-export interface ClimatePhase {
+interface ClimatePhase {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
   /** Climate Change points at which this phase begins. */

@@ -850,7 +850,7 @@ export function purchaseSeatDistrict(
  * column legal at record time can have been claimed by any civ by apply
  * time — the replay refuses rather than double-building. There is no capital
  * gate: real Civ 6 lets any city raise any unlocked wonder. */
-export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
+function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
   const civ = actor.seat;
   const center = state.map.tiles[civCity.centerIndex];
   {

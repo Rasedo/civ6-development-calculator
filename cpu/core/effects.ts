@@ -1418,7 +1418,7 @@ export function inDarkAge(state: GameState, seat: number): boolean {
 
 /** The `GOVERNMENT_LIST` position of one government id, -1 for an unknown or
  *  absent one — the index `governmentBit` shifts by. */
-export function governmentIndex(id: string | null): number {
+function governmentIndex(id: string | null): number {
   return id === null ? -1 : GOVERNMENT_LIST.findIndex((g) => g.id === id);
 }
 
@@ -1700,7 +1700,7 @@ export function withFollowerBelief(
   return m;
 }
 
-export function followerReligionForCity(
+function followerReligionForCity(
   followedReligion: number | null | undefined,
   ownerReligionId: number,
 ): number {

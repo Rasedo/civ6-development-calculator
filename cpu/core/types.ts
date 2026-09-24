@@ -263,7 +263,7 @@ export interface SeatActionRecord {
  * for a slot this seat leaves to the AI line. */
 export type CongressVote = ([number, number, number] | null)[];
 
-export type SeatActionLog = Record<number, Record<number, SeatActionRecord>>;
+type SeatActionLog = Record<number, Record<number, SeatActionRecord>>;
 
 /** One thing on the table: [kind, a, b], where the kind indexes
  *  `DEAL_ITEM_KINDS` and what a and b mean is the kind's own business — an

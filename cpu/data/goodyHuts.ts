@@ -34,7 +34,7 @@ export const GOODY_KIND_WEIGHT = srcConst('goodyHuts.kindWeight', 100,
     { note: 'every GoodyHuts row carries Weight 100, so the kind draw is uniform' }));
 
 /** what a subtype pays — one channel per row, named for the effect it came from */
-export type GoodyPayload =
+type GoodyPayload =
   | { kind: 'relic'; amount: number }
   | { kind: 'civicBoost'; amount: number }
   | { kind: 'techBoost'; amount: number }

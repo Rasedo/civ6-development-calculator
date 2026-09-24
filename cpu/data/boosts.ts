@@ -33,7 +33,7 @@ export type BoostCheck =
   | { kind: 'alliance'; level: number }
   | { kind: 'cities'; count: number };
 
-export interface BoostDef {
+interface BoostDef {
   desc: string;
   check?: BoostCheck;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */

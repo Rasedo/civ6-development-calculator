@@ -55,7 +55,7 @@ export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>
   return appeal;
 }
 
-export interface AppealTier {
+interface AppealTier {
   name: string;
   housing: number;
 }

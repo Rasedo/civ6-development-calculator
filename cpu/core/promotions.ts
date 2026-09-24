@@ -155,7 +155,7 @@ export function promoReady(unit: { level?: number; xp?: number; type: string }):
   return need > 0 && (unit.xp ?? 0) >= need;
 }
 
-export function hasPromo(unit: { promos?: number; type: string }, id: string): boolean {
+function hasPromo(unit: { promos?: number; type: string }, id: string): boolean {
   const rows = unitPromoRows(unit);
   const k = rows.findIndex((p) => p.id === id);
   return k >= 0 && ((unit.promos ?? 0) & (1 << k)) !== 0;

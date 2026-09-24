@@ -223,7 +223,7 @@ const ROW_CATALOGS: Readonly<Record<string, Rows>> = {
  *  no cell in the install to read them from. */
 const SKIP_COL = /^(id|name|description|src|civ|leader|kind|mask|code)$|(Name|Text|Note|Description|Label)$/;
 
-export interface ProvenanceEntry {
+interface ProvenanceEntry {
   catalog: string;
   name: string;
   value: unknown;

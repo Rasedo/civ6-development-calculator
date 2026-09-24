@@ -46,7 +46,7 @@ export function setDealOffer(state: GameState, from: number, to: number, o: Deal
   (state.dealOffers ??= {})[grantKey(from, to)] = o;
 }
 
-export function clearDealOffer(state: GameState, from: number, to: number): void {
+function clearDealOffer(state: GameState, from: number, to: number): void {
   if (state.dealOffers) delete state.dealOffers[grantKey(from, to)];
 }
 
@@ -241,7 +241,7 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
 
 /** Every item on one side, checked against one giver. A deal is atomic: the
  *  table confirms whole or not at all. */
-export function dealBundleOk(state: GameState, giver: number, receiver: number, items: DealItem[]): boolean {
+function dealBundleOk(state: GameState, giver: number, receiver: number, items: DealItem[]): boolean {
   if (items.length > DEAL_ITEMS) return false;
   return items.every((it) => dealItemPayable(state, giver, receiver, it));
 }

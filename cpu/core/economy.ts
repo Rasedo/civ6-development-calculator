@@ -135,7 +135,7 @@ export function pillagePlunder(
   }
 }
 
-export interface LumpGrant {
+interface LumpGrant {
   key: YieldKey;
   amount: number;
 }

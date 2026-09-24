@@ -731,7 +731,7 @@ export function goldAffordable(treasury: number, cost: number): boolean {
 
 /** CIV6 (Ngazargamu): the modifier's own gate is `UnitDomain DOMAIN_LAND` —
  *  a chassis that is neither naval nor air. */
-export function unitIsLandDomain(unitType: string): boolean {
+function unitIsLandDomain(unitType: string): boolean {
   const d = UNITS[unitType];
   return !!d && !d.naval && d.air === undefined;
 }
@@ -1373,7 +1373,7 @@ export function itemCost(item: QueueItem, state?: GameState, city?: City): numbe
  */
 export const ENGINEER_FINISH_FRACTION = 0.2;
 export const ENGINEER_FINISH_DISTRICTS: readonly DistrictId[] = ['AQUEDUCT', 'CANAL', 'DAM'];
-export const ENGINEER_FINISH_BUILDING = 'FLOOD_BARRIER';
+const ENGINEER_FINISH_BUILDING = 'FLOOD_BARRIER';
 
 /**
  * The city whose head a charge spent at `tileIndex` would advance, or
@@ -2219,7 +2219,7 @@ export function deserialize(json: string): GameState {
   return state;
 }
 
-export function canChoosePantheon(state: GameState, seat: number): RuleResult {
+function canChoosePantheon(state: GameState, seat: number): RuleResult {
   if (seatOf(state, seat)!.religion.pantheon) return { ok: false, reason: 'Pantheon already chosen.' };
   if (!state.sandbox && seatOf(state, seat)!.faith < PANTHEON_FAITH_COST) {
     return { ok: false, reason: `Needs ${PANTHEON_FAITH_COST} faith (${Math.floor(seatOf(state, seat)!.faith)} banked).` };

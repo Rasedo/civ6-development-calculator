@@ -214,7 +214,7 @@ export const NGAZARGAMU_BUILDINGS: readonly (readonly string[])[] = [
  *  bonus resource on this seat's tiles serves ONE city, the reach an
  *  `Happiness="1"` luxury would have. */
 export const BUENOS_AIRES_AMENITIES = 1;
-export interface SuzerainBonusDef {
+interface SuzerainBonusDef {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
   name: string;

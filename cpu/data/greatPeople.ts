@@ -69,9 +69,9 @@ export function gpCost(cls: GreatPersonClass, personEra: number, worldEra: numbe
  * belongs to. The roster below supplies the names, the classes and the eras —
  * the magnitude is this model's own.
  */
-export type GpLumpKey = 'science' | 'culture' | 'faith' | 'gold' | 'productionToCapital';
+type GpLumpKey = 'science' | 'culture' | 'faith' | 'gold' | 'productionToCapital';
 
-export const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
+const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
   SCIENTIST: 'science',
   ENGINEER: 'productionToCapital',
   MERCHANT: 'gold',
@@ -83,7 +83,7 @@ export const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
   MUSICIAN: 'culture',
 };
 
-export function gpEffect(cls: GreatPersonClass, era: number): GpEffect {
+function gpEffect(cls: GreatPersonClass, era: number): GpEffect {
   const lump = GP_ERA_GPP[Math.min(Math.max(era, 0), GP_ERA_GPP.length - 1)];
   return { [GP_CURRENCY[cls]]: lump };
 }
@@ -566,7 +566,7 @@ export const SPECIALIST_TIERS: Partial<Record<DistrictId, { buildings: string[];
  * Great Work", and with every slot taken "you will be unable to Activate your
  * Great Person". The rest are individual pages' own wording.
  */
-export type GpSite =
+type GpSite =
   | 'district'     // this seat's COMPLETED district — `siteDistrict`, or the class's own
   | 'anywhere'     // any tile the unit can stand on
   | 'gwSlot'       // a city of this seat with a free slot of the class's work kind
@@ -623,7 +623,7 @@ export const GP_CITY_PERM = [
   // Tourism — Science, Culture and Production at 100%, Gold and Faith at 50%.
   'adjTourism',
 ] as const;
-export type GpCityPermKey = (typeof GP_CITY_PERM)[number];
+type GpCityPermKey = (typeof GP_CITY_PERM)[number];
 
 /** PERMANENT per-TILE channels, same contract — the DISTRICT the charge was
  *  spent on keeps them (the install's ATTACHMENT_TARGET_DISTRICT_IN_TILE). */
@@ -632,7 +632,7 @@ export const GP_TILE_PERM = [
   'regionalProduction',  // CIV6 (Tesla): ...and each provides +2 Production
   'regionalAmenities',   // CIV6 (Paxton): ...and each provides +1 Amenity
 ] as const;
-export type GpTilePermKey = (typeof GP_TILE_PERM)[number];
+type GpTilePermKey = (typeof GP_TILE_PERM)[number];
 
 /** CIV6 (Kenzo Tange): the share of a district's ADJACENCY yield the city
  *  counts as Tourism — Science, Culture and Production whole, Gold and
@@ -649,7 +649,7 @@ export const GP_BUILDING_TOURISM: readonly { perm: GpPermKey; building: string; 
   { perm: 'aquaticsTourism', building: 'AQUATICS_CENTER', district: 'WATER_PARK' },
 ];
 
-export type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
+type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
 
 export function gpPermOf(seat: { gpPerm?: number[] } | undefined, key: GpPermKey): number {
   return seat?.gpPerm?.[GP_PERM.indexOf(key)] ?? 0;
@@ -779,7 +779,7 @@ export const GP_SITES: readonly GpSite[] = [
   'suzerainCityState', 'adjacentBarbarian', 'enemyTerritory',
 ];
 
-export interface GpAbility extends GpEffect {
+interface GpAbility extends GpEffect {
   site?: GpSite;
   siteDistrict?: DistrictId;
   charges?: number;

@@ -10,7 +10,7 @@ import { srcConst, xml, type SrcMap } from './provenance';
 /** shorthand: one `GlobalParameters` row's `Value` */
 const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
 
-export interface NuclearDeviceDef {
+interface NuclearDeviceDef {
   id: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;

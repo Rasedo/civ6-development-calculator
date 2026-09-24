@@ -97,7 +97,7 @@ export const WAR_CONDITIONS: readonly WarCondition[] = [
   'allyAtWarWith', 'jointAgreed',
 ];
 
-export interface WarKindDef {
+interface WarKindDef {
   id: WarKindId;
   civic: string | null;
   denounceTurns: number;

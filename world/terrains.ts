@@ -7,7 +7,7 @@
 
 import type { TerrainId, Yields } from './types';
 
-export interface TerrainDef {
+interface TerrainDef {
   id: TerrainId;
   name: string;
   water: boolean;

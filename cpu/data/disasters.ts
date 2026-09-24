@@ -21,7 +21,7 @@ import { srcConst, xml, type SrcMap } from './provenance';
  * invented. The wiki page they were read from publishes no numbers; the
  * install does.
  */
-export const STANDARD_GAME_TURNS = srcConst('disasters.STANDARD_GAME_TURNS', 500, {
+const STANDARD_GAME_TURNS = srcConst('disasters.STANDARD_GAME_TURNS', 500, {
   pedia: 'the GS standard-speed game length, 500 turns — the span RandomEvent_Frequencies writes '
     + 'its OccurrencesPerGame over (owner ruling 2026-09-04)',
 });
@@ -79,7 +79,7 @@ export const DROUGHT_CHANCE = srcConst('disasters.droughtChance', (23 + 5) / STA
  * the table has them (food 10/20%) though the row's EffectString labels it
  * NO_FERTILITY; the table is the data the game reads.
  */
-export type StormFamily = 'BLIZZARD' | 'DUST_STORM' | 'TORNADO' | 'HURRICANE';
+type StormFamily = 'BLIZZARD' | 'DUST_STORM' | 'TORNADO' | 'HURRICANE';
 /** the wire's family code: `sf` on the tile planes, `family` on each row */
 export const STORM_FAMILIES: readonly StormFamily[] = srcConst('disasters.stormFamilies',
   ['BLIZZARD', 'DUST_STORM', 'TORNADO', 'HURRICANE'], {
@@ -333,7 +333,7 @@ export const STORM_DISC: readonly (readonly [number, number])[] = (() => {
  * Divine Wind is Hojo's LEADER trait over the two hurricane rows; Mother
  * Russia is the CIVILIZATION's over the two blizzard rows.
  */
-export interface StormUnitRow {
+interface StormUnitRow {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
   civ?: CivId;

@@ -155,12 +155,12 @@ export function waterEnterable(
  * a routed tile TO a routed tile — a single roaded tile in open country does
  * nothing. A RAILROAD carries the road under it, so it answers here too.
  */
-export function roadStep(from: Tile, to: Tile): boolean {
+function roadStep(from: Tile, to: Tile): boolean {
   return (!!from.road || !!from.railroad) && (!!to.road || !!to.railroad);
 }
 
 /** Is this step RAILROAD-to-RAILROAD, the 0.25 tier? */
-export function railStep(from: Tile, to: Tile): boolean {
+function railStep(from: Tile, to: Tile): boolean {
   return !!from.railroad && !!to.railroad;
 }
 
@@ -174,13 +174,13 @@ export function roadTier(state: GameState): number {
  * Do routes carry BRIDGES yet? The Ancient road has none; every tier from the
  * Classical road up, the Railroad included, "Creates Bridges over Rivers".
  */
-export function roadBridges(state: GameState): boolean {
+function roadBridges(state: GameState): boolean {
   return !!ROAD_TIER_BRIDGES[roadTier(state)];
 }
 
 /** What a ROUTE-to-ROUTE step costs, in MP_SCALE units: the railroad's own
  *  0.25 where both ends carry one, else the world's current road tier. */
-export function routeStepMp(state: GameState, from: Tile, to: Tile): number {
+function routeStepMp(state: GameState, from: Tile, to: Tile): number {
   if (railStep(from, to)) return RAILROAD_MP;
   return ROAD_TIER_MP[roadTier(state)] ?? MP_SCALE;
 }
@@ -208,7 +208,7 @@ export function moveCostInto(
 /** CIV6 (`Improvements.MovementChange`): the WHOLE cost of entering a tile
  *  this improvement stands on, in whole Movement, or undefined where the row
  *  names none. A pillaged one charges nothing extra. */
-export function improvementMoveCost(tile: Tile): number | undefined {
+function improvementMoveCost(tile: Tile): number | undefined {
   if (!tile.improvement || tile.pillaged) return undefined;
   return IMPROVEMENTS[tile.improvement as ImprovementId]?.movementCost;
 }
@@ -243,7 +243,7 @@ export function riverCharge(state: GameState, from: Tile, to: Tile): number {
  */
 export const TRADE_WATER_NONE = 0;
 export const TRADE_WATER_COAST = 1;
-export const TRADE_WATER_OCEAN = 2;
+const TRADE_WATER_OCEAN = 2;
 
 /** The naval MELEE line: a hull with no ranged strength that is neither a
  *  raider nor a carrier. */
@@ -418,7 +418,7 @@ export function unitIsMilitary(type: string): boolean {
  * and an Admiral." So a water tile holds up to three: the hull, the Admiral,
  * and ONE passenger of either domain.
  */
-export type StackSlot = 'civilian' | 'support' | 'military' | 'air' | 'spy' | 'embarked';
+type StackSlot = 'civilian' | 'support' | 'military' | 'air' | 'spy' | 'embarked';
 export function unitStackSlot(u: { type: string; embarked?: boolean }): StackSlot {
   const d = unitDomain(u.type);
   return u.embarked && d !== 'air' ? 'embarked' : d;
@@ -587,7 +587,7 @@ export function fortifyBonus(unit: { fortifyTurns?: number }): number {
 }
 
 /** The defence a COMPLETE wonder gives the unit standing on its tile. */
-export function wonderOccupyDefense(state: GameState, tileIndex: number): number {
+function wonderOccupyDefense(state: GameState, tileIndex: number): number {
   const t = state.map.tiles[tileIndex];
   if (!t?.builtWonder || !t.builtWonderComplete) return 0;
   return BUILT_WONDERS[t.builtWonder]?.effects?.occupyDefense ?? 0;
@@ -786,7 +786,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
   return null;
 }
 
-export type StepOutcome =
+type StepOutcome =
   | 'moved'
   | 'halted'
   | 'cantAfford'
@@ -804,7 +804,7 @@ export type StepOutcome =
  * not a formation, which is what frees the civilian the moment its escort
  * dies — no sweep, and no stale link to clear at a capture.
  */
-export function escortOf(state: GameState, unit: Unit): Unit | undefined {
+function escortOf(state: GameState, unit: Unit): Unit | undefined {
   if (!unit.escorted) return undefined;
   return state.units.find(
     (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat
@@ -866,7 +866,7 @@ export function breakEscort(unit: Unit): RuleResult {
 /** CIV6 (Giant Death Robot): the chassis "gains additional abilities and
  *  upgrades via Future Era technology research" — an upgrade is the SEAT's
  *  tech, empire-wide, with no per-unit state behind it. */
-export function gdrUpgrade(state: GameState, seat: number, id: string): boolean {
+function gdrUpgrade(state: GameState, seat: number, id: string): boolean {
   const def = GDR_UPGRADES.find((g) => g.id === id);
   return !!def && isTechComplete(state, def.tech, seat);
 }

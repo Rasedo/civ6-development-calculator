@@ -63,7 +63,7 @@ export interface AdjacencyRule {
 /** CIV6 (DistrictReplaces): a civilization's UNIQUE DISTRICT standing in for
  *  this row — the same district in storage, with its own price, and the
  *  flat Housing and Amenity its Districts row adds on top (the Bath). */
-export interface DistrictVariant {
+interface DistrictVariant {
   civ: CivId;
   name: string;
   /** CIV6 (Districts.xml): a unique district's own `Cost` is HALF the row it

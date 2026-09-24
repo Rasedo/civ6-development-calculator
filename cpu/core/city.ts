@@ -227,7 +227,7 @@ export function effectiveSpecialists(state: GameState, city: City): Map<number, 
 
 /** A specialist's yields in this city: the base row, upgraded when the
  * district's TOP building stands ('WORSHIP' = any worship building). */
-export function specialistYields(district: import('./types').DistrictId, buildings: readonly string[]): Partial<Yields> | undefined {
+function specialistYields(district: import('./types').DistrictId, buildings: readonly string[]): Partial<Yields> | undefined {
   const base = SPECIALIST_YIELDS[district];
   if (!base) return undefined;
   const tier = SPECIALIST_TIERS[district];
@@ -320,7 +320,7 @@ export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
 /** CIV6 (Marae): the yields a civilization's unique building pays on every
  *  tile of the city carrying a PASSABLE feature, summed over the buildings the
  *  city holds. A natural wonder is a feature, so a passable one is paid. */
-export function buildingVariantFeatureYields(state: GameState, city: City): Partial<Yields> | null {
+function buildingVariantFeatureYields(state: GameState, city: City): Partial<Yields> | null {
   let out: Partial<Yields> | null = null;
   const civ = civOf(state, city.seat);
   for (const id of city.buildings) {
@@ -427,7 +427,7 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
 /** CIV6 (Autocracy): how many government buildings STAND in this city — the
  *  Government Plaza's and the Diplomatic Quarter's, and the Palace. A dark
  *  district takes its buildings with it, as it does for their yields. */
-export function govYieldBuildingCount(state: GameState, city: City): number {
+function govYieldBuildingCount(state: GameState, city: City): number {
   const dark = darkBuildings(state.map, city);
   let n = 0;
   for (const b of city.buildings) {
@@ -527,7 +527,7 @@ export function borderCandidates(state: GameState, city: City): number[] {
   return out;
 }
 
-export function resourcePriority(tile: Tile): number {
+function resourcePriority(tile: Tile): number {
   if (!tile.resource) return 0;
   const cat = RESOURCES[tile.resource].category;
   return cat === 'luxury' ? 3 : cat === 'strategic' ? 2 : 1;
@@ -691,7 +691,7 @@ export function civEraIndex(techIds: readonly string[], civicIds: readonly strin
   return e;
 }
 
-export function wonderEraIndex(id: string): number {
+function wonderEraIndex(id: string): number {
   const def = BUILT_WONDERS[id];
   if (!def) return 0;
   if (def.requiresTech) return Math.max(0, ERAS.indexOf(TECHS[def.requiresTech]?.era));

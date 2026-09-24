@@ -51,7 +51,7 @@ const CLEARABLE_FEATURES = clearableFeatures();
 interface Vote { seat: number; outcome: number; target: number; weight: number }
 
 /** Mercenary Companies names a CURRENCY, in this order on both engines. */
-export const CONGRESS_CURRENCIES = ['gold', 'faith'] as const;
+const CONGRESS_CURRENCIES = ['gold', 'faith'] as const;
 export const CONGRESS_CUR_GOLD = 0;
 export const CONGRESS_CUR_FAITH = 1;
 
@@ -71,7 +71,7 @@ export interface CongressVoterCtx {
 
 /** The DIPLOMATIC VICTORY resolution's slot in the vote head — the always-3rd
  * resolution, which stands outside the two-slot rotating slate. */
-export const CONGRESS_DV_SLOT = 2;
+const CONGRESS_DV_SLOT = 2;
 
 /** every device a seat holds, across the catalog — what Arms Control compares
  *  when it names a target. */

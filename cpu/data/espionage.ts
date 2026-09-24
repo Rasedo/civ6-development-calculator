@@ -41,7 +41,7 @@ export const SPY_CAPACITY_MAX = srcConst('eras.espionage.capacityMax', 6, {
 /** CIV6 (Espionage): "In ascending order, the levels are as follows: Recruit,
  *  Agent, Secret Agent, Master Spy" — and "a Spy that reaches the Master Spy
  *  level stops gaining experience." */
-export const SPY_LEVELS = srcConst('espionage.SPY_LEVELS',
+const SPY_LEVELS = srcConst('espionage.SPY_LEVELS',
   ['RECRUIT', 'AGENT', 'SECRET_AGENT', 'MASTER_SPY'] as const, {
     derived: 'the ESPIONAGE_MAX_LEVEL levels the GS Espionage page names in ascending order '
       + '(Recruit, Agent, Secret Agent, Master Spy)',
@@ -282,7 +282,7 @@ export const SPY_COUNTERSPY_CATCH_PCT = srcConst('eras.espionage.counterspyPct',
  * the model spy takes the first route whose district stands — soonest back
  * in service, a recorded model choice where the real game asks the player.
  */
-export interface SpyEscapeRoute {
+interface SpyEscapeRoute {
   id: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;

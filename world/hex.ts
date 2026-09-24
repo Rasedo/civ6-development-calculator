@@ -115,7 +115,7 @@ export function vertexTouchingTiles(v: Vertex): [number, number][] {
   return [[col, row], neighborOffset(col, row, DIR_SE), neighborOffset(col, row, DIR_SW)];
 }
 
-export interface VertexEdge {
+interface VertexEdge {
   to: Vertex;
   flanks: { col: number; row: number; dir: number }[];
 }

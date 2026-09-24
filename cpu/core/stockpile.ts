@@ -65,7 +65,7 @@ export function stockpileCap(state: GameState, seat: number): number {
  * turn"; (Automaton Warfare): "Uranium mines accumulate +1 more resource per
  * turn."
  */
-export function goldenMineBonus(state: GameState, seat: number, resourceId: string): number {
+function goldenMineBonus(state: GameState, seat: number, resourceId: string): number {
   if (resourceId === 'ALUMINUM' && goldenDedication(state, seat, DED_SKY)) return SKY_ALUMINUM_PER_TURN;
   if (resourceId === 'URANIUM' && goldenDedication(state, seat, DED_AUTOMATON)) return AUTOMATON_URANIUM_PER_MINE;
   return 0;

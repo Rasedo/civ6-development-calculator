@@ -18,7 +18,7 @@ import { xml, type SrcMap } from './provenance';
  * `yields` for each whole group. A civic may improve the rate, the payout, or
  * both — which is exactly how the three sourced rows below read.
  */
-export interface ImpAdjacency {
+interface ImpAdjacency {
   /** count a neighbour carrying a BONUS resource. */
   bonusResource?: boolean;
   /** count a neighbour holding this completed district. */

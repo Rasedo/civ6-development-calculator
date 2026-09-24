@@ -337,7 +337,7 @@ export function suzerainShareSeats(state: GameState, seat: number): number[] {
 
 /** SOVEREIGNTY outcome B: a minor of the named TYPE provides no unique
  *  suzerain bonus to anyone. */
-export function suzerainBonusBlocked(state: GameState, cityState: CityState): boolean {
+function suzerainBonusBlocked(state: GameState, cityState: CityState): boolean {
   return congressSuzBonusBlocked(state, CITY_STATE_TYPES.indexOf(cityState.type));
 }
 
@@ -351,7 +351,7 @@ export function cityStateTradeCapacityBonus(state: GameState, seat: number): num
   return state.cityStates.filter((cityState) => cityState.type === 'trade' && isSuzerain(state, cityState, seat)).length;
 }
 
-export interface CsBonuses {
+interface CsBonuses {
   capital: Partial<Yields>;
   // Re-keyed to BUILDINGS (real Civ 6: CS bonuses land on the district's
   // BUILDINGS, not the bare district). The 3-envoy tier keys to the type's

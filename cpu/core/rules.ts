@@ -795,7 +795,7 @@ export function buildingCostIn(state: GameState, city: City, id: string): number
 }
 
 /** building ids some tech or civic unlocks — the rows `computeUnlocks` can ever grant */
-export const RESEARCH_GATED_BUILDINGS: ReadonlySet<string> = new Set(
+const RESEARCH_GATED_BUILDINGS: ReadonlySet<string> = new Set(
   [...Object.values(TECHS), ...Object.values(CIVICS)]
     .flatMap((d) => d.effects)
     .flatMap((fx) => (fx.kind === 'unlockBuilding' ? [fx.building] : [])),
@@ -883,7 +883,7 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
 
 /** The tier of the government this seat is running, 0 for Chiefdom or none.
  *   is the one derivation both engines share. */
-export function governmentTier(state: GameState, seat: number): number {
+function governmentTier(state: GameState, seat: number): number {
   const id = seatGovernmentId(state, seat);
   return id ? GOVERNMENTS[id]?.tier ?? 0 : 0;
 }

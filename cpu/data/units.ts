@@ -3839,7 +3839,7 @@ export const ROCK_BAND_MAX_LEVEL = 4;
  * an upgrade is the SEAT's tech, empire-wide, and no per-unit state stands
  * behind it. Catalog order is the wire order.
  */
-export interface GdrUpgradeDef {
+interface GdrUpgradeDef {
   id: string;
   name: string;
   tech: string;

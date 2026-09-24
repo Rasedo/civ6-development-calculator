@@ -80,7 +80,7 @@ const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.m
 // so the census text surface is the concatenation of both files.
 const TYPES_URLS = [new URL('./types.ts', import.meta.url), new URL('../../world/types.ts', import.meta.url)];
 
-export interface ManifestField {
+interface ManifestField {
   name: string;
   compare: 'exact' | 'milli';
   covers: string[];
@@ -90,13 +90,13 @@ export interface ManifestField {
   note?: string;
   gap?: string;
 }
-export interface ManifestGroup {
+interface ManifestGroup {
   name: string;
   kind: string;
   covers: string[];
   fields: ManifestField[];
 }
-export interface Manifest {
+interface Manifest {
   version: number;
   censusTypes: string[];
   groups: ManifestGroup[];
@@ -131,7 +131,7 @@ function quantise(v: number | boolean, scale: number): number {
   return scale === 1 ? (Number.isInteger(n) ? n : Math.round(n)) : Math.round(n * scale);
 }
 
-export type Val = number | boolean | (number | boolean)[];
+type Val = number | boolean | (number | boolean)[];
 
 function fold(h: number, value: Val, scale: number): number {
   const seq = Array.isArray(value) ? value : [value];
@@ -222,7 +222,7 @@ const QUEST_KIND: Record<string, number> = { clearCamp: 1, sendTradeRoute: 2, bu
 
 type Extractor = (state: GameState, rows: readonly unknown[]) => Val[];
 
-export interface CityRow {
+interface CityRow {
   seat: number;
   city: City;
 }
@@ -849,7 +849,7 @@ function unitKeySlot(u: Unit): number {
   return Math.max(0, UNIT_KEY_SLOT.indexOf(unitStackSlot(u)));
 }
 
-export function groupKeys(group: string, rows: readonly unknown[]): number[] {
+function groupKeys(group: string, rows: readonly unknown[]): number[] {
   switch (group) {
     case 'game':
       return [0];
@@ -872,7 +872,7 @@ export function groupKeys(group: string, rows: readonly unknown[]): number[] {
   }
 }
 
-export interface GroupDigest {
+interface GroupDigest {
   exact: string;
   milli: string;
   rows: number;
@@ -969,7 +969,7 @@ export function groupDump(
   return out;
 }
 
-export function interfaceFields(name: string, source: string): string[] {
+function interfaceFields(name: string, source: string): string[] {
   const head = new RegExp(`export interface ${name}\\b[^{]*\\{`).exec(source);
   if (!head) throw new Error(`no 'export interface ${name}' in cpu/core/types.ts + world/types.ts`);
   let i = head.index + head[0].length;

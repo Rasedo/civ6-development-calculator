@@ -5,11 +5,11 @@ function smoothstep(t: number): number {
   return t * t * (3 - 2 * t);
 }
 
-export interface Noise2D {
+interface Noise2D {
   (x: number, y: number): number; // -> [0, 1)
 }
 
-export function valueNoise(seed: number): Noise2D {
+function valueNoise(seed: number): Noise2D {
   const base = seed >>> 0;
   function lattice(ix: number, iy: number): number {
     let h = base;

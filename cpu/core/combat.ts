@@ -65,7 +65,7 @@ import { gpPermOf } from '../data/greatPeople';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
-export const CAMP_CLEAR_REWARD = 50;
+const CAMP_CLEAR_REWARD = 50;
 export const MAX_BARB_PER_CAMP = 3;
 
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
@@ -119,7 +119,7 @@ export function terrainDefense(tile: Tile): number {
 }
 
 export const FORT_DEFENSE_CS = 4; // the FORT improvement, physical and theological alike
-export const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
+const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
 /**
  * CIV6: "Damage of wounded units is diminished... The formula is
  * `round(10 - HP/10)`... units with 30 HP will lose 7 Combat Strength and units
@@ -445,7 +445,7 @@ export const AMPHIBIOUS_ATTACK_CS = 10;
 /** May this unit, standing where it stands, strike that tile at all? CIV6:
  *  "embarked units may not attack any other unit in the water, including other
  *  embarked units", and only a MELEE attack goes ashore. */
-export function amphibiousReach(state: GameState, unit: Unit, targetIndex: number): boolean {
+function amphibiousReach(state: GameState, unit: Unit, targetIndex: number): boolean {
   if (!unit.embarked) return true;
   const target = state.map.tiles[targetIndex];
   if (isWater(target)) return false;
@@ -518,7 +518,7 @@ export function flankCount(state: GameState, defTileIndex: number, attacker: Uni
  *  a city-state's included: TS never paves a minor's centre with a district,
  *  so the minor's own centre list answers for it (the GPU's
  *  `_centre_seat_plane` names both in one plane). */
-export function defensibleDistrict(state: GameState, dt: Tile): boolean {
+function defensibleDistrict(state: GameState, dt: Tile): boolean {
   if (dt.district === 'CITY_CENTER' || encampmentIntact(dt)) return true;
   const cs = cityStateAt(state, dt.index);
   return !!cs && cs.centerIndex === dt.index;

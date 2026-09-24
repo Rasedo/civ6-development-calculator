@@ -15,7 +15,7 @@
  * play stream starts exactly at the seed.
  */
 
-export interface WorldUnit {
+interface WorldUnit {
   type: string;
   tile: number;
 }
@@ -32,7 +32,7 @@ export interface WorldCityState {
   center: number;
 }
 
-export interface WorldMapLayers {
+interface WorldMapLayers {
   width: number;
   height: number;
   terrain: number[];
@@ -45,7 +45,7 @@ export interface WorldMapLayers {
   goodyHut: number[];
 }
 
-export interface WorldCatalogs {
+interface WorldCatalogs {
   terrains: string[];
   elevations: string[];
   features: string[];

@@ -87,7 +87,7 @@ export function hasPromotion(g: Governor, promoIndex: number): boolean {
 
 /** Is this promotion legal for `g` right now — its governor's, not already
  *  held, and one of its prerequisites held? */
-export function promotionLegal(g: Governor, gIndex: number, promoIndex: number): boolean {
+function promotionLegal(g: Governor, gIndex: number, promoIndex: number): boolean {
   const def = GOVERNOR_PROMOTIONS[promoIndex];
   if (!def || !g.appointed) return false;
   if (def.governor !== GOVERNORS[gIndex].id) return false;

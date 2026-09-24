@@ -39,7 +39,7 @@ import { xpToNextLevel } from './promotions';
 import { logXpWrite } from './difflog';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
-export function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
+function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
   return (GP_CLASSES as readonly string[]).includes(unit.type)
     ? (unit.type as GreatPersonClass)
     : undefined;
@@ -52,7 +52,7 @@ export function gpPersonOf(unit: { type: string; gpAt?: number }): GreatPersonDe
 
 /** the seat's city that owns this tile, falling back to its capital — the
  *  city an ability scoped to "this city" applies to. */
-export function gpCityAt(state: GameState, seat: number, tile: Tile): City | undefined {
+function gpCityAt(state: GameState, seat: number, tile: Tile): City | undefined {
   const own = cityAtTile(state, tile);
   if (own && own.seat === seat) return own;
   return citiesOf(state, seat).find((c) => c.isCapital);

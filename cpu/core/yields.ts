@@ -336,7 +336,7 @@ export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, 
  * adjacency yields and their buildings' yields/housing/amenities/GPP go dark
  * until repaired (real Civ 6). One-per-type, so a type→pillaged set suffices.
  */
-export function pillagedDistrictTypes(
+function pillagedDistrictTypes(
   map: GameState['map'],
   districts: { type: DistrictId; tileIndex: number }[],
 ): Set<DistrictId> {
@@ -350,7 +350,7 @@ export function pillagedDistrictTypes(
 
 /** the shape every building-holding city answers with — a City, the minor's
  *  city, or a capture's stub */
-export type BuildingHolder = {
+type BuildingHolder = {
   buildings: string[];
   districts?: { type: DistrictId; tileIndex: number }[];
   pillagedBuildings?: string[];
@@ -543,7 +543,7 @@ export function cityHasFeature(state: GameState, city: City, feature: FeatureId)
   return state.map.tiles.some((t) => tileBelongsTo(t, city) && t.feature === feature);
 }
 
-export interface CityPower {
+interface CityPower {
   demand: number;
   supply: number;
   /** The power-plant building ids whose Industrial Zone reaches this centre,
@@ -632,7 +632,7 @@ export function laserSpeed(state: GameState, seat: number): number {
   return n;
 }
 
-export interface RegionalEffects {
+interface RegionalEffects {
   yields: Yields;
   amenities: number;
 }

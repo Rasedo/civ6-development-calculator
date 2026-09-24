@@ -149,11 +149,11 @@ export function spyTravelTurns(state: GameState, from: number, to: number): numb
     SPY_TRAVEL_TURNS_MIN + Math.floor(d / SPY_TRAVEL_TILES_PER_TURN));
 }
 
-export function spyIdle(unit: Unit): boolean {
+function spyIdle(unit: Unit): boolean {
   return (unit.spyMission ?? SPY_IDLE) === SPY_IDLE;
 }
 
-export function canTravelTo(state: GameState, unit: Unit, tileIndex: number): boolean {
+function canTravelTo(state: GameState, unit: Unit, tileIndex: number): boolean {
   if (!isSpy(unit.type) || !spyIdle(unit)) return false;
   return spyDestinations(state, unit).includes(tileIndex);
 }

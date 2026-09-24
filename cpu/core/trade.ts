@@ -272,7 +272,7 @@ export function wonderRouteOriginGold(state: GameState, city: City): number {
 /** CIV6 (University of Sankore): "Other Civilizations' Trade Routes to this
  *  city provide +1 Science and +1 Gold for them" — the DESTINATION's wonder
  *  pays the foreign SENDER. */
-export function wonderRouteSenderYields(state: GameState, dest: City): { science: number; gold: number } {
+function wonderRouteSenderYields(state: GameState, dest: City): { science: number; gold: number } {
   let science = 0;
   let gold = 0;
   for (const w of dest.wonders ?? []) {
@@ -468,7 +468,7 @@ export function claimTileEnRoute(state: GameState, seat: number, tileIndex: numb
  *  production 1 at home, gold 3 abroad) is simply its row. The origin's
  *  own districts pay nothing: `YieldChangeAsOrigin` is 0 on every row, and
  *  the live game agrees (ask 15). */
-export function districtRouteYields(state: GameState, dest: City, side: 'domestic' | 'international'): Yields {
+function districtRouteYields(state: GameState, dest: City, side: 'domestic' | 'international'): Yields {
   const out = emptyYields();
   for (const d of dest.districts) {
     if (!state.map.tiles[d.tileIndex].districtComplete) continue;

@@ -311,7 +311,7 @@ export const DVP_PER_RESOLUTION = srcConst('eras.dvpPerResolution', 1,
 export const DIPLO_VICTORY_POINTS = srcConst('eras.diploVictoryPoints', 20,
   gp('DIPLOMATIC_VICTORY_POINTS_REQUIRED'));
 
-export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
+type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
   | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
   | 'building' | 'promoClass' | 'religion' | 'governor' | 'spyMission'
   | 'competition' | 'luxury';
@@ -325,7 +325,7 @@ export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'luxury',
 ];
 
-export interface CongressResolutionDef {
+interface CongressResolutionDef {
   id: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
@@ -671,7 +671,7 @@ export const SPECIAL_SESSION_GAP = srcConst('eras.specialSessionGap', 15,
 export const EMERGENCY_SLOTS = srcConst('eras.emergencySlots', 2,
   { stylized: 'concurrent emergencies both engines carry — a tensor width; real Civ 6 has no such cap' });
 
-export interface EmergencyDef {
+interface EmergencyDef {
   id: 'CITY_STATE' | 'MILITARY' | 'NUCLEAR';
   name: string;
   turns: number;
@@ -1017,7 +1017,7 @@ export const COMPETITION_BRONZE_PCT = srcConst('eras.competitionBronzePct', 50,
  * install's other four; they belong to the Aid Request, which needs a
  * gold-gift verb this engine does not have yet.
  */
-export type ScoreSource = 'co2' | 'gpp' | 'project' | 'building' | 'district' | 'gold' | 'atWar' | 'co2Top';
+type ScoreSource = 'co2' | 'gpp' | 'project' | 'building' | 'district' | 'gold' | 'atWar' | 'co2Top';
 export interface ScoreRow {
   source: ScoreSource;
   amount: number;
@@ -1026,7 +1026,7 @@ export interface ScoreRow {
   of?: string;
 }
 
-export interface CompetitionDef {
+interface CompetitionDef {
   id: string;
   name: string;
   /** WHAT the competition counts, one install `<EmergencyScoreSources>` row
