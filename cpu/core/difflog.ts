@@ -2,8 +2,8 @@
  * THE DECOMPOSITION LOG'S EMITTERS — one leaf module, so any rule can push a
  * line without an import cycle.
  *
- * The log exists to answer "which of the two engines did what" at a point the
- * state census cannot reach, and everything it has taught is about the KEY:
+ * The log answers "which of the two engines did what" at a point the state
+ * census cannot reach. Its rules are about the KEY:
  *
  *  - the key names the DECISION, never the outcome. A step is keyed on the
  *    order it came from and a placement on the ANCHOR it was asked for,
@@ -11,43 +11,33 @@
  *    measured — an outcome key files the two sides as two unrelated lines.
  *  - every field that can distinguish two events belongs IN the key. A turn's
  *    unit record is K rows; a city id is a per-seat counter; one pool can be
- *    moved by several writers in one turn. Each of those collided once and
- *    printed a disagreement that was not one.
- *  - the two sides must agree on what a printed TERM means. `have` was net of
- *    war weariness on one engine and gross on the other, and showed a
- *    disagreement in a number both engines computed identically.
+ *    moved by several writers in one turn.
+ *  - the two sides must agree on what a printed TERM means: a value net of
+ *    war weariness on one engine and gross on the other shows a disagreement
+ *    in a number both engines compute identically.
+ *  - a key both engines print is not enough: the two sides must MEASURE THE
+ *    SAME QUANTITY, never a catalog position against a `di`, a base walk
+ *    against a variant walk, or a pre-factor total against a post-factor one.
  *
  * The gate pairs by key, keeps the LAST line per key, and prints only the
  * keys whose lines differ.
  *
  * ONE WINDOW PER KIND, AND EACH ENGINE TRIMS ITS OWN BUFFER. Past a dozen or
- * so live kinds the two sides stop windowing the same turns — during A-4's
- * hunt TS's `c:` lines were pushed out entirely while the GPU's survived, and
- * a kind that appears on ONE side reads as a disagreement that is not one. So
- * the set is a budget, not a collection. What earned its place:
- *
- *   PERMANENT — each decomposes a COMPOSED quantity, which is the only shape
- *   that survives a hunt:
- *     `ds:` adjacency per SOURCE with counts — cracked A-4's third layer
+ * so live kinds the two sides stop windowing the same turns, and a kind that
+ * appears on ONE side reads as a disagreement that is not one. So the set is
+ * a budget, not a collection. The permanent kinds each decompose a COMPOSED
+ * quantity:
+ *     `ds:` adjacency per SOURCE with counts
  *     `dj:` a district's adjacency, keyed by CITY and tile
  *     `dc:` the district price in parts (base/discount/variant/add/total)
  *     `fi:` the turn's faith income, snapshot split from the roster tail
  *     `up:` unit upkeep, the CHARGE beside the unit COUNT
  *     `dm:` the minor's build — the only instrument on that path
  *     `sk:` the strategic bank per WRITER (income, upkeep, burn, charge,
- *           upgrade, deal lump and return, grant) — cracked 9261 t247
+ *           upgrade, deal lump and return, grant)
  *
- *   SCAFFOLDING is kept only while a hunt needs it and deleted when that
- *   hunt closes — eight kinds (the per-city yield buckets, the specialty
- *   count, the governor's faith, the per-unit upkeep, the build-faith pay,
- *   the adjacency halves) left on 2026-09-14 once A-4 and A-5 were green.
- *   A new hunt adds its own and takes them out again in the closing commit.
- *
- * AND THE RULE THEY ALL COST ME: a key both engines print is not enough —
- * the two sides must MEASURE THE SAME QUANTITY. Five lines in A-4's hunt named
- * a shared key while comparing a catalog position against a `di`, a base walk
- * against a variant walk, or a pre-factor total against a post-factor one.
- * One produced a false elimination that had to be withdrawn.
+ * A hunt adds its own scaffolding kinds and deletes them in the commit that
+ * closes it.
  */
 import type { City, DistrictId, GameState, Unit } from './types';
 import { UNIT_TYPE_IDX } from '../data/units';

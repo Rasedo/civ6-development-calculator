@@ -9,15 +9,6 @@ import { srcConst, xml } from './provenance';
 /** shorthand: one `GlobalParameters` row's `Value` */
 const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
 
-export const MAP_SIZES = {
-  duel: { name: 'Duel (44×26)', width: 44, height: 26 },
-  tiny: { name: 'Tiny (60×38)', width: 60, height: 38 },
-  small: { name: 'Small (74×46)', width: 74, height: 46 },
-  standard: { name: 'Standard (84×54)', width: 84, height: 54 },
-} as const;
-
-export type MapSizeId = keyof typeof MAP_SIZES;
-
 /** Minimum distance between city centers.
  * Real Civ 6 blocks settling within 3 tiles of any center. */
 
@@ -33,7 +24,6 @@ export const BORDER_MAX_RADIUS = srcConst('constants.BORDER_MAX_RADIUS', 5,
 export function borderGrowthCost(n: number): number {
   return Math.floor(10 + Math.pow(6 * (n + 1), 1.3));
 }
-
 
 /** Gold price of buying a building/unit = production cost × this (Civ 6). */
 export const GAME_SPEED = srcConst('gameSpeed', 0.6, {
@@ -175,8 +165,8 @@ export const EMBARKED_DEFENSE_CS_BY_ERA: readonly number[] =
 
 /** CIV6 (GlobalParameters.xml): COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE 20 —
  *  the one number the install publishes beside the cavalry capture's
- *  permission. The curve through it is this model's (STYLIZED, owner ruling
- *  2026-09-04): an even fight is a coin flip, certain at +base, nothing at
+ *  permission. The curve through it is this model's (STYLIZED, owner
+ *  ruling): an even fight is a coin flip, certain at +base, nothing at
  *  -base — see `captureRoll`. */
 export const CAPTURE_BASE_STRENGTH_DIFF = srcConst('combat.captureBaseDiff', 20,
   gp('COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE'));
@@ -184,17 +174,11 @@ export const CAPTURE_BASE_STRENGTH_DIFF = srcConst('combat.captureBaseDiff', 20,
 export const CAPTURED_UNIT_HP = srcConst('combat.capturedHp', 25,
   { stylized: 'the hit points a captured unit arrives with; the install publishes none' });
 
-/** master switch for the LIVE scripted WATER movement (the seat
- * war-march taking water steps). N1 lands the full embark/movement MODEL and
- * plumbing but keeps the scripted water-stepping INERT (false): turning it on
- * needs the N2 embarked/naval COMBAT overrides AND embark-aware peace-act /
- * patrol — an embarked unit surviving into a peace turn is otherwise an
- * incoherent intermediate state that cannot be mirrored TS↔GPU cleanly. With
- * `live=false` every walker stays land-only and the gates are byte-identical to
- * the pre-N1 base. N2 flips it true alongside the rest of the naval package.
- * The exporter ships it as rules.embarkLive so the GPU mirror stays in lockstep;
- * tests poke both engines (setEmbarkLive / sim._embark_live) to exercise the
- * water-step path. */
+/** master switch for WATER movement (a land unit embarking and taking water
+ * steps). It is on: walkers embark under the full embark/movement model and
+ * the embarked/naval combat overrides. With `live=false` every walker stays
+ * land-only. The exporter ships it as rules.embarkLive so the GPU mirror
+ * (`_embark_live`) stays in lockstep; tests flip it with setEmbarkLive. */
 export const embarkState = { live: true };
 export function setEmbarkLive(v: boolean): void {
   embarkState.live = v;
@@ -318,15 +302,15 @@ export function emptyStockpile(): number[] {
   return STRATEGIC_IDS.map(() => 0);
 }
 
-/** CIV6 (GS): "The maximum stockpile amount is initially 50 for each resource
- *  but constructing Encampment buildings in your empire (Barracks, Armory,
- *  etc.) will increase your maximum stockpile by 10 per building for all
- *  resources." */
 /** How far a Trader's road-laying walk may reach in one leg. It lives here,
  *  in a LEAF module: `TRADE_WALK_EXPIRY_RAIL` is computed from it at module
  *  load, and a cycle between trade.ts and units.ts would leave that NaN. */
 export const TRADE_ROAD_MAX_STEPS = 32;
 
+/** CIV6 (GS): "The maximum stockpile amount is initially 50 for each resource
+ *  but constructing Encampment buildings in your empire (Barracks, Armory,
+ *  etc.) will increase your maximum stockpile by 10 per building for all
+ *  resources." */
 export const STOCKPILE_CAP_BASE = srcConst('strategic.capBase', 50, {
   pedia: 'the GS Resources page ("The maximum stockpile amount is initially 50 for each resource"); '
     + 'the install carries the cap as a DLL rule',

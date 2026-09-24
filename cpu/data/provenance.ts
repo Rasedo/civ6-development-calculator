@@ -18,7 +18,7 @@
  *   PEDIA     the install's published TEXT (a Civilopedia page, an ability
  *             paragraph) where no table holds the number. Not a measurement.
  *   STYLIZED  a magnitude this engine chose. Named so the choice is visible
- *             instead of remembered (owner rulings 2026-09-04).
+ *             instead of remembered (owner rulings).
  *   DERIVED   arithmetic over other constants — the tag names the inputs and
  *             the formula in words; the checker resolves every input in the
  *             install (a dangling input is RED) and evaluates what it can.
@@ -39,7 +39,7 @@
  *  `GlobalParameters`, `District_TradeRouteYields`); `where` the key
  *  column(s) that pick the row, `Col=VALUE` joined by `&` for a composite
  *  key; `col` the column read. `note` is for the reader, never compared. */
-export interface XmlSrc {
+interface XmlSrc {
   xml: string;      // table name
   where: string;    // `UnitType=UNIT_BUILDER` or `DistrictType=DISTRICT_HARBOR&YieldType=YIELD_GOLD`
   col: string;      // the column whose value this constant IS
@@ -61,13 +61,13 @@ export interface XmlSrc {
 
 /** a live-game measurement: the run file under tools/civ6lab/runs/ or the
  *  AUDIT entry (`C-16`, `ask 16`) that records it. */
-export interface LabSrc {
+interface LabSrc {
   lab: string;
   note?: string;
 }
 
 /** a magnitude this engine chose; `why` names the ruling or the reason. */
-export interface StylizedSrc {
+interface StylizedSrc {
   stylized: string;
 }
 
@@ -77,14 +77,14 @@ export interface StylizedSrc {
  *  paragraph). Weaker than XML (prose can lag the tables) and stronger
  *  than a wiki; not a measurement, so never `lab`. The checker counts it
  *  and does not compare it. */
-export interface PediaSrc {
+interface PediaSrc {
   pedia: string;
 }
 
 /** arithmetic over other constants. `formula` is words the checker can
  *  match against its small vocabulary (`round(x*GAME_SPEED)`, `sum`, ...)
  *  or fail loudly on; `inputs` are XML/LAB sources of the operands. */
-export interface DerivedSrc {
+interface DerivedSrc {
   derived: string;
   inputs?: readonly Src[];
 }
@@ -97,7 +97,7 @@ export type SrcMap = Readonly<Record<string, Src>>;
 
 /** A named scalar's record: the name the dump reports (and the wire uses
  *  where exported), the value at registration, and its source. */
-export interface SrcConstRecord {
+interface SrcConstRecord {
   name: string;
   value: number | string | boolean | readonly (number | string)[];
   src: Src;

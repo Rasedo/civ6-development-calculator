@@ -9,8 +9,8 @@
  * NARROWED MARKER — still model stylizations, not Civ 6 values, and each is
  * labelled at its own definition: MISSIONARY_CAP and APOSTLE_CAP (real Civ 6
  * caps neither unit and varies charges by Holy Site building), and the
- * individual BELIEF magnitudes. The PRESSURE scale is the install's since
- * 2026-09-05 (every RELIGION_SPREAD_* row of GlobalParameters.xml below).
+ * individual BELIEF magnitudes. The PRESSURE scale is the install's (every
+ * RELIGION_SPREAD_* row of GlobalParameters.xml below).
  *
  * Per-city pressure, missionaries, apostles and theological combat are all
  * modelled on both
@@ -92,8 +92,9 @@ export interface BeliefDef {
  * DEFENDER_OF_THE_FAITH = BELIEF_DEFENDER_OF_FAITH,
  * FIRE_GODDESS = BELIEF_GODDESS_OF_FIRE, and the mapping lives in the tag.
  *
- * FOUR beliefs this catalog once fielded are GONE from the pools, because the
- * install this engine mirrors has no row for them: ORAL_TRADITION and
+ * The pools field no ORAL_TRADITION, CHURCH_PROPERTY, CRUSADE or
+ * MESSENGER_OF_THE_GODS, because the install this engine mirrors has no row
+ * for them: ORAL_TRADITION and
  * CHURCH_PROPERTY are DELETED by Gathering Storm
  * (DLC/Expansion2/Data/Expansion2_RemoveData.xml drops both the Beliefs row
  * and its BeliefModifiers), and CRUSADE and MESSENGER_OF_THE_GODS appear
@@ -459,8 +460,7 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     }),
     // GS's SCRIPTURE_SPEAD_STRENGTH carries SpreadMultiplier 25 and nothing
     // else that this catalog has a column for: no spread-charge argument
-    // anywhere in the install, so the +1 missionary charge this row used to
-    // grant is gone.
+    // anywhere in the install, so this row grants no missionary charge.
     B('SCRIPTURE', 'Scripture', 'Religious spreads land 25% more pressure.', {
       spreadPressureMult: 1.25, // lump 200 → 250
     }),

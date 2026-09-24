@@ -667,7 +667,6 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'improvementYields', improvement: 'PASTURE', yields: { production: 1 } },
     ]),
 
-
     T('IRON_WORKING', 'Iron Working', 'Classical', 120, ['BRONZE_WORKING']),
     T('SHIPBUILDING', 'Shipbuilding', 'Classical', 200, ['SAILING']),
 
@@ -696,8 +695,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'RENAISSANCE_WALLS' },
       // Improvements.xml: IMPROVEMENT_FORT's PrereqTech is TECH_SIEGE_TACTICS,
       // NOT Military Engineering (which only trains the Military Engineer that
-      // places it). Until #264 the Fort hung off Military Engineering here and
-      // the row's comment asserted the install said so.
+      // places it).
       { kind: 'unlockImprovement', improvement: 'FORT' },
     ]),
 

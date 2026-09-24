@@ -35,7 +35,7 @@ export const GWO_COUNT = srcConst('greatWorks.GWO_COUNT', 8, {
   derived: 'the number of `GreatWorkObjectTypes` rows',
   inputs: [xml('GreatWorkObjectTypes', 'GreatWorkObjectType=GREATWORKOBJECT_RELIC', 'Value')],
 });
-export const GWO_ART = [GWO_SCULPTURE, GWO_PORTRAIT, GWO_LANDSCAPE, GWO_RELIGIOUS] as const;
+const GWO_ART = [GWO_SCULPTURE, GWO_PORTRAIT, GWO_LANDSCAPE, GWO_RELIGIOUS] as const;
 
 /** GreatWorkSlotTypes. */
 const gws = (id: string, v: number) => srcConst(`greatWorks.GWS_${id}`, v, {
@@ -43,9 +43,9 @@ const gws = (id: string, v: number) => srcConst(`greatWorks.GWS_${id}`, v, {
     + '`GreatWorkSlotTypes` rows carry no Value column, so the numbering is the engine\'s own',
   inputs: [xml('GreatWorkSlotTypes', `GreatWorkSlotType=GREATWORKSLOT_${id}`, 'GreatWorkSlotType')],
 });
-export const GWS_WRITING = gws('WRITING', 0);
+const GWS_WRITING = gws('WRITING', 0);
 export const GWS_ART = gws('ART', 1);
-export const GWS_MUSIC = gws('MUSIC', 2);
+const GWS_MUSIC = gws('MUSIC', 2);
 export const GWS_ARTIFACT = gws('ARTIFACT', 3);
 export const GWS_RELIC = gws('RELIC', 4);
 export const GWS_CATHEDRAL = gws('CATHEDRAL', 5);
@@ -121,7 +121,7 @@ export const GWO_TOURISM: readonly number[] = objYield('objTourism',
   'GreatWorks', 'Tourism', [2, 2, 2, 2, 3, 2, 4, 8]);
 
 /** The theming RULE a holder's row declares (`Building_GreatWorks`). */
-export const GW_THEME_NONE = 0;
+const GW_THEME_NONE = 0;
 /** ThemingSameObjectType + ThemingUniquePerson — the Art Museum. */
 export const GW_THEME_ART = 1;
 /** ThemingSameEras + ThemingUniqueCivs — the Archaeological Museum. */
@@ -136,7 +136,7 @@ export const THEMING_MULT = srcConst('seats.greatWorks.themingMult', 2, {
     'ThemingYieldMultiplier')],
 });
 
-export interface GreatWorkHolderDef {
+interface GreatWorkHolderDef {
   /** a building id (`BUILDINGS`) or a wonder id (`BUILT_WONDERS`) */
   id: string;
   wonder: boolean;
@@ -144,11 +144,6 @@ export interface GreatWorkHolderDef {
   theme: number;
 }
 
-/** CIV6 `Building_GreatWorks`, Base <- Expansion1 <- Expansion2 <- the civ
- *  DLC that carries a row, restricted to the holders this engine builds, in
- *  the install's row order. The Hermitage's row is GREATWORKSLOT_ART with
- *  no object restriction, and the Apadana's is two GREATWORKSLOT_PALACE
- *  slots, which take any object. */
 /** PROVENANCE (cpu/data/provenance.ts): the install's `Buildings.IsWonder` and the row's
  *  own `Building_GreatWorks` slot rows. */
 const GW_HOLDER_SRC: Record<string, SrcMap> = {
@@ -246,6 +241,11 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
   },
 };
 
+/** CIV6 `Building_GreatWorks`, Base <- Expansion1 <- Expansion2 <- the civ
+ *  DLC that carries a row, restricted to the holders this engine builds, in
+ *  the install's row order. The Hermitage's row is GREATWORKSLOT_ART with
+ *  no object restriction, and the Apadana's is two GREATWORKSLOT_PALACE
+ *  slots, which take any object. */
 const RAW_GW_HOLDERS: readonly GreatWorkHolderDef[] = [
   { id: 'PALACE', wonder: false, slots: [{ type: GWS_PALACE, count: 1 }], theme: GW_THEME_NONE },
   { id: 'TEMPLE', wonder: false, slots: [{ type: GWS_RELIC, count: 1 }], theme: GW_THEME_NONE },
@@ -268,7 +268,7 @@ export const GW_HOLDERS: readonly GreatWorkHolderDef[] =
 
 /** CIV6 (EFFECT_ADJUST_..._EXTRA_GREAT_WORK_SLOTS): a roster row widening one
  *  holder's slot row for its seat. The layout carries every row at its widest. */
-export interface ExtraSlotRow {
+interface ExtraSlotRow {
   civ?: CivId;
   leader?: LeaderId;
   holder: string;
@@ -281,7 +281,7 @@ export const EXTRA_SLOT_ROWS: readonly ExtraSlotRow[] = [
   { civ: 'KONGO', holder: 'PALACE', type: GWS_PALACE, amount: 4 },
 ];
 
-export interface GreatWorkSlotDef {
+interface GreatWorkSlotDef {
   /** index into `GW_HOLDERS` */
   holder: number;
   type: number;
@@ -324,7 +324,7 @@ export function holderSlots(holder: number): number[] {
 
 /** CIV6 (Kristina, EFFECT_ADJUST_AUTO_THEMED_BUILDINGS_WITH_X_SLOTS): a holder
  *  with at least `slots` slots, all filled, is themed whatever its rule. */
-export interface AutoThemeRow {
+interface AutoThemeRow {
   civ?: CivId;
   leader?: LeaderId;
   slots: number;

@@ -187,7 +187,7 @@ export function grievanceCityTaken(state: GameState, taker: number, loser: numbe
  * same way — "City-state conquered: 50 (all civs gain Grievances against
  * you)", "City-state razed: 100".
  */
-export function grievanceAgainstTheWorld(state: GameState, transgressor: number, n: number): void {
+function grievanceAgainstTheWorld(state: GameState, transgressor: number, n: number): void {
   for (const s of state.seats) {
     if (s.seat === transgressor) continue;
     addGrievance(state, s.seat, transgressor, n);

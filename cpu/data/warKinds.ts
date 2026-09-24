@@ -22,13 +22,12 @@
  *     `RazeWarmongerPercent` — the three columns the grievance ledger scales
  *     its declaration and city bases by.
  *
- * THIRD PARTY WAR IS A ROW (2026-09-08). It carries `Agreement="true"`, and
- * an earlier pass read that as "not a kind". But `Agreement` says how the
- * install's UI reaches the action — through a proposal the other player
- * accepts — not what it costs or who may use it, and every column that DOES
- * say those things is a kind's column: `InitiatorPrereqCivic`
- * CIVIC_FOREIGN_TRADE, no `DenouncementTurnsRequired`, and
- * `WarmongerPercent` / `CaptureWarmongerPercent` / `RazeWarmongerPercent`
+ * THIRD PARTY WAR IS A ROW. It carries `Agreement="true"`, but `Agreement`
+ * says how the install's UI reaches the action — through a proposal the
+ * other player accepts — not what it costs or who may use it, and every
+ * column that DOES say those things is a kind's column:
+ * `InitiatorPrereqCivic` CIVIC_FOREIGN_TRADE, no `DenouncementTurnsRequired`,
+ * and `WarmongerPercent` / `CaptureWarmongerPercent` / `RazeWarmongerPercent`
  * 100 / 100 / 300. In this engine a war kind IS a gate plus a percent
  * triple, so the row belongs here.
  *
@@ -98,7 +97,7 @@ export const WAR_CONDITIONS: readonly WarCondition[] = [
   'allyAtWarWith', 'jointAgreed',
 ];
 
-export interface WarKindDef {
+interface WarKindDef {
   id: WarKindId;
   civic: string | null;
   denounceTurns: number;
@@ -132,15 +131,10 @@ export const WAR_KINDS: readonly WarKindDef[] = [
 
 export const WAR_KIND_SURPRISE = 0;
 export const WAR_KIND_FORMAL = 1;
-export const WAR_KIND_HOLY = 2;
 export const WAR_KIND_LIBERATION = 3;
 export const WAR_KIND_RECONQUEST = 4;
-export const WAR_KIND_PROTECTORATE = 5;
-export const WAR_KIND_COLONIAL = 6;
 export const WAR_KIND_TERRITORIAL = 7;
 export const WAR_KIND_GOLDEN = 8;
-export const WAR_KIND_RETRIBUTION = 9;
-export const WAR_KIND_IDEOLOGICAL = 10;
 export const WAR_KIND_THIRD_PARTY = 11;
 export const WAR_KIND_JOINT = 12;
 

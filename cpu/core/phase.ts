@@ -123,8 +123,6 @@ const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 const CIV_SPACING = 10;
 
-
-
 /**
  * The seats a row's WAR HEAD addresses: every OTHER major in ascending seat
  * order, then the whole CITY-STATE roster in ascending id order. Column k
@@ -210,8 +208,6 @@ export function placeSeats(state: GameState, count?: number): void {
   });
 }
 
-
-
 /**
  * Rough military strength: 8 per city plus the combat of every unit, rounded.
  *
@@ -226,7 +222,6 @@ export function seatStrength(state: GameState, seat: number): number {
   for (const u of unitsOf(state, seat)) s += UNITS[u.type]?.combat ?? 0;
   return Math.round(s);
 }
-
 
 function nearestDistance(state: GameState, a: number, bs: number[]): number {
   const at = state.map.tiles[a];
@@ -248,7 +243,6 @@ export function seatProximity(state: GameState, a: number, b: number): number {
   }
   return best;
 }
-
 
 /**
  * `declarer` DECLARES a war of `kind` on `target` — the ONE body every path
@@ -418,7 +412,6 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
   state.eventLog.push(`${cityState.name} levies ${LEVY_UNITS} ${type === 'SPEARMAN' ? 'spearmen' : 'warriors'} to your cause.`);
   return ok;
 }
-
 
 /** The CITIZEN pressure a list of cities puts on the tile `here`: each
  *  city's population, weighted down by distance inside `LOYALTY_RANGE`. */
@@ -594,10 +587,6 @@ export function ungovernedLoyalty(state: GameState, seat: number): number {
   return seatBuildingSum(state, seat, 'loyaltyWithoutGovernor');
 }
 
-/**
- * Apply a turn of loyalty to `city` (called from endTurn with the stats it
- * already computed). Returns true when the city has hit 0 and must flip.
- */
 /** CIV6 (Statue of Liberty): "All your cities within 6 tiles are always 100%
  *  Loyal." Measured from the WONDER TILE, like every other wonder aura. */
 function wonderLoyaltyAura(state: GameState, city: City): boolean {
@@ -611,6 +600,10 @@ function wonderLoyaltyAura(state: GameState, city: City): boolean {
   return false;
 }
 
+/**
+ * Apply a turn of loyalty to `city` (called from endTurn with the stats it
+ * already computed). Returns true when the city has hit 0 and must flip.
+ */
 export function applyLoyalty(state: GameState, city: City, amenityTierName: string, hasGovernor = false): boolean {
   const govBonus = hasGovernor ? GOVERNOR_LOYALTY : ungovernedLoyalty(state, city.seat);
   if (!cityHolders(state).some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
@@ -731,20 +724,11 @@ export function relocatePalace(
   if (!best.buildings.includes('PALACE')) best.buildings.push('PALACE');
 }
 
-
-
-
-
-
-
-
-
 /** Queue the district the record names, ON THE TILE THE RECORD NAMES.
  *
  * This engine does NOT choose the plot: WHERE a district goes is a decision,
- * it rides the wire, and this body only re-validates it. Two scans that had to
- * agree forever are one recorded number now. Returns false when the named tile
- * cannot take it. */
+ * it rides the wire, and this body only re-validates it. Returns false when
+ * the named tile cannot take it. */
 export function placeSeatDistrict(
   state: GameState,
   actor: Seat,
@@ -812,17 +796,8 @@ function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileI
   civCity.districts.push({ type: id, tileIndex });
 }
 
-
-
-/** queue ONE named wonder — the tryQueueWonder body for a single
- * def, shared by the scripted chain above and the driven replay. Re-validates
- * EVERYTHING (unlock, one-per-world, placement): one-per-world is CROSS-SEAT,
- * so a column legal at record time can have been claimed by any civ by apply
- * time — the replay refuses rather than double-building. The capital gate
- * stays OUT: it is the scripted picker's heuristic,
- * and real Civ 6 lets any city raise any unlocked wonder. */
 /**
- * BUY A DISTRICT OUTRIGHT (B-24r).
+ * BUY A DISTRICT OUTRIGHT.
  *
  * CIV6 (Contractor): "Allows city to purchase Districts with Gold"; (Divine
  * Architect): the same in Faith. Both are pure permissions — CanPurchase
@@ -870,7 +845,12 @@ export function purchaseSeatDistrict(
   return true;
 }
 
-export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
+/** queue ONE named wonder for the driven replay. Re-validates EVERYTHING
+ * (unlock, one-per-world, placement): one-per-world is CROSS-SEAT, so a
+ * column legal at record time can have been claimed by any civ by apply
+ * time — the replay refuses rather than double-building. There is no capital
+ * gate: real Civ 6 lets any city raise any unlocked wonder. */
+function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
   const civ = actor.seat;
   const center = state.map.tiles[civCity.centerIndex];
   {
@@ -898,24 +878,6 @@ export function queueSeatProject(state: GameState, civCity: City, projId: string
   return queueProject(state, civCity.id, projId, civCity.seat).ok;
 }
 
-
-
-
-
-
-
-
-
-
-/**
- * The WORLD CONGRESS trigger: at every CONGRESS_INTERVAL turn, once ANY civ
- * has reached CONGRESS_MIN_ERA (Medieval), one Regular Session runs — the
- * mechanics and their sources live at `congressSession` and the catalog
- * (CONGRESS_RESOLUTIONS). The slate keys on the MAX era across civs, the
- * wiki's "topics relevant for the current world". Zero-draw: a pure function
- * of state. Called from endTurn right after eraBoundary, the same position
- * the GPU mirrors.
- */
 /** What a voter knows that `congress` cannot look up itself: the live
  *  adoption (which reads the standing slate back) and the envoy spread. */
 function congressVoter(state: GameState, seat: number): CongressVoterCtx {
@@ -933,7 +895,6 @@ function congressVoter(state: GameState, seat: number): CongressVoterCtx {
     : 0;
   return { government, policies, envoysByType };
 }
-
 
 /** A member's war on the emergency's target. CIV6: "this action won't accrue
  *  Grievances because it is considered an effort of the international
@@ -1063,6 +1024,15 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
     `${emergencyName(e.kind)}: ${membersWon ? 'the members' : state.seats[e.target]?.name ?? 'the target'} prevailed.`);
 }
 
+/**
+ * The WORLD CONGRESS trigger: at every CONGRESS_INTERVAL turn, once ANY civ
+ * has reached CONGRESS_MIN_ERA (Medieval), one Regular Session runs — the
+ * mechanics and their sources live at `congressSession` and the catalog
+ * (CONGRESS_RESOLUTIONS). The slate keys on the MAX era across civs, the
+ * wiki's "topics relevant for the current world". Zero-draw: a pure function
+ * of state. Called from endTurn right after eraBoundary, the same position
+ * the GPU mirrors.
+ */
 export function worldCongress(state: GameState): void {
   const recorded = state.seats.map((sx) => sx.congressVote ?? null);
   for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for THIS turn
@@ -1077,12 +1047,6 @@ export function worldCongress(state: GameState): void {
   state.lastSessionTurn = state.turn;
   congressCancelBannedIntl(state);
 }
-
-
-
-
-
-
 
 export function transferCity(
   state: GameState,
@@ -1258,10 +1222,10 @@ export function transferCity(
 /**
  * machine-check (env-gated by CIV6_RC_REGISTRY_CHECK; the TS twin of the
  * GPU engine's _check_rc_registry_invariant). Every district tile and wonder
- * tile an civCity lists must register BACK to that civCity — its `Tile.ownerCity` equals
- * `civCity.id` (a district sits on a tile owned by THAT city, the placement rule
- * tryQueueDistrict/tryQueueWonder now enforce) — and that tile must
- * be owned by this seat's civ. A tile registered to a SIBLING civCity (the seed
+ * tile a city lists must register BACK to that city — its `Tile.ownerCity` equals
+ * the city's id (a district sits on a tile owned by THAT city, the placement
+ * rule placeSeatDistrict/placeSeatWonder enforce) — and that tile must
+ * be owned by this seat's civ. A tile registered to a SIBLING city (the seed
  * 9118 latent) throws. NO always-on cost: only called when the env flag is set.
  */
 export function assertCityRegistryCoherent(state: GameState): void {
@@ -1282,9 +1246,6 @@ export function assertCityRegistryCoherent(state: GameState): void {
     }
   }
 }
-
-
-
 
 /** apply ONE recorded turn for a driven seat. Touches no policy — if this
  * ever needed to consult the ladder, the file would not be a complete record of
@@ -1319,7 +1280,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // The SLOTTED CARDS are a driver decision. Validated whole here —
   // every card unlocked under the live government, the set fitting its
   // slots — and STORED in `government.policies`; a set that does not fit is
-  // refused entire. INERT this step: the greedy fill still pays the effects.
+  // refused entire. The stored set is what pays the card effects.
   if (rec.policies) {
     const gov = computeAdoption(actor.research).government;
     if (gov) {
@@ -1332,10 +1293,9 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // the WAR verb: the recorded declare/peace applies HERE — before the
   // walkers, the exact position the GPU's pre-step war head uses, so a
   // declare turns THIS turn's walkers hostile on both engines. The engine
-  // re-validates: peace pays the seat 0's exact gold schedule or refuses
-  // (the scripted roll's own body, minus the roll — that lives in the
-  // ladder now, rolled from the DRIVER's policy stream, so neither engine's
-  // rule stream moves).
+  // re-validates: peace needs `WAR_MIN_TURNS` at war and pays the
+  // `PEACE_GOLD_COST` schedule, or refuses. Whether to sue is the driver's
+  // call, so neither engine's rule stream moves.
   // The ENVOY verb: the recorded picks land here, ALIVE + met + availability
   // re-validated. BANK ONLY — conversion is an eager RULE at the CS phase for
   // every seat, so a decide-time pick can never exceed the bank. A razed
@@ -1501,8 +1461,6 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
  * are NOT replayed here yet — the ladder's peace verb never emits them, so
  * recording one would mean the policy changed and this needs extending with it.
  */
-/** the unit catalog's order, which IS the GPU's type index — the
- *  decomposition log prints the number so the two sides compare directly. */
 
 export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number[][]): void {
   if (!steps || steps.length === 0) return;
@@ -1729,7 +1687,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           }
         }
       } else if (a >= 6 && a < 12) {
-        // ATTACK — safe to replay now BECAUSE the walkers stand down for
+        // ATTACK — safe to replay BECAUSE the walkers stand down for
         // driven seats (no double-resolution). The SAME combat calls the
         // walkers make; both re-validate their target.
         const to = neighborTile(state.map, here, a - 6);
@@ -2203,8 +2161,8 @@ export function seatPhase(state: GameState): void {
       }
 
       // City-state quests — each MET CS keeps ONE quest per seat
-      // (cityState.seatQuest[actor.seat], SEAT-keyed: row 0 is seat 0, the
-      // GPU base geometry); a satisfied one resolves here (+QUEST_ENVOYS to
+      // (cityState.seatQuest[actor.seat], indexed by seat, the GPU's own
+      // geometry); a satisfied one resolves here (+QUEST_ENVOYS to
       // THIS seat's envoys — the accrual channel), else a new one issues on
       // cooldown expiry. The kind is DETERMINISTIC: the FIRST SATISFIABLE
       // option in the fixed order [clearCamp, buildDistrict, sendTradeRoute]
@@ -2318,7 +2276,7 @@ export function seatPhase(state: GameState): void {
         // the city the purchase SPAWNS in is the one whose buildings price it
         const buyCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
         for (const def of goldBuyableUnits(state, actor.seat)) {
-          // CIV6 (purchase placement, measured 2026-09-13): the bought unit
+          // CIV6 (purchase placement, measured in the live game): the bought unit
           // lands ON the centre and the purchase is refused when a unit of
           // its class already stands there — re-validated HERE, at apply
           // time, as the GPU's `_seat_buy_unit_candidates` does: a unit
@@ -2608,10 +2566,9 @@ export function seatPhase(state: GameState): void {
       seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
       const q = civCity.queue[0];
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
-        // The seat's GOVERNMENT/POLICY encampHarborProdMult, which
-        // `game.ts` has always applied to the seat 0's queue head and the
-        // seat's add never did. A seat that adopts the government owns
-        // its effects; the multiplier keys on the ITEM, not on the seat.
+        // The seat's GOVERNMENT/POLICY encampHarborProdMult: a seat that
+        // adopts the government owns its effects; the multiplier keys on
+        // the ITEM, not on the seat.
         let _em = isEncampHarborItem(q) ? seatMods.encampHarborProdMult : 1;
         // CIV6 (To Arms!, Golden face): "+15% Production towards military
         // units." (Heartbeat of Steam, Golden face): "+10% Production toward
@@ -2700,9 +2657,8 @@ export function seatPhase(state: GameState): void {
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
         q.progress += production * _em;
-        // Pay in the bank, exactly where the seat 0's endTurn does
-        // (game.ts, right after the production add). Without this the field
-        // written below would be write-only.
+        // Pay in the bank right after the production add, so the field
+        // written below is read back.
         if (civCity.productionBank) {
           q.progress += civCity.productionBank;
           civCity.productionBank = 0;
@@ -2989,12 +2945,10 @@ export function seatPhase(state: GameState): void {
     if (Math.round(actor.treasury * 1000) < 0) {
       // The priciest unit goes; a TIE goes to the EARLIEST in `state.units`,
       // which is spawn order — the one order both engines own (the GPU's
-      // pool appends, so its lowest slot is the same unit). It used to tie on
-      // the lowest UNIT ID, which is spawn order for a unit this seat trained
-      // and is NOT for one it re-seated: a converted barbarian keeps its
-      // barbarian-era id, lower than anything the seat owns, and the two
-      // engines disbanded different units the first turn a seat holding one
-      // went broke (seed 9053 t164).
+      // pool appends, so its lowest slot is the same unit). The lowest UNIT
+      // ID is not spawn order for a unit the seat re-seated: a converted
+      // barbarian keeps its barbarian-era id, lower than anything the seat
+      // owns (seed 9053 t164).
       let victim: Unit | undefined;
       for (const u of state.units) {
         if (u.seat !== actor.seat) continue;
@@ -3044,11 +2998,6 @@ export function seatPhase(state: GameState): void {
         actor.government.policies.filter((p): p is string => !!p && open.has(p)));
     }
 
-    // Builder actions (build best-Δ improvement or walk to a job).
-    // driven-parity layer 5: the GPU stands the BUILDER POLICY down for
-    // controlled seats ("controlled opponents' builders answer to the units
-    // head", `active & ~controlled`); this call was ungated, TS builders kept
-
     advanceGreatPeople(state, actor.seat);
 
     // The BELIEF RACES — eager rules for EVERY seat row. Identities are
@@ -3056,7 +3005,7 @@ export function seatPhase(state: GameState): void {
     // draw mirrors the GPU's row-generic _seat_belief_claims (the
     // popen/ropen/eopen shapes), so the streams stay aligned. The open pools
     // are purely the claimed lists — every claim path (this block AND the
-    // seat-0 UI verbs) pushes what it takes.
+    // direct verbs in game.ts) pushes what it takes.
     // Pantheon: costs PANTHEON_FAITH_COST from this seat's own faith.
     if (actor.religion.pantheon === null && (actor.faith ?? 0) >= PANTHEON_FAITH_COST) {
       const open = Object.keys(PANTHEONS).filter((id) => !state.claimedPantheons.includes(id));
@@ -3109,7 +3058,6 @@ export function seatPhase(state: GameState): void {
         state.eventLog.push(`${actor.name} enhanced its religion (${ENHANCER_BELIEFS[ePick].name} is taken).`);
       }
     }
-
 
     const anyWar = atWarWithAny(state, actor.seat);
     for (const foe of warsOf(state, actor.seat)) {

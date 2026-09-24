@@ -190,12 +190,6 @@ export function routePostGold(state: GameState, seat: number, destCenter: number
   return 1 + (suzerainEffect(state, seat, 'routePostGold') ? 1 : 0);
 }
 
-/** CIV6 (Trading Post): "Every Trading Post for your civilization through
- *  which a route passes along its course adds +1 Gold to its total yield",
- *  and "Each foreign Trading Post also adds +1 Gold to the yields of every
- *  Trade Route which passes through this city" — the stored CHAIN is the
- *  course: each chain city pays 1 (the owner's own post, which the chain
- *  rides by construction) plus the OTHER civs' posts standing there. */
 /** The tiles a route TRAVELS: origin to destination, hopping through the
  *  stored chain. `hexDistance` is the leg the Trader walks, which is how
  *  `routeChain` itself measures a leg. */
@@ -229,6 +223,12 @@ export function routeDestLuxuryGold(state: GameState, seat: number, dest: City):
   return AMSTERDAM_DEST_LUXURY_GOLD * seen.size;
 }
 
+/** CIV6 (Trading Post): "Every Trading Post for your civilization through
+ *  which a route passes along its course adds +1 Gold to its total yield",
+ *  and "Each foreign Trading Post also adds +1 Gold to the yields of every
+ *  Trade Route which passes through this city" — the stored CHAIN is the
+ *  course: each chain city pays 1 (the owner's own post, which the chain
+ *  rides by construction) plus the OTHER civs' posts standing there. */
 export function routeChainGold(state: GameState, seat: number, r: TradeRoute): number {
   let g = 0;
   // CIV6 (Jakarta): "Your Trading Posts in FOREIGN cities provide +1
@@ -272,7 +272,7 @@ export function wonderRouteOriginGold(state: GameState, city: City): number {
 /** CIV6 (University of Sankore): "Other Civilizations' Trade Routes to this
  *  city provide +1 Science and +1 Gold for them" — the DESTINATION's wonder
  *  pays the foreign SENDER. */
-export function wonderRouteSenderYields(state: GameState, dest: City): { science: number; gold: number } {
+function wonderRouteSenderYields(state: GameState, dest: City): { science: number; gold: number } {
   let science = 0;
   let gold = 0;
   for (const w of dest.wonders ?? []) {
@@ -467,8 +467,8 @@ export function claimTileEnRoute(state: GameState, seat: number, tileIndex: numb
  *  `city.districts`, so the flat head every route pays (food 1 /
  *  production 1 at home, gold 3 abroad) is simply its row. The origin's
  *  own districts pay nothing: `YieldChangeAsOrigin` is 0 on every row, and
- *  the live game agreed (ask 15, 2026-09-13). */
-export function districtRouteYields(state: GameState, dest: City, side: 'domestic' | 'international'): Yields {
+ *  the live game agrees (ask 15). */
+function districtRouteYields(state: GameState, dest: City, side: 'domestic' | 'international'): Yields {
   const out = emptyYields();
   for (const d of dest.districts) {
     if (!state.map.tiles[d.tileIndex].districtComplete) continue;

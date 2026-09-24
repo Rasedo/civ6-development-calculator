@@ -11,7 +11,7 @@ import { srcConst, xml, type SrcMap } from './provenance';
 /**
  * CIV6 (`RandomEvent_Frequencies`, REALISM_SETTING_MODERATE): every disaster
  * has a published `OccurrencesPerGame` at each of five Realism settings.
- * OWNER RULING 2026-09-04: this engine models MODERATE, and a per-game
+ * OWNER RULING: this engine models MODERATE, and a per-game
  * count becomes a per-turn chance by dividing by the STANDARD game length —
  * Civ 6's 500 turns, the span the install's count is written over. This
  * engine plays 250 of those turns and so sees half a game's worth, which is
@@ -21,7 +21,7 @@ import { srcConst, xml, type SrcMap } from './provenance';
  * invented. The wiki page they were read from publishes no numbers; the
  * install does.
  */
-export const STANDARD_GAME_TURNS = srcConst('disasters.STANDARD_GAME_TURNS', 500, {
+const STANDARD_GAME_TURNS = srcConst('disasters.STANDARD_GAME_TURNS', 500, {
   pedia: 'the GS standard-speed game length, 500 turns — the span RandomEvent_Frequencies writes '
     + 'its OccurrencesPerGame over (owner ruling 2026-09-04)',
 });
@@ -79,7 +79,7 @@ export const DROUGHT_CHANCE = srcConst('disasters.droughtChance', (23 + 5) / STA
  * the table has them (food 10/20%) though the row's EffectString labels it
  * NO_FERTILITY; the table is the data the game reads.
  */
-export type StormFamily = 'BLIZZARD' | 'DUST_STORM' | 'TORNADO' | 'HURRICANE';
+type StormFamily = 'BLIZZARD' | 'DUST_STORM' | 'TORNADO' | 'HURRICANE';
 /** the wire's family code: `sf` on the tile planes, `family` on each row */
 export const STORM_FAMILIES: readonly StormFamily[] = srcConst('disasters.stormFamilies',
   ['BLIZZARD', 'DUST_STORM', 'TORNADO', 'HURRICANE'], {
@@ -92,7 +92,7 @@ export const STORM_FAMILIES: readonly StormFamily[] = srcConst('disasters.stormF
 /**
  * CIV6 (`Expansion2_RandomEvents.xml`, `<PrevailingWinds>`): 22 rows giving a
  * WEIGHTED heading per latitude band, the heading a storm's walk draws each
- * step from (C-49; the walk is measured, ask 16). Eight bands, lower bound
+ * step from (the walk is measured, ask 16). Eight bands, lower bound
  * inclusive, by signed degree (north positive, `windBand`); each row's six
  * weights are in the hex direction order E, NE, NW, W, SW, SE (`AXIAL_DIRS`).
  *   60..90    NW 1  W 2  SW 2        -5..0     W 1   SW 1
@@ -149,8 +149,8 @@ export function windBand(row: number, height: number): number {
   return 7;
 }
 
-/** CIV6 (`RandomEvents`, `Movement="8"` on every storm row — MEASURED
- *  2026-09-13, ask 16): the unit steps a storm's centre walks in its movement
+/** CIV6 (`RandomEvents`, `Movement="8"` on every storm row — MEASURED,
+ *  ask 16): the unit steps a storm's centre walks in its movement
  *  turn and again as it dissipates, each step's heading drawn from
  *  `PREVAILING_WINDS` at the centre's current latitude. */
 export const STORM_MOVEMENT = srcConst('disasters.stormMovement', 8,
@@ -192,7 +192,6 @@ export interface StormEvent {
   fertFood: number;
   fertProd: number;
 }
-
 
 /**
  * PROVENANCE for one storm row (cpu/data/provenance.ts). Every magnitude is an
@@ -334,7 +333,7 @@ export const STORM_DISC: readonly (readonly [number, number])[] = (() => {
  * Divine Wind is Hojo's LEADER trait over the two hurricane rows; Mother
  * Russia is the CIVILIZATION's over the two blizzard rows.
  */
-export interface StormUnitRow {
+interface StormUnitRow {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
   civ?: CivId;
@@ -383,7 +382,7 @@ export const STORM_UNIT_ROWS: readonly StormUnitRow[] =
 /** NOT covered by the per-GAME-counts ruling: the install counts eruptions per GAME
  *  (VOLCANO_GENTLE 4, CATASTROPHIC 2.5, MEGACOLOSSAL 1.5 at MODERATE) where
  *  this engine rolls per VOLCANO, and the conversion needs the map's volcano
- *  count. Still the old stylization; still an open question. */
+ *  count. The rate stays stylized, an open question. */
 export const ERUPTION_CHANCE_PER_VOLCANO = srcConst('disasters.eruptionChance', 0.02, {
   stylized: 'the install counts eruptions per GAME (VOLCANO_GENTLE 4 / CATASTROPHIC 2.5 / '
     + 'MEGACOLOSSAL 1.5 at MODERATE) where this engine rolls per VOLCANO, and the conversion '

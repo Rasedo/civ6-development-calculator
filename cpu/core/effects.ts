@@ -27,7 +27,6 @@ import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { cityStateEnvoyBonuses, isSuzerain, suzerainEffect, suzerainOf, suzerainSciencePct } from './cityStates';
 import { NAN_MADOL_WATER_CULTURE } from '../data/cityStates';
 
-
 import { GP_PERM } from '../data/greatPeople';
 import { CLASS_BIT, classBitOf } from '../data/promotions';
 import { isSpaceProject } from '../data/projects';
@@ -163,7 +162,6 @@ export function availableTechs(state: GameState, seat: number): TechDef[] {
 export function availableCivics(state: GameState, seat: number): CivicDef[] {
   return availableCivicsIn(seatOf(state, seat)!.research);
 }
-
 
 export interface Modifiers {
   improvementYields: Partial<Record<ImprovementId, Partial<Yields>>>;
@@ -430,7 +428,6 @@ export function plotYieldRowsFor(state: GameState, seat: number, civ: string | n
   });
 }
 
-/** The product of a seat's production percentages that name this item. */
 /**
  * The roster's production multipliers for one queue item. `offHome` is
  * REQUIRED — a row may be keyed on the city sitting off the seat's home
@@ -754,18 +751,6 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
   return mods;
 }
 
-
-/** CIV6 (CITY_NOT_FOUNDED): what this seat's roster pays in a city it did
- *  NOT found — the ONE reader, so the amenity and the loyalty cannot drift
- *  apart on which cities count (`NOT_FOUNDED_ROWS`). */
-/** CIV6 (Satyagraha): "+5 Faith for each civilization (including India) they
- *  have met that has founded a Religion and is not currently at war."
- *  Acquaintance is not modelled between majors on either engine — every one
- *  is known — so "met" is every live major (`PEACEFUL_FOUNDER_ROWS`). */
-/** CIV6 (Dharma): "each Religion that has at least 1 Follower" in a city.
- *  Neither engine counts FOLLOWERS — a city holds pressure per religion and
- *  follows the argmax — so a religion with any pressure here is one with a
- *  follower. The religion's id is its founder's seat. */
 /** CIV6 (Faces of Peace, EFFECT_ADJUST_PLAYER_TOURISM_FAVOR): "For every 100
  *  Tourism per turn earn 1 Diplomatic Favor per turn." */
 export function tourismFavorOf(state: GameState, seat: number, tourismPerTurn: number): number {
@@ -778,8 +763,7 @@ export function tourismFavorOf(state: GameState, seat: number, tourismPerTurn: n
 
 /** CIV6 (The Grand Embassy): "Receives Science or Culture from Trade Routes to
  *  civilizations that are more advanced than Russia. +1 per 3 technologies or
- *  civics ahead." Neither engine compared two seats' progress before this, so
- *  the count is spelled here once for both. */
+ *  civics ahead." The count is spelled here once for both engines. */
 export function progressAhead(state: GameState, mine: number, theirs: number, civics: boolean): number {
   const a = seatOf(state, mine);
   const b = seatOf(state, theirs);
@@ -1259,11 +1243,6 @@ export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): 
   return pct;
 }
 
-/** CIV6 (Oligarchy, Fascism): the government's flat Combat Strength for one
- *  unit — "All land melee, anti-cavalry, and naval melee class units gain +4
- *  Combat Strength" (the PROMOTION-class axis: MELEE, ANTICAV, NAVAL_MELEE)
- *  and "All units gain +5 Combat Strength" — read beside `congressUnitCS` at
- *  every roll that composes a unit's strength. */
 /** CIV6 (Cyber Warfare): "+10 Combat Strength against units from Information
  *  and Future Eras." The card is the ASKER's; the era is the FOE's chassis. */
 export function eraMatchupCS(state: GameState, unit: { seat: number }, foeType: string | undefined): number {
@@ -1276,6 +1255,11 @@ export function eraMatchupCS(state: GameState, unit: { seat: number }, foeType: 
   return n;
 }
 
+/** CIV6 (Oligarchy, Fascism): the government's flat Combat Strength for one
+ *  unit — "All land melee, anti-cavalry, and naval melee class units gain +4
+ *  Combat Strength" (the PROMOTION-class axis: MELEE, ANTICAV, NAVAL_MELEE)
+ *  and "All units gain +5 Combat Strength" — read beside `congressUnitCS` at
+ *  every roll that composes a unit's strength. */
 export function governmentUnitCS(state: GameState, unit: { type: string; seat: number }): number {
   if (!isCiv(unit.seat)) return 0;
   const def = UNITS[unit.type];
@@ -1359,18 +1343,6 @@ function applyBeliefEffects(
   }
 }
 
-/**
- * The scripted, deterministic government + policy adoption for a seat
- * (either seat) — a pure function of its research state. Rule:
- *   - Adopt the NEWEST unlocked government: highest tier, ties broken by
- *     GOVERNMENTS table (insertion) order.
- *   - Fill the government's BASE slots greedily in POLICIES table order among
- *     unlocked cards matching the slot kind (a wildcard slot takes the first
- *     unfilled-eligible card). Zero RNG.
- * The government's BASE slots are used (no wonder-granted Forbidden City
- * wildcard) so the scripted both seats seats adopt symmetrically — the
- * GPU mirror computes the same set from the seat's tracked civics.
- */
 /** Count the wonder-granted policy slots, by kind — the LIVE adoption and
  * the boost census both take them. */
 export function wonderExtraSlots(state: GameState, seat: number): Record<SlotKind, number> {
@@ -1438,8 +1410,6 @@ export function slotFavorOf(state: GameState, seat: number): number {
   return n;
 }
 
-/** `blocked` is the POLICY_LIST index POLICY TREATY outcome B forbids; -1
- *  when nothing stands. A blocked card is simply never slotted. */
 /** CIV6 (Dark Age policy card): "they can only be adopted by civilizations
  *  that are experiencing a Dark Age" — the flag every adoption read needs. */
 export function inDarkAge(state: GameState, seat: number): boolean {
@@ -1448,7 +1418,7 @@ export function inDarkAge(state: GameState, seat: number): boolean {
 
 /** The `GOVERNMENT_LIST` position of one government id, -1 for an unknown or
  *  absent one — the index `governmentBit` shifts by. */
-export function governmentIndex(id: string | null): number {
+function governmentIndex(id: string | null): number {
   return id === null ? -1 : GOVERNMENT_LIST.findIndex((g) => g.id === id);
 }
 
@@ -1459,6 +1429,18 @@ export function governmentBit(id: string | null): number {
   return i < 0 ? 0 : 1 << i;
 }
 
+/**
+ * The deterministic government + policy adoption for a seat, a pure
+ * function of its research state. Rule:
+ *   - Adopt the NEWEST unlocked government: highest tier, ties broken by
+ *     GOVERNMENTS table (insertion) order.
+ *   - Fill the government's slots, then the wonder-granted `extra` slots,
+ *     greedily in POLICIES table order among unlocked cards matching the slot
+ *     kind (a wildcard slot takes the first unfilled-eligible card). Zero RNG.
+ * `blocked` is the POLICY_LIST index POLICY TREATY outcome B forbids; -1
+ * when nothing stands. A blocked card is simply never slotted. The GPU
+ * mirror computes the same set from the seat's tracked civics.
+ */
 export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
                                 blocked = -1, dark = false, held = 0): {
   government: string | null;
@@ -1619,7 +1601,6 @@ function applyGovernment(mods: Modifiers, research: ResearchState, stored: reado
   }
 }
 
-
 export function followerBeliefForReligion(state: GameState, g: number): BeliefDef | undefined {
   if (g < 0) return undefined;
   const rel = seatOf(state, g)?.religion;
@@ -1719,7 +1700,7 @@ export function withFollowerBelief(
   return m;
 }
 
-export function followerReligionForCity(
+function followerReligionForCity(
   followedReligion: number | null | undefined,
   ownerReligionId: number,
 ): number {

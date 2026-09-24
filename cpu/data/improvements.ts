@@ -18,7 +18,7 @@ import { xml, type SrcMap } from './provenance';
  * `yields` for each whole group. A civic may improve the rate, the payout, or
  * both — which is exactly how the three sourced rows below read.
  */
-export interface ImpAdjacency {
+interface ImpAdjacency {
   /** count a neighbour carrying a BONUS resource. */
   bonusResource?: boolean;
   /** count a neighbour holding this completed district. */
@@ -138,7 +138,7 @@ export interface ImprovementDef {
   appealYield?: { yield: YieldKey; pct: number };
   /** CIV6 (`DefenseModifier`): what a unit standing on it adds to its own
    *  defence, and CIV6 (`GrantFortification`): the turns of fortification it
-   *  is handed for free. The Fort's own numbers, now on the data. */
+   *  is handed for free. */
   defenseCS?: number;
   grantsFortification?: number;
   /** CIV6 (Great Wall, `BuildInLine` / `BuildOnFrontier`): the row may only
@@ -518,8 +518,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     // carries it explicitly FALSE and stays inside its owner's borders.
     outsideTerritory: true,
     // CIV6 (Improvements.xml `DefenseModifier` / `GrantFortification`): the
-    // Fort's own columns, on the data now that the Great Wall and the Pa
-    // carry the same pair.
+    // Fort's own columns; the Great Wall and the Pa carry the same pair.
     defenseCS: 4,
     grantsFortification: 2,
     // CIV6 (Fort): "can be built on any featureless land tile".

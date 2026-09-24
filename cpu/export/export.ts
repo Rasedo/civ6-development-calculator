@@ -46,11 +46,11 @@ const rules = buildRules() as Record<string, unknown>;
 rules.srcStamp = srcStamp;
 const rulesJson = JSON.stringify(rules);
 // PROVENANCE NEVER RIDES THE WIRE. A catalog exported by a spread carries
-// its `src` tags onto rules.json silently (civLevels and the storms did,
-// 2026-09-14; each spread now sets `src: undefined`). The wire ALSO has a
-// legitimate `src` — a district adjacency rule's SOURCE-KIND index, an
-// integer the GPU reads — so a strip by key name deleted a real field once
-// and the test is for the tag's SHAPE: an object with a kind key.
+// its `src` tags onto rules.json silently, so each spread sets
+// `src: undefined`. The wire ALSO has a legitimate `src` — a district
+// adjacency rule's SOURCE-KIND index, an integer the GPU reads — so a strip
+// by key name would delete a real field, and the test is for the tag's
+// SHAPE: an object with a kind key.
 if (/"src":\{"(xml|lab|stylized|derived)"/.test(rulesJson)) {
   console.error('rules.json carries a provenance tag — an exporter spreads a tagged row; set `src: undefined` there');
   process.exit(1);

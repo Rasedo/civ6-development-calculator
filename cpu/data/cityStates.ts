@@ -112,9 +112,6 @@ export const SUZ_EFFECTS: SuzEffect[] = [
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
  *  so it never leaves the city that holds the buildings. */
 export const CARDIFF_HARBOR_POWER = 2;
-/** Akkad: "Melee and anti-cavalry units' attacks do full damage to the
- *  city's walls." The Battering Ram's own effect, at EVERY walls tier and
- *  with no support unit present. */
 /** Kabul: "Your units receive double experience from battles they initiate." */
 export const KABUL_XP_MULT = 2;
 /** Preslav: "+5 Strength when fighting on hill tiles" (light and heavy cavalry). */
@@ -217,7 +214,7 @@ export const NGAZARGAMU_BUILDINGS: readonly (readonly string[])[] = [
  *  bonus resource on this seat's tiles serves ONE city, the reach an
  *  `Happiness="1"` luxury would have. */
 export const BUENOS_AIRES_AMENITIES = 1;
-export interface SuzerainBonusDef {
+interface SuzerainBonusDef {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
   name: string;
@@ -274,15 +271,6 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Objec
   Object.entries(RAW_CITY_STATE_SUZERAIN_BONUS).map(([k, v]) => [k, { ...v, src: SUZ_SRC }]),
 );
 
-export const CITY_STATE_TYPE_COLORS: Record<CityStateType, string> = {
-  scientific: '#4a90d9',
-  cultural: '#b05fb0',
-  trade: '#d9a94a',
-  industrial: '#b3763e',
-  militaristic: '#c0392b',
-  religious: '#e8e4d8',
-};
-
 /**
  * The per-type placement pool. `seeder/place.ts` holds its own copy — the
  * seeder is hashed into `genStamp` and may not import from `cpu/`, so the two
@@ -299,7 +287,6 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
 
 export const ENVOY_COST = 100;
 export const INFLUENCE_PER_TURN = 3;
-export const ENVOY_THRESHOLDS = [1, 3, 6] as const;
 export const CITY_STATE_CAPITAL_BONUS = 2;
 export const CITY_STATE_DISTRICT_BONUS = 2;
 export const SUZERAIN_ENVOYS = 3;

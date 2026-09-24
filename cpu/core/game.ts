@@ -68,13 +68,8 @@ export function effectiveResearchCost(state: GameState, seat: number, id: string
     goldenBoostBonus(state, seat, !TECHS[id]), rosterBoostPoints(state, seat, !TECHS[id]));
 }
 
-/**
- * Districts get pricier as the game advances (Civ 6 scales with overall
- * research progress). Cost is locked in when the district is queued.
- */
-/** The SPECIALTY base every row shared before the install's own were read —
- *  still the price of a Campus and its kin, and the figure the observation
- *  renders where no district is named. */
+/** The SPECIALTY base: the price of a Campus and its kin, and the figure the
+ *  observation renders where no district is named. */
 export const DISTRICT_SPECIALTY_COST = 54;
 
 /**
@@ -82,8 +77,7 @@ export const DISTRICT_SPECIALTY_COST = 54;
  * are FURTHER through driving the price rather than the average. `base` is
  * REQUIRED: the install gives each row its own (`Districts.Cost` — Aqueduct
  * 36, Canal and Dam 81, Government Plaza and Diplomatic Quarter 30,
- * Neighborhood 54), and a defaulted one silently priced every district as a
- * Campus. It speed-scales like every other production cost, and
+ * Neighborhood 54). It speed-scales like every other production cost, and
  * `districtDiscounted` carries the under-represented discount on top.
  */
 export function districtCostIn(research: ResearchState, base: number): number {
@@ -367,13 +361,6 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   return city;
 }
 
-/**
- * FOUND a city for `seat`: legality, the settler spend, then the mutation.
- * One founding for every seat, first city included: in units mode the spend
- * is a SETTLER unit STANDING ON the tile, consumed by the founding — the
- * real Civ 6 shape. Outside units mode (the classic calculator) and in
- * sandbox there are no units to spend, so founding is free.
- */
 /** a feature ARRIVES after t0 — the eruption's carrier. Nothing in the rollout
  *  calls it yet: WHERE a feature lands (and what it does to an improvement)
  *  is an open owner question, so the refusal set is the conservative
@@ -388,6 +375,13 @@ export function addFeature(state: GameState, tileIndex: number, id: FeatureId): 
   return true;
 }
 
+/**
+ * FOUND a city for `seat`: legality, the settler spend, then the mutation.
+ * One founding for every seat, first city included: in units mode the spend
+ * is a SETTLER unit STANDING ON the tile, consumed by the founding — the
+ * real Civ 6 shape. Outside units mode (the classic calculator) and in
+ * sandbox there are no units to spend, so founding is free.
+ */
 export function foundCity(
   state: GameState,
   tileIndex: number,
@@ -446,10 +440,6 @@ export function placeImprovement(
   }
   tile.improvement = imp;
   return { ok: true };
-}
-
-export function removeImprovement(state: GameState, tileIndex: number): void {
-  state.map.tiles[tileIndex].improvement = null;
 }
 
 export function removeFeature(state: GameState, tileIndex: number, seat: number): RuleResult {
@@ -539,7 +529,6 @@ export function queueWonder(
   }
   return { ok: true };
 }
-
 
 export function projectCost(state: GameState, seat: number, projectId?: string, city?: City): number {
   // Space steps and laser stations carry their REAL fixed price (already
@@ -649,7 +638,6 @@ export function queueProject(state: GameState, cityId: number, projectId: string
   return { ok: true };
 }
 
-
 /** Gold price to buy a building outright (Civ 6's 4× production cost). */
 export function buildingPurchaseCost(buildingId: string): number {
   return (BUILDINGS[buildingId]?.cost ?? 0) * GOLD_PURCHASE_MULT;
@@ -743,7 +731,7 @@ export function goldAffordable(treasury: number, cost: number): boolean {
 
 /** CIV6 (Ngazargamu): the modifier's own gate is `UnitDomain DOMAIN_LAND` —
  *  a chassis that is neither naval nor air. */
-export function unitIsLandDomain(unitType: string): boolean {
+function unitIsLandDomain(unitType: string): boolean {
   const d = UNITS[unitType];
   return !!d && !d.naval && d.air === undefined;
 }
@@ -941,14 +929,6 @@ export function purchaseUnitWithFaith(state: GameState, cityId: number, unitType
   return { ok: true };
 }
 
-/**
- * CIV6 (Theological combat): "When a hostile military unit uses the Condemn
- * Heretic action on a religious unit, the same effect is observed; however,
- * only the losing side loses religious influence, the Religious Pressure lost
- * is halved ... and it only affects cities within 6 tiles. The religion of the
- * military unit does not gain influence." The action's own condition is "Must
- * be at war with the owner of the religious unit."
- */
 /** which of two units real Civ 6 keeps when they merge: "the experience and
  *  promotions of the highest experience unit is preserved". XP banks toward
  *  the NEXT level rather than accumulating, so the LEVEL leads and the banked
@@ -1013,6 +993,14 @@ export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleRes
   return { ok: true };
 }
 
+/**
+ * CIV6 (Theological combat): "When a hostile military unit uses the Condemn
+ * Heretic action on a religious unit, the same effect is observed; however,
+ * only the losing side loses religious influence, the Religious Pressure lost
+ * is halved ... and it only affects cities within 6 tiles. The religion of the
+ * military unit does not gain influence." The action's own condition is "Must
+ * be at war with the owner of the religious unit."
+ */
 export function condemnHeretic(state: GameState, unit: Unit, tileIndex: number): RuleResult {
   if ((UNITS[unit.type]?.combat ?? 0) <= 0) return { ok: false, reason: 'Not a military unit.' };
   const target = state.units.find(
@@ -1072,14 +1060,6 @@ export function removeHeresy(state: GameState, unit: Unit): RuleResult {
   return { ok: true };
 }
 
-/**
- * CIV6 (Heathen Conversion): "Can convert all adjacent Barbarians to your side
- * by using a religious charge."
- *
- * The converts join their new owner in NEIGHBOUR-RING order on both engines —
- * the pooled twin appends them in that order, and an array-order walk that
- * disagreed would hand the next turn's orders to the wrong units.
- */
 /** every barbarian unit in the ring around `here`, in NEIGHBOUR-RING order. */
 export function adjacentBarbarians(state: GameState, here: Tile): Unit[] {
   const got: Unit[] = [];
@@ -1097,6 +1077,14 @@ export function convertAdjacentBarbarians(state: GameState, here: Tile, seat: nu
   return got.length;
 }
 
+/**
+ * CIV6 (Heathen Conversion): "Can convert all adjacent Barbarians to your side
+ * by using a religious charge."
+ *
+ * The converts join their new owner in NEIGHBOUR-RING order on both engines —
+ * the pooled twin appends them in that order, and an array-order walk that
+ * disagreed would hand the next turn's orders to the wrong units.
+ */
 export function convertHeathens(state: GameState, unit: Unit, actor: Seat): RuleResult {
   if (!promoFlag(unit, 'HEATHEN')) return { ok: false, reason: 'No such promotion.' };
   if ((unit.charges ?? 0) <= 0) return { ok: false, reason: 'No charges left.' };
@@ -1385,7 +1373,7 @@ export function itemCost(item: QueueItem, state?: GameState, city?: City): numbe
  */
 export const ENGINEER_FINISH_FRACTION = 0.2;
 export const ENGINEER_FINISH_DISTRICTS: readonly DistrictId[] = ['AQUEDUCT', 'CANAL', 'DAM'];
-export const ENGINEER_FINISH_BUILDING = 'FLOOD_BARRIER';
+const ENGINEER_FINISH_BUILDING = 'FLOOD_BARRIER';
 
 /**
  * The city whose head a charge spent at `tileIndex` would advance, or
@@ -1506,15 +1494,6 @@ export function wonderChargeBoost(state: GameState, unit: Unit, actor: Seat): Ru
   return { ok: true };
 }
 
-export function itemLabel(item: QueueItem): string {
-  if (item.kind === 'district') return DISTRICTS[item.district].name;
-  if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].name;
-  if (item.kind === 'settler') return 'Settler';
-  if (item.kind === 'unit') return UNITS[item.unit]?.name ?? item.unit;
-  if (item.kind === 'project') return PROJECTS[item.project]?.name ?? item.project;
-  return BUILDINGS[item.building].name;
-}
-
 /** CIV6 (Veterancy): "+30% Production toward Encampment districts, Harbor
  * districts, and buildings for these districts." */
 export function isEncampHarborItem(item: QueueItem): boolean {
@@ -1523,7 +1502,6 @@ export function isEncampHarborItem(item: QueueItem): boolean {
   const d = BUILDINGS[item.building]?.district;
   return d === 'ENCAMPMENT' || d === 'HARBOR';
 }
-
 
 /** Gold price of a tile. Real Civ 6: ring-based base (50 for ring
  * ≤2, 75 for ring 3, +25/ring beyond as a scope extension), speed-scaled,
@@ -1640,9 +1618,6 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
   return { ok: true };
 }
 
-
-
-
 export function endTurn(state: GameState): void {
   if (state.unitsMode) {
     refreshUnits(state);
@@ -1679,8 +1654,7 @@ export function endTurn(state: GameState): void {
     }
   }
   // Domination ends the game the instant a civ holds every capital;
-  // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
-  // Detection is indicator-only, so with no domination this stays inert.
+  // otherwise the score victory fires at TURN_LIMIT.
   const dom = dominationWinner(state);
   const spaceWon = state.victoryType === 3;
   const rel = religiousVictor(state);
@@ -1785,9 +1759,8 @@ function cultureVictor(state: GameState): number {
 
 /**
  * Religious victory (real Civ 6 predominance-in-every-civilization,
- * sized to modeled scope) — religion g wins when EVERY alive civ (the seat 0
- * if they hold ≥1 city, each seat with ≥1 city) has MORE THAN HALF of its
- * cities following g. At most one g can predominate in a given civ, so no
+ * sized to modeled scope) — religion g wins when EVERY seat holding at least
+ * one city has MORE THAN HALF of its cities following g. At most one g can predominate in a given civ, so no
  * tie-break is needed beyond the ascending scan (lowest id first). Requires
  * g founded and at least one alive civ (no vacuous win over a dead world).
  * The GPU mirror sits at the identical endTurn position.
@@ -1813,39 +1786,6 @@ function religiousVictor(state: GameState): number {
   return -1;
 }
 
-
-
-
-
-/**
- * religious pressure spread (deterministic, zero-RNG). Religions are
- * indexed in the unified civ space: 0 = the seat 0's, i+1 = seat i's. A
- * founded religion's HOLY tile (its capital center, frozen at founding) emits
- * pressure to every city (seat 0 + seat, symmetric) within
- * RELIGION_PRESSURE_RANGE tiles: +RELIGION_PRESSURE_PER_TURN integer pressure
- * to that city's accumulator for that religion, once per turn. A city then
- * FOLLOWS the religion with the most accumulated pressure (>0); ties resolve
- * to the lowest religion id — a founding-order proxy, since an earlier-founded
- * religion has spent more turns accumulating and so leads outright in the
- * common case, and the id tie-break only settles same-turn foundings.
- *
- * INERT this round: followedReligion/religionPressure are computed and
- * serialized but NOT yet read by the yield pipeline (the per-city follower-
- * belief coupling is the deferred follow-up — a deferred follow-up).
- * The GPU mirror is BatchSim._spread_religious_pressure. Integer pressure
- * keeps the argmax exact (no float association across the batch). Fresh City
- * objects (founded/flipped cities) carry no pressure — the reset-on-birth KILL
- * hygiene, mirrored on the GPU by zeroing dead/absent slots each turn.
- */
-/**
- * CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
- * Inspiration from that era." Runs at the era boundary, right after
- * `eraBoundary` commits the new age, in ascending seat order. A seat draws
- * only when the new era still holds a civic it has neither unlocked nor
- * triggered — an unpayable seat must not advance the shared stream. The
- * granted Inspiration is an Inspiration like any other, so it pays the Pen,
- * Brush and Voice dedication the same way a detected one does.
- */
 /**
  * CIV6 (Dynastic Cycle): "a random Eureka and Inspiration from the era of the
  * wonder, IF AVAILABLE" — one draw per count from the unearned rows of that
@@ -1877,6 +1817,15 @@ export function grantEraBoosts(state: GameState, seat: number, era: string): voi
     .map((c) => c.id), rsr.boosted);
 }
 
+/**
+ * CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
+ * Inspiration from that era." Runs at the era boundary, right after
+ * `eraBoundary` commits the new age, in ascending seat order. A seat draws
+ * only when the new era still holds a civic it has neither unlocked nor
+ * triggered — an unpayable seat must not advance the shared stream. The
+ * granted Inspiration is an Inspiration like any other, so it pays the Pen,
+ * Brush and Voice dedication the same way a detected one does.
+ */
 function eraInspirations(state: GameState): void {
   if (state.turn % ERA_LENGTH !== 0) return;
   const era = ERAS[Math.min(Math.floor(state.turn / ERA_LENGTH), ERAS.length - 1)];
@@ -1906,9 +1855,8 @@ function eraInspirations(state: GameState): void {
  *
  * ORDER is `state.units` ARRAY order for both the attacker walk and the
  * defender pick — this codebase's shared convention, which the GPU mirrors
- * with slot order (capture moves a unit to the END of both). An id tie-break
- * was a parity bug: after a capture an id no longer reflects array
- * position.
+ * with slot order (capture moves a unit to the END of both). Never an id
+ * tie-break: after a capture an id does not reflect array position.
  *
  * WHY IT IS A PHASE AND NOT A VERB: the fight was never a choice — an apostle
  * standing next to an enemy apostle fights, before it can spread. Inside a
@@ -2011,6 +1959,15 @@ export function spreadReligiousPressureForTest(state: GameState): void {
   spreadReligiousPressure(state);
 }
 
+/**
+ * Religious pressure spread (deterministic, zero-RNG). Religions are indexed
+ * by seat: religion g is seat g's. Every city following a founded religion
+ * presses the cities within range once per turn, and a city then FOLLOWS
+ * what `followedReligionOf` picks from its accumulated pressure. The GPU
+ * mirror is BatchSim._spread_religious_pressure. Fresh City objects
+ * (founded/flipped cities) carry no pressure — the reset-on-birth KILL
+ * hygiene, mirrored on the GPU by zeroing dead/absent slots each turn.
+ */
 function spreadReligiousPressure(state: GameState): void {
   const nRel = state.seats.length;
   const founded = state.seats.map((sx) => sx.religion.founded && sx.religion.holyTile != null && sx.religion.holyTile >= 0);
@@ -2138,14 +2095,12 @@ function spreadReligiousPressure(state: GameState): void {
   }
 }
 
-
 export function toggleLockedTile(state: GameState, cityId: number, tileIndex: number, seat: number): void {
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   const tile = state.map.tiles[tileIndex];
   if (!city || !tile || tileCity(tile) !== city.id) return;
   tile.locked = !tile.locked;
 }
-
 
 export function serialize(state: GameState): string {
   return JSON.stringify(state);
@@ -2213,10 +2168,9 @@ export function deserialize(json: string): GameState {
     sx.influencePoints ??= 0;
     sx.envoysAvailable ??= 0;
   }
-  state.seats ??= []; // seats IS the actor storage now
-  // Foreign cities became full City objects; older saves carry the
-  // scalar shape (growthBox, no queue/districts/…). Fill ONLY the missing
-  // fields in place — a current-shape save must round-trip byte-identically
+  state.seats ??= [];
+  // A save in the scalar city shape (growthBox, no queue/districts/…) is
+  // filled in place, ONLY the missing fields: a current-shape save must round-trip byte-identically
   // (the seat determinism test serializes and compares).
   for (const r of state.seats) {
     r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
@@ -2265,8 +2219,7 @@ export function deserialize(json: string): GameState {
   return state;
 }
 
-
-export function canChoosePantheon(state: GameState, seat: number): RuleResult {
+function canChoosePantheon(state: GameState, seat: number): RuleResult {
   if (seatOf(state, seat)!.religion.pantheon) return { ok: false, reason: 'Pantheon already chosen.' };
   if (!state.sandbox && seatOf(state, seat)!.faith < PANTHEON_FAITH_COST) {
     return { ok: false, reason: `Needs ${PANTHEON_FAITH_COST} faith (${Math.floor(seatOf(state, seat)!.faith)} banked).` };
@@ -2284,7 +2237,7 @@ export function choosePantheon(state: GameState, beliefId: string, seat: number)
   if (!state.sandbox) seatOf(state, seat)!.faith -= PANTHEON_FAITH_COST;
   seatOf(state, seat)!.religion.pantheon = beliefId;
   state.claimedPantheons.push(beliefId); // every claim path pushes what it takes — the pool IS the exclusion
-  addEraScore(state, seat, ERA_SCORE_PANTHEON); // seat 0 verb — gate-unreachable, TS-only (actor hook mirrors)
+  addEraScore(state, seat, ERA_SCORE_PANTHEON);
   return { ok: true };
 }
 
@@ -2334,7 +2287,7 @@ export function foundReligion(
   return { ok: true };
 }
 
-/** can the seat 0 enhance its religion (add the Enhancer belief)? Real
+/** can the seat enhance its religion (add the Enhancer belief)? Real
  * Civ 6 spends a second Great Prophet — modeled here as a SECOND earned
  * Prophet-class great person (the first funds founding). */
 export function canEnhanceReligion(state: GameState, seat: number): RuleResult {
@@ -2346,10 +2299,9 @@ export function canEnhanceReligion(state: GameState, seat: number): RuleResult {
   return { ok: true };
 }
 
-/** add an Enhancer belief to the seat 0's founded religion. Effects are
- * inert this round (they need religious pressure / missionary / combat systems
- * that do not exist yet); the slot and claim are real and mirror the
- * follower/founder claimed-pool exclusion. */
+/** add an Enhancer belief to the seat's founded religion. Its effects apply
+ * through getModifiers; the claim mirrors the follower/founder claimed-pool
+ * exclusion. */
 export function enhanceReligion(state: GameState, beliefId: string, seat: number): RuleResult {
   const check = canEnhanceReligion(state, seat);
   if (!check.ok) return check;

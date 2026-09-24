@@ -457,8 +457,6 @@ const SPACE_IDS = new Set(SPACE_PROJECTS.map((p) => p.id));
 export function isSpaceProject(id: string): boolean {
   return SPACE_IDS.has(id);
 }
-/** The device a project builds, or null. */
-export const WMD_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) => p.wmd);
 
 /** CIV6 (GS): a Terrestrial Laser Station "increases the city's Power
  *  requirement by 5 each time it is completed". */
@@ -470,7 +468,7 @@ export const LASER_POWER_LOAD = 5;
  *  Campus Research Grants (Science), Holy Site Prayers (Faith) and the Theater
  *  Square Festival (Culture), so the rate is uniform and needs no per-project
  *  table. We grant the equivalent lump on completion; total production invested
- *  equals the cost, so the totals agree. Was 0.75, which was five times real. */
+ *  equals the cost, so the totals agree. */
 export const PROJECT_YIELD_FRACTION = 0.15;
 export const PROJECT_GPP_FRACTION = 0.22;
 

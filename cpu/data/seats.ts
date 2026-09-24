@@ -7,7 +7,6 @@ const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
 const modArg = (id: string, name = 'Amount') =>
   xml('ModifierArguments', `ModifierId=${id}&Name=${name}`, 'Value');
 
-
 /** `free` is the FREE CITIES player of CIV6 (CIVILIZATION_FREE_CITIES,
  *  CIVILIZATION_LEVEL_FREE_CITIES): it holds the cities loyalty took from
  *  their owners, founds nothing, and stands in DIPLO_STATE_FREE_CITIES_NEUTRAL
@@ -78,31 +77,14 @@ export const MAX_CITIES_PER_SEAT = 6;
 export const CITY_SLOTS_PER_SEAT = srcConst('seats.citySlots', 24,
   { stylized: 'the per-seat OBSERVATION and storage width (rules.seats.citySlots) — wider than MAX_CITIES_PER_SEAT because loyalty flips are not capped; a capacity choice, not a magnitude' });
 /**
- * CIV6: a city holds a production QUEUE — several items lined up, each keeping
- * the production already spent on it, the head merely being the one worked.
- * The game's own queue has no published ceiling; this is the depth both engines
- * carry, because the GPU's queue is a tensor dimension and must be finite.
- * MODEL: the number itself is a capacity choice, not a sourced magnitude.
- */
-/**
  * THE CITY BUILDS ONE THING. Depth 1: the "queue" is the current build and
  * nothing else.
  *
- * OWNER RULING 2026-09-08. The deeper slots were never a mechanic — only the
- * HEAD accrues (every `progress +=` in this engine reads `queue[0]`), so an
- * entry behind it held an id and a permanent zero. They were not what makes
- * hammers survive a switch either; that is `productionBank`, a separate
- * per-city store that works with or without a queue.
- *
- * What they DID cost was an action head nobody could use: Q-1 promote columns
- * per city, legal every turn, asking for "move entry k to the front" while the
- * observation showed only the head — so the choice was uncorrelated with
- * anything visible. Nothing ever reached them but a 6% dice roll in the
- * scripted driver, whose own comment admitted they were "legal every turn and
- * chosen never".
- *
- * A human UI would want a queue. It would sit in the UI and emit one build
- * order a turn, which is exactly this.
+ * OWNER RULING. Only the HEAD accrues (every `progress +=` in this engine
+ * reads `queue[0]`), so a deeper slot would hold an id and a permanent zero.
+ * Hammers survive a switch through `productionBank`, a separate per-city
+ * store that works with or without a queue. A queue belongs in a UI, which
+ * emits one build order a turn: exactly this.
  */
 export const PRODUCTION_QUEUE_MAX = srcConst('seats.productionQueueMax', 1,
   { stylized: 'OWNER RULING 2026-09-08 — the city builds ONE thing; the deeper slots were never a mechanic (only the head accrues) and cost an action head nobody could use' });
@@ -117,7 +99,6 @@ export const WAR_MIN_TURNS = srcConst('seats.warMinTurns', 10,
 export const PEACE_TREATY_TURNS = srcConst('seats.peaceTreatyTurns', 10,
   gp('DIPLOMACY_PEACE_MIN_TURNS'));
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
-
 
 export const LOYALTY_MAX = srcConst('seats.loyaltyMax', 100,
   gp('LOYALTY_MAXIMUM'));
@@ -134,11 +115,11 @@ export const LOYALTY_AFTER_CULTURAL_TRANSFER = srcConst('seats.loyaltyAfterCultu
 /** Max per-turn swing from population pressure. Real Civ 6 ±20. */
 export const LOYALTY_PRESSURE_SCALE = srcConst('seats.loyaltyScale', 20,
   gp('LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_MAX_LOYALTY'));
-/** Per-turn loyalty by amenity tier name. Real Civ 6 ±6/±3. */
 /** CIV6 (`Happinesses_XP1.IdentityPerTurnChange`): the loyalty an amenity tier
  *  pays per turn, one install row per tier. */
 const happy = (tier: string) =>
   xml('Happinesses_XP1', `HappinessType=HAPPINESS_${tier}`, 'IdentityPerTurnChange');
+/** Per-turn loyalty by amenity tier name. Real Civ 6 ±6/±3. */
 export const LOYALTY_AMENITY: Record<string, number> = {
   Ecstatic: srcConst('seats.loyaltyAmenity.Ecstatic', 6, happy('ECSTATIC')),
   Happy: srcConst('seats.loyaltyAmenity.Happy', 3, happy('HAPPY')),
@@ -185,7 +166,7 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 // independently backs it. `WAR_WEARINESS_PER_WMD_LAUNCHED = 10` likewise backs
 // the thread's "+10 * base" nuke reading (12x total with the abroad multiplier).
 //
-// NOT MODELLED, and now known to exist because the data names them:
+// NOT MODELLED, and known to exist because the data names them:
 //   * WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, NONFOUNDED_CITY 1,
 //     FOUNDED_CITY 0}. What these three DO is published nowhere; reading them
 //     as a per-city split is an inference off their names. The rule that IS
@@ -281,27 +262,15 @@ export const AGE_PREV_STEP = srcConst('eras.agePrevStep', 5,
 export const AGE_GOLDEN = 2;
 export const AGE_PRESSURE = [0.5, 1.0, 1.5];
 /**
- * The CULTURE VICTORY constants, verified against the Gathering
- * Storm rules (civilization.fandom.com "Tourism (Civ6)"):
- *   visiting tourists = lifetime tourism / (nCivs * 200)
- *   domestic tourists = lifetime culture / 100
- * and a civ wins once its VISITING tourists exceed EVERY other civ's DOMESTIC
- * tourists. The 200 is the Rise-and-Fall-onward value (it was 150 in vanilla),
- * so it is the right one for the GS ruleset this repo models.
- */
-/**
  * DIPLOMATIC FAVOR — the World Congress currency. Real Civ 6
  * (Gathering Storm, verified against the Civilopedia "World Congress" concept
  * and the Civilization wiki "Diplomatic Favor (Civ6)" page): each civ earns
  * favor per turn equal to its GOVERNMENT TIER (1-4; Chiefdom is tier 0 and
  * pays nothing), plus +1 per city-state it is SUZERAIN of.
  *
- * NOT MODELED, and deliberately not invented: favor from ALLIANCES (seat 0
- * has no alliance axis yet), and the favor PENALTIES for CO2 (no climate
- * system), global grievances and occupying original capitals. The wiki names
- * those terms but not their rates, and guessing a rate would be exactly the
- * fabrication the verify-before-implement rule exists to prevent. Recorded as
- * residuals instead.
+ * The other terms (favor from ALLIANCES, the pollution, grievance and
+ * occupied-capital PENALTIES) each carry their own sourced constant, and
+ * `diplomaticFavorPerTurn` sums them.
  */
 export const DIPLO_FAVOR_PER_SUZERAIN = srcConst('eras.diplomaticFavorPerSuzerain', 1,
   gp('WORLD_CONGRESS_SUZERAIN_FAVOR_PER_TURN'));
@@ -342,7 +311,7 @@ export const DVP_PER_RESOLUTION = srcConst('eras.dvpPerResolution', 1,
 export const DIPLO_VICTORY_POINTS = srcConst('eras.diploVictoryPoints', 20,
   gp('DIPLOMATIC_VICTORY_POINTS_REQUIRED'));
 
-export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
+type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
   | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
   | 'building' | 'promoClass' | 'religion' | 'governor' | 'spyMission'
   | 'competition' | 'luxury';
@@ -356,7 +325,7 @@ export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'luxury',
 ];
 
-export interface CongressResolutionDef {
+interface CongressResolutionDef {
   id: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
@@ -367,13 +336,6 @@ export interface CongressResolutionDef {
   maxEra: number;
   target: CongressTargetKind;
 }
-/**
- * The modeled resolution subset — the rows whose BOTH outcomes land on
- * existing engine channels, era windows verbatim from the wiki table.
- * Catalog order is load-bearing: the slate rotation and the wire's res
- * indices key on it. The unmodeled rows (Trade Policy, Treaty Organization,
- * World Religion, Mercenary Companies, ...) are open AUDIT items.
- */
 /**
  * PROVENANCE (cpu/data/provenance.ts): the install's own `Resolutions` row for each
  * modelled resolution. Four rows this catalog carries have no readable install row at
@@ -472,6 +434,12 @@ const CONGRESS_SRC: Record<string, SrcMap> = {
   },
 };
 
+/**
+ * The modeled resolution subset — the rows whose BOTH outcomes land on
+ * existing engine channels, era windows verbatim from the wiki table.
+ * Catalog order is load-bearing: the slate rotation and the wire's res
+ * indices key on it.
+ */
 const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6: "A: +100% Production towards buildings in this district. /
   // B: No buildings can be created in this district." (through Modern)
@@ -703,7 +671,7 @@ export const SPECIAL_SESSION_GAP = srcConst('eras.specialSessionGap', 15,
 export const EMERGENCY_SLOTS = srcConst('eras.emergencySlots', 2,
   { stylized: 'concurrent emergencies both engines carry — a tensor width; real Civ 6 has no such cap' });
 
-export interface EmergencyDef {
+interface EmergencyDef {
   id: 'CITY_STATE' | 'MILITARY' | 'NUCLEAR';
   name: string;
   turns: number;
@@ -770,19 +738,28 @@ export const EMERGENCY_NUKE_TARGET_CS = srcConst('nuclear.emergencyNukeCS', 3,
 export const EMERGENCY_NUKE_LOYALTY_CUT = srcConst('nuclear.emergencyNukeLoyaltyCut', 1,
   { pedia: 'the GS Emergency page\'s own reward table (Nuclear, failure): "Member cities exert 1 less Loyalty pressure"' });
 
+/**
+ * The CULTURE VICTORY constants, verified against the Gathering
+ * Storm rules (civilization.fandom.com "Tourism (Civ6)"):
+ *   visiting tourists = lifetime tourism / (nCivs * 200)
+ *   domestic tourists = lifetime culture / 100
+ * and a civ wins once its VISITING tourists exceed EVERY other civ's DOMESTIC
+ * tourists. The 200 is the Rise-and-Fall-onward value (it was 150 in vanilla),
+ * so it is the right one for the GS ruleset this repo models.
+ */
 export const TOURISM_PER_VISITOR_PER_CIV = srcConst('seats.tourismPerVisitorPerCiv', 200,
   gp('TOURISM_TOURISM_TO_MOVE_CITIZEN'));
-/** CIV6 (Tourism, "Different government penalty"): the penalty is
- *  "(Your OtherGovernmentIntolerance + Foreign OtherGovernmentIntolerance) x
- *  TOURISM_CONFLICTING_GOVERNMENT_MULTIPLIER", and SAME government pays
- *  nothing. Gathering Storm values: 20 for the three tier-3 governments,
- *  0 for everything earlier, multiplier 1 — so the worst pair is -40%. */
 /** one `Governments` row's `OtherGovernmentIntolerance`; the install writes the
  *  tier-3 penalty as -20 and this table holds its MAGNITUDE. */
 const govTol = (id: string, expect: number) => ({
   ...xml('Governments', `GovernmentType=GOVERNMENT_${id}`, 'OtherGovernmentIntolerance'),
   expect,
 });
+/** CIV6 (Tourism, "Different government penalty"): the penalty is
+ *  "(Your OtherGovernmentIntolerance + Foreign OtherGovernmentIntolerance) x
+ *  TOURISM_CONFLICTING_GOVERNMENT_MULTIPLIER", and SAME government pays
+ *  nothing. Gathering Storm values: 20 for the three tier-3 governments,
+ *  0 for everything earlier, multiplier 1 — so the worst pair is -40%. */
 export const GOV_INTOLERANCE: Readonly<Record<string, number>> = {
   CHIEFDOM: srcConst('seats.GOV_INTOLERANCE.CHIEFDOM', 0, govTol('CHIEFDOM', 0)),
   AUTOCRACY: srcConst('seats.GOV_INTOLERANCE.AUTOCRACY', 0, govTol('AUTOCRACY', 0)),
@@ -1040,7 +1017,7 @@ export const COMPETITION_BRONZE_PCT = srcConst('eras.competitionBronzePct', 50,
  * install's other four; they belong to the Aid Request, which needs a
  * gold-gift verb this engine does not have yet.
  */
-export type ScoreSource = 'co2' | 'gpp' | 'project' | 'building' | 'district' | 'gold' | 'atWar' | 'co2Top';
+type ScoreSource = 'co2' | 'gpp' | 'project' | 'building' | 'district' | 'gold' | 'atWar' | 'co2Top';
 export interface ScoreRow {
   source: ScoreSource;
   amount: number;
@@ -1049,7 +1026,7 @@ export interface ScoreRow {
   of?: string;
 }
 
-export interface CompetitionDef {
+interface CompetitionDef {
   id: string;
   name: string;
   /** WHAT the competition counts, one install `<EmergencyScoreSources>` row
@@ -1084,17 +1061,17 @@ export interface CompetitionDef {
    *  in the list: the ballot's target space is the rows before it. */
   triggered?: boolean;
 }
-/**
- * APPEND-ONLY: the index is the wire, and it is the resolution's TARGET.
- * A row belongs here only when its SCORED QUANTITY and all three tiers are
- * published — the ones that are not are open AUDIT items.
- */
 /** the eight classes the World's Fair scores — every Great Person class but
  *  the Prophet (`WORLDS_FAIR_SCORE_GPP_*`, ScoreAmount 1 apiece). */
 const FAIR_GPP: readonly ScoreRow[] = ([
   'GENERAL', 'ADMIRAL', 'ENGINEER', 'MERCHANT', 'SCIENTIST', 'WRITER', 'ARTIST', 'MUSICIAN',
 ] as const).map((of) => ({ source: 'gpp' as const, amount: 1, of }));
 
+/**
+ * APPEND-ONLY: the index is the wire, and it is the resolution's TARGET.
+ * A row belongs here only when its SCORED QUANTITY and all three tiers are
+ * published — the ones that are not are open AUDIT items.
+ */
 export const COMPETITIONS: readonly CompetitionDef[] = [
   // CIV6 (Climate Accords): scored "1 point per turn for each CO2 emission
   // less than the highest polluter", plus 100 apiece for the three
@@ -1186,7 +1163,6 @@ export const COMPETITION_WORLD_GAMES = 2;
 export const COMPETITION_SPACE_STATION = 3;
 export const COMPETITION_AID_REQUEST = 4;
 
-
 /** CIV6 (Diplomatic Visibility and Gossip): "There are 5 levels of diplomatic
  *  visibility: None, Limited, Open, Secret, and Top Secret." Each source is
  *  worth one level, and the ceiling is the last of them. */
@@ -1221,7 +1197,6 @@ export const DEAL_ITEM_KINDS = [
    *  accepting it declares the war for BOTH parties (`jointWarPayable`) */
   'JOINT_WAR',
 ] as const;
-export type DealItemKind = typeof DEAL_ITEM_KINDS[number];
 export const DEAL_GOLD = DEAL_ITEM_KINDS.indexOf('GOLD');
 export const DEAL_GOLD_PER_TURN = DEAL_ITEM_KINDS.indexOf('GOLD_PER_TURN');
 export const DEAL_FAVOR = DEAL_ITEM_KINDS.indexOf('FAVOR');
@@ -1328,10 +1303,6 @@ export const ALLIANCE_L2_QP = srcConst('seats.allianceL2Qp', 320,
   gp('ALLIANCE_LEVEL_TWO_XP'));
 export const ALLIANCE_L3_QP = srcConst('seats.allianceL3Qp', 960,
   gp('ALLIANCE_LEVEL_THREE_XP'));
-/** CIV6 (Alliance, level 1): Trade Routes between allies pay extra - "+2
- *  Science from Trade Routes to your ally" and +1 from the ally's routes to
- *  you, the same 2/1 in Culture and Faith for their types, 4/2 in Gold for
- *  the Economic type. Indexed by ALLIANCE_TYPES; Military routes pay nothing. */
 /** one `ALLIANCE_ADD_<yield>_TO_<end>_TRADE_ROUTE` modifier's cell. */
 const aRoute = (y: string, end: string, col = 'Amount') =>
   xml('ModifierArguments', `ModifierId=ALLIANCE_ADD_${y}_TO_${end}_TRADE_ROUTE&Name=${col}`, 'Value');
@@ -1341,6 +1312,11 @@ const aNoRoute = {
   derived: 'zero — AllianceEffects carries no ALLIANCE_ADD_*_TRADE_ROUTE modifier for '
     + 'ALLIANCE_MILITARY at any level',
 } as const;
+/** CIV6 (Alliance, level 1): Trade Routes between allies pay extra - "+2
+ *  Science from Trade Routes to your ally" and +1 from the ally's routes to
+ *  you, the same 2/1 in Culture and Faith for their types, 4/2 in Gold for
+ *  the Economic type. Indexed by alliance type (research, cultural,
+ *  economic, military, religious); Military routes pay nothing. */
 export const ALLIANCE_ROUTE_TO = [
   srcConst('seats.allianceRouteTo.0', 2, aRoute('SCIENCE', 'ORIGIN')),
   srcConst('seats.allianceRouteTo.1', 2, aRoute('CULTURE', 'ORIGIN')),
@@ -1505,7 +1481,7 @@ export const GRIEVANCE_FAVOR_MAX = srcConst('eras.grievanceFavorMax', 10,
     note: 'stored here as a MAGNITUDE; the install writes the floor as a negative' });
 
 /**
- * THE TWO AI HEURISTICS the grievance table now feeds. Neither is a published
+ * THE TWO AI HEURISTICS the grievance table feeds. Neither is a published
  * Civ 6 rule and neither has a published number: a seat carrying grievances
  * with ANYONE cannot form an alliance, and once what the world holds against
  * it passes GRIEVANCE_GANG others may declare on it without the usual

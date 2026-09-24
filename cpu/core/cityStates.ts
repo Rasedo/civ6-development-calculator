@@ -27,7 +27,6 @@ const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 const CITY_STATE_SPACING = 8;
 
-
 function siteQuality(state: GameState, tile: Tile): number {
   if (isWater(tile) || isImpassable(tile)) return -1;
   if (naturalWonderAt(tile) || tile.feature === 'OASIS') return -1;
@@ -114,15 +113,10 @@ export function placeCityStateAt(
   return cityState;
 }
 
-
 export function cityStateAt(state: GameState, tileIndex: number): CityState | undefined {
   const _s = tileSeat(state.map.tiles[tileIndex]);
   const cityStateId = isCityStateSeat(_s) ? cityStateOfSeat(_s) : -1;
   return cityStateId === -1 ? undefined : state.cityStates.find((cityState) => cityState.id === cityStateId);
-}
-
-export function metCityStates(state: GameState, seat: number): CityState[] {
-  return state.cityStates.filter((cityState) => hasMet(cityState, seat));
 }
 
 /**
@@ -305,11 +299,6 @@ export function isSuzerain(state: GameState, cityState: CityState, seat: number)
   return contenders(state, cityState).every((c) => c === seat || mine > envoysHere(state, cityState, c));
 }
 
-/**
- * Does `seat` hold a suzerain whose perk is the RULE `effect`? The perks that
- * are rules rather than flat capital yields carry a `suz` code in
- * CITY_STATE_SUZERAIN_BONUS; every rule site asks this one question.
- */
 /** CIV6 (Economic alliance 2): the count behind the Envoy point per turn
  *  "for every City-State with your Ally as Suzerain". */
 export function allianceSuzInfluence(state: GameState, seat: number): number {
@@ -321,6 +310,11 @@ export function allianceSuzInfluence(state: GameState, seat: number): number {
   return n;
 }
 
+/**
+ * Does `seat` hold a suzerain whose perk is the RULE `effect`? The perks that
+ * are rules rather than flat capital yields carry a `suz` code in
+ * CITY_STATE_SUZERAIN_BONUS; every rule site asks this one question.
+ */
 export function suzerainEffect(state: GameState, seat: number, effect: SuzEffect): boolean {
   for (const holder of suzerainShareSeats(state, seat)) {
     for (const cityState of state.cityStates ?? []) {
@@ -343,7 +337,7 @@ export function suzerainShareSeats(state: GameState, seat: number): number[] {
 
 /** SOVEREIGNTY outcome B: a minor of the named TYPE provides no unique
  *  suzerain bonus to anyone. */
-export function suzerainBonusBlocked(state: GameState, cityState: CityState): boolean {
+function suzerainBonusBlocked(state: GameState, cityState: CityState): boolean {
   return congressSuzBonusBlocked(state, CITY_STATE_TYPES.indexOf(cityState.type));
 }
 
@@ -357,7 +351,7 @@ export function cityStateTradeCapacityBonus(state: GameState, seat: number): num
   return state.cityStates.filter((cityState) => cityState.type === 'trade' && isSuzerain(state, cityState, seat)).length;
 }
 
-export interface CsBonuses {
+interface CsBonuses {
   capital: Partial<Yields>;
   // Re-keyed to BUILDINGS (real Civ 6: CS bonuses land on the district's
   // BUILDINGS, not the bare district). The 3-envoy tier keys to the type's
@@ -434,7 +428,6 @@ export function envoyBonusDelta(state: GameState, cityState: CityState, seat: nu
   return delta;
 }
 
-
 export function assignEnvoy(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = state.cityStates.find((c) => c.id === cityStateId);
   if (!cityState) return no('No such city-state.');
@@ -445,7 +438,6 @@ export function assignEnvoy(state: GameState, cityStateId: number, seat: number)
   addEnvoys(state, cityState, seat, 1);
   return ok;
 }
-
 
 export function questSatisfied(
   state: GameState,
@@ -469,15 +461,13 @@ export function questSatisfied(
 }
 
 /**
- * ONE quest issuer for every seat, and it draws NO RNG. An issuer that rolled
- * would have to roll identically on both engines; picking deterministically (a
- * district from a flat four-item list, then a pick among the
- * satisfiable options); that seat's is deterministic and keyed to the
- * city-state's OWN type, which is both the closer read of Civ 6 and the one
- * that costs the shared RNG stream nothing. Fixed order: clearCamp ->
- * buildDistrict -> sendTradeRoute. `owner` supplies the asking seat's routes
- * and cities (omitted = seat 0). Null = nothing applies, retry next turn with
- * the questIssuedTurn clock unchanged.
+ * ONE quest issuer for every seat, and it draws NO RNG: the pick is
+ * deterministic and keyed to the city-state's OWN type, which is both the
+ * closer read of Civ 6 and the one that costs the shared RNG stream nothing.
+ * Fixed order: clearCamp -> buildDistrict -> sendTradeRoute. `owner`
+ * supplies the asking seat's routes and cities (omitted = `seat`'s own).
+ * Null = nothing applies, retry next turn with the questIssuedTurn clock
+ * unchanged.
  */
 export function issueQuest(
   state: GameState,
@@ -572,17 +562,6 @@ export function sueForPeaceWithCityState(state: GameState, cityStateId: number, 
   warWearinessPeace(state, seat, seatOfCityState(cityState.id));
   state.eventLog.push(`You have made peace with ${cityState.name}.`);
   return { ok: true };
-}
-
-export function questLabel(quest: CityStateQuest): string {
-  switch (quest.kind) {
-    case 'clearCamp':
-      return 'Clear the barbarian camp near us';
-    case 'sendTradeRoute':
-      return 'Send us a trade route';
-    case 'buildDistrict':
-      return `Build a ${quest.district?.replace(/_/g, ' ').toLowerCase()}`;
-  }
 }
 
 export function cityStatePhase(state: GameState): void {
