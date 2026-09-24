@@ -6,9 +6,7 @@
  * Yields are the row's `Building_YieldChanges` rows and nothing else: a
  * clause the install writes as a plot or city modifier (the Lighthouse's
  * Coast Food) is a `special`, not a flat yield, so it is never paid twice.
- * Maintenance is `Buildings.Maintenance`; the cost-tier heuristic in city.ts
- * survives only as a fallback for future unsourced additions. Worship
- * buildings stay 0 (faith-purchased).
+ * Maintenance is `Buildings.Maintenance` on every row.
  */
 
 import type { DistrictId, Yields } from '../core/types';
@@ -221,9 +219,9 @@ export interface BuildingDef {
   /** Granted automatically to the capital; never buildable. */
   autoCapital?: boolean;
   worship?: boolean;
-  /** explicit gold upkeep (real Civ 6) — overrides the cost-tier
-   * heuristic in buildingMaintenance where the wiki value is verified. */
-  maintenance?: number;
+  /** gold upkeep a turn: the install's `Buildings.Maintenance` (schema
+   *  DEFAULT 0 where the row writes none). */
+  maintenance: number;
   /**
    * CIV6: "+25% combat experience for all <classes> units trained in this
    * city" — a PERCENTAGE the trained unit carries for life, not starting XP,
@@ -260,10 +258,11 @@ export interface BuildingDef {
 }
 
 const rawList: BuildingDef[] = [
-  { id: 'PALACE', name: 'Palace', district: 'CITY_CENTER', cost: 0, yields: { production: 2, gold: 5, science: 2, culture: 1 }, housing: 1, amenities: 2, autoCapital: true,
+  { id: 'PALACE', name: 'Palace', district: 'CITY_CENTER', cost: 0, yields: { production: 2, gold: 5, science: 2, culture: 1 }, housing: 1, amenities: 2, autoCapital: true, maintenance: 0,
     src: {
       cost: { stylized: "the Palace is granted with the capital and never produced, so its price is never read; the install's Buildings.Cost 1 is a placeholder for a building nobody builds" },
       district: xml('Buildings', 'BuildingType=BUILDING_PALACE', 'PrereqDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_PALACE', 'Maintenance'),
       housing: xml('Buildings', 'BuildingType=BUILDING_PALACE', 'Housing'),
       amenities: xml('Buildings', 'BuildingType=BUILDING_PALACE', 'Entertainment'),
       'yields.production': xml('Building_YieldChanges', 'BuildingType=BUILDING_PALACE&YieldType=YIELD_PRODUCTION', 'YieldChange'),
@@ -409,10 +408,11 @@ const rawList: BuildingDef[] = [
   // CIV6: the install writes the Cathedral ONE Building_YieldChanges row,
   // YIELD_FAITH 3. There is no YIELD_CULTURE row — the Cathedral's Great Work
   // of Art slot is what pays Culture, and this catalog has no column for it.
-  { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, worship: true,
+  { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, worship: true, maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'Maintenance'),
       'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_CATHEDRAL&YieldType=YIELD_FAITH', 'YieldChange'),
       // documentary: the dump emits only columns the row HOLDS, so this tag is
       // never checked — it records why there is no `yields.culture` to check.
@@ -421,40 +421,44 @@ const rawList: BuildingDef[] = [
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_CATHEDRAL', 'PrereqBuilding')] },
     },
   },
-  { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, worship: true,
+  { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, worship: true, maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_GURDWARA', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_GURDWARA', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_GURDWARA', 'Maintenance'),
       'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_GURDWARA&YieldType=YIELD_FAITH', 'YieldChange'),
       worship: xml('Buildings', 'BuildingType=BUILDING_GURDWARA', 'EnabledByReligion'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_GURDWARA', 'PrereqBuilding')] },
       'yields.food': xml('Building_YieldChanges', 'BuildingType=BUILDING_GURDWARA&YieldType=YIELD_FOOD', 'YieldChange'),
     },
   },
-  { id: 'MEETING_HOUSE', name: 'Meeting House', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, production: 2 }, worship: true,
+  { id: 'MEETING_HOUSE', name: 'Meeting House', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, production: 2 }, worship: true, maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_MEETING_HOUSE', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_MEETING_HOUSE', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_MEETING_HOUSE', 'Maintenance'),
       'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_MEETING_HOUSE&YieldType=YIELD_FAITH', 'YieldChange'),
       worship: xml('Buildings', 'BuildingType=BUILDING_MEETING_HOUSE', 'EnabledByReligion'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_MEETING_HOUSE', 'PrereqBuilding')] },
       'yields.production': xml('Building_YieldChanges', 'BuildingType=BUILDING_MEETING_HOUSE&YieldType=YIELD_PRODUCTION', 'YieldChange'),
     },
   },
-  { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 0, worship: true,
+  { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 0, worship: true, maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'Maintenance'),
       'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_PAGODA&YieldType=YIELD_FAITH', 'YieldChange'),
       worship: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'EnabledByReligion'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_PAGODA', 'PrereqBuilding')] },
       housing: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'Housing'),
     },
   },
-  { id: 'STUPA', name: 'Stupa', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, amenities: 1, worship: true,
+  { id: 'STUPA', name: 'Stupa', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, amenities: 1, worship: true, maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_STUPA', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_STUPA', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_STUPA', 'Maintenance'),
       'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_STUPA&YieldType=YIELD_FAITH', 'YieldChange'),
       worship: xml('Buildings', 'BuildingType=BUILDING_STUPA', 'EnabledByReligion'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_STUPA', 'PrereqBuilding')] },
@@ -930,10 +934,11 @@ const rawList: BuildingDef[] = [
   // THE PRESERVE. CIV6: "Unlike other district buildings, you can build these
   // buildings in any order provided that you have unlocked them both" — which
   // is why the Sanctuary requires nothing.
-  { id: 'GROVE', name: 'Grove', district: 'PRESERVE', cost: 150, appealYields: { charming: { food: 1, faith: 1 }, breathtaking: { food: 2, faith: 2, culture: 2 } },
+  { id: 'GROVE', name: 'Grove', district: 'PRESERVE', cost: 150, appealYields: { charming: { food: 1, faith: 1 }, breathtaking: { food: 2, faith: 2, culture: 2 } }, maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_GROVE', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_GROVE', 'PrereqDistrict', { expect: 'DISTRICT_PRESERVE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_GROVE', 'Maintenance'),
       'appealYields.charming.food': xml('Adjacent_AppealYieldChanges', 'BuildingType=BUILDING_GROVE&YieldType=YIELD_FOOD&MinimumValue=2', 'YieldChange'),
       'appealYields.charming.faith': xml('Adjacent_AppealYieldChanges', 'BuildingType=BUILDING_GROVE&YieldType=YIELD_FAITH&MinimumValue=2', 'YieldChange'),
       'appealYields.breathtaking.food': xml('Adjacent_AppealYieldChanges', 'BuildingType=BUILDING_GROVE&YieldType=YIELD_FOOD&MinimumValue=4', 'YieldChange'),
@@ -941,10 +946,11 @@ const rawList: BuildingDef[] = [
       'appealYields.breathtaking.culture': xml('Adjacent_AppealYieldChanges', 'BuildingType=BUILDING_GROVE&YieldType=YIELD_CULTURE&MinimumValue=4', 'YieldChange'),
     },
   },
-  { id: 'SANCTUARY', name: 'Sanctuary', district: 'PRESERVE', cost: 440, appealYields: { charming: { science: 1, gold: 1 }, breathtaking: { science: 2, gold: 2, production: 2 } },
+  { id: 'SANCTUARY', name: 'Sanctuary', district: 'PRESERVE', cost: 440, appealYields: { charming: { science: 1, gold: 1 }, breathtaking: { science: 2, gold: 2, production: 2 } }, maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_SANCTUARY', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_SANCTUARY', 'PrereqDistrict', { expect: 'DISTRICT_PRESERVE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_SANCTUARY', 'Maintenance'),
       'appealYields.charming.science': xml('Adjacent_AppealYieldChanges', 'BuildingType=BUILDING_SANCTUARY&YieldType=YIELD_SCIENCE&MinimumValue=2', 'YieldChange'),
       'appealYields.charming.gold': xml('Adjacent_AppealYieldChanges', 'BuildingType=BUILDING_SANCTUARY&YieldType=YIELD_GOLD&MinimumValue=2', 'YieldChange'),
       'appealYields.breathtaking.science': xml('Adjacent_AppealYieldChanges', 'BuildingType=BUILDING_SANCTUARY&YieldType=YIELD_SCIENCE&MinimumValue=4', 'YieldChange'),

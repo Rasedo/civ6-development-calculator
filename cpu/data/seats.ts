@@ -732,13 +732,18 @@ export const EMERGENCY_ENVOY_GOLD = srcConst('eras.emergencyEnvoyGold', 1,
 export const EMERGENCY_CS_ROUTE_GOLD = srcConst('eras.emergencyCsRouteGold', 2,
   { pedia: 'the GS Emergency page\'s own reward table (City-State, failure): "Target\'s Trade Routes to City-States gain +2 Gold"' });
 /** CIV6 (Nuclear Emergency, success): "Target units have -3 CS when fighting
- *  Member units" — the deeper, permanent version of the running penalty. */
+ *  Member units" — permanent, unit against unit, whichever side attacks
+ *  (NUCLEAR_EMERGENCY_MEMBER_COMBAT_STRENGTH_ATTACK_REWARD adjusts the
+ *  defending target, _DEFEND_REWARD the attacking one, both by -3). */
 export const EMERGENCY_NUKE_TARGET_CS = srcConst('nuclear.emergencyNukeCS', 3,
-  { pedia: 'the GS Emergency page\'s own reward table (Nuclear, success): "Target units have -3 CS when fighting Member units"' });
-/** CIV6 (Nuclear Emergency, failure): "Member cities exert 1 less Loyalty
- *  pressure." */
+  { ...modArg('NUCLEAR_EMERGENCY_MEMBER_COMBAT_STRENGTH_ATTACK_REWARD'), scale: -1,
+    note: 'stored here as a MAGNITUDE; the install writes the target\'s penalty as a negative' });
+/** CIV6 (Nuclear Emergency, failure): "Member cities exert one less Loyalty
+ *  pressure" (NUCLEAR_EMERGENCY_TARGET_CULTURAL_IDENTITY_REWARD,
+ *  EFFECT_ADJUST_CITY_IDENTITY_PRESSURE over the members' cities). */
 export const EMERGENCY_NUKE_LOYALTY_CUT = srcConst('nuclear.emergencyNukeLoyaltyCut', 1,
-  { pedia: 'the GS Emergency page\'s own reward table (Nuclear, failure): "Member cities exert 1 less Loyalty pressure"' });
+  { ...modArg('NUCLEAR_EMERGENCY_TARGET_CULTURAL_IDENTITY_REWARD'), scale: -1,
+    note: 'stored here as a MAGNITUDE; the install writes the cut as a negative' });
 
 /**
  * The CULTURE VICTORY constants, verified against the Gathering

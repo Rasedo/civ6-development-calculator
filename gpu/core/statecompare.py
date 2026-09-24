@@ -327,11 +327,14 @@ def _emg_table(sim, b):
 
 
 def _emg_rewards(sim, b, rows):
-    """What past emergencies left standing: envoy gold, minor-leg gold, then
-    the per-seat heal and city-strike counts, both dense over the roster."""
-    return [[int(sim.civ_emg_envoy_gold[b, c]), int(sim.civ_emg_route_gold[b, c])]
+    """What past emergencies left standing: envoy gold, minor-leg gold, the
+    pressure cut, then the per-seat heal, city-strike and nuclear CS counts,
+    each dense over the roster."""
+    return [[int(sim.civ_emg_envoy_gold[b, c]), int(sim.civ_emg_route_gold[b, c]),
+             int(sim.civ_emg_nuke_cut[b, c])]
             + [int(sim.civ_emg_heal[b, c, o]) for o in rows]
             + [int(sim.civ_emg_strike[b, c, o]) for o in rows]
+            + [int(sim.civ_emg_nuke_cs[b, c, o]) for o in rows]
             for c in rows]
 
 

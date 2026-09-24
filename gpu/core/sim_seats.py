@@ -5613,6 +5613,8 @@ class SimSeats:
             return
         zero_f = torch.zeros(self.B, dtype=self.civ_diplo_favor.dtype, device=self.device)
         is_cs = self.emg_kind[:, k] == self._emg_at.get("CITY_STATE", -1)
+        is_mil = self.emg_kind[:, k] == self._emg_at.get("MILITARY", -1)
+        is_nuc = self.emg_kind[:, k] == self._emg_nuclear
         for row in range(self.n_majors):
             if members_won:
                 hit = m & self.emg_member[:, k, row]
@@ -5629,8 +5631,12 @@ class SimSeats:
                     hit, _pay, zero_f)
                 self.civ_emg_envoy_gold[:, row] += (hit & is_cs).long()
                 for tgt in range(self.n_majors):
-                    self.civ_emg_heal[:, row, tgt] += (hit & ~is_cs & (self.emg_target[:, k] == tgt)).long()
+                    at = hit & (self.emg_target[:, k] == tgt)
+                    self.civ_emg_heal[:, row, tgt] += (at & is_mil).long()
+                    self.civ_emg_nuke_cs[:, row, tgt] += (at & is_nuc).long()
             else:
+                # the Nuclear Emergency's failure term lands on the MEMBERS' cities
+                self.civ_emg_nuke_cut[:, row] += (m & is_nuc & self.emg_member[:, k, row]).long()
                 hit = m & (self.emg_target[:, k] == row)
                 if not bool(hit.any()):
                     continue
@@ -5638,7 +5644,7 @@ class SimSeats:
                     hit, zero_f + self._emg_target_favor, zero_f)
                 self.civ_emg_route_gold[:, row] += (hit & is_cs).long()
                 for mem in range(self.n_majors):
-                    self.civ_emg_strike[:, row, mem] += (hit & ~is_cs & self.emg_member[:, k, mem]).long()
+                    self.civ_emg_strike[:, row, mem] += (hit & is_mil & self.emg_member[:, k, mem]).long()
 
     # --- what an emergency does while it runs, and what it leaves behind ----
 
@@ -5685,9 +5691,20 @@ class SimSeats:
         return kind, phase, is_me, member
 
     def _emergency_pair_cs(self, attacker: torch.Tensor, defender: torch.Tensor) -> torch.Tensor:
-        """[B] f64 — CIV6 (Specifics): "Members gain +2 CS against targets'
-        units", for seat-valued attacker and defender columns."""
+        """[B] f64 — the ATTACKER's emergency CS, unit against unit, for
+        seat-valued attacker and defender columns (`emergencyAttackCS`).
+        CIV6 (Specifics): "Members gain +2 CS against targets' units" while it
+        runs; CIV6 (Nuclear Emergency, success; the _ATTACK_REWARD / _DEFEND_
+        REWARD pair, Amount -3 on the target's side both ways): "Target units
+        have -3 CS when fighting Member units"."""
         out = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        a = attacker.clamp(min=0, max=self.n_majors - 1)
+        d = defender.clamp(min=0, max=self.n_majors - 1)
+        pair = ((attacker >= 0) & (attacker < self.n_majors)
+                & (defender >= 0) & (defender < self.n_majors))
+        won = self.civ_emg_nuke_cs[self._bidx, a, d]
+        lost = self.civ_emg_nuke_cs[self._bidx, d, a]
+        out = out + torch.where(pair, (won - lost).double(), out) * self._emg_nuke_cs
         for row in range(self.n_majors):
             tg = self._emg_member_targets(row)
             if not bool(tg.any()):
@@ -5727,6 +5744,17 @@ class SimSeats:
                 hit = live.unsqueeze(1) & (self.city_id[:, row] == self.emg_city[:, k].unsqueeze(1))
                 out = out + hit.double() * self._emg_target_loyalty
         return out
+
+    def _emergency_pressure_cut(self, row: int) -> torch.Tensor:
+        """[B] f64 — CIV6 (Nuclear Emergency, failure;
+        NUCLEAR_EMERGENCY_TARGET_CULTURAL_IDENTITY_REWARD,
+        EFFECT_ADJUST_CITY_IDENTITY_PRESSURE -1 over the MEMBERS' cities):
+        "Member cities exert one less Loyalty pressure" — the citizens each of
+        `row`'s cities presses with fewer (`emergencyPressureCut`). The Free
+        Cities row carries none."""
+        if not (0 <= row < self.n_majors):
+            return torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        return self.civ_emg_nuke_cut[:, row].double() * self._emg_nuke_loyalty_cut
 
     def _emergency_strike_cs(self, city_owner: int, defender: int) -> torch.Tensor:
         """[B] f64 — CIV6 (Military Emergency, failure): "Target gains +2 CS

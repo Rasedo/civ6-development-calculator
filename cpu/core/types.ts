@@ -580,6 +580,12 @@ export interface Seat {
   emgEnvoyGold?: number;
   /** survived City-State Emergencies: +2 Gold on this seat's minor legs each. */
   emgRouteGold?: number;
+  /** WON Nuclear Emergencies, by the seat they were won against — that
+   * seat's units fight this seat's at -3 CS, one count per win. */
+  emgNukeCS?: number[];
+  /** Nuclear Emergencies this seat LOST as a member: its cities exert one
+   * less Loyalty pressure each. */
+  emgNukeCut?: number;
   /** GREAT PEOPLE this seat has recruited AND SPENT — the ids whose charge
    *  actually fired, which is what a founded religion counts, not the claim. */
   gpActivated?: string[];

@@ -2,19 +2,19 @@ import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { civsAtWar, seatOf } from '../../../cpu/core/seats';
 import { createGame } from '../../../cpu/core/game';
-import { transferCity, worldCongress } from '../../../cpu/core/phase';
+import { loyaltyDelta, transferCity, worldCongress } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
 import {
   EMERGENCIES, EMERGENCY_MILITARY, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR,
   EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY,
   EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS, EMERGENCY_ENVOY_GOLD,
   EMERGENCY_CS_ROUTE_GOLD, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, CONGRESS_INTERVAL,
-  EMERGENCY_SLOTS,
+  EMERGENCY_SLOTS, EMERGENCY_NUCLEAR, EMERGENCY_NUKE_TARGET_CS, EMERGENCY_NUKE_LOYALTY_CUT,
 } from '../../../cpu/data/seats';
 import {
   EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, emergencies, emergencyAttackCS,
   emergencyCsRouteGold, emergencyEnvoyGold, emergencyHeal, emergencyLoyalty, emergencyMoveBonus,
-  emergencyStrikeCS, raiseEmergency,
+  emergencyPressureCut, emergencyStrikeCS, raiseEmergency,
 } from '../../../cpu/core/emergency';
 import { grievancesAgainst } from '../../../cpu/core/grievance';
 
@@ -203,6 +203,63 @@ describe('emergencies: the session, the war and the clock', () => {
     expect(civsAtWar(state, 0, 1)).toBe(false);
     // the losing side is refunded whole — here the lone yes vote spent nothing
     expect(seatOf(state, 0)!.diplomaticFavor).toBe(0);
+  });
+});
+
+describe('emergencies: the nuclear terms', () => {
+  // CIV6 (Nuclear Emergency): success — "Target units have -3 CS when
+  // fighting Member units"; failure — "Member cities exert one less Loyalty
+  // pressure". Neither outcome pays the Military rows.
+  function nuclear(state: ReturnType<typeof twoCivs>) {
+    const cap = seatOf(state, 0)!.cities[0];
+    raiseEmergency(state, EMERGENCY_NUCLEAR, 0, cap.id, [1]);
+    (state.seats[1] as Seat).diplomaticFavor = 200;
+    state.turn = 7;
+    worldCongress(state);          // sponsored
+    state.turn = 8;
+    worldCongress(state);          // held
+    const e = emergencies(state)[0];
+    expect(e.kind).toBe(EMERGENCY_NUCLEAR);
+    expect(e.phase).toBe(EMG_RUNNING);
+    return e;
+  }
+
+  it('taking the capital leaves the target at -3 CS against every member, both ways', () => {
+    const state = twoCivs();
+    const e = nuclear(state);
+    const a = seatOf(state, 0)!, b = state.seats[1] as Seat;
+    a.cities = a.cities.filter((c) => c.id !== e.city);
+    state.turn = 9;
+    worldCongress(state);
+    expect(emergencies(state).length).toBe(0);
+    expect(b.emgNukeCS?.[0]).toBe(1);
+    expect(b.emgHeal).toBeUndefined();
+    expect(emergencyAttackCS(state, 1, 0)).toBe(EMERGENCY_NUKE_TARGET_CS);
+    expect(emergencyAttackCS(state, 0, 1)).toBe(-EMERGENCY_NUKE_TARGET_CS);
+    expect(emergencyPressureCut(state, 1)).toBe(0);
+  });
+
+  it('a target that holds out leaves every member city pressing one citizen lighter', () => {
+    const state = twoCivs();
+    const e = nuclear(state);
+    const a = seatOf(state, 0)!, b = state.seats[1] as Seat;
+    const home = b.cities[0];
+    const tier = 'CONTENT';
+    state.turn = e.act;
+    worldCongress(state);
+    expect(emergencies(state).length).toBe(0);
+    expect(b.emgNukeCut).toBe(1);
+    expect(a.emgNukeCut).toBeUndefined();
+    expect(a.emgStrike).toBeUndefined();
+    expect(emergencyPressureCut(state, 1)).toBe(EMERGENCY_NUKE_LOYALTY_CUT);
+    expect(emergencyPressureCut(state, 0)).toBe(0);
+    expect(emergencyAttackCS(state, 0, 1)).toBe(0);
+    // a lone citizen pressing one lighter presses nothing on its own city
+    home.population = 1;
+    b.emgNukeCut = 0;
+    const whole = loyaltyDelta(state, home, tier);
+    b.emgNukeCut = 1;
+    expect(loyaltyDelta(state, home, tier)).toBeLessThan(whole);
   });
 });
 

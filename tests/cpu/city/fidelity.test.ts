@@ -3,7 +3,7 @@ import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from '../helpers';
 import { foundCity, queueDistrict, queueBuilding, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost } from '../../../cpu/core/game';
 import { detectBoosts, toggleBoost, isBoosted } from '../../../cpu/core/boosts';
-import { computeCityStats, computeHousing, cityMaintenance } from '../../../cpu/core/city';
+import { buildingMaintenance, computeCityStats, computeHousing, cityMaintenance } from '../../../cpu/core/city';
 import { tileAppeal, appealTier } from '../../../cpu/core/appeal';
 import { placeImprovement } from '../../../cpu/core/game';
 
@@ -182,5 +182,12 @@ describe('maintenance', () => {
 
     const stats = computeCityStats(state, city);
     expect(stats.maintenance).toBe(2); // hub exempt
+  });
+
+  it('prices every building by its own Maintenance column', () => {
+    // CIV6: the Preserve's two rows and the worship rows write no
+    // Maintenance, so they take the schema DEFAULT 0
+    for (const id of ['GROVE', 'SANCTUARY', 'CATHEDRAL', 'PALACE']) expect(buildingMaintenance(id)).toBe(0);
+    expect(buildingMaintenance('UNIVERSITY')).toBe(2);
   });
 });

@@ -208,7 +208,7 @@ class Rules:
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
-    palace_maintenance: float  # buildingMaintenance('PALACE') — 0 while the Palace is cost-0
+    palace_maintenance: float  # the Palace row's `Buildings.Maintenance` (buildingMaintenance)
     palace_gov_yield: bool  # does the Palace count for Autocracy's per-government-building yields
     b_cost: torch.Tensor  # [NB]
     b_yields: torch.Tensor  # [NB, 6]
@@ -804,7 +804,7 @@ _MUTABLE = [
     "citystate_last_levy",
     "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_alliance_type", "seat_alliance_pts", "civ_sci_rate", "civ_cul_rate", "civ_tour_rate", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held", "seat_promise", "seat_promise_broken",
-    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "era_score", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank", "city_item_bank", "city_item_amt",
+    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank", "city_item_bank", "city_item_amt",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)

@@ -2134,7 +2134,7 @@ export function buildRules() {
       yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
       housing: BUILDINGS.PALACE?.housing ?? 0,
       amenities: BUILDINGS.PALACE?.amenities ?? 0,
-      maintenance: BUILDINGS.PALACE?.maintenance ?? 0,
+      maintenance: BUILDINGS.PALACE.maintenance,
     },
     buildings: centerBuildings.map((b) => ({
       id: b.id,
@@ -2187,7 +2187,7 @@ export function buildRules() {
         lateTourism: v.lateEraTourism ? [v.lateEraTourism.pct, ERAS.indexOf(v.lateEraTourism.minEra)] : [0, -1],
         districtAdjacencyAsFaith: v.districtAdjacencyAsFaith ? 1 : 0,
       })),
-      maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // the buildingMaintenance mirror
+      maintenance: b.maintenance,
       river: b.special === 'WATER_MILL',
       farmBonusFood: b.special === 'WATER_MILL',
       coastFood: b.special === 'LIGHTHOUSE',

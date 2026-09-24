@@ -477,6 +477,8 @@ class SimPhase:
             "ctr": self.city_center[:, :nrow].reshape(B, -1).clamp(min=0),
             "cong": self._congress_loyalty(row),
             "emg": self._emergency_loyalty(row),
+            # [B, majors] — the citizens each seat's cities press with fewer
+            "cut": torch.stack([self._emergency_pressure_cut(o) for o in range(nrow)], dim=1),
             "gpp": self._gp_city_perm(row, "loyalty"),
             # the Phoenician clause is keyed on the seat's CIVILIZATION; where
             # no game plays one the per-city half is never asked
@@ -507,7 +509,7 @@ class SimPhase:
         loy_gov = self._ungoverned_loyalty(row) if pre["nogov_on"] else pre["z"]
         d = self.pair_dist[here.unsqueeze(1), pre["ctr"]].to(F)
         w = ((rng + 1 - d).clamp(min=0)
-             * self.city_pop[:, :nrow].reshape(B, -1).double()
+             * (self.city_pop[:, :nrow].double() - pre["cut"].unsqueeze(2)).clamp(min=0).reshape(B, -1)
              * self.city_alive[:, :nrow].reshape(B, -1).double())
         sub = w.reshape(B, nrow, self.RC).sum(dim=2) * pre["age_f"]
         own = sub[:, row]
@@ -551,7 +553,8 @@ class SimPhase:
         rng = int(self.rules.seats.get("loyaltyRange", 9))
         ctr = self.city_center[:, row].clamp(min=0)  # [B, RC]
         d = self.pair_dist[here.unsqueeze(1), ctr].to(torch.float64)
-        w = (rng + 1 - d).clamp(min=0) * self.city_pop[:, row].double() * self.city_alive[:, row].double()
+        pop = (self.city_pop[:, row].double() - self._emergency_pressure_cut(row).unsqueeze(1)).clamp(min=0)
+        w = (rng + 1 - d).clamp(min=0) * pop * self.city_alive[:, row].double()
         return w.sum(dim=1)
 
     def _skips_free_city(self, row: int) -> torch.Tensor:

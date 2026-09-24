@@ -241,8 +241,65 @@ def main() -> None:
     assert one(is_me2) == 0, "a bystander reads itself as the target"
     print("  the envoy and minor-leg rewards read their counters; the view keys on the record")
 
+    # --- 9. the nuclear terms -----------------------------------------------
+    # CIV6 (Nuclear Emergency): success — "Target units have -3 CS when
+    # fighting Member units"; failure — "Member cities exert one less Loyalty
+    # pressure". Neither outcome pays the Military rows.
+    nuc = sim._emg_nuclear
+    assert nuc == sim._emg_at["NUCLEAR"]
+
+    def run_nuclear(at: int) -> int:
+        for k in range(sim._emg_slots):
+            sim._emg_clear(k, torch.ones(sim.B, dtype=torch.bool))
+        sim.last_session_turn[:] = -1
+        sim.civ_diplo_favor[:, mem] = 500.0
+        sim.war[:] = False
+        raise_on(sim, city, kind=nuc)
+        sim.turn = at
+        sim._special_sessions(blank_votes(sim))
+        sim.turn = at + 1
+        sim._special_sessions(blank_votes(sim))
+        assert one(sim.emg_kind[:, 0]) == nuc and one(sim.emg_phase[:, 0]) == 2, "the nuclear emergency never ran"
+        assert one(sim.emg_act[:, 0]) == at + 1 + sim._emg_rows[nuc]["turns"]
+        return one(sim.emg_act[:, 0])
+
+    heal0, strike0 = int(sim.civ_emg_heal[0, mem, tgt]), int(sim.civ_emg_strike[0, tgt, mem])
+    run_nuclear(140)
+    sim.city_alive[0, tgt, 0] = False
+    sim.turn = 145
+    sim._resolve_emergencies()
+    assert one(sim.emg_kind[:, 0]) == -1
+    assert int(sim.civ_emg_nuke_cs[0, mem, tgt]) == 1, "the members banked no nuclear CS"
+    assert int(sim.civ_emg_nuke_cs[0, tgt, mem]) == 0
+    assert int(sim.civ_emg_heal[0, mem, tgt]) == heal0, "a nuclear win paid the Military heal"
+    assert float(sim._emergency_pair_cs(a, d)[0]) == sim._emg_nuke_cs, "a member attacking gained nothing"
+    assert float(sim._emergency_pair_cs(d, a)[0]) == -sim._emg_nuke_cs, "the target attacking lost nothing"
+    barb = torch.full((sim.B,), -1, dtype=torch.long)
+    assert float(sim._emergency_pair_cs(a, barb)[0]) == 0.0
+    sim.civ_emg_nuke_cs[:] = 0
+    print("  a nuclear win leaves the target at -3 CS against every member, attacking or attacked")
+
+    sim.city_alive[0, tgt, 0] = True
+    dead = run_nuclear(160)
+    sim.turn = dead
+    sim._resolve_emergencies()
+    assert one(sim.emg_kind[:, 0]) == -1, "the nuclear deadline did not end it"
+    assert int(sim.civ_emg_nuke_cut[0, mem]) == 1, "the members' cities kept their pressure"
+    assert int(sim.civ_emg_nuke_cut[0, tgt]) == 0, "the target's own cities lost pressure"
+    assert int(sim.civ_emg_strike[0, tgt, mem]) == strike0, "a nuclear loss paid the Military City Strike"
+    assert float(sim._emergency_pressure_cut(mem)[0]) == sim._emg_nuke_loyalty_cut
+    assert float(sim._emergency_pressure_cut(tgt)[0]) == 0.0
+    assert float(sim._emergency_pressure_cut(sim.FREE_ROW)[0]) == 0.0
+    here = sim.city_center[:, mem, 0].clamp(min=0)
+    sim.city_pop[0, mem, 0] = 1
+    lighter = float(sim._citizen_pressure_from(here, mem)[0])
+    sim.civ_emg_nuke_cut[:, mem] = 0
+    whole = float(sim._citizen_pressure_from(here, mem)[0])
+    assert lighter < whole, "a member city presses as hard as before"
+    print("  a nuclear hold-out leaves every member city pressing one citizen lighter")
+
     print("EMERGENCY OK — the trigger, the sponsorship, the quiet window, the session, the war, "
-          "both outcomes, the permanent rewards and the observation key")
+          "both outcomes, the permanent rewards, the nuclear terms and the observation key")
 
 
 if __name__ == "__main__":

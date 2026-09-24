@@ -3222,8 +3222,9 @@ class SimEconomy:
     def _gw_holder_present(self, row: int) -> torch.Tensor:
         """[B, RC, H] bool — is each holder PRESENT in each of this row's
         cities: a building held (the Palace by the capital flag), a wonder
-        COMPLETE. Pillage is not asked here — a pillaged holder keeps and
-        pays its works."""
+        COMPLETE. A seat whose unique copy of the building declares no
+        slots (the Marae) holds none there. Pillage is not asked here — a
+        pillaged holder keeps and pays its works."""
         out = torch.zeros(self.B, self.RC, self.GW_H, dtype=torch.bool, device=self.device)
         bl = self.city_bldg[:, row]
         for h in range(self.GW_H):
@@ -3235,7 +3236,11 @@ class SimEconomy:
             elif bi == -2:
                 out[:, :, h] = self.city_is_cap[:, row]
             else:
-                out[:, :, h] = bl[:, :, bi]
+                held = bl[:, :, bi]
+                for (_nbi, _nciv) in self._bvar_no_gw:
+                    if _nbi == bi:
+                        held = held & ~self._row_plays_idx(row, _nciv).unsqueeze(1)
+                out[:, :, h] = held
         return out
 
     def _gw_holder_open(self, row: int, present: torch.Tensor) -> torch.Tensor:

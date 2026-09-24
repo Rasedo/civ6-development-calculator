@@ -35,16 +35,14 @@ re-adds them.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| A-49 the Marae's Great Work slots | 1 | TS gives the Marae none; the GPU builds `_bvar_no_gw` and never reads it |
-| A-50 the opening unit order | 1 | TS spawns seat 0's units first, the GPU appends row 0 last |
-| **A. Engine vs engine** | **2** | |
+| **A. Engine vs engine** | **0** | |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1 |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape |
 | B-82 the turn-limit score winner | 2 | TS names no winner; the GPU names one by a yield score that is not Civ 6's Score |
-| B-83 the nuclear emergency's terms | 1 | two sourced magnitudes exported and applied by neither engine |
-| B-84 building upkeep by cost tier | 1 | Grove and Sanctuary are priced by the tier heuristic; read their `Maintenance` |
 | B-85 Exodus of the Evangelists' golden movement | 1 | whether an Inquisitor takes it too |
+| B-86 the emergency combat terms' reach | 1 | the DEFEND half and ranged combat; how "one less pressure" applies (DLL) |
+| B-87 the Marae's dedication event | 1 | whether a holder with no slots fires Pen, Brush and Voice (LAB) |
 | **B. Fidelity vs real Civ 6** | **8** | |
 | C-1 power | 1 | the accident's gates and payloads (measured), one LAB line on the damage table; a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 1 | ask 18: what "near" is for Don't Settle Near Me; the broken-promise multiplier's operand (DLL) |
@@ -60,7 +58,7 @@ re-adds them.
 | C-74 per-game counts over per-object rolls | 1 | one event a turn, a weighted draw over the eligible |
 | C-81 the tile swap's reach | 1 | the measured adjacency clause (a claimed plot touches the claimant's land) on both engines |
 | **C. Absent systems** | **18** | |
-| **OPEN, TOTAL** | **28** | |
+| **OPEN, TOTAL** | **26** | |
 
 ## The question ledger — owner asks
 
@@ -80,11 +78,6 @@ the gate reaches is worth more here than one that re-reads the exporter, and
 a hunt catch opens an entry here only when it cannot close in the same
 commit.
 
-- **A-49. THE MARAE'S GREAT WORK SLOTS.** Weight 1.
-  - BUILD: the install gives `BUILDING_MARAE` no `Building_GreatWorks` row (`civVariants.0.noGreatWorks` in `cpu/data/buildings.ts`), and TS `workContext` (`cpu/core/greatWorks.ts`) makes a Marae standing in for its base row hold no works. The GPU builds the same set as `_bvar_no_gw` in `SimInit` and no reader asks it: `_gw_holder_present` (`sim_economy.py`) reads the base building's bit alone, so a Maori city with a Marae keeps the base row's slots. REACHED by no lane today: the serve gate reaches it only when a Maori seat builds the Marae and a Great Work lands; a poke lane on a planted Marae closes it.
-- **A-50. THE OPENING UNIT ORDER.** Weight 1.
-  - BUILD: TS `loadWorld` (`cpu/world/load.ts`) spawns each civ's fixture units in fixture order, seat 0 first; the GPU's t0 seeding in `SimInit` sorts `f["civs"]` with `int(c["seat"]) == 0` as the key, so row 0's units go LAST, and its comment calls that order a wire contract with TS `state.units`. One of the two is wrong or the order is unobservable. Read which planes compare the unit pool positionally (`shared/statecompare.manifest.json`, `pool_view`): if none, delete the sort; if one does, make the GPU seed in fixture order. Either way the seat-0 key goes (seats are symmetric).
-
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
 - **B-24r. GOVERNOR TAILS.** Weight 1.
@@ -99,13 +92,14 @@ commit.
   - Oligarchy and Classical Republic are adopted in NO game (`computeAdoption` / `_adopted_gov` take the newest tier); their rows are held by the two government lanes' borrowed-row drills only.
 - **B-82. THE TURN-LIMIT SCORE WINNER.** Weight 2.
   - BUILD: past `TURN_LIMIT` TS `endTurn` (`cpu/core/game.ts`) sets `victoryType` 1 and `victoryRow` -1 and names nobody. The GPU names a winner there (`sim_step.py`, `leader()` over `seat_score`), and `seat_score` is the balanced YIELD score the env rewards (`rules.score`: pop x3 plus weighted yields), not Civ 6's Score. Civ 6's score victory goes to the highest game Score, whose categories and per-item points are the install's `ScoringCategories` / `ScoringLineItems`. Source those rows, build the Score on both engines, and have both name the winner; the env reward stays its own number.
-- **B-83. THE NUCLEAR EMERGENCY'S TERMS.** Weight 1.
-  - BUILD: `EMERGENCY_NUKE_TARGET_CS` 3 ("Target units have -3 CS when fighting Member units", success) and `EMERGENCY_NUKE_LOYALTY_CUT` 1 ("Member cities exert 1 less Loyalty pressure", failure) are sourced in `cpu/data/seats.ts` and exported as `nuclear.emergencyNukeCS` / `emergencyNukeLoyaltyCut`, and neither engine applies them: `cpu/core/emergency.ts` has no nuclear arm, and the GPU reads both into `_emg_nuke_cs` / `_emg_nuke_loyalty_cut` with no reader. Wire them into the emergency resolution on both engines, beside the other kinds' rewards.
-- **B-84. BUILDING UPKEEP BY COST TIER.** Weight 1.
-  - BUILD: `buildingMaintenance` (`cpu/core/city.ts`) prices a row with no `maintenance` by its cost (>=500 is 3, >=190 is 2, else 1), and GROVE and SANCTUARY (`cpu/data/buildings.ts`) carry none, so their upkeep is invented. Both rows already cite the install's `Buildings` table for `Cost`; add `maintenance` from its `Maintenance` column with the same `xml(...)` provenance, then delete the tier arm so a missing value fails loudly (and check the GPU's upkeep reads the exported value, not a copy of the heuristic).
 - **B-85. EXODUS OF THE EVANGELISTS' GOLDEN MOVEMENT.** Weight 1.
   - LAB: both engines give the golden-age Exodus movement bonus to the Missionary and the Apostle only (`goldenMoveBonus` in `cpu/core/eras.ts`; the GPU's `_ded_exodus` row in `sim_masks.py`), while `INQUISITOR` is in the roster. Whether the Inquisitor takes it is answered by the commemoration's golden-age modifier and the requirement set it names in the install's Expansion1 commemoration data; failing that, by a golden-age Exodus seat holding an Inquisitor in the live game.
 
+- **B-86. THE EMERGENCY COMBAT TERMS' REACH.** Weight 1.
+  - BUILD: the Military and Nuclear emergencies' running bonus has a DEFEND half (`MILITARY_EMERGENCY_MEMBER_COMBAT_STRENGTH_DEFEND`, `NUCLEAR_EMERGENCY_MEMBER_COMBAT_STRENGTH_DEFEND`: the target also takes the term when it attacks a member) that neither engine applies, and `emergencyAttackCS` / `_emergency_pair_cs` (the running +2 and the won Nuclear emergency's 3) are called from melee unit-vs-unit combat only, never from ranged unit-vs-unit combat. Apply both halves wherever a unit fights a unit.
+  - DLL: the lost Nuclear emergency's `EFFECT_ADJUST_CITY_IDENTITY_PRESSURE` -1 is read as each member city pressing as one fewer citizen before the distance falloff (`citizenPressure` / `_citizen_pressure_from`); the install gives the amount, not where it enters.
+- **B-87. THE MARAE'S DEDICATION EVENT.** Weight 1.
+  - LAB: both engines fire the Pen, Brush and Voice dedication event when a Marae completes, because it stands in for a Great Work holder (`GW_HOLDERS` in `cpu/core/eras.ts`, the GPU's `_b_gwslot`), though the Marae holds no slots. A Maori seat under that dedication completing a Marae in the live game answers whether the event fires.
 ## C. Absent systems — the blockers, and the gaps waiting on them
 
 - **C-1. POWER.** Weight 1.

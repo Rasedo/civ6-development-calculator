@@ -50,7 +50,7 @@ import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acq
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, congressSessionDue, congressVoter } from './congress';
 import { buyVotes } from './congress';
-import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
+import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, EMERGENCY_NUCLEAR, emergencies, emergencyLoyalty, emergencyName, emergencyPressureCut, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { irradiated, wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { logDistrictCost } from './difflog';
@@ -414,13 +414,16 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
 }
 
 /** The CITIZEN pressure a list of cities puts on the tile `here`: each
- *  city's population, weighted down by distance inside `LOYALTY_RANGE`. */
+ *  city's population, less its owner's `emergencyPressureCut` and never below
+ *  0, weighted down by distance inside `LOYALTY_RANGE`. */
 function citizenPressure(state: GameState, here: Tile, cities: City[]): number {
   let sub = 0;
   for (const c of cities) {
     const t = state.map.tiles[c.centerIndex];
     const d = hexDistance(here.col, here.row, t.col, t.row);
-    if (d <= LOYALTY_RANGE) sub += c.population * (LOYALTY_RANGE + 1 - d);
+    if (d <= LOYALTY_RANGE) {
+      sub += Math.max(0, c.population - emergencyPressureCut(state, c.seat)) * (LOYALTY_RANGE + 1 - d);
+    }
   }
   return sub;
 }
@@ -1020,14 +1023,22 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
       sx.diplomaticFavor = (sx.diplomaticFavor ?? 0)
         + Math.floor((EMERGENCY_MEMBER_FAVOR * (100 + pct)) / 100);
       if (e.kind === EMERGENCY_CITY_STATE) sx.emgEnvoyGold = (sx.emgEnvoyGold ?? 0) + 1;
-      else sx.emgHeal = bump(sx.emgHeal, e.target);
+      else if (e.kind === EMERGENCY_MILITARY) sx.emgHeal = bump(sx.emgHeal, e.target);
+      else if (e.kind === EMERGENCY_NUCLEAR) sx.emgNukeCS = bump(sx.emgNukeCS, e.target);
     }
   } else {
     const t = state.seats[e.target];
     if (t) {
       t.diplomaticFavor = (t.diplomaticFavor ?? 0) + EMERGENCY_TARGET_FAVOR;
       if (e.kind === EMERGENCY_CITY_STATE) t.emgRouteGold = (t.emgRouteGold ?? 0) + 1;
-      else for (const m of e.members) t.emgStrike = bump(t.emgStrike, m);
+      else if (e.kind === EMERGENCY_MILITARY) for (const m of e.members) t.emgStrike = bump(t.emgStrike, m);
+    }
+    // the Nuclear Emergency's failure term lands on the MEMBERS' cities
+    if (e.kind === EMERGENCY_NUCLEAR) {
+      for (const m of e.members) {
+        const sx = state.seats[m];
+        if (sx) sx.emgNukeCut = (sx.emgNukeCut ?? 0) + 1;
+      }
     }
   }
   state.eventLog.push(

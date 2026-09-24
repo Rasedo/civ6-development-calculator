@@ -241,6 +241,17 @@ def main() -> None:
     assert fill(("ROME", "EGYPT", "NORWAY")) == 1
     print("  Nkisi's Palace OK")
 
+    # --- the Marae: a Maori seat's Amphitheater holds no works ---------------
+    def writing_room(names) -> tuple[bool, int]:
+        s = fresh(rules, path, names)
+        s.city_bldg[0, 0, 0, amph] = True
+        s._eff_version += 1
+        return bool(s._gw_room(0, WRITING)[0, 0]), place(s, 0, 0, WRITING, maker=0)
+
+    assert writing_room(("MAORI", "EGYPT", "NORWAY")) == (False, -1), "the Marae has no Great Work slots"
+    assert writing_room(("ROME", "EGYPT", "NORWAY")) == (True, slots_of(sim, H["AMPHITHEATER"])[0])
+    print("  the Marae OK")
+
     # --- the statecompare row reads every slot ------------------------------
     from core.statecompare import CITY as CITY_FIELDS  # noqa: E402
     s = fresh(rules, path)

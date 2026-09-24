@@ -13,7 +13,8 @@ import {
   EMERGENCIES, EMERGENCY_SLOTS, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY,
   EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY,
   EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS,
-  EMERGENCY_ENVOY_GOLD, EMERGENCY_CS_ROUTE_GOLD,
+  EMERGENCY_ENVOY_GOLD, EMERGENCY_CS_ROUTE_GOLD, EMERGENCY_NUCLEAR,
+  EMERGENCY_NUKE_TARGET_CS, EMERGENCY_NUKE_LOYALTY_CUT,
 } from '../data/seats';
 
 /** PHASE 0 the condition holds and nobody has paid; 1 a sponsor has, and the
@@ -71,10 +72,19 @@ function running(state: GameState, target: number): Emergency | null {
 
 // --- WHILE IT RUNS ---------------------------------------------------------
 
-/** CIV6 (Specifics): "Members gain +2 CS against targets' units". */
+/** The ATTACKER's emergency CS against `defender`, unit against unit.
+ *  CIV6 (Specifics): "Members gain +2 CS against targets' units" while the
+ *  emergency runs. CIV6 (Nuclear Emergency, success;
+ *  NUCLEAR_EMERGENCY_MEMBER_COMBAT_STRENGTH_ATTACK_REWARD / _DEFEND_REWARD,
+ *  Amount -3 on the target's side both ways): "Target units have -3 CS when
+ *  fighting Member units" — a member attacking its old target gains the 3,
+ *  and the old target attacking a member loses them. */
 export function emergencyAttackCS(state: GameState, attacker: number, defender: number): number {
   const e = running(state, defender);
-  return e && e.members.includes(attacker) ? EMERGENCY_MEMBER_CS : 0;
+  const live = e && e.members.includes(attacker) ? EMERGENCY_MEMBER_CS : 0;
+  const won = state.seats[attacker]?.emgNukeCS?.[defender] ?? 0;
+  const lost = state.seats[defender]?.emgNukeCS?.[attacker] ?? 0;
+  return live + EMERGENCY_NUKE_TARGET_CS * (won - lost);
 }
 
 /** CIV6 (Specifics): "+1 MP in target's territory" for a member. */
@@ -122,8 +132,16 @@ export function emergencyCsRouteGold(state: GameState, seat: number): number {
   return EMERGENCY_CS_ROUTE_GOLD * (state.seats[seat]?.emgRouteGold ?? 0);
 }
 
+/** CIV6 (Nuclear Emergency, failure; NUCLEAR_EMERGENCY_TARGET_CULTURAL_IDENTITY_REWARD,
+ *  EFFECT_ADJUST_CITY_IDENTITY_PRESSURE -1 over the MEMBERS' cities): "Member
+ *  cities exert one less Loyalty pressure" — each of this seat's cities presses
+ *  as if it had this many fewer citizens, on every city in reach. */
+export function emergencyPressureCut(state: GameState, seat: number): number {
+  return EMERGENCY_NUKE_LOYALTY_CUT * (state.seats[seat]?.emgNukeCut ?? 0);
+}
+
 export function emergencyName(kind: number): string {
   return EMERGENCIES[kind]?.name ?? 'Emergency';
 }
 
-export { EMERGENCY_CITY_STATE, EMERGENCY_MILITARY };
+export { EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, EMERGENCY_NUCLEAR };

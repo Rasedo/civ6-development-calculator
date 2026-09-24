@@ -440,12 +440,14 @@ const SEAT: Record<string, Extractor> = {
   buildersTrained: overSeats((s) => s.buildersTrained),
   relicReserve: overSeats((s) => s.relicReserve ?? 0),
   conquestProdTurns: overSeats((s) => s.conquestProdTurns ?? 0),
-  // what past emergencies left standing: envoy gold, minor-leg gold, then the
-  // per-seat heal and city-strike counts, both dense over the roster
+  // what past emergencies left standing: envoy gold, minor-leg gold, the
+  // pressure cut, then the per-seat heal, city-strike and nuclear CS counts,
+  // each dense over the roster
   emergencyRewards: overSeats((s, st) => [
-    s.emgEnvoyGold ?? 0, s.emgRouteGold ?? 0,
+    s.emgEnvoyGold ?? 0, s.emgRouteGold ?? 0, s.emgNukeCut ?? 0,
     ...st.seats.map((o) => s.emgHeal?.[o.seat] ?? 0),
     ...st.seats.map((o) => s.emgStrike?.[o.seat] ?? 0),
+    ...st.seats.map((o) => s.emgNukeCS?.[o.seat] ?? 0),
   ]),
   bestMeleeCS: overSeats((s) => s.bestMeleeCS),
   spaceLy: overSeats((s) => s.spaceLy ?? -1),

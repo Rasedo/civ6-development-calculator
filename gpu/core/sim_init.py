@@ -537,6 +537,8 @@ class SimInit:
         self.civ_emg_strike = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
         self.civ_emg_envoy_gold = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.civ_emg_route_gold = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        self.civ_emg_nuke_cs = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
+        self.civ_emg_nuke_cut = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         # Per-seat era-score accumulator, one column per seat row — the TS
         # `state.eraScore` mirror. Integer, zero-draw;
         # resets at every eraLength boundary (right after `self.turn += 1`, the
@@ -3740,11 +3742,11 @@ class SimInit:
         # tile), so a builder starts with its charges and every unit with its
         # movesLeft.
         #
-        # ORDER: civ rows in fixture order, then row 0. The pool is compared
-        # POSITIONALLY against TS's `state.units`, so the append order is a
-        # wire contract — not a statement about which seat matters.
+        # ORDER: the fixture's civs in fixture order, each civ's units in its
+        # own order — TS `loadWorld`'s spawn order, so slot order is
+        # `state.units` array order for the walks that cross seats.
         for b, f in enumerate(fixtures):
-            for cv in sorted(f["civs"], key=lambda c: int(c["seat"]) == 0):
+            for cv in f["civs"]:
                 seat = int(cv["seat"])
                 for u_ in cv["units"]:
                     i = int(self.unit_next[b])

@@ -548,13 +548,17 @@
             "Seat.emgEnvoyGold",
             "Seat.emgRouteGold",
             "Seat.emgHeal",
-            "Seat.emgStrike"
+            "Seat.emgStrike",
+            "Seat.emgNukeCS",
+            "Seat.emgNukeCut"
           ],
           "planes": [
             "civ_emg_envoy_gold",
             "civ_emg_route_gold",
             "civ_emg_heal",
-            "civ_emg_strike"
+            "civ_emg_strike",
+            "civ_emg_nuke_cs",
+            "civ_emg_nuke_cut"
           ],
           "note": "what a resolved emergency leaves standing, forever. Counters rather than a list of past emergencies: winning the same kind twice pays twice."
         },
