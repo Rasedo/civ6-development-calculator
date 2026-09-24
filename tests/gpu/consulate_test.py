@@ -21,29 +21,20 @@ import json
 import sys
 from pathlib import Path
 
-import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import plant_city, settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import plant_city, warm_base, opened
 
 
 # THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
 # instead of a fixture load and a settle. Every plane these pokes write is in
 # `_MUTABLE`, so a restore is the whole reset.
-_BASE: dict = {}
 
 
 def build(rules, path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+    return warm_base(str(path), lambda: opened(rules, path))
 
 
 def two_city_row(sim) -> tuple[int, int, int]:

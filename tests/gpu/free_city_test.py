@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.simbase import FREE_SEAT
-from warmup import settle_all, plant_city
+from warmup import settle_all, plant_city, warm_base
 
 B0 = 0
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -68,31 +68,18 @@ def lead(sim, row: int, civ: str, leader: str) -> None:
 # like any other.
 _STATIC = ("row_civ", "row_leader")
 _ATTRS = ("_free_city_loyalty",)
-_BASE: dict = {}
 
 
 def fresh(rules, path, eleanor: bool = False) -> BatchSim:
-    key = (str(path), eleanor)
-    if key not in _BASE:
+    def make():
         sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
         for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
             play(sim, r, name)
         if eleanor:
             lead(sim, 1, "ENGLAND", "ELEANOR_ENGLAND")
         sim = settle_all(sim)
-        _BASE[key] = (sim, sim.snapshot(),
-                      {k: getattr(sim, k).clone() for k in _STATIC},
-                      {k: getattr(sim, k) for k in _ATTRS})
-    sim, snap, stat, attrs = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    for k, v in attrs.items():
-        setattr(sim, k, v)
-    sim._eff_version += 1
-    sim._gen_ver += 1
-    sim._bldg_version += 1
-    return sim
+        return sim
+    return warm_base((str(path), eleanor), make, _STATIC, _ATTRS)
 
 
 def revolt(sim, row: int = 0):

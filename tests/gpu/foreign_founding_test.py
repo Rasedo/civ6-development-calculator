@@ -24,8 +24,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import warm_base, opened
 
 B0 = 0
 ROW = 1
@@ -40,23 +40,10 @@ UNITS = [u["id"] for u in RULES["units"]]
 # `_MUTABLE`), so the helper puts them back by hand and re-bumps exactly the
 # versions a re-seating bumps.
 _STATIC = ("row_civ", "row_leader")
-_BASE: dict = {}
 
 
 def build(path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], load_rules(),
-                                  device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._eff_version += 1
-    sim._gen_ver += 1
-    sim._bldg_version += 1
-    return sim
+    return warm_base(str(path), lambda: opened(load_rules(), path), _STATIC)
 
 
 def _two_continent_fixture():

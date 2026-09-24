@@ -35,8 +35,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import opened, warm_base
 
 B0, ROW = 0, 0
 GEO_FID = 7          # FEAT_IDS: ..., ICE 6, GEOTHERMAL_FISSURE 7, VOLCANIC_SOIL 8
@@ -49,21 +49,10 @@ BOATS = 18
 # list scene 3 rewrites a row of; it is a plain Python list, not a `_MUTABLE`
 # plane, so the helper hands back a fresh copy of the loaded one.
 _ATTRS = ("_d_amen_adj",)
-_BASE: dict = {}
 
 
 def fresh(rules, path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                                  dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot(), {k: list(getattr(sim, k)) for k in _ATTRS})
-    sim, snap, attrs = _BASE[key]
-    sim.restore(snap)
-    for k, v in attrs.items():
-        setattr(sim, k, list(v))
-    sim._bldg_version += 1
-    return sim
+    return warm_base(str(path), lambda: opened(rules, path), (), _ATTRS)
 
 
 def neigh_count(sim, on: torch.Tensor) -> torch.Tensor:

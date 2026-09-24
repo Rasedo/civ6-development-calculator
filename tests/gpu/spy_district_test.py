@@ -32,8 +32,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import load_rules, fixture_paths
+from warmup import opened
 
 B0 = 0
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -42,10 +42,7 @@ BLD = [b["id"] for b in RULES["buildings"]]
 
 
 def fresh(rules, path, turns=30):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
-    return sim
+    return opened(rules, path, turns)
 
 
 def a_city(sim, row):

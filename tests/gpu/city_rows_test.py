@@ -24,7 +24,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, warm_base
 
 B0 = 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
@@ -58,19 +58,6 @@ def play(sim, row: int, name):
 # rather than by a version counter, so a re-seated row would keep the previous
 # civilization's building columns; a fresh build leaves it empty, so does this.
 _STATIC = ("row_civ", "row_leader", "terrain", "hills")
-_BASE: dict = {}
-
-
-def _memo(key, make) -> BatchSim:
-    if key not in _BASE:
-        sim = make()
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._bvar_col_cache.clear()
-    return sim
 
 
 def fresh(rules, path) -> BatchSim:
@@ -80,7 +67,7 @@ def fresh(rules, path) -> BatchSim:
             play(sim, r, name)
         return settle_all(sim)
 
-    return _memo((str(path), "fresh"), make)
+    return warm_base((str(path), "fresh"), make, _STATIC)
 
 
 def bare(rules, path) -> BatchSim:
@@ -91,7 +78,7 @@ def bare(rules, path) -> BatchSim:
             play(sim, r, None)
         return sim
 
-    return _memo((str(path), "bare"), make)
+    return warm_base((str(path), "bare"), make, _STATIC)
 
 
 def T(*xs) -> torch.Tensor:

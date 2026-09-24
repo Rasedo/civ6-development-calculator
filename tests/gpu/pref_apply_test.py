@@ -25,8 +25,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import load_rules, fixture_paths
+from warmup import warm_base, opened
 
 ACTIVE = torch.ones(1, dtype=torch.bool)  # the eliminated-actor gate: these seats hold cities
 
@@ -35,19 +35,10 @@ ACTIVE = torch.ones(1, dtype=torch.bool)  # the eliminated-actor gate: these sea
 # milliseconds — instead of a fixture load, a settle and N steps. Every plane
 # these pokes write is in `_MUTABLE`, so the restore is the whole job; `slot`
 # keys a SECOND base for a scene that holds two live sims at once.
-_BASE: dict = {}
 
 
 def fresh(rules, path, turns=25, slot: int = 0):
-    key = (str(path), turns, slot)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(turns):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+    return warm_base((str(path), turns, slot), lambda: opened(rules, path, turns))
 
 
 def main() -> None:

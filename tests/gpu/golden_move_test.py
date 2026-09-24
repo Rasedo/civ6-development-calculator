@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import BARB_SEAT
-from warmup import settle_all
+from warmup import settle_all, warm_base
 
 
 # THE WARMED BASE, ONE PER (fixture set, slot). A scene pays a `restore` —
@@ -33,20 +33,15 @@ from warmup import settle_all
 # pokes write is in `_MUTABLE` or a view of one (the embark plane and the barb
 # pool's planes are range views of the merged `unit_*` bases). `slot` keys a
 # SECOND base for the one scene that holds two live sims at once.
-_BASE: dict = {}
 
 
 def build(slot: int = 0) -> BatchSim:
     paths = fixture_paths()[:1]
-    key = (tuple(str(p) for p in paths), slot)
-    if key not in _BASE:
+    def make():
         rules = load_rules()
         sim = settle_all(BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+        return sim
+    return warm_base((tuple(str(p) for p in paths), slot), make)
 
 
 def put(sim: BatchSim, pre: str, type_idx: int, seat: int) -> int:

@@ -18,8 +18,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths, FIXTURES
+from warmup import opened, warm_base
 
 
 # THE WARMED BASE, ONE PER (fixture, slot). A scene pays a `restore` —
@@ -32,25 +32,11 @@ from warmup import settle_all
 # `sim2` has forced one of them off, so it cannot share an object with them.
 _CAT = ("_gov_ucs_by_type", "_gov_dc_house", "_gov_dc_amen")
 _ATTRS = ("_gov_live", "_gov_has_effects")
-_BASE: dict = {}
 
 
 def build(rules, path, slot: int = 0) -> BatchSim:
-    key = (str(path), slot)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot(),
-                      {k: getattr(sim, k).clone() for k in _CAT},
-                      {k: getattr(sim, k) for k in _ATTRS})
-    sim, snap, cat, attrs = _BASE[key]
-    sim.restore(snap)
-    for k, v in cat.items():
-        getattr(sim, k).copy_(v)
-    for k, v in attrs.items():
-        setattr(sim, k, v)
+    sim = warm_base((str(path), slot), lambda: opened(rules, path), _CAT, _ATTRS)
     sim._gov_cat_version += 1
-    sim._eff_version += 1
-    sim._bldg_version += 1
     return sim
 
 

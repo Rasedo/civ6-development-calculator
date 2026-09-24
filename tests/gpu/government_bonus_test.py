@@ -22,25 +22,17 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import warm_base, opened
 
 ROW = 0
 SCIENCE = 3   # YIELD_KEYS: food, production, gold, science, culture, faith
 
 # THE WARMED BASE: a scene pays a `restore` instead of a fixture load and a settle.
-_BASE: dict = {}
 
 
 def build(path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], load_rules(),
-                                  device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+    return warm_base(str(path), lambda: opened(load_rules(), path))
 
 
 def gov_index(rules, gid: str) -> int:

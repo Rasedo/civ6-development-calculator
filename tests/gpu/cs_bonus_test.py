@@ -38,8 +38,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import load_rules, load_fixture, fixture_paths, FIXTURES
+from warmup import opened
 
 RULES_J = json.loads((FIXTURES / "rules.json").read_text())
 BUILDING_IDS = [b["id"] for b in RULES_J["buildings"]]
@@ -65,7 +65,7 @@ def _force_scientific_cs0(sim) -> None:
 
 
 def test_catalog(rules, path) -> None:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    sim = opened(rules, path)
     cs = rules.citystate
     # per-type tier lists match the rules export, every member in the roster
     for t in range(len(cs["typeT1Idx"])):
@@ -95,9 +95,7 @@ def test_catalog(rules, path) -> None:
 
 
 def test_building_bonus(rules, path) -> None:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(6):
-        sim.step()
+    sim = opened(rules, path, 6)
     _force_scientific_cs0(sim)
     # kill any other CS so only CS0 contributes
     if sim.S > 1:
@@ -139,9 +137,7 @@ def test_building_bonus(rules, path) -> None:
 
 
 def test_building_pillage(rules, path) -> None:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(6):
-        sim.step()
+    sim = opened(rules, path, 6)
     _force_scientific_cs0(sim)
     if sim.S > 1:
         sim.citystate_alive[0, 1:] = False
@@ -204,9 +200,7 @@ def test_stable_alternative(rules, path) -> None:
     """CIV6 (R&F): the militaristic 3-envoy bonus keys BARRACKS OR STABLE —
     a city holding only the STABLE half of the exclusive pair still
     collects, and the 6-envoy tier lands on the ARMORY."""
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(6):
-        sim.step()
+    sim = opened(rules, path, 6)
     PROD = 1
     sim._citystate_t1idx[0, 0, :] = -1
     sim._citystate_t1idx[0, 0, 0] = bidx("BARRACKS")
@@ -239,9 +233,7 @@ def test_stable_alternative(rules, path) -> None:
 
 
 def test_suzerain(rules, path) -> None:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(6):
-        sim.step()
+    sim = opened(rules, path, 6)
     _force_scientific_cs0(sim)
     if sim.S > 1:
         sim.citystate_alive[0, 1:] = False
@@ -285,9 +277,7 @@ def test_faith_class(rules, path) -> None:
     with Faith." Unreachable in the gate — the scripted seats never carry a
     minor past one envoy — so the class rule, the currency and the gold
     refusal are poked."""
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(20):
-        sim.step()
+    sim = opened(rules, path, 20)
     assert sim._suz_c_faith_bldg >= 0, "the suz-effect table carries no faithBuildings code"
     row = 1
     if sim.S > 1:
@@ -340,9 +330,7 @@ def test_faith_class(rules, path) -> None:
 def test_walls_faith_only(rules, path) -> None:
     """... and the walls half: with the suzerain held, no walls row is offered
     to the GOLD buy any more."""
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(20):
-        sim.step()
+    sim = opened(rules, path, 20)
     assert sim._walls_rows, "no walls rows in this build"
     row = 1
     active = torch.ones(1, dtype=torch.bool)
@@ -366,9 +354,7 @@ def test_walls_faith_only(rules, path) -> None:
 
 
 def test_civ_bonus(rules, path) -> None:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(20):
-        sim.step()
+    sim = opened(rules, path, 20)
     if sim.n_majors == 1:
         print("  civ test SKIPPED (no civs)")
         return

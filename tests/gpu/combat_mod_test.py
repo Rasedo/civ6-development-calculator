@@ -33,10 +33,10 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core import load_rules, fixture_paths
 from core.simbase import BARB_SEAT
 from core.engine import UNIT_SLOTS, js_round, FLANKING_CS, SUPPORT_CS
-from warmup import settle_all
+from warmup import opened
 
 HOLD = 12
 
@@ -86,7 +86,7 @@ def find_melee(rules, paths):
     tier-1 class promotion is guaranteed to pay against the defender.
     Returns (sim, p, code, name)."""
     for path in paths:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        sim = opened(rules, path)
         # the reference model below knows no roster clause: every seat plays
         # a civilization with no combat-strength row (the fixture's trio is
         # the seeder's draw, which may seat Tomyris or Genghis Khan)

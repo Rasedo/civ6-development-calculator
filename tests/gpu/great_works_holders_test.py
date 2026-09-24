@@ -19,7 +19,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all, works_of, clear_works
+from warmup import settle_all, works_of, clear_works, warm_base
 from city_rows_test import play
 
 SCULPTURE, PORTRAIT, LANDSCAPE, RELIGIOUS, ARTIFACT, WRITING, MUSIC, RELIC = range(8)
@@ -48,12 +48,10 @@ def place(sim, row: int, col: int, obj: int, maker: int = -1, era: int = -1, sea
 # (`city_bldg`, `city_wonder`, `built_wonder_complete`, `city_bldg_pillaged`,
 # the `city_gw_*` slots) is `_MUTABLE` and rides the snapshot. No scene holds
 # two of these engines live at once.
-_BASE: dict = {}
 
 
 def fresh(rules, path, names=("ROME", "EGYPT", "NORWAY"), keep_palace=False):
-    key = (str(path), tuple(names), bool(keep_palace))
-    if key not in _BASE:
+    def make():
         sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
         for r, name in enumerate(names):
             play(sim, r, name)
@@ -61,10 +59,8 @@ def fresh(rules, path, names=("ROME", "EGYPT", "NORWAY"), keep_palace=False):
         if not keep_palace:
             sim.city_is_cap[:, :, :] = False
         clear_works(sim)
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+        return sim
+    return warm_base((str(path), tuple(names), bool(keep_palace)), make)
 
 
 def main() -> None:

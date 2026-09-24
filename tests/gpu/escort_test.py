@@ -36,9 +36,9 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from core import load_rules, fixture_paths, FIXTURES
 
-from warmup import settle_all
+from warmup import warm_base, opened
 
 ROW = 1  # a civ row: every body below is seat-generic
 RJ = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -52,19 +52,10 @@ PRO = RJ["promotions"]
 # `unit_escorted`, `unit_promos`, `civ_techs`, `seat_explored`, `seat_ext`) is
 # in `_MUTABLE`, so `restore` carries it all back; no poke holds two of these
 # sims live at once.
-_BASE: dict = {}
 
 
 def fresh(rules, path, turns=6):
-    key = (str(path), turns)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(turns):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    return sim
+    return warm_base((str(path), turns), lambda: opened(rules, path, turns))
 
 
 def put(sim, row, tile, kind, mp=2, escorted=False):
@@ -302,7 +293,6 @@ def poke_convoy(rules, path):
     print("  7 convoy OK — a hull forms with its passenger, and the escort is paid 10")
 
 
-
 # ------------------------------------------------------------ 8 the rider SEES
 def poke_rider_sight(rules, path):
     """CIV6: sight belongs to a UNIT, and a formation's members stand on the
@@ -337,8 +327,6 @@ def poke_rider_sight(rules, path):
     assert any(bool(sim.seat_explored[0, ROW, t]) for t in ring), \
         "the Drone lifted no fog of its own — the step revealed at the Warrior's sight"
     print("  8 rider sight OK — the formation reveals at the WIDEST member's sight")
-
-
 
 
 # ------------------------------------------------- 9 THREE TO A TILE

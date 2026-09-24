@@ -26,15 +26,12 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
-from warmup import settle_all  # noqa: E402
+from core import load_rules, fixture_paths  # noqa: E402
+from warmup import opened  # noqa: E402
 
 
 def fresh(rules, path, turns=30):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
-    return sim
+    return opened(rules, path, turns)
 
 
 def live_units(sim, row):

@@ -24,8 +24,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import warm_base, opened
 
 
 # THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
@@ -33,21 +33,10 @@ from warmup import settle_all
 # pokes write that `snapshot`/`restore` does not carry (`river_mask` is map
 # generation, not `_MUTABLE` state), so the helper puts it back by hand.
 _STATIC = ("river_mask",)
-_BASE: dict = {}
 
 
 def build(rules, path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._eff_version += 1
-    sim._bldg_version += 1
-    return sim
+    return warm_base(str(path), lambda: opened(rules, path), _STATIC)
 
 
 def idx(rules, name: str) -> int:

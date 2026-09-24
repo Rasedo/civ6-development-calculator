@@ -22,17 +22,16 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import plant_city, settle_all
+from core import load_rules, fixture_paths
+from warmup import plant_city, opened
 
 
 def build(rules, path, steps=40):
     """Two live cities on row 0 through the engine's own FOUND verb, then
     `steps` turns of growth (food and pop accrue without decisions)."""
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    sim = opened(rules, path)
     plant_city(sim, 0)
     for _ in range(steps):
         sim.step()

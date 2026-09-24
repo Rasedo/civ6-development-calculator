@@ -18,14 +18,14 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES  # noqa: E402
-from warmup import settle_all  # noqa: E402
+from core import BatchSim, load_rules, fixture_paths, FIXTURES  # noqa: E402
+from warmup import opened  # noqa: E402
 
 B0 = 0
 
 
 def build(rules, path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    return opened(rules, path)
 
 
 def put_district(sim, row: int, j: int, di: int) -> int:

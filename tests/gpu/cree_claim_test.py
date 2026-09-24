@@ -20,9 +20,9 @@ import torch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
+from core import BatchSim, load_rules, fixture_paths  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from warmup import settle_all  # noqa: E402
+from warmup import warm_base, opened  # noqa: E402
 from core.simbase import NO_SEAT  # noqa: E402
 
 B0 = 0
@@ -37,24 +37,12 @@ ROW = 0
 # sim and scenes 3 and 4 call it while their own sim is live — the tile it
 # answers must still be read off a map that carries scene 1's claim.
 _STATIC = ("row_civ",)
-_BASE: dict = {}
 
 
 def build(rules, path, slot: int = 0) -> BatchSim:
     """Every seat's capital FOUNDED — a t0 fixture seats settlers, and
     founding is an ORDER, so a bare step raises no city."""
-    key = (str(path), slot)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._eff_version += 1
-    sim._gen_ver += 1
-    sim._bldg_version += 1
-    return sim
+    return warm_base((str(path), slot), lambda: opened(rules, path), _STATIC)
 
 
 def main() -> int:

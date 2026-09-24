@@ -30,7 +30,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from warmup import settle_all, opened
 
 BUILDING_IDS = [b["id"] for b in json.loads((FIXTURES / "rules.json").read_text())["buildings"]]
 
@@ -68,7 +68,7 @@ def test_catalog(sim) -> None:
 
 
 def test_training_xp_wiring(rules, path) -> None:
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    sim = opened(rules, path)
     # a MELEE chassis by its own promotion class — the Barracks and the Armory
     # name melee, ranged and anti-cavalry, and the Giant Death Robot carries no
     # promotion class for any XP building to address.
@@ -112,7 +112,7 @@ def test_training_xp_wiring(rules, path) -> None:
 def build_strike_scene(rules, path):
     """A seat-0 city (slot 0) owning a COMPLETE Encampment, one AT-WAR civ
     warrior adjacent, no barbs. Returns (sim, enc_tile, tgt_tile, vslot)."""
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    sim = opened(rules, path)
     assert sim.districts_on and sim._encamp_didx >= 0, "encampment district not exported"
     # advance a little so the seat-0 city has borders/tiles
     for _ in range(6):
@@ -375,7 +375,7 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
     so the gate cannot reach the channel at all. Both inputs are poked
     directly."""
     def _prep():
-        s = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+        s = opened(rules, path)
         for _ in range(80):          # civs need civics before they adopt a government
             s.step()
         return s

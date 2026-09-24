@@ -30,12 +30,11 @@ import json
 import sys
 from pathlib import Path
 
-import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import opened
 
 B0, ROW = 0, 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
@@ -73,8 +72,7 @@ ROWS = [
 
 
 def fresh(rules, path) -> BatchSim:
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu",
-                               dtype=torch.float64))
+    return opened(rules, path)
 
 
 def dry_land(sim) -> int:

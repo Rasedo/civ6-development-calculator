@@ -36,17 +36,14 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all, clear_works
+from core import load_rules, fixture_paths
+from warmup import clear_works, opened
 
 ROW = 1  # a civ row: the pokes below are seat-generic, so any row proves them
 
 
 def fresh(rules, path, turns=25):
-    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    for _ in range(turns):
-        sim.step()
-    return sim
+    return opened(rules, path, turns)
 
 
 def rank_of(sim, row, slot):

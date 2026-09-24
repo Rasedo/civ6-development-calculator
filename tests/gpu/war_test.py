@@ -21,9 +21,9 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core import load_rules, fixture_paths
 from core.engine import _MUTABLE
-from warmup import settle_all
+from warmup import opened, warm_base
 
 RICH = 10_000.0
 
@@ -38,24 +38,10 @@ RICH = 10_000.0
 # in test_inert_when_off. `_bvar_col_cache` is keyed by ROW alone rather than
 # by a version counter, so it is emptied the way a fresh build leaves it.
 _STATIC = ("row_leader",)
-_BASE: dict = {}
 
 
 def build(rules, path, steps: int = 0, slot: int = 0):
-    key = (str(path), steps, slot)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(steps):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot(),
-                      {k: getattr(sim, k).clone() for k in _STATIC}, sim._rl_war_active)
-    sim, snap, stat, active = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    sim._rl_war_active = active
-    sim._bvar_col_cache.clear()
-    return sim
+    return warm_base((str(path), steps, slot), lambda: opened(rules, path, steps), _STATIC, ("_rl_war_active",))
 
 
 def snap_all(sim):
@@ -301,7 +287,6 @@ def _melee_slot(sim):
 
 def _place_next_to(sim, p_, ctr):
     """Teleport slot p_ to a free neighbor of ctr; return the attack action."""
-    import torch as _t
 
     nb = sim.neigh[ctr]
     for d in range(6):

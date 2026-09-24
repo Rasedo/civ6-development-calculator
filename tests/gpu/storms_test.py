@@ -35,8 +35,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths, FIXTURES
+from warmup import warm_base, opened
 
 ROW = 0   # the carrier's seat
 FOE = 1   # a seat at war with it
@@ -65,26 +65,11 @@ def play(sim, row: int, name) -> None:
 # (`disasters`, the storm chances) — the helper puts both back by hand.
 _STATIC = ("row_civ", "row_leader")
 _ATTRS = ("disasters", "_st_chance")
-_BASE: dict = {}
 
 
 def fresh(rules) -> BatchSim:
     path = fixture_paths()[0]
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        _BASE[key] = (sim, sim.snapshot(),
-                      {k: getattr(sim, k).clone() for k in _STATIC},
-                      {k: getattr(sim, k) for k in _ATTRS})
-    sim, snap, stat, attrs = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    for k, v in attrs.items():
-        setattr(sim, k, v)
-    sim._eff_version += 1
-    sim._gen_ver += 1
-    sim._bldg_version += 1
+    sim = warm_base(str(path), lambda: opened(rules, path), _STATIC, _ATTRS)
     sim.war[0, ROW, FOE] = sim.war[0, FOE, ROW] = True
     return sim
 

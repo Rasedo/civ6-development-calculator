@@ -29,7 +29,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, warm_base
 
 
 def play(sim, row: int, name):
@@ -66,24 +66,18 @@ ONE = torch.tensor([0], dtype=torch.long)
 # engines live at once — `sim2`..`sim4` are read one after another, and the
 # only thing asked of an earlier one is a catalog scalar.
 _STATIC = ("row_civ", "row_leader", "tile_river", "floodplain")
-_BASE: dict = {}
 
 
 def fresh(rules, path) -> BatchSim:
     """The scene's trio — Rome, Egypt, Norway at rows 0-2 — seated BEFORE the
     capitals settle, so the founding clauses land as the old fixtures had them."""
-    key = str(path)
-    if key not in _BASE:
+    def make():
         sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
         for r, name in enumerate(("ROME", "EGYPT", "NORWAY")):
             play(sim, r, name)
         sim = settle_all(sim)
-        _BASE[key] = (sim, sim.snapshot(), {k: getattr(sim, k).clone() for k in _STATIC})
-    sim, snap, stat = _BASE[key]
-    sim.restore(snap)
-    for k, v in stat.items():
-        getattr(sim, k).copy_(v)
-    return sim
+        return sim
+    return warm_base(str(path), make, _STATIC)
 
 
 def civ(sim, name: str) -> int:

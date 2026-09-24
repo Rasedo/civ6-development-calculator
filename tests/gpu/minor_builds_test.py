@@ -30,8 +30,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from core import BatchSim, load_rules, fixture_paths
+from warmup import warm_base, opened
 
 B0 = 0
 
@@ -41,20 +41,10 @@ B0 = 0
 # write is in `_MUTABLE` or a view of one (`citystate_alive` is a view of
 # `city_alive`), so the restore is the whole of it; the building version moves
 # because `restore` rewrites `city_bldg` in place.
-_BASE: dict = {}
 
 
 def build(rules, path) -> BatchSim:
-    key = str(path)
-    if key not in _BASE:
-        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(4):
-            sim.step()
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+    return warm_base(str(path), lambda: opened(rules, path, 4))
 
 
 def walls_rows(sim) -> list[int]:

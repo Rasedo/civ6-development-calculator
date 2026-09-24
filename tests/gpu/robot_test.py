@@ -32,7 +32,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from warmup import settle_all, warm_base
 
 
 # THE WARMED BASE, ONE PER (fixture, batch width, settled). A scene pays a
@@ -40,21 +40,16 @@ from warmup import settle_all
 # want a founded map, a settle. Every plane these pokes write is in `_MUTABLE`
 # or a view of one (the `major_unit_*` planes are range views of the merged
 # `unit_*` bases), so the restore is the whole of it.
-_BASE: dict = {}
 
 
 def fresh(rules, path, n: int = 1, settled: bool = False) -> BatchSim:
-    key = (str(path), n, settled)
-    if key not in _BASE:
+    def make():
         sim = BatchSim([load_fixture(path) for _ in range(n)], rules, device="cpu",
                        dtype=torch.float64)
         if settled:
             sim = settle_all(sim)
-        _BASE[key] = (sim, sim.snapshot())
-    sim, snap = _BASE[key]
-    sim.restore(snap)
-    sim._bldg_version += 1
-    return sim
+        return sim
+    return warm_base((str(path), n, settled), make)
 
 
 def place_mil(sim, seat: int, t: int, type_idx: int, hp: int = 100) -> int:

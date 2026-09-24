@@ -35,8 +35,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
-from warmup import settle_all
+from core import load_rules, fixture_paths, FIXTURES
+from warmup import opened
 
 ROWS = (0, 1)  # seat 0 and civ 0 — the SAME ladder must serve both
 ACTIVE = torch.ones(1, dtype=torch.bool)
@@ -44,7 +44,7 @@ RICH = 10_000.0
 
 
 def build(rules, path):
-    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    return opened(rules, path)
 
 
 def t1(v: int) -> torch.Tensor:
