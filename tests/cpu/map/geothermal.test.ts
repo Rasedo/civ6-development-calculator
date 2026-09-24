@@ -104,10 +104,8 @@ describe('the Geothermal Fissure', () => {
 });
 
 describe('Volcanic Soil', () => {
-  // The row carries the NAME a belief pays on. NOTHING places it: neither
-  // engine can add a feature after t0, and putting it on the map at
-  // generation would refuse a Farm, Mine or Seaside Resort on every
-  // volcano-adjacent tile, which no source supports.
+  // The row carries the NAME a belief pays on; an eruption paints it on its
+  // ring (tests/cpu/map/feature-add.test.ts).
   it('is a catalog row with no yields of its own', () => {
     expect(FEATURES.VOLCANIC_SOIL.yields).toEqual({});
     expect(FEATURES.VOLCANIC_SOIL.removable).toBe(false);
@@ -125,7 +123,6 @@ describe('Volcanic Soil', () => {
     let guard = 0;
     while (slope.fertility === 0 && guard++ < 600) disasterPhase(state);
     expect(slope.fertility).toBeGreaterThanOrEqual(1);
-    expect(slope.feature).toBeNull(); // nothing paints the feature
   });
 });
 

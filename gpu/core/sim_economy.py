@@ -520,8 +520,8 @@ class SimEconomy:
 
     def _feat_gone(self) -> torch.Tensor:
         """[B, T] bool — the BAKED (t0) feature's yields no longer apply: it
-        was chopped or founding-stripped, or a feature that ARRIVED after t0
-        (`_add_feature`) stands in its place."""
+        was chopped or founding-stripped, or Volcanic Soil (`_paint_soil`)
+        stands in its place."""
         return self.feat_stripped | (self.feat_id != self.feat_id0)
 
     def _feat_added(self) -> torch.Tensor:
@@ -536,38 +536,48 @@ class SimEconomy:
         return (self._feat_cat_y[self.feat_id.clamp(min=0)]
                 * self._feat_added().unsqueeze(2).to(self.dtype))
 
-    def _add_feature(self, att: torch.Tensor, tile: torch.Tensor, fid: int) -> torch.Tensor:
-        """`addFeature` — a feature ARRIVES after t0, the eruption's own carrier.
-        Nothing in the rollout calls it yet: WHERE a feature lands (and what
-        it does to an improvement) is an open owner question, so the refusal
-        set is the conservative envelope — bare land only — mirrored clause
-        for clause by the TS helper. Returns the rows that planted."""
-        if bool(self._feat_natural[fid]):
-            return torch.zeros_like(att)
-        tt = tile.clamp(min=0)
-        t1 = tt.unsqueeze(1)
-        ok = (att
-              & ~self.water.gather(1, t1).squeeze(1)
-              & ~self.tile_submerged.gather(1, t1).squeeze(1)
-              & ((self.feat_id.gather(1, t1).squeeze(1) < 0)
-                 | self.feat_stripped.gather(1, t1).squeeze(1))
-              & (self.district.gather(1, t1).squeeze(1) < 0)
-              & (self.built_wonder.gather(1, t1).squeeze(1) < 0)
-              & (self.improvement.gather(1, t1).squeeze(1) < 0))
-        rows = ok.nonzero(as_tuple=True)[0]
-        if rows.numel():
-            self.feat_id[rows, tt[rows]] = fid
-            self.feat_stripped[rows, tt[rows]] = False
-            # TS reads `tile.feature` LIVE for every bare-ground job, so the
-            # planes the exporter baked per tile move with the arrival
-            # (`featJobs`); -1 leaves the baked value, which is what the soil
-            # asks for.
-            _jobs = self._feat_jobs[fid] if fid < len(self._feat_jobs) else [0, 0, 0, 0]
-            for _pl, _v in zip((self.farm_flat, self.farm_hill, self.mine_ok, self.lumber_ok), _jobs):
-                if _v >= 0:
-                    _pl[rows, tt[rows]] = bool(_v)
-            self._eff_version += 1
-        return ok
+    def _soil_paintable(self, tile: torch.Tensor) -> torch.Tensor:
+        """[B] `soilPaintable`'s twin: may an eruption paint Volcanic Soil on
+        `tile` [B] (-1 = none)? Land that is not a Mountain and not drowned,
+        with no district (a city centre included, kept apart in
+        `centre_slot_at`) and no wonder, either bare (a chopped feature is
+        bare) or under a LIVE feature the soil replaces (Woods, Rainforest)."""
+        t1 = tile.clamp(min=0).unsqueeze(1)
+
+        def at(p: torch.Tensor) -> torch.Tensor:
+            return p.gather(1, t1).squeeze(1)
+
+        fid, strip = at(self.feat_id), at(self.feat_stripped)
+        repl = torch.zeros_like(strip)
+        for f in self._soil_replaces:
+            repl = repl | (fid == f)
+        return ((tile >= 0) & ~at(self.water) & ~at(self.tile_submerged) & ~at(self.tile_mountain)
+                & (at(self.district) < 0) & (at(self.centre_slot_at) < 0) & (at(self.built_wonder) < 0)
+                & ((fid < 0) | strip | repl))
+
+    def _paint_soil(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """`paintVolcanicSoil`'s twin on paintable (row, tile) pairs. A live
+        Woods or Rainforest goes the way a chop takes it (`_strip_feature_at`:
+        its defence and movement, a Lumber Mill, the bare-ground jobs, the
+        adjacency it lent). Every t0 feature bake the plot still carries — a
+        chopped one's included, since the soil clears the strip flag — is
+        zeroed for good: the soil is not removable, so nothing may strip or
+        chop it back. Any other improvement stays."""
+        if not rows.numel():
+            return
+        live = ~self.feat_stripped[rows, tiles] & (self.feat_id[rows, tiles] >= 0)
+        if bool(live.any()):
+            self._strip_feature_at(rows[live], tiles[live])
+        self.appeal_base[rows, tiles] -= self.appeal_feat[rows, tiles]
+        self.appeal_feat[rows, tiles] = 0
+        self.feat_removable[rows, tiles] = False
+        self.tile_ftr[rows, tiles] = 0
+        self.tile_ftu[rows, tiles] = -1
+        self._feat_adj[rows, tiles] = 0
+        self._nfeat_adj[rows, tiles] = 0
+        self.feat_id[rows, tiles] = self._soil_fid
+        self.feat_stripped[rows, tiles] = False
+        self._eff_version += 1
 
     def _food_base(self) -> torch.Tensor:
         """[B, T] tile FOOD as tileYields has it at the END of the improvement
@@ -1075,7 +1085,6 @@ class SimEconomy:
         hit, tile = self._pick_static(r < self._flood_chance * rate, self._flood_list)
         self._flood_river(hit, tile)
 
-        er_rows, er_volc = [], []
         for k in range(self.volcano_tile.shape[1]):
             volc = self.volcano_tile[:, k]
             active = volc >= 0
@@ -1083,15 +1092,23 @@ class SimEconomy:
                 continue
             rv = self._next_random(active)
             erupt = active & (rv < self._eruption_chance * rate)
-            if bool(erupt.any()):
-                rows = erupt.nonzero(as_tuple=True)[0]
-                er_rows.append(rows)
-                er_volc.append(volc[rows])
-        if er_rows:
-            rows = torch.cat(er_rows)
-            nb = self.neigh[torch.cat(er_volc)]
+            if not bool(erupt.any()):
+                continue
+            nb = self.neigh[volc.clamp(min=0)]  # [B, 6], -1 off the map
+            # CIV6 (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL, `ReplaceFeature`):
+            # one draw per eligible ring plot, in ring order, at the chance of
+            # the severity every eruption takes.
+            for d in range(6):
+                nd = torch.where(erupt, nb[:, d], torch.full_like(volc, -1))
+                elig = self._soil_paintable(nd)
+                rs = self._next_random(elig)
+                paint = elig & (rs < self._soil_paint_p)
+                if bool(paint.any()):
+                    pr = paint.nonzero(as_tuple=True)[0]
+                    self._paint_soil(pr, nd[pr])
+            rows = erupt.nonzero(as_tuple=True)[0]
             row6 = rows.unsqueeze(1).expand(-1, 6).reshape(-1)
-            nbf = nb.reshape(-1)
+            nbf = nb[rows].reshape(-1)
             on = nbf >= 0
             self._scorch(row6[on], nbf[on])
             _live = self._fertility_live()[row6[on]]

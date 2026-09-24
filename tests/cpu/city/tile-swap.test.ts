@@ -2,14 +2,16 @@
  * other city. Ownership cannot be swapped if the tile has a district, a
  * wonder, or is next to the other city's center tile." (the install's
  * LOC_PLOTINFO_SWAP_TILE_OWNER_TOOLTIP), plus the Golf Course's and Open-Air
- * Museum's "Tiles with <row> cannot be swapped". The claimant's reach is its
- * work radius. `tests/gpu/tile_swap_test.py` pins the GPU twin on the same
- * scenes. */
+ * Museum's "Tiles with <row> cannot be swapped". The claimant's reach, as the
+ * live game's `CityManager.GetCommandTargets` offers it: within its work
+ * radius (3) and touching a plot it already owns.
+ * `tests/gpu/tile_swap_test.py` pins the GPU twin on the same scenes. */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { swapTileOk, workableTiles } from '../../../cpu/core/city';
 import { seatPhase } from '../../../cpu/core/phase';
-import { setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
+import { setTileOwner, tileBelongsTo, tileCity, tileSeat } from '../../../cpu/core/seats';
+import { hexDistance, neighbors } from '../../../world/hex';
 import type { City, GameState } from '../../../cpu/core/types';
 
 /** two cities of seat 0 four hexes apart on one row: A at (4,6), B at (8,6).
@@ -103,6 +105,32 @@ describe('the tile swap', () => {
     expect(swapTileOk(state, a, g.index)).toBe(false);
     setTileOwner(g, -1);
     expect(swapTileOk(state, a, g.index)).toBe(false);
+  });
+
+  it('reaches a plot within 3 of the claimant only where it touches the claimant\'s own land', () => {
+    const { state, a, b } = scene();
+    const ac = state.map.tiles[a.centerIndex];
+    const bc = state.map.tiles[b.centerIndex];
+    const dA = (t: { col: number; row: number }) => hexDistance(ac.col, ac.row, t.col, t.row);
+    const dB = (t: { col: number; row: number }) => hexDistance(bc.col, bc.row, t.col, t.row);
+    // distance 2 and 3: offered while a plot of A's touches it, refused once none does
+    for (const d of [2, 3]) {
+      const t = state.map.tiles.find((u) => dA(u) === d && dB(u) >= 2 && neighbors(state.map, u).some((n) => tileBelongsTo(n, a)))!;
+      setTileOwner(t, 0, b.id);
+      expect(swapTileOk(state, a, t.index)).toBe(true);
+      // A's centre is 2+ away, so every touching plot of A's can be handed over
+      const mine = neighbors(state.map, t).filter((n) => tileBelongsTo(n, a));
+      for (const n of mine) setTileOwner(n, 0, b.id);
+      expect(swapTileOk(state, a, t.index)).toBe(false);
+      setTileOwner(mine[0], 0, a.id);
+      expect(swapTileOk(state, a, t.index)).toBe(true);
+    }
+    // distance 4, touching A's land: out of reach all the same
+    const far = state.map.tiles.find((u) => dA(u) === 4 && dB(u) >= 2)!;
+    setTileOwner(far, 0, b.id);
+    const edge = neighbors(state.map, far).find((n) => dA(n) === 3)!;
+    setTileOwner(edge, 0, a.id);
+    expect(swapTileOk(state, a, far.index)).toBe(false);
   });
 
   it('the record refuses a refused plot and a claimant that is not the seat\'s city', () => {

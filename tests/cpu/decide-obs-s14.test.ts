@@ -109,17 +109,24 @@ describe('the cities group', () => {
     expect(idx).toEqual([...idx].sort((a, b) => a - b));
   });
 
-  it('swapFrom: a sibling plot within reach, not next to its holder, with worked and locked', () => {
+  it('swapFrom: a sibling plot within reach and touching the claimant\'s land, not next to its holder, with worked and locked', () => {
     const state = scene();
-    const [a] = state.seats[0].cities;
+    const [a, b] = state.seats[0].cities;
     const t = tileAtCoords(state.map, 7, 10);   // held by a, two from a, three from b
     setTileOwner(t, 0, a.id);
+    const touch = tileAtCoords(state.map, 8, 10);   // b's plot beside it
+    setTileOwner(touch, 0, b.id);
     a.workedTiles = [t.index];
     t.locked = true;
-    const rows = citiesObs(state, 0);
+    let rows = citiesObs(state, 0);
     expect(rows[1].swapFrom).toContainEqual([t.index, a.centerIndex, 1, 1]);
     // a plot next to its holder's centre never swaps
     expect(rows[1].swapFrom.map((s) => s[0])).not.toContain(tileAtCoords(state.map, 6, 10).index);
-    expect(rows[0].swapFrom).toEqual([]);
+    // a may claim b's plot back: it touches a's land, three from a
+    expect(rows[0].swapFrom).toEqual([[touch.index, b.centerIndex, 0, 0]]);
+    // touching none of b's land, the plot is not offered
+    setTileOwner(touch, 0, a.id);
+    rows = citiesObs(state, 0);
+    expect(rows[1].swapFrom.map((s) => s[0])).not.toContain(t.index);
   });
 });

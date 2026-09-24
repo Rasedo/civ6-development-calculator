@@ -682,7 +682,7 @@ def _main() -> int:
                 ("peace_treaty", [py, "tests/gpu/peace_treaty_test.py"], 2),  # the treaty shuts the declare column for its term
                 ("city_falls", [py, "tests/gpu/city_falls_test.py"], 2),  # a fallen city takes its garrison with it
                 ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),
-                ("feature_add", [py, "tests/gpu/feature_add_test.py"], 2),  # the carrier for a feature that ARRIVES after t0 — no rollout caller yet  # a flood pillages the district on the floodplain
+                ("feature_add", [py, "tests/gpu/feature_add_test.py"], 2),  # an eruption paints Volcanic Soil on its ring, replacing Woods or Rainforest
                 ("cree_claim", [py, "tests/gpu/cree_claim_test.py"], 2),  # the Cree Trader claims unclaimed ground within 3 of its own city
                 ("decommission", [py, "tests/gpu/decommission_test.py"], 2),  # the three plant-removal projects, opened by a Climate Accords window
                 ("worlds_fair", [py, "tests/gpu/worlds_fair_test.py"], 2),  # the second scored competition, on the Great Person points earned

@@ -11,8 +11,9 @@
  * from one seat's side) or `grievancesAgainst` (what the whole world holds
  * against one seat), so no caller ever touches the key.
  */
-import type { GameState } from './types';
-import { warKindWith, citiesOf, civsAtWar, friendTurnsWith, grantKey, isCiv, seatOf, seatsAllied, warClockKey, alliedWarDiscount } from './seats';
+import type { GameState, Tile } from './types';
+import { warKindWith, citiesOf, civsAtWar, friendTurnsWith, grantKey, isCiv, seatOf, seatsAllied, tileSeat, warClockKey, alliedWarDiscount } from './seats';
+import { tilesWithin } from '../../world/hex';
 import { PROMISES, PROMISE_BROKEN_GRIEVANCE, PROMISE_TURNS, RETRIBUTION_TURNS } from '../data/promises';
 import { WAR_KINDS, WAR_KIND_SURPRISE } from '../data/warKinds';
 import { worldEraIndex } from './eras';
@@ -34,6 +35,8 @@ import { GRIEVANCE_ALLY_SHARE,
   GRIEVANCE_LAST_CITY,
   GRIEVANCE_OCCUPIED_CAPITAL_DECAY,
   GRIEVANCE_OCCUPIED_DECAY,
+  GRIEVANCE_SETTLED_NEAR,
+  GRIEVANCE_SETTLED_NEAR_RANGE,
   GRIEVANCE_WAR_ON_CS_FRIEND,
   GRIEVANCE_WAR_ON_FRIEND,
   GRIEVANCE_WAR_ON_SUZERAIN,
@@ -201,6 +204,22 @@ export function grievanceLastCity(state: GameState, taker: number): void {
 
 export function grievanceCityStateTaken(state: GameState, taker: number, razed: boolean): void {
   grievanceAgainstTheWorld(state, taker, razed ? GRIEVANCE_CS_RAZED : GRIEVANCE_CS_CONQUERED);
+}
+
+/**
+ * SETTLED TOO NEAR: a major founding a city at `centre` owes every other
+ * major that owns a plot within `GRIEVANCE_SETTLED_NEAR_RANGE` of it. The
+ * live game drew it from the near rival alone, promise or none, so it is the
+ * rival's own and no ally or friend shares it.
+ */
+export function grievanceSettledNear(state: GameState, founder: number, centre: Tile): void {
+  if (!isCiv(founder)) return;
+  const near = new Set<number>();
+  for (const t of tilesWithin(state.map, centre.col, centre.row, GRIEVANCE_SETTLED_NEAR_RANGE)) {
+    const s = tileSeat(t);
+    if (s !== founder && isCiv(s)) near.add(s);
+  }
+  for (const s of near) addGrievance(state, s, founder, GRIEVANCE_SETTLED_NEAR);
 }
 
 /** "Denounced: 25". */

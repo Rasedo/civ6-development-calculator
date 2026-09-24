@@ -714,8 +714,10 @@ export const EMERGENCY_MEMBER_FAVOR = srcConst('eras.emergencyMemberFavor', 100,
   { pedia: 'the GS Emergency page\'s own reward table — "members gain 100 Diplomatic Favor" on success' });
 export const EMERGENCY_TARGET_FAVOR = srcConst('eras.emergencyTargetFavor', 200,
   { pedia: 'the GS Emergency page\'s own reward table — "Target gains 200 Diplomatic Favor" on failure' });
-/** CIV6 (both rows, "Specifics"): "Members gain +2 CS against targets' units;
- *  +1 MP in target's territory; target gains +20 Loyalty in the target city." */
+/** CIV6 ("Specifics"): "Members gain +2 CS against targets' units; +1 MP in
+ *  target's territory; target gains +20 Loyalty in the target city." The CS
+ *  and MP ride the Military and Nuclear emergencies only (`EmergencyBuffs`);
+ *  the loyalty rides every kind. */
 export const EMERGENCY_MEMBER_CS = srcConst('eras.emergencyMemberCs', 2,
   { pedia: 'the GS Emergency page\'s own reward table, "Specifics": "Members gain +2 CS against targets\' units"' });
 export const EMERGENCY_MEMBER_MP = srcConst('eras.emergencyMemberMp', 1,
@@ -1440,6 +1442,22 @@ export const GRIEVANCE_CS_RAZED = srcConst('eras.grievanceCsRazed', 100,
 /** "Denounced: 25". */
 export const GRIEVANCE_DENOUNCE = srcConst('eras.grievanceDenounce', 25,
   gp('GRIEVANCES_FOR_DENOUNCEMENT'));
+/** SETTLED TOO NEAR: a major founding a city draws this from every other
+ *  major holding a plot within `GRIEVANCE_SETTLED_NEAR_RANGE` of the new
+ *  centre. No install row carries it (no `GlobalParameters` GRIEVANCE row, no
+ *  grievance log text); the live game drew 19 (18 for an earlier city as
+ *  near), decaying at the ordinary rate, with or without a promise standing. */
+export const GRIEVANCE_SETTLED_NEAR = srcConst('eras.grievanceSettledNear', 19, {
+  lab: 'tools/civ6lab/near_probe.py, runs/promise_near4_20260924T050326Z.log: a founding 4 plots from the rival\'s city, 3 from its border, drew 19 from that rival, then 13, then 7',
+});
+/** The reach, read as the distance from the new centre to the nearest plot
+ *  the other major owns. This border reading fits every measured founding:
+ *  3 from the border drew it; 4, 5 and 6 drew nothing. */
+export const GRIEVANCE_SETTLED_NEAR_RANGE = srcConst('eras.grievanceSettledNearRange', 3, {
+  lab: 'tools/civ6lab/near_probe.py: city/border 4/3 drew the grievance (runs/promise_near4_20260924T050326Z.log); '
+    + '5/4 (runs/promise_near5_20260924T050256Z.log), 7/5 (runs/promise_near7_20260924T050234Z.log) '
+    + 'and 9/6 (runs/promise_near9_20260924T050211Z.log) drew none',
+});
 /** "Controlling the civ's original Capital: 3 per turn while not at war". */
 export const GRIEVANCE_HELD_CAPITAL_PER_TURN = srcConst('eras.grievanceHeldCapital', 3,
   gp('GRIEVANCES_POSSESS_CAPITAL_PER_TURN'));

@@ -1,73 +1,92 @@
 /**
- * A FEATURE ARRIVES AFTER t0 — `addFeature`, the eruption's carrier. Nothing in the
- * rollout calls it yet (WHERE a feature lands is an open owner question), so
- * this file is its whole TS reach. The GPU twin is
- * tests/gpu/feature_add_test.py.
+ * VOLCANIC SOIL — an eruption paints its ring. CIV6 (`RandomEvent_Yields`,
+ * FEATURE_VOLCANIC_SOIL YIELD_FOOD, `ReplaceFeature="true"`): each eligible
+ * land plot of the ring becomes Volcanic Soil with the severity's chance
+ * (`SOIL_PAINT_P`), replacing Woods or Rainforest; Floodplains, a Geothermal
+ * Fissure, water and Mountains are never painted (the lab 4 volcano scene).
+ * The GPU twin is tests/gpu/feature_add_test.py.
  */
 import { describe, expect, it } from 'vitest';
 import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
-import { addFeature } from '../../../cpu/core/game';
+import { disasterPhase, paintVolcanicSoil, soilPaintable } from '../../../cpu/core/disasters';
+import { ERUPTION_SEVERITY, SOIL_PAINT_P } from '../../../cpu/data/disasters';
 import { bareGround, validImprovementsIn } from '../../../cpu/core/rules';
 import { tileYields } from '../../../cpu/core/yields';
+import { neighbors } from '../../../world/hex';
+import type { GameState, Tile } from '../../../cpu/core/types';
 
-describe('addFeature', () => {
-  it('refuses water, a live feature, an improvement and a natural-wonder row', () => {
+describe('Volcanic Soil', () => {
+  it('paints bare land and Woods or Rainforest, and nothing else', () => {
     const state = makeState(makeMap(16, 16));
-    const water = tileAtCoords(state.map, 5, 5);
-    water.terrain = 'COAST';
-    expect(addFeature(state, water.index, 'WOODS')).toBe(false);
-
-    const featured = tileAtCoords(state.map, 6, 5);
-    featured.feature = 'MARSH';
-    expect(addFeature(state, featured.index, 'WOODS')).toBe(false);
-
-    const improved = tileAtCoords(state.map, 7, 5);
+    const at = (c: number, r: number) => tileAtCoords(state.map, c, r);
+    expect(soilPaintable(at(2, 2))).toBe(true);
+    const improved = at(3, 2);
     improved.improvement = 'FARM';
-    expect(addFeature(state, improved.index, 'WOODS')).toBe(false);
-
-    const bare = tileAtCoords(state.map, 8, 5);
-    expect(addFeature(state, bare.index, 'ULURU')).toBe(false); // a wonder never arrives
-    expect(bare.feature).toBeNull();
+    expect(soilPaintable(improved)).toBe(true);
+    for (const f of ['WOODS', 'RAINFOREST'] as const) {
+      const t = at(4, 2);
+      t.feature = f;
+      expect(soilPaintable(t)).toBe(true);
+    }
+    for (const f of ['FLOODPLAINS', 'GEOTHERMAL_FISSURE', 'MARSH', 'OASIS', 'VOLCANIC_SOIL', 'ULURU'] as const) {
+      const t = at(5, 2);
+      t.feature = f;
+      expect(soilPaintable(t)).toBe(false);
+    }
+    const water = at(6, 2);
+    water.terrain = 'COAST';
+    expect(soilPaintable(water)).toBe(false);
+    const peak = at(7, 2);
+    peak.elevation = 'MOUNTAIN';
+    expect(soilPaintable(peak)).toBe(false);
+    const drowned = at(8, 2);
+    drowned.submerged = true;
+    expect(soilPaintable(drowned)).toBe(false);
+    const campus = at(9, 2);
+    campus.district = 'CAMPUS';
+    expect(soilPaintable(campus)).toBe(false);
+    const centre = at(10, 2);
+    centre.district = 'CITY_CENTER';
+    expect(soilPaintable(centre)).toBe(false);
+    const wonder = at(11, 2);
+    wonder.builtWonder = 'PYRAMIDS';
+    expect(soilPaintable(wonder)).toBe(false);
   });
 
-  it('plants on bare land, and the arrival pays its catalog yields live', () => {
+  it('replaces the Woods and its Lumber Mill, keeps any other improvement', () => {
     const state = makeState(makeMap(16, 16));
-    const t = tileAtCoords(state.map, 9, 5);
-    const before = tileYields(bareCtx(state.map), t);
-    expect(addFeature(state, t.index, 'WOODS')).toBe(true);
-    expect(t.feature).toBe('WOODS');
-    const after = tileYields(bareCtx(state.map), t);
-    expect(after.production).toBe(before.production + 1);
-    // a second plant on the SAME tile refuses — the feature is live now
-    expect(addFeature(state, t.index, 'WOODS')).toBe(false);
+    const woods = tileAtCoords(state.map, 9, 5);
+    woods.feature = 'WOODS';
+    woods.improvement = 'LUMBER_MILL';
+    const plain = tileYields(bareCtx(state.map), tileAtCoords(state.map, 9, 6));
+    expect(tileYields(bareCtx(state.map), woods).production).toBeGreaterThan(plain.production);
+    paintVolcanicSoil(woods);
+    expect(woods.feature).toBe('VOLCANIC_SOIL');
+    expect(woods.improvement).toBeNull();
+    // the soil yields nothing of its own: the plot pays what bare ground pays
+    expect(tileYields(bareCtx(state.map), woods)).toEqual(plain);
+    const farm = tileAtCoords(state.map, 10, 5);
+    farm.improvement = 'FARM';
+    paintVolcanicSoil(farm);
+    expect(farm.feature).toBe('VOLCANIC_SOIL');
+    expect(farm.improvement).toBe('FARM');
   });
 
-  it('leaves the ground jobs standing under the SOIL, and takes them under Woods', () => {
+  it('is bare ground: the Farm and the Mine stay buildable under it', () => {
     // CIV6 (Improvement_ValidFeatures): FEATURE_VOLCANIC_SOIL is listed valid
-    // for the Farm, the Mine and the Fort, so the soil is bare ground; Woods
-    // occupy the tile and take those jobs with them.
+    // for the Farm, the Mine and the Fort.
     const state = makeState(makeMap(16, 16));
     const hill = tileAtCoords(state.map, 11, 5);
     hill.terrain = 'GRASSLAND';
     hill.elevation = 'HILLS';
+    hill.feature = 'WOODS';
     const opts = { unlocks: null, ownsTile: () => true };
     const jobs = () => validImprovementsIn(state.map.tiles[hill.index], opts);
+    expect(jobs()).not.toContain('MINE');
+    paintVolcanicSoil(hill);
+    expect(bareGround(hill)).toBe(true);
     expect(jobs()).toContain('MINE');
     expect(jobs()).toContain('FARM');
-
-    expect(addFeature(state, hill.index, 'VOLCANIC_SOIL')).toBe(true);
-    expect(bareGround(state.map.tiles[hill.index])).toBe(true);
-    expect(jobs()).toContain('MINE');
-    expect(jobs()).toContain('FARM');
-
-    const woods = tileAtCoords(state.map, 12, 5);
-    woods.terrain = 'GRASSLAND';
-    woods.elevation = 'HILLS';
-    expect(addFeature(state, woods.index, 'WOODS')).toBe(true);
-    const wj = validImprovementsIn(state.map.tiles[woods.index], opts);
-    expect(wj).not.toContain('MINE');
-    expect(wj).not.toContain('FARM');
-    expect(bareGround(state.map.tiles[woods.index])).toBe(false);
   });
 
   it('Fire Goddess pays its Volcanic Soil half the turn the soil exists', () => {
@@ -76,7 +95,57 @@ describe('addFeature', () => {
     const ctx = bareCtx(state.map);
     ctx.mods.featureYields.VOLCANIC_SOIL = { faith: 2 };
     expect(tileYields(ctx, t).faith).toBe(0);
-    expect(addFeature(state, t.index, 'VOLCANIC_SOIL')).toBe(true);
+    paintVolcanicSoil(t);
     expect(tileYields(ctx, t).faith).toBe(2);
+  });
+
+  it('an eruption paints each eligible ring plot at the severity\'s chance', () => {
+    // sixteen volcanoes four apart, their rings disjoint: each ring is reset
+    // before every phase, and an eruption shows as the fertility it lays down
+    const state: GameState = makeState(makeMap(16, 16));
+    state.disasters = true;
+    const rings: Tile[][] = [];
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        const v = tileAtCoords(state.map, 2 + 4 * i, 2 + 4 * j);
+        v.elevation = 'MOUNTAIN';
+        v.volcano = true;
+        rings.push(neighbors(state.map, v));
+      }
+    }
+    // half the rings stand in Woods under a Lumber Mill; one plot of every
+    // ring is Floodplains, never painted
+    const reset = () => rings.forEach((ring, k) => ring.forEach((t, d) => {
+      t.feature = d === 0 ? 'FLOODPLAINS' : k % 2 ? 'WOODS' : null;
+      t.improvement = k % 2 && d > 0 ? 'LUMBER_MILL' : null;
+      t.pillaged = false;
+      t.fertility = 0;
+    }));
+    let plots = 0;
+    let painted = 0;
+    let woodsPlots = 0;
+    let woodsPainted = 0;
+    for (let guard = 0; guard < 20000 && plots < 1200; guard++) {
+      reset();
+      disasterPhase(state);
+      rings.forEach((ring, k) => {
+        if (!ring.some((t) => t.fertility > 0)) return;
+        expect(ring[0].feature).toBe('FLOODPLAINS');
+        for (const t of ring.slice(1)) {
+          plots += 1;
+          if (k % 2) woodsPlots += 1;
+          if (t.feature !== 'VOLCANIC_SOIL') continue;
+          painted += 1;
+          if (k % 2) {
+            woodsPainted += 1;
+            expect(t.improvement).toBeNull();
+          }
+        }
+      });
+    }
+    const p = SOIL_PAINT_P[ERUPTION_SEVERITY];
+    expect(plots).toBeGreaterThanOrEqual(1200);
+    expect(Math.abs(painted / plots - p)).toBeLessThan(0.05);
+    expect(Math.abs(woodsPainted / woodsPlots - p)).toBeLessThan(0.07);
   });
 });

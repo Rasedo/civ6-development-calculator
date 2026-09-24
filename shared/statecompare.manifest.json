@@ -2603,7 +2603,7 @@
             "feat_id",
             "feat_stripped"
           ],
-          "note": "IDENTITY, in catalog order: feat_id is live now (a chop strips, `_add_feature` plants), so 'which feature' is fully determined on both engines — TS indexes tile.feature through the same catalog order the exporter uses."
+          "note": "IDENTITY, in catalog order: feat_id is live (a chop strips, an eruption's `_paint_soil` paints), so 'which feature' is fully determined on both engines — TS indexes tile.feature through the same catalog order the exporter uses."
         },
         {
           "name": "hasResource",
@@ -3114,6 +3114,30 @@
       {
         "plane": "tile_ftr",
         "why": "a map fact the exporter derives from terrain, feature and resource, so it is STATE for two reasons: the sea can take a tile (`_submerge`), and a Builder can HARVEST its resource away (`_nr_planes`). Both causes are compared directly (Tile.submerged / water, and hasResource), and TS recomputes this flag live from the changed tile, so the two engines agree by construction."
+      },
+      {
+        "plane": "appeal_base",
+        "why": "the exporter's per-tile appeal contribution, t0 feature term included; an eruption's Volcanic Soil (`_paint_soil`) takes the replaced feature's term out for good. Its cause, the live feature, is compared (featureId), and TS recomputes appeal live from it."
+      },
+      {
+        "plane": "appeal_feat",
+        "why": "the t0 feature's share of appeal_base, zeroed when Volcanic Soil replaces the feature; derived from the compared featureId, recomputed live on TS."
+      },
+      {
+        "plane": "feat_removable",
+        "why": "the t0 feature's removability, cleared when Volcanic Soil (not removable) replaces it; derived from the compared featureId, which TS reads live."
+      },
+      {
+        "plane": "tile_ftu",
+        "why": "the tech that unlocks removing the t0 feature, cleared when Volcanic Soil replaces it; derived from the compared featureId, which TS reads live."
+      },
+      {
+        "plane": "_feat_adj",
+        "why": "the district adjacency the t0 removable feature lends, zeroed when Volcanic Soil replaces it (after `_strip_feature_at` withdrew it from d_static_adj, which is compared through the district yields); TS reads adjacency live."
+      },
+      {
+        "plane": "_nfeat_adj",
+        "why": "the non-removable twin of _feat_adj, zeroed on the same Volcanic Soil paint; TS reads adjacency live."
       }
     ]
   }

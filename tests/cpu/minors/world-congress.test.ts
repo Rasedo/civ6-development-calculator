@@ -47,6 +47,9 @@ function newGame(opponents = 1) {
     withVillages: false, cityStates: 0, opponents,
   });
   settleFirstCity(state, 0);
+  // this small map founds seat 0 inside the settled-too-near reach of its
+  // neighbour; the ledger pokes start clean
+  state.grievances = {};
   state.autoResearch = false;
   return state;
 }

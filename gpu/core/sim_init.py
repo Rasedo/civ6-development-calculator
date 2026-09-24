@@ -106,7 +106,7 @@ class SimInit:
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # what a Great Person's per-adjacent clause counts. Both are static;
         # RAINFOREST reads the LIVE pair (`feat_id`/`feat_stripped`), so a
-        # chop leaves it and `_add_feature` joins it, exactly as TS reads
+        # chop or a Volcanic Soil paint leaves it, exactly as TS reads
         # `tile.feature` live.
         self.tile_mountain = torch.tensor([[t.get("mtn", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -604,6 +604,8 @@ class SimInit:
         self._griev_cs_conquered = int(_er2["grievanceCsConquered"])
         self._griev_cs_razed = int(_er2["grievanceCsRazed"])
         self._griev_denounce = int(_er2["grievanceDenounce"])
+        self._griev_settled_near = int(_er2["grievanceSettledNear"])
+        self._griev_settled_near_range = int(_er2["grievanceSettledNearRange"])
         self._griev_held_capital = int(_er2["grievanceHeldCapital"])
         self._griev_ally_share = int(_er2["grievanceAllyShare"])
         self._griev_friend_share = int(_er2["grievanceFriendShare"])
@@ -1381,7 +1383,7 @@ class SimInit:
         _lt, _lm = los_tables(self.W, self.H, self._sight_max)
         self._los_tgt, self._los_mid = _lt.to(device), _lm.to(device)
         self._feat_cat_y = torch.tensor(rules.improvements["featCatalogY"], dtype=self.dtype, device=device)
-        # `feat_id` is LIVE (`_add_feature` writes it); `feat_id0` keeps the
+        # `feat_id` is LIVE (`_paint_soil` writes it); `feat_id0` keeps the
         # t0 bake the per-tile `feat_yields`/chop planes were computed from.
         self.feat_id0 = self.feat_id.clone()
         self.nwonder = self._feat_natural[self.feat_id.clamp(min=0)] & (self.feat_id >= 0)
@@ -2445,6 +2447,9 @@ class SimInit:
         # the per-turn base chances the climate phase scales
         self._flood_chance = float(_ds["floodChance"])
         self._eruption_chance = float(_ds["eruptionChance"])
+        # the per-plot Volcanic Soil chance of an eruption, and what the soil replaces
+        self._soil_paint_p = float(_ds["soilPaintP"])
+        self._soil_replaces = [int(x) for x in _ds["soilReplaces"] if int(x) >= 0]
         self._drought_chance = float(_ds["droughtChance"])
         self._drought_length = int(_ds["droughtLength"])
         # THE EIGHT STORMS (`STORM_EVENTS`), one column per row in table order
@@ -3848,7 +3853,6 @@ class SimInit:
                                         dtype=torch.long, device=dev)
         self._ice_fid = int(c["iceFid"])
         self._soil_fid = int(c["soilFid"])
-        self._feat_jobs = [[int(x) for x in r] for r in c["featJobs"]]
         _clear = torch.zeros(B, T, dtype=torch.bool, device=dev)
         for _f in self._clear_fids.tolist():
             _clear |= self.feat_id == _f

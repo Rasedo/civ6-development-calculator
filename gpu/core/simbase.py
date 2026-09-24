@@ -841,6 +841,9 @@ _MUTABLE = [
     # the harvest copies each one's resource-free value in (`_nr_planes`).
     "site_q3", "tile_ftr", "farm_flat", "farm_hill", "mine_ok", "lumber_ok",
     "_fa_f_c", "_fa_h_c", "_mi_c",
+    # CIV6 (Volcanic Soil): an eruption's soil replaces Woods or Rainforest
+    # for good, so the t0 feature bakes it zeroes are state (`_paint_soil`).
+    "appeal_base", "appeal_feat", "feat_removable", "tile_ftu", "_feat_adj", "_nfeat_adj",
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
     "storm_event", "storm_left",  # the STORM centred on a tile and the turns it has left

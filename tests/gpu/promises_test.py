@@ -165,6 +165,53 @@ def poke_clock(rules, path):
     print("  d clock OK")
 
 
+def poke_settled_near(rules, path):
+    """e. SETTLED TOO NEAR: a founding within 3 of another major's plot draws
+    the measured 19 from that major, and nothing from one whose nearest plot
+    is 4 away; the founding itself pays it."""
+    sim = build(rules, path)
+    nrow = sim.n_majors
+
+    def border(t: int, s: int) -> int:
+        owned = sim.tile_seat[0] == s
+        return int(sim.pair_dist[t][owned].min()) if bool(owned.any()) else 999
+
+    assert sim._griev_settled_near == 19 and sim._griev_settled_near_range == 3
+    at3 = next(t for t in range(sim.T) if int(sim.tile_seat[0, t]) < 0 and border(t, 1) == 3)
+    at4 = next(t for t in range(sim.T) if int(sim.tile_seat[0, t]) < 0
+               and min(border(t, s) for s in range(1, nrow)) == 4)
+    everywhere = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    sim._grievance_settled_near(0, everywhere, n1(sim, at4))
+    assert not bool(sim.civ_grievance.any()), "a founding 4 from every border drew a grievance"
+    sim._grievance_settled_near(0, everywhere, n1(sim, at3))
+    assert int(sim.civ_grievance[0, 1, 0]) == 19, "3 from the border: 19"
+    assert int(sim.civ_grievance[0, 0, 1]) == -19, "the pair carries one signed balance"
+    for s in range(2, nrow):
+        want = 19 if border(at3, s) <= 3 else 0
+        assert int(sim.civ_grievance[0, s, 0]) == want
+    # the founding verb pays it: a legal site for seat 0 within 3 of a rival
+    sim.civ_grievance.zero_()
+    centres = torch.cat((sim.city_center[0, :nrow][sim.city_alive[0, :nrow]],
+                         sim.citystate_center[0][sim.citystate_alive[0]]))
+
+    def legal(t: int) -> bool:
+        return (int(sim.tile_seat[0, t]) < 0 and bool(sim.settle_ok[0, t])
+                and int(sim.district[0, t]) < 0 and int(sim.built_wonder[0, t]) < 0
+                and int(sim.pair_dist[t][centres].min()) >= 4)
+
+    site = next((t for t in range(sim.T)
+                 if legal(t) and min(border(t, s) for s in range(1, nrow)) <= 3), None)
+    if site is None:
+        print("  e settled-near OK (no legal founding site within 3 of a rival on this fixture)")
+        return
+    rivals = [s for s in range(1, nrow) if border(site, s) <= 3]
+    made = sim._found_city_at(0, everywhere, n1(sim, site))
+    assert bool(made[0]), "the founding site was refused"
+    for s in range(1, nrow):
+        assert int(sim.civ_grievance[0, s, 0]) == (19 if s in rivals else 0), f"seat {s} after the founding"
+    print("  e settled-near OK")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -172,6 +219,7 @@ def main() -> int:
     poke_ask_keep_refuse(rules, path)
     poke_incursion(rules, path)
     poke_clock(rules, path)
+    poke_settled_near(rules, path)
     print("BATTERY OK promises")
     return 0
 

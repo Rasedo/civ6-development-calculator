@@ -1214,10 +1214,10 @@ class SimSeats:
         """[B, N] `swapTileOk`'s twin: may city slot `j` [B, N] of `row`
         claim tile `t` [B, N] from another of the row's cities? The tile is
         held by ANOTHER living city of the row, lies within the claimant's
-        work radius, carries no district (a city centre included, which this
-        engine keeps apart in `centre_slot_at`), no wonder (complete or not)
-        and no `noSwap` improvement, and is not next to the losing city's
-        centre."""
+        work radius AND touches a plot the claimant already owns, carries no
+        district (a city centre included, which this engine keeps apart in
+        `centre_slot_at`), no wonder (complete or not) and no `noSwap`
+        improvement, and is not next to the losing city's centre."""
         jc, tc = j.clamp(min=0), t.clamp(min=0)
         alive, ids, ctrs = self.city_alive[:, row], self.city_id[:, row], self.city_center[:, row]
         owner = self.tile_city.gather(1, tc)
@@ -1232,6 +1232,12 @@ class SimSeats:
             & (self.pair_dist[ctr.clamp(min=0), tc].long() <= self._work_radius)
             & (self.pair_dist[lctr.clamp(min=0), tc].long() > 1)
         )
+        nb = self.neigh[tc]  # [B, N, 6], -1 off the map
+        nbc = nb.clamp(min=0).reshape(tc.shape[0], -1)
+        nb_city = self.tile_city.gather(1, nbc).view_as(nb)
+        nb_seat = self.tile_seat.gather(1, nbc).view_as(nb)
+        touch = (nb >= 0) & (nb_seat == int(self._ROW_SEAT[row])) & (nb_city == ids.gather(1, jc).unsqueeze(2))
+        ok = ok & touch.any(dim=2)
         if self._imp_no_swap.numel():
             imp = self.improvement.gather(1, tc)
             ok = ok & ~((imp >= 0) & self._imp_no_swap[imp.clamp(min=0)])
@@ -3583,6 +3589,7 @@ class SimSeats:
         atk_e = a_base + self._promo_cs(
             at0, a_promos, attacking=_t, ranged=_t, foe_type=d_type,
             tile=a_tile).to(a_base.dtype)
+        atk_e = atk_e + self._emergency_pair_cs(a_seat, d_seat).to(atk_e.dtype)
         def_e = def_cs - self._wound(d_hp0, d_type)
         def_e = def_e + self._promo_cs(
             d_type, d_promos, attacking=~_t, ranged=_t, vs_air=_t, foe_type=at0,
@@ -5649,12 +5656,15 @@ class SimSeats:
     # --- what an emergency does while it runs, and what it leaves behind ----
 
     def _emg_member_targets(self, row: int) -> torch.Tensor:
-        """[B, majors] — for each seat j, whether `row` is a MEMBER of an
-        emergency now RUNNING against j. The one membership question every
-        while-it-runs reader asks."""
+        """[B, majors] — for each seat j, whether `row` is a MEMBER of a
+        Military or Nuclear emergency now RUNNING against j (`armedMember`):
+        the two kinds whose `EmergencyBuffs` carry the running combat and
+        movement terms."""
         out = torch.zeros(self.B, self.n_majors, dtype=torch.bool, device=self.device)
         for k in range(self._emg_slots):
-            live = (self.emg_phase[:, k] == 2) & self.emg_member[:, k, row]
+            armed = ((self.emg_kind[:, k] == self._emg_at.get("MILITARY", -1))
+                     | (self.emg_kind[:, k] == self._emg_nuclear))
+            live = (self.emg_phase[:, k] == 2) & armed & self.emg_member[:, k, row]
             if not bool(live.any()):
                 continue
             for tgt in range(self.n_majors):
@@ -5691,12 +5701,15 @@ class SimSeats:
         return kind, phase, is_me, member
 
     def _emergency_pair_cs(self, attacker: torch.Tensor, defender: torch.Tensor) -> torch.Tensor:
-        """[B] f64 — the ATTACKER's emergency CS, unit against unit, for
-        seat-valued attacker and defender columns (`emergencyAttackCS`).
-        CIV6 (Specifics): "Members gain +2 CS against targets' units" while it
-        runs; CIV6 (Nuclear Emergency, success; the _ATTACK_REWARD / _DEFEND_
-        REWARD pair, Amount -3 on the target's side both ways): "Target units
-        have -3 CS when fighting Member units"."""
+        """[B] f64 — the ATTACKER's net emergency CS, for every combat of a
+        unit against a unit, melee or ranged, for seat-valued attacker and
+        defender columns (`emergencyAttackCS`). CIV6 (MILITARY_ /
+        NUCLEAR_EMERGENCY_MEMBER_COMBAT_STRENGTH_ATTACK, -2 on the defending
+        target; _DEFEND, -2 on the attacking target): while it runs a member
+        attacking its target is 2 up, the target attacking a member 2 down.
+        CIV6 (Nuclear Emergency, success; the _ATTACK_REWARD / _DEFEND_REWARD
+        pair, Amount -3 on the target's side both ways): "Target units have -3
+        CS when fighting Member units"."""
         out = torch.zeros(self.B, dtype=torch.float64, device=self.device)
         a = attacker.clamp(min=0, max=self.n_majors - 1)
         d = defender.clamp(min=0, max=self.n_majors - 1)
@@ -5710,9 +5723,12 @@ class SimSeats:
             if not bool(tg.any()):
                 continue
             hit = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            hit_by = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             for tgt in range(self.n_majors):
                 hit = hit | (tg[:, tgt] & (defender == tgt))
+                hit_by = hit_by | (tg[:, tgt] & (attacker == tgt))
             out = out + (hit & (attacker == row)).double() * self._emg_member_cs
+            out = out - (hit_by & (defender == row)).double() * self._emg_member_cs
         return out
 
     def _emergency_mp(self, pre: str) -> torch.Tensor:
@@ -10210,6 +10226,7 @@ class SimSeats:
                 if _cpop:
                     _fw = _first & self._row_is(row, _cc, _cl)[rows]
                     self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
+        self._grievance_settled_near(row, found, tile)
         self._eff_version += 1
         return found
 
@@ -10451,7 +10468,6 @@ class SimSeats:
             if major:
                 atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
                 atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], here, atk_naval).to(atk_e.dtype)
-                # an emergency MEMBER hits its target harder
                 atk_e = atk_e + self._emergency_pair_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._barb_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._vis_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
@@ -13025,7 +13041,8 @@ class SimSeats:
             def_e = def_e + self._gen_aura_cs(
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(d_seat, aseat).to(def_e.dtype)
-            atk_e = atk_e + self._barb_cs(aseat, d_seat).to(atk_e.dtype)
+            atk_e = atk_e + (self._emergency_pair_cs(aseat, d_seat)
+                             + self._barb_cs(aseat, d_seat)).to(atk_e.dtype)
             def_e = def_e + (self._vis_cs(d_seat, aseat) + self._ally_war_cs(d_seat, aseat)).to(def_e.dtype)
             atk_e = atk_e + (self._vis_cs(aseat, d_seat) + self._ally_war_cs(aseat, d_seat)).to(atk_e.dtype)
             def_e = def_e + self._roster_cs(d_seat, d_type, ttc, aseat, a_hp[:, u], False,

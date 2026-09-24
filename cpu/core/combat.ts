@@ -1694,7 +1694,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       + holdTheLineCS(state, attacker, attacker.tileIndex, defender.type)
       + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
       + classMatchupCS(attacker.type, defender.type)
-      + emergencyAttackCS(state, attacker.seat, defender.seat) // an emergency MEMBER hits its target harder
+      + emergencyAttackCS(state, attacker.seat, defender.seat)
       + barbarianCombatCS(state, attacker.seat, defender.seat)
       + visibilityCS(state, attacker.seat, defender.seat)
       + allianceWarCS(state, attacker.seat, defender.seat)
@@ -1844,7 +1844,8 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   // defender's own "+7 Combat Strength when defending vs. air attacks".
   const fromTile = state.map.tiles[attacker.tileIndex];
   const atkE = atk - woundPenalty(attacker)
-    + promoCS(attacker, { attacking: true, ranged: true, foeType: defender.type, tile: fromTile });
+    + promoCS(attacker, { attacking: true, ranged: true, foeType: defender.type, tile: fromTile })
+    + emergencyAttackCS(state, attacker.seat, defender.seat);
   const defE = def - woundPenalty(defender)
     + promoCS(defender, {
       attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
@@ -1969,7 +1970,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  const atkCS = (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker));
+  const atkCS = (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + emergencyAttackCS(state, attacker.seat, defender.seat) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker));
   defender.hp -= damageRoll(state, atkCS - defCS, 'rng', targetIndex, {
     a: atkCS, d: defCS, at: UNIT_TYPE_IDX.indexOf(attacker.type), as: attacker.seat, dt: UNIT_TYPE_IDX.indexOf(defender.type), ds: defender.seat,
   });

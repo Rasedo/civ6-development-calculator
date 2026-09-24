@@ -26,7 +26,7 @@ import { placeCityStates, cityStatePhase, resolveSuzerains, suzerainEffect, suze
 import { minorPhase } from './minorBuild';
 import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
-import { promiseIncursion } from './grievance';
+import { grievanceSettledNear, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
@@ -39,7 +39,6 @@ import { laserSpeed } from './yields';
 import { competitionOf } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
-import type { FeatureId } from '../../world/types';
 import { isWater, deriveContinents, deriveMountainRanges } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
@@ -360,21 +359,8 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     const id = g.unit ?? (g.promoClass ? bestTrainableOfClass(state, seat, g.promoClass) : null);
     if (id) spawnUnit(state, id, tile.index, seat);
   }
+  grievanceSettledNear(state, seat, tile);
   return city;
-}
-
-/** a feature ARRIVES after t0 — the eruption's carrier. Nothing in the rollout
- *  calls it yet: WHERE a feature lands (and what it does to an improvement)
- *  is an open owner question, so the refusal set is the conservative
- *  envelope — bare land only — mirrored clause for clause by
- *  `_add_feature`. A natural-wonder row never arrives this way. */
-export function addFeature(state: GameState, tileIndex: number, id: FeatureId): boolean {
-  const t = state.map.tiles[tileIndex];
-  if (!t || isWater(t) || t.submerged) return false;
-  if (FEATURES[id]?.naturalWonder) return false;
-  if (t.feature !== null || t.district !== null || t.builtWonder !== null || t.improvement !== null) return false;
-  t.feature = id;
-  return true;
 }
 
 /**

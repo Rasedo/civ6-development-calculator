@@ -64,34 +64,44 @@ export function raiseEmergency(state: GameState, kind: number, target: number,
   list.push({ kind, target, city, phase: EMG_PENDING, act: -1, affected: [...affected], members: [] });
 }
 
-/** The emergency now running against `target`, if any. */
-function running(state: GameState, target: number): Emergency | null {
-  for (const e of emergencies(state)) if (e.phase === EMG_RUNNING && e.target === target) return e;
-  return null;
-}
-
 // --- WHILE IT RUNS ---------------------------------------------------------
 
-/** The ATTACKER's emergency CS against `defender`, unit against unit.
- *  CIV6 (Specifics): "Members gain +2 CS against targets' units" while the
- *  emergency runs. CIV6 (Nuclear Emergency, success;
+/** Whether `member` belongs to a Military or Nuclear emergency now running
+ *  against `target`. Those two carry the running combat and movement buffs
+ *  (`EmergencyBuffs`: the _COMBAT_STRENGTH_ATTACK / _DEFEND and _MOVEMENT_BUFF
+ *  rows); the City-State emergency's only running buff is the target city's
+ *  loyalty. */
+function armedMember(state: GameState, member: number, target: number): boolean {
+  return emergencies(state).some((e) => e.phase === EMG_RUNNING && e.target === target
+    && (e.kind === EMERGENCY_MILITARY || e.kind === EMERGENCY_NUCLEAR)
+    && e.members.includes(member));
+}
+
+/** The ATTACKER's net emergency CS against `defender`, for every combat of a
+ *  unit against a unit, melee or ranged. Each term is written on the attacker
+ *  as the difference it makes to the roll.
+ *  CIV6 (MILITARY_ / NUCLEAR_EMERGENCY_MEMBER_COMBAT_STRENGTH_ATTACK, Amount -2
+ *  on the DEFENDER when a member attacks the target; _DEFEND, Amount -2 on the
+ *  ATTACKER when the target attacks a member): while it runs, the member
+ *  attacking its target is 2 up, and the target attacking a member 2 down.
+ *  CIV6 (Nuclear Emergency, success;
  *  NUCLEAR_EMERGENCY_MEMBER_COMBAT_STRENGTH_ATTACK_REWARD / _DEFEND_REWARD,
  *  Amount -3 on the target's side both ways): "Target units have -3 CS when
  *  fighting Member units" — a member attacking its old target gains the 3,
  *  and the old target attacking a member loses them. */
 export function emergencyAttackCS(state: GameState, attacker: number, defender: number): number {
-  const e = running(state, defender);
-  const live = e && e.members.includes(attacker) ? EMERGENCY_MEMBER_CS : 0;
+  const live = (armedMember(state, attacker, defender) ? EMERGENCY_MEMBER_CS : 0)
+    - (armedMember(state, defender, attacker) ? EMERGENCY_MEMBER_CS : 0);
   const won = state.seats[attacker]?.emgNukeCS?.[defender] ?? 0;
   const lost = state.seats[defender]?.emgNukeCS?.[attacker] ?? 0;
   return live + EMERGENCY_NUKE_TARGET_CS * (won - lost);
 }
 
-/** CIV6 (Specifics): "+1 MP in target's territory" for a member. */
+/** CIV6 (Specifics): "+1 MP in target's territory" for a member of a Military
+ *  or Nuclear emergency (MILITARY_ / NUCLEAR_EMERGENCY_MEMBER_MOVEMENT_BUFF). */
 export function emergencyMoveBonus(state: GameState, seat: number, groundSeat: number): number {
   if (groundSeat < 0) return 0;
-  const e = running(state, groundSeat);
-  return e && e.members.includes(seat) ? EMERGENCY_MEMBER_MP : 0;
+  return armedMember(state, seat, groundSeat) ? EMERGENCY_MEMBER_MP : 0;
 }
 
 /** CIV6 (Specifics): "target gains +20 Loyalty in the target city". */

@@ -563,10 +563,10 @@ export function acquireTile(state: GameState, city: City, tileIndex: number): vo
  *  cannot be swapped" (`noSwap`). The tile must be held by ANOTHER living
  *  city of the claimant's seat. A district under construction and a wonder
  *  site both stand on the plot, so both refuse; a city centre is a district
- *  and is never swapped. The game's target set comes from the DLL
- *  (`CityManager.GetCommandTargets`); the claimant's REACH here is its work
- *  radius, the text's "to be worked by this city". The swap costs nothing.
- *  `_swap_tile_ok` is the twin. */
+ *  and is never swapped. The claimant's REACH is measured against the live
+ *  game's `CityManager.GetCommandTargets`: the plot lies within its work
+ *  radius (3) AND touches a plot the claimant already owns. The swap costs
+ *  nothing. `_swap_tile_ok` is the twin. */
 export function swapTileOk(state: GameState, city: City, tileIndex: number): boolean {
   const t = state.map.tiles[tileIndex];
   if (!t || tileSeat(t) !== city.seat || tileCity(t) === city.id) return false;
@@ -577,7 +577,8 @@ export function swapTileOk(state: GameState, city: City, tileIndex: number): boo
   const ctr = state.map.tiles[city.centerIndex];
   if (hexDistance(ctr.col, ctr.row, t.col, t.row) > CITY_WORK_RADIUS) return false;
   const lc = state.map.tiles[loser.centerIndex];
-  return hexDistance(lc.col, lc.row, t.col, t.row) > 1;
+  if (hexDistance(lc.col, lc.row, t.col, t.row) <= 1) return false;
+  return neighbors(state.map, t).some((n) => tileBelongsTo(n, city));
 }
 
 export function empireGrowthMult(state: GameState, seat: number): number {

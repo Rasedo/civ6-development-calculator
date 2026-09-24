@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import type { Seat } from '../../../cpu/core/types';
-import { seatOf, setFriendTurnsWith, setWar, setWarKind, clearWarKind, warIsFormal, warKindWith, warDeclaredBy } from '../../../cpu/core/seats';
+import type { Seat, Tile } from '../../../cpu/core/types';
+import { hexDistance } from '../../../world/hex';
+import { seatOf, tileSeat, setFriendTurnsWith, setWar, setWarKind, clearWarKind, warIsFormal, warKindWith, warDeclaredBy } from '../../../cpu/core/seats';
 import { WAR_GRIEVANCE_PCT, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_SURPRISE } from '../../../cpu/data/warKinds';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
@@ -9,8 +10,9 @@ import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, AGREEMENT_TURNS, FORM
   GRIEVANCE_WAR_BASE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DENOUNCE,
   GRIEVANCE_FRIEND_SHARE, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_GANG,
   GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_OCCUPIED_CAPITAL_DECAY,
-  GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX } from '../../../cpu/data/seats';
-import { addGrievance, grievanceCityTaken, grievanceDenounce, grievanceFavorPenalty, grievanceWith, grievancesAgainst } from '../../../cpu/core/grievance';
+  GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX,
+  GRIEVANCE_SETTLED_NEAR, GRIEVANCE_SETTLED_NEAR_RANGE } from '../../../cpu/data/seats';
+import { addGrievance, decayGrievances, grievanceCityTaken, grievanceDenounce, grievanceFavorPenalty, grievanceWith, grievancesAgainst } from '../../../cpu/core/grievance';
 import { DED_TO_ARMS } from '../../../cpu/data/seats';
 
 const warG = (kind: 'surprise' | 'formal' | 'golden', col: 0 | 1 | 2, base: number) =>
@@ -36,6 +38,9 @@ function newGame(opponents = 1) {
     withVillages: false, cityStates: 0, opponents,
   });
   settleFirstCity(state, 0);
+  // this small map founds seat 0 inside the settled-too-near reach of its
+  // neighbour; every poke here starts from a clean ledger
+  state.grievances = {};
   state.autoResearch = false;
   return state;
 }
@@ -228,6 +233,35 @@ describe('grievances', () => {
     declareWar(state, 0, (state.seats[2] as Seat).seat);
     expect(grievancesAgainst(state, 0)).toBe(2 * warG('surprise', 0, GRIEVANCE_WAR_BASE));
     expect(grievancesAgainst(state, 0)).toBeGreaterThanOrEqual(GRIEVANCE_GANG);
+  });
+
+  it('SETTLED TOO NEAR: a founding within 3 of a rival plot draws the measured 19, and 4 draws nothing', () => {
+    expect(GRIEVANCE_SETTLED_NEAR).toBe(19);
+    expect(GRIEVANCE_SETTLED_NEAR_RANGE).toBe(3);
+    const site = (reach: number) => {
+      const state = newGame(1);
+      settleFirstCity(state, 1);
+      state.grievances = {};
+      const rival = state.map.tiles.filter((t) => tileSeat(t) === 1);
+      const border = (t: Tile) => Math.min(...rival.map((r) => hexDistance(t.col, t.row, r.col, r.row)));
+      const t = state.map.tiles.find((x) => tileSeat(x) < 0 && border(x) === reach)!;
+      expect(t).toBeDefined();
+      foundCityAt(state, 0, t, seatOf(state, 0)!);
+      return grievanceWith(state, 1, 0);
+    };
+    expect(site(3)).toBe(GRIEVANCE_SETTLED_NEAR);
+    expect(site(4)).toBe(0);
+    // and it decays at the ordinary peace rate
+    const state = newGame(1);
+    settleFirstCity(state, 1);
+    state.grievances = {};
+    const rival = state.map.tiles.filter((t) => tileSeat(t) === 1);
+    const t =state.map.tiles.find((x) => tileSeat(x) < 0
+      && Math.min(...rival.map((r) => hexDistance(x.col, x.row, r.col, r.row))) === 2)!;
+    foundCityAt(state, 0, t, seatOf(state, 0)!);
+    expect(grievanceWith(state, 1, 0)).toBe(GRIEVANCE_SETTLED_NEAR);
+    decayGrievances(state, 0);
+    expect(grievanceWith(state, 1, 0)).toBe(GRIEVANCE_SETTLED_NEAR - GRIEVANCE_DECAY_BASE);
   });
 });
 describe('golden age war', () => {

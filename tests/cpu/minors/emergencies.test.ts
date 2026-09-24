@@ -17,6 +17,9 @@ import {
   emergencyPressureCut, emergencyStrikeCS, raiseEmergency,
 } from '../../../cpu/core/emergency';
 import { grievancesAgainst } from '../../../cpu/core/grievance';
+import { rangedAttack } from '../../../cpu/core/combat';
+import { spawnUnit, unitPassable } from '../../../cpu/core/units';
+import { neighbors } from '../../../world/hex';
 
 // EMERGENCIES (GS) run as SPECIAL SESSIONS of the World Congress. Sourced at
 // the catalog: a sponsor pays 30 favor, the previous session must be 15 turns
@@ -146,15 +149,51 @@ describe('emergencies: the session, the war and the clock', () => {
     expect(state.lastSessionTurn).toBe(8);
   });
 
-  it('while it runs: +2 CS for a member, +1 MP on the target ground, +20 loyalty in the city', () => {
+  it('while it runs: +2 CS for a member, -2 for the target attacking one, +1 MP on the target ground, +20 loyalty in the city', () => {
     const state = twoCivs();
     const e = called(state);
     expect(emergencyAttackCS(state, 1, 0)).toBe(EMERGENCY_MEMBER_CS);
-    expect(emergencyAttackCS(state, 0, 1)).toBe(0);   // not a member of anything
+    // CIV6 (MILITARY_EMERGENCY_MEMBER_COMBAT_STRENGTH_DEFEND): the target
+    // attacking a member takes the -2 itself
+    expect(emergencyAttackCS(state, 0, 1)).toBe(-EMERGENCY_MEMBER_CS);
     expect(emergencyMoveBonus(state, 1, 0)).toBe(EMERGENCY_MEMBER_MP);
     expect(emergencyMoveBonus(state, 1, 1)).toBe(0);  // its own ground
     expect(emergencyLoyalty(state, 0, e.city)).toBe(EMERGENCY_TARGET_LOYALTY);
     expect(emergencyLoyalty(state, 0, e.city + 999)).toBe(0);
+    // the City-State emergency's running buff is the loyalty alone
+    e.kind = EMERGENCY_CITY_STATE;
+    expect(emergencyAttackCS(state, 1, 0)).toBe(0);
+    expect(emergencyAttackCS(state, 0, 1)).toBe(0);
+    expect(emergencyMoveBonus(state, 1, 0)).toBe(0);
+    expect(emergencyLoyalty(state, 0, e.city)).toBe(EMERGENCY_TARGET_LOYALTY);
+  });
+
+  it('the running term reaches an ordered RANGED shot, both halves', () => {
+    const shot = (shooter: number, victim: number, member: boolean): number => {
+      const state = twoCivs();
+      const e = called(state);
+      if (!member) e.members = [];
+      const free = (i: number) => unitPassable(state.map.tiles[i])
+        && !state.units.some((u) => u.tileIndex === i);
+      const a = state.map.tiles.find((t) => free(t.index)
+        && neighbors(state.map, t).some((n) => free(n.index)))!;
+      const b = neighbors(state.map, a).find((n) => free(n.index))!;
+      const archer = spawnUnit(state, 'ARCHER', a.index, shooter)!;
+      archer.tileIndex = a.index;
+      spawnUnit(state, 'WARRIOR', b.index, victim)!.tileIndex = b.index;
+      const log: string[] = [];
+      (globalThis as any).__cbLog = log;
+      try {
+        expect(rangedAttack(state, archer.id, b.index).ok).toBe(true);
+      } finally {
+        delete (globalThis as any).__cbLog;
+      }
+      const line = log.find((l) => l.startsWith('k:rng '));
+      expect(line, JSON.stringify(log)).toBeDefined();
+      return Number(line!.match(/diff(-?\d+)/)![1]);
+    };
+    expect(shot(1, 0, true) - shot(1, 0, false)).toBe(EMERGENCY_MEMBER_CS * 10);
+    expect(shot(0, 1, true) - shot(0, 1, false)).toBe(-EMERGENCY_MEMBER_CS * 10);
   });
 
   it('losing the contested city pays the MEMBERS, and their reward is permanent', () => {

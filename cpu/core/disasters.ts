@@ -20,7 +20,7 @@ import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P } from '../data/disasters';
-import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
+import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, DROUGHT_LENGTH, SOIL_PAINT_P, ERUPTION_SEVERITY, SOIL_REPLACES } from '../data/disasters';
 import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
 import { disasterRateMult, severitySplit } from '../data/climate';
 import { defertilize, desertificationLive, fertilityLive } from './climate';
@@ -93,6 +93,24 @@ function cityHoldingDistrict(state: GameState, tile: Tile): City | undefined {
     }
   }
   return undefined;
+}
+
+/** May an eruption paint Volcanic Soil on this ring plot? Land that is not a
+ *  Mountain and not drowned, carrying no district (a city centre is one) and
+ *  no wonder, and either bare or under a feature the soil replaces (Woods,
+ *  Rainforest). Floodplains, a Geothermal Fissure, a natural wonder and soil
+ *  already there are not candidates. `_soil_paintable` is the twin. */
+export function soilPaintable(t: Tile): boolean {
+  if (isWater(t) || t.submerged || t.elevation === 'MOUNTAIN') return false;
+  if (t.district || t.builtWonder) return false;
+  return t.feature === null || SOIL_REPLACES.includes(t.feature);
+}
+
+/** The plot becomes Volcanic Soil; a Lumber Mill goes with the Woods it
+ *  stood on, any other improvement stays. */
+export function paintVolcanicSoil(t: Tile): void {
+  if (t.improvement === 'LUMBER_MILL' && t.feature === 'WOODS') t.improvement = null;
+  t.feature = 'VOLCANIC_SOIL';
 }
 
 function fertilize(state: GameState, tile: Tile): void {
@@ -271,7 +289,13 @@ export function disasterPhase(state: GameState): void {
   for (const volcano of map.tiles) {
     if (!volcano.volcano) continue;
     if (nextRandom(state) >= ERUPTION_CHANCE_PER_VOLCANO * rate) continue;
-    for (const n of neighbors(map, volcano)) {
+    const ring = neighbors(map, volcano);
+    // CIV6 (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): one
+    // draw per eligible ring plot, in ring order, at the severity's chance.
+    for (const n of ring) {
+      if (soilPaintable(n) && nextRandom(state) < SOIL_PAINT_P[ERUPTION_SEVERITY]) paintVolcanicSoil(n);
+    }
+    for (const n of ring) {
       scorch(state, n);
       fertilize(state, n);
     }

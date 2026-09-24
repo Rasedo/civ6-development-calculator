@@ -18,6 +18,7 @@ reward magnitude are this lane's bar.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -72,6 +73,61 @@ def raise_on(sim, city_id: int, target: int = 0, sponsor: int = 1, kind: int = -
     sim._raise_emergency(kind, torch.full((sim.B,), target, dtype=torch.long),
                          torch.full((sim.B,), city_id, dtype=torch.long), aff,
                          torch.ones(sim.B, dtype=torch.bool))
+
+
+def _free(sim, t) -> bool:
+    return (t >= 0 and bool(sim.passable[0, t])
+            and int(sim.military_at[0, t]) < 0 and int(sim.civilian_at[0, t]) < 0)
+
+
+def _place(sim, tile, seat, utype) -> int:
+    slot = int(sim.unit_next[0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = seat
+    sim.major_unit_type[0, slot] = utype
+    sim.major_unit_tile[0, slot] = tile
+    sim.major_unit_hp[0, slot] = 100
+    sim.military_at[0, tile] = slot + sim.POOL_LO["major"]
+    sim.unit_next[0] += 1
+    return slot
+
+
+def _shot(sim, shooter_row: int, target_row: int, pair) -> int:
+    """The attacker's strength (tenths, off the combat log) of one ordered
+    ranged shot by `shooter_row` on a Warrior of `target_row`."""
+    a_tile, t_tile = pair
+    ty = next(i for i in range(sim.NU) if float(sim._type_ranged_strength[i]) > 0)
+    v = _place(sim, a_tile, shooter_row, ty)
+    _place(sim, t_tile, target_row, 2)  # WARRIOR
+    sim._log_combat_b = 0
+    sim._combat_events.clear()
+    att = torch.zeros(sim.B, dtype=torch.bool)
+    att[0] = True
+    sim._ranged_attack(att, torch.full((sim.B,), t_tile, dtype=torch.long), "major", v, shooter_row)
+    ev = [e for e in sim._combat_events if e.startswith("k:rng ")]
+    assert ev, f"no ranged roll was logged: {sim._combat_events}"
+    m = re.search(r" a(-?\d+) d(-?\d+)", ev[-1])
+    assert m, f"the ranged CB line carries no strength split: {ev[-1]}"
+    return int(m.group(1))
+
+
+def ranged_scene(sim, mem: int, tgt: int) -> None:
+    """The running term reaches an ORDERED RANGED shot, both halves: the member
+    shooting the target is 2 up, the target shooting a member 2 down, each
+    against the same shot with the membership withdrawn."""
+    pair = next((t, n) for t in range(sim.T) if _free(sim, t)
+                for n in sim.neigh[t].tolist() if _free(sim, n))
+    base = sim.snapshot()
+    for shooter, victim, sign in ((mem, tgt, 1), (tgt, mem, -1)):
+        on = _shot(sim, shooter, victim, pair)
+        sim.restore(base)
+        sim.emg_member[:, 0, mem] = False
+        off = _shot(sim, shooter, victim, pair)
+        sim.restore(base)
+        want = sign * int(sim._emg_member_cs) * 10
+        assert on - off == want, (
+            f"seat {shooter} shooting seat {victim}: {on} with the emergency, {off} without — "
+            f"the ranged shot must carry emergencyAttackCS ({want / 10:+.0f})")
 
 
 def main() -> None:
@@ -143,22 +199,31 @@ def main() -> None:
     a = torch.full((sim.B,), mem, dtype=torch.long)
     d = torch.full((sim.B,), tgt, dtype=torch.long)
     assert float(sim._emergency_pair_cs(a, d)[0]) == sim._emg_member_cs, "the member CS never landed"
-    assert float(sim._emergency_pair_cs(d, a)[0]) == 0.0, "the target got the member's bonus"
+    assert float(sim._emergency_pair_cs(d, a)[0]) == -sim._emg_member_cs, "the target attacking a member lost nothing"
     tg = sim._emg_member_targets(mem)
     assert bool(tg[0, tgt]) and not bool(tg[0, mem])
+    ranged_scene(sim, mem, tgt)
 
     slot = int((sim.major_unit_seat[0] == mem).nonzero()[0])
     ground = one(sim.tile_seat[:, sim.major_unit_tile[0, slot].clamp(min=0)])
     sim.tile_seat[0, sim.major_unit_tile[0, slot].clamp(min=0)] = tgt
     mp = sim._emergency_mp("major")
     assert int(mp[0, slot]) == sim._emg_member_mp, "a member gained no MP on the target's ground"
+    # the City-State emergency's running buff is the target city's loyalty
+    # alone: no combat term and no movement
+    sim.emg_kind[:, 0] = sim._emg_at["CITY_STATE"]
+    assert float(sim._emergency_pair_cs(a, d)[0]) == 0.0, "a City-State emergency paid the member CS"
+    assert float(sim._emergency_pair_cs(d, a)[0]) == 0.0, "a City-State emergency cut the target's CS"
+    assert int(sim._emergency_mp("major")[0, slot]) == 0, "a City-State emergency paid the member MP"
+    sim.emg_kind[:, 0] = mil
     sim.tile_seat[0, sim.major_unit_tile[0, slot].clamp(min=0)] = ground
     assert int(sim._emergency_mp("major")[0, slot]) == 0, "the MP followed the unit off the ground"
 
     loy = sim._emergency_loyalty(tgt)
     assert float(loy[0, 0]) == sim._emg_target_loyalty, "the target city gained no loyalty"
     assert float(sim._emergency_loyalty(mem).sum()) == 0.0, "a member's city gained the target's loyalty"
-    print("  a member hits harder and moves faster on the target's ground; the target city digs in")
+    print("  a member hits harder, the target attacking a member hits softer, a member moves faster "
+          "on the target's ground (Military and Nuclear only); the target city digs in")
 
     # --- 5. the goal: the members take the city -----------------------------
     before = float(sim.civ_diplo_favor[0, mem])

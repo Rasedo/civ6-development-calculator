@@ -390,6 +390,28 @@ export const ERUPTION_CHANCE_PER_VOLCANO = srcConst('disasters.eruptionChance', 
 });
 export const DROUGHT_LENGTH = 8;
 
+/** CIV6 (`RandomEvent_Yields`, `ReplaceFeature="true"`): the FEATURE_VOLCANIC_SOIL
+ *  YIELD_FOOD row of each eruption severity, GENTLE / CATASTROPHIC /
+ *  MEGACOLOSSAL. Measured as a PER-PLOT chance that an eligible land plot of
+ *  the ring becomes Volcanic Soil (bare land 30 / 52 / 74 % over 66 plots). */
+const soilRow = (ev: string) => xml('RandomEvent_Yields',
+  `RandomEventType=RANDOM_EVENT_VOLCANO_${ev}&YieldType=YIELD_FOOD`, 'Percentage');
+export const SOIL_PAINT_P = srcConst('disasters.soilPaintP', [0.35, 0.5, 0.75] as const, {
+  derived: 'Percentage/100 of each eruption severity\'s FEATURE_VOLCANIC_SOIL YIELD_FOOD row '
+    + '(35 / 50 / 75), read as the per-plot paint chance the volcano scene measured '
+    + '(tools/civ6lab/runs/volcano_20260923T191337Z.jsonl)',
+  inputs: [soilRow('GENTLE'), soilRow('CATASTROPHIC'), soilRow('MEGACOLOSSAL')],
+});
+/** The severity every eruption takes: the engine rolls none, so each one is
+ *  GENTLE, the first row of `SOIL_PAINT_P`. */
+export const ERUPTION_SEVERITY = 0;
+/** The features an eruption's soil REPLACES — Woods and Rainforest (the
+ *  install's FOREST and JUNGLE), measured replaced at 6/28, 11/28, 18/28;
+ *  Floodplains and Geothermal Fissure are never painted (0/18). */
+export const SOIL_REPLACES: readonly string[] = srcConst('disasters.soilReplaces', ['WOODS', 'RAINFOREST'], {
+  lab: 'runs/volcano_20260923T191337Z.jsonl',
+});
+
 /** "Improvement — Pillaged: 100%; Destroyed: 50% / 80%". A flood always
  *  pillages; these are the chances it takes the improvement away entirely. */
 const floodPage = (what: string) => ({

@@ -6,7 +6,9 @@
 Ownership cannot be swapped if the tile has a district, a wonder, or is next
 to the other city's center tile." (LOC_PLOTINFO_SWAP_TILE_OWNER_TOOLTIP), and
 the Golf Course's and Open-Air Museum's "Tiles with <row> cannot be swapped"
-(`_imp_no_swap`). The claimant's reach is its work radius.
+(`_imp_no_swap`). The claimant's reach, as the live game's
+`CityManager.GetCommandTargets` offers it: within its work radius (3) and
+touching a plot it already owns.
 
 The scenes mirror `tests/cpu/city/tile-swap.test.ts`: a second city of the
 same row is planted four hexes from the first, every refusal is asked of
@@ -142,6 +144,39 @@ def main() -> None:
     assert not ok(sim, row, ja, good), "the claimant's own plot is refused"
     sim.tile_city[0, good] = idb
     print("  every refusal: district, wonder, next to the centre, noSwap, other seat, own plot, out of reach")
+
+    # --- 1b) THE REACH: within 3 of the claimant AND touching its own land --
+    def nbrs(t) -> list[int]:
+        return [int(n) for n in sim.neigh[t].tolist() if int(n) >= 0]
+
+    def a_owns(t) -> bool:
+        return int(sim.tile_seat[0, t]) == row and int(sim.tile_city[0, t]) == ida
+
+    for d in (2, 3):
+        t = next(u for u in range(sim.T) if int(pd[ca, u]) == d and int(pd[cb, u]) >= 2
+                 and int(sim.tile_seat[0, u]) == row and any(a_owns(n) for n in nbrs(u)))
+        was = int(sim.tile_city[0, t])
+        sim.tile_city[0, t] = idb
+        assert ok(sim, row, ja, t), f"a sibling's plot at {d} touching the claimant's land is offered"
+        mine = [n for n in nbrs(t) if a_owns(n)]
+        for n in mine:
+            sim.tile_city[0, n] = idb
+        assert not ok(sim, row, ja, t), f"a sibling's plot at {d} touching none of the claimant's land is refused"
+        sim.tile_city[0, mine[0]] = ida
+        assert ok(sim, row, ja, t), "one touching plot of the claimant's is enough"
+        for n in mine:
+            sim.tile_city[0, n] = ida
+        sim.tile_city[0, t] = was
+    far = next(u for u in range(sim.T) if int(pd[ca, u]) == 4 and int(pd[cb, u]) >= 2
+               and any(int(pd[ca, n]) == 3 for n in nbrs(u)))
+    edge = next(n for n in nbrs(far) if int(pd[ca, n]) == 3)
+    saved = [(u, int(sim.tile_seat[0, u]), int(sim.tile_city[0, u])) for u in (far, edge)]
+    sim.tile_seat[0, far], sim.tile_city[0, far] = row, idb
+    sim.tile_seat[0, edge], sim.tile_city[0, edge] = row, ida
+    assert not ok(sim, row, ja, far), "a sibling's plot at 4 touching the claimant's land is out of reach"
+    for u, s, c in saved:
+        sim.tile_seat[0, u], sim.tile_city[0, u] = s, c
+    print("  the reach: within 3 and touching the claimant's land, at 2 and at 3; never at 4")
 
     # --- 2) THE RECORD ARM: a refused swap does nothing, an allowed one lands,
     # the pin stays (a retag inside one seat is not a change of hands) ------

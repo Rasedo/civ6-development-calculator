@@ -175,6 +175,19 @@ class SimGriev:
         self._grievance_world(taker, self._griev_cs_razed, m & razed)
         self._grievance_world(taker, self._griev_cs_conquered, m & ~razed)
 
+    def _grievance_settled_near(self, founder: int, m, centre: torch.Tensor) -> None:
+        """SETTLED TOO NEAR (`grievanceSettledNear`): a major founding a city
+        at `centre` [B] where `m` owes every other major that owns a plot
+        within the measured reach of it — the rival's own, no share."""
+        if founder >= self.n_majors:
+            return
+        near = self.pair_dist[centre.clamp(min=0)] <= self._griev_settled_near_range  # [B, T]
+        for s in range(self.n_majors):
+            if s == founder:
+                continue
+            hit = m & (near & (self.tile_seat == s)).any(dim=1)
+            self._add_grievance(s, founder, self._griev_settled_near, hit)
+
     def _grievance_denounce(self, denouncer: int, target: int, m) -> None:
         self._spread_grievance(target, denouncer, self._griev_denounce, m)
 

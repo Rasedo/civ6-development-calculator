@@ -107,17 +107,10 @@ export const FEATURES: Record<string, FeatureDef> = {
     removable: false,
   },
   // CIV6 (Volcanic Soil): "This land adjacent to a volcano has suffered from
-  // a previous eruption ... the rich deposits of minerals the volcano has
-  // brought forth have probably enhanced the yields here", and its one listed
-  // trait is "Can receive additional yields from environmental effects" —
-  // which is `Tile.fertility` / `fertilityProd`, the channel an eruption
-  // already writes. The row carries the NAME the Fire Goddess addresses; the
-  // yields stay where they were.
-  // CIV6 (Volcanic Soil): "This land adjacent to a volcano has suffered from
   // a previous eruption ... Can receive additional yields from environmental
-  // effects" — the `fertility` channel, which the eruption already lays down.
-  // The row carries the NAME, which Fire Goddess pays Faith on; nothing on
-  // the map places it yet.
+  // effects" — the `fertility` channel, which the eruption lays down. The row
+  // carries the NAME, which Fire Goddess pays Faith on; an eruption paints it
+  // on its ring (`paintVolcanicSoil`).
   VOLCANIC_SOIL: {
     id: 'VOLCANIC_SOIL',
     name: 'Volcanic Soil',
