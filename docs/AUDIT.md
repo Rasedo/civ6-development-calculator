@@ -35,11 +35,18 @@ re-adds them.
 
 | Open item | Weight | What is left |
 |---|---|---|
+| A-49 the Marae's Great Work slots | 1 | TS gives the Marae none; the GPU builds `_bvar_no_gw` and never reads it |
+| A-50 the opening unit order | 1 | TS spawns seat 0's units first, the GPU appends row 0 last |
+| **A. Engine vs engine** | **2** | |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer and Industrialist on C-1; Arms Race Proponent's +30% on the three nuclear projects |
 | B-31r trade-route tails | 1 | `PLUNDER_ROUTE_GOLD` 50 is DLL; the destination's free choice is P8 |
 | B-56r inert promotions | 1 | Ground Crews heals a DEPLOYED fighter; its patrol half is no verb |
 | B-D unsourced data values | 1 | per-city war weariness (DLL); GAME_SPEED shape |
-| **B. Fidelity vs real Civ 6** | **4** | |
+| B-82 the turn-limit score winner | 2 | TS names no winner; the GPU names one by a yield score that is not Civ 6's Score |
+| B-83 the nuclear emergency's terms | 1 | two sourced magnitudes exported and applied by neither engine |
+| B-84 building upkeep by cost tier | 1 | Grove and Sanctuary are priced by the tier heuristic; read their `Maintenance` |
+| B-85 Exodus of the Evangelists' golden movement | 1 | whether an Inquisitor takes it too |
+| **B. Fidelity vs real Civ 6** | **9** | |
 | C-1 power | 1 | the accident's gates and payloads (measured), one LAB line on the damage table; a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 1 | the promises' engine half |
 | C-16 the spy's second half | 1 | the escape's scale (ask 14) |
@@ -55,7 +62,7 @@ re-adds them.
 | C-79 unique INFRASTRUCTURE absent | 1 | the Stepwell's two adjacencies |
 | C-81 the tile swap's reach | 1 | which plots the DLL offers a claiming city (LAB) |
 | **C. Absent systems** | **14** | |
-| **OPEN, TOTAL** | **18** | |
+| **OPEN, TOTAL** | **25** | |
 
 ## The question ledger — owner asks
 
@@ -71,10 +78,16 @@ scenes cite them), so the gaps are closed asks.
 
 ## A. Engine vs engine
 
-No open entry. The digest is the only instrument for this class; a round
-that widens what the gate reaches is worth more here than one that re-reads
-the exporter, and a hunt catch opens an entry here only when it cannot
-close in the same commit.
+The digest is the only instrument for this class; a round that widens what
+the gate reaches is worth more here than one that re-reads the exporter, and
+a hunt catch opens an entry here only when it cannot close in the same
+commit.
+
+- **A-49. THE MARAE'S GREAT WORK SLOTS.** Weight 1.
+  - BUILD: the install gives `BUILDING_MARAE` no `Building_GreatWorks` row (`civVariants.0.noGreatWorks` in `cpu/data/buildings.ts`), and TS `workContext` (`cpu/core/greatWorks.ts`) makes a Marae standing in for its base row hold no works. The GPU builds the same set as `_bvar_no_gw` in `SimInit` and no reader asks it: `_gw_holder_present` (`sim_economy.py`) reads the base building's bit alone, so a Maori city with a Marae keeps the base row's slots. REACHED by no lane today: the serve gate reaches it only when a Maori seat builds the Marae and a Great Work lands; a poke lane on a planted Marae closes it.
+- **A-50. THE OPENING UNIT ORDER.** Weight 1.
+  - BUILD: TS `loadWorld` (`cpu/world/load.ts`) spawns each civ's fixture units in fixture order, seat 0 first; the GPU's t0 seeding in `SimInit` sorts `f["civs"]` with `int(c["seat"]) == 0` as the key, so row 0's units go LAST, and its comment calls that order a wire contract with TS `state.units`. One of the two is wrong or the order is unobservable. Read which planes compare the unit pool positionally (`shared/statecompare.manifest.json`, `pool_view`): if none, delete the sort; if one does, make the GPU seed in fixture order. Either way the seat-0 key goes (seats are symmetric).
+
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
 - **B-24r. GOVERNOR TAILS.** Weight 1.
@@ -90,6 +103,14 @@ close in the same commit.
   - DLL: the PER-CITY war-weariness split. The install's numbers are `WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, FOUNDED_CITY 0, NONFOUNDED_CITY 1}`, `_POINTS_FOR_AMENITY_LOSS 400`, `_PER_COMBAT_IN_{ALLIED 1, FOREIGN 2}_LANDS`, `_PER_UNIT_KILLED 3`, `_PER_WMD_LAUNCHED 10`, `_DECAY_{PEACE_DECLARED 2000, TURN_AT_PEACE 200, TURN_AT_WAR 50}`, `_WARMONGER_BASE 16` — re-read in `GlobalParameters.xml`, all thirteen still there and still the whole of it; how the per-city rows compose is not published. The empire-wide rule ships (`warWearinessPenalty`).
   - `GAME_SPEED` 0.6 is a SHAPE difference: real Civ 6 scales cost, yield and turn tables independently.
   - Oligarchy and Classical Republic are adopted in NO game (`computeAdoption` / `_adopted_gov` take the newest tier); their rows are held by the two government lanes' borrowed-row drills only.
+- **B-82. THE TURN-LIMIT SCORE WINNER.** Weight 2.
+  - BUILD: past `TURN_LIMIT` TS `endTurn` (`cpu/core/game.ts`) sets `victoryType` 1 and `victoryRow` -1 and names nobody. The GPU names a winner there (`sim_step.py`, `leader()` over `seat_score`), and `seat_score` is the balanced YIELD score the env rewards (`rules.score`: pop x3 plus weighted yields), not Civ 6's Score. Civ 6's score victory goes to the highest game Score, whose categories and per-item points are the install's `ScoringCategories` / `ScoringLineItems`. Source those rows, build the Score on both engines, and have both name the winner; the env reward stays its own number.
+- **B-83. THE NUCLEAR EMERGENCY'S TERMS.** Weight 1.
+  - BUILD: `EMERGENCY_NUKE_TARGET_CS` 3 ("Target units have -3 CS when fighting Member units", success) and `EMERGENCY_NUKE_LOYALTY_CUT` 1 ("Member cities exert 1 less Loyalty pressure", failure) are sourced in `cpu/data/seats.ts` and exported as `nuclear.emergencyNukeCS` / `emergencyNukeLoyaltyCut`, and neither engine applies them: `cpu/core/emergency.ts` has no nuclear arm, and the GPU reads both into `_emg_nuke_cs` / `_emg_nuke_loyalty_cut` with no reader. Wire them into the emergency resolution on both engines, beside the other kinds' rewards.
+- **B-84. BUILDING UPKEEP BY COST TIER.** Weight 1.
+  - BUILD: `buildingMaintenance` (`cpu/core/city.ts`) prices a row with no `maintenance` by its cost (>=500 is 3, >=190 is 2, else 1), and GROVE and SANCTUARY (`cpu/data/buildings.ts`) carry none, so their upkeep is invented. Both rows already cite the install's `Buildings` table for `Cost`; add `maintenance` from its `Maintenance` column with the same `xml(...)` provenance, then delete the tier arm so a missing value fails loudly (and check the GPU's upkeep reads the exported value, not a copy of the heuristic).
+- **B-85. EXODUS OF THE EVANGELISTS' GOLDEN MOVEMENT.** Weight 1.
+  - LAB: both engines give the golden-age Exodus movement bonus to the Missionary and the Apostle only (`goldenMoveBonus` in `cpu/core/eras.ts`; the GPU's `_ded_exodus` row in `sim_masks.py`), while `INQUISITOR` is in the roster. Whether the Inquisitor takes it is answered by the commemoration's golden-age modifier and the requirement set it names in the install's Expansion1 commemoration data; failing that, by a golden-age Exodus seat holding an Inquisitor in the live game.
 
 ## C. Absent systems — the blockers, and the gaps waiting on them
 
@@ -141,4 +162,16 @@ close in the same commit.
 
 ## Harness — not weighted
 
-No open entry.
+- **A-51. SEAT 0 WHERE THE INSTRUMENTS DO NOT LOOK.**
+  - BUILD: `SimInit` fills ROW 0 of the city planes differently (`city_center` -1 where the other rows start at 0, `city_hp` `cityMaxHp` where they start at 0). Make every row start alike, or name the reader that needs it.
+  - BUILD: `createGame({opponents})` (`cpu/core/game.ts`) opens a game as seat 0 plus opponents through `placeSeats` (`cpu/core/phase.ts`), a second placement path beside `seeder/place.ts`, and `createGameFromMap` pre-creates seat 0 (`loadWorld` then back-fills the rest). Tests and `tools/cpu/perf-turns.ts` are its only users: move them to seeded worlds and delete it.
+  - BUILD: `Seat.aggression` is a driver preference weight stored as engine state (`cpu/core/types.ts`, `world/file.ts`, `cpu/export/planes.ts`, read by `cpu/core/observe.ts`). It belongs to the driver.
+  - BUILD: `tools/gpu/seat_symmetry_check.py`'s `FORK_PATTERNS` match none of the forms above: a literal row passed as an argument, `_base[:, 0]`, `c["seat"]) == 0`. Teach it those, so a clean run means more than its patterns.
+- **A-52. SWITCHES THAT ARE ALWAYS ON, AND RULE READS WITH DEFAULTS.**
+  - BUILD: `GOVERNMENTS_ADOPTION_LIVE`, `CITY_RELIGION_ADDER_LIVE`, `BARB_SCOUT_OPENER_LIVE`, `ADMIRAL_MARCH_LIVE`, `DEDICATION_PAYOUTS_LIVE`, `ENGINEER_LIVE`, `SCRIPTED_CAMPUS` and `embarkState.live` are all `true`; their `false` arms are dead on both engines, and several ship as rules keys the GPU gates on. Delete each flag, its arms and its key in one commit.
+  - BUILD: keys exported and applied by neither engine: `admiralMarchLive`, the campus scaffold's `active` and `campusUnlockTech` (read into `_admiral_march_live`, `_campus_active`, `campus_unlock_tech`, never used). Stop exporting them; `tools/gpu/rules_reader_census.py` then needs no literal for them.
+  - BUILD: the GPU reads `formalWarMinTurns` into `_formal_war_min` and never uses it, while TS `denounceAged` (`cpu/core/seats.ts`) reads `FORMAL_WAR_MIN_TURNS`. Confirm the GPU's formal-war casus belli takes the same 5 turns from elsewhere; if not, it is an A entry.
+  - BUILD: the GPU's `improvements_on` / `districts_on` gate sections the exporter always ships, and about 600 `.get("key", <number>)` rule reads in `gpu/core` carry a second, unsourced copy of each magnitude. Index the rules directly so a missing key fails loudly.
+- **A-53. THE TS VERB LAYER ONLY TESTS DRIVE.**
+  - BUILD: `cpu/core/game.ts`'s queue, purchase, research, government, policy and religion verbs (`queueSettler`, `queueDistrict`, `queueBuilding`, `queueWonder`, `purchaseBuilding`, `purchaseUnit`, `cancelQueueItem`, `setTechResearch`, `setCivicResearch`, `setGovernment`, `setPolicy`, `toggleLockedTile`, `choosePantheon`, `foundReligion`, `enhanceReligion`), `cpu/core/units.ts`'s `orderMove`, `queueUnit`, `builderImprove`, `builderRepair`, and `spreadReligiousPressureForTest` have no engine caller. `setGovernment` is the only writer of `government.current`, which keeps a second government path alive in `governmentSlots` and `seatTurn.ts`. Move those tests onto the action record and the applier, then delete the layer and `government.current`.
+  - BUILD: `serialize` / `deserialize` (`cpu/core/game.ts`) back-fill old save shapes (`growthBox` to `foodBox`, `legacyCamps`) for one test; the re-exports `GENERAL_AURA_CS` / `GENERAL_AURA_RANGE` (`combat.ts`) and `nextRandom` (`units.ts`) still have importers; `policy/ladder.py`'s `_best_in_lane` has no caller. Delete each.
