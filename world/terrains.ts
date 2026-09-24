@@ -81,4 +81,3 @@ export const TERRAINS: Record<TerrainId, TerrainDef> = {
 };
 
 export const HILLS_YIELDS: Partial<Yields> = { production: 1 };
-export const MOUNTAIN_COLOR = '#8b8b82';

@@ -16,7 +16,7 @@ import { captureCityStateFor } from './combat';
 import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
-  gpChargesOf, gpEffectOf, gpSiteOf, personWorkObjects,
+  gpEffectOf, gpSiteOf, personWorkObjects,
   type GpEffect, type GreatPersonDef,
 } from '../data/greatPeople';
 import { gwCountsByObj, gwHasRoom, placeGreatWork } from './greatWorks';
@@ -424,5 +424,3 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   if ((unit.charges ?? 0) <= 0) disbandUnit(state, unit.id);
   return true;
 }
-
-export { gpChargesOf };

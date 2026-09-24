@@ -147,14 +147,3 @@ export function unitActionIndex(improvementIds: readonly string[]): Record<strin
   unitActionNames(improvementIds).forEach((n, i) => (out[n] = i));
   return out;
 }
-
-export function buildColumnOf(i: number): number {
-  return i < DEDICATED_IMPROVEMENTS ? 13 + i : 18 + (i - DEDICATED_IMPROVEMENTS);
-}
-
-export function improvementOfColumn(a: number, nImp: number): number {
-  if (a >= 13 && a < 13 + DEDICATED_IMPROVEMENTS) return a - 13;
-  const hi = 18 + (nImp - DEDICATED_IMPROVEMENTS);
-  if (a >= 18 && a < hi) return DEDICATED_IMPROVEMENTS + (a - 18);
-  return -1;
-}

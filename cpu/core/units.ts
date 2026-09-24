@@ -365,10 +365,6 @@ export function crossesRiver(from: Tile, to: Tile): boolean {
   return false;
 }
 
-export function unitAt(state: GameState, tileIndex: number): Unit | undefined {
-  return state.units.find((u) => u.tileIndex === tileIndex);
-}
-
 export function unitsAt(state: GameState, tileIndex: number): Unit[] {
   return state.units.filter((u) => u.tileIndex === tileIndex);
 }
@@ -2151,30 +2147,6 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
   state.eventLog.push(`Harvested ${resName}: +${grant.amount} ${grant.key}.`);
   spendCharge(state, unit!);
   return ok;
-}
-
-export function unitNeighbor(state: GameState, unit: Unit, d: number): Tile | null {
-  return neighborTile(state.map, state.map.tiles[unit.tileIndex], d);
-}
-
-export function walkToward(state: GameState, unit: Unit, target: Tile, stopWithin = 0): void {
-  for (;;) {
-    const at = state.map.tiles[unit.tileIndex];
-    const dHere = hexDistance(at.col, at.row, target.col, target.row);
-    if (dHere <= stopWithin) break;
-    let dest = -1;
-    let destD = dHere;
-    for (const n of neighbors(state.map, at)) {
-      if (!tileFreeForUnit(state, n.index, 0, unit)) continue;
-      const d = hexDistance(n.col, n.row, target.col, target.row);
-      if (d < destD) {
-        destD = d;
-        dest = n.index;
-      }
-    }
-    if (dest < 0) break;
-    if (stepUnit(state, unit, state.map.tiles[dest]) !== 'moved') break;
-  }
 }
 
 /** The most advanced strategic resource this seat can actually use.

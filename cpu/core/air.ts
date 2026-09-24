@@ -14,7 +14,7 @@ import { UNITS, UNIT_HP, GDR_DRONE_AA } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { citiesOf, isTerritorial, seatOf, tileSeat } from './seats';
+import { citiesOf, isTerritorial, tileSeat } from './seats';
 import { cityAtIndex, gdrHas, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import { promoFlag, promoValue } from './promotions';
 import { governorTileSum } from './governors';
@@ -25,10 +25,6 @@ export const AERODROME_AIR_SLOTS = 4;
 
 export function isAirUnit(type: string): boolean {
   return UNITS[type]?.air !== undefined;
-}
-
-export function airUnitsOf(state: GameState, seat: number): Unit[] {
-  return state.units.filter((u) => u.seat === seat && isAirUnit(u.type));
 }
 
 /** every air unit standing at this tile — its base's occupancy. */
@@ -362,18 +358,4 @@ export function airDefenseOf(
   const t = state.map.tiles[unit.tileIndex];
   if (!t || tileSeat(t) !== unit.seat) return base;
   return base + governorTileSum(state, t, (e) => e.airDefenseCS);
-}
-
-/** the seat's own count of based aircraft, for the training gate's message. */
-export function airCapacityOf(state: GameState, seat: number): { used: number; total: number } {
-  const bases = airBasesOf(state, seat);
-  const total = bases.reduce((n, t) => n + airSlotsAt(state, seat, t), 0);
-  return { used: airUnitsOf(state, seat).length, total };
-}
-
-export function seatAirIsOverbased(state: GameState, seat: number): boolean {
-  const s = seatOf(state, seat);
-  if (!s) return false;
-  const c = airCapacityOf(state, seat);
-  return c.used > c.total;
 }

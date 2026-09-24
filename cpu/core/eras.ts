@@ -235,10 +235,6 @@ function commitGoldenGrants(state: GameState, seat: number, era: number): void {
   }
 }
 
-export function isHeroicAge(state: GameState, civ: number): boolean {
-  return ((seatOf(state, civ)?.prevAge ?? 1)) === 0 && ((seatOf(state, civ)?.age ?? 1)) === 2;
-}
-
 /**
  * The GOLDEN-AGE face of a dedication — the standing bonus that
  * replaces the Dark/Normal era-score payout. SOURCED from the Civ 6 dedication
@@ -318,4 +314,3 @@ export function goldenCulturePerDistrict(state: GameState, civ: number): number 
 export function agePressureFactor(state: GameState, civ: number): number {
   return AGE_PRESSURE[(seatOf(state, civ)?.age ?? 1)];
 }
-

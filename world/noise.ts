@@ -1,5 +1,5 @@
 
-import { mulberry32, deriveSeed } from './rng';
+import { deriveSeed } from './rng';
 
 function smoothstep(t: number): number {
   return t * t * (3 - 2 * t);
@@ -52,14 +52,5 @@ export function fbm(seed: number, octaves = 4, lacunarity = 2, gain = 0.5): Nois
       freq *= lacunarity;
     }
     return sum / norm;
-  };
-}
-
-export function jitter(seed: number): (i: number) => number {
-  const rng = mulberry32(seed);
-  const cache: number[] = [];
-  return (i: number) => {
-    while (cache.length <= i) cache.push(rng());
-    return cache[i];
   };
 }

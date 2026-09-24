@@ -1197,7 +1197,6 @@ export const DEAL_ITEM_KINDS = [
    *  accepting it declares the war for BOTH parties (`jointWarPayable`) */
   'JOINT_WAR',
 ] as const;
-export type DealItemKind = typeof DEAL_ITEM_KINDS[number];
 export const DEAL_GOLD = DEAL_ITEM_KINDS.indexOf('GOLD');
 export const DEAL_GOLD_PER_TURN = DEAL_ITEM_KINDS.indexOf('GOLD_PER_TURN');
 export const DEAL_FAVOR = DEAL_ITEM_KINDS.indexOf('FAVOR');

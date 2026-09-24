@@ -271,15 +271,6 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Objec
   Object.entries(RAW_CITY_STATE_SUZERAIN_BONUS).map(([k, v]) => [k, { ...v, src: SUZ_SRC }]),
 );
 
-export const CITY_STATE_TYPE_COLORS: Record<CityStateType, string> = {
-  scientific: '#4a90d9',
-  cultural: '#b05fb0',
-  trade: '#d9a94a',
-  industrial: '#b3763e',
-  militaristic: '#c0392b',
-  religious: '#e8e4d8',
-};
-
 /**
  * The per-type placement pool. `seeder/place.ts` holds its own copy — the
  * seeder is hashed into `genStamp` and may not import from `cpu/`, so the two
@@ -296,7 +287,6 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
 
 export const ENVOY_COST = 100;
 export const INFLUENCE_PER_TURN = 3;
-export const ENVOY_THRESHOLDS = [1, 3, 6] as const;
 export const CITY_STATE_CAPITAL_BONUS = 2;
 export const CITY_STATE_DISTRICT_BONUS = 2;
 export const SUZERAIN_ENVOYS = 3;

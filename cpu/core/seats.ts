@@ -72,11 +72,6 @@ export function tileClaimed(t: Tile): boolean {
   return tileSeat(t) !== NO_SEAT;
 }
 
-export function tileForeignTo(t: Tile, civ: number): boolean {
-  const s = tileSeat(t);
-  return s !== NO_SEAT && s !== civ;
-}
-
 /** CIV6 (Resources.PrereqTech; REQUIREMENT_PLOT_RESOURCE_VISIBLE): the
  *  resources this seat cannot yet SEE — a strategic resource is invisible
  *  until its revealing technology, and until then the tile is plain ground

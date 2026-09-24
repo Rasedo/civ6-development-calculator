@@ -457,8 +457,6 @@ const SPACE_IDS = new Set(SPACE_PROJECTS.map((p) => p.id));
 export function isSpaceProject(id: string): boolean {
   return SPACE_IDS.has(id);
 }
-/** The device a project builds, or null. */
-export const WMD_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) => p.wmd);
 
 /** CIV6 (GS): a Terrestrial Laser Station "increases the city's Power
  *  requirement by 5 each time it is completed". */

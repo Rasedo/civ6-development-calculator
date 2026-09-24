@@ -119,10 +119,6 @@ export function cityStateAt(state: GameState, tileIndex: number): CityState | un
   return cityStateId === -1 ? undefined : state.cityStates.find((cityState) => cityState.id === cityStateId);
 }
 
-export function metCityStates(state: GameState, seat: number): CityState[] {
-  return state.cityStates.filter((cityState) => hasMet(cityState, seat));
-}
-
 /**
  * The city-state with this ID, or undefined once it has been captured.
  *
@@ -566,17 +562,6 @@ export function sueForPeaceWithCityState(state: GameState, cityStateId: number, 
   warWearinessPeace(state, seat, seatOfCityState(cityState.id));
   state.eventLog.push(`You have made peace with ${cityState.name}.`);
   return { ok: true };
-}
-
-export function questLabel(quest: CityStateQuest): string {
-  switch (quest.kind) {
-    case 'clearCamp':
-      return 'Clear the barbarian camp near us';
-    case 'sendTradeRoute':
-      return 'Send us a trade route';
-    case 'buildDistrict':
-      return `Build a ${quest.district?.replace(/_/g, ' ').toLowerCase()}`;
-  }
 }
 
 export function cityStatePhase(state: GameState): void {

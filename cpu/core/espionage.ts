@@ -31,7 +31,7 @@ import {
   type SpyMissionDef,
 } from '../data/espionage';
 import { envoysOf, resolveSuzerain, suzerainOf } from './cityStates';
-import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
+import { BARB_SEAT, citiesOf, seatOf, seatsAllied, tileSeat } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
 import { getModifiers } from './effects';
 import { goldenDedication, dedicationEvent, worldEraIndex } from './eras';
@@ -754,5 +754,3 @@ function partisanChassis(state: GameState): string | undefined {
 export function spyIsCounterspy(unit: Unit): boolean {
   return isSpy(unit.type) && unit.spyMission === SPY_M_COUNTERSPY;
 }
-
-export { isCiv };

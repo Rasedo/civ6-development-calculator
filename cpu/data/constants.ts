@@ -9,15 +9,6 @@ import { srcConst, xml } from './provenance';
 /** shorthand: one `GlobalParameters` row's `Value` */
 const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
 
-export const MAP_SIZES = {
-  duel: { name: 'Duel (44×26)', width: 44, height: 26 },
-  tiny: { name: 'Tiny (60×38)', width: 60, height: 38 },
-  small: { name: 'Small (74×46)', width: 74, height: 46 },
-  standard: { name: 'Standard (84×54)', width: 84, height: 54 },
-} as const;
-
-export type MapSizeId = keyof typeof MAP_SIZES;
-
 /** Minimum distance between city centers.
  * Real Civ 6 blocks settling within 3 tiles of any center. */
 

@@ -131,15 +131,10 @@ export const WAR_KINDS: readonly WarKindDef[] = [
 
 export const WAR_KIND_SURPRISE = 0;
 export const WAR_KIND_FORMAL = 1;
-export const WAR_KIND_HOLY = 2;
 export const WAR_KIND_LIBERATION = 3;
 export const WAR_KIND_RECONQUEST = 4;
-export const WAR_KIND_PROTECTORATE = 5;
-export const WAR_KIND_COLONIAL = 6;
 export const WAR_KIND_TERRITORIAL = 7;
 export const WAR_KIND_GOLDEN = 8;
-export const WAR_KIND_RETRIBUTION = 9;
-export const WAR_KIND_IDEOLOGICAL = 10;
 export const WAR_KIND_THIRD_PARTY = 11;
 export const WAR_KIND_JOINT = 12;
 

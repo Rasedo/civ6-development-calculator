@@ -13,8 +13,6 @@
 
 import type { GameMap, Tile } from './types';
 
-export const SQRT3 = Math.sqrt(3);
-
 export const AXIAL_DIRS: ReadonlyArray<readonly [number, number]> = [
   [1, 0], // 0 E
   [1, -1], // 1 NE
@@ -99,47 +97,6 @@ export function tilesWithin(map: GameMap, col: number, row: number, radius: numb
   return out;
 }
 
-export function hexCenter(col: number, row: number, size: number): { x: number; y: number } {
-  return { x: SQRT3 * size * (col + 0.5 * (row & 1)), y: 1.5 * size * row };
-}
-
-export function cornerOffsets(size: number): { x: number; y: number }[] {
-  const w2 = (SQRT3 / 2) * size;
-  const s2 = size / 2;
-  return [
-    { x: w2, y: -s2 },
-    { x: 0, y: -size },
-    { x: -w2, y: -s2 },
-    { x: -w2, y: s2 },
-    { x: 0, y: size },
-    { x: w2, y: s2 },
-  ];
-}
-
-export const EDGE_CORNERS: ReadonlyArray<readonly [number, number]> = [
-  [5, 0], // E
-  [0, 1], // NE
-  [1, 2], // NW
-  [2, 3], // W
-  [3, 4], // SW
-  [4, 5], // SE
-];
-
-export function pixelToHex(x: number, y: number, size: number): [number, number] {
-  const q = ((SQRT3 / 3) * x - (1 / 3) * y) / size;
-  const r = ((2 / 3) * y) / size;
-  const s = -q - r;
-  let rq = Math.round(q);
-  let rr = Math.round(r);
-  const rs = Math.round(s);
-  const dq = Math.abs(rq - q);
-  const dr = Math.abs(rr - r);
-  const ds = Math.abs(rs - s);
-  if (dq > dr && dq > ds) rq = -rr - rs;
-  else if (dr > ds) rr = -rq - rs;
-  return axialToOffset(rq, rr);
-}
-
 export interface Vertex {
   col: number;
   row: number;
@@ -217,9 +174,4 @@ export function vertexNeighbors(v: Vertex): VertexEdge[] {
       ],
     },
   ];
-}
-
-export function vertexPixel(v: Vertex, size: number): { x: number; y: number } {
-  const c = hexCenter(v.col, v.row, size);
-  return { x: c.x, y: c.y + (v.side === 'N' ? -size : size) };
 }

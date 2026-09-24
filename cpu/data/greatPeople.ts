@@ -2,7 +2,7 @@
 import type { DistrictId, GreatPersonClass } from '../core/types';
 import { srcConst, xml, type SrcMap } from './provenance';
 import { LUXURY_AMENITY_CITIES } from './constants';
-import { GW_KIND_ART, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
+import { GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
 
 export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   SCIENTIST: 'CAMPUS',
@@ -17,18 +17,6 @@ export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   // so PROPHET stays index 3.
   WRITER: 'THEATER_SQUARE',
   MUSICIAN: 'THEATER_SQUARE',
-};
-
-export const GP_CLASS_NAMES: Record<GreatPersonClass, string> = {
-  SCIENTIST: 'Great Scientist',
-  ENGINEER: 'Great Engineer',
-  MERCHANT: 'Great Merchant',
-  PROPHET: 'Great Prophet',
-  ARTIST: 'Great Artist',
-  ADMIRAL: 'Great Admiral',
-  GENERAL: 'Great General',
-  WRITER: 'Great Writer',
-  MUSICIAN: 'Great Musician',
 };
 
 /**
@@ -468,11 +456,6 @@ export const GW_WORKS_PER_PERSON = srcConst('seats.gwWorksByKind', [2, 3, 2] as 
     + 'Works of Writing, an Artist 3 Works of Art, a Musician 2 Works of Music',
   inputs: [xml('GreatWorks', 'GreatWorkType=GREATWORK_DONATELLO_1', 'GreatWorkObjectType')],
 });
-export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
-  WRITER: GW_KIND_WRITING,
-  ARTIST: GW_KIND_ART,
-  MUSICIAN: GW_KIND_MUSIC,
-};
 export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'ARTIST', 'MUSICIAN']);
 
 export const ARCHAEOLOGIST_CHARGES = srcConst('greatPeople.ARCHAEOLOGIST_CHARGES', 3, {

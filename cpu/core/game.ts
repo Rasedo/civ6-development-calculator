@@ -442,10 +442,6 @@ export function placeImprovement(
   return { ok: true };
 }
 
-export function removeImprovement(state: GameState, tileIndex: number): void {
-  state.map.tiles[tileIndex].improvement = null;
-}
-
 export function removeFeature(state: GameState, tileIndex: number, seat: number): RuleResult {
   if (state.unitsMode && !state.sandbox) {
     return { ok: false, reason: 'Units mode: move a Builder onto the tile and use its Remove action.' };
@@ -1496,15 +1492,6 @@ export function wonderChargeBoost(state: GameState, unit: Unit, actor: Seat): Ru
   unit.movesLeft = 0;
   if ((unit.charges ?? 0) <= 0) disbandUnit(state, unit.id);
   return { ok: true };
-}
-
-export function itemLabel(item: QueueItem): string {
-  if (item.kind === 'district') return DISTRICTS[item.district].name;
-  if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].name;
-  if (item.kind === 'settler') return 'Settler';
-  if (item.kind === 'unit') return UNITS[item.unit]?.name ?? item.unit;
-  if (item.kind === 'project') return PROJECTS[item.project]?.name ?? item.project;
-  return BUILDINGS[item.building].name;
 }
 
 /** CIV6 (Veterancy): "+30% Production toward Encampment districts, Harbor

@@ -1281,9 +1281,3 @@ export function classBitOf(unitType: string): number {
   const c = UNIT_PROMO_CLASS[unitType];
   return (c && CLASS_BIT[c]) ?? 0;
 }
-
-/** the catalog index of a promotion id — the bit it occupies in a unit's
- *  `promotions` mask, shared by both engines through the rules export. */
-export const PROMO_INDEX: Readonly<Record<string, number>> = Object.fromEntries(
-  PROMOTIONS.map((p, i) => [p.id, i]),
-);

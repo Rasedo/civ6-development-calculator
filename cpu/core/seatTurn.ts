@@ -1,7 +1,7 @@
 
 import type { City, GameState, QueueItem, Seat } from './types';
 import { logPopWrite } from './difflog';
-import { seatOf, civsAtWar, allianceLevelWith, alliedAtLevel, dominantReligionOf } from './seats';
+import { seatOf, allianceLevelWith, alliedAtLevel, dominantReligionOf } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { takeItemBank } from './prodLayout';
@@ -65,13 +65,6 @@ export function seatGovernmentId(state: GameState, seat: number): string | null 
   const s = seatOf(state, seat);
   if (!s) return null;
   return GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(s.research).government : s.government.current;
-}
-
-export function atPeaceWithAllCivs(state: GameState, seat: number): boolean {
-  for (let other = 0; other < state.seats.length; other++) {
-    if (other !== seat && civsAtWar(state, seat, other)) return false;
-  }
-  return true;
 }
 
 /** CIV6 (City-State Emergency, success): "+1 Gold/turn for each Envoy they
@@ -204,4 +197,3 @@ function bankTourismPerRival(
       + Math.floor(religious * Math.max(0, 100 + relPct) / 100);
   }
 }
-

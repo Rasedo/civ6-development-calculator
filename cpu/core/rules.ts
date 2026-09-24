@@ -643,17 +643,6 @@ export function canPlaceDistrict(
   });
 }
 
-export function districtPlacementTiles(state: GameState, city: City, type: DistrictId): number[] {
-  const center = state.map.tiles[city.centerIndex];
-  const out: number[] = [];
-  for (const t of state.map.tiles) {
-    if (!tileBelongsTo(t, city)) continue;
-    if (hexDistance(center.col, center.row, t.col, t.row) > CITY_WORK_RADIUS) continue;
-    if (canPlaceDistrict(state, city, type, t.index).ok) out.push(t.index);
-  }
-  return out;
-}
-
 /** The walls LEVEL this city has BUILT — Ancient 1, Medieval 2, Renaissance
  *  3, and 0 with none. `wallsTier` is the DEFENCE tier, which Urban Defenses
  *  raises without a wall standing; a housing or yield term wants this one. */
@@ -919,10 +908,6 @@ export function buildingCompletable(state: GameState, city: City, buildingId: st
   return true;
 }
 
-export function buildingDef(id: string): BuildingDef {
-  return BUILDINGS[id];
-}
-
 export function wonderExists(state: GameState, wonderId: string): boolean {
   return state.map.tiles.some((t) => t.builtWonder === wonderId);
 }
@@ -1030,26 +1015,4 @@ export function canPlaceWonder(
     return no('Must have founded a religion.');
   }
   return ok;
-}
-
-export function wonderPlacementTiles(state: GameState, city: City, wonderId: string, seat = city.seat): number[] {
-  const center = state.map.tiles[city.centerIndex];
-  const out: number[] = [];
-  for (const t of state.map.tiles) {
-    if (!tileBelongsTo(t, city)) continue;
-    if (hexDistance(center.col, center.row, t.col, t.row) > CITY_WORK_RADIUS) continue;
-    if (canPlaceWonder(state, city, wonderId, t.index, seat).ok) out.push(t.index);
-  }
-  return out;
-}
-
-export function availableWonders(state: GameState, city: City, seat: number): BuiltWonderDef[] {
-  return Object.values(BUILT_WONDERS).filter((def) => {
-    if (wonderExists(state, def.id)) return false;
-    if (!state.sandbox) {
-      if (def.requiresTech && !isTechComplete(state, def.requiresTech, seat)) return false;
-      if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) return false;
-    }
-    return wonderPlacementTiles(state, city, def.id, seat).length > 0;
-  });
 }
