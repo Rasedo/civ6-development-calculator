@@ -157,6 +157,18 @@ describe('combat', () => {
     expect(meleeAttack(state, barb.id, builder.tileIndex, 0).ok).toBe(true);
     expect(state.units.some((u) => u.id === builder.id)).toBe(false);
   });
+
+  it('a Spy is seen by its own side alone, so no hostile fire finds it', () => {
+    const { state } = battlefield();
+    const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 13, 9).index, BARB_SEAT)!;
+    archer.tileIndex = tileAtCoords(state.map, 13, 9).index;
+    const spy = spawnUnit(state, 'SPY', tileAtCoords(state.map, 11, 9).index, 0)!;
+    spy.tileIndex = tileAtCoords(state.map, 11, 9).index;
+
+    expect(attackTargets(state, archer)).not.toContain(spy.tileIndex);
+    expect(rangedAttack(state, archer.id, spy.tileIndex).ok).toBe(false);
+    expect(spy.hp).toBe(100);
+  });
 });
 
 describe('barbarians', () => {

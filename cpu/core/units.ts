@@ -467,6 +467,9 @@ export function unitsHostile(
  * also why an adjacent CITY does not give the hex away.
  */
 export function unitVisibleTo(state: GameState, u: Unit, seat: number): boolean {
+  // CIV6 (Units.xml, UNIT_SPY `TeamVisibility="true"`): a Spy is seen by its
+  // own side alone, so no other seat ever targets, shoots or strikes one.
+  if (isSpy(u.type)) return u.seat === seat;
   // CIV6 (Twilight Veil): "Only adjacent enemy units can reveal this unit" —
   // a promoted hider is never given away at range, so Reveal Stealth lengthens
   // the look at a stealth CHASSIS and at nothing else.

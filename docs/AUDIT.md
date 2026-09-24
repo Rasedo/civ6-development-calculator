@@ -43,7 +43,8 @@ re-adds them.
 | B-85 Exodus of the Evangelists' golden movement | 1 | whether an Inquisitor takes it too |
 | B-86 the emergency combat terms' reach | 1 | how "one less pressure" applies (DLL); the AA answer to a sortie (LAB) |
 | B-87 the Marae's dedication event | 1 | whether a holder with no slots fires Pen, Brush and Voice (LAB) |
-| **B. Fidelity vs real Civ 6** | **8** | |
+| B-89 fire on a religious unit | 1 | whether a military or barbarian attack may target a Missionary / Apostle (LAB) |
+| **B. Fidelity vs real Civ 6** | **9** | |
 | C-1 power | 1 | the accident's unexplained MINOR citizen and its unmeasured building and unit rows (LAB); a minor's grid when C-38 gives one a load |
 | C-2 diplomatic agreements | 1 | ask 18: what "near" is for Don't Settle Near Me; the broken-promise multiplier's operand (DLL) |
 | C-16 the spy's second half | 1 | the counterspy's escape term (LAB) |
@@ -57,7 +58,7 @@ re-adds them.
 | C-60 the Free City's own play | 1 | bankruptcy's amenity loss, on no seat (LAB, then BUILD); whether its flat 72 and its granted units follow the era (LAB) |
 | C-74 the turn's one random event, the residue | 1 | the empty turns, what a site is, `Spacing`, the drought's farm damage (LAB) |
 | **C. Absent systems** | **16** | |
-| **OPEN, TOTAL** | **24** | |
+| **OPEN, TOTAL** | **25** | |
 
 ## The question ledger — owner asks
 
@@ -100,6 +101,8 @@ commit.
   - LAB: the air cover's answer to a sortie (the anti-air burst at the plane) carries no seat-pair term on either engine, the emergency's included; whether Civ 6 applies the emergency term there is unread.
 - **B-87. THE MARAE'S DEDICATION EVENT.** Weight 1.
   - LAB: both engines fire the Pen, Brush and Voice dedication event when a Marae completes, because it stands in for a Great Work holder (`GW_HOLDERS` in `cpu/core/eras.ts`, the GPU's `_b_gwslot`), though the Marae holds no slots. A Maori seat under that dedication completing a Marae in the live game answers whether the event fires.
+- **B-89. FIRE ON A RELIGIOUS UNIT.** Weight 1.
+  - LAB: on both engines a military or barbarian attack (melee, ranged, a city's strike) may take a Missionary or Apostle as its target (`attackTargets` / `hostileRangedStrike` in `cpu/core/combat.ts`, `_civclass_at` / `_nonbarb_unit_plane` on the GPU); Civ 6 appears to allow only Condemn Heretic against them, and no install row says so (`CanCapture="False"` is about capture). A crossbow beside a foreign Missionary at war in the live game answers it; then remove religious units from every target scan on both engines.
 ## C. Absent systems — the blockers, and the gaps waiting on them
 
 - **C-1. POWER.** Weight 1.
