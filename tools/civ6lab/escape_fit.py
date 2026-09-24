@@ -7,9 +7,12 @@ SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE) resolves to EscapeResult:
     2  FAIL_MUST_ESCAPE  -> the spy ESCAPED (the UI's own decode)
     5  KILLED
     1  CAPTURED
-Every route chosen here was the on-foot one (city centre). A successful
-mission promotes the spy first (LevelAfter 2), so the escapes split by the
-level the spy had when it ran.
+The route of each escape is the one `unblock.lua` answered the prompt with
+(its `escape route ...` log line, joined by spy name and turn); a log with
+no such line counts as "unlogged". A successful mission promotes the spy
+first (LevelAfter one higher) but the level counts only once the promotion
+is taken, so the level is the one the prompt line reads.
+Takes one or more logs.
 
 The install's terms are all LEVELS: ESPIONAGE_ESCAPE_BASE_CHANCE 10,
 _LEVEL_BOOST +1 per spy level, _COUNTERSPY_LEVEL_MODIFIER -1 per counterspy
@@ -48,27 +51,67 @@ def p3d6_le(t: int) -> float:
     return sum(1 for r in itertools.product(range(1, 7), repeat=3) if sum(r) <= t) / 216
 
 
-def main(path: str) -> int:
+ROUTE = re.compile(r"escape route (DISTRICT_\w+) of (\d+) for spy (\d+) (\S+) level (\d+) turn (\d+)")
+
+
+def main(paths: list[str]) -> int:
     rows = {}
-    for line in open(path, encoding="utf-8", errors="replace"):
-        # only the RAW history lines (they carry PlotIndex); the summary
-        # lines some run scripts sed down lose fields and would double count
-        if not line.startswith("mission ") or "PlotIndex=" not in line:
-            continue
-        d = dict(kv.split("=", 1) for kv in line.split()[1:] if "=" in kv)
-        key = (d.get("Name"), d.get("CompletionTurn"), d.get("CityName"), d.get("PlotIndex"))
-        rows[key] = d          # the last print of a mission wins (results fill in later)
+    routes = {}
+    for path in paths:
+        for line in open(path, encoding="utf-8", errors="replace"):
+            m = ROUTE.search(line)
+            if m:
+                routes.setdefault((path, m.group(4)), []).append(
+                    (int(m.group(6)), int(m.group(3)), m.group(1), int(m.group(5))))
+                continue
+            # only the RAW history lines (they carry PlotIndex); the summary
+            # lines some run scripts sed down lose fields and would double count
+            if not line.startswith("mission ") or "PlotIndex=" not in line:
+                continue
+            d = dict(kv.split("=", 1) for kv in line.split()[1:] if "=" in kv)
+            d["_log"] = path
+            key = (path, d.get("Name"), d.get("CompletionTurn"), d.get("CityName"), d.get("PlotIndex"))
+            rows[key] = d      # the last print of a mission wins (results fill in later)
+    # A prompt is answered again on the following turn(s) until the game
+    # clears it, and it comes up to a few turns after the mission's
+    # CompletionTurn; the route is a function of the spy's id, so the repeats
+    # agree. Collapse each spy's repeats into one prompt, then pair a name's
+    # must-escape missions with its prompts in turn order.
+    prompts = {}
+    for key, evs in routes.items():
+        out = []
+        for turn, sid, route, lvl in sorted(evs):
+            if out and out[-1][1] == sid and turn - out[-1][3] <= 1:
+                out[-1][3] = turn
+                continue
+            out.append([turn, sid, route, turn, lvl])
+        prompts[key] = out
+    must = sorted((int(d.get("CompletionTurn", -1)), k) for k, d in rows.items()
+                  if RAW.get(int(d.get("InitialResult", -1))) in ("SUCCESS_MUST_ESCAPE", "FAIL_MUST_ESCAPE"))
+    route_of = {}
+    for ct, k in must:
+        d = rows[k]
+        queue = prompts.get((d["_log"], d.get("Name")), [])
+        while queue and queue[0][0] < ct:
+            queue.pop(0)
+        if queue:
+            p = queue.pop(0)
+            route_of[k] = (p[2], p[4])
     esc = Counter()
-    by_level = {1: Counter(), 2: Counter()}
-    for d in rows.values():
+    by_level = {1: Counter(), 2: Counter(), 3: Counter(), 4: Counter()}
+    by_route = {}
+    for k, d in rows.items():
         init = RAW.get(int(d.get("InitialResult", -1)), "?")
         res = RAW.get(int(d.get("EscapeResult", -1)), "?")
         if init not in ("SUCCESS_MUST_ESCAPE", "FAIL_MUST_ESCAPE"):
             continue
-        lvl = int(d.get("LevelAfter", 1))
+        # the level the spy HAS at the prompt (a promotion is only a level
+        # once taken; LevelAfter counts it as soon as it is earned)
+        route, lvl = route_of.get(k, ("unlogged", int(d.get("LevelAfter", 1))))
         out = {"FAIL_MUST_ESCAPE": "escaped", "CAPTURED": "captured", "KILLED": "killed", "NO_RESULT": "pending"}.get(res, res)
         esc[out] += 1
-        by_level[lvl][out] += 1
+        by_level.setdefault(lvl, Counter())[out] += 1
+        by_route.setdefault((route, lvl), Counter())[out] += 1
     n = sum(v for k, v in esc.items() if k != "pending")
     print(f"missions parsed: {len(rows)}; must-escape: {sum(esc.values())}; resolved: {n}; pending: {esc['pending']}")
     print("outcomes:", dict(esc))
@@ -78,6 +121,12 @@ def main(path: str) -> int:
             print(f"  level {lvl}: escaped {c['escaped']}/{m} = {c['escaped']/m:.2f}  (captured {c['captured']}, killed {c['killed']})")
     if n:
         print(f"overall escaped {esc['escaped']}/{n} = {esc['escaped']/n:.2f}")
+    print("by route and level:")
+    for (route, lvl), c in sorted(by_route.items()):
+        m = sum(v for k, v in c.items() if k != "pending")
+        if m:
+            print(f"  {route:26s} level {lvl}: escaped {c['escaped']}/{m} = {c['escaped']/m:.2f}"
+                  f"  (captured {c['captured']}, killed {c['killed']})")
     print("\ncandidate readings (level 1 / level 2):")
     print(f"  percent 10+level              : {0.11:.2f} / {0.12:.2f}")
     print(f"  3d6 >= 10-level               : {p3d6_ge(9):.2f} / {p3d6_ge(8):.2f}")
@@ -89,4 +138,4 @@ def main(path: str) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1]))
+    sys.exit(main(sys.argv[1:]))

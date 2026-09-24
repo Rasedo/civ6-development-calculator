@@ -1,4 +1,4 @@
-r"""PreToolUse guard: no HEREDOCS, no SLEEP.
+r"""PreToolUse guard: no HEREDOCS, no SLEEP, no `python -`.
 
 Both are owner bans (`sleep` 2026-09-08, heredocs 2026-09-09) and both were
 first written as `permissions.deny` globs like `Bash(*<<*)`. Those never
@@ -27,6 +27,8 @@ import sys
 # `<<` opens a heredoc; `<<<` is a here-STRING and is fine, as is a shift.
 HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*[\"']?[A-Za-z_][A-Za-z0-9_]*")
 PS_HERESTRING = re.compile(r"@[\"']\s*$", re.M)
+# `python -` / `python3 -X utf8 -`: the script on stdin
+PY_STDIN = re.compile(r"(^|[;&|(]\s*)python3?(\s+-X\s+\S+)*\s+-(\s|$)")
 SLEEP = re.compile(r"(^|[;&|(]\s*)sleep\s+[\d.]|Start-Sleep", re.I)
 
 
@@ -42,6 +44,12 @@ def main() -> int:
             "backslash escapes silently and break on apostrophes. Write the "
             "script to a file with the Write tool and run `python <path>`; for "
             "a commit message, Write it and use `git commit -F <path>`.\n")
+        return 2
+    if PY_STDIN.search(cmd):
+        sys.stderr.write(
+            "BLOCKED: `python -` reads the script from stdin, and with no stdin "
+            "it hangs until the tool times out. Write the script to a file and "
+            "run `python <path>`.\n")
         return 2
     if SLEEP.search(cmd):
         sys.stderr.write(

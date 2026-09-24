@@ -1,0 +1,1572 @@
+################ save lab4_t200 seat 0 op UNITOPERATION_SPY_FOMENT_UNREST cap 12 extra 8
+setup: four spy civics granted, 8 extra grants
+turn 200 spies 0 started 0 travelled 0 promoted 0 bought 4 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: HistoricMoments: closed
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION | end turn requested
+unstuck: HistoricMoments: closed
+unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CASTLES | end turn requested
+unstuck: HistoricMoments: closed
+turn 201 spies active 0 idle 4 missions 0 captured-enemy 0
+spy 4259845 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 36:46 travel
+spy 4128777 LOC_CITIZEN_MAYA_MODERN_MALE_4 level 1 at 37:38 travel
+spy 4194315 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 32:42 travel
+spy 4063247 LOC_CITIZEN_MAYA_MALE_6 level 1 at 36:42 travel
+turn 201 spies 4 started 0 travelled 4 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CASTLES | end turn requested
+unstuck: HistoricMoments: closed
+unstuck: TechCivicCompletedPopup: closed
+unstuck: WorldCrisisPopup: closed
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_GRANARY | end turn requested
+unstuck: closed sessions [2:2]
+unstuck: DiplomacyActionView: Closing Diplomacy Action View. m_eventID: 19652
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_GRANARY | end turn requested
+unstuck: closed sessions [3:3]
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_GRANARY | end turn requested
+unstuck: WorldCongressIntro: closed
+unstuck: WorldCongressPopup: closed
+unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing | end turn requested
+unstuck: EraCompletePopup: closed
+unstuck: WorldCongressPopup: closed
+turn 202 spies active 0 idle 0 missions 0 captured-enemy 0
+turn 202 spies 0 started 0 travelled 0 promoted 0 bought 4 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: BoostUnlockedPopup: closed
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 203 spies active 0 idle 4 missions 0 captured-enemy 0
+Request to BulkHide( true, NaturalWonder ), Show on 0 = 1
+spy 4784130 LOC_UNIT_SPY_NAME level 1 at 54:21 start
+spy 4587523 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 36:46 travel
+spy 4718596 LOC_CITIZEN_MAYA_MODERN_MALE_4 level 1 at 54:15 start
+spy 4521989 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 32:42 travel
+spy 4456457 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 37:38 travel
+spy 4653066 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 54:11 start
+spy 4390923 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 36:42 travel
+turn 203 spies 7 started 3 travelled 4 promoted 0 bought 0 gold 44902
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: NaturalWonderPopup: closed
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: HistoricMoments: closed
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 204 spies active 3 idle 2 missions 0 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 start
+spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 4718596 LOC_CITIZEN_MAYA_MODERN_MALE_4 level 1 at 54:15 busy
+spy 4653066 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 54:11 busy
+spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 65:16 start
+turn 204 spies 5 started 2 travelled 0 promoted 0 bought 4 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 204 spies active 5 idle 4 missions 0 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 5111811 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 32:42 travel
+spy 4718596 LOC_CITIZEN_MAYA_MODERN_MALE_4 level 1 at 54:15 busy
+spy 5046277 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 37:38 travel
+spy 4980745 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 36:42 travel
+spy 4653066 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 54:11 busy
+spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 65:16 busy
+spy 5177364 LOC_CITIZEN_MAYA_FEMALE_1 level 1 at 36:46 travel
+turn 205 spies 9 started 0 travelled 4 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+turn 206 spies active 5 idle 2 missions 0 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 4718596 LOC_CITIZEN_MAYA_MODERN_MALE_4 level 1 at 54:15 busy
+spy 4653066 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 54:11 busy
+spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 65:16 busy
+spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 59:23 start
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 start
+turn 206 spies 8 started 2 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+turn 207 spies active 5 idle 3 missions 3 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 65:16 busy
+spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 59:23 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 refused
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 start
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 207 spies 8 started 1 travelled 0 promoted 0 bought 3 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: WorldCongressIntro: closed
+unstuck: WorldCongressPopup: closed
+unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing | end turn requested
+unstuck: WorldCongressPopup: closed
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 208 spies active 5 idle 7 missions 5 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 start
+spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 5636105 LOC_CITIZEN_MAYA_MALE_1 level 1 at 32:42 travel
+spy 5767178 LOC_CITIZEN_MAYA_FEMALE_1 level 1 at 45:9 start
+spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 65:16 busy
+spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 59:23 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 refused
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 refused
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 start
+spy 5570577 LOC_CITIZEN_MAYA_MALE_5 level 1 at 36:46 travel
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 208 spies 12 started 3 travelled 2 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_GRANARY | end turn requested
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM | end turn requested
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 209 spies active 7 idle 3 missions 5 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 5767178 LOC_CITIZEN_MAYA_FEMALE_1 level 1 at 45:9 busy
+spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 65:16 busy
+spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 59:23 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 refused
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 refused
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 209 spies 10 started 0 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM | end turn requested
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_HARBOR of 2 for spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 turn 209 | end turn requested
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 210 spies active 7 idle 3 missions 5 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 start
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 start
+spy 5767178 LOC_CITIZEN_MAYA_FEMALE_1 level 1 at 45:9 busy
+spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 65:16 busy
+spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 59:23 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 refused
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 start
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 start
+turn 210 spies 12 started 4 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_HARBOR of 2 for spy 4784130 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 turn 210 | end turn requested
+unstuck: TechCivicCompletedPopup: closed
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 3 for spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 turn 210 | end turn requested
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 211 spies active 8 idle 3 missions 7 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 busy
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 busy
+spy 5767178 LOC_CITIZEN_MAYA_FEMALE_1 level 1 at 45:9 busy
+spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 65:16 busy
+spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 59:23 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 refused
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 start
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 211 spies 11 started 1 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 3 for spy 4915211 LOC_CITIZEN_MAYA_FEMALE_6 level 1 turn 211 | end turn requested
+unstuck: InGamePopup: open, no close
+unstuck: TechCivicCompletedPopup: closed
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 turn 211 | end turn requested
+unstuck: closed sessions [2:2]
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 turn 211 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 212 spies active 6 idle 5 missions 10 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 start
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 busy
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 busy
+spy 5767178 LOC_CITIZEN_MAYA_FEMALE_1 level 1 at 45:9 busy
+spy 6029323 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 36:46 travel
+spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 59:23 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 refused
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 start
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 212 spies 11 started 2 travelled 1 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 1 for spy 5767178 LOC_CITIZEN_MAYA_FEMALE_1 level 1 turn 212 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_HARBOR of 3 for spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 turn 212 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_HARBOR of 3 for spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 turn 212 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 213 spies active 6 idle 3 missions 10 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 busy
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 busy
+spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 59:23 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 refused
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 213 spies 9 started 0 travelled 0 promoted 0 bought 1 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_HARBOR of 3 for spy 5308429 LOC_CITIZEN_MAYA_FEMALE_3 level 1 turn 213 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_MONUMENT | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 214 spies active 5 idle 4 missions 13 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 start
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 busy
+spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 start
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 start
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 6094865 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 36:46 travel
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 214 spies 10 started 3 travelled 1 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_MONUMENT | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 215 spies active 7 idle 4 missions 14 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 busy
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 busy
+spy 6291467 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 65:16 start
+spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 busy
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 6225937 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 36:46 travel
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 215 spies 11 started 1 travelled 1 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CARTOGRAPHY | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 216 spies active 8 idle 2 missions 15 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 busy
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 busy
+spy 6291467 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 65:16 busy
+spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 busy
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 216 spies 10 started 0 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CARTOGRAPHY | end turn requested
+unstuck: InGamePopup: open, no close
+unstuck: TechCivicCompletedPopup: closed
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 turn 216 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 217 spies active 8 idle 2 missions 15 captured-enemy 0
+spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 at 60:16 busy
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 busy
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 busy
+spy 6291467 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 65:16 busy
+spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 busy
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 refused
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 217 spies 10 started 0 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 4849664 LOC_CITIZEN_MAYA_MALE_6 level 1 turn 217 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 turn 217 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 2  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 217 spies active 7 idle 2 missions 15 captured-enemy 0
+spy 5963780 LOC_CITIZEN_MAYA_MALE_5 level 1 at 54:15 busy
+spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:11 busy
+spy 6291467 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 65:16 busy
+spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 1 at 54:21 busy
+spy 5439502 LOC_CITIZEN_MAYA_MODERN_MALE_1 level 1 at 59:23 busy
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 start
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 218 spies 9 started 1 travelled 0 promoted 1 bought 1 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 5898249 LOC_CITIZEN_MAYA_MALE_1 level 1 turn 218 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 turn 218 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 219 spies active 5 idle 3 missions 19 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 start
+spy 6291467 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 65:16 busy
+spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 at 54:21 busy
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 busy
+spy 6422545 LOC_CITIZEN_MAYA_MALE_8 level 1 at 36:46 travel
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 219 spies 8 started 1 travelled 1 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 3 for spy 6291467 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 turn 219 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 turn 219 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_CONSIDER_DISLOYAL_CITY -> nothing | end turn requested
+unstuck: closed sessions [7:7]
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 220 spies active 5 idle 1 missions 19 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 busy
+spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 at 54:21 busy
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 busy
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 220 spies 6 started 0 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_CONSIDER_DISLOYAL_CITY -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 turn 220 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 1  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 3  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 221 spies active 5 idle 1 missions 19 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 busy
+spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 at 54:21 busy
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 5242896 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 60:16 busy
+spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 at 54:11 start
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 221 spies 7 started 1 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 6160397 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 turn 221 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 1 for spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 turn 221 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unstuck: WorldCongressIntro: closed
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 2  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 222 spies active 4 idle 2 missions 20 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 busy
+spy 6553613 LOC_CITIZEN_MAYA_MALE_1 level 1 at 36:46 travel
+spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 at 49:10 busy
+spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 at 54:11 busy
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 refused
+turn 222 spies 6 started 0 travelled 1 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 1 for spy 5701647 LOC_CITIZEN_MAYA_FEMALE_4 level 1 turn 222 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_HARBOR of 2 for spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 turn 222 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 2  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 4  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 223 spies active 3 idle 1 missions 21 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 start
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 start
+spy 6619152 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 36:46 travel
+spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 at 54:11 busy
+spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 63:20 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 start
+turn 223 spies 6 started 3 travelled 1 promoted 0 bought 1 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_HARBOR of 2 for spy 5505042 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 turn 223 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 2  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 4  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 224 spies active 4 idle 1 missions 21 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 busy
+spy 6750221 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 30:48 travel
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 at 54:11 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 224 spies 5 started 0 travelled 1 promoted 0 bought 1 gold 50000
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR | end turn requested
+unstuck: closed sessions [1:1]
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DEFENSIVE_TACTICS | end turn requested
+unstuck: DiplomacyActionView: closed
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DEFENSIVE_TACTICS | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 2  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 4  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 225 spies active 4 idle 3 missions 22 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 busy
+spy 6881293 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 at 36:46 travel
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 6946832 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 54:21 start
+spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 at 54:11 busy
+spy 6815762 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 36:46 travel
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 225 spies 7 started 1 travelled 2 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DEFENSIVE_TACTICS | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 2  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 4  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 226 spies active 5 idle 0 missions 22 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 busy
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 start
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 6946832 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 54:21 busy
+spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 at 54:11 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 refused
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 226 spies 7 started 1 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR | end turn requested
+unstuck: InGamePopup: open, no close
+unstuck: TechCivicCompletedPopup: closed
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 turn 226 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 2  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 4  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 227 spies active 6 idle 1 missions 22 captured-enemy 0
+spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 45:9 busy
+spy 7208971 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 at 60:16 start
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 start
+spy 6946832 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 54:21 busy
+spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 at 54:11 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 refused
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 start
+turn 227 spies 8 started 3 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 1 for spy 6356992 LOC_CITIZEN_MAYA_FEMALE_3 level 1 turn 227 | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 turn 227 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 2  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 5  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 228 spies active 6 idle 1 missions 25 captured-enemy 0
+spy 7208971 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 at 60:16 busy
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 6946832 LOC_CITIZEN_MAYA_MODERN_FEMALE_2 level 1 at 54:21 busy
+spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 at 54:11 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 refused
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 228 spies 7 started 0 travelled 0 promoted 0 bought 2 gold 50000
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 6488081 LOC_CITIZEN_MAYA_MALE_8 level 1 turn 228 | end turn requested
+unstuck: closed sessions [1:1]
+unstuck: LeaderScene: open, no close
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_RECORDED_HISTORY | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 3  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 5  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 229 spies active 4 idle 2 missions 26 captured-enemy 0
+spy 7340032 LOC_CITIZEN_MAYA_MODERN_MALE_9 level 1 at 30:48 travel
+spy 7208971 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 at 60:16 busy
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 start
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 229 spies 6 started 1 travelled 1 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR | end turn requested
+unstuck: InGamePopup: open, no close
+unstuck: TechCivicCompletedPopup: closed
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_THEOLOGY | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 3  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 3  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 5  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 230 spies active 5 idle 0 missions 27 captured-enemy 0
+spy 7208971 LOC_CITIZEN_MAYA_MODERN_MALE_6 level 2 at 60:16 busy
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 230 spies 5 started 0 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_THEOLOGY | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 4  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 4  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 5  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 231 spies active 5 idle 0 missions 30 captured-enemy 0
+spy 7471104 LOC_CITIZEN_MAYA_MODERN_MALE_9 level 1 at 54:11 start
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 start
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 231 spies 5 started 2 travelled 0 promoted 0 bought 2 gold 50000
+unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR | end turn requested
+unstuck: InGamePopup: open, no close
+unstuck: TechCivicCompletedPopup: closed
+unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 3 for spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 turn 231 | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 4  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 4  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 5  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 232 spies active 5 idle 1 missions 30 captured-enemy 0
+spy 7471104 LOC_CITIZEN_MAYA_MODERN_MALE_9 level 1 at 54:11 busy
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7536657 LOC_CITIZEN_MAYA_MALE_2 level 1 at 30:48 notarget
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 232 spies 6 started 0 travelled 0 promoted 0 bought 0 gold 46700
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unstuck: EraCompletePopup: closed
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=233 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 4  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 4  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 6  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 233 spies active 5 idle 1 missions 31 captured-enemy 0
+spy 7471104 LOC_CITIZEN_MAYA_MODERN_MALE_9 level 1 at 54:11 busy
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7536657 LOC_CITIZEN_MAYA_MALE_2 level 1 at 30:48 travel
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 start
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 233 spies 6 started 1 travelled 1 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=233 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 4  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 4  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 6  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 233 spies active 5 idle 0 missions 31 captured-enemy 0
+spy 7471104 LOC_CITIZEN_MAYA_MODERN_MALE_9 level 1 at 54:11 busy
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 234 spies 5 started 0 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=235 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=235 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_9 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=233 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 5  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 5  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 6  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 235 spies active 5 idle 0 missions 33 captured-enemy 0
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 start
+spy 7667729 LOC_CITIZEN_MAYA_MALE_2 level 1 at 60:16 start
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 235 spies 5 started 2 travelled 0 promoted 0 bought 2 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unstuck: WorldCongressIntro: closed
+unstuck: WorldCongressPopup: closed
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=235 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=235 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_9 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=233 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 5  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 5  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 6  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 236 spies active 5 idle 1 missions 33 captured-enemy 0
+spy 7733257 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 30:48 travel
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7667729 LOC_CITIZEN_MAYA_MALE_2 level 1 at 60:16 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 236 spies 6 started 0 travelled 1 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=235 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=235 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_9 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=233 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 5  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 5  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 6  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 237 spies active 5 idle 0 missions 33 captured-enemy 0
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7667729 LOC_CITIZEN_MAYA_MALE_2 level 1 at 60:16 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 237 spies 5 started 0 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=237 EscapeResult=-1 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=235 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=235 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_9 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=233 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 5  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 5  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 6  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 238 spies active 5 idle 0 missions 34 captured-enemy 0
+spy 7798793 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 54:11 start
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7667729 LOC_CITIZEN_MAYA_MALE_2 level 1 at 60:16 busy
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 238 spies 6 started 1 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=239 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_2 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=239 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=237 EscapeResult=-1 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=235 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=235 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_9 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=233 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 5  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 5  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 7  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 239 spies active 6 idle 0 missions 36 captured-enemy 0
+spy 7798793 LOC_CITIZEN_MAYA_FEMALE_3 level 1 at 54:11 busy
+spy 7143437 LOC_CITIZEN_MAYA_MODERN_FEMALE_7 level 1 at 65:16 busy
+spy 6684687 LOC_CITIZEN_MAYA_MALE_1 level 1 at 54:15 busy
+spy 7667729 LOC_CITIZEN_MAYA_MALE_2 level 1 at 60:16 start
+spy 7077906 LOC_CITIZEN_MAYA_MODERN_FEMALE_5 level 1 at 54:21 busy
+spy 5373972 LOC_CITIZEN_MAYA_MODERN_FEMALE_1 level 1 at 49:10 busy
+turn 239 spies 6 started 1 travelled 0 promoted 0 bought 0 gold 50000
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing | end turn requested
+unstuck: InGamePopup: open, no close
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=239 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_2 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=239 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=237 EscapeResult=-1 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=235 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=235 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_9 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=233 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_5 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=231 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=231 EscapeResult=-1 InitialResult=3 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=231 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=230 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_7 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=229 EscapeResult=-1 InitialResult=1 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=227 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=227 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=227 EscapeResult=0 InitialResult=2 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=225 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_8 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=223 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=222 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_3 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=219 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_2 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=218 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_1 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=218 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=218 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=216 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=215 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=214 EscapeResult=0 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_4 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=214 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_1 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=214 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_5 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_VANCOUVER CompletionTurn=212 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_1 Operation=58 PlotIndex=801
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=212 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_WINNIPEG CompletionTurn=211 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_4 Operation=58 PlotIndex=1743
+mission CityName=LOC_CITY_NAME_VICTORIA CompletionTurn=210 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_FEMALE_1 Operation=58 PlotIndex=889
+mission CityName=LOC_CITY_NAME_SAINT_JOHN CompletionTurn=210 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_3 Operation=58 PlotIndex=1991
+mission CityName=LOC_CITY_NAME_HALIFAX CompletionTurn=208 EscapeResult=1 InitialResult=4 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_FEMALE_6 Operation=58 PlotIndex=1409
+mission CityName=LOC_CITY_NAME_QUEBEC_CITY CompletionTurn=208 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MALE_6 Operation=58 PlotIndex=1404
+mission CityName=LOC_CITY_NAME_OTTAWA CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_10 Operation=58 PlotIndex=978
+mission CityName=LOC_CITY_NAME_MONTREAL CompletionTurn=207 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_4 Operation=58 PlotIndex=1314
+mission CityName=LOC_CITY_NAME_TORONTO CompletionTurn=207 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=-1 Name=LOC_CITIZEN_MAYA_MODERN_MALE_6 Operation=58 PlotIndex=1818
+tally 3  FOMENT_UNREST CAPTURED / NO_RESULT
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / CAPTURED
+tally 1  FOMENT_UNREST FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST FAIL_MUST_ESCAPE / KILLED
+tally 3  FOMENT_UNREST FAIL_MUST_ESCAPE / NO_RESULT
+tally 5  FOMENT_UNREST FAIL_UNDETECTED / NO_RESULT
+tally 5  FOMENT_UNREST KILLED / NO_RESULT
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / CAPTURED
+tally 4  FOMENT_UNREST SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  FOMENT_UNREST SUCCESS_MUST_ESCAPE / KILLED
+tally 1  FOMENT_UNREST SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 7  FOMENT_UNREST SUCCESS_UNDETECTED / NO_RESULT
+turn 240 spies active 6 idle 0 missions 36 captured-enemy 0

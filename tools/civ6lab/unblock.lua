@@ -10,12 +10,24 @@ local bname = tostring(b)
 for k, v in pairs(EndTurnBlockingTypes) do if v == b then bname = k end end
 local did = "nothing"
 if b == EndTurnBlockingTypes.ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE then
+  -- the routes the escape popup offers (EspionageEscape.lua): a district the
+  -- city has, the city centre always; the spy's id picks one, so a batch
+  -- spreads over every route on offer
   local id = pl:GetDiplomacy():GetNextEscapingSpyID()
   if id ~= nil and id >= 0 then
+    local spy = pl:GetUnits():FindID(id)
+    local city = Cities.GetPlotPurchaseCity(spy:GetX(), spy:GetY())
+    local routes = {}
+    for _, d in ipairs({"DISTRICT_AERODROME", "DISTRICT_HARBOR", "DISTRICT_COMMERCIAL_HUB"}) do
+      if city ~= nil and city:GetDistricts():HasDistrict(GameInfo.Districts[d].Index, true, true) then routes[#routes + 1] = d end
+    end
+    routes[#routes + 1] = "DISTRICT_CITY_CENTER"
+    local pick = routes[(id % #routes) + 1]
     local t = {}
-    t[PlayerOperations.PARAM_DISTRICT_TYPE] = GameInfo.Districts["DISTRICT_CITY_CENTER"].Index
+    t[PlayerOperations.PARAM_DISTRICT_TYPE] = GameInfo.Districts[pick].Index
     UI.RequestPlayerOperation(me, PlayerOperations.SET_ESCAPE_ROUTE, t)
-    did = "escape route for spy " .. id
+    did = "escape route " .. pick .. " of " .. #routes .. " for spy " .. id .. " " .. spy:GetName()
+      .. " level " .. spy:GetExperience():GetLevel() .. " turn " .. Game.GetCurrentGameTurn()
   else
     did = "escape blocker but no escaping spy id"
   end
