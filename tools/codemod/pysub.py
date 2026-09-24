@@ -1,45 +1,31 @@
-"""The Python half of task #56 — a safe `sub()` for gpu/core/engine.py.
+"""A safe text `sub()` for the Python sources — the twin of the TS codemod
+harness (`tools/codemod/harness.ts`) for files ts-morph cannot touch.
 
-ts-morph cannot touch a 16k-line PyTorch file, and 128 of the 163 codemod edit
-sites in one round's scratchpad were in that file. So the TS harness fixes the
-smaller half of the problem; this fixes the rest, and it fixes THE INCIDENT
-specifically rather than trying to be an AST tool.
+It is a text tool, not an AST tool. The danger it closes is a script that
+stages every edit into one string, prints each as applied, and writes once
+at the end: an anchor miss half-way raises before the write, and the edits
+that already printed were never on disk.
 
-WHAT WENT WRONG WITH THE OLD HELPER. Scripts that edit engine.py hold the whole
-file in a string and write once at the end:
-
-    def sub(old, new, want=1):
-        global s
-        c = s.count(old); assert c == want
-        s = s.replace(old, new); print(f'  x{c} ...')     # <-- prints APPLIED
-    ...
-    open(p, 'w').write(s)                                 # <-- may never run
-
-A later anchor missed on a non-ASCII arrow, the assert raised, the file was
-never written — but every earlier edit had already printed as applied. A
-10-minute parity gate then failed on a bug whose fix was not on disk.
-
-THE FIX IS THE SAME CONTRACT AS THE TS HARNESS:
+THE CONTRACT, the same as the TS harness:
   * staging and printing say PLAN, never "applied";
   * the word APPLIED is printed by `commit()`, after write + read-back + compare;
   * dry-run is the DEFAULT (`--apply` writes);
   * an anchor miss reports the CODEPOINT where it diverges, so `↔` vs `<->`
     is a one-line read instead of `assert 0 != 1`;
-  * bytes in, bytes out — the old helper read in text mode and wrote with
-    newline='', silently rewriting this repo's CRLF files to LF.
+  * bytes in, bytes out, so a CRLF file stays CRLF.
 
 USAGE
 
     import sys; sys.path.insert(0, 'tools/codemod')
     from pysub import Mod
 
-    with Mod('s71-downstream') as m:
-        e = m.file('gpu/core/engine.py')
+    with Mod('rename-pmil') as m:
+        e = m.file('gpu/core/sim_seats.py')
         e.sub('is_pmil', 'is_vet_mil', want=6)
         e.sub(OLD_BLOCK, NEW_BLOCK)
 
-    .venv/Scripts/python .claude/scratchpad/s71_downstream.py            # dry run
-    .venv/Scripts/python .claude/scratchpad/s71_downstream.py --apply --check
+    python .claude/scratchpad/rename_pmil.py                    # dry run
+    python .claude/scratchpad/rename_pmil.py --apply --check
 """
 
 from __future__ import annotations

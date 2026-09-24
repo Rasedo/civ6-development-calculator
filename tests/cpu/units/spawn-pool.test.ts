@@ -9,14 +9,11 @@ import type { GameState } from '../../../cpu/core/types';
 /**
  * A unit is BORN with the pool `unitFullMoves` gives it.
  *
- * `spawnUnit` used to re-add the chassis moves, the raider bonus, the golden
- * bonus and the start tile by hand, and so dropped the three terms
- * `unitFullMoves` also carries — the Mathematics rung every HULL reads,
- * Enhanced Mobility, and the emergency march. A naval unit was therefore born
- * one whole Movement short and only came right at the next `refreshUnits`,
- * which does call the real composer. Its FIRST turn was the divergence: the
- * GPU spawned a Galley with four Movement and TS with three, so a four-step
- * walk parted the engines and TS stopped one tile short.
+ * `spawnUnit` reads the composer, so a newborn unit carries every term
+ * `unitFullMoves` does: the Mathematics rung every HULL reads, Enhanced
+ * Mobility, and the emergency march. A naval unit's FIRST turn is where a
+ * hand-built pool would show: a Galley born with three Movement instead of
+ * four stops one tile short of a four-step walk.
  */
 function scene(): GameState {
   const state = makeState(makeMap(20, 20, 'GRASSLAND'));

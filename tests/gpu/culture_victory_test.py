@@ -59,8 +59,8 @@ def main() -> None:
     def victor(tour, cul, alive_civs=None):
         """Drive _culture_victor directly on planted totals. tour/cul are
         per-seat lists (index 0 = seat 0); a row's whole total is planted in
-        ONE rival's cell, which the per-rival floor reads the same way a
-        lifetime scalar used to."""
+        ONE rival's cell, which the per-rival floor reads the same way it
+        would read a lifetime scalar."""
         s = _sim(1)
         s.civ_tourism_to.zero_()
         s.civ_tourism_rel_to.zero_()

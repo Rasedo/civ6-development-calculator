@@ -54,7 +54,7 @@ describe('the mountain tunnel', () => {
     // allows. What may never change is the seat it already holds.
     expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_TUNNEL')).toBe(22);
     // PILLAGE sits after every BUILD column, so a new improvement moves it —
-    // which is why nothing may write these seats down (#78)
+    // which is why nothing may write these seats down
     expect(names.indexOf('PILLAGE')).toBeGreaterThan(names.indexOf('BUILD_MOUNTAIN_TUNNEL'));
   });
 

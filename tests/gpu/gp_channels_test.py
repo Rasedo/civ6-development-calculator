@@ -1,4 +1,4 @@
-"""The Great Person CHANNEL clauses (AUDIT B-61r, batch A) — gate-unreachable.
+"""The Great Person CHANNEL clauses — gate-unreachable.
 
     python tests/gpu/gp_channels_test.py
 

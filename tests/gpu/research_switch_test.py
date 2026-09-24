@@ -4,14 +4,14 @@ GATE REACHABILITY IS ZERO for this: no driver in the battery ever switches
 research away from an unfinished item, so a green gate says nothing here. This
 lane is the only proof.
 
-Two rules, both from real Civ 6 and both broken before #72:
-  * a seat may switch research AT ANY MOMENT. The GPU refused — the tech mask
-    carried `cur_tech == -1`, so the whole head went illegal for as long as
-    anything was underway (measured: 0 of 68 legal at t60 of seed 9002), and
-    the apply carried the same term, so even a hand-written record was ignored;
-  * the abandoned item KEEPS its progress. Both engines held ONE scalar pool,
-    so switching handed the old item's science to the new one — a free transfer
-    the real game does not grant.
+Two rules, both from real Civ 6:
+  * a seat may switch research AT ANY MOMENT. Neither the tech mask nor the
+    apply may carry a `cur_tech == -1` term, which would make the whole head
+    illegal for as long as anything is underway (t60 of seed 9002 is such a
+    moment);
+  * the abandoned item KEEPS its progress. ONE scalar pool would hand the old
+    item's science to the new one, a free transfer the real game does not
+    grant.
 
 The pool and the parked map PARTITION a seat's science: the item being
 researched is never in the map, and nothing may add the two.

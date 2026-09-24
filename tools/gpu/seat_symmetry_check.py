@@ -72,13 +72,11 @@ FORK_PATTERNS = (
 # ---------------------------------------------------------------------------
 # THE SAME CENSUS, ON THE TS ORACLE.
 #
-# Checking one engine and reporting "the class is closed" is the mistake #112
-# was: a clean run is evidence about the instrument, not the codebase. The GPU
-# half of that round found four live divergences; the FIRST run of the census
-# below found three more in `cpu/`, all of the same shape — a rule body passing
-# a literal 0 where the acting seat belongs — and all of them ones the GPU
-# already got right. There is no reason the oracle should be less measured than
-# the twin.
+# Checking one engine and reporting "the class is closed" is a mistake: a clean
+# run is evidence about the instrument, not the codebase. The shape this census
+# catches in `cpu/` is a rule body passing a literal 0 where the acting seat
+# belongs, and the GPU getting the same rule right does not show the oracle
+# does. The oracle is measured exactly as the twin is.
 # ---------------------------------------------------------------------------
 # `cpu/world` belongs here as much as the rest: WORLD CONSTRUCTION is where a
 # seat gets its leader, its colour and its aggression draw, and a fork there is
@@ -90,11 +88,10 @@ TS_FORK_ALLOW: dict[tuple[str, str], str] = {
     # `seatPhase` and `barbarianPhase` all read the roster, and the unit wire
     # has one schema for every row — the same shape `step()` has on the GPU.
     #
-    # THE CAUTION BEFORE ADDING ONE BACK (the A-3/A-4 hunts, git log -S A-3): this class has been
-    # declared closed three times on the strength of an instrument that only
-    # matched what it had been taught, and each time the next pattern found
-    # live divergences. An empty allowlist is a statement about these
-    # PATTERNS, not about the codebase.
+    # THE CAUTION BEFORE ADDING ONE: an instrument only matches what it has
+    # been taught, and a new pattern can find live divergences under a clean
+    # run. An empty allowlist is a statement about these PATTERNS, not about
+    # the codebase.
 }
 
 TS_FORK_PATTERNS = (
@@ -749,11 +746,10 @@ def bad_gpromo_reads(channels: set[str]) -> list[tuple[str, int, str]]:
 # COMMENTS NAME SYMBOLS, AND A NAME IS A CLAIM.
 #
 # A comment is the only assertion in this repo with no instrument behind it,
-# which is why the purge (#116) took two thirds of them. What survives has to
-# earn it, and the cheapest possible bar is that the symbols it NAMES exist:
-# `stale-transcription-of-a-dead-oracle` is a class this codebase has already
-# been bitten by — a body's comment citing a function deleted with its host —
-# and it costs one scan to make impossible.
+# so it has to earn its place, and the cheapest possible bar is that the
+# symbols it NAMES exist. A body's comment citing a function deleted with its
+# host is a stale transcription of a dead oracle, and one scan makes it
+# impossible.
 #
 # Only BACKTICKED, name-shaped tokens are checked: a name in backticks is a
 # deliberate reference, while prose is prose. Resolution is deliberately broad

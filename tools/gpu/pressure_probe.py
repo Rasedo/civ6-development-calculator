@@ -3,8 +3,8 @@
     python tools/gpu/pressure_probe.py                # 8 fixtures x 250 turns
     python tools/gpu/pressure_probe.py --seeds 4 --turns 120
 
-OWNER RULING 2026-09-04: the follow rule is not decided from my summary of two readings
-but from their measured consequences. The install publishes the pressure
+OWNER RULING: the follow rule is decided from the measured consequences of
+the two readings, not from a summary of them. The install publishes the pressure
 TERMS and never the rule that combines them; two readings fit and differ by
 two orders of magnitude. This tool drives the same games under each and
 reports what happens to religious CONVERSION — how many cities convert, how

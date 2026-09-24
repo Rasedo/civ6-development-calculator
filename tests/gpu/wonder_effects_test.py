@@ -45,9 +45,8 @@ def plant(sim, row: int, col: int, wi: int) -> int:
     return tile
 
 
-# THE WARMED BASE, ONE PER FIXTURE. Every block below used to build an engine
-# of its own — a fixture load and a settle apiece — where a `restore` costs
-# milliseconds. Everything the blocks write (`city_wonder`, `built_wonder`,
+# THE WARMED BASE, ONE PER FIXTURE. Every block below pays a `restore`, which
+# costs milliseconds, instead of a fixture load and a settle apiece. Everything the blocks write (`city_wonder`, `built_wonder`,
 # `built_wonder_complete`, the district registry, `improvement` / `pillaged`,
 # `civ_techs` / `civ_civics` / `civ_tech_boosted`, `civ_gpp`, the city queue
 # and the merged unit pool) is `_MUTABLE` and rides the snapshot, and no block

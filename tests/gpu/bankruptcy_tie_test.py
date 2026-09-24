@@ -7,9 +7,9 @@ The TS twin is tests/cpu/units/bankruptcy-tie.test.ts.
 `_bankrupt_disband` takes the priciest alive unit of a broke seat and breaks
 a tie to the LOWEST SLOT. That equals spawn order only because the pool
 APPENDS — a fact this lane pins, since the whole cross-engine agreement
-rests on it. TS used to tie on the lowest unit ID, which is spawn order for
-a trained unit and not for a re-seated one (a converted barbarian keeps its
-barbarian-era id); it ties on spawn order now, and this side is the oracle.
+rests on it. TS ties on spawn order too; the lowest unit ID would not do,
+since it is spawn order for a trained unit and not for a re-seated one (a
+converted barbarian keeps its barbarian-era id). This side is the oracle.
 """
 
 from __future__ import annotations

@@ -279,7 +279,7 @@ describe('the defender takes its chassis clauses', () => {
   });
 });
 
-// AUDIT C-78: the three LEADER units — a leader's, not the civilization's.
+// The three LEADER units — a leader's, not the civilization's.
 describe('the leader units', () => {
   it('a leader unique trains for its leader alone, and stands in for the chassis there', () => {
     expect(civUnitAllowed('ENGLAND', 'REDCOAT', 'VICTORIA')).toBe(true);

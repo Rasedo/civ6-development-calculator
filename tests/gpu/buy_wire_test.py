@@ -270,7 +270,7 @@ def clear_centre(sim, row: int) -> int:
 
 
 def case_centre_block(sim, base, row: int) -> None:
-    """CIV6 (purchase placement, measured 2026-09-13): a unit of the class
+    """CIV6 (purchase placement, measured in the live game): a unit of the class
     already on the spawn city's centre refuses the purchase, and the gold
     rung's candidates say so — the driver twin mirrors the validator."""
     warr = sim._warrior_idx

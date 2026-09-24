@@ -731,7 +731,7 @@ def poke_transfer(rules, path):
 def poke_float32(rules, path):
     """h. The pair planes' dtypes are construction facts (bool / int8 / long),
     not facts of the build's float dtype — asserted on the lane's own warm
-    base. The 30-turn float32 walk that used to carry them here is
+    base. The 30-turn float32 walk is
     district_breadth_test's `poke_float32_dtype` claim (the same build, the
     same engine step, the same walk), and one lane pays for it."""
     sim = build(rules, path)

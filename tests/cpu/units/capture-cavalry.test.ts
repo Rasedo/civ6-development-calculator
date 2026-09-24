@@ -14,7 +14,7 @@ import type { GameState, Unit } from '../../../cpu/core/types';
  * CIV6 (Mongol Horde): cavalry gains "a chance to capture defeated enemy
  * cavalry class units". The install publishes the PERMISSION and one number
  * beside it, COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE 20; the curve through it
- * is this model's (STYLIZED, owner ruling 2026-09-04): even fight = coin flip,
+ * is this model's (STYLIZED, owner ruling): even fight = coin flip,
  * certain at +20 Combat Strength, nothing at -20. The roll is ONE draw right
  * after the two damage rolls, taken whenever a capture is POSSIBLE — the
  * stream is the parity contract: three draws for a carrier's cavalry beating

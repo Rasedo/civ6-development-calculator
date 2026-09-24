@@ -411,18 +411,16 @@ def poke_three_drag(rules, path) -> None:
 def poke_spawn_slot(rules, path) -> None:
     """`_spawn_unit` writes the occupancy plane its STACKING CLASS names.
 
-    It used to hand-roll two arms off `_type_civilian`, which is the
-    NONCOMBAT set rather than the class: a Military Engineer (build charges,
-    no combat) was born into `civilian_at`, and a Builder trained onto that
-    plot was then refused the tile `spawnUnit` hands it. That is the seed
-    9287 divergence, one line from each engine:
+    `_type_civilian` is the NONCOMBAT set, not the class: a Military
+    Engineer (build charges, no combat) placed by it lands in `civilian_at`,
+    and a Builder trained onto that plot is then refused the tile `spawnUnit`
+    hands it. Seed 9287 shows it, one line from each engine when they part:
 
         D-GPU  sp:1:156:161:14 at162
         D-TS   sp:1:156:161:14 at161
 
-    and the second half of it is `_vacate`, which named three planes by hand
-    and so let a despawned support unit hold its plot for the rest of the
-    game."""
+    The second half is `_vacate`: a plane list written by hand lets a
+    despawned support unit hold its plot for the rest of the game."""
     if "MILITARY_ENGINEER" not in UNI:
         print("  11 spawn slot SKIPPED — no Military Engineer in this catalog")
         return

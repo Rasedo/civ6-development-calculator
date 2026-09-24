@@ -12,8 +12,8 @@ import { UNIT_HP } from '../../../cpu/data/units';
 import type { City, GameState } from '../../../cpu/core/types';
 
 /**
- * The five Government Plaza buildings that used to pay only their governor
- * title. Every magnitude here is the Gathering Storm Civilopedia's own.
+ * The five Government Plaza buildings' own effects, beside the governor title
+ * each grants. Every magnitude here is the Gathering Storm Civilopedia's own.
  */
 
 /** a state with one city, the named buildings standing in it. */

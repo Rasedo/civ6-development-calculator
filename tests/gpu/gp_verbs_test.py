@@ -1,4 +1,4 @@
-"""The Great Person VERB clauses (AUDIT B-61r, batch B) — gate-unreachable.
+"""The Great Person VERB clauses — gate-unreachable.
 
     python tests/gpu/gp_verbs_test.py
 

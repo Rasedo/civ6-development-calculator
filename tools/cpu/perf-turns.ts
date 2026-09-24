@@ -35,9 +35,9 @@ for (const seed of SEEDS) {
     opponents: 2,
   });
   state.disasters = true;
-  // Centre-closest legal capital — the advisor's scored pick is gone (#100),
-  // and a perf run needs a decent deterministic start, not a good one. In
-  // units mode founding consumes a settler (#71), so spawn one on the tile.
+  // Centre-closest legal capital: a perf run needs a decent deterministic
+  // start, not a good one. Founding consumes a settler, so spawn one on the
+  // tile.
   let site = -1;
   let bestD = Infinity;
   for (const t of state.map.tiles) {

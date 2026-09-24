@@ -50,11 +50,11 @@ describe('the gold unit purchase', () => {
   });
 
   it('refuses the buy when a military unit already stands on the centre, at APPLY time', () => {
-    // CIV6 (purchase placement, measured 2026-09-13): the bought unit lands ON
-    // the centre and the purchase is refused when a unit of its class already
-    // stands there. The wire's candidate row refuses it when it offers, the
-    // GPU's rung when it applies — and so does this arm now (9027 t196: a
-    // Warrior trained onto the centre that turn, a bought one spilled beside it)
+    // CIV6 (purchase placement, measured in the live game): the bought unit
+    // lands ON the centre and the purchase is refused when a unit of its class
+    // already stands there. The wire's candidate row refuses it when it
+    // offers, the GPU's rung when it applies, and so does this arm (seed 9027
+    // t196: a Warrior trained onto the centre that turn)
     const { state } = scene();
     const city = seatOf(state, 0)!.cities[0]!;
     expect(spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!.tileIndex).toBe(city.centerIndex);

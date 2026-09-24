@@ -46,9 +46,8 @@ from core.simbase import FIXTURES, NO_SEAT  # noqa: E402
 from warmup import settle_all  # noqa: E402
 
 
-# THE WARMED BASE, ONE PER b. `main` runs one scene per test body and each one
-# used to rebuild: a fixture load, a settle and 20 steps, at B=2, fourteen times
-# over. A scene pays a `restore` instead. `_STATIC` names the plane these pokes
+# THE WARMED BASE, ONE PER b. `main` runs one scene per test body, and a scene
+# pays a `restore` instead of a fixture load, a settle and 20 steps at B=2. `_STATIC` names the plane these pokes
 # write that `snapshot`/`restore` does not carry (it is not in `_MUTABLE`), so
 # the helper puts it back by hand as well.
 _STATIC = ("citystate_suz_code",)

@@ -7,8 +7,8 @@ home at the level it was caught at").
 
 CIV6: a captured spy is "imprisoned, but not killed", and a DEAL_SPY trade
 returns it "immediately ... to the original owner's Capital". No source
-publishes the level it returns at; the best reading (STYLIZED, owner ruling
-2026-09-04) is that the SAME spy comes home, so the cell holds levels —
+publishes the level it returns at; the best reading (STYLIZED, owner
+ruling) is that the SAME spy comes home, so the cell holds levels —
 `seat_spy_held [B, pw, pw, level]` counts by level — and the released spy is
 spawned at the level it was caught at. When one captor holds several, the
 HIGHEST goes first: the real deal names a spy, this model ranks them.

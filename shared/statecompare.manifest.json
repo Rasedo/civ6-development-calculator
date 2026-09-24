@@ -513,7 +513,7 @@
         {
           "name": "grantedTitles",
           "compare": "exact",
-          "why": "governor titles a TRIBAL VILLAGE granted outright (C-47) — nothing derives them, so they are stored",
+          "why": "governor titles a TRIBAL VILLAGE granted outright — nothing derives them, so they are stored",
           "covers": [
             "Seat.grantedTitles"
           ],
@@ -782,7 +782,7 @@
           "planes": [
             "civ_policies"
           ],
-          "note": "the cards a seat has SLOTTED, as a sorted index set over the policy table — a DRIVER decision carried on the wire (C-75). Inert until the cutover: the greedy fill still pays the effects on both engines, and this store is what replaces it."
+          "note": "the cards a seat has SLOTTED, as a sorted index set over the policy table — a DRIVER decision carried on the wire, and the set whose effects both engines pay."
         },
         {
           "name": "age",
@@ -1540,7 +1540,7 @@
           "planes": [
             "city_pop"
           ],
-          "note": "the minor city's POPULATION. Compared since C-38 gave it a real food box: before that both engines moved it on the same 12-turn clock and it could not diverge."
+          "note": "the minor city's POPULATION, grown from its own food box"
         },
         {
           "name": "minorFoodBox",
@@ -1551,7 +1551,7 @@
           "planes": [
             "city_growth"
           ],
-          "note": "the minor city's food box — the install has ONE city rule, so it grows exactly as a major's does (C-38)"
+          "note": "the minor city's food box — the install has ONE city rule, so it grows exactly as a major's does"
         },
         {
           "name": "minorCultureBox",
@@ -1753,7 +1753,7 @@
           "planes": [
             "city_worked"
           ],
-          "note": "C-77: the tiles this city works this turn, ascending. Both engines STORE what their seat-phase walk picked, and only that walk: `computeCityStats` and `_seat_city_walk` are pure reads that the score and great-people rules call again later in the turn, so a pick recorded from those would be the post-growth one while the turn itself ran on the loop-top snapshot. The GPU keeps it in a REGISTERED CITY PLANE for the same reason TS keeps it on the City object: `_reclaim_cities` compacts city slots and derives the planes that ride the permutation from `_MUTABLE` by geometry, so a pick held anywhere else is handed to whichever city compaction moves into the slot. City-state cities are OUT of this key: `minorCity` builds a fresh `City` view per call and has nowhere to keep the pick — they are compared in the citystate group, which carries no worked-tile row."
+          "note": "the tiles this city works this turn, ascending. Both engines STORE what their seat-phase walk picked, and only that walk: `computeCityStats` and `_seat_city_walk` are pure reads that the score and great-people rules call again later in the turn, so a pick recorded from those would be the post-growth one while the turn itself ran on the loop-top snapshot. The GPU keeps it in a REGISTERED CITY PLANE for the same reason TS keeps it on the City object: `_reclaim_cities` compacts city slots and derives the planes that ride the permutation from `_MUTABLE` by geometry, so a pick held anywhere else is handed to whichever city compaction moves into the slot. City-state cities are OUT of this key: `minorCity` builds a fresh `City` view per call and has nowhere to keep the pick — they are compared in the citystate group, which carries no worked-tile row."
         },
         {
           "name": "amenityTier",
@@ -2283,7 +2283,7 @@
         {
           "name": "levied",
           "compare": "exact",
-          "why": "CIV6 (The Raven King): the unit came from a city-state LEVY. Permanent — nothing here returns a levied unit — and read by the 75% upgrade discount (C-66).",
+          "why": "CIV6 (The Raven King): the unit came from a city-state LEVY. Permanent — nothing here returns a levied unit — and read by the 75% upgrade discount.",
           "covers": [
             "Unit.levied"
           ],
@@ -2368,7 +2368,7 @@
         {
           "name": "goodyHut",
           "compare": "exact",
-          "why": "TRIBAL VILLAGES (C-47) — claimed and gone, so the gate must SEE the claim; it was excluded while the GPU had no plane",
+          "why": "TRIBAL VILLAGES — claimed and gone, so the gate must SEE the claim",
           "covers": [
             "Tile.goodyHut"
           ],
@@ -2886,7 +2886,7 @@
       },
       {
         "path": "Tile.mountainRange",
-        "why": "a derived MAP fact, not state, and static for a stronger reason than `continent`: `deriveMountainRanges` flood-fills the MOUNTAIN components once at map creation and the exporter ships the ids per tile, and mountains are the one terrain nothing in the game converts. A Mountain Tunnel is built ON a range and never changes which range a tile belongs to (C-20)."
+        "why": "a derived MAP fact, not state, and static for a stronger reason than `continent`: `deriveMountainRanges` flood-fills the MOUNTAIN components once at map creation and the exporter ships the ids per tile, and mountains are the one terrain nothing in the game converts. A Mountain Tunnel is built ON a range and never changes which range a tile belongs to."
       },
       {
         "path": "Tile.continent",

@@ -3,16 +3,15 @@
     python tests/gpu/narrow_batch_xp_test.py
 
 `_award_pair_xp`'s defender arm narrows every tensor to `rows` — the games
-where a defender actually survived. `_battle_gain` then multiplied by
+where a defender actually survived. `_battle_gain` then multiplies by
 `_recon_xp_mult(seat)` / `_suz_xp_mult(seat)`, both of which end in
-`tab.gather(1, seat.unsqueeze(1))` over a [B, seats] table. With a narrowed
-seat that gather reads BATCH ROWS 0..n-1 — the wrong games — so every
-defender in the batch was paid game 0's Survey and Kabul multipliers.
+`tab.gather(1, seat.unsqueeze(1))` over a [B, seats] table. A narrowed seat
+fed to that gather without its rows reads BATCH ROWS 0..n-1, the wrong games,
+and pays every defender in the batch game 0's Survey and Kabul multipliers.
 
-It could not show at B=1, where the wrong game IS the right game, and the
-battery's fixed 8-shard layout never put the two seeds that expose it in one
-batch. A memory-sized shard (#230) did, at seed 9222 turn 28: GPU 8 vs TS 6,
-a doubled award hitting the cap of 8.
+It cannot show at B=1, where the wrong game IS the right game, and only a
+shard layout that puts the two exposing seeds in one batch shows it (seed
+9222 turn 28: a doubled award hitting the cap of 8, GPU 8 vs TS 6).
 """
 
 from __future__ import annotations

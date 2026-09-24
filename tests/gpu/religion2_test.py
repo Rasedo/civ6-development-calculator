@@ -26,7 +26,7 @@ Covered (all gate-unreachable):
   6. ITINERANT_PREACHERS presR — widens the religion's spread range by exactly 3.
   7. Enhancer COMBAT CS — JUST_WAR near (atk+def +10), DEFENDER of the faith on
      following territory (def +5). (CRUSADE and MESSENGER_OF_THE_GODS are not in
-     the install and left the pool with #264; their wire columns read 0.)
+     the install and are not in the pool; their wire columns read 0.)
   8. RELIGIOUS_COMMUNITY (follower, GS) — +2 gold per Holy Site / Shrine /
      Temple / worship building of a following ORIGIN city on an INTERNATIONAL
      route; nothing on a domestic leg, nothing from a non-following origin.

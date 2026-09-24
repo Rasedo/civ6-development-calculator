@@ -9,7 +9,7 @@
  * know what a tile is WORTH or what a rule DOES, it belongs engine-side
  * (`cpu/export/` compiles Layer B, the GPU's planes, from these files).
  *
- * Placement (spaced-balanced@1, #71): every major civ starts as a SETTLER and
+ * Placement (spaced-balanced@1): every major civ starts as a SETTLER and
  * a WARRIOR on a legal, resource-floored start >= 10 tiles from the others —
  * no pre-founded capitals, no planned future cities. City-states remain
  * founded cities. `rngInit` is DECLARED ((seed ^ 0x9e3779b9) >>> 0): placement

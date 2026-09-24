@@ -1,10 +1,9 @@
 r"""PreToolUse guard: no HEREDOCS, no SLEEP.
 
-Both are owner bans (`sleep` 2026-09-08, heredocs 2026-09-09) and both were
-first written as `permissions.deny` globs like `Bash(*<<*)`. Those never
-fired: the deny matcher is prefix-shaped, not an arbitrary substring match, so
-a rule with a leading `*` silently matches nothing. A ban that does not fire
-is worse than no ban, because it is believed.
+Both are owner bans, and neither fits a `permissions.deny` glob such as
+`Bash(*<<*)`: the deny matcher is prefix-shaped, not an arbitrary substring
+match, so a rule with a leading `*` silently matches nothing. A ban that does
+not fire is worse than no ban, because it is believed.
 
 This reads the command off the hook payload and refuses. Exit 2 blocks the
 call and puts stderr in front of the model.
@@ -38,14 +37,14 @@ def main() -> int:
     cmd = (payload.get("tool_input") or {}).get("command") or ""
     if HEREDOC.search(cmd) or PS_HERESTRING.search(cmd):
         sys.stderr.write(
-            "BLOCKED: heredocs are banned (owner, 2026-09-09). They collapse "
+            "BLOCKED: heredocs are banned (owner). They collapse "
             "backslash escapes silently and break on apostrophes. Write the "
             "script to a file with the Write tool and run `python <path>`; for "
             "a commit message, Write it and use `git commit -F <path>`.\n")
         return 2
     if SLEEP.search(cmd):
         sys.stderr.write(
-            "BLOCKED: `sleep` is banned (owner, 2026-09-08). Launch the work "
+            "BLOCKED: `sleep` is banned (owner). Launch the work "
             "in the background and END THE TURN; act on the completion "
             "notification instead of blocking a slot.\n")
         return 2

@@ -6,9 +6,8 @@ The TS twin is tests/cpu/units/stack-defender-tie.test.ts.
 
 `_stack_fold` is `stackDefender`'s twin: against a ranged attack the
 passenger defends only when its defence CS is STRICTLY greater than the
-hull's, so a tie stays with the hull. TS used to start its comparison from
-whichever fighter came first in the tile's array, so a passenger listed
-before its hull took a volley the hull took here (seed 9209 t178). This side
+hull's, so a tie stays with the hull, whichever fighter comes first in the
+tile's array (seed 9209 t178 lists a passenger before its hull). This side
 is the oracle; the lane pins the tie and the strict case so the two can never
 drift apart quietly.
 """

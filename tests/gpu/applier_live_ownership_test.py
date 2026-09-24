@@ -1,4 +1,4 @@
-"""THE APPLIER READS OWNERSHIP LIVE, RANK BY RANK (AUDIT A-5).
+"""THE APPLIER READS OWNERSHIP LIVE, RANK BY RANK.
 
     python tests/gpu/applier_live_ownership_test.py
 
@@ -148,7 +148,7 @@ def main() -> int:
 
     sim, farm = run(rules, path, settler_first=True)
     assert int(sim.improvement[0, farm]) == sim.FARM, (
-        "A-5: the Builder at the later rank was refused the tile its own seat's "
+        "the Builder at the later rank was refused the tile its own seat's "
         "founding claimed one rank earlier — ownership was read once, before the loop")
     print("  1 settler then builder OK — the Farm lands on ground claimed this same turn")
 

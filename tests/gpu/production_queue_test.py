@@ -3,13 +3,12 @@
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/production_queue_test.py
 
-OWNER RULING 2026-09-08: the queue collapsed to depth 1 — the "queue" is the
-current build. The deeper slots were never a mechanic. Only the HEAD ever
-accrued (every `progress +=` reads slot 0), so an entry behind it held an id
-and a permanent zero; what makes hammers survive a switch is `city_prod_bank`
-and the per-item ledger, both of which are independent of depth. What the
-slots did cost was Q-1 promote columns per city, legal every turn, asking a
-policy to reorder a list the observation never showed it.
+OWNER RULING: the queue is depth 1, and the "queue" is the current build.
+Only the HEAD accrues (every `progress +=` reads slot 0); what makes hammers
+survive a switch is `city_prod_bank` and the per-item ledger, both of which
+are independent of depth. Deeper slots would be no mechanic, only promote
+columns per city asking a policy to reorder a list the observation never
+shows it.
 
 `city_current`, `city_progress`, `city_cost` and `city_qtile` stay dense over
 the queue so the storage keeps one shape; QD is simply 1.

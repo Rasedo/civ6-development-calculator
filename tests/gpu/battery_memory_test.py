@@ -1,16 +1,15 @@
-"""THE BATTERY DEGRADES IN TIME, NOT IN THE BOX (#230).
+"""THE BATTERY DEGRADES IN TIME, NOT IN THE BOX.
 
     python tests/gpu/battery_memory_test.py
 
-OWNER, 2026-09-04, after a second BSOD: the battery launched beside a VM
-holding 24 GB and took the machine down. The fan-out was fixed and
-memory-blind — up to 8 serve shards plus a 9-worker poke pool, each holding a
-batched sim and a TS child, sized from core count with nothing reading how
-much memory was free.
+The battery's fan-out (serve shards plus a poke pool, each holding a batched
+sim and a TS child) is sized from the memory that is FREE, not from the core
+count: a memory-blind fan-out launched beside a large VM takes the machine
+down.
 
-Their words: "it would run longer without enough memory instead of hard
-crashing." So the bar here is that the planner NARROWS and never refuses, and
-that a memory death is neither a pass nor a red.
+OWNER: "it would run longer without enough memory instead of hard crashing."
+So the bar here is that the planner NARROWS and never refuses, and that a
+memory death is neither a pass nor a red.
 """
 
 from __future__ import annotations

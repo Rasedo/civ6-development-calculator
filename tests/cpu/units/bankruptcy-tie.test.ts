@@ -12,10 +12,10 @@ import type { GameState } from '../../../cpu/core/types';
  * When a seat's treasury goes negative, the priciest unit is disbanded and a
  * tie is broken by SPAWN ORDER — the earliest in `state.units`, which is the
  * one order both engines own (the GPU's pool only appends, so its lowest
- * slot is the same unit). TS used to tie on the lowest UNIT ID, which equals
- * spawn order for a unit the seat trained and NOT for one it re-seated: a
- * converted barbarian keeps its barbarian-era id, lower than anything the
- * seat owns, and at seed 9053 t164 the two engines disbanded different units.
+ * slot is the same unit). The lowest UNIT ID is NOT that order: it equals
+ * spawn order for a unit the seat trained and not for one it re-seated, since
+ * a converted barbarian keeps its barbarian-era id, lower than anything the
+ * seat owns (seed 9053 t164 is such a tie).
  *
  * The GPU twin is tests/gpu/bankruptcy_tie_test.py.
  */

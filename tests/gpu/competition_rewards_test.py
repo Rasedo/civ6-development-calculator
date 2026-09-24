@@ -1,4 +1,4 @@
-"""The World Games' and the Space Station's EXTRA podium rewards (AUDIT B-22r).
+"""The World Games' and the Space Station's EXTRA podium rewards.
 
     python tests/gpu/competition_rewards_test.py
 

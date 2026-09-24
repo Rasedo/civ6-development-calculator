@@ -3,8 +3,8 @@ unit (`unitsAt` / `state.units`) sees a support chassis standing alone.
 
     python tests/gpu/support_plane_test.py
 
-A-5 / #260: the support stacking class shipped with its own occupancy plane
-and the hand-written plane lists stayed three wide. This lane stands a lone
+The support stacking class has its own occupancy plane, so a hand-written
+plane list three wide misses it. This lane stands a lone
 support unit where each folded reader looks and asks the question its twin
 asks: the walls' siege assist from a Ram, a nuke's hostile tile, the
 barbarians' march target, the war-weariness occupancy, a storm's damage

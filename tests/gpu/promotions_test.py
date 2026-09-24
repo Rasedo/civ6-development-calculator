@@ -224,9 +224,9 @@ def test_bank_over_threshold(sim) -> None:
     to the requirement. The difference is reachable because two writers move
     the pool without the clamp — a tribal village's experience grant and a
     corps merge's inheritance — so a level-1 unit can legitimately stand
-    above 15, and this used to drag it back to 15 the next time it banked
-    anything (seed 9196 turn 165: GPU 15 against TS 28, on a flat +2 for
-    surviving a city strike)."""
+    above 15, and a clamp here would drag it back to 15 the next time it
+    banked anything (seed 9196 turn 165: a flat +2 for surviving a city
+    strike on a pool of 26)."""
     per = int(sim._promo_xp_per_level)
     lvl1 = torch.ones(1, dtype=torch.long)
     over = torch.full((1,), per + 13, dtype=torch.long)

@@ -238,8 +238,8 @@ def main(argv: list[str]) -> int:
 
     bad = len(no_gpu) + len(no_ts)
     if "--baseline" in argv:
-        # THE RATCHET: the known orphans are task #263's list; the battery
-        # must catch a NEW one — a key exported or a column added that no
+        # THE RATCHET: the known orphans are the baseline file's list; the
+        # battery must catch a NEW one — a key exported or a column added that no
         # engine reads — while the list burns down.
         bpath = pathlib.Path(argv[argv.index("--baseline") + 1])
         known = {ln.strip() for ln in bpath.read_text(encoding="utf-8").splitlines()
