@@ -48,7 +48,7 @@ export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>
     if (n.district) appeal += DISTRICTS[n.district].appealAdjacent;
     if (camps?.has(n.index)) appeal -= 1;
     if (n.feature === 'RAINFOREST' || n.feature === 'MARSH') appeal -= 1;
-    if (n.feature === 'FLOODPLAINS') appeal -= 1; // sourced, was missing
+    if (n.feature === 'FLOODPLAINS') appeal -= 1;
     if (n.pillaged) appeal -= 1; // "-1 each adjacent pillaged tile"
     if (n.improvement) appeal += IMPROVEMENTS[n.improvement as ImprovementId].appealAdjacent ?? 0;
   }

@@ -24,7 +24,6 @@ export const FREE_SEAT = 300;
 export const seatOfCityState = (cityStateId: number): number => CITY_STATE_SEAT_BASE + cityStateId;
 export const cityStateOfSeat = (seat: number): number => seat - CITY_STATE_SEAT_BASE;
 
-
 export function tileSeat(t: Tile): number {
   return t.ownerSeat;
 }
@@ -78,15 +77,6 @@ export function tileForeignTo(t: Tile, civ: number): boolean {
   return s !== NO_SEAT && s !== civ;
 }
 
-/**
- * Does this seat have ACCESS to a strategic resource? True iff some tile it
- * OWNS carries that resource AND its completed, unpillaged matching improvement
- * (PASTURE on horses, MINE on iron — read from the resource catalog).
- * Improvements are instant here, so `tile.improvement === imp` means built.
- *
- * No stockpile, count or maintenance draw: access is a pure boolean gate on
- * build and purchase. Mirrors the GPU res_id/res_imp/improvement scan.
- */
 /** CIV6 (Resources.PrereqTech; REQUIREMENT_PLOT_RESOURCE_VISIBLE): the
  *  resources this seat cannot yet SEE — a strategic resource is invisible
  *  until its revealing technology, and until then the tile is plain ground
@@ -109,6 +99,15 @@ export function hiddenResourcesFor(state: GameState, seat: number): ReadonlySet<
 
 const NOTHING_HIDDEN: ReadonlySet<string> = new Set<string>();
 
+/**
+ * Does this seat have ACCESS to a strategic resource? True iff some tile it
+ * OWNS carries that resource AND its completed, unpillaged matching improvement
+ * (PASTURE on horses, MINE on iron — read from the resource catalog).
+ * Improvements are instant here, so `tile.improvement === imp` means built.
+ *
+ * Access is a pure boolean; the stockpile counts in stockpile.ts. Mirrors the
+ * GPU res_id/res_imp/improvement scan.
+ */
 export function civHasStrategic(state: GameState, civ: number, resourceId: string): boolean {
   const imp = RESOURCES[resourceId]?.improvement;
   if (!imp) return false;
@@ -210,14 +209,14 @@ export function cityHolders(state: GameState): Seat[] {
   return state.freeSeat ? [...state.seats, state.freeSeat] : state.seats;
 }
 
-/** the civilization a seat plays (`CIV_IDS`), or null for a seat without
- *  one — a city-state, the barbarians, a bare `emptySeat`. */
 /** the entry of `variants` that belongs to the civilization this seat plays */
 export function civVariantOf<T extends { civ: string }>(state: GameState, seat: number, variants: readonly T[] | undefined): T | undefined {
   const c = civOf(state, seat);
   return c ? variants?.find((v) => v.civ === c) : undefined;
 }
 
+/** the civilization a seat plays (`CIV_IDS`), or null for a seat without
+ *  one — a city-state, the barbarians, a bare `emptySeat`. */
 export function civOf(state: GameState, seat: number): CivId | null {
   const s = seatOf(state, seat);
   const civ = s && 'civ' in s ? (s as Seat).civ : -1;

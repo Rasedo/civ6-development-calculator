@@ -67,7 +67,7 @@ export function hexLineBetween(map: GameMap, a: Tile, b: Tile): Tile[] {
 }
 
 /**
- * CIV6 (measured 2026-09-13, ask 11): can an eye standing on `from` see `to`?
+ * CIV6 (measured, ask 11): can an eye standing on `from` see `to`?
  * OCCLUSION BY ELEVATION — every tile strictly between must put no more in
  * the way than the observer's own height (flat 0, hills 1, mountain 2); the
  * range is the caller's, a hill adds height and never reach.
@@ -169,7 +169,6 @@ export function initFog(state: GameState): void {
     for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
   }
 }
-
 
 export function nearestUnexplored(state: GameState, unit: Unit): number | null {
   const ex = seatOf(state, unit.seat)?.explored;

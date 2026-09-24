@@ -113,7 +113,6 @@ export interface GreatPersonDef {
   effect: GpEffect;
 }
 
-
 /** the install's own era id, indexed by this engine's era number. */
 const GP_ERA_ID: readonly string[] = [
   'ERA_ANCIENT', 'ERA_CLASSICAL', 'ERA_MEDIEVAL', 'ERA_RENAISSANCE', 'ERA_INDUSTRIAL',
@@ -457,7 +456,6 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
 };
 export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
 
-
 /**
  * GREAT WORKS. A claimed WRITER, ARTIST or MUSICIAN makes the works
  * `personWorkObjects` names, each seeking an open slot that takes it
@@ -538,7 +536,6 @@ export const GW_PRINTING_WRITING_MULT = srcConst('seats.gwPrintingWritingMult', 
     + 'Writing (the culture is untouched); the install writes it as a modifier',
 });
 
-/** Specialist yields per district type (Civ 6-ish; only these take specialists). */
 /** CIV6 (wiki "Specialists (Civ6)", GS values): base yields per specialist
  * by district — Scientists +2 science, Priests +2 faith, Merchants +4 gold,
  * Captains +1 food +2 gold, Artists +2 culture, Engineers +2 production,

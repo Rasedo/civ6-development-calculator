@@ -38,7 +38,6 @@ export interface GovernorDef {
 /** CIV6 (AIR_DEFENSE_INITIATIVE_ANTI_AIR_BONUS, Amount 25). */
 export const AIR_DEFENSE_INITIATIVE_CS = 25;
 
-
 /** the install's own name for each governor's role. */
 const GOVERNOR_INSTALL_ID: Readonly<Record<GovernorId, string>> = {
   REYNA: 'GOVERNOR_THE_MERCHANT', VICTOR: 'GOVERNOR_THE_DEFENDER',
@@ -666,7 +665,6 @@ export const GOVERNOR_DEFAULT_PROMOTION: readonly number[] = GOVERNORS.map((g) =
 
 /**
  * CIV6 (Governor): the thirteen civics that "will grant 1 Governor Title".
- * The ladder they replace was this model's own invention.
  */
 export const GOVERNOR_TITLE_CIVICS: readonly string[] = [
   'STATE_WORKFORCE', 'EARLY_EMPIRE', 'DEFENSIVE_TACTICS', 'RECORDED_HISTORY',

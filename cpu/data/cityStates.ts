@@ -112,9 +112,6 @@ export const SUZ_EFFECTS: SuzEffect[] = [
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
  *  so it never leaves the city that holds the buildings. */
 export const CARDIFF_HARBOR_POWER = 2;
-/** Akkad: "Melee and anti-cavalry units' attacks do full damage to the
- *  city's walls." The Battering Ram's own effect, at EVERY walls tier and
- *  with no support unit present. */
 /** Kabul: "Your units receive double experience from battles they initiate." */
 export const KABUL_XP_MULT = 2;
 /** Preslav: "+5 Strength when fighting on hill tiles" (light and heavy cavalry). */

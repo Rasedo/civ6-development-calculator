@@ -144,11 +144,6 @@ export interface GreatWorkHolderDef {
   theme: number;
 }
 
-/** CIV6 `Building_GreatWorks`, Base <- Expansion1 <- Expansion2 <- the civ
- *  DLC that carries a row, restricted to the holders this engine builds, in
- *  the install's row order. The Hermitage's row is GREATWORKSLOT_ART with
- *  no object restriction, and the Apadana's is two GREATWORKSLOT_PALACE
- *  slots, which take any object. */
 /** PROVENANCE (cpu/data/provenance.ts): the install's `Buildings.IsWonder` and the row's
  *  own `Building_GreatWorks` slot rows. */
 const GW_HOLDER_SRC: Record<string, SrcMap> = {
@@ -246,6 +241,11 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
   },
 };
 
+/** CIV6 `Building_GreatWorks`, Base <- Expansion1 <- Expansion2 <- the civ
+ *  DLC that carries a row, restricted to the holders this engine builds, in
+ *  the install's row order. The Hermitage's row is GREATWORKSLOT_ART with
+ *  no object restriction, and the Apadana's is two GREATWORKSLOT_PALACE
+ *  slots, which take any object. */
 const RAW_GW_HOLDERS: readonly GreatWorkHolderDef[] = [
   { id: 'PALACE', wonder: false, slots: [{ type: GWS_PALACE, count: 1 }], theme: GW_THEME_NONE },
   { id: 'TEMPLE', wonder: false, slots: [{ type: GWS_RELIC, count: 1 }], theme: GW_THEME_NONE },

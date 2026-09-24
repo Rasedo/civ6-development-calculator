@@ -123,11 +123,6 @@ export function cityGovernorEstablished(state: GameState, city: City): boolean {
   return (seatOf(state, city.seat)!.governors![i].establishTurns ?? 0) <= 0;
 }
 
-/**
- * The merged effects of the governor established in this city — the default
- * ability plus every promotion taken. An assigned-but-unestablished governor
- * pays nothing here; only the loyalty channel runs early.
- */
 /** How many PROMOTIONS the governor established here has earned, its first
  *  included — Hwarang's magnitude. Zero where none is established. */
 export function cityGovernorTitles(state: GameState, city: City): number {
@@ -140,6 +135,11 @@ export function cityGovernorTitles(state: GameState, city: City): number {
   return n;
 }
 
+/**
+ * The merged effects of the governor established in this city — the default
+ * ability plus every promotion taken. An assigned-but-unestablished governor
+ * pays nothing here; only the loyalty channel runs early.
+ */
 export function cityGovernorEffects(state: GameState, city: City): GovernorEffects[] {
   const i = governorAt(state, city);
   if (i < 0) return [];

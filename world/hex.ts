@@ -1,6 +1,6 @@
 /**
  * Hex grid math. Civ 6 uses pointy-top hexes in an odd-r offset layout
- * (odd rows shifted +half a hex to the right). No world wrap in stage 1.
+ * (odd rows shifted +half a hex to the right). The world does not wrap.
  *
  * Direction indexes (used by Tile.riverMask bits):
  *   0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE
@@ -99,7 +99,6 @@ export function tilesWithin(map: GameMap, col: number, row: number, radius: numb
   return out;
 }
 
-
 export function hexCenter(col: number, row: number, size: number): { x: number; y: number } {
   return { x: SQRT3 * size * (col + 0.5 * (row & 1)), y: 1.5 * size * row };
 }
@@ -140,7 +139,6 @@ export function pixelToHex(x: number, y: number, size: number): [number, number]
   else if (dr > ds) rr = -rq - rs;
   return axialToOffset(rq, rr);
 }
-
 
 export interface Vertex {
   col: number;

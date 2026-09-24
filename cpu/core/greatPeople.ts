@@ -64,10 +64,6 @@ export function ensureGpOffer(state: GameState, cls: GreatPersonClass): void {
   state.gpPrice[i] = gpCost(cls, roster[at].era, worldEraIndex(state));
 }
 
-/** CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle if
- *  no Prophets are available)" — religion founded or the class spent pays
- *  an Apostle; a standing Prophet with no religion pays nothing; otherwise
- *  the class's offer is claimed FREE (`_grant_free_prophet`). */
 /** CIV6 (The Last Prophet): "Automatically receive the final Great Prophet
  *  when the next-to-last one is claimed (if you have not earned a Great
  *  Prophet already)." Called after every claim, for every seat that names the
@@ -95,6 +91,10 @@ export function greatPeopleEarnedBy(owner: Seat, cls: GreatPersonClass): number 
   return (owner.gpEarned ?? []).filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
 }
 
+/** CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle if
+ *  no Prophets are available)" — religion founded or the class spent pays
+ *  an Apostle; a standing Prophet with no religion pays nothing; otherwise
+ *  the class's offer is claimed FREE (`_grant_free_prophet`). */
 export function grantFreeProphet(state: GameState, seat: number, centre: number): void {
   const owner = seatOf(state, seat);
   if (!owner) return;

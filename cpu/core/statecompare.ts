@@ -110,7 +110,6 @@ export function loadManifest(): Manifest {
   return cached;
 }
 
-
 function mix32(h: number): number {
   h = h >>> 0;
   h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
@@ -221,7 +220,6 @@ function queueItemCost(state: GameState, city: City, q: City['queue'][number] | 
 
 const QUEST_KIND: Record<string, number> = { clearCamp: 1, sendTradeRoute: 2, buildDistrict: 3 };
 
-
 type Extractor = (state: GameState, rows: readonly unknown[]) => Val[];
 
 export interface CityRow {
@@ -273,9 +271,6 @@ const treatyClockLine = (state: GameState, seat: number): Val => {
   return out;
 };
 
-/** The same FLAT shape for a DIPLOMATIC AGREEMENT clock: every major this
- *  seat still holds one with, in ascending seat order, with the turns left.
- *  `read` is the directed or symmetric accessor. */
 /** A DEAL's table, flat: [otherSeat, clock, ...GIVE slots, ...ASK slots] for
  *  every seat this one has one with, in ascending seat order. Both bundles are
  *  padded to `DEAL_ITEMS` slots of [kind, a, b] so the two engines emit the
@@ -310,6 +305,9 @@ const dealTermLine = (state: GameState, seat: number): Val => {
   return out;
 };
 
+/** The same FLAT shape for a DIPLOMATIC AGREEMENT clock: every major this
+ *  seat still holds one with, in ascending seat order, with the turns left.
+ *  `read` is the directed or symmetric accessor. */
 const agreementClockLine = (
   state: GameState,
   seat: number,
@@ -822,7 +820,6 @@ const EXTRACTORS: Record<string, Record<string, Extractor>> = {
   tile: TILE,
 };
 
-
 export function groupRows(state: GameState, group: string): readonly unknown[] {
   switch (group) {
     case 'game':
@@ -874,7 +871,6 @@ export function groupKeys(group: string, rows: readonly unknown[]): number[] {
       throw new Error(`unknown manifest group ${group}`);
   }
 }
-
 
 export interface GroupDigest {
   exact: string;
@@ -972,7 +968,6 @@ export function groupDump(
   }
   return out;
 }
-
 
 export function interfaceFields(name: string, source: string): string[] {
   const head = new RegExp(`export interface ${name}\\b[^{]*\\{`).exec(source);

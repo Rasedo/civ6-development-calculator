@@ -14,10 +14,6 @@ import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { ROAD_TIER_ERA } from '../data/constants';
 import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
-
-/** Pay era score for `count` moments each worth `per`. CIV6 (Taj Mahal):
- *  a moment worth ERA_SCORE_MOMENT_MIN or more pays its owner one more,
- *  so the per-moment value has to survive as far as this call. */
 /** CIV6 (Great People): the WORLD era — "the era of the Great Person and the
  *  World Era when the Great Person appears in the queue". The furthest any seat
  *  has reached, which is also what the World Congress gates on. */
@@ -30,6 +26,9 @@ export function worldEraIndex(state: GameState): number {
   return era;
 }
 
+/** Pay era score for `count` moments each worth `per`. CIV6 (Taj Mahal):
+ *  a moment worth ERA_SCORE_MOMENT_MIN or more pays its owner one more,
+ *  so the per-moment value has to survive as far as this call. */
 export function addEraScore(state: GameState, seat: number, per: number, count = 1): void {
   const s = seatOf(state, seat);
   if (!s || count <= 0) return;
@@ -41,8 +40,8 @@ export function addEraScore(state: GameState, seat: number, per: number, count =
 
 /** Era boundary — runs right AFTER `state.turn += 1` in endTurn (the GPU
  *  mirrors at its own turn increment). At each ERA_LENGTH multiple every
- *  civ's Age for the NEW era comes from the just-ended window's score
- *  (S2), then the accumulators reset for the new window. */
+ *  civ's Age for the NEW era comes from the just-ended window's score,
+ *  then the accumulators reset for the new window. */
 export function eraBoundary(state: GameState): void {
   if (state.turn % ERA_LENGTH !== 0) return;
   // CIV6: "all roads in your territory will upgrade to the next level
@@ -265,14 +264,14 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
 
 /**
  * The MOVEMENT half of the golden dedications, keyed on the unit's OWN
- * seat so a seat in a Golden age gets it exactly as seat 0 does.
+ * seat, so every seat in a Golden age gets it the same way.
  *
  * SOURCE (Civilopedia, Gathering Storm):
  *   MONUMENTALITY — "If chosen at the start of a Golden Age, +2 Movement for
  *     all Builders."
  *   EXODUS OF THE EVANGELISTS — "If chosen at the start of a Golden Age, +2
- *     Movement for all Missionaries, Apostles, and Inquisitors." This roster
- *     has no INQUISITOR, so the pair below is the whole class.
+ *     Movement for all Missionaries, Apostles, and Inquisitors." The body
+ *     below pays only the Missionary and the Apostle, not the INQUISITOR.
  *
  * Model movement points twice and the off-script gate diverges on the `rng`
  * DRAW COUNT, not on a yield. Both engines hold ONE resident MP pool (`unit_mp` against its `unit_mp_full` ceiling), with
@@ -319,6 +318,4 @@ export function goldenCulturePerDistrict(state: GameState, civ: number): number 
 export function agePressureFactor(state: GameState, civ: number): number {
   return AGE_PRESSURE[(seatOf(state, civ)?.age ?? 1)];
 }
-
-
 

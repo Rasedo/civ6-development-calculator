@@ -1,5 +1,4 @@
 
-
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { wonderTerrainOk } from '../core/rules';
 import { neighbors } from '../../world/hex';
@@ -13,17 +12,6 @@ import { TERRAINS } from '../../world/terrains';
 import { TECHS } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
-
-// The GPU improvement index space (tile.improvement values, build codes 13-15).
-// the roster grew — indices 0-2 stay stable (every existing
-// plane/consumer keys on them); the resource-only improvements append.
-// FISHING_BOATS stays OUT: water-only, and a land builder can never stand
-// on the tile (unreachable in both engines).
-// SEASIDE_RESORT appended LAST — this array's order IS the GPU's
-// improvement index, so anything but an append renumbers every other row.
-
- 
-
 
 function chopKeyCode(t: any): number {
   if (!t.feature) return 0;
@@ -41,12 +29,10 @@ function chopUnlockTech(t: any): number {
     (tech.effects ?? []).some((fx: any) => fx.kind === 'unlockFeatureRemoval' && fx.feature === t.feature));
 }
 
-
 const techList = Object.values(TECHS);
 const civicList = Object.values(CIVICS);
 const techIdx = new Map(techList.map((t, i) => [t.id, i]));
 const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
-
 
 const centerBuildings = centerBuildingIds().map((id) => BUILDINGS[id]);
 const buildingIdx = new Map(centerBuildings.map((b, i) => [b.id, i]));
@@ -76,7 +62,6 @@ const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
   'GEOTHERMAL_FISSURE', 'TUNDRA', 'DESERT',
 ]);
-
 
 function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number {
   const def = DISTRICTS[id];
@@ -124,6 +109,5 @@ function featureAdjContribution(tile: Tile, id: DistrictId, removable = true): n
   }
   return sum;
 }
-
 
 export { LUXURY_IDS, chopKeyCode, chopUnlockTech, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, wonderStaticOk, staticAdjRaw, featureAdjContribution };

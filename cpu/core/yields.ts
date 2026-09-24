@@ -706,8 +706,6 @@ export function regionalEffects(
   return out;
 }
 
-/** The amenities a city earns AT HOME: its own complete districts, then its
- *  own non-regional buildings. A pillaged district darkens both. */
 /** Sum one numeric DistrictDef field over a city's complete, unpillaged
  *  districts — the district-side twin of `seatBuildingSum`. */
 export function cityDistrictSum(
@@ -730,6 +728,8 @@ export function cityDistrictSum(
   return n;
 }
 
+/** The amenities a city earns AT HOME: its own complete districts, then its
+ *  own non-regional buildings. A pillaged district darkens both. */
 export function localAmenities(state: GameState, city: City): number {
   const dark = darkBuildings(state.map, city);
   let n = cityDistrictSum(state, city, 'amenities');

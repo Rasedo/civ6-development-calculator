@@ -173,7 +173,6 @@ export function workableTiles(state: GameState, city: City): Tile[] {
   );
 }
 
-
 export function citySpecialistSlots(state: GameState, city: City): Map<number, number> {
   const out = new Map<number, number>();
   for (const d of city.districts) {
@@ -317,7 +316,6 @@ export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
   y.production = Math.max(y.production, CITY_CENTER_MIN_PRODUCTION);
   return y;
 }
-
 
 /** CIV6 (Marae): the yields a civilization's unique building pays on every
  *  tile of the city carrying a PASSABLE feature, summed over the buildings the
@@ -516,7 +514,6 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   return result;
 }
 
-
 export function borderCandidates(state: GameState, city: City): number[] {
   const center = state.map.tiles[city.centerIndex];
   const out: number[] = [];
@@ -587,7 +584,6 @@ export function swapTileOk(state: GameState, city: City, tileIndex: number): boo
   const lc = state.map.tiles[loser.centerIndex];
   return hexDistance(lc.col, lc.row, t.col, t.row) > 1;
 }
-
 
 export function empireGrowthMult(state: GameState, seat: number): number {
   // Migration Treaty first, wonders after — the GPU folds in this order.
@@ -663,13 +659,6 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
   return n;
 }
 
-/**
- * A civ's ERA INDEX — the highest era among its completed techs
- * and civics (real Civ 6 advances a civ's era with its research). Used only
- * by wonder tourism, which pays "1 for each era you have advanced PAST the
- * era in which that wonder was first available", so wonder era and civ era
- * must be measured on the SAME scale. 0 (Ancient) when nothing is done.
- */
 /** CIV6 (Disinformation Campaign): "+3 Diplomatic Favor per turn for each
  *  Broadcast Center" — the card names a building and pays per copy standing. */
 export function cardFavorPerBuilding(state: GameState, seat: number): number {
@@ -682,6 +671,13 @@ export function cardFavorPerBuilding(state: GameState, seat: number): number {
   return n;
 }
 
+/**
+ * A civ's ERA INDEX — the highest era among its completed techs
+ * and civics (real Civ 6 advances a civ's era with its research). Used only
+ * by wonder tourism, which pays "1 for each era you have advanced PAST the
+ * era in which that wonder was first available", so wonder era and civ era
+ * must be measured on the SAME scale. 0 (Ancient) when nothing is done.
+ */
 export function civEraIndex(techIds: readonly string[], civicIds: readonly string[]): number {
   let e = 0;
   for (const id of techIds) {
@@ -770,14 +766,6 @@ function wonderMult(state: GameState, cities: readonly City[], key: 'religiousTo
   return m;
 }
 
-/**
- * The AMENITIES a seat's National Parks pay this city. CIV6: a park
- * gives "2 Amenities to the city that owns it and 1 Amenity to the four
- * closest cities in your empire" — closest by centre-tile hex distance to the
- * park, ties by city id, and the OWNING city never double-dips as one of the
- * four. A park is four tiles; the CLUSTER pays once, so the payout is keyed
- * on the park tile with the LOWEST index in each owning-city group.
- */
 /** Does this city hold a National Park? The ANCHOR tile names the cluster,
  *  which is the same test `parkAmenities` pays on. */
 export function cityHasPark(state: GameState, city: City): boolean {
@@ -788,6 +776,14 @@ export function cityHasPark(state: GameState, city: City): boolean {
   return false;
 }
 
+/**
+ * The AMENITIES a seat's National Parks pay this city. CIV6: a park
+ * gives "2 Amenities to the city that owns it and 1 Amenity to the four
+ * closest cities in your empire" — closest by centre-tile hex distance to the
+ * park, ties by city id, and the OWNING city never double-dips as one of the
+ * four. A park is four tiles; the CLUSTER pays once, so the payout is keyed
+ * on the park tile with the LOWEST index in each owning-city group.
+ */
 export function parkAmenities(state: GameState, city: City): number {
   const cities = citiesOf(state, city.seat);
   if (cities.length === 0) return 0;

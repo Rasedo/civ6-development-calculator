@@ -22,13 +22,12 @@
  *     `RazeWarmongerPercent` — the three columns the grievance ledger scales
  *     its declaration and city bases by.
  *
- * THIRD PARTY WAR IS A ROW (2026-09-08). It carries `Agreement="true"`, and
- * an earlier pass read that as "not a kind". But `Agreement` says how the
- * install's UI reaches the action — through a proposal the other player
- * accepts — not what it costs or who may use it, and every column that DOES
- * say those things is a kind's column: `InitiatorPrereqCivic`
- * CIVIC_FOREIGN_TRADE, no `DenouncementTurnsRequired`, and
- * `WarmongerPercent` / `CaptureWarmongerPercent` / `RazeWarmongerPercent`
+ * THIRD PARTY WAR IS A ROW. It carries `Agreement="true"`, but `Agreement`
+ * says how the install's UI reaches the action — through a proposal the
+ * other player accepts — not what it costs or who may use it, and every
+ * column that DOES say those things is a kind's column:
+ * `InitiatorPrereqCivic` CIVIC_FOREIGN_TRADE, no `DenouncementTurnsRequired`,
+ * and `WarmongerPercent` / `CaptureWarmongerPercent` / `RazeWarmongerPercent`
  * 100 / 100 / 300. In this engine a war kind IS a gate plus a percent
  * triple, so the row belongs here.
  *

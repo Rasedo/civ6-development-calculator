@@ -286,7 +286,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
   return map;
 }
 
-
 function wonderTileValid(
   map: GameMap,
   t: Tile,
@@ -358,7 +357,6 @@ function placeWonders(map: GameMap, seed: number): void {
     }
   }
 }
-
 
 function touchesWater(map: GameMap, v: Vertex, isLandIdx: (i: number) => boolean): boolean {
   for (const [c, r] of vertexTouchingTiles(v)) {
@@ -447,7 +445,6 @@ function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed
     }
   }
 }
-
 
 function resourceValidOnTile(tile: Tile, def: ResourceDef): boolean {
   if (tile.elevation === 'MOUNTAIN') return false;

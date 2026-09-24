@@ -167,9 +167,6 @@ export interface DistrictDef {
   /** CIV6 (Dam): "Prevents damage from Floods on this River", and halves the
    *  Food/Production a flood would fertilize with. */
   floodShield?: boolean;
-  /** CIV6 (Dam, Canal): "Military Engineers can spend a charge to complete
-   *  20% (rounded down) of a Dam's Production cost." The Aqueduct carries it
-   *  too; it is what "engineering district" means. */
   /** CIV6 (Diplomatic Quarter): "Enemy Spies operate at N levels below normal
    *  when targeting this district or adjacent districts." Read as a whole-city
    *  term here, which is what the mission model can address. */
@@ -1236,7 +1233,7 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; src?: SrcMap; unlockId: strin
  *  Ikanda, Oppidum, Observatory, Thanh, Hippodrome and Street Carnival rows
  *  each equal the district they replace. The Indonesia/Khmer SCENARIO adds
  *  culture rows to the centre, hub and harbor; scenario rows are not play.
- *  Measured to the unit in the live game 2026-09-13 (tools/civ6lab
+ *  Measured to the unit in the live game (tools/civ6lab
  *  trade_probe.lua): every foreign destination paid 3 gold plus these rows,
  *  a Harbor city 6, an origin with four specialty districts nothing more than
  *  one with none. The GlobalParameters TRADE_ROUTE_GOLD_PER_*_DISTRICT are

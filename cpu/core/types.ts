@@ -2,7 +2,6 @@ export * from '../../world/types';
 import type { GreatWork } from '../data/greatWorks';
 import type { DistrictId, GameMap, YieldKey } from '../../world/types';
 
-
 export type FocusId = 'balanced' | YieldKey;
 
 /** CIV6 (Pillaging): what a wrecked improvement or district pays its
@@ -391,8 +390,6 @@ export interface GameState {
    *  people are unique individuals, so the denial set is global. Each seat's
    *  own recruits are in `Seat.gpEarned`. */
   claimedGreatPeople: string[];
-  /** per GP class, the QUEUE POSITION the next recruit is offered from;
-   *  it steps PAST anyone the world era has already left behind. */
   /** the FROZEN offer per class: a roster index, -1 = a draw is pending,
    *  -2 = the class is exhausted (no unclaimed person at or past the world
    *  era — final, the pool only shrinks). */
@@ -531,7 +528,7 @@ export interface Unit {
    */
   escorted?: boolean;
   /** A LAND unit currently on a water tile (embarked). Moves
-   * at EMBARK_MOVES, cannot fortify/exert ZOC, and (N2) defends at a flat CS.
+   * at EMBARK_MOVES, cannot fortify/exert ZOC, and defends at a flat CS.
    * Naval units are never `embarked` — they belong on water natively. */
   embarked?: boolean;
 }

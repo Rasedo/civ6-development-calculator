@@ -130,9 +130,8 @@ export const FEATURES: Record<string, FeatureDef> = {
 
 // The NATURAL WONDERS, appended LAST — this record's order is the exported
 // feature index, so anything but an append renumbers every other row.
-// SOURCING SWEEP: Crater Lake faith 4 -> 5. Real Civ 6 Crater Lake yields
-// 5 Faith and 1 Science on its tile (Civilization wiki, "Crater Lake
-// (Civ6)"). Dead Sea (+2 culture / +2 faith) re-verified and correct.
+// Real Civ 6 Crater Lake yields 5 Faith and 1 Science on its tile
+// (Civilization wiki, "Crater Lake (Civ6)"); Dead Sea +2 culture / +2 faith.
 const NW = { terrains: [] as TerrainId[], allowHills: false, removable: false, naturalWonder: true };
 Object.assign(FEATURES, {
   CRATER_LAKE: { id: 'CRATER_LAKE', name: 'Crater Lake', yields: { science: 1, faith: 5 }, ...NW },

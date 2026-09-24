@@ -443,11 +443,10 @@ export function completeQueueItem(
  * the same order.
  *
  * A tile whose district or wonder is still UNDER CONSTRUCTION is flipped too,
- * and `wipeConstruction` undoes the build it was carrying.
+ * and `wipeConstruction` undoes the build it was carrying. Exported because a
+ * completed IMPROVEMENT bombs through the same body (`CULTURE_BOMB_ROWS`), and
+ * a second hand-written claim would drift.
  */
-/** CIV6 (Culture Bomb): the tiles around `tileIndex` become this city's.
- *  Exported because a completed IMPROVEMENT bombs through the same body
- *  (`CULTURE_BOMB_ROWS`), and a second hand-written claim would drift. */
 export function cultureBomb(state: GameState, city: City, tileIndex: number, unownedOnly: boolean): void {
   const owner = seatOf(state, city.seat);
   if (!owner) return;

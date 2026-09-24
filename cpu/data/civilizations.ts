@@ -920,6 +920,17 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
   return row.civ !== undefined ? row.civ === civ : row.leader === leader;
 }
 
+/** CIV6: `foeGolden` is Swift Hawk's "civilizations that are in a Golden or
+ *  Heroic Age" — a HEROIC age IS a golden one on both engines, so the test is
+ *  the age alone. Its "or Free Cities" half is not modeled.
+ *  `foeOtherReligion` is El Escorial's REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION:
+ *  the foe's PLAYER holds a majority religion other than this seat's own
+ *  (`majorityReligionOf` on both sides — both exist and differ). */
+export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden' | 'onHomeContinent' | 'foeOtherReligion';
+/** CIV6 (Thermopylae, ABILITY_GORGO_POLICY_SLOT_COMBAT_BONUS): "+1 Combat
+ *  Strength for every Military Policy slotted" — the row's amount is paid ONCE
+ *  PER slotted policy of the named kind instead of flat. */
+export type CombatCsPer = 'militaryPolicy';
 /**
  * CIV6 (EFFECT_GRANT_ABILITY -> MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH): a flat
  * Combat Strength a civilization's or leader's units carry under a clause —
@@ -929,17 +940,6 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
  * district (the Great Turkish Bombard). `classes` names TARGET_CLASSES; an
  * empty list is every combat unit.
  */
-/** CIV6: `foeGolden` is Swift Hawk's "civilizations that are in a Golden or
- *  Heroic Age" — a HEROIC age IS a golden one on both engines, so the test is
- *  the age alone. Its "or Free Cities" half waits on a Free City existing. */
-/** `foeOtherReligion` is El Escorial's REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION:
- *  the foe's PLAYER holds a majority religion other than this seat's own
- *  (`majorityReligionOf` on both sides — both exist and differ). */
-export type CombatCsWhen = 'always' | 'foeMinor' | 'foeWounded' | 'foeCity' | 'onCoast' | 'foeGolden' | 'onHomeContinent' | 'foeOtherReligion';
-/** CIV6 (Thermopylae, ABILITY_GORGO_POLICY_SLOT_COMBAT_BONUS): "+1 Combat
- *  Strength for every Military Policy slotted" — the row's amount is paid ONCE
- *  PER slotted policy of the named kind instead of flat. */
-export type CombatCsPer = 'militaryPolicy';
 export interface CombatCsRow {
   civ?: CivId;
   leader?: LeaderId;
@@ -1590,7 +1590,6 @@ export const DISTRICT_UNIT_ROWS: readonly DistrictUnitRow[] = withSrc([
 export interface ExtraUnitCopyRow {
   civ?: CivId;
   leader?: LeaderId;
-  /** the unit CLASS the copy follows */
   /** the CLASS a row copies, or '' when it names one chassis instead. */
   cls: string;
   /** CIV6 (TRAIT_EXTRASAKAHORSEARCHER,
@@ -1608,7 +1607,6 @@ export const EXTRA_UNIT_COPY_ROWS: readonly ExtraUnitCopyRow[] = withSrc([
   { civ: 'SCYTHIA', cls: 'LIGHT_CAVALRY', amount: 1 },
   { civ: 'SCYTHIA', cls: '', unit: 'SAKA_HORSE_ARCHER', amount: 1 },
 ], EXTRA_UNIT_COPY_SRC);
-
 
 /** CIV6 (Great Turkish Bombard, EFFECT_ADJUST_POPULATION_AFTER_CONQUEST):
  *  "Conquered cities do not lose Population" — the PERCENTAGE of the

@@ -154,7 +154,6 @@ export function commitProduction(state: GameState, seat: number, city: City, ite
   }
 }
 
-
 export function commitResearch(state: GameState, seat: number, kind: 'tech' | 'civic', id: string | null): void {
   const s = seatOf(state, seat);
   if (!s) return;

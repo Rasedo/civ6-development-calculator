@@ -1,7 +1,7 @@
 /**
- * Unit mechanics (stage 11a): movement with Civ 6-ish terrain costs and the
- * river-crossing rule, A* pathfinding, one-civilian-per-tile stacking,
- * training, maintenance, and builder actions. Military/combat land in 11b.
+ * Unit mechanics: movement with Civ 6 terrain costs and the river-crossing
+ * rule, A* pathfinding, one-civilian-per-tile stacking, training,
+ * maintenance, and builder actions. Combat lives in combat.ts.
  */
 
 import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
@@ -79,7 +79,6 @@ const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 export { nextRandom } from './rand';
-
 
 /**
  * The unit-aware TERRAIN passability plane. A NAVAL unit stands on
@@ -238,13 +237,6 @@ export function riverCharge(state: GameState, from: Tile, to: Tile): number {
 }
 
 /**
- * ONE step of a Trader's walk: from `fromIndex`, the passable neighbour with
- * the lowest hexDistance to `targetIndex` (ties by direction order) — the
- * SAME integer stepping rule the war-march uses, so both engines agree by
- * construction. Returns `fromIndex` unchanged when arrived or stuck (no
- * strictly-closer passable neighbour). Zero draws, integer-only.
- */
-/**
  * How far out to sea a seat's Traders may go. CIV6: "The Celestial Navigation
  * technology is required to move on Coast tiles. The Cartography technology is
  * required to move on Ocean tiles." A seat with neither keeps to the land.
@@ -306,6 +298,13 @@ export function tradeWalkable(tile: Tile, water: number): boolean {
   return tile.terrain !== 'OCEAN' || water >= TRADE_WATER_OCEAN;
 }
 
+/**
+ * ONE step of a Trader's walk: from `fromIndex`, the passable neighbour with
+ * the lowest hexDistance to `targetIndex` (ties by direction order) — the
+ * SAME integer stepping rule the war-march uses, so both engines agree by
+ * construction. Returns `fromIndex` unchanged when arrived or stuck (no
+ * strictly-closer passable neighbour). Zero draws, integer-only.
+ */
 export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: number, water: number): number {
   const map = state.map;
   const dest = map.tiles[targetIndex];
@@ -351,7 +350,7 @@ export function tradeWalkReachable(state: GameState, fromIndex: number, toIndex:
  *  so the bound is a safety rail, not a rule. */
 
 /** The MP a river crossing costs (real Civ 6 ends movement; this model charges
- *  a flat 3 points — the pre-existing convention, now named). */
+ *  a flat 3 points). */
 export const RIVER_CROSS_MP = 3 * MP_SCALE;
 
 export function crossesRiver(from: Tile, to: Tile): boolean {
@@ -398,10 +397,9 @@ export function unitDomain(type: string): 'civilian' | 'support' | 'military' | 
 }
 
 /**
- * THE SET `unitDomain` USED TO CALL 'civilian' — a unit that neither fights
- * nor flies nor spies. Splitting SUPPORT out of the civilian domain changed
- * what one word meant in a dozen predicates that never cared about stacking,
- * so the set they meant has a name of its own and they ask for it.
+ * A unit that neither fights nor flies nor spies: the civilian and SUPPORT
+ * domains together. The predicates that do not care about stacking ask for
+ * this set by name.
  */
 export function unitIsNoncombat(type: string): boolean {
   const d = unitDomain(type);
@@ -495,11 +493,6 @@ export function visibleHostilesAt(state: GameState, tileIndex: number, viewer: {
   );
 }
 
-/** Does this unit project a zone of control at all? CIV6 (Zone of Control):
- *  "Ranged and Bombard class units do not exert ZOC" — SUPPRESSION hands it
- *  back to a ranged unit. The two submarines carry "Does not exert zone of
- *  control" on the chassis, and an embarked unit exerts none either. Air
- *  units are no garrison, so `unitDomain` filters them. */
 /** CIV6 (Zone of Control): "Religious units exert ZOC against other religious
  *  units" — the ONLY class whose zone is not the military one, so it is a
  *  predicate of its own rather than a widening of `unitExertsZoc` (which the
@@ -508,6 +501,11 @@ export function unitReligious(type: string): boolean {
   return (UNITS[type]?.religiousStrength ?? 0) > 0;
 }
 
+/** Does this unit project a zone of control at all? CIV6 (Zone of Control):
+ *  "Ranged and Bombard class units do not exert ZOC" — SUPPRESSION hands it
+ *  back to a ranged unit. The two submarines carry "Does not exert zone of
+ *  control" on the chassis, and an embarked unit exerts none either. Air
+ *  units are no garrison, so `unitDomain` filters them. */
 export function unitExertsZoc(u: Unit): boolean {
   if (unitDomain(u.type) !== 'military' || u.embarked || UNITS[u.type]?.exertsNoZoc) return false;
   const cls = UNIT_PROMO_CLASS[u.type];
@@ -578,8 +576,6 @@ export function inEnemyZoc(
   return false;
 }
 
-/** FORTIFY: the defender-strength bonus a unit's fortifyTurns grants
- * (+3 CS at >=1, +6 at >=2; cap 2). Civilians never fortify (0). */
 /** The pool this unit was GRANTED this turn — `movesFull` where it stands,
  *  and the live full where it does not. ONE fallback: the heal gate, the
  *  fortify gate and the state compare must all read the same number, or a
@@ -588,6 +584,8 @@ export function grantedMoves(state: GameState, unit: Unit): number {
   return unit.movesFull ?? unitFullMoves(state, unit);
 }
 
+/** FORTIFY: the defender-strength bonus a unit's fortifyTurns grants
+ * (+3 CS at >=1, +6 at >=2; cap 2). Civilians never fortify (0). */
 export function fortifyBonus(unit: { fortifyTurns?: number }): number {
   return Math.min(FORTIFY_MAX_TURNS, unit.fortifyTurns ?? 0) * 3;
 }
@@ -598,8 +596,6 @@ export function wonderOccupyDefense(state: GameState, tileIndex: number): number
   if (!t?.builtWonder || !t.builtWonderComplete) return 0;
   return BUILT_WONDERS[t.builtWonder]?.effects?.occupyDefense ?? 0;
 }
-
-
 
 function tileOwnedByUnitOwner(t: Tile, unit: { seat: number }): boolean {
   return tileSeat(t) === unit.seat;
@@ -801,54 +797,6 @@ export type StepOutcome =
   | 'blocked';
 
 /**
- * THE movement-point contract, in one place.
- *
- * Every walker asks this one text. Six copies could not stay the same — the
- * cliff rule reached only two of them, and the two engines enforced it on
- * DIFFERENT unit sets, which is how a musketman walked over a
- * cliff onto water in the off-script gate, t198). One body now
- * owns the whole contract:
- *
- *   - Real Civ 6: entering costs the tile's full cost, +3 for a
- *     river crossing, and needs that much MP left — except a unit at FULL MP
- *     may always take one step, paying everything it has. No Civ-5-style
- *     "enter on fumes", no river-zeroing.
- *   - Embark/disembark (a LAND unit crossing land↔water) costs the step's
- *     own cost plus a 2-MP penalty — CIV6 (Movement): "either 3 Movement or
- *     all the unit's Movement for the round (if it has less than 3)" — and
- *     leftover MP transfers to the new mode, capped at its full pool. The
- *     penalty is waived at a Harbor water tile or a coastal City Center land
- *     tile ("costs only 1 Movement"). Naval units never transition; water
- *     steps never pay a river charge.
- *     An embarked land unit's pool is EMBARK_MOVES, not its land allowance.
- *   - a CLIFF is an unbreakable barrier to that transition —
- *     their entire function, and what makes a cliff-ringed city safe from
- *     naval invasion. Sourced exceptions (the land tile being a city, a
- *     HARBOR bordering the cliff) live in cliffBlocksStep.
- *   - ANY non-barbarian unit clears a barb camp by entering it.
- *     clearCampFor no-ops for barbarians and credits the right treasury.
- *   - ZOC: ending adjacent to a hostile MILITARY unit zeroes MP.
- *
- * The CALLER still picks the destination. That is where the walkers genuinely
- * differ — candidate sets, occupancy tests, stop conditions — and those stay
- * injected at the call site rather than flagged in here.
- *
- * The reveal/goody-hut block is seat 0-only and stays inert for every other
- * walker: hostileUnitAct is fed only by barbUnits/the seat's unit list, and the seat
- * civilian walkers iterate one seat's units.
- */
-/**
- * The movement pool a unit is GRANTED for a turn, BEFORE the general/admiral
- * aura: its type's `moves`, or the flat EMBARK_MOVES pool while embarked,
- * plus whatever golden dedication its seat holds. An
- * embarked unit keeps EMBARK_MOVES — embarkation speed is not a unit's own
- * movement, so the dedication does not touch it.
- *
- * FOUR sites computed this expression — stepUnit, refreshUnits,
- * seatPhase and spawnUnit — and a bonus added to one of them is a bonus the
- * other three silently disagree about. The GPU's twin is `_full_mp`.
- */
-/**
  * THE ESCORT FORMATION. CIV6 (Formations): "A military unit can create a
  * formation with a support or civilian unit at any time"; the formation's
  * Movement "is equal to that of the slowest unit that belongs to it", and
@@ -903,8 +851,7 @@ export function escortUnit(state: GameState, unit: Unit): RuleResult {
   if (!esc) return no('No military unit here to escort it.');
   // ONE RIDER PER STACKING CLASS. CIV6 (Formations): a military unit forms
   // with "a support or civilian unit", and a tile holding all three carries
-  // all three — which is exactly what `escortRiders`' own comment has always
-  // said and what the slot split now makes reachable. A second rider of the
+  // all three, one rider per slot (`escortRiders`). A second rider of the
   // SAME class is still refused: two of one class cannot stand here anyway.
   const slot = unitStackSlot(unit);
   if (escortRiders(state, esc).some((r) => unitStackSlot(r) === slot)) {
@@ -974,6 +921,17 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
   return m;
 }
 
+/**
+ * The movement pool a unit is GRANTED for a turn, BEFORE the general/admiral
+ * aura: its type's `moves`, or the flat EMBARK_MOVES pool while embarked,
+ * plus whatever golden dedication its seat holds. An
+ * embarked unit keeps EMBARK_MOVES — embarkation speed is not a unit's own
+ * movement, so the dedication does not touch it.
+ *
+ * stepUnit, refreshUnits, seatPhase and spawnUnit all read this one
+ * composer, so a bonus added here reaches every one of them. The GPU's twin
+ * is `_full_mp`.
+ */
 export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number; levied?: boolean; mpBonus?: number }): number {
   const def = UNITS[unit.type];
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
@@ -1023,6 +981,36 @@ export function embarkTechMoves(state: GameState, seat: number): number {
   return n;
 }
 
+/**
+ * THE movement-point contract, in one place.
+ *
+ * Every walker asks this one text, so the two engines enforce each rule on
+ * the same unit sets. This body owns the whole contract:
+ *
+ *   - Real Civ 6: entering costs the tile's full cost, +3 for a
+ *     river crossing, and needs that much MP left — except a unit at FULL MP
+ *     may always take one step, paying everything it has. No Civ-5-style
+ *     "enter on fumes", no river-zeroing.
+ *   - Embark/disembark (a LAND unit crossing land↔water) costs the step's
+ *     own cost plus a 2-MP penalty — CIV6 (Movement): "either 3 Movement or
+ *     all the unit's Movement for the round (if it has less than 3)" — and
+ *     leftover MP transfers to the new mode, capped at its full pool. The
+ *     penalty is waived at a Harbor water tile or a coastal City Center land
+ *     tile ("costs only 1 Movement"). Naval units never transition; water
+ *     steps never pay a river charge.
+ *     An embarked land unit's pool is EMBARK_MOVES, not its land allowance.
+ *   - a CLIFF is an unbreakable barrier to that transition —
+ *     their entire function, and what makes a cliff-ringed city safe from
+ *     naval invasion. Sourced exceptions (the land tile being a city, a
+ *     HARBOR bordering the cliff) live in cliffBlocksStep.
+ *   - ANY non-barbarian unit clears a barb camp by entering it.
+ *     clearCampFor no-ops for barbarians and credits the right treasury.
+ *   - ZOC: ending adjacent to a hostile MILITARY unit zeroes MP.
+ *
+ * The CALLER still picks the destination. That is where the walkers genuinely
+ * differ — candidate sets, occupancy tests, stop conditions — and those stay
+ * injected at the call site rather than flagged in here.
+ */
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;
   // a formed civilian has no step of its own: the formation moves as one, and
@@ -1121,7 +1109,6 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   return unit.movesLeft > 0 ? 'moved' : 'halted';
 }
 
-
 export function walkPath(state: GameState, unit: Unit): void {
   while (unit.path && unit.path.length > 0 && unit.movesLeft > 0) {
     const nextIndex = unit.path[0];
@@ -1156,25 +1143,18 @@ export function orderMove(state: GameState, unitId: number, targetIndex: number)
   return ok;
 }
 
-
 /**
  * The builder price escalator — 50 + 4 (pre-speed) per
  * builder THIS SEAT HAS ALREADY PRODUCED, rounded after the game-speed scale
  * like every unit cost (data/units U()). The exporter mirrors the 50/4 literals
  * as scenario.builderBase/builderPer.
  *
- * ONE escalator for every seat, and the QUEUED term is GONE.
- *
- * The seat 0 counted builders "ever trained/purchased OR CURRENTLY IN A QUEUE";
- * the seat counted only those trained. Civ 6 counts neither queue: the unit
- * cost progression is `CostProgressionParam1="4"` applied to the "number of
- * unit already produced" — producing is the event, and an item sitting in a
- * queue has produced nothing. So the CIV SEAT was right and the SEAT 0 was wrong,
- * which is exactly why this task's rule is "pick the behaviour closer to real
- * Civ 6", never "mirror the TypeScript engine".
+ * ONE escalator for every seat, counting only builders already trained or
+ * purchased, never one sitting in a queue. Civ 6's unit cost progression is
+ * `CostProgressionParam1="4"` applied to the "number of unit already
+ * produced": producing is the event, and an item sitting in a queue has
+ * produced nothing.
  *   https://forums.civfanatics.com/threads/600489/
- *
- * `seat` defaults to the seat 0 so the UI call sites are untouched.
  */
 export function builderCost(state: GameState, seat: number): number {
   return Math.round((50 + 4 * (seatOf(state, seat)?.buildersTrained ?? 0)) * GAME_SPEED);
@@ -1198,8 +1178,8 @@ export function traderCost(state: GameState, seat: number): number {
 /**
  * A city may build/buy NAVAL units iff its CENTER is adjacent to a
  * water tile OR it owns a COMPLETED Harbor. Mirrors the GPU naval-build gate
- * (static center-water-adjacency plane | dynamic completed-Harbor). Works for
- * both seat 0 City and City (both carry centerIndex + districts).
+ * (static center-water-adjacency plane | dynamic completed-Harbor). Takes any
+ * city shape that carries centerIndex + districts.
  */
 export function cityNavalCapable(
   state: GameState,
@@ -1232,19 +1212,17 @@ export function bestTrainableOfClass(state: GameState, seat: number, promoClass:
   return best?.id ?? null;
 }
 
-/** CIV6 (Royal Navy Dockyard,
- *  `MODIFIER_PLAYER_ADJUST_DISTRICT_ADD_NAVAL_UNIT`): the install names NO
- *  chassis, so the grant takes the strongest NAVAL unit this seat can train —
- *  `bestTrainableOfClass`'s rule, over the hulls rather than over a promotion
- *  class, because the naval line spans three of them. */
 /** The strongest HULL a seat can train, for the Royal Navy Dockyard's grant.
+ *  CIV6 (Royal Navy Dockyard, `MODIFIER_PLAYER_ADJUST_DISTRICT_ADD_NAVAL_UNIT`):
+ *  the install names NO chassis, so the grant takes the strongest NAVAL unit
+ *  this seat can train — `bestTrainableOfClass`'s rule, over the hulls rather
+ *  than over a promotion class, because the naval line spans three of them.
  *
  *  The CITY is required, not optional-in-practice: `trainableUnits` refuses
  *  every naval chassis without one (`!!city && cityNavalCapable`), which is
  *  right for the gold rung — its unit spawns at the capital and can name no
  *  Harbor — and wrong for a grant made BY a coastal district, whose city is
- *  naval-capable by construction. Called without it this returned null and
- *  the Dockyard granted nothing at all. */
+ *  naval-capable by construction. Without it the answer is null. */
 export function bestTrainableNaval(
   state: GameState,
   seat: number,
@@ -1768,13 +1746,8 @@ export function spawnUnit(
     type: unitType,
     seat,
     tileIndex: spot.index,
-    // ONE composer for the pool. This used to re-add def.moves, the raider
-    // bonus, the golden bonus and the start tile by hand, and so quietly
-    // dropped the three terms `unitFullMoves` also carries — the Mathematics
-    // rung every HULL reads, Enhanced Mobility, and the emergency march. A
-    // naval unit was therefore born a whole Movement short and only came
-    // right at the next `refreshUnits`, which does call this. Its first turn
-    // was the divergence.
+    // ONE composer for the pool: `unitFullMoves`, the same one
+    // `refreshUnits` calls, so a unit is born with every term it carries.
     movesLeft: unitFullMoves(state, { type: unitType, seat, tileIndex: spot.index }),
     hp: UNIT_HP,
     charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType, spot),
@@ -1946,8 +1919,8 @@ export function refreshUnits(state: GameState): void {
     // ground, +5 on foreign-owned land.
     // "spent no MP" is measured against what this unit was GRANTED
     // last refresh, not against its type's base moves — the aura's +1 MP makes
-    // the granted pool vary per turn. `?? full` reproduces the pre-S3 gate for
-    // units that have never been refreshed.
+    // the granted pool vary per turn. A unit that has never been refreshed
+    // measures against its live full pool (`grantedMoves`).
     const grantedLast = grantedMoves(state, unit);
     // CIV6 (Resource, GS): "if you had acquired Iron to produce Swordsmen, but
     // have no continuous access to Iron Mines, those Swordsmen won't be able to
@@ -2009,8 +1982,7 @@ export function refreshUnits(state: GameState): void {
     // no MP since the last refresh). A military unit that stayed put digs in
     // (+1, cap 2); any move/attack (movesLeft < full) resets it. Symmetric
     // across owners; read movesLeft BEFORE the reset below.
-    // NAVAL units never fortify (real Civ 6) — inert until N2 adds
-    // ships. (Embarked land units are still military but march every turn, so
+    // NAVAL units never fortify (real Civ 6). (Embarked land units are still military but march every turn, so
     // their fortify gate resets to 0 in practice.)
     if (unitDomain(unit.type) === 'military' && !naval) {
       const dug = unit.movesLeft >= grantedLast ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
@@ -2068,7 +2040,6 @@ export function setExploreMission(state: GameState, unitId: number, on: boolean)
   if (!on) unit.path = null;
   return ok;
 }
-
 
 function builderOn(state: GameState, unitId: number): { unit?: Unit; err?: RuleResult } {
   const unit = state.units.find((u) => u.id === unitId);
@@ -2165,8 +2136,7 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
   if (!tile.resource) return no('No resource here.');
   // CIV6 (Mana): "Resources cannot be harvested" (`SEAT_BAN_ROWS`)
   if (getModifiers(state, unit!.seat).seatBans.has('harvest')) return no('This civilization cannot harvest resources.');
-  // the ACTING unit's seat, both times: this body read and paid seat 0 for
-  // as long as nothing called it
+  // the ACTING unit's seat, both times
   const grant = harvestGrant(state, tile, unit!.seat);
   if (!grant) {
     return no(
@@ -2246,8 +2216,7 @@ function nearestCityTo(state: GameState, owner: Seat, tile: Tile): City | undefi
  * Real Civ 6 gives the village to whoever reaches it first, so any civ seat
  * claims it; barbarians and city-states neither settle nor research and take
  * none. The reward is the install's own table — `drawGoodyReward` picks it
- * and this pays it. The engine's older six-arm reward was unsourced and is
- * gone rather than preserved.
+ * and this pays it.
  */
 export function claimGoodyHut(state: GameState, unit: Unit): void {
   const tile = state.map.tiles[unit.tileIndex];
@@ -2346,7 +2315,7 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
   if (state.eventLog.length > 20) state.eventLog.shift();
 }
 
-/** CIV6 (purchase placement, measured in the live game 2026-09-13): a PURCHASED
+/** CIV6 (purchase placement, measured in the live game): a PURCHASED
  *  unit is placed ON the city centre, and the purchase is REFUSED — "too many
  *  units of one class here" — when a unit of its stacking class already stands
  *  there. There is no spill to a neighbour, unlike a TRAINED unit's placement.

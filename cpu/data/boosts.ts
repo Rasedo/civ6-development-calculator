@@ -4,11 +4,9 @@
  * (declarative `check`); the rest (war, trade, religion, other civs…) are
  * honest manual toggles in the research panel.
  *
- * SOURCING SWEEP: BOOST_FRACTION = 0.4 is VERIFIED CORRECT for
- * the Gathering Storm ruleset this repo models. Boosts gave 50% in vanilla and
- * were reduced to 40% in Rise and Fall, which GS kept — so the value is right
- * AND the reason it is 0.4 rather than 0.5 is now recorded, which matters
- * because 0.5 is the number most older guides quote.
+ * BOOST_FRACTION = 0.4 is the Gathering Storm value: boosts gave 50% in
+ * vanilla and 40% from Rise and Fall on, which GS kept. 0.5 is the number
+ * most older guides quote.
  *
  * The individual boost CONDITION TEXTS remain a NARROWED marker: they are
  * Civ 6's where the condition survived translation and paraphrased otherwise,

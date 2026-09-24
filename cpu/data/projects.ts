@@ -470,7 +470,7 @@ export const LASER_POWER_LOAD = 5;
  *  Campus Research Grants (Science), Holy Site Prayers (Faith) and the Theater
  *  Square Festival (Culture), so the rate is uniform and needs no per-project
  *  table. We grant the equivalent lump on completion; total production invested
- *  equals the cost, so the totals agree. Was 0.75, which was five times real. */
+ *  equals the cost, so the totals agree. */
 export const PROJECT_YIELD_FRACTION = 0.15;
 export const PROJECT_GPP_FRACTION = 0.22;
 

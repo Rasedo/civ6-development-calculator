@@ -201,17 +201,6 @@ export function airStrikeReaches(state: GameState, unit: Unit, tileIndex: number
   return hexDistance(a.col, a.row, b.col, b.row) <= airRange(unit);
 }
 
-/**
- * What answers an air strike. CIV6: "the attacking unit's Ranged Strength will
- * be matched against the defending unit's Anti-Air Strength (even if its
- * Combat Strength is higher) or Combat Strength if it doesn't have any
- * Anti-Air Strength."
- */
-/**
- * The tiles an air strike may be pointed at, ordered by TILE INDEX ascending
- * and cut to the head's width — the same rule the ring heads use, so both
- * engines agree on what column k means without shipping a list.
- */
 /** CIV6 (Bomber): a bomber "may attack tile improvements and districts",
  *  and what it wrecks is what the ground verb wrecks — the Encampment and a
  *  city centre are the two districts a pillage never reaches. */
@@ -243,6 +232,11 @@ export function airPillageTargets(state: GameState, unit: Unit, width: number): 
   return out;
 }
 
+/**
+ * The tiles an air strike may be pointed at, ordered by TILE INDEX ascending
+ * and cut to the head's width — the same rule the ring heads use, so both
+ * engines agree on what column k means without shipping a list.
+ */
 export function airStrikeTargets(state: GameState, unit: Unit, width: number): number[] {
   const out: number[] = [];
   const here = state.map.tiles[unit.tileIndex];
@@ -348,6 +342,12 @@ export function airCoverAgainst(state: GameState, striker: Unit, tileIndex: numb
   return best;
 }
 
+/**
+ * What answers an air strike. CIV6: "the attacking unit's Ranged Strength will
+ * be matched against the defending unit's Anti-Air Strength (even if its
+ * Combat Strength is higher) or Combat Strength if it doesn't have any
+ * Anti-Air Strength."
+ */
 export function airDefenseOf(
   state: GameState, unit: { type: string; seat: number; tileIndex?: number },
 ): number {

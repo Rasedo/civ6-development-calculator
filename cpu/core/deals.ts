@@ -306,8 +306,7 @@ export function dealPhase(state: GameState): void {
   // Two terms between one pair can end on the same turn and move the same
   // lump through a CAPPED bank in opposite directions, and the order decides
   // where the bank sits when this turn's new deals land (seed 9261 t247: the
-  // GPU walks the pairs in index order and took seat 1's lump, insertion
-  // order here left seat 0 at its cap and took none).
+  // GPU walks the pairs in index order too).
   const byPair = ([a]: [string, unknown], [b]: [string, unknown]): number => {
     const [a0, a1] = a.split('>').map(Number);
     const [b0, b1] = b.split('>').map(Number);

@@ -358,7 +358,7 @@ export function cityCounterLevels(state: GameState, city: City, atTile?: number)
 }
 
 /** CIV6 (Neutralize Governor): "can only be performed in a city with a
- *  Governor" — the holder's roster answers directly now. */
+ *  Governor" — the holder's roster answers directly. */
 function hasGovernor(state: GameState, holder: Seat, city: City): boolean {
   return holder.cities.includes(city) && cityHasGovernor(state, city);
 }
@@ -440,7 +440,7 @@ export const MISSION_CAPTURED = 4;
 export const MISSION_KILLED = 5;
 
 /**
- * CIV6 (measured 2026-09-13, `tools/civ6lab/spy_probe.lua` over the tuner
+ * CIV6 (measured with `tools/civ6lab/spy_probe.lua` over the tuner
  * socket): every mission is ONE roll R of 3d6 read against a threshold
  * T = BaseProbability - k, in six bands by the margin d = R - T:
  *   d >= 2 success undetected; d in {0, 1} success, must escape;
@@ -556,7 +556,7 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
  * FASTEST route whose district stands (a recorded model choice where the
  * real game asks the player), and (Ace Driver) "have a much higher chance
  * of escape (+4 levels)" rides the missions' own per-level term. A failed
- * escape is the old catch: "imprisoned, but not killed" where a MAJOR runs
+ * escape is an ordinary catch: "imprisoned, but not killed" where a MAJOR runs
  * the prison — a minor keeps no cell, so its catch ends the career.
  */
 function spyEscape(state: GameState, unit: Unit,

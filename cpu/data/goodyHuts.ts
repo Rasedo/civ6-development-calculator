@@ -5,8 +5,7 @@
  * row's payload read off the modifier its `ModifierID` names. Nothing here is
  * inferred: the seven kinds all carry Weight 100, every subtype carries its
  * own weight within its kind, and the gates (`MinOneCity`, `Turn`) and
- * amounts are transcribed. The engine's older six-arm stub was unsourced and
- * is gone rather than preserved.
+ * amounts are transcribed.
  *
  * A weight of 0 means the subtype is OFF in this ruleset (GRANT_UPGRADE and
  * GRANT_SETTLER), not that it is free — it is excluded from the draw.

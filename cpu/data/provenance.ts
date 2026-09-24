@@ -18,7 +18,7 @@
  *   PEDIA     the install's published TEXT (a Civilopedia page, an ability
  *             paragraph) where no table holds the number. Not a measurement.
  *   STYLIZED  a magnitude this engine chose. Named so the choice is visible
- *             instead of remembered (owner rulings 2026-09-04).
+ *             instead of remembered (owner rulings).
  *   DERIVED   arithmetic over other constants — the tag names the inputs and
  *             the formula in words; the checker resolves every input in the
  *             install (a dangling input is RED) and evaluates what it can.

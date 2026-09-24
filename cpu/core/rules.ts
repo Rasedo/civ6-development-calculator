@@ -42,7 +42,6 @@ function gates(state: GameState, seat: number): Unlocks | null {
   return state.sandbox ? null : computeUnlocks(state, seat);
 }
 
-
 /**
  * May `seat` found a city on this tile? ONE rule, asked per seat.
  *
@@ -80,7 +79,6 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
   return ok;
 }
 
-
 /**
  * CIV6 (Fort, Airstrip): each may be built "in your own or neutral territory",
  * on land. The one predicate the engineer's improvements, its road and the
@@ -114,17 +112,6 @@ export function territoryOk(
   return ownsTile(tile) || (!!def.outsideTerritory && tileSeat(tile) < 0);
 }
 
-/**
- * CIV6 (Mountain Tunnel): "Can only be built on an adjacent Mountain tile."
- *
- * The engineer stands OFF the mountain and builds onto it — the only
- * improvement in the game with a target that is not the builder's own tile.
- * The action space carries no target, so the pick is deterministic: the
- * LOWEST-index adjacent mountain that is bare. A MODEL choice, recorded in
- * a MODEL choice, and the same shape as every other tie this engine breaks by index.
- *
- * Answers -1 when there is nothing to tunnel.
- */
 /** CIV6 (Mountain Tunnel): the published exit price, "2 Movement". */
 export const PORTAL_MP = 2;
 
@@ -154,6 +141,17 @@ export function portalExit(map: GameMap, tile: Tile): number {
   return first;
 }
 
+/**
+ * CIV6 (Mountain Tunnel): "Can only be built on an adjacent Mountain tile."
+ *
+ * The engineer stands OFF the mountain and builds onto it — the only
+ * improvement in the game with a target that is not the builder's own tile.
+ * The action space carries no target, so the pick is deterministic: the
+ * LOWEST-index adjacent mountain that is bare. A MODEL choice, the same shape
+ * as every other tie this engine breaks by index.
+ *
+ * Answers -1 when there is nothing to tunnel.
+ */
 export function tunnelTarget(
   map: GameMap, tile: Tile, ownsTile: (t: Tile) => boolean,
 ): number {
@@ -478,7 +476,6 @@ export function canRemoveFeature(state: GameState, tile: Tile, seat: number): Ru
   return ok;
 }
 
-
 export function canPlaceDistrictIn(
   state: GameState,
   city: City,
@@ -657,19 +654,6 @@ export function districtPlacementTiles(state: GameState, city: City, type: Distr
   return out;
 }
 
-
-/**
- * Buildings the city could queue right now (research-gated). Districts under
- * construction count (queue-ahead, like Civ 6) — a chain prerequisite is
- * satisfied by an owned OR already-queued building; the turn loop refuses to
- * finish a building before its district/prereqs exist.
- */
-/**
- * The WALLS TIER a city stands behind: 4 once its owner holds Steel, which
- * "builds modern fortifications around the City Centers of all current and
- * future cities" with no production at all, otherwise the highest tier among
- * the walls buildings it has finished.
- */
 /** The walls LEVEL this city has BUILT — Ancient 1, Medieval 2, Renaissance
  *  3, and 0 with none. `wallsTier` is the DEFENCE tier, which Urban Defenses
  *  raises without a wall standing; a housing or yield term wants this one. */
@@ -679,6 +663,12 @@ export function wallsLevel(city: { buildings: string[] }): number {
   return level;
 }
 
+/**
+ * The WALLS TIER a city stands behind: 4 once its owner holds Steel, which
+ * "builds modern fortifications around the City Centers of all current and
+ * future cities" with no production at all, otherwise the highest tier among
+ * the walls buildings it has finished.
+ */
 export function wallsTier(state: GameState, city: { buildings: string[]; seat: number }): number {
   // a city-state's centre arrives here as a stand-in City whose seat has no
   // Seat record at all, so the tech read has to tolerate one
@@ -822,6 +812,12 @@ export const RESEARCH_GATED_BUILDINGS: ReadonlySet<string> = new Set(
     .flatMap((fx) => (fx.kind === 'unlockBuilding' ? [fx.building] : [])),
 );
 
+/**
+ * Buildings the city could queue right now (research-gated). Districts under
+ * construction count (queue-ahead, like Civ 6) — a chain prerequisite is
+ * satisfied by an owned OR already-queued building; the turn loop refuses to
+ * finish a building before its district/prereqs exist.
+ */
 export function availableBuildings(state: GameState, city: City): BuildingDef[] {
   return buildableBuildings(state, city, false);
 }
@@ -926,7 +922,6 @@ export function buildingCompletable(state: GameState, city: City, buildingId: st
 export function buildingDef(id: string): BuildingDef {
   return BUILDINGS[id];
 }
-
 
 export function wonderExists(state: GameState, wonderId: string): boolean {
   return state.map.tiles.some((t) => t.builtWonder === wonderId);

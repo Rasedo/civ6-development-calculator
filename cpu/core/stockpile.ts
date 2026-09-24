@@ -60,12 +60,6 @@ export function stockpileCap(state: GameState, seat: number): number {
 }
 
 /**
- * One turn's income: every tile this seat owns that carries a strategic
- * resource under its matching, unpillaged improvement pays that resource's
- * published per-turn number. The stockpile is then clamped to the cap — a
- * seat over the ceiling (its Encampment just went dark) loses the excess.
- */
-/**
  * What a golden dedication adds to ONE improved source's per-turn yield.
  * CIV6 (Sky and Stars, GS): "Aluminum mines accumulate +2 more resources per
  * turn"; (Automaton Warfare): "Uranium mines accumulate +1 more resource per
@@ -77,6 +71,12 @@ export function goldenMineBonus(state: GameState, seat: number, resourceId: stri
   return 0;
 }
 
+/**
+ * One turn's income: every tile this seat owns that carries a strategic
+ * resource under its matching, unpillaged improvement pays that resource's
+ * published per-turn number. The stockpile is then clamped to the cap — a
+ * seat over the ceiling (its Encampment just went dark) loses the excess.
+ */
 export function accrueStockpiles(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
@@ -233,8 +233,7 @@ export function upgradeGoldCost(
   const raw = Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
   if (!levied) return raw;
   // CIV6 (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
-  // PERCENT): levied units upgrade at a 75% discount. The row shipped and
-  // nothing read it until now.
+  // PERCENT): levied units upgrade at a 75% discount.
   let pct = 0;
   for (const r of getModifiers(state, seat).levy) pct = Math.max(pct, r.upgradeDiscountPct);
   return Math.round(raw * (1 - Math.min(100, pct) / 100));
@@ -284,8 +283,6 @@ export function chargeProjectResource(state: GameState, seat: number, projectId:
   if (p?.resource) spendStockpile(state, seat, p.resource, p.resourceCost ?? 0, 'pc');
 }
 
-/** Draw `n` down. The caller has already asked `canPayStockpile`; this clamps
- *  at zero rather than going negative, because nothing here models debt. */
 /**
  * CIV6 (Railroad): "Does not cost a charge, but does cost 1 Iron and 1 Coal."
  * Lay one tile if the bank can pay for it — the Coal it burns discharges the
@@ -303,6 +300,8 @@ export function layRailroad(state: GameState, seat: number, tile: Tile): boolean
   return true;
 }
 
+/** Draw `n` down. The caller has already asked `canPayStockpile`; this clamps
+ *  at zero rather than going negative, because nothing here models debt. */
 export function spendStockpile(state: GameState, seat: number, resourceId: string | undefined, n: number, tag = 'sp'): void {
   if (!resourceId || n <= 0) return;
   const k = strategicSlot(resourceId);

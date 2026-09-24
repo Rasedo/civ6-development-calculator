@@ -23,7 +23,6 @@ export const AIR_REBASE_COLS = 6;
  *  index ascending — the AIR_STRIKE head's contract, one head per device. */
 export const NUKE_COLS = 12;
 
-
 export function unitActionNames(improvementIds: readonly string[]): string[] {
   const names: string[] = [];
   for (let d = 0; d < 6; d++) names.push(`MOVE_${d}`); // 0-5

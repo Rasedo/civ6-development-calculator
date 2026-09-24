@@ -129,8 +129,6 @@ export interface PolicyEffects {
   /** housing and amenities in every city with ANY completed district */
   cityWithDistrict?: { housing: number; amenities: number };
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
-  /** yield multipliers that apply ONLY in a city with an ESTABLISHED governor
-   *  (Merchant Republic's gold). */
   /** CIV6 (Monarchy): housing per LEVEL of the city's walls. */
   housingPerWallLevel?: number;
   /** CIV6 (Theocracy): religious strength in theological combat. */
@@ -138,6 +136,8 @@ export interface PolicyEffects {
   /** CIV6 (Autocracy): yields to a city per government building standing in
    *  it (`isGovYieldBuilding`), paid to every yield alike. */
   yieldsPerGovBuilding?: number;
+  /** yield multipliers that apply ONLY in a city with an ESTABLISHED governor
+   *  (Merchant Republic's gold). */
   governorYieldMult?: Partial<Yields>;
   /** yields per CITIZEN, only in a city with a governor (Theocracy's faith,
    *  Communism's production). */

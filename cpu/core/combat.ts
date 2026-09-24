@@ -69,9 +69,7 @@ export const CAMP_CLEAR_REWARD = 50;
 export const MAX_BARB_PER_CAMP = 3;
 
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
-  // You do not clear your OWN camps. This was `isBarbSeat(...)` —
-  // an identity test standing in for that rule, which only became sayable once
-  // the camps belonged to a seat and `seatOf` answered for every seat.
+  // You do not clear your OWN camps: the camps belong to the barbarian seat.
   if (seatOf(state, unit.seat) === state.barbSeat) return;
   const camp = state.barbSeat.camps.indexOf(tileIndex);
   if (camp < 0) return;
@@ -87,7 +85,6 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
     drawAndPayGoody(state, unit, state.map.tiles[tileIndex]);
   }
 }
-
 
 /** a FEATURE's own DefenseModifier (Features.xml): woods and rainforest
  *  shelter (+3), marsh and floodplains EXPOSE the defender (−2 — marsh stays
@@ -128,10 +125,10 @@ export const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
  * `round(10 - HP/10)`... units with 30 HP will lose 7 Combat Strength and units
  * with 1 HP will lose 10". The same penalty applies to RELIGIOUS Strength in
  * theological combat. Cities / city-states / walls are not units and never call
- * this.
+ * this. CIV6 (Samurai): "This unit does not suffer combat penalties when
+ * damaged" — the wound curve reads zero for that chassis, attacking and
+ * defending.
  */
-/** CIV6 (Samurai): "This unit does not suffer combat penalties when damaged" —
- *  the wound curve reads zero for that chassis, attacking and defending. */
 export function woundPenalty(unit: { hp: number; type?: string }): number {
   if (unit.type !== undefined && UNITS[unit.type]?.noWoundPenalty) return 0;
   return Math.round(10 - Math.max(0, unit.hp) / (UNIT_HP / 10));
@@ -262,9 +259,6 @@ export const SUPPORT_CS = 2;
 // a level — the CHOSEN PROMOTION is the bonus, so `promoCS` is what the CS
 // assemblies below add.
 
-/** CIV6: "+25% combat experience for all <classes> units trained in this
- *  city", summed over the training city's Encampment and Harbor lines and
- *  carried by the unit for life. */
 /**
  * CIV6 (Ordu, ABILITY_ORDU_INCREASED_MOVEMENT): the flat MOVEMENT a city's
  * unique buildings grant the classes they name, to every unit trained there,
@@ -295,6 +289,9 @@ export function applyTrainingGrants(state: GameState, city: City, unit: Unit): v
   if (mp) unit.mpBonus = mp;
 }
 
+/** CIV6: "+25% combat experience for all <classes> units trained in this
+ *  city", summed over the training city's Encampment and Harbor lines and
+ *  carried by the unit for life. */
 export function trainXpPct(
   state: GameState,
   city: City,
@@ -516,14 +513,6 @@ export function flankCount(state: GameState, defTileIndex: number, attacker: Uni
   return n;
 }
 
-/**
- * CIV6 (Support): "The defender will gain 2 Combat Strength for each adjacent
- * friendly unit", same ownership only. "Embarked land units provide Support
- * like normal" — the one place they differ from flanking. "Units will not gain
- * Support when inside defensible Districts (City Center, Encampment)", though
- * units inside one still provide it. Support is a MELEE-only term, and the
- * callers hold that gate: a ranged attacker never asks for it.
- */
 /** CIV6 (Support): "Units will not gain Support when inside defensible
  *  Districts (City Center, Encampment)" — a CITY CENTER is any live city's,
  *  a city-state's included: TS never paves a minor's centre with a district,
@@ -535,6 +524,14 @@ export function defensibleDistrict(state: GameState, dt: Tile): boolean {
   return !!cs && cs.centerIndex === dt.index;
 }
 
+/**
+ * CIV6 (Support): "The defender will gain 2 Combat Strength for each adjacent
+ * friendly unit", same ownership only. "Embarked land units provide Support
+ * like normal" — the one place they differ from flanking. "Units will not gain
+ * Support when inside defensible Districts (City Center, Encampment)", though
+ * units inside one still provide it. Support is a MELEE-only term, and the
+ * callers hold that gate: a ranged attacker never asks for it.
+ */
 export function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
   if (!flankSupportLive(state, defender.seat)) return 0;
   const dt = state.map.tiles[defTileIndex];
@@ -558,14 +555,14 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
 // owner AND civId. The GENERAL/ADMIRAL units themselves are combat-0 civilians
 // and never trigger this on their own account.
 //
-// widened the SCOPE from unit-vs-unit to every roll where a unit fights
+// The scope is every unit-vs-unit roll AND every roll where a unit fights
 // a city or a city strikes a unit (rcty/csty + their counter-rolls, the
-// ranged-vs-city rolls, and the two city-strike keys cstk/estk).
-// added the movement half (see `generalAuraMP` in aura.ts).
+// ranged-vs-city rolls, and the two city-strike keys cstk/estk). The
+// movement half is `generalAuraMP` in aura.ts.
 //
 // The PREDICATE itself lives in aura.ts so this file and units.ts share ONE
 // definition — combat.ts already imports units.ts, so units.ts cannot import
-// back from here. Re-exported below to keep every existing importer working.
+// back from here. Re-exported below for rules.ts and the tests.
 export { GENERAL_AURA_CS, GENERAL_AURA_RANGE };
 
 export function generalAuraCS(state: GameState, unit: Unit, tileIndex: number): number {
@@ -738,15 +735,6 @@ export function inDistrictTile(state: GameState, tileIndex: number): boolean {
   return !!t && (!!t.district || improvementIsCover(t));
 }
 
-/**
- * Who takes the blow on a STACKED hex. CIV6 (Combat): "When a naval unit and an
- * embarked unit occupy the same hex, the unit with the higher Combat Strength
- * will defend against ranged attacks" — and the page's own note that "strong
- * but gravely injured embarked units can be prioritized over weak but healthy
- * naval units" says the comparison is the CHASSIS strength, not the wounded
- * one. The page states the rule for ranged fire alone; a melee or air blow
- * lands on the hull, which is what an escort is for.
- */
 /** CIV6 (Convoy): "+10 Combat Strength when in a formation" — a Naval Melee
  *  row, and the formation it names is the ESCORT one, so the term rides
  *  whichever unit is CARRYING a rider. */
@@ -758,6 +746,15 @@ export function stackDefenceCS(state: GameState, u: Unit): number {
   return (u.embarked ? embarkedDefenseCS(state, u.seat) : (UNITS[u.type]?.combat ?? 0))
     + formationCS(u) + convoyCS(state, u) - fuelShortCS(state, u);
 }
+/**
+ * Who takes the blow on a STACKED hex. CIV6 (Combat): "When a naval unit and an
+ * embarked unit occupy the same hex, the unit with the higher Combat Strength
+ * will defend against ranged attacks" — and the page's own note that "strong
+ * but gravely injured embarked units can be prioritized over weak but healthy
+ * naval units" says the comparison is the CHASSIS strength, not the wounded
+ * one. The page states the rule for ranged fire alone; a melee or air blow
+ * lands on the hull, which is what an escort is for.
+ */
 export function stackDefender(state: GameState, enemies: Unit[], ranged: boolean): Unit {
   const fighters = enemies.filter((u) => unitDomain(u.type) === 'military');
   if (fighters.length === 0) return enemies[0];
@@ -765,10 +762,9 @@ export function stackDefender(state: GameState, enemies: Unit[], ranged: boolean
   if (!ranged) return hull;
   // CIV6 (Flanking and Support): against a ranged attack "the unit with the
   // higher Combat Strength will defend". On a TIE the HULL does — the unit
-  // that physically holds the hex — which is the GPU's rule too. This used to
-  // start from `fighters[0]`, whichever unit happened to be first in the
-  // tile's array, so a passenger listed before its hull took a volley the
-  // hull took on the other engine (seed 9209 t178).
+  // that physically holds the hex — which is the GPU's rule too. The search
+  // starts from the hull, never from whichever unit is first in the tile's
+  // array (seed 9209 t178: a passenger listed before its hull).
   let best = hull;
   for (const u of fighters) if (stackDefenceCS(state, u) > stackDefenceCS(state, best)) best = u;
   return best;
@@ -1047,11 +1043,6 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
   return getModifiers(state, own).combatVsBarbarians;
 }
 
-/** The flat Combat Strength the WORLD CONGRESS hands one unit: Military
- *  Advisory's adder on its promotion class, and CIV6 (World Religion, outcome
- *  A): "this outcome also gives Warrior Monks +10 Combat Strength", where the
- *  monk's religion is the one its owner founded. Air units carry no promotion
- *  class, so no air roll can see the advisory half. */
 /**
  * THE DEFENDER'S STRENGTH UNDER A CITY'S SHOT — ONE composer for both keys,
  * the centre's `cstk` and the Encampment's `estk`.
@@ -1080,6 +1071,11 @@ export function cityStrikeDefenderCS(state: GameState, defender: Unit, tile: Til
     + congressUnitCS(state, defender) + governmentUnitCS(state, defender);
 }
 
+/** The flat Combat Strength the WORLD CONGRESS hands one unit: Military
+ *  Advisory's adder on its promotion class, and CIV6 (World Religion, outcome
+ *  A): "this outcome also gives Warrior Monks +10 Combat Strength", where the
+ *  monk's religion is the one its owner founded. Air units carry no promotion
+ *  class, so no air roll can see the advisory half. */
 export function congressUnitCS(state: GameState, unit: { type: string; seat: number }): number {
   const monk = unit.type === 'WARRIOR_MONK' ? congressReligiousCs(state, unitSeat(unit)) : 0;
   return congressPromoClassCs(state, UNIT_PROMO_CLASS[unit.type]) + monk;
@@ -1173,8 +1169,7 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       : r.when === 'foeOtherReligion' ? foeOtherReligion(state, own.seat, foeSeat)
       // CIV6 (Terrains.xml): the install's Coast terrain is "Coast and Lake" —
       // a lake is shallow water to a hull. Spelled out rather than left as the
-      // chain's fallback: a `when` that reached no arm used to inherit THIS
-      // rule silently, which is a whole clause paid to the wrong row.
+      // chain's fallback, so a `when` that reaches no arm pays nothing.
       : r.when === 'onCoast'
         ? (def.naval ? isWater(tile) && tile.terrain !== 'OCEAN' : (!own.embarked && isCoastalLand(state.map, tile)))
         : false;
@@ -1351,7 +1346,6 @@ function cityAssault(
   }
 }
 
-
 /**
  * CIV6 (Combat): the Encampment "cannot be pillaged normally - they have to be
  * 'conquered' by a melee unit, as you would a City Center. At this point the
@@ -1525,13 +1519,6 @@ export function encampmentDefense(
   };
 }
 
-
-/** the COMMIT seam for meleeAttack. The resolver returns early on a
- *  dozen refusals; logging inside it would record ATTEMPTS, and an attempt is
- *  not an action. Only a resolved order reaches the log, tagged with the
- *  ACTING SEAT — which is what made the city-first divergences of this round
- *  (a barbarian on a foreign centre; the GPU sieging a peaceful city-state) a
- *  state-column hunt instead of one diff. */
 /**
  * May `seat` attack this city-state's centre? A DECLARED war on the minor
  * itself, or a war with ANY seat that is its SUZERAIN — contesting the
@@ -1585,6 +1572,11 @@ function disciplesSpread(
   }
 }
 
+/** the COMMIT seam for meleeAttack. The resolver returns early on a
+ *  dozen refusals; logging inside it would record ATTEMPTS, and an attempt is
+ *  not an action. Only a resolved order reaches the log, tagged with the
+ *  ACTING SEAT, so a divergence (a barbarian on a foreign centre; the GPU
+ *  sieging a peaceful city-state) reads as one diff line. */
 export function meleeAttack(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const r = meleeAttackInner(state, attackerId, targetIndex, seat);
   if (r.ok) {
@@ -1754,29 +1746,6 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   return ok;
 }
 
-
-/** the COMMIT seam for rangedAttack. The resolver returns early on a
- *  dozen refusals; logging inside it would record ATTEMPTS, and an attempt is
- *  not an action. Only a resolved order reaches the log, tagged with the
- *  ACTING SEAT — which is what made the city-first divergences of this round
- *  (a barbarian on a foreign centre; the GPU sieging a peaceful city-state) a
- *  state-column hunt instead of one diff. */
-/**
- * AN AIR STRIKE. CIV6 (Air combat): "all air attacks are ranged, and the
- * attacking plane doesn't suffer damage in return unless it gets Intercepted".
- * The strike reaches anything inside the aircraft's OPERATIONAL RANGE measured
- * from its base, and takes "a full action to perform".
- *
- * A FIGHTER's ranged damage is "effective against land units, but not against
- * cities and naval units"; a BOMBER's bombard damage is "effective against
- * cities and naval units but not against land units". What answers is the
- * target's Anti-Air Strength "(even if its Combat Strength is higher) or
- * Combat Strength if it doesn't have any".
- *
- * Not modelled here, and recorded rather than invented: PATROL, and with it
- * fighter INTERCEPTION, which needs an air unit to hold a map tile it is not
- * based on.
- */
 /** the answer a sortie takes. CIV6 (Air combat): a plane "doesn't suffer
  *  damage in return unless it gets Intercepted", and "the only exceptions to
  *  this rule are SHIPS with the Anti-Air Strength stat - they have additional
@@ -1827,6 +1796,22 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
   return { ok: true };
 }
 
+/**
+ * AN AIR STRIKE. CIV6 (Air combat): "all air attacks are ranged, and the
+ * attacking plane doesn't suffer damage in return unless it gets Intercepted".
+ * The strike reaches anything inside the aircraft's OPERATIONAL RANGE measured
+ * from its base, and takes "a full action to perform".
+ *
+ * A FIGHTER's ranged damage is "effective against land units, but not against
+ * cities and naval units"; a BOMBER's bombard damage is "effective against
+ * cities and naval units but not against land units". What answers is the
+ * target's Anti-Air Strength "(even if its Combat Strength is higher) or
+ * Combat Strength if it doesn't have any".
+ *
+ * Not modelled here, and recorded rather than invented: PATROL, and with it
+ * fighter INTERCEPTION, which needs an air unit to hold a map tile it is not
+ * based on.
+ */
 export function airStrike(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId && u.seat === seat);
   if (!attacker) return { ok: false, reason: 'No such unit.' };
@@ -1887,6 +1872,11 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   return { ok: true };
 }
 
+/** the COMMIT seam for rangedAttack. The resolver returns early on a
+ *  dozen refusals; logging inside it would record ATTEMPTS, and an attempt is
+ *  not an action. Only a resolved order reaches the log, tagged with the
+ *  ACTING SEAT, so a divergence (a barbarian on a foreign centre; the GPU
+ *  sieging a peaceful city-state) reads as one diff line. */
 export function rangedAttack(state: GameState, attackerId: number, targetIndex: number): RuleResult {
   const r = rangedAttackInner(state, attackerId, targetIndex);
   if (r.ok) {
@@ -2008,7 +1998,6 @@ function spendAttack(unit: Unit, endsTurn = false): void {
   const keeps = promoFlag(unit, 'MOVE_AFTER_ATTACK') || !!UNITS[unit.type]?.moveAfterAttack;
   if (endsTurn || !keeps) unit.movesLeft = 0;
 }
-
 
 /** the promotion context of a RANGED shot at a unit — one body, because both
  *  ranged paths assemble the same terms. */
@@ -2156,7 +2145,6 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   }
   return out;
 }
-
 
 /** how far device `k` flies from this carrier. CIV6: "When deployed from a
  *  Missile Silo or a Nuclear Submarine, they have a Range of 12" / "of 15" —
@@ -2561,8 +2549,6 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);
 }
 
-
-
 function campCandidates(state: GameState): Tile[] {
   const preferFog = state.fogOfWar;
   return state.map.tiles.filter((t) => {
@@ -2719,8 +2705,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     // ZOC: a march step ending adjacent to a hostile MILITARY unit halts.
     // Barbarians OBEY ZOC exactly as seat movers
     // do — unitsHostile makes a barb halt at any adjacent non-barb military
-    // (seat 0 always, at-war the other seats always — barbs raid the other seats too); other
-    // barbs exert nothing. The GPU barb walk mirrors this via
+    // (barbarians are at war with every seat); other barbs exert nothing. The GPU barb walk mirrors this via
     // _in_enemy_zoc_barb, so both engines stay symmetric. No new draws.
     if (stepUnit(state, unit, step) !== 'moved') return;
   }
