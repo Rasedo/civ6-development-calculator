@@ -35,9 +35,11 @@ describe('rule formulas', () => {
     expect(amenitiesNeeded(12)).toBe(6);
     expect(amenitiesNeeded(13)).toBe(7);
     expect(amenityTier(0).name).toBe('Content');
-    expect(amenityTier(1).name).toBe('Happy');
-    expect(amenityTier(3).name).toBe('Ecstatic');
-    expect(amenityTier(-1).name).toBe('Displeased'); // Content is 0 only
+    expect(amenityTier(2).name).toBe('Content'); // Content 0..2
+    expect(amenityTier(3).name).toBe('Happy'); // Happy 3..4
+    expect(amenityTier(4).name).toBe('Happy');
+    expect(amenityTier(5).name).toBe('Ecstatic'); // Ecstatic 5 and up
+    expect(amenityTier(-1).name).toBe('Displeased');
     expect(amenityTier(-2).name).toBe('Displeased');
     expect(amenityTier(-3).name).toBe('Unhappy'); // Unhappy from -3
     expect(amenityTier(-4).name).toBe('Unhappy');

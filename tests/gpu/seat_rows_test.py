@@ -187,22 +187,26 @@ def test_happy_rows(rules, path) -> None:
     sim = fresh(rules, path)
     tiers = sim.rules.amenity_tiers
     ecstatic, happy = 0, 1
-    assert tiers[happy][0] == 1 and tiers[ecstatic][0] == 3, "the tier order moved"
+    assert tiers[happy][0] == 3 and tiers[ecstatic][0] == 5, "the tier order moved"
+
+    imp = RULES["improvements"]["ids"].index("PLANTATION")
 
     def give_luxuries(sim, n: int) -> None:
-        """Improved luxuries on this row's own ground — the amenity source
-        `luxuryAmenities` ranks, so the tier follows the count."""
-        seen: set[int] = set()
+        """N distinct improved luxuries on this row's own ground (no luxury
+        anywhere else) — the amenity source `luxuryAmenities` ranks, so the
+        tier follows the count."""
         for t in range(sim.T):
-            if len(seen) >= n:
-                break
-            k = int(sim.lux_id[B0, t])
-            if k < 0 or k in seen or int(sim.tile_seat[B0, t]) != 0:
-                continue
-            sim.improvement[B0, t] = int(sim.lux_req[B0, t])
+            sim.lux_id[B0, t] = -1
+        own = [t for t in range(sim.T) if int(sim.tile_seat[B0, t]) == 0
+               and int(sim.district[B0, t]) < 0]
+        assert len(own) >= n, f"the row owns {len(own)} plain tiles, the scene wants {n}"
+        for k, t in enumerate(own[:n]):
+            sim.lux_id[B0, t] = k
+            sim.lux_req[B0, t] = imp
+            sim.improvement[B0, t] = imp
             sim.pillaged[B0, t] = False
-            seen.add(k)
         sim._eff_version += 1
+        sim._gen_ver += 1
 
     def sci_and_tier(name, pop: int, lux_add: int) -> tuple[float, int]:
         s2 = fresh(rules, path)
@@ -213,16 +217,17 @@ def test_happy_rows(rules, path) -> None:
         sci = float(s2._seat_city_walk(0, amen_yf=s2._seat_amenity(0)[2])[B0, 0, 3])
         return sci, tier
 
-    seen_tier = False
-    for pop, lux in ((6, 0), (6, 2), (6, 4), (1, 0), (1, 4)):
+    reached = []
+    for pop, lux in ((6, 0), (6, 2), (6, 4), (6, 7), (1, 0), (1, 4), (1, 6)):
         base, t_base = sci_and_tier("ROME", pop, lux)
+        reached.append((pop, lux, t_base))
         scot, t_scot = sci_and_tier("SCOTLAND", pop, lux)
         assert t_base == t_scot, "the roster row moved the TIER itself"
         want = 1.05 if t_base == happy else 1.1 if t_base == ecstatic else 1.0
         assert abs(scot - base * want) < 1e-9, f"tier {t_base} paid {scot / base if base else 0}"
-        if t_base in (happy, ecstatic):
-            seen_tier = True
-    assert seen_tier, "no scene reached Happy or Ecstatic — the rows went unmeasured"
+    tiers_seen = {t for _, _, t in reached}
+    assert {happy, ecstatic} <= tiers_seen, \
+        f"a scene missed Happy or Ecstatic — the rows went unmeasured (pop, luxuries, tier): {reached}"
     print("  6 happiness rows OK — 5% Happy and 10% Ecstatic on Science, Content untouched")
 
 

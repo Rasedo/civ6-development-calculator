@@ -246,18 +246,19 @@ export interface AmenityTier {
 }
 
 /** Tier from amenity balance (have - needed). CIV6 (`Happinesses`, all seven
- * rows): `MinimumAmenityScore` is `min`, `GrowthModifier` and
- * `NonFoodYieldModifier` are the two factors as 1 + pct/100 — Ecstatic 3+,
- * Happy 1..2, Content 0, Displeased −1..−2, Unhappy −3..−4, Unrest −5..−6,
- * Revolt −7 and below. The rows' `RebellionPoints` are not modelled. */
+ * rows, as `Expansion2_Buildings.xml`'s updates leave them):
+ * `MinimumAmenityScore` is `min`, `GrowthModifier` and `NonFoodYieldModifier`
+ * are the two factors as 1 + pct/100 — Ecstatic 5+, Happy 3..4, Content
+ * 0..2, Displeased −1..−2, Unhappy −3..−4, Unrest −5..−6, Revolt −7 and
+ * below. The rows' `RebellionPoints` are not modelled. */
 export const AMENITY_TIERS: readonly (AmenityTier & { min: number })[] = [
-  { min: 3, name: 'Ecstatic', growthFactor: 1.2, yieldFactor: 1.1 },
-  { min: 1, name: 'Happy', growthFactor: 1.1, yieldFactor: 1.05 },
+  { min: 5, name: 'Ecstatic', growthFactor: 1.2, yieldFactor: 1.2 },
+  { min: 3, name: 'Happy', growthFactor: 1.1, yieldFactor: 1.1 },
   { min: 0, name: 'Content', growthFactor: 1, yieldFactor: 1 },
-  { min: -2, name: 'Displeased', growthFactor: 0.85, yieldFactor: 0.95 },
-  { min: -4, name: 'Unhappy', growthFactor: 0.7, yieldFactor: 0.9 },
+  { min: -2, name: 'Displeased', growthFactor: 0.85, yieldFactor: 0.9 },
+  { min: -4, name: 'Unhappy', growthFactor: 0.7, yieldFactor: 0.8 },
   { min: -6, name: 'Unrest', growthFactor: 0, yieldFactor: 0.7 },
-  { min: -999, name: 'Revolt', growthFactor: 0, yieldFactor: 0.4 },
+  { min: -999, name: 'Revolt', growthFactor: 0, yieldFactor: 0.6 },
 ];
 
 export function amenityTier(balance: number): AmenityTier {

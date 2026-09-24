@@ -66,14 +66,14 @@ describe('the Scottish Enlightenment', () => {
     const contentPlain = yieldsOf(seatRow('AMERICA'), 0);
     expect(contentScot.tier).toBe('Content');
     expect(contentScot.science).toBeCloseTo(contentPlain.science, 9);
-    const happyScot = yieldsOf(seatRow('SCOTLAND'), 1);
-    const happyPlain = yieldsOf(seatRow('AMERICA'), 1);
+    const happyScot = yieldsOf(seatRow('SCOTLAND'), 3);
+    const happyPlain = yieldsOf(seatRow('AMERICA'), 3);
     expect(happyScot.tier).toBe('Happy');
     expect(happyScot.science).toBeCloseTo(happyPlain.science * 1.05, 9);
     expect(happyScot.production).toBeCloseTo(happyPlain.production * 1.05, 9);
     expect(happyScot.gold).toBeCloseTo(happyPlain.gold, 9); // an unnamed yield is untouched
-    const ecstaticScot = yieldsOf(seatRow('SCOTLAND'), 3);
-    const ecstaticPlain = yieldsOf(seatRow('AMERICA'), 3);
+    const ecstaticScot = yieldsOf(seatRow('SCOTLAND'), 5);
+    const ecstaticPlain = yieldsOf(seatRow('AMERICA'), 5);
     expect(ecstaticScot.tier).toBe('Ecstatic');
     expect(ecstaticScot.science).toBeCloseTo(ecstaticPlain.science * 1.1, 9);
   });
@@ -94,10 +94,10 @@ describe('the Scottish Enlightenment', () => {
       giveLuxuries(state, city, luxuries);
       return greatPersonPointsPerTurn(state, 0).SCIENTIST;
     };
-    const plain = pointsOf(seatRow('AMERICA'), 1);
-    expect(pointsOf(seatRow('SCOTLAND'), 1)).toBe(plain + 1);   // Happy
-    expect(pointsOf(seatRow('SCOTLAND'), 3)).toBe(plain + 2);   // Ecstatic
-    expect(pointsOf(seatRow('SCOTLAND'), 0)).toBe(plain); // Content pays nothing
+    const plain = pointsOf(seatRow('AMERICA'), 3);
+    expect(pointsOf(seatRow('SCOTLAND'), 3)).toBe(plain + 1);   // Happy
+    expect(pointsOf(seatRow('SCOTLAND'), 5)).toBe(plain + 2);   // Ecstatic
+    expect(pointsOf(seatRow('SCOTLAND'), 2)).toBe(pointsOf(seatRow('AMERICA'), 2)); // Content pays nothing
   });
 });
 

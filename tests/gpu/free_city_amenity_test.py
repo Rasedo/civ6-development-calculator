@@ -39,7 +39,7 @@ def test_wire(rules, path) -> None:
     tiers = sim.rules.amenity_tiers
     assert len(tiers) == 7, f"the Happinesses table has seven rows, the wire {len(tiers)}"
     assert [t[0] for t in tiers[3:]] == [-2, -4, -6, -999], "Displeased -1..-2, Unhappy -3..-4, Unrest -5..-6, Revolt"
-    assert tiers[UNREST][1:] == (0, 0.7) and tiers[6][1:] == (0, 0.4), "Unrest -100%/-30%, Revolt -100%/-60%"
+    assert tiers[UNREST][1:] == (0, 0.7) and tiers[6][1:] == (0, 0.6), "Unrest -100%/-30%, Revolt -100%/-40%"
     assert [float(x) for x in sim._loyalty_amenity] == [6, 3, 0, -3, -6, -6, -6]
     print("  1 the wire OK — need per 2 citizens, seven tiers, seven loyalty rows")
 
