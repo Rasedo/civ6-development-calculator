@@ -20,8 +20,8 @@ import { MP_SCALE, RAILROAD_COST, RAILROAD_TECH } from '../data/constants';
 import { IMPROVEMENTS } from '../data/improvements';
 import { droughtBars } from '../data/disasters';
 import {
-  AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, NUKE_COLS, SPY_MISSIONS, SPY_TRAVEL_COLS, buildColumnOf,
-  unitActionIndex,
+  AIR_DEPLOY_COLS, AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, NUKE_COLS, SPY_MISSIONS, SPY_TRAVEL_COLS,
+  buildColumnOf, unitActionIndex,
 } from './unitActions';
 import {
   artifactHome, borderClosedTo, canCleanFallout, canUpgradeUnit, cliffBlocksStep, concertVenue, digUnderfoot,
@@ -34,7 +34,9 @@ import {
 } from './seats';
 import { attacksLeftOf, promoAvailable, promoFlag, promoReady, promoValue } from './promotions';
 import { cityStateAttackable, nukeTargets, siegeMayShoot } from './combat';
-import { airPillageFit, airRange, airStrikeTargets, isAirUnit, rebaseTargets } from './air';
+import {
+  airPillageFit, airRange, airStrikeTargets, deployTargets, isAirUnit, priorityTargets, rebaseTargets,
+} from './air';
 import { computeUnlocks, getModifiers, isCivicComplete } from './effects';
 import {
   PORTAL_MP, adjacentPlotRowOk, adjacentPlotTarget, canBuildRailroad, canBuildRoad, canRemoveFeature, portalAt,
@@ -94,6 +96,9 @@ const A_REMOVE_IMP = col('REMOVE_IMPROVEMENT');
 const A_HARVEST = col('HARVEST');
 const A_WONDER_CHARGE = col('WONDER_CHARGE');
 const A_PORTAL = col('PORTAL');
+const A_DEPLOY = col('DEPLOY_0');
+const A_RETURN_TO_BASE = col('RETURN_TO_BASE');
+const A_PRIORITY_TARGET = col('PRIORITY_TARGET_0');
 
 /** the roster's Settler and Naturalist: the first unit carrying the flag */
 const SETTLER_ID = Object.values(UNITS).find((u) => u.settler)?.id;
@@ -448,6 +453,13 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
       }
     }
     rebaseTargets(state, u, AIR_REBASE_COLS).forEach((_t, k) => out.add(A_REBASE + k));
+    // PATROL: a fighter's deployment hexes, and the way back to its base.
+    deployTargets(state, u, AIR_DEPLOY_COLS).forEach((_t, k) => out.add(A_DEPLOY + k));
+    if (u.patrol !== undefined) out.add(A_RETURN_TO_BASE);
+    // PRIORITY TARGET: the Support units in operational range.
+    if (attacksLeftOf(u) > 0) {
+      priorityTargets(state, u, AIR_STRIKE_COLS).forEach((_t, k) => out.add(A_PRIORITY_TARGET + k));
+    }
   }
   // SPY: an idle spy's destinations and the missions it may start here.
   if (isSpy(u.type) && spyIdle(u)) {

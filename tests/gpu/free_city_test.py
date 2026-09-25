@@ -22,6 +22,12 @@ the proof.
      pull is highest; its slot compacts away
   5. anyone may attack it without a declaration — no war opens
   6. a Free City heals in its own phase and presses on its neighbours
+  7. the world era's melee pair on the flip turn, then a drawn unit every
+     fifth of the city's turns
+  8. its flat defence and a walled Free City's strike
+  9. its units defend and bank no experience
+  10. its treasury banks its cities' Gold and pays its units' upkeep, goes
+     bankrupt as any seat does, and a join takes the city's grants
 """
 
 from __future__ import annotations
@@ -305,40 +311,105 @@ def free_units(sim) -> list[tuple[int, int, int]]:
 def test_grants(rules, path) -> None:
     sim = fresh(rules, path)
     t0 = int(sim.turn)
+    # the wire: the pair and each class's chassis era by era (`eraUnitOfClass`)
+    assert (sim._free_pair_n, sim._free_grant_period) == (2, 5), "the wire's grant rows"
+    assert [UNI[int(x)] for x in sim._free_pair] == [
+        "WARRIOR", "SWORDSMAN", "MAN_AT_ARMS", "MUSKETMAN", "LINE_INFANTRY",
+        "INFANTRY", "INFANTRY", "MECHANIZED_INFANTRY", "MECHANIZED_INFANTRY"], sim._free_pair
+    assert [UNI[int(x)] if int(x) >= 0 else None for x in sim._free_grant_units[0]] == [
+        None, "HORSEMAN", "COURSER", "COURSER", "CAVALRY", "CAVALRY", "HELICOPTER", "HELICOPTER", "HELICOPTER"]
+    era = int(sim._world_era()[B0].clamp(min=0))
+    pair = int(sim._free_pair[era])
     centre = revolt(sim)
     col = free_slot(sim, centre)
     F = sim.FREE_ROW
-    maa, xbow = UNI.index("MAN_AT_ARMS"), UNI.index("CROSSBOWMAN")
-    assert (sim._free_grant_melee, sim._free_grant_melee_n, sim._free_grant_ranged, sim._free_grant_turns) \
-        == (maa, 2, xbow, 5), "the wire's grant rows"
+    cid = int(sim.city_id[B0, F, col])
     assert int(sim.city_freed_turn[B0, F, col]) == t0
-    # the melee pair exists on the flip turn itself, on the first free land
-    # tiles beside the centre in direction order, in the hostile pool
+    # the world era's melee pair exists on the flip turn itself, on the first
+    # free land tiles beside the centre in direction order, in the hostile
+    # pool, each remembering the city that granted it
     units = free_units(sim)
-    assert [u[1] for u in units] == [maa, maa], units
+    assert [u[1] for u in units] == [pair, pair], units
     nbs = [int(n) for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n])]
     assert [u[2] for u in units] == nbs[:2], (units, nbs)
     lo = sim.POOL_LO["barb"]
     assert all(s >= lo for s, _t, _p in units), "a Free Cities unit left the hostile pool"
     assert all(int(sim.unit_xp[B0, s]) == 0 for s, _t, _p in units)
+    assert all(int(sim.unit_free_city[B0, s]) == cid for s, _t, _p in units)
     sim._check_seat_invariant()
-    # it trains nothing: nothing arrives until the grant falls due, then once
-    for k in range(1, 5):
+    # it trains nothing: nothing arrives until the city's fifth turn...
+    for k in range(1, 4):
         sim.turn = t0 + k
         sim._free_cities_phase()
         assert len(free_units(sim)) == 2, (k, free_units(sim))
-    sim.turn = t0 + 5
+    # ...then one, of a class the era has a chassis for, drawn...
+    open_ = {int(x) for x in sim._free_grant_units[:, era].tolist() if int(x) >= 0}
+    rng0 = int(sim.rng_state[B0])
+    sim.turn = t0 + 4
     sim._free_cities_phase()
     got = free_units(sim)
-    assert sorted(u[1] for u in got) == sorted([maa, maa, xbow]), got
-    sim.turn = t0 + 6
+    assert len(got) == 3 and got[2][1] in open_, got
+    assert int(sim.rng_state[B0]) != rng0, "the grant drew nothing"
+    assert int(sim.unit_free_city[B0, got[2][0]]) == cid
+    # ...and every fifth turn after, while the city stays Free
+    sim.turn = t0 + 5
     sim._free_cities_phase()
     assert len(free_units(sim)) == 3
+    sim.turn = t0 + 9
+    sim._free_cities_phase()
+    assert len(free_units(sim)) == 4
     # no barbarian rule walks them: the raid never moves a Free Cities unit
     before = free_units(sim)
     sim._barbarian_phase()
     assert free_units(sim) == before, "a barbarian walk moved a Free Cities unit"
-    print("  7 the grants OK — two Men-at-Arms on the flip turn, a Crossbowman five turns later, never walked")
+    print("  7 the grants OK — the era's melee pair on the flip turn, a drawn unit every fifth turn, never walked")
+
+
+def test_treasury_and_join(rules, path) -> None:
+    sim = fresh(rules, path)
+    centre = revolt(sim)
+    col = free_slot(sim, centre)
+    F = sim.FREE_ROW
+    assert sim._treasury_of(F).data_ptr() == sim.free_treasury.data_ptr()
+    granted = [s for s, _t, _p in free_units(sim)]
+    granted_at = [p for _s, _t, p in free_units(sim)]
+    # a Free Cities unit no city granted, away from the city, dearer than
+    # any pair
+    horse = UNI.index("TANK")
+    far = spot_at(sim, centre, 6)
+    one = torch.tensor([True])
+    sim._spawn_barb(one, torch.tensor([far]), horse, ladder=False, seat=FREE_SEAT)
+    other = [s for s, _t, _p in free_units(sim) if s not in granted]
+    assert len(other) == 1 and int(sim.unit_free_city[B0, other[0]]) == -1
+    # ITS TREASURY banks its cities' Gold and pays its units' upkeep
+    sim.free_treasury[B0] = 50.0
+    _t, _g, yf, _l = sim._seat_amenity(F)
+    gold = float(sim._seat_city_walk(F, amen_yf=yf, maint=sim._seat_housing(F)[0])[B0, :, 2].sum())
+    mine = sim.unit_alive[B0] & (sim.unit_seat[B0] == FREE_SEAT)
+    upkeep = float((sim._unit_upkeep(F, sim.unit_type)[B0] * mine.double()).sum())
+    assert upkeep > 0, "the Tank costs the seat nothing"
+    sim._free_cities_phase()
+    assert abs(float(sim.free_treasury[B0]) - (50.0 + gold - upkeep)) < 1e-9, \
+        (float(sim.free_treasury[B0]), gold, upkeep)
+    # ...and goes bankrupt as any seat does: at -10 the priciest unit goes
+    sim.free_treasury[B0] = -10.0
+    sim._bankrupt_disband(F)
+    assert not bool(sim.unit_alive[B0, other[0]]), "the Tank, the priciest, should have gone"
+    assert all(bool(sim.unit_alive[B0, s]) for s in granted), "a cheaper unit was disbanded"
+    sim.free_treasury[B0] = 50.0
+    # a JOIN takes the city's grants with it; another Free Cities unit stays
+    sim._spawn_barb(one, torch.tensor([far]), horse, ladder=False, seat=FREE_SEAT)
+    stay = [s for s, _t, _p in free_units(sim) if s not in granted]
+    sim.city_free_press[B0, F, col, 1] = 10_000.0
+    sim.city_loyalty[B0, F, col] = 0.0
+    sim._free_city_loyalty = -1000.0  # hold it at 0 whatever pulls today
+    sim._free_cities_phase()
+    assert int(sim.tile_seat[B0, centre]) == 1, "the Free City did not join"
+    assert not any(bool(sim.unit_alive[B0, s]) for s in granted), "the joined city's grants stayed"
+    assert all(bool(sim.unit_alive[B0, s]) and int(sim.unit_seat[B0, s]) == FREE_SEAT for s in stay)
+    assert all(int(sim.military_at[B0, t]) != s for s, t in zip(granted, granted_at)), "a grant still holds its tile"
+    sim._check_seat_invariant()
+    print("  10 the treasury and the join OK — Gold in, upkeep out, bankrupt as any seat; a join takes its grants")
 
 
 def test_defence_and_strike(rules, path) -> None:
@@ -408,6 +479,7 @@ def main() -> int:
     test_grants(rules, path)
     test_defence_and_strike(rules, path)
     test_free_unit_defends(rules, path)
+    test_treasury_and_join(rules, path)
     print("BATTERY OK free_city")
     return 0
 

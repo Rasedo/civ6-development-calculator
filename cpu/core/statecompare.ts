@@ -74,7 +74,7 @@ import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN, MINOR_BUILD_ROWS } from '../data/cityStates';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
@@ -180,6 +180,7 @@ const beliefIdx = (pool: Record<string, unknown>) => new Map(Object.keys(pool).m
 const PANTHEON_IDX = beliefIdx(PANTHEONS);
 const FOLLOWER_IDX = beliefIdx(FOLLOWER_BELIEFS);
 const FOUNDER_IDX = beliefIdx(FOUNDER_BELIEFS);
+const WORSHIP_IDX = beliefIdx(WORSHIP_BELIEFS);
 const ENHANCER_IDX = beliefIdx(ENHANCER_BELIEFS);
 
 const idx = (m: Map<string, number>, id: string | null | undefined): number =>
@@ -365,7 +366,6 @@ const GAME: Record<string, Extractor> = {
   roadTier: (s) => [s.roadTier ?? 0],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],
-  enhancerBeliefsClaimed: (s) => [(s.claimedEnhancers ?? []).length],
   // one flat row: each class's claimed list behind its LENGTH (the lists
   // vary), then the offer, price and passed-by vectors (one per class)
   greatPeopleByClass: (s) => {
@@ -386,6 +386,8 @@ const GAME: Record<string, Extractor> = {
   climatePhase: (s) => [s.climateIdx ?? -1],
   removableAtStart: (s) => [s.removableAtStart ?? 0],
   iceAtStart: (s) => [s.iceAtStart ?? 0],
+  // the Free Cities seat's treasury: 0 until its first revolt makes the seat
+  freeTreasury: (s) => [s.freeSeat?.treasury ?? 0],
 };
 
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {
@@ -517,11 +519,13 @@ const SEAT: Record<string, Extractor> = {
   holyTile: overSeats((s) => s.religion.holyTile ?? -1),
   religionFounded: overSeats((s) => (s.religion.founded ? 1 : 0)),
   inquisition: overSeats((s) => (s.religion.inquisition ? 1 : 0)),
-  // The GPU carries a DONE bit per belief race beside the chosen id; this side
-  // gates on the id being set. Comparing them is what would show the two
-  // coming apart (a seat that has spent its pick but holds no belief).
+  // The GPU carries a DONE bit beside the chosen pantheon; this side gates on
+  // the id being set. Comparing them is what would show the two coming apart
+  // (a seat that has spent its pick but holds no belief).
   pantheonDone: overSeats((s) => (s.religion.pantheon !== null ? 1 : 0)),
-  enhancerDone: overSeats((s) => ((s.religion.enhancer ?? null) !== null ? 1 : 0)),
+  // the religion's enhancement, latched once: an Enhancer belief may arrive
+  // at the founding, so the belief ids do not say it
+  religionEnhanced: overSeats((s) => (s.religion.enhanced ? 1 : 0)),
   gpPoints: overSeats((s) => GP_CLASSES.map((c) => s.gpp[c] ?? 0)),
   projectsDone: overSeats((s) => s.projectsDone.length),
   wmd: overSeats((s) => (s.wmd ?? []).reduce((n, x) => n + x, 0)),
@@ -561,6 +565,7 @@ const SEAT: Record<string, Extractor> = {
   beliefPantheon: overSeats((s) => idx(PANTHEON_IDX, s.religion.pantheon)),
   beliefFollower: overSeats((s) => idx(FOLLOWER_IDX, s.religion.follower)),
   beliefFounder: overSeats((s) => idx(FOUNDER_IDX, s.religion.founder)),
+  beliefWorship: overSeats((s) => idx(WORSHIP_IDX, s.religion.worship)),
   beliefEnhancer: overSeats((s) => idx(ENHANCER_IDX, s.religion.enhancer)),
   scienceTotal: overSeats((s) => s.scienceTotal),
   nextCityId: overSeats((s) => s.nextCityId),
@@ -740,8 +745,8 @@ const CITY: Record<string, Extractor> = {
     const p = r.city.freePressure ?? [];
     return civSeats(st).map((_s, g) => p[g] ?? 0);
   }),
-  // the turn a FREE CITY revolted, which its ranged grant counts from; -1 for
-  // a city that is not Free
+  // the turn a FREE CITY revolted, which its grants count from; -1 for a
+  // city that is not Free
   freedTurn: overCities((r) => (isFreeSeat(r.city.seat) ? r.city.foundedTurn : -1)),
   // every layout slot's work — object, maker, era, civilization; -1s for an
   // empty slot — which is what the theming rules and the yields read.
@@ -779,6 +784,7 @@ const UNIT_G: Record<string, Extractor> = {
   levied: overUnits((u) => (u.levied ? 1 : 0)),
   formation: overUnits((u) => u.formation ?? 0),
   escorted: overUnits((u) => (u.escorted ? 1 : 0)),
+  patrol: overUnits((u) => u.patrol ?? -1),
   spyMission: overUnits((u) => u.spyMission ?? SPY_IDLE),
   spyTurns: overUnits((u) => u.spyTurns ?? 0),
   spyTarget: overUnits((u) => u.spyTarget ?? -1),
@@ -786,6 +792,7 @@ const UNIT_G: Record<string, Extractor> = {
   bandLevel: overUnits((u) => u.bandLevel ?? 0),
   bandAlbum: overUnits((u) => u.bandAlbum ?? 0),
   gpAt: overUnits((u) => u.gpAt ?? -1),
+  freeCity: overUnits((u) => u.freeCity ?? -1),
 };
 
 const TILE: Record<string, Extractor> = {

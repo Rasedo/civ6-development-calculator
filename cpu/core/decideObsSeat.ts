@@ -9,9 +9,12 @@ import { congressSessionDue, congressVoter, dvLeader, preference, specialSession
 import { CONGRESS_DV_MIN_ERA, CONGRESS_VOTE_STEP } from '../data/seats';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { siloTargets } from './combat';
+import { canEnhanceReligion, canFoundReligion, openBeliefs } from './game';
+import { BELIEF_CATALOGS, BELIEF_SLOTS } from '../data/religion';
 
 /**
- * THE SEAT SCALARS (the silo launch, envoys, congress, the Great Person pass).
+ * THE SEAT SCALARS (the silo launch, envoys, congress, the Great Person pass,
+ * the religion's beliefs).
  *
  * The per-seat groups of the neutral observation this module emits, by the
  * GROUP NAME the GPU's `gpu/core/neutral.py` `seat_obs` uses for the same
@@ -83,9 +86,33 @@ function gpGroup(state: GameState, seat: number): Record<string, number[]> {
   };
 }
 
+/** The `belief` group: whether the seat may found or enhance its religion
+ *  now (`canFoundReligion` / `canEnhanceReligion`), the class catalog row its
+ *  religion holds per class (-1 none), and each class's open beliefs. */
+function beliefGroup(state: GameState, seat: number): Record<string, unknown> {
+  const rel = seatOf(state, seat)?.religion;
+  const open = (c: number) => {
+    const ids = Object.keys(BELIEF_CATALOGS[c]);
+    return openBeliefs(state, c).map((id) => ids.indexOf(id));
+  };
+  return {
+    found: canFoundReligion(state, seat).ok,
+    enhance: canEnhanceReligion(state, seat).ok,
+    held: BELIEF_SLOTS.map((slot, c) => {
+      const id = rel?.[slot];
+      return id ? Object.keys(BELIEF_CATALOGS[c]).indexOf(id) : -1;
+    }),
+    follower: open(0),
+    worship: open(1),
+    founder: open(2),
+    enhancer: open(3),
+  };
+}
+
 export const SEAT_GROUPS: Record<string, SeatEmitter> = {
   nuke: nukeGroup,
   envoy: envoyGroup,
   congress: congressGroup,
   gp: gpGroup,
+  belief: beliefGroup,
 };

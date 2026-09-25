@@ -18,7 +18,7 @@ import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, awardDefenseXp, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoClassOf, promoValue, takePromotion } from './promotions';
-import { PROMO_COLS } from '../data/promotions';
+import { PROMO_COLS, UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
@@ -39,10 +39,10 @@ import { prodLayout } from './prodLayout';   // ONE column layout, shared with t
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { UNITS, UNIT_TYPE_IDX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
+import { UNITS, UNIT_TYPE_IDX, UNIT_ERA_INDEX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
 import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
-import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
+import { PANTHEONS, PANTHEON_FAITH_COST } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings } from './yields';
 import type { CityStats } from './city';
@@ -62,10 +62,10 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
 import { killUnit } from './combat';
-import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost } from './game';
+import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
-import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
-import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
+import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
+import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
 import { beginMission, beginTravel, isSpy, spyDestinations, tickSpies, tickSpyEffects } from './espionage';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
@@ -75,6 +75,9 @@ const A_AIR_STRIKE = unitActionIndex(IMPROVEMENT_IDS).AIR_STRIKE_0;
 const A_NUKE = unitActionIndex(IMPROVEMENT_IDS).NUKE_0_0;
 const A_REBASE = unitActionIndex(IMPROVEMENT_IDS).REBASE_0;
 const A_AIR_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).AIR_PILLAGE_0;
+const A_DEPLOY = unitActionIndex(IMPROVEMENT_IDS).DEPLOY_0;
+const A_RETURN_TO_BASE = unitActionIndex(IMPROVEMENT_IDS).RETURN_TO_BASE;
+const A_PRIORITY_TARGET = unitActionIndex(IMPROVEMENT_IDS).PRIORITY_TARGET_0;
 const A_SPY_TRAVEL = unitActionIndex(IMPROVEMENT_IDS).SPY_TRAVEL_0;
 const A_SPY_MISSION = unitActionIndex(IMPROVEMENT_IDS).SPY_MISSION_0;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
@@ -101,14 +104,14 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_GRANT_MELEE, FREE_CITY_GRANT_MELEE_COUNT, FREE_CITY_GRANT_RANGED, FREE_CITY_GRANT_RANGED_TURNS, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { addEraScore, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
-import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -670,27 +673,102 @@ export function flipCity(state: GameState, city: City): void {
   const free = freeSeatOf(state);
   transferCity(state, city.seat, free, city, 'revolted');
   const freed = free.cities[free.cities.length - 1];
-  for (let k = 0; k < FREE_CITY_GRANT_MELEE_COUNT; k++) grantFreeCityUnit(state, freed, FREE_CITY_GRANT_MELEE);
+  const pair = eraUnitOfClass('MELEE', Math.max(0, worldEraIndex(state)));
+  if (pair) for (let k = 0; k < FREE_CITY_PAIR_COUNT; k++) grantFreeCityUnit(state, freed, pair);
 }
 
-/** A FREE CITY's granted defender. The Free Cities player trains no unit —
- *  its queue holds buildings — yet a revolt hands it `FREE_CITY_GRANT_MELEE`
- *  twice on the flip turn itself and `FREE_CITY_GRANT_RANGED` a fixed number
- *  of turns later. Each stands on the first free land tile beside the centre,
- *  in direction order; with none free it is not granted. The units stand
- *  where they are put: they defend, block and heal, and never move. */
+/** THE ERA'S CHASSIS of a promotion class: the class's generic land chain (no
+ *  civilization's unique, no hull, no plane) from the chassis nothing
+ *  upgrades into, followed up its upgrades while the next one's era — the era
+ *  of the tech or civic that unlocks it (`UNIT_ERA_INDEX`) — is at or below
+ *  `era`. Null where even the chain's first chassis comes later. */
+export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
+  const chain = Object.values(UNITS).filter((d) =>
+    UNIT_PROMO_CLASS[d.id] === cls && !d.uniqueTo && !d.naval && !d.air);
+  let d = chain.find((c) => !chain.some((o) => o.upgradesTo === c.id));
+  let at: string | null = null;
+  while (d && UNIT_ERA_INDEX[d.id] <= era) {
+    at = d.id;
+    const next = d.upgradesTo;
+    d = chain.find((c) => c.id === next);
+  }
+  return at;
+}
+
+/** A FREE CITY's granted unit. The Free Cities player's revolt hands it
+ *  `FREE_CITY_PAIR_COUNT` of the world era's melee on the flip turn, and
+ *  every `FREE_CITY_GRANT_PERIOD`th of its turns while it stays Free one more
+ *  (`freeCityGrantType`). Each stands on the first free land tile beside the
+ *  centre, in direction order; with none free it is not granted. The unit
+ *  remembers the city that granted it (`Unit.freeCity`): when that city
+ *  joins a civilization, the grant goes (`joinFromFreeCity`). The units
+ *  stand where they are put: they defend, block and heal, and never move. */
 function grantFreeCityUnit(state: GameState, city: City, unitType: string): void {
   const probe = { type: unitType, seat: FREE_SEAT };
   const spot = neighbors(state.map, state.map.tiles[city.centerIndex])
     .find((t) => tileFreeForUnit(state, t.index, FREE_SEAT, probe));
-  if (spot) spawnUnit(state, unitType, spot.index, FREE_SEAT);
+  if (!spot) return;
+  const u = spawnUnit(state, unitType, spot.index, FREE_SEAT);
+  if (u) u.freeCity = city.id;
+}
+
+/** A recurring grant's chassis: ONE draw over `FREE_CITY_GRANT_WEIGHTS`
+ *  among the classes the world era has a chassis for, in table order —
+ *  `pick` in [0, their weights' sum) names the first class whose running sum
+ *  exceeds it — and that class's chassis of the era (`eraUnitOfClass`). The
+ *  draw is taken whether or not a tile is free for the unit. */
+function freeCityGrantType(state: GameState): string | null {
+  const era = Math.max(0, worldEraIndex(state));
+  const open: [string, number][] = [];
+  FREE_CITY_GRANT_CLASSES.forEach((cls, i) => {
+    const id = eraUnitOfClass(cls, era);
+    if (id) open.push([id, FREE_CITY_GRANT_WEIGHTS[i]]);
+  });
+  const total = open.reduce((s, [, w]) => s + w, 0);
+  if (total <= 0) return null;
+  const pick = Math.floor(nextRandom(state) * total);
+  let run = 0;
+  for (const [id, w] of open) {
+    run += w;
+    if (pick < run) return id;
+  }
+  return null;
+}
+
+/** BANKRUPTCY'S DISBANDS for `seat` this turn, off the treasury its upkeep
+ *  left: `bankruptDisbands` units, each the priciest still standing, a TIE to
+ *  the EARLIEST in `state.units` — spawn order, the one order both engines
+ *  own (the GPU's pool appends, so its lowest slot is the same unit). The
+ *  lowest UNIT ID is not spawn order for a unit the seat re-seated: a
+ *  converted barbarian keeps its barbarian-era id, lower than anything the
+ *  seat owns (seed 9053 t164). A unit that costs nothing is never taken, and
+ *  nothing is refunded. */
+export function bankruptDisband(state: GameState, seat: number, mods: ReturnType<typeof getModifiers>): void {
+  const n = bankruptDisbands(seatOf(state, seat)?.treasury ?? 0);
+  for (let k = 0; k < n; k++) {
+    let victim: Unit | undefined;
+    let vm = 0;
+    for (const u of state.units) {
+      if (u.seat !== seat) continue;
+      const m = unitUpkeep(mods, u.type);
+      if (m <= 0) continue;
+      if (!victim || m > vm) {
+        victim = u;
+        vm = m;
+      }
+    }
+    if (!victim) return;
+    disbandUnit(state, victim.id);
+  }
 }
 
 /** A Free City at 0 loyalty JOINS a seat. CIV6: "it will join the
  *  Civilization that has exerted the most Loyalty pressure on it since the
  *  Free City became independent" — the `freePressure` race, ties to the
  *  lowest seat id. A seat that pulled nothing, or holds no city any more,
- *  takes nothing; with no taker the city stays Free at 0. */
+ *  takes nothing; with no taker the city stays Free at 0. On a join the units
+ *  the city was GRANTED go the same turn, in `state.units` order; any other
+ *  Free Cities unit stays Free (measured: C-60). */
 function joinFromFreeCity(state: GameState, city: City): void {
   const race = city.freePressure ?? [];
   let winner: Seat | null = null;
@@ -704,6 +782,7 @@ function joinFromFreeCity(state: GameState, city: City): void {
     }
   }
   if (!winner) return;
+  for (const u of state.units.filter((x) => x.seat === FREE_SEAT && x.freeCity === city.id)) disbandUnit(state, u.id);
   transferCity(state, FREE_SEAT, winner, city, 'joined');
 }
 
@@ -711,11 +790,13 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  amenities are the ordinary composer's over the Free Cities seat — the full
  *  need of its population, the supply of what that seat holds (its own
  *  luxuries, buildings and districts; no government, policy or governor) —
- *  and the tier is recorded off a loop-top snapshot of every Free City. Then
- *  each takes its ranged grant on the turn it falls due, fires the ranged
- *  strikes any walled city fires, heals as any unbesieged city does and runs
- *  `freeCityLoyaltyDelta`; the ones that reach 0 join their race's winner, in
- *  array order, after the walk. */
+ *  and the tier is recorded off a loop-top snapshot of every Free City. Its
+ *  treasury banks the Gold those same stats make, in array order, then pays
+ *  its units' upkeep and meets the bankruptcy that upkeep may force — the
+ *  majors' own order. Then each city takes its grant when one falls due,
+ *  fires the ranged strikes any walled city fires, heals as any unbesieged
+ *  city does and runs `freeCityLoyaltyDelta`; the ones that reach 0 join
+ *  their race's winner, in array order, after the walk. */
 export function freeCitiesPhase(state: GameState): void {
   const free = state.freeSeat;
   if (!free || free.cities.length === 0) return;
@@ -724,13 +805,25 @@ export function freeCitiesPhase(state: GameState): void {
   ageReactors(free.cities);
   const luxMap = luxuryAmenities(state, FREE_SEAT);
   const mods = getModifiers(state, FREE_SEAT);
-  const tiers = free.cities.map((city) => amenityTierIndex(computeCityStats(state, city, luxMap, mods).amenities.tier.name));
-  free.cities.forEach((city, i) => { city.amenityTier = tiers[i]; });
+  const stats = free.cities.map((city) => computeCityStats(state, city, luxMap, mods));
+  free.cities.forEach((city, i) => { city.amenityTier = amenityTierIndex(stats[i].amenities.tier.name); });
+  let income = 0;
+  for (const s of stats) income += s.total.gold;
+  free.treasury += income;
+  const upkeep = state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u.type) : 0), 0);
+  const _dlu = (globalThis as { __diffLog?: string[] }).__diffLog;
+  if (_dlu) _dlu.push(`up:${FREE_SEAT}:${state.turn}`
+    + ` n${state.units.filter((u) => u.seat === FREE_SEAT).length}`
+    + ` cost${upkeep.toFixed(3)} purse${free.treasury.toFixed(3)}`);
+  free.treasury -= upkeep;
+  bankruptDisband(state, FREE_SEAT, mods);
   const joiners: City[] = [];
   for (const city of [...free.cities]) {
-    // `foundedTurn` is the revolt's turn: the transfer that made it Free wrote it
-    if (state.turn === city.foundedTurn + FREE_CITY_GRANT_RANGED_TURNS) {
-      grantFreeCityUnit(state, city, FREE_CITY_GRANT_RANGED);
+    // the city's own turn count, the flip turn its first: `foundedTurn` is
+    // the revolt's turn, which the transfer that made it Free wrote
+    if ((state.turn - city.foundedTurn + 1) % FREE_CITY_GRANT_PERIOD === 0) {
+      const type = freeCityGrantType(state);
+      if (type) grantFreeCityUnit(state, city, type);
     }
     cityStrikes(state, city, cityStrikeStrength(state, city));
     const centre = state.map.tiles[city.centerIndex];
@@ -1419,6 +1512,9 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // turn tail, after every seat has had its phase.
   if (rec.vote) actor.congressVote = rec.vote;
   if (rec.gpPass !== undefined && rec.gpPass >= 0) passGreatPerson(state, actor.seat, rec.gpPass);
+  // The BELIEFS the seat's religion adopts: founding or enhancing, validated
+  // whole by `adoptBeliefs` and refused whole.
+  if (rec.beliefs?.length) adoptBeliefs(state, actor.seat, rec.beliefs);
   for (const [centre, aCol, aTile] of prodPairs) {
     const civCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!civCity) continue;                          // centre not this engine's city (drifted state)
@@ -1668,6 +1764,20 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       if (a >= A_REBASE && a < A_REBASE + AIR_REBASE_COLS) {
         const t = rebaseTargets(state, unit, AIR_REBASE_COLS)[a - A_REBASE];
         if (t !== undefined) rebaseAir(state, unit, t);
+        return;
+      }
+      if (a >= A_DEPLOY && a < A_DEPLOY + AIR_DEPLOY_COLS) {
+        const t = deployTargets(state, unit, AIR_DEPLOY_COLS)[a - A_DEPLOY];
+        if (t !== undefined) deployAir(state, unit, t);
+        return;
+      }
+      if (a === A_RETURN_TO_BASE) {
+        returnToBase(unit);
+        return;
+      }
+      if (a >= A_PRIORITY_TARGET && a < A_PRIORITY_TARGET + AIR_STRIKE_COLS) {
+        const t = priorityTargets(state, unit, AIR_STRIKE_COLS)[a - A_PRIORITY_TARGET];
+        if (t !== undefined) airStrike(state, unit.id, t, actor.seat, true);
         return;
       }
       if (a >= A_SPY_TRAVEL && a < A_SPY_TRAVEL + SPY_TRAVEL_COLS) {
@@ -2974,23 +3084,7 @@ export function seatPhase(state: GameState): void {
       + ` cost${_upk.toFixed(3)} purse${(actor.treasury ?? 0).toFixed(3)}`);
     actor.treasury -= _upk;
     actor.treasury -= wmdUpkeep(state, actor.seat);
-    if (Math.round(actor.treasury * 1000) < 0) {
-      // The priciest unit goes; a TIE goes to the EARLIEST in `state.units`,
-      // which is spawn order — the one order both engines own (the GPU's
-      // pool appends, so its lowest slot is the same unit). The lowest UNIT
-      // ID is not spawn order for a unit the seat re-seated: a converted
-      // barbarian keeps its barbarian-era id, lower than anything the seat
-      // owns (seed 9053 t164).
-      let victim: Unit | undefined;
-      for (const u of state.units) {
-        if (u.seat !== actor.seat) continue;
-        const m = unitUpkeep(seatMods, u.type);
-        if (m <= 0) continue;
-        const vm = victim ? unitUpkeep(seatMods, victim.type) : 0;
-        if (!victim || m > vm) victim = u;
-      }
-      if (victim) disbandUnit(state, victim.id);
-    }
+    bankruptDisband(state, actor.seat, seatMods);
     // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's technology grants, after
     // the upkeep they do not yet owe AND after the bankruptcy that upkeep may
     // force — the GPU's tech loop sits on the same side of both.
@@ -3032,12 +3126,10 @@ export function seatPhase(state: GameState): void {
 
     advanceGreatPeople(state, actor.seat);
 
-    // The BELIEF RACES — eager rules for EVERY seat row. Identities are
-    // POLICY draws from the open pools; every gate and
-    // draw mirrors the GPU's row-generic _seat_belief_claims (the
-    // popen/ropen/eopen shapes), so the streams stay aligned. The open pools
-    // are purely the claimed lists — every claim path (this block AND the
-    // direct verbs in game.ts) pushes what it takes.
+    // The PANTHEON RACE — an eager rule for EVERY seat row, drawn from the
+    // open pool; the gate and the draw mirror the GPU's row-generic
+    // `_seat_pantheon_race`, so the streams stay aligned. A religion's own
+    // beliefs are the record's `beliefs` arm (`adoptBeliefs`).
     // Pantheon: costs PANTHEON_FAITH_COST from this seat's own faith.
     if (actor.religion.pantheon === null && (actor.faith ?? 0) >= PANTHEON_FAITH_COST) {
       const open = Object.keys(PANTHEONS).filter((id) => !state.claimedPantheons.includes(id));
@@ -3048,46 +3140,6 @@ export function seatPhase(state: GameState): void {
         addEraScore(state, actor.seat, ERA_SCORE_PANTHEON);
         actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
         state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
-      }
-    }
-    // Religion: the canFoundReligion gates — a pantheon, a completed Holy
-    // Site, an earned Prophet. Follower drawn FIRST, founder second (the
-    // GPU's rf_/ro_ order).
-    if (
-      !actor.religion.founded &&
-      actor.religion.pantheon !== null &&
-      prophetsOf(actor) > 0 &&
-      actor.cities.some((c) =>
-        c.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
-      )
-    ) {
-      const followers = Object.keys(FOLLOWER_BELIEFS).filter((id) => !state.claimedBeliefs.includes(id));
-      const founders = Object.keys(FOUNDER_BELIEFS).filter((id) => !state.claimedBeliefs.includes(id));
-      if (followers.length > 0 && founders.length > 0) {
-        const fPick = followers[Math.floor(nextRandom(state) * followers.length)];
-        const oPick = founders[Math.floor(nextRandom(state) * founders.length)];
-        state.claimedBeliefs.push(fPick);
-        state.claimedBeliefs.push(oPick);
-        actor.religion.founded = true;
-        addEraScore(state, actor.seat, ERA_SCORE_RELIGION);
-        actor.religion.follower = fPick;
-        actor.religion.founder = oPick;
-        actor.religion.holyTile = (actor.cities.find((c) => c.isCapital) ?? actor.cities[0])?.centerIndex ?? null;
-        grantFoundingPressure(state, actor.seat);
-        const name = RELIGION_NAMES[actor.seat % RELIGION_NAMES.length];
-        state.eventLog.push(`${actor.name} founded ${name} — two beliefs left the pool.`);
-      }
-    }
-    // Enhancer: a SECOND earned Prophet claims an enhancer belief, denying
-    // it from the shared pool (the follower/founder mirror). The draw sits
-    // AFTER the founder draw — the GPU's _next_random(eopen) position.
-    if (actor.religion.founded && actor.religion.enhancer == null && prophetsOf(actor) >= 2) {
-      const enhancers = Object.keys(ENHANCER_BELIEFS).filter((id) => !(state.claimedEnhancers ?? []).includes(id));
-      if (enhancers.length > 0) {
-        const ePick = enhancers[Math.floor(nextRandom(state) * enhancers.length)];
-        (state.claimedEnhancers ??= []).push(ePick);
-        actor.religion.enhancer = ePick; // identity kept — effects apply
-        state.eventLog.push(`${actor.name} enhanced its religion (${ENHANCER_BELIEFS[ePick].name} is taken).`);
       }
     }
 

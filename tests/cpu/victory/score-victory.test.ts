@@ -7,7 +7,7 @@ import { scoreLeader, scoreLines } from '../../../cpu/core/score';
 import { SCORING_LINE_ITEMS } from '../../../cpu/data/scoring';
 import { ERA_LENGTH } from '../../../cpu/data/seats';
 import { GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
-import { FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../../../cpu/data/religion';
+import { FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS } from '../../../cpu/data/religion';
 import { makeMap, makeState, settleAt, settleFirstCity } from '../helpers';
 
 // CIV 6'S SCORE and the turn-limit victory it decides. No scripted game
@@ -62,11 +62,13 @@ describe('the Score', () => {
     b.wonders.push({ id: 'ORACLE', tileIndex: ora });
     state.map.tiles[ora].builtWonder = 'ORACLE';
     s.gpEarned.push(GREAT_PEOPLE.SCIENTIST[0].id, GREAT_PEOPLE.ENGINEER[0].id);
-    // founded and enhanced: three beliefs; the pantheon is not one of them
+    // founded and enhanced: one belief of each of the four classes; the
+    // pantheon is not one of them
     s.religion.pantheon = 'GOD_OF_THE_SEA';
     s.religion.founded = true;
     s.religion.follower = Object.keys(FOLLOWER_BELIEFS)[0];
     s.religion.founder = Object.keys(FOUNDER_BELIEFS)[0];
+    s.religion.worship = Object.keys(WORSHIP_BELIEFS)[0];
     s.religion.enhancer = Object.keys(ENHANCER_BELIEFS)[0];
     s.eraScore = 9;
     s.eraScorePast = 30;
@@ -78,10 +80,10 @@ describe('the Score', () => {
     expect(got[line('districts')]).toBe(2 * 2);
     expect(got[line('population')]).toBe(7);
     expect(got[line('greatPeople')]).toBe(2 * 5);
-    expect(got[line('religion')]).toBe(3 * 5);
+    expect(got[line('religion')]).toBe(4 * 5);
     expect(got[line('techs')]).toBe(3 * 2);
     expect(got[line('wonders')]).toBe(15);
-    expect(got.reduce((x, y) => x + y, 0)).toBe(39 + 6 + 10 + 4 + 7 + 10 + 15 + 6 + 15);
+    expect(got.reduce((x, y) => x + y, 0)).toBe(39 + 6 + 10 + 4 + 7 + 10 + 20 + 6 + 15);
   });
 
   it('the era boundary banks the closed era into the whole game\'s era score', () => {

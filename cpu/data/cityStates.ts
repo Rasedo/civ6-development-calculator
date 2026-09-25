@@ -413,7 +413,7 @@ export const MINOR_EXCLUDED_UNIT_CLASSES: readonly PromoClass[] = srcConst('city
  * development row's slots are the quantiles of the turn it first STARTS
  * (turn 4 on; the turn-2 pick is abandoned after one turn in every game),
  * censored at the minor's last record, and -1 where the estimate stops
- * reaching (fewer than eight minors left in the watch). A `byType` row takes
+ * reaching (fewer than eight minors left in the watch). A by-type row takes
  * the minor's type's id and slots.
  *
  * The rows are in the order the census's medians start them. What the census

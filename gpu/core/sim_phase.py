@@ -634,22 +634,26 @@ class SimPhase:
                     self._transfer_city(b, row, j, win, conquest=False)
                 else:
                     self._transfer_city(b, row, j, self.FREE_ROW, conquest=False)
-                    # the revolt GRANTS the Free City its melee pair on the flip
-                    # turn itself (`flipCity`)
+                    # the revolt GRANTS the Free City the world era's melee
+                    # pair on the flip turn itself (`flipCity`)
                     one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                     one[b] = True
                     fcol = self.centre_slot_at[:, int(here[b])].clamp(min=0)
-                    for _k in range(self._free_grant_melee_n):
-                        self._grant_free_unit(one, fcol, self._free_grant_melee)
+                    era = self._world_era().clamp(min=0, max=self._free_pair.numel() - 1)
+                    pair = self._free_pair[era]
+                    for _k in range(self._free_pair_n):
+                        self._grant_free_unit(one, fcol, pair)
 
-    def _grant_free_unit(self, mask: torch.Tensor, col: torch.Tensor, unit_type: int) -> None:
+    def _grant_free_unit(self, mask: torch.Tensor, col: torch.Tensor, unit_type: torch.Tensor) -> None:
         """`grantFreeCityUnit` for the Free City in column `col` [B] of the
-        free row, in the games of `mask` [B]. The Free Cities player trains no
-        unit, yet a revolt hands it defenders: each stands on the first free
-        land tile beside the centre, in direction order, and with none free it
-        is not granted. The unit lands in the hostile pool under FREE_SEAT,
-        where no walker moves it: it defends, blocks and heals."""
-        if unit_type < 0 or not bool(mask.any()):
+        free row, in the games of `mask` [B], of chassis `unit_type` [B] (-1
+        grants nothing). Each stands on the first free land tile beside the
+        centre, in direction order, and with none free it is not granted. The
+        unit lands in the hostile pool under FREE_SEAT, where no walker moves
+        it: it defends, blocks and heals; it remembers the city that granted
+        it (`unit_free_city`), whose join takes it."""
+        mask = mask & (unit_type >= 0)
+        if not bool(mask.any()):
             return
         ctr = self.city_center[self._bidx, self.FREE_ROW, col.clamp(min=0)].clamp(min=0)
         nb = self.neigh[ctr]  # [B, 6], direction order
@@ -657,7 +661,26 @@ class SimPhase:
         ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, FREE_SEAT)
         first = torch.where(ok, torch.arange(6, device=self.device), 6).min(dim=1).values
         spot = nbc.gather(1, first.clamp(max=5).unsqueeze(1)).squeeze(1)
-        self._spawn_barb(mask & (first < 6), spot, unit_type, ladder=False, seat=FREE_SEAT)
+        home = self.city_id[self._bidx, self.FREE_ROW, col.clamp(min=0)]
+        self._spawn_barb(mask & (first < 6), spot, unit_type.clamp(min=0), ladder=False, seat=FREE_SEAT, home=home)
+
+    def _free_grant_type(self, due: torch.Tensor) -> torch.Tensor:
+        """[B] long — `freeCityGrantType` in the games of `due`: ONE draw over
+        `_free_grant_w` among the classes the world era has a chassis for, in
+        table order — `pick` in [0, their weights' sum) names the first class
+        whose running sum exceeds it — and that class's chassis of the era;
+        -1 outside `due`. The draw is taken whether or not a tile is free."""
+        era = self._world_era().clamp(min=0, max=self._free_grant_units.shape[1] - 1)
+        units = self._free_grant_units[:, era].t()  # [B, classes]
+        w = torch.tensor(self._free_grant_w, dtype=torch.long, device=self.device).unsqueeze(0)
+        w = torch.where(units >= 0, w, torch.zeros_like(w))
+        total = w.sum(dim=1)
+        draw = due & (total > 0)
+        r = self._next_random(draw)
+        pick = torch.floor(r * total.to(torch.float64)).to(torch.long)
+        k = (w.cumsum(dim=1) <= pick.unsqueeze(1)).sum(dim=1).clamp(max=units.shape[1] - 1)
+        got = units.gather(1, k.unsqueeze(1)).squeeze(1)
+        return torch.where(draw, got, torch.full_like(got, -1))
 
     def _free_cities_phase(self) -> None:
         """The FREE CITIES player's turn, after every major's — the
@@ -665,10 +688,14 @@ class SimPhase:
         first, off one loop-top `_seat_amenity` over the free row: the full
         need of its population and the supply the Free Cities seat holds (its
         own luxuries, buildings and districts; no government, policy or
-        governor). Then each takes its ranged grant on the turn it falls due
-        (`city_freed_turn` + `_free_grant_turns`), fires the ranged strikes any
-        walled city fires (`_city_strikes`), heals as any unbesieged city does
-        and runs its loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
+        governor). Its treasury (`free_treasury`) banks the Gold that same walk
+        makes, in slot order, then pays its units' upkeep and meets the
+        bankruptcy that upkeep may force (`_seat_upkeep_and_bankruptcy`). Then
+        each city takes its grant when one falls due — every
+        `_free_grant_period`th of its turns, the flip turn its first
+        (`city_freed_turn`), the chassis `_free_grant_type`'s — fires the
+        ranged strikes any walled city fires (`_city_strikes`), heals as any
+        unbesieged city does and runs its loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
         the flat base, the pressure term with every Free City's citizens on
         its own side and every major's (its age in each citizen's term) against,
         and the flat loyalty of what stands in it — no amenity, governor,
@@ -678,7 +705,9 @@ class SimPhase:
         after the walk, in slot order: CIV6 "it will join the Civilization that
         has exerted the most Loyalty pressure on it since the Free City became
         independent". A seat that pulled nothing, or holds no city any more,
-        takes nothing; with no taker the city stays Free at 0."""
+        takes nothing; with no taker the city stays Free at 0. On a join the
+        units the city was GRANTED go the same turn; any other Free Cities
+        unit stays Free."""
         row = self.FREE_ROW
         alive = self.city_alive[:, row]
         if not bool(alive.any()):
@@ -686,10 +715,20 @@ class SimPhase:
         # a Free City's reactor keeps its clock: the seat resolves no power,
         # so the age is kept here (`ageReactors`)
         self._age_reactors(row)
-        _tier = self._seat_amenity(row)[0]
+        _tier, _gf, _yf, _lux = self._seat_amenity(row)
         self.city_amen_tier[:, row, : self.RC] = torch.where(
             alive[:, : self.RC], _tier.to(self.city_amen_tier.dtype),
             torch.full_like(self.city_amen_tier[:, row, : self.RC], -1))
+        # ITS TREASURY: the Gold of the same loop-top walk, summed in slot
+        # order (a dead column adds an exact 0.0), then the upkeep
+        acting = alive.any(dim=1)
+        gold = self._seat_city_walk(row, amen_yf=_yf, maint=self._seat_housing(row)[0])[:, :, 2]
+        income = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for j in range(self.RC):
+            income = income + gold[:, j]
+        self.free_treasury.copy_(torch.where(
+            acting, self.free_treasury + income.to(self.free_treasury.dtype), self.free_treasury))
+        self._seat_upkeep_and_bankruptcy(row, acting)
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
         scale = float(self.rules.seats.get("loyaltyScale", 20))
@@ -701,9 +740,11 @@ class SimPhase:
             if not bool(act.any()):
                 continue
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
-            # the ranged grant falls due a fixed count of turns after the revolt
-            due = act & (self.city_freed_turn[:, row, j] + self._free_grant_turns == int(self.turn))
-            self._grant_free_unit(due, jc, self._free_grant_ranged)
+            # a grant falls due every `_free_grant_period`th of the city's own
+            # turns, the flip turn its first
+            due = act & ((int(self.turn) - self.city_freed_turn[:, row, j] + 1) % self._free_grant_period == 0)
+            if bool(due.any()):
+                self._grant_free_unit(due, jc, self._free_grant_type(due))
             self._city_strikes(row, jc, act)
             self._city_heal(row, jc, act)
             here = self.city_center[bidx, row, jc].clamp(min=0)
@@ -732,6 +773,12 @@ class SimPhase:
                 if not bool(ok.any()):
                     continue
                 win = int(first_argmax(torch.where(ok, race, torch.full_like(race, -1.0)).unsqueeze(0))[0])
+                # the city's grants go with the join, the same turn
+                gone = (self.unit_alive[b] & (self.unit_seat[b] == FREE_SEAT)
+                        & (self.unit_free_city[b] == self.city_id[b, row, j])).nonzero(as_tuple=True)[0]
+                if gone.numel():
+                    self._occ_clear(torch.full_like(gone, b), self.unit_tile[b, gone], gone)
+                    self.unit_alive[b, gone] = False
                 self._transfer_city(b, row, j, win, conquest=False)
 
     def _seat_city_growth(self, row: int, col: torch.Tensor, act: torch.Tensor,
@@ -1747,7 +1794,7 @@ class SimPhase:
         In seatPhase order: bank this turn's city sums (science, gold, faith),
         pay unit upkeep, complete techs, drain a dead tech bank, accrue TOURISM,
         DIPLOMATIC FAVOR and the grievance decay, bank culture, complete civics,
-        drain a dead civic bank, then the great-people and belief races.
+        drain a dead civic bank, then the great-people and pantheon races.
 
         POSITION IS LOAD-BEARING between tourism and the civics: the wonder
         term reads the seat's ERA off completed research, so tourism must sit
@@ -2010,7 +2057,7 @@ class SimPhase:
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
         self._advance_great_people(row, active)
-        self._seat_belief_claims(row, active)
+        self._seat_pantheon_race(row, active)
 
     def _gp_cost(self, cls: int, at: torch.Tensor, world_era: torch.Tensor) -> torch.Tensor:
         """[B] float64 — what the person at queue position `at` costs. CIV6:
@@ -2334,18 +2381,17 @@ class SimPhase:
                          gp_at=at_c.clamp(max=maxN - 1))
         self._gen_ver += 1
 
-    def _seat_belief_claims(self, row: int, active: torch.Tensor) -> None:
-        """The BELIEF RACES for ONE seat row, at the
-        loop position right after the GP race. The picks' IDENTITIES matter:
-        the effects apply to this seat. The draw takes the k-th OPEN id in
-        data order — open[floor(rand * open.length)], the open list filtering
-        the claimed pool. The pantheon costs pantheonFaithCost from this
-        seat's own faith (deducted only when a pick lands); religion needs
-        the canFoundReligion gates — pantheon, completed Holy Site (the
-        seat-axis registry), an earned Prophet; the enhancer a SECOND
-        Prophet. Each draw advances only where its own open-mask fires, so
-        the RNG stream stays aligned with the TS block turn by turn."""
-        rr, B, dev = self.rules.seats, self.B, self.device
+    def _seat_pantheon_race(self, row: int, active: torch.Tensor) -> None:
+        """The PANTHEON RACE for ONE seat row, at the loop position right
+        after the GP race. The pick's IDENTITY matters: the effects apply to
+        this seat. The draw takes the k-th OPEN id in data order —
+        open[floor(rand * open.length)], the open list filtering the claimed
+        pool. The pantheon costs pantheonFaithCost from this seat's own faith
+        (deducted only when a pick lands). The draw advances only where its
+        own open-mask fires, so the RNG stream stays aligned with the TS block
+        turn by turn. A religion's own beliefs are the record's BELIEF arm
+        (`_apply_beliefs`)."""
+        rr = self.rules.seats
         pfc = float(rr.get("pantheonFaithCost", 25))
         pdue = active & ~self.civ_pantheon_done[:, row] & (self.civ_faith[:, row] >= pfc)
         popen = pdue & (self.pantheon_claimed_n < rr.get("pantheonPool", 8))
@@ -2364,6 +2410,14 @@ class SimPhase:
         self.pantheon_claimed_n.add_(popen.long())
         self.civ_pantheon_done[:, row] = self.civ_pantheon_done[:, row] | popen
         self._add_era_score(row, self._era_pts["pantheon"], popen.long())
+
+    def _can_found(self, row: int) -> torch.Tensor:
+        """[B] `canFoundReligion`: no seat ban, no religion yet, a pantheon, a
+        completed Holy Site (the seat-axis registry) or Stonehenge, and an
+        activated Great Prophet."""
+        B, dev = self.B, self.device
+        if row >= self.n_majors:
+            return torch.zeros(B, dtype=torch.bool, device=dev)
         d_hs = int(self._gp_class_district[self._prophet_cls]) if self._prophet_cls < self._gp_nc else -1
         if d_hs >= 0 and self.districts_on:
             reg_hs = self.city_dist_tile[:, row, :, d_hs]
@@ -2375,56 +2429,105 @@ class SimPhase:
         if self._wond_n and bool(self._wond_religion_site.any()):
             has_hs = has_hs | self._seat_wonder_any(row, self._wond_religion_site)
         # CIV6 (Religious Convert): "May not ... found Religions"
-        rdue = (active & ~self.civ_religion_done[:, row] & self.civ_pantheon_done[:, row]
+        return (~self.civ_religion_done[:, row] & self.civ_pantheon_done[:, row]
                 & (self.civ_prophets[:, row] > 0) & has_hs
                 & ~self._row_banned(row, self.BAN_FOUND_RELIGION))
-        ropen = rdue & (self.claimed_f_n < rr.get("followerPool", 8)) & (self.claimed_o_n < rr.get("founderPool", 8))
-        rf_ = self._next_random(ropen)  # follower first, founder second — the TS draw order
-        ro_ = self._next_random(ropen)
-        if bool(ropen.any()) and self._bel_any:
-            orow = ropen.nonzero(as_tuple=True)[0]
-            for claimed_m, ids_t, rnd in ((self.fol_claimed, self.civ_follower, rf_), (self.fou_claimed, self.civ_founder, ro_)):
-                n_open = (~claimed_m).sum(dim=1)
-                k = torch.floor(rnd * n_open.to(torch.float64)).to(torch.long)
-                cum = (~claimed_m).long().cumsum(dim=1)
-                sel = (~claimed_m) & (cum == (k + 1).unsqueeze(1))
-                bid = sel.long().argmax(dim=1)
-                claimed_m[orow, bid[orow]] = True
-                ids_t[orow, row] = bid[orow]
-            self._bel_version += 1
-        self.claimed_f_n.add_(ropen.long())
-        self.claimed_o_n.add_(ropen.long())
-        self.civ_religion_done[:, row] = self.civ_religion_done[:, row] | ropen
-        self._add_era_score(row, self._era_pts["religion"], ropen.long())
+
+    def _can_enhance(self, row: int) -> torch.Tensor:
+        """[B] `canEnhanceReligion`: a founded religion not yet enhanced and a
+        SECOND activated Great Prophet (the first funds the founding)."""
+        if row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return self.civ_religion_done[:, row] & ~self.civ_enhanced[:, row] & (self.civ_prophets[:, row] >= 2)
+
+    def _bel_pools(self) -> tuple:
+        """A religion's belief classes in `BELIEF_CLASSES` order (Follower,
+        Worship, Founder, Enhancer): (claim mask [B, n], the per-seat held id
+        plane [B, n_majors], the catalog size n) each."""
+        n = self._bel_class_n
+        return ((self.fol_claimed, self.civ_follower, n[0]), (self.wor_claimed, self.civ_worship, n[1]),
+                (self.fou_claimed, self.civ_founder, n[2]), (self.enh_claimed, self.civ_enhancer, n[3]))
+
+    def _enhanceable(self, row: int) -> torch.Tensor:
+        """[B, 4] `enhanceableClasses`: the classes seat row `row`'s religion
+        still lacks that have a belief no religion holds."""
+        cols = []
+        for m, ids, n in self._bel_pools():
+            left = (~m[:, :n]).any(dim=1) if n else torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            cols.append((ids[:, row] < 0) & left)
+        return torch.stack(cols, dim=1)
+
+    def _apply_beliefs(self, row: int, act: torch.Tensor, beliefs: torch.Tensor) -> None:
+        """`adoptBeliefs`' twin — the record's BELIEF arm. `beliefs` [B, K, 2]
+        holds (class, index) pairs (`BELIEF_CLASSES` code, the class catalog's
+        row), (-1, -1) padding. FOUNDING (`_can_found`): the Follower first,
+        then one belief of another class. ENHANCING (`_can_enhance`): one
+        belief of every class the religion still lacks that has a belief left
+        (`_enhanceable`), each once. Every pick names a belief no religion
+        holds; a set that does not fit is refused entire. The founding writes
+        the era score, the holy tile and the Holy City's founding pressure,
+        in `adoptBeliefs`' order."""
+        if row >= self.n_majors or not any(self._bel_class_n):
+            return
+        B, dev = self.B, self.device
+        bl = beliefs.to(device=dev, dtype=torch.long)
+        present = (bl[:, :, 0] >= 0) | (bl[:, :, 1] >= 0)                 # [B, K]
+        # the record lists its picks in order; padding closes up behind them
+        order = torch.argsort((~present).long(), dim=1, stable=True)
+        bl = bl.gather(1, order.unsqueeze(2).expand(-1, -1, 2))
+        present = present.gather(1, order)
+        cls, idx = bl[:, :, 0], bl[:, :, 1]
+        K = int(bl.shape[1])
+        pools = self._bel_pools()
+        valid = torch.zeros_like(present)
+        for ci, (m, _ids, n) in enumerate(pools):
+            if n == 0:
+                continue
+            ok_i = (cls == ci) & (idx >= 0) & (idx < n)
+            taken = m.gather(1, idx.clamp(min=0, max=n - 1))
+            valid = valid | (ok_i & ~taken)
+        all_valid = (valid | ~present).all(dim=1)
+        npick = present.long().sum(dim=1)
+        ohc = (cls.unsqueeze(2) == torch.arange(4, device=dev)) & present.unsqueeze(2)   # [B, K, 4]
+        cnt = ohc.long().sum(dim=1)                                                  # [B, 4]
+        first = cls[:, 0] if K > 0 else torch.full((B,), -1, dtype=torch.long, device=dev)
+        second = cls[:, 1] if K > 1 else torch.full((B,), -1, dtype=torch.long, device=dev)
+        found_ok = (act & self._can_found(row) & all_valid & (npick == 2)
+                    & (first == 0) & (second > 0))
+        enh_ok = (act & self._can_enhance(row) & all_valid & (npick >= 1)
+                  & (cnt == self._enhanceable(row).long()).all(dim=1))
+        ok = found_ok | enh_ok
+        if not bool(ok.any()):
+            return
+        for k in range(K):
+            pk = ok & present[:, k]
+            for ci, (m, ids, n) in enumerate(pools):
+                sel = pk & (cls[:, k] == ci)
+                if n == 0 or not bool(sel.any()):
+                    continue
+                r = sel.nonzero(as_tuple=True)[0]
+                ii = idx[r, k]
+                m[r, ii] = True
+                ids[r, row] = ii
+        self._bel_version += 1
+        # a Worship belief puts its building on the buildable list
+        self._eff_version += 1
+        self.civ_religion_done[:, row] = self.civ_religion_done[:, row] | found_ok
+        self._add_era_score(row, self._era_pts["religion"], found_ok.long())
         _alv = self.city_alive[:, row]
         _cap = self.city_is_cap[:, row] & _alv
         _ctr = self.city_center[:, row]
         _h_slot = torch.where(_cap.any(dim=1), _cap.long().argmax(dim=1), _alv.long().argmax(dim=1))
         _holy = _ctr.gather(1, _h_slot.unsqueeze(1)).squeeze(1)
         _holy = torch.where(_alv.any(dim=1), _holy, torch.full_like(_holy, -1))
-        self.holy_tile[:, row] = torch.where(ropen, _holy, self.holy_tile[:, row])
+        self.holy_tile[:, row] = torch.where(found_ok, _holy, self.holy_tile[:, row])
         # CIV6 (RELIGION_SPREAD_HOLY_CITY_PRESSURE_PER_POP): the Holy City starts
         # with that much of its own faith per citizen — `grantFoundingPressure`
-        _gr = ropen & (_holy >= 0)
+        _gr = found_ok & (_holy >= 0)
         if bool(_gr.any()):
             gb = _gr.nonzero(as_tuple=True)[0]
             self.city_pressure[gb, row, _h_slot[gb], row] += self._holy_founding_per_pop * self.city_pop[gb, row, _h_slot[gb]].long()
-
-        edue = active & self.civ_religion_done[:, row] & ~self.civ_enhancer_done[:, row] & (self.civ_prophets[:, row] >= 2)
-        eopen = edue & (self.claimed_e_n < rr.get("enhancerPool", 0))
-        re_ = self._next_random(eopen)
-        if bool(eopen.any()) and self._enh_any:
-            erow = eopen.nonzero(as_tuple=True)[0]
-            n_open = (~self.enh_claimed).sum(dim=1)
-            k = torch.floor(re_ * n_open.to(torch.float64)).to(torch.long)
-            cum = (~self.enh_claimed).long().cumsum(dim=1)
-            sel = (~self.enh_claimed) & (cum == (k + 1).unsqueeze(1))
-            eid = sel.long().argmax(dim=1)
-            self.enh_claimed[erow, eid[erow]] = True
-            self.civ_enhancer[erow, row] = eid[erow]
-            self._bel_version += 1
-        self.claimed_e_n.add_(eopen.long())
-        self.civ_enhancer_done[:, row] = self.civ_enhancer_done[:, row] | eopen
+        self.civ_enhanced[:, row] = self.civ_enhanced[:, row] | enh_ok
 
     #: Reset on an ownership change: a captured unit never carries its old
     #: fortification, its old owner's aura, or movement — movesLeft = 0

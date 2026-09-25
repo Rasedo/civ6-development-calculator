@@ -264,6 +264,11 @@ export interface SeatActionRecord {
   vote?: CongressVote;
   /** the Great Person class this seat PASSES on this turn (-1/absent none) */
   gpPass?: number;
+  /** the BELIEFS this seat's religion adopts this turn, as [class, index]
+   *  pairs (`BELIEF_CLASSES` code, the class catalog's row): founding names
+   *  the Follower and then one other class, enhancing every class the
+   *  religion still lacks that has a belief left (`adoptBeliefs`). */
+  beliefs?: [number, number][];
 }
 
 /** One seat's ballot: [outcome, target, extraVotes] per slate slot, or null
@@ -434,8 +439,9 @@ export interface GameState {
    *  `freeSeatOf` at the first revolt; absent until then. */
   freeSeat?: Seat;
   claimedPantheons: string[];
+  /** every religion belief some religion holds, of every class — the one
+   *  pool that keeps a belief to one religion */
   claimedBeliefs: string[];
-  claimedEnhancers?: string[];
 }
 
 export interface Unit {
@@ -463,6 +469,9 @@ export interface Unit {
   movesFull?: number;
   hp: number;
   charges: number | null;
+  /** the id of the FREE CITY that granted this unit (`grantFreeCityUnit`);
+   *  absent on every other unit. A join takes that city's grants with it. */
+  freeCity?: number;
   /** CIV6 (The Raven King): this unit came from a city-state LEVY. Nothing
    *  in this engine returns a levied unit, so the mark is permanent and
    *  survives an upgrade — which is what makes the upgrade discount
@@ -490,6 +499,10 @@ export interface Unit {
    *  unit attacks, it will become visible for a turn before becoming
    *  invisible again", so it is seen while this equals the live turn. */
   revealedTurn?: number;
+  /** the hex a FIGHTER patrols (UNITOPERATION_DEPLOY), absent while it is
+   *  stationed. CIV6 (Patrols): a deployed fighter holds the hex "until it is
+   *  ordered otherwise or it is destroyed"; `tileIndex` stays its base. */
+  patrol?: number;
   /**
    * XP banked TOWARD THE NEXT LEVEL — never cumulative. CIV6: "earning more
    * XP than needed to reach the next level will not transfer the excess XP to
@@ -755,10 +768,15 @@ export interface ReligionState {
   pantheon: string | null;
   founded: boolean;
   name: string | null;
+  /** the religion's belief of each class (`BELIEF_CLASSES`), null until
+   *  adopted — founding takes the Follower and one other, enhancing the
+   *  rest. `worship` is the Worship BELIEF, which names the building. */
   follower: string | null;
   founder: string | null;
   worship: string | null;
   enhancer?: string | null;
+  /** the religion has been enhanced: latched once, never cleared. */
+  enhanced?: boolean;
   holyTile?: number | null;
 }
 

@@ -52,8 +52,10 @@ describe('the mountain tunnel', () => {
   });
 
   it('keeps the seat it was appended at, so no earlier column moved', () => {
+    // pinned against the verb it landed behind rather than against the END of
+    // the enum, which every later append moves
     const names = unitActionNames(IMPROVEMENT_IDS);
-    expect(names[names.length - 1]).toBe('PORTAL');
+    expect(names.indexOf('PORTAL')).toBe(names.indexOf('WONDER_CHARGE') + 1);
     // The tunnel was the LAST improvement when it landed; the unique rows
     // appended after it, which is exactly what an append-only wire allows.
     // What may never change is the seat it already holds.

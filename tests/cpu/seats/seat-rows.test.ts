@@ -30,6 +30,8 @@ function sceneAs(row: number): GameState {
   state.seats.push(emptySeat(1));
   state.seats[0].civ = row;
   state.seats[1].civ = seatRow('AMERICA');
+  // a solvent seat: bankruptcy's amenity loss would move the tiers these read
+  state.seats[0].treasury = 50;
   return state;
 }
 

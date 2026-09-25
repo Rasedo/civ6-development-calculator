@@ -718,6 +718,7 @@ def _main() -> int:
                 ("pref_apply", [py, "tests/gpu/pref_apply_test.py"], 4),  # preference-order apply — the ONLY lane that reaches it
                 ("seat_verbs", [py, "tests/gpu/seat_verbs_test.py"], 4),  # the 9 civ unit verbs — asserts EXECUTION, not legality
                 ("air", [py, "tests/gpu/air_test.py"], 4),  # bases, slots, both air heads, the sortie and every way a base is lost
+                ("air_patrol", [py, "tests/gpu/air_patrol_test.py"], 4),  # patrol, interception, Priority Target, the sortie's order: no seed trains an aircraft
                 ("spy", [py, "tests/gpu/spy_test.py"], 4),  # capacity, the jump, both spy heads and what each mission does
                 ("drive", [py, "tests/gpu/drive_test.py"], 4),  # the ladder DRIVES a seat for a whole game
                 ("neutral_obs", [py, "tests/gpu/neutral_obs_test.py"], 4),  # the decision server's observation is a plain value
@@ -847,6 +848,7 @@ def _main() -> int:
                 ("production_queue", [py, "tests/gpu/production_queue_test.py"], 4),  # the city's queue: the head, the overflow carry and the reorder
                 ("formation_train", [py, "tests/gpu/formation_train_test.py"], 4),  # the corps/army queue tier: gates, price, apply refusals, the tiered spawn
                 ("gp_pass", [py, "tests/gpu/gp_pass_test.py"], 4),  # the Great Person pass: the fee, the discount, the lockout, the rival's claim
+                ("beliefs", [py, "tests/gpu/beliefs_test.py"], 4),  # a religion's four belief classes, the Worship buildings, the Mosque and the Dar-e Mehr
                 ("minor_builds", [py, "tests/gpu/minor_builds_test.py"], 4),  # the city-state's own walls, type district and Harbor, and the conquest carry
                 ("alliance_levels", [py, "tests/gpu/alliance_levels_test.py"], 4),  # typed alliances: points, levels and the fifteen-effect table
             ],

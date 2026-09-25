@@ -29,7 +29,7 @@ import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, unitReligious } from './units';
 import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
-import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom } from './air';
+import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom, interceptorAgainst, priorityDefender, INTERCEPT_SUPPORT_CS } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
@@ -1774,34 +1774,74 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   return ok;
 }
 
-/** the answer a sortie takes. CIV6 (Air combat): a plane "doesn't suffer
- *  damage in return unless it gets Intercepted", and "the only exceptions to
- *  this rule are SHIPS with the Anti-Air Strength stat - they have additional
- *  close-range defenses, which activate when they are attacked by an
- *  aircraft" — beside which a parked weapon "provides cover from air attacks
- *  up to 1 hex away". `airCoverAgainst` folds both into the one that fires. */
-function airCoverAnswer(state: GameState, attacker: Unit, targetIndex: number): void {
-  const cover = airCoverAgainst(state, attacker, targetIndex);
-  if (!cover) return;
+/** One answer a sortie takes, rolled against the AIRCRAFT, which is the
+ *  defender of this roll. The anti-air gun, the anti-air hull and the
+ *  intercepting fighter share this body: the answerer's strength against
+ *  an aircraft (`airDefenseOf`) plus `support`, against the plane's Ranged
+ *  Strength. `vsAntiAir` says the answerer is an anti-air weapon, which the
+ *  "+7 Combat Strength when defending vs. anti-air" rows ask
+ *  (OPPONENT_IS_ANTI_AIR_REQUIREMENT, tag CLASS_ANTI_AIR); a fighter is
+ *  none. `at` is the hex the answerer fights from. */
+function airAnswer(
+  state: GameState, attacker: Unit, answerer: Unit, support: number, vsAntiAir: boolean,
+  k: string, at: number, targetIndex: number,
+): void {
   const fromTile = state.map.tiles[attacker.tileIndex];
-  const covE = airDefenseOf(state, cover) - woundPenalty(cover)
-    + promoCS(cover, {
+  const ansE = airDefenseOf(state, answerer) - woundPenalty(answerer) + support
+    + promoCS(answerer, {
       attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
-      tile: state.map.tiles[cover.tileIndex],
+      tile: state.map.tiles[at],
     });
-  // the burst answers the AIRCRAFT, which is the defender of this roll
   const airD = (UNITS[attacker.type]?.ranged?.strength ?? 0) - woundPenalty(attacker)
     + promoCS(attacker, {
-      attacking: false, vsAntiAir: true, foeType: cover.type, tile: fromTile,
+      attacking: false, vsAntiAir, foeType: answerer.type, tile: fromTile,
     });
-  attacker.hp -= damageRoll(state, covE - airD, 'airc', targetIndex);
+  attacker.hp -= damageRoll(state, ansE - airD, k, targetIndex);
+}
+
+/**
+ * The answers a sortie meets on its way to `targetIndex`, before its blow.
+ * CIV6 (Interceptions): "Once combat is resolved with any anti-air ground
+ * units and intercepting air units, if the attacking bomber survives, combat
+ * is then resolved with the original target. If a fighter is intercepted by
+ * another fighter on its way to a ground target, it is forced to only engage
+ * the enemy fighter and will not attack the ground target. Bombers do not
+ * have this restriction." The patrol answers first (`interceptorAgainst`,
+ * its backers' +5 apiece), then the anti-air cover (`airCoverAgainst`: a
+ * parked weapon "provides cover from air attacks up to 1 hex away", and
+ * "SHIPS with the Anti-Air Strength stat" answer for their own hex). A plane
+ * shot down leaves; a fighter turned back has spent its sortie. True when the
+ * plane flies on to its target.
+ */
+function airAnswers(state: GameState, attacker: Unit, targetIndex: number): boolean {
+  const icp = interceptorAgainst(state, attacker, targetIndex);
+  if (icp) {
+    airAnswer(state, attacker, icp.unit, INTERCEPT_SUPPORT_CS * icp.others, false, 'airi',
+      icp.unit.patrol!, targetIndex);
+    if (attacker.hp <= 0 || UNITS[attacker.type]?.air === 'FIGHTER') return sortieEnded(state, attacker);
+  }
+  const cover = airCoverAgainst(state, attacker, targetIndex);
+  if (cover) {
+    airAnswer(state, attacker, cover, 0, true, 'airc', cover.tileIndex, targetIndex);
+    if (attacker.hp <= 0) return sortieEnded(state, attacker);
+  }
+  return true;
+}
+
+function sortieEnded(state: GameState, attacker: Unit): false {
   if (attacker.hp <= 0) disbandUnit(state, attacker.id);
+  else spendAttack(attacker, true);
+  return false;
 }
 
 /** CIV6 (Bomber): a bomber "may attack tile improvements and districts...
  *  With these attacks they destroy the targets, which is equivalent to
- *  Pillaging but does not yield any spoils." The sortie goes with it, and the
- *  cover over the wrecked hex answers as it would any air attack. */
+ *  Pillaging but does not yield any spoils." (Air Strikes): "In order for a
+ *  bombing attack to be successful, the attacking air unit must be at 50%
+ *  health or higher after resolving any damage taken from defending fighter
+ *  aircraft and anti-air support units" — so the health bar is asked before
+ *  the sortie and again after its answers, and a bomber below it spends the
+ *  sortie and wrecks nothing. */
 export function airPillage(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId && u.seat === seat);
   if (!attacker) return { ok: false, reason: 'No such unit.' };
@@ -1812,15 +1852,17 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
   if (!airStrikeReaches(state, attacker, targetIndex)) return { ok: false, reason: 'Out of operational range.' };
   if (!airPillageFit(attacker)) return { ok: false, reason: 'Too wounded to pillage from the air.' };
   if (!airPillageOffers(state, attacker, targetIndex)) return { ok: false, reason: 'Nothing there to wreck.' };
+  attacker.patrol = undefined;
+  logUnitOrder(state, seat, attackerId, 'pillage', targetIndex);
+  if (!airAnswers(state, attacker, targetIndex)) return { ok: true };
+  spendAttack(attacker, true);
+  if (!airPillageFit(attacker)) return { ok: true };
   const t = state.map.tiles[targetIndex]!;
   if (t.improvement && !t.pillaged) t.pillaged = true;
   else {
     t.districtPillaged = true;
     displaceAirFrom(state, targetIndex);
   }
-  spendAttack(attacker, true);
-  airCoverAnswer(state, attacker, targetIndex);
-  logUnitOrder(state, seat, attackerId, 'pillage', targetIndex);
   return { ok: true };
 }
 
@@ -1828,7 +1870,8 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
  * AN AIR STRIKE. CIV6 (Air combat): "all air attacks are ranged, and the
  * attacking plane doesn't suffer damage in return unless it gets Intercepted".
  * The strike reaches anything inside the aircraft's OPERATIONAL RANGE measured
- * from its base, and takes "a full action to perform".
+ * from its base, and takes "a full action to perform". The sortie meets its
+ * answers first (`airAnswers`) and strikes only if it flies on.
  *
  * A FIGHTER's ranged damage is "effective against land units, but not against
  * cities and naval units"; a BOMBER's bombard damage is "effective against
@@ -1836,11 +1879,12 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
  * target's Anti-Air Strength "(even if its Combat Strength is higher) or
  * Combat Strength if it doesn't have any".
  *
- * Not modelled here, and recorded rather than invented: PATROL, and with it
- * fighter INTERCEPTION, which needs an air unit to hold a map tile it is not
- * based on.
+ * `priority` is PRIORITY TARGET: the tile's Support-class unit takes the blow
+ * (`priorityDefender`), whoever else stands there.
  */
-export function airStrike(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
+export function airStrike(
+  state: GameState, attackerId: number, targetIndex: number, seat: number, priority = false,
+): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId && u.seat === seat);
   if (!attacker) return { ok: false, reason: 'No such unit.' };
   const kind = UNITS[attacker.type]?.air;
@@ -1848,11 +1892,15 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   if (attacker.movesLeft <= 0) return { ok: false, reason: 'The sortie is spent.' };
   if (attacksLeftOf(attacker) <= 0) return { ok: false, reason: 'The sortie is spent.' };
   if (!airStrikeReaches(state, attacker, targetIndex)) return { ok: false, reason: 'Out of operational range.' };
-  if (!airStrikeOffers(state, attacker, targetIndex)) {
+  const support = priority ? priorityDefender(state, attacker, targetIndex) : undefined;
+  if (priority ? !support : !airStrikeOffers(state, attacker, targetIndex)) {
     return { ok: false, reason: 'Not a target this aircraft answers.' };
   }
   const holder = cityAtIndex(state, targetIndex);
-  if (kind === 'BOMBER' && holder && unitsHostile(state, attacker, { seat: holder.holder.seat })) {
+  if (!priority && kind === 'BOMBER' && holder && unitsHostile(state, attacker, { seat: holder.holder.seat })) {
+    if (!siegeMayShoot(state, attacker)) return { ok: false, reason: 'Siege units cannot move and shoot.' };
+    attacker.patrol = undefined;
+    if (!airAnswers(state, attacker, targetIndex)) return { ok: true };
     const r = rangedAttack(state, attackerId, targetIndex);
     if (r.ok) attacker.movesLeft = 0;
     return r;
@@ -1862,9 +1910,12 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
       && unitVisibleTo(state, u, attacker.seat),
   );
   if (enemies.length === 0) return { ok: false, reason: 'Nothing to strike.' };
+  attacker.patrol = undefined;
+  logUnitOrder(state, seat, attackerId, 'ranged', targetIndex);
+  if (!airAnswers(state, attacker, targetIndex)) return { ok: true };
   // CIV6 (Air combat): "all air attacks are ranged", so the naval hex's
   // higher-chassis rule answers this blow too.
-  const defender = stackDefender(state, enemies, true);
+  const defender = support ?? stackDefender(state, enemies, true);
   const atk = UNITS[attacker.type]?.ranged?.strength ?? 0;
   const def = airDefenseOf(state, defender);
   // CIV6 (Air combat): "all air attacks are ranged", so the sortie is a ranged
@@ -1881,23 +1932,15 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
     });
   defender.hp -= damageRoll(state, atkE - defE, 'air', targetIndex);
   spendAttack(attacker, true);
-  // the answer. CIV6 (Air combat): a plane "doesn't suffer damage in return
-  // unless it gets Intercepted", and "the only exceptions to this rule are
-  // SHIPS with the Anti-Air Strength stat - they have additional close-range
-  // defenses, which activate when they are attacked by an aircraft" — beside
-  // which a parked weapon "provides cover from air attacks up to 1 hex away".
-  // `airCoverAgainst` folds both into the one answer that fires.
-  airCoverAnswer(state, attacker, targetIndex);
   awardBattleXp(state, attacker, defender,
-    { ranged: true, aDied: attacker.hp <= 0, dDied: defender.hp <= 0 });
+    { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, {
-    aDied: attacker.hp <= 0, dDied: defender.hp <= 0,
+    aDied: false, dDied: defender.hp <= 0,
   });
   if (defender.hp <= 0) {
     killUnit(state, defender);
     healOnEliminate(state, attacker);
   }
-  logUnitOrder(state, seat, attackerId, 'ranged', targetIndex);
   return { ok: true };
 }
 

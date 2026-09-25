@@ -20,6 +20,8 @@ export const AIR_STRIKE_COLS = 12;
 import { SPY_TRAVEL_COLS, SPY_MISSIONS } from '../data/espionage';
 export { SPY_TRAVEL_COLS, SPY_MISSIONS };
 export const AIR_REBASE_COLS = 6;
+/** how many hexes a fighter's DEPLOY head offers, tile index ascending. */
+export const AIR_DEPLOY_COLS = 6;
 
 /** how many legal nuclear targets a CARRIER's head offers, ordered by tile
  *  index ascending — the AIR_STRIKE head's contract, one head per device. */
@@ -140,6 +142,15 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // repeated use and needs no encoding the six-direction move space cannot
   // carry. A MODEL choice. Appended last, like every verb since FOUND_CITY.
   names.push('PORTAL');
+  // PATROL (UNITOPERATION_DEPLOY): a fighter deploys to the k-th hex the
+  // DEPLOY head offers (`deployTargets`, tile index ascending), and RETURN TO
+  // BASE ends the patrol. PRIORITY TARGET (UNITCOMMAND_PRIORITY_TARGET): an
+  // aircraft strikes the Support-class unit on the k-th tile its head offers,
+  // the AIR_STRIKE head's width and order. Appended last, like every verb
+  // since FOUND_CITY.
+  for (let k = 0; k < AIR_DEPLOY_COLS; k++) names.push(`DEPLOY_${k}`);
+  names.push('RETURN_TO_BASE');
+  for (let k = 0; k < AIR_STRIKE_COLS; k++) names.push(`PRIORITY_TARGET_${k}`);
   return names;
 }
 

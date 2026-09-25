@@ -83,6 +83,10 @@ class SimOrders:
         _hvc = self._A_HARVEST
         _wcc = self._A_WONDER_CHARGE
         _ptc = self._A_PORTAL
+        _dpc = self._A_DEPLOY
+        _dpw = self._air_deploy_cols
+        _rtc = self._A_RETURN
+        _prc = self._A_PRIORITY
         _nkw = self._nuke_cols * self._n_devices
         _fnc = self._A_FINISH
         _gpc = self._A_GP
@@ -143,6 +147,9 @@ class SimOrders:
             (((_ab >= _nkc) & (_ab < _nkc + _nkw)) if _nkc >= 0 else _no).any(dim=0),  # a nuclear strike
             ((_ab == _hvc) if _hvc >= 0 else _no).any(dim=0),                     # harvest a resource
             ((_ab == _wcc) if _wcc >= 0 else _no).any(dim=0),                     # a charge into a wonder
+            (((_ab >= _dpc) & (_ab < _dpc + _dpw)) if _dpc >= 0 else _no).any(dim=0),  # deploy on patrol
+            ((_ab == _rtc) if _rtc >= 0 else _no).any(dim=0),                     # return to base
+            (((_ab >= _prc) & (_ab < _prc + _asw)) if _prc >= 0 else _no).any(dim=0),  # priority target
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -151,7 +158,7 @@ class SimOrders:
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
          _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean, _rk_nuke,
-         _rk_harvest, _rk_wcharge) = _tab
+         _rk_harvest, _rk_wcharge, _rk_deploy, _rk_return, _rk_priority) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -634,6 +641,47 @@ class SimOrders:
                     if _okR.numel():
                         self.unit_tile[_okR, sc[_okR]] = _tg[_okR]
                         self.unit_mp[_okR, sc[_okR]] = 0
+                        # an order other than the patrol ends it
+                        self.unit_patrol[_okR, sc[_okR]] = -1
+
+            # PATROL (`deployAir`): the fighter holds the hex and the turn goes
+            # with the deployment
+            if _rk_deploy[n] and _dpc >= 0:
+                dpm = act & (a >= _dpc) & (a < _dpc + _dpw)
+                if bool(dpm.any()):
+                    _cols = self._deploy_targets(
+                        row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    _k = (a - _dpc).clamp(min=0, max=_dpw - 1)
+                    _tg = _cols.gather(1, _k.unsqueeze(1)).squeeze(1)
+                    _okD = (dpm & (_tg >= 0)).nonzero(as_tuple=True)[0]
+                    if _okD.numel():
+                        self.unit_patrol[_okD, sc[_okD]] = _tg[_okD]
+                        self.unit_mp[_okD, sc[_okD]] = 0
+
+            # RETURN TO BASE (`returnToBase`): the patrol ends and no movement
+            # is spent
+            if _rk_return[n] and _rtc >= 0:
+                _okT = (act & (a == _rtc)
+                        & (self.unit_patrol.gather(1, sc.unsqueeze(1)).squeeze(1) >= 0)
+                        & (self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1) > 0)
+                        ).nonzero(as_tuple=True)[0]
+                if _okT.numel():
+                    self.unit_patrol[_okT, sc[_okT]] = -1
+
+            # PRIORITY TARGET: the strike aimed at the tile's Support unit
+            if _rk_priority[n] and _prc >= 0:
+                prm = act & (a >= _prc) & (a < _prc + _asw)
+                if bool(prm.any()):
+                    _cols = self._priority_targets(
+                        row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    _k = (a - _prc).clamp(min=0, max=_asw - 1)
+                    _tg = _cols.gather(1, _k.unsqueeze(1)).squeeze(1)
+                    _okQ = prm & (_tg >= 0)
+                    for b_ in _okQ.nonzero(as_tuple=True)[0].tolist():
+                        v = int(sc[b_])
+                        one = torch.zeros(B, dtype=torch.bool, device=dev)
+                        one[b_] = True
+                        self._air_strike(one, _tg, "major", v, row, priority=True)
 
             if _rk_travel[n] and _stc >= 0:
                 stm = act & (a >= _stc) & (a < _stc + _stw)
@@ -1677,26 +1725,65 @@ class SimOrders:
         self._eff_version += 1
 
     def _seat_upkeep_and_bankruptcy(self, row: int, active: torch.Tensor) -> None:
-        """Unit upkeep + the bankruptcy rule for ONE seat row, at the loop
-        position right after the seat's gold lands:
-        charge maintenance for every living unit of this seat off the POOLED
-        planes, then disband while insolvent. An eliminated actor charges
-        nothing (the TS loop's eliminated-actor continue)."""
+        """Unit upkeep + the bankruptcy rule for ONE seat row — a major's at
+        the loop position right after its gold lands, the Free Cities seat's
+        in its own phase after its cities' gold: charge maintenance for every
+        living unit of the row's SEAT off the POOLED planes (the Free Cities'
+        stand in the hostile range), then meet the bankruptcy that charge may
+        force (`_bankrupt_disband`). A game where the seat does not act this
+        turn charges nothing (`active`: the TS loop's eliminated-actor
+        continue, the Free Cities phase's no-city return)."""
         if not self.units_mode:
             return
-        mine = self.unit_alive & (self.unit_seat == row)
+        seat = int(self._ROW_SEAT[row])
+        mine = self.unit_alive & (self.unit_seat == seat)
         upkeep = (self._unit_upkeep(row, self.unit_type) * mine.to(self.dtype)).sum(dim=1)
-        upkeep = upkeep + self._wmd_upkeep(row)
+        if row < self.n_majors:
+            upkeep = upkeep + self._wmd_upkeep(row)
+        tre = self._treasury_of(row)
         if self._log_diff:
             for _b in range(self.B):
                 self._diff_events.setdefault(_b, []).append(
-                    f"up:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                    f"up:{seat}:{int(self.turn)}"
                     f" n{int(mine[_b].sum())}"
                     f" cost{float(upkeep[_b]):.3f}"
-                    f" purse{float(self.civ_treasury[_b, row]):.3f}")
-        tre = self.civ_treasury[:, row]
-        self.civ_treasury[:, row] = torch.where(active, tre - upkeep, tre)
+                    f" purse{float(tre[_b]):.3f}")
+        paid = torch.where(active, tre - upkeep.to(tre.dtype), tre)
+        if row < self.n_majors:
+            self.civ_treasury[:, row] = paid
+        else:
+            self.free_treasury.copy_(paid)
         self._bankrupt_disband(row, active)
+
+    def _treasury_of(self, row: int) -> torch.Tensor:
+        """[B] the treasury of city ROW `row`'s holder — a major's own, a
+        minor's (`citystate_treasury`), the Free Cities seat's
+        (`free_treasury`); 0 on the minor pad of a world with none."""
+        if row < self.n_majors:
+            return self.civ_treasury[:, row]
+        if row == self.FREE_ROW:
+            return self.free_treasury
+        s = row - self._CITY_MINOR0
+        if 0 <= s < self.S:
+            return self.citystate_treasury[:, s]
+        return torch.zeros(self.B, dtype=self.civ_treasury.dtype, device=self.device)
+
+    def _bankruptcy_count(self, row: int, line: int, step: int, on_line: bool) -> torch.Tensor:
+        """[B] long — `bankruptcyCount` over row `row`'s treasury: 0 while the
+        milli-rounded treasury stands above `line` (or on it, when `on_line`
+        is false), past it 1 and one more for every whole `step` further down
+        (`line`, `step` in milli-gold). Integer arithmetic past the rounding,
+        so both engines floor the same quotient."""
+        m = js_round(self._treasury_of(row).double() * 1000).to(torch.long)
+        n = 1 + torch.div(line - m, -step, rounding_mode="floor")
+        clear = (m > line) if on_line else (m >= line)
+        return torch.where(clear, torch.zeros_like(n), n)
+
+    def _bankrupt_amenities(self, row: int) -> torch.Tensor:
+        """[B] f64 — `bankruptAmenities`: the amenities EVERY city of row
+        `row` loses to its holder's treasury. CIV6 (the Gold pedia): "-1
+        penalty to your Amenities per every 10 Gold you drop below 0"."""
+        return self._bankruptcy_count(row, self._bk_amen_line, self._bk_amen_step, False).double()
 
     def _wmd_upkeep(self, row: int) -> torch.Tensor:
         '''[B] gold the seat's nuclear devices bill this turn. CIV6: 14 Gold
@@ -1710,36 +1797,41 @@ class SimOrders:
         return gold * (100.0 + pct) / 100.0
 
     def _bankrupt_disband(self, row: int = 0, active: torch.Tensor | None = None) -> None:
-        """Disband ONE unit of seat-row `row` per turn while its treasury is
-        insolvent — milli-rounded test (sub-milli non-dyadic gold drift must
-        not trip the < 0 boundary here but not on TS). The priciest alive
-        unit goes; ties break to the lowest slot (= oldest, matching TS's
-        FIRST in `state.units` — spawn order, NOT the unit id: a converted
-        barbarian keeps its barbarian-era id and took a new slot, and the two
-        parted on it once. The window only ever appends, so ONE seat's slots ascend in
-        that seat's own spawn order even though every major seat interleaves
-        into it). Only upkeep>0 units are candidates, and there is no refund.
+        """BANKRUPTCY'S DISBANDS for seat row `row` this turn — the
+        `bankruptDisband` twin. CIV6 (the Gold pedia): "at -10 Gold you will
+        automatically disband a unit, at -20 two units": `_bankruptcy_count`
+        over the disband line and step, read off the treasury the upkeep left.
+        Each is the priciest alive unit of the row's SEAT still standing; ties
+        break to the lowest slot (= oldest, matching TS's FIRST in
+        `state.units` — spawn order, NOT the unit id: a converted barbarian
+        keeps its barbarian-era id and took a new slot, and the two parted on
+        it once. The window only ever appends, so ONE seat's slots ascend in
+        that seat's own spawn order even though every seat interleaves into
+        it). Only upkeep>0 units are candidates, and there is no refund.
         `active` is the TS loop's eliminated-actor continue."""
-        insolvent = js_round(self.civ_treasury[:, row] * 1000) < 0
+        left = self._bankruptcy_count(row, self._bk_disband_line, self._bk_disband_step, True)
         if active is not None:
-            insolvent = insolvent & active
-        if not bool(insolvent.any()):
+            left = torch.where(active, left, torch.zeros_like(left))
+        if not bool((left > 0).any()):
             return
+        seat = int(self._ROW_SEAT[row])
         maint = self._unit_upkeep(row, self.unit_type)
-        cand = self.unit_alive & (self.unit_seat == row) & (maint > 0)
-        W = cand.shape[1]
+        W = maint.shape[1]
         slots = torch.arange(W, device=self.device, dtype=maint.dtype).unsqueeze(0)  # [1, W]
-        # maximize (upkeep, -slot): upkeep*(W+1) - slot lets upkeep dominate, tie -> lowest slot
-        score = torch.where(cand, maint * float(W + 1) - slots, torch.full_like(maint, -1e30))
-        victim = score.argmax(dim=1)
-        do_kill = insolvent & cand.any(dim=1)
-        if not bool(do_kill.any()):
-            return
-        rows = do_kill.nonzero(as_tuple=True)[0]
-        vslot = victim[rows]
-        vtile = self.unit_tile[rows, vslot]
-        self._occ_clear(rows, vtile, vslot)
-        self.unit_alive[rows, vslot] = False
+        while True:
+            cand = self.unit_alive & (self.unit_seat == seat) & (maint > 0)
+            do_kill = (left > 0) & cand.any(dim=1)
+            if not bool(do_kill.any()):
+                return
+            # maximize (upkeep, -slot): upkeep*(W+1) - slot lets upkeep dominate, tie -> lowest slot
+            score = torch.where(cand, maint * float(W + 1) - slots, torch.full_like(maint, -1e30))
+            victim = score.argmax(dim=1)
+            rows = do_kill.nonzero(as_tuple=True)[0]
+            vslot = victim[rows]
+            vtile = self.unit_tile[rows, vslot]
+            self._occ_clear(rows, vtile, vslot)
+            self.unit_alive[rows, vslot] = False
+            left = left - do_kill.long()
 
     def _barb_reset_mp(self) -> None:
         """Reset barbarian MP: `u.movesLeft = UNITS[u.type].moves`.

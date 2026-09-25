@@ -222,6 +222,7 @@ ACT_ATTRS = {
     "PROMOTE_0": "_A_PROMOTE", "CONDEMN_0": "_A_CONDEMN", "REMOVE_HERESY": "_A_HERESY",
     "LAUNCH_INQUISITION": "_A_INQUISITION", "CONVERT_HEATHEN": "_A_HEATHEN", "AIR_STRIKE_0": "_A_AIR_STRIKE",
     "REBASE_0": "_A_REBASE", "SPY_TRAVEL_0": "_A_SPY_TRAVEL", "SPY_MISSION_0": "_A_SPY_MISSION",
+    "DEPLOY_0": "_A_DEPLOY", "RETURN_TO_BASE": "_A_RETURN", "PRIORITY_TARGET_0": "_A_PRIORITY",
     "BUILD_ROAD": "_A_ROAD", "BUILD_RAILROAD": "_A_RAIL", "FINISH_DISTRICT": "_A_FINISH", "ACTIVATE_GP": "_A_GP",
     "BOOST_PROJECT": "_A_BOOST", "FORM_UP_0": "_A_FORM_UP", "HARVEST": "_A_HARVEST", "WONDER_CHARGE": "_A_WONDER_CHARGE",
 }
@@ -544,6 +545,14 @@ def main() -> None:
             assert all(float(x) == int(x) for x in sim.gp_price[b, :nG].tolist()), f"{where}: a fractional gp price"
             assert gp["points"] == [math.floor(x) for x in sim.civ_gpp[b, row, :nG].tolist()], f"{where}: gp.points"
             live_gp += sum(x >= 0 for x in gp["offer"])
+            # BELIEFS: the founding and enhancing gates, the held rows, each
+            # class's open rows
+            bg, pools = ob["belief"], sim._bel_pools()
+            gates = [bool(sim._can_found(row)[b]), bool(sim._can_enhance(row)[b])]
+            assert [bg["found"], bg["enhance"]] == gates, f"{where}: belief gates"
+            assert bg["held"] == [int(ids[b, row]) for _m, ids, _n in pools], f"{where}: belief.held"
+            for name, (m, _ids, n) in zip(("follower", "worship", "founder", "enhancer"), pools):
+                assert bg[name] == (~m[b, :n]).nonzero(as_tuple=True)[0].tolist(), f"{where}: belief.{name}"
             if not rows_c:
                 assert not bool(pmask[b].any()), f"{where}: no living city, yet a production column is open"
             live_tgt += check_targets(sim, row, b, ob, tgt_ctx)

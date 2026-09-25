@@ -763,8 +763,10 @@ class SimEconomy:
             if not bool(good.any()):
                 continue
             br, bd, col = br[good], bd[good], col[good]
+            # CIV6 (Dar-e Mehr): "Cannot be pillaged by natural disasters"
             mine = (self.city_bldg[br, r, col]
-                    & (self._b_req_district.unsqueeze(0) == bd.unsqueeze(1)))
+                    & (self._b_req_district.unsqueeze(0) == bd.unsqueeze(1))
+                    & ~self._b_disaster_proof.unsqueeze(0))
             if bool(mine.any()):
                 self.city_bldg_pillaged[br, r, col] |= mine
                 hit = True
@@ -1986,11 +1988,9 @@ class SimEconomy:
         still building, and only `buildingCompletable` — the PURCHASE gate,
         `complete=True` — demands the district be finished.
 
-        WORSHIP buildings are never offered. `availableBuildings` admits one
-        only when it IS this seat's founded religion's worship building, and
-        nothing in the live engine ever sets `religion.worship` (the founding
-        body claims follower/founder/enhancer and no worship id) — the one
-        live path to a worship building is `buyWorshipBuilding`.
+        A WORSHIP building is offered only where it IS the building this
+        seat's religion's Worship belief names (`_worship_bidx_of`), and never
+        on the gold reading.
 
         `queued` is TS's queued SET: a building anywhere in the city's queue is
         already on order, and TS offers neither it nor a prerequisite it would
@@ -2039,10 +2039,14 @@ class SimEconomy:
         # REPAIR, on its own column at `_building_cost_in`'s repair price;
         # the gold arm never sells one (CIV6 repairs from the queue alone)
         held = have if gold else (have & ~self.city_bldg_pillaged[:, row])
+        own_w = torch.zeros(B, NB, dtype=torch.bool, device=dev)
+        if not gold and row < self.n_majors:
+            _wb = self._worship_bidx_of(row)
+            own_w = (torch.arange(NB, device=dev).unsqueeze(0) == _wb.unsqueeze(1)) & (_wb >= 0).unsqueeze(1)
         base = (
             unlocked.unsqueeze(1) & ~held & ~queued
             & (~rd.b_river.reshape(1, 1, -1) | river_c.unsqueeze(2))
-            & ~self._b_worship.reshape(1, 1, -1)
+            & (~self._b_worship.unsqueeze(0) | own_w).unsqueeze(1)
         )
         # CIV6 (Urban Development Treaty, outcome B): "No buildings can be
         # created in this district." New picks only — in-flight items finish.
@@ -2239,23 +2243,30 @@ class SimEconomy:
             out = out & (~is_spy | self._can_train_spy(row).reshape(B, 1, 1))
         return out
 
-    def _worship_bidx_of(self, row: int) -> int:
-        if not self._worship_bidx:
-            return -1
-        return int(self._worship_bidx[row % len(self._worship_bidx)])
+    def _worship_bidx_of(self, row: int) -> torch.Tensor:
+        """[B] the building row seat row `row`'s religion's Worship belief
+        names, -1 where it holds none (`worshipBuildingOf`)."""
+        wi = self.civ_worship[:, row]
+        if self._worship_bidx.numel() == 0:
+            return torch.full_like(wi, -1)
+        wb = self._worship_bidx[wi.clamp(min=0, max=self._worship_bidx.numel() - 1)]
+        return torch.where(wi >= 0, wb, torch.full_like(wi, -1))
 
     def _worship_city_ok(self, row: int) -> torch.Tensor:
         """[B, RC] cities of seat row `row` that could take its worship
-        building NOW — `buyWorshipBuilding`'s city gates: a TEMPLE, a COMPLETE
-        unpillaged Holy Site, and no worship building yet. The seat-level
-        gates (a founded religion, the faith) sit at the call site."""
-        wb = self._worship_bidx_of(row)
-        if wb < 0 or self._temple_bidx < 0 or self._hs_idx < 0:
+        building NOW — `buyWorshipBuilding`'s city gates: the building its
+        religion's Worship belief names, not yet held, a TEMPLE and a COMPLETE
+        unpillaged Holy Site. The seat-level gates (a founded religion, the
+        faith) sit at the call site."""
+        if row >= self.n_majors or self._temple_bidx < 0 or self._hs_idx < 0:
             return torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+        wb = self._worship_bidx_of(row)
         hs = self.city_dist_tile[:, row, :, self._hs_idx]
         hs_ok = (hs >= 0) & self.district_complete.gather(1, hs.clamp(min=0)) & ~self.district_pillaged.gather(1, hs.clamp(min=0))
-        return (self.city_alive[:, row] & self.city_bldg[:, row, :, self._temple_bidx]
-                & ~self.city_bldg[:, row, :, wb] & hs_ok)
+        held_w = self.city_bldg[:, row].gather(
+            2, wb.clamp(min=0).reshape(-1, 1, 1).expand(-1, self.RC, 1)).squeeze(2)
+        return ((wb >= 0).unsqueeze(1) & self.city_alive[:, row] & self.city_bldg[:, row, :, self._temple_bidx]
+                & ~held_w & hs_ok)
 
     def _adj_district_count(self) -> torch.Tensor:
         """[B, T] number of adjacent COMPLETED districts — the DISTRICT
@@ -4623,11 +4634,12 @@ class SimEconomy:
         # combat" — the rest gate does not reach that chassis at all.
         _t = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         # CIV6 (Ground Crews): "Heal while patrolling or deployed" — the
-        # fighter's HEAL_AFTER_ACTION excuses a sortie and a rebase alike, and
-        # a plane always stands at its base.
+        # fighter's HEAL_AFTER_ACTION excuses a sortie, a rebase and a
+        # deployment alike.
+        _gc = self._promo_pool_flag(pre, "HEAL_AFTER_ACTION")
         out = (self._spent_mp(pre) & ~self._type_heals_always[_t]
                & ~(struck & self._promo_pool_flag(pre, "HEAL_AFTER_ATTACK"))
-               & ~self._promo_pool_flag(pre, "HEAL_AFTER_ACTION"))
+               & ~_gc)
         # CIV6 (Pa): "A Maori unit occupying a Pa heals even if they just moved
         # or attacked" — the improvement's OWN civilization's units, so the
         # tile's row and the unit's seat both have to agree.
@@ -4642,7 +4654,10 @@ class SimEconomy:
                     if u >= 0 and bool(self._imp_heals_after[k]):
                         _mine = _mine | ((_iv == k) & self._seat_plays_civ_idx(_sd, u))
                 out = out & ~(_ok & _mine)
-        return out
+        # CIV6 (Patrols): "Aircraft can heal at the end of the game turn when
+        # stationed on a City Center, Aerodrome, Airstrip, or Aircraft
+        # Carrier" — a fighter out on patrol heals only by Ground Crews' clause
+        return out | ((getattr(self, f"{pre}_unit_patrol") >= 0) & ~_gc)
 
     def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
         """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
@@ -6095,8 +6110,8 @@ class SimEconomy:
             "population": (self.city_pop[:, row, : self.RC].long() * alive.long()).sum(dim=1),
             "greatPeople": self.civ_gp_earned[:, row].sum(dim=1),
             # the founded religion's beliefs; the pantheon is not one of them
-            "religion": ((self.civ_follower[:, row] >= 0).long() + (self.civ_founder[:, row] >= 0).long()
-                         + (self.civ_enhancer[:, row] >= 0).long()),
+            "religion": ((self.civ_follower[:, row] >= 0).long() + (self.civ_worship[:, row] >= 0).long()
+                         + (self.civ_founder[:, row] >= 0).long() + (self.civ_enhancer[:, row] >= 0).long()),
             "techs": self.civ_techs[:, row].long().sum(dim=1),
             "wonders": wonders,
         }

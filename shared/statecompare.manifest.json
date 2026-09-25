@@ -184,23 +184,11 @@
           ],
           "planes": [
             "fol_claimed",
-            "claimed_f_n",
+            "wor_claimed",
             "fou_claimed",
-            "claimed_o_n"
+            "enh_claimed"
           ],
-          "note": "TS keeps ONE claimedBeliefs list mixing follower and founder ids; the GPU counts the two pools separately. The comparison is over the total, because splitting the TS list needs the belief catalogs and the total is the fact both engines actually agree on."
-        },
-        {
-          "name": "enhancerBeliefsClaimed",
-          "compare": "exact",
-          "covers": [
-            "GameState.claimedEnhancers"
-          ],
-          "planes": [
-            "enh_claimed",
-            "claimed_e_n"
-          ],
-          "note": "the global COUNT; which enhancer each seat took is the per-seat `beliefEnhancer` field, and the claim mask is that set"
+          "note": "TS keeps ONE claimedBeliefs list over the four religion belief classes; the GPU keeps one claim mask per class. The comparison is over the total; which belief each seat holds is the per-seat `belief*` fields, and the masks are that set."
         },
         {
           "name": "greatPeopleByClass",
@@ -279,6 +267,17 @@
           "planes": [],
           "note": "the polar-melt denominator, stamped the same way.",
           "derived": true
+        },
+        {
+          "name": "freeTreasury",
+          "compare": "milli",
+          "covers": [
+            "GameState.freeSeat"
+          ],
+          "planes": [
+            "free_treasury"
+          ],
+          "note": "the Free Cities seat's treasury (`freeSeat.treasury`): its cities' Gold less its units' upkeep, which bankruptcy reads; 0 before the first revolt makes the seat."
         }
       ]
     },
@@ -921,15 +920,15 @@
           "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `pantheon !== null` vs `civ_pantheon_done`"
         },
         {
-          "name": "enhancerDone",
+          "name": "religionEnhanced",
           "compare": "exact",
           "covers": [
-            "ReligionState.enhancer"
+            "ReligionState.enhanced"
           ],
           "planes": [
-            "civ_enhancer_done"
+            "civ_enhanced"
           ],
-          "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `enhancer != null` vs `civ_enhancer_done`"
+          "note": "the religion's enhancement, latched once; an Enhancer belief may arrive at the founding, so the belief ids do not say it"
         },
         {
           "name": "gpPoints",
@@ -1130,6 +1129,16 @@
           ],
           "planes": [
             "civ_founder"
+          ]
+        },
+        {
+          "name": "beliefWorship",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.worship"
+          ],
+          "planes": [
+            "civ_worship"
           ]
         },
         {
@@ -2030,7 +2039,7 @@
           "planes": [
             "city_freed_turn"
           ],
-          "note": "the turn a FREE CITY revolted, which its ranged grant counts from; -1 for a city that is not Free. TS reads it off `foundedTurn`, which the transfer that made the city Free writes; `foundedTurn` has no other reader."
+          "note": "the turn a FREE CITY revolted, which its grants count from; -1 for a city that is not Free. TS reads it off `foundedTurn`, which the transfer that made the city Free writes; `foundedTurn` has no other reader."
         },
         {
           "name": "greatWorks",
@@ -2389,6 +2398,28 @@
             "unit_escorted"
           ],
           "note": "the civilian half of an escort formation; the escort is whoever holds the tile's military slot."
+        },
+        {
+          "name": "patrol",
+          "compare": "exact",
+          "covers": [
+            "Unit.patrol"
+          ],
+          "planes": [
+            "unit_patrol"
+          ],
+          "note": "the hex a deployed fighter patrols; TS spells 'stationed' as absent and the GPU as -1, both read as -1 here."
+        },
+        {
+          "name": "freeCity",
+          "compare": "exact",
+          "covers": [
+            "Unit.freeCity"
+          ],
+          "planes": [
+            "unit_free_city"
+          ],
+          "note": "the id of the Free City that granted the unit, which a join takes the unit with; TS spells 'no grant' as absent and the GPU as -1, both read as -1 here."
         }
       ]
     },
@@ -2867,7 +2898,7 @@
       },
       {
         "path": "Seat.religion",
-        "why": "the container; its fields are covered one by one (holyTile, founded, and the four belief-identity gap fields)."
+        "why": "the container; its fields are covered one by one (holyTile, founded, enhanced, and the five belief-identity fields)."
       },
       {
         "path": "Seat.research",
@@ -2880,10 +2911,6 @@
       {
         "path": "ReligionState.name",
         "why": "presentation."
-      },
-      {
-        "path": "ReligionState.worship",
-        "why": "the worship building a founded religion unlocks; the GPU derives it from the founder belief rather than storing it."
       },
       {
         "path": "City.id",

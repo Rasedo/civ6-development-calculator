@@ -4,8 +4,8 @@
 
 The TS twin is tests/cpu/units/bankruptcy-tie.test.ts.
 
-`_bankrupt_disband` takes the priciest alive unit of a broke seat and breaks
-a tie to the LOWEST SLOT. That equals spawn order only because the pool
+`_bankrupt_disband` takes the priciest alive unit of a broke seat (one at
+-10 gold) and breaks a tie to the LOWEST SLOT. That equals spawn order only because the pool
 APPENDS — a fact this lane pins, since the whole cross-engine agreement
 rests on it. TS ties on spawn order too; the lowest unit ID would not do,
 since it is spawn order for a trained unit and not for a re-seated one (a
@@ -71,7 +71,7 @@ def test_the_tie_goes_to_the_lower_slot(sim, a: int, b: int) -> None:
         assert float(upk[s]) <= float(upk[a]), f"slot {s} costs more than the pair and would go first"
     lower_others = [s for s in others if float(upk[s]) == float(upk[a]) and s < a]
     victim_expected = min(lower_others) if lower_others else a
-    sim.civ_treasury[B0, ROW] = -1000.0
+    sim.civ_treasury[B0, ROW] = -10.0  # exactly one disband
     sim._bankrupt_disband(ROW, torch.tensor([True]))
     assert not bool(sim.unit_alive[B0, victim_expected]), \
         f"slot {victim_expected} (earliest-spawned of the priciest) should have gone"
@@ -92,7 +92,7 @@ def test_the_pricier_goes_first(sim) -> None:
         sim.unit_alive[B0, s] = False
     a = spawn(sim, cheap_t)
     d = spawn(sim, dear_t)
-    sim.civ_treasury[B0, ROW] = -1000.0
+    sim.civ_treasury[B0, ROW] = -10.0  # exactly one disband
     sim._bankrupt_disband(ROW, torch.tensor([True]))
     assert not bool(sim.unit_alive[B0, d]) and bool(sim.unit_alive[B0, a]), \
         "the pricier unit did not go first"

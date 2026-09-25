@@ -90,6 +90,15 @@
       ["passed_by", "list", "per class: the major seat index that passed on the standing offer (`gpPassedBy`), -1 nobody"],
       ["price", "list", "per class: the offer's frozen price in Great Person points (a whole number)"],
       ["points", "list", "per class: this seat's Great Person points, floored"]
+    ],
+    "belief": [
+      ["found", "bool", "the seat may found its religion now (`canFoundReligion`): no seat ban, no religion yet, a pantheon, a completed Holy Site or Stonehenge, an activated Great Prophet"],
+      ["enhance", "bool", "the seat may enhance its religion now (`canEnhanceReligion`): founded, not yet enhanced, a second activated Great Prophet"],
+      ["held", "list", "per religion belief class (BELIEF_CLASSES: Follower, Worship, Founder, Enhancer): the class catalog row the seat's religion holds, -1 none"],
+      ["follower", "list", "the Follower catalog rows no religion holds, ascending"],
+      ["worship", "list", "the Worship catalog rows no religion holds, ascending"],
+      ["founder", "list", "the Founder catalog rows no religion holds, ascending"],
+      ["enhancer", "list", "the Enhancer catalog rows no religion holds, ascending"]
     ]
   },
   "city": [

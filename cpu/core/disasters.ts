@@ -83,7 +83,8 @@ function pillageTileBuildings(state: GameState, tile: Tile): void {
   const city = held?.city ?? cityHoldingDistrict(state, tile);
   if (!city) return;
   for (const id of [...(city.buildings ?? [])]) {
-    if (BUILDINGS[id]?.district === tile.district) pillageBuilding(city, id);
+    // CIV6 (Dar-e Mehr): "Cannot be pillaged by natural disasters"
+    if (BUILDINGS[id]?.district === tile.district && !BUILDINGS[id]?.disasterProof) pillageBuilding(city, id);
   }
 }
 

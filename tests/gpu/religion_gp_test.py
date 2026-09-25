@@ -5,8 +5,8 @@ Covers paths the scripted rollout can't reach organically:
     cost), driven through the seat-0 advance loop.
   * Writer/Musician classes: n_gp = 9, both share the Theater Square district
     index with the Artist (the three culture classes).
-  * belief catalog counts (pantheons 25 / followers 9 / founders 8) and the
-    Enhancer slot (pool 7 + its effect table).
+  * belief catalog counts (pantheons 24; a religion's classes: followers 9,
+    worship 9, founders 7, enhancers 5) and the four class pools.
 
 Follows the occupancy_test pattern: load rules + a fixture, drive the
 GPU BatchSim, assert on its internal tensors.
@@ -61,12 +61,8 @@ def main() -> None:
     # the pools: Oral Tradition, Church Property, Crusade and
     # Messenger of the Gods are not in the Gathering Storm install
     assert rr["pantheonPool"] == 24, f"pantheons: {rr['pantheonPool']}"
-    assert rr["followerPool"] == 9, f"followers: {rr['followerPool']}"
-    assert rr["founderPool"] == 7, f"founders: {rr['founderPool']}"
-    assert rr["enhancerPool"] == 5, f"enhancers: {rr['enhancerPool']}"
     assert len(bl["pantheons"]) == 24 and len(bl["followers"]) == 9 and len(bl["founders"]) == 7
-    # The enhancer effect table ships alongside the pool.
-    assert len(bl.get("enhancers", [])) == 5, "enhancer effect rows missing from export"
+    assert len(bl["enhancers"]) == 5 and bl["worshipPool"] == 9, "a religion's four class catalogs"
 
     # --- GPU side: tensors auto-extend to n_gp = 9 -------------------------
     paths = fixture_paths()
@@ -78,24 +74,14 @@ def main() -> None:
     assert [int(x) for x in sim._gp_cost_table[:, 0].tolist()] == [row[0] for row in ct]
     assert sim._gp_era.shape[1] == max(rr["gpRoster"]) and sim._gp_effects.shape[1] == sim._gp_era.shape[1]
 
-    # --- enhancer race state is wired (mirror of follower/founder) ---------
+    # --- a religion's four class pools are wired ----------------------------
     assert sim._enh_any, "enhancer pool must be non-empty"
-    assert sim.enh_claimed.shape[1] == 5, f"enh pool mask width: {sim.enh_claimed.shape[1]}"
-    assert sim.civ_enhancer[:, 1:].shape == sim.civ_follower[:, 1:].shape, "civ_only_enhancer must mirror civ_only_follower"
-    assert sim.civ_enhancer_done[:, 1:].shape == sim.civ_religion_done[:, 1:].shape
-    assert bool((sim.civ_enhancer[:, 1:] == -1).all()) and int(sim.claimed_e_n.sum()) == 0, "fresh: no enhancer claimed"
-    # The k-th-open picker (the exact inline arithmetic of the enhancer claim):
-    # the pool is five rows: with idx 1 & 4 pre-claimed the open
-    # ids are {0,2,3}; a draw giving k = 1 selects the 2nd open id = idx 2.
-    ec = sim.enh_claimed.clone()
-    ec[0, 1] = True
-    ec[0, 4] = True
-    draw = torch.tensor([1.4 / 3.0], dtype=torch.float64)  # -> k = 1 (2nd open)
-    n_open = (~ec).sum(dim=1)
-    k = torch.floor(draw * n_open.to(torch.float64)).to(torch.long)
-    cum = (~ec).long().cumsum(dim=1)
-    sel = (~ec) & (cum == (k + 1).unsqueeze(1))
-    assert int(sel.long().argmax(dim=1)[0]) == 2, "enhancer k-th-open pick wrong"
+    assert sim._bel_class_n == [9, 9, 7, 5], f"class pools: {sim._bel_class_n}"
+    for (m, ids, n), w in zip(sim._bel_pools(), (9, 9, 7, 5)):
+        assert m.shape[1] == w and n == w, f"class mask width {m.shape[1]}"
+        assert ids.shape == sim.civ_follower.shape, "one held id per seat per class"
+        assert not bool(m.any()) and bool((ids == -1).all()), "fresh: no belief claimed"
+    assert sim.civ_enhanced.shape == sim.civ_religion_done.shape and not bool(sim.civ_enhanced.any())
 
     # --- religious pressure spread (accumulate / tie / flip / KILL) --------
     assert sim.holy_tile.shape[1] == sim.n_majors and sim.n_majors == sim.n_majors
@@ -268,11 +254,12 @@ def main() -> None:
         assert bool((d_faith == 60.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
 
     # snapshot/restore round-trips the GP tensors + the faith bank
-    # and the enhancer race state (all registered in _MUTABLE).
-    sim.enh_claimed[0, 2] = True  # give the enhancer state something to restore
+    # and the belief state (all registered in _MUTABLE).
+    sim.enh_claimed[0, 2] = True  # give the belief state something to restore
     sim.civ_enhancer[0, 1] = 2
-    sim.civ_enhancer_done[0, 1] = True
-    sim.claimed_e_n[0] = 1
+    sim.wor_claimed[0, 3] = True
+    sim.civ_worship[0, 1] = 3
+    sim.civ_enhanced[0, 1] = True
     sim.holy_tile[0, 0] = 42  # pressure state to restore
     sim.city_pressure[0, 0, 0, 0] = 5
     sim.city_followed[0, 0, 0] = 0
@@ -286,7 +273,9 @@ def main() -> None:
     sim.civ_faith[:, 0] = -1.0
     sim.enh_claimed[0, 2] = False
     sim.civ_enhancer[0, 1] = -1
-    sim.claimed_e_n[0] = 9
+    sim.wor_claimed[0, 3] = False
+    sim.civ_worship[0, 1] = -1
+    sim.civ_enhanced[0, 1] = False
     sim.holy_tile[0, 0] = -1
     sim.city_pressure[0, 0, 0, 0] = 0
     sim.city_followed[0, 0, 0] = -1
@@ -295,8 +284,9 @@ def main() -> None:
     assert bool(sim.gp_claimed[0, 7].any()), "gp_claimed not preserved across snapshot"
     assert int(sim.gp_offer[0, 7]) == _off7 and float(sim.gp_price[0, 7]) == _pr7,         "gp_offer/gp_price not preserved across snapshot"
     assert float(sim.civ_faith[0, 0]) >= 60.0, "faith not preserved across snapshot"
-    assert bool(sim.enh_claimed[0, 2]) and int(sim.civ_enhancer[0, 1]) == 2 and int(sim.claimed_e_n[0]) == 1, \
-        "enhancer race state not preserved across snapshot"
+    assert bool(sim.enh_claimed[0, 2]) and int(sim.civ_enhancer[0, 1]) == 2 and bool(sim.civ_enhanced[0, 1]), \
+        "enhancer state not preserved across snapshot"
+    assert bool(sim.wor_claimed[0, 3]) and int(sim.civ_worship[0, 1]) == 3, "worship state not preserved across snapshot"
     assert int(sim.holy_tile[0, 0]) == 42 and int(sim.city_pressure[0, 0, 0, 0]) == 5 and int(sim.city_followed[0, 0, 0]) == 0, \
         "pressure-spread state not preserved across snapshot"
 

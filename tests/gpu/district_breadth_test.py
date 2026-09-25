@@ -19,10 +19,10 @@ Covered:
      source is dark; another seat never receives.
   d. exclusiveWith: a city owning BARRACKS never queues STABLE (and the
      converse) — poke civ_city_bldg + read the picker's queue mask.
-  e. Worship faith-buy: religionFounded + Temple + complete Holy Site + >=114
-     faith -> the WORSHIP_BUILDINGS[(r+1)%5] row is set and faith drops by
-     EXACTLY 114 (two-run BUY-vs-OWN diff, isolating the debit); no Temple -> no
-     buy.
+  e. Worship faith-buy: religionFounded + a Worship belief + Temple + complete
+     Holy Site + the faith -> the belief's building is set and faith drops by
+     EXACTLY its price (two-run BUY-vs-OWN diff, isolating the debit); no Temple
+     -> no buy.
   f. PALACE: a founded capital's yields carry the palace row (+2 prod/+5 gold/
      +2 sci/+1 cul, a non-capital does not); the per-j path and the batched
      twin agree column-for-column; housing/amenity wired.
@@ -327,16 +327,17 @@ def poke_exclusive_with(rules, rj, path):
 
 
 def poke_worship_buy(rules, rj, path):
-    """e. WORSHIP faith-buy: a religion-founder with a Temple + a COMPLETE
-    unpillaged Holy Site + >=114 faith buys WORSHIP_BUILDINGS[(r+1)%5] for a
-    flat 114 faith. The exact -114 debit is isolated by a two-run BUY-vs-OWN
-    diff (both runs carry the worship building's income; only BUY pays). A seat
-    without the Temple does not buy."""
+    """e. WORSHIP faith-buy: a religion-founder holding a Worship belief, with a
+    Temple + a COMPLETE unpillaged Holy Site + the faith, buys the building
+    the belief names for the flat worship price. The exact debit is isolated
+    by a two-run BUY-vs-OWN diff (both runs carry the worship building's
+    income; only BUY pays). A seat without the Temple does not buy."""
     sim = build(rules, path)
     r, j = 0, 0
     assert bool(sim.city_alive[0, r + 1, j]), "civ capital must be alive"
     TEMPLE, HS = sim._temple_bidx, sim._hs_idx
-    wb = sim._worship_bidx[(r + 1) % len(sim._worship_bidx)]
+    wk = (r + 1) % int(sim._worship_bidx.numel())    # the Worship belief the seat holds
+    wb = int(sim._worship_bidx[wk])
     # the catalog price, then the five-step floor every purchase takes
     # (`_purchase_step`, measured live)
     _d = int(sim.rules.purchase_divisor)
@@ -347,8 +348,9 @@ def poke_worship_buy(rules, rj, path):
     # civ_only_religion_done is the only lever gating the buy (income identical across
     # the two runs).
     sim.civ_religion_done[:, r + 1] = True
+    sim.civ_worship[:, r + 1] = wk
     sim.civ_pantheon_done[:, r + 1] = True   # skip the pantheon-buy faith drain
-    sim.civ_prophets[:, r + 1] = 0           # skip enhancer / (re)founding branches
+    sim.civ_prophets[:, r + 1] = 0
     sim.civ_pantheon[:, r + 1] = -1
     sim.civ_follower[:, r + 1] = -1
     sim.civ_faith[:, r + 1] = 500.0
@@ -395,7 +397,7 @@ def poke_worship_buy(rules, rj, path):
     order_worship(sim)
     sim._seat_phase()
     assert not bool(sim.city_bldg[0, r + 1, j, wb]), "a founder WITHOUT the Temple must not buy a worship building"
-    print(f"  e worship faith-buy OK (row {wb}=WORSHIP[(r+1)%5], -{cost} faith exact; no-Temple no-buy)")
+    print(f"  e worship faith-buy OK (row {wb} = Worship belief {wk}'s building, -{cost} faith exact; no-Temple no-buy)")
 
 
 def poke_civ_palace(rules, rj, path):
@@ -499,7 +501,7 @@ def poke_specialists(rules, rj, path):
     assert bool(sim.city_alive[0, r, j]), "civ capital must be alive"
     CA, HS = didx(rj, "CAMPUS"), didx(rj, "HOLY_SITE")
     LIB, LAB = bidx(rj, "LIBRARY"), bidx(rj, "RESEARCH_LAB")
-    wb = sim._worship_bidx[0]
+    wb = int(sim._worship_bidx[0])
     cit_sci = float(rj["citizenScience"])
 
     def sci_yf():

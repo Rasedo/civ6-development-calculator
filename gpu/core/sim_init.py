@@ -429,8 +429,10 @@ class SimInit:
             ("treasury", dtype, 0),
             # LIFETIME raw carbon. Signed: Carbon Recapture takes it below 0.
             ("co2", dtype, 0), ("co2_turn", dtype, 0),
-            ("enhancer", torch.long, -1), ("enhancer_done", torch.bool, 0),
+            # a religion's belief of each class (-1 none) and its enhancement
+            ("enhancer", torch.long, -1), ("enhanced", torch.bool, 0),
             ("follower", torch.long, -1), ("founder", torch.long, -1),
+            ("worship", torch.long, -1),
             ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
             ("pantheon_done", torch.bool, 0), ("prophets", torch.long, 0),
             ("religion_done", torch.bool, 0), ("tiles_purchased", torch.long, 0),
@@ -1055,6 +1057,12 @@ class SimInit:
             # survives an upgrade — which is what makes the 75% upgrade
             # discount meaningful.
             ("levied", torch.bool),
+            # the hex a deployed FIGHTER patrols (`Unit.patrol`), -1 while it
+            # is stationed; `tile` stays its base
+            ("patrol", torch.long),
+            # the id of the FREE CITY that granted this unit (`Unit.freeCity`),
+            # -1 on every other unit; a join takes that city's grants with it
+            ("free_city", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -1070,6 +1078,8 @@ class SimInit:
         self.unit_level.fill_(1)  # a brand-new unit starts at level 1
         self.unit_gp_at.fill_(-1)
         self.unit_revealed_turn.fill_(-1)
+        self.unit_patrol.fill_(-1)
+        self.unit_free_city.fill_(-1)
         self.unit_spy_mission.fill_(self._spy_idle)
         self.unit_spy_target.fill_(-1)
         self.barb_unit_seat.fill_(BARB_SEAT)
@@ -1101,18 +1111,19 @@ class SimInit:
         # is locked out of THAT individual, the claim resets the cell
         self.gp_passed_by = torch.full((B, n_gp), -1, dtype=torch.long, device=device)
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
-        self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
-        self.claimed_o_n = torch.zeros(B, dtype=torch.long, device=device)
-        self.claimed_e_n = torch.zeros(B, dtype=torch.long, device=device)  # enhancer race
-        # Belief IDENTITY — per-id pool masks + per-seat claimed ids (the counts
-        # above are gate mirrors; masks and counts move together). Ids are -1
-        # until claimed; effects gather rows id+1 from tables whose row 0 is the
+        # Belief IDENTITY — per-id pool masks + per-seat claimed ids (the
+        # pantheon count above is the race's gate mirror). Ids are -1 until
+        # claimed; effects gather rows id+1 from tables whose row 0 is the
         # neutral pad (zeros for adds, ones for multipliers).
         _bl = rules.beliefs or {}
         self.pan_claimed = torch.zeros(B, max(len(_bl.get("pantheons", [])), 1), dtype=torch.bool, device=device)
-        self.fol_claimed = torch.zeros(B, max(len(_bl.get("followers", [])), 1), dtype=torch.bool, device=device)
-        self.fou_claimed = torch.zeros(B, max(len(_bl.get("founders", [])), 1), dtype=torch.bool, device=device)
-        self.enh_claimed = torch.zeros(B, max(len(_bl.get("enhancers", [])), 1), dtype=torch.bool, device=device)
+        # a RELIGION's classes in `BELIEF_CLASSES` order — Follower, Worship,
+        # Founder, Enhancer — each its catalog's size and its claim mask
+        self._bel_class_n = [len(_bl["followers"]), int(_bl["worshipPool"]), len(_bl["founders"]), len(_bl["enhancers"])]
+        self.fol_claimed = torch.zeros(B, max(self._bel_class_n[0], 1), dtype=torch.bool, device=device)
+        self.wor_claimed = torch.zeros(B, max(self._bel_class_n[1], 1), dtype=torch.bool, device=device)
+        self.fou_claimed = torch.zeros(B, max(self._bel_class_n[2], 1), dtype=torch.bool, device=device)
+        self.enh_claimed = torch.zeros(B, max(self._bel_class_n[3], 1), dtype=torch.bool, device=device)
         self._enh_any = len(_bl.get("enhancers", [])) > 0
         # Religious pressure spread. A religion is indexed by the MAJOR SEAT
         # that founded it, so there are exactly `n_majors` of them and group g
@@ -1146,11 +1157,13 @@ class SimInit:
         self.city_free_press = torch.zeros(B, self.CITY_ROWS, civ_city_pad, self.n_majors, dtype=dtype, device=device)
         # the turn a city became FREE — the revolt's turn on the free row, -1
         # on every other city (TS's `foundedTurn`, which the transfer writes).
-        # The ranged grant falls due off it.
+        # Its grants fall due off it.
         self.city_freed_turn = torch.full((B, self.CITY_ROWS, civ_city_pad), -1, dtype=torch.long, device=device)
-        # the Free Cities seat's own persistent city-id counter — the twin of
-        # `civ_next_city_id` for a row that has no civ block
+        # the Free Cities seat's own persistent city-id counter and treasury —
+        # the twins of `civ_next_city_id` and `civ_treasury` for a row that has
+        # no civ block
         self.free_next_city_id = torch.zeros(B, dtype=torch.long, device=device)
+        self.free_treasury = torch.zeros(B, dtype=dtype, device=device)
         # THE GOVERNOR ROSTER, one slot per catalog governor per major row.
         # The neutralize clock follows the PERSON, not the city — a governor a
         # spy turns out keeps counting down in the Palace.
@@ -1739,11 +1752,25 @@ class SimInit:
         self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
         # CIV6 (Mountain Tunnel): the portal step, 2 Movement
         self._A_PORTAL = self._act.get("PORTAL", -1)
+        # PATROL (UNITOPERATION_DEPLOY): the fighter's deployment head and
+        # its way back; PRIORITY TARGET: the strike head's twin aimed at the
+        # tile's Support-class unit
+        self._A_DEPLOY = self._act.get("DEPLOY_0", -1)
+        self._A_RETURN = self._act.get("RETURN_TO_BASE", -1)
+        self._A_PRIORITY = self._act.get("PRIORITY_TARGET_0", -1)
         self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
         _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
         assert _apc in (0, self._air_strike_cols), (
             f"the air pillage head is {_apc} wide, the strike head {self._air_strike_cols}")
+        _ptc = sum(1 for n in self._act_names if n.startswith("PRIORITY_TARGET_"))
+        assert _ptc in (0, self._air_strike_cols), (
+            f"the priority target head is {_ptc} wide, the strike head {self._air_strike_cols}")
         self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
+        self._air_deploy_cols = sum(1 for n in self._act_names if n.startswith("DEPLOY_"))
+        # CIV6 (Patrols, Interceptions): the intercept radius and each backing
+        # patrol's +5 (`INTERCEPT_RANGE`, `INTERCEPT_SUPPORT_CS`)
+        self._intercept_range = int(rules.combat["interceptRange"])
+        self._intercept_support_cs = int(rules.combat["interceptSupportCs"])
         self._nuke_cols = int((rules.nuclear or {}).get("nukeCols", 0))
         _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
         assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
@@ -1774,7 +1801,8 @@ class SimInit:
             + (6 if self._A_FORM_UP >= 0 else 0) \
             + (1 if self._A_ESCORT >= 0 else 0) \
             + (1 if self._A_UNESCORT >= 0 else 0) \
-            + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc
+            + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc \
+            + self._air_deploy_cols + (1 if self._A_RETURN >= 0 else 0) + _ptc
         assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
         self._A_CHOP = self._act["CHOP"]
         self._A_REPAIR = self._act["REPAIR"]
@@ -2803,9 +2831,11 @@ class SimInit:
         self._b_regional = rules.b_regional.to(device)  # [NB] bool
         self._reg_bidx = [i for i in range(NB) if bool(self._b_regional[i])]
         self._regional_range = int(rules.regional_range)
-        # Worship buildings are faith-purchase-only — every production/gold
-        # picker masks them; only the worship faith-buy sets their civ_city_bldg bits.
+        # Worship buildings: built or faith-bought by the religion whose
+        # Worship belief names one, never gold-bought (`_worship_bidx_of`).
         self._b_worship = rules.b_worship.to(device)  # [NB] bool
+        self._b_rel_spreads = rules.b_rel_spreads.to(device)  # [NB] long — the Mosque's spread charges
+        self._b_disaster_proof = rules.b_disaster_proof.to(device)  # [NB] bool — the Dar-e Mehr
         # GS POWER (data/buildings.ts): the base load a building demands, what
         # it pays on top once its city is powered, and the two special rows —
         # a PLANT supplies its region, the Coal one also banks its Industrial
@@ -2972,7 +3002,8 @@ class SimInit:
         for _k in self._gw_holder_bidx:
             if _k >= 0:
                 self._b_gwslot[_k] = True
-        self._worship_bidx = [int(x) for x in rules.worship_bidx]
+        # per Worship belief: the building row it unlocks
+        self._worship_bidx = torch.tensor(rules.worship_bidx, dtype=torch.long, device=device).reshape(-1)
         self._temple_bidx = int(rules.temple_bidx)
         # CIV6 (BuildingReplaces): a civilization's unique building standing in
         # for a row — its district adjacency rule and its coast-resource yields.
@@ -3734,14 +3765,26 @@ class SimInit:
         # CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES, LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY)
         self._free_city_loyalty = float(rules.seats["freeCityLoyaltyPerTurn"])
         self._loyalty_after_cultural = float(rules.seats["loyaltyAfterCulturalTransfer"])
-        # the Free Cities player's own strength floor, and the defenders a
-        # revolt grants it: the melee pair on the flip turn, the ranged one
-        # `_free_grant_turns` later (`FREE_CITY_*`, measured in the live game)
+        # the Free Cities player's own strength floor, and the units it is
+        # granted (`FREE_CITY_*`, measured in the live game): the world era's
+        # melee pair on the flip turn (`_free_pair[era]`), then every
+        # `_free_grant_period`th of the city's turns one unit, its class drawn
+        # over `_free_grant_w` and its chassis `_free_grant_units[class, era]`
+        # (-1 where the era has none)
         self._free_def = int(rules.seats["freeCityDefense"])
-        self._free_grant_melee = int(rules.seats["freeCityGrantMelee"])
-        self._free_grant_melee_n = int(rules.seats["freeCityGrantMeleeCount"])
-        self._free_grant_ranged = int(rules.seats["freeCityGrantRanged"])
-        self._free_grant_turns = int(rules.seats["freeCityGrantRangedTurns"])
+        self._free_pair_n = int(rules.seats["freeCityPairCount"])
+        self._free_pair = torch.tensor([int(x) for x in rules.seats["freeCityPair"]],
+                                       dtype=torch.long, device=device)
+        self._free_grant_period = int(rules.seats["freeCityGrantPeriod"])
+        self._free_grant_w = [int(x) for x in rules.seats["freeCityGrantWeights"]]
+        self._free_grant_units = torch.tensor(
+            [[int(x) for x in row] for row in rules.seats["freeCityGrantUnits"]], dtype=torch.long, device=device)
+        # BANKRUPTCY (GOLD_NEGATIVE_BALANCE_*), in milli-gold: each penalty's
+        # line and step
+        self._bk_amen_line = int(rules.seats["goldAmenityLossLine"]) * 1000
+        self._bk_amen_step = int(rules.seats["goldAmenityLossStep"]) * 1000
+        self._bk_disband_line = int(rules.seats["goldDisbandLine"]) * 1000
+        self._bk_disband_step = int(rules.seats["goldDisbandStep"]) * 1000
         self._captured_hp = int(rules.combat["capturedHp"])
         self._capture_base_diff = int(rules.combat["captureBaseDiff"])
         self._embark_move_rows: list[tuple[int, int, int, int]] = [
@@ -3812,6 +3855,7 @@ class SimInit:
         self._driven_citizens: dict = {}
         self._driven_vote: dict = {}
         self._driven_gp_pass: dict = {}
+        self._driven_beliefs: dict = {}
         self._driven_buy_nat: dict = {}
         self._driven_buy_cls: dict = {}
         self._driven_buy_ucls: dict = {}

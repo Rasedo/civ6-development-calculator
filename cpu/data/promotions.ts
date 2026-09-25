@@ -1130,8 +1130,8 @@ export const PROMOTIONS: readonly PromoDef[] = [
   // CIV6 (Ground Crews): "Heal while patrolling or deployed" —
   // GROUND_CREWS_BONUS_HEALTH is MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION
   // with no argument and no requirement set, so the engine's own heal supplies
-  // the number and the modifier lifts the rest gate. A fighter always sits at
-  // a base, so every turn is a deployed turn; patrolling is no verb.
+  // the number and the modifier lifts the rest gate and the patrol's bar
+  // (`refreshUnits`).
   P('GROUND_CREWS', 'AIR_FIGHTER', 3, ['INTERCEPTOR'], { kind: 'HEAL_AFTER_ACTION' }),
   P('TANK_BUSTER', 'AIR_FIGHTER', 3, ['STRAFE'], cs('CS_VS_CLASS_ANY', 17, MASK_CAVALRY)),
   P('DROP_TANKS', 'AIR_FIGHTER', 4, ['GROUND_CREWS', 'TANK_BUSTER'], cs('RANGE', 2)),

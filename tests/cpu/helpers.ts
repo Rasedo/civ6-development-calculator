@@ -77,7 +77,6 @@ export function makeState(map: GameMap = makeMap()): GameState {
     seats: [emptySeat(0)],
     claimedPantheons: [],
     claimedBeliefs: [],
-    claimedEnhancers: [],
   };
 }
 

@@ -219,6 +219,15 @@ export interface BuildingDef {
   /** Granted automatically to the capital; never buildable. */
   autoCapital?: boolean;
   worship?: boolean;
+  /** CIV6 (Mosque, MOSQUE_ADJUST_SPREAD_CHARGES): "Missionary and Apostles
+   *  created here have +1 spread" — the spread charges a unit tagged
+   *  CLASS_RELIGIOUS_SPREAD (Missionary, Apostle, Inquisitor) bought in this
+   *  city gains while the row stands unpillaged. */
+  religiousSpreads?: number;
+  /** CIV6 (`Buildings_XP2` Pillage false; the Dar-e Mehr's "Cannot be
+   *  pillaged by natural disasters"): a disaster's building roll passes the
+   *  row by. */
+  disasterProof?: boolean;
   /** gold upkeep a turn: the install's `Buildings.Maintenance` (schema
    *  DEFAULT 0 where the row writes none). */
   maintenance: number;
@@ -407,7 +416,12 @@ const rawList: BuildingDef[] = [
   },
   // CIV6: the install writes the Cathedral ONE Building_YieldChanges row,
   // YIELD_FAITH 3. There is no YIELD_CULTURE row — the Cathedral's Great Work
-  // of Art slot is what pays Culture, and this catalog has no column for it.
+  // of Religious Art slot is what pays Culture (`GW_HOLDERS`,
+  // cpu/data/greatWorks.ts).
+  // Every worship row: Cost 190, PurchaseYield FAITH, a Holy Site, a Temple
+  // (BuildingPrereqs), EnabledByReligion — built or bought by the religion
+  // whose Worship belief names it (`WORSHIP_BELIEFS`) — and CitizenSlots 1
+  // with a +1 Faith specialist (`SPECIALIST_TIERS`' WORSHIP tier).
   { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, worship: true, maintenance: 0,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_CATHEDRAL', 'Cost', { scale: GAME_SPEED }),
@@ -421,8 +435,9 @@ const rawList: BuildingDef[] = [
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_CATHEDRAL', 'PrereqBuilding')] },
     },
   },
-  { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, worship: true, maintenance: 0,
+  { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, housing: 1, worship: true, maintenance: 0,
     src: {
+      housing: xml('Buildings', 'BuildingType=BUILDING_GURDWARA', 'Housing'),
       cost: xml('Buildings', 'BuildingType=BUILDING_GURDWARA', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_GURDWARA', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_GURDWARA', 'Maintenance'),
@@ -443,8 +458,12 @@ const rawList: BuildingDef[] = [
       'yields.production': xml('Building_YieldChanges', 'BuildingType=BUILDING_MEETING_HOUSE&YieldType=YIELD_PRODUCTION', 'YieldChange'),
     },
   },
-  { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 0, worship: true, maintenance: 0,
+  // CIV6 (GS): Expansion2_Buildings.xml sets the Pagoda's Housing to 0 and
+  // gives it PAGODA_ADJUST_FAVOR, a MODIFIER_PLAYER_ADJUST_EXTRA_FAVOR_PER_TURN
+  // of Amount 1 ("+1 Diplomatic Favor per turn").
+  { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 0, favorPerTurn: 1, worship: true, maintenance: 0,
     src: {
+      favorPerTurn: xml('ModifierArguments', 'ModifierId=PAGODA_ADJUST_FAVOR&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_PAGODA', 'Maintenance'),
@@ -463,6 +482,56 @@ const rawList: BuildingDef[] = [
       worship: xml('Buildings', 'BuildingType=BUILDING_STUPA', 'EnabledByReligion'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_STUPA', 'PrereqBuilding')] },
       amenities: xml('Buildings', 'BuildingType=BUILDING_STUPA', 'Entertainment'),
+    },
+  },
+  { id: 'MOSQUE', name: 'Mosque', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, religiousSpreads: 1, worship: true, maintenance: 0,
+    src: {
+      cost: xml('Buildings', 'BuildingType=BUILDING_MOSQUE', 'Cost', { scale: GAME_SPEED }),
+      district: xml('Buildings', 'BuildingType=BUILDING_MOSQUE', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_MOSQUE', 'Maintenance'),
+      'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_MOSQUE&YieldType=YIELD_FAITH', 'YieldChange'),
+      worship: xml('Buildings', 'BuildingType=BUILDING_MOSQUE', 'EnabledByReligion'),
+      requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_MOSQUE', 'PrereqBuilding')] },
+      // MODIFIER_SINGLE_CITY_RELIGIOUS_SPREADS under MOSQUE_RELIGIOUS_UNIT,
+      // whose REQUIRES_RELIGIOUS_UNIT matches the unit tag
+      // CLASS_RELIGIOUS_SPREAD: the Missionary, the Apostle and the Inquisitor
+      religiousSpreads: xml('ModifierArguments', 'ModifierId=MOSQUE_ADJUST_SPREAD_CHARGES&Name=Amount', 'Value'),
+    },
+  },
+  { id: 'SYNAGOGUE', name: 'Synagogue', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 5 }, worship: true, maintenance: 0,
+    src: {
+      cost: xml('Buildings', 'BuildingType=BUILDING_SYNAGOGUE', 'Cost', { scale: GAME_SPEED }),
+      district: xml('Buildings', 'BuildingType=BUILDING_SYNAGOGUE', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_SYNAGOGUE', 'Maintenance'),
+      'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_SYNAGOGUE&YieldType=YIELD_FAITH', 'YieldChange'),
+      worship: xml('Buildings', 'BuildingType=BUILDING_SYNAGOGUE', 'EnabledByReligion'),
+      requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_SYNAGOGUE', 'PrereqBuilding')] },
+    },
+  },
+  { id: 'WAT', name: 'Wat', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, science: 2 }, worship: true, maintenance: 0,
+    src: {
+      cost: xml('Buildings', 'BuildingType=BUILDING_WAT', 'Cost', { scale: GAME_SPEED }),
+      district: xml('Buildings', 'BuildingType=BUILDING_WAT', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_WAT', 'Maintenance'),
+      'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_WAT&YieldType=YIELD_FAITH', 'YieldChange'),
+      'yields.science': xml('Building_YieldChanges', 'BuildingType=BUILDING_WAT&YieldType=YIELD_SCIENCE', 'YieldChange'),
+      worship: xml('Buildings', 'BuildingType=BUILDING_WAT', 'EnabledByReligion'),
+      requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_WAT', 'PrereqBuilding')] },
+    },
+  },
+  // CIV6 (GS): "+1 additional Faith for each era since constructed or last
+  // repaired" is a Building_YieldsPerEra row (YIELD_FAITH 1), which needs the
+  // era a building was constructed in — no plane holds it, so the row pays
+  // its flat +3 alone.
+  { id: 'DAR_E_MEHR', name: 'Dar-e Mehr', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, disasterProof: true, worship: true, maintenance: 0,
+    src: {
+      cost: xml('Buildings', 'BuildingType=BUILDING_DAR_E_MEHR', 'Cost', { scale: GAME_SPEED }),
+      district: xml('Buildings', 'BuildingType=BUILDING_DAR_E_MEHR', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_DAR_E_MEHR', 'Maintenance'),
+      'yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_DAR_E_MEHR&YieldType=YIELD_FAITH', 'YieldChange'),
+      worship: xml('Buildings', 'BuildingType=BUILDING_DAR_E_MEHR', 'EnabledByReligion'),
+      requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_DAR_E_MEHR', 'PrereqBuilding')] },
+      disasterProof: { derived: "true where the install's Buildings_XP2 row carries Pillage false", inputs: [xml('Buildings_XP2', 'BuildingType=BUILDING_DAR_E_MEHR', 'Pillage', { expect: 'false' })] },
     },
   },
 

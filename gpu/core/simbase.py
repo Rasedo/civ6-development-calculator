@@ -266,7 +266,7 @@ class Rules:
     resources: dict  # {harvestYield, harvestAmount, improvement} per RESOURCE_IDS — the HARVEST's own table
     nuclear: dict  # {devices[{radius,fallout,range,upkeep,uranium}], falloutDamage, robotDamage, coverRange, aaSupport, aaWound, siloDefense, subDefense, interceptDamage, cleanCharges, siloIid, wwLaunched, emergency*}
     gdr: dict  # {upgradeId[], upgradeTech[], droneAA, particleBeamCS, enhancedMoves, armorPlatingCS, navalPenalty}
-    b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
+    b_worship: torch.Tensor  # bool [NB] — worship building (built or faith-bought by the religion whose Worship belief names it; never gold-bought)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
     b_train_xp_pct: torch.Tensor  # long [NB] — the PERCENTAGE experience modifier this building grants a unit trained here; the Encampment and Harbor lines stack
     b_train_xp_cls: torch.Tensor  # bool [NB, NPC] — which promotion classes `b_train_xp_pct` reaches
@@ -276,6 +276,8 @@ class Rules:
     b_pill_faith_imp: torch.Tensor  # long [NB] — the Chapel's flat faith per pillaged improvement
     b_pill_faith_dist: torch.Tensor  # long [NB] — ...and per pillaged district
     b_grant_unit: torch.Tensor  # long [NB] — unit granted FREE at completion (Intelligence Agency's Spy); -1 none
+    b_rel_spreads: torch.Tensor  # long [NB] — spread charges a religious unit bought in its city gains (the Mosque)
+    b_disaster_proof: torch.Tensor  # bool [NB] — a disaster's building roll passes it by (the Dar-e Mehr)
     #: THE PROMOTION CATALOG, per class and in COLUMN order (the PROMOTE head's
     #: layout). `promo_req[c, k]` is the bitmask of columns that open row k of
     #: class c; `promo_kind/v/mask[c, k, s]` are its effect slots.
@@ -296,7 +298,7 @@ class Rules:
     choke_features: list  # the feature indices CHOKE POINTS defends in (hills are their own plane)
     woods_features: list  # the feature indices a 1-MP woods step waives (hills are their own plane)
     woods_feature: int  # the Woods feature itself — the Stave Church's adjacency source
-    worship_bidx: list  # the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
+    worship_bidx: list  # per Worship belief (WORSHIP_BELIEFS order): the building row it unlocks
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
     workshop_bidx: int  # WORKSHOP row (Leonardo's culture perm), -1 if absent
     worship_faith_cost: float  # flat worship faith price (round(190·GAME_SPEED))
@@ -481,6 +483,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_pill_faith_imp=torch.tensor([int(b.get("pillageFaithImp", 0)) for b in B], dtype=torch.long),
         b_pill_faith_dist=torch.tensor([int(b.get("pillageFaithDist", 0)) for b in B], dtype=torch.long),
         b_grant_unit=torch.tensor([int(b.get("grantUnit", -1)) for b in B], dtype=torch.long),
+        b_rel_spreads=torch.tensor([int(b["religiousSpreads"]) for b in B], dtype=torch.long),
+        b_disaster_proof=torch.tensor([bool(b["disasterProof"]) for b in B], dtype=torch.bool),
         b_era=torch.tensor([int(b.get("eraIdx", 0)) for b in B], dtype=torch.long),
         promo_classes=list(_P.get("classes", [])),
         promo_kinds=list(_P.get("kinds", [])),
@@ -499,7 +503,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         choke_features=list(_P.get("chokeFeatures", [])),
         woods_features=list(_P.get("woodsFeatures", [])),
         woods_feature=int(_P["woodsFeature"]),
-        worship_bidx=r.get("worshipBidx", []),
+        worship_bidx=[int(x) for x in r["worshipBidx"]],
         temple_bidx=int(r.get("templeBidx", -1)),
         # a HARD read at the path the exporter writes (`seats.workshopBidx`):
         # `r.get("workshopBidx", -1)` at the top level defaulted to -1 for
@@ -815,15 +819,15 @@ _MUTABLE = [
     "trading_post",  # Trading Posts by (major row, centre tile)
     "city_id",
     "unit_next",
-    "gp_earned", "gp_offer", "gp_price", "gp_passed_by", "gp_claimed", "civ_gp_used", "civ_gp_earned", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "civ_gp_lux_n_open", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
-    "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
-    "enh_claimed",  # enhancer-claim mask
+    "gp_earned", "gp_offer", "gp_price", "gp_passed_by", "gp_claimed", "civ_gp_used", "civ_gp_earned", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "civ_gp_lux_n_open", "city_gp_perm", "pantheon_claimed_n",
+    "pan_claimed", "fol_claimed", "wor_claimed", "fou_claimed", "enh_claimed",  # belief-claim masks, one per class
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
     "city_worked",  # the worked-tile pick — a city plane, so it rides the compaction
     "city_amen_tier",  # the amenity tier the walk ran on — a city plane, same reason
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
     "city_free_press", "free_next_city_id",  # a FREE CITY's race per major, and the Free Cities seat's city-id counter
-    "city_freed_turn",  # the turn a Free City became free, which its ranged grant counts from
+    "city_freed_turn",  # the turn a Free City became free, which its grants count from
+    "free_treasury",  # the Free Cities seat's treasury
     # THE GOVERNOR ROSTER — one slot per catalog governor per major row
     "civ_gov_appointed", "civ_gov_city", "civ_gov_minor", "civ_gov_establish", "civ_gov_out", "civ_gov_promos",
     "antiquity",  # ANTIQUITY SITES (bool tile plane)
@@ -856,10 +860,10 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_patrol", "unit_free_city",
     "unit_escorted", "military_at", "civilian_at", "support_at", "embarked_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
-    "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
+    "civ_enhancer", "civ_enhanced", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",

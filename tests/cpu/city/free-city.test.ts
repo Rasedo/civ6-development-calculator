@@ -2,11 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { neighbors, tilesWithin } from '../../../world/hex';
-import { flipCity, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
+import { bankruptDisband, eraUnitOfClass, flipCity, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
+import { computeCityStats, luxuryAmenities } from '../../../cpu/core/city';
+import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
+import { worldEraIndex } from '../../../cpu/core/eras';
 import { FREE_SEAT, atWarWithAny, emptySeat, isBarbSeat, isTerritorial, seatOf, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
-import { CIV_LEADERS, FREE_CITY_DEFENSE, FREE_CITY_GRANT_MELEE, FREE_CITY_GRANT_MELEE_COUNT, FREE_CITY_GRANT_RANGED, FREE_CITY_GRANT_RANGED_TURNS, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
+import { CIV_LEADERS, FREE_CITY_DEFENSE, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_PERIOD, FREE_CITY_PAIR_COUNT, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
+import { ERAS } from '../../../cpu/data/techs';
 import { CITY_MAX_HP, WALLS_TIER_CS } from '../../../cpu/data/units';
 import { isWater } from '../../../world/query';
 import type { GameState, City, Seat } from '../../../cpu/core/types';
@@ -156,34 +160,117 @@ describe('the Free City step', () => {
     expect(atWarWithAny(state, rival.seat)).toBe(false);
   });
 
-  it('a revolt grants the melee pair beside the centre, the ranged unit five turns later', () => {
+  it("each era's chassis of a class follows the install's upgrade chain and unlock eras", () => {
+    const at = (cls: Parameters<typeof eraUnitOfClass>[0]) => ERAS.map((_, e) => eraUnitOfClass(cls, e));
+    // CIV6 (Units.PrereqTech's era, UnitUpgrades): the measured pairs —
+    // Swordsman, Man-at-Arms, Musketman, Line Infantry, Infantry, Mechanized
+    // Infantry — are the melee chain's era by era
+    expect(at('MELEE')).toEqual(['WARRIOR', 'SWORDSMAN', 'MAN_AT_ARMS', 'MUSKETMAN', 'LINE_INFANTRY',
+      'INFANTRY', 'INFANTRY', 'MECHANIZED_INFANTRY', 'MECHANIZED_INFANTRY']);
+    expect(at('RANGED')).toEqual(['ARCHER', 'ARCHER', 'CROSSBOWMAN', 'CROSSBOWMAN', 'FIELD_CANNON',
+      'FIELD_CANNON', 'MACHINE_GUN', 'MACHINE_GUN', 'MACHINE_GUN']);
+    expect(at('LIGHT_CAV')).toEqual([null, 'HORSEMAN', 'COURSER', 'COURSER', 'CAVALRY',
+      'CAVALRY', 'HELICOPTER', 'HELICOPTER', 'HELICOPTER']);
+    expect(at('RECON')).toEqual(['SCOUT', 'SCOUT', 'SKIRMISHER', 'SKIRMISHER', 'RANGER',
+      'RANGER', 'SPEC_OPS', 'SPEC_OPS', 'SPEC_OPS']);
+  });
+
+  it("a revolt grants the world era's melee pair beside the centre, then a unit every fifth of its turns", () => {
     const { state, border } = scene(30);
     border.loyalty = 0;
     flipCity(state, border);
     const city = state.freeSeat!.cities[0];
     const centre = state.map.tiles[city.centerIndex];
     const free = () => state.units.filter((u) => u.seat === FREE_SEAT);
-    // CIV6 (the live watch): two Men-at-Arms exist on the flip turn itself, on
-    // the first free tiles beside the centre in direction order
-    const want = neighbors(state.map, centre).filter((t) => !isWater(t)).slice(0, FREE_CITY_GRANT_MELEE_COUNT);
-    expect(free().map((u) => u.type)).toEqual(Array(FREE_CITY_GRANT_MELEE_COUNT).fill(FREE_CITY_GRANT_MELEE));
+    // CIV6 (the live watches): the world era's melee, twice, on the flip turn
+    // itself, on the first free tiles beside the centre in direction order —
+    // this world has researched nothing, so the Ancient era's Warrior
+    const era = Math.max(0, worldEraIndex(state));
+    const pair = eraUnitOfClass('MELEE', era);
+    expect(pair).toBe('WARRIOR');
+    const want = neighbors(state.map, centre).filter((t) => !isWater(t)).slice(0, FREE_CITY_PAIR_COUNT);
+    expect(free().map((u) => u.type)).toEqual(Array(FREE_CITY_PAIR_COUNT).fill(pair));
     expect(free().map((u) => u.tileIndex)).toEqual(want.map((t) => t.index));
+    expect(free().every((u) => u.freeCity === city.id)).toBe(true);
     expect(city.foundedTurn).toBe(state.turn);
-    // it trains nothing: nothing arrives until the grant falls due...
-    for (let k = 1; k < FREE_CITY_GRANT_RANGED_TURNS; k++) {
+    // it trains nothing: nothing arrives until the city's fifth turn...
+    for (let k = 1; k < FREE_CITY_GRANT_PERIOD - 1; k++) {
       state.turn = city.foundedTurn + k;
       freeCitiesPhase(state);
-      expect(free().length).toBe(FREE_CITY_GRANT_MELEE_COUNT);
+      expect(free().length).toBe(FREE_CITY_PAIR_COUNT);
     }
-    // ...and then the Crossbowman, once
-    state.turn = city.foundedTurn + FREE_CITY_GRANT_RANGED_TURNS;
+    // ...then one, of a class the era has a chassis for, drawn...
+    const open = FREE_CITY_GRANT_CLASSES.map((c) => eraUnitOfClass(c, era)).filter((u) => u !== null);
+    const rng0 = state.rngState;
+    state.turn = city.foundedTurn + FREE_CITY_GRANT_PERIOD - 1;
     freeCitiesPhase(state);
-    expect(free().filter((u) => u.type === FREE_CITY_GRANT_RANGED).length).toBe(1);
+    expect(state.rngState).not.toBe(rng0);
+    expect(free().length).toBe(FREE_CITY_PAIR_COUNT + 1);
+    expect(open).toContain(free()[FREE_CITY_PAIR_COUNT].type);
+    expect(free()[FREE_CITY_PAIR_COUNT].freeCity).toBe(city.id);
+    // ...and every fifth turn after, while the city stays Free
     state.turn += 1;
     freeCitiesPhase(state);
-    expect(free().length).toBe(FREE_CITY_GRANT_MELEE_COUNT + 1);
+    expect(free().length).toBe(FREE_CITY_PAIR_COUNT + 1);
+    state.turn = city.foundedTurn + 2 * FREE_CITY_GRANT_PERIOD - 1;
+    freeCitiesPhase(state);
+    expect(free().length).toBe(FREE_CITY_PAIR_COUNT + 2);
     // the Free Cities' units are no barbarians: no camp counts or walks them
     expect(free().every((u) => !isBarbSeat(u.seat) && u.xp === undefined)).toBe(true);
+  });
+
+  it('a later era grants its own chassis: the pair is the Swordsman once anyone reaches the Classical', () => {
+    const { state, border } = scene(30);
+    // Iron Working is a Classical technology
+    seatOf(state, 0)!.research.techs.push('IRON_WORKING');
+    expect(worldEraIndex(state)).toBe(1);
+    border.loyalty = 0;
+    flipCity(state, border);
+    expect(state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.type))
+      .toEqual(Array(FREE_CITY_PAIR_COUNT).fill('SWORDSMAN'));
+  });
+
+  it('a join takes the grants of the city that joins; any other Free Cities unit stays Free', () => {
+    const { state, border, rival } = scene(30);
+    border.loyalty = 0;
+    flipCity(state, border);
+    const city = state.freeSeat!.cities[0];
+    const granted = state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.id);
+    expect(granted.length).toBe(FREE_CITY_PAIR_COUNT);
+    // a Free Cities unit no city granted, well away from it
+    const other = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 20, 2).index, FREE_SEAT)!;
+    expect(other.freeCity).toBeUndefined();
+    city.loyalty = 1;
+    freeCitiesPhase(state);
+    expect(rival.cities.some((c) => c.name === border.name)).toBe(true);
+    expect(state.units.some((u) => granted.includes(u.id))).toBe(false);
+    expect(state.units.find((u) => u.id === other.id)?.seat).toBe(FREE_SEAT);
+  });
+
+  it('the Free Cities seat banks its cities\' Gold, pays its units\' upkeep, and goes bankrupt', () => {
+    const { state, border } = scene(30);
+    border.loyalty = 0;
+    flipCity(state, border);
+    const free = state.freeSeat!;
+    const mods = getModifiers(state, FREE_SEAT);
+    const spot = tileAtCoords(state.map, 20, 2).index;
+    spawnUnit(state, 'HORSEMAN', spot, FREE_SEAT);
+    free.treasury = 50;
+    const lux = luxuryAmenities(state, FREE_SEAT);
+    const gold = free.cities.reduce((s, c) => s + computeCityStats(state, c, lux, mods).total.gold, 0);
+    const upkeep = state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u.type) : 0), 0);
+    expect(upkeep).toBeGreaterThan(0);
+    freeCitiesPhase(state);
+    expect(free.treasury).toBeCloseTo(50 + gold - upkeep, 9);
+    // its bankruptcy is any seat's: at -20 two units go, the priciest first
+    const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 20, 5).index, FREE_SEAT)!;
+    const horse = state.units.find((u) => u.seat === FREE_SEAT && u.type === 'HORSEMAN')!;
+    free.treasury = -20;
+    bankruptDisband(state, FREE_SEAT, mods);
+    expect(state.units.some((u) => u.id === horse.id)).toBe(false);
+    expect(state.units.some((u) => u.id === archer.id)).toBe(false);
+    // the Warriors cost nothing, so nothing takes them
+    expect(state.units.filter((u) => u.seat === FREE_SEAT && u.type === 'WARRIOR').length).toBe(FREE_CITY_PAIR_COUNT);
   });
 
   it('a Free City stands on its own flat base, 72 with no walls', () => {

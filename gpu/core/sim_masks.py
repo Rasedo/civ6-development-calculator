@@ -2213,11 +2213,13 @@ class SimMasks:
         return torch.where(self.unit_water_walk[ut],
                            land_ok | self.wpass.gather(1, dc).squeeze(1), out)
 
-    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False, ladder: bool = True,
-                    seat: int = BARB_SEAT) -> None:
+    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int | torch.Tensor, naval: bool = False, ladder: bool = True,
+                    seat: int = BARB_SEAT, home: torch.Tensor | None = None) -> None:
         """Spawn into the HOSTILE pool — the barbarians' and the Free Cities'
         (`seat`), the two classes that earn no experience and that no driven
-        seat walks."""
+        seat walks. With `ladder` off, `unit_type` may be [B] roster indices,
+        one per game; `home` [B] is the id of the Free City a grant comes from
+        (`unit_free_city`), -1 on every other spawn."""
         if not bool(mask.any()):
             return
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
@@ -2232,11 +2234,14 @@ class SimMasks:
         assert int(slot.max()) < simbase.BARB_POOL_MAX, "barbarian slot pool exhausted — raise simbase.BARB_POOL_MAX"
         self.barb_unit_alive[rows, slot] = True
         self.barb_unit_seat[rows, slot] = seat
-        self.barb_unit_type[rows, slot] = int(self._barb_ladder[unit_type]) if ladder else unit_type
+        self.barb_unit_type[rows, slot] = int(self._barb_ladder[unit_type]) if ladder else (
+            unit_type[rows] if isinstance(unit_type, torch.Tensor) else unit_type)
+        self.barb_unit_free_city[rows, slot] = -1 if home is None else home[rows]
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
         self.barb_unit_revealed_turn[rows, slot] = -1
+        self.barb_unit_patrol[rows, slot] = -1
         self.barb_unit_xp[rows, slot] = 0
         self.barb_unit_level[rows, slot] = 1
         self.barb_unit_promos[rows, slot] = 0
@@ -2255,9 +2260,10 @@ class SimMasks:
         self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
         if self._log_diff:
             for _sb in rows.tolist():
+                _ut = unit_type[_sb] if isinstance(unit_type, torch.Tensor) else unit_type
                 self._diff_events.setdefault(_sb, []).append(
                     f"sp:{seat}:{int(self.turn)}"
-                    f":{int(at_tile[_sb])}:{int(unit_type)}"
+                    f":{int(at_tile[_sb])}:{int(_ut)}"
                     f" at{int(spot[_sb])}")
         self.next_slot[rows] += 1
 
@@ -2507,6 +2513,8 @@ class SimMasks:
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1
+        getattr(self, f"{pre}_unit_patrol")[rows, slot] = -1  # born stationed
+        getattr(self, f"{pre}_unit_free_city")[rows, slot] = -1  # no Free City's grant
         # CIV6 (Embrasure): "Military units trained in this city start with a
         # free promotion" — a unit that owes no XP for its first level, which
         # `takePromotion` then zeroes, so nothing carries into the second.
@@ -3803,6 +3811,20 @@ class SimMasks:
             _pex = self._portal_exit(tc.reshape(-1), _prow).reshape(tc.shape)
             _pt = [(present & (_pex >= 0)
                     & (self.unit_mp.gather(1, sc) >= self._portal_mp * self._mp_scale)).unsqueeze(2)]
+        # PATROL: a fighter's deployment hexes (`deployTargets`) and, for a
+        # patrolling aircraft with movement left, the way back to its base;
+        # then the PRIORITY TARGET head (`priorityTargets`).
+        _dp: list[torch.Tensor] = []
+        if self._A_DEPLOY >= 0:
+            _dp = [present.unsqueeze(2) & (self._deploy_targets(row, sc, tc, utype) >= 0)]
+        _rtb: list[torch.Tensor] = []
+        if self._A_RETURN >= 0:
+            _rtb = [(present & (self.unit_patrol.gather(1, sc) >= 0)
+                     & (self.unit_mp.gather(1, sc) > 0)
+                     & (self._type_air[ut] > 0)).unsqueeze(2)]
+        _prt: list[torch.Tensor] = []
+        if self._A_PRIORITY >= 0:
+            _prt = [present.unsqueeze(2) & (self._priority_targets(row, sc, tc, utype) >= 0)]
         _fi: list[torch.Tensor] = []
         if self._A_FINISH >= 0:
             _fi = [(present
@@ -3853,7 +3875,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc + _pt,
+            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc + _pt + _dp + _rtb + _prt,
             dim=2,
         )
         if N < _NFULL:
@@ -4125,6 +4147,68 @@ class SimMasks:
     def _rebase_mask(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
                      utype: torch.Tensor) -> torch.Tensor:
         return self._rebase_targets(row, sc, tc, utype) >= 0
+
+    def _deploy_targets(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                        utype: torch.Tensor) -> torch.Tensor:
+        """[B, N, W] TILE INDEX, -1 on a dead column — `deployTargets`: this
+        seat's own district and city-centre tiles within the FIGHTER's Moves
+        of its base, in tile-index order. CIV6 (Patrols): "Fighter aircraft
+        can be deployed to a valid hex within their Movement range from a
+        friendly air base"; a bomber never deploys."""
+        B, N = tc.shape
+        W, dev = self._air_deploy_cols, self.device
+        out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
+        ti = utype.clamp(min=0, max=self.NU - 1)
+        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        cols = self._air_cols(kind)
+        if W == 0 or cols.numel() == 0:
+            return out
+        k, t2 = kind[:, cols], tc[:, cols]
+        dist = self.pair_dist[t2.reshape(-1)].reshape(B, cols.numel(), self.T).long()
+        reach = self._type_moves[ti[:, cols]].unsqueeze(2)
+        # a CENTRE is a CITY_CENTER district TS-side and lives in its own
+        # plane here
+        site = ((self.district >= 0) | (self.centre_slot_at >= 0)) & (self.tile_seat == row)
+        cand = (
+            (dist <= reach) & site.unsqueeze(1)
+            & (k == 1).unsqueeze(2)
+            & (self.unit_mp.gather(1, sc[:, cols]) > 0).unsqueeze(2)
+        )
+        out[:, cols] = self._air_first_k(cand, W)
+        return out
+
+    def _priority_targets(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                          utype: torch.Tensor) -> torch.Tensor:
+        """[B, N, W] TILE INDEX, -1 on a dead column — `priorityTargets`: the
+        tiles in operational range whose SUPPORT-class occupant is hostile,
+        off a hostile centre, in tile-index order. CIV6 (Air Strikes): "Air
+        units also have the Priority Target ability which allows them to
+        attack Support class units directly"."""
+        B, N = tc.shape
+        W, dev = self._air_strike_cols, self.device
+        out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
+        ti = utype.clamp(min=0, max=self.NU - 1)
+        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        cols = self._air_cols(kind)
+        if W == 0 or cols.numel() == 0:
+            return out
+        k, t2 = kind[:, cols], tc[:, cols]
+        dist = self.pair_dist[t2.reshape(-1)].reshape(B, cols.numel(), self.T).long()
+        rngv = (self._type_ranged_range[ti[:, cols]]
+                + self._promo_val(ti[:, cols], self.unit_promos.gather(1, sc[:, cols]),
+                                  "RANGE")).unsqueeze(2)
+        sl = self.support_at
+        s = torch.where(sl >= 0, self.unit_seat.gather(1, sl.clamp(min=0)), torch.full_like(sl, -1))
+        sup = (sl >= 0) & self._seats_hostile(row, s)
+        ctr = self._seats_hostile(row, self._centre_target_seat(self._centre_seat_plane()))
+        cand = (
+            (dist > 0) & (dist <= rngv) & (sup & ~ctr).unsqueeze(1)
+            & (k > 0).unsqueeze(2)
+            & (self.unit_mp.gather(1, sc[:, cols]) > 0).unsqueeze(2)
+            & (self.unit_attacks.gather(1, sc[:, cols]) > 0).unsqueeze(2)
+        )
+        out[:, cols] = self._air_first_k(cand, W)
+        return out
 
     def _upgrade_ok(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
                     utype: torch.Tensor) -> torch.Tensor:

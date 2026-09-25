@@ -55,6 +55,8 @@ def _lux_on(sim, tile: int, lux: int, imp: int) -> None:
 def test_need_and_supply(rules, path) -> None:
     sim = fresh(rules, path)
     assert sim.improvements_on, "the fixture carries no improvements"
+    # solvent seats: bankruptcy's amenity loss is its own lane
+    sim.civ_treasury[B0, 0] = 50.0
     imp = RULES["improvements"]["ids"].index("PLANTATION")
     for t in range(sim.T):  # a clean slate: no luxury anywhere
         if int(sim.lux_id[B0, t]) >= 0:
@@ -81,6 +83,7 @@ def test_need_and_supply(rules, path) -> None:
     F = sim.FREE_ROW
     assert int(sim.city_pop[B0, F, fc]) == 9
     assert int(sim.city_amen_tier[B0, F, fc]) == -1, "no walk has read the Free City yet"
+    sim.free_treasury[B0] = 50.0
     sim._free_cities_phase()
     assert bool(sim.city_alive[B0, F, fc]), "the Free City joined somebody"
     got = int(sim.city_amen_tier[B0, F, fc])
@@ -90,6 +93,7 @@ def test_need_and_supply(rules, path) -> None:
             and int(sim.district[B0, t]) < 0]
     assert mine, "the Free City owns no ground beyond its centre"
     _lux_on(sim, mine[0], 1, imp)
+    sim.free_treasury[B0] = 50.0
     sim._free_cities_phase()
     got = int(sim.city_amen_tier[B0, F, fc])
     assert got == UNHAPPY, f"its own luxury pays 1 against 5 (-4), UNHAPPY: tier {got}"

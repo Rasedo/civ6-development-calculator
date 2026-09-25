@@ -27,6 +27,7 @@ import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, PILLAGE_BUILDING_REPAIR_PERCENT, maxSpecialtyDistricts } from '../data/constants';
 import { buildingPillaged } from './yields';
 import { gpCityPermOf } from '../data/greatPeople';
+import { worshipBuildingOf } from '../data/religion';
 import { campTiles, cityHolders, citiesOf, civOf, seatOf, tileBelongsTo, tileClaimed, tileSeat, hiddenResourcesFor } from './seats';
 import { getModifiers } from './effects';
 import { irradiated } from './nuclear';
@@ -881,8 +882,10 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
       // arm never sells one (CIV6 repairs from the queue alone)
       if ((have.has(def.id) && (gold || !buildingPillaged(city, def.id))) || queued.has(def.id)) continue;
       if (def.worship) {
+        // CIV6: a worship building is built (or faith-bought, never
+        // gold-bought) by the religion whose Worship belief names it
         if (gold) continue;
-        if (seatOf(state, city.seat)?.religion.worship !== def.id) continue;
+        if (worshipBuildingOf(seatOf(state, city.seat)?.religion.worship) !== def.id) continue;
       } else if (unlocks && RESEARCH_GATED_BUILDINGS.has(def.id) && !unlocks.buildings.has(def.id)) {
         // the research gate holds only rows some tech or civic GRANTS: a
         // Government Plaza tier building (or Hangar/Airport) is unlocked by

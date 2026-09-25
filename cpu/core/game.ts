@@ -2,7 +2,6 @@
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { dropQueuedBuilding } from './production';
 import { bankItemProgress } from './prodLayout';
-import { greatPeopleEarned } from './greatPeople';
 import { airTrainTile } from './air';
 import { GP_CLASSES } from '../data/greatPeople';
 import { placeGreatWorkIn } from './greatWorks';
@@ -36,7 +35,7 @@ import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SC
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
-import { laserSpeed } from './yields';
+import { darkBuildings, laserSpeed } from './yields';
 import { competitionOf } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
@@ -50,12 +49,12 @@ import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { PANTHEONS, ENHANCER_BELIEFS, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, beliefIdAt, worshipBuildingOf, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
+import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
@@ -216,7 +215,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     seats: [emptySeat(0)],
     claimedPantheons: [],
     claimedBeliefs: [],
-    claimedEnhancers: [],
   };
 }
 
@@ -478,11 +476,6 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   if (!city) return { ok: false, reason: 'No such city.' };
   if (!availableBuildings(state, city).some((b) => b.id === buildingId)) {
     return { ok: false, reason: 'Building not available in this city.' };
-  }
-  // Worship buildings are faith-purchase ONLY — they
-  // never enter the production queue (purchaseBuilding faith-prices them).
-  if (BUILDINGS[buildingId]?.worship) {
-    return { ok: false, reason: 'Worship buildings are purchased with faith, not built.' };
   }
   if (state.sandbox) {
     city.buildings.push(buildingId);
@@ -843,13 +836,14 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
 export function buyWorshipBuilding(state: GameState, cityId: number, seat: number): RuleResult {
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
-  if (!buyer.religion.founded) return { ok: false, reason: 'No founded religion.' };
+  // the building the religion's Worship belief names
+  const wid = buyer.religion.founded ? worshipBuildingOf(buyer.religion.worship) : undefined;
+  if (!wid) return { ok: false, reason: 'The religion holds no Worship belief.' };
   // CIV6 (Urban Development Treaty, outcome B): a faith purchase still
   // CREATES a building in the district, so the ban covers it.
   if (congressUdtBlockedDistrict(state) === 'HOLY_SITE') return { ok: false, reason: 'The World Congress bans new Holy Site buildings.' };
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
-  const wid = WORSHIP_BUILDINGS[seat % WORSHIP_BUILDINGS.length];
   if (city.buildings.includes(wid) || !city.buildings.includes('TEMPLE')) {
     return { ok: false, reason: 'Needs a Temple, and no worship building yet.' };
   }
@@ -1189,6 +1183,12 @@ export function purchaseReligiousUnit(
   // CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face): "newly
   // trained ones get +2 Charges" — Missionaries, Apostles and Inquisitors alike.
   if (goldenDedication(state, seat, DED_EXODUS)) u.charges = (u.charges ?? 0) + 2;
+  // CIV6 (Mosque): the buying city's standing buildings add their spreads to
+  // the three CLASS_RELIGIOUS_SPREAD units
+  const dark = darkBuildings(state.map, city);
+  for (const id of city.buildings) {
+    if (!dark.has(id)) u.charges = (u.charges ?? 0) + (BUILDINGS[id]?.religiousSpreads ?? 0);
+  }
   return { ok: true };
 }
 
@@ -2198,7 +2198,6 @@ export function deserialize(json: string): GameState {
   }
   state.claimedPantheons ??= [];
   state.claimedBeliefs ??= [];
-  state.claimedEnhancers ??= [];
   for (const u of state.units) {
     u.seat ??= 0; // old saves predate the seat field
     u.hp ??= 100;
@@ -2247,14 +2246,19 @@ export function choosePantheon(state: GameState, beliefId: string, seat: number)
   return { ok: true };
 }
 
+/** can the seat found its religion now? No seat ban, no religion yet, a
+ *  pantheon, a completed Holy Site (or Stonehenge) and an activated Great
+ *  Prophet (`prophetsOf`) — the gates `_can_found` mirrors. */
 export function canFoundReligion(state: GameState, seat: number): RuleResult {
+  const sx = seatOf(state, seat);
+  if (!sx) return { ok: false, reason: 'No such seat.' };
   // CIV6 (Religious Convert): "May not ... found Religions" (`SEAT_BAN_ROWS`)
   if (getModifiers(state, seat).seatBans.has('foundReligion')) {
     return { ok: false, reason: 'This leader may not found a religion.' };
   }
-  if (seatOf(state, seat)!.religion.founded) return { ok: false, reason: 'Religion already founded.' };
-  if (!seatOf(state, seat)!.religion.pantheon) return { ok: false, reason: 'Choose a pantheon first.' };
-  const hasHolySite = seatOf(state, seat)!.cities.some((c) =>
+  if (sx.religion.founded) return { ok: false, reason: 'Religion already founded.' };
+  if (!sx.religion.pantheon) return { ok: false, reason: 'Choose a pantheon first.' };
+  const hasHolySite = sx.cities.some((c) =>
     c.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
   );
   // CIV6 (Stonehenge): "Prophets may found a religion on Stonehenge
@@ -2262,61 +2266,89 @@ export function canFoundReligion(state: GameState, seat: number): RuleResult {
   if (!hasHolySite && !seatWonderFlag(state, seat, 'religionSite')) {
     return { ok: false, reason: 'Needs a completed Holy Site.' };
   }
-  if (!state.sandbox && greatPeopleEarned(state, 'PROPHET') === 0) {
-    return { ok: false, reason: 'Needs a Great Prophet (earn Prophet great-person points).' };
+  if (!state.sandbox && prophetsOf(sx) === 0) {
+    return { ok: false, reason: 'Needs an activated Great Prophet.' };
   }
   return { ok: true };
 }
 
-export function foundReligion(
-  state: GameState,
-  choice: { name: string; follower: string; founder: string; worship: string },
-  seat: number,
-): RuleResult {
-  const check = canFoundReligion(state, seat);
-  if (!check.ok) return check;
-  if (!FOLLOWER_BELIEFS[choice.follower]) return { ok: false, reason: 'No such follower belief.' };
-  if (!FOUNDER_BELIEFS[choice.founder]) return { ok: false, reason: 'No such founder belief.' };
-  if (!WORSHIP_BUILDINGS.includes(choice.worship)) return { ok: false, reason: 'No such worship building.' };
-  if (state.claimedBeliefs.includes(choice.follower) || state.claimedBeliefs.includes(choice.founder)) {
-    return { ok: false, reason: 'Another religion already claimed that belief.' };
-  }
-  seatOf(state, seat)!.religion.founded = true;
-  addEraScore(state, seat, ERA_SCORE_RELIGION);
-  seatOf(state, seat)!.religion.name = choice.name || RELIGION_NAMES[0];
-  seatOf(state, seat)!.religion.follower = choice.follower;
-  seatOf(state, seat)!.religion.founder = choice.founder;
-  state.claimedBeliefs.push(choice.follower, choice.founder); // pushed like the eager race's picks
-  seatOf(state, seat)!.religion.worship = choice.worship;
-  seatOf(state, seat)!.religion.holyTile = (seatOf(state, seat)!.cities.find((c) => c.isCapital) ?? seatOf(state, seat)!.cities[0])?.centerIndex ?? null;
-  grantFoundingPressure(state, seat);
-  return { ok: true };
-}
-
-/** can the seat enhance its religion (add the Enhancer belief)? Real
- * Civ 6 spends a second Great Prophet — modeled here as a SECOND earned
- * Prophet-class great person (the first funds founding). */
+/** can the seat enhance its religion now? A founded religion not yet
+ *  enhanced and a SECOND activated Great Prophet (the first funds the
+ *  founding) — `_can_enhance`'s gates. */
 export function canEnhanceReligion(state: GameState, seat: number): RuleResult {
-  if (!seatOf(state, seat)!.religion.founded) return { ok: false, reason: 'Found a religion first.' };
-  if (seatOf(state, seat)!.religion.enhancer) return { ok: false, reason: 'Religion already enhanced.' };
-  if (!state.sandbox && greatPeopleEarned(state, 'PROPHET') < 2) {
-    return { ok: false, reason: 'Needs a second Great Prophet to enhance.' };
+  const sx = seatOf(state, seat);
+  if (!sx) return { ok: false, reason: 'No such seat.' };
+  if (!sx.religion.founded) return { ok: false, reason: 'Found a religion first.' };
+  if (sx.religion.enhanced) return { ok: false, reason: 'Religion already enhanced.' };
+  if (!state.sandbox && prophetsOf(sx) < 2) {
+    return { ok: false, reason: 'Needs a second activated Great Prophet.' };
   }
   return { ok: true };
 }
 
-/** add an Enhancer belief to the seat's founded religion. Its effects apply
- * through getModifiers; the claim mirrors the follower/founder claimed-pool
- * exclusion. */
-export function enhanceReligion(state: GameState, beliefId: string, seat: number): RuleResult {
-  const check = canEnhanceReligion(state, seat);
-  if (!check.ok) return check;
-  if (!ENHANCER_BELIEFS[beliefId]) return { ok: false, reason: 'No such enhancer belief.' };
-  state.claimedEnhancers ??= [];
-  if (state.claimedEnhancers.includes(beliefId)) {
-    return { ok: false, reason: 'Another religion already claimed that enhancer.' };
+/** the belief ids of one class no religion holds, in catalog order */
+export function openBeliefs(state: GameState, cls: number): string[] {
+  return Object.keys(BELIEF_CATALOGS[cls] ?? {}).filter((id) => !state.claimedBeliefs.includes(id));
+}
+
+/** the class codes the seat's religion still lacks that have a belief left,
+ *  ascending — what an enhancement adds */
+export function enhanceableClasses(state: GameState, seat: number): number[] {
+  const rel = seatOf(state, seat)?.religion;
+  if (!rel) return [];
+  return BELIEF_SLOTS.map((_slot, c) => c)
+    .filter((c) => (rel[BELIEF_SLOTS[c]] ?? null) === null && openBeliefs(state, c).length > 0);
+}
+
+/**
+ * The seat's religion ADOPTS beliefs — the record's `beliefs` arm and the one
+ * verb that founds or enhances, `_apply_beliefs`' twin. `picks` are
+ * [class, index] pairs (`BELIEF_CLASSES`, the class catalog's row).
+ *
+ * FOUNDING (no religion yet, `canFoundReligion`): the Follower first, then one
+ * belief of any other class. ENHANCING (`canEnhanceReligion`): one belief of
+ * every class the religion still lacks that has a belief left, each class
+ * once. Every pick names a belief no religion holds. A set that does not fit
+ * is refused entire.
+ */
+export function adoptBeliefs(state: GameState, seat: number, picks: readonly (readonly [number, number])[]): RuleResult {
+  const sx = seatOf(state, seat);
+  if (!sx) return { ok: false, reason: 'No such seat.' };
+  const rel = sx.religion;
+  const ids = picks.map(([c, k]) => beliefIdAt(c, k));
+  if (ids.some((id) => id === undefined || state.claimedBeliefs.includes(id))) {
+    return { ok: false, reason: 'A belief is unknown or another religion holds it.' };
   }
-  seatOf(state, seat)!.religion.enhancer = beliefId;
-  state.claimedEnhancers.push(beliefId);
+  const cls = picks.map(([c]) => c);
+  const founding = !rel.founded;
+  if (founding) {
+    const check = canFoundReligion(state, seat);
+    if (!check.ok) return check;
+    if (picks.length !== 2 || cls[0] !== BELIEF_CLASS_FOLLOWER || cls[1] === BELIEF_CLASS_FOLLOWER) {
+      return { ok: false, reason: 'Founding takes the Follower belief, then one belief of another class.' };
+    }
+  } else {
+    const check = canEnhanceReligion(state, seat);
+    if (!check.ok) return check;
+    const want = enhanceableClasses(state, seat);
+    if (want.length === 0 || [...cls].sort((a, b) => a - b).join() !== want.join()) {
+      return { ok: false, reason: 'Enhancing adds one belief of every class the religion still lacks.' };
+    }
+  }
+  ids.forEach((id, k) => {
+    rel[BELIEF_SLOTS[cls[k]]] = id!;
+    state.claimedBeliefs.push(id!);
+  });
+  if (founding) {
+    rel.founded = true;
+    rel.name = RELIGION_NAMES[seat % RELIGION_NAMES.length];
+    addEraScore(state, seat, ERA_SCORE_RELIGION);
+    rel.holyTile = (sx.cities.find((c) => c.isCapital) ?? sx.cities[0])?.centerIndex ?? null;
+    grantFoundingPressure(state, seat);
+    state.eventLog.push(`${sx.name} founded ${rel.name}.`);
+  } else {
+    rel.enhanced = true;
+    state.eventLog.push(`${sx.name} enhanced ${rel.name}.`);
+  }
   return { ok: true };
 }

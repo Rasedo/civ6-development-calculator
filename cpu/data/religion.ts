@@ -1,5 +1,6 @@
 /**
- * Religion: pantheons, follower/founder beliefs and worship buildings.
+ * Religion: pantheons and a religion's four belief classes (Follower,
+ * Worship, Founder, Enhancer).
  *
  * SOURCING SWEEP. VERIFIED CORRECT against the Civ 6 sources:
  * PANTHEON_FAITH_COST = 25 (25 Faith on Standard speed) and
@@ -67,6 +68,9 @@ export interface BeliefEffects {
   missionaryChargeBonus?: number;
   spreadPressureMult?: number;
   missionaryCostMult?: number;
+  /** a WORSHIP belief's building: the one Holy Site building the religion
+   *  holding the belief may build or buy (`WORSHIP_BELIEFS`). */
+  worshipBuilding?: string;
 }
 
 export interface BeliefDef {
@@ -297,6 +301,13 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       xml('ModifierArguments', 'ModifierId=STEWARDSHIP_GOLD_DISTRICTS_MODIFIER&Name=Amount', 'Value'),
   },
 
+  // ---- WORSHIP ----
+  ...Object.fromEntries(['CATHEDRAL', 'GURDWARA', 'MEETING_HOUSE', 'MOSQUE', 'PAGODA', 'SYNAGOGUE', 'WAT', 'STUPA', 'DAR_E_MEHR']
+    .map((id) => [id, {
+      'effects.worshipBuilding': xml('ModifierArguments', `ModifierId=ALLOW_${id}&Name=BuildingType`, 'Value',
+        { expect: `BUILDING_${id}` }),
+    }])),
+
   // ---- ENHANCER ----
   ITINERANT_PREACHERS: {
     'effects.pressureRangeBonus':
@@ -447,9 +458,28 @@ export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
 );
 
 /**
- * Enhancer beliefs — the fifth belief slot, added when a founded
- * religion is ENHANCED (real Civ 6: spend a second Great Prophet / an
- * Apostle). Each of the five boosts a system this engine DOES model —
+ * Worship beliefs. CIV6 (Beliefs.xml, BELIEF_CLASS_WORSHIP): nine rows, each
+ * carrying ONE BeliefModifier, ALLOW_<building>, a
+ * MODIFIER_PLAYER_RELIGION_ADD_RELIGIOUS_BUILDING whose BuildingType names
+ * the Holy Site building the religion unlocks. The engine id strips BELIEF_
+ * as every catalog here does, which makes it the building's own id.
+ */
+export const WORSHIP_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
+  [
+    B('CATHEDRAL', 'Cathedral', 'Allows the Cathedral.', { worshipBuilding: 'CATHEDRAL' }),
+    B('GURDWARA', 'Gurdwara', 'Allows the Gurdwara.', { worshipBuilding: 'GURDWARA' }),
+    B('MEETING_HOUSE', 'Meeting House', 'Allows the Meeting House.', { worshipBuilding: 'MEETING_HOUSE' }),
+    B('MOSQUE', 'Mosque', 'Allows the Mosque.', { worshipBuilding: 'MOSQUE' }),
+    B('PAGODA', 'Pagoda', 'Allows the Pagoda.', { worshipBuilding: 'PAGODA' }),
+    B('SYNAGOGUE', 'Synagogue', 'Allows the Synagogue.', { worshipBuilding: 'SYNAGOGUE' }),
+    B('WAT', 'Wat', 'Allows the Wat.', { worshipBuilding: 'WAT' }),
+    B('STUPA', 'Stupa', 'Allows the Stupa.', { worshipBuilding: 'STUPA' }),
+    B('DAR_E_MEHR', 'Dar-e Mehr', 'Allows the Dar-e Mehr.', { worshipBuilding: 'DAR_E_MEHR' }),
+  ].map((b) => [b.id, b]),
+);
+
+/**
+ * Enhancer beliefs. Each of the five boosts a system this engine DOES model —
  * pressure range, spread strength, missionary purchase cost, and the two
  * religion-keyed combat adders — and every one of them is live.
  */
@@ -476,7 +506,44 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   ].map((b) => [b.id, b]),
 );
 
-export const WORSHIP_BUILDINGS = ['CATHEDRAL', 'GURDWARA', 'MEETING_HOUSE', 'PAGODA', 'STUPA'];
+/**
+ * A religion's BELIEF CLASSES, in the install's `BeliefClasses` row order
+ * (the Pantheon, its own race, left out). CIV6 (Beliefs.xml): each carries
+ * `MaxInReligion` 1, so a religion ends holding one belief of each.
+ * CIV6 (ReligionScreen.lua `PopulateAvailableBeliefs` / `OnBeliefSelected`)
+ * and the pedia ("A newly established Religion will consist of two beliefs:
+ * a Follower belief, and one of three additional types"): FOUNDING takes the
+ * Follower first, then one belief of any other class; ENHANCING adds the
+ * classes the religion still lacks. A class code is its index here — the
+ * wire's (class, index) pairs and the GPU's pools share it.
+ */
+export const BELIEF_CLASSES = ['FOLLOWER', 'WORSHIP', 'FOUNDER', 'ENHANCER'] as const;
+export type BeliefClass = typeof BELIEF_CLASSES[number];
+export const BELIEF_CLASS_FOLLOWER = BELIEF_CLASSES.indexOf('FOLLOWER');
+
+/** each class's catalog, by class code */
+export const BELIEF_CATALOGS: readonly Record<string, BeliefDef>[] = [
+  FOLLOWER_BELIEFS, WORSHIP_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS,
+];
+
+/** the ReligionState slot each class fills, by class code */
+export const BELIEF_SLOTS = ['follower', 'worship', 'founder', 'enhancer'] as const;
+
+/** a (class, index) pair's belief id, undefined for a pair naming none */
+export function beliefIdAt(cls: number, index: number): string | undefined {
+  const cat = BELIEF_CATALOGS[cls];
+  return cat && Number.isInteger(index) && index >= 0 ? Object.keys(cat)[index] : undefined;
+}
+
+/** a belief id's class code, -1 for an id no religion class holds */
+export function beliefClassOf(id: string): number {
+  return BELIEF_CATALOGS.findIndex((cat) => id in cat);
+}
+
+/** the building a worship belief unlocks, undefined for none */
+export function worshipBuildingOf(beliefId: string | null | undefined): string | undefined {
+  return beliefId ? WORSHIP_BELIEFS[beliefId]?.effects.worshipBuilding : undefined;
+}
 
 export const RELIGION_NAMES = [
   'Buddhism', 'Catholicism', 'Confucianism', 'Hinduism', 'Islam', 'Judaism',

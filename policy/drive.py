@@ -593,24 +593,55 @@ def _seat_unit_orders(st, seat: int, nobs: list):
         orders0 = torch.where(hasp, A_PM + pick, orders0)
     A_AS = st.col("AIR_STRIKE_0")
     A_RB = st.col("REBASE_0")
+    A_PT = st.col("PRIORITY_TARGET_0")
+    A_DP = st.col("DEPLOY_0")
+    A_RT = st.col("RETURN_TO_BASE")
+    _dpw = sum(1 for n in st.act if n.startswith("DEPLOY_"))
     _as_live = _live(A_AS, st.air_strike_cols)
-    if A_AS >= 0 and um.shape[2] >= A_AS + st.air_strike_cols \
-            and (_as_live or _live(A_RB, st.air_rebase_cols)):
-        _as = um[:, :, A_AS:A_AS + st.air_strike_cols]
-        if _as_live:
-            orders0 = torch.where(present & _as.any(dim=2),
-                                  A_AS + _as.float().argmax(dim=2), orders0)
-        if A_RB >= 0 and um.shape[2] >= A_RB + st.air_rebase_cols:
+    _pt_live = _live(A_PT, st.air_strike_cols)
+    _dp_live = _live(A_DP, _dpw)
+    _rt_live = _live(A_RT)
+    if _as_live or _pt_live or _dp_live or _rt_live or _live(A_RB, st.air_rebase_cols):
+        _none = torch.zeros_like(present)
+        _hit = um[:, :, A_AS:A_AS + st.air_strike_cols].any(dim=2) if _as_live else _none
+        _pri = um[:, :, A_PT:A_PT + st.air_strike_cols] if _pt_live else None
+        _pri_any = _pri.any(dim=2) if _pri is not None else _none
+        # a PATROLLING aircraft is the one that may return to base
+        _out = um[:, :, A_RT] if _rt_live else _none
+        _war = view["at_war"]
+
+        def _rotated(cols, width):
+            k = torch.arange(width, device=um.device)
+            rot = (seat + turn) % max(width, 1)
+            key = torch.where(cols, (k - rot) % max(width, 1), torch.full_like(k, 1 << 20))
+            return key.amin(dim=2)
+
+        if _live(A_RB, st.air_rebase_cols):
             # an aircraft with nothing to hit MOVES BASE — otherwise the whole
             # air force sits on the aerodrome it was built in and the rebase
-            # head is never reached.
+            # head is never reached. A patrol at war holds its hex instead.
             _rb = um[:, :, A_RB:A_RB + st.air_rebase_cols]
-            _rk = torch.arange(st.air_rebase_cols, device=um.device)
-            _rot = (seat + turn) % max(st.air_rebase_cols, 1)
-            _key = torch.where(_rb, (_rk - _rot) % max(st.air_rebase_cols, 1),
-                               torch.full_like(_rk, 1 << 20))
-            orders0 = torch.where(present & ~_as.any(dim=2) & _rb.any(dim=2),
-                                  A_RB + _key.amin(dim=2), orders0)
+            orders0 = torch.where(present & ~_hit & ~_pri_any & _rb.any(dim=2) & ~(_out & _war),
+                                  A_RB + _rotated(_rb, st.air_rebase_cols), orders0)
+        if _rt_live:
+            # at peace a patrol comes home, where it heals
+            orders0 = torch.where(present & _out & ~_war & ~_hit & ~_pri_any,
+                                  torch.full_like(orders0, A_RT), orders0)
+        if _dp_live:
+            # at war a stationed fighter with nothing to hit goes on patrol
+            # over one of its seat's own districts
+            _dp = um[:, :, A_DP:A_DP + _dpw]
+            orders0 = torch.where(present & _war & ~_out & ~_hit & ~_pri_any & _dp.any(dim=2),
+                                  A_DP + _rotated(_dp, _dpw), orders0)
+        if _as_live:
+            _as = um[:, :, A_AS:A_AS + st.air_strike_cols]
+            orders0 = torch.where(present & _hit, A_AS + _as.float().argmax(dim=2), orders0)
+        if _pt_live:
+            # a Support unit in reach is struck directly on alternate turns,
+            # and whenever nothing else is in reach
+            _odd = ((seat + turn) % 2) == 1
+            orders0 = torch.where(present & _pri_any & (~_hit | _odd),
+                                  A_PT + _pri.float().argmax(dim=2), orders0)
 
     A_SM = st.col("SPY_MISSION_0")
     A_ST = st.col("SPY_TRAVEL_0")
@@ -1262,6 +1293,48 @@ def _decide_gp_pass(nobs: list, row: int, seeds, turn, device) -> torch.Tensor |
     return torch.where(hit, pick, torch.full_like(pick, -1))
 
 
+#: a religion's belief classes, in the observation's (`BELIEF_CLASSES`) order
+_BELIEF_CLASSES = ("follower", "worship", "founder", "enhancer")
+
+
+def _decide_beliefs(nobs: list, row: int, seeds, turn, device) -> torch.Tensor | None:
+    """[B, 2, 2] — the (class, index) beliefs the seat's religion adopts this
+    turn, (-1, -1) padding; None where no game has one to adopt. FOUNDING
+    takes a Follower, then one belief of a class drawn among Worship, Founder
+    and Enhancer; ENHANCING takes one belief of every class the religion still
+    lacks. Every pick is a draw over the class's open rows (the observation's
+    `belief` group), so every belief is reachable; the applier re-validates
+    the whole set."""
+    if seeds is None:
+        return None
+    obs = [ob["belief"] for ob in nobs]
+    if not any(o["found"] or o["enhance"] for o in obs):
+        return None
+    r_cls = _policy_rng(device, seeds, turn, row, 21).tolist()
+    r_pick = (_policy_rng(device, seeds, turn, row, 22).tolist(),
+              _policy_rng(device, seeds, turn, row, 23).tolist())
+
+    def draw(rows: list, r: float) -> int:
+        return rows[min(int(r * len(rows)), len(rows) - 1)]
+
+    out = torch.full((len(obs), 2, 2), -1, dtype=torch.long)
+    for b, o in enumerate(obs):
+        if o["found"]:
+            others = [c for c in (1, 2, 3) if o[_BELIEF_CLASSES[c]]]
+            if not o["follower"] or not others:
+                continue
+            c2 = draw(others, r_cls[b])
+            out[b, 0, 0], out[b, 0, 1] = 0, draw(o["follower"], r_pick[0][b])
+            out[b, 1, 0], out[b, 1, 1] = c2, draw(o[_BELIEF_CLASSES[c2]], r_pick[1][b])
+        elif o["enhance"]:
+            want = [c for c in range(4) if o["held"][c] < 0 and o[_BELIEF_CLASSES[c]]]
+            for k, c in enumerate(want[:2]):
+                out[b, k, 0], out[b, k, 1] = c, draw(o[_BELIEF_CLASSES[c]], r_pick[k][b])
+    if not bool((out >= 0).any()):
+        return None
+    return out.to(device)
+
+
 def tables(st) -> tuple:
     """(roster, classes) — the unit roster and the production classes the
     ladder picks over, off the static value. Static per game: the caller
@@ -1281,7 +1354,7 @@ DECIDE_FIELDS = (
     "prod", "dtile", "tech", "civic", "war", "war_kind", "env_seq", "seq",
     "buy", "worship", "relig", "levy", "monu", "nat", "cls", "ucls", "pat",
     "band", "dist", "route", "nuke", "spec", "lock", "swap", "vote", "gp_pass",
-    "policies",
+    "policies", "beliefs",
 )
 
 
@@ -1365,11 +1438,13 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
     swap = _decide_swap(nobs, dev)
     vote = _decide_vote(nobs, row, dev)
     gp_pass = _decide_gp_pass(nobs, row, seeds, t, dev)
+    beliefs = _decide_beliefs(nobs, row, seeds, t, dev)
     return {"prod": (cities["centre"], prod), "dtile": dtile, "tech": tech, "civic": civic, "war": war,
             "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
             "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
             "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,
-            "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "policies": policies}
+            "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "policies": policies,
+            "beliefs": beliefs}
 
 
 def plan_units(st, row: int, nobs: list, max_steps: int = 4) -> torch.Tensor:

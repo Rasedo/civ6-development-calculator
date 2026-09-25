@@ -36,6 +36,8 @@ function scene() {
   foundCity(state, tileAtCoords(state.map, 2, 7).index, 0);
   const border = foundCity(state, tileAtCoords(state.map, 12, 7).index, 0).city!;
   border.population = 9;
+  // a solvent owner: bankruptcy's amenity loss is its own test
+  state.seats[0].treasury = 50;
   addRival(state, 16, 7);
   const cotton = tileAtCoords(state.map, 3, 7);
   cotton.resource = 'COTTON';
@@ -58,6 +60,7 @@ describe("the Free City's amenities", () => {
     const city = state.freeSeat!.cities[0];
     expect(city.seat).toBe(FREE_SEAT);
     expect(city.amenityTier).toBeUndefined();
+    state.freeSeat!.treasury = 50;
     freeCitiesPhase(state);
     const after = computeCityStats(state, city).amenities;
     // CIV6 (measured, a pop-9 Free City): the need is 5, as any city's
@@ -78,6 +81,7 @@ describe("the Free City's amenities", () => {
     border.loyalty = 0;
     flipCity(state, border);
     const city = state.freeSeat!.cities[0];
+    state.freeSeat!.treasury = 50;
     freeCitiesPhase(state);
     const a = computeCityStats(state, city).amenities;
     expect(a.have).toBe(0);

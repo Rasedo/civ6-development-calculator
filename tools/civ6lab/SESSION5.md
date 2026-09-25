@@ -561,10 +561,11 @@ search outward; H3 the centre → allow it; H2 none → nothing.
   `runs/bankrupt_<stamp>.jsonl`.
 - **Sample.** 3 arms × about 10 turns; the pedia's step every -10 of
   cumulative deficit separates the arms. About 40 min.
-- **Fit.** The rule for every seat in the upkeep block (`phase.ts`,
-  `_seat_upkeep_and_bankruptcy` / `_bankrupt_disband`) and the amenity
-  composers; the engines' "below 0 → disband the priciest unit" retired unless
-  confirmed; the Free Cities seat gets a treasury and the same body.
+- **Fit.** Both engines run the AUDIT reading for every seat, the Free Cities
+  seat's treasury included: `bankruptAmenities` / `_bankrupt_amenities` in the
+  amenity composers, `bankruptDisband` / `_bankrupt_disband` after the upkeep
+  (`phase.ts`, `_seat_upkeep_and_bankruptcy`). The reads confirm or replace
+  its counts, its line at 0 and its victim order.
 
 ## 6. Instrument 5 — observer watches
 

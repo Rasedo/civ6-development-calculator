@@ -2,7 +2,9 @@
  * AIR UNITS. CIV6 (Air combat): "Each air unit has to be based somewhere. You
  * will not be able to build more units than you have space for in your bases."
  * A plane is not a tile occupant the way a land unit is — it sits INSIDE its
- * base, strikes from it, and re-bases rather than walking.
+ * base, strikes from it, and re-bases rather than walking. A FIGHTER may also
+ * deploy to PATROL a hex (`Unit.patrol`); its base keeps its slot and its
+ * `tileIndex` while it is out.
  *
  * Bases and their slots come from the install, not the page: Districts.xml
  * gives DISTRICT_CITY_CENTER AirSlots 1, DISTRICT_AERODROME 4 and
@@ -18,10 +20,24 @@ import { citiesOf, isTerritorial, tileSeat } from './seats';
 import { cityAtIndex, gdrHas, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import { promoFlag, promoValue } from './promotions';
 import { governorTileSum } from './governors';
+import { srcConst } from '../data/provenance';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
 const CITY_CENTER_AIR_SLOTS = 1;
 export const AERODROME_AIR_SLOTS = 4;
+
+/** CIV6 (Patrols): a deployed fighter flies "around its effective intercept
+ *  range (currently 1 hex radius)". */
+export const INTERCEPT_RANGE = srcConst('combat.interceptRange', 1, {
+  pedia: 'Civilopedia_Concepts_Text.xml LOC_PEDIA_CONCEPTS_PAGE_AIRCOMBAT_3_CHAPTER_CONTENT_PARA_1: '
+    + '"its effective intercept range (currently 1 hex radius)"',
+});
+/** CIV6 (Interceptions): "The remaining aircraft act in support of the
+ *  defense by adding +5 to the strength of the main interceptor." */
+export const INTERCEPT_SUPPORT_CS = srcConst('combat.interceptSupportCs', 5, {
+  pedia: 'Civilopedia_Concepts_Text.xml LOC_PEDIA_CONCEPTS_PAGE_AIRCOMBAT_5_CHAPTER_CONTENT_PARA_1: '
+    + '"adding +5 to the strength of the main interceptor"',
+});
 
 export function isAirUnit(type: string): boolean {
   return UNITS[type]?.air !== undefined;
@@ -136,7 +152,119 @@ export function rebaseAir(state: GameState, unit: Unit, tileIndex: number): bool
   if (!canRebaseTo(state, unit, tileIndex)) return false;
   unit.tileIndex = tileIndex;
   unit.movesLeft = 0;
+  unit.patrol = undefined; // an order other than the patrol ends it
   return true;
+}
+
+/**
+ * PATROL (UNITOPERATION_DEPLOY). CIV6 (Patrols): "Fighter aircraft can be
+ * deployed to a valid hex within their Movement range from a friendly air
+ * base"; (Air Strikes) "Heavy Bomber aircraft cannot deploy on Patrols, but
+ * they are instead considered 'stationed' at a friendly air base". The
+ * deployment spends the turn, as a re-base does.
+ */
+export function deployRange(type: string): number {
+  return UNITS[type]?.moves ?? 0;
+}
+
+export function canDeployTo(state: GameState, unit: Unit, tileIndex: number): boolean {
+  if (UNITS[unit.type]?.air !== 'FIGHTER' || unit.movesLeft <= 0) return false;
+  const a = state.map.tiles[unit.tileIndex];
+  const b = state.map.tiles[tileIndex];
+  if (!a || !b) return false;
+  return hexDistance(a.col, a.row, b.col, b.row) <= deployRange(unit.type);
+}
+
+/** the hexes the DEPLOY head offers: this seat's own district and city-centre
+ *  tiles the fighter may deploy over, tile index ascending, cut to width. */
+export function deployTargets(state: GameState, unit: Unit, width: number): number[] {
+  const out: number[] = [];
+  for (const t of state.map.tiles) {
+    if (out.length >= width) break;
+    if (!t.district || tileSeat(t) !== unit.seat) continue;
+    if (canDeployTo(state, unit, t.index)) out.push(t.index);
+  }
+  return out;
+}
+
+export function deployAir(state: GameState, unit: Unit, tileIndex: number): boolean {
+  if (!canDeployTo(state, unit, tileIndex)) return false;
+  unit.patrol = tileIndex;
+  unit.movesLeft = 0;
+  return true;
+}
+
+/** CIV6 (Patrols): "At any time during the player's turn, Fighter aircraft
+ *  can 'Return to Base' (station at a friendly air base) in order to heal." */
+export function returnToBase(unit: Unit): boolean {
+  if (unit.patrol === undefined) return false;
+  unit.patrol = undefined;
+  return true;
+}
+
+/**
+ * The patrol that answers a sortie at `tileIndex`, and how many others back
+ * it. CIV6 (Interceptions): "If an air unit tries an air strike against a
+ * target within the range of an intercepting unit, the interceptor will fire
+ * on the attacker"; "If an attacking aircraft enters the defensive radius of
+ * more than one patrolling aircraft, the highest strength aircraft is chosen
+ * to intercept. The remaining aircraft act in support of the defense by
+ * adding +5 to the strength of the main interceptor." (Patrols): "Aircraft
+ * stationed at an air base do not intercept attacking aircraft." The
+ * strength is the one an aircraft meets (`airDefenseOf`'s base); ties go to
+ * the lower patrolled tile, then to the unit order.
+ */
+export function interceptorAgainst(
+  state: GameState, striker: Unit, tileIndex: number,
+): { unit: Unit; others: number } | undefined {
+  const at = state.map.tiles[tileIndex];
+  if (!at) return undefined;
+  let best: Unit | undefined;
+  let bestS = 0;
+  let n = 0;
+  for (const u of state.units) {
+    if (u.patrol === undefined || !unitsHostile(state, striker, u)) continue;
+    const p = state.map.tiles[u.patrol];
+    if (hexDistance(p.col, p.row, at.col, at.row) > INTERCEPT_RANGE) continue;
+    n += 1;
+    const s = antiAirAt(state, u) || (UNITS[u.type]?.combat ?? 0);
+    if (!best || s > bestS || (s === bestS && u.patrol < best.patrol!)) {
+      best = u;
+      bestS = s;
+    }
+  }
+  return best ? { unit: best, others: n - 1 } : undefined;
+}
+
+/**
+ * PRIORITY TARGET (UNITCOMMAND_PRIORITY_TARGET). CIV6 (Air Strikes): "Air
+ * units also have the Priority Target ability which allows them to attack
+ * Support class units directly, without first having to eliminate the enemy
+ * combat unit placed in the same location." The Support-class unit standing
+ * on `tileIndex` that this aircraft may strike, or none; a hostile centre is
+ * the city's to defend, as it is for every strike.
+ */
+export function priorityDefender(state: GameState, unit: Unit, tileIndex: number): Unit | undefined {
+  if (!isAirUnit(unit.type)) return undefined;
+  const holder = cityAtIndex(state, tileIndex);
+  if (holder !== undefined && unitsHostile(state, unit, { seat: holder.holder.seat })) return undefined;
+  return unitsAt(state, tileIndex).find((u) => unitStackSlot(u) === 'support'
+    && unitsHostile(state, unit, u) && unitVisibleTo(state, u, unit.seat));
+}
+
+/** the PRIORITY TARGET head: tiles in operational range carrying a Support
+ *  unit this aircraft may strike, tile index ascending, cut to width. */
+export function priorityTargets(state: GameState, unit: Unit, width: number): number[] {
+  const out: number[] = [];
+  const here = state.map.tiles[unit.tileIndex];
+  if (!here || !isAirUnit(unit.type)) return out;
+  for (const t of state.map.tiles) {
+    if (out.length >= width) break;
+    if (t.index === unit.tileIndex) continue;
+    if (hexDistance(here.col, here.row, t.col, t.row) > airRange(unit)) continue;
+    if (priorityDefender(state, unit, t.index)) out.push(t.index);
+  }
+  return out;
 }
 
 /**

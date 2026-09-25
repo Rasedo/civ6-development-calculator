@@ -496,6 +496,7 @@ class SimSeats:
         vote: torch.Tensor | None = None,  # [B, 3, 3] the congress ballot: [outcome, target, extra votes] per slate slot
         gp_pass: torch.Tensor | None = None,  # [B] the GP class this seat PASSES on (-1 = none)
         nuke: tuple | None = None,  # the MISSILE SILO's launch: (device [B], tile [B]); -1 = none
+        beliefs: torch.Tensor | None = None,  # [B, K, 2] (class, index) beliefs the religion adopts; -1 = padding
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
         seat_masks layout; -1 = no action. Queue writes mirror the picker's exact
@@ -534,6 +535,8 @@ class SimSeats:
             self._driven_vote[row] = vote
         if gp_pass is not None:
             self._driven_gp_pass[row] = gp_pass
+        if beliefs is not None:
+            self._driven_beliefs[row] = beliefs
 
     def _reset_war_clock(self, i: int, j: int, mask: torch.Tensor) -> None:
         self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])
@@ -1061,6 +1064,7 @@ class SimSeats:
         citizens = self._driven_citizens.pop(row, None)
         vote = self._driven_vote.pop(row, None)
         gp_pass = self._driven_gp_pass.pop(row, None)
+        beliefs = self._driven_beliefs.pop(row, None)
         production, pref, dtile = self._driven_picks.pop(row, (None, None, None))
         if not bool(active.any()):
             return
@@ -1168,6 +1172,10 @@ class SimSeats:
                     1, gi.unsqueeze(1),
                     torch.where(ok_g, torch.full_like(gi, row),
                                 self.gp_passed_by.gather(1, gi.unsqueeze(1)).squeeze(1)).unsqueeze(1))
+        if beliefs is not None:
+            # the BELIEFS the seat's religion adopts: founding or enhancing,
+            # validated whole and refused whole (`adoptBeliefs`)
+            self._apply_beliefs(row, active & ext, beliefs)
         if pref is not None:
             self._apply_seat_pref(row, pref, dtile)
         elif production is not None:
@@ -2624,17 +2632,29 @@ class SimSeats:
         if row in self._driven_buy_worship:
             wj = self._driven_buy_worship.pop(row)
             wb = self._worship_bidx_of(row)
-            if wb >= 0:
+            if bool((wb >= 0).any()):
                 jw = wj.clamp(min=0, max=self.RC - 1)
-                buy_w = active & ext & (wj >= 0) & self.civ_religion_done[:, row] \
+                # CIV6 (Urban Development Treaty, outcome B): a faith purchase
+                # still CREATES a building in the district (`buyWorshipBuilding`)
+                buy_w = active & ext & (wj >= 0) & self.civ_religion_done[:, row] & (wb >= 0) \
                     & self._afford(self.civ_faith[:, row], self._faith_price(row, self._worship_cost_of(row))) \
-                    & self._worship_city_ok(row)[bidx, jw]
+                    & self._worship_city_ok(row)[bidx, jw] & ~self._congress_holy_blocked()
                 if bool(buy_w.any()):
                     rows_w = buy_w.nonzero(as_tuple=True)[0]
-                    self.city_bldg[rows_w, row, jw[rows_w], wb] = True
+                    col_w = jw[rows_w]
+                    self.city_bldg[rows_w, row, col_w, wb[rows_w]] = True
                     self._bldg_version += 1
                     self._eff_version += 1
                     self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._faith_price(row, self._worship_cost_of(row)).to(self.civ_faith.dtype), self.civ_faith[:, row])
+                    # CIV6: a queued copy of the bought building is
+                    # INVALIDATED — its progress banks and the entry closes
+                    # up, `dropQueuedBuilding`'s splice
+                    cur_w = self.city_current[rows_w, row, col_w]
+                    gone_w = cur_w == wb[rows_w].unsqueeze(1)
+                    if bool(gone_w.any()):
+                        prog_w = self.city_progress[rows_w, row, col_w]
+                        self.city_prod_bank[rows_w, row, col_w] += (prog_w * gone_w).sum(dim=1)
+                        self._q_drop(rows_w, row, col_w, gone_w)
         rel_kind, rel_j = self._driven_buy_relig.pop(row) if row in self._driven_buy_relig else (None, None)
         if rel_kind is not None and rel_j is not None:
             rel_city = self._seat_religious_city_ok(row)
@@ -2647,6 +2667,11 @@ class SimSeats:
             # CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face):
             # "newly trained ones get +2 Charges" — Missionaries, Apostles and Inquisitors.
             exo_chg = self._golden_ded_table(self._ded_exodus)[:, row].long() * 2
+            # CIV6 (Mosque): the buying city's standing buildings add their
+            # spreads to the same three units
+            _bl_r = self.city_bldg[bidx, row, jr] & ~self._bldg_dark(
+                self.city_dist_tile[bidx, row, jr], self.city_bldg_pillaged[bidx, row, jr])
+            exo_chg = exo_chg + (_bl_r.long() * self._b_rel_spreads.unsqueeze(0)).sum(dim=1)
             if self._missionary_idx >= 0:
                 n_live_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
                 mcost = self._faith_price(row, self._unit_faith_cost(
@@ -3472,47 +3497,105 @@ class SimSeats:
         return torch.where(has, S.gather(1, pick.unsqueeze(1)).squeeze(1),
                            torch.full((B,), -1, dtype=torch.long, device=dev)), has
 
-    def _air_cover_answer(self, fire: torch.Tensor, atk_kind: str, u: int, row: int,
-                          tgt: torch.Tensor) -> torch.Tensor:
-        """the answer a sortie takes, and who dies of it — `airCoverAnswer`.
+    def _interceptor_scan(self, a_seat: torch.Tensor, tgt: torch.Tensor):
+        """(slot, has, n) — `interceptorAgainst`: the PATROLLING fighter that
+        answers a sortie at `tgt`, and how many patrols reach it in all.
 
-        CIV6 (Air combat): a plane "doesn't suffer damage in return unless it
-        gets Intercepted", and the two sentences `_air_cover_scan` folds are
-        the whole of what answers here."""
+        CIV6 (Interceptions): "If an attacking aircraft enters the defensive
+        radius of more than one patrolling aircraft, the highest strength
+        aircraft is chosen to intercept"; (Patrols) "Aircraft stationed at an
+        air base do not intercept attacking aircraft". The strength is the one
+        an aircraft meets; ties go to the lower patrolled tile, then to the
+        unit order."""
+        B, dev = self.B, self.device
+        neg = torch.full((B,), -1, dtype=torch.long, device=dev)
+        pat = self.unit_patrol
+        ok = self.unit_alive & (pat >= 0)
+        if not bool(ok.any()):
+            return neg, torch.zeros(B, dtype=torch.bool, device=dev), torch.zeros_like(neg)
+        pc = pat.clamp(min=0)
+        d = self.pair_dist[pc, tgt.clamp(min=0).unsqueeze(1)].long()
+        ok = ok & (d <= self._intercept_range) & self._seats_hostile(a_seat, self.unit_seat)
+        ty = self.unit_type.clamp(min=0, max=self.NU - 1)
+        aa = self._anti_air_at(ty, self.unit_seat)
+        s = torch.where(aa > 0, aa, self._type_combat[ty])
+        U, T = pat.shape[1], self.T
+        idx = torch.arange(U, device=dev).unsqueeze(0)
+        key = (s * T + (T - 1 - pc)) * U + (U - 1 - idx)
+        key = torch.where(ok, key, torch.full_like(key, -1))
+        pick = key.argmax(dim=1)
+        has = key.gather(1, pick.unsqueeze(1)).squeeze(1) >= 0
+        return torch.where(has, pick, neg), has, ok.long().sum(dim=1)
+
+    def _air_answer(self, fire: torch.Tensor, atk_kind: str, u: int, tgt: torch.Tensor,
+                    a_slot: torch.Tensor, support: torch.Tensor, vs_aa: bool, k: str,
+                    at: torch.Tensor) -> None:
+        """one answer a sortie takes, rolled against the AIRCRAFT, which is the
+        defender of this roll — `airAnswer`. The anti-air gun, the anti-air
+        hull and the intercepting fighter share this body: the answerer's
+        strength against an aircraft plus `support`, against the plane's
+        Ranged Strength. `vs_aa` says the answerer is an anti-air weapon (the
+        CLASS_ANTI_AIR rows); `at` is the hex it fights from."""
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
-        ttc = tgt.clamp(min=0)
-        c_slot, c_has = self._air_cover_scan(row, ttc)
-        ret = fire & c_has
-        a_died = torch.zeros_like(fire)
-        if not bool(ret.any()):
-            return a_died
         _t = torch.ones_like(fire)
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         a_base = self._type_ranged_strength[at0] - self._wound(_hp_p[:, u], at0)
-        cs0 = c_slot.clamp(min=0)
+        cs0 = a_slot.clamp(min=0)
         c_type = self.unit_type.gather(1, cs0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
         c_seat = self.unit_seat.gather(1, cs0.unsqueeze(1)).squeeze(1)
         c_aa = self._anti_air_at(c_type, c_seat)
         c_cs = torch.where(c_aa > 0, c_aa, self._type_combat[c_type])
         c_cs = c_cs + self._air_defense_cs(
             c_aa, c_seat, self.unit_tile.gather(1, cs0.unsqueeze(1)).squeeze(1))
-        c_e = c_cs - self._wound(self.unit_hp.gather(1, cs0.unsqueeze(1)).squeeze(1), c_type)
+        c_e = c_cs - self._wound(self.unit_hp.gather(1, cs0.unsqueeze(1)).squeeze(1), c_type) + support
         c_e = c_e + self._promo_cs(
             c_type, self.unit_promos.gather(1, cs0.unsqueeze(1)).squeeze(1),
-            attacking=~_t, ranged=_t, vs_air=_t, foe_type=at0,
-            tile=self.unit_tile.gather(1, cs0.unsqueeze(1)).squeeze(1).clamp(min=0),
+            attacking=~_t, ranged=_t, vs_air=_t, foe_type=at0, tile=at.clamp(min=0),
         ).to(c_e.dtype)
-        # the burst answers the AIRCRAFT, which is the defender of this roll
         air_d = a_base + self._promo_cs(
-            at0, a_promos, attacking=~_t, vs_anti_air=_t, foe_type=c_type,
+            at0, a_promos, attacking=~_t, vs_anti_air=_t if vs_aa else None, foe_type=c_type,
             tile=_tile_p[:, u]).to(a_base.dtype)
-        a_dmg = self._damage_roll(ret, c_e - air_d, k="airc", tile=tgt)
-        _hp_p[:, u] = torch.where(ret, _hp_p[:, u] - a_dmg, _hp_p[:, u])
-        a_died = ret & (_hp_p[:, u] <= 0)
-        if bool(a_died.any()):
-            _alive_p[:, u] = _alive_p[:, u] & ~a_died
-        return a_died
+        a_dmg = self._damage_roll(fire, c_e - air_d, k=k, tile=tgt)
+        _hp_p[:, u] = torch.where(fire, _hp_p[:, u] - a_dmg, _hp_p[:, u])
+
+    def _air_answers(self, fire: torch.Tensor, atk_kind: str, u: int, row: int,
+                     tgt: torch.Tensor) -> torch.Tensor:
+        """[B] — the sorties that fly on to their target, `airAnswers`.
+
+        CIV6 (Interceptions): "Once combat is resolved with any anti-air
+        ground units and intercepting air units, if the attacking bomber
+        survives, combat is then resolved with the original target. If a
+        fighter is intercepted by another fighter on its way to a ground
+        target, it is forced to only engage the enemy fighter and will not
+        attack the ground target." The patrol answers first, its backers +5
+        apiece, then the anti-air cover `_air_cover_scan` finds. A plane shot
+        down leaves; a fighter turned back has spent its sortie."""
+        _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
+        at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
+        through = fire.clone()
+        i_slot, i_has, i_n = self._interceptor_scan(_seat_p[:, u], tgt)
+        ifire = fire & i_has
+        if bool(ifire.any()):
+            self._air_answer(ifire, atk_kind, u, tgt, i_slot,
+                             (i_n - 1).clamp(min=0) * self._intercept_support_cs, False, "airi",
+                             self.unit_patrol.gather(1, i_slot.clamp(min=0).unsqueeze(1)).squeeze(1))
+            through = through & ~(ifire & ((_hp_p[:, u] <= 0) | (self._type_air[at0] == 1)))
+        c_slot, c_has = self._air_cover_scan(row, tgt.clamp(min=0))
+        cfire = through & c_has
+        if bool(cfire.any()):
+            self._air_answer(cfire, atk_kind, u, tgt, c_slot, torch.zeros_like(c_slot), True, "airc",
+                             self.unit_tile.gather(1, c_slot.clamp(min=0).unsqueeze(1)).squeeze(1))
+            through = through & ~(cfire & (_hp_p[:, u] <= 0))
+        dead = fire & (_hp_p[:, u] <= 0)
+        if bool(dead.any()):
+            _alive_p[:, u] = _alive_p[:, u] & ~dead
+        spent = fire & ~through & ~dead
+        if bool(spent.any()):
+            _mp = getattr(self, f"{atk_kind}_unit_mp")
+            _mp[:, u] = torch.where(spent, torch.zeros_like(_mp[:, u]), _mp[:, u])
+            self._spend_one_attack(atk_kind, u, spent)
+        return through
 
     def _air_pillage(self, act: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
                      u: int, row: int) -> None:
@@ -3520,32 +3603,49 @@ class SimSeats:
 
         CIV6 (Bomber): a bomber "may attack tile improvements and districts...
         With these attacks they destroy the targets, which is equivalent to
-        Pillaging but does not yield any spoils."""
+        Pillaging but does not yield any spoils." (Air Strikes): "the attacking
+        air unit must be at 50% health or higher after resolving any damage
+        taken from defending fighter aircraft and anti-air support units" —
+        the bar is asked again after the answers, and a bomber below it spends
+        the sortie and wrecks nothing."""
         if not bool(act.any()):
             return
+        getattr(self, f"{atk_kind}_unit_patrol")[:, u] = torch.where(
+            act, torch.full_like(tgt, -1), getattr(self, f"{atk_kind}_unit_patrol")[:, u])
+        through = self._air_answers(act, atk_kind, u, row, tgt)
+        if not bool(through.any()):
+            return
+        _mp = getattr(self, f"{atk_kind}_unit_mp")
+        _mp[:, u] = torch.where(through, torch.zeros_like(_mp[:, u]), _mp[:, u])
+        self._spend_one_attack(atk_kind, u, through)
+        _hp_p, _tile_p, _type_p = self._pool_of(atk_kind)[:3]
+        _ty = _type_p[:, u].clamp(min=0, max=self.NU - 1)
+        fit = through & (
+            (_hp_p[:, u] * 2 > int(self.rules.combat.get("unitHp", 100)))
+            | self._promo_flag(_ty, self._promo_pool(atk_kind)[0][:, u], "AIR_PILLAGE_ANY_HP"))
+        if not bool(fit.any()):
+            return
         ttc = tgt.clamp(min=0)
-        _r = act.nonzero(as_tuple=True)[0]
+        _r = fit.nonzero(as_tuple=True)[0]
         _tt = ttc[_r]
         _pi = (self.improvement[_r, _tt] >= 0) & ~self.pillaged[_r, _tt]
         _pd = ~_pi
         self.pillaged[_r[_pi], _tt[_pi]] = True
         self.district_pillaged[_r[_pd], _tt[_pd]] = True
         self._air_scatter_from(_r[_pd], _tt[_pd])
-        _mp = getattr(self, f"{atk_kind}_unit_mp")
-        _mp[:, u] = torch.where(act, torch.zeros_like(_mp[:, u]), _mp[:, u])
-        self._spend_one_attack(atk_kind, u, act)
-        self._air_cover_answer(act, atk_kind, u, row, tgt)
         self._eff_version += 1
 
     def _air_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
-                    u: int, row: int) -> None:
+                    u: int, row: int, priority: bool = False) -> None:
         """`airStrike` — one sortie, and the turn goes with it.
 
         CIV6 (Air combat): "the attacking unit's Ranged Strength will be
         matched against the defending unit's Anti-Air Strength (even if its
         Combat Strength is higher) or Combat Strength if it doesn't have any
-        Anti-Air Strength", and only an anti-air SHIP answers back. A BOMBER
-        pointed at a hostile centre fires the ordinary ranged attack instead."""
+        Anti-Air Strength". The sortie meets its answers first
+        (`_air_answers`) and strikes only if it flies on. A BOMBER pointed at
+        a hostile centre fires the ordinary ranged attack instead. `priority`
+        is PRIORITY TARGET: the tile's Support-class unit takes the blow."""
         ttc = tgt.clamp(min=0)
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
@@ -3553,29 +3653,49 @@ class SimSeats:
         ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
         city = att & (self._type_air[at0] == 2) & self._seats_hostile(
             row, self._centre_target_seat(ctr))
-        if bool(city.any()):
-            fired = self._ranged_attack(city, tgt, atk_kind, u, row)
+        if priority:
+            city = torch.zeros_like(att)
+            # `priorityDefender` — the Support unit, whoever else stands there
+            sslot = self.support_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            neg = torch.full_like(sslot, -1)
+            d_seat = torch.where(sslot >= 0, self.unit_seat.gather(1, sslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+            d_slot = torch.where((sslot >= 0) & self._seats_hostile(row, d_seat), sslot, neg)
+        else:
+            mslot = self._visible_military_at(row).gather(1, ttc.unsqueeze(1)).squeeze(1)
+            cslot = self._civclass_at(ttc)  # civilian OR support: both are targets
+            neg = torch.full_like(mslot, -1)
+            m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+            c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+            elig_m = self._seats_hostile(row, m_seat)
+            elig_c = self._seats_hostile(row, c_seat)
+            # CIV6 (Air combat): "all air attacks are ranged", so the naval
+            # hex's higher-chassis rule answers this blow too.
+            mslot, m_seat, elig_m, cslot, c_seat, elig_c = self._stack_fold(
+                ttc, row, mslot, m_seat, elig_m, cslot, c_seat, elig_c, ranged=True)
+            # `stackDefender` — the tile's FIGHTING occupant answers first, and
+            # a lone civilian answers when it is all there is.
+            d_slot = torch.where(elig_m, mslot, torch.where(elig_c, cslot, neg))
+            d_seat = torch.where(elig_m, m_seat, c_seat)
+        # every refusal the TS body makes before its answers: the city blow's
+        # siege gate, and a tile with nobody to strike
+        go_city = city & self._siege_may_shoot(atk_kind)[:, u]
+        go_unit = att & ~city & (d_slot >= 0)
+        go = go_city | go_unit
+        if not bool(go.any()):
+            return
+        # an order other than the patrol ends it
+        _pat = getattr(self, f"{atk_kind}_unit_patrol")
+        _pat[:, u] = torch.where(go, torch.full_like(_pat[:, u], -1), _pat[:, u])
+        through = self._air_answers(go, atk_kind, u, row, tgt)
+        city_t = go_city & through
+        if bool(city_t.any()):
+            fired = self._ranged_attack(city_t, tgt, atk_kind, u, row)
             _mp0 = getattr(self, f"{atk_kind}_unit_mp")
             _mp0[:, u] = torch.where(fired, torch.zeros_like(_mp0[:, u]), _mp0[:, u])
-        mslot = self._visible_military_at(row).gather(1, ttc.unsqueeze(1)).squeeze(1)
-        cslot = self._civclass_at(ttc)  # civilian OR support: both are targets
-        neg = torch.full_like(mslot, -1)
-        m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-        c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-        elig_m = self._seats_hostile(row, m_seat)
-        elig_c = self._seats_hostile(row, c_seat)
-        # CIV6 (Air combat): "all air attacks are ranged", so the naval hex's
-        # higher-chassis rule answers this blow too.
-        mslot, m_seat, elig_m, cslot, c_seat, elig_c = self._stack_fold(
-            ttc, row, mslot, m_seat, elig_m, cslot, c_seat, elig_c, ranged=True)
-        # `stackDefender` — the tile's FIGHTING occupant answers first, and a
-        # lone civilian answers when it is all there is.
-        d_slot = torch.where(elig_m, mslot, torch.where(elig_c, cslot, neg))
-        unit_att = att & ~city & (d_slot >= 0)
+        unit_att = go_unit & through
         if not bool(unit_att.any()):
             return
         ds0 = d_slot.clamp(min=0)
-        d_seat = torch.where(elig_m, m_seat, c_seat)
         d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
         d_hp0 = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
         aa = self._anti_air_at(d_type, d_seat)
@@ -3606,7 +3726,7 @@ class SimSeats:
         _mp = getattr(self, f"{atk_kind}_unit_mp")
         _mp[:, u] = torch.where(unit_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
         self._spend_one_attack(atk_kind, u, unit_att)
-        a_died = self._air_cover_answer(unit_att, atk_kind, u, row, tgt)
+        a_died = torch.zeros_like(unit_att)  # it flew through its answers
         d_died = unit_att & ((d_hp0 - d_dmg) <= 0)
         self._award_pair_xp(
             unit_att, a_kind=atk_kind, u=u, a_type=_type_p[:, u], a_seat=a_seat,
@@ -9495,6 +9615,9 @@ class SimSeats:
                 extra = _z if extra is None else extra + _z
         balance = have + lux_add - need if extra is None else have + lux_add + extra - need
         balance = balance - self._ww_penalty(row, torch.float64).unsqueeze(1)
+        # CIV6 (GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE): every city of a seat
+        # whose treasury has fallen to the line loses amenities to bankruptcy
+        balance = balance - self._bankrupt_amenities(row).unsqueeze(1)
         growth_f, yield_f = self._amenity_factors(balance)
         tier_idx = torch.full_like(self.city_pop[:, row, :cols], len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):
@@ -9800,7 +9923,7 @@ class SimSeats:
         # the race a FREE CITY runs starts at nothing "since the Free City
         # became independent"; any other arrival carries none
         self.city_free_press[b, dst_row, col, :] = 0
-        # ...and the turn it became Free, which its ranged grant counts from
+        # ...and the turn it became Free, which its grants count from
         self.city_freed_turn[b, dst_row, col] = int(self.turn) if dst_row == self.FREE_ROW else -1
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
@@ -12393,10 +12516,8 @@ class SimSeats:
         self.city_pop[fell, hr, sl] = ((self.city_pop[fell, hr, sl] * 3) // 4).clamp(min=1)
         for _i in range(fell.numel()):
             self._log_pop(fell[_i:_i + 1], int(hr[_i]), sl[_i:_i + 1], "sk")
-        # the holder's treasury pays a fifth, 100 at most. A FREE CITY's holder
-        # has no treasury plane here and a never-credited `freeSeat.treasury`
-        # on TS (`sackCity` deducts min(100, round(0 * 0.2)) = 0), so only a
-        # MAJOR row is charged (seed 9092 t121+: a raider sacked a Free City).
+        # the holder's treasury pays a fifth, 100 at most — a major's, and the
+        # Free Cities seat's (`free_treasury`) when a raider sacks a Free City
         _maj = hr < self.n_majors
         if bool(_maj.any()):
             _fm, _hm = fell[_maj], hr[_maj]
@@ -12405,6 +12526,14 @@ class SimSeats:
                 js_round(js_round(self.civ_treasury[_fm, _hm].double() * 1000) / 1000 * 0.2).double(),
             )
             self.civ_treasury[_fm, _hm] -= loss.to(self.civ_treasury.dtype)
+        _fre = hr == self.FREE_ROW
+        if bool(_fre.any()):
+            _ff = fell[_fre]
+            loss = torch.minimum(
+                torch.tensor(100.0, dtype=torch.float64, device=self.device),
+                js_round(js_round(self.free_treasury[_ff].double() * 1000) / 1000 * 0.2).double(),
+            )
+            self.free_treasury[_ff] -= loss.to(self.free_treasury.dtype)
         self.city_hp[fell, hr, sl] = round(int(self.rules.combat.get("cityMaxHp", 200)) / 2)
         if self.improvements_on:
             centers = self.city_center[fell, hr, sl]

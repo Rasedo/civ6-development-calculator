@@ -123,21 +123,33 @@ const FREE_CITY_WATCH = 'tools/civ6lab/runs/freecity_watch_20260921T001500Z.json
 export const FREE_CITY_DEFENSE = srcConst('seats.freeCityDefense', 72, {
   lab: `${FREE_CITY_WATCH}: centre and Encampment "def" 72 on turns 115-124, walls false`,
 });
-/** The defenders a revolt GRANTS: two of this melee unit exist on the flip
- *  turn itself, on free tiles beside the centre. */
-export const FREE_CITY_GRANT_MELEE = srcConst('seats.freeCityGrantMelee', 'MAN_AT_ARMS', {
-  lab: `${FREE_CITY_WATCH}: two UNIT_MAN_AT_ARMS of player 62 beside the centre on the flip turn (115)`,
+/** THE FREE CITIES' GRANTS, over the 28 revolts of the watched games — the
+ *  census `tools/civ6lab/free_city_census.py` reads (C-60). */
+const FREE_CITY_CENSUS = 'C-60: runs/cs_watch_obs1_20260923T173434Z.jsonl, runs/cs_watch_obs2_20260923T173434Z.jsonl,'
+  + ' runs/cs_watch_lab4_20260923T135005Z.jsonl, runs/rebel_watch_rebel3b_20260924T043843Z.jsonl,'
+  + ' runs/rebel_watch_rebel3c_20260924T043919Z.jsonl and the other cs_watch games';
+/** A revolt hands the Free City this many of the WORLD era's melee chassis on
+ *  the flip turn itself (`eraUnitOfClass`: Swordsman, Man-at-Arms, Musketman,
+ *  Line Infantry, Infantry, Mechanized Infantry as the eras run). */
+export const FREE_CITY_PAIR_COUNT = srcConst('seats.freeCityPairCount', 2, {
+  lab: `${FREE_CITY_WATCH}: two UNIT_MAN_AT_ARMS of player 62 beside the centre on the flip turn (115);`
+    + ` ${FREE_CITY_CENSUS}: two of the era's melee at the first read of the Free City`,
 });
-export const FREE_CITY_GRANT_MELEE_COUNT = srcConst('seats.freeCityGrantMeleeCount', 2, {
-  lab: `${FREE_CITY_WATCH}: two UNIT_MAN_AT_ARMS on turn 115, ids 65536 and 131073`,
+/** ...then ONE unit every this many of the city's turns while it stays Free,
+ *  the flip turn counted as its first: the 5th, the 10th, ... — a grant, not
+ *  production. */
+export const FREE_CITY_GRANT_PERIOD = srcConst('seats.freeCityGrantPeriod', 5, {
+  lab: `${FREE_CITY_WATCH}: the flip in turn 115, the Crossbowman first read on turn 120;`
+    + ` ${FREE_CITY_CENSUS}: 73 grants first read 4, 9, 14, ... turns after the Free City's first read`,
 });
-/** ...and one ranged unit this many turns after the flip, while the build
- *  queue holds buildings: a grant, not production. */
-export const FREE_CITY_GRANT_RANGED = srcConst('seats.freeCityGrantRanged', 'CROSSBOWMAN', {
-  lab: `${FREE_CITY_WATCH}: a UNIT_CROSSBOWMAN of player 62 beside the centre on turn 120, the Cathedral in the queue`,
-});
-export const FREE_CITY_GRANT_RANGED_TURNS = srcConst('seats.freeCityGrantRangedTurns', 5, {
-  lab: `${FREE_CITY_WATCH}: the flip on turn 115, the Crossbowman first read on turn 120`,
+/** ...its CLASS drawn over these weights — the classes of the 73 grants on
+ *  that cadence (29 light cavalry, 27 ranged, 12 melee, 1 recon; the 4
+ *  Builders are a civilian the hostile pool does not host) — and its chassis
+ *  that class's of the world era (`eraUnitOfClass`). */
+export const FREE_CITY_GRANT_CLASSES = srcConst('seats.freeCityGrantClasses',
+  ['LIGHT_CAV', 'RANGED', 'MELEE', 'RECON'] as const, { lab: FREE_CITY_CENSUS });
+export const FREE_CITY_GRANT_WEIGHTS = srcConst('seats.freeCityGrantWeights', [29, 27, 12, 1], {
+  lab: FREE_CITY_CENSUS,
 });
 /** Max per-turn swing from population pressure. Real Civ 6 ±20. */
 export const LOYALTY_PRESSURE_SCALE = srcConst('seats.loyaltyScale', 20,
@@ -1566,6 +1578,40 @@ export const GRIEVANCE_GANG = srcConst('eras.grievanceGang', 2 * GRIEVANCE_WAR_B
   { derived: 'two formal wars\' worth — 2 * GRIEVANCE_WAR_BASE. The BAR itself is this engine\'s: no published Civ 6 rule gangs up on a grievance score', inputs: [] });
 export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.max(0, weariness) / WAR_WEARINESS_PER_AMENITY);
+}
+
+/** BANKRUPTCY. CIV6 (the Gold pedia): "-1 penalty to your Amenities per every
+ *  10 Gold you drop below 0 ... at -10 Gold you will automatically disband a
+ *  unit, at -20 two units" — the four `GOLD_NEGATIVE_BALANCE_*` rows, one line
+ *  and one step for each penalty. */
+export const GOLD_AMENITY_LOSS_LINE = srcConst('seats.goldAmenityLossLine', 0,
+  gp('GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE'));
+export const GOLD_AMENITY_LOSS_STEP = srcConst('seats.goldAmenityLossStep', -10,
+  gp('GOLD_NEGATIVE_BALANCE_SUBSEQUENT_AMENITY_LOSS'));
+export const GOLD_DISBAND_LINE = srcConst('seats.goldDisbandLine', -10,
+  gp('GOLD_NEGATIVE_BALANCE_DISBAND_UNIT_LINE'));
+export const GOLD_DISBAND_STEP = srcConst('seats.goldDisbandStep', -10,
+  gp('GOLD_NEGATIVE_BALANCE_SUBSEQUENT_DISBAND_UNIT'));
+
+/** 0 while `treasury` stands above `line` (or on it, when `onLine` is false);
+ *  past it 1, and one more for every whole `step` further down. Read on the
+ *  milli-rounded treasury, the digest's own quantum, so a sub-milli float
+ *  drift never crosses a line on one engine and not the other. */
+function bankruptcyCount(treasury: number, line: number, step: number, onLine: boolean): number {
+  const m = Math.round(treasury * 1000);
+  if (onLine ? m > line * 1000 : m >= line * 1000) return 0;
+  return 1 + Math.floor((line * 1000 - m) / (-step * 1000));
+}
+
+/** the amenities EACH city of a seat holding `treasury` loses — from the first
+ *  gold "below 0", so a seat standing at 0 loses none */
+export function bankruptAmenities(treasury: number): number {
+  return bankruptcyCount(treasury, GOLD_AMENITY_LOSS_LINE, GOLD_AMENITY_LOSS_STEP, false);
+}
+
+/** the units a seat holding `treasury` disbands this turn — "at -10 Gold" */
+export function bankruptDisbands(treasury: number): number {
+  return bankruptcyCount(treasury, GOLD_DISBAND_LINE, GOLD_DISBAND_STEP, true);
 }
 
 export const DOW_PROXIMITY = 9;

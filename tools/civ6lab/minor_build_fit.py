@@ -131,7 +131,7 @@ def main():
 
     # the opening's propensities are COMPLETIONS by turn 100: a run of a unit
     # completes when the next record holds one more of it, a building's when
-    # it never recurs (`minor_census`)
+    # it never recurs (minor_census.py)
     mg = pickle.load(open(".claude/scratchpad/wmin_census.pkl", "rb"))
 
     def ev_done(match):

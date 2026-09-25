@@ -21,7 +21,7 @@ import { goldenDedication, monumentalityBuyMult } from './eras';
 import { builderCost, goldBuyableUnits, purchaseSpotBlocked, trainableUnits } from './units';
 import { hasMet, isSuzerain } from './cityStates';
 import { pickBorderTile } from './city';
-import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
+import { worshipBuildingOf, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
 import { availableBuildings, buildingCompletable, goldPurchasableBuildings } from './rules';
 import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from './effects';
 import { congressUdtBlockedDistrict } from './congress';
@@ -340,14 +340,15 @@ export function buyContext(state: GameState, seat: number): BuyContext {
     out.monu_settler_ok = spawn.population >= 2
       && goldAffordable(faith, faithPrice(state, seat, settlerCost(state, seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, seat)));
   }
-  // kinds 4, 5, 6, 11 — the founded religion's worship building and units.
+  // kinds 4, 5, 6, 11 — the founded religion's worship building (the one its
+  // Worship belief names, once it holds one) and units.
   // A Shrine sells the Missionary; the Apostle and the Inquisitor need a
   // Temple on top; every unit tier sells only in a city with a majority
   // religion.
   if (actor.religion.founded) {
-    const wid = WORSHIP_BUILDINGS[seat % WORSHIP_BUILDINGS.length];
-    const wCity = cities.find((c) => !c.buildings.includes(wid) && c.buildings.includes('TEMPLE') && holySiteOk(state, c));
-    if (wCity && congressUdtBlockedDistrict(state) !== 'HOLY_SITE'
+    const wid = worshipBuildingOf(actor.religion.worship);
+    const wCity = wid ? cities.find((c) => !c.buildings.includes(wid) && c.buildings.includes('TEMPLE') && holySiteOk(state, c)) : undefined;
+    if (wid && wCity && congressUdtBlockedDistrict(state) !== 'HOLY_SITE'
       && goldAffordable(faith, faithPrice(state, seat, buildingFaithCost(state, seat, wid)))) {
       out.worship_ok = true;
       out.worship_city = wCity.centerIndex;

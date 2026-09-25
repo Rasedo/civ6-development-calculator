@@ -1,6 +1,6 @@
 /**
  * THE NEUTRAL OBSERVATION'S SEAT SCALARS, TS side: the `nuke`, `envoy`,
- * `congress` and `gp` groups (cpu/core/decideObsSeat.ts), each in the shape
+ * `congress`, `gp` and `belief` groups (cpu/core/decideObsSeat.ts), each in the shape
  * `gpu/core/neutral.py` `seat_obs` emits and the gate compares every turn.
  */
 import { describe, it, expect } from 'vitest';
@@ -11,7 +11,8 @@ import { seatGroups } from '../../cpu/core/decideObs';
 import { SEAT_GROUPS } from '../../cpu/core/decideObsSeat';
 import { congressSessionDue, specialSessionDue } from '../../cpu/core/congress';
 import { EMG_CALLED } from '../../cpu/core/emergency';
-import { GP_CLASSES } from '../../cpu/data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE } from '../../cpu/data/greatPeople';
+import { BELIEF_CATALOGS } from '../../cpu/data/religion';
 import { TECHS, ERAS } from '../../cpu/data/techs';
 import {
   CONGRESS_BORDER_CONTROL, CONGRESS_INTERVAL, CONGRESS_MERCENARY, CONGRESS_MIGRATION,
@@ -33,8 +34,8 @@ const LAST_TECH = Object.keys(TECHS).find((id) => TECHS[id].era === ERAS[ERAS.le
 
 describe('seat scalar groups', () => {
   it('registers the GPU group names', () => {
-    expect(Object.keys(SEAT_GROUPS)).toEqual(['nuke', 'envoy', 'congress', 'gp']);
-    expect(Object.keys(seatGroups(scene(), 0))).toEqual(expect.arrayContaining(['nuke', 'envoy', 'congress', 'gp']));
+    expect(Object.keys(SEAT_GROUPS)).toEqual(['nuke', 'envoy', 'congress', 'gp', 'belief']);
+    expect(Object.keys(seatGroups(scene(), 0))).toEqual(expect.arrayContaining(['nuke', 'envoy', 'congress', 'gp', 'belief']));
   });
 
   it('nuke: -1 each without a device', () => {
@@ -68,6 +69,38 @@ describe('seat scalar groups', () => {
       price: [60, ...Array(n - 1).fill(0)],
       points: [12, ...Array(n - 1).fill(0)],
     });
+  });
+
+  it('belief: the founding and enhancing gates, the held rows, each class\'s open rows', () => {
+    const state = scene();
+    const all = (c: number) => Object.keys(BELIEF_CATALOGS[c]).map((_id, i) => i);
+    expect(SEAT_GROUPS.belief(state, 0)).toEqual({
+      found: false, enhance: false, held: [-1, -1, -1, -1],
+      follower: all(0), worship: all(1), founder: all(2), enhancer: all(3),
+    });
+    // a pantheon, a completed Holy Site, an activated prophet: founding opens
+    const s = state.seats[0];
+    s.religion.pantheon = 'GOD_OF_THE_SEA';
+    const hs = tileAtCoords(state.map, 6, 5);
+    s.cities[0].districts.push({ type: 'HOLY_SITE', tileIndex: hs.index });
+    hs.district = 'HOLY_SITE';
+    hs.districtComplete = true;
+    s.gpActivated = [GREAT_PEOPLE.PROPHET[0].id];
+    expect((SEAT_GROUPS.belief(state, 0) as Record<string, unknown>).found).toBe(true);
+    // another religion's Mosque leaves the Worship pool; a founded religion
+    // holds its rows and needs a second prophet to enhance
+    const worship = Object.keys(BELIEF_CATALOGS[1]);
+    state.claimedBeliefs.push('MOSQUE', 'CHORAL_MUSIC', 'TITHE');
+    s.religion.founded = true;
+    s.religion.follower = 'CHORAL_MUSIC';
+    s.religion.founder = 'TITHE';
+    const g = SEAT_GROUPS.belief(state, 0) as Record<string, unknown>;
+    expect([g.found, g.enhance]).toEqual([false, false]);
+    expect(g.held).toEqual([Object.keys(BELIEF_CATALOGS[0]).indexOf('CHORAL_MUSIC'), -1,
+      Object.keys(BELIEF_CATALOGS[2]).indexOf('TITHE'), -1]);
+    expect(g.worship).toEqual(all(1).filter((i) => worship[i] !== 'MOSQUE'));
+    s.gpActivated.push(GREAT_PEOPLE.PROPHET[1].id);
+    expect((SEAT_GROUPS.belief(state, 0) as Record<string, unknown>).enhance).toBe(true);
   });
 
   it('congress: nothing sits off a session turn or before the era', () => {

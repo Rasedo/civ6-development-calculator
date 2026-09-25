@@ -258,8 +258,8 @@ GAME = {
     "lastSessionTurn": lambda sim, b, rows: [int(sim.last_session_turn[b])],
     "roadTier": lambda sim, b, rows: [int(sim.road_tier)],
     "pantheonsClaimed": lambda sim, b, rows: [int(sim.pantheon_claimed_n[b])],
-    "beliefsClaimed": lambda sim, b, rows: [int(sim.claimed_f_n[b]) + int(sim.claimed_o_n[b])],
-    "enhancerBeliefsClaimed": lambda sim, b, rows: [int(sim.claimed_e_n[b])],
+    # the four religion classes' claim masks, summed: TS keeps one list
+    "beliefsClaimed": lambda sim, b, rows: [sum(int(m[b, :n].sum()) for m, _ids, n in sim._bel_pools())],
     # one flat row: each class's claimed list behind its LENGTH (the lists
     # vary), then the offer, price and passed-by vectors (one per class)
     "greatPeopleByClass": lambda sim, b, rows: [_gp_by_class(sim, b)],
@@ -269,6 +269,7 @@ GAME = {
     "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],
     "removableAtStart": lambda sim, b, rows: [int(sim._removable_at_start[b])],
     "iceAtStart": lambda sim, b, rows: [int(sim._ice_at_start[b])],
+    "freeTreasury": lambda sim, b, rows: [float(sim.free_treasury[b])],
 }
 
 
@@ -613,7 +614,7 @@ SEAT = {
     "religionFounded": lambda sim, b, rows: [1 if bool(sim.civ_religion_done[b, c]) else 0 for c in rows],
     "inquisition": lambda sim, b, rows: [1 if bool(sim.civ_inquisition[b, c]) else 0 for c in rows],
     "pantheonDone": lambda sim, b, rows: [1 if bool(sim.civ_pantheon_done[b, c]) else 0 for c in rows],
-    "enhancerDone": lambda sim, b, rows: [1 if bool(sim.civ_enhancer_done[b, c]) else 0 for c in rows],
+    "religionEnhanced": lambda sim, b, rows: [1 if bool(sim.civ_enhanced[b, c]) else 0 for c in rows],
     "gpPoints": lambda sim, b, rows: [[float(x) for x in sim.civ_gpp[b, c].tolist()] for c in rows],
     "projectsDone": lambda sim, b, rows: [sum(1 for x in sim.project_done[b, c].tolist() if x) for c in rows],
     "wmd": lambda sim, b, rows: [int(sim.civ_wmd[b, c].sum()) for c in rows],
@@ -643,6 +644,7 @@ SEAT = {
     "beliefPantheon": _civ_scalar("civ_pantheon"),
     "beliefFollower": _civ_scalar("civ_follower"),
     "beliefFounder": _civ_scalar("civ_founder"),
+    "beliefWorship": _civ_scalar("civ_worship"),
     "beliefEnhancer": _civ_scalar("civ_enhancer"),
     "nextCityId": _civ_scalar("civ_next_city_id"),
     "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
@@ -902,6 +904,8 @@ UNIT = {
     "levied": _unit("unit_levied"),
     "formation": _unit("unit_formation"),
         "escorted": _unit("unit_escorted"),
+    "patrol": _unit("unit_patrol"),
+    "freeCity": _unit("unit_free_city"),
 }
 
 

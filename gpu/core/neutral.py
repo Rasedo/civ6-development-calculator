@@ -372,6 +372,19 @@ def _columns(sim, row: int) -> dict:
     out["gp", "passed_by"] = sim.gp_passed_by[:, :nG]
     out["gp", "price"] = _as_long(sim.gp_price[:, :nG])
     out["gp", "points"] = _floored(sim.civ_gpp[:, row, :nG])
+    out.update(_beliefs(sim, row))
+    return out
+
+
+def _beliefs(sim, row: int) -> dict:
+    """The `belief` group: whether the seat may found or enhance its
+    religion now, the class catalog row it holds per class (-1 none), and
+    each class's open beliefs as membership rows (`_INDEX_LISTS`)."""
+    out = {("belief", "found"): sim._can_found(row), ("belief", "enhance"): sim._can_enhance(row)}
+    pools = sim._bel_pools()
+    out["belief", "held"] = torch.stack([ids[:, row] for _m, ids, _n in pools], dim=1)
+    for name, (m, _ids, n) in zip(("follower", "worship", "founder", "enhancer"), pools):
+        out["belief", name] = ~m[:, :n]
     return out
 
 
@@ -396,7 +409,8 @@ def _congress(sim, row: int) -> dict:
 
 
 # the `list` fields that hold ASCENDING INDICES; every other list is dense
-_INDEX_LISTS = {("policy", "unlocked"), ("war", "declare"), ("war", "sue")}
+_INDEX_LISTS = {("policy", "unlocked"), ("war", "declare"), ("war", "sue"),
+                ("belief", "follower"), ("belief", "worship"), ("belief", "founder"), ("belief", "enhancer")}
 
 
 def _city_rows(sim, row: int) -> list:

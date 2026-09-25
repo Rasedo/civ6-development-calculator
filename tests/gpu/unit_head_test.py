@@ -68,10 +68,14 @@ def main() -> None:
         ("NUKE_", rj["nuclear"]["nukeCols"] * len(rj["nuclear"]["devices"])),
     ]
     # ...+ 1 for HARVEST, + 1 for WONDER_CHARGE and + 1 for
-    # PORTAL, the newest last-append. This sum is a COUNT PIN and it
-    # lives in a file no verb's author is editing — every new verb has to come
-    # back here, which is the whole reason the lane exists.
-    want = (13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30 + 1 + 1 + 1 + 1)
+    # PORTAL, then the PATROL's DEPLOY head, RETURN_TO_BASE and the PRIORITY
+    # TARGET head (the strike head's width), the newest last-appends. This sum
+    # is a COUNT PIN and it lives in a file no verb's author is editing — every
+    # new verb has to come back here, which is the whole reason the lane exists.
+    _dpw = sum(1 for n in acts if n.startswith("DEPLOY_"))
+    assert _dpw > 0, "the DEPLOY head is empty"
+    want = (13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30 + 1 + 1 + 1 + 1
+            + _dpw + 1 + dict(heads)["AIR_STRIKE_"])
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
@@ -93,9 +97,12 @@ def main() -> None:
              + [f"NUKE_{k}_{c}" for k in range(len(rj["nuclear"]["devices"]))
                 for c in range(rj["nuclear"]["nukeCols"])]
              # ...the improvement REMOVER, the Builder's HARVEST, its
-             # charge into a wonder, and the Mountain Tunnel's PORTAL —
-             # the newest last-append
-             + ["REMOVE_IMPROVEMENT", "HARVEST", "WONDER_CHARGE", "PORTAL"])
+             # charge into a wonder, and the Mountain Tunnel's PORTAL
+             + ["REMOVE_IMPROVEMENT", "HARVEST", "WONDER_CHARGE", "PORTAL"]
+             # ...then the patrol's two verbs and PRIORITY TARGET, the newest
+             # last-appends
+             + [f"DEPLOY_{k}" for k in range(_dpw)] + ["RETURN_TO_BASE"]
+             + [f"PRIORITY_TARGET_{k}" for k in range(dict(heads)["AIR_STRIKE_"])])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so
     # `_last` is what proves its contiguity and the walk below skips it.
@@ -152,6 +159,9 @@ def main() -> None:
     assert sim._A_AIR_STRIKE == acts.index("AIR_STRIKE_0"), "AIR_STRIKE dispatch column"
     assert sim._A_AIR_PILLAGE == acts.index("AIR_PILLAGE_0"), "AIR_PILLAGE dispatch column"
     assert sim._A_REBASE == acts.index("REBASE_0"), "REBASE dispatch column"
+    assert sim._A_DEPLOY == acts.index("DEPLOY_0"), "DEPLOY dispatch column"
+    assert sim._A_RETURN == acts.index("RETURN_TO_BASE"), "RETURN_TO_BASE dispatch column"
+    assert sim._A_PRIORITY == acts.index("PRIORITY_TARGET_0"), "PRIORITY_TARGET dispatch column"
     assert sim._A_SPY_TRAVEL == acts.index("SPY_TRAVEL_0"), "SPY_TRAVEL dispatch column"
     assert sim._A_SPY_MISSION == acts.index("SPY_MISSION_0"), "SPY_MISSION dispatch column"
     # pillage must NOT share a column with any build verb

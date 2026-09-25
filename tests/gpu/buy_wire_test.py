@@ -400,12 +400,13 @@ def case_tile(sim, base, row: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# kind 4 — the WORSHIP building (faith only)
+# kind 4 — the WORSHIP building (faith, never gold)
 # ---------------------------------------------------------------------------
 
 def endow_worship(sim, row: int, j: int) -> None:
-    """Plant buyWorshipBuilding's three city gates: a COMPLETE Holy Site in
-    THIS city's registry, its Temple prerequisite, and a founded religion."""
+    """Plant buyWorshipBuilding's gates: a COMPLETE Holy Site in THIS city's
+    registry, its Temple prerequisite, and a founded religion holding Worship
+    belief 0."""
     owned = ((sim.tile_seat[0] == row) & (sim.district[0] < 0) & (sim.centre_slot_at[0] < 0)
              & (sim.built_wonder[0] < 0)).nonzero(as_tuple=True)[0]
     assert len(owned), f"row {row}: city owns no free tile for a HOLY_SITE"
@@ -415,24 +416,29 @@ def endow_worship(sim, row: int, j: int) -> None:
     sim.city_dist_tile[0, row, j, sim._hs_idx] = t
     sim.city_bldg[0, row, j, sim._temple_bidx] = True
     sim.civ_religion_done[0, row] = True
+    sim.civ_worship[0, row] = 0
     sim.civ_faith[0, row] = RICH
     sim._eff_version += 1
 
 
 def case_worship(sim, base, row: int) -> None:
-    if not sim._worship_bidx or sim._temple_bidx < 0 or sim._hs_idx < 0:
+    if sim._worship_bidx.numel() == 0 or sim._temple_bidx < 0 or sim._hs_idx < 0:
         print(f"  row {row}: worship buy SKIPPED (no worship catalog)")
         return
-    wj = sim._worship_bidx_of(row)
+    wj = int(sim._worship_bidx[0])   # the building Worship belief 0 names
     assert wj >= 0, f"row {row}: no worship building"
 
     sim.restore(base)
     prep(sim, row)
-    # a worship building is faith-ONLY: neither production column offers it
-    assert not bool(sim._seat_buildable(row)[0, 0, wj]), f"row {row}: worship must never be queueable"
-    assert not bool(sim._seat_buildable(row, True)[0, 0, wj]), f"row {row}: worship must never gold-buy"
     j = cap_slot(sim, row)
+    # no Worship belief: the building is on no list
+    assert int(sim._worship_bidx_of(row)[0]) == -1, f"row {row}: a worship building with no Worship belief"
+    assert not bool(sim._seat_buildable(row)[0, j, wj]), f"row {row}: worship queueable with no Worship belief"
     endow_worship(sim, row, j)
+    assert int(sim._worship_bidx_of(row)[0]) == wj, f"row {row}: the Worship belief names another building"
+    # the belief puts it on the PRODUCTION list, never on the gold one
+    assert bool(sim._seat_buildable(row)[0, j, wj]), f"row {row}: the Worship belief's building must be queueable"
+    assert not bool(sim._seat_buildable(row, gold=True)[0, j, wj]), f"row {row}: worship must never gold-buy"
     assert bool(sim._worship_city_ok(row)[0, j]), (
         f"row {row}: worship must be buyable once its Temple and Holy Site stand"
     )

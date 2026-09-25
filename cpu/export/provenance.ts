@@ -29,7 +29,7 @@ import { PROMOTIONS } from '../data/promotions';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { POLICIES, GOVERNMENTS } from '../data/policies';
 import { GOVERNORS, GOVERNOR_PROMOTIONS } from '../data/governors';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { GW_HOLDERS } from '../data/greatWorks';
 import { STORM_EVENTS, STORM_UNIT_ROWS } from '../data/disasters';
@@ -98,6 +98,7 @@ const ROW_CATALOGS: Readonly<Record<string, Rows>> = {
   pantheons: PANTHEONS,
   followerBeliefs: FOLLOWER_BELIEFS,
   founderBeliefs: FOUNDER_BELIEFS,
+  worshipBeliefs: WORSHIP_BELIEFS,
   enhancerBeliefs: ENHANCER_BELIEFS,
   greatPeople: Object.values(GREAT_PEOPLE).flat(),
   greatWorkHolders: GW_HOLDERS,

@@ -16,7 +16,7 @@
  *   - districts: the completed districts of the seat's cities, the city
  *     centre excluded and each completed WONDER's district included — the
  *     reader counted `GetDistricts():Members()` that are complete, and a
- *     wonder stands on its own complete `DISTRICT_WONDER`;
+ *     wonder stands on its own complete DISTRICT_WONDER;
  *   - greatPeople: every Great Person the seat earned (the timeline's
  *     claimant);
  *   - religion: the beliefs of the religion the seat founded — Follower,
@@ -28,9 +28,9 @@
  *     eras' total and the current era's moments (EraProgressPanel.lua), and
  *     which the Score's era category matched on all six seats.
  *
- * TWO GS rows are not scored here: Empire's `LINE_ITEM_ERA_BUILDINGS`
+ * TWO GS rows are not scored here: Empire's LINE_ITEM_ERA_BUILDINGS
  * (Multiplier 1, TieBreakerPriority 1030) and Religion's
- * `LINE_ITEM_ERA_CONVERTED` (Multiplier 2, TieBreakerPriority 1020). The live
+ * LINE_ITEM_ERA_CONVERTED (Multiplier 2, TieBreakerPriority 1020). The live
  * game leaves a residue in each category the measured counts do not explain,
  * and no reading of what they count fits every seat.
  *

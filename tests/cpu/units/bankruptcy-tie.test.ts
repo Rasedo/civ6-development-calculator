@@ -2,20 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
-import { endTurn } from '../../../cpu/core/game';
+import { bankruptDisband } from '../../../cpu/core/phase';
 import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
  * A BANKRUPTCY TIE GOES TO THE EARLIEST-SPAWNED UNIT, NOT THE LOWEST ID.
  *
- * When a seat's treasury goes negative, the priciest unit is disbanded and a
- * tie is broken by SPAWN ORDER — the earliest in `state.units`, which is the
- * one order both engines own (the GPU's pool only appends, so its lowest
- * slot is the same unit). The lowest UNIT ID is NOT that order: it equals
- * spawn order for a unit the seat trained and not for one it re-seated, since
- * a converted barbarian keeps its barbarian-era id, lower than anything the
- * seat owns (seed 9053 t164 is such a tie).
+ * When bankruptcy disbands a unit, the priciest goes and a tie is broken by
+ * SPAWN ORDER — the earliest in `state.units`, which is the one order both
+ * engines own (the GPU's pool only appends, so its lowest slot is the same
+ * unit). The lowest UNIT ID is NOT that order: it equals spawn order for a
+ * unit the seat trained and not for one it re-seated, since a converted
+ * barbarian keeps its barbarian-era id, lower than anything the seat owns
+ * (seed 9053 t164 is such a tie). A treasury of -10 disbands exactly one.
  *
  * The GPU twin is tests/gpu/bankruptcy_tie_test.py.
  */
@@ -32,8 +32,7 @@ function scene(): { state: GameState; early: number; late: number } {
   lateUnit.id = lowId;
   const m = getModifiers(state, 0);
   expect(unitUpkeep(m, 'ARCHER')).toBeGreaterThan(0);
-  // broke beyond any single turn's income
-  seat.treasury = -1000;
+  seat.treasury = -10;
   return { state, early, late: lowId };
 }
 
@@ -43,7 +42,7 @@ describe('the bankruptcy tie-break', () => {
     const order = state.units.filter((u) => u.seat === 0).map((u) => u.id);
     expect(order.indexOf(early)).toBeLessThan(order.indexOf(late));
     expect(late).toBeLessThan(early);
-    endTurn(state);
+    bankruptDisband(state, 0, getModifiers(state, 0));
     const ids = new Set(state.units.filter((u) => u.seat === 0).map((u) => u.id));
     expect(ids.has(early), 'the earlier-spawned unit should be the one disbanded').toBe(false);
     expect(ids.has(late), 'the later-spawned low-id unit must survive').toBe(true);
@@ -63,8 +62,8 @@ describe('the bankruptcy tie-break', () => {
     const dearUnit = spawnUnit(state, dearType!, tileAtCoords(state.map, 6, 8).index, 0);
     expect(dearUnit, `${dearType} did not spawn`).not.toBeNull();
     const dear = dearUnit!.id;
-    seat.treasury = -1000;
-    endTurn(state);
+    seat.treasury = -10;
+    bankruptDisband(state, 0, m);
     const ids = new Set(state.units.filter((u) => u.seat === 0).map((u) => u.id));
     expect(ids.has(dear)).toBe(false);
     expect(ids.has(cheap)).toBe(true);
