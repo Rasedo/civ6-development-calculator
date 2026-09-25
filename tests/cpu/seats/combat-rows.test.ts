@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
-import { emptySeat, NO_SEAT } from '../../../cpu/core/seats';
+import { emptySeat, NO_SEAT, FREE_SEAT } from '../../../cpu/core/seats';
 import { spawnUnit, unitFullMoves, stepUnit, ignoresShores } from '../../../cpu/core/units';
-import { rosterCS, healOnEliminate } from '../../../cpu/core/combat';
+import { rosterCS, healOnEliminate, cityStrikeDefenderCS } from '../../../cpu/core/combat';
 import { getModifiers } from '../../../cpu/core/effects';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS, EMBARK_MOVE_ROWS, IGNORE_SHORES_ROWS } from '../../../cpu/data/civilizations';
@@ -119,6 +119,55 @@ describe('the combat-strength rows', () => {
     const foot = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 6).index, 0)!;
     expect(rosterCS(state, foot, 1, null, true)).toBe(0);
   });
+
+  it("Swift Hawk's +10 against the Free Cities, and a civilization only in a golden age", () => {
+    const state = coastalScene('MAPUCHE');
+    const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
+    expect(rosterCS(state, u, FREE_SEAT, 100, false)).toBe(10);
+    expect(rosterCS(state, u, FREE_SEAT, null, true)).toBe(10); // a Free City too
+    expect(rosterCS(state, u, 1, 100, false)).toBe(0);
+    expect(rosterCS(state, u, 100, 100, false)).toBe(0); // a city-state is neither
+  });
+});
+
+describe("the unit a city's strike hits", () => {
+  // CIV6: no roster row's requirement set asks who attacks, so the struck
+  // unit takes its rows with the striking city as its opponent — a district
+  // (OPPONENT_IS_DISTRICT), of the city's seat, never wounded
+  const struck = (civ: string, type: string, striker: number, tech?: string) => {
+    const state = coastalScene(civ);
+    if (tech) grantTechs(state, tech);
+    const t = tileAtCoords(state.map, 5, 5);
+    const u = spawnUnit(state, type, t.index, 0)!;
+    const withRows = cityStrikeDefenderCS(state, u, t, striker);
+    state.seats[0].civ = -1;
+    return withRows - cityStrikeDefenderCS(state, u, t, striker);
+  };
+
+  it('the Great Turkish Bombard: a siege unit +5 against the shooting district', () => {
+    expect(struck('OTTOMAN', 'CATAPULT', 1, 'ENGINEERING')).toBe(5);
+    expect(struck('OTTOMAN', 'WARRIOR', 1)).toBe(0);
+  });
+
+  it("Barbarossa's +7 when the city is a city-state's, and only then", () => {
+    expect(struck('GERMANY', 'WARRIOR', 100)).toBe(7);
+    expect(struck('GERMANY', 'WARRIOR', 1)).toBe(0);
+  });
+
+  it("Swift Hawk's +10 when the city is a Free City", () => {
+    expect(struck('MAPUCHE', 'WARRIOR', FREE_SEAT)).toBe(10);
+    expect(struck('MAPUCHE', 'WARRIOR', 1)).toBe(0);
+  });
+
+  it("Tomyris takes nothing — a city is never wounded — and Hojo's coast still pays", () => {
+    expect(struck('SCYTHIA', 'WARRIOR', 1)).toBe(0);
+    const state = coastalScene('JAPAN');
+    const shore = tileAtCoords(state.map, 7, 5);
+    const u = spawnUnit(state, 'WARRIOR', shore.index, 0)!;
+    const withRows = cityStrikeDefenderCS(state, u, shore, 1);
+    state.seats[0].civ = -1;
+    expect(withRows - cityStrikeDefenderCS(state, u, shore, 1)).toBe(5);
+  });
 });
 
 describe('the site census', () => {
@@ -130,14 +179,8 @@ describe('the site census', () => {
     const missing = bodies
       .filter((b) => b.includes('congressUnitCS(') && !b.includes('rosterCS('))
       .map((b) => b.slice(0, b.indexOf('(')));
-    // TWO allowed names, each for its own reason:
-    //  - `congressUnitCS` is the adder's OWN body.
-    //  - `cityStrikeDefenderCS` is what a CITY's shot is shooting at, and
-    //    neither engine pays a roster row there (the GPU's
-    //    `_seat_city_strike` defence carries none either) — recorded under
-    //. It moved into this file when the two strike keys stopped
-    //    assembling it inline; the exemption came with it.
-    const allowed = new Set(['congressUnitCS', 'cityStrikeDefenderCS']);
+    // ONE allowed name: `congressUnitCS` is the adder's OWN body.
+    const allowed = new Set(['congressUnitCS']);
     expect(missing.filter((n) => !allowed.has(n))).toEqual([]);
   });
 });

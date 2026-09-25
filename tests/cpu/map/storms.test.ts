@@ -5,7 +5,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { disasterPhase, stormWeights, eventRows, stormFootprint, stormTile, stormWalk } from '../../../cpu/core/disasters';
 import { hexDistance } from '../../../world/hex';
-import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, PREVAILING_WINDS, WIND_BAND_LO, windBand } from '../../../cpu/data/disasters';
+import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, WIND_BAND_LO, windBand, RANDOM_EVENT_START_TURN } from '../../../cpu/data/disasters';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { tileYields } from '../../../cpu/core/yields';
 import type { GameState, Tile } from '../../../cpu/core/types';
@@ -24,6 +24,8 @@ import type { GameState, Tile } from '../../../cpu/core/types';
 const STEP = 0x6d2b79f5; // mulberry32's per-draw increment, on both engines
 const seatRow = (leader: string) => CIV_LEADERS.findIndex((l) => l.leader === leader);
 const EV = (id: string) => STORM_EVENTS[STORM_EVENTS.findIndex((e) => e.id === id)];
+/** a family's two rows, in table order */
+const familyPair = (f: string) => STORM_EVENTS.flatMap((e, i) => (e.family === f ? [i] : []));
 
 function draws(s0: number, s1: number): number {
   for (let k = 0; k <= 12; k++) if (((s0 + k * STEP) >>> 0) === (s1 >>> 0)) return k;
@@ -35,6 +37,7 @@ function board(leader: string | null, terrain: 'GRASSLAND' | 'COAST' | 'SNOW' = 
   const state: GameState = makeState(makeMap(16, 16, terrain));
   state.unitsMode = true;
   state.disasters = true;
+  state.turn = RANDOM_EVENT_START_TURN;
   state.seats.push(emptySeat(1));
   state.seats[0].civ = leader ? seatRow(leader) : -1;
   setWar(state, 0, 1, true);
@@ -67,7 +70,7 @@ describe('the eight storms are the install\'s table', () => {
     // OccurrencesPerGame at MODERATE, each row's weight in the turn's one draw
     expect(STORM_EVENTS.map((e) => e.weight)).toEqual([8, 2, 8, 2, 15, 3, 15, 3]);
     for (const f of STORM_FAMILIES) {
-      const [a, b] = stormFamilyPair(f);
+      const [a, b] = familyPair(f);
       expect(STORM_EVENTS[a].severity).toBe(1);
       expect(STORM_EVENTS[b].severity).toBe(2);
     }
@@ -200,13 +203,14 @@ describe('the eight storms are the install\'s table', () => {
     // phase makes: a tornado on the board's one PLAINS HILL in a sea can
     // never leave its tile, so every step is a dropped draw and the
     // footprint is one tile's eleven. That hill is the board's only
-    // tornado and drought plot, so the turn's event draw names a tornado
-    // (whose centre pick lands on the busy hill) or a drought (whose centre
-    // pick is the hill): two draws a turn, whichever fires.
+    // tornado plot, and its Woods keep any drought off it, so the turn's
+    // event draw names a tornado, whose centre pick lands on the busy hill:
+    // two draws a turn.
     const state = board(null, 'COAST');
     const c = tileAtCoords(state.map, 8, 8);
     c.terrain = 'PLAINS';
     c.elevation = 'HILLS';
+    c.feature = 'WOODS';
     c.stormEvent = STORM_EVENTS.findIndex((e) => e.id === 'TORNADO_FAMILY');
     c.stormTurns = 3;
     const counts: number[] = [];
@@ -300,15 +304,16 @@ describe('the eight storms are the install\'s table', () => {
     expect(city.pillagedBuildings ?? []).toEqual(before);
   });
 
-  it('the climate ramp is the flood\'s: weight moves to the worse severity, the family\'s total kept', () => {
-    const base = stormWeights(-1);
+  it('a warmed world grows each row by its own ChanceIncreasePerDegree', () => {
+    // CIV6 (`RandomEvents.ChanceIncreasePerDegree`): 0 on each family's milder
+    // row, 50 on its worse — weight x (1 + 50/100 x 2) at two degrees
+    const base = stormWeights(0);
     expect(base).toEqual(STORM_EVENTS.map((e) => e.weight));
     const warm = stormWeights(2);
     for (const f of STORM_FAMILIES) {
-      const [a, b] = stormFamilyPair(f);
-      expect(warm[a]).toBeLessThan(base[a]);
-      expect(warm[b]).toBeGreaterThan(base[b]);
-      expect(warm[a] + warm[b]).toBeCloseTo(base[a] + base[b], 12);
+      const [a, b] = familyPair(f);
+      expect(warm[a]).toBe(base[a]);
+      expect(warm[b]).toBeCloseTo(base[b] * 2, 12);
     }
     // ...and the draw reads exactly these rows, in the install's table order
     const rows = eventRows(2);

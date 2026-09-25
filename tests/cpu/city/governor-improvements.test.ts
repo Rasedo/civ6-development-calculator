@@ -72,9 +72,10 @@ describe('the catalog rows are the install rows', () => {
     expect(d.tourismTech).toBe('FLIGHT');
   });
 
-  it('appends both to the Builder wire LAST', () => {
-    expect(IMPROVEMENT_IDS[IMPROVEMENT_IDS.length - 2]).toBe('FISHERY');
-    expect(IMPROVEMENT_IDS[IMPROVEMENT_IDS.length - 1]).toBe('CITY_PARK');
+  it('appends both to the Builder wire after the unique rows', () => {
+    const at = IMPROVEMENT_IDS.indexOf('FISHERY');
+    expect(at).toBeGreaterThan(IMPROVEMENT_IDS.indexOf('STEPWELL'));
+    expect(IMPROVEMENT_IDS[at + 1]).toBe('CITY_PARK');
   });
 });
 

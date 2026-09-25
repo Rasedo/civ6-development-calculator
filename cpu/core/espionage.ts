@@ -366,15 +366,20 @@ function hasGovernor(state: GameState, holder: Seat, city: City): boolean {
   return holder.cities.includes(city) && cityHasGovernor(state, city);
 }
 
-/** the holder's counterspy posts that DEFEND the district at `tileIndex`: a
- *  post guards the district it stands on, and CIV6 (Surveillance) "When
- *  Counterspying all city districts are defended". */
+/** the holder's counterspy posts that DEFEND the district at `tileIndex`,
+ *  highest level first, ties in slot order — the first is the post that
+ *  pursues. CIV6 (LOC_ESPIONAGECHOOSER_COUNTERSPY): a post will "Protect
+ *  {1_District} (and all adjacent districts) from enemy spies" — the
+ *  district it stands on and every district within 1 of it; and
+ *  (Surveillance) "When Counterspying all city districts are defended". */
 function counterspiesGuarding(state: GameState, holder: number, city: City, tileIndex: number): Unit[] {
-  return state.units.filter(
-    (u) => u.seat === holder && isSpy(u.type) && u.spyMission === SPY_M_COUNTERSPY
-      && cityHoldsTile(city, u.tileIndex)
-      && (u.tileIndex === tileIndex || promoValue(u, 'SPY_SURVEIL') > 0),
-  );
+  const at = state.map.tiles[tileIndex];
+  return state.units.filter((u) => {
+    if (u.seat !== holder || !isSpy(u.type) || u.spyMission !== SPY_M_COUNTERSPY) return false;
+    const p = state.map.tiles[u.tileIndex];
+    return hexDistance(p.col, p.row, at.col, at.row) <= 1
+      || (cityHoldsTile(city, u.tileIndex) && promoValue(u, 'SPY_SURVEIL') > 0);
+  }).sort((a, b) => spyLevel(b) - spyLevel(a));
 }
 
 /** CIV6 (Great Work Heist): "Great Works of Writing will be displayed first,
@@ -610,8 +615,8 @@ function spyEscape(state: GameState, unit: Unit,
 function spyCaptured(state: GameState, unit: Unit, jailer: number, posted: Unit[]): void {
   // CIV6 (Spies and Espionage): a spy "may gain levels from successful
   // offensive operations, or capturing an enemy Spy" — the post that made
-  // the catch likelier is the one that earns it, and the first of them by
-  // slot is the captor on both engines.
+  // the catch likelier is the one that earns it: the pursuer, the first
+  // guarding post (the highest level).
   const captor = posted[0];
   if (captor) levelUpSpy(state, captor);
   // CIV6: captured spies "are imprisoned, but not killed", and the owner

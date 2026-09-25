@@ -142,6 +142,13 @@ export const FREE_CITY_GRANT_RANGED_TURNS = srcConst('seats.freeCityGrantRangedT
 /** Max per-turn swing from population pressure. Real Civ 6 ±20. */
 export const LOYALTY_PRESSURE_SCALE = srcConst('seats.loyaltyScale', 20,
   gp('LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_MAX_LOYALTY'));
+/** CIV6 (the Loyalty pedia): "Each Citizen exerts a base pressure of 1". */
+export const CITIZEN_PRESSURE_BASE = srcConst('seats.citizenPressureBase', 1,
+  gp('CITIZEN_IDENTITY_PRESSURE_BASE'));
+/** CIV6 (the Loyalty pedia): "Citizens in a Capital city exert an additional
+ *  1 pressure". */
+export const CITIZEN_PRESSURE_CAPITAL = srcConst('seats.citizenPressureCapital', 1,
+  gp('CITIZEN_IDENTITY_PRESSURE_CAPITAL'));
 /** CIV6 (`Happinesses_XP1.IdentityPerTurnChange`): the loyalty an amenity tier
  *  pays per turn, one install row per tier. */
 const happy = (tier: string) =>
@@ -289,7 +296,13 @@ export const AGE_PREV_STEP = srcConst('eras.agePrevStep', 5,
  *  `prevAge` tells the two apart — which is why every "is this seat in a
  *  Golden Age" test is an equality against this. */
 export const AGE_GOLDEN = 2;
-export const AGE_PRESSURE = [0.5, 1.0, 1.5];
+/** CIV6 (the Loyalty pedia, LOC_PEDIA_CONCEPTS_PAGE_LOYALTY_1_CHAPTER_CONTENT_PARA_2):
+ *  "Golden and Heroic Ages add 0.5 for all Citizens, while Dark Ages
+ *  subtract 0.5" — the per-citizen pressure term by `Seat.age` (Dark,
+ *  Normal, Golden or Heroic). */
+export const AGE_PRESSURE = srcConst('eras.agePressure', [-0.5, 0, 0.5], {
+  pedia: 'Expansion1_Civilopedia_Text.xml LOC_PEDIA_CONCEPTS_PAGE_LOYALTY_1_CHAPTER_CONTENT_PARA_2 — "Golden and Heroic Ages add 0.5 for all Citizens, while Dark Ages subtract 0.5"',
+});
 /**
  * DIPLOMATIC FAVOR — the World Congress currency. Real Civ 6
  * (Gathering Storm, verified against the Civilopedia "World Congress" concept
@@ -1472,10 +1485,18 @@ export const GRIEVANCE_DENOUNCE = srcConst('eras.grievanceDenounce', 25,
 /** SETTLED TOO NEAR: a major founding a city draws this from every other
  *  major holding a plot within `GRIEVANCE_SETTLED_NEAR_RANGE` of the new
  *  centre. No install row carries it (no `GlobalParameters` GRIEVANCE row, no
- *  grievance log text); the live game drew 19 (18 for an earlier city as
- *  near), decaying at the ordinary rate, with or without a promise standing. */
-export const GRIEVANCE_SETTLED_NEAR = srcConst('eras.grievanceSettledNear', 19, {
-  lab: 'tools/civ6lab/near_probe.py, runs/promise_near4_20260924T050326Z.log: a founding 4 plots from the rival\'s city, 3 from its border, drew 19 from that rival, then 13, then 7',
+ *  grievance log text). The live game read it one turn after the founding,
+ *  one decay late: 19 in the Industrial era (`GrievanceDecayRate` 6) and 18
+ *  in the Renaissance (7), each then falling by that era's rate — 25 at the
+ *  act, with or without a promise standing. */
+export const GRIEVANCE_SETTLED_NEAR = srcConst('eras.grievanceSettledNear', 25, {
+  derived: 'the lab reading one turn after the act plus that turn\'s GrievanceDecayRate: 19 + 6 (Industrial) = 18 + 7 (Renaissance) = 25',
+  inputs: [
+    { lab: 'tools/civ6lab/near_probe.py, runs/promise_near4_20260924T050326Z.log: a founding 4 plots from the rival\'s city, 3 from its border, read 19 from that rival, then 13, then 7' },
+    xml('Eras_XP2', 'EraType=ERA_INDUSTRIAL', 'GrievanceDecayRate'),
+    { lab: 'tools/civ6lab/near_probe.py, runs/promise_near5_20260924T050035Z.log: read 18, then 11, then 4' },
+    xml('Eras_XP2', 'EraType=ERA_RENAISSANCE', 'GrievanceDecayRate'),
+  ],
 });
 /** The reach, read as the distance from the new centre to the nearest plot
  *  the other major owns. This border reading fits every measured founding:

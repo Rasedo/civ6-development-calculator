@@ -16,7 +16,7 @@ import { STRATEGIC_IDS } from '../data/constants';
 import {
   CARBON_PER_POWER, UNIT_CARBON_SHARE, UNIT_CARBON_RESOURCE_SHARE,
   ADVANCED_POWER_CELLS_SHARE, ADVANCED_POWER_CELLS_TECH,
-  CLIMATE_PHASES, CO2_PER_POINT, LOWLAND_MAX_BAND, FLOOD_BARRIER_PER_TILE,
+  CLIMATE_PHASES, CO2_PER_POINT, CO2_PER_DEGREE, LOWLAND_MAX_BAND, FLOOD_BARRIER_PER_TILE,
   climatePhase, deforestationModifier, pollutionPoints,
   FAVOR_PER_POLLUTION_OVER, FAVOR_POLLUTION_CAP,
 } from '../data/climate';
@@ -126,6 +126,14 @@ export function worldCarbon(state: GameState): number {
 /** Climate Change points for a carbon total. */
 export function climatePoints(state: GameState): number {
   return Math.floor(Math.max(0, worldCarbon(state)) / CO2_PER_POINT);
+}
+
+/** CIV6 (`GameClimate.GetTemperatureChange`, "Change in temperature from the
+ *  starting baseline, in Celsius"): the world's warming in degrees, read live
+ *  off the same carbon the points count — `CO2For1DegreeTempRise` per degree,
+ *  never below 0. */
+export function warmingDegrees(state: GameState): number {
+  return Math.max(0, worldCarbon(state)) / CO2_PER_DEGREE;
 }
 
 /** The lowland bands the sea has already taken, 0..LOWLAND_MAX_BAND — the

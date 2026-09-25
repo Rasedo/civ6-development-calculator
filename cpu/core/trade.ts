@@ -9,8 +9,8 @@ import { BUILDINGS } from '../data/buildings';
 import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isCityStateSeat, seatsAllied, setTileOwner, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent } from './seats';
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
-import { hexDistance, tilesWithin, neighbors } from '../../world/hex';
-import { isCoastalLand, isWater, isMountain } from '../../world/query';
+import { hexDistance, tilesWithin } from '../../world/hex';
+import { isCoastalLand, isImpassable, isWater, isMountain } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnUnit } from './units';
@@ -29,6 +29,7 @@ import { goldenDedication } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
 import { gpPermOf } from '../data/greatPeople';
+import { srcConst, xml } from '../data/provenance';
 import { getModifiers, progressAhead, followerReligionsForCity, followerBeliefForReligion } from './effects';
 import { governorSum } from './governors';
 /**
@@ -158,7 +159,8 @@ export function stampTradingPost(owner: Seat, centerIndex: number): void {
  * CIV6 (All Roads Lead to Rome): "All cities you found or conquer start with
  * a Trading Post and, if within Trade Route range of your Capital, a road to
  * it." The road is the Trader's own course (`tradeWalkStep`), laid on every
- * land tile of the descent, capital excluded when it is the city itself.
+ * passable land tile of the descent, capital excluded when it is the city
+ * itself.
  */
 export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: number): void {
   const owner = seatOf(state, seat);
@@ -176,7 +178,8 @@ export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: 
   let at = centerIndex;
   for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at !== cap.centerIndex; step++) {
     at = tradeWalkStep(state, at, cap.centerIndex, water);
-    if (!isWater(tiles[at])) tiles[at].road = true;
+    // passable land only: a portal's mountain carries no road
+    if (!isWater(tiles[at]) && !isImpassable(tiles[at])) tiles[at].road = true;
   }
 }
 
@@ -317,6 +320,16 @@ export const PLUNDER_ROUTE_GOLD = 50;
 export const TRADE_WALK_EXPIRY_RAIL = 2 * TRADE_ROAD_MAX_STEPS;
 
 /**
+ * CIV6 (TRADER_IS_WITHIN_FOUR_REQUIREMENT, REQUIREMENT_PLOT_NEARBY_UNIT_TAG_MATCHES
+ * MinDistance 0 / MaxDistance 4, Tag CLASS_TRADER): how far an escort's
+ * protection reaches — "Trader units are immune to being plundered if they are
+ * within 4 tiles of a Mandekalu Cavalry and on a land tile", and of a Bireme
+ * "and on a water tile". Distance 0 is the escort's own tile.
+ */
+export const TRADER_GUARD_RADIUS = srcConst('trade.guardRadius', 4,
+  xml('RequirementArguments', 'RequirementId=TRADER_IS_WITHIN_FOUR_REQUIREMENT&Name=MaxDistance', 'Value'));
+
+/**
  * The seat that would PLUNDER a Trader standing on `tileIndex` — the LOWEST
  * hostile seat id with a unit there (barbarians always hostile, others by
  * the war matrix), or null. CIV6 (Reform the Coinage, Golden face): "your
@@ -325,15 +338,18 @@ export const TRADE_WALK_EXPIRY_RAIL = 2 * TRADE_ROAD_MAX_STEPS;
 export function routePlunderer(state: GameState, tileIndex: number, seat: number): number | null {
   if (!state.unitsMode) return null;
   if (goldenDedication(state, seat, DED_COINAGE)) return null;
-  // CIV6 (Mandekalu Cavalry): "Protects nearby land Trade units from Plunder"
-  // — a guard of this seat's own on the Trader's tile or beside it.
+  // CIV6 (ABILITY_MANDEKALU / ABILITY_BIREME_PROTECT_TRADER,
+  // MODIFIER_PLAYER_UNITS_GRANT_ABILITY): the escort grants its OWN seat's
+  // Traders within TRADER_GUARD_RADIUS immunity, on the escort's ground alone
+  // (DomainType DOMAIN_LAND for the Mandekalu, DOMAIN_SEA for the Bireme).
   const here = state.map.tiles[tileIndex];
   if (here) {
     const ground = isWater(here) ? 'water' : 'land';
-    const near = [here, ...neighbors(state.map, here)];
-    if (state.units.some((g) => g.seat === seat && g.hp > 0
-      && UNITS[g.type]?.guardsTraders === ground
-      && near.some((t) => t.index === g.tileIndex))) return null;
+    if (state.units.some((g) => {
+      if (g.seat !== seat || g.hp <= 0 || UNITS[g.type]?.guardsTraders !== ground) return false;
+      const gt = state.map.tiles[g.tileIndex];
+      return !!gt && hexDistance(gt.col, gt.row, here.col, here.row) <= TRADER_GUARD_RADIUS;
+    })) return null;
   }
   let raider: number | null = null;
   for (const u of state.units) {
@@ -343,6 +359,31 @@ export function routePlunderer(state: GameState, tileIndex: number, seat: number
     if (raider === null || u.seat < raider) raider = u.seat;
   }
   return raider;
+}
+
+/**
+ * Does the plundering seat stand a HULL on the Trader's tile? CIV6
+ * (ABILITY_FRANCIS_DRAKE_PLUNDER_BONUS, ABILITY_CHING_SHIH_PLUNDER_BONUS,
+ * MODIFIER_PLAYER_UNIT_ADJUST_PLUNDER_YIELDS): the admirals' "+X% rewards for
+ * plundering sea Trade Routes" is an ability tagged CLASS_NAVAL_MELEE /
+ * _RANGED / _RAIDER / _CARRIER — every sea-domain chassis this catalog
+ * carries — and no requirement set tests the route itself, so it is the
+ * plundering unit's class that decides. An embarked passenger is a land unit.
+ */
+export function plunderedByHull(state: GameState, tileIndex: number, raider: number): boolean {
+  return state.units.some((u) => u.seat === raider && u.tileIndex === tileIndex && !!UNITS[u.type]?.naval);
+}
+
+/** The Gold the `raider` seat banks for plundering the route whose Trader
+ *  stands on `tileIndex`: the base, the seat's own multiplier (Total War,
+ *  Letter of Marque), and the admirals' permanent percentage when its hull
+ *  plunders (`plunderedByHull`). */
+export function routePlunderGold(state: GameState, raider: number, tileIndex: number): number {
+  const rs = seatOf(state, raider);
+  if (!rs) return 0;
+  const hull = plunderedByHull(state, tileIndex, raider);
+  return PLUNDER_ROUTE_GOLD * getModifiers(state, raider).routePlunderMult
+    * (hull ? 1 + gpPermOf(rs, 'routePlunderPct') / 100 : 1);
 }
 
 /** The FREE Trader this seat owns on the LOWEST tile index — the unit the

@@ -11,6 +11,7 @@ import { barbarianPhase, meleeAttack, attackTargets } from '../../../cpu/core/co
 import { spawnUnit } from '../../../cpu/core/units';
 import { CITY_STATE_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST } from '../../../cpu/data/cityStates';
 import { declareWarOnCityState } from '../../../cpu/core/cityStates';
+import { LOYALTY_PRESSURE_SCALE } from '../../../cpu/data/seats';
 import type { CityState, CityStateType, GameState, City, Seat } from '../../../cpu/core/types';
 
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
@@ -247,6 +248,41 @@ describe('loyalty', () => {
     expect(loyaltyDelta(state, border, 'Ecstatic')).toBeGreaterThan(
       loyaltyDelta(state, border, 'Unhappy'),
     );
+  });
+
+  it('each citizen presses at base + capital + age, 10% less per tile', () => {
+    // CIV6 (the Loyalty pedia): "Each Citizen exerts a base pressure of 1 ...
+    // Citizens in a Capital city exert an additional 1 pressure. Golden and
+    // Heroic Ages add 0.5 for all Citizens, while Dark Ages subtract 0.5. This
+    // Citizen pressure affects cities within 9 tiles, but is 10% less
+    // effective per tile distant."
+    const state = makeState(makeMap(20, 14));
+    foundCity(state, tileAtCoords(state.map, 2, 7).index, 0); // the capital, 10 out: no reach
+    const border = foundCity(state, tileAtCoords(state.map, 12, 7).index, 0).city!;
+    const civ = addCiv(state, 16, 7); // 4 from the border city
+    const rival = civ.cities[0];
+    rival.population = 10;
+    const me = seatOf(state, 0)!;
+    // own: the border city's citizens at its own centre (weight 10); foreign:
+    // the rival's ten, 4 out (weight 6)
+    const pt = (ownEach: number, foreignEach: number): number => {
+      const own = border.population * ownEach * 10;
+      const foreign = rival.population * foreignEach * 6;
+      return (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
+    };
+    const rest = loyaltyDelta(state, border, 'Content') - pt(1, 1);
+    const off = (ownEach: number, foreignEach: number): number =>
+      loyaltyDelta(state, border, 'Content') - rest - pt(ownEach, foreignEach);
+    civ.age = 2; // Golden, and a Heroic age carries the same code
+    expect(off(1, 1.5)).toBeCloseTo(0, 12);
+    civ.age = 0; // Dark
+    expect(off(1, 0.5)).toBeCloseTo(0, 12);
+    rival.isCapital = true;
+    expect(off(1, 1.5)).toBeCloseTo(0, 12); // 1 + 1 - 0.5
+    civ.age = 2;
+    expect(off(1, 2.5)).toBeCloseTo(0, 12); // 1 + 1 + 0.5
+    me.age = 0;
+    expect(off(0.5, 2.5)).toBeCloseTo(0, 12);
   });
 
   it('a city at zero loyalty revolts into a Free City, not to the pressuring civ', () => {

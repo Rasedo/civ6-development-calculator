@@ -208,8 +208,9 @@ def test_free_city_loyalty_and_join(rules, path) -> None:
     sim._eff_version += 1
     here = torch.tensor([centre])
     own = float(sim._citizen_pressure_from(here, F)[B0])
-    pulls = [float(sim._citizen_pressure_from(here, r)[B0]) * float(sim._age_factor[int(sim.civ_age[B0, r])])
-             for r in range(sim.n_majors)]
+    pulls = [float(sim._citizen_pressure_from(here, r)[B0]) for r in range(sim.n_majors)]
+    # a Normal-age rival's 30 citizens, not in its capital, 4 away: 1 each at weight 6
+    assert int(sim.civ_age[B0, 1]) == 1 and not bool(sim.city_is_cap[B0, 1, rcol])
     assert own == 10.0 and pulls[1] == 30 * 6, (own, pulls)
     # the old owner's capital is still inside range 9 of the city it lost
     assert pulls[0] > 0 and pulls[0] < pulls[1], pulls

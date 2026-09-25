@@ -17,6 +17,7 @@ import {
   DED_DRACONES,
   DED_COINAGE,
   DED_STEAM,
+  DED_PEN_BRUSH_AND_VOICE,
   DED_TO_ARMS,
   DED_MONUMENTALITY,
   DED_EXODUS,
@@ -33,6 +34,7 @@ import {
   DRACONES_DISCOVERY_SCORE,
   COINAGE_INTL_GOLD_PER_SPEC,
   GOLDEN_MOVE_BONUS,
+  CIV_LEADERS,
 } from '../../../cpu/data/seats';
 import { BUILDING_ERA_INDEX } from '../../../cpu/data/buildings';
 import { UNITS } from '../../../cpu/data/units';
@@ -153,6 +155,27 @@ describe('the four new dedications', () => {
     expect(seatOf(state, 0)!.eraScore).toBe(DED_EVENT_SCORE[DED_STEAM]);
     completeQueueItem(state, city, { kind: 'building', building: 'GRANARY', progress: 0 }, 65, 0);
     expect(seatOf(state, 0)!.eraScore).toBe(DED_EVENT_SCORE[DED_STEAM]); // ancient pays nothing
+  });
+
+  it('Pen, Brush and Voice: a building with a Great Work slot pays +1; the Marae has none', () => {
+    // CIV6: "+1 Era Score for constructing a building with a Great Work Slot";
+    // the Marae, the Maori Amphitheater, carries no Building_GreatWorks row.
+    const state = makeState(makeMap(20, 20));
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+    commit(state, 0, DED_PEN_BRUSH_AND_VOICE);
+    completeQueueItem(state, city, { kind: 'building', building: 'AMPHITHEATER', progress: 0 }, 150, 0);
+    expect(seatOf(state, 0)!.eraScore).toBe(DED_EVENT_SCORE[DED_PEN_BRUSH_AND_VOICE]);
+    completeQueueItem(state, city, { kind: 'building', building: 'GRANARY', progress: 0 }, 65, 0);
+    expect(seatOf(state, 0)!.eraScore).toBe(DED_EVENT_SCORE[DED_PEN_BRUSH_AND_VOICE]); // no slot, no score
+
+    const maori = makeState(makeMap(20, 20));
+    const mcity = settleAt(maori, tileAtCoords(maori.map, 9, 9).index);
+    seatOf(maori, 0)!.civ = CIV_LEADERS.findIndex((l) => l.civ === 'MAORI');
+    commit(maori, 0, DED_PEN_BRUSH_AND_VOICE);
+    completeQueueItem(maori, mcity, { kind: 'building', building: 'AMPHITHEATER', progress: 0 }, 150, 0);
+    expect(seatOf(maori, 0)!.eraScore).toBe(0); // the Marae
+    completeQueueItem(maori, mcity, { kind: 'building', building: 'TEMPLE', progress: 0 }, 120, 0);
+    expect(seatOf(maori, 0)!.eraScore).toBe(DED_EVENT_SCORE[DED_PEN_BRUSH_AND_VOICE]); // the Maori Temple has its slot
   });
 
   it('Heartbeat of Steam, Golden face: campus science adjacency pays production too', () => {

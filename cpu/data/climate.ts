@@ -1,9 +1,9 @@
 /**
  * THE CLIMATE ARC — Gathering Storm's CO2, its seven phases, and the sea.
  *
- * Every number below with a CIV6 note is the Climate (Civ6) page's own. The
- * two MODEL notes mark the places that page states qualitatively and never
- * quantifies; each is one modelling choice keyed to published numbers, not a
+ * Every number below with a CIV6 note is the Climate (Civ6) page's own or the
+ * install's. The MODEL note marks the place that page states qualitatively and
+ * never quantifies: one modelling choice keyed to published numbers, not a
  * fresh ladder of invented constants.
  */
 
@@ -54,14 +54,21 @@ export const ADVANCED_POWER_CELLS_TECH = srcConst('climate.ADVANCED_POWER_CELLS_
     { expect: 'TECH_ADVANCED_POWER_CELLS' }));
 
 /**
+ * CIV6 (`Maps_XP2.CO2For1DegreeTempRise`): the CO2 that warms the world one
+ * degree — MAPSIZE_DUEL 500,000. This world is 44x26, which IS Civ 6's Duel.
+ */
+export const CO2_PER_DEGREE = srcConst('climate.co2PerDegree', 500_000,
+  xml('Maps_XP2', 'MapSizeType=MAPSIZE_DUEL', 'CO2For1DegreeTempRise'));
+
+/**
  * CIV6: "In order for the global temperature to rise by 0.5° (1 Climate
  * Change Point), you will need a different amount of CO2 emissions depending
- * on map size" — Duel 250,000. This world is 44x26, which IS Civ 6's Duel.
+ * on map size" — half of `CO2_PER_DEGREE`, Duel 250,000.
  */
-export const CO2_PER_POINT = srcConst('climate.co2PerPoint', 250_000, {
-  pedia: 'the GS Climate page ("you will need a different amount of CO2 emissions depending on map '
-    + 'size" — Duel 250,000, which is this 44x26 world); the install ships no readable '
-    + 'climate-level table',
+export const CO2_PER_POINT = srcConst('climate.co2PerPoint', CO2_PER_DEGREE / 2, {
+  derived: 'Maps_XP2.CO2For1DegreeTempRise (MAPSIZE_DUEL) / 2 — the GS Climate page: one Climate '
+    + 'Change Point is a rise of 0.5 degrees',
+  inputs: [xml('Maps_XP2', 'MapSizeType=MAPSIZE_DUEL', 'CO2For1DegreeTempRise')],
 });
 
 /** CIV6 (Carbon Recapture): "will recover 50,000 units of CO2". The project
@@ -166,25 +173,6 @@ export const LOWLAND_MAX_BAND = srcConst('climate.lowlandMaxBand', 3, {
     + 'level and publishes neither the generator\'s rule nor the elevations; this engine reads '
     + 'the band as hex distance to the nearest water, three deep',
 });
-
-/**
- * How much likelier a disaster is to arrive at its worst severity once the
- * world has warmed.
- *
- * MODEL — but a narrow one. The page states "a greater chance the disasters
- * will be of the most destructive strength" and does not quantify it, so it
- * rides the ONE warming curve the page does publish,
- * `CLIMATE_PHASES[p].iceMelt`: that fraction of the mildest row's weight in
- * the turn's one event draw moves onto the worst. Below Phase I nothing moves.
- */
-export function severitySplit(base: readonly number[], phase: number): number[] {
-  const out = [...base];
-  if (phase < 0 || out.length < 2) return out;
-  const moved = out[0] * CLIMATE_PHASES[phase].iceMelt;
-  out[0] -= moved;
-  out[out.length - 1] += moved;
-  return out;
-}
 
 /** The phase index for a point total: -1 below Phase I, else 0..6. CIV6: "It
  *  is not possible to revert climate change to an earlier phase", which is the

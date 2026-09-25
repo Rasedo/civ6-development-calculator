@@ -125,9 +125,10 @@ ALLOWLIST: dict[str, str] = {
     "uranium": "the charge is paid off the BUILD PROJECT's own row (`rs`/`rc`, "
                "cpu/core/stockpile.ts:277 and gpu/core/sim_seats.py:3029); the device column is "
                "the same install fact transcribed a second time",
-    "severity": "both engines take a storm's severity from its POSITION in its family pair — "
-                "stormFamilyPair (cpu/data/disasters.ts:291) and its twin "
-                "(gpu/core/sim_init.py:2467) — so neither reads the column",
+    "severity": "no rule reads a storm's Severity: the warmed world reads each row's own "
+                "`cipd` (ChanceIncreasePerDegree) — stormWeights (cpu/core/disasters.ts) and "
+                "`_event_rows` (gpu/core/sim_economy.py) — so the column is carried for a test "
+                "to assert",
     "resourceOnly": "the rule is the resource early return: a resourced tile offers exactly "
                     "RESOURCES[r].improvement (cpu/core/rules.ts:328) and no other arm lists a "
                     "resource-only row",

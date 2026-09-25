@@ -659,7 +659,12 @@ export interface Seat {
   fuelShort?: number;
   camps: number[];
   gpEarned: string[];
+  /** the era score earned in the CURRENT era — the window the Age bars read,
+   *  reset at every era boundary. */
   eraScore?: number;
+  /** the era score earned in every era already closed; with `eraScore` it is
+   *  the whole game's, which the Score counts. */
+  eraScorePast?: number;
   /** how many DARK / GOLDEN-or-HEROIC ages this civ has entered — the
    *  per-civ threshold drift's memory. */
   darkAges?: number;
@@ -796,9 +801,14 @@ export interface CityState extends Seat {
   /** `City.pillagedBuildings` for the minor's city — the same ONE reader. */
   pillagedBuildings?: string[];
   outerHp?: number;
-  /** the build pot: the city's own Production, banked until the ladder's
-   *  next item is covered (`minorPhase`). */
+  /** the build pot: the city's own Production, banked until the build
+   *  table's next item is covered (`minorPhase`). */
   prodProgress?: number;
+  /** the episode's draws (`minorPlan`): per `MINOR_BUILD_ROWS` row, the turn
+   *  from which it wants its item (-1 never, 0 for a row that draws none),
+   *  and the army it keeps. Absent = not drawn yet. */
+  buildFrom?: number[];
+  armyCap?: number;
   /** the minor city's GOLD and FAITH, banked — what its yield walk pays and
    *  nothing spends yet. A Seat's own fields, declared here so the census
    *  compares them for a minor (`minorTreasury` / `minorFaith`). */

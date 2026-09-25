@@ -14,9 +14,10 @@ runs a spy mission end to end, so these scenes are the evidence:
   2. a mission is offered where its district stands under the spy — the
      Zone's on the Zone, the centre's on the centre — and the counterspy
      post on any district of an own city
-  3. CIV6 (Surveillance): the post defends every district of its city, and
-     works a level higher within one hex of where it stands; Polygraph reads
-     the whole city
+  3. the counterspy post defends its own district "and all adjacent
+     districts", the highest level first; CIV6 (Surveillance): every district
+     of its city, and a level higher within one hex of where it stands;
+     Polygraph reads the whole city
   4. CIV6 (Sabotage Production) pillages the Zone's BUILDINGS: the yield
      walk skips them, the queue offers the repair at a quarter of the price,
      the gold arm does not, and the repair completing clears the flag
@@ -169,14 +170,25 @@ def main() -> None:
     assert sim._counter_levels(B0, foe, theirs, iz) == base_iz + 1, "no +1 level within one hex of the post"
     assert sim._counter_levels(B0, foe, theirs, far) == base_far, "the +1 reached two hexes out"
     assert sim._counter_levels(B0, foe, theirs, ctr_t) == base_iz + 1, "the post's own tile is within reach"
-    # the post GUARDS the district the intruder works from: its own tile
-    # always, every district of the city with Surveillance
+    # the post GUARDS the district the intruder works from: its own tile and
+    # every adjacent district ("and all adjacent districts"), every district
+    # of the city with Surveillance
     sim.unit_promos[B0, guard] = 0
-    assert sim._counterspies_guarding(B0, foe, theirs, iz).numel() == 0, "a post on the centre guarded the Zone unpromoted"
     assert sim._counterspies_guarding(B0, foe, theirs, ctr_t).tolist() == [guard]
+    assert sim._counterspies_guarding(B0, foe, theirs, iz).tolist() == [guard], "a post on the centre left the adjacent Zone"
+    assert sim._counterspies_guarding(B0, foe, theirs, far).numel() == 0, "a post on the centre guarded two hexes out unpromoted"
+    # the highest level pursues, whatever the slot order; ties keep the slot order
+    high = spawn_spy(sim, foe, iz)
+    sim.unit_spy_mission[B0, high] = sim._spy_m_counterspy
+    assert sim._counterspies_guarding(B0, foe, theirs, iz).tolist() == sorted([guard, high])
+    sim.unit_spy_level[B0, high] = 2
+    lo_first = sim._counterspies_guarding(B0, foe, theirs, iz).tolist()
+    assert lo_first == [high, guard], f"the higher post does not pursue first: {lo_first}"
+    sim.unit_alive[B0, high] = False
+    sim._gen_ver += 1
     sim.unit_promos[B0, guard] = 1 << pcol(sim, "SPY_SURVEIL")
-    assert sim._counterspies_guarding(B0, foe, theirs, iz).tolist() == [guard], "Surveillance did not extend the guard"
-    assert sim._counterspies_guarding(B0, foe, theirs, far).tolist() == [guard]
+    assert sim._counterspies_guarding(B0, foe, theirs, iz).tolist() == [guard]
+    assert sim._counterspies_guarding(B0, foe, theirs, far).tolist() == [guard], "Surveillance did not extend the guard"
     # Polygraph: the post reads anywhere in the city
     sim.unit_promos[B0, guard] = 1 << pcol(sim, "SPY_HOME_ENEMY_LEVEL")
     sim.unit_tile[B0, guard] = far
@@ -184,7 +196,8 @@ def main() -> None:
     assert sim._counter_levels(B0, foe, theirs, iz) == base_iz + 1, "Polygraph on a district did not reach the city"
     sim.unit_alive[B0, guard] = False
     sim._gen_ver += 1
-    print("  3 surveillance OK — every district guarded, +1 level within one hex; Polygraph city-wide")
+    print("  3 counterspy OK — its own and the adjacent districts guarded, the highest level first; "
+          "Surveillance every district, +1 level within one hex; Polygraph city-wide")
 
     # -- 4: Sabotage pillages the Zone's buildings; the queue repairs them ---
     wk = int((sim._b_req_district == sim._iz_idx).nonzero(as_tuple=True)[0][0])

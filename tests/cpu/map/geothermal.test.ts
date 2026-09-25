@@ -11,6 +11,7 @@ import { FEATURES } from '../../../world/features';
 import { IMPROVEMENTS } from '../../../cpu/data/improvements';
 import { PANTHEONS } from '../../../cpu/data/religion';
 import { disasterPhase } from '../../../cpu/core/disasters';
+import { RANDOM_EVENT_START_TURN } from '../../../cpu/data/disasters';
 import { generateMap } from '../../../world/mapgen';
 import type { GameState, Tile } from '../../../cpu/core/types';
 
@@ -114,6 +115,7 @@ describe('Volcanic Soil', () => {
   it('...and the eruption lays down the fertility its page describes', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const volcano = tileAtCoords(state.map, 8, 8);
     volcano.elevation = 'MOUNTAIN';
     volcano.volcano = true;

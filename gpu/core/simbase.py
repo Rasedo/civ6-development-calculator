@@ -172,6 +172,7 @@ class Rules:
     goody_huts: dict  # TRIBAL VILLAGES: the install's kind + subtype tables
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
+    scoring: list  # Civ 6's Score: [{count, value}] per ScoringLineItems row, in tie order
     boosts: list  # [{target, idx, kind, ...}] — eureka/inspiration conditions
     combat: dict  # barbarian constants + the JS-computed damage-base table
     disasters: dict  # the Flood (Civ6) severity tables + the weights of the turn's one event draw
@@ -377,6 +378,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         goody_huts=r["goodyHuts"],
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
+        scoring=r["scoring"],
         boosts=r.get("boosts", []),
         combat=r.get("combat", {}),
         disasters=r["disasters"],
@@ -791,7 +793,7 @@ _MUTABLE = [
     "seat_science_total",
     "rng_state", "centre_slot_at", "tdef", "tmove", "railroad",
     "next_slot", "camp_tile", "n_camps", "game_over",
-    "victory_type", "victory_row", "winner", "project_done",  # one-time project ledger
+    "victory_type", "victory_row", "project_done",  # one-time project ledger
     "space_ly", "civ_orbital_lasers", "city_lasers",  # the Exoplanet flight: LY travelled, the seat's orbital stations, the terrestrial ones per city
     "civ_stockpile", "civ_fuel_short", "city_powered",  # GS strategic banks, the slots short at the last fuel bill, and the grid they run
     "civ_wmd",  # nuclear devices held, dense over the device catalog
@@ -804,7 +806,7 @@ _MUTABLE = [
     "citystate_last_levy",
     "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_alliance_type", "seat_alliance_pts", "civ_sci_rate", "civ_cul_rate", "civ_tour_rate", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held", "seat_promise", "seat_promise_broken",
-    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank", "city_item_bank", "city_item_amt",
+    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "era_score_past", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank", "city_item_bank", "city_item_amt",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
@@ -862,6 +864,7 @@ _MUTABLE = [
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
     "citystate_treasury", "citystate_faith",
+    "citystate_build_from", "citystate_army_cap", "citystate_builders_trained",
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair

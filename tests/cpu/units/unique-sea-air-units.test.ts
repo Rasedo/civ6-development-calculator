@@ -141,6 +141,22 @@ describe('the sea and air clauses', () => {
     expect(routePlunderer(state, land.index, 0)).toBe(null);
   });
 
+  it('lets the Bireme reach a Trader 4 tiles off, and no farther', () => {
+    // CIV6: "Trader units are immune to being plundered if they are within 4
+    // tiles of a Bireme and on a water tile" (TRADER_IS_WITHIN_FOUR_REQUIREMENT)
+    const guardAt = (col: number): number | null => {
+      const state = scene();
+      state.seats.push(emptySeat(1));
+      setWar(state, 0, 1, true);
+      sea(state, [6, 7, 8, 9, 10, 11], 6);
+      put(state, 'GALLEY', 6, 6, 1);
+      put(state, 'BIREME', col, 6, 0);
+      return routePlunderer(state, tileAtCoords(state.map, 6, 6).index, 0);
+    };
+    expect(guardAt(10)).toBe(null);
+    expect(guardAt(11)).toBe(1);
+  });
+
   it('gives the Janissary its free promotion and the Saka its early bow', () => {
     const state = scene();
     const j = put(state, 'JANISSARY', 6, 6);

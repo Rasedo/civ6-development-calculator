@@ -2,14 +2,16 @@
  * VOLCANIC SOIL — an eruption paints its ring. CIV6 (`RandomEvent_Yields`,
  * FEATURE_VOLCANIC_SOIL YIELD_FOOD, `ReplaceFeature="true"`): each eligible
  * land plot of the ring becomes Volcanic Soil with the severity's chance
- * (`SOIL_PAINT_P`), replacing Woods or Rainforest; Floodplains, a Geothermal
+ * (`ERUPTION_PAINT_P`), replacing Woods or Rainforest; Floodplains, a Geothermal
  * Fissure, water and Mountains are never painted (the lab 4 volcano scene).
  * The GPU twin is tests/gpu/feature_add_test.py.
  */
 import { describe, expect, it } from 'vitest';
 import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
 import { disasterPhase, erupt, paintVolcanicSoil, soilPaintable } from '../../../cpu/core/disasters';
-import { SOIL_PAINT_P } from '../../../cpu/data/disasters';
+import { ERUPTION_PAINT_P, RANDOM_EVENT_START_TURN, eruptionRow } from '../../../cpu/data/disasters';
+/** the volcano's three rows' paint chances, GENTLE / CATASTROPHIC / MEGACOLOSSAL */
+const VOLCANO_PAINT_P = [0, 1, 2].map((sev) => ERUPTION_PAINT_P[eruptionRow('volcano', sev)]);
 import { bareGround, validImprovementsIn } from '../../../cpu/core/rules';
 import { tileYields } from '../../../cpu/core/yields';
 import { neighbors } from '../../../world/hex';
@@ -121,14 +123,14 @@ describe('Volcanic Soil', () => {
       t.pillaged = false;
       t.fertility = 0;
     }));
-    for (let sev = 0; sev < SOIL_PAINT_P.length; sev++) {
+    for (let sev = 0; sev < VOLCANO_PAINT_P.length; sev++) {
       let plots = 0;
       let painted = 0;
       let woodsPlots = 0;
       let woodsPainted = 0;
       for (let round = 0; round < 40; round++) {
         reset();
-        volcanoes.forEach((v) => erupt(state, v, SOIL_PAINT_P[sev]));
+        volcanoes.forEach((v) => erupt(state, v, eruptionRow('volcano', sev)));
         rings.forEach((ring, k) => {
           expect(ring[0].feature).toBe('FLOODPLAINS');
           for (const t of ring.slice(1)) {
@@ -143,7 +145,7 @@ describe('Volcanic Soil', () => {
           }
         });
       }
-      const p = SOIL_PAINT_P[sev];
+      const p = VOLCANO_PAINT_P[sev];
       expect(Math.abs(painted / plots - p)).toBeLessThan(0.05);
       expect(Math.abs(woodsPainted / woodsPlots - p)).toBeLessThan(0.07);
     }
@@ -157,6 +159,7 @@ describe('Volcanic Soil', () => {
     // weighted mean of the three paint chances.
     const state: GameState = makeState(makeMap(16, 16, 'COAST'));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const v = tileAtCoords(state.map, 8, 8);
     v.terrain = 'DESERT';
     v.elevation = 'MOUNTAIN';
@@ -177,7 +180,14 @@ describe('Volcanic Soil', () => {
     // the volcano's 8 against the dust storms' 8 + 2
     expect(Math.abs(eruptions / 3000 - 8 / 18)).toBeLessThan(0.03);
     const w = [4, 2.5, 1.5];
-    const mean = w.reduce((a, x, s) => a + x * SOIL_PAINT_P[s], 0) / 8;
+    const mean = w.reduce((a, x, s) => a + x * VOLCANO_PAINT_P[s], 0) / 8;
     expect(Math.abs(painted / plots - mean)).toBeLessThan(0.03);
+  });
+
+  it('the five eruption rows are the install\'s paint chances', () => {
+    // Kilimanjaro GENTLE / CATASTROPHIC, then the volcano's three
+    expect([...ERUPTION_PAINT_P]).toEqual([0.5, 0.5, 0.35, 0.5, 0.75]);
+    expect(eruptionRow('kilimanjaro', 1)).toBe(1);
+    expect(eruptionRow('volcano', 0)).toBe(2);
   });
 });

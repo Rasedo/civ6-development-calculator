@@ -6,8 +6,8 @@ SOURCE (Civilopedia, Gathering Storm):
   MONUMENTALITY — "If chosen at the start of a Golden Age, +2 Movement for all
     Builders."
   EXODUS OF THE EVANGELISTS — "If chosen at the start of a Golden Age, +2
-    Movement for all Missionaries, Apostles, and Inquisitors." This roster has
-    no INQUISITOR, so MISSIONARY and APOSTLE are the whole class.
+    Movement for all Missionaries, Apostles, and Inquisitors."
+    (`Expansion1_Moments.xml` UNIT_IS_RELIGIOUS: the three of them.)
 
 Every assertion has its NEGATIVE twin — the same unit without the dedication,
 a unit of the wrong class, a barbarian, an embarked unit — so the lane cannot
@@ -83,8 +83,8 @@ def main() -> None:
         "Re-run `npx vite-node scripts/export-gpu.ts`."
     )
     mono, exo = sim._ded_monumentality, sim._ded_exodus
-    bld, mis, apo = sim._builder_idx, sim._missionary_idx, sim._apostle_idx
-    assert bld >= 0 and mis >= 0 and apo >= 0, "roster indices missing"
+    bld, mis, apo, inq = sim._builder_idx, sim._missionary_idx, sim._apostle_idx, sim._inquisitor_idx
+    assert bld >= 0 and mis >= 0 and apo >= 0 and inq >= 0, "roster indices missing"
 
     # ---- 1. no dedication -> no bonus, for every class ---------------------
     p_bld = put(sim, "major", bld, 0)
@@ -105,16 +105,20 @@ def main() -> None:
     assert full(sim, "major", v_mis) == base(sim, mis), "MONUMENTALITY reached a Missionary"
     print(f"  2 MONUMENTALITY: builder {base(sim, bld)} -> {full(sim, 'major', p_bld)} for seat 0 AND civ; warrior/missionary untouched")
 
-    # ---- 3. EXODUS lifts MISSIONARY + APOSTLE, and only those -------------
+    # ---- 3. EXODUS lifts MISSIONARY + APOSTLE + INQUISITOR, and only those -
     sim2 = build()
     p_bld2 = put(sim2, "major", bld, 0)
     v_mis2 = put(sim2, "major", mis, 1)
     v_apo2 = put(sim2, "major", apo, 1)
+    v_inq2 = put(sim2, "major", inq, 1)
+    assert full(sim2, "major", v_inq2) == base(sim2, inq), "an Inquisitor with no Golden age gained MP"
     golden(sim2, 1, exo)
     assert full(sim2, "major", v_mis2) == base(sim2, mis) + bonus, "EXODUS missed the Missionary"
     assert full(sim2, "major", v_apo2) == base(sim2, apo) + bonus, "EXODUS missed the Apostle"
+    assert full(sim2, "major", v_inq2) == base(sim2, inq) + bonus, "EXODUS missed the Inquisitor"
     assert full(sim2, "major", p_bld2) == base(sim2, bld), "EXODUS reached a Builder"
-    print(f"  3 EXODUS: missionary {base(sim2, mis)} -> {full(sim2, 'major', v_mis2)}, apostle {base(sim2, apo)} -> {full(sim2, 'major', v_apo2)}; builder untouched")
+    print(f"  3 EXODUS: missionary {base(sim2, mis)} -> {full(sim2, 'major', v_mis2)}, apostle {base(sim2, apo)} -> {full(sim2, 'major', v_apo2)}, "
+          f"inquisitor {base(sim2, inq)} -> {full(sim2, 'major', v_inq2)}; builder untouched")
 
     # ---- 4. a DARK/NORMAL age holding the same dedication pays nothing ----
     sim2.civ_age[0, 1] = 1

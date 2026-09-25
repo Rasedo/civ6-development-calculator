@@ -4,13 +4,14 @@ import {
   deriveLowlands, standingRemovable, deforestationLevel, worldCarbon, climatePoints,
   emitCarbon, plantCarbon, unitCarbon, climateTurn, floodLevel, floodBarrierCost,
   cityLowlands, repairBehindBarrier, fertilityLive, desertificationLive, defertilize,
-  pollutionFavorPenalty, CARBON_PER_RESOURCE,
+  pollutionFavorPenalty, CARBON_PER_RESOURCE, warmingDegrees,
 } from '../../../cpu/core/climate';
 import {
-  CLIMATE_PHASES, CO2_PER_POINT, CARBON_PER_POWER, climatePhase, deforestationModifier,
-  severitySplit, pollutionPoints, FLOOD_BARRIER_PER_TILE,
+  CLIMATE_PHASES, CO2_PER_POINT, CO2_PER_DEGREE, CARBON_PER_POWER, climatePhase, deforestationModifier,
+  pollutionPoints, FLOOD_BARRIER_PER_TILE,
 } from '../../../cpu/data/climate';
-import { FLOOD_WEIGHT } from '../../../cpu/data/disasters';
+import { FLOOD_WEIGHT, FLOOD_CIPD, DROUGHT_WEIGHT, STORM_EVENTS } from '../../../cpu/data/disasters';
+import { eventRows, floodWeights, stormWeights } from '../../../cpu/core/disasters';
 import { availableBuildings, buildingCostIn } from '../../../cpu/core/rules';
 import { availableProjects } from '../../../cpu/core/game';
 import { completeQueueItem } from '../../../cpu/core/production';
@@ -23,8 +24,9 @@ import { isWater } from '../../../world/query';
 import type { GameState } from '../../../cpu/core/types';
 
 // Gathering Storm's climate arc, clause by clause. Every magnitude below is
-// the Climate (Civ6) page's own; the two places it publishes nothing are
-// marked MODEL in cpu/data/climate.ts and are asserted for SHAPE, not value.
+// the Climate (Civ6) page's own or the install's; the place it publishes
+// nothing is marked MODEL in cpu/data/climate.ts and is asserted for SHAPE,
+// not value.
 
 /** Emit exactly what `points` Climate Change points cost RIGHT NOW — the
  *  deforestation band scales every raw unit before it becomes a point, and a
@@ -333,18 +335,35 @@ describe('the Flood Barrier', () => {
 });
 
 describe('what a warmed world does to its weather', () => {
-  it('the severity split rides the published melt curve', () => {
-    // MODEL, asserted for SHAPE: the worst row gains weight monotonically
-    // off the ONE curve the page publishes, below Phase I nothing moves, and
-    // the family's total weight is kept.
-    expect(severitySplit(FLOOD_WEIGHT, -1)).toEqual([...FLOOD_WEIGHT]);
-    const worst = severitySplit(FLOOD_WEIGHT, 6);
-    expect(worst[0]).toBeLessThan(FLOOD_WEIGHT[0]);
-    expect(worst[2]).toBeGreaterThan(FLOOD_WEIGHT[2]);
-    expect(worst.reduce((a, b) => a + b, 0)).toBeCloseTo(4.5, 9);
-    for (let p = 1; p < CLIMATE_PHASES.length; p++) {
-      expect(severitySplit(FLOOD_WEIGHT, p)[2]).toBeGreaterThan(severitySplit(FLOOD_WEIGHT, p - 1)[2]);
-    }
+  it('a row grows by its own ChanceIncreasePerDegree, per degree of warming', () => {
+    // CIV6 (Maps_XP2.CO2For1DegreeTempRise, MAPSIZE_DUEL): 500,000 CO2 a
+    // degree, two Climate Change points
+    expect(CO2_PER_DEGREE).toBe(500_000);
+    expect(CO2_PER_POINT * 2).toBe(CO2_PER_DEGREE);
+    const state = makeState();
+    expect(warmingDegrees(state)).toBe(0);
+    emitPoints(state, 3);
+    expect(warmingDegrees(state)).toBeCloseTo(1.5, 9);
+    // the floods 20 / 20 / 20: the mix holds, the family grows
+    expect([...FLOOD_CIPD]).toEqual([20, 20, 20]);
+    expect(floodWeights(0)).toEqual([...FLOOD_WEIGHT]);
+    const warm = floodWeights(2);
+    FLOOD_WEIGHT.forEach((w, s) => expect(warm[s]).toBeCloseTo(w * 1.4, 12));
+    // the storms 0 on the milder row, 50 on the worse
+    expect(STORM_EVENTS.map((e) => e.cipd)).toEqual([0, 50, 0, 50, 0, 50, 0, 50]);
+    const st = stormWeights(2);
+    STORM_EVENTS.forEach((e, i) => expect(st[i]).toBeCloseTo(e.weight * (e.cipd ? 2 : 1), 12));
+    // the droughts MAJOR 0, EXTREME 50; the eruptions and accidents hold
+    const rows = eventRows(2);
+    const drought = rows.filter((r) => r.family === 'drought').map((r) => r.weight);
+    expect(drought[0]).toBe(DROUGHT_WEIGHT[0]);
+    expect(drought[1]).toBeCloseTo(DROUGHT_WEIGHT[1] * 2, 12);
+    const base = eventRows(0);
+    rows.forEach((r, i) => {
+      if (r.family === 'volcano' || r.family === 'kilimanjaro' || r.family === 'accident') {
+        expect(r.weight).toBe(base[i].weight);
+      }
+    });
   });
 
   it('fertility stops at Phase IV and reverses at Phase V', () => {

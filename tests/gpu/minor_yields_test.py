@@ -17,7 +17,7 @@ takes no decision), so these scenes are the whole evidence:
      Production; Gold and Faith bank in `citystate_treasury` / `citystate_faith`
   3. a unit levied from a minor holding a Barracks carries its +25% training
      experience, and a pillaged Barracks pays none
-  4. power: nothing the minor's ladder builds draws or supplies Power — the
+  4. power: nothing the minor's build table raises draws or supplies Power — the
      grid has no minor arm because it would compute zero
 """
 
@@ -38,8 +38,6 @@ B0 = 0
 ROOT = Path(__file__).resolve().parent.parent.parent
 RULES = json.loads((ROOT / "seeder" / "worlds" / "rules.json").read_text())
 BLD = [b["id"] for b in RULES["buildings"]]
-MINOR_LADDER = ("ANCIENT_WALLS", "MEDIEVAL_WALLS", "RENAISSANCE_WALLS", "LIBRARY", "AMPHITHEATER",
-                "MARKET", "WORKSHOP", "BARRACKS", "STABLE", "SHRINE")
 
 
 # THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
@@ -191,12 +189,15 @@ def test_levy_xp(rules, path) -> None:
 
 
 def test_power_vacuous() -> None:
-    by_id = {b["id"]: b for b in RULES["buildings"]}
-    for bid in MINOR_LADDER:
-        b = by_id[bid]
-        assert "power" in b and "powerSupply" in b, f"{bid}: the wire dropped its power columns"
-        assert int(b["power"]) == 0 and int(b["powerSupply"]) == 0, f"{bid} draws or supplies Power"
-    print("  4 power OK — nothing the minor's ladder builds draws or supplies Power")
+    cs = RULES["cityState"]
+    kinds = cs["buildKinds"]
+    items = {int(i) for r in cs["buildRows"] if kinds[int(r["k"])] == "building" for i in r["item"] if int(i) >= 0}
+    assert items, "the build table names no building"
+    for bi in sorted(items):
+        b = RULES["buildings"][bi]
+        assert "power" in b and "powerSupply" in b, f"{b['id']}: the wire dropped its power columns"
+        assert int(b["power"]) == 0 and int(b["powerSupply"]) == 0, f"{b['id']} draws or supplies Power"
+    print("  4 power OK — nothing the minor's build table raises draws or supplies Power")
 
 
 def main() -> None:

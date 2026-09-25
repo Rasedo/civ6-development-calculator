@@ -364,9 +364,10 @@ def main() -> int:
                "POLDER", "STEPWELL"]
     assert [_iids.index(_n) for _n in _WANT_I] == list(range(23, 35)),         "a unique improvement's build column moved"
     assert _iids.index("MOUNTAIN_TUNNEL") == 22, "an earlier build column moved"
-    # ...and the governor improvements follow them, with nothing after yet
-    assert _iids.index("FISHERY") == 35 and _iids.index("CITY_PARK") == 36,         "the governor improvements are not the last build columns"
-    assert len(_iids) == 37, "a build column was added without a pin"
+    # ...and the governor improvements follow them, then Pachacuti's Qhapaq Ñan
+    assert _iids.index("FISHERY") == 35 and _iids.index("CITY_PARK") == 36,         "a governor improvement's build column moved"
+    assert _iids.index("MOUNTAIN_ROAD") == 37, "the Qhapaq Ñan build column moved"
+    assert len(_iids) == 38, "a build column was added without a pin"
     _byid = {r["id"]: r for r in _irows}
     for _n in _WANT_I:
         assert int(_byid[_n]["uniq"]) >= 0, f"{_n} names no civilization"

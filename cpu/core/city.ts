@@ -1,5 +1,5 @@
 
-import { addYields, emptyYields, type City, type DistrictId, type GameState, type Seat, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
+import { addYields, emptyYields, type City, type CityState, type DistrictId, type GameState, type Seat, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
@@ -17,7 +17,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, buildingVariantFor, effectiveBuilding, isGovYieldBuilding } from '../data/buildings';
 import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
-import { cityAppealResolver, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles } from './governors';
+import { cityAppealResolver, governorBuildingYields, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
@@ -26,14 +26,14 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, GW_PRINTING_TECH } from '../data/g
 import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from './greatWorks';
 import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
-import { suzerainEffect, minorLuxuries } from './cityStates';
+import { suzerainEffect, minorCity, minorLuxuries } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { FEATURES } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor } from './seats';
-import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
+import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
@@ -433,7 +433,10 @@ function govYieldBuildingCount(state: GameState, city: City): number {
 }
 
 export function luxuryAmenities(state: GameState, seat: number): Map<number, number> {
-  const cities = citiesOf(state, seat);
+  // a city-state's one city is its `minorCity` view (its Seat's `cities` is
+  // empty): an improved luxury on its ground serves it like any city's
+  const minor = isCityStateSeat(seat) ? (seatOf(state, seat) as CityState | undefined) : undefined;
+  const cities = minor ? [minorCity(minor)] : citiesOf(state, seat);
   const result = new Map<number, number>();
   for (const c of cities) result.set(c.id, 0);
   if (cities.length === 0) return result;
@@ -1235,6 +1238,9 @@ export function computeCityStats(
     }
     bonuses.gold += perPass * n;
   }
+  // CIV6 (Industrialist, Renewable Subsidizer): the named buildings' own
+  // extra yields while the governor holds the promotion
+  addYields(bonuses, governorBuildingYields(state, city));
   // CIV6 (University of Sankore): "+2 Science for every Trade Route to this
   // city. Domestic Trade Routes give an additional +1 Faith to this city."
   const perIn = wonderCityFlat(state, city, 'routesToCityScience');

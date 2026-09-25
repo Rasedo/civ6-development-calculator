@@ -598,6 +598,44 @@ def test_reactor_accident(sim) -> None:
           "reactor's plot alone, the plant kept, a site only past each MinTurnAtRisk")
 
 
+def test_free_city_reactor(sim) -> None:
+    """11. A FREE CITY'S REACTOR: the flip keeps the plant and its clock
+    (`transferCity` / `_transfer_city`), the Free Cities phase ages it
+    (`ageReactors`), and it is an accident site like a major's
+    (`_reactor_plane`), the accident's citizen taken from the Free City."""
+    row, j = a_city(sim)
+    izt = put_district(sim, row, j, sim._iz_idx)
+    nuc = sim._nuclear_bidx
+    sim.city_bldg[0, row, j, nuc] = True
+    sim.city_reactor_age[0, row, j] = 25
+    centre = int(sim.city_center[0, row, j])
+    sim._transfer_city(0, row, j, sim.FREE_ROW, conquest=False)
+    fr = sim.FREE_ROW
+    col = int(sim.centre_slot_at[0, centre])
+    assert col >= 0 and bool(sim.city_alive[0, fr, col]), "the city is Free"
+    assert bool(sim.city_bldg[0, fr, col, nuc]), "the flip keeps the plant"
+    assert int(sim.city_reactor_age[0, fr, col]) == 25, "...and its clock"
+    sim._age_reactors(fr)
+    assert int(sim.city_reactor_age[0, fr, col]) == 26, "the Free City's reactor ages"
+    plane = sim._reactor_plane()
+    assert int(plane[0, centre]) == 26, "a Free City's reactor is an accident site"
+    # the CATASTROPHIC row takes its citizen from the Free City at 80
+    hit = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+    hit[0] = True
+    at = torch.full((sim.B,), centre, dtype=torch.long, device=sim.device)
+    lost = 0
+    N = 600
+    for _ in range(N):
+        sim.city_pop[0, fr, col] = 12
+        sim.district_pillaged[0, izt] = False
+        sim._nuclear_accident(hit, at, 2)
+        lost += int(int(sim.city_pop[0, fr, col]) == 11)
+        assert bool(sim.district_pillaged[0, izt]), "CATASTROPHIC pillages the Free City's zone"
+    assert abs(lost / N - 0.8) < 0.05, f"a Free City loses its citizen at 80: {lost}/{N}"
+    print("  free city reactor OK: the clock rides the flip, ages in the Free Cities phase, "
+          "and the city is a site")
+
+
 def test_spec_tier(sim) -> None:
     iz = sim._iz_idx
     tier = sim._spec_tb[iz]
@@ -614,7 +652,7 @@ def main() -> None:
     for fn in (test_demand, test_plant_reach, test_cardiff, test_powered_yields,
                test_regional_powered, test_fuel, test_accrual, test_unit_charge,
                test_upkeep, test_starved_heal, test_renewables, test_generator_ground,
-               test_reactor_age, test_reactor_accident, test_spec_tier):
+               test_reactor_age, test_reactor_accident, test_free_city_reactor, test_spec_tier):
         fn(build(rules, path))
     print("power_test OK — demand (buildings + stations, dark under pillage), the plant's reach, "
           "Cardiff's renewable supply, all-or-nothing, the powered halves (local, regional, "

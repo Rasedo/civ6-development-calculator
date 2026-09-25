@@ -30,6 +30,7 @@ import { grievanceSettledNear, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
+import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH, COMPETITIONS } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
@@ -1186,7 +1187,7 @@ export function purchaseReligiousUnit(
     patronSaint(state, city, u);
   }
   // CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face): "newly
-  // trained ones get +2 Charges" — Missionaries and Apostles alike.
+  // trained ones get +2 Charges" — Missionaries, Apostles and Inquisitors alike.
   if (goldenDedication(state, seat, DED_EXODUS)) u.charges = (u.charges ?? 0) + 2;
   return { ok: true };
 }
@@ -1646,7 +1647,8 @@ export function endTurn(state: GameState): void {
     }
   }
   // Domination ends the game the instant a civ holds every capital;
-  // otherwise the score victory fires at TURN_LIMIT.
+  // otherwise the score victory fires at TURN_LIMIT and names the seat with
+  // the highest Civ 6 Score (`scoreLeader`).
   const dom = dominationWinner(state);
   const spaceWon = state.victoryType === 3;
   const rel = religiousVictor(state);
@@ -1679,7 +1681,9 @@ export function endTurn(state: GameState): void {
           ? cul
           : dip >= 0
             ? dip
-            : -1;
+            : state.gameOver
+              ? scoreLeader(state)
+              : -1;
 }
 
 /**

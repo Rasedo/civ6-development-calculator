@@ -8,8 +8,10 @@ The TS twin is tests/cpu/seats/combat-rows.test.ts.
 CIV6 (the install's UnitAbilities and their modifiers): a flat Combat
 Strength under a clause (`_roster_cs` — Barbarossa vs a city-state's unit,
 Tomyris vs the wounded, Genghis Khan's cavalry, Hojo's coasts, the Great
-Turkish Bombard on a city), the heal on a kill (`_heal_on_kill`), embarked
-Movement (`_roster_embark_mp`) and no shore penalty (`_ignore_shores`).
+Turkish Bombard on a city, Swift Hawk vs the Free Cities — and the same rows
+on the unit a city's strike hits, `_seat_city_strike`), the heal on a kill
+(`_heal_on_kill`), embarked Movement (`_roster_embark_mp`) and no shore
+penalty (`_ignore_shores`).
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core.simbase import FREE_SEAT
 from warmup import settle_all, warm_base
 
 B0 = 0
@@ -162,12 +165,86 @@ def test_site_census(rules, path) -> None:
                      if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
             if "_congress_unit_cs" in calls and "_roster_cs" not in calls:
                 missing.append(f"{name}::{fn.name}")
-    # a CITY's own strike composes its DEFENDER without the roster's rows on
-    # BOTH engines (`seatPhase`'s city-strike block does the same), so the two
-    # agree; the gap is recorded in docs/AUDIT.md, not fixed on one side only
-    allow = {"gpu/core/sim_phase.py::_seat_city_strike"}
-    assert not (set(missing) - allow), f"a strength composition without the roster's own: {missing}"
+    assert not missing, f"a strength composition without the roster's own: {missing}"
     print(f"  5 site census OK — every `_congress_unit_cs` site carries `_roster_cs`")
+
+
+def test_swift_hawk(rules, path) -> None:
+    """CIV6 (Swift Hawk, OPPONENT_IS_IN_GOLDEN_AGE_FREE_CITY_REQUIREMENTS,
+    REQUIREMENTSET_TEST_ANY): +10 against the Free Cities, or a civilization
+    in a golden age — never a city-state."""
+    sim = fresh(rules, path)
+    land = a_tile(sim, lambda t: not bool(sim.water[B0, t]) and bool(sim.passable[B0, t]))
+    play(sim, 0, "MAPUCHE")
+    assert bool(sim._row_leads(0, "LAUTARO")[B0])
+    assert cs(sim, 0, "WARRIOR", land, FREE_SEAT, 100, False) == 10, "vs a Free City's unit"
+    assert cs(sim, 0, "WARRIOR", land, FREE_SEAT, None, True) == 10, "vs a Free City"
+    sim.civ_age[B0, 1] = 1
+    assert cs(sim, 0, "WARRIOR", land, 1, 100, False) == 0, "vs a civilization out of its golden age"
+    sim.civ_age[B0, 1] = 2
+    assert cs(sim, 0, "WARRIOR", land, 1, 100, False) == 10, "vs a civilization in its golden age"
+    assert cs(sim, 0, "WARRIOR", land, 100, 100, False) == 0, "a city-state is neither"
+    print("  7 Swift Hawk OK — +10 vs the Free Cities and a golden civilization")
+
+
+def _strike_def_e(sim, utype: str) -> float:
+    """The defender's strength `_seat_city_strike` hands its resolver: row 0's
+    first city fires at a lone row-1 `utype` beside its centre, with every
+    other unit gone and row 1 the only war."""
+    assert bool(sim.city_alive[B0, 0, 0]), "row 0 holds no first city — the scene would prove nothing"
+    ctr = int(sim.city_center[B0, 0, 0])
+    for _pl in (sim.military_at, sim.civilian_at, sim.embarked_at):
+        _pl[:] = -1
+    sim.major_unit_alive[:] = False
+    sim.barb_unit_alive[:] = False
+    sim.war[B0, 0, :] = False
+    sim.war[B0, :, 0] = False
+    sim.war[B0, 0, 1] = sim.war[B0, 1, 0] = True
+    sim.sync_war()
+    tt = next(int(t) for t in sim.neigh[ctr].tolist()
+              if t >= 0 and bool(sim.passable[B0, t]) and not bool(sim.water[B0, t])
+              and int(sim.centre_slot_at[B0, t]) < 0)
+    slot = int(sim.unit_next[B0])
+    sim.major_unit_alive[B0, slot] = True
+    sim.major_unit_seat[B0, slot] = 1
+    sim.major_unit_type[B0, slot] = UNITS.index(utype)
+    sim.major_unit_tile[B0, slot] = tt
+    sim.major_unit_hp[B0, slot] = 100
+    sim.major_unit_emb[B0, slot] = False
+    sim.major_unit_formation[B0, slot] = 0
+    sim.major_unit_levied[B0, slot] = False
+    sim.military_at[B0, tt] = slot + sim.POOL_LO["major"]
+    sim.unit_next[B0] += 1
+    got = []
+    sim._city_strike_resolve = lambda *a: got.append(a)
+    try:
+        sim._seat_city_strike(0, torch.zeros(sim.B, dtype=torch.long),
+                              torch.ones(sim.B, dtype=torch.bool), "cstk")
+    finally:
+        del sim._city_strike_resolve
+    assert got, "the city found no target"
+    strike, t_hit, d_slot, def_e = got[0][0], got[0][1], got[0][2], got[0][8]
+    assert bool(strike[B0]) and int(t_hit[B0]) == tt and int(d_slot[B0]) == slot + sim.POOL_LO["major"]
+    return float(def_e[B0])
+
+
+def test_city_strike_roster(rules, path) -> None:
+    """The unit a city's strike hits takes its roster's rows: no row's
+    requirement set asks who attacks, and the striking city is its opponent
+    — a district (OPPONENT_IS_DISTRICT), of the city's seat, never wounded
+    (`cityStrikeDefenderCS`)."""
+    def gap(civ: str, utype: str) -> float:
+        sim = fresh(rules, path)
+        play(sim, 1, civ)
+        with_rows = _strike_def_e(sim, utype)
+        play(sim, 1, None)
+        return with_rows - _strike_def_e(sim, utype)
+
+    assert gap("OTTOMAN", "CATAPULT") == 5, "the Bombard's +5 against the shooting district"
+    assert gap("OTTOMAN", "WARRIOR") == 0, "the Bombard is siege alone"
+    assert gap("GERMANY", "WARRIOR") == 0, "Barbarossa's +7 is against a city-state's city only"
+    assert gap("SCYTHIA", "WARRIOR") == 0, "a city is never wounded"
+    print("  8 city strike OK — the struck unit takes its roster's rows")
 
 
 def test_roosevelt(rules, path) -> None:
@@ -203,6 +280,8 @@ def main() -> int:
     test_embarked(rules, path)
     test_site_census(rules, path)
     test_roosevelt(rules, path)
+    test_swift_hawk(rules, path)
+    test_city_strike_roster(rules, path)
     print("BATTERY OK combat_rows")
     return 0
 

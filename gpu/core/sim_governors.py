@@ -598,6 +598,27 @@ class SimGovernors:
                      + gov_percit.double().unsqueeze(1) * seated) * pop.double().unsqueeze(2)
         out[:, :, 5] = out[:, :, 5] + self._governor_sum(row, "faithPerSpecialty") * spec.double()
         out[:, :, 2] = out[:, :, 2] + self._governor_feature_gold(row) + self._governor_pass_route_gold(row)
+        return out + self._governor_building_yields(row)
+
+    def _governor_building_yields(self, row: int) -> torch.Tensor:
+        """[B, RC, 6] f64 — `governorBuildingYields`: CIV6
+        (MODIFIER_BUILDING_YIELD_CHANGE on a promotion — Industrialist's
+        plants, Renewable Subsidizer's Dam) what the named buildings of each
+        city pay on top while its governor holds the promotion. A dark building
+        (a pillaged district's, or pillaged itself) pays nothing, and the
+        change stays with the governed city whatever reach the building has."""
+        B, RC, dev = self.B, self.RC, self.device
+        out = torch.zeros(B, RC, 6, dtype=torch.float64, device=dev)
+        if not self._gpromo_bldg_y or not self.n_governors or row >= self.n_majors:
+            return out
+        m = self._governor_mask(row)                                     # [B, RC, NP]
+        stand = self.city_bldg[:, row] & ~self._bldg_dark(
+            self.city_dist_tile[:, row], self.city_bldg_pillaged[:, row])  # [B, RC, NB]
+        for p, n, y in self._gpromo_bldg_y:
+            if n < 0:
+                continue
+            held = (m[:, :, p] & stand[:, :, n]).double().unsqueeze(2)
+            out = out + held * torch.tensor(y, dtype=torch.float64, device=dev).view(1, 1, 6)
         return out
 
     def _governor_ymult(self, row: int, gov_ymult: torch.Tensor) -> torch.Tensor:

@@ -3,19 +3,21 @@
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/minor_builds_test.py
 
-CIV6 (City-state): a city-state "will build a district within their territory
-that corresponds to their type", a Harbor when it sits on the coast, and
-walls. The city's Production goes into a pot under the minor's production
-rows (Leaders.xml's MINOR_CIV set: -50% on the yield, +200% toward walls,
-+500% toward the Harbor and the type's district), and the ladder's first
-buildable item completes when the pot covers it, at most one a turn.
+CIV6 (City-state): the minor's city produces what the build table
+(`MINOR_BUILD_ROWS`, fitted to C-38's census) wants first. The city's
+Production goes into a pot under the minor's production rows (Leaders.xml's
+MINOR_CIV set: -50% on the yield, +200% toward walls, a Builder and a military
+unit, +500% toward the Harbor and the type's district), and the item
+completes when the pot covers it, at most one a turn. Each scene sets the
+rows it wants due by hand (`plan`), so only the row under test reaches the pot.
 
 Proven here:
   * the pot takes the city's Production under those rows, the item the turn
     goes toward choosing the row;
-  * the first item is Ancient Walls —
-    landing only once its tech is in the minor's OWN record, filling the
-    perimeter pool, and never landing twice;
+  * Ancient Walls land only once their tech is in the minor's OWN record,
+    fill the perimeter pool, and never land twice;
+  * a Builder trains into the majors' pool under the minor's seat, and the
+    episode's draws are made once;
   * the type's district takes the LOWEST legal plot, writes the tile planes
     and the minor's registry, and pays the research-scaled district price;
   * a landlocked minor never builds the Harbor;
@@ -78,6 +80,50 @@ def grant_district_tech(sim, s: int, dv: int) -> None:
             sim.citystate_civics[B0, s, int(uc)] = True
 
 
+def row_of(rules, kind: str, item0: int) -> int:
+    """the build table's row of `kind` whose scientific item is `item0`"""
+    cs = rules.citystate
+    kinds = cs["buildKinds"]
+    for r, row in enumerate(cs["buildRows"]):
+        if kinds[int(row["k"])] == kind and int(row["item"][0]) == item0:
+            return r
+    raise AssertionError(f"no {kind} row for item {item0}")
+
+
+def plan(sim, s: int, due: list[int], cap: int = 0) -> None:
+    """the episode's draws by hand: the listed drawn rows due now, every other
+    drawn row never, and an army cap of `cap`"""
+    drawn = torch.tensor(sim._mb_drawn, dtype=torch.bool)
+    want = torch.zeros(len(sim._mb_drawn), dtype=torch.bool)
+    for r in due:
+        want[r] = True
+    sim.citystate_build_from[B0, s] = torch.where(drawn & ~want, torch.full_like(want, -1, dtype=torch.long),
+                                                  torch.zeros_like(want, dtype=torch.long))
+    sim.citystate_army_cap[B0, s] = cap
+
+
+def idle_builder(sim, s: int) -> None:
+    """a spent Builder on the minor's centre: the Builder row sees one standing
+    and it lays nothing"""
+    row = sim._CITY_MINOR0 + s
+    ctr = sim.citystate_center[:, s].clamp(min=0)
+    one = torch.zeros(sim.B, dtype=torch.bool)
+    one[B0] = True
+    landed = sim._spawn_unit(row, one, ctr, sim._builder_idx)
+    assert bool(landed[B0]), "the Builder did not land"
+    g = int(sim.civilian_at[B0, int(ctr[B0])])
+    assert g >= 0 and int(sim.unit_seat[B0, g]) == 100 + s, "the Builder is not the minor's"
+    sim.unit_charges[B0, g] = 0
+
+
+def walls_row(sim, rules) -> int:
+    return row_of(rules, "building", walls_rows(sim)[0])
+
+
+def district_row(sim, rules) -> int:
+    return row_of(rules, "district", int(rules.citystate["typeDistrictIdx"][0]))
+
+
 def a_minor(sim) -> int:
     live = sim.citystate_alive[B0].nonzero().flatten().tolist()
     assert live, "the fixture holds no living city-state"
@@ -87,6 +133,8 @@ def a_minor(sim) -> int:
 def test_walls_first_and_only_once(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
+    idle_builder(sim, s)
+    plan(sim, s, [walls_row(sim, rules)])
     row = sim._CITY_MINOR0 + s
     anc = walls_rows(sim)[0]
     cost = float(sim.rules_dev.b_cost[anc])
@@ -117,7 +165,7 @@ def test_walls_first_and_only_once(rules, path) -> None:
     # never twice — the next call moves down the ladder instead
     sim.citystate_prod[B0, s] = cost * 10
     before = float(sim.citystate_prod[B0, s])
-    sim._minor_build()
+    sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, anc])
     assert float(sim.citystate_prod[B0, s]) >= before, \
         "the pot paid for walls that already stand"
@@ -127,6 +175,8 @@ def test_walls_first_and_only_once(rules, path) -> None:
 def test_the_type_district_lands_on_the_first_plot(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
+    idle_builder(sim, s)
+    plan(sim, s, [district_row(sim, rules)])
     row = sim._CITY_MINOR0 + s
     dv = int(sim._citystate_didx[B0, s])
     assert dv >= 0, "the minor's type names no district"
@@ -147,7 +197,7 @@ def test_the_type_district_lands_on_the_first_plot(rules, path) -> None:
         print(f"  2 district SKIPPED — no legal plot for district {dv} on this fixture")
         return
     want_t = int(expect_plane[B0].long().argmax())
-    sim._minor_build()
+    sim._minor_build(s)
     got = int(sim.city_dist_tile[B0, row, 0, dv])
     assert got == want_t, f"the district took plot {got}, the first legal plot is {want_t}"
     assert int(sim.district[B0, got]) == dv and bool(sim.district_complete[B0, got]), \
@@ -167,11 +217,13 @@ def test_the_landlocked_minor_never_harbors(rules, path) -> None:
         if not bool(sim.citystate_alive[B0, s]):
             continue
         row = sim._CITY_MINOR0 + s
+        idle_builder(sim, s)
+        plan(sim, s, [row_of(rules, "district", hv)])
         grant_district_tech(sim, s, hv)
         coastal = bool((sim._minor_district_site(s) & sim.coastal_water)[B0].any())
         sim.citystate_prod[B0, s] = 100_000.0
         for _ in range(8):
-            sim._minor_build()
+            sim._minor_build(s)
         built = int(sim.city_dist_tile[B0, row, 0, hv]) >= 0
         if coastal:
             assert built, f"a coastal minor (s={s}) with the tech and the pot never built its Harbor"
@@ -183,24 +235,26 @@ def test_the_landlocked_minor_never_harbors(rules, path) -> None:
 def test_damaged_walls_block_the_higher_tier(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
+    idle_builder(sim, s)
     row = sim._CITY_MINOR0 + s
     tiers = walls_rows(sim)
     if len(tiers) < 2:
         print("  4 damage SKIPPED — one walls tier in the catalog")
         return
     anc, med = tiers[0], tiers[1]
+    plan(sim, s, [row_of(rules, "building", anc), row_of(rules, "building", med)])
     for bi in (anc, med):
         grant_walls_tech(sim, s, bi)
     sim.city_bldg[B0, row, 0, anc] = True
     full = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     sim.city_outer_hp[B0, row, 0] = full - 7   # breached
     sim.citystate_prod[B0, s] = 100_000.0
-    sim._minor_build()
+    sim._minor_build(s)
     assert not bool(sim.city_bldg[B0, row, 0, med]), \
         "a damaged perimeter accepted a higher wall"
     sim.city_outer_hp[B0, row, 0] = full
     for _ in range(4):
-        sim._minor_build()
+        sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, med]), "an intact perimeter refused the higher wall"
     print("  4 damage OK — the majors' walls clause holds the minor too")
 
@@ -208,6 +262,8 @@ def test_damaged_walls_block_the_higher_tier(rules, path) -> None:
 def test_the_conquest_carries_the_build(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
+    idle_builder(sim, s)
+    plan(sim, s, [district_row(sim, rules)])
     row = sim._CITY_MINOR0 + s
     anc = walls_rows(sim)[0]
     grant_walls_tech(sim, s, anc)
@@ -217,7 +273,7 @@ def test_the_conquest_carries_the_build(rules, path) -> None:
     dv = int(sim._citystate_didx[B0, s])
     grant_district_tech(sim, s, dv)
     sim.citystate_prod[B0, s] = 10_000.0
-    sim._minor_build()
+    sim._minor_build(s)
     dt = int(sim.city_dist_tile[B0, row, 0, dv])
     cols_before = sim.city_alive[B0, 0].sum()
     sim._capture_city_state(torch.tensor([B0]), torch.full((sim.B,), s, dtype=torch.long), 0)
@@ -275,13 +331,18 @@ def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
 
 
 def test_the_tier1_building_follows_the_district(rules, path) -> None:
-    """The type district's TIER-1 building is the ladder rung after the
-    district itself — never before it stands, one item a tick."""
+    """The type district's TIER-1 building follows the district itself —
+    never before it stands, one item a tick."""
     sim = build(rules, path)
     s = a_minor(sim)
     row = sim._CITY_MINOR0 + s
     dv = int(sim._citystate_didx[B0, s])
-    bi = int(sim._citystate_t1b[B0, s])
+    typ = int(sim.citystate_type[B0, s])
+    t1 = next(r for r, k in enumerate(sim._mb_kind)
+              if k == "building" and int(sim._mb_item[r][typ]) == int(sim._citystate_t1idx[B0, s, 0]))
+    bi = int(sim._mb_item[t1][typ])
+    idle_builder(sim, s)
+    plan(sim, s, [district_row(sim, rules), t1])
     assert bi >= 0, "the type names no tier-1 building"
     anc = walls_rows(sim)[0]
     grant_walls_tech(sim, s, anc)
@@ -290,12 +351,12 @@ def test_the_tier1_building_follows_the_district(rules, path) -> None:
     grant_district_tech(sim, s, dv)
     grant_building_research(sim, s, bi)
     sim.citystate_prod[B0, s] = 100_000.0
-    sim._minor_build()
+    sim._minor_build(s)
     if int(sim.city_dist_tile[B0, row, 0, dv]) < 0:
         print("  7 tier-1 building SKIPPED — no legal plot for the type district")
         return
     assert not bool(sim.city_bldg[B0, row, 0, bi]), "the building landed the same tick as its district"
-    sim._minor_build()
+    sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, bi]), "the tier-1 building did not follow its district"
     print(f"  7 tier-1 building OK — row {bi} follows district {dv}, one item a tick")
 
@@ -365,6 +426,8 @@ def test_the_production_rows(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
     row = sim._CITY_MINOR0 + s
+    idle_builder(sim, s)
+    plan(sim, s, [walls_row(sim, rules)])
     anc = walls_rows(sim)[0]
     grant_walls_tech(sim, s, anc)
     assert turn(sim, s) == 1.5, "toward the walls the pot did not take half the yield times 3"
@@ -375,8 +438,12 @@ def test_the_production_rows(rules, path) -> None:
     sim.city_outer_hp[B0, row, 0] = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     dv = int(sim._citystate_didx[B0, s])
     grant_district_tech(sim, s, dv)
-    bi = int(sim._citystate_t1b[B0, s])
+    typ = int(sim.citystate_type[B0, s])
+    t1 = next(r for r, k in enumerate(sim._mb_kind)
+              if k == "building" and int(sim._mb_item[r][typ]) == int(sim._citystate_t1idx[B0, s, 0]))
+    bi = int(sim._mb_item[t1][typ])
     grant_building_research(sim, s, bi)
+    plan(sim, s, [walls_row(sim, rules), row_of(rules, "district", int(rules.citystate["typeDistrictIdx"][0])), t1])
     plc = next(int(p) for (di, _ut, _uc, p, _fc) in sim._scaffold if int(di) == dv)
     surface = sim.coastal_water if plc == 2 else (sim.d_usable | (sim.d_usable0 & sim._res_hidden(row)))
     plane = sim._minor_district_site(s) & surface & ~sim._fallout()
@@ -400,6 +467,8 @@ def test_the_production_rows(rules, path) -> None:
         if not bool((sim._minor_district_site(s) & sim.coastal_water)[B0].any()):
             continue
         row = sim._CITY_MINOR0 + s
+        idle_builder(sim, s)
+        plan(sim, s, [row_of(rules, "district", hv)])
         anc = walls_rows(sim)[0]
         sim.city_bldg[B0, row, 0, anc] = True
         sim.city_outer_hp[B0, row, 0] = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
@@ -422,13 +491,14 @@ def test_the_production_rows(rules, path) -> None:
 def test_a_dead_minor_builds_nothing(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
+    plan(sim, s, [walls_row(sim, rules)])
     row = sim._CITY_MINOR0 + s
     anc = walls_rows(sim)[0]
     grant_walls_tech(sim, s, anc)
     sim.citystate_prod[B0, s] = 100_000.0
     sim.citystate_alive[B0, s] = False
     pot = float(sim.citystate_prod[B0, s])
-    sim._minor_build()
+    sim._minor_build(s)
     assert float(sim.citystate_prod[B0, s]) == pot, "a dead minor's pot moved"
     assert not bool(sim.city_bldg[B0, row, 0, anc]), "a dead minor built walls"
     print("  6 dead OK — nothing accrues, nothing lands")

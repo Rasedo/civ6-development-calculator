@@ -920,9 +920,10 @@ export function rowIsFor(row: { civ?: CivId; leader?: LeaderId }, civ: string | 
   return row.civ !== undefined ? row.civ === civ : row.leader === leader;
 }
 
-/** CIV6: `foeGolden` is Swift Hawk's "civilizations that are in a Golden or
- *  Heroic Age" — a HEROIC age IS a golden one on both engines, so the test is
- *  the age alone. Its "or Free Cities" half is not modeled.
+/** CIV6: `foeGolden` is Swift Hawk's OPPONENT_IS_IN_GOLDEN_AGE_FREE_CITY_REQUIREMENTS
+ *  (REQUIREMENTSET_TEST_ANY): the foe is the Free Cities player, or a
+ *  civilization in a Golden or Heroic Age — a HEROIC age IS a golden one on
+ *  both engines, so the civilization's test is the age alone.
  *  `foeOtherReligion` is El Escorial's REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION:
  *  the foe's PLAYER holds a majority religion other than this seat's own
  *  (`majorityReligionOf` on both sides — both exist and differ). */

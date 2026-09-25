@@ -9,6 +9,7 @@ import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS } from '../data/improvements';
+import { droughtShielded } from '../data/disasters';
 import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
 import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
@@ -17,6 +18,7 @@ import { regionalReach, suzerainEffect } from './cityStates';
 import { gpTilePermOf } from '../data/greatPeople';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
+import { cityGovernorEffects, cityGovernorPromos, governorSum } from './governors';
 
 function terrainYields(tile: Tile): Yields {
   const out = emptyYields();
@@ -210,7 +212,9 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
 
   if (tile.fertility > 0) out.food += tile.fertility;
   if (tile.fertilityProd > 0) out.production += tile.fertilityProd;
-  if (tile.droughtTurns > 0) out.food = Math.max(0, out.food - 1);
+  // CIV6 (PreventsDrought): a city with an Aqueduct, Bath, Dam or Stepwell
+  // "will not suffer the -1 Food yield during a Drought"
+  if (tile.droughtTurns > 0 && !droughtShielded(ctx.map.tiles, tile)) out.food = Math.max(0, out.food - 1);
   // CIV6 (Grove, Sanctuary): what a PRESERVE's buildings pay the unimproved
   // tiles around them, resolved per tile when the context was built. Past the
   // drought floor, so a drought never eats the Grove's food.
@@ -549,8 +553,11 @@ interface CityPower {
   demand: number;
   supply: number;
   /** The power-plant building ids whose Industrial Zone reaches this centre,
-   *  in catalog order — what `resolveSeatPower` picks a fuel from. */
-  plants: string[];
+   *  in catalog order — what `resolveSeatPower` picks a fuel from — each with
+   *  the Power one unit of its fuel provides here: the fuel's own rate, plus
+   *  CIV6 (Industrialist) "+1" where the governor of the plant's city holds
+   *  it, the best such plant in reach taken. */
+  plants: { id: string; rate: number }[];
 }
 
 /**
@@ -563,8 +570,10 @@ interface CityPower {
  * cities within range ... The Power range always counts from the District
  * that generates Power to the City Center", which is the same reach a
  * regional building has (a Mexico City suzerain widens both). The RENEWABLE
- * half "provide[s] Power only for their respective city"; the one this engine
- * carries is Cardiff's, "+2 Power for every Harbor building".
+ * half "provide[s] Power only for their respective city": the Hydroelectric
+ * Dam, the generators on the city's plots (each with Renewable Subsidizer's
+ * share where the governor holds it), and Cardiff's "+2 Power for every Harbor
+ * building".
  *
  * This is the fuel-free half: what the city ASKS and what its own renewables
  * answer, plus which plants could cover the rest. `resolveSeatPower` decides,
@@ -588,12 +597,24 @@ export function cityPower(state: GameState, city: City): CityPower {
     const def = BUILDINGS[id];
     if (def?.powerSupply && !dark.has(id)) supply += def.powerSupply;
   }
+  // CIV6 (Renewable Subsidizer, MERCHANT_RENEWABLE_ENERGY_HYDROELECTRIC_DAM_FREE_POWER):
+  // the Dam's own supply grows while this city's governor holds the promotion
+  for (const e of cityGovernorEffects(state, city)) {
+    for (const [id, n] of Object.entries(e.buildingPower ?? {})) {
+      if (city.buildings.includes(id) && !dark.has(id)) supply += n;
+    }
+  }
   // CIV6 (Solar Farm, Wind Farm): a renewable generator "provides Power to
   // its city" — the one that owns its plot — from a source no stockpile
   // stands behind, so it counts here beside the Dam and not with the plants.
+  // CIV6 (Renewable Subsidizer): each generator's own `governorPower` on top
+  // while the city's governor holds the promotion.
+  const promos = cityGovernorPromos(state, city);
   for (const tile of state.map.tiles) {
     if (!tileBelongsTo(tile, city) || tile.pillaged || !tile.improvement) continue;
-    supply += IMPROVEMENTS[tile.improvement as ImprovementId]?.power ?? 0;
+    const idef = IMPROVEMENTS[tile.improvement as ImprovementId];
+    supply += idef?.power ?? 0;
+    if (idef?.governorPower && promos.has(idef.governorPower.promo)) supply += idef.governorPower.amount;
   }
   // CIV6 (Biosphere): the wonder names no city, so every renewable this seat
   // holds pays triple — Cardiff's Harbor power is not on its list and is
@@ -608,8 +629,9 @@ export function cityPower(state: GameState, city: City): CityPower {
   const reach = regionalReach(state, city.seat);
   // CATALOG order, so `resolveSeatPower`'s "largest stockpile wins" tie-break
   // reads the same list the GPU builds.
-  const plants: string[] = [];
+  const plants: { id: string; rate: number }[] = [];
   for (const id of POWER_PLANT_IDS) {
+    let rate = -1;
     for (const other of citiesOf(state, city.seat)) {
       if (!other.buildings.includes(id)) continue;
       const inst = other.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
@@ -617,9 +639,12 @@ export function cityPower(state: GameState, city: City): CityPower {
       const tile = state.map.tiles[inst.tileIndex];
       if (!tile.districtComplete || tile.districtPillaged) continue;
       if (hexDistance(tile.col, tile.row, center.col, center.row) > reach) continue;
-      plants.push(id);
-      break;
+      // CIV6 (Industrialist, EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR):
+      // the plant's OWN city's governor raises what each resource provides
+      rate = Math.max(rate, (BUILDINGS[id]?.fuelRate ?? 0)
+        + governorSum(state, other, (e) => e.plantPowerPerResource));
     }
+    if (rate >= 0) plants.push({ id, rate });
   }
   return { demand, supply, plants };
 }

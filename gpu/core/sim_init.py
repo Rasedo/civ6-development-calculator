@@ -216,14 +216,23 @@ class SimInit:
         self.citystate_civics = torch.zeros(B, s_pad, len(rules.c_cost), dtype=torch.bool, device=device)
         self.citystate_tech_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_civic_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
-        # the minor's PRODUCTION pot (`minorBuild`): population points a turn,
-        # spent down the fixed build ladder — walls, the type's district, the
-        # coastal Harbor. The built results live on the shared city planes
-        # (`city_bldg`, `city_dist_tile`, `city_outer_hp`) at the minor's row.
+        # the minor's PRODUCTION pot (`minorBuild`): its city's Production,
+        # spent down the fitted build table. The built results live on the
+        # shared city planes (`city_bldg`, `city_dist_tile`, `city_outer_hp`)
+        # at the minor's row and its units in the majors' pool.
         self.citystate_prod = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        # the episode's draws (`minorPlan`): per build-table row the turn it
+        # wants its item from (-1 never), and the army it keeps — -1 until
+        # drawn at the minor's first build; and the Builders it has trained,
+        # which price the next (`builderCost`)
+        self.citystate_build_from = torch.zeros(
+            B, s_pad, len(rules.citystate["buildRows"]), dtype=torch.long, device=device)
+        self.citystate_army_cap = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_builders_trained = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        self._init_minor_build(rules)
         # the minor city's GOLD and FAITH: what its yield walk pays, banked —
-        # nothing in this engine spends either yet (the TS `CityState.treasury`
-        # / `.faith` twins)
+        # nothing in this engine spends either (the TS `CityState.treasury` /
+        # `.faith` twins)
         self.citystate_treasury = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_faith = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -293,8 +302,6 @@ class SimInit:
         _t2p = torch.tensor([list(x) + [-1] * (_w2 - len(x)) for x in _t2], dtype=torch.long, device=device)
         self._citystate_t1idx = _t1p[self.citystate_type.clamp(min=0)]  # [B, S, w1]
         self._citystate_t2idx = _t2p[self.citystate_type.clamp(min=0)]  # [B, S, w2]
-        # the minor's own build ladder raises the FIRST tier-1 member
-        self._citystate_t1b = self._citystate_t1idx[:, :, 0]  # [B, S]
         # Suzerain perks modeled as RULES — `effects` is the code order the
         # per-CS `suzCode` plane indexes; -1 = the perk is not in this build.
         _suz = rules.citystate["suz"]
@@ -545,6 +552,10 @@ class SimInit:
         # endTurn eraBoundary mirror). Loaded from the fixture's t0 snapshot.
         # _MUTABLE for snapshot/restore.
         self.era_score = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        # ...and the era score of every era already closed, banked at the same
+        # boundary (`Seat.eraScorePast`): with `era_score` the whole game's,
+        # which the Score counts. Zero at t0.
+        self.era_score_past = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         # CIV6 (Ages): how many DARK and GOLDEN/HEROIC ages each civ has
         # entered — the per-civ threshold drift's memory.
         self.dark_ages = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
@@ -718,9 +729,9 @@ class SimInit:
         self._era_moment_min = int(_er["momentMin"])
         # Per-seat Age (0 Dark / 1 Normal / 2 Golden), assigned at each era
         # boundary from the just-ended window's score; era 0 is all Normal (the
-        # TS civAges default — nothing exported at t0). _MUTABLE. _age_factor =
-        # the SOURCE seat's loyalty-pressure multiplier (halves — exact in f32
-        # AND f64, so modulated sums stay association-free).
+        # TS civAges default — nothing exported at t0). _MUTABLE. _age_pressure
+        # = the per-citizen loyalty pressure the SOURCE seat's age adds (halves —
+        # exact in f32 AND f64, so the pressure sums stay association-free).
         self.civ_age = torch.ones(B, self.n_majors, dtype=torch.long, device=device)
         # CIV6 (Legacy policy card): the governments this seat HAS BEEN in, as
         # a bitmask over the government roster's own order — what unlocks each
@@ -732,7 +743,10 @@ class SimInit:
         self._era_dark = int(_er["darkT"])    # GlobalParameters DARK_AGE_SCORE_BASE_THRESHOLD
         self._era_gold = int(_er["goldenT"])  # GOLDEN_AGE_SCORE_BASE_THRESHOLD
         self._age_step = int(_er.get("agePrevStep", 5))
-        self._age_factor = torch.tensor(_er.get("agePressure", [0.5, 1.0, 1.5]), dtype=torch.float64, device=device)
+        self._age_pressure = torch.tensor([float(x) for x in _er["agePressure"]], dtype=torch.float64, device=device)
+        # CIV6 (the Loyalty pedia): each citizen's base pressure and a capital's extra
+        self._citizen_press_base = float(rules.seats["citizenPressureBase"])
+        self._citizen_press_cap = float(rules.seats["citizenPressureCapital"])
         # THE GOVERNOR CATALOG. `governors` order IS the governor index; the
         # thirteen title civics, the neutralize clock and the Governance
         # Doctrine favor ride the era block beside the ages that gate them.
@@ -767,8 +781,16 @@ class SimInit:
                        "envoysAtMinor", "envoyDoubleAtMinor", "minorLuxuries",
                        "routeStartFood", "industryAllSources", "envDamageImmune",
                        "goldPerFeature", "appealNearFeature", "firstPromoBonus",
-                       "passRouteGold", "borderExpansionPct"):
+                       "passRouteGold", "borderExpansionPct", "plantPowerPerResource"):
                 self._gpromo[_k] = torch.tensor([p[_k] for p in _gp], dtype=torch.float64, device=device)
+        # CIV6 (MODIFIER_BUILDING_YIELD_CHANGE / _ADJUST_FREE_POWER on a
+        # promotion): (promotion, building, six yields) and (promotion,
+        # building, Power) — what a NAMED building of the governed city pays
+        # on top (Industrialist's plants, Renewable Subsidizer's Dam)
+        self._gpromo_bldg_y = [(pi, int(b[0]), [float(v) for v in b[1:]])
+                               for pi, p in enumerate(_gp) for b in p["buildingYields"]]
+        self._gpromo_bldg_pow = [(pi, int(b[0]), float(b[1]))
+                                 for pi, p in enumerate(_gp) for b in p["buildingPower"]]
         # Whether ANY governor promotion can move `_tile_appeal` at all — the
         # gate on the version bump `_governor_phase` owes that cache.
         self._gov_appeal_any = bool(
@@ -1645,6 +1667,8 @@ class SimInit:
 
         self.disasters = bool(f0.get("disasters", 0))
         self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # the GROUND a drought may start on (`droughtTerrain`); the live start
+        # plots are this, featureless and above water (`_drought_cands`)
         self.drought_cand = torch.tensor([[t.get("dc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # the storm FAMILY that may start on each tile (`stormFamilyAt`), -1 none
         self.storm_fam = torch.tensor([[t.get("sf", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
@@ -1879,6 +1903,23 @@ class SimInit:
             for r in _R]
         self._imp_terr_kind_any = any(x is not None for x in self._imp_terr_kind_y)
         self._imp_disaster_ok = [bool(r.get("disasterOk", 0)) for r in _R]
+        # CIV6 (MOUNTAIN_PORTAL): the rows that are a movement portal on a
+        # mountain range (the Tunnel, Qhapaq Ñan) — one network per range
+        self._imp_portal = torch.tensor([bool(r["portal"]) for r in _R] or [False],
+                                        dtype=torch.bool, device=device)
+        self._imp_portal_any = bool(self._imp_portal.any())
+        # CIV6 (`BuildOnAdjacentPlot`): the unit builds onto a bare mountain
+        # BESIDE it (`adjacentPlotTarget`)
+        self._imp_adj_plot = [bool(r["adjPlot"]) for r in _R]
+        # PLUNDER_NONE / NO_PLUNDER: the pillage verb refuses the row outright
+        self._imp_no_pillage = torch.tensor([bool(r["noPillage"]) for r in _R] or [False],
+                                            dtype=torch.bool, device=device)
+        # a LEADER's row (a TRAIT_LEADER_* TraitType): its roster row, -1 none
+        self._imp_uniq_leader = [int(r["uniqLeader"]) for r in _R]
+        # [promotion, Power] a renewable row supplies its city on top while the
+        # owning city's governor holds the promotion (Renewable Subsidizer)
+        self._imp_gov_power = [(int(r["govPow"][0]), float(r["govPow"][1])) for r in _R]
+        self._imp_gov_power_any = any(p >= 0 for p, _ in self._imp_gov_power)
         self._imp_air_any = bool((self._imp_air_slots > 0).any())
         # CIV6 (Solar Farm, Wind Farm): what a RENEWABLE generator supplies the
         # city that owns its plot, per turn.
@@ -2444,6 +2485,7 @@ class SimInit:
         self._route_centre_intl = torch.tensor([float(x) for x in _tr.get("centreRouteIntl", [0, 0, 3, 0, 0, 0])], dtype=torch.float64, device=device)  # [6]
         self._trade_duration = int(_tr.get("duration", 20))  # route lifetime
         self._trade_plunder_gold = int(_tr["plunderGold"])
+        self._trader_guard_radius = int(_tr["guardRadius"])  # an escort's reach (`routePlunderer`)
         self._trade_walk_rail = int(_tr["walkRail"])
         self._trade_dur_bumps = [int(x) for x in _tr["durEraBumps"]]  # eras adding +10/+20/+30
         self._trader_cost_prog = int(_tr["traderCostProg"])
@@ -2457,28 +2499,48 @@ class SimInit:
         self._eruption_weight = [float(x) for x in _ds["eruptionWeight"]]
         self._accident_weight = [float(x) for x in _ds["accidentWeight"]]
         self._drought_weight = [float(x) for x in _ds["droughtWeight"]]
+        # each row's ChanceIncreasePerDegree (`warmedWeight`); the storms' ride
+        # their records below
+        self._flood_cipd = [float(x) for x in _ds["floodCipd"]]
+        self._drought_cipd = [float(x) for x in _ds["droughtCipd"]]
+        # RANDOM_EVENT_START_TURN: no event fires, and no draw is spent, before it
+        self._random_event_start_turn = int(_ds["randomEventStartTurn"])
         # the nuclear accident by severity: the reactor age that opens the
         # row, the fallout turns, the district and population chances
         self._accident_min_turn = [int(x) for x in _ds["accidentMinTurn"]]
         self._accident_fallout = torch.tensor([int(x) for x in _ds["accidentFallout"]], dtype=torch.long, device=device)
         self._accident_district_p = torch.tensor([float(x) for x in _ds["accidentDistrictP"]], dtype=torch.float64, device=device)
         self._accident_pop_p = torch.tensor([float(x) for x in _ds["accidentPopP"]], dtype=torch.float64, device=device)
-        # the per-plot Volcanic Soil chance by eruption severity, and what the soil replaces
-        self._soil_paint_p = torch.tensor([float(x) for x in _ds["soilPaintP"]], dtype=torch.float64, device=device)
+        # THE FIVE ERUPTION ROWS (`ERUPTION_ROWS`: Kilimanjaro's GENTLE and
+        # CATASTROPHIC, then the volcano's three), one entry per row: the
+        # per-plot Volcanic Soil chance and the `RandomEvent_Damages` rows
+        def _erf(k: str) -> torch.Tensor:
+            return torch.tensor([float(x) for x in _ds[k]], dtype=torch.float64, device=device)
+        self._er_paint_p = _erf("eruptionPaintP")
+        self._er_destroy_p, self._er_district_p = _erf("eruptionDestroyP"), _erf("eruptionDistrictP")
+        self._er_bldg_p, self._er_pop_p = _erf("eruptionBldgP"), _erf("eruptionPopP")
+        self._er_civ_kill_p = _erf("eruptionCivKillP")
+        self._er_dmg_lo = torch.tensor([int(x) for x in _ds["eruptionDmgLo"]], dtype=torch.long, device=device)
+        self._er_dmg_hi = torch.tensor([int(x) for x in _ds["eruptionDmgHi"]], dtype=torch.long, device=device)
+        # what the soil replaces, and the feature whose plots are Kilimanjaro's sites
         self._soil_replaces = [int(x) for x in _ds["soilReplaces"] if int(x) >= 0]
-        # Kilimanjaro's eruptions: the paint chance by row, and the feature
-        # whose plots are their sites
-        self._kilimanjaro_soil_p = torch.tensor([float(x) for x in _ds["kilimanjaroSoilP"]],
-                                                dtype=torch.float64, device=device)
         self._kilimanjaro_fid = int(_ds["kilimanjaroFid"])
         # a drought's turns by severity, and its footprint's `STORM_DISC` slots
         self._drought_duration = torch.tensor([int(x) for x in _ds["droughtDuration"]], dtype=torch.long, device=device)
         self._drought_hexes = int(_ds["droughtHexes"])
+        # the improvement rows a drought pillages and bars while it lasts, its
+        # destroy chance by severity, and the district and improvement rows
+        # that spare a city's food (`droughtShielded`)
+        self._drought_imps = [int(x) for x in _ds["droughtImprovements"] if int(x) >= 0]
+        self._drought_destroy_p = _erf("droughtDestroyP")
+        self._drought_shield_dists = [int(x) for x in _ds["droughtShieldDistricts"] if int(x) >= 0]
+        self._drought_shield_imps = [int(x) for x in _ds["droughtShieldImprovements"] if int(x) >= 0]
         # THE EIGHT STORMS (`STORM_EVENTS`), one column per row in table order
         _st = _ds["storms"]
         self._st_ids = [str(e["id"]) for e in _st]
         self._st_family = [int(e["family"]) for e in _st]
         self._st_weight = [float(e["weight"]) for e in _st]
+        self._st_cipd = [float(e["cipd"]) for e in _st]
         # CIV6 (`PrevailingWinds`, `PREVAILING_WINDS`): the weighted heading per
         # latitude band, [8 bands, 6 hex directions E NE NW W SW SE]; and the
         # band of every tile's row (`windBand`, the same integer comparisons)
@@ -2507,11 +2569,6 @@ class SimInit:
         self._st_naval_lo, self._st_naval_hi = _sti("navalLo"), _sti("navalHi")
         self._st_low_pill, self._st_low_dist = _stf("lowlandPill"), _stf("lowlandDist")
         self._st_fert_food, self._st_fert_prod = _stf("fertFood"), _stf("fertProd")
-        # each family's (severity 1, severity 2) event pair, `stormFamilyPair`
-        self._st_pairs: list[tuple[int, int]] = []
-        for fam in sorted(set(self._st_family)):
-            pair = [i for i, f in enumerate(self._st_family) if f == fam]
-            self._st_pairs.append((pair[0], pair[1]))
         # [civ, leaderRow, eventIdx, effect (0 noDamage / 1 doubleOpposing), amount]
         # — `STORM_UNIT_ROWS`, Divine Wind's hurricanes and Mother Russia's blizzards
         self._storm_unit_rows: list[tuple[int, int, int, int, int]] = [
@@ -2654,7 +2711,7 @@ class SimInit:
         self._gen_aura_cache = None
         self._bidx1 = torch.arange(B, device=device).unsqueeze(1)  # [B, 1] batch index, for advanced indexing
         self._fbase_cache: tuple[int, torch.Tensor] | None = None
-        self._food_cache: tuple[int, torch.Tensor] | None = None
+        self._food_cache: tuple[tuple[int, int], torch.Tensor] | None = None
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
         self._seat_route_cache = None   # ((turn,r,_eff_version,_rp_kill_version), [B,RC]|None)
@@ -2689,7 +2746,6 @@ class SimInit:
         # the flood sites (`floodSites`): one plot per river carrying
         # Floodplains, and each riverless Floodplains plot
         self._build_flood_sites()
-        self._droughtc_list = cand_list(self.drought_cand)
         # the volcanoes each game holds (`volcano_tile` is packed from 0)
         self._volc_n = (self.volcano_tile >= 0).sum(dim=1)
         # one start-tile list per storm family (`stormFamilyAt`)
@@ -3019,11 +3075,10 @@ class SimInit:
         self.game_over = torch.zeros(B, dtype=torch.bool, device=device)
         # WHAT ended the game (0 none, 1 score/turn limit, 2 domination,
         # 3 science, 4 religion, 5 culture, 6 diplomatic) and WHO won it (the
-        # seat row, -1 where no condition named one — a turn-limit end has a
-        # score leader, not a victor, and that lives in `winner`).
+        # seat row; a turn-limit end names the highest Score, `leader()`; -1
+        # while the game runs).
         self.victory_type = torch.zeros(B, dtype=torch.long, device=device)
         self.victory_row = torch.full((B,), -1, dtype=torch.long, device=device)
-        self.winner = torch.full((B,), -1, dtype=torch.long, device=device)
         self.project_done = torch.zeros(B, self.n_majors, max(self._n_once, 1), dtype=torch.bool, device=device)
         self.civ_wmd = torch.zeros(B, self.n_majors, max(self._n_devices, 1), dtype=torch.long, device=device)
         self.tile_fallout = torch.zeros(B, self.T, dtype=torch.long, device=device)
@@ -3908,11 +3963,15 @@ class SimInit:
 
         self._carbon_per_resource = torch.tensor(
             [float(x) for x in c["carbonPerResource"]], dtype=torch.float64, device=dev)
+        # raw carbon per POWER a plant makes from each slot's fuel (`plantCarbon`)
+        self._carbon_per_power = torch.tensor(
+            [float(x) for x in c["carbonPerPower"]], dtype=torch.float64, device=dev)
         self._carbon_unit_share = float(c["unitShare"])
         self._carbon_unit_res_share = float(c["unitResourceShare"])
         self._carbon_cells_share = float(c["cellsShare"])
         self._carbon_cells_tech = int(c["cellsTech"])
         self._co2_per_point = float(c["co2PerPoint"])
+        self._co2_per_degree = float(c["co2PerDegree"])
         self._recapture_units = float(c["recaptureUnits"])
         self._recapture_favor = int(c["recaptureFavor"])
         self._barrier_per_tile = int(c["barrierPerTile"])

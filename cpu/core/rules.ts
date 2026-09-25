@@ -9,6 +9,7 @@ import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, cong
 import { tileAppeal, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { IMPROVEMENTS, type ImprovementDef, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
+import { droughtBars } from '../data/disasters';
 import { isSuzerain } from './cityStates';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -112,29 +113,43 @@ export function territoryOk(
   return ownsTile(tile) || (!!def.outsideTerritory && tileSeat(tile) < 0);
 }
 
-/** CIV6 (Mountain Tunnel): the published exit price, "2 Movement". */
+/** CIV6 (Mountain Tunnel, Qhapaq Ñan): the published exit price, "2 Movement". */
 export const PORTAL_MP = 2;
 
 /**
- * Where a portal step from `tile` comes out: the NEXT tunnel on the same
- * mountain range by ascending tile index, wrapping back to the lowest.
+ * CIV6 (MOUNTAIN_PORTAL): does a movement portal stand here — the Mountain
+ * Tunnel or Qhapaq Ñan? Its mountain is ENTERABLE by anything ("allowing
+ * units to move into it") and only that: it does not become workable,
+ * campable or farmable, which is why it rides the movement sites rather than
+ * `isImpassable` itself — fourteen exported flags derive from that predicate
+ * and none of them should move.
+ */
+export function portalAt(tile: Tile): boolean {
+  return !!tile.improvement && !!IMPROVEMENTS[tile.improvement as ImprovementId]?.portal;
+}
+
+/**
+ * Where a portal step from `tile` comes out: the NEXT portal on the same
+ * mountain range by ascending tile index, wrapping back to the lowest. Every
+ * row carrying MOUNTAIN_PORTAL is one network — a Tunnel leads to a Qhapaq Ñan
+ * on the same range as readily as to another Tunnel.
  *
  * The action space carries six DIRECTIONS and no target, so "another portal"
  * has to be deterministic. Wrapping-next reaches every portal on the range
- * under repeated use, where a fixed "lowest" would make one tunnel a hub. A
- * MODEL choice, recorded in docs/AUDIT.md; the install's EFFECT_MOUNTAIN_PORTAL
- * carries no arguments at all.
+ * under repeated use, where a fixed "lowest" would make one portal a hub. A
+ * MODEL choice; the install's EFFECT_MOUNTAIN_PORTAL carries no arguments at
+ * all.
  *
- * -1 when this tile is not a tunnel, or is the only one on its range.
+ * -1 when this tile is not a portal, or is the only one on its range.
  */
 export function portalExit(map: GameMap, tile: Tile): number {
-  if (tile.improvement !== 'MOUNTAIN_TUNNEL') return -1;
+  if (!portalAt(tile)) return -1;
   const range = tile.mountainRange ?? -1;
   if (range < 0) return -1;
   let first = -1;
   for (const t of map.tiles) {
     if (t.index === tile.index) continue;
-    if (t.improvement !== 'MOUNTAIN_TUNNEL' || (t.mountainRange ?? -1) !== range) continue;
+    if (!portalAt(t) || (t.mountainRange ?? -1) !== range) continue;
     if (t.index > tile.index) return t.index;      // the next one up
     if (first < 0) first = t.index;                 // ...else wrap to the lowest
   }
@@ -142,29 +157,43 @@ export function portalExit(map: GameMap, tile: Tile): number {
 }
 
 /**
- * CIV6 (Mountain Tunnel): "Can only be built on an adjacent Mountain tile."
+ * CIV6 (`Improvements_XP2.BuildOnAdjacentPlot`: the Mountain Tunnel, Qhapaq
+ * Ñan): "Can only be built on an adjacent Mountain tile."
  *
- * The engineer stands OFF the mountain and builds onto it — the only
- * improvement in the game with a target that is not the builder's own tile.
- * The action space carries no target, so the pick is deterministic: the
- * LOWEST-index adjacent mountain that is bare. A MODEL choice, the same shape
- * as every other tie this engine breaks by index.
+ * The unit stands OFF the mountain and builds onto it — a row whose target is
+ * not the builder's own tile. The action space carries no target, so the pick
+ * is deterministic: the LOWEST-index adjacent mountain that is bare. A MODEL
+ * choice, the same shape as every other tie this engine breaks by index.
  *
- * Answers -1 when there is nothing to tunnel.
+ * Answers -1 when there is nothing to build on.
  */
-export function tunnelTarget(
-  map: GameMap, tile: Tile, ownsTile: (t: Tile) => boolean,
+export function adjacentPlotTarget(
+  map: GameMap, tile: Tile, def: ImprovementDef, ownsTile: (t: Tile) => boolean,
 ): number {
   let best = -1;
   for (const n of neighbors(map, tile)) {
     if (!isMountain(n) || n.improvement) continue;
-    // the TARGET answers the territory column, not the tile the engineer
+    // the TARGET answers the territory column, not the tile the builder
     // stands on — `CanBuildOutsideTerritory` reaches unowned mountains and
     // stops at another seat's border like every other row.
-    if (!territoryOk(IMPROVEMENTS.MOUNTAIN_TUNNEL, n, ownsTile)) continue;
+    if (!territoryOk(def, n, ownsTile)) continue;
     if (best < 0 || n.index < best) best = n.index;
   }
   return best;
+}
+
+/**
+ * May THIS seat's `unitType` lay the adjacent-plot row `def` right now? The
+ * row's own unit (the Military Engineer's Tunnel, the Builder's Qhapaq Ñan),
+ * its unlock, and a leader's row its leader alone (CIV6, a TRAIT_LEADER_*
+ * `TraitType`: "unique to Pachacuti").
+ */
+export function adjacentPlotRowOk(
+  def: ImprovementDef, unitType: string, unlocks: Unlocks, leader: string | null,
+): boolean {
+  if (unitType !== (def.engineer ? 'MILITARY_ENGINEER' : 'BUILDER')) return false;
+  if (!unlocks.improvements.has(def.id)) return false;
+  return !def.uniqueLeader || def.uniqueLeader === leader;
 }
 
 /**
@@ -330,7 +359,7 @@ export function validImprovementsIn(
   if (opts.builder !== undefined && opts.builder !== 'BUILDER') return [];
   if (tile.resource && !opts.hidden?.has(tile.resource)) {
     const imp = RESOURCES[tile.resource].improvement;
-    return unlocked(imp) ? [imp] : [];
+    return unlocked(imp) && !droughtBars(tile, imp) ? [imp] : [];
   }
   if (isWater(tile)) {
     // the WATER-ONLY rows (the Offshore Wind Farm): a water plot with no
@@ -425,7 +454,9 @@ export function validImprovementsIn(
         && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
     out.push(def.id);
   }
-  return out;
+  // CIV6 (LOC_UNITOPERATION_IMPROVEMENT_BLOCKED_BY_DROUGHT): "This improvement
+  // cannot be built while a drought is in progress" — the drought's own list
+  return out.filter((imp) => !droughtBars(tile, imp));
 }
 
 /** The city-states this seat is suzerain of, by name — what gates a
@@ -659,8 +690,8 @@ export function wallsLevel(city: { buildings: string[] }): number {
  * the walls buildings it has finished.
  */
 export function wallsTier(state: GameState, city: { buildings: string[]; seat: number }): number {
-  // a city-state's centre arrives here as a stand-in City whose seat has no
-  // Seat record at all, so the tech read has to tolerate one
+  // every holder's own research: a major's, a city-state's (`seatOf` answers
+  // its CityState record) and the Free Cities', which researches nothing
   if (seatOf(state, city.seat)?.research.techs.includes(URBAN_DEFENSES_TECH)) return WALLS_TIER_URBAN;
   return wallsLevel(city);
 }

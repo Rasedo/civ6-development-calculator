@@ -1,6 +1,6 @@
 import type { GameState } from './types';
 import { civEraIndex } from './city';
-import { onHomeContinent, seatOf, citiesOf, isBarbSeat, isCiv } from './seats';
+import { onHomeContinent, seatOf, citiesOf, isBarbSeat, isCiv, civOf } from './seats';
 import { getModifiers } from './effects';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
@@ -8,7 +8,7 @@ import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, DED_TO_ARMS, SKY_EUREK
 import { TECHS } from '../data/techs';
 import { promoValue } from './promotions';
 import { spawnUnit } from './units';
-import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
+import { BUILDINGS, BUILDING_ERA_INDEX, buildingVariantFor } from '../data/buildings';
 import { GW_HOLDERS } from '../data/greatWorks';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { ROAD_TIER_ERA } from '../data/constants';
@@ -90,7 +90,10 @@ export function eraBoundary(state: GameState): void {
   }
   for (let c = 0; c < state.seats.length; c++) {
     const seat = seatOf(state, c);
-    if (seat) seat.eraScore = 0;  // the window resets for the new era
+    if (!seat) continue;
+    // the window banks into the whole game's era score, then resets
+    seat.eraScorePast = (seat.eraScorePast ?? 0) + (seat.eraScore ?? 0);
+    seat.eraScore = 0;
   }
 }
 
@@ -125,8 +128,10 @@ export function dedicationEvent(state: GameState, civ: number, kind: number, eve
  * Every dedication a COMPLETED BUILDING pays, at one site both engines call.
  * CIV6: Heartbeat of Steam "+2 Era Score for each Industrial or later building
  * constructed"; Free Inquiry "+1 Era Score ... when constructing a building
- * which provides Science"; Pen, Brush and Voice "+1 Era Score ... when you
- * construct a building with a Great Work slot".
+ * which provides Science"; Pen, Brush and Voice "+1 Era Score for
+ * constructing a building with a Great Work Slot" — the slot the building
+ * gives the seat that builds it, so a unique copy that declares none (the
+ * Marae, no `Building_GreatWorks` row) pays nothing.
  */
 export function buildingDedications(state: GameState, seat: number, buildingId: string): void {
   if ((BUILDING_ERA_INDEX[buildingId] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, seat, DED_STEAM);
@@ -134,7 +139,10 @@ export function buildingDedications(state: GameState, seat: number, buildingId: 
   // constructed."
   if (BUILDINGS[buildingId]?.district === 'AERODROME') dedicationEvent(state, seat, DED_SKY);
   if ((BUILDINGS[buildingId]?.yields?.science ?? 0) > 0) dedicationEvent(state, seat, DED_FREE_INQUIRY);
-  if (GW_HOLDERS.some((h) => !h.wonder && h.id === buildingId)) dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
+  if (GW_HOLDERS.some((h) => !h.wonder && h.id === buildingId)
+    && !buildingVariantFor(civOf(state, seat), buildingId)?.noGreatWorks) {
+    dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
+  }
 }
 
 /** CIV6 (Hic Sunt Dracones, dark face): "+1 Era Score each time you kill a
@@ -247,7 +255,7 @@ function commitGoldenGrants(state: GameState, seat: number, era: number): void {
  *                        Science.
  *   PEN_BRUSH_AND_VOICE  Inspirations provide an ADDITIONAL 10% of civic cost,
  *                        and each city gains +1 Culture per SPECIALTY district.
- *   EXODUS               +2 Movement for MISSIONARIES/APOSTLES, +4 Great
+ *   EXODUS               +2 Movement for MISSIONARIES/APOSTLES/INQUISITORS, +4 Great
  *                        Prophet points per turn, and newly trained ones get
  *                        +2 Charges.
  */
@@ -266,8 +274,10 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
  *   MONUMENTALITY — "If chosen at the start of a Golden Age, +2 Movement for
  *     all Builders."
  *   EXODUS OF THE EVANGELISTS — "If chosen at the start of a Golden Age, +2
- *     Movement for all Missionaries, Apostles, and Inquisitors." The body
- *     below pays only the Missionary and the Apostle, not the INQUISITOR.
+ *     Movement for all Missionaries, Apostles, and Inquisitors."
+ *     (`Expansion1_Moments.xml`: COMMEMORATION_RELIGIOUS_GA_MOVEMENT takes
+ *     UNIT_IS_GOLDEN_AGE_RELIGIOUS, whose UNIT_IS_RELIGIOUS is the Missionary,
+ *     the Apostle and the Inquisitor.)
  *
  * Model movement points twice and the off-script gate diverges on the `rng`
  * DRAW COUNT, not on a yield. Both engines hold ONE resident MP pool (`unit_mp` against its `unit_mp_full` ceiling), with
@@ -279,7 +289,7 @@ export function goldenMoveBonus(state: GameState, unit: { type: string; seat: nu
   if (unit.type === 'BUILDER') {
     return goldenDedication(state, civ, DED_MONUMENTALITY) ? GOLDEN_MOVE_BONUS : 0;
   }
-  if (unit.type === 'MISSIONARY' || unit.type === 'APOSTLE') {
+  if (unit.type === 'MISSIONARY' || unit.type === 'APOSTLE' || unit.type === 'INQUISITOR') {
     return goldenDedication(state, civ, DED_EXODUS) ? GOLDEN_MOVE_BONUS : 0;
   }
   /* CIV6 (Hic Sunt Dracones, Golden face): "+2 Movement for naval and
@@ -311,6 +321,9 @@ export function goldenCulturePerDistrict(state: GameState, civ: number): number 
   return goldenDedication(state, civ, DED_PEN_BRUSH_AND_VOICE) ? 1 : 0;
 }
 
-export function agePressureFactor(state: GameState, civ: number): number {
-  return AGE_PRESSURE[(seatOf(state, civ)?.age ?? 1)];
+/** The per-citizen loyalty pressure a seat's AGE adds (`AGE_PRESSURE`): a
+ *  Heroic age carries the Golden code. Only a major has an age; the Free
+ *  Cities player's citizens take none. */
+export function agePressure(state: GameState, seat: number): number {
+  return isCiv(seat) ? AGE_PRESSURE[(seatOf(state, seat)?.age ?? 1)] : 0;
 }

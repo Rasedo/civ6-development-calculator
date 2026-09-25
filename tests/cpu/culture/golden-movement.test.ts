@@ -18,8 +18,8 @@ import type { GameState, Unit } from '../../../cpu/core/types';
 //   MONUMENTALITY: "If chosen at the start of a Golden Age, +2 Movement for
 //     all Builders."
 //   EXODUS OF THE EVANGELISTS: "If chosen at the start of a Golden Age, +2
-//     Movement for all Missionaries, Apostles, and Inquisitors." (no
-//     INQUISITOR in this roster).
+//     Movement for all Missionaries, Apostles, and Inquisitors."
+//     (`Expansion1_Moments.xml` UNIT_IS_RELIGIOUS: the three of them.)
 //
 // MP is one resident pool with one reset rule and one step contract on both
 // engines, so the bonus has exactly one home each side. Model it twice and the
@@ -76,15 +76,19 @@ describe('golden movement dedications', () => {
     expect(unitFullMoves(state, rm)).toBe(MP_SCALE * UNITS.MISSIONARY.moves);
   });
 
-  it('EXODUS lifts Missionaries and Apostles, not Builders', () => {
+  it('EXODUS lifts Missionaries, Apostles and Inquisitors, not Builders', () => {
     const state = newGame();
     golden(state, 1, DED_EXODUS);
     const m = place(state, 'MISSIONARY', 1);
     const a = place(state, 'APOSTLE', 1);
+    const q = place(state, 'INQUISITOR', 1);
     const b = place(state, 'BUILDER', 1);
     expect(unitFullMoves(state, m)).toBe(MP_SCALE * (UNITS.MISSIONARY.moves + GOLDEN_MOVE_BONUS));
     expect(unitFullMoves(state, a)).toBe(MP_SCALE * (UNITS.APOSTLE.moves + GOLDEN_MOVE_BONUS));
+    expect(unitFullMoves(state, q)).toBe(MP_SCALE * (UNITS.INQUISITOR.moves + GOLDEN_MOVE_BONUS));
     expect(unitFullMoves(state, b)).toBe(MP_SCALE * UNITS.BUILDER.moves);
+    seatOf(state, 1)!.dedicationPicks = [DED_MONUMENTALITY];
+    expect(unitFullMoves(state, q)).toBe(MP_SCALE * UNITS.INQUISITOR.moves);
   });
 
   it('a NORMAL age holding the same dedication pays nothing', () => {

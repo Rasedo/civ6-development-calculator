@@ -9,7 +9,7 @@
 
 import type { DistrictId, ImprovementId, PlunderRow, Yields, YieldKey } from '../core/types';
 import type { Elevation, FeatureId, TerrainId } from '../../world/types';
-import type { CivId } from './seats';
+import type { CivId, LeaderId } from './seats';
 import { xml, type SrcMap } from './provenance';
 
 /**
@@ -78,6 +78,18 @@ export interface ImprovementDef {
   /** CIV6 (Civilizations.xml): a UNIQUE IMPROVEMENT — this civilization's
    *  Builders alone lay it (`validImprovementsIn` / `_uniq_improvement_ok`). */
   uniqueTo?: CivId;
+  /** CIV6 (a TRAIT_LEADER_* `TraitType`): a LEADER's improvement — a seat
+   *  led by this leader alone lays it, whatever civilization it plays. */
+  uniqueLeader?: LeaderId;
+  /** CIV6 (MOUNTAIN_PORTAL, EFFECT_MOUNTAIN_PORTAL): "Acts as a movement
+   *  portal on a mountain range, allowing units to move into it and exit from
+   *  another portal at the cost of 2 Movement" — its mountain is enterable,
+   *  and every portal on one range leads to the others (`portalExit`). */
+  portal?: boolean;
+  /** CIV6 (`Improvements_XP2.BuildOnAdjacentPlot`): "Can only be built on an
+   *  adjacent Mountain tile" — the unit stands OFF the plot it improves
+   *  (`adjacentPlotTarget`). */
+  adjacentPlot?: boolean;
   /** CIV6 (Improvement_ValidFeatures): the ONLY features the row may stand
    *  on; absent leaves the feature unchecked, as the older rows are. */
   features?: FeatureId[];
@@ -208,6 +220,12 @@ export interface ImprovementDef {
    * governor leaves — but this payment stops.
    */
   governorYields?: { promo: string; yields: Partial<Yields> };
+  /** CIV6 (MERCHANT_RENEWABLE_ENERGY_*_GENERATE_POWER,
+   *  MODIFIER_SINGLE_CITY_ADJUST_FREE_POWER behind
+   *  CITY_HAS_GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY): Power the row
+   *  supplies its city ON TOP of `power` while the owning city's governor
+   *  holds the promotion. */
+  governorPower?: { promo: string; amount: number };
   /**
    * CIV6 (CITY_PARK_WATER_AMENITY,
    * MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY behind
@@ -231,6 +249,39 @@ export const BIOSPHERE_POWER_MULT = 3;
 export const PARK_AMENITIES_OWNER = 2;
 export const PARK_AMENITIES_NEAR = 1;
 export const PARK_AMENITY_CITIES = 4;
+
+/** CIV6 (Renewable Subsidizer): "All Offshore Wind Farms, Solar Farms, Wind
+ *  Farms, Geothermal Plants and Hydroelectric Dams in this city receive +2
+ *  Power and +2 Gold" — the renewable generators' half. The Gold is
+ *  RENEWABLE_ENERGY_IMPROVEMENT_PLOTS_GOLD (a plot yield over the
+ *  PLOT_HAS_RENEWABLE_IMPROVEMENT set), the Power each row's own
+ *  MERCHANT_RENEWABLE_ENERGY_*_GENERATE_POWER; the Dam's half rides the
+ *  promotion (`buildingYields`, `buildingPower`). */
+const RENEWABLE_SUBSIDY = {
+  governorYields: { promo: 'RENEWABLE_SUBSIDIZER', yields: { gold: 2 } },
+  governorPower: { promo: 'RENEWABLE_SUBSIDIZER', amount: 2 },
+};
+/** the install's names for each generator: its power row's middle, and the
+ *  requirement that names it inside PLOT_HAS_RENEWABLE_IMPROVEMENT. */
+const RENEWABLE_SUBSIDY_REQ: Readonly<Record<string, string>> = {
+  SOLAR_FARM: 'REQUIRES_CITY_HAS_SOLAR_FARM',
+  WIND_FARM: 'REQUIRES_CITY_HAS_WIND_FARM',
+  GEOTHERMAL: 'REQUIRES_CITY_HAS_GEOTHERMAL_PLANT',
+  OFFSHORE_WIND_FARM: 'REQUIRES_CITY_HAS_OFFSHORE_WIND_FARM',
+};
+const renewableSubsidySrc = (power: string): SrcMap => ({
+  'governorYields.promo': xml('GovernorPromotionModifiers',
+    'GovernorPromotionType=GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY&ModifierId=RENEWABLE_ENERGY_IMPROVEMENT_PLOTS_GOLD',
+    'GovernorPromotionType', { expect: 'GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY' }),
+  'governorYields.yields.gold': xml('ModifierArguments',
+    'ModifierId=RENEWABLE_ENERGY_IMPROVEMENT_PLOTS_GOLD&Name=Amount', 'Value',
+    { note: `PLOT_HAS_RENEWABLE_IMPROVEMENT names this row through ${RENEWABLE_SUBSIDY_REQ[power]}` }),
+  'governorPower.promo': xml('RequirementArguments',
+    'RequirementId=REQUIRES_CITY_HAS_GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY&Name=GovernorPromotionType',
+    'Value', { expect: 'GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY' }),
+  'governorPower.amount': xml('ModifierArguments',
+    `ModifierId=MERCHANT_RENEWABLE_ENERGY_${power}_GENERATE_POWER&Name=Amount`, 'Value'),
+});
 
 export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   FARM: {
@@ -439,10 +490,12 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     resourceOnly: false,
     groundOnly: true,
     power: 2,
+    ...RENEWABLE_SUBSIDY,
     elevations: ['FLAT'],
     excludeTerrains: ['SNOW'],
     description: 'Flat non-snow land. Supplies 2 Power to its city from the sun.',
     src: {
+      ...renewableSubsidySrc('SOLAR_FARM'),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_SOLAR_FARM', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_SOLAR_FARM', 'PlunderAmount'),
       'yields.gold': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_SOLAR_FARM&YieldType=YIELD_GOLD', 'YieldChange'),
@@ -466,9 +519,11 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     resourceOnly: false,
     groundOnly: true,
     power: 2,
+    ...RENEWABLE_SUBSIDY,
     elevations: ['HILLS'],
     description: 'Hills. Supplies 2 Power to its city from the wind.',
     src: {
+      ...renewableSubsidySrc('WIND_FARM'),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_WIND_FARM', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_WIND_FARM', 'PlunderAmount'),
       'yields.gold': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_WIND_FARM&YieldType=YIELD_GOLD', 'YieldChange'),
@@ -493,9 +548,11 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     resourceOnly: false,
     groundOnly: true,
     power: 4,
+    ...RENEWABLE_SUBSIDY,
     requiresFeature: 'GEOTHERMAL_FISSURE',
     description: 'A Geothermal Fissure. Supplies 4 Power to its city from the ground.',
     src: {
+      ...renewableSubsidySrc('GEOTHERMAL'),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_GEOTHERMAL_PLANT', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_GEOTHERMAL_PLANT', 'PlunderAmount'),
       'yields.science': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_GEOTHERMAL_PLANT&YieldType=YIELD_SCIENCE', 'YieldChange'),
@@ -720,9 +777,11 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     resourceOnly: false,
     waterOnly: true,
     power: 2,
+    ...RENEWABLE_SUBSIDY,
     terrains: ['COAST', 'LAKE'],
     description: 'Coast or Lake. Supplies 2 Power to its city from the wind.',
     src: {
+      ...renewableSubsidySrc('OFFSHORE_WIND_FARM'),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'PlunderAmount'),
       'yields.production': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM&YieldType=YIELD_PRODUCTION', 'YieldChange'),
@@ -853,8 +912,12 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     // a storm passes over it. `noPillage` answers the PILLAGE verb; this
     // answers the disaster walk, and they are two different callers.
     disasterResistant: true,
-    description: 'Military Engineer only, on a mountain, built from an adjacent tile. A movement portal to the next tunnel on its range, at 2 Movement. Cannot be pillaged or removed.',
+    portal: true,
+    adjacentPlot: true,
+    description: 'Military Engineer only, on a mountain, built from an adjacent tile. A movement portal to the next portal on its range, at 2 Movement. Cannot be pillaged or removed.',
     src: {
+      portal: xml('ImprovementModifiers', 'ImprovementType=IMPROVEMENT_MOUNTAIN_TUNNEL&ModifierId=MOUNTAIN_PORTAL', 'ModifierId', { expect: 'MOUNTAIN_PORTAL' }),
+      adjacentPlot: xml('Improvements_XP2', 'ImprovementType=IMPROVEMENT_MOUNTAIN_TUNNEL', 'BuildOnAdjacentPlot', { expect: true }),
       housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUNTAIN_TUNNEL', 'Housing'),
       resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_MOUNTAIN_TUNNEL', 'ResourceType')] },
       engineer: xml('Improvement_ValidBuildUnits', 'ImprovementType=IMPROVEMENT_MOUNTAIN_TUNNEL&UnitType=UNIT_MILITARY_ENGINEER', 'UnitType', { expect: 'UNIT_MILITARY_ENGINEER' }),
@@ -1459,6 +1522,42 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_CITY_PARK', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
       tourismTech: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_CITY_PARK', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
       amenityAdjacentWater: xml('ModifierArguments', 'ModifierId=CITY_PARK_WATER_AMENITY&Name=Amount', 'Value'),
+    },
+  },
+  // CIV6 (Qhapaq Ñan, Expansion2_Improvements_Major.xml): Pachacuti's own
+  // Mountain Tunnel — "Unlocks the Builder ability to construct a Qhapaq Ñan,
+  // unique to Pachacuti. Acts as a movement portal on a mountain range,
+  // allowing units to move into it and exit from another portal at the cost
+  // of 2 Movement. ... Can only be built on an adjacent Mountain tile. Cannot
+  // be pillaged or removed." TraitType TRAIT_LEADER_PACHACUTI_IMPROVEMENT_MOUNTAIN_ROAD,
+  // PrereqCivic CIVIC_FOREIGN_TRADE, `Improvement_ValidBuildUnits` UNIT_BUILDER,
+  // the five mountain terrains, CanBuildOutsideTerritory, PLUNDER_NONE, and
+  // the Tunnel's own MOUNTAIN_PORTAL modifier. No yield row.
+  MOUNTAIN_ROAD: {
+    id: 'MOUNTAIN_ROAD',
+    name: 'Qhapaq Ñan',
+    code: 'Qn',
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    uniqueLeader: 'PACHACUTI',
+    outsideTerritory: true,
+    elevations: ['MOUNTAIN'],
+    noPillage: true,
+    disasterResistant: true,
+    portal: true,
+    adjacentPlot: true,
+    description: 'Pachacuti\'s Builders only, on a mountain, built from an adjacent tile. A movement portal to the next portal on its range, at 2 Movement. Cannot be pillaged or removed.',
+    src: {
+      housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD', 'Housing'),
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD', 'ResourceType')] },
+      uniqueLeader: xml('LeaderTraits', 'LeaderType=LEADER_PACHACUTI&TraitType=TRAIT_LEADER_PACHACUTI_IMPROVEMENT_MOUNTAIN_ROAD', 'LeaderType', { expect: 'LEADER_PACHACUTI' }),
+      outsideTerritory: xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD', 'CanBuildOutsideTerritory', { expect: true }),
+      elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_MOUNTAIN_ROAD', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD', 'TerrainType')] },
+      noPillage: xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD', 'PlunderType', { expect: 'PLUNDER_NONE' }),
+      disasterResistant: xml('Improvements_XP2', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD', 'DisasterResistant', { expect: true }),
+      portal: xml('ImprovementModifiers', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD&ModifierId=MOUNTAIN_PORTAL', 'ModifierId', { expect: 'MOUNTAIN_PORTAL' }),
+      adjacentPlot: xml('Improvements_XP2', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD', 'BuildOnAdjacentPlot', { expect: true }),
     },
   },
   ZIGGURAT: {

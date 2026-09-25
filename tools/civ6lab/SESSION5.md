@@ -113,12 +113,16 @@ GameCore), one record per save per reader.
   only ACTIVE volcanoes are sites (`RealismSettings.PercentVolcanoesActive`
   70); whether `Spacing` 15 is a distance between storms or a turn gap; the
   absolute normaliser, P(event) against Σ Occ × sites / 250 × a map factor;
-  the per-degree increase's form (`ChanceIncreasePerDegree`).
+  the per-degree increase's form (both engines ship weight × (1 + CIPD/100 ×
+  ΔT) with ΔT continuous and able to fall; the game may step by half
+  degrees or never cool); the drought's start (the tooltip's "devoid of all
+  Features", shipped, against the pedia's stricter "four featureless
+  Grassland/Plains tiles adjacent").
 - **Already settled from the tallies** (no play needed): the empty share falls
   with map size (Small 25%, Standard 8%, Large 1%, Huge 0%); one-site rows run
   at about Occ × turns/250 × 0.75 / 0.93 / ~1.2 by size; lab 4's 74 eruptions
   fit 70% of 13 volcanoes; the flood mix held at base through seven sea-level
-  rises (the per-degree columns fit, `severitySplit` does not); a strict
+  rises (the per-degree columns fit, the old ice-melt shift did not); a strict
   15-turn per-row cooldown is refuted (19 CAT_4 in 249 turns).
 - **Reads.** For t = 1..now, the full `GetEventsForTurn(t)` record
   (`RandomEvent`, `StartTurn`, `EndTurn`, `StartLocation`, `CurrentLocation`,
@@ -137,10 +141,10 @@ GameCore), one record per save per reader.
   split river from plot; the ten `lab4_t*` saves give increase against ΔT.
 - **Fit.** Active volcanoes drawn at load (`eventSites` / `_volc_n`); an empty
   mass so P(event) = min(1, Σ w·n·f / 250) in `randomEvent` / `_random_event`;
-  START_TURN in `disasterPhase`; `severitySplit` replaced by weight ×
-  (1 + CIPD/100 × ΔT) in `eventRows` / `_event_rows` and the flood weights;
-  Spacing as the fit names it; `droughtCandidate` on featureless plots if the
-  drought `StartLocation`s show it.
+  the warming form in `warmingDegrees` / `_warming_degrees` if the
+  temperature reads step or never fall; Spacing as the fit names it;
+  `droughtCandidate` narrowed if the drought `StartLocation`s show the
+  pedia's stricter start.
 - **Rides along.** C-49: the natural storms' 16-step resultants with
   `CurrentDirection` (about 60 open-ocean hurricanes), compared with the
   independent-band law and a persistent-heading law. C-41: eruption counts

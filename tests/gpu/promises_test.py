@@ -167,8 +167,9 @@ def poke_clock(rules, path):
 
 def poke_settled_near(rules, path):
     """e. SETTLED TOO NEAR: a founding within 3 of another major's plot draws
-    the measured 19 from that major, and nothing from one whose nearest plot
-    is 4 away; the founding itself pays it."""
+    25 from that major (the lab's 19 / 18 one Industrial / Renaissance decay
+    later), and nothing from one whose nearest plot is 4 away; the founding
+    itself pays it."""
     sim = build(rules, path)
     nrow = sim.n_majors
 
@@ -176,7 +177,7 @@ def poke_settled_near(rules, path):
         owned = sim.tile_seat[0] == s
         return int(sim.pair_dist[t][owned].min()) if bool(owned.any()) else 999
 
-    assert sim._griev_settled_near == 19 and sim._griev_settled_near_range == 3
+    assert sim._griev_settled_near == 25 and sim._griev_settled_near_range == 3
     at3 = next(t for t in range(sim.T) if int(sim.tile_seat[0, t]) < 0 and border(t, 1) == 3)
     at4 = next(t for t in range(sim.T) if int(sim.tile_seat[0, t]) < 0
                and min(border(t, s) for s in range(1, nrow)) == 4)
@@ -184,10 +185,10 @@ def poke_settled_near(rules, path):
     sim._grievance_settled_near(0, everywhere, n1(sim, at4))
     assert not bool(sim.civ_grievance.any()), "a founding 4 from every border drew a grievance"
     sim._grievance_settled_near(0, everywhere, n1(sim, at3))
-    assert int(sim.civ_grievance[0, 1, 0]) == 19, "3 from the border: 19"
-    assert int(sim.civ_grievance[0, 0, 1]) == -19, "the pair carries one signed balance"
+    assert int(sim.civ_grievance[0, 1, 0]) == 25, "3 from the border: 25"
+    assert int(sim.civ_grievance[0, 0, 1]) == -25, "the pair carries one signed balance"
     for s in range(2, nrow):
-        want = 19 if border(at3, s) <= 3 else 0
+        want = 25 if border(at3, s) <= 3 else 0
         assert int(sim.civ_grievance[0, s, 0]) == want
     # the founding verb pays it: a legal site for seat 0 within 3 of a rival
     sim.civ_grievance.zero_()
@@ -208,7 +209,7 @@ def poke_settled_near(rules, path):
     made = sim._found_city_at(0, everywhere, n1(sim, site))
     assert bool(made[0]), "the founding site was refused"
     for s in range(1, nrow):
-        assert int(sim.civ_grievance[0, s, 0]) == (19 if s in rivals else 0), f"seat {s} after the founding"
+        assert int(sim.civ_grievance[0, s, 0]) == (25 if s in rivals else 0), f"seat {s} after the founding"
     print("  e settled-near OK")
 
 

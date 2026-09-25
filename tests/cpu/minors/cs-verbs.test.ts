@@ -4,11 +4,11 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { initFog } from '../../../cpu/core/fog';
 import { seatPhase } from '../../../cpu/core/phase';
-import { envoysOf, isSuzerain, setMet } from '../../../cpu/core/cityStates';
+import { envoysOf, isSuzerain, issueQuest, setMet } from '../../../cpu/core/cityStates';
 import { ensureGpOffer } from '../../../cpu/core/greatPeople';
 import { GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { hexDistance, tilesWithin } from '../../../world/hex';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, QUEST_ENVOYS, QUEST_COOLDOWN, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, QUEST_ENVOYS, QUEST_COOLDOWN, QUEST_CAMP_RADIUS, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState, Seat, City } from '../../../cpu/core/types';
 
 // A civ with ONE city; opts out of the belief/settle draws by default so a
@@ -233,6 +233,17 @@ describe('civ quests (deterministic, zero-draw)', () => {
     const df = hexDistance(state.map.tiles[far].col, state.map.tiles[far].row, ct.col, ct.row);
     expect(q?.campIndex).toBe(dc <= df ? close : far);
     expect(state.rngState).toBe(rng0);
+  });
+
+  it('asks for a camp within 5 tiles alone (Quests_Text.xml)', () => {
+    const { state, civ, cityState } = scenario('scientific');
+    const ct = state.map.tiles[cityState.centerIndex];
+    const at = (d: number) => state.map.tiles.find((t) => hexDistance(t.col, t.row, ct.col, ct.row) === d)!.index;
+    expect(QUEST_CAMP_RADIUS).toBe(5);
+    state.barbSeat.camps = [at(6)];
+    expect(issueQuest(state, cityState, civ.seat)?.kind).toBe('buildDistrict');
+    state.barbSeat.camps = [at(5)];
+    expect(issueQuest(state, cityState, civ.seat)).toEqual({ kind: 'clearCamp', campIndex: at(5) });
   });
 
   it('resolves a satisfied quest with +QUEST_ENVOYS to the civ, zero-draw', () => {

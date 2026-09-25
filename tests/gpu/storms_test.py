@@ -154,7 +154,8 @@ def main() -> int:
                    "TORNADO_FAMILY", "TORNADO_OUTBREAK", "HURRICANE_CAT_4", "HURRICANE_CAT_5"], ids
     assert sim._st_hexes.tolist() == [7, 19, 3, 7, 1, 3, 7, 19]
     assert sim._st_weight == [8, 2, 8, 2, 15, 3, 15, 3]
-    assert sim._st_pairs == [(0, 1), (2, 3), (4, 5), (6, 7)]
+    # ChanceIncreasePerDegree: 0 on each family's milder row, 50 on its worse
+    assert sim._st_cipd == [0, 50, 0, 50, 0, 50, 0, 50]
     offs = sim._storm_offs.tolist()
     assert len(offs) == 19 and offs[0] == [0, 0]
     ring = [max(abs(q), abs(r), abs(q + r)) for q, r in offs]
@@ -337,9 +338,11 @@ def main() -> int:
         turn["drought"] = bool((sim10.drought[0] > 0).any())
         n_fired = sum(1 for v in turn.values() if v)
         assert n_fired == 1, f"the turn fired {n_fired} events: {turn}"
-        # the event draw, then the storm's or the drought's centre pick
+        # the event draw, then the storm's or the drought's centre pick, and
+        # one draw per land plot of the drought's footprint
         spent = draws(s0, int(sim10.rng_state[0]))
-        assert spent == (2 if turn["storm"] or turn["drought"] else 1), (spent, turn)
+        dry = int((sim10.drought[0] > 0).sum())
+        assert spent == (2 if turn["storm"] else 2 + dry if turn["drought"] else 1), (spent, turn)
         for k, v in turn.items():
             fired[k] += int(v)
     del sim10._flood_river, sim10._erupt, sim10._nuclear_accident
@@ -349,13 +352,104 @@ def main() -> int:
         "volcano": 8.0 * int(sim10._volc_n[0]) + 6.5 * int(((sim10.feat_id[0] == sim10._kilimanjaro_fid)
                                                           & ~sim10.feat_stripped[0]).sum()),
         "storm": sum(sim10._st_weight[e] for e in range(8) if sim10._st_family[e] in fams),
-        "drought": 28.0 if int(sim10._droughtc_list[1][0]) > 0 else 0.0,
+        "drought": 28.0 if bool(sim10._drought_cands()[0].any()) else 0.0,
         "accident": 0.0,
     }
     total = sum(w.values())
     for k in fired:
         assert abs(fired[k] / N - w[k] / total) < 0.03, f"{k}: {fired[k]}/{N} against {w[k]}/{total}"
     print(f"  10 one event a turn OK — {fired} over {N} turns against weights {w}")
+
+    # 11 — RANDOM_EVENT_START_TURN: on turn 1 the phase fires nothing and
+    # spends no draw; on the start turn it draws
+    s11 = fresh(rules)
+    s11.disasters = True
+    assert s11._random_event_start_turn == 2
+    s11.turn = 1
+    s11.storm_left.zero_()
+    s11.storm_event.fill_(-1)
+    r0 = int(s11.rng_state[0])
+    s11._disaster_phase()
+    assert int(s11.rng_state[0]) == r0, "turn 1 spent a draw"
+    s11.turn = 2
+    s11._disaster_phase()
+    assert int(s11.rng_state[0]) != r0, "the start turn drew nothing"
+    print("  11 start turn OK — nothing before turn 2")
+
+    # 12 — THE DROUGHT (`drought`): a featureless start, its listed
+    # improvements pillaged (EXTREME destroys 30), barred from building and
+    # repair while it lasts, and a PreventsDrought city keeps its food
+    s12 = fresh(rules)
+    cand = s12._drought_cands()[0]
+    assert bool((cand <= s12.drought_cand[0]).all()), "a candidate is drought ground"
+    assert not bool((cand & (s12.feat_id[0] >= 0) & ~s12.feat_stripped[0]).any()), \
+        "a drought starts on no feature"
+    c = int(cand.nonzero()[0][0])
+    from core.simbase import tiles_from_offsets  # noqa: E402
+    area = [int(t) for t in tiles_from_offsets(torch.tensor([c]), s12._storm_offs[: s12._drought_hexes],
+                                                  s12.W, s12.H)[0].tolist()
+            if int(t) >= 0 and not bool(s12.water[0, int(t)])]
+    one = torch.tensor([True])
+    strip = torch.tensor([False])
+    for sev, want in ((0, 0.0), (1, 0.3)):
+        farms = gone = 0
+        for it in range(200):
+            s = fresh(rules)
+            s.rng_state[0] = 7919 * (it + 1) + sev
+            for t in area:
+                s.improvement[0, t] = s.FARM if t != area[-1] else s.MINE
+                s.pillaged[0, t] = False
+            r0 = int(s.rng_state[0])
+            s._drought(one, torch.tensor([c]), torch.tensor([sev]), strip)
+            assert draws(r0, int(s.rng_state[0])) == len(area), "one draw per land plot"
+            assert int(s.improvement[0, area[-1]]) == s.MINE and not bool(s.pillaged[0, area[-1]]), \
+                "a Mine is not the drought's"
+            for t in area[:-1]:
+                assert int(s.drought[0, t]) == int(s._drought_duration[sev])
+                farms += 1
+                if int(s.improvement[0, t]) < 0:
+                    gone += 1
+                else:
+                    assert bool(s.pillaged[0, t]), "SPECIFIC_IMPROVEMENT_PILLAGED 100"
+        assert abs(gone / farms - want) < 0.05, f"severity {sev}: destroyed {gone}/{farms}"
+    # the bar: a pillaged Farm under a live drought is neither rebuilt nor repaired
+    s = fresh(rules)
+    t = area[0]
+    s.improvement[0, t] = s.FARM
+    s.pillaged[0, t] = True
+    assert not bool(s._drought_barred()[0, t])
+    s.drought[0, t] = 3
+    assert bool(s._drought_barred()[0, t]), "a drought bars its own improvement"
+    s.improvement[0, t] = s.MINE
+    assert not bool(s._drought_barred()[0, t]), "...and no other"
+    # the shield: a plot's city with a complete Aqueduct keeps its food
+    s = fresh(rules)
+    owned = (s.tile_seat[0] == 0) & (s.centre_slot_at[0] < 0) & ~s.water[0] & (s.district[0] < 0)
+    t = int(owned.nonzero()[0][0])
+    s.improvement[0, t] = -1
+    s._eff_version += 1
+    wet = float(s._eff_food()[0, t])
+    s.drought[0, t] = 3
+    s._eff_version += 1
+    assert float(s._eff_food()[0, t]) == max(0.0, wet - 1), "a drought starves the plot"
+    same = (s.tile_seat[0] == 0) & (s.tile_city[0] == s.tile_city[0, t]) & (s.centre_slot_at[0] < 0)
+    same[t] = False
+    aq = int(same.nonzero()[0][0])
+    aq_d = s._drought_shield_dists[0]
+    s.district[0, aq] = aq_d
+    s.district_complete[0, aq] = True
+    s._eff_version += 1
+    assert float(s._eff_food()[0, t]) == wet, "the Aqueduct's city keeps its food"
+    s.district_pillaged[0, aq] = True
+    s._eff_version += 1
+    assert float(s._eff_food()[0, t]) == max(0.0, wet - 1), "a pillaged Aqueduct shields nothing"
+    s.district[0, aq] = -1
+    s.district_complete[0, aq] = False
+    s.district_pillaged[0, aq] = False
+    s.improvement[0, aq] = s._drought_shield_imps[0]
+    s._eff_version += 1
+    assert float(s._eff_food()[0, t]) == wet, "a Stepwell's city keeps its food"
+    print(f"  12 drought OK — featureless start, pillage and destroy, the bar, the shield")
     print("BATTERY OK storms")
     return 0
 

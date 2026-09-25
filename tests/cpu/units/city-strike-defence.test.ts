@@ -25,11 +25,11 @@ describe('the defender under a city strike', () => {
     const state = scene();
     const t = tileAtCoords(state.map, 6, 6);
     const u = spawnUnit(state, 'WARRIOR', t.index, 1)!;
-    const plain = cityStrikeDefenderCS(state, u, t);
+    const plain = cityStrikeDefenderCS(state, u, t, 0);
     u.formation = 1; // Corps
-    expect(cityStrikeDefenderCS(state, u, t)).toBe(plain + FORMATION_CS[1]!);
+    expect(cityStrikeDefenderCS(state, u, t, 0)).toBe(plain + FORMATION_CS[1]!);
     u.formation = 2; // Army
-    expect(cityStrikeDefenderCS(state, u, t)).toBe(plain + FORMATION_CS[2]!);
+    expect(cityStrikeDefenderCS(state, u, t, 0)).toBe(plain + FORMATION_CS[2]!);
     expect(FORMATION_CS[1]).toBe(10);
     expect(FORMATION_CS[2]).toBe(17);
   });
@@ -41,8 +41,8 @@ describe('the defender under a city strike', () => {
     hill.elevation = 'HILLS';
     const a = spawnUnit(state, 'WARRIOR', flat.index, 1)!;
     const b = spawnUnit(state, 'WARRIOR', hill.index, 1)!;
-    expect(cityStrikeDefenderCS(state, b, hill))
-      .toBeGreaterThan(cityStrikeDefenderCS(state, a, flat));
+    expect(cityStrikeDefenderCS(state, b, hill, 0))
+      .toBeGreaterThan(cityStrikeDefenderCS(state, a, flat, 0));
   });
 
   it('takes the flat embarked override instead of everything above it', () => {
@@ -50,8 +50,8 @@ describe('the defender under a city strike', () => {
     const t = tileAtCoords(state.map, 6, 6);
     const u = spawnUnit(state, 'WARRIOR', t.index, 1)!;
     u.embarked = true;
-    const emb = cityStrikeDefenderCS(state, u, t);
+    const emb = cityStrikeDefenderCS(state, u, t, 0);
     u.formation = 2;
-    expect(cityStrikeDefenderCS(state, u, t)).toBe(emb);
+    expect(cityStrikeDefenderCS(state, u, t, 0)).toBe(emb);
   });
 });

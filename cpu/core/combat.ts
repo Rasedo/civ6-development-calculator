@@ -1074,8 +1074,12 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
  * A city strike is a RANGED attack, so Support is ignored and the promotions
  * are read with `ranged` and `vsCity`. An EMBARKED target takes the era's
  * flat override instead of everything above it, formation included.
+ *
+ * `striker` is the seat that owns the firing city or Encampment: the
+ * roster's rows read it as the unit's OPPONENT, a district that is never
+ * wounded (`rosterCS` with no foe hit points and a district foe).
  */
-export function cityStrikeDefenderCS(state: GameState, defender: Unit, tile: Tile): number {
+export function cityStrikeDefenderCS(state: GameState, defender: Unit, tile: Tile, striker: number): number {
   const base = defender.embarked
     ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
     : (UNITS[defender.type]?.combat ?? 0) + formationCS(defender) + terrainDefense(tile)
@@ -1085,7 +1089,8 @@ export function cityStrikeDefenderCS(state: GameState, defender: Unit, tile: Til
   // unit's own strength wherever it fights, a city's shot included.
   return base + generalAuraCS(state, defender, tile.index)
     + gdrBeamCS(state, defender) // the beam "applies ... when defending"
-    + congressUnitCS(state, defender) + governmentUnitCS(state, defender);
+    + congressUnitCS(state, defender) + governmentUnitCS(state, defender)
+    + rosterCS(state, defender, striker, null, true);
 }
 
 /** The flat Combat Strength the WORLD CONGRESS hands one unit: Military
@@ -1149,7 +1154,15 @@ export function captureRoll(state: GameState, strengthDiff: number, t = -1): boo
 /**
  * CIV6 (the roster's granted abilities): the flat Combat Strength a unit's
  * civilization or leader adds under the row's clause — see `COMBAT_CS_ROWS`.
- * `foeHp` is null against a city, `foeIsCity` marks a district target.
+ * `foeHp` is null against a city, `foeIsCity` marks a district OPPONENT: the
+ * city or Encampment the unit assaults, or the one whose strike it takes.
+ *
+ * One composer for both sides of a fight. No row's requirement set carries
+ * REQUIREMENT_PLAYER_IS_ATTACKING (the install's PLAYER_IS_ATTACKER_REQUIREMENTS
+ * / PLAYER_IS_DEFENDER_REQUIREMENTS), so every row pays attacking and
+ * defending alike and only the opponent's kind selects — the trait texts'
+ * "when attacking" (Holy Roman Emperor, Killer of Cyrus) are display strings
+ * the rows outrank.
  */
 export function rosterCS(state: GameState, own: { type: string; seat: number; tileIndex: number; embarked?: boolean; formation?: number; levied?: boolean },
     foeSeat: number, foeHp: number | null, foeIsCity: boolean): number {
@@ -1178,8 +1191,10 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       : r.when === 'foeMinor' ? isCityStateSeat(foeSeat)
       : r.when === 'foeWounded' ? foeHp !== null && foeHp < UNIT_HP
       : r.when === 'foeCity' ? foeIsCity
-      // CIV6 (Swift Hawk): a HEROIC age is a golden one, so the age is the test
-      : r.when === 'foeGolden' ? isCiv(foeSeat) && (seatOf(state, foeSeat)?.age ?? 0) === AGE_GOLDEN
+      // CIV6 (Swift Hawk, REQUIREMENTSET_TEST_ANY): the Free Cities, or a
+      // civilization in a golden age — a HEROIC age is a golden one here
+      : r.when === 'foeGolden' ? isFreeSeat(foeSeat)
+        || (isCiv(foeSeat) && (seatOf(state, foeSeat)?.age ?? 0) === AGE_GOLDEN)
       // CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
       : r.when === 'onHomeContinent' ? onHomeContinent(state, own.seat, own.tileIndex)
       // CIV6 (El Escorial): the foe's player follows another majority religion

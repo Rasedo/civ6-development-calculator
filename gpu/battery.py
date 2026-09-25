@@ -686,6 +686,7 @@ def _main() -> int:
                 ("cree_claim", [py, "tests/gpu/cree_claim_test.py"], 2),  # the Cree Trader claims unclaimed ground within 3 of its own city
                 ("decommission", [py, "tests/gpu/decommission_test.py"], 2),  # the three plant-removal projects, opened by a Climate Accords window
                 ("worlds_fair", [py, "tests/gpu/worlds_fair_test.py"], 2),  # the second scored competition, on the Great Person points earned
+                ("score_victory", [py, "tests/gpu/score_victory_test.py"], 2),  # Civ 6's Score line by line, its tie order, the turn-limit winner
                 ("competition_rewards", [py, "tests/gpu/competition_rewards_test.py"], 2),  # the World Games' and Space Station's permanent podium rewards
                 ("unique_units", [py, "tests/gpu/unique_units_test.py"], 2),  # the 31 unique chassis and their ability clauses
                 ("flood_severity", [py, "tests/gpu/flood_severity_test.py"], 2),  # the severity ladder: pillage, destroy, damage bands, the two silts, the Bath
@@ -793,6 +794,9 @@ def _main() -> int:
                 ("feature_appeal", [py, "tests/gpu/feature_appeal_test.py"], 5),  # the Amazon reads a rainforest her own way
                 ("shared_vision", [py, "tests/gpu/shared_vision_test.py"], 6),  # an alliance shares what it sees
                 ("mountain_tunnel", [py, "tests/gpu/mountain_tunnel_test.py"], 7),  # the portal on a mountain range
+                ("qhapaq_nan", [py, "tests/gpu/qhapaq_nan_test.py"], 4),  # Pachacuti's portal: the leader gate, the adjacent build, one network with the Tunnel
+                ("trade_tails", [py, "tests/gpu/trade_tails_test.py"], 4),  # the escort's reach of 4, the admirals' hull-only percentage, a Trader through a portal
+                ("governor_power", [py, "tests/gpu/governor_power_test.py"], 4),  # Industrialist and Renewable Subsidizer: no governed city of a seed holds either
                 ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # the levy mark and its 75% discount
                 ("government_bonus", [py, "tests/gpu/government_bonus_test.py"], 6),  # the GS flat government bonus and what a legacy card pays
                 ("battery_memory", [py, "tests/gpu/battery_memory_test.py"], 1),  # the harness narrows instead of taking the box down

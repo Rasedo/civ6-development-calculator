@@ -1355,10 +1355,15 @@ class SimSeats:
         CIV6: Heartbeat of Steam "+2 Era Score for each Industrial or later
         building constructed"; Free Inquiry "+1 Era Score ... when constructing
         a building which provides Science"; Pen, Brush and Voice "+1 Era Score
-        ... when you construct a building with a Great Work slot"."""
+        for constructing a building with a Great Work Slot" — the slot the
+        building gives this row's civilization, so a unique copy that declares
+        none (the Marae) pays nothing."""
         self._dedication_event(row, self._ded_steam, made & (self._b_era[bi] >= self._industrial_era))
         self._dedication_event(row, self._ded_free_inquiry, made & self._b_science[bi])
-        self._dedication_event(row, self._ded_pen_brush, made & self._b_gwslot[bi])
+        gw = self._b_gwslot[bi]
+        for (_nbi, _nciv) in self._bvar_no_gw:
+            gw = gw & ~((bi == _nbi) & self._row_plays_idx(row, _nciv))
+        self._dedication_event(row, self._ded_pen_brush, made & gw)
         # CIV6 (Sky and Stars): "+1 Era Score for each Aerodrome building
         # constructed."
         if self._aerodrome_didx >= 0:
@@ -2640,7 +2645,7 @@ class SimSeats:
             base_t = active & ext & (rel_j >= 0) & self.civ_religion_done[:, row] & tpl_city[bidx, jr]
             bought_relig = torch.zeros(B, dtype=torch.bool, device=dev)
             # CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face):
-            # "newly trained ones get +2 Charges" — Missionaries and Apostles.
+            # "newly trained ones get +2 Charges" — Missionaries, Apostles and Inquisitors.
             exo_chg = self._golden_ded_table(self._ded_exodus)[:, row].long() * 2
             if self._missionary_idx >= 0:
                 n_live_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
@@ -7276,7 +7281,9 @@ class SimSeats:
         return winner
 
     def _rcy_globals(self) -> dict:
-        if self._rcy_cache is not None and self._rcy_cache[0] == self._eff_version:
+        # the food plane reads the drought shield, which is the OWNING city's
+        key = self._food_key()
+        if self._rcy_cache is not None and self._rcy_cache[0] == key:
             return self._rcy_cache[1]
         fs = self._feat_gone().to(self.dtype)
         _addy = self._feat_add_y()
@@ -7300,7 +7307,7 @@ class SimSeats:
         w = self.rules_dev.focus_base.double()
         oth_score = (ty_oth[:, :, 2:].double() * w[2:].reshape(1, 1, 4)).sum(dim=2)
         g = {"fs": fs, "f_base": f_base, "p_plane": p_plane, "ty_oth": ty_oth, "oth_score": oth_score, "w": w, "f_r": {}}
-        self._rcy_cache = (self._eff_version, g)
+        self._rcy_cache = (key, g)
         return g
 
     def _rcy_food_plane(self, row: int, g: dict) -> torch.Tensor:
@@ -8763,11 +8770,15 @@ class SimSeats:
         amt = self._wond_regam.reshape(1, 1, nW).expand(B, cols, nW).reshape(B, cols * nW, 1)
         return (hit.double() * amt).sum(dim=1) * alive.double()
 
-    def _city_power_need(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _city_power_need(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """The `cityPower` twin — what each city of seat row `row` ASKS, what
         its own renewables answer, and which plants could cover the rest.
-        Returns ([B, cols] demand, [B, cols] supply, [B, cols, nPlant] reach),
-        all fuel-free; `_resolve_seat_power` decides what the bank can run.
+        Returns ([B, cols] demand, [B, cols] supply, [B, cols, nPlant] reach,
+        [B, cols, nPlant] rate), all fuel-free; `_resolve_seat_power` decides
+        what the bank can run. `rate` is the Power one unit of the plant's fuel
+        provides the receiver: the fuel's own rate plus CIV6 (Industrialist)
+        "+1" where the plant city's governor holds it, the best plant of the
+        kind in reach taken.
 
         CIV6 (Power): a city's base load is what its standing buildings demand
         (a pillaged district's are dark, like their yields) plus
@@ -8779,8 +8790,9 @@ class SimSeats:
         all cities within range", from its own Industrial Zone tile to the
         receiving CITY CENTER, over the reach a regional building has (a Mexico
         City suzerain widens both). RENEWABLE supply "provide[s] Power only for
-        [its] respective city" and is Cardiff's here, so it must cover the load
-        by itself."""
+        [its] respective city" — the Dam, the generators on the city's plots
+        (each with Renewable Subsidizer's share where the governor holds it)
+        and Cardiff's — so it must cover the load by itself."""
         B, cols, dev = self.B, self.RC, self.device
         alive = self.city_alive[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
@@ -8791,19 +8803,39 @@ class SimSeats:
         nP = max(len(self._plant_bidx), 1)
         supply = torch.zeros(B, cols, dtype=torch.float64, device=dev)
         reach_p = torch.zeros(B, cols, nP, dtype=torch.bool, device=dev)
+        rate_p = torch.zeros(B, cols, nP, dtype=torch.long, device=dev)
         if not bool((demand > 0).any()):
-            return demand, supply, reach_p
+            return demand, supply, reach_p, rate_p
+        _gov = self.n_governors > 0 and row < self.n_majors
         # CIV6 (Hydroelectric Dam): "Provides 6 Power to the city from
         # renewable water sources" — a renewable like Cardiff's, so it too must
         # cover the whole load by itself before a plant is asked.
         if bool((self._b_power_supply > 0).any()):
             supply = supply + stand.double() @ self._b_power_supply
+        # CIV6 (Renewable Subsidizer, MERCHANT_RENEWABLE_ENERGY_HYDROELECTRIC_DAM_FREE_POWER):
+        # the Dam's own supply grows while this city's governor holds the
+        # promotion (`buildingPower`)
+        if self._gpromo_bldg_pow and _gov:
+            _gm = self._governor_mask(row)[:, :cols]                      # [B, cols, NP]
+            for _p, _n, _amt in self._gpromo_bldg_pow:
+                if _n >= 0:
+                    supply = supply + (_gm[:, :, _p] & stand[:, :, _n]).double() * _amt
         # CIV6 (Solar Farm, Wind Farm): a renewable generator "provides Power
         # to its city" — the one that owns its plot — so it counts here beside
         # the Dam and never with the plants.
         if self._imp_power_any:
-            per = self._imp_power[self.improvement.clamp(min=0)] \
-                * ((self.improvement >= 0) & ~self.pillaged & (self.tile_seat == int(self._ROW_SEAT[row]))).double()
+            _live = (self.improvement >= 0) & ~self.pillaged & (self.tile_seat == int(self._ROW_SEAT[row]))
+            per = self._imp_power[self.improvement.clamp(min=0)] * _live.double()
+            # CIV6 (Renewable Subsidizer): each generator's own `governorPower`
+            # on top while the owning city's governor holds the promotion
+            if self._imp_gov_power_any and _gov:
+                _sl = self.city_slot_at(row)                              # [B, T]
+                _gm = self._governor_mask(row)                            # [B, RC, NP]
+                for _k, (_p, _amt) in enumerate(self._imp_gov_power):
+                    if _p < 0:
+                        continue
+                    _held = torch.gather(_gm[:, :, _p], 1, _sl.clamp(min=0))
+                    per = per + (_live & (self.improvement == _k) & (_sl >= 0) & _held).double() * _amt
             for j in range(cols):
                 mine = ((self.tile_city == self.city_id[:, row, j].unsqueeze(1))
                         & alive[:, j].unsqueeze(1))
@@ -8830,10 +8862,16 @@ class SimSeats:
                 ctrs = self.city_center[:, row, :cols].clamp(min=0)
                 dd = self.pair_dist[stc.unsqueeze(2), ctrs.unsqueeze(1)]  # [B, src, recv]
                 near = zone.unsqueeze(2) & (dd <= reach)  # [B, src, recv]
+                # CIV6 (Industrialist, EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR):
+                # the plant's OWN city's governor raises what each resource provides
+                _ppr = (self._governor_sum(row, "plantPowerPerResource")[:, :cols].long() if _gov
+                        else torch.zeros(B, cols, dtype=torch.long, device=dev))   # [B, src]
                 for pi, n in enumerate(self._plant_bidx):
                     src = near & self.city_bldg[:, row, :cols, n].unsqueeze(2)
                     reach_p[:, :, pi] = src.any(dim=1)
-        return demand, supply, reach_p
+                    _best = torch.where(src, _ppr.unsqueeze(2), torch.full_like(src, -1, dtype=torch.long)).amax(dim=1)
+                    rate_p[:, :, pi] = int(self._b_fuel_rate[n]) + _best.clamp(min=0)
+        return demand, supply, reach_p, rate_p
 
     def _resolve_seat_power(self, row: int) -> None:
         """THE TURN'S POWER for seat row `row`: set `city_powered` and burn what
@@ -8849,15 +8887,8 @@ class SimSeats:
         several cities is not published; this walks the city SLOTS in order, and
         a city the fuel no longer covers stays dark (`resolveSeatPower`)."""
         cols = self.RC
-        # CIV6 (Nuclear accident): the reactor ages one turn for every turn since
-        # it was built or last recommissioned. A city with no plant has no
-        # reactor, and a plant lost with the building takes its clock with it.
-        if self._nuclear_bidx >= 0:
-            has = self.city_alive[:, row, :cols] & self.city_bldg[:, row, :cols, self._nuclear_bidx]
-            age = self.city_reactor_age[:, row, :cols]
-            self.city_reactor_age[:, row, :cols] = torch.where(
-                has, age.clamp(min=0) + 1, torch.full_like(age, -1))
-        demand, supply, reach_p = self._city_power_need(row)
+        self._age_reactors(row)
+        demand, supply, reach_p, rate_p = self._city_power_need(row)
         lit = (demand > 0) & (supply >= demand)
         need = (demand - supply).clamp(min=0).long()
         want = (demand > 0) & (supply < demand)
@@ -8870,14 +8901,17 @@ class SimSeats:
                 best_have = torch.full_like(cand, -1, dtype=torch.long)
                 best_cost = torch.zeros_like(best_have)
                 best_slot = torch.zeros_like(best_have)
+                best_rate = torch.ones_like(best_have)
                 for pi, n in enumerate(self._plant_bidx):
-                    slot, rate = int(self._b_fuel_slot[n]), int(self._b_fuel_rate[n])
-                    if slot < 0 or rate <= 0:
+                    slot, base = int(self._b_fuel_slot[n]), int(self._b_fuel_rate[n])
+                    if slot < 0 or base <= 0:
                         continue
+                    rate = rate_p[:, j, pi].clamp(min=1)
                     have = stock[:, slot]
                     take = cand & reach_p[:, j, pi] & (have > best_have)
                     best_have = torch.where(take, have, best_have)
                     best_cost = torch.where(take, (need[:, j] + rate - 1) // rate, best_cost)
+                    best_rate = torch.where(take, rate, best_rate)
                     best_slot = torch.where(take, torch.full_like(best_slot, slot), best_slot)
                 pay = cand & (best_have >= 0) & (best_have >= best_cost)
                 lit[:, j] = lit[:, j] | pay
@@ -8885,10 +8919,12 @@ class SimSeats:
                     1, best_slot.unsqueeze(1),
                     torch.where(pay, -best_cost, torch.zeros_like(best_cost)).unsqueeze(1))
                 self._log_stock(pay.nonzero(as_tuple=True)[0], row, best_slot[pay], "fu")
-                # CIV6 (Climate): the fuel a plant burns discharges carbon at
-                # its own published rate per unit (`plantCarbon`).
+                # CIV6 (Climate): the fuel a plant burns discharges carbon "per
+                # Power generated" (`plantCarbon`) — units x the Power each gave
+                # x the fuel's own carbon per Power, which is its per-resource
+                # figure over its base rate.
                 self._emit_carbon(row, torch.where(
-                    pay, best_cost.double() * self._carbon_per_resource[best_slot],
+                    pay, (best_cost * best_rate).double() * self._carbon_per_power[best_slot],
                     torch.zeros_like(best_cost, dtype=torch.float64)))
         self.city_powered[:, row, :cols] = lit
 
@@ -9281,7 +9317,7 @@ class SimSeats:
             imp_w = self.improvement.gather(1, wf).reshape_as(win)
             own = (
                 (win >= 0)
-                & (self.tile_seat.gather(1, wf).reshape_as(win) == row)
+                & (self.tile_seat.gather(1, wf).reshape_as(win) == int(self._ROW_SEAT[row]))
                 & (self.tile_city.gather(1, wf).reshape_as(win) == self.city_id[:, row, :cols].unsqueeze(2))
                 & (imp_w >= 0)
             )
@@ -9624,6 +9660,8 @@ class SimSeats:
         old_orig = int(self.city_orig_cap[b, src_row, src_col])
         old_founder = int(self.city_founder[b, src_row, src_col])
         old_lz = int(self.city_lasers[b, src_row, src_col])
+        # the plant stays, so its reactor keeps its clock (`ageReactors`)
+        old_age = int(self.city_reactor_age[b, src_row, src_col])
         # the GREAT WORKS ride the flip in their slots, provenance and all
         old_gw = [getattr(self, _p)[b, src_row, src_col, :].clone() for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat")]
         old_bldg = self.city_bldg[b, src_row, src_col, :].clone()
@@ -9767,6 +9805,7 @@ class SimSeats:
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
         self.city_lasers[b, dst_row, col] = old_lz  # the stations ride the flip with the Spaceport that holds them
+        self.city_reactor_age[b, dst_row, col] = old_age
         self.city_powered[b, dst_row, col] = False  # the new owner's own turn re-resolves the grid
         for _p, _v in zip(("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"), old_gw):
             getattr(self, _p)[b, dst_row, col, :] = _v
@@ -10265,7 +10304,7 @@ class SimSeats:
         with a Trading Post and, if within Trade Route range of your Capital, a
         road to it." `rows` are the games, `centre` the new city's tile per
         game. The road is the Trader's own course (`_trade_walk_step`), laid
-        on every land tile of the descent (`allRoadsLeadToRome`)."""
+        on every passable land tile of the descent (`allRoadsLeadToRome`)."""
         if rows.numel() == 0:
             return
         _rome = self._row_plays(row, "ROME")[rows]
@@ -10296,7 +10335,9 @@ class SimSeats:
             if not bool(walking.any()):
                 break
             cur = self._trade_walk_step(rr, cur, tgt, w)
-            land = walking & ~self.water[rr, cur]
+            # passable land only: a portal's mountain carries no road
+            _imp = self.improvement[rr, cur]
+            land = walking & ~self.water[rr, cur] & ~(self._imp_portal[_imp.clamp(min=0)] & (_imp >= 0))
             self.road[rr[land], cur[land]] = True
 
     def _found_city_grants(self, row: int, made: torch.Tensor, tile: torch.Tensor) -> None:
@@ -12660,7 +12701,7 @@ class SimSeats:
                 atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
             atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
                              + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
-            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, hrow, None, True, a_form, a_lev).to(atk_e.dtype)
+            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True, a_form, a_lev).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp[_wtier]
@@ -12950,7 +12991,7 @@ class SimSeats:
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_city = self._damage_roll(city_att,
                                        atk_base - atk_rs0 + _rs + _cpromo + rel_city
-                                       + self._roster_cs(aseat, at0, a_tile[:, u], hrow, None, True,
+                                       + self._roster_cs(aseat, at0, a_tile[:, u], hseat, None, True,
                                                          getattr(self, f"{atk_kind}_unit_formation")[:, u],
                                             getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
                                        - def_cs,
@@ -13201,10 +13242,10 @@ class SimSeats:
         route_dest = self.seat_routes[:, row, :, 1]  # [B, K_routes]
         s_ar = torch.arange(S, device=dev)
         has_route = (route_dest.unsqueeze(1) == (-(2 + s_ar)).reshape(1, S, 1)).any(dim=2)  # [B, S]
-        # clearCamp: the NEAREST camp within range 6, ties to the lowest tile
-        # index (key = dist·(T+1)+tile, issueQuest's key).
+        # clearCamp: the NEAREST camp within the quest's radius, ties to the
+        # lowest tile index (key = dist·(T+1)+tile, issueQuest's key).
         cdist = self.pair_dist[csc.unsqueeze(2), self.camp_tile.clamp(min=0).unsqueeze(1)].to(torch.long)  # [B, S, K]
-        near_c = (self.camp_tile >= 0).unsqueeze(1) & (cdist <= 6)  # [B, S, K]
+        near_c = (self.camp_tile >= 0).unsqueeze(1) & (cdist <= int(rr["questCampRadius"]))  # [B, S, K]
         span = self.T + 1
         key_c = torch.where(near_c, cdist * span + self.camp_tile.clamp(min=0).unsqueeze(1), torch.full_like(cdist, 10**18))
         best_k = key_c.argmin(dim=2)  # [B, S]
@@ -13642,9 +13683,11 @@ class SimSeats:
         tile destroys the route AND its Trader — a hull, a civilian or a
         PASSENGER, since `routePlunderer` asks the tile and not a class; a
         MAJOR raider (the lowest hostile seat id on a shared tile — the
-        cross-engine tie-break) banks
-        the gold. CIV6 (Reform the Coinage, Golden face): "your Traders
-        cannot be plundered"."""
+        cross-engine tie-break) banks the gold (`routePlunderGold`), the
+        admirals' percentage only where its hull stands on the tile. An
+        escort of the owner's within `_trader_guard_radius` on the walker's
+        ground guards it. CIV6 (Reform the Coinage, Golden face): "your
+        Traders cannot be plundered"."""
         dev = self.device
         act = self.seat_routes[:, row, :, 0] >= 0  # [B, K]
         leg = self.seat_route_leg[:, row]
@@ -13660,7 +13703,8 @@ class SimSeats:
                 wl = self._trade_water_level(row)[bb] if row < self.n_majors else torch.zeros_like(cur)
                 nxt = self._trade_walk_step(bb, cur, tgt, wl)
                 self.seat_route_walk[bb, row, kk] = nxt
-                # roads go on LAND only — a sea leg lays nothing
+                # roads go on passable LAND only — a sea leg lays nothing, and
+                # neither does a portal's mountain
                 moved = (nxt != cur) & self.passable[bb, nxt.clamp(min=0)]
                 if bool(moved.any()):
                     self.road[bb[moved], nxt[moved]] = True
@@ -13698,16 +13742,17 @@ class SimSeats:
         raider = torch.minimum(torch.where(h_m, s_m, big), torch.where(h_c, s_c, big))
         raider = torch.minimum(raider, torch.where(h_s, s_s, big))
         raider = torch.minimum(raider, torch.where(h_e, s_e, big))
-        # CIV6 (Mandekalu Cavalry): "Protects nearby land Trade units from
-        # Plunder" — a guard of this seat's own on the Trader's tile or beside
-        # it takes the raider off it.
+        # CIV6 (ABILITY_MANDEKALU / ABILITY_BIREME_PROTECT_TRADER): the escort
+        # grants its OWN seat's Traders within `_trader_guard_radius` of it
+        # immunity, on the escort's ground alone — a guard in reach takes the
+        # raider off the Trader.
         if bool((self._type_guards_traders > 0).any()) and row < self.n_majors:
             _gt = self._type_guards_traders
             # `pair_dist` is the unbatched [T, T] table, so the Trader's tile
             # and the unit's tile index it directly — no gather, and nothing
             # that could pair a selection row with the wrong game.
             _mt = self.major_unit_tile[bb].clamp(min=0)                 # [n, U]
-            _near = self.pair_dist[tiles.unsqueeze(1), _mt] <= 1
+            _near = self.pair_dist[tiles.unsqueeze(1), _mt] <= self._trader_guard_radius
             # 1 guards LAND ground, 2 guards WATER — the Trader's own tile decides
             _want = torch.where(self.water[bb, tiles], 2, 1).unsqueeze(1)
             _guard = (self.major_unit_alive[bb] & _near & (self.major_unit_hp[bb] > 0)
@@ -13719,14 +13764,20 @@ class SimSeats:
         if not bool(hit.any()):
             return
         hb, hk, hr = bb[hit], kk[hit], raider[hit]
+        # the raider's HULL on the Trader's tile (`plunderedByHull`): the
+        # military plane is where a ship stands, and no other plane holds one
+        _hull = (s_m[hit] == hr) & self.unit_naval[self.unit_type[hb, ms[hit].clamp(min=0)].clamp(min=0)]
         mj = hr < self.n_majors
         if bool(mj.any()):
             _gold = torch.full((int(mj.sum()),), float(self._trade_plunder_gold),
                                dtype=torch.float64, device=dev)
             if self._gov_has_effects:
                 _gold = _gold * self._fx_at_seat("rplun", hr[mj], hb[mj]).double()
-            # CIV6 (Francis Drake, Ching Shih): a permanent percentage on top.
-            _gold = _gold * (1 + self._gp_perm_at(hr[mj], "routePlunderPct", hb[mj]).double() / 100)
+            # CIV6 (Francis Drake, Ching Shih): a permanent percentage on top,
+            # an ability of the naval classes alone — it pays when a hull
+            # plunders.
+            _pp = 1 + self._gp_perm_at(hr[mj], "routePlunderPct", hb[mj]).double() / 100
+            _gold = _gold * torch.where(_hull[mj], _pp, torch.ones_like(_pp))
             self.civ_treasury.index_put_((hb[mj], hr[mj]), _gold, accumulate=True)
         # a city-state raider banks the plain gold into its own treasury (it
         # carries no government or Great Person rows)

@@ -24,7 +24,7 @@ import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boos
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
-import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL, claimTileEnRoute } from './trade';
+import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, routePlunderGold, stampTradingPost, TRADE_WALK_EXPIRY_RAIL, claimTileEnRoute } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
 import { POLICY_LIST } from '../data/policies';
@@ -48,13 +48,15 @@ import { cityDistrictSum, darkBuildings } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum, swapTileOk } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
+import { ageReactors } from './disasters';
+import { droughtBars } from '../data/disasters';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, congressSessionDue, congressVoter } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, EMERGENCY_NUCLEAR, emergencies, emergencyLoyalty, emergencyName, emergencyPressureCut, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { irradiated, wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { logDistrictCost } from './difflog';
-import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, tunnelTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
+import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, adjacentPlotRowOk, adjacentPlotTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
@@ -99,12 +101,12 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_GRANT_MELEE, FREE_CITY_GRANT_MELEE_COUNT, FREE_CITY_GRANT_RANGED, FREE_CITY_GRANT_RANGED_TURNS, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_GRANT_MELEE, FREE_CITY_GRANT_MELEE_COUNT, FREE_CITY_GRANT_RANGED, FREE_CITY_GRANT_RANGED_TURNS, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
-import { addEraScore, agePressureFactor, goldenBoostBonus, worldEraIndex } from './eras';
+import { addEraScore, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, grantFoundingPressure, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
@@ -116,7 +118,7 @@ import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDE
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { INDUSTRIAL_ERA_INDEX, ERAS } from '../data/techs';
 
-import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import { gpCityPermOf } from '../data/greatPeople';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -413,16 +415,23 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
   return ok;
 }
 
-/** The CITIZEN pressure a list of cities puts on the tile `here`: each
- *  city's population, less its owner's `emergencyPressureCut` and never below
- *  0, weighted down by distance inside `LOYALTY_RANGE`. */
+/** The CITIZEN pressure a list of cities puts on the tile `here`. CIV6 (the
+ *  Loyalty pedia): "Each Citizen exerts a base pressure of 1 ... Citizens in
+ *  a Capital city exert an additional 1 pressure. Golden and Heroic Ages add
+ *  0.5 for all Citizens, while Dark Ages subtract 0.5. This Citizen pressure
+ *  affects cities within 9 tiles, but is 10% less effective per tile
+ *  distant." Each city's citizens — its population less its owner's
+ *  `emergencyPressureCut`, never below 0 — press at base + capital + age
+ *  each, weighted by `LOYALTY_RANGE + 1 - d`: ten times the pedia's 10%
+ *  steps, a scale the pressure term's ratio cancels. */
 function citizenPressure(state: GameState, here: Tile, cities: City[]): number {
   let sub = 0;
   for (const c of cities) {
     const t = state.map.tiles[c.centerIndex];
     const d = hexDistance(here.col, here.row, t.col, t.row);
     if (d <= LOYALTY_RANGE) {
-      sub += Math.max(0, c.population - emergencyPressureCut(state, c.seat)) * (LOYALTY_RANGE + 1 - d);
+      const each = CITIZEN_PRESSURE_BASE + (c.isCapital ? CITIZEN_PRESSURE_CAPITAL : 0) + agePressure(state, c.seat);
+      sub += Math.max(0, c.population - emergencyPressureCut(state, c.seat)) * each * (LOYALTY_RANGE + 1 - d);
     }
   }
   return sub;
@@ -438,14 +447,14 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
   let own = 0;
   let foreign = 0;
   for (const s of state.seats) {
-    const sub = citizenPressure(state, here, s.cities) * agePressureFactor(state, s.seat);
+    const sub = citizenPressure(state, here, s.cities);
     if (s.seat === city.seat) own += sub;
     // CIV6 (Cultural alliance 1): "Allies do not exert Loyalty pressure on
     // each other."
     else if (!alliedAtLevel(state, city.seat, s.seat, ALLIANCE_CULTURAL, 1)) foreign += sub;
   }
   // CIV6: a Free City's citizens press on their neighbours like any other
-  // city's. The Free Cities player has no age, so its factor is 1.
+  // city's. The Free Cities player has no age, so they press at the base.
   if (state.freeSeat) foreign += citizenPressure(state, here, state.freeSeat.cities);
   return pressureTerm(own, foreign) + (LOYALTY_AMENITY[amenityTierName] ?? 0) + standingLoyalty(state, city)
     + greatWorkLoyalty(state, city);
@@ -456,7 +465,7 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
  *  where a major's city takes its owner's amenity, governor, policy and roster
  *  terms — and the Free Cities player carries none of those. Its own side of
  *  the pressure term is every Free City's citizens; the foreign side is every
- *  major's, at that major's age factor; and what STANDS in the city pays its
+ *  major's, its age in each citizen's term; and what STANDS in the city pays its
  *  flat loyalty to whoever holds it. Each major's share also accrues into the
  *  city's `freePressure` race — "the most Loyalty pressure on it since the
  *  Free City became independent". */
@@ -466,7 +475,7 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
   const race = (city.freePressure ??= state.seats.map(() => 0));
   let foreign = 0;
   for (const s of state.seats) {
-    const sub = citizenPressure(state, here, s.cities) * agePressureFactor(state, s.seat);
+    const sub = citizenPressure(state, here, s.cities);
     foreign += sub;
     race[s.seat] = (race[s.seat] ?? 0) + sub;
   }
@@ -636,9 +645,9 @@ export function skipsFreeCityStep(state: GameState, seat: number): boolean {
 /** A city at 0 loyalty REVOLTS. CIV6: "When Loyalty reaches 0, the city
  *  revolts against its owner and becomes a Free City" — unless the seat
  *  pressing hardest on it right now skips that step (Eleanor), in which case
- *  it joins that seat directly. The pull is the RAW citizen pressure, no age
- *  factor, the owner and its cultural allies excluded; ties to the lowest
- *  seat id. */
+ *  it joins that seat directly. The pull is the citizen pressure
+ *  (`citizenPressure`), the owner and its cultural allies excluded; ties to
+ *  the lowest seat id. */
 export function flipCity(state: GameState, city: City): void {
   const here = state.map.tiles[city.centerIndex];
   let winner: Seat | null = null;
@@ -710,6 +719,9 @@ function joinFromFreeCity(state: GameState, city: City): void {
 export function freeCitiesPhase(state: GameState): void {
   const free = state.freeSeat;
   if (!free || free.cities.length === 0) return;
+  // a Free City's reactor keeps its clock: the seat resolves no power, so the
+  // age is kept here
+  ageReactors(free.cities);
   const luxMap = luxuryAmenities(state, FREE_SEAT);
   const mods = getModifiers(state, FREE_SEAT);
   const tiers = free.cities.map((city) => amenityTierIndex(computeCityStats(state, city, luxMap, mods).amenities.tier.name));
@@ -1218,6 +1230,8 @@ export function transferCity(
     // the laser stations ride the flip with the Spaceport that holds them —
     // and go on drawing Power from whoever owns the city now
     laserStations: civCity.laserStations,
+    // the plant stays, so its reactor keeps its clock (`ageReactors`)
+    reactorAge: civCity.reactorAge,
     powered: false, // the new owner's own turn re-resolves the grid
     // a CONQUERED city is taken at half health; a city that revolts or joins
     // was never hit, and keeps what it had
@@ -1823,6 +1837,9 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           builderRemoveFeature(state, unit.id, actor.seat);
         } else if (a === 17) {
           if (unit.type !== 'BUILDER') return; // the GPU repair arm's builder gate
+          // CIV6 (LOC_UNITOPERATION_REPAIR_BLOCKED_BY_DROUGHT): a drought's
+          // improvement waits for the rain
+          if (droughtBars(here, here.improvement)) return;
           if (here.pillaged && tileOwnedByCiv(here, actor.seat)) {
             here.pillaged = false;
             unit.movesLeft = 0;
@@ -1834,16 +1851,16 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const ii = a < 18 ? a - 13 : DEDICATED_IMPROVEMENTS + (a - 18);
           const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
           const un = computeUnlocks(state, actor.seat);
-          // CIV6 (Mountain Tunnel): the ONE improvement whose target is not
+          // CIV6 (Mountain Tunnel, Qhapaq Ñan): the rows whose target is not
           // the builder's own tile — "Can only be built on an adjacent
-          // Mountain tile". The engineer stands off the mountain, so the
-          // legality and the write both move to `tunnelTarget`.
-          if (imp === 'MOUNTAIN_TUNNEL') {
-            const tt = tunnelTarget(state.map, here, (t: Tile) => tileOwnedByCiv(t, actor.seat));
-            const unl = computeUnlocks(state, actor.seat);
-            if (tt >= 0 && unl.improvements.has('MOUNTAIN_TUNNEL')
-                && unit.type === 'MILITARY_ENGINEER' && (unit.charges ?? 0) > 0) {
-              state.map.tiles[tt].improvement = 'MOUNTAIN_TUNNEL';
+          // Mountain tile". The unit stands off the mountain, so the
+          // legality and the write both move to `adjacentPlotTarget`.
+          const idef = IMPROVEMENTS[imp];
+          if (idef.adjacentPlot) {
+            const tt = adjacentPlotTarget(state.map, here, idef, (t: Tile) => tileOwnedByCiv(t, actor.seat));
+            if (tt >= 0 && adjacentPlotRowOk(idef, unit.type, un, leaderOf(state, actor.seat))
+                && (unit.charges ?? 0) > 0) {
+              state.map.tiles[tt].improvement = imp;
               unit.charges = (unit.charges ?? 0) - 1;
               unit.movesLeft = 0;
               if (unit.charges <= 0 && unitIsNoncombat(unit.type)) disbandUnit(state, unit.id);
@@ -1906,9 +1923,9 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // CIV6 (The First Emperor): a charge into the wonder underfoot
         wonderChargeBoost(state, unit, actor);
       } else if (a === A_PORTAL) {
-        // CIV6 (Mountain Tunnel): "move into it and exit from another portal
-        // at the cost of 2 Movement". The exit is the NEXT tunnel on the same
-        // range by ascending tile index, wrapping.
+        // CIV6 (Mountain Tunnel, Qhapaq Ñan): "move into it and exit from
+        // another portal at the cost of 2 Movement". The exit is the NEXT
+        // portal on the same range by ascending tile index, wrapping.
         const exit = portalExit(state.map, here);
         if (exit >= 0 && unit.movesLeft >= PORTAL_MP * MP_SCALE
             && tileFreeForUnit(state, exit, unit.seat, unit)) {
@@ -1955,7 +1972,7 @@ export function cityStrikes(state: GameState, city: City, strikeCS: number): voi
     }
     if (bestTile < 0) return;
     const defender = stackDefender(state, visibleHostilesAt(state, bestTile, striker), true); // a city strike is a SHOT
-    const defCSa = cityStrikeDefenderCS(state, defender, state.map.tiles[bestTile]);
+    const defCSa = cityStrikeDefenderCS(state, defender, state.map.tiles[bestTile], city.seat);
     // a survived Military Emergency pays its target +2 CS on every City
     // Strike against a member, forever. CIV6 (Expansion1_Emergencies.xml):
     // the reward is gated on COMBAT_DISTRICT_VS_UNIT, so the Encampment's
@@ -2530,8 +2547,9 @@ export function seatPhase(state: GameState): void {
         const next = tradeWalkStep(state, r.walkTile, target, water);
         if (next !== r.walkTile) {
           r.walkTile = next;
-          // roads go on LAND only — a sea leg lays nothing
-          if (!isWater(state.map.tiles[next])) state.map.tiles[next].road = true;
+          // roads go on passable LAND only — a sea leg lays nothing, and
+          // neither does a portal's mountain
+          if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) state.map.tiles[next].road = true;
           claimTileEnRoute(state, actor.seat, next);
         }
         if (r.walkLeg === 0 && r.walkTile === destC) r.walkLeg = 1;
@@ -2547,10 +2565,7 @@ export function seatPhase(state: GameState): void {
           if (raider === null) continue;
           plundered.add(r);
           const rs = seatOf(state, raider);
-          if (rs) {
-            rs.treasury += PLUNDER_ROUTE_GOLD * getModifiers(state, raider).routePlunderMult
-              * (1 + gpPermOf(rs, 'routePlunderPct') / 100);
-          }
+          if (rs) rs.treasury += routePlunderGold(state, raider, r.walkTile!);
         }
         if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
       }

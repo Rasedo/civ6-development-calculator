@@ -8,7 +8,9 @@ export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL'
   'CHATEAU', 'CHEMAMULL', 'GOLF_COURSE', 'GREAT_WALL', 'ICE_HOCKEY_RINK', 'KURGAN',
   'MAORI_PA', 'MEKEWAP', 'MISSION', 'OPEN_AIR_MUSEUM', 'POLDER', 'STEPWELL',
   // ...and the two GOVERNOR improvements after them, for the same reason
-  'FISHERY', 'CITY_PARK'];
+  'FISHERY', 'CITY_PARK',
+  // ...and Pachacuti's LEADER improvement after those
+  'MOUNTAIN_ROAD'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 
@@ -131,13 +133,12 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // the tile underfoot, one charge — the era band is the row's
   // (`WONDER_CHARGE_ROWS`).
   names.push('WONDER_CHARGE');
-  // THE MOUNTAIN TUNNEL'S PORTAL: CIV6 "allowing units to move into it and
-  // exit from another portal at the cost of 2 Movement". One column, no
-  // target — the exit is the NEXT tunnel on the same mountain range by
-  // ascending tile index, wrapping, which reaches every portal under repeated
-  // use and needs no encoding the six-direction move space cannot carry. A
-  // MODEL choice, recorded in docs/AUDIT.md. Appended last, like every verb since
-  // FOUND_CITY.
+  // THE MOUNTAIN PORTAL (the Tunnel, Qhapaq Ñan): CIV6 "allowing units to
+  // move into it and exit from another portal at the cost of 2 Movement". One
+  // column, no target — the exit is the NEXT portal on the same mountain range
+  // by ascending tile index, wrapping, which reaches every portal under
+  // repeated use and needs no encoding the six-direction move space cannot
+  // carry. A MODEL choice. Appended last, like every verb since FOUND_CITY.
   names.push('PORTAL');
   return names;
 }

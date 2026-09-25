@@ -592,6 +592,8 @@ SEAT = {
     "warWeariness": _ww_pairs("ww", lambda v: v != 0),
     "warWearinessTurn": _ww_pairs("ww_turn", lambda v: v >= 0),
     "eraScore": _civ_scalar("era_score"),
+    "eraScorePast": _civ_scalar("era_score_past"),
+    "score": lambda sim, b, rows: [[int(x) for x in sim.score_lines(c)[b].tolist()] for c in rows],
     "age": _civ_scalar("civ_age"),
     "governmentsHeld": _civ_scalar("civ_gov_held"),
     "policySlotsExtra": lambda sim, b, rows: [
@@ -720,6 +722,9 @@ CITY_STATE = {
     "religionPressure": lambda sim, b, rows: [
         [int(sim.city_pressure[b, sim._CITY_MINOR0 + s, 0, c]) for c in _civ_seats(sim)] for s in rows],
     "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],
+    "minorBuildFrom": lambda sim, b, rows: [[int(x) for x in sim.citystate_build_from[b, s].tolist()] for s in rows],
+    "minorArmyCap": lambda sim, b, rows: [int(sim.citystate_army_cap[b, s]) for s in rows],
+    "minorBuildersTrained": lambda sim, b, rows: [int(sim.citystate_builders_trained[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
     "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],
 }

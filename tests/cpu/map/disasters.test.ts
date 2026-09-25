@@ -1,24 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { setTileOwner } from '../../../cpu/core/seats';
+import { setTileOwner, freeSeatOf, FREE_SEAT } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodSites } from '../../../cpu/core/disasters';
-import { ACCIDENT_FALLOUT } from '../../../cpu/data/disasters';
+import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodSites, erupt, drought, ageReactors } from '../../../cpu/core/disasters';
+import { ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, eruptionRow, droughtCandidate, DROUGHT_DURATION } from '../../../cpu/data/disasters';
+import { validImprovementsIn } from '../../../cpu/core/rules';
+import { builderRepair } from '../../../cpu/core/units';
+import { transferCity, freeCitiesPhase } from '../../../cpu/core/phase';
 // The turn draws ONE random event over every eligible (row, site) pair, so a
 // board's floods, eruptions and storms share the turn: a loop below WAITS for
 // its event to land.
 //
-// STORMS PERSIST three turns each: a scene that reads "this tile got pillaged" as "a
-// flood or an eruption reached it" can see a tornado first. `stormFree` runs
-// one phase and says whether any storm was live during it — one already
-// raging or one that formed — so a scene about floods can put a storm's
-// scorch back and wait on.
+// STORMS PERSIST three turns each, and a DROUGHT pillages a Farm near its
+// centre: a scene that reads "this tile got pillaged" as "a flood or an
+// eruption reached it" can see a tornado or a drought first. `stormFree` runs
+// one phase and says whether no storm was live during it — one already raging
+// or one that formed — and no drought struck, so a scene about floods can put
+// their scorch back and wait on. It clears the event log to read the phase's.
 function stormFree(state: GameState, watched: Tile[]): boolean {
   const before = watched.map((t) => [t.pillaged, t.improvement, t.districtPillaged] as const);
   const live = () => state.map.tiles.some((t) => (t.stormTurns ?? 0) > 0);
   const raging = live();
+  state.eventLog = [];
   disasterPhase(state);
-  const stormed = raging || live();
+  const stormed = raging || live() || state.eventLog.some((e) => e.startsWith('Drought'));
   if (stormed) {
     watched.forEach((t, i) => {
       t.pillaged = before[i][0];
@@ -45,6 +50,7 @@ describe('disasters', () => {
   it('eruptions scorch and fertilize the slopes', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const volcano = tileAtCoords(state.map, 8, 8);
     volcano.elevation = 'MOUNTAIN';
     volcano.volcano = true;
@@ -57,7 +63,8 @@ describe('disasters', () => {
     // wait for the ERUPTION itself: a storm pillages the slope first now
     while (!erupted() && guard++ < 4000) disasterPhase(state);
     expect(erupted()).toBe(true);
-    expect(slope.pillaged).toBe(true);
+    // pillaged on every row; a CATASTROPHIC or MEGACOLOSSAL one may take it away
+    expect(slope.pillaged || slope.improvement === null).toBe(true);
     expect(slope.fertility).toBeGreaterThanOrEqual(1);
 
     // fertility is capped
@@ -70,6 +77,7 @@ describe('disasters', () => {
   it('a flood pillages the district on the floodplain, not just the improvement', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const plain = tileAtCoords(state.map, 4, 4);
     plain.feature = 'FLOODPLAINS';
     plain.district = 'CAMPUS';
@@ -85,6 +93,7 @@ describe('disasters', () => {
   it('a flood leaves an UNFINISHED district and a city centre alone', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const site = tileAtCoords(state.map, 4, 4);
     site.feature = 'FLOODPLAINS';
     site.district = 'CAMPUS'; // queued, not complete
@@ -150,6 +159,7 @@ describe('disasters', () => {
   const floodBoard = () => {
     const state = makeState(makeMap(18, 18));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     state.unitsMode = true;
     const plain = tileAtCoords(state.map, 4, 4);
     plain.feature = 'FLOODPLAINS';
@@ -230,6 +240,7 @@ describe('disasters', () => {
   const shieldBoard = () => {
     const state = makeState(makeMap(18, 18));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const plain = tileAtCoords(state.map, 4, 4);
     const up = neighborTile(state.map, plain, 0)!;
     plain.riverMask |= 1 << 0;
@@ -334,6 +345,7 @@ describe('the flood reaches the whole river', () => {
   it('one flood takes every floodplain along its river together', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const a = tileAtCoords(state.map, 4, 4);
     const b = link(state.map, a, 0);
     const c = link(state.map, b, 0);
@@ -364,10 +376,13 @@ describe('the flood reaches the whole river', () => {
 
 describe('the turn\'s one random event', () => {
   /** a sea holding two volcanoes (their rings water, so no storm starts
-   *  there) and one river of two Grassland floodplains plus a lone one */
+   *  there), one river of two Grassland floodplains plus a lone one, and one
+   *  bare Grassland plot — the only featureless one, the drought's start */
   const eventBoard = () => {
     const state = makeState(makeMap(18, 18, 'COAST'));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
+    tileAtCoords(state.map, 14, 14).terrain = 'GRASSLAND';
     for (const [c, r] of [[4, 4], [12, 12]]) {
       const v = tileAtCoords(state.map, c, r);
       v.terrain = 'GRASSLAND';
@@ -393,7 +408,8 @@ describe('the turn\'s one random event', () => {
 
   it('fires at most one event a turn, each row weighted once per site', () => {
     // sites: 2 flood sites x 4.5, 2 volcanoes x 8, and the Grassland's one
-    // tornado pair (15 + 3) and drought pair (23 + 5): 9 + 16 + 18 + 28 = 71
+    // tornado pair (15 + 3) and the bare plot's drought pair (23 + 5):
+    // 9 + 16 + 18 + 28 = 71
     const { state } = eventBoard();
     const N = 6000;
     let floods = 0;
@@ -470,6 +486,7 @@ describe('the nuclear accident', () => {
   const reactorBoard = (age: number) => {
     const state = makeState(makeMap(18, 18, 'COAST'));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const centre = tileAtCoords(state.map, 9, 9);
     const izTile = neighborTile(state.map, centre, 0)!;
     for (const t of [centre, izTile]) t.terrain = 'DESERT';
@@ -521,5 +538,273 @@ describe('the nuclear accident', () => {
       }
       expect([...seen].sort()).toEqual([...want]);
     }
+  });
+});
+
+describe('the random events wait for their first turn', () => {
+  it('turn 1 draws nothing and fires nothing; the start turn draws', () => {
+    // CIV6 (RANDOM_EVENT_START_TURN 2): a Grassland board, every turn a
+    // tornado or drought site
+    const state = makeState(makeMap(16, 16));
+    state.disasters = true;
+    expect(RANDOM_EVENT_START_TURN).toBe(2);
+    state.turn = 1;
+    const s0 = state.rngState;
+    for (let i = 0; i < 50; i++) disasterPhase(state);
+    expect(state.rngState).toBe(s0);
+    expect(state.eventLog).toHaveLength(0);
+    state.turn = RANDOM_EVENT_START_TURN;
+    disasterPhase(state);
+    expect(state.rngState).not.toBe(s0);
+  });
+});
+
+describe('the eruption\'s damage rows', () => {
+  /** a volcano on a Grassland board, its ring plots owned by a city whose
+   *  centre stands on the ring's first plot */
+  const ringBoard = () => {
+    const state = makeState(makeMap(18, 18));
+    state.unitsMode = true;
+    const v = tileAtCoords(state.map, 8, 8);
+    v.elevation = 'MOUNTAIN';
+    v.volcano = true;
+    const ring = neighbors(state.map, v);
+    const city = settleAt(state, ring[0].index);
+    const reset = () => {
+      for (const t of ring.slice(1)) {
+        t.feature = null;
+        t.improvement = 'FARM';
+        t.pillaged = false;
+        setTileOwner(t, 0);
+        t.ownerCity = city.id;
+      }
+      city.hp = 200;
+      city.population = 10;
+    };
+    return { state, v, ring, city, reset };
+  };
+
+  it('CATASTROPHIC destroys and pillages at 75, bands the land units and the centre, kills and costs citizens at 20', () => {
+    const { state, v, ring, city, reset } = ringBoard();
+    const N = 600;
+    let farms = 0;
+    let destroyed = 0;
+    let civilians = 0;
+    let killed = 0;
+    let rolls = 0;
+    let lost = 0;
+    const bands = new Set<number>();
+    const centre = new Set<number>();
+    for (let i = 0; i < N; i++) {
+      reset();
+      const w = spawnUnit(state, 'WARRIOR', ring[1].index, 0)!;
+      const b = spawnUnit(state, 'BUILDER', ring[2].index, 0)!;
+      erupt(state, v, eruptionRow('volcano', 1));
+      for (const t of ring.slice(1)) {
+        farms += 1;
+        if (t.improvement === null) destroyed += 1;
+        else expect(t.pillaged).toBe(true);
+      }
+      const wu = state.units.find((x) => x.id === w.id);
+      bands.add(wu ? 100 - wu.hp : 100);
+      civilians += 1;
+      if (!state.units.some((x) => x.id === b.id)) killed += 1;
+      centre.add(200 - city.hp);
+      // one POPULATION_LOSS roll per ring plot the city owns, its centre's too
+      rolls += ring.length;
+      lost += 10 - city.population;
+      state.units = state.units.filter((x) => x.id !== w.id && x.id !== b.id);
+    }
+    expect(Math.abs(destroyed / farms - 0.75)).toBeLessThan(0.04);
+    for (const d of bands) expect(d >= 40 && d <= 60).toBe(true);
+    for (const d of centre) expect(d >= 40 && d <= 60).toBe(true);
+    expect(bands.size).toBeGreaterThan(5);
+    expect(Math.abs(killed / civilians - 0.2)).toBeLessThan(0.05);
+    expect(Math.abs(lost / rolls - 0.2)).toBeLessThan(0.04);
+  });
+
+  it('GENTLE pillages the ring and takes nothing else', () => {
+    const { state, v, ring, city, reset } = ringBoard();
+    for (const row of [eruptionRow('volcano', 0), eruptionRow('kilimanjaro', 0)]) {
+      for (let i = 0; i < 100; i++) {
+        reset();
+        const w = spawnUnit(state, 'WARRIOR', ring[1].index, 0)!;
+        const b = spawnUnit(state, 'BUILDER', ring[2].index, 0)!;
+        erupt(state, v, row);
+        for (const t of ring.slice(1)) {
+          expect(t.improvement).toBe('FARM');
+          expect(t.pillaged).toBe(true);
+        }
+        expect(state.units.find((x) => x.id === w.id)?.hp).toBe(100);
+        expect(state.units.some((x) => x.id === b.id)).toBe(true);
+        expect(city.hp).toBe(200);
+        expect(city.population).toBe(10);
+        state.units = state.units.filter((x) => x.id !== w.id && x.id !== b.id);
+      }
+    }
+  });
+
+  it('Kilimanjaro\'s CATASTROPHIC row destroys at 80; no row touches a hull', () => {
+    const { state, v, ring, reset } = ringBoard();
+    const sea = ring[3];
+    let farms = 0;
+    let destroyed = 0;
+    for (let i = 0; i < 500; i++) {
+      reset();
+      sea.terrain = 'COAST';
+      sea.improvement = null;
+      const g = spawnUnit(state, 'GALLEY', sea.index, 0)!;
+      erupt(state, v, eruptionRow('kilimanjaro', 1));
+      for (const t of ring.slice(1)) {
+        if (t === sea) continue;
+        farms += 1;
+        if (t.improvement === null) destroyed += 1;
+      }
+      expect(state.units.find((x) => x.id === g.id)?.hp).toBe(100);
+      state.units = state.units.filter((x) => x.id !== g.id);
+    }
+    expect(Math.abs(destroyed / farms - 0.8)).toBeLessThan(0.04);
+  });
+});
+
+describe('the drought\'s rules', () => {
+  /** a Grassland board: the drought's centre and its ring, farmed and owned
+   *  by a city standing two plots off */
+  const dryBoard = () => {
+    const state = makeState(makeMap(18, 18));
+    state.unitsMode = true;
+    const c = tileAtCoords(state.map, 8, 8);
+    const plots = [c, ...neighbors(state.map, c)];
+    const city = settleAt(state, tileAtCoords(state.map, 8, 11).index);
+    for (const t of plots) {
+      t.improvement = 'FARM';
+      setTileOwner(t, 0);
+      t.ownerCity = city.id;
+    }
+    return { state, c, plots, city };
+  };
+
+  it('starts only on featureless Plains or Grassland', () => {
+    const t = { terrain: 'GRASSLAND', elevation: 'FLAT', feature: null as string | null, submerged: false };
+    expect(droughtCandidate(t)).toBe(true);
+    expect(droughtCandidate({ ...t, elevation: 'HILLS' })).toBe(true);
+    for (const f of ['WOODS', 'RAINFOREST', 'MARSH', 'FLOODPLAINS', 'VOLCANIC_SOIL']) {
+      expect(droughtCandidate({ ...t, feature: f })).toBe(false);
+    }
+    expect(droughtCandidate({ ...t, terrain: 'DESERT' })).toBe(false);
+    expect(droughtCandidate({ ...t, elevation: 'MOUNTAIN' })).toBe(false);
+    expect(droughtCandidate({ ...t, submerged: true })).toBe(false);
+  });
+
+  it('pillages its listed improvements, and EXTREME takes 30 of them away; a Mine stands', () => {
+    const { state, c, plots } = dryBoard();
+    const mine = plots[1];
+    for (const sev of [0, 1]) {
+      let farms = 0;
+      let gone = 0;
+      for (let i = 0; i < 300; i++) {
+        for (const t of plots) {
+          t.improvement = t === mine ? 'MINE' : 'FARM';
+          t.pillaged = false;
+          t.droughtTurns = 0;
+        }
+        drought(state, c, sev, false);
+        for (const t of plots) {
+          expect(t.droughtTurns).toBe(DROUGHT_DURATION[sev]);
+          if (t === mine) {
+            expect(t.improvement).toBe('MINE');
+            expect(t.pillaged).toBe(false);
+            continue;
+          }
+          farms += 1;
+          if (t.improvement === null) gone += 1;
+          else expect(t.pillaged).toBe(true);
+        }
+      }
+      expect(Math.abs(gone / farms - [0, 0.3][sev])).toBeLessThan(0.04);
+    }
+  });
+
+  it('bars building and repairing its improvements until it ends', () => {
+    const { state, c } = dryBoard();
+    const opts = { unlocks: null, ownsTile: () => true, map: state.map };
+    c.improvement = null;
+    expect(validImprovementsIn(c, opts)).toContain('FARM');
+    c.droughtTurns = 3;
+    expect(validImprovementsIn(c, opts)).not.toContain('FARM');
+    c.improvement = 'FARM';
+    c.pillaged = true;
+    const b = spawnUnit(state, 'BUILDER', c.index, 0)!;
+    expect(builderRepair(state, b.id).ok).toBe(false);
+    expect(c.pillaged).toBe(true);
+    c.droughtTurns = 0;
+    expect(builderRepair(state, b.id).ok).toBe(true);
+    expect(c.pillaged).toBe(false);
+  });
+
+  it('a city with an Aqueduct, a Dam or a Stepwell keeps its food; a pillaged one does not', () => {
+    const { state, c, city } = dryBoard();
+    c.improvement = null;
+    c.pillaged = false;
+    const food = () => tileYields(bareCtx(state.map), c).food;
+    const wet = food();
+    c.droughtTurns = 3;
+    expect(food()).toBe(wet - 1);
+    // the Aqueduct beside the centre, complete
+    const aq = neighbors(state.map, state.map.tiles[city.centerIndex])[0];
+    aq.improvement = null;
+    aq.district = 'AQUEDUCT';
+    aq.districtComplete = true;
+    setTileOwner(aq, 0);
+    aq.ownerCity = city.id;
+    expect(food()).toBe(wet);
+    aq.districtPillaged = true;
+    expect(food()).toBe(wet - 1);
+    aq.district = null;
+    aq.districtComplete = false;
+    aq.districtPillaged = false;
+    // the Stepwell on any plot the city owns
+    aq.improvement = 'STEPWELL';
+    expect(food()).toBe(wet);
+    // another city's Stepwell is no shield
+    aq.ownerCity = city.id + 1;
+    expect(food()).toBe(wet - 1);
+  });
+});
+
+describe('a Free City\'s reactor', () => {
+  it('keeps its clock through the flip, ages on, and is an accident site', () => {
+    const state = makeState(makeMap(18, 18, 'COAST'));
+    state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
+    const centre = tileAtCoords(state.map, 9, 9);
+    const izTile = neighborTile(state.map, centre, 0)!;
+    for (const t of [centre, izTile]) t.terrain = 'DESERT';
+    const city = settleAt(state, centre.index);
+    izTile.district = 'INDUSTRIAL_ZONE';
+    izTile.districtComplete = true;
+    setTileOwner(izTile, 0);
+    izTile.ownerCity = city.id;
+    city.districts.push({ type: 'INDUSTRIAL_ZONE', tileIndex: izTile.index });
+    city.buildings.push('NUCLEAR_POWER_PLANT');
+    city.reactorAge = 25;
+    transferCity(state, 0, freeSeatOf(state), city, 'revolted');
+    const free = state.freeSeat!.cities[0];
+    expect(free.seat).toBe(FREE_SEAT);
+    expect(free.reactorAge).toBe(25);
+    freeCitiesPhase(state);
+    expect(free.reactorAge).toBe(26);
+    ageReactors([free]);
+    expect(free.reactorAge).toBe(27);
+    // past MAJOR's 20, before CATASTROPHIC's 30: rows MINOR and MAJOR fire
+    const seen = new Set<number>();
+    for (let i = 0; i < 1500; i++) {
+      state.eventLog = [];
+      disasterPhase(state);
+      for (const e of state.eventLog.filter((x) => x.startsWith('Nuclear accident'))) {
+        seen.add(Number(e.slice(-2, -1)));
+      }
+    }
+    expect([...seen].sort()).toEqual([0, 1]);
   });
 });

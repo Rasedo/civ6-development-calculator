@@ -73,15 +73,16 @@ def main() -> None:
 
     # THE DRAW COUNT IS FIXED. Eight per REACHED tile, whatever stands on it —
     # TS spends the same, so a bare floodplain and a built-up one cannot slide
-    # the two streams apart.
+    # the two streams apart. The flood alone, so no other event of the turn
+    # moves the stream between the two runs.
     seed = int(sim.rng_state[0])
     sim.improvement[0, t] = -1
-    sim._disaster_phase()
+    flood(sim, t)
     bare = int(sim.rng_state[0])
     sim.rng_state[0] = seed
     sim.improvement[0, t] = 0
     sim.pillaged[0, t] = False
-    sim._disaster_phase()
+    flood(sim, t)
     assert int(sim.rng_state[0]) == bare, (
         "a flood over an IMPROVED tile spent a different number of draws than a bare one")
     print("  a flood costs the same draws whatever stands on the tile")

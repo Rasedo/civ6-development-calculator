@@ -2,11 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { deriveMountainRanges } from '../../../world/query';
-import { tunnelTarget, portalExit, PORTAL_MP } from '../../../cpu/core/rules';
-import { tunnelAt } from '../../../cpu/core/units';
+import { adjacentPlotTarget, portalAt, portalExit, PORTAL_MP } from '../../../cpu/core/rules';
 import { IMPROVEMENTS } from '../../../cpu/data/improvements';
 import { IMPROVEMENT_IDS, unitActionNames } from '../../../cpu/core/unitActions';
-import type { GameState } from '../../../cpu/core/types';
+import type { GameMap, GameState, Tile } from '../../../cpu/core/types';
 
 /**
  * CIV6 (Mountain Tunnel): "Acts as a movement portal on a mountain range,
@@ -18,8 +17,11 @@ import type { GameState } from '../../../cpu/core/types';
  *
  * The GPU twin is tests/gpu/mountain_tunnel_test.py.
  */
-/** seat 0's own ground — the closure every `tunnelTarget` caller passes. */
+/** seat 0's own ground — the closure every `adjacentPlotTarget` caller passes. */
 const mine = (t: { ownerSeat: number }) => tileSeat(t as never) === 0;
+/** the Tunnel's own adjacent-plot target */
+const tunnelTarget = (map: GameMap, t: Tile, owns: (t: Tile) => boolean) =>
+  adjacentPlotTarget(map, t, IMPROVEMENTS.MOUNTAIN_TUNNEL, owns);
 
 function ridge(cols: number[]): GameState {
   const state = makeState(makeMap(16, 16, 'GRASSLAND'));
@@ -44,14 +46,17 @@ describe('the mountain tunnel', () => {
     expect(d.outsideTerritory).toBe(true);
     expect(IMPROVEMENTS.MISSILE_SILO.outsideTerritory).toBeUndefined();
     expect(PORTAL_MP).toBe(2);
+    // ImprovementModifiers MOUNTAIN_PORTAL, Improvements_XP2 BuildOnAdjacentPlot
+    expect(d.portal).toBe(true);
+    expect(d.adjacentPlot).toBe(true);
   });
 
   it('keeps the seat it was appended at, so no earlier column moved', () => {
     const names = unitActionNames(IMPROVEMENT_IDS);
     expect(names[names.length - 1]).toBe('PORTAL');
-    // The tunnel was the LAST improvement when it landed; the twelve unique
-    // rows appended after it, which is exactly what an append-only wire
-    // allows. What may never change is the seat it already holds.
+    // The tunnel was the LAST improvement when it landed; the unique rows
+    // appended after it, which is exactly what an append-only wire allows.
+    // What may never change is the seat it already holds.
     expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_TUNNEL')).toBe(22);
     // PILLAGE sits after every BUILD column, so a new improvement moves it —
     // which is why nothing may write these seats down
@@ -105,12 +110,12 @@ describe('the mountain tunnel', () => {
   it('makes its own mountain ENTERABLE and nothing else', () => {
     const s = ridge([3, 4, 5]);
     const m = tileAtCoords(s.map, 4, 5);
-    expect(tunnelAt(m)).toBe(false);
+    expect(portalAt(m)).toBe(false);
     m.improvement = 'MOUNTAIN_TUNNEL';
-    expect(tunnelAt(m)).toBe(true);
+    expect(portalAt(m)).toBe(true);
     // the tile is still a mountain — the fourteen baked flags must not move
     expect(m.elevation).toBe('MOUNTAIN');
-    expect(tunnelAt(tileAtCoords(s.map, 3, 5))).toBe(false);
+    expect(portalAt(tileAtCoords(s.map, 3, 5))).toBe(false);
   });
 
   it('exits at the NEXT portal on its range, wrapping, and never off-range', () => {

@@ -337,7 +337,7 @@ def main() -> None:
     s10.city_bldg[b, row, col, load] = True
     s10.city_bldg[b, row, col, hyd] = True
     s10._eff_version += 1
-    dem, sup, _ = s10._city_power_need(row)
+    dem, sup, _, _ = s10._city_power_need(row)
     assert float(dem[b, col]) > 0, "the lane needs a load before a supply is asked"
     # CIV6 (Hydroelectric Dam): "Provides 6 Power to the city."
     assert float(sup[b, col]) == float(rj["buildings"][hyd]["powerSupply"]) == 6.0

@@ -102,7 +102,8 @@ export type ImprovementId =
   | 'POLDER'
   | 'STEPWELL'
   | 'FISHERY'
-  | 'CITY_PARK';
+  | 'CITY_PARK'
+  | 'MOUNTAIN_ROAD';
 
 export type DistrictId =
   | 'CITY_CENTER'

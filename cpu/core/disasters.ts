@@ -6,7 +6,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { neighborTile, neighbors, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
-import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv } from './seats';
+import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders } from './seats';
 import { raiseAidRequest } from './competition';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -19,13 +19,13 @@ import { pillageBuilding } from './yields';
 import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
-import { FLOOD_WEIGHT, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P } from '../data/disasters';
-import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_DURATION, DROUGHT_HEXES, droughtCandidate, SOIL_PAINT_P, SOIL_REPLACES } from '../data/disasters';
-import { KILIMANJARO_FEATURE, KILIMANJARO_WEIGHT, KILIMANJARO_SOIL_P } from '../data/disasters';
+import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P, warmedWeight, RANDOM_EVENT_START_TURN } from '../data/disasters';
+import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_DURATION, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtCandidate, SOIL_REPLACES } from '../data/disasters';
+import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, eruptionRow } from '../data/disasters';
+import { KILIMANJARO_FEATURE, KILIMANJARO_WEIGHT } from '../data/disasters';
 import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P } from '../data/disasters';
-import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, stormFamilyPair, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
-import { severitySplit } from '../data/climate';
-import { defertilize, desertificationLive, fertilityLive } from './climate';
+import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
+import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
 
 export const FERTILITY_CAP = 3;
@@ -95,6 +95,73 @@ function cityHoldingDistrict(state: GameState, tile: Tile): City | undefined {
     }
   }
   return undefined;
+}
+
+/** IMPROVEMENT_DESTROYED: the improvement is taken away, not pillaged. */
+function destroyImprovement(state: GameState, tile: Tile): void {
+  if (tile.improvement && !envImmune(state, tile)) {
+    tile.improvement = null;
+    tile.pillaged = false;
+  }
+}
+
+/** POPULATION_LOSS: one citizen of the city owning the tile, never its last —
+ *  every holder that keeps a city list, the Free Cities seat included. */
+function losePopulation(state: GameState, tile: Tile): void {
+  const seat = tileSeat(tile);
+  const home = seatOf(state, seat)?.cities.find((c) => c.id === tile.ownerCity);
+  if (home && home.population > 1) {
+    home.population -= 1;
+    logPopWrite(state, home, 'ds');
+    (state.aidHit ??= []).push(seat);  // CIV6 (Aid Request trigger)
+  }
+}
+
+/** CITY_GARRISON and CITY_WALLS: a CITY CENTRE on the tile loses HP and, if
+ *  it has one, perimeter, by the row's one damage roll. */
+function hitCityCentre(state: GameState, tile: Tile, dmg: number): void {
+  const held = cityAtIndex(state, tile.index);
+  if (!held) return;
+  held.city.hp = Math.max(1, held.city.hp - dmg);
+  const outer = outerPool(state, held.city);
+  if (outer > 0) held.city.outerHp = Math.max(0, outer - dmg);
+}
+
+/** What the tile's units take from one event: whether each domain's share
+ *  roll hit, the civilians' kill roll, and the two HP rolls. */
+interface UnitStrike {
+  land: boolean;
+  naval: boolean;
+  civ: boolean;
+  landDmg: number;
+  navalDmg: number;
+}
+
+/**
+ * UNIT_DAMAGE_LAND / UNIT_DAMAGE_NAVAL / UNIT_KILLED_CIVILIAN on one tile's
+ * units. READINGS shared with the GPU twin: a domain's roll is one per tile
+ * for ALL that domain's units on it; an embarked unit is its chassis' domain;
+ * an air unit or a spy holds no tile and is neither domain. A storm's roster
+ * rows (`stormSpares`, `stormExtraPct`) read `ev`; an event with none passes
+ * null.
+ */
+function strikeUnits(state: GameState, tile: Tile, owner: number, s: UnitStrike, ev: StormEvent | null): void {
+  for (const u of [...unitsAt(state, tile.index)]) {
+    const dom = unitDomain(u.type);
+    if (dom === 'air' || dom === 'spy') continue;
+    if (ev && stormSpares(state, u.seat, ev)) continue;
+    if (dom === 'civilian') {
+      if (s.civ) disbandUnit(state, u.id);
+      continue;
+    }
+    const naval = !!UNITS[u.type]?.naval;
+    if (!(naval ? s.naval : s.land)) continue;
+    const base = naval ? s.navalDmg : s.landDmg;
+    const pct = ev ? stormExtraPct(state, u.seat, owner, ev) : 0;
+    const dmg = base + Math.floor(base * pct / 100);
+    u.hp -= dmg;
+    if (u.hp <= 0) disbandUnit(state, u.id);
+  }
 }
 
 /** May an eruption paint Volcanic Soil on this ring plot? Land that is not a
@@ -169,16 +236,16 @@ export function riverShielded(reach: Tile[]): boolean {
   return false;
 }
 
-/** The three flood weights at this climate phase: a warmed world moves mass
- *  from the mildest row onto the worst (`severitySplit`). */
-export function floodWeights(phase: number): number[] {
-  return severitySplit(FLOOD_WEIGHT, phase);
+/** The three flood weights at `degrees` of warming: each row's own
+ *  `ChanceIncreasePerDegree` on its weight (`warmedWeight`). */
+export function floodWeights(degrees: number): number[] {
+  return FLOOD_WEIGHT.map((w, sev) => warmedWeight(w, FLOOD_CIPD[sev], degrees));
 }
 
 /** A flood that no draw chose — the spy's breached Dam: ONE draw names the
- *  severity by the flood rows' weights at this climate phase. */
+ *  severity by the flood rows' weights at the world's warming. */
 export function floodSeverity(state: GameState): number {
-  const w = floodWeights(state.climateIdx ?? -1);
+  const w = floodWeights(warmingDegrees(state));
   let total = 0;
   for (const x of w) total += x;
   const at = nextRandom(state) * total;
@@ -260,22 +327,14 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
   const immune = civOf(state, seat) === 'EGYPT';
   if (!mitigated && !immune) {
     scorch(state, tile);
-    if (rDestroy < FLOOD_DESTROY_P[sev] && tile.improvement && !envImmune(state, tile)) {
-      tile.improvement = null;
-      tile.pillaged = false;
-    }
+    if (rDestroy < FLOOD_DESTROY_P[sev]) destroyImprovement(state, tile);
     if (rDistrict < FLOOD_DISTRICT_P[sev]) pillageDistrict(state, tile);
     if (rBldg < FLOOD_BLDG_P[sev]) pillageTileBuildings(state, tile);
     const dmg = FLOOD_DAMAGE_LO[sev]
       + Math.floor(rDamage * (FLOOD_DAMAGE_HI[sev] - FLOOD_DAMAGE_LO[sev] + 1));
     if (dmg > 0) {
       // A CITY CENTER on the floodplain loses HP and, if it has one, perimeter.
-      const held = cityAtIndex(state, tile.index);
-      if (held) {
-        held.city.hp = Math.max(1, held.city.hp - dmg);
-        const outer = outerPool(state, held.city);
-        if (outer > 0) held.city.outerHp = Math.max(0, outer - dmg);
-      }
+      hitCityCentre(state, tile, dmg);
       for (const u of [...unitsAt(state, tile.index)]) {
         if (unitIsNoncombat(u.type)) {
           // "Civilians killed" is its own column — a chance, not damage.
@@ -286,15 +345,7 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
         }
       }
     }
-    if (rPop < FLOOD_POP_P[sev]) {
-      const owner = seatOf(state, seat);
-      const home = owner?.cities.find((c) => c.id === tile.ownerCity);
-      if (home && home.population > 1) {
-        home.population -= 1;
-        logPopWrite(state, home, 'ds');
-        (state.aidHit ??= []).push(seat);  // CIV6 (Aid Request trigger)
-      }
-    }
+    if (rPop < FLOOD_POP_P[sev]) losePopulation(state, tile);
   }
   // FERTILIZATION. Each yield is its own roll, so one flood may pay both.
   // A mitigated river still silts, at half the rate.
@@ -321,18 +372,19 @@ export interface EventRow {
 /**
  * THE DRAW'S ROWS, in the install's `RandomEvents` table order — the three
  * floods, Kilimanjaro's two eruptions, the three eruptions, the eight storms,
- * the three nuclear accidents, the two droughts — at this climate phase. A
- * warmed world moves weight from the mildest flood row onto the worst and from
- * each storm family's milder row onto its worse (`severitySplit`).
+ * the three nuclear accidents, the two droughts — at `degrees` of warming.
+ * A flood, storm or drought row's weight grows by its own
+ * `ChanceIncreasePerDegree` (`warmedWeight`); the eruptions and the accidents
+ * carry no such column and hold still.
  */
-export function eventRows(phase: number): EventRow[] {
+export function eventRows(degrees: number): EventRow[] {
   const rows: EventRow[] = [];
-  floodWeights(phase).forEach((weight, sev) => rows.push({ family: 'flood', sev, weight }));
+  floodWeights(degrees).forEach((weight, sev) => rows.push({ family: 'flood', sev, weight }));
   KILIMANJARO_WEIGHT.forEach((weight, sev) => rows.push({ family: 'kilimanjaro', sev, weight }));
   ERUPTION_WEIGHT.forEach((weight, sev) => rows.push({ family: 'volcano', sev, weight }));
-  stormWeights(phase).forEach((weight, sev) => rows.push({ family: 'storm', sev, weight }));
+  stormWeights(degrees).forEach((weight, sev) => rows.push({ family: 'storm', sev, weight }));
   ACCIDENT_WEIGHT.forEach((weight, sev) => rows.push({ family: 'accident', sev, weight }));
-  DROUGHT_WEIGHT.forEach((weight, sev) => rows.push({ family: 'drought', sev, weight }));
+  DROUGHT_WEIGHT.forEach((w, sev) => rows.push({ family: 'drought', sev, weight: warmedWeight(w, DROUGHT_CIPD[sev], degrees) }));
   return rows;
 }
 
@@ -343,10 +395,11 @@ interface ReactorSite {
 }
 
 /** The sites every row can strike this turn. A storm or a drought is ONE site
- *  when its terrain exists anywhere (the centre is drawn after); a flood has
- *  one per river (`floodSites`), Kilimanjaro's eruption one per Kilimanjaro
- *  plot, an eruption one per volcano, an accident one per city whose reactor
- *  has reached the row's `MinTurnAtRisk`, in ascending centre order. */
+ *  when its start plot exists anywhere (the centre is drawn after); a flood
+ *  has one per river (`floodSites`), Kilimanjaro's eruption one per
+ *  Kilimanjaro plot, an eruption one per volcano, an accident one per city
+ *  whose reactor has reached the row's `MinTurnAtRisk` — whoever holds it, the
+ *  Free Cities seat included — in ascending centre order. */
 interface EventSites {
   flood: Tile[];
   kilimanjaro: Tile[];
@@ -359,7 +412,7 @@ interface EventSites {
 function eventSites(state: GameState): EventSites {
   const map = state.map;
   const reactors: ReactorSite[] = [];
-  for (const s of state.seats) {
+  for (const s of cityHolders(state)) {
     for (const city of s.cities) {
       if (city.reactorAge !== undefined) reactors.push({ seat: s.seat, city });
     }
@@ -397,7 +450,7 @@ function siteCount(sites: EventSites, row: EventRow): number {
  * drought's centre is a second draw over their start plots.
  */
 function randomEvent(state: GameState, strip: boolean): void {
-  const rows = eventRows(state.climateIdx ?? -1);
+  const rows = eventRows(warmingDegrees(state));
   const sites = eventSites(state);
   const count = rows.map((row) => siteCount(sites, row));
   const cum: number[] = [];
@@ -417,7 +470,6 @@ function randomEvent(state: GameState, strip: boolean): void {
 }
 
 function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number, strip: boolean): void {
-  const map = state.map;
   switch (row.family) {
     case 'flood': {
       const start = sites.flood[k];
@@ -426,11 +478,11 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
       return;
     }
     case 'kilimanjaro': {
-      erupt(state, sites.kilimanjaro[k], KILIMANJARO_SOIL_P[row.sev]);
+      erupt(state, sites.kilimanjaro[k], eruptionRow('kilimanjaro', row.sev));
       return;
     }
     case 'volcano': {
-      erupt(state, sites.volcano[k], SOIL_PAINT_P[row.sev]);
+      erupt(state, sites.volcano[k], eruptionRow('volcano', row.sev));
       return;
     }
     case 'storm': {
@@ -446,13 +498,7 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
     case 'drought': {
       const center = pick(state, sites.drought);
       if (!center) return;
-      const turns = DROUGHT_DURATION[row.sev];
-      for (const t of stormFootprint(map, center, DROUGHT_HEXES)) {
-        if (isWater(t)) continue;
-        t.droughtTurns = Math.max(t.droughtTurns, turns);
-        if (strip) defertilize(t);
-      }
-      log(state, `Drought around (${center.col}, ${center.row}) — food suffers for ${turns} turns.`);
+      drought(state, center, row.sev, strip);
       return;
     }
     case 'accident': {
@@ -464,21 +510,97 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
 }
 
 /**
- * AN ERUPTION of a volcano or of Kilimanjaro. CIV6 (`RandomEvent_Yields`
- * FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): one draw per eligible ring plot,
- * in ring order, at the row's paint chance `paintP`; then the ring is
- * scorched and fertilized.
+ * A DROUGHT of severity `sev` centred on `center`: its footprint is the first
+ * `DROUGHT_HEXES` slots of `STORM_DISC`, water skipped, each plot in the
+ * disc's order (`droughtTile`).
  */
-export function erupt(state: GameState, volcano: Tile, paintP: number): void {
+export function drought(state: GameState, center: Tile, sev: number, strip: boolean): void {
+  const turns = DROUGHT_DURATION[sev];
+  for (const t of stormFootprint(state.map, center, DROUGHT_HEXES)) {
+    if (isWater(t)) continue;
+    droughtTile(state, t, sev, turns, strip);
+  }
+  log(state, `Drought around (${center.col}, ${center.row}) — food suffers for ${turns} turns.`);
+}
+
+/**
+ * ONE drought plot at severity `sev`. ONE draw, always, whatever stands there.
+ * The plot dries for the row's turns; a listed improvement is pillaged
+ * (SPECIFIC_IMPROVEMENT_PILLAGED 100) and, at the row's
+ * SPECIFIC_IMPROVEMENT_DESTROYED chance, taken away instead; a warmed world
+ * strips the plot's silt.
+ */
+function droughtTile(state: GameState, t: Tile, sev: number, turns: number, strip: boolean): void {
+  const rDestroy = nextRandom(state);
+  t.droughtTurns = Math.max(t.droughtTurns, turns);
+  if (t.improvement && DROUGHT_IMPROVEMENTS.includes(t.improvement) && !envImmune(state, t)) {
+    t.pillaged = true;
+    if (rDestroy < DROUGHT_DESTROY_P[sev]) destroyImprovement(state, t);
+  }
+  if (strip) defertilize(t);
+}
+
+/**
+ * AN ERUPTION of a volcano or of Kilimanjaro, at `ERUPTION_ROWS` row `row`.
+ * CIV6 (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): one
+ * draw per eligible ring plot, in ring order, at the row's paint chance; then
+ * each ring plot, in ring order, takes the row's damage (`eruptTile`) and is
+ * fertilized.
+ */
+export function erupt(state: GameState, volcano: Tile, row: number): void {
   const ring = neighbors(state.map, volcano);
   for (const n of ring) {
-    if (soilPaintable(n) && nextRandom(state) < paintP) paintVolcanicSoil(n);
+    if (soilPaintable(n) && nextRandom(state) < ERUPTION_PAINT_P[row]) paintVolcanicSoil(n);
   }
   for (const n of ring) {
-    scorch(state, n);
+    eruptTile(state, n, row);
     fertilize(state, n);
   }
   log(state, `Volcanic eruption at (${volcano.col}, ${volcano.row}) — slopes scorched, soil enriched.`);
+}
+
+/**
+ * ONE eruption's damage on one ring plot — the row's `RandomEvent_Damages`
+ * applied as the flood's are, on every plot of the ring whoever owns it.
+ * SIX draws per plot, always, whatever stands there: improvement destroyed,
+ * district pillaged, buildings pillaged, the HP band, civilian killed,
+ * population. The improvement is pillaged outright (IMPROVEMENT_PILLAGED 100
+ * on every row); the land units and a city centre take the band
+ * (UNIT_DAMAGE_LAND, CITY_GARRISON, CITY_WALLS, Percentage 100); no row names
+ * UNIT_DAMAGE_NAVAL, so a hull on a water plot is untouched.
+ */
+function eruptTile(state: GameState, tile: Tile, row: number): void {
+  const rDestroy = nextRandom(state);
+  const rDistrict = nextRandom(state);
+  const rBldg = nextRandom(state);
+  const rDamage = nextRandom(state);
+  const rCivilian = nextRandom(state);
+  const rPop = nextRandom(state);
+  scorch(state, tile);
+  if (rDestroy < ERUPTION_DESTROY_P[row]) destroyImprovement(state, tile);
+  if (rDistrict < ERUPTION_DISTRICT_P[row]) pillageDistrict(state, tile);
+  if (rBldg < ERUPTION_BLDG_P[row]) pillageTileBuildings(state, tile);
+  const dmg = ERUPTION_DMG_LO[row]
+    + Math.floor(rDamage * (ERUPTION_DMG_HI[row] - ERUPTION_DMG_LO[row] + 1));
+  if (dmg > 0) hitCityCentre(state, tile, dmg);
+  strikeUnits(state, tile, tileSeat(tile), {
+    land: dmg > 0, naval: false, civ: rCivilian < ERUPTION_CIV_KILL_P[row], landDmg: dmg, navalDmg: 0,
+  }, null);
+  if (rPop < ERUPTION_POP_P[row]) losePopulation(state, tile);
+}
+
+/** CIV6 (Nuclear accident): each city's reactor ages one turn for every turn
+ *  since its plant was built, converted to, or last recommissioned. A city
+ *  with no plant has no reactor, and a plant lost with the building takes its
+ *  clock with it. Every holder's cities age, the Free Cities' included. */
+export function ageReactors(cities: readonly City[]): void {
+  for (const city of cities) {
+    if (city.buildings.includes('NUCLEAR_POWER_PLANT')) {
+      city.reactorAge = (city.reactorAge ?? 0) + 1;
+    } else if (city.reactorAge !== undefined) {
+      city.reactorAge = undefined;
+    }
+  }
 }
 
 /**
@@ -517,7 +639,9 @@ export function disasterPhase(state: GameState): void {
     if ((t.falloutTurns ?? 0) > 0) t.falloutTurns = (t.falloutTurns ?? 0) - 1;
   }
 
-  randomEvent(state, strip);
+  // CIV6 (RANDOM_EVENT_START_TURN): no event fires before its first turn, and
+  // no draw is spent
+  if (state.turn >= RANDOM_EVENT_START_TURN) randomEvent(state, strip);
   // CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
   // storm lives three turns. ENTRY: the footprint at the strike plot.
   // MOVEMENT: the centre walks `STORM_MOVEMENT` unit steps, then the
@@ -574,17 +698,10 @@ export function stormWalk(state: GameState, center: Tile, ev: StormEvent): Tile 
   return center;
 }
 
-/** [8] the storm rows' weights at this climate phase: `severitySplit` over
- *  each family's (severity 1, severity 2) pair. */
-export function stormWeights(phase: number): number[] {
-  const out = STORM_EVENTS.map((ev) => ev.weight);
-  for (const fam of STORM_FAMILIES) {
-    const [a, b] = stormFamilyPair(fam);
-    const sp = severitySplit([STORM_EVENTS[a].weight, STORM_EVENTS[b].weight], phase);
-    out[a] = sp[0];
-    out[b] = sp[1];
-  }
-  return out;
+/** [8] the storm rows' weights at `degrees` of warming: each row's own
+ *  `ChanceIncreasePerDegree` on its weight (`warmedWeight`). */
+export function stormWeights(degrees: number): number[] {
+  return STORM_EVENTS.map((ev) => warmedWeight(ev.weight, ev.cipd, degrees));
 }
 
 /** The first `hexes` slots of `STORM_DISC` around a centre, on-map ones only,
@@ -659,39 +776,17 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
   const pillP = lowland && ev.lowlandPill > 0 ? ev.lowlandPill : ev.impPill;
   const distP = lowland && ev.lowlandDist > 0 ? ev.lowlandDist : ev.distPill;
   if (rPill < pillP) scorch(state, tile);
-  if (rDestroy < ev.impDest && tile.improvement && !envImmune(state, tile)) {
-    tile.improvement = null;
-    tile.pillaged = false;
-  }
+  if (rDestroy < ev.impDest) destroyImprovement(state, tile);
   if (rDistrict < distP) pillageDistrict(state, tile);
   if (rBldgS < ev.bldgPill) pillageTileBuildings(state, tile);
-  if (rPop < ev.pop) {
-    const home = seatOf(state, owner)?.cities.find((c) => c.id === tile.ownerCity);
-    if (home && home.population > 1) {
-      home.population -= 1;
-      logPopWrite(state, home, 'ds');
-      (state.aidHit ??= []).push(owner);  // CIV6 (Aid Request trigger)
-    }
-  }
-  const landHit = rLand < ev.landP;
-  const navalHit = rNaval < ev.navalP;
-  const landDmg = ev.landLo + Math.floor(rHp * (ev.landHi - ev.landLo + 1));
-  const navalDmg = ev.navalLo + Math.floor(rHp * (ev.navalHi - ev.navalLo + 1));
-  for (const u of [...unitsAt(state, tile.index)]) {
-    const dom = unitDomain(u.type);
-    if (dom === 'air' || dom === 'spy') continue;
-    if (stormSpares(state, u.seat, ev)) continue;
-    if (dom === 'civilian') {
-      if (rCivilian < ev.civKill) disbandUnit(state, u.id);
-      continue;
-    }
-    const naval = !!UNITS[u.type]?.naval;
-    if (!(naval ? navalHit : landHit)) continue;
-    const base = naval ? navalDmg : landDmg;
-    const dmg = base + Math.floor(base * stormExtraPct(state, u.seat, owner, ev) / 100);
-    u.hp -= dmg;
-    if (u.hp <= 0) disbandUnit(state, u.id);
-  }
+  if (rPop < ev.pop) losePopulation(state, tile);
+  strikeUnits(state, tile, owner, {
+    land: rLand < ev.landP,
+    naval: rNaval < ev.navalP,
+    civ: rCivilian < ev.civKill,
+    landDmg: ev.landLo + Math.floor(rHp * (ev.landHi - ev.landLo + 1)),
+    navalDmg: ev.navalLo + Math.floor(rHp * (ev.navalHi - ev.navalLo + 1)),
+  }, ev);
   // FERTILITY, each yield its own roll — or, past Phase IV, the reverse:
   // CIV6 "all Storms and Droughts now start removing fertility from tiles
   // instead of adding it".

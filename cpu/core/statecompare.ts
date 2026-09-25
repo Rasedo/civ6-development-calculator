@@ -53,6 +53,7 @@ import { FEATURES } from '../../world/features';
 import { ROUTE_CHAIN_MAX } from './trade';
 import { GP_CITY_PERM, GP_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { laserSpeed } from './yields';
+import { scoreLines } from './score';
 import { emptyStockpile } from '../data/constants';
 
 // the exported feature index (FEAT_IDS order = the catalog's own)
@@ -72,7 +73,7 @@ import { buildingCostIn } from './rules';
 import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
-import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN, MINOR_BUILD_ROWS } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
 
@@ -492,6 +493,8 @@ const SEAT: Record<string, Extractor> = {
   warWeariness: overSeats((s) => wwPairs(s.ww, (v) => v !== 0)),
   warWearinessTurn: overSeats((s) => wwPairs(s.wwTurn, (v) => v >= 0)),
   eraScore: overSeats((s) => s.eraScore ?? 0),
+  eraScorePast: overSeats((s) => s.eraScorePast ?? 0),
+  score: overSeats((s, state) => scoreLines(state, s)),
   age: overSeats((s) => s.age ?? 1),
   governmentsHeld: overSeats((s) => s.government.held ?? 0),
   // the SLOTTED cards as a sorted index set — the stored decision
@@ -656,6 +659,9 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorOuterHp: overCityStates((cityState) => cityState.outerHp ?? 0),
   religionPressure: overCityStates((cityState, st) => perCiv(st, (seat) => cityState.religionPressure?.[seat] ?? 0)),
   lastLevyTurn: overCityStates((cityState) => cityState.lastLevyTurn ?? -LEVY_COOLDOWN),
+  minorBuildFrom: overCityStates((cityState) => cityState.buildFrom ?? MINOR_BUILD_ROWS.map(() => 0)),
+  minorArmyCap: overCityStates((cityState) => cityState.armyCap ?? -1),
+  minorBuildersTrained: overCityStates((cityState) => cityState.buildersTrained),
   warTurns: overCityStates((cityState, state) => warClockLine(state, cityState.seat)),
   treatyTurns: overCityStates((cityState, state) => treatyClockLine(state, cityState.seat)),
 };

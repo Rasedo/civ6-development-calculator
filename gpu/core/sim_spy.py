@@ -223,7 +223,7 @@ class SimSpy:
                 ok = maj & (mine if mdef["athome"] else ~mine)
                 di = mdef["district"]
                 if mdef.get("anyDistrict", 0):
-                    pass  # the counterspy post guards whichever district it stands on
+                    pass  # the counterspy post stands on any district of the city
                 elif di >= 0:
                     ok = ok & (under_d == di) & under_live
                 else:
@@ -568,8 +568,8 @@ class SimSpy:
         (`spyCaptured`)."""
         # CIV6 (Spies and Espionage): a spy "may gain levels from
         # successful offensive operations, or capturing an enemy Spy" —
-        # the post that made the catch likelier is the one that earns it,
-        # and the first of them by slot is the captor on both engines.
+        # the post that made the catch likelier is the one that earns it:
+        # the pursuer, the first guarding post (the highest level).
         if posted.numel():
             self._level_up_spy(b, int(posted[0]))
         # CIV6: captured spies "are imprisoned, but not killed", and the
@@ -751,18 +751,22 @@ class SimSpy:
         self._promo_offer_draw(one, torch.full((self.B,), v, dtype=torch.long, device=self.device))
 
     def _counterspies_guarding(self, b: int, hr: int, hc: int, t: int) -> torch.Tensor:
-        """the holder's counterspy posts that DEFEND the district at `t`: a
-        post guards the district it stands on, and CIV6 (Surveillance) "When
-        Counterspying all city districts are defended" (`counterspiesGuarding`)."""
+        """the holder's counterspy posts that DEFEND the district at `t`,
+        highest level first, ties in slot order — the first is the post that
+        pursues. CIV6 (LOC_ESPIONAGECHOOSER_COUNTERSPY): a post will "Protect
+        {1_District} (and all adjacent districts) from enemy spies" — the
+        district it stands on and every district within 1 of it; and
+        (Surveillance) "When Counterspying all city districts are defended"
+        (`counterspiesGuarding`)."""
         posts = (self._spies_of(hr)[b]
                  & (self.unit_spy_mission[b] == self._spy_m_counterspy)).nonzero(as_tuple=True)[0]
         keep = []
         for u in posts.tolist():
             ut = int(self.unit_tile[b, u])
-            if not self._city_holds_tile(b, hr, hc, ut):
-                continue
-            if ut == t or self._spy_promo_sum(b, u, "SPY_SURVEIL") > 0:
+            if int(self.pair_dist[ut, t]) <= 1 or (
+                    self._city_holds_tile(b, hr, hc, ut) and self._spy_promo_sum(b, u, "SPY_SURVEIL") > 0):
                 keep.append(u)
+        keep.sort(key=lambda u: -min(int(self.unit_spy_level[b, u]), self._spy_max_level))  # stable: ties keep slot order
         return torch.tensor(keep, dtype=torch.long, device=self.device)
 
     def _counter_levels(self, b: int, hr: int, hc: int, t: int = -1) -> int:

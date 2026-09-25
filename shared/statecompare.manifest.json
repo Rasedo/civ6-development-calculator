@@ -759,6 +759,24 @@
           ]
         },
         {
+          "name": "eraScorePast",
+          "compare": "exact",
+          "covers": [
+            "Seat.eraScorePast"
+          ],
+          "planes": [
+            "era_score_past"
+          ]
+        },
+        {
+          "name": "score",
+          "compare": "exact",
+          "covers": [],
+          "planes": [],
+          "derived": true,
+          "note": "Civ 6's Score, one value per ScoringLineItems row in the exported order (count x Multiplier x the category's Multiplier). Derived on both engines (`scoreLines` / `score_lines`) from state the digest already compares, and compared every turn because it is what the turn-limit victory ranks: two engines can agree on every input and still count a district, a wonder or a belief differently."
+        },
+        {
           "name": "governmentsHeld",
           "compare": "exact",
           "covers": [
@@ -1656,6 +1674,37 @@
           "planes": [
             "citystate_last_levy"
           ]
+        },
+        {
+          "name": "minorBuildFrom",
+          "compare": "exact",
+          "covers": [
+            "CityState.buildFrom"
+          ],
+          "planes": [
+            "citystate_build_from"
+          ],
+          "note": "the episode's draws: per build-table row the turn from which it wants its item (-1 never, 0 for a row that draws none); zeros until the minor's first build draws them."
+        },
+        {
+          "name": "minorArmyCap",
+          "compare": "exact",
+          "covers": [
+            "CityState.armyCap"
+          ],
+          "planes": [
+            "citystate_army_cap"
+          ],
+          "note": "the army the minor keeps, drawn once; -1 until drawn."
+        },
+        {
+          "name": "minorBuildersTrained",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "citystate_builders_trained"
+          ],
+          "note": "the Builders the minor has trained, which price its next (`builderCost`); the Seat field a minor's record carries."
         },
         {
           "name": "warTurns",
@@ -3009,10 +3058,6 @@
       {
         "plane": "civ_congress_vote",
         "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary and there is no TS field to compare it against."
-      },
-      {
-        "plane": "winner",
-        "why": "the winner is DERIVED, not stored, on the TS side — domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache would mean recomputing that derivation in the adapter. The manifest describes STATE; a derived quantity is compared through the observation that reads it."
       },
       {
         "plane": "centre_slot_at",

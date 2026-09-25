@@ -17,6 +17,7 @@
  */
 
 import type { CityStateType, DistrictId, YieldKey } from '../core/types';
+import type { PromoClass } from './promotions';
 import { type SrcMap, srcConst, xml } from './provenance';
 
 export const CITY_STATE_TYPES: CityStateType[] = [
@@ -48,8 +49,7 @@ export const CITY_STATE_TYPE_DISTRICT: Record<CityStateType, DistrictId> = {
 
 // CIV6 (Rise and Fall): the 3-/6-envoy bonuses key to the type district's
 // TIER-1 / TIER-2 building. Either member of an exclusive pair carries the
-// bonus (a city holds at most one of the pair), and the minor's own build
-// ladder takes the FIRST tier-1 member — a model choice.
+// bonus (a city holds at most one of the pair).
 export const CITY_STATE_TYPE_TIER1: Record<CityStateType, readonly string[]> = {
   scientific: ['LIBRARY'],
   cultural: ['AMPHITHEATER'],
@@ -292,6 +292,11 @@ export const CITY_STATE_DISTRICT_BONUS = 2;
 export const SUZERAIN_ENVOYS = 3;
 export const QUEST_COOLDOWN = 12;
 export const QUEST_ENVOYS = 1;
+/** CIV6 (Quests_Text.xml, LOC_QUEST_CLEAR_BARBARIAN_CAMP_DESCRIPTION):
+ *  "Destroy one Barbarian Outpost within 5 tiles of the city." */
+export const QUEST_CAMP_RADIUS = srcConst('cityState.questCampRadius', 5, {
+  pedia: 'Quests_Text.xml LOC_QUEST_CLEAR_BARBARIAN_CAMP_DESCRIPTION: "within 5 tiles of the city"',
+});
 export const CITY_STATE_MAX_HP = 150;
 /** CIV6 (Eras.xml `BonusMinorStartingUnits`, "Additional Starting Units for
  *  Minor Civilizations in addition to their Settler"): an Ancient-era start
@@ -314,10 +319,10 @@ export const MINOR_STARTING_UNITS = srcConst('cityState.startingUnits', 2, {
  *  BUILDING_WALLS, BUILDING_CASTLE and BUILDING_STAR_FORT (this engine's
  *  three walls rows); `MINOR_CIV_PRODUCTION_HARBORS` is
  *  `MODIFIER_PLAYER_CITIES_ADJUST_DISTRICT_PRODUCTION` +500 toward
- *  DISTRICT_HARBOR. The trait's Builder (+200), military-unit (+200 under
- *  PLAYER_HAS_SMALL_MILITARY) and upgrade-discount rows reach nothing while a
- *  minor trains no unit. No difficulty row touches a minor: the
- *  HIGH_DIFFICULTY_* scaling rows attach to TRAIT_LEADER_MAJOR_CIV alone. */
+ *  DISTRICT_HARBOR; `MINOR_CIV_PRODUCTION_BUILDERS` and
+ *  `MINOR_CIV_PRODUCTION_MILITARY` below are the unit rows. No difficulty row
+ *  touches a minor: the HIGH_DIFFICULTY_* scaling rows attach to
+ *  TRAIT_LEADER_MAJOR_CIV alone. */
 export const MINOR_PRODUCTION_PCT = srcConst('cityState.productionPct', -50,
   xml('ModifierArguments', 'ModifierId=MINOR_CIV_PRODUCTION_PENALTY&Name=Amount', 'Value'));
 export const MINOR_WALLS_PROD_PCT = srcConst('cityState.wallsProdPct', 200,
@@ -341,6 +346,207 @@ export const MINOR_TYPE_DISTRICT_PROD_PCT: Record<CityStateType, number> = {
   religious: srcConst('cityState.typeDistrictProdPct.religious', 500,
     xml('ModifierArguments', 'ModifierId=MINOR_CIV_RELIGIOUS_HOLY_SITE_PRODUCTION&Name=Amount', 'Value')),
 };
+/** CIV6 (Leaders.xml, MINOR_CIV_PRODUCTION_BUILDERS):
+ *  `MODIFIER_PLAYER_UNITS_ADJUST_UNIT_PRODUCTION` UnitType UNIT_BUILDER Amount
+ *  200 — toward a Builder. */
+export const MINOR_BUILDER_PROD_PCT = srcConst('cityState.builderProdPct', 200,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_PRODUCTION_BUILDERS&Name=Amount', 'Value'));
+/** CIV6 (Leaders.xml, MINOR_CIV_PRODUCTION_MILITARY):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_MILITARY_UNITS_PRODUCTION` Amount 200 toward
+ *  a military unit, under PLAYER_HAS_SMALL_MILITARY — the inverse of
+ *  REQUIREMENT_PLAYER_HAS_AT_LEAST_NUM_MILITARY_UNITS Amount 10, so while the
+ *  minor holds fewer than ten military units. */
+export const MINOR_MILITARY_PROD_PCT = srcConst('cityState.militaryProdPct', 200,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_PRODUCTION_MILITARY&Name=Amount', 'Value'));
+export const MINOR_SMALL_MILITARY = srcConst('cityState.smallMilitary', 10,
+  xml('RequirementArguments', 'RequirementId=REQUIRES_PLAYER_HAS_SMALL_MILITARY&Name=Amount', 'Value'));
+
+/** CIV6 (AiFavoredItems, ListType MinorCivDistricts, the default minor
+ *  trait's `Districts` list): the sixteen districts a GS minor disfavours —
+ *  every type's district (each type's own list re-favours its own), the
+ *  Aqueduct, and the rest of the late or civ-level districts. The census saw
+ *  no minor build another type's district, so the build table holds the
+ *  type's district, the Harbor and the Neighborhood and no row of this list. */
+export const MINOR_DISFAVORED_DISTRICTS: readonly DistrictId[] = srcConst('cityState.disfavoredDistricts', [
+  'HOLY_SITE', 'CAMPUS', 'ENCAMPMENT', 'AERODROME', 'COMMERCIAL_HUB', 'ENTERTAINMENT_COMPLEX',
+  'THEATER_SQUARE', 'INDUSTRIAL_ZONE', 'AQUEDUCT', 'SPACEPORT', 'GOVERNMENT_PLAZA', 'WATER_PARK',
+  'CANAL', 'DAM', 'DIPLOMATIC_QUARTER', 'PRESERVE',
+], {
+  derived: 'the Item column of every AiFavoredItems row with ListType MinorCivDistricts and Favored false, '
+    + 'as engine district ids (THEATER is THEATER_SQUARE, GOVERNMENT GOVERNMENT_PLAZA, '
+    + 'WATER_ENTERTAINMENT_COMPLEX WATER_PARK)',
+  inputs: ['HOLY_SITE', 'CAMPUS', 'ENCAMPMENT', 'AERODROME', 'COMMERCIAL_HUB', 'ENTERTAINMENT_COMPLEX', 'THEATER',
+    'INDUSTRIAL_ZONE', 'AQUEDUCT', 'SPACEPORT', 'GOVERNMENT', 'WATER_ENTERTAINMENT_COMPLEX', 'CANAL', 'DAM',
+    'DIPLOMATIC_QUARTER', 'PRESERVE'].map((d) => xml('AiFavoredItems',
+    `ListType=MinorCivDistricts&Item=DISTRICT_${d}`, 'Favored', { expect: false })),
+}) as readonly DistrictId[];
+
+/** CIV6 (AiFavoredItems, ListType MinorCivUnitBuilds, Value -100): a minor
+ *  trains no Recon and no carrier. */
+export const MINOR_EXCLUDED_UNIT_CLASSES: readonly PromoClass[] = srcConst('cityState.excludedUnitClasses',
+  ['RECON', 'NAVAL_CARRIER'], {
+    derived: 'the Item column of the AiFavoredItems rows with ListType MinorCivUnitBuilds (Value -100), '
+      + 'as engine promotion classes',
+    inputs: ['RECON', 'NAVAL_CARRIER'].map((c) => xml('AiFavoredItems',
+      `ListType=MinorCivUnitBuilds&Item=PROMOTION_CLASS_${c}`, 'Value', { expect: -100 })),
+  }) as readonly PromoClass[];
+
+/**
+ * THE MINOR'S BUILD TABLE — what a city-state's city produces, fitted to the
+ * watched games (C-38's census: `runs/cs_watch_*.jsonl`, 250 minor-games with
+ * a known opening; the fit is `tools/civ6lab/minor_build_fit.py`). OWNER
+ * 2026-09-23: a minor's behaviour is the environment an agent trains against,
+ * so what the install does not publish is fitted to the lab records and
+ * randomised per episode where the records give a spread.
+ *
+ * Every turn the minor's Production goes toward the FIRST row that wants an
+ * item it can make now, under that item's toward-row; the item completes when
+ * the pot covers it, one a turn. A turn no row wants banks the Production
+ * (the census: 21.7% of turns to t101 build nothing, and an item that opens
+ * after such a stretch completes at once — the walls in one turn, with no Gold
+ * spent).
+ *
+ * A row with `from` is DRAWN once per episode, at the minor's first build:
+ * one of twenty equally likely slots, the turn from which the row wants its
+ * item, -1 never. An opening row's slots are 0 or -1 — the share of minors
+ * that complete the item by turn 100 (Kaplan-Meier over the watches). A
+ * development row's slots are the quantiles of the turn it first STARTS
+ * (turn 4 on; the turn-2 pick is abandoned after one turn in every game),
+ * censored at the minor's last record, and -1 where the estimate stops
+ * reaching (fewer than eight minors left in the watch). A `byType` row takes
+ * the minor's type's id and slots.
+ *
+ * The rows are in the order the census's medians start them. What the census
+ * holds that this table does not: the Trader (a minor runs no trade route in
+ * this engine), the district projects and the repair project (no minor
+ * project), the Factory, Research Lab, Stock Exchange and Broadcast Center
+ * (each draws Power, and a minor's grid is C-1's), the worship buildings, the
+ * Flood Barrier and the Food Market, the Aqueduct (disfavoured), and naval
+ * units. MinorCivPseudoYields' PSEUDOYIELD_TOURISM -200 names no row here: no
+ * item in the table pays Tourism.
+ */
+export interface MinorBuildRow {
+  kind: 'builder' | 'unit' | 'building' | 'district' | 'army';
+  /** a building or district row's item, per minor type; null = nothing this
+   *  engine hosts for the type */
+  item?: Readonly<Record<CityStateType, string | null>>;
+  /** a unit row's promotion class: it trains while the minor's military count
+   *  is below `below`, or with no `below` while no unit of the class stands */
+  cls?: PromoClass;
+  below?: number;
+  /** a drawn row's twenty slots, per minor type */
+  from?: Readonly<Record<CityStateType, readonly number[]>>;
+}
+
+/** the slots a drawn row carries */
+export const MINOR_BUILD_SLOTS = 20;
+const NEVER: readonly number[] = Array<number>(MINOR_BUILD_SLOTS).fill(-1);
+const every = <T,>(v: T): Record<CityStateType, T> =>
+  Object.fromEntries(CITY_STATE_TYPES.map((t) => [t, v])) as Record<CityStateType, T>;
+/** one census fit, the same for every type */
+const slots = (name: string, v: readonly number[]) => every(srcConst(`cityState.build.${name}`, v, { lab: 'C-38' }));
+/** one census fit per type */
+const slotsByType = (name: string, v: Record<CityStateType, readonly number[]>) =>
+  Object.fromEntries(CITY_STATE_TYPES.map((t) => [t, v[t] === NEVER ? NEVER
+    : srcConst(`cityState.build.${name}.${t}`, v[t], { lab: 'C-38' })])) as Record<CityStateType, readonly number[]>;
+
+export const MINOR_BUILD_ROWS: readonly MinorBuildRow[] = [
+  // a Builder while none stands: 554 of 557 Builder runs began with none
+  { kind: 'builder' },
+  { kind: 'building', item: every('MONUMENT'),
+    from: slots('MONUMENT', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1]) },
+  // the third military unit beside the two it starts with (165 of the 190
+  // first Warriors were started with two standing)
+  { kind: 'unit', cls: 'MELEE', below: 3,
+    from: slots('MELEE', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1]) },
+  { kind: 'building', item: every('GRANARY'),
+    from: slots('GRANARY', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1]) },
+  // a ranged unit while none stands
+  { kind: 'unit', cls: 'RANGED',
+    from: slots('RANGED', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1]) },
+  { kind: 'district', item: CITY_STATE_TYPE_DISTRICT, from: slotsByType('typeDistrict', {
+    scientific: [15, 16, 16, 17, 17, 19, 22, 23, 26, 28, 28, 34, 36, 46, 52, 53, 56, -1, -1, -1],
+    cultural: [44, 45, 45, 46, 49, 52, 55, 59, 63, 66, 80, 86, 95, -1, -1, -1, -1, -1, -1, -1],
+    trade: [43, 45, 51, 54, 56, 57, 58, 64, 68, 80, 83, 96, -1, -1, -1, -1, -1, -1, -1, -1],
+    industrial: [70, 74, 79, 83, 84, 114, 137, 143, 150, 150, 160, 162, -1, -1, -1, -1, -1, -1, -1, -1],
+    militaristic: [52, 62, 73, 98, 100, 119, 119, 148, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    religious: [11, 14, 15, 16, 18, 19, 21, 22, 26, 27, 28, 28, 33, 41, 64, 72, -1, -1, -1, -1],
+  }) },
+  { kind: 'building', item: {
+    scientific: 'LIBRARY', cultural: 'AMPHITHEATER', trade: 'MARKET', industrial: 'WORKSHOP',
+    militaristic: 'BARRACKS', religious: 'SHRINE',
+  }, from: slotsByType('typeTier1', {
+    scientific: [17, 24, 28, 35, 36, 39, 42, 43, 50, 52, 53, 65, 71, 75, 78, 83, -1, -1, -1, -1],
+    cultural: [45, 46, 46, 47, 59, 72, 77, 83, 85, 94, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    trade: [44, 52, 56, 56, 59, 60, 64, 67, 70, 85, 91, 98, -1, -1, -1, -1, -1, -1, -1, -1],
+    industrial: [143, 145, 145, 159, 178, 178, 180, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    militaristic: [53, 84, 101, 104, 104, 125, 167, 167, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    religious: [20, 24, 32, 36, 42, 43, 50, 54, 57, 64, 67, 74, 80, 100, -1, -1, -1, -1, -1, -1],
+  }) },
+  { kind: 'building', item: every('WATER_MILL'),
+    from: slots('WATER_MILL', [38, 41, 45, 48, 50, 54, 56, 58, 63, 74, 118, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
+  { kind: 'district', item: every('HARBOR'),
+    from: slots('HARBOR', [38, 44, 54, 60, 67, 171, 205, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
+  { kind: 'building', item: every('ANCIENT_WALLS'),
+    from: slots('ANCIENT_WALLS', [47, 51, 53, 54, 55, 57, 58, 60, 62, 63, 64, 65, 67, 68, 70, 72, 74, 79, 88, -1]) },
+  { kind: 'building', item: every('LIGHTHOUSE'),
+    from: slots('LIGHTHOUSE', [40, 50, 59, 68, 81, 214, 244, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
+  // the industrial second tier, the Factory, draws Power (C-1)
+  { kind: 'building', item: {
+    scientific: 'UNIVERSITY', cultural: 'MUSEUM', trade: 'BANK', industrial: null,
+    militaristic: 'ARMORY', religious: 'TEMPLE',
+  }, from: slotsByType('typeTier2', {
+    scientific: [81, 97, 100, 104, 104, 107, 107, 107, 107, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    cultural: [98, 101, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    trade: NEVER,
+    industrial: NEVER,
+    militaristic: [89, 114, 114, 148, 148, 175, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    religious: [66, 69, 71, 73, 75, 77, 77, 78, 82, 84, 91, 101, -1, -1, -1, -1, -1, -1, -1, -1],
+  }) },
+  { kind: 'building', item: every('MEDIEVAL_WALLS'),
+    from: slots('MEDIEVAL_WALLS', [82, 86, 90, 92, 92, 93, 94, 96, 97, 98, 99, 101, 104, 107, 108, 110, 112, 115, -1, -1]) },
+  // the third tier: the Research Lab, Stock Exchange and Broadcast Center draw
+  // Power (C-1), and the religious one is a worship building
+  { kind: 'building', item: { ...every<string | null>(null), militaristic: 'MILITARY_ACADEMY' },
+    from: slotsByType('typeTier3', { ...every(NEVER),
+      militaristic: [136, 136, 138, 172, 172, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1] }) },
+  { kind: 'building', item: every('RENAISSANCE_WALLS'),
+    from: slots('RENAISSANCE_WALLS', [110, 118, 121, 123, 125, 126, 129, 130, 130, 131, 132, 135, 138, 138, 140, 141, 146, 151, -1, -1]) },
+  { kind: 'building', item: every('SHIPYARD'),
+    from: slots('SHIPYARD', [135, 144, 161, 204, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
+  { kind: 'district', item: every('NEIGHBORHOOD'),
+    from: slots('NEIGHBORHOOD', [147, 158, 166, 169, 175, 179, 180, 195, 204, 215, 218, 226, -1, -1, -1, -1, -1, -1, -1, -1]) },
+  { kind: 'building', item: every('SEWER'),
+    from: slots('SEWER', [174, 177, 183, 189, 193, 199, 203, 207, 208, 211, 212, 224, 250, -1, -1, -1, -1, -1, -1, -1]) },
+  { kind: 'building', item: every('SEAPORT'),
+    from: slots('SEAPORT', [223, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
+  // a military unit while the army is below the episode's cap
+  { kind: 'army' },
+];
+
+/** The army the minor keeps: it trains a military unit while it holds fewer
+ *  than this, drawn once per episode — one more than the largest land army a
+ *  minor started a post-opening military unit at (turns 20-100), the smallest
+ *  it idled at where it started none; 226 minor-games. */
+export const MINOR_ARMY_CAP_SLOTS = srcConst('cityState.armyCapSlots',
+  [1, 1, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 7], { lab: 'C-38' });
+
+/** The army row's class: the one the army holds fewest of against these
+ *  weights — the census's post-opening military starts by class (Recon's one
+ *  start aside: MinorCivUnitBuilds) — then the strongest chassis of it. */
+export const MINOR_ARMY_CLASSES: readonly (readonly [PromoClass, number])[] = [
+  ['RANGED', 140], ['SIEGE', 97], ['ANTICAV', 92], ['HEAVY_CAV', 65], ['MELEE', 50], ['LIGHT_CAV', 14],
+];
+
+/** A minor's Builder lays an improvement on a turn with this chance (per
+ *  mille): three charges over its standing span, whose median is 11 turns
+ *  over 934 spans — the rate whose third success has that median. */
+export const MINOR_BUILDER_RATE_PERMILLE = srcConst('cityState.builderRatePermille', 236, { lab: 'C-38' });
+/** ...on the minor's own plots within this many tiles of its centre, where its
+ *  Builders stand 94% of their turns. WHICH plot and improvement is
+ *  unmeasured (LAB C-38-S1), so the pick is one draw over every valid pair. */
+export const MINOR_BUILDER_RADIUS = srcConst('cityState.builderRadius', 2, { lab: 'C-38' });
+
 export const LEVY_UNITS = 2;
 export const LEVY_GOLD_COST = 120;
 export const LEVY_COOLDOWN = 20;

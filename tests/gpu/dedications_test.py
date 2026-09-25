@@ -304,12 +304,34 @@ def main() -> None:
     assert not bool(sim._governor_tiles(row, sim.city_alive[:, row]).any()), "a NORMAL age paid the golden clause"
     print("wish governor wonder tourism ok")
 
+    # ---- Pen, Brush and Voice: a building with a Great Work slot ----------
+    # CIV6: "+1 Era Score for constructing a building with a Great Work Slot";
+    # the Marae, the Maori Amphitheater, carries no Building_GreatWorks row.
+    yes = torch.ones(B, dtype=torch.bool)
+    amph = torch.full((B,), holder_bidx(sim, "AMPHITHEATER"), dtype=torch.long)
+    temple = torch.full((B,), holder_bidx(sim, "TEMPLE"), dtype=torch.long)
+    maori = sim._civ_idx("MAORI")
+    assert maori >= 0, "the roster carries no Maori"
+    assert any(c == maori for (_b, c) in sim._bvar_no_gw), "the Marae declares its slots"
+    civ0 = sim.row_civ[:, row].clone()
+    sim.row_civ[:, row] = 0 if maori != 0 else 1
+    commit(sim, row, sim._ded_pen_brush)
+    sim._building_dedications(row, amph, yes)
+    assert score(sim, row) == sim._ded_event_score[sim._ded_pen_brush], score(sim, row)
+    sim.row_civ[:, row] = maori
+    commit(sim, row, sim._ded_pen_brush)
+    sim._building_dedications(row, amph, yes)
+    assert score(sim, row) == 0, "the Marae holds no Great Work slot, and pays nothing"
+    sim._building_dedications(row, temple, yes)
+    assert score(sim, row) == sim._ded_event_score[sim._ded_pen_brush], "the Maori Temple keeps its slot"
+    sim.row_civ[:, row] = civ0
+    print("pen brush great-work building ok")
+
     # ---- Sky and Stars ------------------------------------------------------
     # CIV6: "+1 Era Score for each Aerodrome building constructed. +1 Era Score
     # each time a Great Person is Earned."
     aero_b = [b for b in range(sim.NB) if int(sim._b_req_district[b]) == sim._aerodrome_didx]
     assert aero_b, "the catalog carries no Aerodrome building"
-    yes = torch.ones(B, dtype=torch.bool)
     commit(sim, row, sim._ded_sky)
     sim._building_dedications(row, torch.full((B,), aero_b[0], dtype=torch.long), yes)
     assert score(sim, row) == sim._ded_event_score[sim._ded_sky], score(sim, row)

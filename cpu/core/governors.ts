@@ -1,11 +1,11 @@
-import type { City, GameState, Governor, Seat, Tile } from './types';
+import { addYields, emptyYields, type City, type GameState, type Governor, type Seat, type Tile, type Yields } from './types';
 import { cityAtTile, citiesOf, isCityStateSeat, seatOf } from './seats';
 import { hexDistance, neighbors } from '../../world/hex';
 import { type FeatureAppealRow } from '../data/civilizations';
 import { GP_CITY_PERM } from '../data/greatPeople';
 import type { GpAppeal } from './appeal';
 import { seatBuildingSum, cityHasPark } from './city';
-import { cityDistrictSum } from './yields';
+import { cityDistrictSum, darkBuildings } from './yields';
 import { congressGovernorFavorType } from './congress';
 import { getModifiers } from './effects';
 import {
@@ -207,6 +207,24 @@ export function governorMult(state: GameState, city: City, pick: (e: GovernorEff
   let m = 1;
   for (const e of cityGovernorEffects(state, city)) m *= pick(e) ?? 1;
   return m;
+}
+
+/** CIV6 (MODIFIER_BUILDING_YIELD_CHANGE on a promotion — Industrialist's
+ *  plants, Renewable Subsidizer's Dam): what the named buildings of this city
+ *  pay on top while its established governor holds the promotion. A dark
+ *  building (a pillaged district's, or pillaged itself) pays nothing, and the
+ *  change stays with the governed city whatever reach the building has. */
+export function governorBuildingYields(state: GameState, city: City): Yields {
+  const out = emptyYields();
+  const fx = cityGovernorEffects(state, city);
+  if (!fx.some((e) => e.buildingYields)) return out;
+  const dark = darkBuildings(state.map, city);
+  for (const e of fx) {
+    for (const [id, y] of Object.entries(e.buildingYields ?? {})) {
+      if (city.buildings.includes(id) && !dark.has(id)) addYields(out, y);
+    }
+  }
+  return out;
 }
 
 /** Is any established governor flag set in this city? */

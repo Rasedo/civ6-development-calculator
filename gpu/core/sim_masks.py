@@ -323,10 +323,16 @@ class SimMasks:
             tier = torch.maximum(tier, torch.where(bl[:, bi], torch.full_like(tier, t),
                                                    torch.zeros_like(tier)))
         if self._urban_def_tech >= 0:
-            # a MAJOR's tech; the Free Cities row researches nothing, so its
+            # the holder's own research: a major's `civ_techs`, a city-state's
+            # `citystate_techs`; the Free Cities row researches nothing, so its
             # city keeps the walls it has (`seatOf(FREE_SEAT).research` is empty)
             major = r0 < self.n_majors
             urban = self.civ_techs[b, r0.clamp(max=self.n_majors - 1), self._urban_def_tech] & major
+            if self.S > 0:
+                s0 = r0 - self._CITY_MINOR0
+                minor = (s0 >= 0) & (s0 < self.S)
+                urban = urban | (minor & self.citystate_techs[b, s0.clamp(min=0, max=self.S - 1),
+                                                              self._urban_def_tech])
             tier = torch.where(urban, torch.full_like(tier, self._walls_tier_urban), tier)
         return torch.where((row >= 0) & (col >= 0), tier, torch.zeros_like(tier))
 
@@ -1224,9 +1230,12 @@ class SimMasks:
                    levied: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `rosterCS`: the flat Combat Strength a unit's
         civilization or leader adds under its row's clause (`COMBAT_CS_ROWS`):
-        against a city-state's unit, a wounded one, a city or district, for a
-        class, on a coastal tile (a hull on Coast, a land unit on coastal
-        land, never embarked)."""
+        against a city-state, a wounded unit, a district opponent (`foe_city`:
+        the city it assaults or the city whose strike it takes), for a class,
+        on a coastal tile (a hull on Coast, a land unit on coastal land, never
+        embarked). One composer for attacker and defender: no row's
+        requirement set carries REQUIREMENT_PLAYER_IS_ATTACKING, so only the
+        opponent's kind selects."""
         z = torch.zeros(seat.shape, dtype=torch.long, device=self.device)
         # CIV6 (The Raven King): ABILITY_THE_RAVEN_KING gives a LEVIED unit
         # EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5. Flat and clause-free
@@ -1270,11 +1279,13 @@ class SimMasks:
             elif when == 4:
                 who = who & on_coast
             elif when == 5:
-                # CIV6 (Swift Hawk): a HEROIC age is a golden one on both
-                # engines, so the age plane alone answers
+                # CIV6 (Swift Hawk, REQUIREMENTSET_TEST_ANY): the Free Cities,
+                # or a civilization in a golden age — a HEROIC age is a
+                # golden one on both engines, so the age plane answers
                 _fr = foe_seat.clamp(min=0, max=self.n_majors - 1).reshape(self.B, -1)
                 _fg = self.civ_age.gather(1, _fr).reshape(foe_seat.shape) == 2
-                who = who & (foe_seat >= 0) & (foe_seat < self.n_majors) & _fg
+                who = who & ((foe_seat == FREE_SEAT)
+                             | ((foe_seat >= 0) & (foe_seat < self.n_majors) & _fg))
             elif when == 6:
                 # CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
                 who = who & self._seat_on_home_continent(seat, tc.reshape(seat.shape))
@@ -1718,21 +1729,28 @@ class SimMasks:
                 & ~self.district_pillaged)
 
     def _trade_walkable(self, rows: torch.Tensor, tiles: torch.Tensor, water: torch.Tensor) -> torch.Tensor:
-        """`tradeWalkable` — may a Trader at this water level stand here?
+        """`tradeWalkable` — may a Trader at this water level stand here? A
+        portal's mountain is ground to walk onto, as it is to every unit.
         `water` broadcasts against `tiles`."""
-        return (
+        out = (
             self.passable[rows, tiles]
             | ((water >= 1) & self.wpass[rows, tiles]
                & (~self.ocean_tile[rows, tiles] | (water >= 2)))
         )
+        if self._imp_portal_any:
+            imp = self.improvement[rows, tiles]
+            out = out | (self._imp_portal[imp.clamp(min=0)] & (imp >= 0))
+        return out
 
     def _trade_walk_step(self, rows: torch.Tensor, cur: torch.Tensor, target: torch.Tensor,
                          water: torch.Tensor) -> torch.Tensor:
         """ONE step of a Trader's walk (`tradeWalkStep`): the walkable
         neighbour strictly closer to `target` by hexDistance, ties by
         direction order — the war-march's integer rule, so both engines agree
-        by construction. Arrived or stuck rows return `cur` unchanged.
-        Zero draws, integer-only."""
+        by construction — and, standing on a portal, its exit as a seventh
+        candidate after the six (CIV6: "Trade Routes traveling through it").
+        Arrived or stuck rows return `cur` unchanged. Zero draws,
+        integer-only."""
         dev = self.device
         ar6 = torch.arange(6, device=dev)
         nb = self.neigh[cur.clamp(min=0)]
@@ -1741,9 +1759,13 @@ class SimMasks:
         d_nb = self.pair_dist[target.clamp(min=0).unsqueeze(1), nbc].to(torch.long)
         d_cur = self.pair_dist[target.clamp(min=0), cur.clamp(min=0)].to(torch.long)
         key = torch.where(okn & (d_nb < d_cur.unsqueeze(1)), d_nb * 8 + ar6, 10**9)
-        best = key.min(dim=1).values
+        pex = self._portal_exit(cur.clamp(min=0), rows)
+        d_px = self.pair_dist[target.clamp(min=0), pex.clamp(min=0)].to(torch.long)
+        key7 = torch.where((pex >= 0) & (d_px < d_cur), d_px * 8 + 6, 10**9)
+        best = torch.minimum(key.min(dim=1).values, key7)
         ok = (cur >= 0) & (target >= 0) & (cur != target) & (best < 10**9)
         nxt = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
+        nxt = torch.where(best % 8 == 6, pex, nxt)
         return torch.where(ok, nxt, cur)
 
     def _trade_walk_ok(self, rows: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor,
@@ -2381,24 +2403,34 @@ class SimMasks:
         self.major_unit_mp[rows, slots] = full[rows, slots]
         self.major_unit_mp_full[rows, slots] = full[rows, slots]
 
-    def _portal_exit(self, tiles: torch.Tensor) -> torch.Tensor:
-        """[B] — where a portal step from `tiles` comes out, -1 if nowhere.
+    def _portal_plane(self) -> torch.Tensor:
+        """[B, T] bool — `portalAt`: a MOUNTAIN_PORTAL row (the Tunnel,
+        Qhapaq Ñan) stands here."""
+        imp = self.improvement
+        return self._imp_portal[imp.clamp(min=0)] & (imp >= 0)
 
-        The NEXT tunnel on the same mountain range by ascending tile index,
-        wrapping to the lowest. `portalExit`'s twin: the action space carries
-        six directions and no target, so the exit has to be deterministic, and
-        wrapping-next reaches every portal on the range where a fixed "lowest"
-        would make one tunnel a hub (a MODEL choice)."""
+    def _portal_exit(self, tiles: torch.Tensor, rows: torch.Tensor | None = None) -> torch.Tensor:
+        """[B] (or [n] for the game `rows`, one per tile) — where a portal
+        step from `tiles` comes out, -1 if nowhere.
+
+        The NEXT portal on the same mountain range by ascending tile index,
+        wrapping to the lowest; every MOUNTAIN_PORTAL row is one network.
+        `portalExit`'s twin: the action space carries six directions and no
+        target, so the exit has to be deterministic, and wrapping-next reaches
+        every portal on the range where a fixed "lowest" would make one portal
+        a hub (a MODEL choice)."""
         out = torch.full_like(tiles, -1)
-        if self.TUNNEL < 0:
+        if not self._imp_portal_any:
             return out
-        tun = self.improvement == self.TUNNEL                    # [B, T]
-        if not bool(tun.any()):
+        plane = self._portal_plane()                             # [B, T]
+        if not bool(plane.any()):
             return out
+        tun = plane if rows is None else plane[rows]             # [n, T]
+        rng = self.tile_range if rows is None else self.tile_range[rows]
         idx = torch.arange(self.T, device=self.device).unsqueeze(0)
         here = tiles.clamp(min=0).unsqueeze(1)
-        rng_here = self.tile_range.gather(1, tiles.clamp(min=0).unsqueeze(1))
-        same = tun & (self.tile_range == rng_here) & (rng_here >= 0) & (idx != here)
+        rng_here = rng.gather(1, tiles.clamp(min=0).unsqueeze(1))
+        same = tun & (rng == rng_here) & (rng_here >= 0) & (idx != here)
         BIG = self.T + 1
         up = torch.where(same & (idx > here), idx, torch.full_like(idx, BIG)).min(dim=1).values
         lo = torch.where(same, idx, torch.full_like(idx, BIG)).min(dim=1).values
@@ -2420,12 +2452,18 @@ class SimMasks:
         elif type_idx.dim() == 0:
             type_idx = type_idx.expand(self.B)
         pre = "major"
+        # a CITY-STATE's row trains into the majors' pool too, under its seat
+        # id 100 + s (`minorBuild`); a major's row IS its seat
+        seat = int(self._ROW_SEAT[row])
+        minor = row >= self.n_majors
         is_civ_u = self._type_civilian[type_idx.clamp(min=0)]
         ti_n = type_idx.clamp(min=0, max=self.NU - 1)
         no_hold = (self._type_air[ti_n] > 0) | (ti_n == self._spy_idx)
         naval_m = self.unit_naval[ti_n] & mask
-        cart = self._row_ocean_open_naval(row)
-        found, spot = self._first_free_spot(at_tile, row, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
+        # a minor trains no hull (its build table holds land units alone)
+        cart = (torch.zeros(self.B, dtype=torch.bool, device=self.device) if minor
+                else self._row_ocean_open_naval(row))
+        found, spot = self._first_free_spot(at_tile, seat, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
                                             utype=type_idx,
                                             sup_mask=self._type_support[type_idx.clamp(min=0)])
         if bool(no_hold.any()):
@@ -2448,7 +2486,7 @@ class SimMasks:
         rows = can.nonzero(as_tuple=True)[0]
         if self._log_diff:
             for _sb in rows.tolist():
-                _rank = int((self.unit_alive[_sb] & (self.unit_seat[_sb] == row)).sum())
+                _rank = int((self.unit_alive[_sb] & (self.unit_seat[_sb] == seat)).sum())
                 self._diff_events.setdefault(_sb, []).append(
                     f"sp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
                     f":{int(at_tile[_sb])}:{int(type_idx[_sb])}"
@@ -2457,13 +2495,15 @@ class SimMasks:
         slot = nxt[rows]
         assert int(slot.max()) < simbase.MAJOR_POOL_MAX, "major slot pool exhausted — raise simbase.MAJOR_POOL_MAX"
         getattr(self, f"{pre}_unit_alive")[rows, slot] = True
-        self.major_unit_seat[rows, slot] = row
+        self.major_unit_seat[rows, slot] = seat
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx[rows]
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot[rows]
-        self._reveal_around(rows, row, spot[rows],
-                            self._unit_sight(type_idx[rows], torch.zeros_like(slot),
-                                             torch.full_like(slot, row), rows),
-                            see_through=self._type_see_through[type_idx[rows].clamp(min=0, max=self.NU - 1)])
+        # revealAround is a MAJOR's alone ("nothing reads a city-state's fog")
+        if not minor:
+            self._reveal_around(rows, row, spot[rows],
+                                self._unit_sight(type_idx[rows], torch.zeros_like(slot),
+                                                 torch.full_like(slot, row), rows),
+                                see_through=self._type_see_through[type_idx[rows].clamp(min=0, max=self.NU - 1)])
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1
@@ -2535,7 +2575,11 @@ class SimMasks:
                 _spy_lvl = _spy_lvl + _sw.long() * _sn
         getattr(self, f"{pre}_unit_spy_level")[rows, slot] = _spy_lvl
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
-        getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx, at_tile)[rows]
+        # `extraCharges` of a minor is 0: it holds no wonder, card, roster row
+        # or governor-held city
+        if not minor:
+            _ch = _ch + self._extra_charges(row, type_idx, at_tile)[rows]
+        getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch
         off = self.POOL_LO[pre]
         # ONE occupancy writer, the one every other caller uses. `_occ_set`
         # makes the three-way split on the stacking class (`_type_civilian` is
@@ -2548,6 +2592,11 @@ class SimMasks:
         if len(_hold) > 0:
             self._occ_set(_hold, spot[_hold], nxt[_hold] + off)
         nxt[rows] += 1
+        # a minor's centre stands on its own strength (`minorCityCS`), and no
+        # chassis it trains climbs in price, so neither tally below has a
+        # minor column
+        if minor:
+            return can
         # track the seat's strongest MELEE ever fielded (city defense) — a
         # civilian's combat 0 never raises it. Gated on `can` like TS: a
         # no-spot spawn never lands the unit.
@@ -2850,9 +2899,9 @@ class SimMasks:
 
         Civilopedia (Gathering Storm): MONUMENTALITY is "+2 Movement for all
         Builders", EXODUS OF THE EVANGELISTS "+2 Movement for all Missionaries,
-        Apostles, and Inquisitors" — this roster has no INQUISITOR. Keyed on the
-        unit's OWN seat, so every seat in a Golden age gets it on the same rule;
-        barbarians and city-states hold no dedications."""
+        Apostles, and Inquisitors" (`Expansion1_Moments.xml`'s UNIT_IS_RELIGIOUS).
+        Keyed on the unit's OWN seat, so every seat in a Golden age gets it on the
+        same rule; barbarians and city-states hold no dedications."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         out = torch.zeros_like(typ)
         if self._golden_move <= 0:
@@ -2862,7 +2911,7 @@ class SimMasks:
         civ = torch.where(civ_ok, seat, torch.zeros_like(seat))
         for kind, types in (
             (self._ded_monumentality, (self._builder_idx,)),
-            (self._ded_exodus, (self._missionary_idx, self._apostle_idx)),
+            (self._ded_exodus, (self._missionary_idx, self._apostle_idx, self._inquisitor_idx)),
         ):
             tsel = None
             for t in types:
@@ -3142,12 +3191,12 @@ class SimMasks:
         _jmp = ((ut == self._gdr_idx) & self._gdr_row_up(row, self._gdr_u_moves).unsqueeze(1)).unsqueeze(2)
         if bool(_jmp.any()):
             terr = terr | (_jmp & self.tile_mountain.gather(1, nbc).reshape(B, N, 6))
-        # CIV6 (Mountain Tunnel): "allowing units to move into it" — a tunnelled
-        # mountain is ENTERABLE by anything, and only that. It rides the jump's
-        # site rather than `passable` because fourteen exported flags derive
-        # from impassability and none of them should move.
-        if self.TUNNEL >= 0:
-            terr = terr | (self.improvement.gather(1, nbc).reshape(B, N, 6) == self.TUNNEL)
+        # CIV6 (Mountain Tunnel, Qhapaq Ñan): "allowing units to move into it"
+        # — a portal's mountain is ENTERABLE by anything, and only that. It
+        # rides the jump's site rather than `passable` because fourteen
+        # exported flags derive from impassability and none of them should move.
+        if self._imp_portal_any:
+            terr = terr | self._portal_plane().gather(1, nbc).reshape(B, N, 6)
         _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
         # ONE call with the mover's own class flags: the flags are per-unit
         # tensors the rule already accepts, so no class needs a call of its own.
@@ -3239,6 +3288,11 @@ class SimMasks:
                 & (self.built_wonder.gather(1, tc) < 0)      # an in-flight wonder pave refuses improvements
             )
             farmable = self._farm_ground(row, civics).gather(1, tc)
+            # CIV6 (LOC_UNITOPERATION_IMPROVEMENT_BLOCKED_BY_DROUGHT): a
+            # drought's own improvements wait for the rain (`droughtBars`)
+            dry_here = (self.drought > 0).gather(1, tc)
+            if self.FARM in self._drought_imps:
+                farmable = farmable & ~dry_here
             build_f = (here_ok & farmable).unsqueeze(2)
             build_m = (here_ok & self._plane_seen("mine_ok", row).gather(1, tc) & mining).unsqueeze(2)
             build_l = (here_ok & self._plane_seen("lumber_ok", row).gather(1, tc) & ~self.feat_stripped.gather(1, tc) & constr).unsqueeze(2)
@@ -3257,12 +3311,14 @@ class SimMasks:
             & ~self._congress_chop(self.feat_id.gather(1, tc))[0]
         ).unsqueeze(2)
         # REPAIR (`builderRepair`): a builder on an OWN tile whose improvement
-        # or district is pillaged. No charge is spent — the turn is.
+        # or district is pillaged, and no drought holding its improvement
+        # (`droughtBars`). No charge is spent — the turn is.
         repair = (
             present
             & ((utype == self._builder_idx) if self._builder_idx >= 0 else torch.zeros_like(present))
             & own_tile.gather(1, tc)
             & (self.pillaged.gather(1, tc) | self.district_pillaged.gather(1, tc))
+            & ~self._drought_barred().gather(1, tc)
         ).unsqueeze(2)
         # THE MILITARY ENGINEER'S GROUND (`engineerTileOk`): the WIDEST its
         # rows reach is "your own or neutral territory", so the ownership term
@@ -3330,8 +3386,8 @@ class SimMasks:
                     _base_live = int(self._imp_built_by[_k]) in _utyp
                 elif self._imp_suz[_k] or self._imp_uniq[_k] >= 0:
                     _base_live = _any_here
-                elif _k == self.TUNNEL:
-                    _base_live = int(self._eng_idx) in _utyp
+                elif self._imp_adj_plot[_k]:
+                    _base_live = int(self._eng_idx if self._imp_eng[_k] else self._builder_idx) in _utyp
                 elif self._imp_eng[_k]:
                     _base_live = _any_eng
                 else:
@@ -3367,12 +3423,13 @@ class SimMasks:
                     _ok = here_ok & self._suz_improvement_ok(row, _k).gather(1, tc)
                 elif self._imp_uniq[_k] >= 0:
                     _ok = here_ok & self._uniq_improvement_ok(row, _k).gather(1, tc)
-                elif _k == self.TUNNEL:
-                    # CIV6 (Mountain Tunnel): "Can only be built on an adjacent
-                    # Mountain tile" — the engineer stands OFF the mountain, so
-                    # the ground rule is about a NEIGHBOUR, not this tile. The
-                    # applier writes the lowest-index bare adjacent mountain
-                    # (`tunnelTarget`'s twin).
+                elif self._imp_adj_plot[_k]:
+                    # CIV6 (Mountain Tunnel, Qhapaq Ñan): "Can only be built on
+                    # an adjacent Mountain tile" — the unit stands OFF the
+                    # mountain, so the ground rule is about a NEIGHBOUR, not
+                    # this tile. The applier writes the lowest-index bare
+                    # adjacent mountain (`adjacentPlotTarget`'s twin); the row's
+                    # own unit, unlock and leader are `adjacentPlotRowOk`'s.
                     _tnb = self.neigh[tc.reshape(-1)].reshape(tc.shape + (6,))
                     _tnc = _tnb.clamp(min=0)
                     _tflat = _tnc.reshape(B, -1)
@@ -3387,7 +3444,13 @@ class SimMasks:
                             & (self.improvement.gather(1, _tflat).reshape(_tnb.shape) < 0)
                             & _tterr
                             & (_tnb >= 0))
-                    _ok = (present & (utype == self._eng_idx) & (u_charges > 0)
+                    _uc = int(self._imp_unlock_civic[_k])
+                    if _uc >= 0:
+                        _unl = _unl & self.civ_civics[:, row, _uc].unsqueeze(1)
+                    if self._imp_uniq_leader[_k] >= 0:
+                        _unl = _unl & self._row_is(row, -1, self._imp_uniq_leader[_k]).unsqueeze(1)
+                    _who = self._eng_idx if self._imp_eng[_k] else self._builder_idx
+                    _ok = (present & (utype == _who) & (u_charges > 0)
                            & _unl & _tmt.any(dim=-1))
                 elif self._imp_eng[_k]:
                     _who = (utype == self._eng_idx) & _unl
@@ -3413,6 +3476,8 @@ class SimMasks:
                            & self._imp_gov_ok(row, _k).gather(1, tc))
                 else:
                     _ok = here_ok & (_rq == _k) & _unl
+                if _k in self._drought_imps:
+                    _ok = _ok & ~(self.drought > 0).gather(1, tc)
                 _res_cols.append(_ok.unsqueeze(2))
         # PILLAGE needs a WAR with the tile's owner, city-state owners
         # included — `phase.ts`'s replay arm re-validates exactly this and
@@ -3727,14 +3792,15 @@ class SimMasks:
                        else torch.zeros_like(present))
                     & (u_charges > 0)
                     & self._wonder_charge_at(row).gather(1, tc)).unsqueeze(2)]
-        # CIV6 (Mountain Tunnel): "move into it and exit from another portal at
-        # the cost of 2 Movement" — offered where the unit STANDS on a tunnel,
-        # another portal shares its range, and the 2 Movement is affordable.
-        # The applier asks `_portal_exit` too, so a legal column cannot land in
-        # no arm.
+        # CIV6 (Mountain Tunnel, Qhapaq Ñan): "move into it and exit from
+        # another portal at the cost of 2 Movement" — offered where the unit
+        # STANDS on a portal, another shares its range, and the 2 Movement is
+        # affordable. The applier asks `_portal_exit` too, so a legal column
+        # cannot land in no arm.
         _pt: list[torch.Tensor] = []
         if self._A_PORTAL >= 0:
-            _pex = self._portal_exit(tc.reshape(-1)).reshape(tc.shape)
+            _prow = torch.arange(B, device=dev).repeat_interleave(tc.shape[1])
+            _pex = self._portal_exit(tc.reshape(-1), _prow).reshape(tc.shape)
             _pt = [(present & (_pex >= 0)
                     & (self.unit_mp.gather(1, sc) >= self._portal_mp * self._mp_scale)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []

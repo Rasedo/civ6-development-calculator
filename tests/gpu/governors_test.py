@@ -9,7 +9,7 @@ Every poke builds a BatchSim from a fixture, forces state in-memory, then
 drives the exact engine twin (_transfer_city, the step-tail era boundary,
 _seat_city_loyalty/_seat_loyalty_flips, _seat_phase). EVERY constant comes from rules.json
 through the engine's own loaders (sim._era_len/_era_dark/_era_gold/_era_pts/
-_gov_title_civics/_gov_loy/_age_factor) — nothing is hardcoded.
+_gov_title_civics/_gov_loy/_age_pressure/_citizen_press_*) — nothing is hardcoded.
 
 Covered:
   a. Event hooks: _transfer_city bumps the RECEIVER's era_score by the
@@ -19,8 +19,8 @@ Covered:
   b. Boundary math: at a turn that crosses a multiple of eras.length each seat's
      new-era Age comes from the just-ended window's score — darkT-1→Dark,
      darkT→Normal, goldenT-1→Normal, goldenT→Golden — then era_score resets 0.
-  c. Age pressure: the seat-0 loyalty twin's pressure scales every SOURCE
-     seat's contribution by its age factor (Dark ½ / Normal 1 / Golden 1½);
+  c. Age pressure: in the seat-0 loyalty twin every SOURCE seat's citizens
+     press at base + capital + its age term (Dark -½ / Normal 0 / Golden +½);
      asserted by an EXACT reconstruction across five age combos
      (quantized-milli).
   d. Governor pick: one title per NAMED civic appoints one governor, and each
@@ -74,30 +74,30 @@ def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float) -> None:
 
 
 def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
-    """Closed-form applyLoyalty for seat-0 city c: every source contribution
-    scaled by its seat's age factor, then pressure + amenity + governor,
-    clamped. The engine twin is _seat_city_loyalty, which reads the same LIVE
-    pops this reconstruction does."""
-    rng = int(sim.rules.seats.get("loyaltyRange", 9))
-    scale = float(sim.rules.seats.get("loyaltyScale", 20))
-    af = sim._age_factor.tolist()
+    """Closed-form applyLoyalty for seat-0 city c: every source city's
+    citizens press at base + capital + its seat's age each (the Loyalty
+    pedia), then pressure + amenity + governor, clamped. The engine twin is
+    _seat_city_loyalty, which reads the same LIVE pops this reconstruction
+    does."""
+    rng = int(sim.rules.seats["loyaltyRange"])
+    scale = float(sim.rules.seats["loyaltyScale"])
+    ap = sim._age_pressure.tolist()
     sc = int(sim.city_center[0, 0, c])
-    own = 0.0
-    for cp in range(sim.RC):
-        if not bool(sim.city_alive[0, 0, cp]):
-            continue
-        w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.city_center[0, 0, cp])]))
-        own += float(sim.city_pop[0, 0, cp]) * w
-    own_eff = own * af[int(sim.civ_age[0, 0])]
-    for_eff = 0.0
-    for row in range(1, sim.n_majors):
+
+    def row_press(row: int) -> float:
         sub = 0.0
         for j in range(sim.RC):
             if not bool(sim.city_alive[0, row, j]):
                 continue
             w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.city_center[0, row, j])]))
-            sub += float(sim.city_pop[0, row, j]) * w
-        for_eff += sub * af[int(sim.civ_age[0, row])]
+            each = (sim._citizen_press_base
+                    + (sim._citizen_press_cap if bool(sim.city_is_cap[0, row, j]) else 0.0)
+                    + ap[int(sim.civ_age[0, row])])
+            sub += float(sim.city_pop[0, row, j]) * each * w
+        return sub
+
+    own_eff = row_press(0)
+    for_eff = sum(row_press(row) for row in range(1, sim.n_majors))
     tot = own_eff + for_eff
     press = scale * (own_eff - for_eff) / tot if tot > 0 else 0.0
     amen = float(sim._loyalty_amenity[tier_idx_c])
@@ -136,8 +136,8 @@ def two_city_setup(rules, path):
     add_seat0_city(sim, cols[1], nb[1], 4, 59.0)
     # GUARANTEE FOREIGN PRESSURE. Loyalty pressure is a RATIO —
     # `scale * (own - foreign) / (own + foreign)` — so with foreign == 0 it is
-    # `own/own` and the SOURCE-seat age factor CANCELS ALGEBRAICALLY, leaving
-    # the Golden x1.5 assertion unable to fire whatever the starting loyalty.
+    # `own/own` and the SOURCE seat's age term CANCELS ALGEBRAICALLY, leaving
+    # the Golden +0.5 assertion unable to fire whatever the starting loyalty.
     # Plant a civ city in range rather than hoping a fixture parks one there.
     if sim.n_majors > 1:
         cap_tile = int(sim.city_center[0, 0, cap])
@@ -216,10 +216,10 @@ def poke_boundary(rules, path):
 
 
 def poke_age_pressure(rules, path):
-    """c. Seat-0 loyalty pressure scales each SOURCE seat's contribution by its
-    age factor — EXACT reconstruction across five (seat 0, r0, r1) age combos.
-    (1,0,0)/(1,2,2) isolate the FOREIGN source factor ½/1½; (0,1,1)/(2,1,1) the
-    OWN factor — every term is a multiple of ½ (exact f64)."""
+    """c. Seat-0 loyalty pressure takes each SOURCE seat's age into every
+    citizen's term — EXACT reconstruction across five (seat 0, r0, r1) age
+    combos. (1,0,0)/(1,2,2) isolate the FOREIGN source term -½/+½;
+    (0,1,1)/(2,1,1) the OWN term — every term is a multiple of ½ (exact f64)."""
     sim, cols = two_city_setup(rules, path)
     tier = torch.zeros(sim.B, sim.RC, dtype=torch.long)
     snap = sim.snapshot()
@@ -233,7 +233,7 @@ def poke_age_pressure(rules, path):
         for c in exp:
             got = float(sim.city_loyalty[0, 0, c])
             assert q(exp[c]) == q(got), f"age {combo} city {c}: recon {exp[c]:.5f} != engine {got:.5f}"
-    print(f"  c age pressure OK (factors {sim._age_factor.tolist()} reconstructed exactly across {len(combos)} age combos)")
+    print(f"  c age pressure OK (per-citizen terms {sim._age_pressure.tolist()} reconstructed exactly across {len(combos)} age combos)")
 
 
 def _grant_titles(sim, row: int, n: int) -> None:
@@ -340,8 +340,8 @@ def poke_seat0_golden(rules, path):
     sim.step()
     assert int(sim.civ_age[0, 0]) == 2, "goldenT flips seat 0 to Golden (the gate-unreachable axis)"
 
-    # own-pressure ×1.5: reconstruct the seat-0 loyalty at Normal vs Golden and
-    # confirm the engine matches Golden exactly (own term × af[2]=1.5).
+    # own pressure +0.5 a citizen: reconstruct the seat-0 loyalty at Normal vs
+    # Golden and confirm the engine matches Golden exactly.
     sim2, cols = two_city_setup(rules, path)
     tier = torch.zeros(sim2.B, sim2.RC, dtype=torch.long)
     snap = sim2.snapshot()
@@ -354,13 +354,13 @@ def poke_seat0_golden(rules, path):
     exp_gold = {c: recon_seat0_next(sim2, c, 0, False) for c in cols}
     apply_loyalty_row(sim2, tier)
     got_gold = {c: float(sim2.city_loyalty[0, 0, c]) for c in cols}
-    af = sim2._age_factor.tolist()
+    ap = sim2._age_pressure.tolist()
     for c in cols:
         assert q(exp_norm[c]) == q(got_norm[c]) and q(exp_gold[c]) == q(got_gold[c]), (
             f"reconstruction must match engine at both ages (city {c})"
         )
-        assert q(got_gold[c]) != q(got_norm[c]), f"Golden own-pressure (×{af[2]}) must move city {c} vs Normal"
-    print(f"  e seat-0 Golden OK (goldenT {gold} → civ_age[0]=2 reachable; own-pressure ×{af[2]} reconstructed exactly)")
+        assert q(got_gold[c]) != q(got_norm[c]), f"Golden own pressure (+{ap[2]} a citizen) must move city {c} vs Normal"
+    print(f"  e seat-0 Golden OK (goldenT {gold} → civ_age[0]=2 reachable; own pressure +{ap[2]} a citizen reconstructed exactly)")
 
 
 def poke_capital_immunity(rules, path):

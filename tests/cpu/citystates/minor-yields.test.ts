@@ -16,9 +16,10 @@ import { computeCityStats } from '../../../cpu/core/city';
 import { levyUnits } from '../../../cpu/core/phase';
 import { buildingPillaged, pillageBuilding } from '../../../cpu/core/yields';
 import { trainXpPct } from '../../../cpu/core/combat';
+import { spawnUnit } from '../../../cpu/core/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { CITIZEN_SCIENCE } from '../../../cpu/data/constants';
-import { MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
+import { MINOR_BUILD_ROWS, MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
 
@@ -77,12 +78,16 @@ describe("the minor's city rides the yield walk", () => {
     minorDistrict(state, cs, 'CAMPUS', 1);
     cs.buildings = ['LIBRARY'];
     state.turn = 1;
+    // nothing on its build table wanted: a spent Builder stands, every drawn
+    // row is never, and it keeps no army
+    spawnUnit(state, 'BUILDER', cs.centerIndex, cs.seat)!.charges = 0;
+    cs.buildFrom = MINOR_BUILD_ROWS.map((row) => (row.from ? -1 : 0));
+    cs.armyCap = 0;
     const y = computeCityStats(state, minorCity(cs)).total;
     minorPhase(state);
     expect(cs.research.techProgress).toBe(y.science);
     expect(cs.research.civicProgress).toBe(y.culture);
-    // nothing on its ladder is buildable, so the pot takes the city's
-    // Production under the minor's own percent alone
+    // so the pot takes the city's Production under the minor's own percent
     expect(cs.prodProgress).toBe(y.production * ((100 + MINOR_PRODUCTION_PCT) / 100) * 1);
     expect(cs.treasury).toBe(y.gold);
     expect(cs.faith).toBe(y.faith);
@@ -129,11 +134,16 @@ describe('a levied unit carries the training experience of the minor that raised
 });
 
 describe('power at a minor', () => {
-  it("nothing the minor's ladder builds draws or supplies Power", () => {
+  it("nothing the minor's build table raises draws or supplies Power", () => {
     // the grid has no minor arm because it would compute zero — the day the
-    // ladder reaches a building with a load, this pin fails and the arm is due
-    for (const id of ['ANCIENT_WALLS', 'MEDIEVAL_WALLS', 'RENAISSANCE_WALLS', 'LIBRARY', 'AMPHITHEATER',
-      'MARKET', 'WORKSHOP', 'BARRACKS', 'STABLE', 'SHRINE']) {
+    // table holds a building with a load, this pin fails and the arm is due
+    const ids = new Set<string>();
+    for (const row of MINOR_BUILD_ROWS) {
+      if (row.kind !== 'building') continue;
+      for (const id of Object.values(row.item ?? {})) if (id) ids.add(id);
+    }
+    expect(ids.size).toBeGreaterThan(0);
+    for (const id of ids) {
       const def = BUILDINGS[id];
       expect(def, id).toBeTruthy();
       expect(def.power ?? 0).toBe(0);

@@ -20,6 +20,7 @@ import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
 import { cityImprovedResourceKinds, cityPower, darkBuildings } from './yields';
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
+import { ageReactors } from './disasters';
 import type { City, GameState, Seat, Tile, Unit } from './types';
 
 export function strategicSlot(resourceId: string | undefined): number {
@@ -327,15 +328,8 @@ export function spendStockpile(state: GameState, seat: number, resourceId: strin
  * seat's cities in slot order, and a city the fuel no longer covers stays dark.
  */
 export function resolveSeatPower(state: GameState, seat: number): void {
+  ageReactors(citiesOf(state, seat));
   for (const city of citiesOf(state, seat)) {
-    // CIV6 (Nuclear accident): the reactor ages one turn for every turn since
-    // it was built or last recommissioned. A city with no plant has no
-    // reactor, and a plant lost with the building takes its clock with it.
-    if (city.buildings.includes('NUCLEAR_POWER_PLANT')) {
-      city.reactorAge = (city.reactorAge ?? 0) + 1;
-    } else if (city.reactorAge !== undefined) {
-      city.reactorAge = undefined;
-    }
     const p = cityPower(state, city);
     if (p.demand <= 0) {
       city.powered = false;
@@ -348,14 +342,14 @@ export function resolveSeatPower(state: GameState, seat: number): void {
     let bestFuel: string | undefined;
     let bestRate = 0;
     let bestStock = -1;
-    for (const id of p.plants) {
-      const def = BUILDINGS[id];
+    for (const plant of p.plants) {
+      const def = BUILDINGS[plant.id];
       if (!def?.fuel || !def.fuelRate) continue;
       const have = stockOf(state, seat, def.fuel);
       if (have > bestStock) {
         bestStock = have;
         bestFuel = def.fuel;
-        bestRate = def.fuelRate;
+        bestRate = plant.rate;
       }
     }
     const burn = bestFuel ? Math.ceil((p.demand - p.supply) / bestRate) : 0;

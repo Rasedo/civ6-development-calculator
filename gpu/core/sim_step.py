@@ -150,6 +150,8 @@ class SimStep:
                         torch.full_like(self.ded_picks[:, _c, _k], -1),
                     )
             self._commit_golden_grants(_era_i)
+            # the window banks into the whole game's era score, then resets
+            self.era_score_past += self.era_score
             self.era_score[:] = 0
             self._era_inspirations()
         self._world_congress()
@@ -177,18 +179,13 @@ class SimStep:
         dip = torch.where((rel >= 0) | (cul >= 0), torch.full_like(rel, -1), self._diplomatic_victor())
         self.game_over = space_won | (dom >= 0) | (rel >= 0) | (cul >= 0) | (dip >= 0) | (self.turn > self.rules.turn_limit)
         self.victory_type.copy_(torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, torch.full_like(rel, 4), torch.where(cul >= 0, torch.full_like(cul, 5), torch.where(dip >= 0, torch.full_like(dip, 6), torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))))))
-        self.victory_row.copy_(torch.where(space_won, self.victory_row, torch.where(dom >= 0, dom, torch.where(rel >= 0, rel, torch.where(cul >= 0, cul, torch.where(dip >= 0, dip, torch.full_like(dom, -1)))))))
-        # The WINNER is whoever the outcome names — `victory_row` for every
-        # condition that has a victor. Only the turn-limit score result has
-        # none, and there the score leader is the winner.
-        # `lead` is read ONLY where the game is over with no named victor —
-        # the turn-limit score finish. Gating on those exact rows (not
-        # game_over.any()) keeps three full seat_score city walks out of
-        # every turn that follows the batch's first finished game.
-        need_lead = self.game_over & (self.victory_row < 0)
-        lead = self.leader() if bool(need_lead.any()) else torch.full_like(dom, -1)
-        self.winner = torch.where(self.victory_row >= 0, self.victory_row,
-                                  torch.where(self.game_over, lead, torch.full_like(dom, -1)))
+        # THE SCORE VICTORY names the seat with the highest Civ 6 Score
+        # (`leader()`, the `scoreLeader` twin) wherever the turn limit ended
+        # the game with no other victor. `leader()` runs only on a turn where
+        # some game of the batch stands ended on the score.
+        by_score = self.victory_type == 1
+        lead = self.leader() if bool(by_score.any()) else torch.full_like(dom, -1)
+        self.victory_row.copy_(torch.where(space_won, self.victory_row, torch.where(dom >= 0, dom, torch.where(rel >= 0, rel, torch.where(cul >= 0, cul, torch.where(dip >= 0, dip, torch.where(by_score, lead, torch.full_like(dom, -1))))))))
 
         # THE POPULATION SNAPSHOT, at the census's own moment and over the
         # census's own rows — `_city_rows` walks the majors and then the Free

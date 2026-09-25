@@ -6,6 +6,7 @@ import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../
 import { regionalEffects } from '../../../cpu/core/yields';
 import { cityTradeYields } from '../../../cpu/core/trade';
 import { disasterPhase } from '../../../cpu/core/disasters';
+import { RANDOM_EVENT_START_TURN } from '../../../cpu/data/disasters';
 import { computeCityStats } from '../../../cpu/core/city';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { purchaseReligiousUnit } from '../../../cpu/core/game';
@@ -113,6 +114,7 @@ describe('Reinforced Materials', () => {
   function volcanoWorld(withGovernor: boolean) {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const city = settleAt(state, tileAtCoords(state.map, 4, 4).index, 0);
     const volcano = tileAtCoords(state.map, 8, 8);
     volcano.elevation = 'MOUNTAIN';
@@ -127,13 +129,15 @@ describe('Reinforced Materials', () => {
   it('an eruption scorches an ordinary tile', () => {
     const { state, slope } = volcanoWorld(false);
     let guard = 0;
-    while (!slope.pillaged && guard++ < 600) disasterPhase(state);
-    expect(slope.pillaged).toBe(true);
+    // pillaged on every row; a CATASTROPHIC or MEGACOLOSSAL one may take it away
+    while (!slope.pillaged && slope.improvement !== null && guard++ < 600) disasterPhase(state);
+    expect(slope.pillaged || slope.improvement === null).toBe(true);
   });
 
   it('...and leaves the governed city\'s improvement alone', () => {
     const { state, slope } = volcanoWorld(true);
     for (let i = 0; i < 600; i++) disasterPhase(state);
+    expect(slope.improvement).toBe('FARM');
     expect(slope.pillaged).toBe(false);
     expect(state.eventLog.some((e) => e.includes('eruption'))).toBe(true);
   });
@@ -141,6 +145,7 @@ describe('Reinforced Materials', () => {
   it('a flood pillages no district the promotion covers', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
     const city = settleAt(state, tileAtCoords(state.map, 4, 4).index, 0);
     const plain = tileAtCoords(state.map, 6, 6);
     plain.feature = 'FLOODPLAINS';

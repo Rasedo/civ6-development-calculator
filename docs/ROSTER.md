@@ -8,10 +8,10 @@ in git history.
 
 ## How it is read
 
-- **`docs/roster_ledger.json` is the truth.** 343 rows keyed by
+- **`docs/roster_ledger.json` is the truth.** 356 rows keyed by
   `ModifierId`, each `shipped`, `open: <AUDIT item> — <blocker>`, or `AI:`
   (a modifier that is nothing but the game's AI weighting, out of scope by
-  the owner's 2026-09-20 ruling). Today: 341 shipped, 0 open, 2 AI.
+  the owner's 2026-09-20 ruling). Today: 353 shipped, 1 open, 2 AI.
 - **`tests/cpu/data/ledger-audit.test.ts` is the guard.** Every `open:` row
   must cite an AUDIT item that exists and is not CLOSED; every `AI:` row
   must quote the ruling it rests on; no third state exists, so a deferral
@@ -37,13 +37,39 @@ Australia, Khmer and Indonesia, and the New Frontier passes) have no seat
 here, so their uniques have no row: a Hypaspist or an Immortal is out of
 scope by construction, not an open item.
 
-Trait MODIFIERS only. A seat's unique units are AUDIT C-78 and its unique
-infrastructure C-79 — their own censuses, not counted here. Agendas are the
-game's AI and out of scope by the 2026-09-20 ruling.
+Trait MODIFIERS only. A seat's unique units and unique infrastructure are
+catalog rows, not trait modifiers: they live in the unit, building, district
+and improvement catalogs, are guarded by their own tests
+(`tests/cpu/units/unique-*-units.test.ts`, `tests/cpu/city/unique-buildings`,
+`unique-districts`, `uniques-infra`, `tests/cpu/map/unique-improvements`)
+and are not counted here; a missing one is an AUDIT entry of its own.
+Agendas are the game's AI and out of scope by the 2026-09-20 ruling.
 
-## The two rows that are not `shipped`
+## The rows Gathering Storm deletes
 
-Both are out of scope by the owner's ruling of 2026-09-20 — this project
+`TRAIT_CIVILIZATION_ITERU` (Egypt) carries thirteen `TRAIT_FLOODPLAINS_VALID_*`
+modifiers: twelve in Base `Civilizations.xml` (Holy Site, Campus,
+Encampment, Commercial Hub, Entertainment Complex, Theater Square,
+Industrial Zone, Neighborhood, Aerodrome, Spaceport, Aqueduct —
+`MODIFIER_PLAYER_CITIES_ADJUST_VALID_FEATURES_DISTRICTS` — and wonders,
+`…_VALID_FEATURES_WONDERS`, each on `FEATURE_FLOODPLAINS`) and
+`…_GOVERNMENT` in `Expansion1_Civilizations.xml`. A Gathering Storm game
+never grants them: `Expansion2_RemoveData.xml` deletes all thirteen from
+the trait and from `Modifiers`, and `Expansion2_Features.xml`'s
+`Features_XP2` gives `FEATURE_FLOODPLAINS`, `_GRASSLAND` and `_PLAINS`
+`ValidDistrictPlacement` and `ValidWonderPlacement` for every
+civilization. So each row's ledger state is whether both engines do what
+Gathering Storm put in its place:
+
+- the twelve district rows are `shipped` — `canPlaceDistrictIn` has no
+  floodplain test and the exporter's `du` plane admits floodplains;
+- `TRAIT_FLOODPLAINS_VALID_WONDER` is `open` — `wonderTerrainOk` still
+  refuses a floodplain to any wonder without `allowFloodplains`.
+
+## The rows that are not `shipped`
+
+`TRAIT_FLOODPLAINS_VALID_WONDER` is open, above. The other two are out of
+scope by the owner's ruling of 2026-09-20 — this project
 models Civ 6's ENGINE, never its AI, and a diplomatic-action PREFERENCE is
 nothing but the AI's weighting of an action it might choose. Deleted, not
 parked:

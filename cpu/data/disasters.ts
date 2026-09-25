@@ -31,6 +31,31 @@ export const FLOOD_WEIGHT = srcConst('disasters.floodWeight', [2, 1.5, 1] as con
   inputs: [freq('FLOOD_MODERATE'), freq('FLOOD_MAJOR'), freq('FLOOD_1000_YEAR')],
 });
 
+/**
+ * CIV6 (`RandomEvents.ChanceIncreasePerDegree`): the percent a row's weight
+ * grows per degree of global warming — weight x (1 + CIPD/100 x degrees)
+ * (`warmedWeight`). A row without the column (the eruptions, the nuclear
+ * accidents) reads the schema's default 0 and never moves.
+ */
+const cipd = (ev: string) => xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${ev}`, 'ChanceIncreasePerDegree');
+export const FLOOD_CIPD = srcConst('disasters.floodCipd', [20, 20, 20] as const, {
+  derived: 'each flood row\'s RandomEvents.ChanceIncreasePerDegree, in severity order',
+  inputs: [cipd('FLOOD_MODERATE'), cipd('FLOOD_MAJOR'), cipd('FLOOD_1000_YEAR')],
+});
+
+/** A row's weight at `degrees` of warming: CIV6 (`ChanceIncreasePerDegree`)
+ *  "the chance of Storms, River Flooding, and Drought occurring increases"
+ *  as the CO2 rises — the column's percent per degree, on the row's own
+ *  weight. */
+export function warmedWeight(weight: number, cipdPct: number, degrees: number): number {
+  return weight * (1 + (cipdPct / 100) * degrees);
+}
+
+/** CIV6 (`RANDOM_EVENT_START_TURN`, Expansion2_GlobalParameters): the first
+ *  turn a random event may fire. */
+export const RANDOM_EVENT_START_TURN = srcConst('disasters.randomEventStartTurn', 2,
+  xml('GlobalParameters', 'Name=RANDOM_EVENT_START_TURN', 'Value'));
+
 /** DROUGHT_MAJOR / DROUGHT_EXTREME: weights 23 / 5, each counted once; the
  *  footprint is `Hexes` 7 (the first seven `STORM_DISC` slots, the centre and
  *  its ring) and the dry spell lasts `Duration` 5 / 10 turns. */
@@ -44,11 +69,100 @@ export const DROUGHT_DURATION = srcConst('disasters.droughtDuration', [5, 10] as
   inputs: [drought('DROUGHT_MAJOR', 'Duration'), drought('DROUGHT_EXTREME', 'Duration')],
 });
 export const DROUGHT_HEXES = srcConst('disasters.droughtHexes', 7, drought('DROUGHT_MAJOR', 'Hexes'));
+export const DROUGHT_CIPD = srcConst('disasters.droughtCipd', [0, 50] as const, {
+  derived: 'the two drought rows\' RandomEvents.ChanceIncreasePerDegree, MAJOR then EXTREME',
+  inputs: [drought('DROUGHT_MAJOR', 'ChanceIncreasePerDegree'), drought('DROUGHT_EXTREME', 'ChanceIncreasePerDegree')],
+});
 
-/** CIV6 (`RandomEvent_Terrains`): a drought starts on Plains or Grassland,
- *  flat or hills — the four rows both drought events list. */
-export function droughtCandidate(t: { terrain: string; elevation: string }): boolean {
+/** CIV6 (`RandomEvent_Terrains`): the ground a drought starts on — Plains or
+ *  Grassland, flat or hills, the four rows both drought events list. Static;
+ *  the exporter ships it as the `dc` plane. */
+export function droughtTerrain(t: { terrain: string; elevation: string }): boolean {
   return (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation !== 'MOUNTAIN';
+}
+
+/** A plot a drought may centre on now: its terrain, above ground, and
+ *  CIV6 (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP) "Drought targets areas
+ *  that are devoid of all Features" — no feature of any kind stands there. */
+export function droughtCandidate(t: {
+  terrain: string; elevation: string; feature: string | null; submerged?: boolean;
+}): boolean {
+  return droughtTerrain(t) && t.feature === null && !t.submerged;
+}
+
+/**
+ * CIV6 (`RandomEvent_PillagedImprovements`, every layer a Gathering Storm game
+ * loads): the improvements a drought pillages at SPECIFIC_IMPROVEMENT_PILLAGED
+ * 100 on both rows, and which "cannot be rebuilt until the Drought ends"
+ * (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP; "cannot be repaired while a
+ * drought is in progress", LOC_UNITOPERATION_REPAIR_BLOCKED_BY_DROUGHT). The
+ * install's list also names the Cahokia Mound, the Outback Station and the
+ * Hacienda, which this roster does not carry.
+ */
+const droughtImp = (imp: string) => xml('RandomEvent_PillagedImprovements',
+  `RandomEventType=RANDOM_EVENT_DROUGHT_MAJOR&ImprovementType=IMPROVEMENT_${imp}`, 'ImprovementType',
+  { expect: `IMPROVEMENT_${imp}` });
+export const DROUGHT_IMPROVEMENTS: readonly string[] = srcConst('disasters.droughtImprovements',
+  ['FARM', 'PASTURE', 'CAMP', 'PLANTATION', 'TERRACE_FARM', 'MEKEWAP'], {
+    derived: 'the RandomEvent_PillagedImprovements rows of RANDOM_EVENT_DROUGHT_MAJOR (EXTREME lists the '
+      + 'same) whose improvement this roster carries — Expansion2_RandomEvents.xml and '
+      + 'Expansion1_Expansion2.xml (the Mekewap)',
+    inputs: ['FARM', 'PASTURE', 'CAMP', 'PLANTATION', 'TERRACE_FARM', 'MEKEWAP'].map(droughtImp),
+  });
+/** SPECIFIC_IMPROVEMENT_DESTROYED by severity: MAJOR carries no row, EXTREME
+ *  30 — the chance a listed improvement is taken away instead of pillaged. */
+export const DROUGHT_DESTROY_P = srcConst('disasters.droughtDestroyP', [0, 0.3] as const, {
+  derived: 'Percentage/100 of each drought row\'s SPECIFIC_IMPROVEMENT_DESTROYED row (MAJOR carries none)',
+  inputs: [
+    xml('RandomEvent_Damages', 'RandomEventType=RANDOM_EVENT_DROUGHT_MAJOR&DamageType=SPECIFIC_IMPROVEMENT_DESTROYED',
+      'Percentage', { absent: true }),
+    xml('RandomEvent_Damages', 'RandomEventType=RANDOM_EVENT_DROUGHT_EXTREME&DamageType=SPECIFIC_IMPROVEMENT_DESTROYED',
+      'Percentage'),
+  ],
+});
+
+/** May this improvement be built or repaired on this plot now? Not a listed
+ *  one while a drought lies on it. */
+export function droughtBars(t: { droughtTurns: number }, imp: string | null): boolean {
+  return t.droughtTurns > 0 && imp !== null && DROUGHT_IMPROVEMENTS.includes(imp);
+}
+
+/**
+ * CIV6 (`Districts_XP2.PreventsDrought` on the Aqueduct, its Bath and the Dam;
+ * `Improvements_XP2.PreventsDrought` on the Stepwell): "A city with an
+ * Aqueduct, Dam, Bath District, or Stepwell improvement will not suffer the -1
+ * Food yield during a Drought, but will still have Improvements pillaged"
+ * (the Droughts pedia page). The Bath is the Aqueduct's variant on the plot.
+ */
+export const DROUGHT_SHIELD_DISTRICTS: readonly string[] = srcConst('disasters.droughtShieldDistricts',
+  ['AQUEDUCT', 'DAM'], {
+    derived: 'the districts whose Districts_XP2 row sets PreventsDrought (the Bath rides the Aqueduct row)',
+    inputs: ['AQUEDUCT', 'BATH', 'DAM'].map((d) => xml('Districts_XP2', `DistrictType=DISTRICT_${d}`,
+      'PreventsDrought', { expect: true })),
+  });
+export const DROUGHT_SHIELD_IMPROVEMENTS: readonly string[] = srcConst('disasters.droughtShieldImprovements',
+  ['STEPWELL'], {
+    derived: 'the improvements whose Improvements_XP2 row sets PreventsDrought',
+    inputs: [xml('Improvements_XP2', 'ImprovementType=IMPROVEMENT_STEPWELL', 'PreventsDrought', { expect: true })],
+  });
+
+/** Does the city owning this plot hold a drought shield — a complete,
+ *  unpillaged Aqueduct or Dam, or an unpillaged Stepwell, on any plot it
+ *  owns? A city-state's one city is its seat's plots; an unowned plot has no
+ *  city. */
+export function droughtShielded(tiles: readonly ShieldPlot[], t: ShieldPlot): boolean {
+  if (t.ownerSeat < 0) return false;
+  for (const u of tiles) {
+    if (u.ownerSeat !== t.ownerSeat || u.ownerCity !== t.ownerCity) continue;
+    if (u.district !== null && DROUGHT_SHIELD_DISTRICTS.includes(u.district)
+        && u.districtComplete && !u.districtPillaged) return true;
+    if (u.improvement !== null && DROUGHT_SHIELD_IMPROVEMENTS.includes(u.improvement) && !u.pillaged) return true;
+  }
+  return false;
+}
+interface ShieldPlot {
+  ownerSeat: number; ownerCity: number; district: string | null; districtComplete: boolean;
+  districtPillaged?: boolean; improvement: string | null; pillaged?: boolean;
 }
 
 /**
@@ -160,10 +274,13 @@ export interface StormEvent {
    *  exporter; checked by tools/civ6lab/xml_check.py. */
   src?: SrcMap;
   family: StormFamily;
-  /** the install's Severity, 1 or 2 — the climate ramp moves mass onto 2 */
+  /** the install's Severity, 1 or 2 */
   severity: 1 | 2;
   /** the weight in the turn's one draw: OccurrencesPerGame (MODERATE) */
   weight: number;
+  /** ChanceIncreasePerDegree: the percent the weight grows per degree of
+   *  warming (`warmedWeight`) — 0 on each family's milder row, 50 on its worse */
+  cipd: number;
   hexes: number;
   duration: number;
   impPill: number;
@@ -222,6 +339,7 @@ const stormSrc = (id: string, d: Partial<StormEvent>): SrcMap => {
     duration: xml('RandomEvents', ev, 'Duration'),
     weight: xml('RandomEvent_Frequencies',
       `${ev}&RealismSettingType=REALISM_SETTING_MODERATE`, 'OccurrencesPerGame'),
+    cipd: xml('RandomEvents', ev, 'ChanceIncreasePerDegree'),
     impPill: pct('IMPROVEMENT_PILLAGED'),
     impDest: pct('IMPROVEMENT_DESTROYED'),
     distPill: pct('DISTRICT_PILLAGED'),
@@ -242,10 +360,10 @@ const stormSrc = (id: string, d: Partial<StormEvent>): SrcMap => {
 };
 
 const storm = (
-  id: string, family: StormFamily, severity: 1 | 2, perGame: number, hexes: number,
+  id: string, family: StormFamily, severity: 1 | 2, perGame: number, cipdPct: number, hexes: number,
   d: Partial<StormEvent>,
 ): StormEvent => ({
-  id, family, severity, weight: perGame, hexes, duration: 3,
+  id, family, severity, weight: perGame, cipd: cipdPct, hexes, duration: 3,
   src: stormSrc(id, d),
   impPill: 0, impDest: 0, distPill: 0, bldgPill: 0, pop: 0, civKill: 0,
   landP: 0, navalP: 0, landLo: 0, landHi: 0, navalLo: 0, navalHi: 0,
@@ -253,35 +371,28 @@ const storm = (
 });
 
 export const STORM_EVENTS: readonly StormEvent[] = [
-  storm('BLIZZARD_SIGNIFICANT', 'BLIZZARD', 1, 8, 7,
+  storm('BLIZZARD_SIGNIFICANT', 'BLIZZARD', 1, 8, 0, 7,
     { impDest: 0.25, impPill: 0.5, distPill: 0.15, bldgPill: 0.4, fertFood: 0.1 }),
-  storm('BLIZZARD_CRIPPLING', 'BLIZZARD', 2, 2, 19,
+  storm('BLIZZARD_CRIPPLING', 'BLIZZARD', 2, 2, 50, 19,
     { impDest: 0.5, impPill: 1, distPill: 0.5, bldgPill: 1, pop: 0.15, civKill: 0.2,
       landP: 1, landLo: 40, landHi: 60, navalP: 0.6, navalLo: 40, navalHi: 60, fertFood: 0.2 }),
-  storm('DUST_STORM_GRADIENT', 'DUST_STORM', 1, 8, 3,
+  storm('DUST_STORM_GRADIENT', 'DUST_STORM', 1, 8, 0, 3,
     { impDest: 0.35, impPill: 0.75, distPill: 0.2, bldgPill: 0.6, fertFood: 0.1, fertProd: 0.2 }),
-  storm('DUST_STORM_HABOOB', 'DUST_STORM', 2, 2, 7,
+  storm('DUST_STORM_HABOOB', 'DUST_STORM', 2, 2, 50, 7,
     { impDest: 0.75, impPill: 1, distPill: 0.75, bldgPill: 1, pop: 0.2, civKill: 0.2,
       landP: 1, landLo: 40, landHi: 60, navalP: 0.6, navalLo: 40, navalHi: 60, fertFood: 0.2, fertProd: 0.3 }),
-  storm('TORNADO_FAMILY', 'TORNADO', 1, 15, 1,
+  storm('TORNADO_FAMILY', 'TORNADO', 1, 15, 0, 1,
     { impDest: 0.35, impPill: 0.75, distPill: 0.2, bldgPill: 0.6 }),
-  storm('TORNADO_OUTBREAK', 'TORNADO', 2, 3, 3,
+  storm('TORNADO_OUTBREAK', 'TORNADO', 2, 3, 50, 3,
     { impDest: 0.75, impPill: 1, distPill: 0.75, bldgPill: 1, pop: 0.2, civKill: 0.2,
       landP: 1, landLo: 40, landHi: 60, navalP: 1, navalLo: 40, navalHi: 60 }),
-  storm('HURRICANE_CAT_4', 'HURRICANE', 1, 15, 7,
+  storm('HURRICANE_CAT_4', 'HURRICANE', 1, 15, 0, 7,
     { impDest: 0.25, impPill: 0.5, distPill: 0.15, bldgPill: 0.4, lowlandPill: 1, lowlandDist: 1,
       navalP: 0.6, navalLo: 40, navalHi: 60, fertFood: 0.3 }),
-  storm('HURRICANE_CAT_5', 'HURRICANE', 2, 3, 19,
+  storm('HURRICANE_CAT_5', 'HURRICANE', 2, 3, 50, 19,
     { impDest: 0.5, impPill: 1, distPill: 0.5, bldgPill: 1, lowlandDist: 1, pop: 0.15, civKill: 0.2,
       landP: 1, landLo: 40, landHi: 60, navalP: 1, navalLo: 60, navalHi: 80, fertFood: 0.45, fertProd: 0.15 }),
 ];
-
-/** The two severities of one family, in table order — the climate ramp's
- *  `severitySplit` runs over each pair the way it runs over the flood's ladder. */
-export function stormFamilyPair(family: StormFamily): [number, number] {
-  const idx = STORM_EVENTS.map((e, i) => (e.family === family ? i : -1)).filter((i) => i >= 0);
-  return [idx[0], idx[1]];
-}
 
 /** CIV6 (`RandomEvent_Terrains`): where each family STARTS — blizzards on
  *  snow and tundra, dust storms on desert, tornadoes on grassland and plains
@@ -371,25 +482,67 @@ export const STORM_UNIT_ROWS: readonly StormUnitRow[] =
   RAW_STORM_UNIT_ROWS.map((r) => ({ ...r, src: stormUnitSrc(r) }));
 
 /** One weight per eruption severity, GENTLE / CATASTROPHIC / MEGACOLOSSAL:
- *  4 / 2.5 / 1.5, each counted once per volcano. Every eruption array below
- *  is indexed by that severity. */
+ *  4 / 2.5 / 1.5, each counted once per volcano. The rows' paint and damage
+ *  are `ERUPTION_ROWS` 2 to 4. */
 export const ERUPTION_WEIGHT = srcConst('disasters.eruptionWeight', [4, 2.5, 1.5] as const, {
   derived: 'each eruption row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE, in severity order',
   inputs: [freq('VOLCANO_GENTLE'), freq('VOLCANO_CATASTROPHIC'), freq('VOLCANO_MEGACOLOSSAL')],
 });
 
-/** CIV6 (`RandomEvent_Yields`, `ReplaceFeature="true"`): the FEATURE_VOLCANIC_SOIL
- *  YIELD_FOOD row of each eruption severity, GENTLE / CATASTROPHIC /
- *  MEGACOLOSSAL. Measured as a PER-PLOT chance that an eligible land plot of
- *  the ring becomes Volcanic Soil (bare land 30 / 52 / 74 % over 66 plots). */
-const soilRow = (ev: string) => xml('RandomEvent_Yields',
-  `RandomEventType=RANDOM_EVENT_VOLCANO_${ev}&YieldType=YIELD_FOOD`, 'Percentage');
-export const SOIL_PAINT_P = srcConst('disasters.soilPaintP', [0.35, 0.5, 0.75] as const, {
-  derived: 'Percentage/100 of each eruption severity\'s FEATURE_VOLCANIC_SOIL YIELD_FOOD row '
-    + '(35 / 50 / 75), read as the per-plot paint chance the volcano scene measured '
-    + '(tools/civ6lab/runs/volcano_20260923T191337Z.jsonl)',
-  inputs: [soilRow('GENTLE'), soilRow('CATASTROPHIC'), soilRow('MEGACOLOSSAL')],
+/**
+ * THE FIVE ERUPTION ROWS, in the install's `RandomEvents` order — Kilimanjaro's
+ * GENTLE and CATASTROPHIC, then the volcano's GENTLE, CATASTROPHIC and
+ * MEGACOLOSSAL. Every `ERUPTION_*` column below is indexed by this row
+ * (`eruptionRow`).
+ */
+export const ERUPTION_ROWS = ['KILIMANJARO_GENTLE', 'KILIMANJARO_CATASTROPHIC',
+  'VOLCANO_GENTLE', 'VOLCANO_CATASTROPHIC', 'VOLCANO_MEGACOLOSSAL'] as const;
+/** the `ERUPTION_ROWS` index of Kilimanjaro's or a volcano's severity row */
+export function eruptionRow(family: 'kilimanjaro' | 'volcano', sev: number): number {
+  return family === 'kilimanjaro' ? sev : 2 + sev;
+}
+
+/** CIV6 (`RandomEvent_Yields`, `ReplaceFeature="true"`): each row's
+ *  FEATURE_VOLCANIC_SOIL YIELD_FOOD row, 50 / 50 and 35 / 50 / 75. Measured
+ *  as a PER-PLOT chance that an eligible land plot of the ring becomes
+ *  Volcanic Soil (bare land 30 / 52 / 74 % over 66 plots, the volcano's). */
+export const ERUPTION_PAINT_P = srcConst('disasters.eruptionPaintP', [0.5, 0.5, 0.35, 0.5, 0.75] as const, {
+  derived: 'Percentage/100 of each eruption row\'s FEATURE_VOLCANIC_SOIL YIELD_FOOD row, read as the '
+    + 'per-plot paint chance the volcano scene measured (tools/civ6lab/runs/volcano_20260923T191337Z.jsonl)',
+  inputs: ERUPTION_ROWS.map((r) => xml('RandomEvent_Yields',
+    `RandomEventType=RANDOM_EVENT_${r}&YieldType=YIELD_FOOD`, 'Percentage')),
 });
+
+/**
+ * THE ERUPTION'S DAMAGE ROWS (`RandomEvent_Damages`), per `ERUPTION_ROWS`
+ * index, applied to every plot of the radius-1 ring (`RealismSettings.
+ * ExtraRange` is false at MODERATE, so `ExtraRangePercentage` never reads)
+ * the way the flood's rows are applied: IMPROVEMENT_PILLAGED 100 on every
+ * row, then IMPROVEMENT_DESTROYED, DISTRICT_PILLAGED and BUILDING_PILLAGED,
+ * UNIT_DAMAGE_LAND's band on the land units (and CITY_GARRISON / CITY_WALLS,
+ * the same band on every row, on a city centre), UNIT_KILLED_CIVILIAN and
+ * POPULATION_LOSS. The GENTLE rows carry only the two pillage rows; a damage
+ * row a row lacks reads 0.
+ */
+const eruptDmg = (kind: string, col = 'Percentage') => ERUPTION_ROWS.map((r) =>
+  xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_${r}&DamageType=${kind}`, col,
+    r.endsWith('GENTLE') && kind !== 'BUILDING_PILLAGED' ? { absent: true } : undefined));
+const eruptPct = (name: string, kind: string, v: readonly number[]) => srcConst(`disasters.${name}`, v, {
+  derived: `Percentage/100 of each eruption row's ${kind} row; a GENTLE row carries none and reads 0`,
+  inputs: eruptDmg(kind),
+});
+export const ERUPTION_DESTROY_P = eruptPct('eruptionDestroyP', 'IMPROVEMENT_DESTROYED', [0, 0.8, 0, 0.75, 0.8]);
+export const ERUPTION_DISTRICT_P = eruptPct('eruptionDistrictP', 'DISTRICT_PILLAGED', [0, 0.8, 0, 0.75, 0.8]);
+export const ERUPTION_BLDG_P = eruptPct('eruptionBldgP', 'BUILDING_PILLAGED', [1, 1, 1, 1, 1]);
+export const ERUPTION_POP_P = eruptPct('eruptionPopP', 'POPULATION_LOSS', [0, 0.2, 0, 0.2, 0.35]);
+export const ERUPTION_CIV_KILL_P = eruptPct('eruptionCivKillP', 'UNIT_KILLED_CIVILIAN', [0, 0.2, 0, 0.2, 0.35]);
+const eruptBand = (name: string, col: 'MinHP' | 'MaxHP', v: readonly number[]) => srcConst(`disasters.${name}`, v, {
+  derived: `each eruption row's UNIT_DAMAGE_LAND ${col}, inclusive; CITY_GARRISON and CITY_WALLS carry the `
+    + 'same band on every row, so one roll serves all three; a GENTLE row carries none and reads 0',
+  inputs: [...eruptDmg('UNIT_DAMAGE_LAND', col), ...eruptDmg('CITY_GARRISON', col), ...eruptDmg('CITY_WALLS', col)],
+});
+export const ERUPTION_DMG_LO = eruptBand('eruptionDmgLo', 'MinHP', [0, 40, 0, 40, 60]);
+export const ERUPTION_DMG_HI = eruptBand('eruptionDmgHi', 'MaxHP', [0, 60, 0, 60, 80]);
 /** The features an eruption's soil REPLACES — Woods and Rainforest (the
  *  install's FOREST and JUNGLE), measured replaced at 6/28, 11/28, 18/28;
  *  Floodplains and Geothermal Fissure are never painted (0/18). */
@@ -401,8 +554,7 @@ export const SOIL_REPLACES: readonly string[] = srcConst('disasters.soilReplaces
  *  (`RandomEvents.NaturalWonder` FEATURE_KILIMANJARO, this engine's
  *  MOUNT_KILIMANJARO), between the floods and the volcanoes in the table's
  *  order. Weights 4 / 2.5, each counted once per Kilimanjaro plot; their
- *  FEATURE_VOLCANIC_SOIL YIELD_FOOD rows, 50 / 50, are the per-plot paint
- *  chance on the wonder's ring, read as the volcanoes' are. */
+ *  paint and damage are `ERUPTION_ROWS` 0 and 1. */
 export const KILIMANJARO_FEATURE = srcConst('disasters.kilimanjaroFeature', 'MOUNT_KILIMANJARO', {
   derived: 'the engine feature id of the rows\' NaturalWonder FEATURE_KILIMANJARO',
   inputs: [xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_KILIMANJARO_GENTLE', 'NaturalWonder'),
@@ -411,13 +563,6 @@ export const KILIMANJARO_FEATURE = srcConst('disasters.kilimanjaroFeature', 'MOU
 export const KILIMANJARO_WEIGHT = srcConst('disasters.kilimanjaroWeight', [4, 2.5] as const, {
   derived: 'the two Kilimanjaro rows\' OccurrencesPerGame at REALISM_SETTING_MODERATE, GENTLE then CATASTROPHIC',
   inputs: [freq('KILIMANJARO_GENTLE'), freq('KILIMANJARO_CATASTROPHIC')],
-});
-const kiliSoilRow = (ev: string) => xml('RandomEvent_Yields',
-  `RandomEventType=RANDOM_EVENT_KILIMANJARO_${ev}&YieldType=YIELD_FOOD`, 'Percentage');
-export const KILIMANJARO_SOIL_P = srcConst('disasters.kilimanjaroSoilP', [0.5, 0.5] as const, {
-  derived: 'Percentage/100 of each Kilimanjaro row\'s FEATURE_VOLCANIC_SOIL YIELD_FOOD row (50 / 50), '
-    + 'read as the per-plot paint chance SOIL_PAINT_P reads',
-  inputs: [kiliSoilRow('GENTLE'), kiliSoilRow('CATASTROPHIC')],
 });
 
 /** "Improvement — Pillaged: 100%; Destroyed: 50% / 80%". A flood always

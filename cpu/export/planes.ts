@@ -22,7 +22,7 @@ import { terrainMp, unitPassable } from '../core/units';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater, naturalWonderAt } from '../../world/query';
 import { neighbors } from '../../world/hex';
 import { UNITS } from '../data/units';
-import { stormFamilyAt, STORM_FAMILIES, droughtCandidate } from '../data/disasters';
+import { stormFamilyAt, STORM_FAMILIES, droughtTerrain } from '../data/disasters';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -297,7 +297,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // belongs to, -1 off a mountain. Static, so it bakes.
       mrange: t.mountainRange ?? -1,
       fp: t.feature === 'FLOODPLAINS' ? 1 : 0,
-      dc: droughtCandidate(t) ? 1 : 0,
+      dc: droughtTerrain(t) ? 1 : 0,
       // the storm FAMILY that may start here (`STORM_FAMILIES` index), -1 none
       sf: (() => { const f = stormFamilyAt(t); return f ? STORM_FAMILIES.indexOf(f) : -1; })(),
       fz: !isWater(t) && t.elevation !== 'MOUNTAIN' ? 1 : 0,

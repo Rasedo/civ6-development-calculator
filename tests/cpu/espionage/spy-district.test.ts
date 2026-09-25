@@ -115,7 +115,7 @@ describe('the jump names a district tile', () => {
   });
 });
 
-describe('the counterspy defends the district it stands on', () => {
+describe('the counterspy defends the district it stands on and the adjacent ones', () => {
   it("SURVEILLANCE guards every district and works a level higher within one hex; POLYGRAPH reads the whole city", () => {
     const { state, theirs } = spyState();
     const near = districtAt(state, theirs, 'INDUSTRIAL_ZONE', 1);
@@ -134,17 +134,18 @@ describe('the counterspy defends the district it stands on', () => {
     expect(cityCounterLevels(state, theirs, near)).toBe(1);
   });
 
-  it('a post on the centre catches nobody on the Hub — until Surveillance extends it', () => {
-    // FOOT the only route (the police's guess certain, every escape lost) and
-    // the roll the measured 3d6, so over a seed walk whether the post GUARDS
-    // the Hub decides whether it ever earns the level
+  it('a post on the centre catches on an adjacent Hub, and on one two out only with Surveillance', () => {
+    // CIV6: "Protect {1_District} (and all adjacent districts) from enemy
+    // spies". FOOT the only route (the police's guess certain, every escape
+    // lost) and the roll the measured 3d6, so over a seed walk whether the
+    // post GUARDS the Hub decides whether it ever earns the level
     const gates = SPY_ESCAPE_ROUTES.map((r) => r.district);
     for (const r of SPY_ESCAPE_ROUTES) if (r.district !== null) (r as { district: string }).district = 'NO_SUCH_DISTRICT';
     try {
-      const run = (surveil: boolean): boolean => {
+      const run = (dist: number, surveil: boolean): boolean => {
         for (let seed = 1; seed < 200; seed++) {
           const { state, theirs } = spyState();
-          const hub = districtAt(state, theirs, 'COMMERCIAL_HUB', 1);
+          const hub = districtAt(state, theirs, 'COMMERCIAL_HUB', dist);
           const guard = spyAt(state, 1, theirs.centerIndex);
           if (surveil) guard.promos = spyBit('SURVEILLANCE');
           expect(beginMission(state, guard, SPY_M_COUNTERSPY)).toBe(true);
@@ -156,8 +157,38 @@ describe('the counterspy defends the district it stands on', () => {
         }
         return false;
       };
-      expect(run(false)).toBe(false);
-      expect(run(true)).toBe(true);
+      expect(run(1, false)).toBe(true);
+      expect(run(2, false)).toBe(false);
+      expect(run(2, true)).toBe(true);
+    } finally {
+      SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { district: string | null }).district = gates[i]; });
+    }
+  });
+
+  it('of two guarding posts the higher level pursues, whatever the slot order', () => {
+    const gates = SPY_ESCAPE_ROUTES.map((r) => r.district);
+    for (const r of SPY_ESCAPE_ROUTES) if (r.district !== null) (r as { district: string }).district = 'NO_SUCH_DISTRICT';
+    try {
+      let caught = false;
+      for (let seed = 1; seed < 200 && !caught; seed++) {
+        const { state, theirs } = spyState();
+        const hub = districtAt(state, theirs, 'COMMERCIAL_HUB', 1);
+        const low = spyAt(state, 1, theirs.centerIndex); // first by slot, adjacent
+        const high = spyAt(state, 1, hub);               // second by slot, on the Hub
+        high.spyLevel = 2;
+        expect(beginMission(state, low, SPY_M_COUNTERSPY)).toBe(true);
+        expect(beginMission(state, high, SPY_M_COUNTERSPY)).toBe(true);
+        const spy = spyAt(state, 0, hub);
+        state.rngState = seed;
+        expect(beginMission(state, spy, SPY_M_SIPHON_FUNDS)).toBe(true);
+        for (let i = 0; i < turnsOf(SPY_M_SIPHON_FUNDS); i++) tickSpies(state, 0);
+        if (spyHeldWith(state, 0, 1) === 1) {
+          caught = true;
+          expect(high.spyLevel).toBe(3);
+          expect(low.spyLevel ?? 0).toBe(0);
+        }
+      }
+      expect(caught).toBe(true);
     } finally {
       SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { district: string | null }).district = gates[i]; });
     }

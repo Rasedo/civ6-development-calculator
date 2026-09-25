@@ -47,6 +47,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_FOREIGN_TRADE&PrereqCivic=CIVIC_CODE_OF_LAWS', 'PrereqCivic', { expect: 'CIVIC_CODE_OF_LAWS' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_CARAVANSARIES', 'PrereqCivic', { expect: 'CIVIC_FOREIGN_TRADE' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_MARITIME_INDUSTRIES', 'PrereqCivic', { expect: 'CIVIC_FOREIGN_TRADE' }),
+    'effects.2.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUNTAIN_ROAD', 'PrereqCivic', { expect: 'CIVIC_FOREIGN_TRADE' }),
   },
   MILITARY_TRADITION: {
     era: xml('Civics', 'CivicType=CIVIC_MILITARY_TRADITION', 'EraType', { expect: 'ERA_ANCIENT' }),
@@ -418,6 +419,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('FOREIGN_TRADE', 'Foreign Trade', 'Ancient', 40, ['CODE_OF_LAWS'], [
       { kind: 'unlockPolicy', policy: 'CARAVANSARIES' },
       { kind: 'unlockPolicy', policy: 'MARITIME_INDUSTRIES' },
+      { kind: 'unlockImprovement', improvement: 'MOUNTAIN_ROAD' }, // CIV6 (Qhapaq Ñan): PrereqCivic
     ]),
     C('MILITARY_TRADITION', 'Military Tradition', 'Ancient', 50, ['CRAFTSMANSHIP'], [
       { kind: 'unlockPolicy', policy: 'MANEUVER' },

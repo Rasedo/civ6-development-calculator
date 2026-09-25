@@ -235,8 +235,12 @@ describe('grievances', () => {
     expect(grievancesAgainst(state, 0)).toBeGreaterThanOrEqual(GRIEVANCE_GANG);
   });
 
-  it('SETTLED TOO NEAR: a founding within 3 of a rival plot draws the measured 19, and 4 draws nothing', () => {
-    expect(GRIEVANCE_SETTLED_NEAR).toBe(19);
+  it('SETTLED TOO NEAR: a founding within 3 of a rival plot draws 25, and 4 draws nothing', () => {
+    // the lab read 19 and 18 one turn later, after the Industrial (6) and
+    // Renaissance (7) GrievanceDecayRate
+    expect(GRIEVANCE_SETTLED_NEAR).toBe(25);
+    expect(GRIEVANCE_SETTLED_NEAR - 6).toBe(19);
+    expect(GRIEVANCE_SETTLED_NEAR - 7).toBe(18);
     expect(GRIEVANCE_SETTLED_NEAR_RANGE).toBe(3);
     const site = (reach: number) => {
       const state = newGame(1);

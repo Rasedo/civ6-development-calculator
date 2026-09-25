@@ -9,16 +9,13 @@ import { addEnvoys, isSuzerain, minorCity, resolveSuzerain, suzerainOf } from '.
 import { minorPhase } from '../../../cpu/core/minorBuild';
 import { computeCityStats } from '../../../cpu/core/city';
 import { containmentBonus } from '../../../cpu/core/effects';
-import {
-  MINOR_HARBOR_PROD_PCT, MINOR_PRODUCTION_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT, SUZERAIN_ENVOYS,
-} from '../../../cpu/data/cityStates';
-import { BUILDINGS } from '../../../cpu/data/buildings';
+import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
 import { OPEN_BORDERS_CIVIC } from '../../../cpu/data/seats';
 import { SPREAD_PRESSURE } from '../../../cpu/data/religion';
 import { TECHS } from '../../../cpu/data/techs';
 import { CIVICS } from '../../../cpu/data/civics';
 import { tilesWithin } from '../../../world/hex';
-import type { CityState, CityStateType, GameState, Seat, Tile } from '../../../cpu/core/types';
+import type { CityState, CityStateType, GameState, Seat } from '../../../cpu/core/types';
 
 function addCs(state: GameState, col: number, row: number, opts: Partial<CityState> & { type?: CityStateType } = {}): CityState {
   const center = tileAtCoords(state.map, col, row);
@@ -185,75 +182,5 @@ describe('a city-state can be converted', () => {
     // city-states; unpromoted the lump is the plain one.
     expect(cs.religionPressure?.[0]).toBe(SPREAD_PRESSURE);
     expect(ap.charges).toBe(2);
-  });
-});
-
-// ---------------------------------------------------------------------------
-describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
-  // the turn's Production goes toward the ladder's first buildable item: half
-  // the city's yield, times that item's toward-row
-  const half = (100 + MINOR_PRODUCTION_PCT) / 100;
-  function turnOf(state: GameState, cs: CityState): number {
-    state.turn = 1;
-    cs.prodProgress = 0;
-    const p = computeCityStats(state, minorCity(cs)).total.production;
-    expect(p).toBeGreaterThan(0);
-    minorPhase(state);
-    return p;
-  }
-  function hold(cs: CityState, district: 'CAMPUS', t: Tile): void {
-    setTileOwner(t, cs.seat);
-    t.district = district;
-    t.districtComplete = true;
-    (cs.districts ??= []).push({ type: district, tileIndex: t.index });
-  }
-
-  it('with nothing buildable the pot takes half the yield', () => {
-    const state = makeState(makeMap(24, 24));
-    const cs = addCs(state, 12, 12, { population: 5 });
-    const p = turnOf(state, cs);
-    expect(cs.prodProgress).toBe(p * half);
-  });
-
-  it('toward the walls: +200%, and the walls complete off that pot', () => {
-    const state = makeState(makeMap(24, 24));
-    const cs = addCs(state, 12, 12, { population: 5 });
-    cs.research.techs = ['MINING', 'MASONRY'];
-    const p = turnOf(state, cs);
-    expect(MINOR_WALLS_PROD_PCT).toBe(200);
-    expect(cs.prodProgress).toBe(p * half * ((100 + MINOR_WALLS_PROD_PCT) / 100));
-    expect(cs.buildings ?? []).not.toContain('ANCIENT_WALLS');
-    cs.prodProgress = BUILDINGS.ANCIENT_WALLS.cost - p * half * 3 + 1;
-    minorPhase(state);
-    expect(cs.buildings).toContain('ANCIENT_WALLS');
-  });
-
-  it("toward the type's district: +500%; toward its tier-1 building: no row", () => {
-    const state = makeState(makeMap(24, 24));
-    const cs = addCs(state, 12, 12, { population: 5, buildings: ['ANCIENT_WALLS'] });
-    cs.research.techs = ['POTTERY', 'WRITING'];
-    const p = turnOf(state, cs);
-    expect(MINOR_TYPE_DISTRICT_PROD_PCT.scientific).toBe(500);
-    expect(cs.prodProgress).toBe(p * half * ((100 + MINOR_TYPE_DISTRICT_PROD_PCT.scientific) / 100));
-    expect(cs.districts ?? []).toEqual([]);
-
-    const b = makeState(makeMap(24, 24));
-    const cs2 = addCs(b, 12, 12, { population: 5, buildings: ['ANCIENT_WALLS'] });
-    cs2.research.techs = ['POTTERY', 'WRITING'];
-    hold(cs2, 'CAMPUS', tileAtCoords(b.map, 13, 12));
-    const p2 = turnOf(b, cs2);
-    expect(cs2.prodProgress).toBe(p2 * half * 1);
-  });
-
-  it('toward the Harbor: +500%', () => {
-    const state = makeState(makeMap(24, 24));
-    for (let c = 14; c < 24; c++) for (let r = 0; r < 24; r++) tileAtCoords(state.map, c, r).terrain = 'COAST';
-    const cs = addCs(state, 12, 12, { population: 5, buildings: ['ANCIENT_WALLS', 'LIBRARY'] });
-    for (const t of tilesWithin(state.map, 12, 12, 2)) setTileOwner(t, cs.seat);
-    hold(cs, 'CAMPUS', tileAtCoords(state.map, 11, 12));
-    cs.research.techs = ['POTTERY', 'WRITING', 'SAILING', 'ASTROLOGY', 'CELESTIAL_NAVIGATION'];
-    const p = turnOf(state, cs);
-    expect(MINOR_HARBOR_PROD_PCT).toBe(500);
-    expect(cs.prodProgress).toBe(p * half * ((100 + MINOR_HARBOR_PROD_PCT) / 100));
   });
 });

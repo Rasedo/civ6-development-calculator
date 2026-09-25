@@ -211,6 +211,18 @@ export interface GovernorEffects {
   /** extra promotions banked on a religious unit bought here, taken with its
    *  first (Patron Saint). */
   firstPromoBonus?: number;
+  /** CIV6 (MODIFIER_BUILDING_YIELD_CHANGE): flat yields a NAMED building of
+   *  the city pays on top of its own, while it stands lit (Industrialist's
+   *  plants, Renewable Subsidizer's Dam). */
+  buildingYields?: Readonly<Record<string, Yields>>;
+  /** CIV6 (MODIFIER_SINGLE_CITY_ADJUST_FREE_POWER behind the promotion):
+   *  Power a NAMED building of the city supplies on top of its own renewable
+   *  supply (Renewable Subsidizer's Dam). */
+  buildingPower?: Readonly<Record<string, number>>;
+  /** CIV6 (Industrialist, MODIFIER_GOVERNOR_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR):
+   *  Power each resource burned by THIS city's power plant provides on top
+   *  of the fuel's own rate. */
+  plantPowerPerResource?: number;
 }
 
 /** The promotion catalog is longer than 32 rows and JavaScript's bitwise
@@ -329,6 +341,14 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.districtGoldBuy': xml('ModifierArguments',
       'ModifierId=CONTRACTOR_ENABLE_DISTRICT_PURCHASE&Name=CanPurchase', 'Value'),
   },
+  RENEWABLE_SUBSIDIZER: {
+    'effects.buildingYields.HYDROELECTRIC_DAM.gold': xml('ModifierArguments',
+      'ModifierId=RENEWABLE_ENERGY_IMPROVEMENT_BUILDING_GOLD&Name=Amount', 'Value',
+      { note: 'its BuildingType row names BUILDING_HYDROELECTRIC_DAM' }),
+    'effects.buildingPower.HYDROELECTRIC_DAM': xml('ModifierArguments',
+      'ModifierId=MERCHANT_RENEWABLE_ENERGY_HYDROELECTRIC_DAM_FREE_POWER&Name=Amount', 'Value',
+      { note: 'BuildingModifiers attach it to BUILDING_HYDROELECTRIC_DAM behind CITY_HAS_GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY' }),
+  },
   REDOUBT: {
     'effects.cityDefense': xml('ModifierArguments',
       'ModifierId=DEFENDER_ADJUST_CITY_DEFENSE_STRENGTH&Name=Amount', 'Value'),
@@ -402,6 +422,19 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
       inputs: [xml('ModifierArguments',
         'ModifierId=EXPEDITION_ADJUST_SETTLERS_CONSUME_POPULATION&Name=Enabled', 'Value')],
     },
+  },
+  INDUSTRIALIST: {
+    'effects.buildingYields.COAL_POWER_PLANT.production': xml('ModifierArguments',
+      'ModifierId=INDUSTRIALIST_COAL_POWER_PLANT_PRODUCTION&Name=Amount', 'Value',
+      { note: 'its BuildingType row names BUILDING_COAL_POWER_PLANT' }),
+    'effects.buildingYields.OIL_POWER_PLANT.production': xml('ModifierArguments',
+      'ModifierId=INDUSTRIALIST_OIL_POWER_PLANT_PRODUCTION&Name=Amount', 'Value',
+      { note: 'its BuildingType row names BUILDING_FOSSIL_FUEL_POWER_PLANT' }),
+    'effects.buildingYields.NUCLEAR_POWER_PLANT.production': xml('ModifierArguments',
+      'ModifierId=INDUSTRIALIST_NUCLEAR_POWER_PLANT_PRODUCTION&Name=Amount', 'Value',
+      { note: 'its BuildingType row names BUILDING_POWER_PLANT' }),
+    'effects.plantPowerPerResource': xml('ModifierArguments',
+      'ModifierId=INDUSTRIALIST_RESOURCE_POWER_PROVIDED&Name=Amount', 'Value'),
   },
   BLACK_MARKETEER: {
     'effects.resourceDiscountPct': xml('ModifierArguments',
@@ -565,9 +598,13 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
   G('CONTRACTOR', 'REYNA', 3, 'Contractor',
     'Allows city to purchase Districts with Gold.',
     { districtGoldBuy: true }, ['TAX_COLLECTOR']),
+  // the renewable generators' +2 Gold and +2 Power ride their own catalog
+  // rows (`governorYields` / `governorPower` in improvements.ts); the Dam's
+  // ride here
   G('RENEWABLE_SUBSIDIZER', 'REYNA', 3, 'Renewable Subsidizer',
     'All Offshore Wind Farms, Solar Farms, Wind Farms, Geothermal Plants and Hydroelectric Dams in this city receive +2 Power and +2 Gold.',
-    {}, ['TAX_COLLECTOR']),
+    { buildingYields: { HYDROELECTRIC_DAM: { gold: 2 } }, buildingPower: { HYDROELECTRIC_DAM: 2 } },
+    ['TAX_COLLECTOR']),
 
   // ---- VICTOR, the Castellan ----
   G('REDOUBT', 'VICTOR', 0, 'Redoubt',
@@ -621,7 +658,12 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { settlerFreePop: true }),
   G('INDUSTRIALIST', 'MAGNUS', 2, 'Industrialist',
     'Increase the Power provided by each resource of the Coal Power Plant, Oil Power Plant and Nuclear Power Plant by 1 and the Production by 2.',
-    {}, ['SURPLUS_LOGISTICS']),
+    {
+      buildingYields: {
+        COAL_POWER_PLANT: { production: 2 }, OIL_POWER_PLANT: { production: 2 }, NUCLEAR_POWER_PLANT: { production: 2 },
+      },
+      plantPowerPerResource: 1,
+    }, ['SURPLUS_LOGISTICS']),
   G('BLACK_MARKETEER', 'MAGNUS', 2, 'Black Marketeer',
     'Strategic resources for units are discounted 80%.',
     { resourceDiscountPct: 80 }, ['PROVISION']),

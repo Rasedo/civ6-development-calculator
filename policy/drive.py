@@ -656,7 +656,13 @@ def _seat_unit_orders(st, seat: int, nobs: list):
         # ...and only the columns some game actually holds: a dead column can
         # never be the FIRST legal one, so dropping it moves no pick — and the
         # improvement run is most of this list and mostly locked.
-        bcols = [c for c in ([c for c in (st.col("FINISH_DISTRICT"),) if c >= 0]
+        # THE PORTAL RULE: one turn in ten (by seat) a Builder on its job lays
+        # a Qhapaq Ñan onto a bare mountain beside it first, where one is legal
+        # — the row's one driver, at a rate that leaves the charges for the
+        # job's own improvement.
+        _qn = st.col("BUILD_MOUNTAIN_ROAD")
+        bcols = [c for c in ([_qn] if _qn >= 0 and (turn + seat) % 10 == 0 else [])
+                 + ([c for c in (st.col("FINISH_DISTRICT"),) if c >= 0]
                              + [c for c in (st.col("HARVEST"),) if c >= 0]
                              + [c for c in (st.col("WONDER_CHARGE"),) if c >= 0]
                              + [c for c in st.a_imp if c >= 0]

@@ -61,10 +61,11 @@ describe('the unique improvement catalog', () => {
     // and the three that shipped earlier keep the seats they already held
     expect(IMPROVEMENT_IDS.indexOf('SPHINX')).toBe(19);
     expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_TUNNEL')).toBe(22);
-    // the governor rows follow, and nothing follows them yet
+    // the governor rows follow, then Pachacuti's Qhapaq Ñan
     expect(IMPROVEMENT_IDS.indexOf('FISHERY')).toBe(35);
     expect(IMPROVEMENT_IDS.indexOf('CITY_PARK')).toBe(36);
-    expect(IMPROVEMENT_IDS.length).toBe(37);
+    expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_ROAD')).toBe(37);
+    expect(IMPROVEMENT_IDS.length).toBe(38);
   });
 
   it('gives one civilization at most one unique improvement', () => {

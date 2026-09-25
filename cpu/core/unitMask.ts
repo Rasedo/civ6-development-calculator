@@ -18,13 +18,14 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { LAUNCH_INQUISITION_CHARGES } from '../data/religion';
 import { MP_SCALE, RAILROAD_COST, RAILROAD_TECH } from '../data/constants';
 import { IMPROVEMENTS } from '../data/improvements';
+import { droughtBars } from '../data/disasters';
 import {
   AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, NUKE_COLS, SPY_MISSIONS, SPY_TRAVEL_COLS, buildColumnOf,
   unitActionIndex,
 } from './unitActions';
 import {
   artifactHome, borderClosedTo, canCleanFallout, canUpgradeUnit, cliffBlocksStep, concertVenue, digUnderfoot,
-  encampmentBlocks, gdrJump, navalMelee, ownerHasTech, parkCluster, parkClusterLegal, tunnelAt, unitDomain,
+  encampmentBlocks, gdrJump, navalMelee, ownerHasTech, parkCluster, parkClusterLegal, unitDomain,
   unitsHostile, unitVisibleTo, waterEnterable, waterWalks,
 } from './units';
 import {
@@ -35,7 +36,10 @@ import { attacksLeftOf, promoAvailable, promoFlag, promoReady, promoValue } from
 import { cityStateAttackable, nukeTargets, siegeMayShoot } from './combat';
 import { airPillageFit, airRange, airStrikeTargets, isAirUnit, rebaseTargets } from './air';
 import { computeUnlocks, getModifiers, isCivicComplete } from './effects';
-import { canBuildRailroad, canBuildRoad, canRemoveFeature, suzerainNames, tunnelTarget, validImprovementsIn } from './rules';
+import {
+  PORTAL_MP, adjacentPlotRowOk, adjacentPlotTarget, canBuildRailroad, canBuildRoad, canRemoveFeature, portalAt,
+  portalExit, suzerainNames, validImprovementsIn,
+} from './rules';
 import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { stockOf } from './stockpile';
 import { harvestGrant } from './economy';
@@ -159,7 +163,7 @@ function moveOk(ctx: MaskCtx, u: Unit, here: Tile, to: Tile): boolean {
       && waterEnterable(state, to, { seat: u.seat });
   } else terr = !isImpassable(to);
   if (!terr && !water && gdrJump(state, u, to)) terr = true;
-  if (!terr && tunnelAt(to)) terr = true;
+  if (!terr && portalAt(to)) terr = true;
   if (!terr) return false;
   if (stackBlocked(ctx, u, to, naval) || encampmentBlocks(state, to, u)) return false;
   if (borderClosedTo(state, u.seat, to, u.type)) return false;
@@ -314,8 +318,10 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   // no Congress ban. `builderRemoveFeature` pays only inside the borders.
   if (builder && charges > 0 && here.feature && FEATURES[here.feature]?.chopYield
       && canRemoveFeature(state, here, seat).ok) out.add(A_CHOP);
-  // REPAIR asks no charge: a Builder on an own pillaged tile.
-  if (builder && owned && (here.pillaged || here.districtPillaged)) out.add(A_REPAIR);
+  // REPAIR asks no charge: a Builder on an own pillaged tile, and no drought
+  // holding its improvement (`droughtBars`).
+  if (builder && owned && (here.pillaged || here.districtPillaged)
+      && !droughtBars(here, here.improvement)) out.add(A_REPAIR);
   // A row a NAMED unit lays (`Improvement_ValidBuildUnits`): the GPU asks no
   // charge of it.
   if (!builder && def && Object.values(IMPROVEMENTS).some((x) => x.builtBy === u.type)) {
@@ -327,19 +333,27 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
     }
   }
   // THE MILITARY ENGINEER'S rows (and the Legion's Fort): a charge, the
-  // engineer's own-or-neutral ground, and each row's own clauses; the Tunnel
-  // targets an adjacent bare mountain instead.
+  // engineer's own-or-neutral ground, and each row's own clauses; the
+  // adjacent-plot rows target a bare mountain beside the unit instead.
   const engineer = u.type === 'MILITARY_ENGINEER';
   if ((engineer || def?.fortBuilder) && charges > 0 && bare(ctx, here)) {
     for (const imp of validImprovementsIn(here, impOpts(ctx, here, u.type))) {
-      if (imp === 'MOUNTAIN_TUNNEL') continue;
+      if (IMPROVEMENTS[imp]?.adjacentPlot) continue;
       const i = IMPROVEMENT_IDS.indexOf(imp);
       if (i >= 0) out.add(buildColumnOf(i));
     }
   }
-  if (engineer && charges > 0 && computeUnlocks(state, seat).improvements.has('MOUNTAIN_TUNNEL')
-      && tunnelTarget(state.map, here, ctx.owns) >= 0) {
-    out.add(buildColumnOf(IMPROVEMENT_IDS.indexOf('MOUNTAIN_TUNNEL')));
+  // THE ADJACENT-PLOT rows (the Engineer's Tunnel, Pachacuti's Qhapaq Ñan):
+  // the row's own unit with a charge, its unlock and leader, and a bare
+  // mountain beside it (`adjacentPlotTarget`).
+  if ((engineer || builder) && charges > 0) {
+    const un = computeUnlocks(state, seat);
+    const leader = leaderOf(state, seat);
+    for (const imp of IMPROVEMENT_IDS) {
+      const idef = IMPROVEMENTS[imp as keyof typeof IMPROVEMENTS];
+      if (!idef?.adjacentPlot || !adjacentPlotRowOk(idef, u.type, un, leader)) continue;
+      if (adjacentPlotTarget(state.map, here, idef, ctx.owns) >= 0) out.add(buildColumnOf(IMPROVEMENT_IDS.indexOf(imp)));
+    }
   }
 
   // PILLAGE: a fighter on ground whose owner this seat is at WAR with (the
@@ -508,17 +522,9 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
     const q = city?.queue[0];
     if (q?.kind === 'wonder' && wonderChargePct(state, seat, q.wonder) > 0) out.add(A_WONDER_CHARGE);
   }
-  // PORTAL: on a tunnel with another on its range, 2 Movement left.
-  if (portalOk(state, u, here)) out.add(A_PORTAL);
+  // PORTAL: on a portal with another on its range, 2 Movement left.
+  if (u.movesLeft >= PORTAL_MP * MP_SCALE && portalExit(state.map, here) >= 0) out.add(A_PORTAL);
   return [...out].sort((a, b) => a - b);
-}
-
-function portalOk(state: GameState, u: Unit, here: Tile): boolean {
-  if (here.improvement !== 'MOUNTAIN_TUNNEL' || u.movesLeft < 2 * MP_SCALE) return false;
-  const range = here.mountainRange ?? -1;
-  if (range < 0) return false;
-  return state.map.tiles.some((t) => t.index !== here.index && t.improvement === 'MOUNTAIN_TUNNEL'
-    && (t.mountainRange ?? -1) === range);
 }
 
 /** ground a seat this one is at WAR with holds (a major's or a city-state's;

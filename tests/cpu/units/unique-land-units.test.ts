@@ -9,7 +9,7 @@ import { emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats
 import { spawnUnit, terrainMp, ignoresShores } from '../../../cpu/core/units';
 import { chassisAbilityCS, chassisFlankMult, woundPenalty, siegeMayShoot, defenderCS } from '../../../cpu/core/combat';
 import { attacksPerTurn } from '../../../cpu/core/promotions';
-import { routePlunderer } from '../../../cpu/core/trade';
+import { routePlunderer, TRADER_GUARD_RADIUS } from '../../../cpu/core/trade';
 import { unitKillEvent } from '../../../cpu/core/eras';
 import { UNITS, UNIT_HP, civUnitAllowed, civReplacement, civUpgradeTarget } from '../../../cpu/data/units';
 import { GAME_SPEED } from '../../../cpu/data/constants';
@@ -255,6 +255,26 @@ describe('the reward and protection clauses', () => {
     expect(routePlunderer(state, road.index, 0)).toBe(1);
     put(state, 'MANDEKALU_CAVALRY', 7, 6, 0);
     expect(routePlunderer(state, road.index, 0)).toBe(null);
+  });
+
+  it('reaches a Trader within 4 tiles of the Mandekalu, and no farther', () => {
+    // CIV6 (TRADER_IS_WITHIN_FOUR_REQUIREMENT, MaxDistance 4): "Trader units
+    // are immune to being plundered if they are within 4 tiles of a
+    // Mandekalu Cavalry and on a land tile"
+    expect(TRADER_GUARD_RADIUS).toBe(4);
+    const guardAt = (col: number, seat: number): number | null => {
+      const state = scene();
+      state.seats.push(emptySeat(1), emptySeat(2));
+      setWar(state, 0, 1, true);
+      put(state, 'WARRIOR', 6, 6, 1);
+      put(state, 'MANDEKALU_CAVALRY', col, 6, seat);
+      return routePlunderer(state, tileAtCoords(state.map, 6, 6).index, 0);
+    };
+    expect(guardAt(10, 0)).toBe(null);  // 4 tiles along the row
+    expect(guardAt(11, 0)).toBe(1);     // 5 tiles: out of reach
+    // the ability goes to the escort's OWN seat's units alone
+    // (MODIFIER_PLAYER_UNITS_GRANT_ABILITY)
+    expect(guardAt(7, 2)).toBe(1);
   });
 
   it('lets the Mountie found a park off a charge and ride on', () => {

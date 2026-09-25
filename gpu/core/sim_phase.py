@@ -152,6 +152,11 @@ class SimPhase:
         def_e = def_e + (self._gdr_beam_cs(d_type, d_seat)  # "...and when defending"
                          + self._congress_unit_cs(d_type, _def_seat)
                          + self._gov_unit_cs(d_type, _def_seat)).to(def_e.dtype)
+        # the roster's rows read the striking city's seat as the unit's
+        # OPPONENT — a district, never wounded (`cityStrikeDefenderCS`)
+        def_e = def_e + self._roster_cs(_def_seat, d_type, tt, torch.full_like(tt, seat), None, True,
+                                        self.unit_formation[bidx, ds0],
+                                        self.unit_levied[bidx, ds0]).to(def_e.dtype)
         self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)
 
@@ -486,7 +491,7 @@ class SimPhase:
             "scale": float(rr.get("loyaltyScale", 20)),
             "lmax": float(rr.get("loyaltyMax", 100)),
             "keep": torch.where(cul_ally, torch.zeros_like(keep), keep),
-            "age_f": self._age_factor[self.civ_age[:, :nrow]],
+            "age_p": self._age_pressure[self.civ_age[:, :nrow]],
             "ctr": self.city_center[:, :nrow].reshape(B, -1).clamp(min=0),
             "cong": self._congress_loyalty(row),
             "emg": self._emergency_loyalty(row),
@@ -521,14 +526,19 @@ class SimPhase:
         here = self.city_center[bidx, row, col].clamp(min=0)
         loy_gov = self._ungoverned_loyalty(row) if pre["nogov_on"] else pre["z"]
         d = self.pair_dist[here.unsqueeze(1), pre["ctr"]].to(F)
+        # each citizen presses at base + capital + its seat's age (`citizenPressure`)
+        each = (self._citizen_press_base
+                + self._citizen_press_cap * self.city_is_cap[:, :nrow].double()
+                + pre["age_p"].unsqueeze(2))
+        cits = (self.city_pop[:, :nrow].double() - pre["cut"].unsqueeze(2)).clamp(min=0)
         w = ((rng + 1 - d).clamp(min=0)
-             * (self.city_pop[:, :nrow].double() - pre["cut"].unsqueeze(2)).clamp(min=0).reshape(B, -1)
+             * (cits * each).reshape(B, -1)
              * self.city_alive[:, :nrow].reshape(B, -1).double())
-        sub = w.reshape(B, nrow, self.RC).sum(dim=2) * pre["age_f"]
+        sub = w.reshape(B, nrow, self.RC).sum(dim=2)
         own = sub[:, row]
         foreign = (sub * pre["keep"]).sum(dim=1)
         # CIV6: a Free City's citizens press on their neighbours like any other
-        # city's; the Free Cities player has no age, so its factor is 1
+        # city's; the Free Cities player has no age, so they press at the base
         foreign = foreign + self._citizen_pressure_from(here, self.FREE_ROW)
         tot = own + foreign
         press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
@@ -561,13 +571,18 @@ class SimPhase:
 
     def _citizen_pressure_from(self, here: torch.Tensor, row: int) -> torch.Tensor:
         """[B] f64 — the CITIZEN pressure row `row`'s cities put on tile `here`
-        ([B]): each city's population weighted down by distance inside
-        loyaltyRange, no age factor (`citizenPressure`)."""
+        ([B]) (`citizenPressure`): each city's citizens, less the emergency
+        cut, at base + capital + the row's age each, weighted down by distance
+        inside loyaltyRange. Only a major row has an age; the Free Cities row's
+        citizens press at the base."""
         rng = int(self.rules.seats.get("loyaltyRange", 9))
         ctr = self.city_center[:, row].clamp(min=0)  # [B, RC]
         d = self.pair_dist[here.unsqueeze(1), ctr].to(torch.float64)
         pop = (self.city_pop[:, row].double() - self._emergency_pressure_cut(row).unsqueeze(1)).clamp(min=0)
-        w = (rng + 1 - d).clamp(min=0) * pop * self.city_alive[:, row].double()
+        each = self._citizen_press_base + self._citizen_press_cap * self.city_is_cap[:, row].double()
+        if row < self.n_majors:
+            each = each + self._age_pressure[self.civ_age[:, row]].unsqueeze(1)
+        w = (rng + 1 - d).clamp(min=0) * (pop * each) * self.city_alive[:, row].double()
         return w.sum(dim=1)
 
     def _skips_free_city(self, row: int) -> torch.Tensor:
@@ -584,10 +599,9 @@ class SimPhase:
         AFTER the seat's city loop, the TS defectors-list position.
 
         CIV6: "When Loyalty reaches 0, the city revolts against its owner and
-        becomes a Free City" — unless the major exerting the most RAW pressure
-        on it right now skips that step (Eleanor), in which case it joins that
-        seat directly. No age factor here, which is flipCity's deliberate
-        difference from loyaltyDelta. The owner is excluded, and so is a seat
+        becomes a Free City" — unless the major exerting the most citizen
+        pressure on it right now (`_citizen_pressure_from`) skips that step
+        (Eleanor), in which case it joins that seat directly. The owner is excluded, and so is a seat
         that does not exist and a cultural ally; a seat that EXISTS but holds
         no city still exerts 0 and still beats the sentinel, exactly as the TS
         scan's `best = -1` does. Ties go to the lowest seat id (the strict-`>`
@@ -656,7 +670,7 @@ class SimPhase:
         walled city fires (`_city_strikes`), heals as any unbesieged city does
         and runs its loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
         the flat base, the pressure term with every Free City's citizens on
-        its own side and every major's (at that major's age factor) against,
+        its own side and every major's (its age in each citizen's term) against,
         and the flat loyalty of what stands in it — no amenity, governor,
         policy or roster term, which are an OWNER's and the Free Cities player
         carries none. Each major's share accrues into the city's race
@@ -669,6 +683,9 @@ class SimPhase:
         alive = self.city_alive[:, row]
         if not bool(alive.any()):
             return
+        # a Free City's reactor keeps its clock: the seat resolves no power,
+        # so the age is kept here (`ageReactors`)
+        self._age_reactors(row)
         _tier = self._seat_amenity(row)[0]
         self.city_amen_tier[:, row, : self.RC] = torch.where(
             alive[:, : self.RC], _tier.to(self.city_amen_tier.dtype),
@@ -693,7 +710,7 @@ class SimPhase:
             own = self._citizen_pressure_from(here, row)
             foreign = torch.zeros(B, dtype=F, device=dev)
             for _o in range(nrow):
-                sub = self._citizen_pressure_from(here, _o) * self._age_factor[self.civ_age[:, _o]]
+                sub = self._citizen_pressure_from(here, _o)
                 foreign = foreign + sub
                 self.city_free_press[bidx, row, jc, _o] = torch.where(
                     act, self.city_free_press[bidx, row, jc, _o] + sub.to(self.city_free_press.dtype),

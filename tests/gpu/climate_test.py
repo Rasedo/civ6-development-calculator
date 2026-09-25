@@ -17,7 +17,9 @@ Proven here:
   * a phase floods its own lowland band, a FLOOD BARRIER holds the sea off
     its city's tiles, and one built late repairs what already went under;
   * `_melt_ice` takes the published fraction off the front of the map;
-  * `_severity_split` rides the melt curve, and
+  * `_warming_degrees` reads the carbon at `CO2For1DegreeTempRise` a
+    degree, and each flood, storm and drought row grows by its own
+    `ChanceIncreasePerDegree` (`_event_rows`), and
     `_fertility_live` / `_desertification_live` flip at IV and V;
   * `_pollution_favor_penalty` is -1 per 3 points over average, capped at 20;
   * `_flood_barrier_cost` is the published formula and `_seat_buildable`
@@ -74,6 +76,7 @@ def main() -> int:
     assert sim._cl_desertify == [False, False, False, False, True, True, True]
     assert sim._defor_cuts == [(0.5, 0.5), (0.4, 0.3), (0.25, 0.1), (0.1, 0.0), (0.0, -0.2)]
     assert sim._co2_per_point == 250_000, "the Duel row, and this world is 44x26"
+    assert sim._co2_per_degree == 500_000, "Maps_XP2.CO2For1DegreeTempRise, MAPSIZE_DUEL"
     # CIV6: 820/490/48 carbon per Power, over 4/4/16 Power per resource.
     cpr = sim._carbon_per_resource.tolist()
     assert 3280 in cpr and 1960 in cpr and 768 in cpr, cpr
@@ -317,16 +320,20 @@ def main() -> int:
     # --- 9) a warmed world's weather --------------------------------------
     s9 = fresh(rules, paths[0])
     assert bool(s9._fertility_live()[b]) and not bool(s9._desertification_live()[b])
-    base = s9._flood_weight
-    assert s9._severity_split(base)[b].tolist() == list(base)
-    prev = base[-1]
-    for p in range(7):
-        s9.climate_idx[b] = p
-        sp = s9._severity_split(base)[b].tolist()
-        assert sp[-1] > prev, f"phase {p} must weigh the worst flood above phase {p - 1}"
-        prev = sp[-1]
-        assert sp[0] < base[0] and sp[-1] > base[-1]
-        assert abs(sum(sp) - sum(base)) < 1e-12
+    assert s9._flood_cipd == [20, 20, 20] and s9._drought_cipd == [0, 50]
+    assert s9._st_cipd == [0, 50, 0, 50, 0, 50, 0, 50]
+    cold = [float(w[b]) for _f, _s, w in s9._event_rows()]
+    assert float(s9._warming_degrees()[b]) == 0.0
+    _emit_points(s9, row, 4)  # two degrees
+    assert abs(float(s9._warming_degrees()[b]) - 2.0) < 1e-9
+    rows9 = s9._event_rows()
+    cipd = (s9._flood_cipd + [0.0] * (len(s9._kilimanjaro_weight) + len(s9._eruption_weight))
+            + s9._st_cipd + [0.0] * len(s9._accident_weight) + s9._drought_cipd)
+    assert len(cipd) == len(rows9)
+    for (_f, _s, w), c0, pct in zip(rows9, cold, cipd):
+        # weight x (1 + CIPD/100 x degrees): the floods x1.4, a worse storm
+        # or the EXTREME drought x2, every row without the column held
+        assert abs(float(w[b]) - c0 * (1 + pct / 100 * 2.0)) < 1e-9, (_f, _s, float(w[b]), c0, pct)
     s9.climate_idx[b] = 3  # Phase IV
     assert not bool(s9._fertility_live()[b]) and not bool(s9._desertification_live()[b])
     s9.climate_idx[b] = 4  # Phase V

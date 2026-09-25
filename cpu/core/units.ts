@@ -23,10 +23,11 @@ const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial, DIR_E, DIR_W } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
-import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
+import { validImprovements, canRemoveFeature, portalAt, portalExit, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
+import { droughtBars } from '../data/disasters';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
 import { effectiveAdjacency, buildingVariantAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
@@ -292,8 +293,10 @@ export function tradeWaterLevel(state: GameState, seat: number): number {
   return techs.includes('CARTOGRAPHY') ? TRADE_WATER_OCEAN : TRADE_WATER_COAST;
 }
 
-/** May a Trader at this water level stand here? */
+/** May a Trader at this water level stand here? A portal's mountain is
+ *  ground to walk onto, as it is to every unit (`portalAt`). */
 export function tradeWalkable(tile: Tile, water: number): boolean {
+  if (portalAt(tile)) return true;
   if (isImpassable(tile)) return false;
   if (!isWater(tile)) return true;
   if (water < TRADE_WATER_COAST) return false;
@@ -306,6 +309,11 @@ export function tradeWalkable(tile: Tile, water: number): boolean {
  * SAME integer stepping rule the war-march uses, so both engines agree by
  * construction. Returns `fromIndex` unchanged when arrived or stuck (no
  * strictly-closer passable neighbour). Zero draws, integer-only.
+ *
+ * CIV6 (Mountain Tunnel, Qhapaq Ñan): "Trade Routes traveling through it" —
+ * a Trader standing on a portal may take it as a unit does (`portalExit`), a
+ * seventh candidate after the six directions, taken only when strictly
+ * closer.
  */
 export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: number, water: number): number {
   const map = state.map;
@@ -321,6 +329,11 @@ export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: 
       bestD = d;
       best = n;
     }
+  }
+  const exit = portalExit(map, at);
+  if (exit >= 0) {
+    const e = map.tiles[exit];
+    if (hexDistance(e.col, e.row, dest.col, dest.row) < bestD) best = e;
   }
   return best ? best.index : fromIndex;
 }
@@ -699,7 +712,7 @@ export function tileFreeForUnit(
   allowEmbark = false,
 ): boolean {
   const tile = state.map.tiles[tileIndex];
-  if (isImpassable(tile) && !gdrJump(state, unit, tile) && !tunnelAt(tile)) return false;
+  if (isImpassable(tile) && !gdrJump(state, unit, tile) && !portalAt(tile)) return false;
   // An AIRCRAFT is BASED, not stationed: several of them share one plot, none
   // of them holds it, and what gates the landing is the base's slot count
   // (`airBaseFree`), never the tile. CIV6 (Espionage): a Spy likewise
@@ -745,7 +758,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
     !borderClosedTo(state, unit.seat, t, unit.type) &&
     (naval
       ? hullTile(t) && !isImpassable(t) && (canalPassage(t) || waterEnterable(state, t, unit))
-      : unitPassable(t, unit) || gdrJump(state, unit, t) || tunnelAt(t));
+      : unitPassable(t, unit) || gdrJump(state, unit, t) || portalAt(t));
   if (!passOk(target)) return null;
   const start = map.tiles[unit.tileIndex];
 
@@ -890,17 +903,6 @@ export function gdrHas(state: GameState, unit: { type: string; seat: number }, i
  *  mirrors; a gate that knows the seat's research composes this beside it. */
 export function gdrJump(state: GameState, unit: { type: string; seat: number } | undefined, tile: Tile): boolean {
   return !!unit && isMountain(tile) && gdrHas(state, unit, 'ENHANCED_MOBILITY');
-}
-
-/**
- * CIV6 (Mountain Tunnel): "allowing units to move into it". A tunnelled
- * mountain is ENTERABLE by anything — and only that. It does not become
- * workable, campable or farmable, which is why this rides `gdrJump`'s two
- * movement sites rather than `isImpassable` itself: fourteen exported flags
- * derive from that predicate and none of them should move.
- */
-export function tunnelAt(tile: Tile): boolean {
-  return tile.improvement === 'MOUNTAIN_TUNNEL';
 }
 
 /** the Movement a chassis draws from the tile under it at the turn's start:
@@ -2110,6 +2112,8 @@ export function builderRepair(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
   const tile = state.map.tiles[unit!.tileIndex];
+  // CIV6 (LOC_UNITOPERATION_REPAIR_BLOCKED_BY_DROUGHT)
+  if (droughtBars(tile, tile.improvement)) return no('This improvement cannot be repaired while a drought is in progress.');
   if (tile.pillaged) tile.pillaged = false;
   else if (tile.districtPillaged) tile.districtPillaged = false;
   else return no('Nothing pillaged here.');

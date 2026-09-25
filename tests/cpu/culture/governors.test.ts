@@ -1,11 +1,11 @@
 import { seatOf, citiesOf } from '../../../cpu/core/seats';
 import { describe, it, expect } from 'vitest';
-import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } from '../../../cpu/core/seats';
+import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat, FREE_SEAT } from '../../../cpu/core/seats';
 import { dedicationEvent } from '../../../cpu/core/eras';
 import { DED_MONUMENTALITY, DED_EXODUS, DED_EVENT_SCORE } from '../../../cpu/data/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
-import { addEraScore, eraBoundary, agePressureFactor } from '../../../cpu/core/eras';
+import { addEraScore, eraBoundary, agePressure } from '../../../cpu/core/eras';
 import { governorAt, governorPhase, governorsOf, governorTitlesAvailable, governorTitlesEarned, governorTitlesSpent, hasPromotion } from '../../../cpu/core/governors';
 import { GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_TITLE_CIVICS, promotionBit, promotionBitValue } from '../../../cpu/data/governors';
 import { tilesWithin } from '../../../world/hex';
@@ -220,15 +220,19 @@ describe('governors / era score', () => {
     expect(seatOf(state, 7)?.eraScore).toBeUndefined();
   });
 
-  // ---- agePressureFactor: defaults + values -----------------------------------
-  it('agePressureFactor reads Normal when the age is absent, else the age factor', () => {
+  // ---- agePressure: defaults + values ------------------------------------------
+  it('agePressure reads Normal when the age is absent, else the per-citizen age term', () => {
+    // CIV6 (the Loyalty pedia): "Golden and Heroic Ages add 0.5 for all
+    // Citizens, while Dark Ages subtract 0.5"
+    expect([...AGE_PRESSURE]).toEqual([-0.5, 0, 0.5]);
     const state = makeState();
     addCiv(state, 5, 5); // seat 1
-    expect(agePressureFactor(state, 0)).toBe(AGE_PRESSURE[1]); // no age set → Normal
+    expect(agePressure(state, 0)).toBe(AGE_PRESSURE[1]); // no age set → Normal
     [0, 2].forEach((v, i) => { const s = seatOf(state, i); if (s) s.age = v; });
-    expect(agePressureFactor(state, 0)).toBe(AGE_PRESSURE[0]); // Dark
-    expect(agePressureFactor(state, 1)).toBe(AGE_PRESSURE[2]); // Golden
-    expect(agePressureFactor(state, 5)).toBe(AGE_PRESSURE[1]); // absent seat → Normal
+    expect(agePressure(state, 0)).toBe(AGE_PRESSURE[0]); // Dark
+    expect(agePressure(state, 1)).toBe(AGE_PRESSURE[2]); // Golden (a Heroic age too)
+    expect(agePressure(state, 5)).toBe(AGE_PRESSURE[1]); // absent seat → Normal
+    expect(agePressure(state, FREE_SEAT)).toBe(0); // the Free Cities player has no age
   });
 
   // ---- seatPhase-driven: the weakest city gets +GOVERNOR_LOYALTY -------------

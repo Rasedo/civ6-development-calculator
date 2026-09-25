@@ -41,6 +41,7 @@ import { CIV_LEVELS } from '../data/civLevels';
 import { BOOSTS } from '../data/boosts';
 import { CONGRESS_RESOLUTIONS, EMERGENCIES } from '../data/seats';
 import { CLIMATE_PHASES } from '../data/climate';
+import { SCORING_LINE_ITEMS } from '../data/scoring';
 import {
   HARDRADA_PILLAGE, PLOT_YIELD_ROWS, PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS,
   DOMESTIC_ROUTE_YIELD_ROWS, ROUTE_CAPACITY_ROWS, COMBAT_CS_ROWS, POST_KILL_HEAL_ROWS,
@@ -113,6 +114,7 @@ const ROW_CATALOGS: Readonly<Record<string, Rows>> = {
   congressResolutions: CONGRESS_RESOLUTIONS,
   emergencies: EMERGENCIES,
   climatePhases: CLIMATE_PHASES,
+  scoring: SCORING_LINE_ITEMS,
   // THE ROSTER'S CIVILIZATION AND LEADER MODIFIER ROWS (cpu/data/civilizations.ts)
   hardradaPillage: HARDRADA_PILLAGE,
   plotYield: PLOT_YIELD_ROWS,
