@@ -186,7 +186,8 @@ export function chargeUnitUpkeep(state: GameState, seat: number): void {
   const cells = powerCells(state, seat);
   let short = 0;
   for (const u of state.units) {
-    if (u.seat !== seat) continue;
+    // a Meteor Site's grant burns nothing (`Unit.noResourceUpkeep`)
+    if (u.seat !== seat || u.noResourceUpkeep) continue;
     const def = UNITS[u.type];
     const k = strategicSlot(def?.requiresResource);
     if (k < 0 || !def?.resourceUpkeep) continue;
@@ -207,7 +208,7 @@ export function chargeUnitUpkeep(state: GameState, seat: number): void {
 export function fuelShortCS(state: GameState, u: Unit): number {
   const def = UNITS[u.type];
   const k = strategicSlot(def?.requiresResource);
-  if (k < 0 || !def?.resourceUpkeep) return 0;
+  if (k < 0 || !def?.resourceUpkeep || u.noResourceUpkeep) return 0;
   return ((seatOf(state, u.seat)?.fuelShort ?? 0) >> k) & 1 ? FUEL_SHORT_CS : 0;
 }
 

@@ -1256,6 +1256,11 @@ class SimMasks:
         # mark (`WAR_BUFF_ROWS`); `rosterCS` returns 0 for a non-combat unit
         if self._war_buff_rows:
             lv = lv + self._seat_war_buff(seat, 1) * combat.long()
+        # CIV6 (Rajendra Chola, ABILITY_CHOLA_NAVAL_COMBAT): the seat's Great
+        # Person channel on every naval combat unit — the ability's TypeTags
+        # are the four CLASS_NAVAL_* classes, and every sea-domain unit with a
+        # Combat value carries one of them
+        lv = lv + (combat & self.unit_naval[t]).long() * self._gp_perm_at(seat, "navalCombat").long()
         if not self._combat_cs_rows and not self._formation_rows:
             return lv
         bit = self.rules_dev.promo_class_bit[self.rules_dev.u_promo_class[t].clamp(min=0)]
@@ -1794,7 +1799,8 @@ class SimMasks:
         return arrived
 
     def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river3: torch.Tensor,
-                    utype: torch.Tensor | None = None, promos: torch.Tensor | None = None):
+                    utype: torch.Tensor | None = None, promos: torch.Tensor | None = None,
+                    useat: torch.Tensor | None = None):
         """The (terrain, river) MP terms a step pays, route-aware —
         the `moveCostInto` + `riverCharge` twin. A ROUTE-to-ROUTE step ignores
         the terrain penalty entirely ("roads let a unit pass through Woods or
@@ -1834,6 +1840,13 @@ class SimMasks:
                 _ww = self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS") | self._type_no_woods_cost[_ut0]
                 tm = tm - (wood & _ww).long() * self._mp_scale
             tm = tm.clamp(min=0)
+        # CIV6 (Missionary Zeal): a religious unit of a seat whose religion
+        # holds it pays no terrain, feature or river Movement
+        # (`religiousIgnoresTerrain`)
+        zeal = None
+        if utype is not None and useat is not None and self._enh_zeal_any:
+            zeal = self._religious_zeal(utype, useat)
+            tm = torch.where(zeal, torch.zeros_like(tm), tm)
         fc, dcc = frm.clamp(min=0).unsqueeze(1), dest.clamp(min=0).unsqueeze(1)
         f_rr = self.railroad.gather(1, fc).squeeze(1)
         d_rr = self.railroad.gather(1, dcc).squeeze(1)
@@ -1845,7 +1858,21 @@ class SimMasks:
         terr = torch.where(rd, step - self._mp_scale, tm)
         bridged = bool(self._road_tier_bridges[self.road_tier])
         riv = torch.where(rd, torch.zeros_like(river3), river3) if bridged else river3
+        if zeal is not None:
+            riv = torch.where(zeal, torch.zeros_like(riv), riv)
         return terr, riv
+
+    def _religious_zeal(self, utype: torch.Tensor, useat: torch.Tensor) -> torch.Tensor:
+        """`religiousIgnoresTerrain` — a religious unit (`_rel_strength` > 0)
+        of a major whose founded religion's Enhancer ignores terrain."""
+        NM = self.n_majors
+        maj = (useat >= 0) & (useat < NM)
+        sr = useat.clamp(min=0, max=NM - 1)
+        enh = self.civ_enhancer.gather(1, sr.reshape(self.B, -1)).reshape_as(useat)
+        done = self.civ_religion_done.gather(1, sr.reshape(self.B, -1)).reshape_as(useat)
+        z = self._enh["zeal"][enh + 1] > 0
+        rel = self._rel_strength[utype.clamp(min=0, max=self.NU - 1)] > 0
+        return maj & done & z & rel & (utype >= 0)
 
     def _encamp_live(self) -> torch.Tensor:
         """[B, T] bool — a LIVE Encampment garrison. The exact
@@ -2515,6 +2542,7 @@ class SimMasks:
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1
         getattr(self, f"{pre}_unit_patrol")[rows, slot] = -1  # born stationed
         getattr(self, f"{pre}_unit_free_city")[rows, slot] = -1  # no Free City's grant
+        getattr(self, f"{pre}_unit_no_res_upkeep")[rows, slot] = False  # no Meteor Site's grant
         # CIV6 (Embrasure): "Military units trained in this city start with a
         # free promotion" — a unit that owes no XP for its first level, which
         # `takePromotion` then zeroes, so nothing carries into the second.
@@ -3825,6 +3853,12 @@ class SimMasks:
         _prt: list[torch.Tensor] = []
         if self._A_PRIORITY >= 0:
             _prt = [present.unsqueeze(2) & (self._priority_targets(row, sc, tc, utype) >= 0)]
+        # EVANGELIZE BELIEF: an Apostle of a religion with a class still to
+        # earn (`evangelizeOk`)
+        _evg: list[torch.Tensor] = []
+        if self._A_EVANGELIZE >= 0:
+            _evg = [(present & (utype == self._apostle_idx)
+                     & self._evangelize_ok(row).unsqueeze(1)).unsqueeze(2)]
         _fi: list[torch.Tensor] = []
         if self._A_FINISH >= 0:
             _fi = [(present
@@ -3875,7 +3909,7 @@ class SimMasks:
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
-            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc + _pt + _dp + _rtb + _prt,
+            + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc + _pt + _dp + _rtb + _prt + _evg,
             dim=2,
         )
         if N < _NFULL:

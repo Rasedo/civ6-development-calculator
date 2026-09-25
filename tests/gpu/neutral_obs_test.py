@@ -78,7 +78,8 @@ def target_ctx(sim, row: int) -> dict:
     ctx = {"smap": smap, "mask": sim._seat_unit_mask(row),
            "tile": sim.unit_tile.gather(1, sc), "type": sim.unit_type.gather(1, sc),
            "charges": sim.unit_charges.gather(1, sc), "gpAt": sim.unit_gp_at.gather(1, sc),
-           "spread": spread, "goody": sim.tile_goody,
+           # a Meteor Site is a goody target beside the villages
+           "spread": spread, "goody": sim.tile_goody | sim.tile_meteor,
            "digs": (sim._dig_here(row, allt) & ((sim.tile_seat < 0) | (sim.tile_seat == row))
                     & sim._museum_room(row).unsqueeze(1))}
     if sim.improvements_on:
@@ -90,11 +91,14 @@ def target_ctx(sim, row: int) -> dict:
 
 
 def found_ok(sim, b: int) -> list:
-    """`canFoundCity`'s terms, tile by tile, in game `b`."""
+    """`canFoundCity`'s terms, tile by tile, in game `b` — a fire's plot
+    (`fireFeature`) takes no city."""
     ctrs = [int(c) for r in range(sim.n_majors) for c, a in zip(sim.city_center[b, r].tolist(), sim.city_alive[b, r].tolist()) if a]
     ctrs += [int(c) for c, a in zip(sim.citystate_center[b].tolist(), sim.citystate_alive[b].tolist()) if a]
+    fire = sim._fire_plots()[b]
     return [t for t in range(sim.T)
-            if int(sim.tile_seat[b, t]) < 0 and bool(sim.settle_ok[b, t]) and int(sim.district[b, t]) < 0
+            if int(sim.tile_seat[b, t]) < 0 and bool(sim.settle_ok[b, t]) and not bool(fire[t])
+            and int(sim.district[b, t]) < 0
             and int(sim.built_wonder[b, t]) < 0 and all(int(sim.pair_dist[t, c]) >= 4 for c in ctrs)]
 
 
@@ -225,6 +229,7 @@ ACT_ATTRS = {
     "DEPLOY_0": "_A_DEPLOY", "RETURN_TO_BASE": "_A_RETURN", "PRIORITY_TARGET_0": "_A_PRIORITY",
     "BUILD_ROAD": "_A_ROAD", "BUILD_RAILROAD": "_A_RAIL", "FINISH_DISTRICT": "_A_FINISH", "ACTIVATE_GP": "_A_GP",
     "BOOST_PROJECT": "_A_BOOST", "FORM_UP_0": "_A_FORM_UP", "HARVEST": "_A_HARVEST", "WONDER_CHARGE": "_A_WONDER_CHARGE",
+    "EVANGELIZE_BELIEF": "_A_EVANGELIZE",
 }
 
 
@@ -393,6 +398,19 @@ def main() -> None:
         f"the diplomatic table never filled: {dict(live_geo)}")
     for p, v in keep.items():
         getattr(sim, p).copy_(v)
+    # the drive may end with no Builder standing (a fire kills the civilians
+    # on its plots): seat one in row 0's first city of each game, so the
+    # jobs plane has a holder to read
+    bld = sim._builder_idx
+    for b in range(sim.B):
+        held = (sim.major_unit_alive[b] & (sim.major_unit_seat[b] == 0) & (sim.major_unit_type[b] == bld)).any()
+        cols = sim.city_alive[b, 0].nonzero().flatten()
+        if not bool(held) and cols.numel():
+            one = torch.zeros(sim.B, dtype=torch.bool)
+            one[b] = True
+            sim._spawn_unit(0, one, torch.full((sim.B,), int(sim.city_center[b, 0, int(cols[0])]), dtype=torch.long),
+                            torch.full((sim.B,), bld, dtype=torch.long))
+    sim._gen_ver += 1
     # the drive leaves every queue full; EMPTY the even seats' so their
     # production columns and district plots are open to read
     for row in range(0, sim.n_majors, 2):
@@ -545,10 +563,10 @@ def main() -> None:
             assert all(float(x) == int(x) for x in sim.gp_price[b, :nG].tolist()), f"{where}: a fractional gp price"
             assert gp["points"] == [math.floor(x) for x in sim.civ_gpp[b, row, :nG].tolist()], f"{where}: gp.points"
             live_gp += sum(x >= 0 for x in gp["offer"])
-            # BELIEFS: the founding and enhancing gates, the held rows, each
-            # class's open rows
+            # BELIEFS: the founding gate, the enhancement's count, the held
+            # rows, each class's open rows
             bg, pools = ob["belief"], sim._bel_pools()
-            gates = [bool(sim._can_found(row)[b]), bool(sim._can_enhance(row)[b])]
+            gates = [bool(sim._can_found(row)[b]), int(sim._belief_picks(row)[b])]
             assert [bg["found"], bg["enhance"]] == gates, f"{where}: belief gates"
             assert bg["held"] == [int(ids[b, row]) for _m, ids, _n in pools], f"{where}: belief.held"
             for name, (m, _ids, n) in zip(("follower", "worship", "founder", "enhancer"), pools):

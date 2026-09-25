@@ -315,12 +315,14 @@ describe('the eight storms are the install\'s table', () => {
       expect(warm[a]).toBe(base[a]);
       expect(warm[b]).toBeCloseTo(base[b] * 2, 12);
     }
-    // ...and the draw reads exactly these rows, in the install's table order
+    // ...and the draw reads exactly these rows, in the live table's order
     const rows = eventRows(2);
     expect(rows.filter((r) => r.family === 'storm').map((r) => r.weight)).toEqual(warm);
     expect(rows.map((r) => r.family)).toEqual([
-      'flood', 'flood', 'flood', 'kilimanjaro', 'kilimanjaro', 'volcano', 'volcano', 'volcano',
+      'eruption', 'eruption', 'flood', 'flood', 'flood',
+      'eruption', 'eruption', 'eruption', 'eruption', 'eruption', 'eruption',
       ...STORM_EVENTS.map(() => 'storm'), 'accident', 'accident', 'accident', 'drought', 'drought',
+      'meteor', 'fire', 'fire',
     ]);
   });
 });

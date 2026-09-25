@@ -1,7 +1,7 @@
 
 import type { DistrictId, GreatPersonClass } from '../core/types';
 import { srcConst, xml, type SrcMap } from './provenance';
-import { LUXURY_AMENITY_CITIES } from './constants';
+import { GAME_SPEED, LUXURY_AMENITY_CITIES, scaleByGameSpeed } from './constants';
 import { GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
 
 export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
@@ -613,6 +613,9 @@ export const GP_PERM = [
   // CIV6 (Space Station, ISS_FIRST_PLACE_SPACESHIP_SPEED): +3 light-years per
   // turn for the Exoplanet craft once launched.
   'exoSpeed',
+  // CIV6 (Rajendra Chola, ABILITY_CHOLA_NAVAL_COMBAT): Combat Strength on
+  // every naval combat unit of the seat, now and later (`rosterCS`).
+  'navalCombat',
 ] as const;
 export type GpPermKey = (typeof GP_PERM)[number];
 
@@ -706,7 +709,10 @@ export interface GpEffect {
    *  City-state, then removes all other players' Envoys." */
   suzerainSeize?: boolean;
   /** production into a WONDER under construction in the activating city,
-   *  doubled when that wonder's era is at or below `wonderEraDouble`. */
+   *  doubled when that wonder's era is at or below `wonderEraDouble` — at
+   *  Standard speed: every install row on this channel is typed
+   *  `ScaleByGameSpeed`, and Imhotep's doubled grant is a row of its own, so
+   *  the payout scales the whole grant, the double included. */
   wonderProduction?: number;
   /** CIV6 (Shah Jahan): gold pays the WONDER at the head of the queue —
    *  production = min(what the wonder still needs, treasury / 2), gold falls
@@ -788,6 +794,29 @@ interface GpAbility extends GpEffect {
   unmodelled?: boolean;
 }
 
+/** CIV6 (Rajendra Chola, GREATPERSON_RAJENDRA_CHOLA_ACTIVE: a Permanent
+ *  MODIFIER_PLAYER_UNITS_GRANT_ABILITY of ABILITY_CHOLA_NAVAL_COMBAT): "+3
+ *  Combat Strength for all naval units" — CHOLA_NAVAL_UNITS_COMBAT_STRENGTH. */
+const GP_CHOLA_NAVAL_CS = srcConst('greatPeople.GP_CHOLA_NAVAL_CS', 3,
+  xml('ModifierArguments', 'ModifierId=CHOLA_NAVAL_UNITS_COMBAT_STRENGTH&Name=Amount', 'Value'));
+/** CIV6 (Francis Drake, GREATPERSON_FRANCIS_DRAKE_ACTIVE:
+ *  MODIFIER_PLAYER_UNIT_GRANT_UNIT_WITH_EXPERIENCE, Experience -1): "Instantly
+ *  creates a Privateer unit with 1 promotion level". */
+const GP_DRAKE_UNIT = srcConst('greatPeople.GP_DRAKE_UNIT', 'PRIVATEER',
+  xml('ModifierArguments', 'ModifierId=GREATPERSON_FRANCIS_DRAKE_ACTIVE&Name=UnitType', 'Value',
+    { expect: 'UNIT_PRIVATEER' }));
+
+/** a Great Person's grant the install types `ScaleByGameSpeed` (or flags
+ *  `Scale`): the modifier's Standard-speed Amount through `scaleByGameSpeed`,
+ *  registered so the checker re-reads the row. */
+const gpScaled = (name: string, modifierId: string, standard: number): number =>
+  srcConst(`greatPeople.${name}`, scaleByGameSpeed(standard),
+    xml('ModifierArguments', `ModifierId=${modifierId}&Name=Amount`, 'Value', { scale: GAME_SPEED }));
+/** a wonder grant at Standard speed — the payout scales it (`wonderProduction`). */
+const gpStandard = (name: string, modifierId: string, standard: number): number =>
+  srcConst(`greatPeople.${name}`, standard,
+    xml('ModifierArguments', `ModifierId=${modifierId}&Name=Amount`, 'Value'));
+
 /**
  * WHAT EACH PERSON DOES, off that class's own wiki roster table. Only the five
  * one-off classes are listed: a Prophet founds a religion and a Writer, Artist
@@ -804,36 +833,42 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_EUCLID: { eurekaTechs: ['MATHEMATICS'], eurekaRandom: 1, eurekaLo: 1, eurekaHi: 1 },
   GP_HYPATIA: { buildings: ['LIBRARY'] },
   GP_ABU_AL_QASIM_AL_ZAHRAWI: { site: 'anywhere', eurekaRandom: 1, eurekaHi: 1, perm: { healBonus: 5 } },
-  GP_HILDEGARD_OF_BINGEN: { siteDistrict: 'HOLY_SITE', faith: 100 },
+  GP_HILDEGARD_OF_BINGEN: { siteDistrict: 'HOLY_SITE', faith: gpScaled('GP_HILDEGARD_FAITH', 'GREATPERSON_FAITH', 100) },
   GP_OMAR_KHAYYAM: { eurekaRandom: 2, eurekaHi: 1, inspirationRandom: 1 },
   GP_IBN_KHALDUN: { cityPerm: { housing: 2, amenities: 1 } },
   GP_EMILIE_DU_CHATELET: { eurekaRandom: 3, eurekaHi: 1 },
-  GP_GALILEO_GALILEI: { perAdjacent: { source: 'MOUNTAIN', yield: 'science', amount: 250 } },
+  GP_GALILEO_GALILEI: { perAdjacent: { source: 'MOUNTAIN', yield: 'science', amount: gpScaled('GP_GALILEO_SCIENCE', 'GREATPERSON_ADJACENT_GRASSMOUNTAIN_SCIENCE', 250) } },
   GP_ISAAC_NEWTON: { buildings: ['LIBRARY', 'UNIVERSITY'] },
-  GP_CHARLES_DARWIN: { perAdjacent: { source: 'NATURAL_WONDER', yield: 'science', amount: 500 } },
+  GP_CHARLES_DARWIN: { perAdjacent: { source: 'NATURAL_WONDER', yield: 'science', amount: gpScaled('GP_DARWIN_SCIENCE', 'GREATPERSON_ADJACENT_NATURALWONDER_SCIENCE', 500) } },
   GP_DMITRI_MENDELEEV: { eurekaTechs: ['CHEMISTRY'], eurekaRandom: 1 },
   GP_JAMES_YOUNG: { eurekaRandom: 2, eurekaHi: 1 },
   GP_ALAN_TURING: { eurekaTechs: ['COMPUTERS'], eurekaRandom: 1 },
-  GP_ALBERT_EINSTEIN: { eurekaRandom: 1 },
-  GP_ALFRED_NOBEL: { eurekaRandom: 1, eurekaHi: 1, gppAll: 100 },
+  // CIV6 (GREATPERSON_1MODERNATOMICTECHBOOST): one boost drawn over
+  // ERA_MODERN..ERA_ATOMIC
+  GP_ALBERT_EINSTEIN: { eurekaRandom: 1, eurekaHi: 1 },
+  GP_ALFRED_NOBEL: { eurekaRandom: 1, eurekaHi: 1, gppAll: gpScaled('GP_NOBEL_GPP', 'GREATPERSON_GREAT_PERSON_FREE_POINTS', 100) },
   GP_ERWIN_SCHRODINGER: { eurekaRandom: 3, eurekaHi: 1 },
-  GP_JANAKI_AMMAL: { perAdjacent: { source: 'RAINFOREST', yield: 'science', amount: 400, here: true } },
-  GP_MARY_LEAKEY: { artifactScience: 350 }, // the tourism clause waits on the tourism system
-  GP_MARGARET_MEAD: { science: 1000, culture: 1000 },
-  GP_CARL_SAGAN: { spaceProduction: 3000 },
+  GP_JANAKI_AMMAL: { perAdjacent: { source: 'RAINFOREST', yield: 'science', amount: gpScaled('GP_JANAKI_SCIENCE', 'GREATPERSON_ADJACENT_RAINFOREST_SCIENCE', 400), here: true } },
+  GP_MARY_LEAKEY: { artifactScience: gpScaled('GP_LEAKEY_SCIENCE', 'GREATPERSON_ARTIFACT_SCIENCE', 350) }, // the tourism clause waits on the tourism system
+  GP_MARGARET_MEAD: {
+    science: gpScaled('GP_MEAD_SCIENCE', 'GREAT_PERSON_GRANT_LOTSO_SCIENCE', 1000),
+    culture: gpScaled('GP_MEAD_CULTURE', 'GREAT_PERSON_GRANT_LOTSO_CULTURE', 1000),
+  },
+  GP_CARL_SAGAN: { spaceProduction: gpScaled('GP_SAGAN_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_LATE_SPACE_RACE', 3000) },
   GP_STEPHANIE_KWOLEK: { perm: { spaceProdPct: 100 } },
   GP_ABDUS_SALAM: { eurekaEra: true },
 
   // ---- ENGINEER: wonders, buildings and the Space Race ----
-  GP_IMHOTEP: { charges: 2, wonderProduction: 175, wonderEraDouble: 1 },
+  // the doubled grant is its own row: ..._ANCIENT_CLASSICAL, Amount 350
+  GP_IMHOTEP: { charges: 2, wonderProduction: gpStandard('GP_IMHOTEP_PRODUCTION', 'GREAT_PERSON_INDIVIDUAL_IMHOTEP_PRODUCTION_OTHER', 175), wonderEraDouble: 1 },
   GP_BI_SHENG: { eurekaTechs: ['PRINTING'], cityPerm: { districtLimit: 1 } },
-  GP_ISIDORE_OF_MILETUS: { charges: 2, wonderProduction: 215 },
+  GP_ISIDORE_OF_MILETUS: { charges: 2, wonderProduction: gpStandard('GP_ISIDORE_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_MEDIEVAL', 215) },
   GP_JAMES_OF_ST_GEORGE: { charges: 3, buildings: ['ANCIENT_WALLS', 'MEDIEVAL_WALLS'] },
-  GP_FILIPPO_BRUNELLESCHI: { charges: 2, wonderProduction: 315 },
+  GP_FILIPPO_BRUNELLESCHI: { charges: 2, wonderProduction: gpStandard('GP_BRUNELLESCHI_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_RENAISSANCE', 315) },
   GP_LEONARDO_DA_VINCI: { eurekaRandom: 1, eurekaLo: 2, eurekaHi: 2, perm: { workshopCulture: 3 } },
   GP_MIMAR_SINAN: { cityPerm: { housing: 1, amenities: 1 } },
   GP_ADA_LOVELACE: { eurekaTechs: ['COMPUTERS'], cityPerm: { districtLimit: 1 } },
-  GP_GUSTAVE_EIFFEL: { charges: 2, wonderProduction: 480 },
+  GP_GUSTAVE_EIFFEL: { charges: 2, wonderProduction: gpStandard('GP_EIFFEL_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_INDUSTRIAL', 480) },
   GP_JAMES_WATT: { buildings: ['WORKSHOP', 'FACTORY'] },
   // CIV6 (Shah Jahan): "Grants Production towards wonder construction,
   // capped at half of your current treasury. Then reduces your Gold by twice
@@ -846,7 +881,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_NIKOLA_TESLA: { siteDistrict: 'INDUSTRIAL_ZONE', tilePerm: { regionalRange: 3, regionalProduction: 2 } },
   GP_JANE_DREW: { cityPerm: { housing: 4, amenities: 3 } },
   GP_JOHN_ROEBLING: { charges: 2, cityPerm: { housing: 2, amenities: 1 } },
-  GP_SERGEI_KOROLEV: { spaceProduction: 1500 },
+  GP_SERGEI_KOROLEV: { spaceProduction: gpScaled('GP_KOROLEV_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_EARLY_SPACE_RACE', 1500) },
   // CIV6 (Joseph Paxton): the same on an Entertainment Complex, +1 Amenity.
   GP_JOSEPH_PAXTON: { siteDistrict: 'ENTERTAINMENT_COMPLEX', tilePerm: { regionalRange: 3, regionalAmenities: 1 } },
   GP_CHARLES_CORREA: { cityPerm: { appeal: 2 } },
@@ -856,17 +891,17 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_KENZO_TANGE: { site: 'anywhere', cityPerm: { adjTourism: 1 } },
 
   // ---- MERCHANT: gold, envoys, trade capacity and invented luxuries ----
-  GP_COLAEUS: { site: 'luxury', faith: 100, luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
-  GP_MARCUS_LICINIUS_CRASSUS: { site: 'adjacentOwn', charges: 3, gold: 60 },
+  GP_COLAEUS: { site: 'luxury', faith: gpScaled('GP_COLAEUS_FAITH', 'GREATPERSON_FAITH_SMALL', 100), luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
+  GP_MARCUS_LICINIUS_CRASSUS: { site: 'adjacentOwn', charges: 3, gold: gpScaled('GP_CRASSUS_GOLD', 'GREATPERSON_GOLD_TINY', 60) },
   GP_ZHANG_QIAN: { perm: { tradeCapacity: 1 } },
   GP_IBN_FADLAN: { perm: { tradeCapacity: 1 } },
   GP_IRENE_OF_ATHENS: { site: 'luxury', perm: { tradeCapacity: 1 }, luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
   GP_MARCO_POLO: { unit: 'TRADER', perm: { tradeCapacity: 1 } },
   GP_ZHOU_DAGUAN: { site: 'cityState', envoys: 3 },
-  GP_JAKOB_FUGGER: { gold: 200, envoys: 2 },
+  GP_JAKOB_FUGGER: { gold: gpScaled('GP_FUGGER_GOLD', 'GREATPERSON_GOLD_SMALL', 200), envoys: 2 },
   GP_RAJA_TODAR_MAL: { envoys: 1 },
   GP_ADAM_SMITH: { perm: { policySlotEconomic: 1 } },
-  GP_JOHN_JACOB_ASTOR: { gold: 500, envoys: 2 },
+  GP_JOHN_JACOB_ASTOR: { gold: gpScaled('GP_ASTOR_GOLD', 'GREATPERSON_GOLD_LARGE', 500), envoys: 2 },
   GP_JOHN_SPILSBURY: { luxuryCopies: 1, luxuryAmenities: 4 },
   // CIV6 (Stamford Raffles, `ActionRequiresSuzerainTerritory`): the city-state
   // joins the empire and keeps +10 Loyalty per turn (the GS attachment).
@@ -902,7 +937,8 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_TUPAC_AMARU: { site: 'enemyTerritory', unitEachDistrict: 'MUSKETMAN' },
   GP_JOHN_MONASH: { promotionLevels: 1, xpPct: 75 },
   GP_MARINA_RASKOVA: { siteDistrict: 'AERODROME', airSlotBonus: 1 },
-  GP_SAMORI_TOURE: { unit: 'INFANTRY', unitPromotions: 1 },
+  // CIV6 (GREATPERSON_SAMORI_TURE_ACTIVE): UNIT_SPEC_OPS, Experience -1
+  GP_SAMORI_TOURE: { unit: 'SPEC_OPS', unitPromotions: 1 },
   GP_DOUGLAS_MACARTHUR: { unit: 'TANK', unitPromotions: 1 },
   GP_DWIGHT_EISENHOWER: { perm: { unitProdPct: 5 } },
   GP_GEORGY_ZHUKOV: { perm: { flankPctLand: 50 } },
@@ -917,13 +953,15 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_HANNO_THE_NAVIGATOR: { unit: 'GALLEY' },
   GP_HIMERIOS: { promotionLevels: 1, xpPct: 25 },
   GP_LEIF_ERIKSON: { perm: { navalOcean: 1, navalSight: 1 } },
-  GP_RAJENDRA_CHOLA: { gold: 50 },
+  GP_RAJENDRA_CHOLA: { perm: { navalCombat: GP_CHOLA_NAVAL_CS } },
   GP_ZHENG_HE: { envoys: 1 },
-  GP_FRANCIS_DRAKE: { gold: 75, perm: { routePlunderPct: 50 } },
+  GP_FRANCIS_DRAKE: { unit: GP_DRAKE_UNIT, unitPromotions: 1, perm: { routePlunderPct: 50 } },
   GP_SANTA_CRUZ: { formation: 2, formationNaval: true },
   GP_YI_SUN_SIN: { unit: 'IRONCLAD', unitPromotions: 1 },
   GP_FERDINAND_MAGELLAN: { cityPerm: { loyalty: 4 } },
-  GP_CHING_SHIH: { gold: 100, perm: { routePlunderPct: 60 } },
+  // CIV6 (Ching Shih, GREATPERSON_CHING_SHIH_ACTIVE): "Gain 500 Gold (on
+  // Standard speed)", beside the +60% sea-route plunder
+  GP_CHING_SHIH: { gold: gpScaled('GP_CHING_SHIH_GOLD', 'GREATPERSON_CHING_SHIH_ACTIVE', 500), perm: { routePlunderPct: 60 } },
   GP_HORATIO_NELSON: { siteDistrict: 'HARBOR', buildings: ['LIGHTHOUSE', 'SHIPYARD'], perm: { flankPctNaval: 50 } },
   GP_LASKARINA_BOUBOULINA: { promotionLevels: 1, xpPct: 50 },
   GP_MATTHEW_PERRY: { site: 'cityState', suzerainSeize: true },
@@ -931,7 +969,9 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_JOAQUIM_MARQUES_LISBOA: { perm: { warWearyPct: 25 } },
   GP_TOGO_HEIHACHIRO: { promotionLevels: 1, xpPct: 75 },
   GP_CHESTER_NIMITZ: { perm: { unitProdPct: 20 } },
-  GP_GRACE_HOPPER: { freeTechRandom: 1 },
+  // CIV6 (GREATPERSON_GRACE_HOPPER_ACTIVE, MODIFIER_PLAYER_GRANT_RANDOM_TECHNOLOGY
+  // Amount 2): "Gain 2 randomly-chosen free technologies"
+  GP_GRACE_HOPPER: { freeTechRandom: 2 },
   GP_SERGEI_GORSHKOV: { promotionLevels: 1, xpPct: 100 },
   GP_CLANCY_FERNANDO: { promotionLevels: 1, xpPct: 200 },
 };

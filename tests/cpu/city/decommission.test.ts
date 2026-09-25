@@ -16,7 +16,7 @@ import { completeProject } from '../../../cpu/core/production';
 import { startCompetition } from '../../../cpu/core/competition';
 import { PROJECTS } from '../../../cpu/data/projects';
 import { COMPETITION_CLIMATE, COMPETITIONS } from '../../../cpu/data/seats';
-import { GAME_SPEED } from '../../../cpu/data/constants';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import type { City, GameState } from '../../../cpu/core/types';
 
 const ROWS = [
@@ -42,8 +42,8 @@ describe('the decommission projects', () => {
     for (const [id, plant] of ROWS) {
       const p = PROJECTS[id];
       expect(p).toBeTruthy();
-      // the catalog scales every published cost by GAME_SPEED, as `P()` does
-      expect(p.cost).toBe(Math.round(400 * GAME_SPEED));
+      // the catalog scales every published cost through `scaleByGameSpeed`
+      expect(p.cost).toBe(scaleByGameSpeed(400));
       expect(p.district).toBe('INDUSTRIAL_ZONE');
       expect(p.consumesBuilding).toBe(plant);
       expect(p.competitionOnly).toBe('CLIMATE_ACCORDS');

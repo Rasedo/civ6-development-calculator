@@ -5,6 +5,12 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { foundCity, queueSettler, settlerCost, endTurn } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
 import { settlerCount, spawnUnit } from '../../../cpu/core/units';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
+import { SETTLER_COST_STEP, UNITS } from '../../../cpu/data/units';
+
+// the Units row's Cost 80 and CostProgressionParam1 30, each at the speed
+const BASE = UNITS.SETTLER.cost;
+const STEP = scaleByGameSpeed(SETTLER_COST_STEP);
 
 describe('settlers', () => {
   it('the settler is a UNIT: training spawns it, founding stands on the tile and consumes it', () => {
@@ -14,7 +20,8 @@ describe('settlers', () => {
     spawnUnit(state, 'SETTLER', aTile.index, 0);
     const a = foundCity(state, aTile.index, 0).city!; // consumes the starting settler
     expect(settlerCount(state, 0)).toBe(0);
-    expect(settlerCost(state, 0)).toBe(48); // 80 × GAME_SPEED
+    expect(BASE).toBe(scaleByGameSpeed(80));
+    expect(settlerCost(state, 0)).toBe(BASE);
 
     // a second founding needs a settler STANDING on the tile
     expect(foundCity(state, tileAtCoords(state.map, 12, 9).index, 0).ok).toBe(false);
@@ -23,9 +30,9 @@ describe('settlers', () => {
     expect(queueSettler(state, a.id, 0).ok).toBe(false);
     a.population = 2;
     expect(queueSettler(state, a.id, 0).ok).toBe(true);
-    expect(settlerCost(state, 0)).toBe(66); // queued settler raises the next price (+18)
+    expect(settlerCost(state, 0)).toBe(BASE + STEP); // a queued settler raises the next price
     const prod = computeCityStats(state, a).total.production;
-    const turns = Math.ceil(48 / prod);
+    const turns = Math.ceil(BASE / prod);
     for (let i = 0; i < turns; i++) endTurn(state);
     expect(settlerCount(state, 0)).toBe(1); // completion SPAWNED the unit at the city
 

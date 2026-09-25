@@ -1,6 +1,6 @@
 import type { City, GameState, Seat, Unit } from './types';
 import { logPopWrite } from './difflog';
-import { repairBuilding } from './yields';
+import { repairBuilding, stampBuildingEra } from './yields';
 import { scoreProject } from './competition';
 import type { QueueItem } from './types';
 import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital, civOf } from './seats';
@@ -421,6 +421,7 @@ export function completeQueueItem(
       // and the GPU carries it as one bit per building.
       if (!city.buildings.includes(item.building)) city.buildings.push(item.building);
       repairBuilding(city, item.building); // a held building's column completing is its REPAIR
+      stampBuildingEra(state, city, item.building);
       buildingDedications(state, city.seat, item.building);
       // CIV6 (Intelligence Agency): "+1 Spy" — the free unit, here.
       if (BUILDINGS[item.building]?.grantUnit) spawnUnit(state, BUILDINGS[item.building].grantUnit!, city.centerIndex, city.seat);

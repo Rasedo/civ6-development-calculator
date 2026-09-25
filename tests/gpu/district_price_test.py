@@ -40,12 +40,12 @@ def test_the_wire(rules, path) -> None:
     """One base and one discount PER placeable row, and the two that differ."""
     sim = build(path)
     dcp = sim.rules.district_cost
-    per = dcp.get("perDistrict") or []
-    disc = dcp.get("discountPct") or []
+    per = dcp["perDistrict"]
+    disc = dcp["discountPct"]
     names = [d.get("id", "?") for d in sim.districts_cat]
     assert len(per) == len(names), f"{len(per)} bases for {len(names)} districts"
     assert len(disc) == len(names), f"{len(disc)} discounts for {len(names)} districts"
-    speed = float(sim.rules.game_speed)
+    sp = sim.rules.scale_by_game_speed
 
     want = {"AQUEDUCT": 36, "CANAL": 81, "DAM": 81, "NEIGHBORHOOD": 54,
             "GOVERNMENT_PLAZA": 30, "DIPLOMATIC_QUARTER": 30, "SPACEPORT": 1800,
@@ -54,8 +54,8 @@ def test_the_wire(rules, path) -> None:
         if nm not in names:
             continue
         i = names.index(nm)
-        assert per[i] == round(base * speed), (
-            f"{nm} ships {per[i]}, expected {base} speed-scaled to {round(base * speed)}")
+        assert per[i] == sp(base), (
+            f"{nm} ships {per[i]}, expected {base} speed-scaled to {sp(base)}")
     # the ONLY two rows off the install's 40
     odd = sorted(names[i] for i, p in enumerate(disc) if p != 40)
     assert odd == ["DIPLOMATIC_QUARTER", "GOVERNMENT_PLAZA"], f"off-40 rows: {odd}"
@@ -68,9 +68,9 @@ def test_bases_differ_from_the_specialty_one(rules, path) -> None:
     """The point of the row's own base: an Aqueduct must not cost a Campus."""
     sim = build(path)
     dcp = sim.rules.district_cost
-    per = dcp.get("perDistrict") or []
+    per = dcp["perDistrict"]
     names = [d.get("id", "?") for d in sim.districts_cat]
-    spec = int(dcp.get("base", 32))
+    spec = int(dcp["base"])
     aq = per[names.index("AQUEDUCT")]
     dam = per[names.index("DAM")]
     assert aq < spec, f"the Aqueduct ships {aq}, not below the specialty {spec}"
@@ -85,16 +85,16 @@ def test_the_engine_pays_the_row(rules, path) -> None:
     sim = build(path)
     row = 0
     dcp = sim.rules.district_cost
-    per = dcp.get("perDistrict") or []
+    per = dcp["perDistrict"]
     names = [d.get("id", "?") for d in sim.districts_cat]
     t_pct = sim.civ_techs[:, row].sum(dim=1).double() / float(sim.rules_dev.t_cost.shape[0])
     c_pct = sim.civ_civics[:, row].sum(dim=1).double() / float(sim.rules_dev.c_cost.shape[0])
-    fac = 1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)
+    fac = 1 + dcp["scale"] * torch.maximum(t_pct, c_pct)
     price = {nm: float(torch.floor(float(per[names.index(nm)]) * fac)[B0])
              for nm in ("AQUEDUCT", "CAMPUS", "DAM")}
     assert price["AQUEDUCT"] < price["CAMPUS"] < price["DAM"], price
     # ...and the discount is the row's, not a shared 0.6
-    disc = dcp.get("discountPct") or []
+    disc = dcp["discountPct"]
     for nm, want in (("CAMPUS", 0.6), ("GOVERNMENT_PLAZA", 0.75)):
         if nm not in names:
             continue
@@ -111,8 +111,8 @@ def test_the_two_models_part(rules, path) -> None:
     tell them apart — which is how one curve stood in for both."""
     sim = build(path)
     dcp = sim.rules.district_cost
-    pg = dcp.get("progressGame") or []
-    per = dcp.get("perDistrict") or []
+    pg = dcp["progressGame"]
+    per = dcp["perDistrict"]
     hot = [i for i, v in enumerate(pg) if v]
     assert hot, "no row carries the GAME_PROGRESS parameter"
 
@@ -125,7 +125,7 @@ def test_the_two_models_part(rules, path) -> None:
     fac = float(sim._district_research_fac(0)[0])
     for si, (di, *_rest) in enumerate(sim._scaffold):
         cost = float(sim._district_cost_si(0, si)[0])
-        base = float(per[di]) if di < len(per) else float(dcp.get("base", 32))
+        base = float(per[di]) if di < len(per) else float(dcp["base"])
         if di in hot:
             # ...and it must not be the multiplied one, or the two models
             # would be one again

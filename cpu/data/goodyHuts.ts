@@ -10,11 +10,14 @@
  * A weight of 0 means the subtype is OFF in this ruleset (GRANT_UPGRADE and
  * GRANT_SETTLER), not that it is free — it is excluded from the draw.
  *
- * `scale` marks the rows the install flags `Scale: true`, which take the
- * game-speed scale every other yield figure here already takes.
+ * `scale` marks the rows whose amount the install scales by the game speed —
+ * the six Gold and Faith rows, whose modifiers carry `Scale: true`, and the
+ * strategic grant, whose `Amount` is typed `ScaleByGameSpeed` — and
+ * `goodyAmount` is the one composer of what a row pays.
  *
  * The GPU twin reads these through the wire's `goodyHuts` block.
  */
+import { scaleByGameSpeed } from './constants';
 import { srcConst, xml } from './provenance';
 
 export type GoodyKind =
@@ -71,7 +74,8 @@ export interface GoodySubType {
   turn?: number;
   /** the row needs the claimer to hold at least one city */
   minOneCity?: boolean;
-  /** the install's `Scale: true` — take the game-speed scale */
+  /** the install scales this row's amount by the game speed (`Scale: true`,
+   *  or an `Amount` typed `ScaleByGameSpeed`) */
   scale?: boolean;
   payload: GoodyPayload;
 }
@@ -108,7 +112,8 @@ export const GOODY_SUBTYPES: readonly GoodySubType[] = [
     payload: { kind: 'experience', amount: 20 } },
   { id: 'HEAL', hut: 'MILITARY', weight: 25,
     payload: { kind: 'heal', amount: 100 } },
-  { id: 'RESOURCES', hut: 'MILITARY', weight: 20,
+  // GOODY_MILITARY_ADJUST_STRATEGIC_RESOURCES: Amount 20, typed ScaleByGameSpeed
+  { id: 'RESOURCES', hut: 'MILITARY', weight: 20, scale: true,
     payload: { kind: 'strategic', amount: 20 } },
   // ----- SCIENCE
   { id: 'ONE_TECH', hut: 'SCIENCE', weight: 15, turn: 50, minOneCity: true,
@@ -135,3 +140,11 @@ export const GOODY_SUBTYPES: readonly GoodySubType[] = [
   { id: 'FAVOR', hut: 'DIPLOMACY', weight: 45, turn: 30,
     payload: { kind: 'favor', amount: 20 } },
 ];
+
+/** what a row pays at this game's speed — its amount, through
+ *  `scaleByGameSpeed` where the install scales it. The TS payout and the
+ *  exporter's wire both read this, so the two engines cannot disagree. */
+export function goodyAmount(sub: GoodySubType): number {
+  const a = 'amount' in sub.payload ? sub.payload.amount : 0;
+  return sub.scale ? scaleByGameSpeed(a) : a;
+}

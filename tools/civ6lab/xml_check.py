@@ -51,6 +51,7 @@ mism + dangl only.
 from __future__ import annotations
 
 import json
+import math
 import pathlib
 import re
 import sys
@@ -395,14 +396,14 @@ def xml_cell(inst: Install, src: dict, want) -> tuple[str | None, str]:
     """the install cell a tag names, in the CATALOG's units (scale applied)"""
     v, who = inst.get(src["xml"], src["where"], src["col"])
     if v is not None and "scale" in src and _num(v) is not None:
-        # the catalog holds cell * scale — rounded when the catalog's value
-        # is a whole number (a cost through GAME_SPEED), exact when it is a
-        # fraction (a percentage stored as 0.25)
+        # the catalog holds cell * scale — truncated when the catalog's value
+        # is a whole number (a cost through GAME_SPEED, `scaleByGameSpeed`),
+        # exact when it is a fraction (a percentage stored as 0.25)
         prod = float(_num(v)) * float(src["scale"])
         if isinstance(want, (int, float)) and float(want) != int(want):
             v = repr(prod)
         else:
-            v = str(int(round(prod + 1e-9)))
+            v = str(int(math.floor(prod + 1e-9)))
     return v, who
 
 

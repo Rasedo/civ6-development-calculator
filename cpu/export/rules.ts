@@ -10,7 +10,8 @@ import { eraUnitOfClass } from '../core/phase';
 import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
-import { SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary } from '../core/units';
+import { SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary, classLine } from '../core/units';
+import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY, METEOR_GRANT_CLASS, FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG, FIRE_APPEAL } from '../data/disasters';
 import { NUCLEAR_DEVICES, FALLOUT_DAMAGE, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, FALLOUT_CLEAN_CHARGES, NUKE_CARRIERS, NUKE_AA_SUPPORT, NUKE_AA_WOUND, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../data/nuclear';
 import type { PlunderRow, ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE, featureDefense } from '../core/combat';
@@ -24,7 +25,7 @@ import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { KILL_SPREAD_RANGE } from '../data/promotions';
 import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_WORKS_PER_PERSON, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, GWO_COUNT, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
@@ -40,10 +41,10 @@ import { SCORING_LINE_ITEMS } from '../data/scoring';
 import { NUKE_COLS, unitActionNames } from '../core/unitActions';
 import { INTERCEPT_RANGE, INTERCEPT_SUPPORT_CS } from '../core/air';
 import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC, AMPHIBIOUS_ATTACK_CS, FORT_DEFENSE_CS, THEO_HOLY_GROUND_STRENGTH, THEO_HOLY_CITY_STRENGTH } from '../core/combat';
-import { GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, FORMATION_CS, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_RESOURCE_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING, OPEN_TERRAINS, UNITS, isLightCavalry, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL } from '../data/units';
+import { GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, FORMATION_CS, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_RESOURCE_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING, OPEN_TERRAINS, UNITS, isLightCavalry, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, SETTLER_COST_STEP, BUILDER_COST_STEP } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FEATURE_SIGHT_THROUGH, ELEVATION_SIGHT, SIGHT_MAX } from '../data/sight';
-import { PREVAILING_WINDS, STORM_MOVEMENT, FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_BLDG_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, ERUPTION_WEIGHT, SOIL_REPLACES, KILIMANJARO_FEATURE, KILIMANJARO_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_DURATION, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, DROUGHT_SHIELD_DISTRICTS, DROUGHT_SHIELD_IMPROVEMENTS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, RANDOM_EVENT_START_TURN, ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI } from '../data/disasters';
+import { PREVAILING_WINDS, STORM_MOVEMENT, FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_BLDG_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, ERUPTION_WEIGHT, SOIL_REPLACES, ERUPTION_WONDER,DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_DURATION, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, DROUGHT_SHIELD_DISTRICTS, DROUGHT_SHIELD_IMPROVEMENTS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, RANDOM_EVENT_START_TURN, ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI } from '../data/disasters';
 import {
   CLIMATE_PHASES, DEFORESTATION_BANDS, CO2_PER_POINT, CO2_PER_DEGREE, UNIT_CARBON_SHARE,
   UNIT_CARBON_RESOURCE_SHARE, ADVANCED_POWER_CELLS_SHARE, ADVANCED_POWER_CELLS_TECH,
@@ -255,8 +256,8 @@ const effectRow = (fx: PolicyEffects) => ({
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
-import { GOODY_KINDS, GOODY_PAYLOAD_KINDS, GOODY_SUBTYPES } from '../data/goodyHuts';
-import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, PILLAGE_BUILDING_REPAIR_PERCENT, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, PURCHASE_DIVISOR, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
+import { GOODY_KINDS, GOODY_PAYLOAD_KINDS, GOODY_SUBTYPES, goodyAmount } from '../data/goodyHuts';
+import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, PILLAGE_BUILDING_REPAIR_PERCENT, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, PURCHASE_DIVISOR, LUXURY_AMENITY_CITIES, GAME_SPEED, scaleByGameSpeed, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values): this array's
 // order IS the GPU's improvement index, so anything but an append renumbers
@@ -309,6 +310,12 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
     ? [def.effects.perFollowers.per, ...YIELD_KEYS.map((k) => def.effects.perFollowers!.yields[k] ?? 0)]
     : [0, 0, 0, 0, 0, 0, 0],
   perC: YIELD_KEYS.map((k) => def.effects.perCity?.[k] ?? 0),
+  // Lay Ministry: per completed district of a type, [nDistrict, 6]
+  perD: PLACEABLE_DISTRICTS.map((d) => YIELD_KEYS.map((k) => def.effects.perDistrict?.[d]?.[k] ?? 0)),
+  perW: YIELD_KEYS.map((k) => def.effects.perWonderCity?.[k] ?? 0),  // Sacred Places
+  zeal: def.effects.religiousIgnoreTerrain ? 1 : 0,  // Missionary Zeal
+  theoKeep: def.effects.theoLossReductionPct ?? 0,  // Monastic Isolation
+  hwHeal: def.effects.holySiteReligiousHeal ?? 0,  // Holy Waters
   fpw: def.effects.faithPerWonder ?? 0,  // Divine Inspiration
   presR: def.effects.pressureRangeBonus ?? 0,  // Itinerant Preachers
   tradeRel: YIELD_KEYS.map((k) => def.effects.tradeReligionYields?.[k] ?? 0),  // Messenger of the Gods [6]
@@ -551,26 +558,26 @@ export function buildRules() {
     // amenityTier(balance) thresholds, highest first (see data/constants.ts).
     amenityTiers: AMENITY_TIERS.map((t) => ({ min: t.min, growth: t.growthFactor, yield: t.yieldFactor })),
     amenityPopPer: CITY_POP_PER_AMENITY,
-    scenario: { settlerBase: Math.round(80 * GAME_SPEED), settlerPerCity: Math.round(30 * GAME_SPEED), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, purchaseDivisor: PURCHASE_DIVISOR, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED, spaceLyTarget: SPACE_FLIGHT_LY },
+    scenario: { settlerBase: UNITS.SETTLER.cost, settlerPerCity: scaleByGameSpeed(SETTLER_COST_STEP), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, purchaseDivisor: PURCHASE_DIVISOR, turnLimit: TURN_LIMIT, builderBase: UNITS.BUILDER.cost, builderPer: scaleByGameSpeed(BUILDER_COST_STEP), gameSpeed: GAME_SPEED, spaceLyTarget: SPACE_FLIGHT_LY },
     actions: { unit: unitActionNames(IMPROVEMENT_IDS) },
     districtCost: {
       // the SPECIALTY base, still what a district with no row of its own pays
-      base: Math.round(DISTRICT_SPECIALTY_COST * GAME_SPEED), scale: 9,
+      base: scaleByGameSpeed(DISTRICT_SPECIALTY_COST), scale: 9,
       // ...and each PLACEABLE row's own base and under-represented discount,
       // straight off `Districts.Cost` and `CostProgressionParam1`
-      perDistrict: PLACEABLE_DISTRICTS.map((d) => Math.round((DISTRICTS[d]?.cost ?? DISTRICT_SPECIALTY_COST) * GAME_SPEED)),
+      perDistrict: PLACEABLE_DISTRICTS.map((d) => scaleByGameSpeed(DISTRICTS[d]?.cost ?? DISTRICT_SPECIALTY_COST)),
       discountPct: PLACEABLE_DISTRICTS.map((d) => DISTRICTS[d]?.discountPct ?? 40),
       // ...and the GAME_PROGRESS parameter, 0 on a row that does not carry
       // one, pre-scaled like every other speed figure on the wire
       progressGame: PLACEABLE_DISTRICTS.map(
-        (d) => Math.round((DISTRICTS[d]?.costProgressGame ?? 0) * GAME_SPEED)),
+        (d) => scaleByGameSpeed(DISTRICTS[d]?.costProgressGame ?? 0)),
     },
     // TRIBAL VILLAGES — the install's `GoodyHuts` + `GoodyHutSubTypes`
     // straight through, so the GPU draws from the same table TS does. Kinds
     // are indices into `kinds`; `payload` is the channel index into
     // `payloadKinds` with its own amount, and a weight of 0 is a subtype this
-    // ruleset turns OFF. The two SCALED yields are pre-scaled here, as every
-    // other game-speed figure on the wire is.
+    // ruleset turns OFF. A scaled amount is pre-scaled here (`goodyAmount`),
+    // as every other game-speed figure on the wire is.
     goodyHuts: {
       kinds: GOODY_KINDS,
       payloadKinds: GOODY_PAYLOAD_KINDS,
@@ -583,8 +590,7 @@ export function buildRules() {
           turn: g.turn ?? 0,
           minOneCity: g.minOneCity ? 1 : 0,
           payload: GOODY_PAYLOAD_KINDS.indexOf(pl.kind),
-          amount: 'amount' in pl
-            ? (g.scale ? Math.round(pl.amount * GAME_SPEED) : pl.amount) : 0,
+          amount: goodyAmount(g),
           // a unit row names its chassis by roster index, -1 for a CLASS row
           unit: pl.kind === 'unitInCity'
             ? Object.values(UNITS).findIndex((u) => u.id === pl.unit) : -1,
@@ -625,7 +631,13 @@ export function buildRules() {
       return bi;
     }),
     templeBidx: buildingIdx.get('TEMPLE') ?? -1,
-    worshipFaithCost: Math.round(380 * GAME_SPEED),
+    // a worship building's faith price: its own Cost at the faith rate, one
+    // figure because the install prices every worship row alike (Cost 190)
+    worshipFaithCost: (() => {
+      const costs = new Set(Object.values(BUILDINGS).filter((b) => b.worship).map((b) => b.cost));
+      if (costs.size !== 1) throw new Error('the worship buildings no longer share one Cost');
+      return [...costs][0] * FAITH_PURCHASE_MULT;
+    })(),
     shrineBidx: buildingIdx.get('SHRINE') ?? -1,
     trade: {
       marketBidx: buildingIdx.get('MARKET') ?? -1,
@@ -883,7 +895,6 @@ export function buildRules() {
       // and for both engines' observation/decision head (see CITY_SLOTS_PER_SEAT).
       citySlots: CITY_SLOTS_PER_SEAT,
       productionQueueMax: PRODUCTION_QUEUE_MAX,
-      settlerBase: Math.round(80 * GAME_SPEED), // 48 + 18·max(0, cities − 1 + live + queued)
       pantheonFaithCost: PANTHEON_FAITH_COST,
       prophetCls: GP_CLASSES.indexOf('PROPHET'),
       engineerCls: GP_CLASSES.indexOf('ENGINEER'),
@@ -1089,6 +1100,7 @@ export function buildRules() {
       inquisitorHomeStrength: INQUISITOR_HOME_STRENGTH,
       removeHeresyPct: REMOVE_HERESY_PCT,
       launchInquisitionCharges: LAUNCH_INQUISITION_CHARGES,
+      religionInitialBeliefs: RELIGION_INITIAL_BELIEFS,
       condemnPressureRange: CONDEMN_PRESSURE_RANGE,
       condemnPressureSwing: CONDEMN_PRESSURE_SWING,
       // Each ADJ_SRC entry as the FEATURE / the TERRAIN it names, -1 where it
@@ -1220,8 +1232,9 @@ export function buildRules() {
     // scripted greedy takes the lowest legal index, so a base project always
     // shadows them. Laser rows (`ls`, repeatable, gated on the tech and on the
     // finished expedition; `orb` = the unconditional orbital one) sit between
-    // the base rows and the chain; `pc` is a FIXED price (already speed-scaled)
-    // where >= 0, else the generic curve applies.
+    // the base rows and the chain; `pc` is the row's own speed-scaled Cost,
+    // -1 on the repair alone (priced by the HP it restores), and `pcg` its
+    // speed-scaled GAME_PROGRESS climb (`projectCost`).
     // GS STRATEGIC STOCKPILES. `rid` maps a stockpile SLOT to the resource
     // table the tile plane uses; `rate` is what one improved source pays per
     // turn. `slotOf` inverts it so a tile or a unit gate can find its slot.
@@ -1313,7 +1326,7 @@ export function buildRules() {
         pc: p.cost ?? -1,
         // CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS): what the price climbs by
         // over the whole game, 0 where the row takes no such curve
-        pcg: p.costProgressGame === undefined ? 0 : Math.round(p.costProgressGame * GAME_SPEED),
+        pcg: p.costProgressGame === undefined ? 0 : scaleByGameSpeed(p.costProgressGame),
         rt: p.requiresTech ? (techIdx.get(p.requiresTech) ?? -1) : -1,
         // the CIVIC half of the research gate, and the carbon the row takes
         // back out of the air
@@ -1345,15 +1358,45 @@ export function buildRules() {
     // RIVER FLOOD magnitudes — the Flood (Civ6) tables, by severity.
     disasters: {
       // THE TURN'S ONE DRAW: each row's weight, per site, in severity order
+      // (the eruptions' in `ERUPTION_ROWS` order, the fires' JUNGLE, FOREST)
       floodWeight: [...FLOOD_WEIGHT],
-      kilimanjaroWeight: [...KILIMANJARO_WEIGHT],
       eruptionWeight: [...ERUPTION_WEIGHT],
       droughtWeight: [...DROUGHT_WEIGHT],
       accidentWeight: [...ACCIDENT_WEIGHT],
+      meteorWeight: METEOR_WEIGHT,
+      fireWeight: [...FIRE_WEIGHT],
       // each row's ChanceIncreasePerDegree, the percent its weight grows per
       // degree of warming (the storms' ride their records)
       floodCipd: [...FLOOD_CIPD],
       droughtCipd: [...DROUGHT_CIPD],
+      fireCipd: [...FIRE_CIPD],
+      // THE METEOR SHOWER: the terrains it strikes (`TERRAIN_IDS`), the
+      // features its site stands under, whether it keeps off every border,
+      // and the Heavy Cavalry line its site grants from, [unit, tech, civic]
+      // per unit in line order (`meteorGrantUnit`)
+      meteorTerrains: METEOR_TERRAINS.map((t) => TERRAIN_IDS.indexOf(t)),
+      meteorFeatures: METEOR_FEATURES.map((f) => featIdx.get(f) ?? -1),
+      meteorAvoidsTerritory: METEOR_AVOIDS_TERRITORY ? 1 : 0,
+      meteorGrantLine: classLine(METEOR_GRANT_CLASS).map((id) => [
+        Object.keys(UNITS).indexOf(id),
+        UNITS[id].requiresTech ? (techIdx.get(UNITS[id].requiresTech!) ?? -1) : -1,
+        UNITS[id].requiresCivic ? (civicIdx.get(UNITS[id].requiresCivic!) ?? -1) : -1,
+      ]),
+      // THE FIRES, per row JUNGLE then FOREST: the feature ids it starts on,
+      // burns as and is burnt as; the event's turns it turns burnt and
+      // regrows at; the spread's chance and turns; the damage rows' turns,
+      // the population turn and the unit band; the fire features' Appeal
+      fireStartFid: FIRE_START_FEATURE.map((f) => featIdx.get(f) ?? -1),
+      fireBurningFid: FIRE_BURNING_FEATURE.map((f) => featIdx.get(f) ?? -1),
+      fireBurntFid: FIRE_BURNT_FEATURE.map((f) => featIdx.get(f) ?? -1),
+      fireBurntTurn: FIRE_BURNT_TURN,
+      fireRegrowTurn: FIRE_REGROW_TURN,
+      fireSpreadP: FIRE_SPREAD_P,
+      fireSpreadTurns: [...FIRE_SPREAD_TURNS],
+      fireDamageTurns: [...FIRE_DAMAGE_TURNS],
+      firePopTurn: FIRE_POP_TURN,
+      fireDmg: [...FIRE_DMG],
+      fireAppeal: FIRE_APPEAL,
       // the first turn an event may fire
       randomEventStartTurn: RANDOM_EVENT_START_TURN,
       // the nuclear accident by severity: the reactor age that opens the
@@ -1373,9 +1416,10 @@ export function buildRules() {
       floodFertProd: FLOOD_FERT_PROD.map((r) => [...r]),
       // per TERRAIN id, which fertility column it reads
       floodFertCol: TERRAIN_IDS.map((t) => floodTerrainColumn(t)),
-      // THE FIVE ERUPTION ROWS (`ERUPTION_ROWS`: Kilimanjaro's two, then the
-      // volcano's three): the per-plot Volcanic Soil chance and the damage
-      // rows, and the feature ids the soil replaces
+      // THE EIGHT ERUPTION ROWS (`ERUPTION_ROWS`: Eyjafjallajokull's two,
+      // Kilimanjaro's two, Vesuvius's, then the volcano's three): the per-plot
+      // Volcanic Soil chance and the damage rows, and the feature ids the
+      // soil replaces
       eruptionPaintP: [...ERUPTION_PAINT_P],
       eruptionDestroyP: [...ERUPTION_DESTROY_P],
       eruptionDistrictP: [...ERUPTION_DISTRICT_P],
@@ -1385,8 +1429,12 @@ export function buildRules() {
       eruptionDmgLo: [...ERUPTION_DMG_LO],
       eruptionDmgHi: [...ERUPTION_DMG_HI],
       soilReplaces: SOIL_REPLACES.map((f) => featIdx.get(f) ?? -1),
-      // the feature id whose plots are Kilimanjaro's eruption sites
-      kilimanjaroFid: featIdx.get(KILIMANJARO_FEATURE),
+      // per eruption row, 1 where it erupts a volcano plot, else the feature
+      // id of the natural wonder it erupts — -1 on a wonder the feature
+      // roster does not carry (Eyjafjallajokull, Vesuvius), which no plot
+      // can hold
+      eruptionOnVolcano: ERUPTION_WONDER.map((w) => (w ? 0 : 1)),
+      eruptionWonderFid: ERUPTION_WONDER.map((w) => (w ? (featIdx.get(w) ?? -1) : -1)),
       // a drought's turns by severity, and its footprint's `STORM_DISC` slots
       droughtDuration: [...DROUGHT_DURATION],
       droughtHexes: DROUGHT_HEXES,
@@ -2247,7 +2295,7 @@ export function buildRules() {
         unlockCivic: unlockKind === 'civic' ? civicIdx.get(unlockId) ?? -1 : -1,
         placement: placement ? PLACEMENT_CODE[placement] : 0,
         // FLAT price (the Spaceport): speed-scaled here, -1 = the generic curve.
-        fixedCost: DISTRICTS[id].fixedCost ? Math.round(DISTRICTS[id].cost * GAME_SPEED) : -1,
+        fixedCost: DISTRICTS[id].fixedCost ? scaleByGameSpeed(DISTRICTS[id].cost) : -1,
       })),
     },
     palace: {
@@ -2384,6 +2432,8 @@ export function buildRules() {
       religiousSpreads: b.religiousSpreads ?? 0,
       // the Dar-e Mehr: a disaster's building roll passes it by
       disasterProof: b.disasterProof ? 1 : 0,
+      // ...and what it pays per game era since its city's stamp
+      perEra: YIELD_KEYS.map((k) => b.yieldsPerEra?.[k] ?? 0),
     })),
     techs: techList.map((t) => ({
       id: t.id,

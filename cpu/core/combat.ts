@@ -34,6 +34,7 @@ import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
+import { fireFeature } from '../data/disasters';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
 import { isExplored, revealAround, unexploredByAll } from './fog';
 import { wipeConstruction } from './production';
@@ -93,7 +94,8 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
  *  defender's terrain, since an embarked one defends at the normalized CS
  *  that carries no terrain at all. Exported per feature as `featDef`. */
 export function featureDefense(feature: string | null | undefined): number {
-  if (feature === 'WOODS' || feature === 'RAINFOREST') return 3;
+  // the pack's burning and burnt Woods and Rainforest carry the same 3
+  if (feature === 'WOODS' || feature === 'RAINFOREST' || fireFeature(feature)) return 3;
   if (feature === 'MARSH' || feature === 'FLOODPLAINS') return -2;
   if (feature === 'REEF') return 3;
   return 0;
@@ -1181,10 +1183,15 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
   // strength a leader's units carry for the turns after a declaration of
   // the row's own war kind — clause-free like the levy mark (`WAR_BUFF_ROWS`)
   const warCs = warBuffCS(state, own.seat);
-  if (rows.length === 0 && mods.formations.length === 0) return levyCs + warCs;
+  // CIV6 (Rajendra Chola, ABILITY_CHOLA_NAVAL_COMBAT): the seat's Great Person
+  // channel on every naval combat unit — the ability's TypeTags are the four
+  // CLASS_NAVAL_* classes, and every sea-domain unit with a Combat value
+  // carries one of them.
+  const gpNavalCs = def.naval ? gpPermOf(seatOf(state, own.seat), 'navalCombat') : 0;
+  if (rows.length === 0 && mods.formations.length === 0) return levyCs + warCs + gpNavalCs;
   const bit = classBitOf(own.type);
   const tile = state.map.tiles[own.tileIndex];
-  let cs = levyCs + warCs;
+  let cs = levyCs + warCs + gpNavalCs;
   for (const r of rows) {
     if (r.classMask !== 0 && (bit & r.classMask) === 0) continue;
     const hit = r.when === 'always' ? true
@@ -2630,7 +2637,7 @@ function campCandidates(state: GameState): Tile[] {
   const preferFog = state.fogOfWar;
   return state.map.tiles.filter((t) => {
     if (isWater(t) || isImpassable(t) || naturalWonderAt(t) || t.district || t.builtWonder) return false;
-    if (tileClaimed(t) || t.goodyHut) return false;
+    if (tileClaimed(t) || t.goodyHut || t.meteor) return false;
     if (preferFog && !unexploredByAll(state, t.index)) return false; // camps rise in the fog
     for (const c of allCities(state)) {
       const ct = state.map.tiles[c.centerIndex];

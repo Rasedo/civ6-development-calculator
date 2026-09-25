@@ -67,7 +67,8 @@ export function targetsObs(state: GameState, seat: number): TargetsObs {
   for (const [site, arg] of [...keys.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1])) {
     for (const t of gpSiteTiles(state, seat, site, arg)) out.gpSites.push([site, arg, t]);
   }
-  for (const t of state.map.tiles) if (t.goodyHut) out.goody.push(t.index);
+  // a Meteor Site is taken the way a village is: the first unit in
+  for (const t of state.map.tiles) if (t.goodyHut || t.meteor) out.goody.push(t.index);
   if (atWarWithAny(state, seat)) out.warImps = warImpSites(state, seat);
   out.warCities = warCitySites(state, seat);
   return out;

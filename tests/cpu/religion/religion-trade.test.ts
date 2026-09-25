@@ -2,12 +2,15 @@ import { grantFoundingPressure, emptySeat } from '../../../cpu/core/seats';
 import { spreadReligiousPressureForTest } from '../../../cpu/core/game';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import type { City } from '../../../cpu/core/types';
-import { RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, BELIEF_CATALOGS, WORSHIP_BELIEFS, beliefClassOf } from '../../../cpu/data/religion';
+import { RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, BELIEF_CATALOGS, WORSHIP_BELIEFS, RELIGION_INITIAL_BELIEFS, beliefClassOf } from '../../../cpu/data/religion';
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, adoptBeliefs, canEnhanceReligion, enhanceableClasses, buyWorshipBuilding, purchaseReligiousUnit, endTurn } from '../../../cpu/core/game';
-import { applySeatActionRecord } from '../../../cpu/core/phase';
+import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, adoptBeliefs, canEnhanceReligion, enhanceableClasses, buyWorshipBuilding, purchaseReligiousUnit, endTurn, beliefPicks, evangelizeOk, evangelizeBelief } from '../../../cpu/core/game';
+import { applySeatActionRecord, applySeatUnitOrders } from '../../../cpu/core/phase';
+import { spawnUnit } from '../../../cpu/core/units';
+import { IMPROVEMENT_IDS, unitActionIndex, unitActionNames } from '../../../cpu/core/unitActions';
+import { maskCtx, unitMask } from '../../../cpu/core/unitMask';
 import { seatBuildingSum } from '../../../cpu/core/city';
 import { scoreLines } from '../../../cpu/core/score';
 import { SCORING_LINE_ITEMS } from '../../../cpu/data/scoring';
@@ -107,44 +110,86 @@ describe('founding a religion', () => {
     expect(rel.enhancer).toBe('SCRIPTURE');
     expect(rel.founder).toBeNull();
     expect(rel.worship).toBeNull();
-    expect(rel.enhanced ?? false).toBe(false);
+    expect(rel.beliefsEarned).toBe(RELIGION_INITIAL_BELIEFS);
     expect(state.claimedBeliefs).toEqual(['JUST_WAR', 'CHORAL_MUSIC', 'SCRIPTURE']);
   });
 
-  it('enhancing adds every class the religion lacks, and the religion ends with four', () => {
-    const { state } = ready();
+  /** an Apostle of seat 0 on the city centre */
+  const apostle = (state: ReturnType<typeof ready>['state'], city: City) =>
+    spawnUnit(state, 'APOSTLE', city.centerIndex, 0)!;
+
+  it('an Apostle evangelizes a belief, and the religion adopts one class a time to four', () => {
+    const { state, city } = ready();
     const s = seatOf(state, 0)!;
     expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')]).ok).toBe(true);
     state.sandbox = false;
-    s.gpActivated = [GREAT_PEOPLE.PROPHET[0].id];
-    expect(canEnhanceReligion(state, 0).ok).toBe(false); // one prophet founded it
-    s.gpActivated.push(GREAT_PEOPLE.PROPHET[1].id);
-    expect(canEnhanceReligion(state, 0).ok).toBe(true);
-    expect(enhanceableClasses(state, 0)).toEqual([1, 3]);
-    // one of the two lacking classes is not an enhancement; nor is a second
-    // Follower, nor a class the religion already holds
+    // the founding earned two and the religion holds two: nothing to adopt
+    expect(beliefPicks(state, 0)).toBe(0);
+    expect(canEnhanceReligion(state, 0).ok).toBe(false);
     expect(adoptBeliefs(state, 0, [pick('PAGODA')]).ok).toBe(false);
-    expect(adoptBeliefs(state, 0, [pick('PAGODA'), pick('FEED_THE_WORLD')]).ok).toBe(false);
-    expect(adoptBeliefs(state, 0, [pick('PAGODA'), pick('PILGRIMAGE')]).ok).toBe(false);
-    expect(adoptBeliefs(state, 0, [pick('HOLY_ORDER'), pick('PAGODA')]).ok).toBe(true);
-    expect(s.religion.enhanced).toBe(true);
+    // a second activated Great Prophet earns nothing
+    s.gpActivated = [GREAT_PEOPLE.PROPHET[0].id, GREAT_PEOPLE.PROPHET[1].id];
+    expect(canEnhanceReligion(state, 0).ok).toBe(false);
+    // EVANGELIZE BELIEF spends the Apostle and earns one belief
+    const a1 = apostle(state, city);
+    expect(evangelizeOk(state, a1, 0)).toBe(true);
+    expect(evangelizeBelief(state, a1, s).ok).toBe(true);
+    expect(state.units.includes(a1)).toBe(false);
+    expect(s.religion.beliefsEarned).toBe(3);
+    expect(beliefPicks(state, 0)).toBe(1);
+    expect(enhanceableClasses(state, 0)).toEqual([1, 3]);
+    // one belief, of a class the religion lacks: not two, not a held class
+    expect(adoptBeliefs(state, 0, [pick('HOLY_ORDER'), pick('PAGODA')]).ok).toBe(false);
+    expect(adoptBeliefs(state, 0, [pick('PILGRIMAGE')]).ok).toBe(false);
+    expect(adoptBeliefs(state, 0, [pick('FEED_THE_WORLD')]).ok).toBe(false);
+    expect(adoptBeliefs(state, 0, [pick('PAGODA')]).ok).toBe(true);
+    expect(beliefPicks(state, 0)).toBe(0);
+    // the second Apostle earns the fourth
+    const a2 = apostle(state, city);
+    expect(evangelizeBelief(state, a2, s).ok).toBe(true);
+    expect(adoptBeliefs(state, 0, [pick('HOLY_ORDER')]).ok).toBe(true);
     expect([s.religion.follower, s.religion.worship, s.religion.founder, s.religion.enhancer])
       .toEqual(['CHORAL_MUSIC', 'PAGODA', 'TITHE', 'HOLY_ORDER']);
-    expect(canEnhanceReligion(state, 0).ok).toBe(false); // no double-enhance
+    // a full religion has nothing left to evangelize
+    const a3 = apostle(state, city);
+    expect(evangelizeOk(state, a3, 0)).toBe(false);
+    expect(evangelizeBelief(state, a3, s).ok).toBe(false);
+    expect(state.units.includes(a3)).toBe(true);
     // B-82's Religion line: 5 per belief, four beliefs
     const line = SCORING_LINE_ITEMS.findIndex((l) => l.count === 'religion');
     expect(scoreLines(state, s)[line]).toBe(4 * 5);
   });
 
-  it('a class whose pool ran dry leaves the enhancement to the other', () => {
-    const { state } = ready();
+  it('the evangelize column is the Apostle\'s, and the record adopts through the same verb', () => {
+    const { state, city } = ready();
+    const s = seatOf(state, 0)!;
+    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')]);
+    state.sandbox = false;
+    const a = apostle(state, city);
+    const col = unitActionIndex(IMPROVEMENT_IDS).EVANGELIZE_BELIEF;
+    expect(unitActionNames(IMPROVEMENT_IDS).at(-1)).toBe('EVANGELIZE_BELIEF');
+    expect(unitMask(maskCtx(state, 0), a)).toContain(col);
+    const units = state.units.filter((u) => u.seat === 0);
+    applySeatUnitOrders(state, s, [units.map((u) => (u === a ? col : -1))]);
+    expect(s.religion.beliefsEarned).toBe(3);
+    applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [], beliefs: [pick('STUPA')] });
+    expect(s.religion.worship).toBe('STUPA');
+  });
+
+  it('a class whose pool ran dry caps what an Apostle may earn', () => {
+    const { state, city } = ready();
+    const s = seatOf(state, 0)!;
     expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')]).ok).toBe(true);
+    state.sandbox = false;
     // every Worship belief is another religion's
     state.claimedBeliefs.push(...Object.keys(WORSHIP_BELIEFS));
     expect(enhanceableClasses(state, 0)).toEqual([3]);
-    expect(adoptBeliefs(state, 0, [pick('HOLY_ORDER'), pick('PAGODA')]).ok).toBe(false);
+    expect(evangelizeBelief(state, apostle(state, city), s).ok).toBe(true);
+    expect(adoptBeliefs(state, 0, [pick('PAGODA')]).ok).toBe(false);
     expect(adoptBeliefs(state, 0, [pick('HOLY_ORDER')]).ok).toBe(true);
-    expect(seatOf(state, 0)!.religion.worship).toBeNull();
+    expect(s.religion.worship).toBeNull();
+    // nothing left to earn a second time
+    expect(evangelizeOk(state, apostle(state, city), 0)).toBe(false);
   });
 
   it('the record founds through the same verb', () => {

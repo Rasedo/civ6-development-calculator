@@ -90,7 +90,7 @@ def _stand_builder_beside(sim, mt: int):
 def test_the_wire(rules, path) -> None:
     sim = build(path)
     k = IIDS.index("MOUNTAIN_ROAD")
-    assert IIDS[-1] == "MOUNTAIN_ROAD", "appended LAST, so no earlier column moved"
+    assert k == 37, "appended after the governor rows, so no earlier column moved"
     assert bool(sim._imp_portal[k]) and bool(sim._imp_portal[sim.TUNNEL]), "both rows carry MOUNTAIN_PORTAL"
     assert sim._imp_adj_plot[k] and sim._imp_adj_plot[sim.TUNNEL], "both build on an ADJACENT plot"
     assert bool(sim._imp_no_pillage[k]) and bool(sim._imp_no_pillage[sim.TUNNEL])

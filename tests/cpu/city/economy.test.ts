@@ -6,7 +6,11 @@ import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount } from '.
 import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
 import { goldPurchasableBuildings } from '../../../cpu/core/rules';
-import { purchaseStep } from '../../../cpu/core/effects';   // every price is floored to a multiple of five (measured)
+import { purchaseStep } from '../../../cpu/core/effects';
+import { GOLD_PURCHASE_MULT, scaleByGameSpeed } from '../../../cpu/data/constants';
+import { UNITS } from '../../../cpu/data/units';
+import { TECHS } from '../../../cpu/data/techs';
+import { CIVICS } from '../../../cpu/data/civics';   // every price is floored to a multiple of five (measured)
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
 function foundAt(state: GameState, col: number, row: number): City {
@@ -108,7 +112,8 @@ describe('gold & faith purchases', () => {
     expect(state.units.length).toBe(1);
     expect(seatOf(state, 0)!.treasury).toBe(0);
     expect(seatOf(state, 0)!.buildersTrained).toBe(1);
-    expect(unitPurchaseCost(state, 'BUILDER', 0)).toBeGreaterThan(120); // escalated
+    // escalated past the first Builder's price
+    expect(unitPurchaseCost(state, 'BUILDER', 0)).toBeGreaterThan(UNITS.BUILDER.cost * GOLD_PURCHASE_MULT);
     expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(false); // broke
 
     const sCost = purchaseStep(settlerCost(state, 0) * 4);
@@ -241,7 +246,13 @@ describe('district projects', () => {
     const r = queueProject(state, city.id, 'RESEARCH_GRANTS', 0);
     expect(r.ok).toBe(true);
     const cost = itemCost(city.queue[0]);
-    expect(cost).toBe(projectCost(state, 0));
+    // CIV6 (Projects.xml): Cost 25 + COST_PROGRESSION_GAME_PROGRESS 1500 x the
+    // further tree's share, each at the speed
+    const rs = seatOf(state, 0)!.research;
+    const p = Math.max(rs.techs.length / Object.keys(TECHS).length, rs.civics.length / Object.keys(CIVICS).length);
+    expect(p).toBeGreaterThan(0);
+    expect(cost).toBe(scaleByGameSpeed(25) + Math.floor(scaleByGameSpeed(1500) * p));
+    expect(cost).toBe(projectCost(state, 0, 'RESEARCH_GRANTS'));
 
     city.queue[0].progress = cost; // about to finish
     const sciBefore = seatOf(state, 0)!.scienceTotal;

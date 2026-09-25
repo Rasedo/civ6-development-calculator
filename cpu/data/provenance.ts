@@ -47,8 +47,9 @@ interface XmlSrc {
    *  the cell to THIS, and the tag is where the id mapping lives
    *  (`requiresTech: 'POTTERY'` <- `PrereqTech` = `TECH_POTTERY`). */
   expect?: string | number | boolean;
-  /** the catalog holds `round(cell * scale)` — a unit's cost through
-   *  GAME_SPEED; the checker applies the same arithmetic. */
+  /** the catalog holds `floor(cell * scale)` — a unit's cost through
+   *  GAME_SPEED (`scaleByGameSpeed`); the checker applies the same
+   *  arithmetic, exact where the catalog holds a fraction. */
   scale?: number;
   /** THE FACT IS AN ABSENCE: the install row carries no such column (a
    *  building with no PurchaseYield cannot be bought), or no such row
@@ -82,7 +83,7 @@ interface PediaSrc {
 }
 
 /** arithmetic over other constants. `formula` is words the checker can
- *  match against its small vocabulary (`round(x*GAME_SPEED)`, `sum`, ...)
+ *  match against its small vocabulary (`floor(x*GAME_SPEED)`, `sum`, ...)
  *  or fail loudly on; `inputs` are XML/LAB sources of the operands. */
 interface DerivedSrc {
   derived: string;

@@ -920,15 +920,15 @@
           "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `pantheon !== null` vs `civ_pantheon_done`"
         },
         {
-          "name": "religionEnhanced",
+          "name": "beliefsEarned",
           "compare": "exact",
           "covers": [
-            "ReligionState.enhanced"
+            "ReligionState.beliefsEarned"
           ],
           "planes": [
-            "civ_enhanced"
+            "civ_beliefs_earned"
           ],
-          "note": "the religion's enhancement, latched once; an Enhancer belief may arrive at the founding, so the belief ids do not say it"
+          "note": "the beliefs the religion has earned: two at the founding, one per Apostle's Evangelize Belief; one earned and not yet adopted shows in no belief id"
         },
         {
           "name": "gpPoints",
@@ -1913,6 +1913,17 @@
           "note": "the SET of building indices in cpu/core/prodLayout.ts order — the order rules.json ships and the GPU's city_bldg column order."
         },
         {
+          "name": "buildingEras",
+          "compare": "exact",
+          "covers": [
+            "City.buildingEras"
+          ],
+          "planes": [
+            "city_bldg_era"
+          ],
+          "note": "building index, game era — a flat pair per stamped building (the rows carrying `yieldsPerEra`), ascending by index: the era each was constructed or last repaired in."
+        },
+        {
           "name": "buildingsPillaged",
           "compare": "exact",
           "covers": [
@@ -2420,6 +2431,17 @@
             "unit_free_city"
           ],
           "note": "the id of the Free City that granted the unit, which a join takes the unit with; TS spells 'no grant' as absent and the GPU as -1, both read as -1 here."
+        },
+        {
+          "name": "noResourceUpkeep",
+          "compare": "exact",
+          "covers": [
+            "Unit.noResourceUpkeep"
+          ],
+          "planes": [
+            "unit_no_res_upkeep"
+          ],
+          "note": "a Meteor Site's grant, which burns no fuel and is never short of it, through any upgrade."
         }
       ]
     },
@@ -2482,6 +2504,17 @@
           ],
           "planes": [
             "tile_goody"
+          ]
+        },
+        {
+          "name": "meteorSite",
+          "compare": "exact",
+          "why": "a Meteor Shower's site — laid by the draw, taken by the first civilization unit in",
+          "covers": [
+            "Tile.meteor"
+          ],
+          "planes": [
+            "tile_meteor"
           ]
         },
         {
@@ -2685,6 +2718,17 @@
           ]
         },
         {
+          "name": "fireStart",
+          "compare": "exact",
+          "covers": [
+            "Tile.fireStart"
+          ],
+          "planes": [
+            "fire_start"
+          ],
+          "note": "the turn the fire this plot belongs to began, -1 when none: the plot burns, is burnt at its Turn 2 and regrows at its Turn 6."
+        },
+        {
           "name": "featureId",
           "compare": "exact",
           "covers": [
@@ -2694,7 +2738,7 @@
             "feat_id",
             "feat_stripped"
           ],
-          "note": "IDENTITY, in catalog order: feat_id is live (a chop strips, an eruption's `_paint_soil` paints), so 'which feature' is fully determined on both engines — TS indexes tile.feature through the same catalog order the exporter uses."
+          "note": "IDENTITY, in catalog order: feat_id is live (a chop strips, an eruption's `_paint_soil` paints, a fire burns and regrows), so 'which feature' is fully determined on both engines — TS indexes tile.feature through the same catalog order the exporter uses."
         },
         {
           "name": "hasResource",

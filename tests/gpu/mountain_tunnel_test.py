@@ -54,8 +54,9 @@ def test_the_wire(rules, path) -> None:
     assert sim.TUNNEL >= 0, "the improvement is not on the wire"
     assert sim._A_PORTAL >= 0, "the PORTAL verb is not on the wire"
     assert sim._portal_mp == 2, f"the published price is 2 Movement, wire has {sim._portal_mp}"
-    # appended LAST, so no earlier column moved
-    assert sim._act_names[-1] == "PORTAL", f"PORTAL is not last: {sim._act_names[-1]}"
+    # appended right after WONDER_CHARGE, so no earlier column moved
+    assert sim._act_names.index("PORTAL") == sim._act_names.index("WONDER_CHARGE") + 1, \
+        "PORTAL does not follow WONDER_CHARGE"
     assert sim._A_IMP[sim.TUNNEL] < sim._act_names.index("PILLAGE"), \
         "a BUILD column must sit before PILLAGE"
     print("  1 the wire OK — the improvement, the verb, and 2 Movement")

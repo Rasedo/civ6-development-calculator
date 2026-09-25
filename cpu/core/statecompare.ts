@@ -523,9 +523,9 @@ const SEAT: Record<string, Extractor> = {
   // the id being set. Comparing them is what would show the two coming apart
   // (a seat that has spent its pick but holds no belief).
   pantheonDone: overSeats((s) => (s.religion.pantheon !== null ? 1 : 0)),
-  // the religion's enhancement, latched once: an Enhancer belief may arrive
-  // at the founding, so the belief ids do not say it
-  religionEnhanced: overSeats((s) => (s.religion.enhanced ? 1 : 0)),
+  // the beliefs the religion has earned: an Evangelize Belief earns one the
+  // belief ids do not show until the record adopts it
+  beliefsEarned: overSeats((s) => s.religion.beliefsEarned ?? 0),
   gpPoints: overSeats((s) => GP_CLASSES.map((c) => s.gpp[c] ?? 0)),
   projectsDone: overSeats((s) => s.projectsDone.length),
   wmd: overSeats((s) => (s.wmd ?? []).reduce((n, x) => n + x, 0)),
@@ -706,6 +706,11 @@ const CITY: Record<string, Extractor> = {
       .filter((i): i is number => i !== undefined)
       .sort((a, b) => a - b),
   ),
+  buildingEras: overCities((r) =>
+    Object.entries(r.city.buildingEras ?? {})
+      .map(([b, era]) => [BUILDING_IDX.get(b) ?? -1, era])
+      .sort((a, b) => a[0] - b[0])
+      .flat()),
   buildingsPillaged: overCities((r) =>
     (r.city.pillagedBuildings ?? [])
       .map((b) => BUILDING_IDX.get(b))
@@ -793,6 +798,7 @@ const UNIT_G: Record<string, Extractor> = {
   bandAlbum: overUnits((u) => u.bandAlbum ?? 0),
   gpAt: overUnits((u) => u.gpAt ?? -1),
   freeCity: overUnits((u) => u.freeCity ?? -1),
+  noResourceUpkeep: overUnits((u) => (u.noResourceUpkeep ? 1 : 0)),
 };
 
 const TILE: Record<string, Extractor> = {
@@ -801,6 +807,7 @@ const TILE: Record<string, Extractor> = {
   improvement: overTiles((t) => (t.improvement === null ? -1 : IMPROVEMENT_IDS.indexOf(t.improvement))),
   pillaged: overTiles((t) => (t.pillaged ? 1 : 0)),
   goodyHut: overTiles((t) => (t.goodyHut ? 1 : 0)),
+  meteorSite: overTiles((t) => (t.meteor ? 1 : 0)),
   district: overTiles((t) => (t.district === null ? -1 : PLACEABLE_DISTRICTS.indexOf(t.district))),
   // PLACEABLE districts only, matching `district`'s own encoding: a founded
   // centre carries districtComplete on TS while the GPU has no CITY_CENTER
@@ -824,6 +831,7 @@ const TILE: Record<string, Extractor> = {
   droughtTurns: overTiles((t) => t.droughtTurns),
   stormEvent: overTiles((t) => ((t.stormTurns ?? 0) > 0 ? (t.stormEvent ?? -1) : -1)),
   stormTurns: overTiles((t) => t.stormTurns ?? 0),
+  fireStart: overTiles((t) => t.fireStart ?? -1),
   featureId: overTiles((t) => (t.feature === null ? -1 : (FEAT_IDX_SC.get(t.feature) ?? -1))),
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),

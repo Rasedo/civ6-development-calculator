@@ -15,7 +15,7 @@ import type { Era } from './techs';
 import type { AdjacencySource } from './districts';
 import type { CivId } from './seats';
 import type { PromoClass } from './promotions';
-import { GAME_SPEED } from './constants';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
 import { xml, type SrcMap } from './provenance';
 
 /** CIV6 (BuildingReplaces): a civilization's UNIQUE BUILDING standing in for
@@ -228,6 +228,10 @@ export interface BuildingDef {
    *  pillaged by natural disasters"): a disaster's building roll passes the
    *  row by. */
   disasterProof?: boolean;
+  /** CIV6 (`Building_YieldsPerEra`; the Dar-e Mehr's "+1 additional Faith
+   *  for each era since constructed or last repaired"): what the row pays
+   *  per game era since the city's stamp for it (`City.buildingEras`). */
+  yieldsPerEra?: Partial<Yields>;
   /** gold upkeep a turn: the install's `Buildings.Maintenance` (schema
    *  DEFAULT 0 where the row writes none). */
   maintenance: number;
@@ -520,11 +524,10 @@ const rawList: BuildingDef[] = [
     },
   },
   // CIV6 (GS): "+1 additional Faith for each era since constructed or last
-  // repaired" is a Building_YieldsPerEra row (YIELD_FAITH 1), which needs the
-  // era a building was constructed in — no plane holds it, so the row pays
-  // its flat +3 alone.
-  { id: 'DAR_E_MEHR', name: 'Dar-e Mehr', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, disasterProof: true, worship: true, maintenance: 0,
+  // repaired" is a Building_YieldsPerEra row (YIELD_FAITH 1).
+  { id: 'DAR_E_MEHR', name: 'Dar-e Mehr', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, yieldsPerEra: { faith: 1 }, disasterProof: true, worship: true, maintenance: 0,
     src: {
+      'yieldsPerEra.faith': xml('Building_YieldsPerEra', 'BuildingType=BUILDING_DAR_E_MEHR&YieldType=YIELD_FAITH', 'YieldChange'),
       cost: xml('Buildings', 'BuildingType=BUILDING_DAR_E_MEHR', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_DAR_E_MEHR', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_DAR_E_MEHR', 'Maintenance'),
@@ -1181,12 +1184,11 @@ const rawList: BuildingDef[] = [
 
 const list: BuildingDef[] = rawList.map((b) => ({
   ...b,
-  cost: Math.round(b.cost * GAME_SPEED),
+  cost: scaleByGameSpeed(b.cost),
   // A VARIANT's own price is a catalog cost like any other and rides the same
-  // game-speed scale as the row it replaces. Missing this made the Grand
-  // Bazaar dearer than the Bank instead of cheaper.
+  // game-speed scale as the row it replaces.
   civVariants: b.civVariants?.map(
-    (v) => (v.cost === undefined ? v : { ...v, cost: Math.round(v.cost * GAME_SPEED) })),
+    (v) => (v.cost === undefined ? v : { ...v, cost: scaleByGameSpeed(v.cost) })),
 }));
 
 /**

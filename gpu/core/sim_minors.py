@@ -431,9 +431,9 @@ class SimMinors:
         c_pct = self.citystate_civics[:, s].sum(dim=1).double() / float(max(int(rd.c_cost.shape[0]), 1))
         # the research factor is the minor's; the BASE is the row's own
         _mprog = torch.maximum(t_pct, c_pct)
-        d_fac = 1 + dcp.get("scale", 9) * _mprog
-        d_per = dcp.get("perDistrict") or []
-        _d_pg = dcp.get("progressGame") or []
+        d_fac = 1 + dcp["scale"] * _mprog
+        d_per = dcp["perDistrict"]
+        _d_pg = dcp["progressGame"]
 
         halt = ~alive
         for r, kind in enumerate(self._mb_kind):
@@ -519,7 +519,7 @@ class SimMinors:
                     cap_ok = ones_b
                 surface = (self.coastal_water if plc == 2
                            else self.d_usable | (self.d_usable0 & self._res_hidden(row)))
-                splane = site_s & surface & ~self._fallout()
+                splane = site_s & surface & ~self._fallout() & ~self._fire_plots()
                 if plc == 3:
                     splane = splane & (self._adj_center_count() == 0)
                 avail = g & ~held & unlock & cap_ok & splane.any(dim=1)
@@ -528,7 +528,7 @@ class SimMinors:
                 pct = (torch.full_like(zero_b, harbor_pct) if dv == int(self._harbor_didx)
                        else torch.where(self._citystate_didx[:, s] == dv, type_pct[typ], zero_b))
                 toward(avail, pct)
-                _b_dv = float(d_per[dv]) if dv < len(d_per) else float(dcp.get("base", 32))
+                _b_dv = float(d_per[dv]) if dv < len(d_per) else float(dcp["base"])
                 # the row's OWN cost model — a minor builds real districts
                 # and the GAME_PROGRESS rows climb differently.
                 _g_dv = float(_d_pg[dv]) if dv < len(_d_pg) else 0.0
@@ -727,7 +727,8 @@ class SimMinors:
         `wok` bitmask the exporter baked out of `wonderTerrainOk`, so nothing
         here re-derives ground."""
         wrow = self._wond_rows[wi]
-        cand_w = base_ok & ((self.wok >> wi) & 1).bool()
+        # ...and `canPlaceWonder` refuses a fire's plot (`fireFeature`)
+        cand_w = base_ok & ((self.wok >> wi) & 1).bool() & ~self._fire_plots()
         adjD = int(wrow.get("adjD", -1))
         adjDB = int(wrow.get("adjDB", -1))
         if adjD == -2:
@@ -811,11 +812,3 @@ class SimMinors:
         self._q_push(row, j, has_w, _b1 * code_w,
                      _b1.to(self.city_cost.dtype) * float(wrow["cost"]))
         self._eff_version += 1
-
-    def _seat_proj_cost(self, row: int) -> torch.Tensor:
-        dcp = self.rules.district_cost
-        t_pct_r = self.civ_techs[:, row].to(torch.float64).mean(dim=1)
-        c_pct_r = self.civ_civics[:, row].to(torch.float64).mean(dim=1)
-        d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct_r, c_pct_r)))
-        p_floor = float(round(15 * self.rules.game_speed))
-        return torch.maximum(torch.full_like(d_cost, p_floor), js_round(d_cost * 0.5))

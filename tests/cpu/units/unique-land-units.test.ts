@@ -12,7 +12,7 @@ import { attacksPerTurn } from '../../../cpu/core/promotions';
 import { routePlunderer, TRADER_GUARD_RADIUS } from '../../../cpu/core/trade';
 import { unitKillEvent } from '../../../cpu/core/eras';
 import { UNITS, UNIT_HP, civUnitAllowed, civReplacement, civUpgradeTarget } from '../../../cpu/data/units';
-import { GAME_SPEED } from '../../../cpu/data/constants';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
@@ -66,7 +66,7 @@ describe('the unique land unit catalog', () => {
       expect(d, `${id} has no catalog row`).toBeTruthy();
       expect(d.uniqueTo, `${id} names the wrong civilization`).toBe(civ);
       expect(d.replaces ?? null, `${id} replaces the wrong chassis`).toBe(replaces);
-      expect(d.cost, `${id} cost`).toBe(Math.round(cost * GAME_SPEED));
+      expect(d.cost, `${id} cost`).toBe(scaleByGameSpeed(cost));
       expect(d.moves, `${id} moves`).toBe(moves);
       expect(d.combat, `${id} combat`).toBe(combat);
       // a replacement keeps its chassis's own upgrade target

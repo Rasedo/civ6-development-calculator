@@ -67,6 +67,7 @@ class SimOrders:
         _cn = self._A_CONDEMN
         _hx = self._A_HERESY
         _lq = self._A_INQUISITION
+        _evc = self._A_EVANGELIZE
         _hn = self._A_HEATHEN
         _ug = self._A_UPGRADE
         _ar = self._A_AIR_STRIKE
@@ -150,6 +151,7 @@ class SimOrders:
             (((_ab >= _dpc) & (_ab < _dpc + _dpw)) if _dpc >= 0 else _no).any(dim=0),  # deploy on patrol
             ((_ab == _rtc) if _rtc >= 0 else _no).any(dim=0),                     # return to base
             (((_ab >= _prc) & (_ab < _prc + _asw)) if _prc >= 0 else _no).any(dim=0),  # priority target
+            ((_ab == _evc) if _evc >= 0 else _no).any(dim=0),                     # evangelize a belief
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -158,7 +160,7 @@ class SimOrders:
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
          _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean, _rk_nuke,
-         _rk_harvest, _rk_wcharge, _rk_deploy, _rk_return, _rk_priority) = _tab
+         _rk_harvest, _rk_wcharge, _rk_deploy, _rk_return, _rk_priority, _rk_evangel) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -382,6 +384,18 @@ class SimOrders:
                     self.civ_inquisition[lr, row] = True
                     self.unit_alive[lr, sc[lr]] = False
                     self._occ_clear(lr, hc[lr], sc[lr])
+                    self._gen_ver += 1
+
+            # EVANGELIZE BELIEF: the Apostle is spent and its religion earns a
+            # belief (`evangelizeBelief`)
+            if _rk_evangel[n] and _evc >= 0 and self._apostle_idx >= 0:
+                evm = (act & (a == _evc) & (utp == self._apostle_idx)
+                       & self._evangelize_ok(row))
+                if bool(evm.any()):
+                    er = evm.nonzero(as_tuple=True)[0]
+                    self.civ_beliefs_earned[er, row] += 1
+                    self.unit_alive[er, sc[er]] = False
+                    self._occ_clear(er, hc[er], sc[er])
                     self._gen_ver += 1
 
             if _rk_heathen[n] and _hn >= 0:
@@ -1643,6 +1657,7 @@ class SimOrders:
             self.city_wonder[b, row, col, :] = -1
             self.city_bldg[b, row, col, :] = self.city_bldg[b, self._CITY_MINOR0 + s, 0, :]
             self.city_bldg_pillaged[b, row, col, :] = self.city_bldg_pillaged[b, self._CITY_MINOR0 + s, 0, :]
+            self.city_bldg_era[b, row, col, :] = -1   # a minor stamps none
             self._bldg_version += 1
             self.city_followed[b, row, col] = -1
             self.city_pressure[b, row, col, :] = 0
@@ -1890,8 +1905,10 @@ class SimOrders:
             alive_w = self.city_alive[wr, :self.n_majors].reshape(len(wr), -1)
             near_city_w = ((self.pair_dist[cc_w.clamp(min=0)] < 5) & alive_w.unsqueeze(2)).any(dim=1)  # [n, T]
             # the HUT clause is LIVE, not baked into camp_ok: a village is
-            # claimed mid-game (`tileClaimed(t) || t.goodyHut`)
-            cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0) & ~self.tile_goody[wr]
+            # claimed mid-game, and a Meteor Site laid and taken
+            # (`tileClaimed(t) || t.goodyHut || t.meteor`)
+            cand_w = (self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & (self.district[wr] < 0)
+                      & (self.built_wonder[wr] < 0) & ~self.tile_goody[wr] & ~self.tile_meteor[wr])
             if self.fog_of_war:
                 # camps rise IN THE FOG — only on tiles dark to EVERY major
                 # seat (unexploredByAll; combat.ts's preferFog term).

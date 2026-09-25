@@ -54,8 +54,8 @@ describe('Qhapaq Ñan', () => {
     expect(d.engineer).toBeUndefined();          // the Builder's row
     expect(Object.values(d.yields)).toEqual([]);  // no yield row
     expect(CIVICS.FOREIGN_TRADE.effects).toContainEqual({ kind: 'unlockImprovement', improvement: 'MOUNTAIN_ROAD' });
-    // appended LAST, so no earlier build column moved
-    expect(IMPROVEMENT_IDS[IMPROVEMENT_IDS.length - 1]).toBe('MOUNTAIN_ROAD');
+    // appended after the governor rows, so no earlier build column moved
+    expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_ROAD')).toBe(37);
     expect(unitActionIndex(IMPROVEMENT_IDS).BUILD_MOUNTAIN_ROAD).toBe(COL);
   });
 

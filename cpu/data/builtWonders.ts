@@ -14,7 +14,7 @@
 
 import type { DistrictId, FeatureId, GreatPersonClass, ImprovementId, TerrainId, Yields } from '../core/types';
 import type { SlotKind } from './policies';
-import { GAME_SPEED } from './constants';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
 import { xml, type SrcMap } from './provenance';
 
 export interface BuiltWonderDef {
@@ -174,7 +174,7 @@ export interface BuiltWonderDef {
   description: string;
 }
 
-const W = (def: BuiltWonderDef): BuiltWonderDef => ({ ...def, cost: Math.round(def.cost * GAME_SPEED) });
+const W = (def: BuiltWonderDef): BuiltWonderDef => ({ ...def, cost: scaleByGameSpeed(def.cost) });
 
 export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
   [

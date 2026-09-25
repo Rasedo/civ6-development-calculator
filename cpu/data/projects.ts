@@ -20,8 +20,8 @@
 
 import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';
 import type { CivId, LeaderId } from '../../world/roster';
-import { GAME_SPEED } from './constants';
-import { xml, type SrcMap } from './provenance';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 export interface ProjectDef {
   id: string;
@@ -77,8 +77,9 @@ export interface ProjectDef {
    *  always has, and its price is the perimeter HP missing when it is queued
    *  ("Walls gain HP equal to the Production invested into the project"). */
   repair?: boolean;
-  /** FIXED production cost (real Civ 6 value; the table mapper applies the
-   *  game-speed coefficient). Absent = the generic district-project price. */
+  /** the install's `Projects.Cost` at Standard speed; the table mapper
+   *  applies `scaleByGameSpeed`. Absent on the repair alone, whose price is
+   *  the perimeter HP it restores. */
   cost?: number;
   /** Gating CIVIC — the research half a tech cannot express. */
   requiresCivic?: string;
@@ -102,10 +103,11 @@ export interface ProjectDef {
    *  the Phoenician Capital moves to this city" — the ORIGINAL capital,
    *  `moveCapital`. */
   movesCapital?: boolean;
-  /** CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS, Param1): this project's price
-   *  climbs with the game's own progress rather than taking the generic
-   *  half-a-district curve — `cost + param x progress`. The engine's one
-   *  notion of that progress is `districtCostIn`'s max(tech, civic) share. */
+  /** CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS, Param1): this
+   *  project's price climbs with the game's own progress — `cost + param x
+   *  progress`, the param at Standard speed and scaled where it is read. The
+   *  engine's one notion of that progress is `districtCostIn`'s max(tech,
+   *  civic) share. Every district project carries one (Cost 25, Param1 1500). */
   costProgressGame?: number;
 }
 
@@ -120,7 +122,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'science',
       gpClass: 'SCIENTIST',
       description: 'Convert production into science and Great Scientist points.',
+      cost: 25,
+      costProgressGame: 1500,
       src: {
+        cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'PrereqDistrict', { expect: 'DISTRICT_CAMPUS' }),
         gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_SCIENTIST' }),
         yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'YieldType', { expect: 'YIELD_SCIENCE' }),
@@ -135,7 +141,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       gpClasses: ['WRITER', 'ARTIST', 'MUSICIAN'],
       gppFraction: 0.11,
       description: 'Convert production into culture and Great Writer/Artist/Musician points.',
+      cost: 25,
+      costProgressGame: 1500,
       src: {
+        cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'PrereqDistrict', { expect: 'DISTRICT_THEATER' }),
         gpClass: { derived: 'the PRIMARY of the THREE Project_GreatPersonPoints classes the install gives this project; the catalog keeps one for wire-index stability and the full list in gpClasses', inputs: [xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'GreatPersonClassType')] },
         yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'YieldType', { expect: 'YIELD_CULTURE' }),
@@ -150,7 +160,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'faith',
       gpClass: 'PROPHET',
       description: 'Convert production into faith and Great Prophet points.',
+      cost: 25,
+      costProgressGame: 1500,
       src: {
+        cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
         gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_PROPHET' }),
         yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'YieldType', { expect: 'YIELD_FAITH' }),
@@ -163,7 +177,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'gold',
       gpClass: 'MERCHANT',
       description: 'Convert production into gold and Great Merchant points.',
+      cost: 25,
+      costProgressGame: 1500,
       src: {
+        cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'PrereqDistrict', { expect: 'DISTRICT_COMMERCIAL_HUB' }),
         gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_MERCHANT' }),
         yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'YieldType', { expect: 'YIELD_GOLD' }),
@@ -176,7 +194,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'gold',
       gpClass: 'ADMIRAL',
       description: 'Convert production into gold and Great Admiral points.',
+      cost: 25,
+      costProgressGame: 1500,
       src: {
+        cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
         gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_ADMIRAL' }),
         yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'YieldType', { expect: 'YIELD_GOLD' }),
@@ -189,7 +211,11 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: null,
       gpClass: 'GENERAL',
       description: 'Convert production into Great General points.',
+      cost: 25,
+      costProgressGame: 1500,
       src: {
+        cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'PrereqDistrict', { expect: 'DISTRICT_ENCAMPMENT' }),
         gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_GENERAL' }),
       },
@@ -280,9 +306,10 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
         recommission: { derived: 'true for the install RECOMMISSION_REACTOR row', inputs: [xml('Projects', 'ProjectType=PROJECT_RECOMMISSION_REACTOR', 'ProjectType')] },
       },
     }),
-    P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.',
+    P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, cost: 400, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.',
       src: {
         district: xml('Projects', 'ProjectType=PROJECT_CARBON_RECAPTURE', 'PrereqDistrict', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_CARBON_RECAPTURE', 'Cost', { scale: GAME_SPEED }),
         requiresCivic: xml('Projects', 'ProjectType=PROJECT_CARBON_RECAPTURE', 'PrereqCivic', { expect: 'CIVIC_GLOBAL_WARMING_MITIGATION' }),
         carbonRecapture: { derived: 'true for the install CARBON_RECAPTURE row', inputs: [xml('Projects', 'ProjectType=PROJECT_CARBON_RECAPTURE', 'ProjectType')] },
       },
@@ -440,13 +467,19 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
         competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row', inputs: [xml('Projects', 'ProjectType=PROJECT_SEND_AID', 'ProjectType')] },
       },
     }),
-  ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: Math.round(p.cost * GAME_SPEED) } : p]),
+  ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: scaleByGameSpeed(p.cost) } : p]),
 );
 
-/** CIV6 (GS): the Exoplanet craft's journey — 50 light-years on Standard
- *  speed at a base 1 LY/turn, +1 LY/turn per completed laser station; the
- *  distance takes the game-speed coefficient like every other magnitude. */
-export const SPACE_FLIGHT_LY = Math.round(50 * GAME_SPEED);
+/** CIV6 (GS): the Exoplanet craft's journey — `SCIENCE_VICTORY_POINTS_REQUIRED`
+ *  50 light-years at a base 1 LY/turn, +1 LY/turn per completed laser station.
+ *  The pedia: "The threshold for victory varies depending on game speed"; the
+ *  install publishes no rule for how, and this engine reads it as a cost
+ *  (`scaleByGameSpeed`). */
+export const SPACE_FLIGHT_LY = srcConst('scenario.spaceLyTarget', scaleByGameSpeed(50),
+  xml('GlobalParameters', 'Name=SCIENCE_VICTORY_POINTS_REQUIRED', 'Value', {
+    scale: GAME_SPEED,
+    note: 'the speed scaling is this engine\'s reading of the pedia\'s "varies depending on game speed"',
+  }));
 
 export const SPACE_PROJECTS: ProjectDef[] = Object.values(PROJECTS)
   .filter((p) => p.once && p.district === 'SPACEPORT');

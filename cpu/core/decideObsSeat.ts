@@ -9,7 +9,7 @@ import { congressSessionDue, congressVoter, dvLeader, preference, specialSession
 import { CONGRESS_DV_MIN_ERA, CONGRESS_VOTE_STEP } from '../data/seats';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { siloTargets } from './combat';
-import { canEnhanceReligion, canFoundReligion, openBeliefs } from './game';
+import { beliefPicks, canFoundReligion, openBeliefs } from './game';
 import { BELIEF_CATALOGS, BELIEF_SLOTS } from '../data/religion';
 
 /**
@@ -86,9 +86,10 @@ function gpGroup(state: GameState, seat: number): Record<string, number[]> {
   };
 }
 
-/** The `belief` group: whether the seat may found or enhance its religion
- *  now (`canFoundReligion` / `canEnhanceReligion`), the class catalog row its
- *  religion holds per class (-1 none), and each class's open beliefs. */
+/** The `belief` group: whether the seat may found its religion now
+ *  (`canFoundReligion`), how many beliefs an enhancement adopts now
+ *  (`beliefPicks`), the class catalog row its religion holds per class (-1
+ *  none), and each class's open beliefs. */
 function beliefGroup(state: GameState, seat: number): Record<string, unknown> {
   const rel = seatOf(state, seat)?.religion;
   const open = (c: number) => {
@@ -97,7 +98,7 @@ function beliefGroup(state: GameState, seat: number): Record<string, unknown> {
   };
   return {
     found: canFoundReligion(state, seat).ok,
-    enhance: canEnhanceReligion(state, seat).ok,
+    enhance: beliefPicks(state, seat),
     held: BELIEF_SLOTS.map((slot, c) => {
       const id = rel?.[slot];
       return id ? Object.keys(BELIEF_CATALOGS[c]).indexOf(id) : -1;

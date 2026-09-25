@@ -320,11 +320,12 @@ def main() -> int:
     # counted here with its effect taken out, so the shares read the draw
     # alone.
     sim10 = fresh(rules)
-    fired = {"flood": 0, "volcano": 0, "storm": 0, "drought": 0, "accident": 0}
+    fired = {"flood": 0, "volcano": 0, "storm": 0, "drought": 0, "accident": 0, "meteor": 0, "fire": 0}
     turn = {}
     sim10._flood_river = lambda hit, tile, sev: turn.__setitem__("flood", bool(hit[0]))
-    sim10._erupt = lambda hit, volc, sev: turn.__setitem__("volcano", bool(hit[0]))
+    sim10._erupt = lambda hit, ring, sev: turn.__setitem__("volcano", bool(hit[0]))
     sim10._nuclear_accident = lambda hit, centre, sev: turn.__setitem__("accident", bool(hit[0]))
+    sim10._ignite = lambda rows, tiles, start: turn.__setitem__("fire", bool((rows == 0).any()))
     strip = sim10._desertification_live()
     N = 4000
     for _ in range(N):
@@ -332,28 +333,34 @@ def main() -> int:
         sim10.storm_left.zero_()
         sim10.storm_event.fill_(-1)
         sim10.drought.zero_()
+        sim10.tile_meteor.zero_()
         s0 = int(sim10.rng_state[0])
         sim10._random_event(strip)
         turn["storm"] = bool((sim10.storm_left[0] > 0).any())
         turn["drought"] = bool((sim10.drought[0] > 0).any())
+        turn["meteor"] = bool(sim10.tile_meteor[0].any())
         n_fired = sum(1 for v in turn.values() if v)
         assert n_fired == 1, f"the turn fired {n_fired} events: {turn}"
-        # the event draw, then the storm's or the drought's centre pick, and
-        # one draw per land plot of the drought's footprint
+        # the event draw, then the storm's, the drought's, the meteor's or the
+        # fire's plot pick, and one draw per land plot of the drought's
+        # footprint
         spent = draws(s0, int(sim10.rng_state[0]))
         dry = int((sim10.drought[0] > 0).sum())
-        assert spent == (2 if turn["storm"] else 2 + dry if turn["drought"] else 1), (spent, turn)
+        picks = turn.get("storm") or turn.get("meteor") or turn.get("fire")
+        assert spent == (2 if picks else 2 + dry if turn["drought"] else 1), (spent, turn)
         for k, v in turn.items():
             fired[k] += int(v)
-    del sim10._flood_river, sim10._erupt, sim10._nuclear_accident
+    del sim10._flood_river, sim10._erupt, sim10._nuclear_accident, sim10._ignite
     fams = {int(f) for f in range(len(sim10._storm_lists)) if int(sim10._storm_lists[f][1][0]) > 0}
     w = {
         "flood": 4.5 * int(sim10._flood_sites[1][0]),
-        "volcano": 8.0 * int(sim10._volc_n[0]) + 6.5 * int(((sim10.feat_id[0] == sim10._kilimanjaro_fid)
-                                                          & ~sim10.feat_stripped[0]).sum()),
+        "volcano": 8.0 * int(sim10._volc_n[0]) + 6.5 * int(((sim10.feat_id[0] == sim10._er_wonder_fid[2])
+                                                          & ~sim10.feat_stripped[0]).any()),
         "storm": sum(sim10._st_weight[e] for e in range(8) if sim10._st_family[e] in fams),
         "drought": 28.0 if bool(sim10._drought_cands()[0].any()) else 0.0,
         "accident": 0.0,
+        "meteor": 6.0 if bool(sim10._meteor_cands()[0].any()) else 0.0,
+        "fire": sum(6.0 for s in range(2) if bool(sim10._fire_cands(s)[0].any())),
     }
     total = sum(w.values())
     for k in fired:

@@ -10,7 +10,9 @@ export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL'
   // ...and the two GOVERNOR improvements after them, for the same reason
   'FISHERY', 'CITY_PARK',
   // ...and Pachacuti's LEADER improvement after those
-  'MOUNTAIN_ROAD'];
+  'MOUNTAIN_ROAD',
+  // ...and the Offshore Wind Farm after that
+  'OFFSHORE_WIND_FARM'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 
@@ -151,6 +153,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   for (let k = 0; k < AIR_DEPLOY_COLS; k++) names.push(`DEPLOY_${k}`);
   names.push('RETURN_TO_BASE');
   for (let k = 0; k < AIR_STRIKE_COLS; k++) names.push(`PRIORITY_TARGET_${k}`);
+  // EVANGELIZE BELIEF (UNITOPERATION_EVANGELIZE_BELIEF): the Apostle is
+  // spent and its religion earns a belief. Appended last, like every verb
+  // since FOUND_CITY.
+  names.push('EVANGELIZE_BELIEF');
   return names;
 }
 

@@ -4,12 +4,12 @@
  * maintenance, and builder actions. Combat lives in combat.ts.
  */
 
-import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
+import { ATHEISM_PRESSURE_PER_POP, ENHANCER_BELIEFS } from '../data/religion';
 import type { GameState, City, Seat, Tile, Unit, QueueItem } from './types';
 import { seatWonderSum } from './wonders';
 import { takeItemBank } from './prodLayout';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC } from '../data/units';
+import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC, BUILDER_COST_STEP } from '../data/units';
 
 /** what a unit's FORMATION adds to Combat, Ranged and Bombard Strength alike.
  *  ONE reader of the optional field, so no strength site spells its own
@@ -27,7 +27,7 @@ import { validImprovements, canRemoveFeature, portalAt, portalExit, type RuleRes
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
-import { droughtBars } from '../data/disasters';
+import { droughtBars, fireFeature, METEOR_GRANT_CLASS } from '../data/disasters';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
 import { effectiveAdjacency, buildingVariantAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
@@ -52,7 +52,7 @@ import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
 import {
-  GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
+  scaleByGameSpeed, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
   MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP, TRADE_ROAD_MAX_STEPS,
   STRATEGIC_IDS, emptyStockpile,
 } from '../data/constants';
@@ -61,6 +61,7 @@ import { CIVICS } from '../data/civics';
 import { tradeCapacity } from './trade';
 import { revealAround, nearestUnexplored, unitSight, unitSeesThrough } from './fog';
 import { drawGoodyReward } from './goodyHuts';
+import { goodyAmount } from '../data/goodyHuts';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { promiseIncursion } from './grievance';
@@ -196,7 +197,7 @@ function routeStepMp(state: GameState, from: Tile, to: Tile): number {
  * own published cost instead.
  * `from` is the tile being left; passing the same tile twice is harmless. */
 export function moveCostInto(
-  state: GameState, from: Tile, tile: Tile, mover?: { promos?: number; type: string },
+  state: GameState, from: Tile, tile: Tile, mover?: { promos?: number; type: string; seat?: number },
 ): number {
   // CIV6 (Polder, `MovementChange="2"`): an improvement may make its own tile
   // dearer to enter than the flat step. Water only, so `terrainMp` — the half
@@ -205,7 +206,19 @@ export function moveCostInto(
   // a hull in a Canal's passage pays the water step, not the ground's
   if (mover && UNITS[mover.type]?.naval && canalPassage(tile)) return MP_SCALE;
   if (roadStep(from, tile)) return routeStepMp(state, from, tile);
+  if (mover && religiousIgnoresTerrain(state, mover)) return MP_SCALE;
   return terrainMp(tile, mover);
+}
+
+/** CIV6 (Missionary Zeal, ABILITY_RELIGIOUS_IGNORE_TERRAIN_COST on
+ *  CLASS_RELIGIOUS_ALL): a religious unit of a seat whose founded religion
+ *  holds the belief pays neither terrain nor feature Movement
+ *  (MOD_IGNORE_TERRAIN_COST) nor a river crossing
+ *  (MOD_IGNORE_CROSSING_RIVERS_COST). */
+export function religiousIgnoresTerrain(state: GameState, mover: { type: string; seat?: number }): boolean {
+  if ((UNITS[mover.type]?.religiousStrength ?? 0) <= 0 || mover.seat === undefined) return false;
+  const rel = seatOf(state, mover.seat)?.religion;
+  return !!rel?.founded && !!rel.enhancer && !!ENHANCER_BELIEFS[rel.enhancer]?.effects.religiousIgnoreTerrain;
 }
 
 /** CIV6 (`Improvements.MovementChange`): the WHOLE cost of entering a tile
@@ -230,12 +243,16 @@ export function terrainMp(tile: Tile, mover?: { promos?: number; type: string })
   if (tile.elevation === 'HILLS' && hills) cost += MP_SCALE;
   if (tile.feature === 'MARSH') cost += MP_SCALE;
   else if ((tile.feature === 'WOODS' || tile.feature === 'RAINFOREST') && woods) cost += MP_SCALE;
+  // the pack's burning and burnt Woods and Rainforest (`MovementChange` 1):
+  // not Woods or Jungle, so no Ranger or chassis waives them
+  else if (fireFeature(tile.feature)) cost += MP_SCALE;
   return cost;
 }
 
-export function riverCharge(state: GameState, from: Tile, to: Tile): number {
+export function riverCharge(state: GameState, from: Tile, to: Tile, mover?: { type: string; seat?: number }): number {
   if (isWater(to)) return 0;
   if (roadStep(from, to) && roadBridges(state)) return 0;
+  if (mover && religiousIgnoresTerrain(state, mover)) return 0;
   return crossesRiver(from, to) ? RIVER_CROSS_MP : 0;
 }
 
@@ -793,7 +810,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
       if (closed.has(n.index) || !passOk(n)) continue;
       // Rivers cost +3 to cross — the same charge the walker pays (water steps
       // never pay a river charge, so naval routing skips it).
-      const g = cur.g + moveCostInto(state, curTile, n, unit) + (naval ? 0 : riverCharge(state, curTile, n)); // roads
+      const g = cur.g + moveCostInto(state, curTile, n, unit) + (naval ? 0 : riverCharge(state, curTile, n, unit)); // roads
       const existing = open.get(n.index);
       if (!existing || g < existing.g) {
         open.set(n.index, { g, f: g + hexDistance(n.col, n.row, target.col, target.row), from: bestIdx });
@@ -1035,7 +1052,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     || ignoresShores(state, unit);
   const cost = transition
     ? moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP)
-    : moveCostInto(state, from, to, unit) + riverCharge(state, from, to); // roads
+    : moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit); // roads
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   // THE FORMATION MOVES AS ONE — and no further than its slowest member,
   // unless the escort carries Escort Mobility.
@@ -1103,6 +1120,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
       if (extra > 0) unit.charges = (unit.charges ?? 0) + extra;
     }
     claimGoodyHut(state, unit);
+    claimMeteorSite(state, unit);
   }
   clearCampFor(state, unit, to.index);
   if (inEnemyZoc(state, unit.tileIndex, unit)) {
@@ -1147,10 +1165,11 @@ export function orderMove(state: GameState, unitId: number, targetIndex: number)
 }
 
 /**
- * The builder price escalator — 50 + 4 (pre-speed) per
- * builder THIS SEAT HAS ALREADY PRODUCED, rounded after the game-speed scale
- * like every unit cost (data/units U()). The exporter mirrors the 50/4 literals
- * as scenario.builderBase/builderPer.
+ * The builder price escalator — the Units row's Cost 50 + its
+ * CostProgressionParam1 4 per builder THIS SEAT HAS ALREADY PRODUCED, each
+ * through `scaleByGameSpeed` like every unit cost (data/units U()); 25 + 2·n
+ * online. The exporter ships both scaled figures as
+ * scenario.builderBase/builderPer.
  *
  * ONE escalator for every seat, counting only builders already trained or
  * purchased, never one sitting in a queue. Civ 6's unit cost progression is
@@ -1160,7 +1179,7 @@ export function orderMove(state: GameState, unitId: number, targetIndex: number)
  *   https://forums.civfanatics.com/threads/600489/
  */
 export function builderCost(state: GameState, seat: number): number {
-  return Math.round((50 + 4 * (seatOf(state, seat)?.buildersTrained ?? 0)) * GAME_SPEED);
+  return UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * (seatOf(state, seat)?.buildersTrained ?? 0);
 }
 
 /**
@@ -1893,7 +1912,26 @@ export function religiousHeal(state: GameState, unit: Unit, ctx: YieldCtx): numb
   const mon = here.improvement && !here.pillaged
     ? IMPROVEMENTS[here.improvement as ImprovementId].religiousHeal ?? 0
     : 0;
-  return RELIGIOUS_HEAL_PER_FAITH * best + (tileSeat(here) === unit.seat ? mon : 0);
+  return RELIGIOUS_HEAL_PER_FAITH * best + (tileSeat(here) === unit.seat ? mon : 0) + holyWatersHeal(state, here);
+}
+
+/** CIV6 (Holy Waters, HOLY_WATERS_HEALING): the belief's Amount more healing
+ *  on or next to a complete, unpillaged Holy Site district of a major's city
+ *  that follows the religion holding it. The install attaches it through
+ *  COLLECTION_ALL_DISTRICTS and COLLECTION_ALL_UNITS with no owner clause,
+ *  so every religious unit standing there takes it. `_holy_waters` twin. */
+function holyWatersHeal(state: GameState, here: Tile): number {
+  for (const sx of state.seats) {
+    const rel = sx.religion;
+    const amount = rel?.founded && rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer]?.effects.holySiteReligiousHeal ?? 0 : 0;
+    if (!amount) continue;
+    for (const t of [here, ...neighbors(state.map, here)]) {
+      if (t.district !== 'HOLY_SITE' || !t.districtComplete || t.districtPillaged) continue;
+      const c = cityAtTile(state, t);
+      if (c && isCiv(c.seat) && c.followedReligion === sx.seat) return amount;
+    }
+  }
+  return 0;
 }
 
 /** CIV6 (Chaplain): the Apostle "operates as a Medic, providing extra healing
@@ -2224,6 +2262,60 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
   drawAndPayGoody(state, unit, tile);
 }
 
+/** A promotion class's GENERIC line — its units no civilization owns, from
+ *  the one nothing upgrades into, each `upgradesTo` after — in line order. */
+export function classLine(cls: string): string[] {
+  const chain = Object.values(UNITS).filter((d) =>
+    UNIT_PROMO_CLASS[d.id] === cls && !d.uniqueTo && !d.naval && !d.air);
+  const out: string[] = [];
+  let d = chain.find((c) => !chain.some((o) => o.upgradesTo === c.id));
+  while (d && !out.includes(d.id)) {
+    out.push(d.id);
+    const next = d.upgradesTo;
+    d = chain.find((c) => c.id === next);
+  }
+  return out;
+}
+
+/**
+ * THE METEOR SITE'S GRANT (`METEOR_GRANT_CLASS`, Heavy Cavalry): "more
+ * powerful than what the player can currently build" — the unit of the
+ * class's generic line one past the last whose tech and civic the seat holds;
+ * the line's first when it holds none, its last at the top.
+ */
+export function meteorGrantUnit(state: GameState, seat: number): string | null {
+  const line = classLine(METEOR_GRANT_CLASS);
+  let have = -1;
+  line.forEach((id, i) => {
+    const d = UNITS[id];
+    if ((!d.requiresTech || isTechComplete(state, d.requiresTech, seat))
+        && (!d.requiresCivic || isCivicComplete(state, d.requiresCivic, seat))) have = i;
+  });
+  return line[Math.min(have + 1, line.length - 1)] ?? null;
+}
+
+/**
+ * CLAIM a METEOR SITE with a unit standing on it — CIV6
+ * (IMPROVEMENT_METEOR_GOODY, `RemoveOnEntry`, `Goody`): taken the way a Tribal
+ * Village is, by the first civilization unit in, and gone. The claimer's
+ * nearest city receives `meteorGrantUnit`, which "has no resource
+ * maintenance cost" (`Unit.noResourceUpkeep`); a seat with no city takes the
+ * site and receives nothing. No draw.
+ */
+export function claimMeteorSite(state: GameState, unit: Unit): void {
+  const tile = state.map.tiles[unit.tileIndex];
+  const owner = seatOf(state, unit.seat);
+  if (!tile.meteor || !owner || !isCiv(unit.seat)) return;
+  tile.meteor = false;
+  const city = nearestCityTo(state, owner, tile);
+  const id = meteorGrantUnit(state, unit.seat);
+  if (!city || !id) return;
+  const u = spawnUnit(state, id, city.centerIndex, unit.seat);
+  if (u) u.noResourceUpkeep = true;
+  state.eventLog.push(`Meteor Site: ${id}.`);
+  if (state.eventLog.length > 20) state.eventLog.shift();
+}
+
 /**
  * Draw one village reward and pay it — the ONE payout body, so the tile a
  * unit walked onto and the barbarian outpost it cleared cannot drift apart on
@@ -2240,30 +2332,30 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
   const sub = drawGoodyReward(state, state.turn, owner.cities.length > 0);
   if (!sub) return;
   const p = sub.payload;
-  const scaled = (n: number) => (sub.scale ? Math.round(n * GAME_SPEED) : n);
+  const amount = goodyAmount(sub);
   switch (p.kind) {
     case 'relic':
-      owner.relicReserve += p.amount;
+      owner.relicReserve += amount;
       break;
     case 'gold':
-      owner.treasury += scaled(p.amount);
+      owner.treasury += amount;
       break;
     case 'faith':
-      owner.faith += scaled(p.amount);
+      owner.faith += amount;
       break;
     case 'civicBoost':
     case 'techBoost': {
       const pool = Object.keys(p.kind === 'techBoost' ? TECHS : CIVICS).filter((id) =>
         !owner.research.boosted.includes(id)
         && !(p.kind === 'techBoost' ? owner.research.techs : owner.research.civics).includes(id));
-      for (let i = 0; i < p.amount && pool.length; i++) {
+      for (let i = 0; i < amount && pool.length; i++) {
         owner.research.boosted.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
       }
       break;
     }
     case 'tech': {
       const pool = Object.keys(TECHS).filter((id) => !owner.research.techs.includes(id));
-      for (let i = 0; i < p.amount && pool.length; i++) {
+      for (let i = 0; i < amount && pool.length; i++) {
         owner.research.techs.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
       }
       break;
@@ -2279,33 +2371,33 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
       break;
     }
     case 'experience':
-      unit.xp = (unit.xp ?? 0) + p.amount;
+      unit.xp = (unit.xp ?? 0) + amount;
       logXpWrite(state, unit, 'gh');
       break;
     case 'heal':
-      unit.hp = Math.min(UNIT_HP, unit.hp + p.amount);
+      unit.hp = Math.min(UNIT_HP, unit.hp + amount);
       break;
     case 'population': {
       const city = nearestCityTo(state, owner, tile);
       if (city) {
-        city.population += p.amount;
+        city.population += amount;
         logPopWrite(state, city, 'gh');
       }
       break;
     }
     case 'governorTitle':
-      owner.grantedTitles += p.amount;
+      owner.grantedTitles += amount;
       break;
     case 'envoy':
-      owner.envoysAvailable += p.amount;
+      owner.envoysAvailable += amount;
       break;
     case 'favor':
-      owner.diplomaticFavor += p.amount;
+      owner.diplomaticFavor += amount;
       break;
     case 'strategic': {
       const slot = mostAdvancedStrategic(state, unit.seat);
       const bank = (owner.stockpile ??= emptyStockpile());
-      bank[slot] = (bank[slot] ?? 0) + p.amount;
+      bank[slot] = (bank[slot] ?? 0) + amount;
       logStockWrite(state.turn, unit.seat, slot, 'gh', bank[slot]);
       break;
     }

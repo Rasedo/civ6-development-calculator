@@ -20,7 +20,7 @@
 
 import type { DistrictId, GreatPersonClass, ResourceCategory, Yields } from '../core/types';
 import type { AdjacencyRule } from './districts';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 export interface BeliefEffects {
   /** extra ADJACENCY rules one district type reads while this belief is held
@@ -71,6 +71,25 @@ export interface BeliefEffects {
   /** a WORSHIP belief's building: the one Holy Site building the religion
    *  holding the belief may build or buy (`WORSHIP_BELIEFS`). */
   worshipBuilding?: string;
+  /** CIV6 (BELIEF_YIELD_PER_DISTRICT, Lay Ministry): yields per COMPLETED
+   *  district of a type in the belief seat's cities, paid in the capital —
+   *  the `perCity` channel's reach, counted by district. */
+  perDistrict?: Partial<Record<DistrictId, Partial<Yields>>>;
+  /** CIV6 (BELIEF_YIELD_PER_CITY_WITH_WONDER, Sacred Places): yields per
+   *  belief-seat city holding a completed World Wonder, paid in the capital. */
+  perWonderCity?: Partial<Yields>;
+  /** CIV6 (ABILITY_RELIGIOUS_IGNORE_TERRAIN_COST, Missionary Zeal): the
+   *  seat's religious units pay no terrain, feature or river-crossing
+   *  Movement — MOD_IGNORE_TERRAIN_COST and MOD_IGNORE_CROSSING_RIVERS_COST. */
+  religiousIgnoreTerrain?: boolean;
+  /** CIV6 (EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS, Monastic Isolation): the
+   *  percent of the pressure the religion loses to a lost theological combat
+   *  that it keeps (`ReductionPercent`). */
+  theoLossReductionPct?: number;
+  /** CIV6 (MODIFIER_ALL_UNITS_ADJUST_HEAL_RELIGION_PER_TURN, Holy Waters):
+   *  the extra healing a religious unit takes on or next to a Holy Site
+   *  district of a city following the religion. */
+  holySiteReligiousHeal?: number;
 }
 
 export interface BeliefDef {
@@ -300,6 +319,24 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.buildingYields.BANK.gold':
       xml('ModifierArguments', 'ModifierId=STEWARDSHIP_GOLD_DISTRICTS_MODIFIER&Name=Amount', 'Value'),
   },
+  LAY_MINISTRY: {
+    // BELIEF_YIELD_PER_DISTRICT, PerXItems 1, the district its DistrictType
+    'effects.perDistrict.HOLY_SITE.faith':
+      xml('ModifierArguments', 'ModifierId=LAY_MINISTRY_FAITH_DISTRICTS_MODIFIER&Name=Amount', 'Value'),
+    'effects.perDistrict.THEATER_SQUARE.culture':
+      xml('ModifierArguments', 'ModifierId=LAY_MINISTRY_CULTURE_DISTRICTS_MODIFIER&Name=Amount', 'Value'),
+  },
+  SACRED_PLACES: {
+    // BELIEF_YIELD_PER_CITY_WITH_WONDER, PerXItems 1, one modifier per yield
+    'effects.perWonderCity.science':
+      xml('ModifierArguments', 'ModifierId=SACRED_PLACES_SCIENCE_WONDER_CITY_MODIFIER&Name=Amount', 'Value'),
+    'effects.perWonderCity.culture':
+      xml('ModifierArguments', 'ModifierId=SACRED_PLACES_CULTURE_WONDER_CITY_MODIFIER&Name=Amount', 'Value'),
+    'effects.perWonderCity.gold':
+      xml('ModifierArguments', 'ModifierId=SACRED_PLACES_GOLD_WONDER_CITY_MODIFIER&Name=Amount', 'Value'),
+    'effects.perWonderCity.faith':
+      xml('ModifierArguments', 'ModifierId=SACRED_PLACES_FAITH_WONDER_CITY_MODIFIER&Name=Amount', 'Value'),
+  },
 
   // ---- WORSHIP ----
   ...Object.fromEntries(['CATHEDRAL', 'GURDWARA', 'MEETING_HOUSE', 'MOSQUE', 'PAGODA', 'SYNAGOGUE', 'WAT', 'STUPA', 'DAR_E_MEHR']
@@ -332,6 +369,20 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       derived: '1 - Amount/100 — the install writes the purchase DISCOUNT (30), the catalog the multiplier',
       inputs: [xml('ModifierArguments', 'ModifierId=HOLY_ORDER_MISSIONARY_DISCOUNT_MODIFIER&Name=Amount', 'Value')],
     },
+  },
+  MISSIONARY_ZEAL: {
+    'effects.religiousIgnoreTerrain':
+      xml('ModifierArguments', 'ModifierId=MISSIONARY_ZEAL_IGNORE_TERRAIN_MODIFIER&Name=AbilityType', 'Value',
+        { expect: 'ABILITY_RELIGIOUS_IGNORE_TERRAIN_COST',
+          note: 'the ability carries MOD_IGNORE_TERRAIN_COST and MOD_IGNORE_CROSSING_RIVERS_COST, tagged CLASS_RELIGIOUS_ALL' }),
+  },
+  MONASTIC_ISOLATION: {
+    'effects.theoLossReductionPct':
+      xml('ModifierArguments', 'ModifierId=MONASTIC_ISOLATION_REDUCE_COMBAT_LOSS&Name=ReductionPercent', 'Value'),
+  },
+  HOLY_WATERS: {
+    'effects.holySiteReligiousHeal':
+      xml('ModifierArguments', 'ModifierId=HOLY_WATERS_HEALING_MODIFIER&Name=Amount', 'Value'),
   },
 };
 
@@ -454,6 +505,12 @@ export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     }),
     B('PAPAL_PRIMACY', 'Papal Primacy', '+25% influence points toward earning envoys.', {}),
     B('RELIGIOUS_UNITY', 'Religious Unity', 'Your alliances and city-state relations gain bonuses from shared religion.', {}),
+    B('LAY_MINISTRY', 'Lay Ministry', '+1 Faith for each Holy Site and +1 Culture for each Theater Square district.', {
+      perDistrict: { HOLY_SITE: { faith: 1 }, THEATER_SQUARE: { culture: 1 } },
+    }),
+    B('SACRED_PLACES', 'Sacred Places', '+2 Science, Culture, Gold and Faith for each city with a World Wonder.', {
+      perWonderCity: { science: 2, culture: 2, gold: 2, faith: 2 },
+    }),
   ].map((b) => [b.id, b]),
 );
 
@@ -479,9 +536,11 @@ export const WORSHIP_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
 );
 
 /**
- * Enhancer beliefs. Each of the five boosts a system this engine DOES model —
- * pressure range, spread strength, missionary purchase cost, and the two
- * religion-keyed combat adders — and every one of them is live.
+ * Enhancer beliefs, the install's nine. RELIGIOUS_COLONIZATION
+ * (EFFECT_ENABLE_RELIGION_AUTO_SPREAD: "Cities start with this Religion in
+ * place if founded by a player who has this as their majority Religion")
+ * holds its place in the pool and applies nothing: the install names no
+ * amount of pressure a new city starts with.
  */
 export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   [
@@ -503,6 +562,16 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {
       missionaryCostMult: 0.7,
     }),
+    B('MISSIONARY_ZEAL', 'Missionary Zeal', 'Religious units ignore Movement costs of terrain and features.', {
+      religiousIgnoreTerrain: true,
+    }),
+    B('MONASTIC_ISOLATION', 'Monastic Isolation', "Your Religion's pressure never drops due to losses in Theological Combat.", {
+      theoLossReductionPct: 100,
+    }),
+    B('RELIGIOUS_COLONIZATION', 'Religious Colonization', 'Cities start with this Religion in place if founded by a player who has this as their majority Religion.', {}),
+    B('HOLY_WATERS', 'Holy Waters', '+10 healing for religious units in or next to Holy Site districts of cities following this Religion.', {
+      holySiteReligiousHeal: 10,
+    }),
   ].map((b) => [b.id, b]),
 );
 
@@ -513,13 +582,22 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
  * CIV6 (ReligionScreen.lua `PopulateAvailableBeliefs` / `OnBeliefSelected`)
  * and the pedia ("A newly established Religion will consist of two beliefs:
  * a Follower belief, and one of three additional types"): FOUNDING takes the
- * Follower first, then one belief of any other class; ENHANCING adds the
- * classes the religion still lacks. A class code is its index here — the
- * wire's (class, index) pairs and the GPU's pools share it.
+ * Follower first, then one belief of any other class. A class code is its
+ * index here — the wire's (class, index) pairs and the GPU's pools share it.
  */
 export const BELIEF_CLASSES = ['FOLLOWER', 'WORSHIP', 'FOUNDER', 'ENHANCER'] as const;
 export type BeliefClass = typeof BELIEF_CLASSES[number];
 export const BELIEF_CLASS_FOLLOWER = BELIEF_CLASSES.indexOf('FOLLOWER');
+
+/** CIV6 (GlobalParameters RELIGION_INITIAL_BELIEFS 2): the beliefs a religion
+ *  earns at its founding. Each EVANGELIZE BELIEF earns one more (the Apostle:
+ *  "Once per game may Evangelize Belief to add an additional Belief to their
+ *  Religion. These uses consume the Apostle"; the pedia: "use the Evangelize
+ *  Belief action on Apostles to add additional beliefs to your Religion. You
+ *  can have a total of 4 beliefs in a Religion"), and the religion adopts
+ *  what it has earned from the classes it still lacks. */
+export const RELIGION_INITIAL_BELIEFS = srcConst('religion.initialBeliefs', 2,
+  xml('GlobalParameters', 'Name=RELIGION_INITIAL_BELIEFS', 'Value'));
 
 /** each class's catalog, by class code */
 export const BELIEF_CATALOGS: readonly Record<string, BeliefDef>[] = [

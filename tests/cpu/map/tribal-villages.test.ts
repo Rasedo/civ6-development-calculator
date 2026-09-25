@@ -3,11 +3,11 @@ import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { claimGoodyHut, mostAdvancedStrategic } from '../../../cpu/core/units';
 import { drawGoodyReward, goodyEligible, eligibleGoodyKinds } from '../../../cpu/core/goodyHuts';
-import { GOODY_SUBTYPES, GOODY_KINDS, GOODY_KIND_WEIGHT } from '../../../cpu/data/goodyHuts';
+import { GOODY_SUBTYPES, GOODY_KINDS, GOODY_KIND_WEIGHT, goodyAmount } from '../../../cpu/data/goodyHuts';
 import { CAMP_GOODY_ROWS } from '../../../cpu/data/civilizations';
 import { getModifiers } from '../../../cpu/core/effects';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
-import { STRATEGIC_IDS, GAME_SPEED } from '../../../cpu/data/constants';
+import { STRATEGIC_IDS, scaleByGameSpeed } from '../../../cpu/data/constants';
 import { governorTitlesEarned } from '../../../cpu/core/governors';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
@@ -120,12 +120,16 @@ describe('claiming a village', () => {
     expect(state.map.tiles[hut].goodyHut).toBe(true);   // still there
   });
 
-  it('scales the two flagged yields by game speed and nothing else', () => {
+  it('scales the rows the install scales by game speed and nothing else', () => {
     const of = (id: string) => GOODY_SUBTYPES.find((s) => s.id === id)!;
-    expect(of('LARGE_GOLD').scale).toBe(true);
-    expect(of('SMALL_FAITH').scale).toBe(true);
-    expect(of('GRANT_EXPERIENCE').scale).toBeUndefined();
-    expect(Math.round(120 * GAME_SPEED)).toBeLessThan(120);  // the speed is < 1 here
+    // the six Gold and Faith rows (`Scale: true`) and the strategic grant
+    // (its `Amount` typed ScaleByGameSpeed)
+    expect(GOODY_SUBTYPES.filter((s) => s.scale).map((s) => s.id).sort()).toEqual([
+      'LARGE_FAITH', 'LARGE_GOLD', 'MEDIUM_FAITH', 'MEDIUM_GOLD', 'RESOURCES', 'SMALL_FAITH', 'SMALL_GOLD']);
+    expect(goodyAmount(of('LARGE_GOLD'))).toBe(scaleByGameSpeed(120));
+    expect(goodyAmount(of('SMALL_FAITH'))).toBe(scaleByGameSpeed(20));
+    expect(goodyAmount(of('RESOURCES'))).toBe(scaleByGameSpeed(20));
+    expect(goodyAmount(of('GRANT_EXPERIENCE'))).toBe(20);
   });
 
   it('grants a governor title that the roster then counts', () => {

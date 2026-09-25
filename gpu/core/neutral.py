@@ -377,10 +377,11 @@ def _columns(sim, row: int) -> dict:
 
 
 def _beliefs(sim, row: int) -> dict:
-    """The `belief` group: whether the seat may found or enhance its
-    religion now, the class catalog row it holds per class (-1 none), and
-    each class's open beliefs as membership rows (`_INDEX_LISTS`)."""
-    out = {("belief", "found"): sim._can_found(row), ("belief", "enhance"): sim._can_enhance(row)}
+    """The `belief` group: whether the seat may found its religion now, how
+    many beliefs an enhancement adopts now (`_belief_picks`), the class
+    catalog row it holds per class (-1 none), and each class's open beliefs
+    as membership rows (`_INDEX_LISTS`)."""
+    out = {("belief", "found"): sim._can_found(row), ("belief", "enhance"): sim._belief_picks(row)}
     pools = sim._bel_pools()
     out["belief", "held"] = torch.stack([ids[:, row] for _m, ids, _n in pools], dim=1)
     for name, (m, _ids, n) in zip(("follower", "worship", "founder", "enhancer"), pools):
@@ -601,13 +602,15 @@ def _found_ok(sim, row: int, gate: torch.Tensor) -> torch.Tensor:
                      sim.citystate_center), dim=1)
     live = torch.cat((sim.city_alive[:, :nrow].reshape(B, -1), sim.city_alive[:, fr:fr + 1].reshape(B, -1),
                       sim.citystate_alive), dim=1)
+    # a fire's plot takes no city (`fireFeature`, `foundSites`)
+    fire = sim._fire_plots()
     for b in range(B):
         if not bool(gate[b]):
             continue
         cb = ctr[b][live[b]]
         dmin = (sim.pair_dist[:, cb.clamp(min=0)].min(dim=1).values.to(torch.long)
                 if int(live[b].sum()) else torch.full((T,), 999, dtype=torch.long, device=dev))
-        ok[b] = ((sim.tile_seat[b] < 0) & sim.settle_ok[b]
+        ok[b] = ((sim.tile_seat[b] < 0) & sim.settle_ok[b] & ~fire[b]
                  & (sim.district[b] < 0) & (sim.built_wonder[b] < 0) & (dmin >= 4))
     return ok
 
@@ -685,7 +688,8 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
         g = holds(sim._naturalist_idx)
         if bool(g.any()):
             planes["parks"] = (g, sim._park_cluster_legal(row, sim._park_cluster(allt)).any(dim=2))
-    planes["goody"] = (~no, sim.tile_goody)
+    # a Meteor Site is taken the way a village is: the first unit in
+    planes["goody"] = (~no, sim.tile_goody | sim.tile_meteor)
     war_row = sim.war[:, row]
     at_war = war_row.any(dim=1)
     city_rows: list = []

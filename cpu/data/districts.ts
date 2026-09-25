@@ -102,7 +102,7 @@ export interface DistrictDef {
   code: string;
   color: string;
   cost: number;
-  /** CIV6: this district's cost is FLAT (`cost` × game speed) — it never
+  /** CIV6: this district's cost is FLAT (`scaleByGameSpeed(cost)`) — it never
    *  scales with research progress and takes no discount. The Spaceport. */
   fixedCost?: boolean;
   /** CIV6 (`Districts.CostProgressionParam1`): the UNDER-REPRESENTED discount,
@@ -114,8 +114,8 @@ export interface DistrictDef {
   /** CIV6 (`Districts.CostProgressionModel` = GAME_PROGRESS, with
    *  `Districts.CostProgressionParam1`): this
    *  row's price climbs with the GAME's own progress rather than with the
-   *  specialty curve — `base + floor(round(param x speed) x progress)`, the
-   *  model `projectCost` already runs for the Cothon. The install writes it
+   *  specialty curve — `base + floor(scaleByGameSpeed(param) x progress)`,
+   *  the model `projectCost` runs for the district projects and the Cothon. The install writes it
    *  on six rows at 1000; a civVariant carries its own base and the SAME
    *  parameter, which is why the term is added after the variant ratio. */
   costProgressGame?: number;

@@ -1,6 +1,6 @@
 
 import type { Era, ResearchEffect } from './techs';
-import { GAME_SPEED } from './constants';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
 import { xml, type SrcMap } from './provenance';
 
 export interface CivicDef {
@@ -396,7 +396,7 @@ const C = (
   prereqs: string[],
   effects: ResearchEffect[] = [],
 ): CivicDef => ({
-  id, name, era, cost: Math.round(cost * GAME_SPEED), prereqs, effects,
+  id, name, era, cost: scaleByGameSpeed(cost), prereqs, effects,
   ...(CIVIC_SRC[id] ? { src: CIVIC_SRC[id] } : {}),
 });
 

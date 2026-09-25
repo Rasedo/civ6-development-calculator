@@ -3,7 +3,7 @@ import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat } from '../../../cpu/core/seats';
 import { districtCostIn, districtScaledBase, districtProgressAdd, districtCost, districtDiscountMult, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
 import { DISTRICTS } from '../../../cpu/data/districts';
-import { GAME_SPEED } from '../../../cpu/data/constants';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import { TECHS } from '../../../cpu/data/techs';
 import { CIVICS } from '../../../cpu/data/civics';
 import type { GameState } from '../../../cpu/core/types';
@@ -50,7 +50,7 @@ describe('a district is priced off its own row', () => {
     // base x (1 + 9p) and the GAME_PROGRESS one base + floor(param x p),
     // and both are `base` at p = 0.
     for (const [base, got] of [[36, aqueduct], [54, campus], [81, canal]] as const) {
-      expect(got).toBe(Math.round(base * GAME_SPEED));
+      expect(got).toBe(scaleByGameSpeed(base));
       expect(districtProgressAdd(rs, 'CAMPUS')).toBe(0);
     }
   });
@@ -70,15 +70,15 @@ describe('a district is priced off its own row', () => {
 
     // the specialty row MULTIPLIES
     expect(districtScaledBase(rs, 'CAMPUS'))
-      .toBe(Math.floor(Math.round(54 * GAME_SPEED) * (1 + 9 * p)));
+      .toBe(Math.floor(scaleByGameSpeed(54) * (1 + 9 * p)));
     expect(districtProgressAdd(rs, 'CAMPUS')).toBe(0);
 
     // ...and a GAME_PROGRESS row keeps its flat base and ADDS
     for (const [id, base] of [['AQUEDUCT', 36], ['CANAL', 81], ['DAM', 81],
       ['NEIGHBORHOOD', 54]] as const) {
-      expect(districtScaledBase(rs, id)).toBe(Math.round(base * GAME_SPEED));
+      expect(districtScaledBase(rs, id)).toBe(scaleByGameSpeed(base));
       expect(districtProgressAdd(rs, id))
-        .toBe(Math.floor(Math.round(1000 * GAME_SPEED) * p));
+        .toBe(Math.floor(scaleByGameSpeed(1000) * p));
     }
   });
 
@@ -99,7 +99,7 @@ describe('a district is priced off its own row', () => {
     // research moves every other price and never this one
     state.seats[0].research.techs = ['POTTERY', 'WRITING'];
     expect(districtCost(state, 0, 'SPACEPORT')).toBe(before);
-    expect(districtCost(state, 0, 'SPACEPORT')).toBe(Math.round(1800 * GAME_SPEED));
+    expect(districtCost(state, 0, 'SPACEPORT')).toBe(scaleByGameSpeed(1800));
   });
 
   it('prices an untyped call at the SPECIALTY base, which the observation renders', () => {

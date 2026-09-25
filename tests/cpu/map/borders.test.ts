@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { borderGrowthCost } from '../../../cpu/data/constants';
+import { borderGrowthCost, scaleByGameSpeed } from '../../../cpu/data/constants';
 import { foundCity, endTurn, buyTile, tilePurchaseCost } from '../../../cpu/core/game';
 import { borderCandidates, pickBorderTile } from '../../../cpu/core/city';
 import { hexDistance } from '../../../world/hex';
@@ -48,14 +48,14 @@ describe('cultural border growth', () => {
     const target = tileAtCoords(state.map, 11, 9);
     expect(borderCandidates(state, city)).toContain(target.index);
     const cost = tilePurchaseCost(state, city, target.index);
-    expect(cost).toBe(30); // ring 2: round(50 × GAME_SPEED), no research yet
+    expect(cost).toBe(scaleByGameSpeed(50)); // ring 2, no research yet
 
     expect(buyTile(state, city.id, target.index, 0).ok).toBe(true);
     expect(tileCity(target)).toBe(city.id);
     expect(seatOf(state, 0)!.treasury).toBe(1000 - cost);
     expect(city.tilesAcquired).toBe(1); // purchases skip the culture BOX but advance the acquired count
     expect(seatOf(state, 0)!.tilesPurchased).toBe(1);
-    expect(tilePurchaseCost(state, city)).toBe(33); // +5 (speed-scaled → 3) per purchase
+    expect(tilePurchaseCost(state, city)).toBe(scaleByGameSpeed(50) + scaleByGameSpeed(5)); // +5, speed-scaled, per purchase
 
     // far tile: not a candidate
     const far = tileAtCoords(state.map, 16, 9);

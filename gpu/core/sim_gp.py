@@ -478,7 +478,7 @@ class SimGp:
             self._convert_ring(row, cb.nonzero(as_tuple=True)[0], hc)
         # CIV6 (Tupac Amaru): the chassis once per district of the enemy city
         # whose land this is, in tile order; the spawn probe finds each its spot
-        ue = self._gp_fx(cls, at, "unitEachDistrict").long()
+        ue = self._gp_granted_chassis(row, self._gp_fx(cls, at, "unitEachDistrict").long())
         te = m & (ue >= 0) & (ue < self.NU)
         if bool(te.any()):
             for b in te.nonzero(as_tuple=True)[0].tolist():
@@ -611,7 +611,8 @@ class SimGp:
             return
         _drip = self.city_progress[:, row, :, 0].clone()
         r = hit.nonzero(as_tuple=True)[0]
-        self.city_progress[r, row, cc[r], 0] += (amt[r] * mult[r]).to(self.city_progress.dtype)
+        # at Standard speed on the wire: the whole grant takes the speed
+        self.city_progress[r, row, cc[r], 0] += self.rules.scale_by_game_speed(amt[r] * mult[r]).to(self.city_progress.dtype)
         if bool(buy.any()):
             rb = buy.nonzero(as_tuple=True)[0]
             cb = cc[rb]
@@ -705,7 +706,7 @@ class SimGp:
                         at: torch.Tensor, hc: torch.Tensor) -> None:
         """a free chassis at the tile, and a promotion level plus a permanent
         experience share for whoever is already standing on it."""
-        uidx = self._gp_fx(cls, at, "unitIdx").long()
+        uidx = self._gp_granted_chassis(row, self._gp_fx(cls, at, "unitIdx").long())
         made = m & (uidx >= 0)
         if bool(made.any()):
             _xp = (self._gp_fx(cls, at, "unitPromotions").long() > 0)
@@ -732,6 +733,14 @@ class SimGp:
         self.unit_xp[r, t] = torch.where(lvl[r] > 0, need, self.unit_xp[r, t])
         self._log_xp(r, t, "gp")
         self.unit_xp_pct[r, t] = self.unit_xp_pct[r, t] + pct[r]
+
+    def _gp_granted_chassis(self, row: int, uidx: torch.Tensor) -> torch.Tensor:
+        """[B] — `grantedChassis`: CIV6 (MODIFIER_PLAYER_UNIT_GRANT_UNIT_WITH_EXPERIENCE
+        and MODIFIER_GRANT_UNITS_IN_DISTRICTS, `UniqueOverride` true on every
+        Great Person row) a granted chassis arrives as the civilization's
+        unique standing in for it (`_row_repl`), where it has one."""
+        rep = self._row_repl(row).gather(1, uidx.clamp(min=0, max=self.NU - 1).unsqueeze(1)).squeeze(1)
+        return torch.where((uidx >= 0) & (uidx < self.NU) & (rep >= 0), rep, uidx)
 
     def _gp_form_up(self, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor,
                     hc: torch.Tensor) -> None:

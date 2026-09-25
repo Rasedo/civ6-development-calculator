@@ -1378,9 +1378,34 @@ class SimSeats:
             self._dedication_event(row, self._ded_sky,
                                    made & (self._b_req_district[bi] == self._aerodrome_didx))
 
+    def _game_era(self) -> int:
+        """`gameEraIndex`: the ERA_LENGTH timeline every seat's age turns on,
+        capped at the last era."""
+        return min(int(self.turn // self._era_len), self._era_count - 1)
+
+    def _stamp_bldg_era(self, r: torch.Tensor, row: int, col: torch.Tensor, bi: torch.Tensor) -> None:
+        """`stampBuildingEra` — games `r` [n], their city slots `col` [n] of
+        seat row `row`, buildings `bi` [n] just constructed or repaired: a row
+        carrying `yieldsPerEra` takes the game era now."""
+        if not self._bpe_n or r.numel() == 0:
+            return
+        k = self._bpe_col[bi]
+        hit = k >= 0
+        if bool(hit.any()):
+            self.city_bldg_era[r[hit], row, col[hit], k[hit]] = self._game_era()
+
+    def _bldg_era_yields(self, row: int, sl, selb: torch.Tensor) -> torch.Tensor:
+        """[B, n, 6] — `buildingEraYields`: what the standing rows `selb`
+        [B, n, NB] carrying `yieldsPerEra` pay per game era since their stamp."""
+        st = self.city_bldg_era[:, row, sl]                          # [B, n, NPE]
+        on = selb[:, :, self._bpe_bidx] & (st >= 0)
+        k = torch.where(on, (self._game_era() - st).clamp(min=0), torch.zeros_like(st)).double()
+        return torch.einsum("bjp,pk->bjk", k, self._bpe_y)
+
     def _seat_buy_building(self, row: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
         rows6 = can6.nonzero(as_tuple=True)[0]
         self.city_bldg[rows6, row, jj6[rows6], bb6[rows6]] = True
+        self._stamp_bldg_era(rows6, row, jj6[rows6], bb6[rows6])
         self._bldg_version += 1
         self._building_dedications(row, bb6, can6)  # a purchased building is constructed too
         self._eff_version += 1
@@ -1396,6 +1421,7 @@ class SimSeats:
         """The class purchase's write — the gold buy's twin, paid out of faith."""
         rows = ok.nonzero(as_tuple=True)[0]
         self.city_bldg[rows, row, jj[rows], bb[rows]] = True
+        self._stamp_bldg_era(rows, row, jj[rows], bb[rows])
         self._bldg_version += 1
         self._building_dedications(row, bb, ok)
         self._eff_version += 1
@@ -1629,7 +1655,7 @@ class SimSeats:
         """[B] f64 — the RESEARCH factor a NUM_UNDER_AVG_PLUS_TECH district's
         base is scaled by. The factor is the SEAT's; the base is the row's
         own."""
-        return 1 + self.rules.district_cost.get("scale", 9) * self._district_progress(row)
+        return 1 + self.rules.district_cost["scale"] * self._district_progress(row)
 
     def _district_cost_si(self, row: int, si: int,
                           d_fac: torch.Tensor | None = None) -> torch.Tensor:
@@ -1643,19 +1669,19 @@ class SimSeats:
         one (the queue walk computes it once for every scaffold row)."""
         dcp = self.rules.district_cost
         di, _utech, _uciv, _plc, fc = self._scaffold[si]
-        d_per = dcp.get("perDistrict") or []
-        d_disc = dcp.get("discountPct") or []
+        d_per = dcp["perDistrict"]
+        d_disc = dcp["discountPct"]
         if d_fac is None:
             d_fac = self._district_research_fac(row)
         # this row's OWN base (`Districts.Cost`) against the seat's research
         # factor — a shared 54 priced an Aqueduct as a Campus
-        _b_si = float(d_per[di]) if di < len(d_per) else float(dcp.get("base", 32))
+        _b_si = float(d_per[di]) if di < len(d_per) else float(dcp["base"])
         # CIV6 (COST_PROGRESSION_GAME_PROGRESS): six rows climb on the game's
         # own progress instead of the specialty curve, and the climb is a flat
         # ADD made after the discount and the variant ratio — the install
         # gives the Bath and the Mbanza their own base AND the same parameter,
         # so a Bath is `18 + term`, not half of `36 + term`.
-        _d_pg = dcp.get("progressGame") or []
+        _d_pg = dcp["progressGame"]
         _g_si = float(_d_pg[di]) if di < len(_d_pg) else 0.0
         d_cost = (torch.full_like(d_fac, _b_si) if _g_si > 0
                   else torch.floor(_b_si * d_fac)).to(self.dtype)
@@ -1713,7 +1739,8 @@ class SimSeats:
         out = torch.full((self.B,), float(self._worship_cost), dtype=torch.float64, device=self.device)
         for _wc, _wl, _wcp, _wyp in self._live_rows(row, self._worship_rows):
             _w = self._row_is(row, _wc, _wl)
-            out = torch.where(_w, torch.full_like(out, float(round(self._worship_cost * _wcp / 100.0))), out)
+            # `Math.round` half-up, as `buildingFaithCost` rounds
+            out = torch.where(_w, torch.full_like(out, float(math.floor(self._worship_cost * _wcp / 100.0 + 0.5))), out)
         return out
 
     def _row_banned(self, row: int, ban: int) -> torch.Tensor:
@@ -1969,8 +1996,10 @@ class SimSeats:
         ring = self.pair_dist[ctr, tgt].clamp(min=2)
         tpct = self.civ_techs[:, row].sum(dim=1).double() / max(1, self.civ_techs.shape[2])
         cpct = self.civ_civics[:, row].sum(dim=1).double() / max(1, self.civ_civics.shape[2])
-        base = js_round(torch.full_like(tpct, 1.0) * (50.0 + 25.0 * (ring - 2).double()) * self.rules.game_speed)
-        step = js_round(torch.full_like(tpct, 5.0 * self.rules.game_speed))
+        # `tilePurchaseCost`: the ring base and the per-purchase step, each
+        # through the speed as a cost
+        base = self.rules.scale_by_game_speed(torch.full_like(tpct, 1.0) * (50.0 + 25.0 * (ring - 2).double()))
+        step = torch.full_like(tpct, float(self.rules.scale_by_game_speed(5)))
         tpm = self._gov_mods(row)[6].double()
         # CIV6 (EFFECT_ADJUST_PLOT_PURCHASE_COST_TERRAIN): the roster's terrain rows (`TILE_COST_ROWS`)
         _tpct = torch.zeros_like(tpm)
@@ -2643,6 +2672,7 @@ class SimSeats:
                     rows_w = buy_w.nonzero(as_tuple=True)[0]
                     col_w = jw[rows_w]
                     self.city_bldg[rows_w, row, col_w, wb[rows_w]] = True
+                    self._stamp_bldg_era(rows_w, row, col_w, wb[rows_w])
                     self._bldg_version += 1
                     self._eff_version += 1
                     self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._faith_price(row, self._worship_cost_of(row)).to(self.civ_faith.dtype), self.civ_faith[:, row])
@@ -3055,7 +3085,7 @@ class SimSeats:
                         self._queue_wonder_at(row, j, wi_a, rows_a, cand_a)
             is_p = act & (a >= self.PROJECT_BASE) & (a < self.PROJECT_BASE + nP_a)
             if bool(is_p.any()):
-                pc_a = self._seat_proj_cost(row)
+                _z_pc = torch.zeros(self.B, dtype=torch.float64, device=self.device)
                 for pcode in sorted(set(a[is_p].tolist())):
                     pi_a = int(pcode) - self.PROJECT_BASE
                     prow_a = self._proj_rows[pi_a]
@@ -3094,24 +3124,24 @@ class SimSeats:
                     rows_p = is_p & (a == pcode) & has_pa
                     if not bool(rows_p.any()):
                         continue
-                    # Space steps and laser stations carry their REAL fixed
-                    # price (`pc`); everything else takes the generic curve.
-                    pc_fixed = int(prow_a.get("pc", -1))
-                    pc_prog = int(prow_a.get("pcg", 0))
+                    # `projectCost`: the row's own speed-scaled `Projects.Cost`
+                    # (`pc`), plus the GAME_PROGRESS climb where the row
+                    # carries one (`pcg`, the six district projects and the
+                    # Cothon's move); the repair is priced by the HP it restores.
+                    pc_fixed = max(int(prow_a["pc"]), 0)
+                    pc_prog = int(prow_a["pcg"])
                     if int(prow_a.get("rep", 0)):
                         price_a = self._repair_cost(row, j)
-                    elif pc_fixed >= 0 and pc_prog:
+                    elif pc_prog:
                         # CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS): the price
-                        # climbs with the game's own progress, read exactly
-                        # where `_seat_proj_cost` reads it.
+                        # climbs with the game's own progress, the larger of
+                        # the tech and civic shares researched.
                         _tp = self.civ_techs[:, row].to(torch.float64).mean(dim=1)
                         _cp = self.civ_civics[:, row].to(torch.float64).mean(dim=1)
-                        price_a = (torch.full_like(pc_a, float(pc_fixed))
+                        price_a = (_z_pc + float(pc_fixed)
                                    + torch.floor(pc_prog * torch.maximum(_tp, _cp)))
-                    elif pc_fixed >= 0:
-                        price_a = torch.full_like(pc_a, float(pc_fixed))
                     else:
-                        price_a = pc_a
+                        price_a = _z_pc + float(pc_fixed)
                     self._q_push(row, j, rows_p,
                                  torch.full_like(a, self.PROJECT_BASE + pi_a), price_a)
                     self._charge_project_resource(row, rows_p, pi_a)
@@ -3842,7 +3872,8 @@ class SimSeats:
             alive = getattr(self, f"{pre}_unit_alive")
             seat = getattr(self, f"{pre}_unit_seat")
             typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
-            mine = alive & (seat == row)
+            # a Meteor Site's grant burns nothing (`unit_no_res_upkeep`)
+            mine = alive & (seat == row) & ~getattr(self, f"{pre}_unit_no_res_upkeep")
             if not bool(mine.any()):
                 continue
             for u_idx, slot, rate in self._upkeep_units:
@@ -3942,6 +3973,21 @@ class SimSeats:
                 _gok = _gok & cv[:, _gc].unsqueeze(1)
             _gok = _gok & self._imp_gov_ok(row, _g)
             ok = ok | _gok
+        # THE WATER-ONLY rows (the Offshore Wind Farm): a water plot with no
+        # resource to insist on a different improvement, on the row's own
+        # clause. `builderJobAt` names no civilization and no governor, so a
+        # unique or a governor-gated water row is no job.
+        for _w, _wet in enumerate(self._imp_water):
+            if not _wet or self._imp_uniq[_w] >= 0 or self._imp_gov_promo[_w] >= 0:
+                continue
+            _wok = (self._imp_ground_ok(_w) & self._res_bare(row)
+                    & self.wpass & ~self.tile_submerged & ~self.nwonder)
+            _wu, _wc = int(self._imp_unlock[_w]), int(self._imp_unlock_civic[_w])
+            if _wu >= 0:
+                _wok = _wok & tk[:, _wu].unsqueeze(1)
+            if _wc >= 0:
+                _wok = _wok & cv[:, _wc].unsqueeze(1)
+            ok = ok | _wok
         new_res = self.res_imp >= 3
         if bool(new_res.any()):
             unlocked = tk.gather(1, self._imp_unlock[self.res_imp.clamp(min=0)].clamp(min=0))
@@ -4421,7 +4467,8 @@ class SimSeats:
         major = (seat >= 0) & (seat < self.n_majors)
         short = self.civ_fuel_short[torch.arange(self.B, device=self.device),
                                     seat.clamp(min=0, max=self.n_majors - 1), k.clamp(min=0)]
-        hit = major & (k >= 0) & (self._type_res_upkeep[ty] > 0) & short
+        hit = (major & (k >= 0) & (self._type_res_upkeep[ty] > 0) & short
+               & ~self.unit_no_res_upkeep.gather(1, s).squeeze(1))
         return hit.long() * self._fuel_short_cs_val
 
     def _fuel_short_cs_pool(self, atk_kind: str, u: int) -> torch.Tensor:
@@ -4470,6 +4517,19 @@ class SimSeats:
         self._occ_clear(fr, self.unit_tile[fr, a], a)
         self._gen_ver += 1
 
+    def _theo_loss(self, b: torch.Tensor, rel: torch.Tensor, swing: int) -> torch.Tensor:
+        """[n] long — `theoLoss`: the pressure religion `rel` [n] (a seat id)
+        sheds in games `b` [n] to a lost theological combat, `swing` less the
+        ReductionPercent its Enhancer keeps (Monastic Isolation)."""
+        out = torch.full_like(rel, int(swing))
+        if not self._enh_theo_any:
+            return out
+        NM = self.n_majors
+        sr = rel.clamp(min=0, max=NM - 1)
+        maj = (rel >= 0) & (rel < NM) & self.civ_religion_done[b, sr]
+        keep = torch.where(maj, self._enh["theoKeep"][self.civ_enhancer[b, sr] + 1], torch.zeros_like(rel))
+        return torch.div(int(swing) * (100 - keep.clamp(max=100)), 100, rounding_mode="floor")
+
     def _condemn_heretic(self, row: int, live: torch.Tensor, tile: torch.Tensor,
                          rel: torch.Tensor, sc: torch.Tensor) -> None:
         """`condemnHeretic` — a military unit kills an adjacent religious one.
@@ -4491,13 +4551,14 @@ class SimSeats:
             self.pair_dist[ctr.clamp(min=0).reshape(n, -1), dt.unsqueeze(1)]
             .reshape(n, nrow, self.RC) <= self._condemn_range
         ) & self.city_alive[cr][:, :nrow]
+        _loss = self._theo_loss(cr, los, self._condemn_swing)
         for k in range(n):
             msk = torch.zeros_like(self.city_alive[cr[k]])
             msk[:nrow] = near[k]
             if not bool(msk.any()):
                 continue
             _cur = self.city_pressure[cr[k], msk, los[k]]
-            self.city_pressure[cr[k], msk, los[k]] = (_cur - self._condemn_swing).clamp(min=0)
+            self.city_pressure[cr[k], msk, los[k]] = (_cur - _loss[k]).clamp(min=0)
         _rel_all = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         _rel_all[cr] = los
         self.civ_diplo_favor[:, row] = (self.civ_diplo_favor[:, row]
@@ -4645,6 +4706,7 @@ class SimSeats:
                     self.pair_dist[ctr.clamp(min=0).reshape(n, -1), dt.unsqueeze(1)]
                     .reshape(n, nrow, self.RC) <= self._theo_range
                 ) & self.city_alive[dr][:, :nrow]
+                _loss = self._theo_loss(dr, lr, sw)
                 for k in range(n):
                     msk = torch.zeros_like(self.city_alive[dr[k]])
                     msk[:nrow] = near[k]
@@ -4652,7 +4714,7 @@ class SimSeats:
                         continue
                     self.city_pressure[dr[k], msk, wr[k]] += sw
                     _cur = self.city_pressure[dr[k], msk, lr[k]]
-                    self.city_pressure[dr[k], msk, lr[k]] = (_cur - sw).clamp(min=0)
+                    self.city_pressure[dr[k], msk, lr[k]] = (_cur - _loss[k]).clamp(min=0)
             # RELICS — a fallen unit martyrs when it HOLDS the MARTYR
             # promotion, one of the nine an Apostle chooses from at purchase.
             # Granted BEFORE the disbands and in TS's order, defender then
@@ -6194,6 +6256,56 @@ class SimSeats:
             one[b] = True
             self._draw_and_pay_goody(one, b, srow, t,
                                      None if slot is None else int(slot[b]))
+
+    def _meteor_grant_type(self, row: int) -> torch.Tensor:
+        """[B] long `meteorGrantUnit` — the Heavy Cavalry "more powerful than
+        what the player can currently build": the unit of the class's generic
+        line one past the last whose tech and civic seat row `row` holds, the
+        line's first when it holds none, its last at the top."""
+        have = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        for i, (_u, tech, civic) in enumerate(self._meteor_line):
+            ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
+            if tech >= 0:
+                ok &= self.civ_techs[:, row, tech]
+            if civic >= 0:
+                ok &= self.civ_civics[:, row, civic]
+            have = torch.where(ok, torch.full_like(have, i), have)
+        units = torch.tensor([u for u, _t, _c in self._meteor_line] or [-1], dtype=torch.long, device=self.device)
+        return units[(have + 1).clamp(max=units.numel() - 1)]
+
+    def _claim_meteor_site(self, mask: torch.Tensor, tile: torch.Tensor, seat: torch.Tensor) -> None:
+        """`claimMeteorSite` — a unit entering a METEOR SITE takes it the way
+        a Tribal Village is taken: the first civilization unit in, and the
+        site is gone. The claimer's nearest city (its lowest column on a tie,
+        the goody's `near`) receives `_meteor_grant_type`, marked
+        `unit_no_res_upkeep`; a seat with no city takes the site and receives
+        nothing. No draw."""
+        if not bool(mask.any()):
+            return
+        tc = tile.clamp(min=0).unsqueeze(1)
+        hit = mask & self.tile_meteor.gather(1, tc).squeeze(1) & (seat >= 0) & (seat < self.n_majors)
+        if not bool(hit.any()):
+            return
+        nxt = getattr(self, self.POOL_NEXT["major"])
+        for b in hit.nonzero(as_tuple=True)[0].tolist():
+            t = int(tile[b])
+            srow = int(seat[b])
+            self.tile_meteor[b, t] = False
+            alive = self.city_alive[b, srow]
+            if not bool(alive.any()):
+                continue
+            cols = alive.nonzero().flatten()
+            d = self.pair_dist[self.city_center[b, srow, cols].clamp(min=0), t]
+            near = int(cols[int(d.argmin())])
+            ut = self._meteor_grant_type(srow)
+            if int(ut[b]) < 0:
+                continue
+            one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            one[b] = True
+            at = torch.full((self.B,), int(self.city_center[b, srow, near]), dtype=torch.long, device=self.device)
+            slot = int(nxt[b])
+            if bool(self._spawn_unit(srow, one, at, ut)[b]):
+                self.major_unit_no_res_upkeep[b, slot] = True
 
     def _draw_and_pay_goody(self, one: torch.Tensor, b: int, srow: int, t: int,
                             slot: int | None = None) -> None:
@@ -9702,6 +9814,7 @@ class SimSeats:
         self.city_wonder[b, row, col, :] = -1
         self.city_bldg[b, row, col, :] = False
         self.city_bldg_pillaged[b, row, col, :] = False
+        self.city_bldg_era[b, row, col, :] = -1
         self.city_reactor_age[b, row, col] = -1
         self._bldg_version += 1
         self.city_followed[b, row, col] = -1
@@ -9791,6 +9904,8 @@ class SimSeats:
         # a pillaged building stays pillaged in the new owner's hands — the
         # repair is the queue's, whoever holds the queue
         old_bpil = self.city_bldg_pillaged[b, src_row, src_col, :].clone()
+        # ...and the era each stamped building was constructed in
+        old_bera = self.city_bldg_era[b, src_row, src_col, :].clone()
         # CIV6 (`DISTRICT_CITY_CENTER` carries `CaptureRemovesCityDefenses`):
         # a CONQUEST destroys the WALLS THEMSELVES, not just the pool behind
         # them — `keptBuildings`' second clause. Measured on a live capture
@@ -9934,6 +10049,7 @@ class SimSeats:
             getattr(self, _p)[b, dst_row, col, :] = _v
         self.city_bldg[b, dst_row, col, :] = old_bldg
         self.city_bldg_pillaged[b, dst_row, col, :] = old_bpil
+        self.city_bldg_era[b, dst_row, col, :] = old_bera
         self._bldg_version += 1
         # the CONQUEROR manages nothing yet: TS's flipped literal carries no
         # `specialistPref`, so every slot goes back to the automatic rule.
@@ -10241,6 +10357,8 @@ class SimSeats:
             & self.settle_ok.gather(1, tc.unsqueeze(1)).squeeze(1)
             & (self.district.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
             & (self.built_wonder.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
+            # a fire's plot (`Settlement="false"`)
+            & ~self._fire_plots().gather(1, tc.unsqueeze(1)).squeeze(1)
         )
         # every centre on the map keeps the 4-hex spacing — the majors', then
         # the Free Cities row's (`canFoundCity` walks `cityHolders`)
@@ -10315,6 +10433,7 @@ class SimSeats:
         self.city_wonder[rows, row, slot, :] = -1
         self.city_bldg[rows, row, slot, :] = False
         self.city_bldg_pillaged[rows, row, slot, :] = False
+        self.city_bldg_era[rows, row, slot, :] = -1
         self._bldg_version += 1
         # Persistent id — foundCityAt's `nextCityId++`; tile_city stores it
         # (TS ownerCity), the slot stays a storage address only.
@@ -11357,7 +11476,8 @@ class SimSeats:
         u_type = self.unit_type.gather(1, gs1).squeeze(1)
         u_promos = self.unit_promos.gather(1, gs1).squeeze(1)
         river3 = (3 * self._mp_scale) * ((self.river_mask.gather(1, hc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
-        terr, riv = self._road_terms(here, dest, river3, u_type, u_promos)
+        terr, riv = self._road_terms(here, dest, river3, u_type, u_promos,
+                                     self.unit_seat.gather(1, gs1).squeeze(1))
         land_cost = self._mp_scale + terr + riv
         mp = self.unit_mp.gather(1, gs1).squeeze(1)
         full = self.unit_mp_full.gather(1, gs1).squeeze(1)
@@ -11494,6 +11614,7 @@ class SimSeats:
         # B=3 shard raised IndexError on the first three-game move.
         _mv_seat = self.unit_seat.gather(1, gs1).squeeze(1)
         self._claim_goody_hut(moved, dest, _mv_seat, gslot)
+        self._claim_meteor_site(moved, dest, _mv_seat)
         if clear_camp:
             self._clear_camp_at(moved, dest, _mv_seat, seat)
         spent = (mp - cost).clamp(min=0)

@@ -46,7 +46,7 @@ import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { stockOf } from './stockpile';
 import { harvestGrant } from './economy';
 import { seatBuildingSum } from './city';
-import { engineerFinishCity, projectBoostCity, wonderChargeCity, wonderChargePct } from './game';
+import { engineerFinishCity, evangelizeOk, projectBoostCity, wonderChargeCity, wonderChargePct } from './game';
 import { gpActivateOk } from './gpAbility';
 import { isSpy, missionOffered, spyDestinations, spyIdle } from './espionage';
 import { gpSiteKey } from './targetSites';
@@ -73,6 +73,7 @@ const A_PROMOTE = col('PROMOTE_0');
 const A_CONDEMN = col('CONDEMN_0');
 const A_REMOVE_HERESY = col('REMOVE_HERESY');
 const A_LAUNCH_INQUISITION = col('LAUNCH_INQUISITION');
+const A_EVANGELIZE = col('EVANGELIZE_BELIEF');
 const A_CONVERT_HEATHEN = col('CONVERT_HEATHEN');
 const A_UPGRADE = col('UPGRADE');
 const A_AIR_STRIKE = col('AIR_STRIKE_0');
@@ -428,6 +429,8 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   // LAUNCH_INQUISITION
   if (u.type === 'APOSTLE' && charges >= LAUNCH_INQUISITION_CHARGES && tileSeat(here) === seat
       && !actor?.religion.inquisition) out.add(A_LAUNCH_INQUISITION);
+  // EVANGELIZE_BELIEF: an Apostle of a religion with a class still to earn
+  if (evangelizeOk(state, u, seat)) out.add(A_EVANGELIZE);
   // CONVERT_HEATHEN: a charge, the promotion, and a barbarian (military or
   // civilian occupant) in the ring.
   if (charges > 0 && promoFlag(u, 'HEATHEN') && neighbors(state.map, here).some((n) =>

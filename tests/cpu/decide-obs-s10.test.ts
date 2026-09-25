@@ -71,11 +71,11 @@ describe('seat scalar groups', () => {
     });
   });
 
-  it('belief: the founding and enhancing gates, the held rows, each class\'s open rows', () => {
+  it('belief: the founding gate, the enhancement count, the held rows, each class\'s open rows', () => {
     const state = scene();
     const all = (c: number) => Object.keys(BELIEF_CATALOGS[c]).map((_id, i) => i);
     expect(SEAT_GROUPS.belief(state, 0)).toEqual({
-      found: false, enhance: false, held: [-1, -1, -1, -1],
+      found: false, enhance: 0, held: [-1, -1, -1, -1],
       follower: all(0), worship: all(1), founder: all(2), enhancer: all(3),
     });
     // a pantheon, a completed Holy Site, an activated prophet: founding opens
@@ -88,19 +88,22 @@ describe('seat scalar groups', () => {
     s.gpActivated = [GREAT_PEOPLE.PROPHET[0].id];
     expect((SEAT_GROUPS.belief(state, 0) as Record<string, unknown>).found).toBe(true);
     // another religion's Mosque leaves the Worship pool; a founded religion
-    // holds its rows and needs a second prophet to enhance
+    // holds its rows and adopts only what an Apostle evangelized
     const worship = Object.keys(BELIEF_CATALOGS[1]);
     state.claimedBeliefs.push('MOSQUE', 'CHORAL_MUSIC', 'TITHE');
     s.religion.founded = true;
     s.religion.follower = 'CHORAL_MUSIC';
     s.religion.founder = 'TITHE';
+    s.religion.beliefsEarned = 2;
     const g = SEAT_GROUPS.belief(state, 0) as Record<string, unknown>;
-    expect([g.found, g.enhance]).toEqual([false, false]);
+    expect([g.found, g.enhance]).toEqual([false, 0]);
     expect(g.held).toEqual([Object.keys(BELIEF_CATALOGS[0]).indexOf('CHORAL_MUSIC'), -1,
       Object.keys(BELIEF_CATALOGS[2]).indexOf('TITHE'), -1]);
     expect(g.worship).toEqual(all(1).filter((i) => worship[i] !== 'MOSQUE'));
     s.gpActivated.push(GREAT_PEOPLE.PROPHET[1].id);
-    expect((SEAT_GROUPS.belief(state, 0) as Record<string, unknown>).enhance).toBe(true);
+    expect((SEAT_GROUPS.belief(state, 0) as Record<string, unknown>).enhance).toBe(0);
+    s.religion.beliefsEarned = 3;
+    expect((SEAT_GROUPS.belief(state, 0) as Record<string, unknown>).enhance).toBe(1);
   });
 
   it('congress: nothing sits off a session turn or before the era', () => {

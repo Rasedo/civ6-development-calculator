@@ -57,7 +57,11 @@ export type FeatureId =
   | 'YOSEMITE'
   | 'CLIFFS_OF_DOVER'
   | 'MOUNT_EVEREST'
-  | 'EYE_OF_THE_SAHARA';
+  | 'EYE_OF_THE_SAHARA'
+  | 'BURNING_WOODS'
+  | 'BURNT_WOODS'
+  | 'BURNING_RAINFOREST'
+  | 'BURNT_RAINFOREST';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 
@@ -253,6 +257,14 @@ export interface Tile {
    *  footprint's effects. Absent or 0 turns = no storm. */
   stormEvent?: number;
   stormTurns?: number;
+  /** CIV6 (`RandomEvent_Yields`, the pack's fires): the turn the FIRE this
+   *  plot belongs to began — the event's clock, which a plot the fire spreads
+   *  to shares. The plot burns, is burnt at the fire's Turn 2 and regrows at
+   *  its Turn 6, when the record goes. Absent = no fire. */
+  fireStart?: number;
+  /** CIV6 (IMPROVEMENT_METEOR_GOODY): a METEOR SITE a shower left here, taken
+   *  by the first civilization unit to enter it. */
+  meteor?: boolean;
 }
 
 export interface GameMap {

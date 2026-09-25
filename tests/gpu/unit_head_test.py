@@ -75,7 +75,7 @@ def main() -> None:
     _dpw = sum(1 for n in acts if n.startswith("DEPLOY_"))
     assert _dpw > 0, "the DEPLOY head is empty"
     want = (13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30 + 1 + 1 + 1 + 1
-            + _dpw + 1 + dict(heads)["AIR_STRIKE_"])
+            + _dpw + 1 + dict(heads)["AIR_STRIKE_"] + 1)   # ...+ 1 EVANGELIZE_BELIEF
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
@@ -102,7 +102,9 @@ def main() -> None:
              # ...then the patrol's two verbs and PRIORITY TARGET, the newest
              # last-appends
              + [f"DEPLOY_{k}" for k in range(_dpw)] + ["RETURN_TO_BASE"]
-             + [f"PRIORITY_TARGET_{k}" for k in range(dict(heads)["AIR_STRIKE_"])])
+             + [f"PRIORITY_TARGET_{k}" for k in range(dict(heads)["AIR_STRIKE_"])]
+             # ...and the Apostle's EVANGELIZE BELIEF
+             + ["EVANGELIZE_BELIEF"])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so
     # `_last` is what proves its contiguity and the walk below skips it.

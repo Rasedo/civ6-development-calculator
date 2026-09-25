@@ -19,6 +19,8 @@ import { gpTilePermOf } from '../data/greatPeople';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
 import { cityGovernorEffects, cityGovernorPromos, governorSum } from './governors';
+import { ERA_LENGTH } from '../data/seats';
+import { ERAS } from '../data/techs';
 
 function terrainYields(tile: Tile): Yields {
   const out = emptyYields();
@@ -381,6 +383,37 @@ export function repairBuilding(city: { pillagedBuildings?: string[] }, id: strin
   if (!city.pillagedBuildings) return;
   city.pillagedBuildings = city.pillagedBuildings.filter((b) => b !== id);
   if (city.pillagedBuildings.length === 0) delete city.pillagedBuildings;
+}
+
+/** the GAME era: the ERA_LENGTH timeline every seat's age turns on
+ *  (`eraBoundary`), capped at the last era. */
+export function gameEraIndex(state: GameState): number {
+  return Math.min(Math.floor(state.turn / ERA_LENGTH), ERAS.length - 1);
+}
+
+/** a building carrying `yieldsPerEra` was constructed or repaired: its
+ *  city's stamp for it takes the game era now. Every path that completes a
+ *  building calls this; the row decides whether it keeps a stamp. */
+export function stampBuildingEra(state: GameState, city: City, id: string): void {
+  if (BUILDINGS[id]?.yieldsPerEra) (city.buildingEras ??= {})[id] = gameEraIndex(state);
+}
+
+/** CIV6 (`Building_YieldsPerEra`; the Dar-e Mehr: "+1 additional Faith for
+ *  each era since constructed or last repaired"): what the city's standing
+ *  rows pay per game era since their stamp. A dark row pays nothing. */
+export function buildingEraYields(state: GameState, city: City): Yields {
+  const out = emptyYields();
+  const era = gameEraIndex(state);
+  let dark: Set<string> | undefined;
+  for (const id of city.buildings) {
+    const per = BUILDINGS[id]?.yieldsPerEra;
+    if (!per) continue;
+    dark ??= darkBuildings(state.map, city);
+    if (dark.has(id)) continue;
+    const n = era - (city.buildingEras?.[id] ?? era);
+    if (n > 0) addYields(out, per, n);
+  }
+  return out;
 }
 
 /**

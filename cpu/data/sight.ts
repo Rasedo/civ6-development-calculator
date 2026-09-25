@@ -36,6 +36,11 @@ export const FEATURE_SIGHT_THROUGH: Readonly<Record<string, number>> = {
     feat('FEATURE_KILIMANJARO')),
   YOSEMITE: srcConst('improvements.featSightThrough.YOSEMITE', 2, feat('FEATURE_YOSEMITE')),
   MOUNT_EVEREST: srcConst('improvements.featSightThrough.MOUNT_EVEREST', 2, feat('FEATURE_EVEREST')),
+  // the pack's fire features (GranColombia_Maya_Expansion2.xml) keep the Woods' 1
+  BURNING_WOODS: srcConst('improvements.featSightThrough.BURNING_WOODS', 1, feat('FEATURE_BURNING_FOREST')),
+  BURNT_WOODS: srcConst('improvements.featSightThrough.BURNT_WOODS', 1, feat('FEATURE_BURNT_FOREST')),
+  BURNING_RAINFOREST: srcConst('improvements.featSightThrough.BURNING_RAINFOREST', 1, feat('FEATURE_BURNING_JUNGLE')),
+  BURNT_RAINFOREST: srcConst('improvements.featSightThrough.BURNT_RAINFOREST', 1, feat('FEATURE_BURNT_JUNGLE')),
 };
 
 /** the farthest any chassis looks — the reach of the static line table both

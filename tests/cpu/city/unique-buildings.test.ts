@@ -14,10 +14,10 @@ import { buildingCostIn, wallsMax } from '../../../cpu/core/rules';
 import { computeUnlocksIn } from '../../../cpu/core/effects';
 import { workContext } from '../../../cpu/core/greatWorks';
 import { CIV_LEADERS } from '../../../world/roster';
-import { GAME_SPEED } from '../../../cpu/data/constants';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
 
 /** the catalog scales every cost, a variant's own included. */
-const sp = (n: number): number => Math.round(n * GAME_SPEED);
+const sp = (n: number): number => scaleByGameSpeed(n);
 import type { City, GameState } from '../../../cpu/core/types';
 
 /** replaces -> [civ, name] straight off `Buildings_BuildingReplaces`. */

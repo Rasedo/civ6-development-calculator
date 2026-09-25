@@ -353,14 +353,17 @@ describe('what a warmed world does to its weather', () => {
     expect(STORM_EVENTS.map((e) => e.cipd)).toEqual([0, 50, 0, 50, 0, 50, 0, 50]);
     const st = stormWeights(2);
     STORM_EVENTS.forEach((e, i) => expect(st[i]).toBeCloseTo(e.weight * (e.cipd ? 2 : 1), 12));
-    // the droughts MAJOR 0, EXTREME 50; the eruptions and accidents hold
+    // the droughts MAJOR 0, EXTREME 50; the pack's fires 50 each; the
+    // eruptions, the accidents and the meteor hold
     const rows = eventRows(2);
     const drought = rows.filter((r) => r.family === 'drought').map((r) => r.weight);
     expect(drought[0]).toBe(DROUGHT_WEIGHT[0]);
     expect(drought[1]).toBeCloseTo(DROUGHT_WEIGHT[1] * 2, 12);
+    const fires = rows.filter((r) => r.family === 'fire').map((r) => r.weight);
+    expect(fires).toEqual([12, 12]);
     const base = eventRows(0);
     rows.forEach((r, i) => {
-      if (r.family === 'volcano' || r.family === 'kilimanjaro' || r.family === 'accident') {
+      if (r.family === 'eruption' || r.family === 'accident' || r.family === 'meteor') {
         expect(r.weight).toBe(base[i].weight);
       }
     });

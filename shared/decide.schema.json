@@ -93,7 +93,7 @@
     ],
     "belief": [
       ["found", "bool", "the seat may found its religion now (`canFoundReligion`): no seat ban, no religion yet, a pantheon, a completed Holy Site or Stonehenge, an activated Great Prophet"],
-      ["enhance", "bool", "the seat may enhance its religion now (`canEnhanceReligion`): founded, not yet enhanced, a second activated Great Prophet"],
+      ["enhance", "int", "how many beliefs an enhancement of the seat's religion adopts now (`beliefPicks`): the beliefs earned (two at the founding, one per Apostle's Evangelize Belief) and not yet held, capped by the classes it lacks that have a belief left; 0 none"],
       ["held", "list", "per religion belief class (BELIEF_CLASSES: Follower, Worship, Founder, Enhancer): the class catalog row the seat's religion holds, -1 none"],
       ["follower", "list", "the Follower catalog rows no religion holds, ascending"],
       ["worship", "list", "the Worship catalog rows no religion holds, ascending"],
@@ -117,11 +117,11 @@
     ["jobs", "list", "the tiles a Builder has improvement work on (the TS driver's `jobTiles`: an owned tile that is pillaged, holds a pillaged district, or is bare and takes an improvement it has unlocked), ascending; empty where improvements are off or the seat holds no Builder with a charge"],
     ["engJobs", "list", "the tiles a Military Engineer has work on (the TS driver's `engTiles`: a road it may lay, an engineer improvement site, or a 20%-charge site), ascending; empty where improvements are off or the seat holds no Military Engineer with a charge"],
     ["spread", "list", "the CENTRE tiles of every living major city not following this seat's religion (the TS driver's `spreadTargets`), ascending; empty where the seat founded no religion or holds no Missionary or Apostle with a charge"],
-    ["foundOk", "list", "the tiles a city may be founded on (`canFoundCity`: unowned, settleable, bare of district and wonder, at least 4 from every living city and city-state centre), ascending; empty where the seat holds no Settler or stands at the city cap"],
+    ["foundOk", "list", "the tiles a city may be founded on (`canFoundCity`: unowned, settleable, no fire burning or burnt there, bare of district and wonder, at least 4 from every living city and city-state centre), ascending; empty where the seat holds no Settler or stands at the city cap"],
     ["digs", "list", "the tiles an Archaeologist may excavate (a dig underfoot on unowned or own ground) while a museum slot takes an Artifact, ascending; empty where the seat holds no Archaeologist with a charge"],
     ["parks", "list", "the tiles that ANCHOR a legal National Park rhombus (`parkClusterLegal` on any of the tile's clusters), ascending; empty where the seat holds no Naturalist with a charge"],
     ["gpSites", "table", "for every Great Person site a living person of this seat with a charge walks toward (its `gpSite`, `gpArg`; never site 1, which activates where it stands): each tile it may be spent on, as [site, arg, tile], ascending"],
-    ["goody", "list", "the tiles holding a Tribal Village, ascending"],
+    ["goody", "list", "the tiles holding a Tribal Village or a Meteor Site, ascending"],
     ["warImps", "list", "the tiles a unit at war marches on first: an unpillaged improvement, or a complete unpillaged district, on ground owned by a seat this one is at war with (majors and city-states; Free City ground is not a march target), ascending; empty where the seat is at war with nobody"],
     ["warCities", "table", "every living city of a seat this one is at war with, as [seat, centre]: the owner's seat id (a major's index, 100 + a city-state's index, 300 the Free Cities) and the city's CENTRE tile, ascending; the march takes the nearest, the seat id then the centre breaking a distance tie; empty where the seat is at war with nobody"]
   ],

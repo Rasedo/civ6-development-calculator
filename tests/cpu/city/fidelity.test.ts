@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost } from '../../../cpu/core/game';
+import { foundCity, queueDistrict, queueBuilding, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import { detectBoosts, toggleBoost, isBoosted } from '../../../cpu/core/boosts';
 import { buildingMaintenance, computeCityStats, computeHousing, cityMaintenance } from '../../../cpu/core/city';
 import { tileAppeal, appealTier } from '../../../cpu/core/appeal';
@@ -45,7 +46,7 @@ describe('district cost scaling', () => {
   it('rises with research and locks at queue time', () => {
     const state = makeState(makeMap(16, 16));
     const base = districtCost(state, 0);
-    expect(base).toBe(32); // round(54 × GAME_SPEED)
+    expect(base).toBe(scaleByGameSpeed(DISTRICT_SPECIALTY_COST));
 
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     grantTechs(state, 'WRITING');

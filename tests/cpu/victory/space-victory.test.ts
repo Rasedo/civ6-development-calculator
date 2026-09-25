@@ -8,7 +8,9 @@ import { settleFirstCity } from '../helpers';
 import { PROJECTS, SPACE_PROJECTS, SPACE_FLIGHT_LY, isSpaceProject } from '../../../cpu/data/projects';
 import { cityPower, laserSpeed } from '../../../cpu/core/yields';
 import { resolveSeatPower } from '../../../cpu/core/stockpile';
-import { STRATEGIC_IDS } from '../../../cpu/data/constants';
+import { STRATEGIC_IDS, scaleByGameSpeed } from '../../../cpu/data/constants';
+import { TECHS } from '../../../cpu/data/techs';
+import { CIVICS } from '../../../cpu/data/civics';
 
 // space race / science victory. Gated on Information/Future techs, so no gate
 // lane reaches it and these pokes are the only proof of the semantics. The GPU
@@ -51,21 +53,23 @@ describe('science victory', () => {
     for (const p of SPACE_PROJECTS) expect(p.district).toBe('SPACEPORT');
   });
 
-  it('carries the REAL fixed prices (GS x 0.6 game speed)', () => {
+  it('carries the REAL fixed prices, speed-scaled', () => {
     const { state } = newGameWithSpaceport();
     // 900 / 1500 / 1800 / 2100, speed-scaled; the laser stations 600.
-    expect(CHAIN.map((id) => projectCost(state, 0, id))).toEqual([540, 900, 1080, 1260]);
-    expect(projectCost(state, 0, 'TERRESTRIAL_LASER_STATION')).toBe(360);
-    expect(projectCost(state, 0, 'LAGRANGE_LASER_STATION')).toBe(360);
-    // base projects keep the generic curve
-    expect(projectCost(state, 0, 'RESEARCH_GRANTS')).toBe(projectCost(state, 0));
+    expect(CHAIN.map((id) => projectCost(state, 0, id))).toEqual([900, 1500, 1800, 2100].map(scaleByGameSpeed));
+    expect(projectCost(state, 0, 'TERRESTRIAL_LASER_STATION')).toBe(scaleByGameSpeed(600));
+    expect(projectCost(state, 0, 'LAGRANGE_LASER_STATION')).toBe(scaleByGameSpeed(600));
+    // a district project climbs on its own row: Cost 25 + 1500 x progress
+    const rs = seatOf(state, 0)!.research;
+    const p = Math.max(rs.techs.length / Object.keys(TECHS).length, rs.civics.length / Object.keys(CIVICS).length);
+    expect(projectCost(state, 0, 'RESEARCH_GRANTS')).toBe(scaleByGameSpeed(25) + Math.floor(scaleByGameSpeed(1500) * p));
   });
 
-  it('the SPACEPORT: flat 1080 whatever the research, and flat land only', () => {
+  it('the SPACEPORT: flat 1800 whatever the research, and flat land only', () => {
     const { state, city } = newGame(); // no pre-built Spaceport — a city takes ONE
-    expect(districtCost(state, 0, 'SPACEPORT')).toBe(1080);
+    expect(districtCost(state, 0, 'SPACEPORT')).toBe(scaleByGameSpeed(1800));
     seatOf(state, 0)!.research.techs.push(...GATING_TECHS);
-    expect(districtCost(state, 0, 'SPACEPORT')).toBe(1080); // never scales
+    expect(districtCost(state, 0, 'SPACEPORT')).toBe(scaleByGameSpeed(1800)); // never climbs
     // sanitize one OWNED plot to known-good land, then flip ONLY the
     // elevation: the flat-land clause is the single term under test.
     const spare = state.map.tiles.find((t) => t.index !== city.centerIndex && tileBelongsTo(t, city))!;
@@ -114,14 +118,14 @@ describe('science victory', () => {
     const { state, city } = newGameWithSpaceport();
     seatOf(state, 0)!.research.techs.push(...GATING_TECHS);
     expect(queueSeatProject(state, city, 'LAUNCH_EARTH_SATELLITE')).toBe(true);
-    expect(city.queue[0]).toMatchObject({ kind: 'project', project: 'LAUNCH_EARTH_SATELLITE', cost: 540 });
+    expect(city.queue[0]).toMatchObject({ kind: 'project', project: 'LAUNCH_EARTH_SATELLITE', cost: scaleByGameSpeed(900) });
     // and the chain still gates it: step 2 is refused until step 1 is DONE.
     const later = newGameWithSpaceport();
     seatOf(later.state, 0)!.research.techs.push(...GATING_TECHS);
     expect(queueSeatProject(later.state, later.city, 'LAUNCH_MOON_LANDING')).toBe(false);
   });
 
-  it('completing the chain LAUNCHES — the win is the ARRIVAL, 30 LY later', () => {
+  it('completing the chain LAUNCHES — the win is the ARRIVAL, SPACE_FLIGHT_LY later', () => {
     // One live opponent, or a lone civ trivially satisfies another victory
     // condition the moment the game runs past the launch.
     const { state, city } = newGameWithSpaceport(1);
@@ -130,13 +134,14 @@ describe('science victory', () => {
       completeThroughQueue(state, city, id);
       expect(seatOf(state, 0)!.projectsDone).toContain(id);
     }
-    // The launch endTurn already ticked the craft once: 1 of 30 LY flown.
-    expect(SPACE_FLIGHT_LY).toBe(30);
+    // The launch endTurn already ticked the craft once: 1 LY flown of
+    // SCIENCE_VICTORY_POINTS_REQUIRED 50 at the speed.
+    expect(SPACE_FLIGHT_LY).toBe(scaleByGameSpeed(50));
     expect(seatOf(state, 0)!.spaceLy).toBe(1);
     expect(state.victoryType).toBe(0);
     expect(state.gameOver).toBe(false);
-    for (let i = 0; i < 28; i++) endTurn(state);
-    expect(seatOf(state, 0)!.spaceLy).toBe(29);
+    for (let i = 0; i < SPACE_FLIGHT_LY - 2; i++) endTurn(state);
+    expect(seatOf(state, 0)!.spaceLy).toBe(SPACE_FLIGHT_LY - 1);
     expect(state.victoryType).toBe(0);
     endTurn(state);
     expect(state.victoryType).toBe(3);

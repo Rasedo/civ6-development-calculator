@@ -766,7 +766,8 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   },
   // CIV6 (Offshore Wind Farm): "+2 Production", "Provides 2 Power per turn",
   // "Must be constructed on Coast and Lake", unlocked by Predictive Systems
-  // and built by Builders.
+  // and built by Builders. The install names no Improvement_ValidFeatures row
+  // for it, so a Reef plot refuses it as Woods refuse a Farm.
   OFFSHORE_WIND_FARM: {
     id: 'OFFSHORE_WIND_FARM',
     name: 'Offshore Wind Farm',
@@ -779,7 +780,8 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     power: 2,
     ...RENEWABLE_SUBSIDY,
     terrains: ['COAST', 'LAKE'],
-    description: 'Coast or Lake. Supplies 2 Power to its city from the wind.',
+    noFeature: true,
+    description: 'Coast or Lake with no feature. Supplies 2 Power to its city from the wind.',
     src: {
       ...renewableSubsidySrc('OFFSHORE_WIND_FARM'),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
@@ -790,6 +792,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       waterOnly: xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'Domain', { expect: 'DOMAIN_SEA' }),
       power: xml('ModifierArguments', 'ModifierId=OFFSHORE_WIND_FARM_GENERATE_POWER&Name=Amount', 'Value'),
       terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_OFFSHORE_WIND_FARM, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'TerrainType')] },
+      noFeature: { derived: 'true where the install writes no Improvement_ValidFeatures row for the row', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'FeatureType')] },
     },
   },
   // CIV6 (Civilizations.xml): the roster's UNIQUE IMPROVEMENTS, each read off

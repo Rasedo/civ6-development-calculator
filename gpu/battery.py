@@ -849,8 +849,10 @@ def _main() -> int:
                 ("formation_train", [py, "tests/gpu/formation_train_test.py"], 4),  # the corps/army queue tier: gates, price, apply refusals, the tiered spawn
                 ("gp_pass", [py, "tests/gpu/gp_pass_test.py"], 4),  # the Great Person pass: the fee, the discount, the lockout, the rival's claim
                 ("beliefs", [py, "tests/gpu/beliefs_test.py"], 4),  # a religion's four belief classes, the Worship buildings, the Mosque and the Dar-e Mehr
+                ("belief_effects", [py, "tests/gpu/belief_effects_test.py"], 4),  # Lay Ministry, Sacred Places, Missionary Zeal, Monastic Isolation, Holy Waters, the Dar-e Mehr's eras
                 ("minor_builds", [py, "tests/gpu/minor_builds_test.py"], 4),  # the city-state's own walls, type district and Harbor, and the conquest carry
                 ("alliance_levels", [py, "tests/gpu/alliance_levels_test.py"], 4),  # typed alliances: points, levels and the fifteen-effect table
+                ("gs_rows", [py, "tests/gpu/gs_rows_test.py"], 4),  # the three GS admirals and the Offshore Wind Farm: no seed recruits them or reaches Predictive Systems
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

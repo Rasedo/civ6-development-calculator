@@ -7,16 +7,19 @@ CIV6 (Beliefs.xml `BeliefClasses`): Follower, Worship, Founder and Enhancer
 each carry `MaxInReligion` 1. (ReligionScreen.lua; the pedia: "A newly
 established Religion will consist of two beliefs: a Follower belief, and one
 of three additional types"): FOUNDING takes the Follower first and then one
-belief of any other class; ENHANCING adds the classes the religion still
+belief of any other class (RELIGION_INITIAL_BELIEFS 2); each Apostle's
+EVANGELIZE BELIEF earns one more, adopted from a class the religion still
 lacks. A Worship belief names the one Holy Site building its religion builds
 or buys. The TS twin is tests/cpu/religion/religion-trade.test.ts.
 
 Proven here, on the record's BELIEF arm (`_apply_beliefs`, `adoptBeliefs`'
-twin) and the buildings:
+twin), the Apostle's EVANGELIZE_BELIEF column and the buildings:
   1 founding: the order, the count, the classes and the open pool decide; the
-    founding writes the holy tile, the Holy City's pressure and the era score;
-  2 enhancing: a second prophet, every lacking class once, the latch, and the
-    Score's Religion line at four beliefs; a dry pool leaves the other class;
+    founding writes the beliefs earned, the holy tile, the Holy City's
+    pressure and the era score;
+  2 enhancing: an Apostle evangelizes one belief at a time, a second prophet
+    earns none, a full religion evangelizes nothing, and the Score's
+    Religion line at four beliefs; a dry pool caps what can be earned;
   3 the Worship belief's building: on the production list (never the gold
     one), faith-bought off the queue with its progress banked;
   4 the Mosque's spread charge, the Dar-e Mehr's disaster immunity;
@@ -115,7 +118,8 @@ def test_founding(rules, path) -> None:
     adopt(sim, ROW, [[FOL, 2], [ENH, 0]])
     assert bool(sim.civ_religion_done[B0, ROW]), "the founding was refused"
     assert held(sim, ROW) == [2, -1, -1, 0], f"held {held(sim, ROW)}"
-    assert not bool(sim.civ_enhanced[B0, ROW]), "the founding enhanced the religion"
+    assert int(sim.civ_beliefs_earned[B0, ROW]) == sim._religion_initial_beliefs == 2, "the founding's beliefs earned"
+    assert int(sim._belief_picks(ROW)[B0]) == 0, "the founding left a belief to adopt"
     assert claimed(sim) == 3, f"claimed {claimed(sim)}"
     assert int(sim.holy_tile[B0, ROW]) == int(sim.city_center[B0, ROW, j]), "the holy tile is the capital's centre"
     assert int(sim.city_pressure[B0, ROW, j, ROW]) - press0 == \
@@ -124,35 +128,82 @@ def test_founding(rules, path) -> None:
     print("  1 founding OK — the Follower first, one other class, the open pool; holy tile, pressure, era score")
 
 
+def apostle(sim, row: int) -> tuple[int, int]:
+    """an Apostle of seat row `row` on a free tile of its own: (slot, rank)"""
+    t = int(((sim.tile_seat[B0] == row) & sim.passable[B0] & (sim.civilian_at[B0] < 0)
+             & (sim.military_at[B0] < 0)).nonzero(as_tuple=True)[0][0])
+    slot = int(sim.unit_next[B0])
+    sim.unit_next[B0] += 1
+    sim.major_unit_alive[B0, slot] = True
+    sim.major_unit_seat[B0, slot] = row
+    sim.major_unit_type[B0, slot] = sim._apostle_idx
+    sim.major_unit_tile[B0, slot] = t
+    sim.major_unit_hp[B0, slot] = 100
+    sim.major_unit_charges[B0, slot] = 1
+    sim.major_unit_mp[B0, slot] = 4
+    sim.major_unit_promos[B0, slot] = 0
+    sim.civilian_at[B0, t] = slot + sim.POOL_LO["major"]
+    smap = sim._seat_slot_map(row)
+    rank = int((smap[B0] == slot + sim.POOL_LO["major"]).long().argmax())
+    return slot, rank
+
+
+def evangelize(sim, row: int) -> tuple[bool, int]:
+    """an Apostle takes the EVANGELIZE_BELIEF column: (the mask offered it,
+    its slot)"""
+    slot, rank = apostle(sim, row)
+    offered = bool(sim._seat_unit_mask(row)[B0, rank, sim._A_EVANGELIZE])
+    a = torch.full(sim._seat_slot_map(row).shape, -1, dtype=torch.long)
+    a[B0, rank] = sim._A_EVANGELIZE
+    sim._apply_seat_unit_actions(row, a)
+    return offered, slot
+
+
 def test_enhancing(rules, path) -> None:
     sim = build(rules, path)
     ready(sim, ROW)
+    assert sim._act_names[-1] == "EVANGELIZE_BELIEF" == sim._act_names[sim._A_EVANGELIZE], "the column is not last"
     adopt(sim, ROW, [[FOL, 2], [FOU, 0]])
     assert bool(sim.civ_religion_done[B0, ROW])
-    # one prophet founded it: no enhancement yet
-    adopt(sim, ROW, [[ENH, 0], [WOR, 4]])
-    assert not bool(sim.civ_enhanced[B0, ROW]), "enhanced on one prophet"
+    # the founding's two are held: nothing to adopt, and a second prophet earns none
     sim.civ_prophets[B0, ROW] = 2
+    adopt(sim, ROW, [[WOR, 4]])
+    assert held(sim, ROW) == [2, -1, 0, -1], "adopted a belief nobody earned"
+    # EVANGELIZE BELIEF: the Apostle is spent, the religion earns one
+    offered, slot = evangelize(sim, ROW)
+    assert offered, "the mask shut an Apostle's evangelize"
+    assert not bool(sim.major_unit_alive[B0, slot]), "the evangelizing Apostle was not spent"
+    assert int(sim.civ_beliefs_earned[B0, ROW]) == 3 and int(sim._belief_picks(ROW)[B0]) == 1
     assert sim._enhanceable(ROW)[B0].tolist() == [False, True, False, True]
-    for bad in ([[WOR, 4]], [[WOR, 4], [FOL, 1]], [[WOR, 4], [FOU, 1]], [[WOR, 4], [WOR, 5]]):
+    for bad in ([[WOR, 4], [ENH, 3]], [[FOU, 1]], [[FOL, 1]], [[WOR, 99]]):
         adopt(sim, ROW, bad)
-        assert not bool(sim.civ_enhanced[B0, ROW]), f"enhanced on {bad}"
-    adopt(sim, ROW, [[ENH, 3], [WOR, 4]])
-    assert bool(sim.civ_enhanced[B0, ROW]), "the enhancement was refused"
+        assert held(sim, ROW) == [2, -1, 0, -1], f"adopted {bad}"
+    adopt(sim, ROW, [[WOR, 4]])
+    assert held(sim, ROW) == [2, 4, 0, -1], f"held {held(sim, ROW)}"
+    assert not bool(sim._can_enhance(ROW)[B0]), "an adoption is open with nothing earned"
+    # the second Apostle earns the fourth
+    evangelize(sim, ROW)
+    adopt(sim, ROW, [[ENH, 3]])
     assert held(sim, ROW) == [2, 4, 0, 3], f"held {held(sim, ROW)}"
-    assert not bool(sim._can_enhance(ROW)[B0]), "a second enhancement is open"
+    # a full religion has nothing to evangelize: the column shuts, the Apostle stays
+    offered, slot = evangelize(sim, ROW)
+    assert not offered and bool(sim.major_unit_alive[B0, slot]), "a full religion evangelized"
+    assert int(sim.civ_beliefs_earned[B0, ROW]) == 4
     line = next(i for i, ln in enumerate(sim.rules.scoring) if ln["count"] == "religion")
     assert int(sim.score_lines(ROW)[B0, line]) == 4 * 5, "the Score's Religion line: 5 per belief, four beliefs"
-    # a dry Worship pool leaves the enhancement to the Enhancer alone
+    # a dry Worship pool caps what an Apostle may earn
     sim2 = build(rules, path)
-    ready(sim2, ROW, prophets=2)
+    ready(sim2, ROW)
     adopt(sim2, ROW, [[FOL, 2], [FOU, 0]])
     sim2.wor_claimed[B0, :] = True
-    adopt(sim2, ROW, [[ENH, 3], [WOR, 4]])
-    assert not bool(sim2.civ_enhanced[B0, ROW]), "enhanced with a belief no pool holds"
+    evangelize(sim2, ROW)
+    adopt(sim2, ROW, [[WOR, 4]])
+    assert held(sim2, ROW) == [2, -1, 0, -1], "adopted a belief no pool holds"
     adopt(sim2, ROW, [[ENH, 3]])
-    assert bool(sim2.civ_enhanced[B0, ROW]) and held(sim2, ROW) == [2, -1, 0, 3], "the dry-pool enhancement"
-    print("  2 enhancing OK — a second prophet, every lacking class once, the latch; Religion line 20")
+    assert held(sim2, ROW) == [2, -1, 0, 3], "the dry-pool enhancement"
+    offered, _slot = evangelize(sim2, ROW)
+    assert not offered and int(sim2.civ_beliefs_earned[B0, ROW]) == 3, "earned past the dry pool"
+    print("  2 enhancing OK — one belief per Apostle, no prophet path, a full religion evangelizes nothing; Religion line 20")
 
 
 def test_worship_building(rules, path) -> None:
@@ -226,10 +277,10 @@ def test_obs_driver_record(rules, path) -> None:
     ready(sim, ROW)
     base = sim.snapshot()
     ob = neutral.seat_obs(sim, ROW)[B0]["belief"]
-    assert ob["found"] and not ob["enhance"], f"belief group {ob}"
+    assert ob["found"] and ob["enhance"] == 0, f"belief group {ob}"
     assert ob["held"] == [-1, -1, -1, -1] and ob["worship"] == list(range(sim._bel_class_n[WOR])), f"{ob}"
     # every founding the driver draws lands, and it reaches every second class
-    seconds = set()
+    seconds, thirds = set(), set()
     for turn in range(40):
         sim.restore(base)
         nobs = neutral.seat_obs(sim, ROW)
@@ -245,15 +296,26 @@ def test_obs_driver_record(rules, path) -> None:
         sim._seat_record_apply(ROW, ONES)
         assert bool(sim.civ_religion_done[B0, ROW]), f"the driver's founding {rec['beliefs']} was refused"
         seconds.add(int(dec[B0, 1, 0]))
-        # ...and the enhancement it draws next lands too
-        sim.civ_prophets[B0, ROW] = 2
-        ob2 = neutral.seat_obs(sim, ROW)
-        assert ob2[B0]["belief"]["enhance"], "the observation missed the open enhancement"
-        dec2 = drive._decide_beliefs(ob2, ROW, [42], turn + 1, sim.device)
-        adopt(sim, ROW, dec2[B0].tolist())
-        assert bool(sim.civ_enhanced[B0, ROW]) and -1 not in held(sim, ROW), f"the driver's enhancement {dec2[B0].tolist()}"
+        # ...and each evangelized belief it draws next lands too
+        for k in (1, 2):
+            sim.civ_beliefs_earned[B0, ROW] += 1
+            ob2 = neutral.seat_obs(sim, ROW)
+            assert ob2[B0]["belief"]["enhance"] == 1, f"the observation's enhancement count {ob2[B0]['belief']}"
+            dec2 = drive._decide_beliefs(ob2, ROW, [42], turn + 10 * k, sim.device)
+            picks = [p for p in dec2[B0].tolist() if p[0] >= 0]
+            adopt(sim, ROW, picks)
+            if k == 1:
+                thirds.add(int(picks[0][0]))
+            assert sum(1 for h in held(sim, ROW) if h >= 0) == 2 + k, f"the driver's enhancement {picks}"
     assert seconds == {WOR, FOU, ENH}, f"the driver's second classes {seconds}"
-    print("  5 observation, driver and record OK — 40 foundings and enhancements, every second class reached")
+    assert len(thirds) >= 2, f"the driver's third classes {thirds}"
+    # the driver sends an Apostle to evangelize where the column is open
+    sim.restore(base)
+    adopt(sim, ROW, [[FOL, 2], [FOU, 0]])
+    slot, rank = apostle(sim, ROW)
+    um = sim._seat_unit_mask(ROW)
+    assert bool(um[B0, rank, sim._A_EVANGELIZE]), "the evangelize column is shut"
+    print("  5 observation, driver and record OK — 40 foundings and two enhancements each, every second class reached")
 
 
 def main() -> int:

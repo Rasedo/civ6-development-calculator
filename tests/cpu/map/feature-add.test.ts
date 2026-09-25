@@ -9,9 +9,9 @@
 import { describe, expect, it } from 'vitest';
 import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
 import { disasterPhase, erupt, paintVolcanicSoil, soilPaintable } from '../../../cpu/core/disasters';
-import { ERUPTION_PAINT_P, RANDOM_EVENT_START_TURN, eruptionRow } from '../../../cpu/data/disasters';
+import { ERUPTION_PAINT_P, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS } from '../../../cpu/data/disasters';
 /** the volcano's three rows' paint chances, GENTLE / CATASTROPHIC / MEGACOLOSSAL */
-const VOLCANO_PAINT_P = [0, 1, 2].map((sev) => ERUPTION_PAINT_P[eruptionRow('volcano', sev)]);
+const VOLCANO_PAINT_P = [0, 1, 2].map((sev) => ERUPTION_PAINT_P[volcanoRow(sev)]);
 import { bareGround, validImprovementsIn } from '../../../cpu/core/rules';
 import { tileYields } from '../../../cpu/core/yields';
 import { neighbors } from '../../../world/hex';
@@ -130,7 +130,7 @@ describe('Volcanic Soil', () => {
       let woodsPainted = 0;
       for (let round = 0; round < 40; round++) {
         reset();
-        volcanoes.forEach((v) => erupt(state, v, eruptionRow('volcano', sev)));
+        volcanoes.forEach((v) => erupt(state, [v], volcanoRow(sev)));
         rings.forEach((ring, k) => {
           expect(ring[0].feature).toBe('FLOODPLAINS');
           for (const t of ring.slice(1)) {
@@ -169,7 +169,7 @@ describe('Volcanic Soil', () => {
     let painted = 0;
     let eruptions = 0;
     for (let i = 0; i < 3000; i++) {
-      for (const t of ring) { t.terrain = 'DESERT'; t.elevation = 'FLAT'; t.feature = null; }
+      for (const t of ring) { t.terrain = 'DESERT'; t.elevation = 'FLAT'; t.feature = null; t.meteor = false; }
       state.eventLog = [];
       disasterPhase(state);
       if (!state.eventLog.some((e) => e.includes('eruption'))) continue;
@@ -177,17 +177,21 @@ describe('Volcanic Soil', () => {
       plots += ring.length;
       painted += ring.filter((t) => t.feature === 'VOLCANIC_SOIL').length;
     }
-    // the volcano's 8 against the dust storms' 8 + 2
-    expect(Math.abs(eruptions / 3000 - 8 / 18)).toBeLessThan(0.03);
+    // the volcano's 8 against the dust storms' 8 + 2 and the meteor's 6 (the
+    // bare desert ring is nobody's)
+    expect(Math.abs(eruptions / 3000 - 8 / 24)).toBeLessThan(0.03);
     const w = [4, 2.5, 1.5];
     const mean = w.reduce((a, x, s) => a + x * VOLCANO_PAINT_P[s], 0) / 8;
     expect(Math.abs(painted / plots - mean)).toBeLessThan(0.03);
   });
 
-  it('the five eruption rows are the install\'s paint chances', () => {
-    // Kilimanjaro GENTLE / CATASTROPHIC, then the volcano's three
-    expect([...ERUPTION_PAINT_P]).toEqual([0.5, 0.5, 0.35, 0.5, 0.75]);
-    expect(eruptionRow('kilimanjaro', 1)).toBe(1);
-    expect(eruptionRow('volcano', 0)).toBe(2);
+  it('the eight eruption rows are the install\'s paint chances, in the live table\'s order', () => {
+    // Eyjafjallajokull CATASTROPHIC / MEGACOLOSSAL, Kilimanjaro GENTLE /
+    // CATASTROPHIC, Vesuvius MEGACOLOSSAL, then the volcano's three
+    expect([...ERUPTION_ROWS]).toEqual(['EYJAFJALLAJOKULL_CATASTROPHIC', 'EYJAFJALLAJOKULL_MEGACOLOSSAL',
+      'KILIMANJARO_GENTLE', 'KILIMANJARO_CATASTROPHIC', 'VESUVIUS_MEGACOLOSSAL',
+      'VOLCANO_GENTLE', 'VOLCANO_CATASTROPHIC', 'VOLCANO_MEGACOLOSSAL']);
+    expect([...ERUPTION_PAINT_P]).toEqual([0.5, 0.75, 0.5, 0.5, 0.25, 0.35, 0.5, 0.75]);
+    expect([0, 1, 2].map(volcanoRow)).toEqual([5, 6, 7]);
   });
 });

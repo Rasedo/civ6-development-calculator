@@ -9,7 +9,7 @@ import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, cong
 import { tileAppeal, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { IMPROVEMENTS, type ImprovementDef, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
-import { droughtBars } from '../data/disasters';
+import { droughtBars, fireFeature } from '../data/disasters';
 import { isSuzerain } from './cityStates';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -62,6 +62,8 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
   if (isImpassable(tile)) return no('Impassable terrain.');
   if (naturalWonderAt(tile)) return no('Cannot settle on a natural wonder.');
   if (tile.feature === 'OASIS') return no('Cannot settle on an oasis.');
+  // CIV6 (the pack's fire features, `Settlement="false"`)
+  if (fireFeature(tile.feature)) return no('Cannot settle where a fire has burned.');
   if (tile.district) return no('Tile already occupied.');
   if (tileClaimed(tile) && tileSeat(tile) !== seat) return no('Foreign territory.');
   // every centre on the map, a Free City's included (the GPU reads the
@@ -540,6 +542,9 @@ export function canPlaceDistrictIn(
   if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
   if (tile.feature === 'OASIS') return no('Districts cannot be built on an oasis.');
+  // CIV6 (the pack's fire features): neither Removable nor
+  // `ValidDistrictPlacement`, so nothing paves the plot until it regrows
+  if (fireFeature(tile.feature)) return no('A fire has burned here.');
   // GS lets districts be built on every kind of Floodplains (they flood
   // instead of being refused), so there is no floodplain test here.
   //
@@ -1010,6 +1015,9 @@ export function canPlaceWonder(
   if (tile.district || tile.builtWonder) return no('Tile already occupied.');
   if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
+  // CIV6 (the pack's fire features): neither Removable nor
+  // `ValidWonderPlacement`
+  if (fireFeature(tile.feature)) return no('A fire has burned here.');
   if (tile.resource && !hiddenResourcesFor(state, seat).has(tile.resource)) {   // an unseen strategic is plain ground
     const cat = RESOURCES[tile.resource].category;
     if (cat !== 'bonus') return no(`Cannot build over a ${cat} resource.`);

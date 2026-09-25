@@ -43,8 +43,8 @@ import { UNITS, UNIT_TYPE_IDX, UNIT_ERA_INDEX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP
 import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { PANTHEONS, PANTHEON_FAITH_COST } from '../data/religion';
-import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
-import { cityDistrictSum, darkBuildings } from './yields';
+import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
+import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
 import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum, swapTileOk } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
@@ -62,7 +62,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost } from './game';
+import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -90,6 +90,7 @@ const A_PROMOTE = unitActionIndex(IMPROVEMENT_IDS).PROMOTE_0;
 const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN_0;
 const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
 const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION;
+const A_EVANGELIZE = unitActionIndex(IMPROVEMENT_IDS).EVANGELIZE_BELIEF;
 const A_CONVERT_HEATHEN = unitActionIndex(IMPROVEMENT_IDS).CONVERT_HEATHEN;
 const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
 const A_SNIPE = unitActionIndex(IMPROVEMENT_IDS).SNIPE_0;
@@ -907,7 +908,7 @@ export function districtSiteCost(
   // CIV6: the Spaceport's cost is FLAT — no research scaling, no discount.
   const base = districtScaledBase(actor.research, id);
   const cost0 = DISTRICTS[id]?.fixedCost
-    ? Math.round(DISTRICTS[id].cost * GAME_SPEED)
+    ? scaleByGameSpeed(DISTRICTS[id].cost)
     : districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities })
       ? Math.floor(base * districtDiscountMult(id))
       : base;
@@ -1307,6 +1308,10 @@ export function transferCity(
     // a pillaged building stays pillaged in the new owner's hands — the
     // repair is the queue's, whoever holds the queue
     pillagedBuildings: civCity.pillagedBuildings?.filter((b) => keptBuildings.includes(b)),
+    // ...and so does the era each kept building was constructed in
+    buildingEras: civCity.buildingEras
+      ? Object.fromEntries(Object.entries(civCity.buildingEras).filter(([b]) => keptBuildings.includes(b)))
+      : undefined,
     districts: keptDistricts,
     wonders: civCity.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], { seat: to.seat, id: newId })).map((w) => ({ ...w })),
     // GREAT WORKS AND RELICS RIDE WITH THE CITY. Real Civ 6: the
@@ -1692,6 +1697,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       }
       if (a === A_LAUNCH_INQUISITION) {
         launchInquisition(state, unit, actor);
+        return;
+      }
+      if (a === A_EVANGELIZE) {
+        evangelizeBelief(state, unit, actor);
         return;
       }
       if (a === A_CONVERT_HEATHEN) {
@@ -2482,6 +2491,7 @@ export function seatPhase(state: GameState): void {
               if (Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
                 actor.treasury = (actor.treasury ?? 0) - price;
                 civCity.buildings.push(def.id);
+                stampBuildingEra(state, civCity, def.id);
                 dropQueuedBuilding(civCity, def.id);
                 buildingDedications(state, civCity.seat, def.id);
                 if (def.walls) { civCity.outerHp = wallsMax(state, civCity); fitEncampOuter(state, civCity); }

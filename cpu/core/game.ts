@@ -33,9 +33,9 @@ import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH, COMPETITIONS } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
+import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
-import { darkBuildings, laserSpeed } from './yields';
+import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
 import { competitionOf } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
@@ -49,9 +49,10 @@ import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
-import { PANTHEONS, ENHANCER_BELIEFS, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, beliefIdAt, worshipBuildingOf, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { PANTHEONS, ENHANCER_BELIEFS, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, worshipBuildingOf, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
-import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
+import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed } from '../data/constants';
+import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
 import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
@@ -59,7 +60,14 @@ import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
 
-export const TURN_LIMIT = 250;
+/** CIV6 (GameSpeeds.xml, GameSpeed_Turns): the online game's eight calendar
+ *  increments run 35 + 30 + 20 + 20 + 30 + 25 + 60 + 30 turns — 250, past
+ *  which the Score decides. */
+export const TURN_LIMIT = srcConst('scenario.turnLimit', 250, {
+  derived: 'the sum of TurnsPerIncrement over the GAMESPEED_ONLINE GameSpeed_Turns rows',
+  inputs: [960, 600, 480, 240, 120, 48, 24, 12].map((m) => xml('GameSpeed_Turns',
+    `GameSpeedType=GAMESPEED_ONLINE&MonthIncrement=${m}`, 'TurnsPerIncrement')),
+});
 
 export function effectiveResearchCost(state: GameState, seat: number, id: string, baseCost: number): number {
   // A GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost — the
@@ -84,7 +92,7 @@ export const DISTRICT_SPECIALTY_COST = 54;
 export function districtCostIn(research: ResearchState, base: number): number {
   const tPct = research.techs.length / Object.keys(TECHS).length;
   const cPct = research.civics.length / Object.keys(CIVICS).length;
-  return Math.floor(Math.round(base * GAME_SPEED) * (1 + 9 * Math.max(tPct, cPct)));
+  return Math.floor(scaleByGameSpeed(base) * (1 + 9 * Math.max(tPct, cPct)));
 }
 
 /** CIV6 (`Districts.CostProgressionParam1`): what the under-represented
@@ -131,7 +139,7 @@ export function districtScaledBase(research: ResearchState, type?: DistrictId): 
   const base = type !== undefined
     ? (DISTRICTS[type]?.cost ?? DISTRICT_SPECIALTY_COST) : DISTRICT_SPECIALTY_COST;
   return type !== undefined && DISTRICTS[type]?.costProgressGame !== undefined
-    ? Math.round(base * GAME_SPEED)
+    ? scaleByGameSpeed(base)
     : districtCostIn(research, base);
 }
 
@@ -143,12 +151,12 @@ export function districtProgressAdd(research: ResearchState, type?: DistrictId):
   if (p === undefined) return 0;
   const tPct = research.techs.length / Object.keys(TECHS).length;
   const cPct = research.civics.length / Object.keys(CIVICS).length;
-  return Math.floor(Math.round(p * GAME_SPEED) * Math.max(tPct, cPct));
+  return Math.floor(scaleByGameSpeed(p) * Math.max(tPct, cPct));
 }
 
 export function districtCost(state: GameState, seat: number, type?: DistrictId): number {
   // CIV6: the Spaceport's cost is FLAT — it never scales and takes no discount.
-  if (type !== undefined && DISTRICTS[type]?.fixedCost) return Math.round(DISTRICTS[type].cost * GAME_SPEED);
+  if (type !== undefined && DISTRICTS[type]?.fixedCost) return scaleByGameSpeed(DISTRICTS[type].cost);
   const research = seatOf(state, seat)!.research;
   const base = districtScaledBase(research, type);
   const cost = type !== undefined && districtDiscounted(state, seat, type)
@@ -218,16 +226,17 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
   };
 }
 
-/** Civ 6-ish settler cost, rising with every city, live SETTLER unit and
- * queued one. The real 80 + 30·n, speed-scaled like unit costs → 48 + 18·n. */
+/** The settler's price, rising with every city, live SETTLER unit and
+ * queued one: the Units row's Cost 80 + CostProgressionParam1 30 per copy,
+ * each through `scaleByGameSpeed` as every unit cost is (40 + 15·n online). */
 export function settlerCost(state: GameState, seat: number): number {
   const queued = seatOf(state, seat)!.cities.reduce(
     (n, c) => n + c.queue.filter((q) => q.kind === 'settler').length,
     0,
   );
   return (
-    Math.round(80 * GAME_SPEED) +
-    Math.round(30 * GAME_SPEED) *
+    UNITS.SETTLER.cost +
+    scaleByGameSpeed(SETTLER_COST_STEP) *
       Math.max(0, seatOf(state, seat)!.cities.length - 1 + settlerCount(state, seat) + queued)
   );
 }
@@ -479,6 +488,7 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   }
   if (state.sandbox) {
     city.buildings.push(buildingId);
+    stampBuildingEra(state, city, buildingId);
     if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
   } else {
     commitProduction(state, city.seat, city, { kind: 'building', building: buildingId, progress: 0 });
@@ -512,26 +522,27 @@ export function queueWonder(
   return { ok: true };
 }
 
-export function projectCost(state: GameState, seat: number, projectId?: string, city?: City): number {
-  // Space steps and laser stations carry their REAL fixed price (already
-  // speed-scaled in the table); everything else takes the generic curve.
-  const def = projectId !== undefined ? PROJECTS[projectId] : undefined;
+/** A project's price: its own `Projects.Cost` row (already speed-scaled in
+ *  the table), plus the GAME_PROGRESS climb where the row carries one — the
+ *  six district projects, the Cothon's capital move. The repair alone is
+ *  priced by the HP it restores. */
+export function projectCost(state: GameState, seat: number, projectId: string, city?: City): number {
+  const def = PROJECTS[projectId];
   // CIV6: "Walls gain HP equal to the Production invested into the project" —
   // so the whole repair costs exactly the perimeter HP it puts back.
   if (def?.repair && city) return Math.max(1, wallsMax(state, city) - outerPool(state, city) + encampOuterMissing(state, city));
-  const fixed = def?.cost;
+  const fixed = def?.cost ?? 0;
   // CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS): the price climbs with the game's
   // own progress, which this engine reads exactly where `districtCostIn`
   // reads it — the larger of the tech and civic shares researched.
-  if (fixed !== undefined && def?.costProgressGame !== undefined) {
+  if (def?.costProgressGame !== undefined) {
     const r = seatOf(state, seat)?.research;
     const pct = r
       ? Math.max(r.techs.length / Object.keys(TECHS).length, r.civics.length / Object.keys(CIVICS).length)
       : 0;
-    return fixed + Math.floor(Math.round(def.costProgressGame * GAME_SPEED) * pct);
+    return fixed + Math.floor(scaleByGameSpeed(def.costProgressGame) * pct);
   }
-  if (fixed !== undefined) return fixed;
-  return Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCost(state, seat) * 0.5));
+  return fixed;
 }
 
 /** CIV6: the repair "becomes available after building Walls. A city can
@@ -628,15 +639,16 @@ export function buildingPurchaseCost(state: GameState, seat: number, buildingId:
   return (effectiveBuilding(civOf(state, seat), buildingId)?.cost ?? 0) * GOLD_PURCHASE_MULT;
 }
 
-/** Faith price of a worship building. CIV6 (GS Civilopedia, Cathedral):
- * a FLAT 380 faith at standard speed (speed-scaled like every other cost);
- * anything else keeps the production×mult schedule. */
+/** Faith price of a building: its own row's Cost at the one faith rate
+ * (`FAITH_PURCHASE_MULT`, measured on every priced building), before the
+ * five-step floor. A worship building (every one Cost 190 in the install)
+ * prices the same way. */
 export function buildingFaithCost(state: GameState, seat: number, buildingId: string): number {
   if (BUILDINGS[buildingId]?.worship) {
     // CIV6 (Righteousness of the Faith): the row pays `costPct` of the price
     let pct = 100;
     for (const r of getModifiers(state, seat).worship) pct = Math.min(pct, r.costPct);
-    return Math.round((380 * GAME_SPEED * pct) / 100);
+    return Math.round((BUILDINGS[buildingId].cost * FAITH_PURCHASE_MULT * pct) / 100);
   }
   // CIV6 (Valletta's suzerain): the three walls are bought at
   // `VALLETTA_WALLS_DISCOUNT_PCT` off, and by that suzerain alone.
@@ -771,6 +783,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
     }
   }
   city.buildings.push(buildingId);
+  stampBuildingEra(state, city, buildingId);
   dropQueuedBuilding(city, buildingId);
   buildingDedications(state, city.seat, buildingId);
   if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
@@ -856,6 +869,7 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(wid);
+  stampBuildingEra(state, city, wid);
   dropQueuedBuilding(city, wid);
   return { ok: true };
 }
@@ -881,6 +895,7 @@ export function purchaseBuildingWithFaith(state: GameState, cityId: number, buil
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(buildingId);
+  stampBuildingEra(state, city, buildingId);
   dropQueuedBuilding(city, buildingId);
   buildingDedications(state, city.seat, buildingId);
   if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
@@ -988,6 +1003,17 @@ export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleRes
  * military unit does not gain influence." The action's own condition is "Must
  * be at war with the owner of the religious unit."
  */
+/** CIV6 (Monastic Isolation, EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS): the
+ *  pressure religion `rel` sheds to a lost theological combat, `swing` less
+ *  the ReductionPercent its Enhancer belief keeps. The pedia's Theological
+ *  Combat chapter counts a Condemn Heretic's halved drop as the same loss.
+ *  `_theo_loss`' twin. */
+function theoLoss(state: GameState, rel: number, swing: number): number {
+  const r = seatOf(state, rel)?.religion;
+  const keep = r?.founded && r.enhancer ? ENHANCER_BELIEFS[r.enhancer]?.effects.theoLossReductionPct ?? 0 : 0;
+  return Math.floor((swing * (100 - Math.min(100, keep))) / 100);
+}
+
 export function condemnHeretic(state: GameState, unit: Unit, tileIndex: number): RuleResult {
   if ((UNITS[unit.type]?.combat ?? 0) <= 0) return { ok: false, reason: 'Not a military unit.' };
   const target = state.units.find(
@@ -1004,6 +1030,7 @@ export function condemnHeretic(state: GameState, unit: Unit, tileIndex: number):
   if (condemner) condemner.diplomaticFavor += congressCondemnFavor(state, loser);
   const nRel = state.seats.length;
   const dt = state.map.tiles[tileIndex];
+  const loss = theoLoss(state, loser, CONDEMN_PRESSURE_SWING);
   for (const c of allCities(state)) {
     const ct = state.map.tiles[c.centerIndex];
     if (hexDistance(dt.col, dt.row, ct.col, ct.row) > CONDEMN_PRESSURE_RANGE) continue;
@@ -1012,7 +1039,7 @@ export function condemnHeretic(state: GameState, unit: Unit, tileIndex: number):
       pres = new Array(nRel).fill(0);
       c.religionPressure = pres;
     }
-    pres[loser] = Math.max(0, pres[loser] - CONDEMN_PRESSURE_SWING);
+    pres[loser] = Math.max(0, pres[loser] - loss);
   }
   disbandUnit(state, target.id);
   unit.movesLeft = 0;
@@ -1500,7 +1527,9 @@ export function isEncampHarborItem(item: QueueItem): boolean {
  * ≤2, 75 for ring 3, +25/ring beyond as a scope extension), speed-scaled,
  * × (1 + 4·research progress), +5 (scaled) per tile EVER purchased
  * empire-wide — fully decoupled from the culture-growth counter. Without a
- * target tile (UI headline price) the ring-2 base is shown. */
+ * target tile (UI headline price) the ring-2 base is shown. The install
+ * publishes no speed rule for a plot's price; this engine scales it as a
+ * cost (`scaleByGameSpeed`). */
 export function tilePurchaseCost(
   state: GameState,
   city: City | City,
@@ -1524,8 +1553,8 @@ export function tilePurchaseCost(
   }
   const tPct = src.research.techs.length / Object.keys(TECHS).length;
   const cPct = src.research.civics.length / Object.keys(CIVICS).length;
-  const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
-  const step = Math.round(5 * GAME_SPEED);
+  const base = scaleByGameSpeed(50 + 25 * (ring - 2));
+  const step = scaleByGameSpeed(5);
   return Math.round(
     (base * (1 + 4 * Math.max(tPct, cPct)) + step * (src.tilesPurchased ?? 0)) * src.mods.tilePurchaseMult * (1 + terrainPct / 100),
   );
@@ -1907,6 +1936,7 @@ function theologicalCombatPhase(state: GameState): void {
     const winnerRel = def.hp <= 0 ? g : att.hp <= 0 ? unitSeat(def) : -1;
     if (winnerRel >= 0) {
       const dt = state.map.tiles[def.hp <= 0 ? def.tileIndex : att.tileIndex];
+      const loss = loserRel >= 0 ? theoLoss(state, loserRel, THEO_PRESSURE_SWING) : 0;
       for (const c of allCities(state)) {
         const ct = state.map.tiles[c.centerIndex];
         if (hexDistance(dt.col, dt.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
@@ -1916,7 +1946,7 @@ function theologicalCombatPhase(state: GameState): void {
           c.religionPressure = pres;
         }
         pres[winnerRel] += THEO_PRESSURE_SWING;
-        if (loserRel >= 0) pres[loserRel] = Math.max(0, pres[loserRel] - THEO_PRESSURE_SWING);
+        if (loserRel >= 0) pres[loserRel] = Math.max(0, pres[loserRel] - loss);
       }
     }
     // RELICS. CIV 6 creates one when the Apostle killed here HELD the MARTYR
@@ -2272,17 +2302,53 @@ export function canFoundReligion(state: GameState, seat: number): RuleResult {
   return { ok: true };
 }
 
-/** can the seat enhance its religion now? A founded religion not yet
- *  enhanced and a SECOND activated Great Prophet (the first funds the
- *  founding) — `_can_enhance`'s gates. */
+/** can the seat enhance its religion now? A founded religion with a belief
+ *  earned and not yet adopted (`beliefPicks`) — `_can_enhance`'s gates. */
 export function canEnhanceReligion(state: GameState, seat: number): RuleResult {
   const sx = seatOf(state, seat);
   if (!sx) return { ok: false, reason: 'No such seat.' };
   if (!sx.religion.founded) return { ok: false, reason: 'Found a religion first.' };
-  if (sx.religion.enhanced) return { ok: false, reason: 'Religion already enhanced.' };
-  if (!state.sandbox && prophetsOf(sx) < 2) {
-    return { ok: false, reason: 'Needs a second activated Great Prophet.' };
+  if (beliefPicks(state, seat) === 0) {
+    return { ok: false, reason: 'No belief earned to adopt: an Apostle evangelizes one.' };
   }
+  return { ok: true };
+}
+
+/** the beliefs the seat's religion holds, of its four classes */
+function beliefsHeld(rel: Seat['religion']): number {
+  return BELIEF_SLOTS.filter((slot) => (rel[slot] ?? null) !== null).length;
+}
+
+/** how many beliefs an enhancement of the seat's founded religion adopts
+ *  now: the beliefs earned and not yet held, capped by the classes it still
+ *  lacks that have a belief left (`enhanceableClasses`). The sandbox has
+ *  earned every class. `_belief_picks`' twin. */
+export function beliefPicks(state: GameState, seat: number): number {
+  const rel = seatOf(state, seat)?.religion;
+  if (!rel?.founded) return 0;
+  const earned = state.sandbox ? BELIEF_SLOTS.length : (rel.beliefsEarned ?? 0);
+  return Math.max(0, Math.min(earned - beliefsHeld(rel), enhanceableClasses(state, seat).length));
+}
+
+/**
+ * CIV6 (UNITOPERATION_EVANGELIZE_BELIEF; the Apostle: "Once per game may
+ * Evangelize Belief to add an additional Belief to their Religion. These uses
+ * consume the Apostle"): the seat's founded religion earns one belief, which
+ * the record's `beliefs` arm adopts. Open while an earned belief would still
+ * find a class to fill; the install names no site. `_evangelize_ok`'s twin.
+ */
+export function evangelizeOk(state: GameState, unit: Unit, seat: number): boolean {
+  if (unit.type !== 'APOSTLE' || unit.seat !== seat) return false;
+  const rel = seatOf(state, seat)?.religion;
+  if (!rel?.founded) return false;
+  return (rel.beliefsEarned ?? 0) - beliefsHeld(rel) < enhanceableClasses(state, seat).length;
+}
+
+export function evangelizeBelief(state: GameState, unit: Unit, actor: Seat): RuleResult {
+  if (!evangelizeOk(state, unit, actor.seat)) return { ok: false, reason: 'No belief left to evangelize.' };
+  actor.religion.beliefsEarned = (actor.religion.beliefsEarned ?? 0) + 1;
+  disbandUnit(state, unit.id);
+  state.eventLog.push(`${actor.name} evangelized a belief of ${actor.religion.name}.`);
   return { ok: true };
 }
 
@@ -2292,7 +2358,7 @@ export function openBeliefs(state: GameState, cls: number): string[] {
 }
 
 /** the class codes the seat's religion still lacks that have a belief left,
- *  ascending — what an enhancement adds */
+ *  ascending — what an enhancement may add */
 export function enhanceableClasses(state: GameState, seat: number): number[] {
   const rel = seatOf(state, seat)?.religion;
   if (!rel) return [];
@@ -2305,11 +2371,11 @@ export function enhanceableClasses(state: GameState, seat: number): number[] {
  * verb that founds or enhances, `_apply_beliefs`' twin. `picks` are
  * [class, index] pairs (`BELIEF_CLASSES`, the class catalog's row).
  *
- * FOUNDING (no religion yet, `canFoundReligion`): the Follower first, then one
- * belief of any other class. ENHANCING (`canEnhanceReligion`): one belief of
- * every class the religion still lacks that has a belief left, each class
- * once. Every pick names a belief no religion holds. A set that does not fit
- * is refused entire.
+ * FOUNDING (no religion yet, `canFoundReligion`): RELIGION_INITIAL_BELIEFS
+ * picks, the Follower first, then a belief of another class. ENHANCING
+ * (`canEnhanceReligion`): `beliefPicks` beliefs, each of a different class the
+ * religion still lacks that has a belief left. Every pick names a belief no
+ * religion holds. A set that does not fit is refused entire.
  */
 export function adoptBeliefs(state: GameState, seat: number, picks: readonly (readonly [number, number])[]): RuleResult {
   const sx = seatOf(state, seat);
@@ -2320,19 +2386,20 @@ export function adoptBeliefs(state: GameState, seat: number, picks: readonly (re
     return { ok: false, reason: 'A belief is unknown or another religion holds it.' };
   }
   const cls = picks.map(([c]) => c);
+  if (new Set(cls).size !== cls.length) return { ok: false, reason: 'One belief of each class.' };
   const founding = !rel.founded;
   if (founding) {
     const check = canFoundReligion(state, seat);
     if (!check.ok) return check;
-    if (picks.length !== 2 || cls[0] !== BELIEF_CLASS_FOLLOWER || cls[1] === BELIEF_CLASS_FOLLOWER) {
+    if (picks.length !== RELIGION_INITIAL_BELIEFS || cls[0] !== BELIEF_CLASS_FOLLOWER) {
       return { ok: false, reason: 'Founding takes the Follower belief, then one belief of another class.' };
     }
   } else {
     const check = canEnhanceReligion(state, seat);
     if (!check.ok) return check;
     const want = enhanceableClasses(state, seat);
-    if (want.length === 0 || [...cls].sort((a, b) => a - b).join() !== want.join()) {
-      return { ok: false, reason: 'Enhancing adds one belief of every class the religion still lacks.' };
+    if (picks.length !== beliefPicks(state, seat) || cls.some((c) => !want.includes(c))) {
+      return { ok: false, reason: 'Enhancing adopts each earned belief from a class the religion still lacks.' };
     }
   }
   ids.forEach((id, k) => {
@@ -2341,13 +2408,13 @@ export function adoptBeliefs(state: GameState, seat: number, picks: readonly (re
   });
   if (founding) {
     rel.founded = true;
+    rel.beliefsEarned = RELIGION_INITIAL_BELIEFS;
     rel.name = RELIGION_NAMES[seat % RELIGION_NAMES.length];
     addEraScore(state, seat, ERA_SCORE_RELIGION);
     rel.holyTile = (sx.cities.find((c) => c.isCapital) ?? sx.cities[0])?.centerIndex ?? null;
     grantFoundingPressure(state, seat);
     state.eventLog.push(`${sx.name} founded ${rel.name}.`);
   } else {
-    rel.enhanced = true;
     state.eventLog.push(`${sx.name} enhanced ${rel.name}.`);
   }
   return { ok: true };

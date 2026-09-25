@@ -563,6 +563,11 @@ def _seat_unit_orders(st, seat: int, nobs: list):
         # standing where the charge may be spent: spend it. The mask carries
         # every legality term the person's own row asks for.
         orders0 = torch.where(present & um[:, :, A_GP], torch.full_like(orders0, A_GP), orders0)
+    A_EV = st.col("EVANGELIZE_BELIEF")
+    if _live(A_EV):
+        # an Apostle whose religion still has a class to earn spends itself on
+        # it; the Inquisition below outranks it where both are open
+        orders0 = torch.where(present & um[:, :, A_EV], torch.full_like(orders0, A_EV), orders0)
     A_LQ = st.col("LAUNCH_INQUISITION")
     if _live(A_LQ):
         orders0 = torch.where(present & um[:, :, A_LQ], torch.full_like(orders0, A_LQ), orders0)
@@ -1301,8 +1306,9 @@ def _decide_beliefs(nobs: list, row: int, seeds, turn, device) -> torch.Tensor |
     """[B, 2, 2] — the (class, index) beliefs the seat's religion adopts this
     turn, (-1, -1) padding; None where no game has one to adopt. FOUNDING
     takes a Follower, then one belief of a class drawn among Worship, Founder
-    and Enhancer; ENHANCING takes one belief of every class the religion still
-    lacks. Every pick is a draw over the class's open rows (the observation's
+    and Enhancer; ENHANCING takes the observation's `enhance` count of
+    beliefs from the classes the religion still lacks, the first class drawn.
+    Every pick is a draw over the class's open rows (the observation's
     `belief` group), so every belief is reachable; the applier re-validates
     the whole set."""
     if seeds is None:
@@ -1328,7 +1334,11 @@ def _decide_beliefs(nobs: list, row: int, seeds, turn, device) -> torch.Tensor |
             out[b, 1, 0], out[b, 1, 1] = c2, draw(o[_BELIEF_CLASSES[c2]], r_pick[1][b])
         elif o["enhance"]:
             want = [c for c in range(4) if o["held"][c] < 0 and o[_BELIEF_CLASSES[c]]]
-            for k, c in enumerate(want[:2]):
+            if not want:
+                continue
+            s0 = min(int(r_cls[b] * len(want)), len(want) - 1)
+            take = [want[(s0 + i) % len(want)] for i in range(min(int(o["enhance"]), len(want), 2))]
+            for k, c in enumerate(take):
                 out[b, k, 0], out[b, k, 1] = c, draw(o[_BELIEF_CLASSES[c]], r_pick[k][b])
     if not bool((out >= 0).any()):
         return None

@@ -102,6 +102,10 @@ export interface City {
    *  PILLAGE_BUILDING_REPAIR_PERCENT of its cost. ONE reader:
    *  `buildingPillaged`. Absent = none. */
   pillagedBuildings?: string[];
+  /** the game era each member of `buildings` that carries `yieldsPerEra`
+   *  was constructed or last repaired in (`stampBuildingEra`), by building
+   *  id. It rides the city through a capture or a flip. Absent = none. */
+  buildingEras?: Record<string, number>;
   districts: { type: DistrictId; tileIndex: number }[];
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
@@ -477,6 +481,10 @@ export interface Unit {
    *  survives an upgrade — which is what makes the upgrade discount
    *  meaningful. */
   levied?: boolean;
+  /** CIV6 (GOODY_METEOR_UNIT_REFUND_COST, IGNORE_RESOURCE_MAINTENANCE): a
+   *  Meteor Site's grant "has no resource maintenance cost" — it burns no
+   *  fuel and is never short of it, through any upgrade. */
+  noResourceUpkeep?: boolean;
   /** SPY STATE. `spyMission` is SPY_IDLE, SPY_TRAVELLING or a `SPY_MISSIONS`
    *  index; `spyTurns` is the clock it is running; `spyTarget` the centre tile
    *  it is in transit to; `spyLevel` its rank, capped at Master Spy. */
@@ -769,14 +777,16 @@ export interface ReligionState {
   founded: boolean;
   name: string | null;
   /** the religion's belief of each class (`BELIEF_CLASSES`), null until
-   *  adopted — founding takes the Follower and one other, enhancing the
-   *  rest. `worship` is the Worship BELIEF, which names the building. */
+   *  adopted — founding takes the Follower and one other, each Evangelize
+   *  Belief one more. `worship` is the Worship BELIEF, which names the
+   *  building. */
   follower: string | null;
   founder: string | null;
   worship: string | null;
   enhancer?: string | null;
-  /** the religion has been enhanced: latched once, never cleared. */
-  enhanced?: boolean;
+  /** the beliefs the religion has EARNED: RELIGION_INITIAL_BELIEFS at the
+   *  founding, one more per Apostle's Evangelize Belief. Absent = none. */
+  beliefsEarned?: number;
   holyTile?: number | null;
 }
 

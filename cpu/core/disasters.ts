@@ -6,7 +6,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { neighborTile, neighbors, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
-import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders } from './seats';
+import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders, campTiles } from './seats';
 import { raiseAidRequest } from './competition';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -21,8 +21,9 @@ import { disbandUnit } from './units';
 import { unitDomain } from './units';
 import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P, warmedWeight, RANDOM_EVENT_START_TURN } from '../data/disasters';
 import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_DURATION, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtCandidate, SOIL_REPLACES } from '../data/disasters';
-import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, eruptionRow } from '../data/disasters';
-import { KILIMANJARO_FEATURE, KILIMANJARO_WEIGHT } from '../data/disasters';
+import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER } from '../data/disasters';
+import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
+import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
 import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P } from '../data/disasters';
 import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
 import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
@@ -360,10 +361,12 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
 }
 
 /** The families of the turn's one draw. */
-export type EventFamily = 'flood' | 'kilimanjaro' | 'volcano' | 'storm' | 'accident' | 'drought';
+export type EventFamily = 'eruption' | 'flood' | 'storm' | 'accident' | 'drought' | 'meteor' | 'fire';
 
-/** One row of the turn's draw: its family, the severity (or, for a storm, the
- *  `STORM_EVENTS` index) and the weight each of its sites carries. */
+/** One row of the turn's draw: its family, the row within it (an eruption's
+ *  `ERUPTION_ROWS` index, a storm's `STORM_EVENTS` index, a fire's
+ *  `FIRE_START_FEATURE` index, else the severity) and the weight each of its
+ *  sites carries. */
 export interface EventRow {
   family: EventFamily;
   sev: number;
@@ -371,21 +374,30 @@ export interface EventRow {
 }
 
 /**
- * THE DRAW'S ROWS, in the install's `RandomEvents` table order — the three
- * floods, Kilimanjaro's two eruptions, the three eruptions, the eight storms,
- * the three nuclear accidents, the two droughts — at `degrees` of warming.
- * A flood, storm or drought row's weight grows by its own
- * `ChanceIncreasePerDegree` (`warmedWeight`); the eruptions and the accidents
- * carry no such column and hold still.
+ * THE DRAW'S ROWS, in the live game's `RandomEvents` order (MEASURED, the
+ * `index` column of every event history, `tools/civ6lab/runs/
+ * event_history_*`): Eyjafjallajokull's two eruptions (index 0-1), the three
+ * floods (2-4), Kilimanjaro's two eruptions and Vesuvius's (5-7), the
+ * volcano's three (8-10), the eight storms (11-18), the three nuclear
+ * accidents (19-21), the two droughts (22-23), then the pack's Meteor Shower,
+ * Jungle Fire and Forest Fire (31-33) — at `degrees` of warming. A flood,
+ * storm, drought or fire row's weight grows by its own
+ * `ChanceIncreasePerDegree` (`warmedWeight`); the eruptions, the accidents
+ * and the meteor carry no such column and hold still.
  */
 export function eventRows(degrees: number): EventRow[] {
   const rows: EventRow[] = [];
+  const eruption = (from: number, to: number) => {
+    for (let r = from; r < to; r++) rows.push({ family: 'eruption', sev: r, weight: ERUPTION_WEIGHT[r] });
+  };
+  eruption(0, 2);
   floodWeights(degrees).forEach((weight, sev) => rows.push({ family: 'flood', sev, weight }));
-  KILIMANJARO_WEIGHT.forEach((weight, sev) => rows.push({ family: 'kilimanjaro', sev, weight }));
-  ERUPTION_WEIGHT.forEach((weight, sev) => rows.push({ family: 'volcano', sev, weight }));
+  eruption(2, ERUPTION_ROWS.length);
   stormWeights(degrees).forEach((weight, sev) => rows.push({ family: 'storm', sev, weight }));
   ACCIDENT_WEIGHT.forEach((weight, sev) => rows.push({ family: 'accident', sev, weight }));
   DROUGHT_WEIGHT.forEach((w, sev) => rows.push({ family: 'drought', sev, weight: warmedWeight(w, DROUGHT_CIPD[sev], degrees) }));
+  rows.push({ family: 'meteor', sev: 0, weight: METEOR_WEIGHT });
+  FIRE_WEIGHT.forEach((w, sev) => rows.push({ family: 'fire', sev, weight: warmedWeight(w, FIRE_CIPD[sev], degrees) }));
   return rows;
 }
 
@@ -395,19 +407,43 @@ interface ReactorSite {
   city: City;
 }
 
-/** The sites every row can strike this turn. A storm or a drought is ONE site
- *  when its start plot exists anywhere (the centre is drawn after); a flood
- *  has one per river (`floodSites`), Kilimanjaro's eruption one per
- *  Kilimanjaro plot, an eruption one per volcano, an accident one per city
- *  whose reactor has reached the row's `MinTurnAtRisk` — whoever holds it, the
- *  Free Cities seat included — in ascending centre order. */
+/**
+ * May a Meteor Shower strike this plot? CIV6 (`RandomEvent_Terrains`) its
+ * Plains, Grassland, Snow or Desert, flat or hills and above the sea;
+ * (`AvoidTerritory`) nobody's plot; and room for the Meteor Site it leaves —
+ * bare or under a feature the site stands on (`Improvement_ValidFeatures`),
+ * no improvement, Tribal Village, Meteor Site or barbarian outpost there
+ * already. `_meteor_cands` is the twin.
+ */
+export function meteorCandidate(t: Tile, camps: ReadonlySet<number>): boolean {
+  if (isWater(t) || t.submerged || t.elevation === 'MOUNTAIN') return false;
+  if (!METEOR_TERRAINS.includes(t.terrain)) return false;
+  if (t.feature !== null && !METEOR_FEATURES.includes(t.feature)) return false;
+  if (METEOR_AVOIDS_TERRITORY && tileSeat(t) >= 0) return false;
+  return !t.improvement && !t.goodyHut && !t.meteor && !t.district && !t.builtWonder && !camps.has(t.index);
+}
+
+/** May fire row `row` start on this plot — a live plot of its feature above
+ *  the sea? The same test is the spread's (`fireTurn`). */
+function fireCandidate(t: Tile, row: number): boolean {
+  return t.feature === FIRE_START_FEATURE[row] && !t.submerged;
+}
+
+/** The sites every row can strike this turn. A storm, a drought, the meteor
+ *  and a fire is ONE site when its start plot exists anywhere (the plot is
+ *  drawn after); a flood has one per river (`floodSites`), a volcano's
+ *  eruption one per volcano, a natural wonder's one while the wonder stands
+ *  (its plots together), an accident one per city whose reactor has reached
+ *  the row's `MinTurnAtRisk` — whoever holds it, the Free Cities seat
+ *  included — in ascending centre order. */
 interface EventSites {
   flood: Tile[];
-  kilimanjaro: Tile[];
-  volcano: Tile[];
+  eruption: Tile[][][];  // per ERUPTION_ROWS row, its sites, each a site's plots
   storm: Tile[][];      // per family, the live start plots
   drought: Tile[];
   accident: ReactorSite[][];  // per severity
+  meteor: Tile[];
+  fire: Tile[][];       // per fire row, its live start plots
 }
 
 function eventSites(state: GameState): EventSites {
@@ -419,24 +455,32 @@ function eventSites(state: GameState): EventSites {
     }
   }
   reactors.sort((a, b) => a.city.centerIndex - b.city.centerIndex);
+  const volcanoes = map.tiles.filter((t) => t.volcano).map((t) => [t]);
+  const camps = campTiles(state);
   return {
     flood: floodSites(map),
-    kilimanjaro: map.tiles.filter((t) => t.feature === KILIMANJARO_FEATURE),
-    volcano: map.tiles.filter((t) => t.volcano),
+    eruption: ERUPTION_WONDER.map((w) => {
+      if (!w) return volcanoes;
+      const plots = map.tiles.filter((t) => t.feature === w);
+      return plots.length ? [plots] : [];
+    }),
     storm: STORM_FAMILIES.map((f) => map.tiles.filter((t) => stormFamilyAt(t) === f)),
     drought: map.tiles.filter((t) => droughtCandidate(t)),
     accident: ACCIDENT_MIN_TURN.map((gate) => reactors.filter((r) => (r.city.reactorAge ?? 0) >= gate)),
+    meteor: map.tiles.filter((t) => meteorCandidate(t, camps)),
+    fire: FIRE_START_FEATURE.map((_f, row) => map.tiles.filter((t) => fireCandidate(t, row))),
   };
 }
 
 function siteCount(sites: EventSites, row: EventRow): number {
   switch (row.family) {
     case 'flood': return sites.flood.length;
-    case 'kilimanjaro': return sites.kilimanjaro.length;
-    case 'volcano': return sites.volcano.length;
+    case 'eruption': return sites.eruption[row.sev].length;
     case 'storm': return sites.storm[STORM_FAMILIES.indexOf(STORM_EVENTS[row.sev].family)].length > 0 ? 1 : 0;
     case 'accident': return sites.accident[row.sev].length;
     case 'drought': return sites.drought.length > 0 ? 1 : 0;
+    case 'meteor': return sites.meteor.length > 0 ? 1 : 0;
+    case 'fire': return sites.fire[row.sev].length > 0 ? 1 : 0;
   }
 }
 
@@ -447,8 +491,8 @@ function siteCount(sites: EventSites, row: EventRow): number {
  * ONE draw `x = r * total` walks the rows in table order: the row whose
  * cumulative weight first exceeds `x` fires, at site
  * `floor((x - weight before it) / row weight)`. Nothing eligible, nothing
- * fires; the draw is spent every turn either way. The storm's and the
- * drought's centre is a second draw over their start plots.
+ * fires; the draw is spent every turn either way. The storm's, the drought's,
+ * the meteor's and the fire's plot is a second draw over their start plots.
  */
 function randomEvent(state: GameState, strip: boolean): void {
   const rows = eventRows(warmingDegrees(state));
@@ -478,12 +522,8 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
       log(state, `Flood at (${start.col}, ${start.row}) — ${reach.length} floodplain tiles along the river.`);
       return;
     }
-    case 'kilimanjaro': {
-      erupt(state, sites.kilimanjaro[k], eruptionRow('kilimanjaro', row.sev));
-      return;
-    }
-    case 'volcano': {
-      erupt(state, sites.volcano[k], eruptionRow('volcano', row.sev));
+    case 'eruption': {
+      erupt(state, sites.eruption[row.sev][k], row.sev);
       return;
     }
     case 'storm': {
@@ -506,6 +546,89 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
       const site = sites.accident[row.sev][k];
       nuclearAccident(state, site.seat, site.city, row.sev);
       return;
+    }
+    case 'meteor': {
+      const at = pick(state, sites.meteor);
+      if (!at) return;
+      at.meteor = true;
+      log(state, `Meteor shower at (${at.col}, ${at.row}) — a Meteor Site lies there.`);
+      return;
+    }
+    case 'fire': {
+      const at = pick(state, sites.fire[row.sev]);
+      if (!at) return;
+      ignite(at, state.turn);
+      log(state, `Fire at (${at.col}, ${at.row}).`);
+      return;
+    }
+  }
+}
+
+/** A plot catches fire on the clock of the fire that began on `start`: its
+ *  Woods or Rainforest becomes the burning form (`RandomEvent_Yields` Turn 0,
+ *  Amount 0 — burning pays nothing). */
+function ignite(t: Tile, start: number): void {
+  const row = FIRE_START_FEATURE.indexOf(t.feature ?? '');
+  t.feature = FIRE_BURNING_FEATURE[row] as Tile['feature'];
+  t.fireStart = start;
+}
+
+/**
+ * THE FIRES' TURN, after the draw: every plot on fire, on its fire's clock
+ * (`age` = turns since the fire began). SPREAD first: each plot burning at an
+ * age in `FIRE_SPREAD_TURNS` — the list taken before any spreads, so a plot
+ * caught this turn does not spread this turn — draws once per adjacent live
+ * Woods or Rainforest, in direction order, and at `FIRE_SPREAD_P` sets it
+ * burning on the same clock. Then each plot on fire, in ascending order: a
+ * BURNING plot draws once for the UNIT_DAMAGE_LAND band and takes the rows
+ * whose turns hold its age — its improvement and district pillaged, its
+ * civilians killed and land units struck, and at `FIRE_POP_TURN` one citizen
+ * of the owning city — then at `FIRE_BURNT_TURN` turns burnt, +1 Food; a
+ * BURNT plot at `FIRE_REGROW_TURN` regrows its feature, +1 Production, and
+ * the record goes. A plot whose fire's feature is gone keeps no record.
+ */
+function fireTurn(state: GameState): void {
+  const map = state.map;
+  const spreading = map.tiles.filter((t) => {
+    if (t.fireStart === undefined || !FIRE_BURNING_FEATURE.includes(t.feature ?? '')) return false;
+    const age = state.turn - t.fireStart;
+    return age >= FIRE_SPREAD_TURNS[0] && age <= FIRE_SPREAD_TURNS[1];
+  });
+  for (const t of spreading) {
+    for (const n of neighbors(map, t)) {
+      const row = FIRE_START_FEATURE.indexOf(n.feature ?? '');
+      if (row < 0 || !fireCandidate(n, row)) continue;
+      if (nextRandom(state) < FIRE_SPREAD_P) ignite(n, t.fireStart!);
+    }
+  }
+  for (const t of map.tiles) {
+    if (t.fireStart === undefined) continue;
+    const age = state.turn - t.fireStart;
+    const burning = FIRE_BURNING_FEATURE.indexOf(t.feature ?? '');
+    const burnt = FIRE_BURNT_FEATURE.indexOf(t.feature ?? '');
+    if (burning >= 0) {
+      const rDamage = nextRandom(state);
+      if (age >= FIRE_DAMAGE_TURNS[0] && age <= FIRE_DAMAGE_TURNS[1]) {
+        scorch(state, t);
+        pillageDistrict(state, t);
+        const dmg = FIRE_DMG[0] + Math.floor(rDamage * (FIRE_DMG[1] - FIRE_DMG[0] + 1));
+        strikeUnits(state, t, tileSeat(t), { land: true, naval: false, civ: true, landDmg: dmg, navalDmg: 0 }, null);
+      }
+      if (age === FIRE_POP_TURN) losePopulation(state, t);
+      if (age >= FIRE_BURNT_TURN) {
+        t.feature = FIRE_BURNT_FEATURE[burning] as Tile['feature'];
+        fertilize(state, t);
+      }
+    } else if (burnt >= 0) {
+      if (age >= FIRE_REGROW_TURN) {
+        t.feature = FIRE_START_FEATURE[burnt] as Tile['feature'];
+        t.fireStart = undefined;
+        if (fertilityLive(state) && !isWater(t) && t.elevation !== 'MOUNTAIN') {
+          t.fertilityProd = Math.min(FERTILITY_CAP, t.fertilityProd + 1);
+        }
+      }
+    } else {
+      t.fireStart = undefined;
     }
   }
 }
@@ -542,14 +665,34 @@ function droughtTile(state: GameState, t: Tile, sev: number, turns: number, stri
 }
 
 /**
- * AN ERUPTION of a volcano or of Kilimanjaro, at `ERUPTION_ROWS` row `row`.
- * CIV6 (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): one
- * draw per eligible ring plot, in ring order, at the row's paint chance; then
- * each ring plot, in ring order, takes the row's damage (`eruptTile`) and is
- * fertilized.
+ * The RING an eruption strikes: every plot touching one of `plots` (a
+ * volcano's one plot, or a natural wonder's), none of them itself — each plot
+ * in ascending order, its neighbours in direction order, a plot met twice
+ * taken once.
  */
-export function erupt(state: GameState, volcano: Tile, row: number): void {
-  const ring = neighbors(state.map, volcano);
+export function eruptionRing(map: GameMap, plots: readonly Tile[]): Tile[] {
+  const skip = new Set(plots.map((p) => p.index));
+  const out: Tile[] = [];
+  for (const p of [...plots].sort((a, b) => a.index - b.index)) {
+    for (const n of neighbors(map, p)) {
+      if (skip.has(n.index)) continue;
+      skip.add(n.index);
+      out.push(n);
+    }
+  }
+  return out;
+}
+
+/**
+ * AN ERUPTION of a volcano or of a natural wonder (`plots`, its plots), at
+ * `ERUPTION_ROWS` row `row`. CIV6 (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL,
+ * `ReplaceFeature`): one draw per eligible ring plot, in ring order, at the
+ * row's paint chance; then each ring plot, in ring order, takes the row's
+ * damage (`eruptTile`) and is fertilized.
+ */
+export function erupt(state: GameState, plots: readonly Tile[], row: number): void {
+  const ring = eruptionRing(state.map, plots);
+  const volcano = plots[0];
   for (const n of ring) {
     if (soilPaintable(n) && nextRandom(state) < ERUPTION_PAINT_P[row]) paintVolcanicSoil(n);
   }
@@ -643,6 +786,7 @@ export function disasterPhase(state: GameState): void {
   // CIV6 (RANDOM_EVENT_START_TURN): no event fires before its first turn, and
   // no draw is spent
   if (state.turn >= RANDOM_EVENT_START_TURN) randomEvent(state, strip);
+  fireTurn(state);
   // CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
   // storm lives three turns. ENTRY: the footprint at the strike plot.
   // MOVEMENT: the centre walks `STORM_MOVEMENT` unit steps, then the

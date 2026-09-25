@@ -342,6 +342,11 @@ export interface Modifiers {
   buildingHousingAdd: Partial<Record<string, number>>;
   riverCity: { amenities: number; housing: number } | null;
   faithPerWonder: number;
+  /** a belief's capital yields per completed district of a type in the
+   *  seat's cities (Lay Ministry), and per city holding a completed World
+   *  Wonder (Sacred Places) — counted live by `beliefCapitalYields`. */
+  beliefPerDistrict: Partial<Record<DistrictId, Partial<Yields>>>;
+  beliefPerWonderCity: Partial<Yields>;
   districtYieldAdd: Partial<Record<DistrictId, Partial<Yields>>>;
   prodBoosts: ProdBoost[];
   builderCharges: number;
@@ -576,6 +581,8 @@ export function defaultModifiers(): Modifiers {
     buildingHousingAdd: {},
     riverCity: null,
     faithPerWonder: 0,
+    beliefPerDistrict: {},
+    beliefPerWonderCity: {},
     districtYieldAdd: {},
     prodBoosts: [],
     builderCharges: 0,
@@ -1341,6 +1348,10 @@ function applyBeliefEffects(
       mods.capitalYields[key] = (mods.capitalYields[key] ?? 0) + (v ?? 0) * n;
     }
   }
+  for (const [d, y] of Object.entries(fx.perDistrict ?? {})) {
+    addPartial((mods.beliefPerDistrict[d as DistrictId] ??= {}), y);
+  }
+  if (fx.perWonderCity) addPartial(mods.beliefPerWonderCity, fx.perWonderCity);
 }
 
 /** Count the wonder-granted policy slots, by kind — the LIVE adoption and

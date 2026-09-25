@@ -10,7 +10,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { chassisAbilityCS, mayCapture } from '../../../cpu/core/combat';
 import { routePlunderer } from '../../../cpu/core/trade';
 import { UNITS } from '../../../cpu/data/units';
-import { GAME_SPEED } from '../../../cpu/data/constants';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
 /** id -> [civ, replaces|null, cost, moves, combat] straight off Units.xml. */
@@ -50,7 +50,7 @@ describe('the unique sea and air catalog', () => {
       expect(d, `${id} has no catalog row`).toBeTruthy();
       expect(d.uniqueTo, `${id} names the wrong civilization`).toBe(civ);
       expect(d.replaces ?? null, `${id} replaces the wrong chassis`).toBe(replaces);
-      expect(d.cost, `${id} cost`).toBe(Math.round(cost * GAME_SPEED));
+      expect(d.cost, `${id} cost`).toBe(scaleByGameSpeed(cost));
       expect(d.moves, `${id} moves`).toBe(moves);
       expect(d.combat, `${id} combat`).toBe(combat);
       if (replaces) expect(d.upgradesTo, `${id} upgrade`).toBe(UNITS[replaces].upgradesTo);

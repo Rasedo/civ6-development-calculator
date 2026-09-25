@@ -92,15 +92,24 @@ def main() -> None:
             assert int(row.get("rp", -1)) == -1, "step 1 (Earth Satellite) has no requiresProject"
         else:
             assert int(row.get("rp", -1)) == space[k - 1][0], f"space step {k} must require the previous step"
-    # THE REAL PRICES (GS 900/1500/1800/2100 and 600, x0.6 game speed); base
-    # rows carry pc -1 = the generic curve.
-    assert [int(r.get("pc", -1)) for _, r in space] == [540, 900, 1080, 1260], \
-        f"space prices off: {[int(r.get('pc', -1)) for _, r in space]}"
+    # THE REAL PRICES (GS 900/1500/1800/2100 and 600), each at the speed;
+    # a district project carries its own row (Cost 25 + 1500 x progress),
+    # the repair pc -1 (priced by the HP it restores).
+    sp = rules.scale_by_game_speed
+    assert [int(r["pc"]) for _, r in space] == [sp(900), sp(1500), sp(1800), sp(2100)], \
+        f"space prices off: {[int(r['pc']) for _, r in space]}"
     for i, row in lasers:
-        assert int(row.get("pc", -1)) == 360, f"laser row {i} price: {row}"
+        assert int(row["pc"]) == sp(600), f"laser row {i} price: {row}"
         assert int(row.get("rt", -1)) >= 0 and int(row["spc"]) == 0, f"laser row {i} gating: {row}"
-    assert all(int(r.get("pc", -1)) == -1 for i, r in enumerate(rows) if i < base_n and not int(r.get("ls", 0)) and not int(r.get("rec", 0))), \
-        "base projects must keep the generic curve (pc -1)"
+    for i, r in enumerate(rows):
+        if int(r["g"]) >= 0:
+            # the six district projects, the rows that pay a Great Person class
+            assert (int(r["pc"]), int(r["pcg"])) == (sp(25), sp(1500)), \
+                f"district project row {i} is not Cost 25 + 1500 x progress: {r}"
+        elif int(r.get("rep", 0)):
+            assert int(r["pc"]) == -1, f"the repair is priced by the HP it restores: {r}"
+        else:
+            assert int(r["pc"]) >= 0, f"row {i} carries no Cost of its own: {r}"
 
     # --- 2) engine metadata mirrors the exported chain ---------------------
     sim = mk()
@@ -118,7 +127,7 @@ def main() -> None:
     for name in ("project_done", "space_ly", "civ_orbital_lasers", "city_lasers"):
         assert name in _MUTABLE, f"{name} must be registered in _MUTABLE"
     assert sim.project_done.shape == (sim.B, sim.n_majors, len(once)), f"project_done shape {tuple(sim.project_done.shape)}"
-    assert int(sim.rules.space_ly_target) == 30, "the craft's distance: 50 LY x 0.6 game speed"
+    assert int(sim.rules.space_ly_target) == sp(50), "the craft's distance: SCIENCE_VICTORY_POINTS_REQUIRED 50 at the speed"
     assert bool((sim.space_ly == -1).all()), "no craft is in flight at the start"
 
     # --- 2a) THE SPACEPORT scaffold row ------------------------------------
@@ -127,7 +136,7 @@ def main() -> None:
     _di, spt_ut, _uc, spt_plc, spt_fc = spt_row
     assert spt_ut == int(space[0][1]["rt"]), "the Spaceport unlocks with step 1's own tech (Rocketry)"
     assert spt_plc == 4, f"the Spaceport's placement code is 4 (flat land), got {spt_plc}"
-    assert spt_fc == 1080, f"the Spaceport's FLAT price is 1800 x 0.6 = 1080, got {spt_fc}"
+    assert spt_fc == sp(1800), f"the Spaceport's FLAT price is 1800 at the speed, got {spt_fc}"
     assert not bool(sim._is_specialty[spt_didx]), "the Spaceport must not count toward the specialty cap"
     # The flat-land surface: placement 4 is exactly the plain surface minus
     # Hills, for any city that could place on the plain surface at all.
@@ -160,8 +169,8 @@ def main() -> None:
     sq.apply_seat_actions(rq, production=pr, production_tile=dt)
     sq._seat_record_apply(rq, torch.ones(1, dtype=torch.bool))
     assert int(sq.city_current[0, rq, jq, 0]) == sq.DISTRICT_BASE + spt_si, "the Spaceport column did not queue"
-    assert float(sq.city_cost[0, rq, jq, 0]) == 1080.0, \
-        f"the Spaceport must queue at its FLAT price 1080, got {float(sq.city_cost[0, rq, jq, 0])}"
+    assert float(sq.city_cost[0, rq, jq, 0]) == float(sp(1800)), \
+        f"the Spaceport must queue at its FLAT price {sp(1800)}, got {float(sq.city_cost[0, rq, jq, 0])}"
     assert int(sq.city_dist_tile[0, rq, jq, spt_didx]) == tq, "the registry missed the Spaceport's tile"
 
     # --- 2b) _once_step_ok — the `availableProjects` space arm, term by term
@@ -240,14 +249,14 @@ def main() -> None:
     sim2._seat_phase()
     assert bool(sim2.project_done[0, r + 1, last_step]), "civ's victory step must land in project_done"
     assert int(sim2.space_ly[0, r + 1]) == 0, "completing the Exoplanet Expedition LAUNCHES (space_ly = 0)"
-    assert int(sim2.victory_type[0]) == 0, "the launch alone must NOT win — the craft has 30 LY to fly"
+    assert int(sim2.victory_type[0]) == 0, "the launch alone must NOT win — the craft has its distance to fly"
     assert not bool(sim2.game_over[0]), "the game runs on while the craft flies"
 
     # --- 3a) THE FLIGHT: 1 LY/turn, +1 per laser, win on arrival ------------
     tgt = int(sim2.rules.space_ly_target)
     sim2.step()
     assert int(sim2.space_ly[0, r + 1]) == 1, "the craft covers 1 LY/turn at base speed"
-    assert int(sim2.victory_type[0]) == 0, "1 of 30 LY is not an arrival"
+    assert int(sim2.victory_type[0]) == 0, "1 LY is not an arrival"
     # an ORBITAL station pays whatever happens; a TERRESTRIAL one in a city
     # that cannot meet its own load pays nothing at all
     sim2.civ_orbital_lasers[0, r + 1] = 2
@@ -379,9 +388,10 @@ def main() -> None:
         and int(s.city_lasers[0, 1, 0]) == 0, \
         "restore must roll the flight state back to the snapshot"
 
-    print("space_race_test OK — Spaceport (flat land, flat 1080), real prices 540/900/1080/1260 (+360 lasers), "
+    print("space_race_test OK — Spaceport (flat land, flat 1800 at the speed), real prices 900/1500/1800/2100 "
+          "(+600 lasers) at the speed, "
           "the truth table, THE MASK OFFERS IT (tech + launched craft), the reveal/culture/nothing side effects, "
-          "launch -> 30 LY flight (+1 per orbital station, +1 per POWERED terrestrial one) -> victoryType 3 on "
+          "launch -> SCIENCE_VICTORY_POINTS_REQUIRED LY flight (+1 per orbital station, +1 per POWERED terrestrial one) -> victoryType 3 on "
           "ARRIVAL, tie to the lowest row, preservation, _MUTABLE round-trip")
 
 

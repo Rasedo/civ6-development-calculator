@@ -481,32 +481,58 @@ const RAW_STORM_UNIT_ROWS: readonly StormUnitRow[] = [
 export const STORM_UNIT_ROWS: readonly StormUnitRow[] =
   RAW_STORM_UNIT_ROWS.map((r) => ({ ...r, src: stormUnitSrc(r) }));
 
-/** One weight per eruption severity, GENTLE / CATASTROPHIC / MEGACOLOSSAL:
- *  4 / 2.5 / 1.5, each counted once per volcano. The rows' paint and damage
- *  are `ERUPTION_ROWS` 2 to 4. */
-export const ERUPTION_WEIGHT = srcConst('disasters.eruptionWeight', [4, 2.5, 1.5] as const, {
-  derived: 'each eruption row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE, in severity order',
-  inputs: [freq('VOLCANO_GENTLE'), freq('VOLCANO_CATASTROPHIC'), freq('VOLCANO_MEGACOLOSSAL')],
+/**
+ * THE EIGHT ERUPTION ROWS, in the live game's `RandomEvents` order (MEASURED,
+ * the `index` of every event history, `tools/civ6lab/runs/event_history_*`):
+ * Eyjafjallajokull's CATASTROPHIC and MEGACOLOSSAL (`VikingsLandmarks_
+ * Expansion2.xml`, criteria VikingLandmarks_Expansion2 = RULESET_EXPANSION_2,
+ * so every Gathering Storm game loads them), Kilimanjaro's GENTLE and
+ * CATASTROPHIC, Vesuvius's MEGACOLOSSAL, then the volcano's GENTLE,
+ * CATASTROPHIC and MEGACOLOSSAL. Every `ERUPTION_*` column below is indexed by
+ * this row.
+ */
+export const ERUPTION_ROWS = ['EYJAFJALLAJOKULL_CATASTROPHIC', 'EYJAFJALLAJOKULL_MEGACOLOSSAL',
+  'KILIMANJARO_GENTLE', 'KILIMANJARO_CATASTROPHIC', 'VESUVIUS_MEGACOLOSSAL',
+  'VOLCANO_GENTLE', 'VOLCANO_CATASTROPHIC', 'VOLCANO_MEGACOLOSSAL'] as const;
+/** the `ERUPTION_ROWS` index of a volcano's severity row (GENTLE 0,
+ *  CATASTROPHIC 1, MEGACOLOSSAL 2) */
+export function volcanoRow(sev: number): number {
+  return ERUPTION_ROWS.indexOf(`VOLCANO_${['GENTLE', 'CATASTROPHIC', 'MEGACOLOSSAL'][sev]}` as typeof ERUPTION_ROWS[number]);
+}
+
+/** Each row's weight in the turn's one draw, its OccurrencesPerGame at
+ *  MODERATE, counted once per SITE: a volcano's rows once per volcano, a
+ *  natural wonder's rows once while the wonder stands. */
+export const ERUPTION_WEIGHT = srcConst('disasters.eruptionWeight', [4, 2.5, 4, 2.5, 7, 4, 2.5, 1.5] as const, {
+  derived: 'each ERUPTION_ROWS row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE, in row order',
+  inputs: ERUPTION_ROWS.map((r) => freq(r)),
 });
 
 /**
- * THE FIVE ERUPTION ROWS, in the install's `RandomEvents` order — Kilimanjaro's
- * GENTLE and CATASTROPHIC, then the volcano's GENTLE, CATASTROPHIC and
- * MEGACOLOSSAL. Every `ERUPTION_*` column below is indexed by this row
- * (`eruptionRow`).
+ * CIV6 (`RandomEvents.NaturalWonder`): the natural wonder a row erupts, as this
+ * engine names the feature — FEATURE_EYJAFJALLAJOKULL, FEATURE_KILIMANJARO
+ * (MOUNT_KILIMANJARO), FEATURE_VESUVIUS; empty on a volcano's row, which
+ * erupts a volcano plot. A wonder is ONE site however many plots it covers
+ * (Eyjafjallajokull covers two: lab 4's four eruptions in 251 turns fit one
+ * site at 6.5, not two), and its ring is every plot touching one of its
+ * plots (`Callback GetAffectedPlots_NaturalWonder`). The seeder places no
+ * Eyjafjallajokull and no Vesuvius, and the feature roster carries neither,
+ * so their rows have no site in any world yet.
  */
-export const ERUPTION_ROWS = ['KILIMANJARO_GENTLE', 'KILIMANJARO_CATASTROPHIC',
-  'VOLCANO_GENTLE', 'VOLCANO_CATASTROPHIC', 'VOLCANO_MEGACOLOSSAL'] as const;
-/** the `ERUPTION_ROWS` index of Kilimanjaro's or a volcano's severity row */
-export function eruptionRow(family: 'kilimanjaro' | 'volcano', sev: number): number {
-  return family === 'kilimanjaro' ? sev : 2 + sev;
-}
+export const ERUPTION_WONDER: readonly string[] = srcConst('disasters.eruptionWonder',
+  ['EYJAFJALLAJOKULL', 'EYJAFJALLAJOKULL', 'MOUNT_KILIMANJARO', 'MOUNT_KILIMANJARO', 'VESUVIUS', '', '', ''], {
+    derived: 'each ERUPTION_ROWS row\'s RandomEvents.NaturalWonder as the engine feature id (the install\'s '
+      + 'FEATURE_ prefix dropped, FEATURE_KILIMANJARO spelled MOUNT_KILIMANJARO); a volcano row carries none '
+      + 'and reads the empty id',
+    inputs: ERUPTION_ROWS.map((r) => xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${r}`, 'NaturalWonder',
+      r.startsWith('VOLCANO') ? { absent: true } : undefined)),
+  });
 
 /** CIV6 (`RandomEvent_Yields`, `ReplaceFeature="true"`): each row's
- *  FEATURE_VOLCANIC_SOIL YIELD_FOOD row, 50 / 50 and 35 / 50 / 75. Measured
- *  as a PER-PLOT chance that an eligible land plot of the ring becomes
- *  Volcanic Soil (bare land 30 / 52 / 74 % over 66 plots, the volcano's). */
-export const ERUPTION_PAINT_P = srcConst('disasters.eruptionPaintP', [0.5, 0.5, 0.35, 0.5, 0.75] as const, {
+ *  FEATURE_VOLCANIC_SOIL YIELD_FOOD row. Measured as a PER-PLOT chance that
+ *  an eligible land plot of the ring becomes Volcanic Soil (bare land
+ *  30 / 52 / 74 % over 66 plots, the volcano's). */
+export const ERUPTION_PAINT_P = srcConst('disasters.eruptionPaintP', [0.5, 0.75, 0.5, 0.5, 0.25, 0.35, 0.5, 0.75] as const, {
   derived: 'Percentage/100 of each eruption row\'s FEATURE_VOLCANIC_SOIL YIELD_FOOD row, read as the '
     + 'per-plot paint chance the volcano scene measured (tools/civ6lab/runs/volcano_20260923T191337Z.jsonl)',
   inputs: ERUPTION_ROWS.map((r) => xml('RandomEvent_Yields',
@@ -515,10 +541,10 @@ export const ERUPTION_PAINT_P = srcConst('disasters.eruptionPaintP', [0.5, 0.5, 
 
 /**
  * THE ERUPTION'S DAMAGE ROWS (`RandomEvent_Damages`), per `ERUPTION_ROWS`
- * index, applied to every plot of the radius-1 ring (`RealismSettings.
- * ExtraRange` is false at MODERATE, so `ExtraRangePercentage` never reads)
- * the way the flood's rows are applied: IMPROVEMENT_PILLAGED 100 on every
- * row, then IMPROVEMENT_DESTROYED, DISTRICT_PILLAGED and BUILDING_PILLAGED,
+ * index, applied to every plot of the ring (`RealismSettings.ExtraRange` is
+ * false at MODERATE, so `ExtraRangePercentage` never reads) the way the
+ * flood's rows are applied: IMPROVEMENT_PILLAGED 100 on every row, then
+ * IMPROVEMENT_DESTROYED, DISTRICT_PILLAGED and BUILDING_PILLAGED,
  * UNIT_DAMAGE_LAND's band on the land units (and CITY_GARRISON / CITY_WALLS,
  * the same band on every row, on a city centre), UNIT_KILLED_CIVILIAN and
  * POPULATION_LOSS. The GENTLE rows carry only the two pillage rows; a damage
@@ -531,18 +557,18 @@ const eruptPct = (name: string, kind: string, v: readonly number[]) => srcConst(
   derived: `Percentage/100 of each eruption row's ${kind} row; a GENTLE row carries none and reads 0`,
   inputs: eruptDmg(kind),
 });
-export const ERUPTION_DESTROY_P = eruptPct('eruptionDestroyP', 'IMPROVEMENT_DESTROYED', [0, 0.8, 0, 0.75, 0.8]);
-export const ERUPTION_DISTRICT_P = eruptPct('eruptionDistrictP', 'DISTRICT_PILLAGED', [0, 0.8, 0, 0.75, 0.8]);
-export const ERUPTION_BLDG_P = eruptPct('eruptionBldgP', 'BUILDING_PILLAGED', [1, 1, 1, 1, 1]);
-export const ERUPTION_POP_P = eruptPct('eruptionPopP', 'POPULATION_LOSS', [0, 0.2, 0, 0.2, 0.35]);
-export const ERUPTION_CIV_KILL_P = eruptPct('eruptionCivKillP', 'UNIT_KILLED_CIVILIAN', [0, 0.2, 0, 0.2, 0.35]);
+export const ERUPTION_DESTROY_P = eruptPct('eruptionDestroyP', 'IMPROVEMENT_DESTROYED', [0.75, 0.8, 0, 0.8, 0.8, 0, 0.75, 0.8]);
+export const ERUPTION_DISTRICT_P = eruptPct('eruptionDistrictP', 'DISTRICT_PILLAGED', [0.75, 0.8, 0, 0.8, 0.8, 0, 0.75, 0.8]);
+export const ERUPTION_BLDG_P = eruptPct('eruptionBldgP', 'BUILDING_PILLAGED', [1, 1, 1, 1, 1, 1, 1, 1]);
+export const ERUPTION_POP_P = eruptPct('eruptionPopP', 'POPULATION_LOSS', [0.3, 0.4, 0, 0.2, 1, 0, 0.2, 0.35]);
+export const ERUPTION_CIV_KILL_P = eruptPct('eruptionCivKillP', 'UNIT_KILLED_CIVILIAN', [0.3, 0.4, 0, 0.2, 1, 0, 0.2, 0.35]);
 const eruptBand = (name: string, col: 'MinHP' | 'MaxHP', v: readonly number[]) => srcConst(`disasters.${name}`, v, {
   derived: `each eruption row's UNIT_DAMAGE_LAND ${col}, inclusive; CITY_GARRISON and CITY_WALLS carry the `
     + 'same band on every row, so one roll serves all three; a GENTLE row carries none and reads 0',
   inputs: [...eruptDmg('UNIT_DAMAGE_LAND', col), ...eruptDmg('CITY_GARRISON', col), ...eruptDmg('CITY_WALLS', col)],
 });
-export const ERUPTION_DMG_LO = eruptBand('eruptionDmgLo', 'MinHP', [0, 40, 0, 40, 60]);
-export const ERUPTION_DMG_HI = eruptBand('eruptionDmgHi', 'MaxHP', [0, 60, 0, 60, 80]);
+export const ERUPTION_DMG_LO = eruptBand('eruptionDmgLo', 'MinHP', [40, 60, 0, 40, 70, 0, 40, 60]);
+export const ERUPTION_DMG_HI = eruptBand('eruptionDmgHi', 'MaxHP', [60, 80, 0, 60, 90, 0, 60, 80]);
 /** The features an eruption's soil REPLACES — Woods and Rainforest (the
  *  install's FOREST and JUNGLE), measured replaced at 6/28, 11/28, 18/28;
  *  Floodplains and Geothermal Fissure are never painted (0/18). */
@@ -550,19 +576,163 @@ export const SOIL_REPLACES: readonly string[] = srcConst('disasters.soilReplaces
   lab: 'runs/volcano_20260923T191337Z.jsonl',
 });
 
-/** KILIMANJARO's eruptions, GENTLE / CATASTROPHIC: rows of their own
- *  (`RandomEvents.NaturalWonder` FEATURE_KILIMANJARO, this engine's
- *  MOUNT_KILIMANJARO), between the floods and the volcanoes in the table's
- *  order. Weights 4 / 2.5, each counted once per Kilimanjaro plot; their
- *  paint and damage are `ERUPTION_ROWS` 0 and 1. */
-export const KILIMANJARO_FEATURE = srcConst('disasters.kilimanjaroFeature', 'MOUNT_KILIMANJARO', {
-  derived: 'the engine feature id of the rows\' NaturalWonder FEATURE_KILIMANJARO',
-  inputs: [xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_KILIMANJARO_GENTLE', 'NaturalWonder'),
-    xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_KILIMANJARO_CATASTROPHIC', 'NaturalWonder')],
+/**
+ * THE GATHERING STORM PACK ROWS (`DLC/GranColombia_Maya/Data/
+ * GranColombia_Maya_Expansion2.xml`): its .modinfo applies the file under
+ * criteria GranColombiaMaya_Expansion2, `any="1"` over RuleSetInUse
+ * RULESET_EXPANSION_2, so every Gathering Storm game on the owner's install
+ * loads the Meteor Shower, the Jungle Fire and the Forest Fire. Only the
+ * `*_MODE.xml` files (Apocalypse) stay out.
+ */
+
+/** RANDOM_EVENT_METEOR_SHOWER: weight 6, no ChanceIncreasePerDegree. ONE site
+ *  while a plot it may strike exists anywhere (lab 4 fired it 7 times in 251
+ *  turns — its column, not a per-plot rate); the plot is a second draw. */
+export const METEOR_WEIGHT = srcConst('disasters.meteorWeight', 6, freq('METEOR_SHOWER'));
+/** CIV6 (`RandomEvent_Terrains`): the meteor falls on Plains, Grassland,
+ *  Snow or Desert, flat or hills — the eight rows, no Tundra, no Mountain. */
+export const METEOR_TERRAINS: readonly string[] = srcConst('disasters.meteorTerrains',
+  ['PLAINS', 'GRASSLAND', 'SNOW', 'DESERT'], {
+    derived: 'the RandomEvent_Terrains rows of RANDOM_EVENT_METEOR_SHOWER as engine terrains, each listed '
+      + 'flat and _HILLS (TERRAIN_GRASS is GRASSLAND)',
+    inputs: ['PLAINS', 'PLAINS_HILLS', 'GRASS', 'GRASS_HILLS', 'SNOW', 'SNOW_HILLS', 'DESERT', 'DESERT_HILLS']
+      .map((t) => xml('RandomEvent_Terrains', `RandomEventType=RANDOM_EVENT_METEOR_SHOWER&TerrainType=TERRAIN_${t}`,
+        'TerrainType', { expect: `TERRAIN_${t}` })),
+  });
+/** CIV6 (`Improvement_ValidFeatures`): the Meteor Site the shower leaves
+ *  (`RandomEvent_Improvement_Placements` IMPROVEMENT_METEOR_GOODY) stands on
+ *  bare ground or under Woods, Rainforest or Marsh — any other feature (a
+ *  natural wonder, Floodplains, a fire's) refuses it. */
+export const METEOR_FEATURES: readonly string[] = srcConst('disasters.meteorFeatures',
+  ['WOODS', 'RAINFOREST', 'MARSH'], {
+    derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_METEOR_GOODY as engine features '
+      + '(FEATURE_FOREST is WOODS, FEATURE_JUNGLE is RAINFOREST)',
+    inputs: ['FOREST', 'JUNGLE', 'MARSH'].map((f) => xml('Improvement_ValidFeatures',
+      `ImprovementType=IMPROVEMENT_METEOR_GOODY&FeatureType=FEATURE_${f}`, 'FeatureType', { expect: `FEATURE_${f}` })),
+  });
+/** CIV6 (`RandomEvents.AvoidTerritory`): the meteor falls outside every
+ *  player's borders — "in the space between player territories" (the
+ *  Environmental Effects pedia). The site's IMPROVEMENT_PILLAGED and
+ *  DISTRICT_PILLAGED rows (101) therefore never find anything to take: the
+ *  plot holds no improvement and no district. */
+export const METEOR_AVOIDS_TERRITORY = srcConst('disasters.meteorAvoidsTerritory', true,
+  xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_METEOR_SHOWER', 'AvoidTerritory'));
+/** CIV6 (GOODY_METEOR_FREE_UNIT, MODIFIER_PLAYER_GRANT_ADVANCED_UNIT_OF_CLASS_
+ *  IN_NEAREST_OWNER_CITY_AND_APPLY_ABILITY, `UnitPromotionClassType`): a unit
+ *  that enters the site is granted a Heavy Cavalry unit in its nearest city,
+ *  "more powerful than what the player can currently build"
+ *  (LOC_IMPROVEMENT_METEOR_GOODY_DESCRIPTION), and "This unit has no resource
+ *  maintenance cost" (GOODY_METEOR_UNIT_REFUND_COST, IGNORE_RESOURCE_
+ *  MAINTENANCE). `meteorGrantUnit` reads "more powerful" as the next unit of
+ *  the class's line past the last one the seat has unlocked. */
+export const METEOR_GRANT_CLASS = srcConst('disasters.meteorGrantClass', 'HEAVY_CAV',
+  xml('ModifierArguments', 'ModifierId=GOODY_METEOR_FREE_UNIT&Name=UnitPromotionClassType', 'Value',
+    { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }));
+
+/**
+ * THE FIRES, RANDOM_EVENT_JUNGLE_FIRE then RANDOM_EVENT_FOREST_FIRE (the
+ * table's order): each starts on a live plot of its `RandomEvent_Features`
+ * row (FEATURE_JUNGLE = RAINFOREST, FEATURE_FOREST = WOODS), ONE site while
+ * such a plot exists (lab 4: 6 and 6 in 251 turns at their column 6), the
+ * plot a second draw. The plot BURNS (`RandomEvent_Yields` Turn 0), is BURNT
+ * at Turn 2 and REGROWS at Turn 6, every turn counted from the event's own
+ * start — the plots a fire spreads to share its clock, which is how its
+ * "Fire Ended" notification (MinTurn 2) reports every one of them at once.
+ * A plot the fire spreads to burns as the burning form of its own feature.
+ */
+const FIRE_IDS = ['JUNGLE_FIRE', 'FOREST_FIRE'] as const;
+const fire = (col: string) => FIRE_IDS.map((id) => xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${id}`, col));
+const fireDmg = (kind: string, col: string) => FIRE_IDS.map((id) =>
+  xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_${id}&DamageType=${kind}`, col));
+const fireYield = (turn: number, col: string, expect: (id: string) => string) => FIRE_IDS.map((id) =>
+  xml('RandomEvent_Yields', `RandomEventType=RANDOM_EVENT_${id}&Turn=${turn}`, col, { expect: expect(id) }));
+export const FIRE_WEIGHT = srcConst('disasters.fireWeight', [6, 6] as const, {
+  derived: 'the two fire rows\' OccurrencesPerGame at REALISM_SETTING_MODERATE, JUNGLE then FOREST',
+  inputs: FIRE_IDS.map((id) => freq(id)),
 });
-export const KILIMANJARO_WEIGHT = srcConst('disasters.kilimanjaroWeight', [4, 2.5] as const, {
-  derived: 'the two Kilimanjaro rows\' OccurrencesPerGame at REALISM_SETTING_MODERATE, GENTLE then CATASTROPHIC',
-  inputs: [freq('KILIMANJARO_GENTLE'), freq('KILIMANJARO_CATASTROPHIC')],
+export const FIRE_CIPD = srcConst('disasters.fireCipd', [50, 50] as const, {
+  derived: 'the two fire rows\' RandomEvents.ChanceIncreasePerDegree, JUNGLE then FOREST',
+  inputs: fire('ChanceIncreasePerDegree'),
+});
+/** per fire row, the feature it starts on (`RandomEvent_Features`) and the
+ *  one it puts back at Turn 6 */
+export const FIRE_START_FEATURE: readonly string[] = srcConst('disasters.fireStartFeature', ['RAINFOREST', 'WOODS'], {
+  derived: 'each fire row\'s RandomEvent_Features FeatureType as the engine feature (FEATURE_JUNGLE is '
+    + 'RAINFOREST, FEATURE_FOREST is WOODS); its Turn 6 RandomEvent_Yields row names the same feature',
+  inputs: [...FIRE_IDS.map((id) => xml('RandomEvent_Features', `RandomEventType=RANDOM_EVENT_${id}`, 'FeatureType')),
+    ...fireYield(6, 'FeatureType', (id) => (id === 'JUNGLE_FIRE' ? 'FEATURE_JUNGLE' : 'FEATURE_FOREST'))],
+});
+/** per fire row, the feature the plot burns as (`RandomEvent_Yields` Turn 0) */
+export const FIRE_BURNING_FEATURE: readonly string[] = srcConst('disasters.fireBurningFeature',
+  ['BURNING_RAINFOREST', 'BURNING_WOODS'], {
+    derived: 'each fire row\'s Turn 0 RandomEvent_Yields FeatureType as the engine feature '
+      + '(FEATURE_BURNING_JUNGLE, FEATURE_BURNING_FOREST)',
+    inputs: fireYield(0, 'FeatureType', (id) => (id === 'JUNGLE_FIRE' ? 'FEATURE_BURNING_JUNGLE' : 'FEATURE_BURNING_FOREST')),
+  });
+/** per fire row, the feature the plot is burnt as (`RandomEvent_Yields` Turn 2) */
+export const FIRE_BURNT_FEATURE: readonly string[] = srcConst('disasters.fireBurntFeature',
+  ['BURNT_RAINFOREST', 'BURNT_WOODS'], {
+    derived: 'each fire row\'s Turn 2 RandomEvent_Yields FeatureType as the engine feature '
+      + '(FEATURE_BURNT_JUNGLE, FEATURE_BURNT_FOREST)',
+    inputs: fireYield(2, 'FeatureType', (id) => (id === 'JUNGLE_FIRE' ? 'FEATURE_BURNT_JUNGLE' : 'FEATURE_BURNT_FOREST')),
+  });
+/** `RandomEvent_Yields` Turn 2: the burning plot turns BURNT and gains +1
+ *  Food (YIELD_FOOD Amount 1, Percentage 100) — the fertility channel. The
+ *  Turn 0 row's Amount is 0: burning pays nothing. */
+export const FIRE_BURNT_TURN = srcConst('disasters.fireBurntTurn', 2, {
+  derived: 'the Turn of each fire row\'s YIELD_FOOD Amount 1 row, the one naming the BURNT feature',
+  inputs: fireYield(2, 'Amount', () => '1'),
+});
+/** `RandomEvent_Yields` Turn 6: the burnt plot REGROWS its feature and gains
+ *  +1 Production (YIELD_PRODUCTION Amount 1, Percentage 100). */
+export const FIRE_REGROW_TURN = srcConst('disasters.fireRegrowTurn', 6, {
+  derived: 'the Turn of each fire row\'s YIELD_PRODUCTION Amount 1 row, which puts FEATURE_JUNGLE / FEATURE_FOREST back',
+  inputs: fireYield(6, 'Amount', () => '1'),
+});
+/** SPREAD 50, MinTurn 1 / MaxTurn 2: on the event's turns 1 and 2 each plot
+ *  burning catches every adjacent live Woods or Rainforest at 50% — "The
+ *  flames will spread to any adjacent forest or jungle" (LOC_TUTORIAL_FOREST_
+ *  FIRES), "Spreads to adjacent Woods or Rainforest" (the Climate screen). */
+export const FIRE_SPREAD_P = srcConst('disasters.fireSpreadP', 0.5, {
+  derived: 'Percentage/100 of each fire row\'s SPREAD damage row', inputs: fireDmg('SPREAD', 'Percentage'),
+});
+export const FIRE_SPREAD_TURNS = srcConst('disasters.fireSpreadTurns', [1, 2] as const, {
+  derived: 'the SPREAD row\'s MinTurn and MaxTurn', inputs: [...fireDmg('SPREAD', 'MinTurn'), ...fireDmg('SPREAD', 'MaxTurn')],
+});
+/** The burning plot's damage rows, every one at Percentage 101 — no roll: an
+ *  improvement and a district pillaged, a civilian killed and the land units
+ *  struck on the event's turns 0 to 2, and ONE citizen of the owning city on
+ *  turn 0 alone (POPULATION_LOSS MaxTurn 0). */
+export const FIRE_DAMAGE_TURNS = srcConst('disasters.fireDamageTurns', [0, 2] as const, {
+  derived: 'the MinTurn / MaxTurn of the fire rows\' IMPROVEMENT_PILLAGED, DISTRICT_PILLAGED, '
+    + 'UNIT_KILLED_CIVILIAN and UNIT_DAMAGE_LAND rows (all four carry 0 / 2)',
+  inputs: ['IMPROVEMENT_PILLAGED', 'DISTRICT_PILLAGED', 'UNIT_KILLED_CIVILIAN', 'UNIT_DAMAGE_LAND']
+    .flatMap((k) => [...fireDmg(k, 'MinTurn'), ...fireDmg(k, 'MaxTurn')]),
+});
+export const FIRE_POP_TURN = srcConst('disasters.firePopTurn', 0, {
+  derived: 'the MaxTurn of the fire rows\' POPULATION_LOSS row (MinTurn 0)',
+  inputs: fireDmg('POPULATION_LOSS', 'MaxTurn'),
+});
+/** UNIT_DAMAGE_LAND's inclusive band, MinHP 50 / MaxHP 101: a unit at full
+ *  health dies on a roll of 100 or 101. */
+export const FIRE_DMG = srcConst('disasters.fireDmg', [50, 101] as const, {
+  derived: 'the fire rows\' UNIT_DAMAGE_LAND MinHP and MaxHP, inclusive',
+  inputs: [...fireDmg('UNIT_DAMAGE_LAND', 'MinHP'), ...fireDmg('UNIT_DAMAGE_LAND', 'MaxHP')],
+});
+/** CIV6 (`Features`, the pack's four fire rows): the burning and burnt plot
+ *  keeps the Woods' DefenseModifier 3, MovementChange 1 and
+ *  SightThroughModifier 1, carries Appeal -1 and Settlement false, and no
+ *  `Feature_YieldChanges` row; it is not Removable, and it carries no
+ *  `Features_XP2.ValidDistrictPlacement` or `ValidWonderPlacement`, so no
+ *  city, district or wonder is placed on it (`fireFeature`). */
+const FIRE_FEATURES: readonly string[] = [...FIRE_BURNING_FEATURE, ...FIRE_BURNT_FEATURE];
+export function fireFeature(f: string | null | undefined): boolean {
+  return f != null && FIRE_FEATURES.includes(f);
+}
+export const FIRE_APPEAL = srcConst('disasters.fireAppeal', -1, {
+  derived: 'the Appeal column of the four fire features (all -1)',
+  inputs: ['BURNING_FOREST', 'BURNT_FOREST', 'BURNING_JUNGLE', 'BURNT_JUNGLE'].map((f) =>
+    xml('Features', `FeatureType=FEATURE_${f}`, 'Appeal')),
 });
 
 /** "Improvement — Pillaged: 100%; Destroyed: 50% / 80%". A flood always

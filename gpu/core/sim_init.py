@@ -61,6 +61,14 @@ class SimInit:
         self.FREE_ROW = self.n_majors + _sp
         self.CITY_ROWS = self.FREE_ROW + 1
         self._aliases: dict = {}
+        # the building rows that pay per game era since their city's stamp
+        # (`yieldsPerEra`, the Dar-e Mehr): their ids, and each one's column
+        # of `city_bldg_era`, -1 for every other row
+        self._bpe_bidx = (rules.b_per_era != 0).any(dim=1).nonzero(as_tuple=True)[0].to(device)
+        self._bpe_n = int(self._bpe_bidx.numel())
+        self._bpe_col = torch.full((max(len(rules.b_cost), 1),), -1, dtype=torch.long, device=device)
+        self._bpe_col[self._bpe_bidx] = torch.arange(self._bpe_n, device=device)
+        self._bpe_y = rules.b_per_era.to(device)[self._bpe_bidx].double()   # [NPE, 6]
         for _k, _dt, _rf, _pf, _ex in (
             ("alive", torch.bool, False, None, None),
             ("center", torch.long, 0, -1, None),
@@ -91,6 +99,9 @@ class SimInit:
             # city's own queue repairs them; `_bldg_dark` folds them with the
             # district's own pillage, `_building_pillaged` reads them alone
             ("bldg_pillaged", torch.bool, False, None, max(len(rules.b_cost), 1)),
+            # the game era each `_bpe_bidx` row was constructed or last
+            # repaired in (`City.buildingEras`), -1 none
+            ("bldg_era", torch.long, -1, None, max(self._bpe_n, 1)),
             ("gp_perm", dtype, 0, None, max(len((rules.seats or {}).get("gpCityPermKeys", [])), 1)),
         ):
             _shape = (B, self.CITY_ROWS, _rcp) + ((_ex,) if _ex else ())
@@ -429,8 +440,9 @@ class SimInit:
             ("treasury", dtype, 0),
             # LIFETIME raw carbon. Signed: Carbon Recapture takes it below 0.
             ("co2", dtype, 0), ("co2_turn", dtype, 0),
-            # a religion's belief of each class (-1 none) and its enhancement
-            ("enhancer", torch.long, -1), ("enhanced", torch.bool, 0),
+            # a religion's belief of each class (-1 none) and the beliefs it
+            # has earned (`ReligionState.beliefsEarned`)
+            ("enhancer", torch.long, -1), ("beliefs_earned", torch.long, 0),
             ("follower", torch.long, -1), ("founder", torch.long, -1),
             ("worship", torch.long, -1),
             ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
@@ -1063,6 +1075,9 @@ class SimInit:
             # the id of the FREE CITY that granted this unit (`Unit.freeCity`),
             # -1 on every other unit; a join takes that city's grants with it
             ("free_city", torch.long),
+            # a METEOR SITE's grant (`Unit.noResourceUpkeep`): it burns no
+            # fuel and is never short of it, through any upgrade
+            ("no_res_upkeep", torch.bool),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -1205,6 +1220,9 @@ class SimInit:
                 "zen": torch.tensor([[0.0, 0.0]] + [x["zen"] for x in _rows], dtype=torch.float64, device=device),
                 "perF": torch.tensor([[0.0] * 7] + [x["perF"] for x in _rows], dtype=torch.float64, device=device),
                 "perC": torch.tensor([[0.0] * 6] + [x["perC"] for x in _rows], dtype=torch.float64, device=device),
+                # Lay Ministry [district, 6] and Sacred Places [6]
+                "perD": torch.tensor([[[0.0] * 6] * _nad] + [x["perD"] for x in _rows], dtype=torch.float64, device=device),
+                "perW": torch.tensor([[0.0] * 6] + [x["perW"] for x in _rows], dtype=torch.float64, device=device),
                 "impRes": torch.tensor([[[0.0] * 6] * 4] + [x.get("impRes", [[0.0] * 6] * 4) for x in _rows], dtype=torch.float64, device=device),
                 "fpw": torch.tensor([0.0] + [float(x.get("fpw", 0)) for x in _rows], dtype=torch.float64, device=device),
                 "impY": torch.tensor(
@@ -1256,6 +1274,9 @@ class SimInit:
         self._inquisitor_home_strength = int(_bl.get("inquisitorHomeStrength", 35))
         self._remove_heresy_pct = int(_bl.get("removeHeresyPct", 75))
         self._launch_inquisition_charges = int(_bl.get("launchInquisitionCharges", 3))
+        # CIV6 (RELIGION_INITIAL_BELIEFS): the beliefs a founding earns; each
+        # Evangelize Belief earns one more
+        self._religion_initial_beliefs = int(_bl["religionInitialBeliefs"])
         self._condemn_range = int(_bl.get("condemnPressureRange", 6))
         self._condemn_swing = int(_bl.get("condemnPressureSwing", 7))
         _rs = _bl.get("relStrength") or []
@@ -1275,7 +1296,15 @@ class SimInit:
             "mchg": torch.tensor([0] + [int(x.get("mchg", 0)) for x in _erows], dtype=torch.long, device=device),
             "mlump": torch.tensor([_mlump0] + [int(x.get("mlump", _mlump0)) for x in _erows], dtype=torch.long, device=device),
             "mcostMult": torch.tensor([1.0] + [float(x.get("mcostMult", 1.0)) for x in _erows], dtype=torch.float64, device=device),
+            # Missionary Zeal, Monastic Isolation's kept percent, Holy Waters
+            "zeal": torch.tensor([0] + [int(x["zeal"]) for x in _erows], dtype=torch.long, device=device),
+            "theoKeep": torch.tensor([0] + [int(x["theoKeep"]) for x in _erows], dtype=torch.long, device=device),
+            "hwHeal": torch.tensor([0] + [int(x["hwHeal"]) for x in _erows], dtype=torch.long, device=device),
         }
+        # whether the catalog carries each channel at all
+        self._enh_zeal_any = bool((self._enh["zeal"] != 0).any())
+        self._enh_theo_any = bool((self._enh["theoKeep"] != 0).any())
+        self._enh_hw_any = bool((self._enh["hwHeal"] != 0).any())
         self._just_war_range = int(_bl.get("justWarRange", 3))
         self._enh_combat_any = bool((self._enh["cnear"] != 0).any() or (self._enh["cdef"] != 0).any() or (self._enh["cvs"] != 0).any())
         self._rel_planes_cache = None  # ((turn, _eff_version), (near3 [B,O,T], terr [B,O,T]))
@@ -1727,6 +1756,7 @@ class SimInit:
         self._A_CONDEMN = self._act.get("CONDEMN_0", -1)  # vs an adjacent religious unit
         self._A_HERESY = self._act.get("REMOVE_HERESY", -1)
         self._A_INQUISITION = self._act.get("LAUNCH_INQUISITION", -1)
+        self._A_EVANGELIZE = self._act.get("EVANGELIZE_BELIEF", -1)   # the Apostle earns its religion a belief
         self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
         self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
         self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
@@ -1802,7 +1832,8 @@ class SimInit:
             + (1 if self._A_ESCORT >= 0 else 0) \
             + (1 if self._A_UNESCORT >= 0 else 0) \
             + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc \
-            + self._air_deploy_cols + (1 if self._A_RETURN >= 0 else 0) + _ptc
+            + self._air_deploy_cols + (1 if self._A_RETURN >= 0 else 0) + _ptc \
+            + (1 if self._A_EVANGELIZE >= 0 else 0)
         assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
         self._A_CHOP = self._act["CHOP"]
         self._A_REPAIR = self._act["REPAIR"]
@@ -2063,6 +2094,12 @@ class SimInit:
             [[t.get("nfadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
         )
+        # the t0 chop planes a FIRE suspends and its regrowth puts back
+        # (`_ignite`, `_regrow`): a burning or burnt plot is neither choppable
+        # nor Removable, and the Woods or Rainforest that regrows is the t0 one
+        self._ftr0 = self.tile_ftr.clone()
+        self._ftu0 = self.tile_ftu.clone()
+        self._frm0 = self.feat_removable.clone()
         sc = rules.district_scaffold or {}
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
@@ -2520,17 +2557,48 @@ class SimInit:
         # RIVER FLOOD, the Flood (Civ6) tables by severity.
         _ds = rules.disasters
         # THE TURN'S ONE DRAW (`eventRows`): each row's weight per site, in
-        # severity order — floods, Kilimanjaro's eruptions, eruptions,
-        # accidents, droughts; the storms' ride their own records below
+        # severity order — floods, the eight eruption rows (`ERUPTION_ROWS`),
+        # accidents, droughts, the meteor, the fires (JUNGLE, FOREST); the
+        # storms' ride their own records below
         self._flood_weight = [float(x) for x in _ds["floodWeight"]]
-        self._kilimanjaro_weight = [float(x) for x in _ds["kilimanjaroWeight"]]
         self._eruption_weight = [float(x) for x in _ds["eruptionWeight"]]
         self._accident_weight = [float(x) for x in _ds["accidentWeight"]]
         self._drought_weight = [float(x) for x in _ds["droughtWeight"]]
+        self._meteor_weight = float(_ds["meteorWeight"])
+        self._fire_weight = [float(x) for x in _ds["fireWeight"]]
         # each row's ChanceIncreasePerDegree (`warmedWeight`); the storms' ride
         # their records below
         self._flood_cipd = [float(x) for x in _ds["floodCipd"]]
         self._drought_cipd = [float(x) for x in _ds["droughtCipd"]]
+        self._fire_cipd = [float(x) for x in _ds["fireCipd"]]
+        # THE METEOR SHOWER (`meteorCandidate`): the terrain and feature ids a
+        # site stands on, whether it keeps off every border, and the Heavy
+        # Cavalry line its site grants from, (unit, tech, civic) in line order
+        self._meteor_terrains = [int(x) for x in _ds["meteorTerrains"] if int(x) >= 0]
+        self._meteor_fids = [int(x) for x in _ds["meteorFeatures"] if int(x) >= 0]
+        self._meteor_avoids_territory = bool(_ds["meteorAvoidsTerritory"])
+        self._meteor_line = [(int(u), int(t), int(c)) for u, t, c in _ds["meteorGrantLine"]]
+        # THE FIRES, per row JUNGLE then FOREST (`fireTurn`): the feature ids
+        # it starts on, burns as and is burnt as; the event turns it turns
+        # burnt and regrows at; the spread's chance and turns; the damage
+        # rows' turns, the population turn and the unit band; the Appeal
+        self._fire_start_fid = [int(x) for x in _ds["fireStartFid"]]
+        self._fire_burning_fid = [int(x) for x in _ds["fireBurningFid"]]
+        self._fire_burnt_fid = [int(x) for x in _ds["fireBurntFid"]]
+        self._fire_burnt_turn = int(_ds["fireBurntTurn"])
+        self._fire_regrow_turn = int(_ds["fireRegrowTurn"])
+        self._fire_spread_p = float(_ds["fireSpreadP"])
+        self._fire_spread_turns = [int(x) for x in _ds["fireSpreadTurns"]]
+        self._fire_damage_turns = [int(x) for x in _ds["fireDamageTurns"]]
+        self._fire_pop_turn = int(_ds["firePopTurn"])
+        self._fire_dmg = [int(x) for x in _ds["fireDmg"]]
+        self._fire_appeal = int(_ds["fireAppeal"])
+        # [nFeat] — the fire's four features, the catalog view `_fire_plots` reads
+        self._fire_feat = torch.zeros(self._feat_natural.shape[0], dtype=torch.bool, device=device)
+        for _f in self._fire_start_fid + self._fire_burning_fid + self._fire_burnt_fid:
+            assert _f >= 0, "a fire feature the feature roster does not carry"
+        for _f in self._fire_burning_fid + self._fire_burnt_fid:
+            self._fire_feat[_f] = True
         # RANDOM_EVENT_START_TURN: no event fires, and no draw is spent, before it
         self._random_event_start_turn = int(_ds["randomEventStartTurn"])
         # the nuclear accident by severity: the reactor age that opens the
@@ -2539,9 +2607,10 @@ class SimInit:
         self._accident_fallout = torch.tensor([int(x) for x in _ds["accidentFallout"]], dtype=torch.long, device=device)
         self._accident_district_p = torch.tensor([float(x) for x in _ds["accidentDistrictP"]], dtype=torch.float64, device=device)
         self._accident_pop_p = torch.tensor([float(x) for x in _ds["accidentPopP"]], dtype=torch.float64, device=device)
-        # THE FIVE ERUPTION ROWS (`ERUPTION_ROWS`: Kilimanjaro's GENTLE and
-        # CATASTROPHIC, then the volcano's three), one entry per row: the
-        # per-plot Volcanic Soil chance and the `RandomEvent_Damages` rows
+        # THE EIGHT ERUPTION ROWS (`ERUPTION_ROWS`: Eyjafjallajokull's two,
+        # Kilimanjaro's two, Vesuvius's, then the volcano's three), one entry
+        # per row: the per-plot Volcanic Soil chance and the
+        # `RandomEvent_Damages` rows
         def _erf(k: str) -> torch.Tensor:
             return torch.tensor([float(x) for x in _ds[k]], dtype=torch.float64, device=device)
         self._er_paint_p = _erf("eruptionPaintP")
@@ -2550,9 +2619,12 @@ class SimInit:
         self._er_civ_kill_p = _erf("eruptionCivKillP")
         self._er_dmg_lo = torch.tensor([int(x) for x in _ds["eruptionDmgLo"]], dtype=torch.long, device=device)
         self._er_dmg_hi = torch.tensor([int(x) for x in _ds["eruptionDmgHi"]], dtype=torch.long, device=device)
-        # what the soil replaces, and the feature whose plots are Kilimanjaro's sites
+        # what the soil replaces, and per eruption row whether it erupts a
+        # volcano plot, else the natural wonder whose plots are its one site
+        # (-1: a wonder the feature roster does not carry, which has none)
         self._soil_replaces = [int(x) for x in _ds["soilReplaces"] if int(x) >= 0]
-        self._kilimanjaro_fid = int(_ds["kilimanjaroFid"])
+        self._er_on_volcano = [bool(x) for x in _ds["eruptionOnVolcano"]]
+        self._er_wonder_fid = [int(x) for x in _ds["eruptionWonderFid"]]
         # a drought's turns by severity, and its footprint's `STORM_DISC` slots
         self._drought_duration = torch.tensor([int(x) for x in _ds["droughtDuration"]], dtype=torch.long, device=device)
         self._drought_hexes = int(_ds["droughtHexes"])
@@ -3982,6 +4054,10 @@ class SimInit:
         # turns it has left (`Tile.stormEvent` / `Tile.stormTurns`)
         self.storm_event = torch.full((B, T), -1, dtype=torch.long, device=dev)
         self.storm_left = torch.zeros(B, T, dtype=torch.long, device=dev)
+        # the turn the FIRE a plot belongs to began, -1 none (`Tile.fireStart`),
+        # and a METEOR SITE on the plot (`Tile.meteor`)
+        self.fire_start = torch.full((B, T), -1, dtype=torch.long, device=dev)
+        self.tile_meteor = torch.zeros(B, T, dtype=torch.bool, device=dev)
         # -1 = no climate change yet; monotone, so it never steps back.
         self.climate_idx = torch.full((B,), -1, dtype=torch.long, device=dev)
 

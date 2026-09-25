@@ -19,6 +19,7 @@ engine, float32 on CUDA for throughput.
 from __future__ import annotations
 
 import json
+import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -160,9 +161,9 @@ class Rules:
     settler_base: float
     settler_per_city: float
     settler_pop_gate: int
-    builder_base: float
-    builder_per: float
-    game_speed: float
+    builder_base: float  # the Builder's scaled Cost
+    builder_per: float  # its scaled CostProgressionParam1, per builder trained
+    game_speed: float  # GAMESPEED_ONLINE CostMultiplier / 100 (`scale_by_game_speed`)
     gold_purchase_mult: float  # gold price = production cost × this (GOLD_PURCHASE_MULT)
     faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
     purchase_divisor: int  # every gold / faith price is floored to a multiple of this (PURCHASE_DIVISOR 5, measured)
@@ -278,6 +279,7 @@ class Rules:
     b_grant_unit: torch.Tensor  # long [NB] — unit granted FREE at completion (Intelligence Agency's Spy); -1 none
     b_rel_spreads: torch.Tensor  # long [NB] — spread charges a religious unit bought in its city gains (the Mosque)
     b_disaster_proof: torch.Tensor  # bool [NB] — a disaster's building roll passes it by (the Dar-e Mehr)
+    b_per_era: torch.Tensor  # long [NB, 6] — yields per game era since the city's stamp (`yieldsPerEra`, the Dar-e Mehr)
     #: THE PROMOTION CATALOG, per class and in COLUMN order (the PROMOTE head's
     #: layout). `promo_req[c, k]` is the bitmask of columns that open row k of
     #: class c; `promo_kind/v/mask[c, k, s]` are its effect slots.
@@ -301,7 +303,7 @@ class Rules:
     worship_bidx: list  # per Worship belief (WORSHIP_BELIEFS order): the building row it unlocks
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
     workshop_bidx: int  # WORKSHOP row (Leonardo's culture perm), -1 if absent
-    worship_faith_cost: float  # flat worship faith price (round(190·GAME_SPEED))
+    worship_faith_cost: float  # a worship building's faith price: its row's scaled Cost x the faith rate
     shrine_bidx: int  # SHRINE row (the missionary buy's gate), -1 if absent
     t_cost: torch.Tensor  # [NT]
     t_award_env: torch.Tensor  # long [NT] — envoys paid ONCE at completion
@@ -315,6 +317,15 @@ class Rules:
     trade: dict  # {marketBidx, lighthouseBidx, foreignTradeCidx, capWonderWidx, range} — trade capacity/route anchors
     eras: dict  # {length, found, conquer, wonder, pantheon, religion, gp} — era-score events + age thresholds
     actions: dict  # {unit: [name, ...]} — the unit-action enum, index = mask column
+
+    def scale_by_game_speed(self, x):
+        """A Standard-speed figure at the online speed — `× CostMultiplier /
+        100`, TRUNCATED (`scaleByGameSpeed`'s twin): a cost, a progression
+        step, or an amount the install types `ScaleByGameSpeed` / flags
+        `Scale`. A tensor in, a tensor out; a number in, an int out."""
+        if isinstance(x, torch.Tensor):
+            return torch.floor(x * self.game_speed)
+        return math.floor(x * self.game_speed)
 
 
 def _class_mask(rows: list, n: int) -> torch.Tensor:
@@ -368,15 +379,15 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         settler_base=r["scenario"]["settlerBase"],
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
-        builder_base=r["scenario"].get("builderBase", 50),
-        builder_per=r["scenario"].get("builderPer", 4),
-        game_speed=r["scenario"].get("gameSpeed", 0.6),
+        builder_base=r["scenario"]["builderBase"],
+        builder_per=r["scenario"]["builderPer"],
+        game_speed=r["scenario"]["gameSpeed"],
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
         faith_purchase_mult=r["scenario"].get("faithPurchaseMult", 2),
         purchase_divisor=int(r["scenario"]["purchaseDivisor"]),
-        turn_limit=r["scenario"].get("turnLimit", 250),
-        space_ly_target=r["scenario"].get("spaceLyTarget", 30),
-        district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
+        turn_limit=r["scenario"]["turnLimit"],
+        space_ly_target=r["scenario"]["spaceLyTarget"],
+        district_cost=r["districtCost"],
         goody_huts=r["goodyHuts"],
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
@@ -485,6 +496,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_grant_unit=torch.tensor([int(b.get("grantUnit", -1)) for b in B], dtype=torch.long),
         b_rel_spreads=torch.tensor([int(b["religiousSpreads"]) for b in B], dtype=torch.long),
         b_disaster_proof=torch.tensor([bool(b["disasterProof"]) for b in B], dtype=torch.bool),
+        b_per_era=torch.tensor([[int(x) for x in b["perEra"]] for b in B], dtype=torch.long).reshape(len(B), 6),
         b_era=torch.tensor([int(b.get("eraIdx", 0)) for b in B], dtype=torch.long),
         promo_classes=list(_P.get("classes", [])),
         promo_kinds=list(_P.get("kinds", [])),
@@ -510,7 +522,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         # every game and Leonardo's +3 Culture per Workshop paid nobody on this
         # engine (9209 t246)
         workshop_bidx=int(r["seats"]["workshopBidx"]),
-        worship_faith_cost=float(r.get("worshipFaithCost", 114)),
+        worship_faith_cost=float(r["worshipFaithCost"]),
         shrine_bidx=int(r.get("shrineBidx", -1)),
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
         t_award_env=torch.tensor([int(t.get("awardEnvoys", 0)) for t in r["techs"]], dtype=torch.long),
@@ -854,16 +866,18 @@ _MUTABLE = [
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
     "storm_event", "storm_left",  # the STORM centred on a tile and the turns it has left
+    "fire_start",  # the turn a plot's FIRE began, -1 none
+    "tile_meteor",  # METEOR SITES: laid by the draw, taken by the first unit in
     "tile_goody",  # TRIBAL VILLAGES: claimed and gone
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_patrol", "unit_free_city",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_patrol", "unit_free_city", "unit_no_res_upkeep",
     "unit_escorted", "military_at", "civilian_at", "support_at", "embarked_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
-    "civ_enhancer", "civ_enhanced", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",
+    "civ_enhancer", "civ_beliefs_earned", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
@@ -873,7 +887,7 @@ _MUTABLE = [
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_unit_acq",  # copies of each chassis a seat has ever acquired (the progressive price)
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_reactor_age",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_gpp_turn",  # Great Person points EARNED this turn, per class (a competition reads it)
     "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",

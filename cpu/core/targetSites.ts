@@ -12,6 +12,7 @@ import { CITY_MIN_DIST } from '../../world/types';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { GP_SITES, gpSiteOf } from '../data/greatPeople';
 import { GW_KINDS, gwKindObjects } from '../data/greatWorks';
+import { fireFeature } from '../data/disasters';
 import { BARB_SEAT, campTiles, cityHolders, civsAtWar, hiddenResourcesFor, tileOwnedByCiv, tileSeat } from './seats';
 import { computeUnlocks, type Unlocks } from './effects';
 import { canBuildRoad, validImprovementsIn } from './rules';
@@ -100,7 +101,8 @@ export function foundSites(state: GameState): number[] {
   ];
   const out: number[] = [];
   for (const t of state.map.tiles) {
-    if (tileSeat(t) >= 0 || isWater(t) || isImpassable(t) || naturalWonderAt(t) || t.feature === 'OASIS') continue;
+    if (tileSeat(t) >= 0 || isWater(t) || isImpassable(t) || naturalWonderAt(t) || t.feature === 'OASIS'
+      || fireFeature(t.feature)) continue;
     if (t.district || t.builtWonder) continue;
     if (centres.some((c) => hexDistance(c.col, c.row, t.col, t.row) < CITY_MIN_DIST)) continue;
     out.push(t.index);

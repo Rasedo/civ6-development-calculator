@@ -140,3 +140,16 @@ Object.assign(FEATURES, {
   MOUNT_EVEREST: { id: 'MOUNT_EVEREST', name: 'Mount Everest', yields: {}, impassable: true, adjacentYields: { faith: 1, science: 1 }, ...NW },
   EYE_OF_THE_SAHARA: { id: 'EYE_OF_THE_SAHARA', name: 'Eye of the Sahara', yields: { science: 2, gold: 1 }, ...NW },
 } satisfies Record<string, FeatureDef>);
+
+// THE FIRE'S FEATURES, appended after the wonders. CIV6
+// (GranColombia_Maya_Expansion2.xml): a Woods or Rainforest a fire burns,
+// then leaves burnt until it regrows. No Feature_YieldChanges row — the plot
+// yields its terrain alone — and not Removable; `Feature_ValidTerrains` gives
+// the burning and burnt Woods Grassland, Plains and Tundra and the Rainforest's
+// Grassland and Plains, flat or hills. Nothing lays one at map generation.
+Object.assign(FEATURES, {
+  BURNING_WOODS: { id: 'BURNING_WOODS', name: 'Burning Woods', yields: {}, terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], allowHills: true, removable: false },
+  BURNT_WOODS: { id: 'BURNT_WOODS', name: 'Burnt Woods', yields: {}, terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], allowHills: true, removable: false },
+  BURNING_RAINFOREST: { id: 'BURNING_RAINFOREST', name: 'Burning Rainforest', yields: {}, terrains: ['GRASSLAND', 'PLAINS'], allowHills: true, removable: false },
+  BURNT_RAINFOREST: { id: 'BURNT_RAINFOREST', name: 'Burnt Rainforest', yields: {}, terrains: ['GRASSLAND', 'PLAINS'], allowHills: true, removable: false },
+} satisfies Record<string, FeatureDef>);

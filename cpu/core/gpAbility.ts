@@ -11,7 +11,7 @@ import type { Tile } from '../../world/types';
 import { neighbors } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
-import { cityAtTile, citiesOf, civsAtWar, isCityStateSeat, seatOf, tileOwnedByCiv, tileSeat } from './seats';
+import { cityAtTile, citiesOf, civOf, civsAtWar, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat } from './seats';
 import { captureCityStateFor } from './combat';
 import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
 import {
@@ -26,6 +26,7 @@ import { isSuzerain, receiveEnvoyTiles, resolveSuzerains } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
+import { scaleByGameSpeed } from '../data/constants';
 import { isSpaceProject } from '../data/projects';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import { dedicationEvent } from './eras';
@@ -34,7 +35,7 @@ import { spawnUnit, disbandUnit } from './units';
 import { grantStockpile } from './stockpile';
 import { repairDrip, urbanDefensesFit } from './rules';
 import { itemCost } from './game';
-import { UNITS, URBAN_DEFENSES_TECH } from '../data/units';
+import { UNITS, URBAN_DEFENSES_TECH, civReplacement } from '../data/units';
 import { xpToNextLevel } from './promotions';
 import { logXpWrite } from './difflog';
 
@@ -178,6 +179,14 @@ function freeTechs(state: GameState, seat: number, n: number): void {
   }
 }
 
+/** CIV6 (MODIFIER_PLAYER_UNIT_GRANT_UNIT_WITH_EXPERIENCE and
+ *  MODIFIER_GRANT_UNITS_IN_DISTRICTS, `UniqueOverride` true on every Great
+ *  Person row): a granted chassis arrives as the civilization's unique
+ *  standing in for it, where it has one. */
+function grantedChassis(state: GameState, seat: number, id: string): string {
+  return civReplacement(civOf(state, seat), id, leaderOf(state, seat)) ?? id;
+}
+
 function permAdd(target: { gpPerm?: number[] }, width: number, key: string, keys: readonly string[], n: number): void {
   const k = keys.indexOf(key);
   if (k < 0) return;
@@ -298,7 +307,8 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     if (q?.kind === 'wonder') {
       const dbl = fx.wonderEraDouble !== undefined && (WONDER_ERA_INDEX[q.wonder] ?? 0) <= fx.wonderEraDouble;
       const before = q.progress;
-      q.progress += fx.wonderProduction * (dbl ? 2 : 1);
+      // at Standard speed in the catalog: the whole grant takes the speed
+      q.progress += scaleByGameSpeed(fx.wonderProduction * (dbl ? 2 : 1));
       repairDrip(state, city, before);
     }
   }
@@ -373,7 +383,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // THE UNIT ON THE TILE — a granted chassis, or a promotion for whoever is
   // already standing here.
   if (fx.unit && UNITS[fx.unit]) {
-    const made = spawnUnit(state, fx.unit, unit.tileIndex, unit.seat);
+    const made = spawnUnit(state, grantedChassis(state, unit.seat, fx.unit), unit.tileIndex, unit.seat);
     if (made && fx.unitPromotions) {
       made.xp = xpToNextLevel(made);
       logXpWrite(state, made, 'gf');
@@ -419,7 +429,8 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // CIV6 (Tupac Amaru): the chassis once per district of the enemy city
   // whose land this is, in tile order; the spawn probe finds each its spot.
   if (fx.unitEachDistrict && UNITS[fx.unitEachDistrict]) {
-    for (const t of districtTilesOfOwner(state, tile)) spawnUnit(state, fx.unitEachDistrict, t, unit.seat);
+    const chassis = grantedChassis(state, unit.seat, fx.unitEachDistrict);
+    for (const t of districtTilesOfOwner(state, tile)) spawnUnit(state, chassis, t, unit.seat);
   }
 
   // PERMANENT CHANNELS.

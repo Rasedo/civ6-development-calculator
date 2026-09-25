@@ -1,6 +1,6 @@
 
 import type { DistrictId, ImprovementId, Yields } from '../core/types';
-import { GAME_SPEED } from './constants';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
 import { xml, type SrcMap } from './provenance';
 
 export type Era =
@@ -533,7 +533,7 @@ const T = (
   prereqs: string[],
   effects: ResearchEffect[] = [],
 ): TechDef => ({
-  id, name, era, cost: Math.round(cost * GAME_SPEED), prereqs, effects,
+  id, name, era, cost: scaleByGameSpeed(cost), prereqs, effects,
   ...(TECH_SRC[id] ? { src: TECH_SRC[id] } : {}),
 });
 

@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type CityState, type DistrictId, type GameState, type Seat, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
-import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
+import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
 import { computeAdoption, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -670,6 +670,26 @@ export function cardFavorPerBuilding(state: GameState, seat: number): number {
   return n;
 }
 
+/** CIV6 (BELIEF_YIELD_PER_DISTRICT, BELIEF_YIELD_PER_CITY_WITH_WONDER): the
+ *  capital's belief yields counted over the seat's cities — each completed
+ *  district of a type the belief names (Lay Ministry), and each city holding
+ *  a completed World Wonder (Sacred Places). The reach is `perCity`'s: the
+ *  belief seat's own cities. */
+export function beliefCapitalYields(state: GameState, seat: number, m: Modifiers): Yields {
+  const out = emptyYields();
+  const perD = Object.entries(m.beliefPerDistrict) as [DistrictId, Partial<Yields>][];
+  const perW = Object.keys(m.beliefPerWonderCity).length > 0;
+  if (!perD.length && !perW) return out;
+  for (const c of citiesOf(state, seat)) {
+    for (const [type, y] of perD) {
+      const n = c.districts.filter((d) => d.type === type && state.map.tiles[d.tileIndex].districtComplete).length;
+      if (n) addYields(out, y, n);
+    }
+    if (perW && completedWonders(state, c).length > 0) addYields(out, m.beliefPerWonderCity);
+  }
+  return out;
+}
+
 /**
  * A civ's ERA INDEX — the highest era among its completed techs
  * and civics (real Civ 6 advances a civ's era with its research). Used only
@@ -1139,6 +1159,7 @@ export function computeCityStats(
     if (y) addYields(districts, y, n);
   }
   const buildings = cityBuildingYields(ctx, city, city.powered ?? false);
+  addYields(buildings, buildingEraYields(state, city));
   const regional = regionalEffects(
     state, city, governorFlag(state, city, (e) => e.industryAllSources));
   addYields(buildings, regional.yields);
@@ -1198,7 +1219,10 @@ export function computeCityStats(
 
   const bonuses = emptyYields();
   addYields(bonuses, m.cityYields);
-  if (city.isCapital) addYields(bonuses, m.capitalYields);
+  if (city.isCapital) {
+    addYields(bonuses, m.capitalYields);
+    addYields(bonuses, beliefCapitalYields(state, city.seat, m));
+  }
   // CIV6 (Autocracy): "+1 to all yields for each Government Plaza building,
   // Diplomatic Quarter building, and palace in a city."
   if (m.yieldsPerGovBuilding) {

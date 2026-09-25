@@ -614,7 +614,7 @@ SEAT = {
     "religionFounded": lambda sim, b, rows: [1 if bool(sim.civ_religion_done[b, c]) else 0 for c in rows],
     "inquisition": lambda sim, b, rows: [1 if bool(sim.civ_inquisition[b, c]) else 0 for c in rows],
     "pantheonDone": lambda sim, b, rows: [1 if bool(sim.civ_pantheon_done[b, c]) else 0 for c in rows],
-    "religionEnhanced": lambda sim, b, rows: [1 if bool(sim.civ_enhanced[b, c]) else 0 for c in rows],
+    "beliefsEarned": lambda sim, b, rows: [int(sim.civ_beliefs_earned[b, c]) for c in rows],
     "gpPoints": lambda sim, b, rows: [[float(x) for x in sim.civ_gpp[b, c].tolist()] for c in rows],
     "projectsDone": lambda sim, b, rows: [sum(1 for x in sim.project_done[b, c].tolist() if x) for c in rows],
     "wmd": lambda sim, b, rows: [int(sim.civ_wmd[b, c].sum()) for c in rows],
@@ -840,6 +840,11 @@ CITY = {
     "buildings": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.city_bldg[b, c, s].tolist()) if on] for c, s in rows
     ],
+    "buildingEras": lambda sim, b, rows: [
+        [x for k, e in enumerate(sim.city_bldg_era[b, c, s].tolist()[:sim._bpe_n]) if e >= 0
+         for x in (int(sim._bpe_bidx[k]), int(e))]
+        for c, s in rows
+    ],
     "buildingsPillaged": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.city_bldg_pillaged[b, c, s].tolist()) if on] for c, s in rows
     ],
@@ -906,6 +911,7 @@ UNIT = {
         "escorted": _unit("unit_escorted"),
     "patrol": _unit("unit_patrol"),
     "freeCity": _unit("unit_free_city"),
+    "noResourceUpkeep": _unit("unit_no_res_upkeep"),
 }
 
 
@@ -941,6 +947,7 @@ TILE = {
     "improvement": _tile("improvement"),
     "pillaged": _tile("pillaged"),
     "goodyHut": _tile("tile_goody"),
+    "meteorSite": _tile("tile_meteor"),
     "district": _tile("district"),
     "districtComplete": _tile("district_complete"),
     "districtPillaged": _tile("district_pillaged"),
@@ -960,6 +967,7 @@ TILE = {
     "droughtTurns": _tile("drought"),
     "stormEvent": _tile("storm_event"),
     "stormTurns": _tile("storm_left"),
+    "fireStart": _tile("fire_start"),
     "featureId": lambda sim, b, rows: sim.feat_id[b].masked_fill(sim.feat_stripped[b], -1).numpy(),
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),
     "flooded": lambda sim, b, rows: sim.tile_flooded[b].long().numpy(),

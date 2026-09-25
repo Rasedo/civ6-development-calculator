@@ -3,7 +3,7 @@ import { setTileOwner, freeSeatOf, FREE_SEAT } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodSites, erupt, drought, ageReactors } from '../../../cpu/core/disasters';
-import { ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, eruptionRow, droughtCandidate, DROUGHT_DURATION } from '../../../cpu/data/disasters';
+import { ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtCandidate, DROUGHT_DURATION } from '../../../cpu/data/disasters';
 import { validImprovementsIn } from '../../../cpu/core/rules';
 import { builderRepair } from '../../../cpu/core/units';
 import { transferCity, freeCitiesPhase } from '../../../cpu/core/phase';
@@ -408,29 +408,34 @@ describe('the turn\'s one random event', () => {
 
   it('fires at most one event a turn, each row weighted once per site', () => {
     // sites: 2 flood sites x 4.5, 2 volcanoes x 8, and the Grassland's one
-    // tornado pair (15 + 3) and the bare plot's drought pair (23 + 5):
-    // 9 + 16 + 18 + 28 = 71
+    // tornado pair (15 + 3), the bare plot's drought pair (23 + 5) and its
+    // Meteor Shower (6 — nobody owns it): 9 + 16 + 18 + 28 + 6 = 77
     const { state } = eventBoard();
+    const bare = tileAtCoords(state.map, 14, 14);
     const N = 6000;
     let floods = 0;
     let eruptions = 0;
     let droughts = 0;
+    let meteors = 0;
     for (let i = 0; i < N; i++) {
+      bare.meteor = false;
       state.eventLog = [];
       disasterPhase(state);
       expect(state.eventLog.length).toBeLessThanOrEqual(1);
       if (state.eventLog.some((e) => e.startsWith('Flood'))) floods++;
       if (state.eventLog.some((e) => e.includes('eruption'))) eruptions++;
       if (state.eventLog.some((e) => e.startsWith('Drought'))) droughts++;
+      if (state.eventLog.some((e) => e.startsWith('Meteor'))) meteors++;
     }
-    expect(Math.abs(floods / N - 9 / 71)).toBeLessThan(0.02);
-    expect(Math.abs(eruptions / N - 16 / 71)).toBeLessThan(0.02);
-    expect(Math.abs(droughts / N - 28 / 71)).toBeLessThan(0.02);
+    expect(Math.abs(floods / N - 9 / 77)).toBeLessThan(0.02);
+    expect(Math.abs(eruptions / N - 16 / 77)).toBeLessThan(0.02);
+    expect(Math.abs(droughts / N - 28 / 77)).toBeLessThan(0.02);
+    expect(Math.abs(meteors / N - 6 / 77)).toBeLessThan(0.015);
   });
 
   it('Kilimanjaro erupts on its own two rows, 4 + 2.5, painting its ring at 50%', () => {
     // the board above plus one Mount Kilimanjaro ringed by bare Grassland (the
-    // tornado and drought sites already stand): 71 + 6.5 = 77.5
+    // tornado, drought and meteor sites already stand): 77 + 6.5 = 83.5
     const { state } = eventBoard();
     const k = tileAtCoords(state.map, 14, 4);
     k.terrain = 'GRASSLAND';
@@ -443,6 +448,7 @@ describe('the turn\'s one random event', () => {
     let plots = 0;
     let painted = 0;
     for (let i = 0; i < N; i++) {
+      for (const t of state.map.tiles) t.meteor = false;
       for (const t of ring) {
         t.terrain = 'GRASSLAND';
         t.elevation = 'FLAT';
@@ -457,8 +463,8 @@ describe('the turn\'s one random event', () => {
       plots += ring.length;
       painted += ring.filter((t) => t.feature === 'VOLCANIC_SOIL').length;
     }
-    expect(Math.abs(kili / N - 6.5 / 77.5)).toBeLessThan(0.015);
-    expect(Math.abs((eruptions - kili) / N - 16 / 77.5)).toBeLessThan(0.02);
+    expect(Math.abs(kili / N - 6.5 / 83.5)).toBeLessThan(0.015);
+    expect(Math.abs((eruptions - kili) / N - 16 / 83.5)).toBeLessThan(0.02);
     expect(Math.abs(painted / plots - 0.5)).toBeLessThan(0.04);
     expect(k.feature).toBe('MOUNT_KILIMANJARO');
   });
@@ -599,7 +605,7 @@ describe('the eruption\'s damage rows', () => {
       reset();
       const w = spawnUnit(state, 'WARRIOR', ring[1].index, 0)!;
       const b = spawnUnit(state, 'BUILDER', ring[2].index, 0)!;
-      erupt(state, v, eruptionRow('volcano', 1));
+      erupt(state, [v], volcanoRow(1));
       for (const t of ring.slice(1)) {
         farms += 1;
         if (t.improvement === null) destroyed += 1;
@@ -625,12 +631,12 @@ describe('the eruption\'s damage rows', () => {
 
   it('GENTLE pillages the ring and takes nothing else', () => {
     const { state, v, ring, city, reset } = ringBoard();
-    for (const row of [eruptionRow('volcano', 0), eruptionRow('kilimanjaro', 0)]) {
+    for (const row of [volcanoRow(0), ERUPTION_ROWS.indexOf('KILIMANJARO_GENTLE')]) {
       for (let i = 0; i < 100; i++) {
         reset();
         const w = spawnUnit(state, 'WARRIOR', ring[1].index, 0)!;
         const b = spawnUnit(state, 'BUILDER', ring[2].index, 0)!;
-        erupt(state, v, row);
+        erupt(state, [v], row);
         for (const t of ring.slice(1)) {
           expect(t.improvement).toBe('FARM');
           expect(t.pillaged).toBe(true);
@@ -654,7 +660,7 @@ describe('the eruption\'s damage rows', () => {
       sea.terrain = 'COAST';
       sea.improvement = null;
       const g = spawnUnit(state, 'GALLEY', sea.index, 0)!;
-      erupt(state, v, eruptionRow('kilimanjaro', 1));
+      erupt(state, [v], ERUPTION_ROWS.indexOf('KILIMANJARO_CATASTROPHIC'));
       for (const t of ring.slice(1)) {
         if (t === sea) continue;
         farms += 1;

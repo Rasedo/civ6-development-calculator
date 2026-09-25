@@ -1297,6 +1297,7 @@ class SimPhase:
             self.city_bldg[br, row, col[br], bi[br]] = True
             # a building already held and standing pillaged was REPAIRED
             self.city_bldg_pillaged[br, row, col[br], bi[br]] = False
+            self._stamp_bldg_era(br, row, col[br], bi[br])
             self._bldg_version += 1
             self._building_dedications(row, bi, made_b2)
             # A completed REGIONAL building reaches OTHER cities' yields, so
@@ -2434,11 +2435,32 @@ class SimPhase:
                 & ~self._row_banned(row, self.BAN_FOUND_RELIGION))
 
     def _can_enhance(self, row: int) -> torch.Tensor:
-        """[B] `canEnhanceReligion`: a founded religion not yet enhanced and a
-        SECOND activated Great Prophet (the first funds the founding)."""
+        """[B] `canEnhanceReligion`: a founded religion with a belief earned
+        and not yet adopted (`_belief_picks`)."""
+        return self._belief_picks(row) > 0
+
+    def _beliefs_held(self, row: int) -> torch.Tensor:
+        """[B] long — the beliefs seat row `row`'s religion holds, of its
+        four classes."""
+        return sum((ids[:, row] >= 0).long() for _m, ids, _n in self._bel_pools())
+
+    def _belief_picks(self, row: int) -> torch.Tensor:
+        """[B] long — `beliefPicks`: how many beliefs an enhancement of the
+        founded religion adopts now, the beliefs earned and not yet held
+        capped by the classes it still lacks that have a belief left."""
+        if row >= self.n_majors:
+            return torch.zeros(self.B, dtype=torch.long, device=self.device)
+        left = self.civ_beliefs_earned[:, row] - self._beliefs_held(row)
+        n = torch.minimum(left, self._enhanceable(row).long().sum(dim=1)).clamp(min=0)
+        return torch.where(self.civ_religion_done[:, row], n, torch.zeros_like(n))
+
+    def _evangelize_ok(self, row: int) -> torch.Tensor:
+        """[B] — `evangelizeOk`'s seat half: the founded religion of seat row
+        `row` would still find a class for one more earned belief."""
         if row >= self.n_majors:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        return self.civ_religion_done[:, row] & ~self.civ_enhanced[:, row] & (self.civ_prophets[:, row] >= 2)
+        left = self.civ_beliefs_earned[:, row] - self._beliefs_held(row)
+        return self.civ_religion_done[:, row] & (left < self._enhanceable(row).long().sum(dim=1))
 
     def _bel_pools(self) -> tuple:
         """A religion's belief classes in `BELIEF_CLASSES` order (Follower,
@@ -2460,13 +2482,14 @@ class SimPhase:
     def _apply_beliefs(self, row: int, act: torch.Tensor, beliefs: torch.Tensor) -> None:
         """`adoptBeliefs`' twin — the record's BELIEF arm. `beliefs` [B, K, 2]
         holds (class, index) pairs (`BELIEF_CLASSES` code, the class catalog's
-        row), (-1, -1) padding. FOUNDING (`_can_found`): the Follower first,
-        then one belief of another class. ENHANCING (`_can_enhance`): one
-        belief of every class the religion still lacks that has a belief left
-        (`_enhanceable`), each once. Every pick names a belief no religion
-        holds; a set that does not fit is refused entire. The founding writes
-        the era score, the holy tile and the Holy City's founding pressure,
-        in `adoptBeliefs`' order."""
+        row), (-1, -1) padding. FOUNDING (`_can_found`): RELIGION_INITIAL_BELIEFS
+        picks, the Follower first, then a belief of another class. ENHANCING
+        (`_can_enhance`): `_belief_picks` beliefs, each of a different class
+        the religion still lacks that has a belief left (`_enhanceable`).
+        Every pick names a belief no religion holds; a set that does not fit
+        is refused entire. The founding writes the beliefs earned, the era
+        score, the holy tile and the Holy City's founding pressure, in
+        `adoptBeliefs`' order."""
         if row >= self.n_majors or not any(self._bel_class_n):
             return
         B, dev = self.B, self.device
@@ -2491,11 +2514,12 @@ class SimPhase:
         ohc = (cls.unsqueeze(2) == torch.arange(4, device=dev)) & present.unsqueeze(2)   # [B, K, 4]
         cnt = ohc.long().sum(dim=1)                                                  # [B, 4]
         first = cls[:, 0] if K > 0 else torch.full((B,), -1, dtype=torch.long, device=dev)
-        second = cls[:, 1] if K > 1 else torch.full((B,), -1, dtype=torch.long, device=dev)
-        found_ok = (act & self._can_found(row) & all_valid & (npick == 2)
-                    & (first == 0) & (second > 0))
-        enh_ok = (act & self._can_enhance(row) & all_valid & (npick >= 1)
-                  & (cnt == self._enhanceable(row).long()).all(dim=1))
+        once = (cnt <= 1).all(dim=1)                  # one belief of each class
+        found_ok = (act & self._can_found(row) & all_valid & once
+                    & (npick == self._religion_initial_beliefs) & (first == 0))
+        enh_ok = (act & self._can_enhance(row) & all_valid & once
+                  & (npick == self._belief_picks(row))
+                  & ~((cnt > 0) & ~self._enhanceable(row)).any(dim=1))
         ok = found_ok | enh_ok
         if not bool(ok.any()):
             return
@@ -2513,6 +2537,9 @@ class SimPhase:
         # a Worship belief puts its building on the buildable list
         self._eff_version += 1
         self.civ_religion_done[:, row] = self.civ_religion_done[:, row] | found_ok
+        self.civ_beliefs_earned[:, row] = torch.where(
+            found_ok, torch.full_like(self.civ_beliefs_earned[:, row], self._religion_initial_beliefs),
+            self.civ_beliefs_earned[:, row])
         self._add_era_score(row, self._era_pts["religion"], found_ok.long())
         _alv = self.city_alive[:, row]
         _cap = self.city_is_cap[:, row] & _alv
@@ -2527,7 +2554,6 @@ class SimPhase:
         if bool(_gr.any()):
             gb = _gr.nonzero(as_tuple=True)[0]
             self.city_pressure[gb, row, _h_slot[gb], row] += self._holy_founding_per_pop * self.city_pop[gb, row, _h_slot[gb]].long()
-        self.civ_enhanced[:, row] = self.civ_enhanced[:, row] | enh_ok
 
     #: Reset on an ownership change: a captured unit never carries its old
     #: fortification, its old owner's aura, or movement — movesLeft = 0

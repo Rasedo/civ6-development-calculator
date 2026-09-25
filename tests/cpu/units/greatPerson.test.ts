@@ -20,6 +20,10 @@ import { BARB_SEAT } from '../../../cpu/core/seats';
 import { neighbors, hexDistance } from '../../../world/hex';
 import { isWater, isImpassable } from '../../../world/query';
 import { completeQueueItem } from '../../../cpu/core/production';
+import { rosterCS } from '../../../cpu/core/combat';
+import { xpToNextLevel } from '../../../cpu/core/promotions';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
+import { CIV_LEADERS } from '../../../cpu/data/seats';
 import type { GameState, QueueItem, Unit } from '../../../cpu/core/types';
 
 // — A GREAT PERSON IS PLACED AND USED. CIV6 ("Activating Great People"): the
@@ -533,5 +537,111 @@ describe('the verb clauses', () => {
     const m0 = mine();
     expect(activateGreatPerson(state, u)).toBe(true);
     expect(mine() - m0).toBe(tiles.length);
+  });
+});
+
+// CIV6 (Expansion2_GreatPeople_Admirals.xml over GreatPeople_Admirals.xml,
+// Expansion2_RemoveData.xml taking the base rows out): Rajendra Chola's
+// ABILITY_CHOLA_NAVAL_COMBAT, Francis Drake's Privateer "with 1 promotion
+// level", Ching Shih's 500 Gold typed ScaleByGameSpeed.
+describe('the Gathering Storm admirals', () => {
+  const found = (id: string) => {
+    const at = GREAT_PEOPLE.ADMIRAL.findIndex((p) => p.id === id);
+    expect(at).toBeGreaterThanOrEqual(0);
+    return at;
+  };
+  const civRow = (civ: string) => CIV_LEADERS.findIndex((l) => l.civ === civ);
+
+  /** a land plot beside open Coast, nobody on either — where a granted hull
+   *  finds water at the first ring of the spawn probe. */
+  function shore(state: GameState): number {
+    const free = (i: number) => !state.units.some((x) => x.tileIndex === i);
+    const t = state.map.tiles.find((x) => !isWater(x) && !isImpassable(x) && !x.district && !x.builtWonder
+      && free(x.index) && neighbors(state.map, x).some((n) => n.terrain === 'COAST' && !isImpassable(n) && free(n.index)));
+    expect(t).toBeDefined();
+    return t!.index;
+  }
+
+  it('the catalog carries the three rows as Gathering Storm layers them', () => {
+    expect(GP_ABILITY.GP_RAJENDRA_CHOLA).toEqual({ perm: { navalCombat: 3 } });
+    expect(GP_ABILITY.GP_FRANCIS_DRAKE).toEqual({ unit: 'PRIVATEER', unitPromotions: 1, perm: { routePlunderPct: 50 } });
+    expect(GP_ABILITY.GP_CHING_SHIH).toEqual({ gold: scaleByGameSpeed(500), perm: { routePlunderPct: 60 } });
+  });
+
+  it('Rajendra Chola: +3 Combat Strength on every naval combat unit of the seat, and no gold', () => {
+    const state = newGame();
+    const seat = state.seats[0];
+    const u = person(state, 'ADMIRAL', found('GP_RAJENDRA_CHOLA'), ownBare(state));
+    const cs = (type: string, s = 0) => rosterCS(state, { type, seat: s, tileIndex: u.tileIndex }, 1, 100, false);
+    const kinds = ['GALLEY', 'QUADRIREME', 'PRIVATEER', 'AIRCRAFT_CARRIER', 'SEA_DOG', 'WARRIOR', 'ADMIRAL'];
+    const before = new Map(kinds.map((k) => [k, cs(k)]));
+    const foe0 = cs('GALLEY', 1);
+    const gold0 = seat.treasury;
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(gpPermOf(seat, 'navalCombat')).toBe(3);
+    for (const k of ['GALLEY', 'QUADRIREME', 'PRIVATEER', 'AIRCRAFT_CARRIER', 'SEA_DOG']) {
+      expect(cs(k), k).toBe(before.get(k)! + 3);
+    }
+    expect(cs('WARRIOR')).toBe(before.get('WARRIOR'));   // a land unit
+    expect(cs('ADMIRAL')).toBe(0);                        // no Combat value, no strength
+    expect(cs('GALLEY', 1)).toBe(foe0);                   // another seat's hull
+    expect(seat.treasury).toBe(gold0);
+  });
+
+  it('Francis Drake: a Privateer one promotion level up, and the +50% plunder', () => {
+    const state = newGame();
+    state.seats[0].civ = civRow('ROME'); // no unique stands in for the Privateer
+    const seat = state.seats[0];
+    const at = shore(state);
+    const u = person(state, 'ADMIRAL', found('GP_FRANCIS_DRAKE'), at);
+    Object.assign(u, { tileIndex: at });
+    const gold0 = seat.treasury;
+    const n0 = state.units.filter((x) => x.seat === 0 && x.type === 'PRIVATEER').length;
+    expect(activateGreatPerson(state, u)).toBe(true);
+    const made = state.units.filter((x) => x.seat === 0 && x.type === 'PRIVATEER');
+    expect(made.length).toBe(n0 + 1);
+    const p = made[made.length - 1]!;
+    expect(isWater(state.map.tiles[p.tileIndex])).toBe(true);
+    expect(p.xp).toBe(xpToNextLevel(p));
+    expect(p.xp).toBeGreaterThan(0);
+    expect(gpPermOf(seat, 'routePlunderPct')).toBe(50);
+    expect(seat.treasury).toBe(gold0);
+  });
+
+  it('...and the civilization\'s own unique where it has one (UniqueOverride)', () => {
+    const state = newGame();
+    state.seats[0].civ = civRow('ENGLAND');
+    const at = shore(state);
+    const u = person(state, 'ADMIRAL', found('GP_FRANCIS_DRAKE'), at);
+    Object.assign(u, { tileIndex: at });
+    const dogs0 = state.units.filter((x) => x.seat === 0 && x.type === 'SEA_DOG').length;
+    const priv0 = state.units.filter((x) => x.seat === 0 && x.type === 'PRIVATEER').length;
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(state.units.filter((x) => x.seat === 0 && x.type === 'SEA_DOG').length).toBe(dogs0 + 1);
+    expect(state.units.filter((x) => x.seat === 0 && x.type === 'PRIVATEER').length).toBe(priv0);
+  });
+
+  it('three more rows as the layered install writes them', () => {
+    // GREATPERSON_GRACE_HOPPER_ACTIVE Amount 2; GREATPERSON_1MODERNATOMICTECHBOOST
+    // Modern..Atomic; GREATPERSON_SAMORI_TURE_ACTIVE UNIT_SPEC_OPS Experience -1
+    expect(GP_ABILITY.GP_GRACE_HOPPER).toEqual({ freeTechRandom: 2 });
+    expect(GP_ABILITY.GP_ALBERT_EINSTEIN).toEqual({ eurekaRandom: 1, eurekaHi: 1 });
+    expect(GP_ABILITY.GP_SAMORI_TOURE).toEqual({ unit: 'SPEC_OPS', unitPromotions: 1 });
+    const state = newGame();
+    const techs = state.seats[0].research.techs;
+    const n0 = techs.length;
+    const u = person(state, 'ADMIRAL', found('GP_GRACE_HOPPER'), ownBare(state));
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(techs.length).toBe(n0 + 2);
+  });
+
+  it('Ching Shih: 500 Gold on Standard speed, scaled by this game\'s speed', () => {
+    const state = newGame();
+    const seat = state.seats[0];
+    const u = person(state, 'ADMIRAL', found('GP_CHING_SHIH'), ownBare(state));
+    const gold0 = seat.treasury;
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(seat.treasury).toBe(gold0 + scaleByGameSpeed(500));
+    expect(gpPermOf(seat, 'routePlunderPct')).toBe(60);
   });
 });

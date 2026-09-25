@@ -25,11 +25,34 @@ export function borderGrowthCost(n: number): number {
   return Math.floor(10 + Math.pow(6 * (n + 1), 1.3));
 }
 
-/** Gold price of buying a building/unit = production cost × this (Civ 6). */
-export const GAME_SPEED = srcConst('gameSpeed', 0.6, {
-  stylized: 'the COMPRESSION this engine plays at — every install production cost passes through '
-    + 'it; the install\'s own GameSpeeds table has no 0.6 row',
-});
+/**
+ * THE ONLINE SPEED. CIV6 (GameSpeeds.xml, GAMESPEED_ONLINE): `CostMultiplier`
+ * 50 — every production and research cost is half its Standard-speed row.
+ * Lab 2 scene G read `Cost × 0.5` on all 302 priced rows of one city
+ * (runs/purchase_20260920T181359Z.jsonl). No expansion or DLC pack writes a
+ * GameSpeeds row. The game's length is the online `GameSpeed_Turns` rows'
+ * sum, `TURN_LIMIT`.
+ */
+export const GAME_SPEED = srcConst('scenario.gameSpeed', 0.5,
+  xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CostMultiplier',
+    { scale: 0.01, note: 'the install writes a percent; this engine holds the fraction' }));
+
+/**
+ * A Standard-speed figure at the online speed: `× CostMultiplier / 100`,
+ * TRUNCATED. The one composer for every figure the install scales by the
+ * speed — a production or research cost, a cost progression's step, and a
+ * modifier amount the install types `ScaleByGameSpeed` or flags `Scale` (a
+ * Great Person's grant, a tribal village's Gold). Truncated as the lab read
+ * every odd cost: a Slinger (Cost 35) costs 17, a Spy (225) 112, a Canal (81)
+ * 40 — 21 units and 17 districts in runs/purchase_20260920T181359Z.jsonl.
+ * The amounts take the same multiplier: `ScaleByGameSpeed` names the speed,
+ * and the speed's one published multiplier is `CostMultiplier` (the
+ * `GameSpeed_Scalings` HALF / SLIGHT rows are named by no row a Gathering
+ * Storm game loads). The GPU twin is `Rules.scale_by_game_speed`.
+ */
+export function scaleByGameSpeed(n: number): number {
+  return Math.floor(n * GAME_SPEED);
+}
 
 /** THE PURCHASE PRICE, measured live (lab 2 scene G — all 302 priced rows of
  *  one city fitted, then a real 445-gold transaction; runs/purchase_*.jsonl):

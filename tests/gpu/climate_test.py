@@ -327,8 +327,13 @@ def main() -> int:
     _emit_points(s9, row, 4)  # two degrees
     assert abs(float(s9._warming_degrees()[b]) - 2.0) < 1e-9
     rows9 = s9._event_rows()
-    cipd = (s9._flood_cipd + [0.0] * (len(s9._kilimanjaro_weight) + len(s9._eruption_weight))
-            + s9._st_cipd + [0.0] * len(s9._accident_weight) + s9._drought_cipd)
+    # the live table's order: Eyjafjallajokull's two eruptions, the floods,
+    # the other six eruptions, the storms, the accidents, the droughts, the
+    # meteor (no column) and the fires (50 each)
+    assert s9._fire_cipd == [50, 50]
+    cipd = ([0.0, 0.0] + s9._flood_cipd + [0.0] * (len(s9._eruption_weight) - 2)
+            + s9._st_cipd + [0.0] * len(s9._accident_weight) + s9._drought_cipd
+            + [0.0] + s9._fire_cipd)
     assert len(cipd) == len(rows9)
     for (_f, _s, w), c0, pct in zip(rows9, cold, cipd):
         # weight x (1 + CIPD/100 x degrees): the floods x1.4, a worse storm

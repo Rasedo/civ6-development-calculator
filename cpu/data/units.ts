@@ -5,7 +5,7 @@
  * design; great people arrive by points, never production).
  */
 
-import { GAME_SPEED } from './constants';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
 import { TECHS, ERAS } from './techs';
 import { CIVICS } from './civics';
 import type { CivId } from './seats';
@@ -387,9 +387,19 @@ export interface UnitDef {
 
 const U = (def: UnitDef): UnitDef => ({
   ...def,
-  cost: Math.round(def.cost * GAME_SPEED),
-  ...(def.costStep === undefined ? {} : { costStep: Math.round(def.costStep * GAME_SPEED) }),
+  cost: scaleByGameSpeed(def.cost),
+  ...(def.costStep === undefined ? {} : { costStep: scaleByGameSpeed(def.costStep) }),
 });
+
+/** CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): what each earlier copy
+ *  adds to the next Settler's and the next Builder's Cost, at Standard speed.
+ *  Their own price columns charge them (`settlerCost`, `builderCost`), never
+ *  the generic `costStep`, which counts acquisitions rather than the
+ *  settlers fielded or the builders trained. */
+export const SETTLER_COST_STEP = srcConst('units.settlerCostStep', 30,
+  xml('Units', 'UnitType=UNIT_SETTLER', 'CostProgressionParam1'));
+export const BUILDER_COST_STEP = srcConst('units.builderCostStep', 4,
+  xml('Units', 'UnitType=UNIT_BUILDER', 'CostProgressionParam1'));
 
 export const UNITS: Record<string, UnitDef> = Object.fromEntries(
   [

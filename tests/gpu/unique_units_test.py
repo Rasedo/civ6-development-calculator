@@ -79,7 +79,6 @@ def main() -> int:
     ids = [u["id"] for u in rules.units]
     idx = {u: i for i, u in enumerate(ids)}
     civs = list(rules.uniques["civs"])
-    speed = float(sim.rules.game_speed)
 
     # 1 — every row reached the wire with the install's numbers
     for uid, (civ, repl, cost, moves, combat) in ROWS.items():
@@ -90,7 +89,7 @@ def main() -> int:
         assert got_repl == repl, f"{uid} replaces {got_repl}, wanted {repl}"
         assert int(r["moves"]) == moves, f"{uid} moves"
         assert int(r["combat"]) == combat, f"{uid} combat"
-        assert int(r["cost"]) == round(cost * speed), f"{uid} cost"
+        assert int(r["cost"]) == sim.rules.scale_by_game_speed(cost), f"{uid} cost"
     print(f"  1 catalog OK — {len(ROWS)} rows, every one keyed to its civilization")
 
     # 2 — the ability columns landed on the right chassis
@@ -367,7 +366,8 @@ def main() -> int:
     # ...and the governor improvements follow them, then Pachacuti's Qhapaq Ñan
     assert _iids.index("FISHERY") == 35 and _iids.index("CITY_PARK") == 36,         "a governor improvement's build column moved"
     assert _iids.index("MOUNTAIN_ROAD") == 37, "the Qhapaq Ñan build column moved"
-    assert len(_iids) == 38, "a build column was added without a pin"
+    assert _iids.index("OFFSHORE_WIND_FARM") == 38, "the Offshore Wind Farm build column moved"
+    assert len(_iids) == 39, "a build column was added without a pin"
     _byid = {r["id"]: r for r in _irows}
     for _n in _WANT_I:
         assert int(_byid[_n]["uniq"]) >= 0, f"{_n} names no civilization"
