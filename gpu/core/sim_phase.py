@@ -1412,7 +1412,6 @@ class SimPhase:
             made_p = done & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
             if bool(made_p.any()):
                 pi = (cur - self.PROJECT_BASE).clamp(min=0)
-                amt_y = js_round(cost * self._proj_yf)
                 for pidx, prow in enumerate(self._proj_rows):
                     hit = made_p & (pi == pidx)
                     if not bool(hit.any()):
@@ -1422,6 +1421,8 @@ class SimPhase:
                     # goes on to do, so the score lands FIRST, as TS's does.
                     self._score_project(row, hit, pidx)
                     y_i = int(prow.get("y", -1))
+                    # `projectYieldLump`: the cost at the row's own percent
+                    amt_y = js_round(cost * (self._proj_yp[pidx] / 100))
                     # ORACLE: applyLumpYield's science/culture arms feed the
                     # LIFETIME banks alongside the pools.
                     if y_i == 3:

@@ -91,7 +91,10 @@ export interface ImprovementDef {
    *  (`adjacentPlotTarget`). */
   adjacentPlot?: boolean;
   /** CIV6 (Improvement_ValidFeatures): the ONLY features the row may stand
-   *  on; absent leaves the feature unchecked, as the older rows are. */
+   *  on. Absent is the install writing no row, and the row refuses every
+   *  feature plot. Every arm of `validImprovementsIn` that reads the catalog's
+   *  ground clause reads it; the Farm, Mine, Lumber Mill, Seaside Resort and
+   *  the resource rows spell their own ground. */
   features?: FeatureId[];
   /** CIV6 (a SINGLE_PLOT modifier): extra yields while standing on one of
    *  these features (the Sphinx's Floodplains Culture). */
@@ -122,8 +125,6 @@ export interface ImprovementDef {
   power?: number;
   /** built by the MILITARY ENGINEER rather than the Builder. */
   engineer?: boolean;
-  /** refuses a tile that still carries a feature. */
-  noFeature?: boolean;
   /** the row may stand ONLY on this feature (the Geothermal Plant). */
   requiresFeature?: FeatureId;
   /** what the row pays extra on a RIVER tile (the Lumber Mill's second
@@ -493,7 +494,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     ...RENEWABLE_SUBSIDY,
     elevations: ['FLAT'],
     excludeTerrains: ['SNOW'],
-    noFeature: true,
     description: 'Flat non-snow land with no feature. Supplies 2 Power to its city from the sun.',
     src: {
       ...renewableSubsidySrc('SOLAR_FARM'),
@@ -506,7 +506,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       groundOnly: xml('Improvements', 'ImprovementType=IMPROVEMENT_SOLAR_FARM', 'Domain', { expect: 'DOMAIN_LAND' }),
       power: xml('ModifierArguments', 'ModifierId=SOLAR_FARM_GENERATE_POWER&Name=Amount', 'Value'),
       elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_SOLAR_FARM', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_SOLAR_FARM', 'TerrainType')] },
-      noFeature: { derived: 'true where the install writes no Improvement_ValidFeatures row for the row', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_SOLAR_FARM', 'FeatureType')] },
     },
   },
   // CIV6 (Wind Farm): "Provides 2 Power per turn", "+2 Gold" and "+1
@@ -523,7 +522,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     power: 2,
     ...RENEWABLE_SUBSIDY,
     elevations: ['HILLS'],
-    noFeature: true,
     description: 'Hills with no feature. Supplies 2 Power to its city from the wind.',
     src: {
       ...renewableSubsidySrc('WIND_FARM'),
@@ -536,7 +534,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       groundOnly: xml('Improvements', 'ImprovementType=IMPROVEMENT_WIND_FARM', 'Domain', { expect: 'DOMAIN_LAND' }),
       power: xml('ModifierArguments', 'ModifierId=WIND_FARM_GENERATE_POWER&Name=Amount', 'Value'),
       elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_WIND_FARM', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_WIND_FARM', 'TerrainType')] },
-      noFeature: { derived: 'true where the install writes no Improvement_ValidFeatures row for the row', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_WIND_FARM', 'FeatureType')] },
     },
   },
   // CIV6 (Geothermal Plant): "+1 Science", "+2 Production" and "Provides 4
@@ -555,7 +552,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     ...RENEWABLE_SUBSIDY,
     requiresFeature: 'GEOTHERMAL_FISSURE',
     description: 'A Geothermal Fissure. Supplies 4 Power to its city from the ground.',
+    features: ['GEOTHERMAL_FISSURE'],
     src: {
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_GEOTHERMAL_PLANT, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_GEOTHERMAL_PLANT', 'FeatureType')] },
       ...renewableSubsidySrc('GEOTHERMAL'),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_GEOTHERMAL_PLANT', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_GEOTHERMAL_PLANT', 'PlunderAmount'),
@@ -586,10 +585,12 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     // Fort's own columns; the Great Wall and the Pa carry the same pair.
     defenseCS: 4,
     grantsFortification: 2,
-    // CIV6 (Fort): "can be built on any featureless land tile".
-    noFeature: true,
+    // CIV6 (Fort): "can be built on any featureless land tile"; its one
+    // Improvement_ValidFeatures row is Volcanic Soil.
     description: 'Military Engineer only, featureless land. Occupying unit gets +4 defense strength and 2 turns of fortification.',
+    features: ['VOLCANIC_SOIL'],
     src: {
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_FORT, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_FORT', 'FeatureType')] },
       housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_FORT', 'Housing'),
       resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_FORT', 'ResourceType')] },
       engineer: xml('Improvement_ValidBuildUnits', 'ImprovementType=IMPROVEMENT_FORT&UnitType=UNIT_MILITARY_ENGINEER', 'UnitType', { expect: 'UNIT_MILITARY_ENGINEER' }),
@@ -617,7 +618,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     appealAdjacent: -1,
     airSlots: 3,
     description: 'Military Engineer only, flat land. Bases 3 aircraft and costs its neighbours a point of appeal.',
+    features: ['VOLCANIC_SOIL'],
     src: {
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_AIRSTRIP, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_AIRSTRIP', 'FeatureType')] },
       housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_AIRSTRIP', 'Housing'),
       resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_AIRSTRIP', 'ResourceType')] },
       engineer: xml('Improvement_ValidBuildUnits', 'ImprovementType=IMPROVEMENT_AIRSTRIP&UnitType=UNIT_MILITARY_ENGINEER', 'UnitType', { expect: 'UNIT_MILITARY_ENGINEER' }),
@@ -643,7 +646,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
     elevations: ['FLAT'],
     description: 'Military Engineer only, flat land. Launches nuclear devices at range.',
+    features: ['VOLCANIC_SOIL'],
     src: {
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_MISSILE_SILO, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_MISSILE_SILO', 'FeatureType')] },
       housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_MISSILE_SILO', 'Housing'),
       resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_MISSILE_SILO', 'ResourceType')] },
       engineer: xml('Improvement_ValidBuildUnits', 'ImprovementType=IMPROVEMENT_MISSILE_SILO&UnitType=UNIT_MILITARY_ENGINEER', 'UnitType', { expect: 'UNIT_MILITARY_ENGINEER' }),
@@ -706,9 +711,8 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     housing: 0,
     resourceOnly: false,
     suzerainOf: 'La Venta',
-    // CIV6: "Cannot be built on Snow or Snow Hills." The page's terrain list
-    // also names Volcanic Soil, which this map has no carrier for — an
-    // eruption enriches the ground it stands on instead of retexturing it.
+    // CIV6: "Cannot be built on Snow or Snow Hills."; its one
+    // Improvement_ValidFeatures row is Volcanic Soil.
     excludeTerrains: ['SNOW'],
     // CIV6: "+1 Faith for every 2 adjacent Woods or Rainforests (increasing to
     // +1 Faith for every adjacent Woods or Rainforest with Humanism)."
@@ -720,7 +724,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     tourismFrom: 'faith',
     tourismTech: 'FLIGHT',
     description: '+2 faith, +1 more per 2 adjacent Woods/Rainforest (per 1 with Humanism). Anywhere but snow.',
+    features: ['VOLCANIC_SOIL'],
     src: {
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_COLOSSAL_HEAD, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_COLOSSAL_HEAD', 'FeatureType')] },
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_COLOSSAL_HEAD', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_COLOSSAL_HEAD', 'PlunderAmount'),
       'yields.faith': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_COLOSSAL_HEAD&YieldType=YIELD_FAITH', 'YieldChange'),
@@ -784,7 +790,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     power: 2,
     ...RENEWABLE_SUBSIDY,
     terrains: ['COAST', 'LAKE'],
-    noFeature: true,
     description: 'Coast or Lake with no feature. Supplies 2 Power to its city from the wind.',
     src: {
       ...renewableSubsidySrc('OFFSHORE_WIND_FARM'),
@@ -796,7 +801,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       waterOnly: xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'Domain', { expect: 'DOMAIN_SEA' }),
       power: xml('ModifierArguments', 'ModifierId=OFFSHORE_WIND_FARM_GENERATE_POWER&Name=Amount', 'Value'),
       terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_OFFSHORE_WIND_FARM, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'TerrainType')] },
-      noFeature: { derived: 'true where the install writes no Improvement_ValidFeatures row for the row', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'FeatureType')] },
     },
   },
   // CIV6 (Civilizations.xml): the roster's UNIQUE IMPROVEMENTS, each read off
@@ -869,7 +873,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
         upgradeTech: 'REPLACEABLE_PARTS', upgradePer: 1 },
     ],
     description: '+1 food, +1 housing on hills. +1 food per adjacent mountain, +2 production per adjacent Aqueduct, and its own kind beside it from Feudalism.',
+    features: ['VOLCANIC_SOIL'],
     src: {
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_TERRACE_FARM, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_TERRACE_FARM', 'FeatureType')] },
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_TERRACE_FARM', 'PlunderType', { expect: 'PLUNDER_HEAL' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_TERRACE_FARM', 'PlunderAmount'),
       'yields.food': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_TERRACE_FARM&YieldType=YIELD_FOOD', 'YieldChange'),
@@ -1370,7 +1376,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     // a Builder row on WATER whose ground rule is its terrain list alone
     waterOnly: true,
     terrains: ['COAST', 'LAKE'],
-    noFeature: true,
     adjacentLandMin: 3,
     movementCost: 3,
     // CIV6 (Polder_Polder_Food_Early/Late, Polder_Polder_Production)
@@ -1391,7 +1396,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       uniqueTo: xml('CivilizationTraits', 'TraitType=TRAIT_CIVILIZATION_IMPROVEMENT_POLDER', 'CivilizationType', { expect: 'CIVILIZATION_NETHERLANDS' }),
       waterOnly: xml('Improvements', 'ImprovementType=IMPROVEMENT_POLDER', 'Domain', { expect: 'DOMAIN_SEA' }),
       terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_POLDER, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_POLDER', 'TerrainType')] },
-      noFeature: { derived: 'true where the install writes no Improvement_ValidFeatures row for the row', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_POLDER', 'FeatureType')] },
       adjacentLandMin: xml('Improvements', 'ImprovementType=IMPROVEMENT_POLDER', 'ValidAdjacentTerrainAmount'),
       movementCost: xml('Improvements', 'ImprovementType=IMPROVEMENT_POLDER', 'MovementChange', { expect: 2, note: 'MovementChange is the surcharge; the catalog holds the whole cost (1 + 2)' }),
       'adjacency.0.sameImprovement': xml('Adjacency_YieldChanges', 'ID=Polder_Polder_Food_Early', 'AdjacentImprovement', { expect: 'IMPROVEMENT_POLDER' }),
@@ -1472,7 +1476,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     resourceOnly: false,
     waterOnly: true,
     terrains: ['COAST'],
-    noFeature: true,
     governorPromo: 'AQUACULTURE',
     governorYields: { promo: 'AQUACULTURE', yields: { production: 1 } },
     // Improvement_Adjacencies -> Fishery_SeaResourceAdjacency:
@@ -1487,7 +1490,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_FISHERY', 'ResourceType')] },
       waterOnly: xml('Improvements', 'ImprovementType=IMPROVEMENT_FISHERY', 'Domain', { expect: 'DOMAIN_SEA' }),
       terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_FISHERY, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_FISHERY', 'TerrainType')] },
-      noFeature: { derived: 'true where the install writes no Improvement_ValidFeatures row for the row', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_FISHERY', 'FeatureType')] },
       'governorYields.yields.production': xml('ModifierArguments', 'ModifierId=FISHERY_GOVERNOR_PRODUCTION&Name=Amount', 'Value'),
       'adjacency.0.seaResource': xml('Adjacency_YieldChanges', 'ID=Fishery_SeaResourceAdjacency', 'AdjacentSeaResource', { expect: true }),
       'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=Fishery_SeaResourceAdjacency', 'TilesRequired'),

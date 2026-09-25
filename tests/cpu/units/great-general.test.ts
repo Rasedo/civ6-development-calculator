@@ -3,7 +3,7 @@ import { isCiv, seatOf, setWar, tileSeat } from '../../../cpu/core/seats';
 import { endTurn } from '../../../cpu/core/game';
 import { seededGame } from '../helpers';
 import { spawnUnit, unitDomain, trainableUnits } from '../../../cpu/core/units';
-import { isImpassable } from '../../../world/query';
+import { isImpassable, isWater } from '../../../world/query';
 import { generalAuraCS, meleeAttack } from '../../../cpu/core/combat';
 import { GENERAL_AURA_CS } from '../../../cpu/core/aura';
 import { neighbors, hexDistance } from '../../../world/hex';
@@ -22,12 +22,14 @@ function newGame(): GameState {
   return state;
 }
 
-/** A free land tile at exactly `dist` from `ctr` (no unit, not a city center). */
+/** A free, passable land tile at exactly `dist` from `ctr` (no unit, not a
+ *  city center), read off whatever world the seed generates. */
 function tileAt(state: GameState, ctr: number, dist: number, banned: number[] = []): number {
   const c = state.map.tiles[ctr];
   for (const t of state.map.tiles) {
     if (t.index === ctr || banned.includes(t.index)) continue;
     if ((tileSeat(t)) === 0) continue;
+    if (isWater(t) || isImpassable(t)) continue;
     if (hexDistance(c.col, c.row, t.col, t.row) !== dist) continue;
     if (state.units.some((u) => u.tileIndex === t.index)) continue;
     return t.index;
@@ -99,10 +101,20 @@ describe('aura', () => {
       const state = newGame();
       setWar(state, (state.seats[(0) + 1] as Seat).seat, 0, true);
       const cap = seatOf(state, 0)!.cities[0].centerIndex;
-      const at = tileAt(state, cap, 3);
-      const nb = neighbors(state.map, state.map.tiles[at]).find(
-        (n) => tileSeat(n) !== 0 && !isImpassable(n),
-      )!;
+      // the first land plot 3 out with a free land plot beside it for the defender
+      const land = (n: { index: number }) => {
+        const t = state.map.tiles[n.index];
+        return tileSeat(t) !== 0 && !isImpassable(t) && !isWater(t)
+          && !state.units.some((u) => u.tileIndex === t.index);
+      };
+      const banned: number[] = [];
+      let at = tileAt(state, cap, 3);
+      while (at >= 0 && !neighbors(state.map, state.map.tiles[at]).some(land)) {
+        banned.push(at);
+        at = tileAt(state, cap, 3, banned);
+      }
+      expect(at).toBeGreaterThanOrEqual(0);
+      const nb = neighbors(state.map, state.map.tiles[at]).find(land)!;
       const atk = spawnUnit(state, 'WARRIOR', at, 0)!;
       atk.tileIndex = at;
       atk.movesLeft = UNITS.WARRIOR.moves;

@@ -61,10 +61,12 @@ describe('the military engineer', () => {
     expect(engineerTileOk(tile({ ownerSeat: 3 } as Partial<Tile>), () => false)).toBe(false);
   });
 
-  it('refuses a Fort on a featured tile and an Airstrip on hills', () => {
+  it('refuses a Fort or an Airstrip on Woods, takes both on Volcanic Soil, and no Airstrip on hills', () => {
+    // CIV6 (Improvement_ValidFeatures): both rows list Volcanic Soil alone
     const eng = { ...opts, builder: 'MILITARY_ENGINEER' };
     expect(validImprovementsIn(tile({ feature: 'WOODS' }), eng)).not.toContain('FORT');
-    expect(validImprovementsIn(tile({ feature: 'WOODS' }), eng)).toContain('AIRSTRIP');
+    expect(validImprovementsIn(tile({ feature: 'WOODS' }), eng)).not.toContain('AIRSTRIP');
+    expect(validImprovementsIn(tile({ feature: 'VOLCANIC_SOIL' }), eng)).toEqual(expect.arrayContaining(['FORT', 'AIRSTRIP']));
     expect(validImprovementsIn(tile({ elevation: 'HILLS' }), eng)).toContain('FORT');
     expect(validImprovementsIn(tile({ elevation: 'HILLS' }), eng)).not.toContain('AIRSTRIP');
   });

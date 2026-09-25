@@ -26,7 +26,7 @@ import type { GameMap, MapGenOptions, TerrainId, Tile } from './types';
 import { RESOURCES, type ResourceDef } from './resources';
 import { TERRAINS } from './terrains';
 import { naturalWonderAt } from './query';
-import { WONDERS, wonderQuota, type NaturalWonderDef } from './wonders';
+import { MIN_DISTANCE_NW, WONDERS, wonderQuota, type GroundKind, type NaturalWonderDef } from './wonders';
 
 export function generateMap(opts: MapGenOptions): GameMap {
   const width = opts.width;
@@ -303,17 +303,23 @@ function wonderTileValid(
   if (def.spawn.water) {
     return t.terrain === 'COAST' && t.feature !== 'ICE';
   }
-  // CIV6 (Feature_ValidTerrains, NoCoast, NoRiver): rules of every plot the
-  // wonder covers, not only its anchor
-  if (TERRAINS[t.terrain].water || (t.elevation === 'MOUNTAIN') !== !!def.spawn.mountain) return false;
-  if (def.spawn.terrains && !def.spawn.terrains.includes(t.terrain)) return false;
-  if (def.spawn.noRiver && t.riverMask !== 0) return false;
-  if (
-    def.spawn.inland &&
-    neighbors(map, t).some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN')
-  ) {
-    return false;
-  }
+  // CIV6 (Feature_ValidTerrains, Feature_(Not)AdjacentTerrains,
+  // Feature_AdjacentFeatures, NoCoast, Coast, NoRiver, NoAdjacentFeatures):
+  // rules of every plot the wonder covers, not only its anchor
+  const sp = def.spawn;
+  if (TERRAINS[t.terrain].water) return false;
+  if (!sp.terrains?.includes(t.terrain) || !sp.elevations?.includes(t.elevation)) return false;
+  if (sp.noRiver && t.riverMask !== 0) return false;
+  const nb = neighbors(map, t);
+  const salt = nb.some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN');
+  if (sp.inland && salt) return false;
+  if (sp.coast && !salt) return false;
+  const on = (kinds: readonly GroundKind[], n: Tile) =>
+    kinds.some(([terrain, elevation]) => n.terrain === terrain && n.elevation === elevation);
+  if (sp.adjacentTerrains && !nb.some((n) => on(sp.adjacentTerrains!, n))) return false;
+  if (sp.notAdjacentTerrains && nb.some((n) => on(sp.notAdjacentTerrains!, n))) return false;
+  if (sp.adjacentFeatures && !nb.some((n) => n.feature !== null && sp.adjacentFeatures!.includes(n.feature))) return false;
+  if (sp.noAdjacentFeatures && nb.some((n) => n.feature !== null)) return false;
   return true;
 }
 
@@ -340,7 +346,7 @@ function placeWonders(map: GameMap, seed: number): void {
       if (tiles.length < def.size) continue;
       if (
         placedTiles.some((p) =>
-          tiles.some((t) => hexDistance(p.col, p.row, t.col, t.row) < 6),
+          tiles.some((t) => hexDistance(p.col, p.row, t.col, t.row) < MIN_DISTANCE_NW),
         )
       ) {
         continue;

@@ -94,6 +94,18 @@ describe('the mountain tunnel', () => {
     expect(tunnelTarget(s.map, stand, mine)).not.toBe(t);
   });
 
+  it('refuses a natural wonder\'s mountain: the row lists no feature', () => {
+    // CIV6 (Improvement_ValidFeatures): no row for IMPROVEMENT_MOUNTAIN_TUNNEL
+    // or IMPROVEMENT_MOUNTAIN_ROAD, so a feature plot refuses both
+    const s = ridge([3, 4, 5]);
+    const stand = tileAtCoords(s.map, 4, 6);
+    const first = tunnelTarget(s.map, stand, mine);
+    s.map.tiles[first].feature = 'MOUNT_KILIMANJARO';
+    const next = tunnelTarget(s.map, stand, mine);
+    expect(next).not.toBe(first);
+    expect(adjacentPlotTarget(s.map, stand, IMPROVEMENTS.MOUNTAIN_ROAD, mine)).toBe(next);
+  });
+
   it('refuses a mountain inside ANOTHER seat\'s borders', () => {
     // CIV6 (`CanBuildOutsideTerritory`): outside means UNOWNED. A tile inside
     // another seat's borders is nobody's to improve, so the widening the flag

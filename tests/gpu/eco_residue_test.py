@@ -109,17 +109,26 @@ def test_policy_unlock(sim, rj) -> None:
 def test_minor_palace(sim) -> None:
     alive = sim.citystate_alive[0]
     assert bool(alive.any()), "the world has no living city-state"
-    s = int(alive.long().argmax())
+    assert not bool(sim._palace_at(sim.FREE_ROW, slice(0, sim.RC)).any())
+    real = sim._palace_at
+
+    def gold_of(row: int, palace: bool) -> float:
+        sim._palace_at = real if palace else (lambda r, sl: sim.city_is_cap[:, r, sl])
+        sim._eff_version += 1
+        g = float(sim._seat_city_stats(row)[0][0, 0, 2])
+        sim._palace_at = real
+        sim._eff_version += 1
+        return g
+
+    # the first minor whose city earns no Gold of its own without the Palace:
+    # taking the Palace away also takes 10% off the city's other yields, so a
+    # plot paying Gold would blur the flat +5 under test
+    s = next((m for m in alive.nonzero().flatten().tolist()
+              if gold_of(sim._CITY_MINOR0 + m, False) == 0.0), -1)
+    assert s >= 0, "every city-state's city earns Gold of its own"
     row = sim._CITY_MINOR0 + s
     assert bool(sim._palace_at(row, slice(0, sim.RC))[0, 0])
-    assert not bool(sim._palace_at(sim.FREE_ROW, slice(0, sim.RC)).any())
-    gold = float(sim._seat_city_stats(row)[0][0, 0, 2])
-    real = sim._palace_at
-    sim._palace_at = lambda r, sl: sim.city_is_cap[:, r, sl]
-    sim._eff_version += 1
-    bare = float(sim._seat_city_stats(row)[0][0, 0, 2])
-    sim._palace_at = real
-    sim._eff_version += 1
+    gold, bare = gold_of(row, True), gold_of(row, False)
     assert gold - bare == 5.0, (gold, bare)
     print(f"  3 a city-state's Palace pays +5 Gold (minor {s}: {bare} -> {gold}) OK")
 

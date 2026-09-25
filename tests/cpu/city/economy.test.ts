@@ -7,7 +7,7 @@ import { commitProduction } from '../../../cpu/core/seatTurn';
 import { PEACE_GOLD_COST } from '../../../cpu/data/seats';
 import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount, purchaseSpotBlocked } from '../../../cpu/core/units';
 import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
-import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
+import { PROJECTS, projectYieldLump, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
 import { goldPurchasableBuildings } from '../../../cpu/core/rules';
 import { purchaseStep } from '../../../cpu/core/effects';
 import { scaleByGameSpeed } from '../../../cpu/data/constants';
@@ -258,7 +258,8 @@ describe('district projects', () => {
     city.queue[0].progress = cost; // about to finish
     const sciBefore = seatOf(state, 0)!.scienceTotal;
     endTurn(state);
-    const lump = Math.round(cost * PROJECT_YIELD_FRACTION);
+    const lump = projectYieldLump(PROJECTS.RESEARCH_GRANTS, cost);
+    expect(lump).toBe(Math.round(cost * 0.15));
     const gpp = Math.round(cost * PROJECT_GPP_FRACTION);
     expect(city.queue.length).toBe(0);
     expect(seatOf(state, 0)!.scienceTotal - sciBefore).toBeGreaterThanOrEqual(lump);
@@ -270,7 +271,7 @@ describe('district projects', () => {
     expect(queueProject(state, city.id, 'RESEARCH_GRANTS', 0).ok).toBe(true);
   });
 
-  it('Encampment Training grants only general points', () => {
+  it('Encampment Training converts 15% of its cost into Gold and pays General points', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
     addDistrict(state, city, 'ENCAMPMENT', 6, 5);
@@ -281,14 +282,21 @@ describe('district projects', () => {
     expect(seatOf(state, 0)!.gpp.GENERAL ?? 0).toBeGreaterThanOrEqual(
       Math.round(cost * PROJECT_GPP_FRACTION),
     );
-    // No yield lump. Asserting a bound derived from PROJECT_YIELD_FRACTION
-    // would test the constant's size, not the project: at the sourced 0.15 the
-    // bound falls below ordinary city gold income. Assert the actual
-    // invariant: TRAINING carries no yield by construction, and no
-    // other GP class moves.
-    expect(PROJECTS.TRAINING.yield).toBeNull();
+    // CIV6 (Project_YieldConversions): YIELD_GOLD at 15% of the Production
+    const lump = projectYieldLump(PROJECTS.TRAINING, cost);
+    expect(PROJECTS.TRAINING.yield).toBe('gold');
+    expect(lump).toBe(Math.round(cost * 0.15));
+    expect(lump).toBeGreaterThan(0);
+    expect(state.eventLog).toContain(`${city.name} completed Encampment Training: +${lump} gold.`);
     expect(seatOf(state, 0)!.gpp.SCIENTIST ?? 0).toBe(0);
     expect(seatOf(state, 0)!.gpp.ARTIST ?? 0).toBe(0);
+  });
+
+  it('each district project converts at its own install percent', () => {
+    const pct = Object.fromEntries(Object.values(PROJECTS).filter((p) => p.yield).map((p) => [p.id, p.yieldPct]));
+    expect(pct).toEqual({ RESEARCH_GRANTS: 15, FESTIVAL: 15, PRAYERS: 15, INVESTMENT: 30, SHIPPING: 15, TRAINING: 15 });
+    expect(projectYieldLump(PROJECTS.INVESTMENT, 100)).toBe(30);
+    expect(PROJECTS.LOGISTICS.yield).toBeNull();
   });
 
   // The Festival is the ONE multi-class project. Real Civ 6 pays Great

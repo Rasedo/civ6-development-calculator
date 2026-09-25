@@ -5422,13 +5422,15 @@ class SimEconomy:
         return t
 
     def _building_tourism(self, row: int, col_mask: torch.Tensor | None = None) -> torch.Tensor:
-        """[B] long — `buildingTourism`: CIV6 (Marae, MARAE_TOURISM_FEATURES)
-        Tourism per owned tile carrying a feature once Flight is held;
-        (Thermal Bath, THERMALBATH_ADDTOURISM) Tourism while the border holds a
-        Geothermal Fissure. A dark building pays nothing. `col_mask` [B, RC]
-        narrows the sum to some of the row's cities."""
+        """[B] long — `buildingTourism`: a building's flat Tourism on its own
+        district (Ferris Wheel, Shopping Mall); CIV6 (Marae,
+        MARAE_TOURISM_FEATURES) Tourism per owned tile carrying a feature once
+        Flight is held; (Thermal Bath, THERMALBATH_ADDTOURISM) Tourism while
+        the border holds a Geothermal Fissure. A dark building pays nothing.
+        `col_mask` [B, RC] narrows the sum to some of the row's cities."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        if row >= self.n_majors or (not self._bvar_tour_feat and not self._bvar_tour_with_feat):
+        if row >= self.n_majors or (not self._b_tour_any and not self._bvar_tour_feat
+                                    and not self._bvar_tour_with_feat):
             return out
         cols = self.RC
         dreg = self.city_dist_tile[:, row, :cols]
@@ -5438,6 +5440,8 @@ class SimEconomy:
         held = (self.city_bldg[:, row, :cols]
                 & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols])
                 & alive.unsqueeze(2))
+        if self._b_tour_any:
+            out = out + (held.long() * self._b_tourism).sum(dim=(1, 2))
         feat_cnt = None
         for (bi, c), (amt, tech) in self._bvar_tour_feat.items():
             w = self._row_plays_idx(row, c)

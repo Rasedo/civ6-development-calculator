@@ -31,7 +31,7 @@ import {
 } from '../data/cityStates';
 import { ENCAMPMENT_HP, UNIT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
-import { PROJECTS, PROJECT_YIELD_FRACTION } from '../data/projects';
+import { PROJECTS, projectYieldLump } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
@@ -123,11 +123,12 @@ export function minorLevyReturn(state: GameState, cityState: CityState): void {
  * THE MINOR'S GRID (`cityPower` over its one city). CIV6 (Power): the load is
  * met all at once or not at all. A city-state holds no stockpile, so no power
  * plant can run for it; its renewables (a Dam, the Solar and Wind Farms on its
- * plots) must carry the whole load.
+ * plots) must carry the whole load — or a running `fullyPowered` project
+ * (Industrial Zone Logistics) meets it, as a major's does.
  */
 export function minorPower(state: GameState, cityState: CityState): void {
   const p = cityPower(state, minorCity(cityState));
-  cityState.powered = p.demand > 0 && p.supply >= p.demand;
+  cityState.powered = p.demand > 0 && (p.supply >= p.demand || !!cityState.fullyPowered);
 }
 
 /** The minor's military units, in unit order. */
@@ -594,10 +595,11 @@ function minorWant(
  *  With no row wanting anything the pot takes it under the city's percent
  *  alone. A district paves its plot (`paveGround`). The repair restores the
  *  walls, the city's and its Encampment's, at the HP it puts back
- *  (`projectCost`); a district project pays its yield conversion, its cost x
- *  `PROJECT_YIELD_FRACTION`, into the minor's own pot for that yield (a
+ *  (`projectCost`); a district project pays its yield conversion, its cost at
+ *  the row's `yieldPct` (`projectYieldLump`), into the minor's own pot for that yield (a
  *  city-state earns no Great People, so its points go nowhere). */
 function minorBuild(state: GameState, cityState: CityState, production: number): void {
+  cityState.fullyPowered = false;
   let pot = cityState.prodProgress ?? 0;
   const toward = (pct: number) => {
     pot += minorProduction(production, pct);
@@ -650,14 +652,17 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
       toward(0);
       const city = minorCity(cityState);
       const cost = projectCost(state, cityState.seat, want.project, city);
-      if (pot < cost) return;
-      cityState.prodProgress = pot - cost;
       const def = PROJECTS[want.project];
+      if (pot < cost) {
+        cityState.fullyPowered = !!def.fullyPowered;
+        return;
+      }
+      cityState.prodProgress = pot - cost;
       if (def.repair) {
         cityState.outerHp = wallsMax(state, city);
         fitEncampOuter(state, city);
       } else if (def.yield) {
-        applyLumpYield(state, cityState.centerIndex, { key: def.yield, amount: Math.round(cost * PROJECT_YIELD_FRACTION) },
+        applyLumpYield(state, cityState.centerIndex, { key: def.yield, amount: projectYieldLump(def, cost) },
           cityState.seat);
       }
       return;

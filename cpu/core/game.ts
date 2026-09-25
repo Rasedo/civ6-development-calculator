@@ -18,7 +18,7 @@ import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlan
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
-import { cityStatePhase, resolveSuzerains, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
+import { cityStatePhase, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
 import { minorPhase } from './minorBuild';
 import { seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
@@ -50,7 +50,7 @@ import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed }
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
+import { BARB_SEAT, allCities, cityHolders, grantFoundingPressure, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
@@ -1841,116 +1841,10 @@ export function serialize(state: GameState): string {
   return JSON.stringify(state);
 }
 
+/** A save is written by `serialize` and read here, by this engine alone:
+ *  the state IS its JSON, so the parse is the whole load. */
 export function deserialize(json: string): GameState {
-  const state = JSON.parse(json) as GameState;
-  for (const sx of state.seats) {
-    sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
-    sx.research.boosted ??= [];
-    sx.government ??= { chosen: null, policies: [], held: 0, civicTurn: 0 };
-    sx.government.civicTurn ??= 0;
-    sx.government.held ??= 0;
-    sx.government.chosen ??= null;
-    sx.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null };
-    sx.religion.enhancer ??= null;
-    // a founded religion with no earned count has earned what it holds
-    if (sx.religion.founded) sx.religion.beliefsEarned ??= beliefsHeld(sx.religion);
-    sx.buildersTrained ??= 0;
-    sx.relicReserve ??= 0;
-    sx.tilesPurchased ??= 0;
-    sx.bestMeleeCS ??= Math.max(
-      0,
-      ...state.units
-        .filter((u) => u.seat === sx.seat && !UNITS[u.type]?.ranged)
-        .map((u) => UNITS[u.type]?.combat ?? 0),
-    );
-  }
-  state.claimedGreatPeople ??= [];
-  if (!state.gpOffer || state.gpOffer.length !== GP_CLASSES.length) state.gpOffer = GP_CLASSES.map((_, i) => state.gpOffer?.[i] ?? -1);
-  if (!state.gpPrice || state.gpPrice.length !== GP_CLASSES.length) state.gpPrice = GP_CLASSES.map((_, i) => state.gpPrice?.[i] ?? 0);
-  for (const t of state.map.tiles) {
-    t.builtWonder ??= null;
-    t.builtWonderComplete ??= false;
-  }
-  state.unitsMode ??= false;
-  state.units ??= [];
-  state.nextUnitId ??= 0;
-  state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
-  state.barbSeat ??= { ...emptySeat(BARB_SEAT), camps: [] };
-  state.barbSeat.camps ??= [];
-  for (const cityState of state.cityStates ?? []) {
-    Object.assign(cityState, { ...emptySeat(seatOfCityState(cityState.id)), ...cityState });
-  }
-  resolveSuzerains(state);
-  for (const s of allSeats(state)) {
-    s.wars ??= [];
-    s.warKinds ??= {};
-    s.denounced ??= {};
-  }
-  for (const s of allSeats(state)) {
-    for (const other of s.wars) {
-      const os = seatOf(state, other);
-      if (os && !os.wars.includes(s.seat)) os.wars.push(s.seat);
-    }
-  }
-  state.disasters ??= false;
-  // gameOver is recomputed every endTurn (turn > TURN_LIMIT); no migration
-  // needed, and adding ??= would break serialize round-trip idempotence for
-  // states that never ran a turn (fresh makeState has it undefined).
-  state.fogOfWar ??= false;
-  for (const s of allSeats(state)) s.explored ??= [];
-  state.eventLog ??= [];
-  state.cityStates ??= [];
-  for (const sx of state.seats) {
-    sx.influencePoints ??= 0;
-    sx.envoysAvailable ??= 0;
-  }
-  state.seats ??= [];
-  // A city is filled in place, ONLY the missing fields: a current-shape save
-  // must round-trip byte-identically (the seat determinism test serializes
-  // and compares).
-  for (const r of state.seats) {
-    r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
-    r.treasury ??= 0;
-    for (const civCity of r.cities) {
-      civCity.seat ??= r.seat;
-      civCity.foodBox ??= 0;
-      civCity.cultureBox ??= 0;
-      civCity.focus ??= 'balanced';
-      civCity.queue ??= [];
-      civCity.isCapital ??= false;
-      civCity.origCapitalSeat ??= -1;
-      civCity.founderSeat ??= civCity.seat;
-      civCity.buildings ??= [];
-      civCity.districts ??= [{ type: 'CITY_CENTER', tileIndex: civCity.centerIndex }];
-      civCity.wonders ??= [];
-    }
-  }
-  state.claimedPantheons ??= [];
-  state.claimedBeliefs ??= [];
-  for (const u of state.units) {
-    u.seat ??= 0; // old saves predate the seat field
-    u.hp ??= 100;
-    // FORTIFY: fill only MILITARY units in place (civilians never carry
-    // the field) so a current-shape save round-trips byte-identically.
-    if (UNITS[u.type]?.charges === undefined) u.fortifyTurns ??= 0;
-  }
-  for (const t of state.map.tiles) {
-    (t as Tile).pillaged ??= false;
-    (t as Tile).districtPillaged ??= false;
-    (t as Tile).goodyHut ??= false;
-    (t as Tile).volcano ??= false;
-    (t as Tile).fertility ??= 0;
-    (t as Tile).fertilityProd ??= 0;
-    (t as Tile).droughtTurns ??= 0;
-  }
-  for (const c of allCities(state)) {
-    c.cultureBox ??= 0;
-    c.tilesAcquired ??= 0;
-    c.wonders ??= [];
-    // productionBank stays optional (readers use ?? 0) so that adding it
-    // here cannot desync serialize(live) vs serialize(roundtripped).
-  }
-  return state;
+  return JSON.parse(json) as GameState;
 }
 
 /** can the seat found its religion now? No seat ban, no religion yet, a

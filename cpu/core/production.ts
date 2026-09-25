@@ -18,7 +18,7 @@ import { governorFlag, governorSum } from './governors';
 import { DISTRICTS } from '../data/districts';
 import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate';
 import { emitCarbon, repairBehindBarrier } from './climate';
-import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
+import { PROJECTS, projectYieldLump, gpClassesOf, gppFractionOf } from '../data/projects';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
@@ -160,7 +160,7 @@ export function completeProject(state: GameState, city: City, projectId: string,
     return;
   }
   if (def.yield) {
-    const amount = Math.round(cost * PROJECT_YIELD_FRACTION);
+    const amount = projectYieldLump(def, cost);
     applyLumpYield(state, city.centerIndex, { key: def.yield, amount }, city.seat);
     state.eventLog.push(`${city.name} completed ${def.name}: +${amount} ${def.yield}.`);
   }

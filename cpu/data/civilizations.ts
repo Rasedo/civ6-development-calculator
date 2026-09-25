@@ -630,11 +630,12 @@ export const KNARR_NAVAL_MELEE_NEUTRAL_HEAL = srcConst('knarrNeutralHeal', 10,
   ma('MELEE_SHIP_HEAL_NEUTRAL', 'Amount', undefined,
     'the clause is the ability ABILITY_HEAL_NEUTRAL_TERRITORY, tagged CLASS_NAVAL_MELEE, and the modifier\'s `Type` is NEUTRAL'));
 
-/** CIV6 (Epic Quest): "Levying units from a city-state costs 50% less Gold." */
-export const EPIC_QUEST_LEVY_MULT = srcConst('epicQuestLevyMult', 0.5, {
-  derived: '1 - Percent/100 — the install writes the DISCOUNT (50) on TRAIT_LEVY_DISCOUNT, the catalog what is left to pay',
-  inputs: [ma('TRAIT_LEVY_DISCOUNT', 'Percent')],
-});
+/** CIV6 (Epic Quest, TRAIT_LEVY_DISCOUNT, MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT):
+ *  "Levying units from a city-state costs 50% less Gold" — the percent off,
+ *  summed with the Foreign Ministry's row of the same modifier
+ *  (`levyGoldCost`). */
+export const EPIC_QUEST_LEVY_DISCOUNT_PCT = srcConst('epicQuestLevyDiscountPct', 50,
+  ma('TRAIT_LEVY_DISCOUNT', 'Percent'));
 
 /** CIV6 (All Roads Lead to Rome): "Trade Routes generate +1 Gold for passing
  *  through Trading Posts in your own cities." */

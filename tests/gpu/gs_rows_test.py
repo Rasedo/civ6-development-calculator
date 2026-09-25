@@ -232,7 +232,7 @@ def test_owf_column(rules, path) -> None:
     assert iids.index("MOUNTAIN_ROAD") == 37, "no earlier build column moved"
     assert sim._A_IMP[k] == sim._act["BUILD_OFFSHORE_WIND_FARM"] == sim._act["PILLAGE"] - 1
     assert sim._imp_water[k] and not sim._imp_ground[k], "a WATER row"
-    assert sim._imp_no_feat[k], "no Improvement_ValidFeatures row: a feature refuses it"
+    assert sim._imp_feats_ok[k] == [], "no Improvement_ValidFeatures row: a feature refuses it"
     assert float(sim._imp_power[k]) == 2.0
     print(f"  4 Offshore Wind Farm column OK — improvement {k}, BUILD column {sim._A_IMP[k]}")
 

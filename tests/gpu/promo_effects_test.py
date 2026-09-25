@@ -89,9 +89,18 @@ def order(sim, row: int, slot: int, action: int) -> None:
 
 
 def free_tile(sim, near: int) -> int:
+    """A passable neighbour of `near` no live unit holds. The scenes retire
+    their units by the alive bit alone, so a plane entry naming a retired
+    major unit is cleared here rather than counted as a holder."""
+    lo, n_major = sim.POOL_LO["major"], sim.major_unit_alive.shape[1]
     for n in sim.neigh[near].tolist():
-        if n >= 0 and bool(sim.passable[0, n]) and int(sim.military_at[0, n]) < 0 \
-                and int(sim.civilian_at[0, n]) < 0:
+        if n < 0 or not bool(sim.passable[0, n]):
+            continue
+        for plane in (sim.military_at, sim.civilian_at):
+            s = int(plane[0, n])
+            if lo <= s < lo + n_major and not bool(sim.major_unit_alive[0, s - lo]):
+                plane[0, n] = -1
+        if int(sim.military_at[0, n]) < 0 and int(sim.civilian_at[0, n]) < 0:
             return n
     raise AssertionError("no free neighbour")
 

@@ -340,6 +340,8 @@ export function spendStockpile(state: GameState, seat: number, resourceId: strin
  * stockpile". What the source does NOT publish is the order in which one
  * stockpile is shared out among several cities that need it; this walks the
  * seat's cities in slot order, and a city the fuel no longer covers stays dark.
+ * CIV6 (Industrial Zone Logistics, `FullyPoweredWhileActive`): a city whose
+ * queue a `fullyPowered` project heads meets its whole load, no fuel burned.
  */
 export function resolveSeatPower(state: GameState, seat: number): void {
   ageReactors(citiesOf(state, seat));
@@ -349,7 +351,8 @@ export function resolveSeatPower(state: GameState, seat: number): void {
       city.powered = false;
       continue;
     }
-    if (p.supply >= p.demand) {
+    const head = city.queue[0];
+    if (p.supply >= p.demand || (head?.kind === 'project' && PROJECTS[head.project]?.fullyPowered)) {
       city.powered = true;
       continue;
     }

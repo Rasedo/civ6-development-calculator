@@ -119,11 +119,13 @@ def main() -> None:
     # -- 1: the catalog says who builds what, and on what ground -----------
     assert sim._imp_eng[FORT] and sim._imp_eng[AIR], "both rows are the ENGINEER's"
     assert not sim._imp_suz[FORT] and not sim._imp_suz[AIR], "neither rides a suzerainty"
-    assert sim._imp_no_feat[FORT], "CIV6 (Fort): 'any featureless land tile'"
+    # CIV6 (Improvement_ValidFeatures): both rows list Volcanic Soil alone
+    assert sim._imp_feats_ok[FORT] == [sim._soil_fid] == sim._imp_feats_ok[AIR], \
+        "the Fort and the Airstrip take Volcanic Soil and no other feature"
     assert sim._imp_elev[AIR] == [0], "CIV6 (Airstrip): 'may be built on flat terrain'"
     assert int(sim._imp_air_slots[AIR]) == 3, "CIV6 (Airstrip): '+3 aircraft slots'"
     assert int(sim._imp_appeal_adj[AIR]) == -1, "CIV6 (Airstrip): '-1 Appeal'"
-    print(f"  1 catalog OK (fort featureless, airstrip flat / 3 slots / -1 appeal)")
+    print(f"  1 catalog OK (fort and airstrip soil-only, airstrip flat / 3 slots / -1 appeal)")
 
     # the ground predicate is the one body both the mask and the apply ask
     t_flat = own_flat(sim, row)
@@ -133,11 +135,18 @@ def main() -> None:
     clear_tile(sim, hill)
     g_air = sim._imp_ground_ok(AIR)[0]
     assert bool(g_air[t_flat]) and not bool(g_air[hill]), "an Airstrip refuses hills"
+    # a live Woods refuses both rows, a live Volcanic Soil takes both
+    _fid0 = int(sim.feat_id[0, t_flat])
     sim.feat_stripped[0, t_flat] = False
-    if int(sim.feat_id[0, t_flat]) >= 0:
-        assert not bool(sim._imp_ground_ok(FORT)[0, t_flat]), "a Fort refuses a featured tile"
+    sim.feat_id[0, t_flat] = int(sim._woods_feats[0])
+    assert not bool(sim._imp_ground_ok(FORT)[0, t_flat]), "a Fort refuses Woods"
+    assert not bool(sim._imp_ground_ok(AIR)[0, t_flat]), "an Airstrip refuses Woods"
+    sim.feat_id[0, t_flat] = sim._soil_fid
+    assert bool(sim._imp_ground_ok(FORT)[0, t_flat]), "a Fort takes Volcanic Soil"
+    assert bool(sim._imp_ground_ok(AIR)[0, t_flat]), "an Airstrip takes Volcanic Soil"
+    sim.feat_id[0, t_flat] = _fid0
     sim.feat_stripped[0, t_flat] = True
-    print("  2 ground OK (airstrip flat-only, fort featureless)")
+    print("  2 ground OK (airstrip flat-only, both refuse Woods and take Volcanic Soil)")
 
     # -- 3: the MASK offers both rows, on OWN and on NEUTRAL ground --------
     for k in (FORT, AIR):

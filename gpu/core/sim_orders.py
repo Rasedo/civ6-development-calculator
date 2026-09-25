@@ -1139,8 +1139,11 @@ class SimOrders:
                     _tterr = own_tile.gather(1, _tnc)
                     if self._imp_outside[_k]:
                         _tterr = _tterr | (self.tile_seat.gather(1, _tnc) < 0)
+                    # neither row lists a feature (`featureOk`), so a natural
+                    # wonder's mountain refuses it
+                    _tfeat = ((self.feat_id >= 0) & ~self.feat_stripped).gather(1, _tnc)
                     _tok = ((_tnb >= 0) & self.tile_mountain.gather(1, _tnc)
-                            & (self.improvement.gather(1, _tnc) < 0) & _tterr)
+                            & (self.improvement.gather(1, _tnc) < 0) & ~_tfeat & _tterr)
                     _tkey = torch.where(_tok, _tnb, torch.full_like(_tnb, 2 ** 30))
                     _tt = _tkey.min(dim=1).values
                     _tt = torch.where(_tt < 2 ** 30, _tt, torch.full_like(_tt, -1))

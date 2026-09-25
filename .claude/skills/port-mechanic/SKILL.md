@@ -34,9 +34,9 @@ gate-stage.
 - **State**: TS fields on the right object (City/Seat/Tile) + GPU
   tensors sized [B, …] with pad conventions (−1 empty, slot pools
   append-only) + registration in `_MUTABLE` (snapshot/restore).
-- **Save migration**: `deserialize` (`cpu/core/game.ts`) fills new fields
-  IN-PLACE with `??=` only — rebuilding objects reorders JSON keys and
-  breaks replay determinism (it happened).
+- **No save migration**: `deserialize` (`cpu/core/game.ts`) is the plain
+  JSON parse — a save is written and read by this engine alone, so a new
+  field needs no back-fill; the round-trip tests are what hold it.
 - **Exporter**: new static planes/catalogs only if no existing plane
   covers it (check first). Planes are TERRAIN-STATIC; unlock gating stays
   live per owner. Compute planes by CALLING the TS rule

@@ -1818,16 +1818,18 @@ class SimSeats:
         """[B] f64 `levyGoldCost` — `LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST`
         of the Gold purchase prices of the army the levy takes from the minor
         named per game (`sl`), each the chassis' own price floored to five,
-        summed and floored. CIV6 (Epic Quest): "Levying units from a
-        city-state costs 50% less Gold." """
+        summed and floored. Then the seat's levy discount
+        (MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT), its rows summed and
+        capped at the whole price: CIV6 (Epic Quest) "Levying units from a
+        city-state costs 50% less Gold", and (Foreign Ministry) "Leveraging
+        City States costs half Gold"."""
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         each = self._purchase_step(self._type_cost[mt].double() * float(self.rules.gold_purchase_mult))
         total = (each * self._minor_army(sl).double()).sum(dim=1)
         base = torch.floor(total * self._levy_cost_pct / 100.0)
-        mult = torch.where(self._row_plays(row, "SUMERIA"),
-                           torch.full((self.B,), self._epic_levy_mult, dtype=torch.float64, device=self.device),
-                           torch.ones(self.B, dtype=torch.float64, device=self.device))
-        return base * mult
+        off = (self._row_plays(row, "SUMERIA").long() * self._epic_levy_pct
+               + self._seat_building_sum(row, self._b_levy_discount))
+        return (base * (100 - off.clamp(max=100)).double()) / 100.0
 
     def _row_civ_or_none(self, row: int) -> torch.Tensor:
         """[B] long — the row's civilization index, the catalog's LAST row
@@ -4039,15 +4041,13 @@ class SimSeats:
             for e in elev:
                 allow |= self.hills if e == 1 else ~self.hills
             ok &= allow
-        if self._imp_no_feat[k]:
-            ok &= ~self._feat_blocks_ground()
-        feats = self._imp_feats_ok[k]
-        if feats:
-            live = (self.feat_id >= 0) & ~self.feat_stripped
-            allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-            for f in feats:
-                allow |= self.feat_id == f
-            ok &= ~live | allow
+        # CIV6 (Improvement_ValidFeatures, `featureOk`): a live feature takes
+        # only the rows that list it; a row with no list takes bare ground.
+        live = (self.feat_id >= 0) & ~self.feat_stripped
+        allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        for f in self._imp_feats_ok[k]:
+            allow |= self.feat_id == f
+        ok &= ~live | allow
         if self._imp_no_adj_same[k]:
             nb = self.neigh
             nbc = nb.clamp(min=0)
@@ -4085,8 +4085,8 @@ class SimSeats:
     def _feat_blocks_ground(self) -> torch.Tensor:
         """[B, T] — a LIVE feature that occupies the tile, `bareGround`'s
         twin. CIV6 (Improvement_ValidFeatures): VOLCANIC_SOIL is listed valid
-        for the Farm, the Mine, the Fort, the Beach Resort, the Airstrip and
-        the Missile Silo, so it blocks none of them."""
+        for the Farm, the Mine and the Beach Resort, whose ground is spelled by
+        hand, so it blocks none of them."""
         live = (self.feat_id >= 0) & ~self.feat_stripped
         if self._soil_fid >= 0:
             live = live & (self.feat_id != self._soil_fid)
@@ -9161,13 +9161,21 @@ class SimSeats:
         engine will use the Power Plant which draws the resource of which you
         have a larger stockpile". The order in which one bank is shared among
         several cities is not published; this walks the city SLOTS in order, and
-        a city the fuel no longer covers stays dark (`resolveSeatPower`)."""
+        a city the fuel no longer covers stays dark (`resolveSeatPower`).
+        CIV6 (Industrial Zone Logistics, `FullyPoweredWhileActive`): a city
+        whose queue a `fullyPowered` project heads meets its whole load, no
+        fuel burned."""
         cols = self.RC
         self._age_reactors(row)
         demand, supply, reach_p, rate_p = self._city_power_need(row)
-        lit = (demand > 0) & (supply >= demand)
+        met = supply >= demand
+        if self._proj_fp:
+            head = self.city_current[:, row, :cols, 0]
+            for pi in self._proj_fp:
+                met = met | (head == self.PROJECT_BASE + pi)
+        lit = (demand > 0) & met
         need = (demand - supply).clamp(min=0).long()
-        want = (demand > 0) & (supply < demand)
+        want = (demand > 0) & ~met
         if bool(want.any()) and self._plant_bidx:
             stock = self.civ_stockpile[:, row]
             for j in range(cols):

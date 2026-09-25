@@ -172,6 +172,11 @@ export interface BuildingDef {
   influencePerTurn?: number;
   /** CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn." */
   favorPerTurn?: number;
+  /** CIV6 (Foreign Ministry, BUILDING_GOV_LEVY_DISCOUNT,
+   *  MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT): "Leveraging City States
+   *  costs half Gold" — a percent off the owner's levies, summed with every
+   *  other row of the modifier (`levyGoldCost`). */
+  levyDiscountPct?: number;
   /** CIV6 (Hydroelectric Dam): "Provides 6 Power to the city from renewable
    *  water sources" — a supply with no fuel behind it. */
   powerSupply?: number;
@@ -211,6 +216,10 @@ export interface BuildingDef {
    *  Powered"). A REGIONAL row pays it to the same cities its base reaches. */
   poweredYields?: Partial<Yields>;
   poweredAmenities?: number;
+  /** CIV6 (Ferris Wheel, Shopping Mall; MODIFIER_PLAYER_DISTRICT_ADJUST_TOURISM_CHANGE
+   *  on COLLECTION_OWNER): flat Tourism on the building's own district, paid
+   *  while it stands (`buildingTourism`). */
+  tourism?: number;
   /** CIV6 (Power Plants): this row SUPPLIES Power to its own city and to every
    *  city centre within the regional range of its Industrial Zone. */
   powerPlant?: boolean;
@@ -972,8 +981,9 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
 
   // THE WATER PARK. The Aquarium and the Aquatics Center reach NINE tiles,
   // not the six every other regional row reaches.
-  { id: 'FERRIS_WHEEL', name: 'Ferris Wheel', district: 'WATER_PARK', cost: 290, maintenance: 1, amenities: 2, yields: { culture: 3 },
+  { id: 'FERRIS_WHEEL', name: 'Ferris Wheel', district: 'WATER_PARK', cost: 290, maintenance: 1, amenities: 2, yields: { culture: 3 }, tourism: 2,
     src: {
+      tourism: xml('ModifierArguments', 'ModifierId=FERRIS_WHEEL_TOURISM&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_FERRIS_WHEEL', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_FERRIS_WHEEL', 'PrereqDistrict', { expect: 'DISTRICT_WATER_ENTERTAINMENT_COMPLEX' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_FERRIS_WHEEL', 'Maintenance'),
@@ -1107,7 +1117,7 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       conquestProdTurns: xml('ModifierArguments', 'ModifierId=GOV_PRODUCTION_BOOST_FROM_CAPTURE&Name=TurnsActive', 'Value'),
     },
   },
-  { id: 'FOREIGN_MINISTRY', name: 'Foreign Ministry', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, favorPerTurn: 3, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'],
+  { id: 'FOREIGN_MINISTRY', name: 'Foreign Ministry', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, favorPerTurn: 3, levyDiscountPct: 50, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'],
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_GOV_CITYSTATES', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_GOV_CITYSTATES', 'PrereqDistrict', { expect: 'DISTRICT_GOVERNMENT' }),
@@ -1118,6 +1128,7 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       exclusiveWith: { derived: 'the MutuallyExclusiveBuildings rows of this building, as engine ids', inputs: [xml('MutuallyExclusiveBuildings', 'Building=BUILDING_GOV_CITYSTATES', 'MutuallyExclusiveBuilding')] },
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_GOV_CITYSTATES', 'PrereqBuilding')] },
       favorPerTurn: xml('ModifierArguments', 'ModifierId=GOVCITYSTATES_ADJUST_FAVOR&Name=Amount', 'Value'),
+      levyDiscountPct: xml('ModifierArguments', 'ModifierId=BUILDING_GOV_LEVY_DISCOUNT&Name=Percent', 'Value'),
     },
   },
   { id: 'GRAND_MASTERS_CHAPEL', name: "Grand Master's Chapel", district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, faithBuyUnits: true, pillageFaithImp: 15, pillageFaithDist: 30, yields: { faith: 5 }, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'INTELLIGENCE_AGENCY'],
@@ -1190,16 +1201,35 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
   },
   // CIV6 (Expansion1_Buildings.xml, BUILDING_FOOD_MARKET): the Neighborhood's
   // Replaceable Parts building, +4 Food and +2 more while powered on a load of
-  // 1. The install excludes it with the Shopping Mall, which this catalog does
-  // not carry. APPENDED LAST — a building's catalog index is its action code.
-  { id: 'FOOD_MARKET', name: 'Food Market', district: 'NEIGHBORHOOD', cost: 380, yields: { food: 4 }, power: 1, poweredYields: { food: 2 }, maintenance: 1,
+  // 1; a city holds it or the Shopping Mall, never both.
+  { id: 'FOOD_MARKET', name: 'Food Market', district: 'NEIGHBORHOOD', cost: 380, yields: { food: 4 }, power: 1, poweredYields: { food: 2 }, maintenance: 1, exclusiveWith: ['SHOPPING_MALL'],
     src: {
+      exclusiveWith: { derived: 'the MutuallyExclusiveBuildings rows of this building, as engine ids', inputs: [xml('MutuallyExclusiveBuildings', 'Building=BUILDING_FOOD_MARKET', 'MutuallyExclusiveBuilding')] },
       cost: xml('Buildings', 'BuildingType=BUILDING_FOOD_MARKET', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_FOOD_MARKET', 'PrereqDistrict', { expect: 'DISTRICT_NEIGHBORHOOD' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_FOOD_MARKET', 'Maintenance'),
       'yields.food': xml('Building_YieldChanges', 'BuildingType=BUILDING_FOOD_MARKET&YieldType=YIELD_FOOD', 'YieldChange'),
       'poweredYields.food': xml('Building_YieldChangesBonusWithPower', 'BuildingType=BUILDING_FOOD_MARKET&YieldType=YIELD_FOOD', 'YieldChange'),
       power: xml('Buildings_XP2', 'BuildingType=BUILDING_FOOD_MARKET', 'RequiredPower'),
+    },
+  },
+  // CIV6 (Expansion1_Buildings.xml, BUILDING_SHOPPING_MALL): the Neighborhood's
+  // Capitalism building — +2 Gold, 1 Amenity and +4 Tourism, and on a load of
+  // 1 +2 Gold and +1 Amenity more while powered; a city holds it or the Food
+  // Market, never both. APPENDED LAST — a building's catalog index is its
+  // action code.
+  { id: 'SHOPPING_MALL', name: 'Shopping Mall', district: 'NEIGHBORHOOD', cost: 440, maintenance: 1, yields: { gold: 2 }, amenities: 1, tourism: 4, power: 1, poweredYields: { gold: 2 }, poweredAmenities: 1, exclusiveWith: ['FOOD_MARKET'],
+    src: {
+      cost: xml('Buildings', 'BuildingType=BUILDING_SHOPPING_MALL', 'Cost', { scale: GAME_SPEED }),
+      district: xml('Buildings', 'BuildingType=BUILDING_SHOPPING_MALL', 'PrereqDistrict', { expect: 'DISTRICT_NEIGHBORHOOD' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_SHOPPING_MALL', 'Maintenance'),
+      'yields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_SHOPPING_MALL&YieldType=YIELD_GOLD', 'YieldChange'),
+      amenities: xml('Buildings', 'BuildingType=BUILDING_SHOPPING_MALL', 'Entertainment'),
+      tourism: xml('ModifierArguments', 'ModifierId=SHOPPING_MALL_TOURISM&Name=Amount', 'Value'),
+      power: xml('Buildings_XP2', 'BuildingType=BUILDING_SHOPPING_MALL', 'RequiredPower'),
+      'poweredYields.gold': xml('Building_YieldChangesBonusWithPower', 'BuildingType=BUILDING_SHOPPING_MALL&YieldType=YIELD_GOLD', 'YieldChange'),
+      poweredAmenities: xml('Buildings_XP2', 'BuildingType=BUILDING_SHOPPING_MALL', 'EntertainmentBonusWithPower'),
+      exclusiveWith: { derived: 'the MutuallyExclusiveBuildings rows of this building, as engine ids', inputs: [xml('MutuallyExclusiveBuildings', 'Building=BUILDING_SHOPPING_MALL', 'MutuallyExclusiveBuilding')] },
     },
   },
 ];

@@ -172,10 +172,14 @@ def test_rome_founding(rules, path) -> None:
     sim = fresh(rules, path)
     rome = row_of(sim, "ROME")
     cap = int(sim.civ_cap_tile[B0, rome])
-    t = site_near(sim, cap)
     water = sim._trade_water_level(rome)
-    assert bool(sim._trade_walk_ok(ONE, torch.tensor([t]), torch.tensor([cap]), water)[0]), \
-        "the plot must be reachable for the road clause to be the thing under test"
+    # the first settleable plot 4..7 out that the Trader's walk reaches, so the
+    # road clause is the thing under test whatever world the fixture holds
+    d = sim.pair_dist[cap].to(torch.long)
+    cand = (settleable(sim) & (d >= 4) & (d <= 7)).nonzero(as_tuple=True)[0].tolist()
+    t = next((int(x) for x in cand
+              if bool(sim._trade_walk_ok(ONE, torch.tensor([x]), torch.tensor([cap]), water)[0])), -1)
+    assert t >= 0, "no plot near the capital that the Trader's walk reaches"
     assert not bool(sim.trading_post[B0, rome, t])
     found = sim._found_city_at(rome, torch.tensor([True]), torch.tensor([t]))
     assert bool(found[B0]), "the founding itself failed"
@@ -414,9 +418,20 @@ def test_epic_quest_levy(rules, path) -> None:
     base = float(sim._levy_cost(rome, s0)[0])
     assert base > 0
     play(sim, rome, "SUMERIA")
-    assert float(sim._levy_cost(rome, s0)[0]) == base * sim._epic_levy_mult
+    assert float(sim._levy_cost(rome, s0)[0]) == base / 2
+    # the Foreign Ministry's row of the same modifier sums with it: free
+    # together, half alone, nothing from a pillaged one
+    fm = [b["id"] for b in rules.buildings].index("FOREIGN_MINISTRY")
+    j = int(sim.city_alive[B0, rome].nonzero(as_tuple=True)[0][0])
+    sim.city_bldg[B0, rome, j, fm] = True
+    assert float(sim._levy_cost(rome, s0)[0]) == 0
     play(sim, rome, "ROME")
-    print("  9 Epic Quest OK — half-price levies")
+    assert float(sim._levy_cost(rome, s0)[0]) == base / 2
+    sim.city_bldg_pillaged[B0, rome, j, fm] = True
+    assert float(sim._levy_cost(rome, s0)[0]) == base
+    sim.city_bldg_pillaged[B0, rome, j, fm] = False
+    sim.city_bldg[B0, rome, j, fm] = False
+    print("  9 Epic Quest OK — half-price levies, the Foreign Ministry's half summed")
 
 
 def main() -> int:

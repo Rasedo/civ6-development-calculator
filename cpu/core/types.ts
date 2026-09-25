@@ -830,6 +830,9 @@ export interface CityState extends Seat {
   lastHitTurn?: number;
   /** its city's power this turn (`City.powered`), set by `minorPower` */
   powered?: boolean;
+  /** its last turn's Production went toward a `fullyPowered` project that is
+   *  still running (`minorBuild`) — the queue head `minorPower` reads */
+  fullyPowered?: boolean;
   /** The STORED answer to the suzerain contest (-1 none), refreshed at every
    *  envoy write — the fixed point that rules reweighting envoys BY the
    *  current suzerain read (Containment, the border passage). */

@@ -39,12 +39,16 @@ def build(path) -> BatchSim:
 
 
 def _ridge(sim, n: int = 3):
-    """A connected run of `n` mountain tiles, with its own range id."""
-    mt = sim.tile_mountain[B0].nonzero().flatten().tolist()
+    """A connected run of `n` mountain tiles, with its own range id: the
+    longest range this world holds, its natural-wonder plots left out (no
+    tunnel stands on one)."""
+    mt = (sim.tile_mountain[B0] & ~sim.nwonder[B0]).nonzero().flatten().tolist()
     assert mt, "this fixture carries no mountain"
     # take a whole range, so the tiles are genuinely connected
-    rid = int(sim.tile_range[B0, mt[0]])
-    same = [t for t in mt if int(sim.tile_range[B0, t]) == rid]
+    ranges: dict[int, list[int]] = {}
+    for t in mt:
+        ranges.setdefault(int(sim.tile_range[B0, t]), []).append(t)
+    rid, same = max(ranges.items(), key=lambda kv: (len(kv[1]), -kv[0]))
     assert len(same) >= 2, f"range {rid} holds {len(same)} tiles, need 2+"
     return rid, sorted(same)[:n]
 
@@ -200,7 +204,9 @@ def test_the_two_xp2_columns(rules, path) -> None:
         "a NEUTRAL mountain must be offered — CanBuildOutsideTerritory is true"
 
     # ...and inside ANOTHER seat's borders it is nobody's to tunnel. `outside`
-    # means UNOWNED, never "not mine".
+    # means UNOWNED, never "not mine". Every mountain beside the engineer goes.
+    here = int(sim.major_unit_tile[B0, slot])
+    mt = [int(x) for x in sim.neigh[here].tolist() if x >= 0 and bool(sim.tile_mountain[B0, x])]
     for _t in mt:
         sim.tile_seat[B0, _t] = 1
     sim._gen_ver += 1
@@ -220,6 +226,40 @@ def test_the_two_xp2_columns(rules, path) -> None:
           "the territory question in mask and applier alike")
 
 
+def test_a_natural_wonder_refuses_it(rules, path) -> None:
+    """CIV6 (Improvement_ValidFeatures): no row for the tunnel, so a feature
+    plot — a natural wonder's mountain — refuses it (`featureOk` in
+    `adjacentPlotTarget`), in mask and applier alike."""
+    sim = build(path)
+    _rid, mt = _ridge(sim, 2)
+    tgt = mt[0]
+    for _t in mt:
+        sim.tile_seat[B0, _t] = -1
+    slot, rank = _stand_beside(sim, tgt)
+    here = int(sim.major_unit_tile[B0, slot])
+    # every OTHER mountain beside the engineer is taken, so `tgt` is the only one
+    for _t in (int(x) for x in sim.neigh[here].tolist() if x >= 0):
+        if _t != tgt and bool(sim.tile_mountain[B0, _t]):
+            sim.improvement[B0, _t] = sim.TUNNEL
+    col = int(sim._A_IMP[sim.TUNNEL])
+    sim._gen_ver += 1
+    sim._eff_version += 1
+    assert bool(sim._seat_unit_mask(0)[0, rank, col]), "a bare neutral mountain must be offered"
+    nw = int(sim._feat_natural.nonzero().flatten()[0])
+    sim.feat_id[B0, tgt] = nw
+    sim.feat_stripped[B0, tgt] = False
+    sim._gen_ver += 1
+    sim._eff_version += 1
+    assert not bool(sim._seat_unit_mask(0)[0, rank, col]), "a natural wonder's mountain was offered"
+    acts = torch.full((1, sim._seat_slot_map(0)[0].shape[0]), -1, dtype=torch.long)
+    acts[0, rank] = col
+    sim.seat_ext[B0, 0] = True
+    sim._apply_seat_unit_actions(0, acts)
+    assert int(sim.improvement[B0, tgt]) != sim.TUNNEL, "the applier tunnelled a natural wonder"
+    assert int(sim.major_unit_charges[B0, slot]) == 3, "and it spent no charge"
+    print("  9 the feature gate OK — a natural wonder's mountain refuses the tunnel")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -231,6 +271,7 @@ def main() -> int:
     test_it_never_exits_onto_another_range(rules, path)
     test_it_cannot_be_pillaged(rules, path)
     test_the_two_xp2_columns(rules, path)
+    test_a_natural_wonder_refuses_it(rules, path)
     print("BATTERY OK mountain_tunnel")
     return 0
 

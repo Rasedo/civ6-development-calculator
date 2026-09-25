@@ -68,7 +68,8 @@ class SimMinors:
         once or not at all. A city-state holds no stockpile, so no plant runs
         for it: its renewables — a Dam's supply, the generators on its own
         plots — carry the whole load (`cityPower`'s fuel-free half, the
-        governor, wonder and suzerain terms a city-state never holds aside)."""
+        governor, wonder and suzerain terms a city-state never holds aside),
+        or a running `fullyPowered` project meets it."""
         row = self._CITY_MINOR0 + s
         B, dev = self.B, self.device
         alive = self.city_alive[:, row, 0]
@@ -86,7 +87,7 @@ class SimMinors:
                 live = ((self.improvement >= 0) & ~self.pillaged & (self.tile_seat == 100 + s)
                         & (self.tile_city == -1))
                 supply = supply + (self._imp_power[self.improvement.clamp(min=0)] * live.double()).sum(dim=1)
-        self.city_powered[:, row, 0] = (demand > 0) & (supply >= demand)
+        self.city_powered[:, row, 0] = (demand > 0) & ((supply >= demand) | self.citystate_full_power[:, s])
 
     def _minor_traders(self, s: int) -> torch.Tensor:
         """[B] long — minor `s`'s Traders out on a route or standing
@@ -742,6 +743,7 @@ class SimMinors:
         if not bool(alive.any()):
             return
         B, dev = self.B, self.device
+        self.citystate_full_power[:, s] = False
         rd = self.rules_dev
         row = self._CITY_MINOR0 + s
         seat = 100 + s
@@ -876,10 +878,13 @@ class SimMinors:
                     # `projectCost`: the row's own Cost plus the GAME_PROGRESS climb
                     cost_p = float(max(int(prow["pc"]), 0)) + torch.floor(float(prow["pcg"]) * _mprog)
                     pay = avail & (self.citystate_prod[:, s] >= cost_p)
+                    if pi in self._proj_fp:
+                        # a project still running lights the next turn's grid
+                        self.citystate_full_power[:, s] |= avail & ~pay
                     if bool(pay.any()):
                         self.citystate_prod[:, s] -= torch.where(pay, cost_p, zero_b)
                         yi = int(prow["y"])
-                        amt = torch.where(pay, js_round(cost_p * self._proj_yf), zero_b)
+                        amt = torch.where(pay, js_round(cost_p * (self._proj_yp[pi] / 100)), zero_b)
                         if yi == 2:
                             self.citystate_treasury[:, s] += amt
                         elif yi == 3:

@@ -15,7 +15,9 @@ const VOLCANO_PAINT_P = [0, 1, 2].map((sev) => ERUPTION_PAINT_P[volcanoRow(sev)]
 import { bareGround, validImprovementsIn } from '../../../cpu/core/rules';
 import { tileYields } from '../../../cpu/core/yields';
 import { neighbors } from '../../../world/hex';
+import { IMPROVEMENTS } from '../../../cpu/data/improvements';
 import type { GameState, Tile } from '../../../cpu/core/types';
+import type { FeatureId, ImprovementId } from '../../../world/types';
 
 describe('Volcanic Soil', () => {
   it('paints bare land and Woods or Rainforest, and nothing else', () => {
@@ -74,9 +76,41 @@ describe('Volcanic Soil', () => {
     expect(farm.improvement).toBe('FARM');
   });
 
+  it('a catalog row stands on a feature only where Improvement_ValidFeatures lists it', () => {
+    // CIV6 (Improvement_ValidFeatures): the Fort, the Airstrip, the Missile
+    // Silo, the Colossal Head and the Terrace Farm list Volcanic Soil alone;
+    // the rows below them list nothing, so any feature plot refuses them.
+    const state = makeState(makeMap(16, 16));
+    const t = tileAtCoords(state.map, 8, 8);
+    const offered = (id: ImprovementId, feature: FeatureId | null): boolean => {
+      const def = IMPROVEMENTS[id];
+      t.terrain = def.terrains?.[0] ?? 'GRASSLAND';
+      t.elevation = def.elevations?.[0] ?? 'FLAT';
+      t.feature = feature;
+      return validImprovementsIn(t, {
+        unlocks: null, ownsTile: () => true, map: state.map,
+        builder: def.engineer ? 'MILITARY_ENGINEER' : def.builtBy,
+        civ: def.uniqueTo ?? null,
+        suzerain: new Set(def.suzerainOf ? [def.suzerainOf] : []),
+        govPromos: new Set(def.governorPromo ? [def.governorPromo] : []),
+      }).includes(id);
+    };
+    const soil: ImprovementId[] = ['FORT', 'AIRSTRIP', 'MISSILE_SILO', 'COLOSSAL_HEADS', 'TERRACE_FARM'];
+    const none: ImprovementId[] = ['SOLAR_FARM', 'WIND_FARM', 'CITY_PARK', 'KURGAN', 'MISSION', 'STEPWELL',
+      'GOLF_COURSE', 'ICE_HOCKEY_RINK', 'OPEN_AIR_MUSEUM', 'MONASTERY', 'BATEY', 'MAORI_PA'];
+    for (const id of [...soil, ...none]) {
+      expect(offered(id, null), `${id} on bare ground`).toBe(true);
+      expect(offered(id, 'WOODS'), `${id} on Woods`).toBe(false);
+      expect(offered(id, 'VOLCANIC_SOIL'), `${id} on Volcanic Soil`).toBe(soil.includes(id));
+    }
+    // the two whose other clauses this bare scene cannot meet list nothing
+    expect(IMPROVEMENTS.MEKEWAP.features).toBeUndefined();
+    expect(IMPROVEMENTS.CHEMAMULL.features).toBeUndefined();
+  });
+
   it('is bare ground: the Farm and the Mine stay buildable under it', () => {
     // CIV6 (Improvement_ValidFeatures): FEATURE_VOLCANIC_SOIL is listed valid
-    // for the Farm, the Mine and the Fort.
+    // for the Farm and the Mine.
     const state = makeState(makeMap(16, 16));
     const hill = tileAtCoords(state.map, 11, 5);
     hill.terrain = 'GRASSLAND';

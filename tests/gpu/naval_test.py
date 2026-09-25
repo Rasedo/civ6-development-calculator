@@ -15,9 +15,8 @@ Covered here (all gate-unreachable):
   2. GALLEY naval melee — CAPTURE a coastal city-state.
   3. QUADRIREME range-1 bombard — a civ UNIT (no retaliation, no advance).
   4. QUADRIREME range-1 bombard — a civ CITY (HP floors at 1, never captures).
-  5. SEAT-0 naval — spawn on WATER (_spawn_unit naval probe) + attack; plus
-     the MOVE-verb limit: the controlled MOVE verb cannot step a ship onto
-     water, because its apply reads the land `passable` plane, not wpass.
+  5. SEAT-0 naval — spawn on WATER (_spawn_unit naval probe) + attack; then
+     the MOVE verb sails the ship onto water and refuses it a land step.
   6. OCEAN gate — a naval mover's spawn probe is blocked over OCEAN pre-
      CARTOGRAPHY, allowed post- (and COAST is ungated). (Embarked OCEAN gating
      is the TS twin in tests/cpu/units/naval-embark.test.ts.)
@@ -340,9 +339,8 @@ def poke_quadrireme_city(rules, path, QUAD):
 
 def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     """5. Seat-0 naval end-to-end (forced, since seat 0 builds no ships on its
-    own): a GALLEY SPAWNS on the nearest free WATER tile, then attacks. Plus the
-    MOVE-verb limit — the controlled MOVE verb reads the land `passable` plane
-    (no wpass), so it cannot step a ship onto water."""
+    own): a GALLEY SPAWNS on the nearest free WATER tile, then attacks, then
+    the MOVE verb sails it onto water and refuses it a step ashore."""
     sim = build(rules, path, 25)
     r, j, ctr = first_civ_city(sim)
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
@@ -375,21 +373,27 @@ def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     sim._apply_seat_unit_actions(0, order(sim, gslot, 6 + da))
     assert int(sim.major_unit_hp[0, vslot]) < vhp0, "seat-0 galley dealt no melee damage"
 
-    # the controlled MOVE verb cannot move a ship onto water.
+    # the MOVE verb sails a hull onto water (`moveOk`'s naval arm: the water
+    # plane, not the land `passable` one), and refuses it a step ashore. The
+    # strike spent the ship's moves, so it takes the next turn's first.
+    sim.major_unit_mp[0, gslot] = sim.major_unit_mp_full[0, gslot]
     gt2 = int(sim.major_unit_tile[0, gslot])
-    wt2 = empty_neighbor(sim, gt2)
+    land = free_neighbor(sim, gt2, -1)
+    assert land >= 0
+    sim.water[0, land] = False
+    sim.wpass[0, land] = False
+    sim.ocean_tile[0, land] = False
+    sim.passable[0, land] = True
+    wt2 = free_neighbor(sim, gt2, land)
     assert wt2 >= 0
     force_water(sim, wt2)
     assert not bool(sim.passable[0, wt2]), "water is not on the land `passable` plane"
-    dm = dir_to(sim, gt2, wt2)
-    assert dm >= 0
-    before = int(sim.major_unit_tile[0, gslot])
-    sim._apply_seat_unit_actions(0, order(sim, gslot, dm))  # a MOVE order (0..5)
-    assert int(sim.major_unit_tile[0, gslot]) == before, (
-       "RL/controlled move stepped a ship onto water — the residual (seat-0 naval "
-        "water-move columns) is unexpectedly LIVE"
-    )
-    print("  5 seat-0 naval OK (spawn-on-water + attack; RL water-move is the documented residual)")
+    sim._apply_seat_unit_actions(0, order(sim, gslot, dir_to(sim, gt2, land)))
+    assert int(sim.major_unit_tile[0, gslot]) == gt2, "a hull stepped ashore"
+    sim._apply_seat_unit_actions(0, order(sim, gslot, dir_to(sim, gt2, wt2)))
+    assert int(sim.major_unit_tile[0, gslot]) == wt2, "the MOVE verb did not sail the ship onto water"
+    assert int(sim.military_at[0, wt2]) == gslot + sim.POOL_LO["major"] and int(sim.military_at[0, gt2]) < 0
+    print("  5 seat-0 naval OK (spawn-on-water, attack, a MOVE onto water and none ashore)")
 
 
 def poke_ocean_gate(rules, path, GALLEY):

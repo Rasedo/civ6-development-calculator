@@ -264,6 +264,63 @@ def test_fuel(sim) -> None:
     print("  fuel OK: the plant converts its own stockpile, and stops when it is empty")
 
 
+def test_logistics(sim) -> None:
+    row, j = a_city(sim)
+    put_district(sim, row, j, sim._iz_idx)
+    lab, coal = bidx(sim, "RESEARCH_LAB"), bidx(sim, "COAL_POWER_PLANT")
+    sim.city_bldg[0, row, j, lab] = True
+    sim.city_bldg[0, row, j, coal] = True
+    slot = int(sim._b_fuel_slot[coal])
+    assert len(sim._proj_fp) == 1, "Logistics is the one project that powers its city"
+    code = sim.PROJECT_BASE + sim._proj_fp[0]
+    sim.city_current[0, row, j, 0] = code
+    sim.civ_stockpile[:, row] = 5
+    sim._resolve_seat_power(row)
+    assert bool(sim.city_powered[0, row, j]), "Logistics at the head meets the whole load"
+    assert int(sim.civ_stockpile[0, row, slot]) == 5, "and burns no fuel"
+    # with another item at the head it runs no longer
+    sim.city_current[0, row, j, 0] = bidx(sim, "LIBRARY")  # a building's code is its index
+    sim.civ_stockpile[:, row] = 0
+    sim._resolve_seat_power(row)
+    assert not bool(sim.city_powered[0, row, j]), "a queued, not running, Logistics lights nothing"
+    # a city with no load stays unpowered: there is nothing to meet
+    sim.city_current[0, row, j, 0] = code
+    sim.city_bldg[0, row, j, lab] = False
+    sim._resolve_seat_power(row)
+    assert not bool(sim.city_powered[0, row, j]), "no load, nothing to power"
+    print("  logistics OK: the project at the head powers its city in full, no fuel burned")
+
+
+def test_shopping_mall(sim) -> None:
+    row, j = a_city(sim)
+    mall, fm = bidx(sim, "SHOPPING_MALL"), bidx(sim, "FOOD_MARKET")
+    assert sim._b_excl_buildings[mall] == [fm] and sim._b_excl_buildings[fm] == [mall], \
+        "the Food Market and the Shopping Mall exclude each other"
+    assert float(sim._b_power[mall]) == 1.0 and float(sim._b_pow_am[mall]) == 1.0
+    assert int(sim._b_tourism[mall]) == 4 and int(sim._b_tourism[bidx(sim, "FERRIS_WHEEL")]) == 2
+    nb = next(i for i, d in enumerate(sim.districts_cat) if d.get("id") == "NEIGHBORHOOD")
+    put_district(sim, row, j, nb)
+    put_district(sim, row, j, sim._iz_idx)
+    # the plant stands throughout (its upkeep in every reading); the fuel
+    # decides whether it runs
+    sim.city_bldg[0, row, j, bidx(sim, "COAL_POWER_PLANT")] = True
+    t0 = int(sim._building_tourism(row)[0])
+    yf = torch.ones(sim.B, sim.RC, dtype=torch.float64, device=sim.device)
+    lit(sim, row, j, fuel=0)
+    g0 = float(sim._seat_city_walk(row, j, amen_yf=yf[:, j:j + 1])[0, 0, 2])
+    sim.city_bldg[0, row, j, mall] = True
+    sim._eff_version += 1
+    assert not lit(sim, row, j, fuel=0), "a load of 1 with nothing to meet it"
+    g_dark = float(sim._seat_city_walk(row, j, amen_yf=yf[:, j:j + 1])[0, 0, 2])
+    # the walk's Gold is net of upkeep: +2 less the Mall's Maintenance 1
+    assert g_dark - g0 == 1.0, f"CIV6 (Shopping Mall): +2 Gold, 1 upkeep, got {g_dark - g0}"
+    assert int(sim._building_tourism(row)[0]) - t0 == 4, "CIV6 (Shopping Mall): +4 Tourism"
+    assert lit(sim, row, j)
+    g_lit = float(sim._seat_city_walk(row, j, amen_yf=yf[:, j:j + 1])[0, 0, 2])
+    assert g_lit - g_dark == 2.0, f"CIV6 (Shopping Mall): +2 Gold more when powered, got {g_lit - g_dark}"
+    print("  shopping mall OK: excluded with the Food Market, +2/+2 Gold, +4 Tourism, the powered amenity")
+
+
 def a_source(sim, row: int, rid: int = -1) -> tuple[int, int]:
     """A map tile carrying a strategic resource, handed to seat `row` and
     improved. Returns (tile, stockpile slot)."""
@@ -485,9 +542,10 @@ def test_generator_ground(sim) -> None:
                    if k not in (solar_i, wind_i, plant_i, park_i)),         "and no row beyond the three generators and the City Park claims that arm"
     sol, wnd = sim._imp_ground_ok(solar_i)[0], sim._imp_ground_ok(wind_i)[0]
     hills, snow = sim.hills[0], sim.terrain[0] == sim._imp_xterr[solar_i][0]
-    # neither row has an Improvement_ValidFeatures row: a feature plot is refused
-    bare = ~sim._feat_blocks_ground()[0]
-    assert sim._imp_no_feat[solar_i] and sim._imp_no_feat[wind_i]
+    # neither row has an Improvement_ValidFeatures row: any live feature,
+    # Volcanic Soil included, refuses the plot
+    bare = ~((sim.feat_id >= 0) & ~sim.feat_stripped)[0]
+    assert sim._imp_feats_ok[solar_i] == [] and sim._imp_feats_ok[wind_i] == []
     assert bool((wnd == (hills & bare)).all()), "CIV6 (Wind Farm): featureless Hills, and only those"
     assert bool((sol == (~hills & ~snow & bare)).all()), \
         "CIV6 (Solar Farm): featureless flat terrain, and never Snow"
@@ -653,7 +711,8 @@ def main() -> None:
     rules = load_rules()
     path = fixture_paths()[0]
     for fn in (test_demand, test_plant_reach, test_cardiff, test_powered_yields,
-               test_regional_powered, test_fuel, test_accrual, test_unit_charge,
+               test_regional_powered, test_fuel, test_logistics, test_shopping_mall,
+               test_accrual, test_unit_charge,
                test_upkeep, test_starved_heal, test_renewables, test_generator_ground,
                test_reactor_age, test_reactor_accident, test_free_city_reactor, test_spec_tier):
         fn(build(rules, path))

@@ -89,7 +89,7 @@ export function seatBuildingSum(
   seat: number,
   key: 'spyCapacity' | 'influencePerTurn' | 'favorPerTurn' | 'govTitle' | 'loyaltyWithoutGovernor'
     | 'amenitiesWithGovernor' | 'housingWithGovernor' | 'healOnKill' | 'conquestProdPct'
-    | 'conquestProdTurns' | 'projectChargePct',
+    | 'conquestProdTurns' | 'projectChargePct' | 'levyDiscountPct',
 ): number {
   let n = 0;
   for (const city of citiesOf(state, seat)) {
@@ -875,12 +875,13 @@ export function gpDistrictTourism(state: GameState, seat: number, cities: readon
   return t;
 }
 
-/** CIV6 (Marae, MARAE_TOURISM_FEATURES; Thermal Bath, THERMALBATH_ADDTOURISM):
- *  the Tourism a unique building pays its city — per owned tile carrying a
- *  feature (EFFECT_ADJUST_CITY_TOURISM_PER_FEATURE names no passability)
- *  once Flight is held, or flat while the border holds a Geothermal
- *  Fissure. A dark building (its district or itself pillaged) pays
- *  nothing. */
+/** The Tourism a building pays its city: flat on its own district (Ferris
+ *  Wheel, Shopping Mall — `BuildingDef.tourism`); and a unique building's —
+ *  CIV6 (Marae, MARAE_TOURISM_FEATURES; Thermal Bath, THERMALBATH_ADDTOURISM)
+ *  per owned tile carrying a feature (EFFECT_ADJUST_CITY_TOURISM_PER_FEATURE
+ *  names no passability) once Flight is held, or flat while the border holds
+ *  a Geothermal Fissure. A dark building (its district or itself pillaged)
+ *  pays nothing. */
 export function buildingTourism(state: GameState, seat: number, cities: readonly City[]): number {
   const civ = civOf(state, seat);
   const techs = seatOf(state, seat)?.research.techs ?? [];
@@ -889,6 +890,7 @@ export function buildingTourism(state: GameState, seat: number, cities: readonly
     const dark = darkBuildings(state.map, c);
     for (const id of c.buildings) {
       if (dark.has(id)) continue;
+      t += BUILDINGS[id]?.tourism ?? 0;
       const bv = buildingVariantFor(civ, id);
       if (!bv) continue;
       const pf = bv.tourismPerFeature;

@@ -176,6 +176,8 @@ export function adjacentPlotTarget(
   let best = -1;
   for (const n of neighbors(map, tile)) {
     if (!isMountain(n) || n.improvement) continue;
+    // neither row lists a feature, so a natural wonder's mountain refuses it
+    if (!featureOk(def, n)) continue;
     // the TARGET answers the territory column, not the tile the builder
     // stands on — `CanBuildOutsideTerritory` reaches unowned mountains and
     // stops at another seat's border like every other row.
@@ -216,13 +218,18 @@ export function canBuildRailroad(tile: Tile, ownsTile: (t: Tile) => boolean): bo
 }
 
 /** CIV6 (Improvement_ValidFeatures, Expansion2_Improvements.xml):
- *  FEATURE_VOLCANIC_SOIL is listed valid for the Farm, the Mine, the Fort,
- *  the Beach Resort, the Airstrip and the Missile Silo (and the Moai, the
- *  Colossal Head, the Great Wall, the Roman Fort and a barbarian camp), so
- *  the soil does not occupy a tile the way Woods do. Every clause that asks
- *  for BARE GROUND reads it through here. */
+ *  FEATURE_VOLCANIC_SOIL is listed valid for the Farm, the Mine and the Beach
+ *  Resort, whose ground `validImprovementsIn` spells by hand, so for those
+ *  three (and the Farm rows the roster adds) the soil does not occupy a tile
+ *  the way Woods do. The catalog rows read their own list (`featureOk`). */
 export function bareGround(tile: Tile): boolean {
   return tile.feature === null || tile.feature === 'VOLCANIC_SOIL';
+}
+
+/** CIV6 (Improvement_ValidFeatures): a plot carrying a feature takes only the
+ *  rows that list that feature; a row with no list takes bare ground alone. */
+export function featureOk(def: ImprovementDef, tile: Tile): boolean {
+  return tile.feature === null || !!def.features?.includes(tile.feature);
 }
 
 /**
@@ -329,7 +336,7 @@ export function validImprovementsIn(
       // CIV6 (Legion): the Roman Fort is the FORT row, laid without its tech.
       if (fortBuilder ? def.id !== 'FORT' : (!def.engineer || !unlocked(def.id))) continue;
       if (!territoryOk(def, tile, opts.ownsTile)) continue;
-      if (def.noFeature && !bareGround(tile)) continue;
+      if (!featureOk(def, tile)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.excludeTerrains?.includes(tile.terrain)) continue;
       if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
@@ -347,7 +354,7 @@ export function validImprovementsIn(
       if (def.uniqueTo && def.uniqueTo !== opts.civ) continue;
       if (!territoryOk(def, tile, opts.ownsTile)) continue;
       if (tile.improvement) continue;
-      if (def.noFeature && !bareGround(tile)) continue;
+      if (!featureOk(def, tile)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
       if (!uniqueGroundOk(def, tile, opts)) continue;
@@ -378,7 +385,7 @@ export function validImprovementsIn(
       if (def.noAdjacentSame && opts.map
           && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
-      if (def.noFeature && tile.feature) continue;
+      if (!featureOk(def, tile)) continue;
       if (!uniqueGroundOk(def, tile, opts)) continue;
       out.push(def.id);
     }
@@ -395,7 +402,7 @@ export function validImprovementsIn(
     if (def.uniqueTo && (def.uniqueTo !== opts.civ || !unlocked(def.id))) continue;
     // a row the BUILDER does not lay (the Pa's Toa) has its own arm above
     if (def.builtBy || def.waterOnly) continue;
-    if (def.features && tile.feature !== null && !def.features.includes(tile.feature)) continue;
+    if (!featureOk(def, tile)) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
@@ -449,7 +456,7 @@ export function validImprovementsIn(
     if (!def.groundOnly || !unlocked(def.id)) continue;
     if (!govOk(def)) continue;
     if (def.requiresFeature && tile.feature !== def.requiresFeature) continue;
-    if (def.noFeature && !bareGround(tile)) continue;
+    if (!featureOk(def, tile)) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;

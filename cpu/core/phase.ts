@@ -9,7 +9,7 @@ import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production
 import { isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
-import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
+import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
@@ -311,12 +311,17 @@ export function minorArmy(state: GameState, cityState: CityState): Unit[] {
 /** THE LEVY'S PRICE (`LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST`): that
  *  share of the Gold purchase prices of the units it takes — each the
  *  chassis' own price at the purchase rate, floored to five as the minor's own
- *  purchases pay (`purchaseStep`) — summed and floored. CIV6 (Epic Quest):
- *  "Levying units from a city-state costs 50% less Gold." */
+ *  purchases pay (`purchaseStep`) — summed and floored. Then the seat's levy
+ *  discount (MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT), its rows summed
+ *  and capped at the whole price: CIV6 (Epic Quest) "Levying units from a
+ *  city-state costs 50% less Gold", and (Foreign Ministry) "Leveraging City
+ *  States costs half Gold". */
 export function levyGoldCost(state: GameState, seat: number, cityState: CityState): number {
   let sum = 0;
   for (const u of minorArmy(state, cityState)) sum += purchaseStep(UNITS[u.type].cost * GOLD_PURCHASE_MULT);
-  return Math.floor((sum * LEVY_COST_PCT) / 100) * (civOf(state, seat) === 'SUMERIA' ? EPIC_QUEST_LEVY_MULT : 1);
+  const off = (civOf(state, seat) === 'SUMERIA' ? EPIC_QUEST_LEVY_DISCOUNT_PCT : 0)
+    + seatBuildingSum(state, seat, 'levyDiscountPct');
+  return (Math.floor((sum * LEVY_COST_PCT) / 100) * (100 - Math.min(100, off))) / 100;
 }
 
 /**

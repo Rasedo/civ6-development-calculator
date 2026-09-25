@@ -3493,8 +3493,12 @@ class SimMasks:
                     if self._imp_outside[_k]:
                         _tterr = _tterr | (
                             self.tile_seat.gather(1, _tflat).reshape(_tnb.shape) < 0)
+                    # neither row lists a feature (`featureOk`), so a natural
+                    # wonder's mountain refuses it
+                    _tfeat = ((self.feat_id >= 0) & ~self.feat_stripped).gather(1, _tflat).reshape(_tnb.shape)
                     _tmt = (self.tile_mountain.gather(1, _tflat).reshape(_tnb.shape)
                             & (self.improvement.gather(1, _tflat).reshape(_tnb.shape) < 0)
+                            & ~_tfeat
                             & _tterr
                             & (_tnb >= 0))
                     _uc = int(self._imp_unlock_civic[_k])

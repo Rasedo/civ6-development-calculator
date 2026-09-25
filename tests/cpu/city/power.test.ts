@@ -8,9 +8,10 @@
  * is the renewable supply, and it never leaves the city that earns it.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, expandBorders, standDistrict } from '../helpers';
+import { makeMap, makeState, tileAtCoords, expandBorders, standDistrict, grantCivics, grantTechs } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
-import { computeCityStats } from '../../../cpu/core/city';
+import { computeCityStats, buildingTourism } from '../../../cpu/core/city';
+import { availableBuildings } from '../../../cpu/core/rules';
 import { cityPower, regionalEffects } from '../../../cpu/core/yields';
 import { resolveSeatPower } from '../../../cpu/core/stockpile';
 import { seatOf, setTileOwner } from '../../../cpu/core/seats';
@@ -93,6 +94,54 @@ describe('power', () => {
     expect(seat.stockpile[STRATEGIC_IDS.indexOf('COAL')]).toBe(0);
     resolveSeatPower(state, 0);
     expect(city.powered).toBe(false); // the bank ran out
+  });
+
+  it('the Shopping Mall: Gold, an Amenity and Tourism, more of both powered, and never beside a Food Market', () => {
+    const { state, city } = industrialCity();
+    grantCivics(state, 'CAPITALISM');
+    grantTechs(state, 'REPLACEABLE_PARTS');
+    standDistrict(state, city, 'NEIGHBORHOOD', tileAtCoords(state.map, 8, 9).index);
+    const offered = () => availableBuildings(state, city).map((b) => b.id);
+    expect(offered()).toEqual(expect.arrayContaining(['SHOPPING_MALL', 'FOOD_MARKET']));
+    city.buildings.push('FOOD_MARKET');
+    expect(offered()).not.toContain('SHOPPING_MALL');
+    city.buildings = city.buildings.filter((b) => b !== 'FOOD_MARKET');
+    const base = computeCityStats(state, city);
+    const tour0 = buildingTourism(state, 0, [city]);
+    city.buildings.push('SHOPPING_MALL');
+    expect(offered()).not.toContain('FOOD_MARKET');
+    expect(cityPower(state, city).demand).toBe(1);
+    expect(lit(state, city)).toBe(false); // no plant stands
+    const dark = computeCityStats(state, city);
+    expect(dark.breakdown.buildings.gold - base.breakdown.buildings.gold).toBe(2);
+    expect(buildingTourism(state, 0, [city]) - tour0).toBe(4);
+    city.buildings.push('COAL_POWER_PLANT');
+    expect(lit(state, city)).toBe(true);
+    const powered = computeCityStats(state, city);
+    expect(powered.breakdown.buildings.gold - dark.breakdown.buildings.gold).toBe(2);
+    expect(powered.amenities.have - dark.amenities.have).toBe(1);
+    expect(dark.amenities.have - base.amenities.have).toBe(1);
+  });
+
+  it('Industrial Zone Logistics powers its city in full while it heads the queue, burning nothing', () => {
+    const { state, city } = industrialCity();
+    const seat = seatOf(state, 0)!;
+    city.buildings.push('RESEARCH_LAB', 'COAL_POWER_PLANT');
+    seat.stockpile = STRATEGIC_IDS.map(() => 5);
+    city.queue = [{ kind: 'project', project: 'LOGISTICS', progress: 0, cost: 100 }];
+    resolveSeatPower(state, 0);
+    expect(city.powered).toBe(true);
+    expect(seat.stockpile[STRATEGIC_IDS.indexOf('COAL')]).toBe(5); // no fuel burned
+    // behind another item it runs no longer
+    city.queue.unshift({ kind: 'building', building: 'LIBRARY', progress: 0 });
+    seat.stockpile = STRATEGIC_IDS.map(() => 0);
+    resolveSeatPower(state, 0);
+    expect(city.powered).toBe(false);
+    // a city with no load stays unpowered: there is nothing to meet
+    const bare = industrialCity();
+    bare.city.queue = [{ kind: 'project', project: 'LOGISTICS', progress: 0, cost: 100 }];
+    resolveSeatPower(bare.state, 0);
+    expect(bare.city.powered).toBe(false);
   });
 
   it("the Coal Power Plant banks its Industrial Zone's adjacency as LOCAL production", () => {

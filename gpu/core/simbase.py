@@ -184,7 +184,7 @@ class Rules:
     citystate: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     seats: dict  # seat pacing, loyalty, GP costs, belief-pool sizes (cpu/data/seats.ts)
     beliefs: dict  # dense pantheon/follower/founder effect tables (data-file key order = claim-draw order)
-    projects: dict  # {rows: [{d, y, g}], yieldFraction, gppFraction} in data order
+    projects: dict  # {rows: [{d, y, yp, fp, g, ...}], gppFraction} in data order
     wonders: dict  # {rows: [{cost, ut, uc, cy, growAll, petra, mult, adjD, adjR}], fpFid} in data order
     improvements: dict  # FARM food/housing, builder roster idx, hillFarms civic
     districts: list  # catalog [{id, idx, cost, adjYield, adjacency, housing, ...}]
@@ -251,6 +251,8 @@ class Rules:
     b_spy_pen_enc: torch.Tensor  # long [NB] — the same, empire-wide, in any city of the seat holding an Encampment
     b_influence: torch.Tensor  # long [NB] — influence points per turn, paid to the SEAT
     b_favor: torch.Tensor  # long [NB] — diplomatic favor per turn, paid to the SEAT
+    b_levy_discount: torch.Tensor  # long [NB] — percent off the SEAT's levies
+    b_tourism: torch.Tensor  # long [NB] — flat Tourism on the building's own district
     b_loy_no_gov: torch.Tensor  # f64 [NB] — loyalty per turn in every one of the seat's UNGOVERNED cities
     b_amen_gov: torch.Tensor  # f64 [NB] — amenities in every city that HOLDS a governor
     b_house_gov: torch.Tensor  # f64 [NB] — housing in every city that HOLDS a governor
@@ -471,6 +473,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_spy_pen_enc=torch.tensor([int(b.get("spyLevelPenaltyEncampment", 0)) for b in B], dtype=torch.long),
         b_influence=torch.tensor([int(b.get("influencePerTurn", 0)) for b in B], dtype=torch.long),
         b_favor=torch.tensor([int(b.get("favorPerTurn", 0)) for b in B], dtype=torch.long),
+        b_levy_discount=torch.tensor([int(b["levyDiscountPct"]) for b in B], dtype=torch.long),
+        b_tourism=torch.tensor([int(b["tourism"]) for b in B], dtype=torch.long),
         b_loy_no_gov=torch.tensor([float(b.get("loyaltyWithoutGovernor", 0)) for b in B], dtype=torch.float64),
         b_amen_gov=torch.tensor([float(b.get("amenitiesWithGovernor", 0)) for b in B], dtype=torch.float64),
         b_house_gov=torch.tensor([float(b.get("housingWithGovernor", 0)) for b in B], dtype=torch.float64),
@@ -883,6 +887,7 @@ _MUTABLE = [
     "citystate_treasury", "citystate_faith",
     "citystate_build_from", "citystate_army_cap", "citystate_builders_trained",
     "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window
+    "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "city_free_pot",  # a Free City's build pot
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",

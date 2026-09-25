@@ -147,7 +147,9 @@ def main() -> int:
 
     # --- 5b) a phase that SUBMERGES takes its band forever ----------------
     s5b = fresh(rules, paths[0])
-    keep = (s5b.tile_lowland[b] == 2).nonzero(as_tuple=True)[0]
+    # a city centre never drowns, so band 2 is read off the world's other plots
+    keep = ((s5b.tile_lowland[b] == 2) & ~s5b._centre_plane()[b]).nonzero(as_tuple=True)[0]
+    assert len(keep), "no band-2 tile to drown on this seed"
     take = (s5b.tile_lowland[b] == 1) & ~s5b._centre_plane()[b]
     ti = take.nonzero(as_tuple=True)[0]
     assert len(ti), "no band-1 tile to drown on this seed"

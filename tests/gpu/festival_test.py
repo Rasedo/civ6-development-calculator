@@ -39,9 +39,8 @@ def main() -> None:
     pi_fest, frow = multi[0]
     assert abs(float(frow["gf"]) - 0.11) < 1e-12, f"Festival pays 0.11 per class, got {frow['gf']}"
     assert len(frow["gs"]) == 3, f"the Festival pays THREE classes, got {frow['gs']}"
-    yf = float((rules.projects or {}).get("yieldFraction"))
     gf = float((rules.projects or {}).get("gppFraction"))
-    assert abs(yf - 0.15) < 1e-12, f"district projects convert 15% of production, got {yf}"
+    assert int(frow["yp"]) == 15, f"the Festival converts 15% of production, got {frow['yp']}"
     assert abs(gf - 0.22) < 1e-12, f"a single-class project pays 22%, got {gf}"
     # and every OTHER project stays single-class
     for i, r in enumerate(rows):

@@ -682,6 +682,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   levyEnds: overCityStates((cityState) => cityState.levyEnds ?? -1),
   minorLastHit: overCityStates((cityState) => cityState.lastHitTurn ?? 0),
   minorPowered: overCityStates((cityState) => (cityState.powered ? 1 : 0)),
+  minorFullyPowered: overCityStates((cityState) => (cityState.fullyPowered ? 1 : 0)),
   minorRoutes: overCityStates((cityState, state) => routeRowsOf(state, cityState)),
   minorBuildFrom: overCityStates((cityState) => cityState.buildFrom ?? MINOR_BUILD_ROWS.map(() => 0)),
   minorArmyCap: overCityStates((cityState) => cityState.armyCap ?? -1),

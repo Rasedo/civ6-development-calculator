@@ -206,4 +206,23 @@ describe('Epic Quest', () => {
     state.seats[0].civ = civ('SUMERIA');
     expect(levyGoldCost(state, 0, cs)).toBe(full / 2);
   });
+
+  it('sums with the Foreign Ministry: half each, free together, nothing from a dark one', () => {
+    const state = makeState(makeMap(12, 12, 'GRASSLAND'));
+    const cs: CityState = {
+      ...emptySeat(seatOfCityState(0)), id: 0, name: 'CS0', type: 'militaristic',
+      centerIndex: tileAtCoords(state.map, 9, 9).index, population: 3, envoys: {}, met: [0],
+    };
+    state.cityStates.push(cs);
+    spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat);
+    spawnUnit(state, 'SLINGER', cs.centerIndex, cs.seat);
+    const full = levyGoldCost(state, 0, cs);
+    const city = settleAt(state, tileAtCoords(state.map, 3, 3).index, 0);
+    city.buildings.push('FOREIGN_MINISTRY');
+    expect(levyGoldCost(state, 0, cs)).toBe(full / 2);
+    state.seats[0].civ = civ('SUMERIA');
+    expect(levyGoldCost(state, 0, cs)).toBe(0);
+    city.pillagedBuildings = ['FOREIGN_MINISTRY'];
+    expect(levyGoldCost(state, 0, cs)).toBe(full / 2);
+  });
 });

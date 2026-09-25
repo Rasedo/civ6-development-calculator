@@ -302,6 +302,29 @@ def main() -> None:
         print(f"  6 eruption damage OK — row {row}: destroyed {gone}/{farms}, civilians {kills}/{N6}, "
               f"land band {min(bands)}-{max(bands)}")
 
+    # 7 — the catalog rows read their own Improvement_ValidFeatures list
+    # (`featureOk`): a live Woods refuses every row below, Volcanic Soil only
+    # those that list it
+    g = fresh(rules, path, slot=7)
+    t7 = bare_land(g)
+    g.feat_stripped[B0, t7] = False
+    soil_rows = ("FORT", "AIRSTRIP", "MISSILE_SILO", "COLOSSAL_HEADS", "TERRACE_FARM")
+    none_rows = ("SOLAR_FARM", "WIND_FARM", "CITY_PARK", "KURGAN", "MISSION", "STEPWELL", "MEKEWAP",
+                 "CHEMAMULL", "GOLF_COURSE", "ICE_HOCKEY_RINK", "OPEN_AIR_MUSEUM", "MONASTERY",
+                 "BATEY", "MAORI_PA")
+    for name in soil_rows + none_rows:
+        k = g._imp_ids.index(name)
+        assert g._imp_feats_ok[k] == ([SOIL] if name in soil_rows else []), f"{name}: {g._imp_feats_ok[k]}"
+        g.feat_id[B0, t7] = WOODS
+        assert not bool(g._imp_ground_ok(k)[B0, t7]), f"{name} stands on Woods"
+        g.feat_id[B0, t7] = SOIL
+        # the row's other clauses may refuse this plot; the feature alone must not
+        g.feat_stripped[B0, t7] = True
+        bare = bool(g._imp_ground_ok(k)[B0, t7])
+        g.feat_stripped[B0, t7] = False
+        assert bool(g._imp_ground_ok(k)[B0, t7]) == (bare and name in soil_rows), f"{name} on Volcanic Soil"
+    print(f"  7 ValidFeatures OK — {len(soil_rows)} rows take Volcanic Soil alone, {len(none_rows)} no feature")
+
     print("VOLCANIC SOIL OK — the envelope, the replacement, the per-plot chance, the damage rows")
 
 

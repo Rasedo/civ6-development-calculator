@@ -129,41 +129,58 @@ def main() -> None:
     print("  a pillaged district takes its slots with it")
 
     # --- 5) A LOCKED PLOT IS WORKED whatever it scores ----------------------
-    # Shrink the city to ONE worked plot and lock the worst one in its window:
+    # Shrink a city to ONE worked plot and lock the worst one in its window:
     # if the lock is honoured the city works that plot instead of its best.
-    tiles, valid = sim._work_window(row)
-    win = [int(t) for t, v in zip(tiles[0, j].tolist(), valid[0, j].tolist()) if v]
-    assert len(win) >= 2, "the city works too few plots to tell a lock apart"
-    sim.city_pop[0, row, j] = 1
-    sim._eff_version += 1
+    # The city is the first one, on any seat, whose window holds two plots
+    # that score apart, so the scene reads whatever world the fixture holds.
+    def food_prod(r: int, c: int) -> tuple[float, float]:
+        yf = sim._seat_amenity(r)[2]
+        tot = sim._seat_city_walk(r, amen_yf=yf)
+        return float(tot[0, c, 0]), float(tot[0, c, 1])
 
-    def food_prod() -> tuple[float, float]:
-        yf = sim._seat_amenity(row)[2]
-        tot = sim._seat_city_walk(row, amen_yf=yf)
-        return float(tot[0, j, 0]), float(tot[0, j, 1])
-
-    base = food_prod()
-    worst, worst_key = -1, None
-    for t in win:
+    def locked_keys(r: int, c: int, win: list[int]) -> dict[int, tuple[float, float]]:
+        keys = {}
+        for t in win:
+            sim.tile_locked[0, :] = False
+            sim.tile_locked[0, t] = True
+            sim._eff_version += 1
+            keys[t] = food_prod(r, c)
         sim.tile_locked[0, :] = False
-        sim.tile_locked[0, t] = True
         sim._eff_version += 1
-        k = food_prod()
-        if worst_key is None or k < worst_key:
-            worst, worst_key = t, k
-    sim.tile_locked[0, :] = False
-    sim._eff_version += 1
-    assert worst_key is not None and worst >= 0
+        return keys
+
+    scene = None
+    for r in range(sim.n_majors):
+        tiles, valid = sim._work_window(r)
+        for c in sim.city_alive[0, r].nonzero().flatten().tolist():
+            win = [int(t) for t, v in zip(tiles[0, c].tolist(), valid[0, c].tolist()) if v]
+            if len(win) < 2:
+                continue
+            pop0 = int(sim.city_pop[0, r, c])
+            sim.city_pop[0, r, c] = 1
+            sim._eff_version += 1
+            keys = locked_keys(r, c, win)
+            if len(set(keys.values())) > 1:
+                scene = (r, c, win, keys)
+                break
+            sim.city_pop[0, r, c] = pop0
+            sim._eff_version += 1
+        if scene:
+            break
+    assert scene, "no city's window holds two plots that score apart"
+    row, j, win, keys = scene
+    base = food_prod(row, j)
+    worst = min(keys, key=lambda t: keys[t])
+    worst_key = keys[worst]
     assert worst_key <= base, (
         f"locking the weakest plot {worst} should not beat the free choice {base} — got {worst_key}"
     )
-    sim.tile_locked[0, worst] = True
+    other = min((t for t in keys if keys[t] != base), key=lambda t: keys[t], default=-1)
+    assert other >= 0, "no lock changed the city's yield — the ranking is ignoring tile_locked"
+    sim.tile_locked[0, other] = True
     sim._eff_version += 1
-    assert food_prod() == worst_key, "the lock did not survive being set again"
-    assert worst_key != base or len(set(win)) == 1, (
-        "no lock changed the city's yield — the ranking is ignoring tile_locked"
-    )
-    print(f"  a locked plot displaces the city's own pick ({base} -> {worst_key})")
+    assert food_prod(row, j) == keys[other], "the lock did not survive being set again"
+    print(f"  a locked plot displaces the city's own pick ({base} -> {keys[other]})")
 
     # --- 6) THE WIRE: a flip needs the seat's own ground --------------------
     sim.tile_locked[0, :] = False

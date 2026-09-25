@@ -605,11 +605,48 @@ def test_the_project_row(rules, path) -> None:
     sim.citystate_prod[B0, s] = cost
     sci0 = float(sim.citystate_tech_prog[B0, s])
     sim._minor_build(s)
-    want = math.floor(cost * sim._proj_yf + 0.5)
+    want = math.floor(cost * (sim._proj_yp[grants] / 100) + 0.5)
     assert abs(float(sim.citystate_tech_prog[B0, s]) - (sci0 + want)) < 1e-9, \
         f"the project paid {float(sim.citystate_tech_prog[B0, s]) - sci0} Science, want {want}"
     assert abs(float(sim.citystate_prod[B0, s])) < 1e-9
     print(f"  12 project OK — Research Grants for {cost:.0f}, +{want} Science into the minor's pot")
+
+
+def test_the_logistics_power(rules, path) -> None:
+    """`minorBuild` / `minorPower`: a Logistics project the pot went toward and
+    did not finish lights the next turn's grid; a finished one does not."""
+    sim = build(rules, path)
+    s = a_minor(sim)
+    row = sim._CITY_MINOR0 + s
+    sim.citystate_type[B0, s] = 3  # industrial: Industrial Zone Logistics
+    idle_builder(sim, s)
+    logi = next(i for i, p in enumerate(sim._proj_rows) if int(p["d"]) == sim._iz_idx and int(p["fp"]))
+    assert sim._proj_fp == [logi], "Logistics is the one project that powers its city"
+    plan(sim, s, [kind_row(rules, "project", next(i for i, p in enumerate(sim._proj_rows)
+                                                  if int(p["d"]) == sim._campus_idx and int(p["y"]) == 3))])
+    plane = [t for t in range(sim.T) if int(sim.tile_seat[B0, t]) == 100 + s and int(sim.district[B0, t]) < 0
+             and bool(sim.passable[B0, t]) and t != int(sim.citystate_center[B0, s])]
+    t = plane[0]
+    sim.district[B0, t] = sim._iz_idx
+    sim.district_complete[B0, t] = True
+    sim.city_dist_tile[B0, row, 0, sim._iz_idx] = t
+    for name in ("WORKSHOP", "FACTORY"):
+        sim.city_bldg[B0, row, 0, BLD.index(name)] = True
+    sim._eff_version += 1
+    sim._minor_power(s)
+    assert not bool(sim.city_powered[B0, row, 0]), "the Factory's load, nothing to meet it"
+    sim.citystate_prod[B0, s] = 0.0
+    sim._minor_build(s)
+    assert bool(sim.citystate_full_power[B0, s]), "the pot went toward Logistics"
+    sim._minor_power(s)
+    assert bool(sim.city_powered[B0, row, 0]), "a running Logistics meets the whole load"
+    sim.citystate_prod[B0, s] = 1.0e4
+    sim._minor_build(s)
+    assert float(sim.citystate_prod[B0, s]) < 1.0e4, "the project completes"
+    assert not bool(sim.citystate_full_power[B0, s])
+    sim._minor_power(s)
+    assert not bool(sim.city_powered[B0, row, 0]), "a finished Logistics lights nothing"
+    print("  12b logistics OK — a running project lights the minor's grid, a finished one does not")
 
 
 def test_the_worship_row(rules, path) -> None:
@@ -748,6 +785,7 @@ def main() -> int:
     test_the_district_paves_an_improved_plot(rules, path)
     test_the_repair_row(rules, path)
     test_the_project_row(rules, path)
+    test_the_logistics_power(rules, path)
     test_the_worship_row(rules, path)
     test_the_flood_barrier_row(rules, path)
     test_the_trader_row(rules, path)

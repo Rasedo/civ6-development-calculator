@@ -22,7 +22,7 @@ import {
   MINOR_HARBOR_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_NAVAL_BUY_BP, MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY,
   MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT, type MinorBuildRow,
 } from '../../../cpu/data/cityStates';
-import { PROJECTS, PROJECT_YIELD_FRACTION } from '../../../cpu/data/projects';
+import { PROJECTS, projectYieldLump } from '../../../cpu/data/projects';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { TECHS } from '../../../cpu/data/techs';
 import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../../../cpu/data/units';
@@ -83,7 +83,7 @@ function turnOf(state: GameState, cs: CityState): number {
   minorPhase(state);
   return p;
 }
-function hold(cs: CityState, district: 'CAMPUS', t: Tile): void {
+function hold(cs: CityState, district: 'CAMPUS' | 'INDUSTRIAL_ZONE', t: Tile): void {
   setTileOwner(t, cs.seat);
   t.district = district;
   t.districtComplete = true;
@@ -461,7 +461,31 @@ describe('the rows the table grew', () => {
     cs.prodProgress = cost;
     const y = computeCityStats(state, minorCity(cs)).total.science;
     minorPhase(state);
-    expect(cs.research.techProgress).toBeCloseTo(sci0 + y + Math.round(cost * PROJECT_YIELD_FRACTION), 9);
+    expect(cs.research.techProgress).toBeCloseTo(sci0 + y + projectYieldLump(PROJECTS.RESEARCH_GRANTS, cost), 9);
+  });
+
+  it('a running Logistics project lights the next turn\'s grid; a finished one does not', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12, { type: 'industrial', buildings: ['ANCIENT_WALLS', 'WORKSHOP', 'FACTORY'] });
+    idleBuilder(state, cs);
+    plan(cs, [PROJECT_ROW()]);
+    hold(cs, 'INDUSTRIAL_ZONE', tileAtCoords(state.map, 13, 12));
+    state.turn = 1;
+    cs.prodProgress = 0;
+    minorPhase(state);
+    expect(cs.powered).toBe(false); // the Factory's load, nothing to meet it
+    expect(cs.fullyPowered).toBe(true); // the pot went toward Logistics
+    minorPhase(state);
+    expect(cs.powered).toBe(true);
+    // (a tech landing this turn may raise the price, so the pot holds plenty)
+    const pot = projectCost(state, cs.seat, 'LOGISTICS') + 100;
+    cs.prodProgress = pot;
+    minorPhase(state); // it completes
+    expect(cs.prodProgress).toBeLessThan(pot);
+    expect(cs.fullyPowered).toBe(false);
+    plan(cs, []);
+    minorPhase(state);
+    expect(cs.powered).toBe(false);
   });
 
   it('the worship row raises the building its majority religion names', () => {

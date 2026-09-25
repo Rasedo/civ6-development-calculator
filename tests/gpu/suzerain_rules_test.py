@@ -314,8 +314,22 @@ def main() -> None:
     _bs = build()
     _row = 0
     hold(_bs, _row, _bs._suz_c_bonus_amen)
-    _own = ((_bs.res_id >= 0) & (_bs.res_priority == 1)
-            & (_bs.tile_seat == int(_bs._ROW_SEAT[_row])) & ~_bs.res_stripped)[0]
+    _mine = (_bs.tile_seat == int(_bs._ROW_SEAT[_row]))[0]
+    _own = ((_bs.res_id >= 0) & (_bs.res_priority == 1) & ~_bs.res_stripped)[0] & _mine
+    if not bool(_own.any()):
+        # the world gave this seat's ground no bonus copy: plant one of the
+        # map's own on a bare owned land plot
+        _bonus = ((_bs.res_id >= 0) & (_bs.res_priority == 1))[0]
+        assert bool(_bonus.any()), "the map carries no bonus resource"
+        _src = int(_bonus.long().argmax())
+        _bare = _mine & (_bs.res_id[0] < 0) & ~_bs.water[0] & _bs.passable[0]
+        assert bool(_bare.any()), "the seat owns no bare land plot"
+        _p = int(_bare.long().argmax())
+        _bs.res_id[0, _p] = _bs.res_id[0, _src]
+        _bs.res_priority[0, _p] = 1
+        _bs.res_stripped[0, _p] = False
+        _bs._eff_version += 1
+        _own = ((_bs.res_id >= 0) & (_bs.res_priority == 1) & ~_bs.res_stripped)[0] & _mine
     assert bool(_own.any()), "the scene owns no unstripped bonus resource"
     _have = torch.zeros(_bs.B, _bs.RC, dtype=torch.float64, device=_bs.device)
     _need = torch.full((_bs.B, _bs.RC), 9.0, dtype=torch.float64, device=_bs.device)

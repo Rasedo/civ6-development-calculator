@@ -20,7 +20,7 @@ import { isImpassable } from '../../../world/query';
 import { FEATURE_SIGHT_THROUGH } from '../../../cpu/data/sight';
 import { WORLD_PRESETS } from '../../../seeder/presets';
 import { loadWorld } from '../../../cpu/world/load';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import type { WorldFile } from '../../../world/file';
 import { bareCtx } from '../helpers';
 import type { GameState, Tile } from '../../../cpu/core/types';
@@ -402,41 +402,58 @@ describe('Eyjafjallajokull and Vesuvius on the map', () => {
     expect(isImpassable(w)).toBe(true);
   });
 
-  it('every generated placement keeps its plots\' rules (Feature_ValidTerrains, NoCoast, NoRiver)', () => {
+  it('every generated land wonder keeps its plots\' rules (Feature_ValidTerrains, the adjacency rows, NoCoast, Coast, NoRiver)', () => {
     const P = WORLD_PRESETS.baseline;
-    const seen = { EYJAFJALLAJOKULL: 0, VESUVIUS: 0 };
+    const seen: Record<string, number> = {};
+    const on = (kinds: readonly (readonly [string, string])[], n: Tile) =>
+      kinds.some(([terrain, elevation]) => n.terrain === terrain && n.elevation === elevation);
     for (let s = 0; s < 240; s++) {
       const map = generateMap({
         width: P.width, height: P.height, seed: 20000 + s, withResources: true, withWonders: true,
         withVillages: true, layout: P.layout, landFraction: P.landFraction, resourceMult: P.resourceMult,
       });
-      for (const id of ['EYJAFJALLAJOKULL', 'VESUVIUS'] as const) {
-        const plots = map.tiles.filter((t) => t.feature === id);
+      for (const def of Object.values(WONDERS)) {
+        if (def.spawn.water) continue;
+        const plots = map.tiles.filter((t) => t.feature === def.id);
         if (plots.length === 0) continue;
-        seen[id] += 1;
-        expect(plots.length).toBe(WONDERS[id].size);
+        seen[def.id] = (seen[def.id] ?? 0) + 1;
+        expect(plots.length).toBe(def.size);
+        const sp = def.spawn;
         for (const t of plots) {
           expect(t.riverMask).toBe(0);
-          if (id === 'VESUVIUS') {
-            expect(['GRASSLAND', 'PLAINS']).toContain(t.terrain);
-            expect(t.elevation).toBe('MOUNTAIN');
-            expect(t.volcano).toBe(false);
-          } else {
-            expect(['SNOW', 'TUNDRA']).toContain(t.terrain);
-            expect(t.elevation).not.toBe('MOUNTAIN');
-            expect(neighbors(map, t).some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN')).toBe(false);
+          expect(t.volcano).toBe(false);
+          if (!def.becomesTerrain) {
+            expect(sp.terrains).toContain(t.terrain);
+            expect(sp.elevations).toContain(t.elevation);
           }
+          const nb = neighbors(map, t);
+          const salt = nb.some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN');
+          if (sp.inland) expect(salt).toBe(false);
+          if (sp.coast) expect(salt).toBe(true);
+          // the wonder's own plots may have become LAKE since, so the
+          // neighbour rows read the plots outside it
+          const out = nb.filter((n) => n.feature !== def.id);
+          if (sp.notAdjacentTerrains) expect(out.some((n) => on(sp.notAdjacentTerrains!, n))).toBe(false);
+          if (sp.adjacentTerrains && !def.becomesTerrain) expect(nb.some((n) => on(sp.adjacentTerrains!, n))).toBe(true);
         }
       }
     }
-    expect(seen.EYJAFJALLAJOKULL).toBeGreaterThan(0);
-    expect(seen.VESUVIUS).toBeGreaterThan(0);
+    // Kilimanjaro stands on a lone Mountain, Everest and Vesuvius on a range's edge
+    for (const id of ['EYJAFJALLAJOKULL', 'VESUVIUS', 'MOUNT_KILIMANJARO', 'MOUNT_EVEREST']) {
+      expect(seen[id], id).toBeGreaterThan(0);
+    }
   });
 
   it('a locked world holding Vesuvius offers its row a real site', () => {
-    const state = loadWorld(JSON.parse(readFileSync('seeder/worlds/seed9027.world.json', 'utf-8')) as WorldFile);
-    const v = state.map.tiles.find((t) => t.feature === 'VESUVIUS')!;
-    expect(v).toBeDefined();
+    const files = readdirSync('seeder/worlds').filter((f) => /^seed\d+\.world\.json$/.test(f)).sort();
+    let found: { state: GameState; v: Tile } | undefined;
+    for (const f of files) {
+      const s = loadWorld(JSON.parse(readFileSync(`seeder/worlds/${f}`, 'utf-8')) as WorldFile);
+      const t = s.map.tiles.find((x) => x.feature === 'VESUVIUS');
+      if (t) { found = { state: s, v: t }; break; }
+    }
+    expect(found, 'no locked world holds Vesuvius').toBeDefined();
+    const { state, v } = found!;
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
     let hit = false;

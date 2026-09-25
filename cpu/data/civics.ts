@@ -326,6 +326,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_CAPITALISM', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Civics', 'CivicType=CIVIC_CAPITALISM', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_CAPITALISM&PrereqCivic=CIVIC_MASS_MEDIA', 'PrereqCivic', { expect: 'CIVIC_MASS_MEDIA' }),
+    'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_SHOPPING_MALL', 'PrereqCivic', { expect: 'CIVIC_CAPITALISM' }),
   },
   CULTURAL_HERITAGE: {
     era: xml('Civics', 'CivicType=CIVIC_CULTURAL_HERITAGE', 'EraType', { expect: 'ERA_ATOMIC' }),
@@ -597,7 +598,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'FIVE_YEAR_PLAN' },
     ]),
     C('NUCLEAR_PROGRAM', 'Nuclear Program', 'Modern', 1715, ['IDEOLOGY']),
-    C('CAPITALISM', 'Capitalism', 'Modern', 1580, ['MASS_MEDIA']),
+    C('CAPITALISM', 'Capitalism', 'Modern', 1580, ['MASS_MEDIA'], [
+      { kind: 'unlockBuilding', building: 'SHOPPING_MALL' },
+    ]),
     C('CULTURAL_HERITAGE', 'Cultural Heritage', 'Atomic', 1955, ['CONSERVATION']),
 
     C('COLD_WAR', 'Cold War', 'Atomic', 2185, ['IDEOLOGY'], [

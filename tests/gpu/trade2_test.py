@@ -236,37 +236,49 @@ def main() -> None:
         and int(s3.seat_route_exp[0, 1, 0]) == -1, "restore must roll back route metadata"
 
     # --- 7) THE WALK: one descent step per turn, road behind ---------------
-    # paths[7] (seed9092) is the fixture whose two capitals share a land
-    # path; the fixture set is FIXED (worlds.lock), so assert rather than skip.
-    s5 = settle_all(BatchSim([load_fixture(paths[7])], rules, device="cpu", dtype=torch.float64))
-    o_t = int(s5.city_center[0, 1, 0])
-    d_t = int(s5.city_center[0, 0, 0])
-    land = bool(s5._trade_walk_ok(torch.tensor([0]), torch.tensor([o_t]), torch.tensor([d_t]),
-                                  torch.zeros(1, dtype=torch.long))[0])
-    assert land, "paths[7] must give a land capital pair — did the fixture set change?"
-    if land:
-        s5.seat_routes[0, 1, 0, 0] = int(s5.city_id[0, 1, 0])
-        s5.seat_routes[0, 1, 0, 1] = -1
-        s5.seat_route_dseat[0, 1, 0] = 0
-        s5.seat_route_dcity[0, 1, 0] = int(s5.city_id[0, 0, 0])
-        s5.seat_route_exp[0, 1, 0] = int(s5.turn) + s5._trade_duration
-        s5.seat_route_born[0, 1, 0] = int(s5.turn)
-        s5.seat_route_walk[0, 1, 0] = o_t
-        s5.seat_route_leg[0, 1, 0] = 0
-        s5._trade_walk_tick(1, torch.ones(s5.B, dtype=torch.bool))
-        w1 = int(s5.seat_route_walk[0, 1, 0])
-        assert w1 != o_t, "a land walker must step on turn one"
-        assert bool(s5.road[0, w1]), "the walker lays road where it lands"
-        d0 = int(s5.pair_dist[o_t, d_t])
-        assert int(s5.pair_dist[w1, d_t]) == d0 - 1, "the descent step closes on the destination"
-        # ROUND-TRIP EXPIRY: the term arriving with the walker OUT holds
-        s5.seat_route_exp[0, 1, 0] = int(s5.turn)
-        s5._expire_seat_routes(1)
-        assert int(s5.seat_routes[0, 1, 0, 0]) >= 0, "term + walker OUT must hold the route"
-        s5.seat_route_walk[0, 1, 0] = o_t  # home: the round trip completes
-        s5._expire_seat_routes(1)
-        assert int(s5.seat_routes[0, 1, 0, 0]) == -1, "term + walker HOME must end the route"
-        print("walk + round-trip expiry ok")
+    # the first fixture, in order, whose two capitals share a land path, read
+    # off whatever worlds the seeder locked
+    s5, orow, drow = None, -1, -1
+    for _p in paths:
+        _s = settle_all(BatchSim([load_fixture(_p)], rules, device="cpu", dtype=torch.float64))
+        for _o in range(_s.n_majors):
+            for _d in range(_s.n_majors):
+                if _o == _d or not bool(_s.city_alive[0, _o, 0]) or not bool(_s.city_alive[0, _d, 0]):
+                    continue
+                if bool(_s._trade_walk_ok(torch.tensor([0]), torch.tensor([int(_s.city_center[0, _o, 0])]),
+                                          torch.tensor([int(_s.city_center[0, _d, 0])]),
+                                          torch.zeros(1, dtype=torch.long))[0]):
+                    s5, orow, drow = _s, _o, _d
+                    break
+            if s5 is not None:
+                break
+        if s5 is not None:
+            break
+    assert s5 is not None, "no locked world gives two capitals a land path"
+    o_t = int(s5.city_center[0, orow, 0])
+    d_t = int(s5.city_center[0, drow, 0])
+    s5.seat_routes[0, orow, 0, 0] = int(s5.city_id[0, orow, 0])
+    s5.seat_routes[0, orow, 0, 1] = -1
+    s5.seat_route_dseat[0, orow, 0] = int(s5._ROW_SEAT[drow])
+    s5.seat_route_dcity[0, orow, 0] = int(s5.city_id[0, drow, 0])
+    s5.seat_route_exp[0, orow, 0] = int(s5.turn) + s5._trade_duration
+    s5.seat_route_born[0, orow, 0] = int(s5.turn)
+    s5.seat_route_walk[0, orow, 0] = o_t
+    s5.seat_route_leg[0, orow, 0] = 0
+    s5._trade_walk_tick(orow, torch.ones(s5.B, dtype=torch.bool))
+    w1 = int(s5.seat_route_walk[0, orow, 0])
+    assert w1 != o_t, "a land walker must step on turn one"
+    assert bool(s5.road[0, w1]), "the walker lays road where it lands"
+    d0 = int(s5.pair_dist[o_t, d_t])
+    assert int(s5.pair_dist[w1, d_t]) == d0 - 1, "the descent step closes on the destination"
+    # ROUND-TRIP EXPIRY: the term arriving with the walker OUT holds
+    s5.seat_route_exp[0, orow, 0] = int(s5.turn)
+    s5._expire_seat_routes(orow)
+    assert int(s5.seat_routes[0, orow, 0, 0]) >= 0, "term + walker OUT must hold the route"
+    s5.seat_route_walk[0, orow, 0] = o_t  # home: the round trip completes
+    s5._expire_seat_routes(orow)
+    assert int(s5.seat_routes[0, orow, 0, 0]) == -1, "term + walker HOME must end the route"
+    print("walk + round-trip expiry ok")
 
     # --- 8) PLUNDER: an at-war major on the walker tile kills the route and
     #        banks the gold; the Trader does NOT come back --------------------

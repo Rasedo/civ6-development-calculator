@@ -4,12 +4,13 @@
  * matching class. Cost scales with research progress like districts (locked in
  * when queued).
  *
- * SOURCING SWEEP. The district -> yield -> GP-class mapping was
- * checked against the Civilopedia project entries and is CORRECT as written for
- * Campus Research Grants (science / Great Scientist), Holy Site Prayers (faith /
- * Great Prophet), Commercial Hub Investment (gold / Great Merchant), Harbor
- * Shipping (gold / Great Admiral) and Encampment Training (no yield / Great
- * General).
+ * The district -> yield -> GP-class mapping is the install's
+ * `Project_YieldConversions` and `Project_GreatPersonPoints`: Campus Research
+ * Grants (science / Great Scientist), Holy Site Prayers (faith / Great
+ * Prophet), Commercial Hub Investment (gold / Great Merchant), Harbor Shipping
+ * (gold / Great Admiral), Encampment Training (gold / Great General) and
+ * Industrial Zone Logistics (no yield — Gathering Storm deletes its row — /
+ * Great Engineer).
  *
  * The THEATER SQUARE FESTIVAL pays all three of its real classes — Great
  * WRITER, ARTIST and MUSICIAN, each ~11% of the production invested (Standard
@@ -31,6 +32,14 @@ export interface ProjectDef {
   name: string;
   district: DistrictId;
   yield: YieldKey | null;
+  /** CIV6 (Project_YieldConversions.PercentOfProductionRate): the share of
+   *  the Production invested that the project converts into `yield`, paid as
+   *  one lump on completion (the Production invested equals the cost, so the
+   *  totals agree). Present exactly where `yield` is. */
+  yieldPct?: number;
+  /** CIV6 (Projects_XP2.FullyPoweredWhileActive): the city counts as fully
+   *  powered, with no fuel burned, while this project heads its queue. */
+  fullyPowered?: boolean;
   /** Great-person class receiving points on completion. Kept as the PRIMARY
    *  class (and the GPU export's single `g` column) for index stability; read
    *  `gpClassesOf(p)` for the full list. */
@@ -120,11 +129,13 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       name: 'Campus Research Grants',
       district: 'CAMPUS',
       yield: 'science',
+      yieldPct: 15,
       gpClass: 'SCIENTIST',
       description: 'Convert production into science and Great Scientist points.',
       cost: 25,
       costProgressGame: 1500,
       src: {
+        yieldPct: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'PercentOfProductionRate'),
         cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'Cost', { scale: GAME_SPEED }),
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_CAMPUS', 'PrereqDistrict', { expect: 'DISTRICT_CAMPUS' }),
@@ -137,6 +148,7 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       name: 'Theater Square Festival',
       district: 'THEATER_SQUARE',
       yield: 'culture',
+      yieldPct: 15,
       gpClass: 'ARTIST',
       gpClasses: ['WRITER', 'ARTIST', 'MUSICIAN'],
       gppFraction: 0.11,
@@ -144,6 +156,7 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       cost: 25,
       costProgressGame: 1500,
       src: {
+        yieldPct: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'PercentOfProductionRate'),
         cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'Cost', { scale: GAME_SPEED }),
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_THEATER', 'PrereqDistrict', { expect: 'DISTRICT_THEATER' }),
@@ -158,11 +171,13 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       name: 'Holy Site Prayers',
       district: 'HOLY_SITE',
       yield: 'faith',
+      yieldPct: 15,
       gpClass: 'PROPHET',
       description: 'Convert production into faith and Great Prophet points.',
       cost: 25,
       costProgressGame: 1500,
       src: {
+        yieldPct: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'PercentOfProductionRate'),
         cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'Cost', { scale: GAME_SPEED }),
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'PrereqDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
@@ -175,11 +190,13 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       name: 'Commercial Hub Investment',
       district: 'COMMERCIAL_HUB',
       yield: 'gold',
+      yieldPct: 30,
       gpClass: 'MERCHANT',
       description: 'Convert production into gold and Great Merchant points.',
       cost: 25,
       costProgressGame: 1500,
       src: {
+        yieldPct: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'PercentOfProductionRate'),
         cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'Cost', { scale: GAME_SPEED }),
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB', 'PrereqDistrict', { expect: 'DISTRICT_COMMERCIAL_HUB' }),
@@ -192,11 +209,13 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       name: 'Harbor Shipping',
       district: 'HARBOR',
       yield: 'gold',
+      yieldPct: 15,
       gpClass: 'ADMIRAL',
       description: 'Convert production into gold and Great Admiral points.',
       cost: 25,
       costProgressGame: 1500,
       src: {
+        yieldPct: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'PercentOfProductionRate'),
         cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'Cost', { scale: GAME_SPEED }),
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HARBOR', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
@@ -208,12 +227,15 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       id: 'TRAINING',
       name: 'Encampment Training',
       district: 'ENCAMPMENT',
-      yield: null,
+      yield: 'gold',
+      yieldPct: 15,
       gpClass: 'GENERAL',
-      description: 'Convert production into Great General points.',
+      description: 'Convert production into gold and Great General points.',
       cost: 25,
       costProgressGame: 1500,
       src: {
+        yield: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'YieldType', { expect: 'YIELD_GOLD' }),
+        yieldPct: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'PercentOfProductionRate'),
         cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'Cost', { scale: GAME_SPEED }),
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_ENCAMPMENT', 'PrereqDistrict', { expect: 'DISTRICT_ENCAMPMENT' }),
@@ -469,19 +491,23 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     }),
     // CIV6 (PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE, Industrial Zone
     // Logistics): the Industrial Zone's district project — Cost 25 on the
-    // GAME_PROGRESS curve like its five siblings, Great Engineer points and no
-    // yield conversion. `Projects_XP2.FullyPoweredWhileActive` is not modelled.
+    // GAME_PROGRESS curve like its five siblings, Great Engineer points, no
+    // yield conversion (Expansion2_Projects.xml deletes the base row), and
+    // "provides this city with full Power while active".
     // APPENDED LAST, because a project's catalog index IS its action code.
     P({
       id: 'LOGISTICS',
       name: 'Industrial Zone Logistics',
       district: 'INDUSTRIAL_ZONE',
       yield: null,
+      fullyPowered: true,
       gpClass: 'ENGINEER',
-      description: 'Convert production into Great Engineer points.',
+      description: 'Full Power while active; Great Engineer points once finished.',
       cost: 25,
       costProgressGame: 1500,
       src: {
+        yield: { derived: 'null: Expansion2_Projects.xml deletes the base game\'s YIELD_GOLD conversion row', inputs: [xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'YieldType')] },
+        fullyPowered: xml('Projects_XP2', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'FullyPoweredWhileActive'),
         cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'Cost', { scale: GAME_SPEED }),
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'PrereqDistrict', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
@@ -516,14 +542,11 @@ export function isSpaceProject(id: string): boolean {
  *  requirement by 5 each time it is completed". */
 export const LASER_POWER_LOAD = 5;
 
-/** Yield granted on completion = production cost × this.
- *  SOURCED: real Civ 6 converts **15%** of the city's production output to
- *  the district's yield while the project runs — confirmed identically for
- *  Campus Research Grants (Science), Holy Site Prayers (Faith) and the Theater
- *  Square Festival (Culture), so the rate is uniform and needs no per-project
- *  table. We grant the equivalent lump on completion; total production invested
- *  equals the cost, so the totals agree. */
-export const PROJECT_YIELD_FRACTION = 0.15;
+/** The yield lump a district project pays on completion: its cost at the
+ *  row's `yieldPct`. */
+export function projectYieldLump(p: ProjectDef, cost: number): number {
+  return Math.round(cost * ((p.yieldPct ?? 0) / 100));
+}
 export const PROJECT_GPP_FRACTION = 0.22;
 
 export function gpClassesOf(p: ProjectDef): GreatPersonClass[] {

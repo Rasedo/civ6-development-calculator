@@ -124,9 +124,12 @@ def test_upkeep(rules, path) -> None:
     sim.citystate_treasury[B0, s] = 10.0
     sim._minor_accrue(s)
     assert abs(float(sim.citystate_treasury[B0, s]) - max(0.0, 10.0 + gold - upkeep)) < 1e-9
+    # the accrual grows the city and its borders, so its Gold is read again
+    gold = float(sim._seat_city_stats(sim._CITY_MINOR0 + s)[0][B0, 0, 2])
     sim.citystate_treasury[B0, s] = 0.0
     sim._minor_accrue(s)
-    assert float(sim.citystate_treasury[B0, s]) == max(0.0, gold - upkeep) >= 0.0
+    got = float(sim.citystate_treasury[B0, s])
+    assert got >= 0.0 and abs(got - max(0.0, gold - upkeep)) < 1e-9, (got, gold, upkeep)
     print("  2 upkeep OK — the units' Maintenance out of the city's Gold, never below 0")
 
 

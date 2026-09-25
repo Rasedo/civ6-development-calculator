@@ -1,27 +1,67 @@
 
-import type { FeatureId, TerrainId } from './types';
+import type { Elevation, FeatureId, TerrainId } from './types';
+
+/** a terrain as the install names one: the base terrain and its elevation
+ *  (TERRAIN_GRASS_MOUNTAIN is GRASSLAND at MOUNTAIN). */
+export type GroundKind = readonly [TerrainId, Elevation];
+
+/** every pair of `terrains` × `elevations`, the shape every roster row's
+ *  terrain list takes. */
+function ground(terrains: readonly TerrainId[], elevations: readonly Elevation[]): GroundKind[] {
+  return terrains.flatMap((t) => elevations.map((e) => [t, e] as const));
+}
+
+const LAND: readonly TerrainId[] = ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'];
+const MOUNTAINS = ground(LAND, ['MOUNTAIN']);
+
+/** CIV6 (`Features.MinDistanceNW`, 8 on every natural wonder row): no plot of
+ *  a wonder stands nearer than this to a plot of another. */
+export const MIN_DISTANCE_NW = 8;
 
 /** MAPGEN data only — a wonder's yields, appeal and passability live on its
- *  FEATURE row (`FEATURES`), the one roster every reader asks. */
+ *  FEATURE row (`FEATURES`), the one roster every reader asks. Every land
+ *  clause holds for every plot the wonder covers. */
 export interface NaturalWonderDef {
   /** doubles as the wonder's FEATURE row id — the roster the readers ask. */
   id: FeatureId;
   name: string;
   code: string;
+  /** CIV6 (`Features.Tiles`): the plots it covers. */
   size: number;
   becomesTerrain?: TerrainId;
   spawn: {
     water?: boolean; // must be coast water
-    terrains?: TerrainId[]; // for land wonders
-    minLat?: number;
+    minLat?: number; // the water wonders' band
     maxLat?: number;
-    inland?: boolean; // no adjacent salt water
-    mountain?: boolean; // stands on a Mountain (a *_MOUNTAIN Feature_ValidTerrains row); every other land wonder refuses one
-    noRiver?: boolean; // no river edge on any of its plots (Features.NoRiver)
+    /** CIV6 (Feature_ValidTerrains): the land terrains and elevations a plot
+     *  may stand on — every roster row's list is their product. */
+    terrains?: TerrainId[];
+    elevations?: Elevation[];
+    /** CIV6 (`Features.NoCoast`): no adjacent salt water. */
+    inland?: boolean;
+    /** CIV6 (`Features.Coast`): adjacent salt water. */
+    coast?: boolean;
+    /** CIV6 (`Features.NoRiver`): no river edge. */
+    noRiver?: boolean;
+    /** CIV6 (Feature_AdjacentTerrains): at least one neighbour stands on one
+     *  of these. */
+    adjacentTerrains?: GroundKind[];
+    /** CIV6 (Feature_NotAdjacentTerrains): no neighbour stands on one of
+     *  these. */
+    notAdjacentTerrains?: GroundKind[];
+    /** CIV6 (Feature_AdjacentFeatures): at least one neighbour carries one of
+     *  these. */
+    adjacentFeatures?: FeatureId[];
+    /** CIV6 (`Features.NoAdjacentFeatures`): no neighbour carries a feature. */
+    noAdjacentFeatures?: boolean;
   };
   color: string;
 }
 
+// The land rows are the layered install's Features, Feature_ValidTerrains,
+// Feature_AdjacentTerrains, Feature_NotAdjacentTerrains and
+// Feature_AdjacentFeatures rows (Features.xml, Expansion1_Features_Major.xml,
+// Expansion2_Features.xml, Australia_Features.xml, VikingsLandmarks_Features.xml).
 export const WONDERS: Record<string, NaturalWonderDef> = {
   CRATER_LAKE: {
     id: 'CRATER_LAKE',
@@ -29,7 +69,7 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     code: 'CL',
     size: 1,
     becomesTerrain: 'LAKE',
-    spawn: { terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], inland: true, maxLat: 0.85 },
+    spawn: { terrains: ['PLAINS', 'TUNDRA'], elevations: ['FLAT'], inland: true, noRiver: true },
     color: '#7fd4e8',
   },
   DEAD_SEA: {
@@ -38,7 +78,10 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     code: 'DS',
     size: 2,
     becomesTerrain: 'LAKE',
-    spawn: { terrains: ['DESERT', 'PLAINS'], inland: true, minLat: 0.15, maxLat: 0.55 },
+    spawn: {
+      terrains: ['GRASSLAND', 'DESERT'], elevations: ['FLAT'], inland: true, noRiver: true,
+      notAdjacentTerrains: MOUNTAINS, noAdjacentFeatures: true,
+    },
     color: '#9fe0d8',
   },
   GALAPAGOS: {
@@ -61,8 +104,11 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     id: 'PANTANAL',
     name: 'Pantanal',
     code: 'PN',
-    size: 3,
-    spawn: { terrains: ['GRASSLAND', 'PLAINS'], maxLat: 0.45 },
+    size: 4,
+    spawn: {
+      terrains: ['GRASSLAND', 'PLAINS'], elevations: ['FLAT'], inland: true, noRiver: true,
+      notAdjacentTerrains: ground(['SNOW'], ['FLAT']),
+    },
     color: '#8fd86f',
   },
   ULURU: {
@@ -70,7 +116,10 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Uluru',
     code: 'UL',
     size: 1,
-    spawn: { terrains: ['DESERT', 'PLAINS'], minLat: 0.15, maxLat: 0.55 },
+    spawn: {
+      terrains: ['DESERT'], elevations: ['FLAT', 'HILLS'], inland: true, noRiver: true,
+      notAdjacentTerrains: [...MOUNTAINS, ...ground(['GRASSLAND', 'PLAINS', 'TUNDRA', 'SNOW'], ['FLAT', 'HILLS'])],
+    },
     color: '#e8845f',
   },
   TORRES_DEL_PAINE: {
@@ -78,16 +127,21 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Torres del Paine',
     code: 'TP',
     size: 2,
-    spawn: { terrains: ['PLAINS', 'TUNDRA', 'GRASSLAND'], minLat: 0.45, maxLat: 0.88 },
+    spawn: {
+      terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], elevations: ['FLAT', 'HILLS'], inland: true, noRiver: true,
+      notAdjacentTerrains: [...ground(['DESERT', 'SNOW'], ['FLAT']), ...MOUNTAINS],
+    },
     color: '#b8c8e8',
   },
-
   MOUNT_KILIMANJARO: {
     id: 'MOUNT_KILIMANJARO',
     name: 'Mount Kilimanjaro',
     code: 'KI',
     size: 1,
-    spawn: { terrains: ['GRASSLAND', 'PLAINS'], maxLat: 0.4 },
+    spawn: {
+      terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA'], elevations: ['MOUNTAIN'], inland: true, noRiver: true,
+      notAdjacentTerrains: MOUNTAINS,
+    },
     color: '#cfe0b0',
   },
   YOSEMITE: {
@@ -95,7 +149,10 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Yosemite',
     code: 'YO',
     size: 2,
-    spawn: { terrains: ['PLAINS', 'TUNDRA', 'GRASSLAND'], minLat: 0.4 },
+    spawn: {
+      terrains: ['PLAINS', 'TUNDRA'], elevations: ['FLAT'], inland: true, noRiver: true,
+      notAdjacentTerrains: MOUNTAINS, adjacentFeatures: ['WOODS'],
+    },
     color: '#a8c890',
   },
   CLIFFS_OF_DOVER: {
@@ -103,15 +160,18 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Cliffs of Dover',
     code: 'CD',
     size: 2,
-    spawn: { terrains: ['GRASSLAND', 'PLAINS'], minLat: 0.45 },
+    spawn: { terrains: ['GRASSLAND', 'PLAINS'], elevations: ['HILLS'], coast: true, noRiver: true },
     color: '#e8e8f0',
   },
   MOUNT_EVEREST: {
     id: 'MOUNT_EVEREST',
     name: 'Mount Everest',
     code: 'EV',
-    size: 2,
-    spawn: { terrains: ['TUNDRA', 'PLAINS', 'GRASSLAND'], minLat: 0.5 },
+    size: 3,
+    spawn: {
+      terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA'], elevations: ['MOUNTAIN'], inland: true, noRiver: true,
+      adjacentTerrains: ground(LAND, ['FLAT', 'HILLS']),
+    },
     color: '#dce6f2',
   },
   EYE_OF_THE_SAHARA: {
@@ -119,28 +179,29 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Eye of the Sahara',
     code: 'ES',
     size: 3,
-    spawn: { terrains: ['DESERT'], minLat: 0.1, maxLat: 0.5 },
+    spawn: { terrains: ['DESERT'], elevations: ['FLAT', 'HILLS'], inland: true, noRiver: true },
     color: '#e0c088',
   },
-  // CIV6 (`VikingsLandmarks_Features.xml`, FEATURE_EYJAFJALLAJOKULL): Tiles 2,
-  // Feature_ValidTerrains Snow and Tundra flat or hills, NoCoast, NoRiver.
   EYJAFJALLAJOKULL: {
     id: 'EYJAFJALLAJOKULL',
     name: 'Eyjafjallajökull',
     code: 'EY',
     size: 2,
-    spawn: { terrains: ['SNOW', 'TUNDRA'], inland: true, noRiver: true },
+    spawn: {
+      terrains: ['SNOW', 'TUNDRA'], elevations: ['FLAT', 'HILLS'], inland: true, noRiver: true,
+      adjacentTerrains: ground(['SNOW', 'TUNDRA'], ['FLAT', 'HILLS']),
+    },
     color: '#c8ccd4',
   },
-  // CIV6 (`Expansion2_Features.xml`, FEATURE_VESUVIUS): Tiles 1,
-  // Feature_ValidTerrains TERRAIN_GRASS_MOUNTAIN and TERRAIN_PLAINS_MOUNTAIN,
-  // NoRiver.
   VESUVIUS: {
     id: 'VESUVIUS',
     name: 'Vesuvius',
     code: 'VE',
     size: 1,
-    spawn: { terrains: ['GRASSLAND', 'PLAINS'], mountain: true, noRiver: true },
+    spawn: {
+      terrains: ['GRASSLAND', 'PLAINS'], elevations: ['MOUNTAIN'], noRiver: true,
+      adjacentTerrains: ground(LAND, ['FLAT', 'HILLS']),
+    },
     color: '#8a6f63',
   },
 };

@@ -244,6 +244,9 @@ class SimInit:
         self.citystate_builder_buy = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_army_seen = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_loss_turn = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        # its last turn's Production went toward a `fullyPowered` project
+        # still running — the queue head `_minor_power` reads (`fullyPowered`)
+        self.citystate_full_power = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         self._init_minor_build(rules)
         # the minor city's GOLD and FAITH: what its yield walk pays, less its
         # units' upkeep, spent on its purchases and upgrades (the TS
@@ -1333,7 +1336,10 @@ class SimInit:
         self._proj_seat_rows: list[tuple[int, int]] = [
             (int(p.get("cv", -1)), int(p.get("ld", -1))) for p in self._proj_rows]
         self._proj_move_cap = {i for i, p in enumerate(self._proj_rows) if int(p.get("mc", 0))}
-        self._proj_yf = float(_pj.get("yieldFraction", 0.15))
+        # each row's yield conversion (`yieldPct`, 0 for none) and the rows
+        # that power their city while they head its queue (`fullyPowered`)
+        self._proj_yp = [int(p["yp"]) for p in self._proj_rows]
+        self._proj_fp = [i for i, p in enumerate(self._proj_rows) if int(p["fp"])]
         self._proj_gf = float(_pj.get("gppFraction", 0.22))
         # The space-race chain. Space rows carry sp/vic flags (+ rt tech gate,
         # rp previous-step link) and sit LAST in the projects table, in chain
@@ -1943,11 +1949,10 @@ class SimInit:
         self._imp_tour_y = [int(r.get("tourY", -1)) for r in imp["rows"]]
         self._imp_tour_tech = [int(r.get("tourTech", -1)) for r in imp["rows"]]
         # THE MILITARY ENGINEER'S ROWS. `eng` marks the ones it — and only it —
-        # builds; `noFeat` is the Fort's featureless-tile clause; `air` is what
-        # an Airstrip bases; `appeal` is what ANY improvement takes off its
-        # neighbours, the `DistrictDef.appealAdjacent` twin.
+        # builds; `air` is what an Airstrip bases; `appeal` is what ANY
+        # improvement takes off its neighbours, the `DistrictDef.appealAdjacent`
+        # twin.
         self._imp_eng = [bool(r.get("eng", 0)) for r in imp["rows"]]
-        self._imp_no_feat = [bool(r.get("noFeat", 0)) for r in imp["rows"]]
         # the ONE feature a row may stand on (-1 = free) — the Geothermal Plant
         self._imp_req_feat = [int(r.get("reqFeat", -1)) for r in imp["rows"]]
         self._imp_air_slots = torch.tensor(
@@ -2964,6 +2969,9 @@ class SimInit:
         self._b_spy_pen_enc = rules.b_spy_pen_enc.to(device)
         self._b_influence = rules.b_influence.to(device)
         self._b_favor = rules.b_favor.to(device)
+        self._b_levy_discount = rules.b_levy_discount.to(device)
+        self._b_tourism = rules.b_tourism.to(device)
+        self._b_tour_any = bool((self._b_tourism != 0).any())
         self._b_loy_no_gov = rules.b_loy_no_gov.to(device)
         self._b_amen_gov = rules.b_amen_gov.to(device)
         self._b_house_gov = rules.b_house_gov.to(device)
@@ -3523,7 +3531,7 @@ class SimInit:
         _ab = _uq["abilities"]
         self._iteru_mult = float(_ab["iteruProdMult"])
         self._knarr_heal = int(_ab["knarrNeutralHeal"])
-        self._epic_levy_mult = float(_ab["epicQuestLevyMult"])
+        self._epic_levy_pct = int(_ab["epicQuestLevyDiscountPct"])
         self._rome_post_gold = float(_ab["romeOwnPostGold"])
         _la = _uq["leaderAbilities"]
         self._cleo_intl_gold = float(_la["cleopatraIntlGold"])
