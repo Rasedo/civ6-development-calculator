@@ -11,7 +11,7 @@ in git history.
 - **`docs/roster_ledger.json` is the truth.** 356 rows keyed by
   `ModifierId`, each `shipped`, `open: <AUDIT item> — <blocker>`, or `AI:`
   (a modifier that is nothing but the game's AI weighting, out of scope by
-  the owner's 2026-09-20 ruling). Today: 353 shipped, 1 open, 2 AI.
+  the owner's 2026-09-20 ruling). Today: 354 shipped, 2 AI.
 - **`tests/cpu/data/ledger-audit.test.ts` is the guard.** Every `open:` row
   must cite an AUDIT item that exists and is not CLOSED; every `AI:` row
   must quote the ruling it rests on; no third state exists, so a deferral
@@ -61,14 +61,13 @@ the trait and from `Modifiers`, and `Expansion2_Features.xml`'s
 civilization. So each row's ledger state is whether both engines do what
 Gathering Storm put in its place:
 
-- the twelve district rows are `shipped` — `canPlaceDistrictIn` has no
-  floodplain test and the exporter's `du` plane admits floodplains;
-- `TRAIT_FLOODPLAINS_VALID_WONDER` is `open` — `wonderTerrainOk` still
-  refuses a floodplain to any wonder without `allowFloodplains`.
+- all thirteen are `shipped` — `canPlaceDistrictIn` has no floodplain test,
+  the exporter's `du` plane admits floodplains, and `wonderTerrainOk` refuses
+  a floodplain to no wonder.
 
 ## The rows that are not `shipped`
 
-`TRAIT_FLOODPLAINS_VALID_WONDER` is open, above. The other two are out of
+The two rows not `shipped` are out of
 scope by the owner's ruling of 2026-09-20 — this project
 models Civ 6's ENGINE, never its AI, and a diplomatic-action PREFERENCE is
 nothing but the AI's weighting of an action it might choose. Deleted, not

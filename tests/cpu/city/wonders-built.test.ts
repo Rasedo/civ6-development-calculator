@@ -32,6 +32,16 @@ describe('world wonders', () => {
     expect(canPlaceWonder(state, city, 'HANGING_GARDENS', dry.index, 0).ok).toBe(true);
   });
 
+  it('takes floodplains for any wonder (Features_XP2.ValidWonderPlacement)', () => {
+    const { state, city } = sandboxCity();
+    const plain = tileAtCoords(state.map, 7, 8);
+    plain.riverMask = 1;
+    plain.feature = 'FLOODPLAINS';
+    expect(canPlaceWonder(state, city, 'HANGING_GARDENS', plain.index, 0).ok).toBe(true);
+    plain.feature = 'OASIS';
+    expect(canPlaceWonder(state, city, 'HANGING_GARDENS', plain.index, 0).ok).toBe(false);
+  });
+
   it('is one-per-world', () => {
     const { state, city } = sandboxCity();
     const desert = tileAtCoords(state.map, 9, 8);

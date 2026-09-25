@@ -161,7 +161,7 @@
   "TRAIT_FLOODPLAINS_VALID_NEIGHBORHOOD": "shipped",
   "TRAIT_FLOODPLAINS_VALID_SPACEPORT": "shipped",
   "TRAIT_FLOODPLAINS_VALID_THEATER": "shipped",
-  "TRAIT_FLOODPLAINS_VALID_WONDER": "open: C-26 — Expansion2_RemoveData.xml deletes the row and Features_XP2 gives every floodplains feature ValidWonderPlacement, so any civilization places a wonder on floodplains; wonderTerrainOk still refuses floodplains to a wonder without allowFloodplains",
+  "TRAIT_FLOODPLAINS_VALID_WONDER": "shipped",
   "TRAIT_FLOOD_BARRIER_PRODUCTION": "shipped",
   "TRAIT_FOREIGN_CONTINENT_MELEE_UNIT": "shipped",
   "TRAIT_FOREIGN_CONTINENT_TRADE_ROUTE": "shipped",

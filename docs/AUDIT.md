@@ -50,7 +50,7 @@ re-adds them.
 | C-2 diplomatic agreements | 1 | the promise's break and the broken-promise operand (LAB) |
 | C-16 the spy's second half | 1 | the counterspy's escape term (LAB) |
 | C-20 the route's transportation efficiency | 1 | how the score becomes the multiplier, then the path term (LAB) |
-| C-26 civilization abilities, the residue | 1 | wonders on floodplains (BUILD); Trajan on a capture, the Knarr's Trader path, a damaged city as a wounded foe (LAB) |
+| C-26 civilization abilities, the residue | 1 | Trajan on a capture, the Knarr's Trader path, a damaged city as a wounded foe (LAB); the struck unit's other terms (audit) |
 | C-34 air combat's second half | 3 | Patrol, Priority Target, and the anti-air answer before the strike (BUILD); their strengths (LAB) |
 | C-38 a city-state's play | 5 | purchases, upgrades, the walker, its trade routes, what its build order cannot host yet (BUILD); quests, builders' improvements, research, centre strength, coastal rates (LAB); later-era starts (no start era); its grid (C-1) |
 | C-41 Volcanic Soil | 1 | the plot condition, bonus-resource loss, Marsh / Oasis, built plots, the yield rows (LAB) |
@@ -126,8 +126,7 @@ commit.
   Routes walk through Mountain Tunnels and Qhapaq Ñan, one portal network per range (`portalExit`, `tradeWalkable` / `tradeWalkStep`, `_trade_walk_step`).
   - LAB C-20-S1: the pedia multiplies a route's yields by its path "over water or Railroads, or through Canals or Mountain Tunnels", from `TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_MAX_RATIO` 1.0, `_SCORE_BEST_ROUTE_TILE` 2, `_SCORE_MULTIPLE_DOMAINS` 15, `_SCORE_PORTAL_USE` 15, `_SCORE_WATER_TILE` 2 (`Expansion2_GlobalParameters.xml`). How the score becomes the multiplier (Σ/100 capped at `MAX_RATIO`, or normalised by length; floor or round) is read from the route-chooser previews; then the path term is built on both engines.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
-  The census is `docs/roster_ledger.json`, read as `docs/ROSTER.md` says (353 of 356 rows `shipped`, one open, two `AI:`). A city's strike composes the struck unit with the roster's rows (`cityStrikeDefenderCS`, `_seat_city_strike`); no roster row carries an attacking or defending requirement, so one composer serves both sides. Qhapaq Ñan ships (`MOUNTAIN_ROAD`).
-  - BUILD: wonders on floodplains. GS deletes the thirteen `TRAIT_FLOODPLAINS_VALID_*` rows (`Expansion2_RemoveData.xml`) and gives every civilization floodplain `ValidWonderPlacement` (`Features_XP2`); `wonderTerrainOk` still refuses a floodplain without `allowFloodplains`. Delete the refusal, the field and its provenance (`cpu/data/builtWonders.ts`); the ledger's `TRAIT_FLOODPLAINS_VALID_WONDER` row is the open one.
+  The census is `docs/roster_ledger.json`, read as `docs/ROSTER.md` says (354 of 356 rows `shipped`, two `AI:`). A city's strike composes the struck unit with the roster's rows (`cityStrikeDefenderCS`, `_seat_city_strike`); no roster row carries an attacking or defending requirement, so one composer serves both sides. Qhapaq Ñan ships (`MOUNTAIN_ROAD`), and a wonder takes floodplains as GS allows (`Features_XP2.ValidWonderPlacement`).
   - LAB: whether a damaged city is a "wounded" opponent (`REQUIREMENT_OPPONENT_IS_WOUNDED`, Tomyris); both engines read a city as never wounded.
   - The city strike's defender still omits `defenderCS`'s other unit-vs-unit terms (`chassisAbilityCS`, `barbarianCombatCS`, `visibilityCS`, `allianceWarCS`, `eraMatchupCS`); audit which apply to a struck unit before building.
   - LAB C-26-S1: whether Trajan's grant (`TRAIT_ADJUST_NON_CAPITAL_FREE_CHEAPEST_BUILDING`, no requirement set, no RunOnce) fires on a CAPTURED city; founding ships (`trajansColumn` / `_trajans_column`).

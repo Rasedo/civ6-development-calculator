@@ -55,7 +55,6 @@ export interface BuiltWonderDef {
     /** CIV6: "on Coast adjacent to land" — every wonder that asks for it
      *  also says "It cannot be built on a Lake", so this means COAST. */
     onCoastalWater?: boolean;
-    allowFloodplains?: boolean;
   };
   cityYields?: Partial<Yields>;
   effects?: {
@@ -206,7 +205,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       code: 'PY',
       cost: 220,
       requiresTech: 'MASONRY',
-      placement: { terrains: ['DESERT'], flatOnly: true, allowFloodplains: true },
+      placement: { terrains: ['DESERT'], flatOnly: true },
       cityYields: { culture: 2 },
       effects: { buildCharges: 1, grantUnit: 'BUILDER' },
       description: '+2 culture, a free Builder; every Builder trained carries an extra build charge. Desert (floodplains allowed).',
@@ -217,7 +216,6 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_PYRAMIDS', 'PrereqTech', { expect: 'TECH_MASONRY' }),
         'cityYields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_PYRAMIDS&YieldType=YIELD_CULTURE', 'YieldChange'),
         'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_PYRAMIDS', 'TerrainType')] },
-        'placement.allowFloodplains': { derived: 'true where Building_ValidFeatures carries FEATURE_FLOODPLAINS', inputs: [xml('Building_ValidFeatures', 'BuildingType=BUILDING_PYRAMIDS', 'FeatureType')] },
         'effects.buildCharges': xml('ModifierArguments', 'ModifierId=PYRAMID_ADJUST_BUILDER_CHARGES&Name=Amount', 'Value'),
         'effects.grantUnit': xml('ModifierArguments', 'ModifierId=PYRAMID_GRANT_BUILDERS&Name=UnitType', 'Value', { expect: 'UNIT_BUILDER' }),
       },
@@ -310,7 +308,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       code: 'PE',
       cost: 400,
       requiresTech: 'MATHEMATICS',
-      placement: { terrains: ['DESERT'], flatOnly: true, allowFloodplains: true },
+      placement: { terrains: ['DESERT'], flatOnly: true },
       effects: {
         tileYields: [{ terrain: 'DESERT', excludeFeature: 'FLOODPLAINS', yields: { food: 2, gold: 2, production: 1 } }],
       },
@@ -321,7 +319,6 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'placement.terrains': { derived: 'the Building_ValidTerrains rows of this wonder, as engine terrain ids', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_PETRA', 'TerrainType')] },
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_PETRA', 'PrereqTech', { expect: 'TECH_MATHEMATICS' }),
         'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_PETRA', 'TerrainType')] },
-        'placement.allowFloodplains': { derived: 'true where Building_ValidFeatures carries FEATURE_FLOODPLAINS', inputs: [xml('Building_ValidFeatures', 'BuildingType=BUILDING_PETRA', 'FeatureType')] },
         'effects.tileYields.0.yields.food': { derived: 'element 0 of the comma-joined Amount list the install packs into ONE ModifierArguments row (3 yields, one modifier)', inputs: [xml('ModifierArguments', 'ModifierId=PETRA_YIELD_MODIFIER&Name=Amount', 'Value'), xml('ModifierArguments', 'ModifierId=PETRA_YIELD_MODIFIER&Name=YieldType', 'Value')] },
         'effects.tileYields.0.yields.gold': { derived: 'element 1 of the comma-joined Amount list the install packs into ONE ModifierArguments row (3 yields, one modifier)', inputs: [xml('ModifierArguments', 'ModifierId=PETRA_YIELD_MODIFIER&Name=Amount', 'Value'), xml('ModifierArguments', 'ModifierId=PETRA_YIELD_MODIFIER&Name=YieldType', 'Value')] },
         'effects.tileYields.0.yields.production': { derived: 'element 2 of the comma-joined Amount list the install packs into ONE ModifierArguments row (3 yields, one modifier)', inputs: [xml('ModifierArguments', 'ModifierId=PETRA_YIELD_MODIFIER&Name=Amount', 'Value'), xml('ModifierArguments', 'ModifierId=PETRA_YIELD_MODIFIER&Name=YieldType', 'Value')] },
@@ -498,7 +495,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'GREAT_BATH', name: 'Great Bath', code: 'GT', cost: 180,
-      requiresTech: 'POTTERY', placement: { onFeature: ['FLOODPLAINS'], allowFloodplains: true },
+      requiresTech: 'POTTERY', placement: { onFeature: ['FLOODPLAINS'] },
       effects: { cityHousing: 3, cityAmenities: 1, floodMitigation: true, faithPerFlood: 1 },
       description: '+3 housing, +1 amenity, +1 faith per flood the city has taken, and floods along its river do no damage.',
       src: {
@@ -506,7 +503,6 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         cost: xml('Buildings', 'BuildingType=BUILDING_GREAT_BATH', 'Cost', { scale: GAME_SPEED }),
         'placement.onFeature': { derived: 'the Building_RequiredFeatures rows of this wonder, as engine feature ids', inputs: [xml('Building_RequiredFeatures', 'BuildingType=BUILDING_GREAT_BATH', 'FeatureType')] },
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_GREAT_BATH', 'PrereqTech', { expect: 'TECH_POTTERY' }),
-        'placement.allowFloodplains': { derived: 'true where Building_RequiredFeatures carries FEATURE_FLOODPLAINS', inputs: [xml('Building_RequiredFeatures', 'BuildingType=BUILDING_GREAT_BATH', 'FeatureType')] },
         'effects.cityHousing': xml('Buildings', 'BuildingType=BUILDING_GREAT_BATH', 'Housing'),
         'effects.cityAmenities': xml('Buildings', 'BuildingType=BUILDING_GREAT_BATH', 'Entertainment'),
         'effects.floodMitigation': xml('Buildings_XP2', 'BuildingType=BUILDING_GREAT_BATH', 'PreventsFloods'),
@@ -515,7 +511,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'ETEMENANKI', name: 'Etemenanki', code: 'ET', cost: 220,
-      requiresTech: 'WRITING', placement: { onFeature: ['FLOODPLAINS', 'MARSH'], allowFloodplains: true },
+      requiresTech: 'WRITING', placement: { onFeature: ['FLOODPLAINS', 'MARSH'] },
       cityYields: { science: 2 },
       effects: {
         tileYields: [
@@ -530,7 +526,6 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'placement.onFeature': { derived: 'the Building_RequiredFeatures rows of this wonder, as engine feature ids', inputs: [xml('Building_RequiredFeatures', 'BuildingType=BUILDING_ETEMENANKI', 'FeatureType')] },
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_ETEMENANKI', 'PrereqTech', { expect: 'TECH_WRITING' }),
         'cityYields.science': xml('Building_YieldChanges', 'BuildingType=BUILDING_ETEMENANKI&YieldType=YIELD_SCIENCE', 'YieldChange'),
-        'placement.allowFloodplains': { derived: 'true where Building_RequiredFeatures carries FEATURE_FLOODPLAINS', inputs: [xml('Building_RequiredFeatures', 'BuildingType=BUILDING_ETEMENANKI', 'FeatureType')] },
         'effects.tileYields.0.yields.science': xml('ModifierArguments', 'ModifierId=ETEMENANKI_SCIENCE_MARSH&Name=Amount', 'Value'),
         'effects.tileYields.0.yields.production': xml('ModifierArguments', 'ModifierId=ETEMENANKI_PRODUCTION_MARSH&Name=Amount', 'Value'),
         'effects.tileYields.1.yields.science': xml('ModifierArguments', 'ModifierId=ETEMENANKI_SCIENCE_FLOODPLAINS&Name=Amount', 'Value'),
@@ -603,7 +598,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'MONT_ST_MICHEL', name: 'Mont St. Michel', code: 'MS', cost: 710,
-      requiresCivic: 'DIVINE_RIGHT', placement: { onFeature: ['FLOODPLAINS', 'MARSH'], allowFloodplains: true },
+      requiresCivic: 'DIVINE_RIGHT', placement: { onFeature: ['FLOODPLAINS', 'MARSH'] },
       cityYields: { faith: 2 },
       effects: { apostleMartyr: true, occupyDefense: 6 },
       description: '+2 faith, 2 relic slots; every Apostle carries Martyr, and the unit standing on it gets +6 defence.',
@@ -613,7 +608,6 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'placement.onFeature': { derived: 'the Building_RequiredFeatures rows of this wonder, as engine feature ids', inputs: [xml('Building_RequiredFeatures', 'BuildingType=BUILDING_MONT_ST_MICHEL', 'FeatureType')] },
         requiresCivic: xml('Buildings', 'BuildingType=BUILDING_MONT_ST_MICHEL', 'PrereqCivic', { expect: 'CIVIC_DIVINE_RIGHT' }),
         'cityYields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_MONT_ST_MICHEL&YieldType=YIELD_FAITH', 'YieldChange'),
-        'placement.allowFloodplains': { derived: 'true where Building_RequiredFeatures carries FEATURE_FLOODPLAINS', inputs: [xml('Building_RequiredFeatures', 'BuildingType=BUILDING_MONT_ST_MICHEL', 'FeatureType')] },
         'effects.apostleMartyr': { derived: 'true where the install grants PROMOTION_MARTYR to the owner\'s units', inputs: [xml('ModifierArguments', 'ModifierId=MONT_ST_MICHEL_GRANT_MARTYR&Name=PromotionType', 'Value')] },
         'effects.occupyDefense': xml('Buildings', 'BuildingType=BUILDING_MONT_ST_MICHEL', 'DefenseModifier'),
       },

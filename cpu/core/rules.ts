@@ -960,9 +960,9 @@ export function wonderTerrainOk(def: BuiltWonderDef, tile: Tile, map: GameMap): 
     if (isWater(tile)) return false;
     if (p.onFeature) {
       if (!tile.feature || !p.onFeature.includes(tile.feature)) return false;
-    } else {
-      if (tile.feature === 'FLOODPLAINS' && !p.allowFloodplains) return false;
-      if (tile.feature === 'OASIS') return false;
+    } else if (tile.feature === 'OASIS') {
+      // Floodplains take any wonder (`Features_XP2.ValidWonderPlacement`).
+      return false;
     }
     if (p.terrains && !p.terrains.includes(tile.terrain)) return false;
     if (p.excludeTerrains?.includes(tile.terrain)) return false;
