@@ -27,8 +27,8 @@ import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { cityStateEnvoyBonuses, isSuzerain, suzerainEffect, suzerainOf, suzerainSciencePct } from './cityStates';
 import { NAN_MADOL_WATER_CULTURE } from '../data/cityStates';
 
-import { GP_PERM } from '../data/greatPeople';
-import { CLASS_BIT, classBitOf } from '../data/promotions';
+import { GP_PERM, GP_UNIT_PROD_CLASSES } from '../data/greatPeople';
+import { CLASS_BIT, classBitOf, UNIT_PROMO_CLASS } from '../data/promotions';
 import { isSpaceProject } from '../data/projects';
 import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityGovernorPromos, cityHasGovernor } from './governors';
 import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
@@ -937,8 +937,8 @@ function plotRowsGateOnEra(civ: string | null, leader: string | null): boolean {
  *    `unlockedPolicyIds`'s `civEraIndex`, `plotYieldRowsFor`'s civic clause);
  *  - the city count and population SUM (the belief seat's `followers`/`cities`);
  *  - `religion`'s pantheon / founded / founder / enhancer;
- *  - `government.policies` (the stored cards) and `government.held` (the
- *    legacy cards' gate);
+ *  - `government.policies` (the stored cards), `government.held` (the
+ *    legacy cards' gate) and `government.chosen` (`seatGovernment`);
  *  - the World Congress record (`congressPolicyBlocked` and, under the
  *    city-state block, `congressSuzBonusBlocked`);
  *  - the WORLD era, where a plot row of this roster gates on one;
@@ -979,6 +979,7 @@ function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): 
   for (let i = 0; i < stored.length; i++) fpPush(m, stored[i]);
   fpPush(m, FP_MARK);
   fpPush(m, gov.held);
+  fpPush(m, gov.chosen);
   // the government ROWS are a catalog, but they are still an input `applyGovernment`
   // reads: a test borrows a row onto the adopted government by SWAPPING the
   // effects object in memory (`borrowingRow`), exactly as the GPU poke does, so
@@ -1181,8 +1182,8 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
   }
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
-    applyGovernment(mods, s.research, s.government.policies, congressPolicyBlocked(state),
-                    inDarkAge(state, seat), s.government.held);
+    applyGovernment(mods, seatGovernment(state, seat), s.research, s.government.policies,
+                    congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);
   }
 
   const beliefSeat = { followers: pop, cities: cities.length };
@@ -1233,6 +1234,12 @@ export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): 
   // A Great Person's permanent share stacks additively with the cards, which
   // is how CIV6 stacks production modifiers.
   if (q.kind === 'unit' || q.kind === 'settler') pct += (gpPerm?.[GP_PERM.indexOf('unitProdPct')] ?? 0) / 100;
+  // CIV6 (Themistocles, Nimitz): the share one promotion class takes
+  if (q.kind === 'unit') {
+    for (const r of GP_UNIT_PROD_CLASSES) {
+      if (UNIT_PROMO_CLASS[q.unit] === r.cls) pct += (gpPerm?.[GP_PERM.indexOf(r.perm)] ?? 0) / 100;
+    }
+  }
   if (q.kind === 'project' && isSpaceProject(q.project)) pct += (gpPerm?.[GP_PERM.indexOf('spaceProdPct')] ?? 0) / 100;
   for (const b of mods.prodBoosts) {
     if (b.target === 'wonder') {
@@ -1374,11 +1381,11 @@ export function wonderExtraSlots(state: GameState, seat: number): Record<SlotKin
     }
   }
   // WORLD IDEOLOGY moves a WILDCARD slot on one GOVERNMENT type. The
-  // government itself is picked by tier out of what is unlocked and never
-  // depends on the slot count, so it can be resolved first.
+  // government itself (`seatGovernment`) never depends on the slot count, so
+  // it can be resolved first.
   const s = seatOf(state, seat);
   if (s) {
-    const gov = computeAdoption(s.research).government;
+    const gov = seatGovernment(state, seat);
     const i = gov ? GOVERNMENT_LIST.findIndex((g) => g.id === gov) : -1;
     if (i >= 0) out.wildcard = Math.max(0, out.wildcard + congressWildcardDelta(state, i));
     // CIV6 (Founding Fathers): "All Diplomatic policy slots in the current
@@ -1408,7 +1415,7 @@ export function slotFavorOf(state: GameState, seat: number): number {
   const rows = getModifiers(state, seat).slotFavor;
   if (!rows.length) return 0;
   const s = seatOf(state, seat);
-  const gov = s ? computeAdoption(s.research).government : null;
+  const gov = s ? seatGovernment(state, seat) : null;
   const i = gov ? GOVERNMENT_LIST.findIndex((g) => g.id === gov) : -1;
   if (i < 0) return 0;
   const base = GOVERNMENT_LIST[i].slots;
@@ -1440,29 +1447,93 @@ export function governmentBit(id: string | null): number {
   return i < 0 ? 0 : 1 << i;
 }
 
-/**
- * The deterministic government + policy adoption for a seat, a pure
- * function of its research state. Rule:
- *   - Adopt the NEWEST unlocked government: highest tier, ties broken by
- *     GOVERNMENTS table (insertion) order.
- *   - Fill the government's slots, then the wonder-granted `extra` slots,
- *     greedily in POLICIES table order among unlocked cards matching the slot
- *     kind (a wildcard slot takes the first unfilled-eligible card). Zero RNG.
- * `blocked` is the POLICY_LIST index POLICY TREATY outcome B forbids; -1
- * when nothing stands. A blocked card is simply never slotted. The GPU
- * mirror computes the same set from the seat's tracked civics.
- */
-export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
-                                blocked = -1, dark = false, held = 0): {
-  government: string | null;
-  policies: (string | null)[];
-} {
+/** The NEWEST government `research` unlocks: the highest tier, ties to the
+ *  GOVERNMENTS table order — what a seat whose record never named one is in.
+ *  `_newest_gov` is the twin. */
+export function newestGovernment(research: ResearchState): string | null {
   const u = computeUnlocksIn(research, []); // no seat here — governments take no district override
   let chosen: GovernmentDef | null = null;
   for (const g of Object.values(GOVERNMENTS)) {
     if (!u.governments.has(g.id)) continue;
     if (!chosen || g.tier > chosen.tier) chosen = g;
   }
+  return chosen ? chosen.id : null;
+}
+
+/** The government seat `seat` is IN: the one its record chose
+ *  (`government.chosen`, `adoptGovernment`), else the newest its civics
+ *  unlock. A city-state never records one. `_adopted_gov` is the twin. */
+export function seatGovernment(state: GameState, seat: number): string | null {
+  const s = seatOf(state, seat);
+  if (!s) return null;
+  return s.government.chosen ?? newestGovernment(s.research);
+}
+
+/** The governments seat `seat`'s record may name now, as `GOVERNMENT_LIST`
+ *  positions ascending: unlocked by its civics, and never one it has been in
+ *  before unless it is in it now. CIV6 (the Governments pedia): "If you switch
+ *  to a previously adopted government, you will enter a state of Anarchy" —
+ *  a return is refused here, so no seat enters Anarchy. `_gov_open` is the
+ *  twin. */
+export function governmentsOpen(state: GameState, seat: number): number[] {
+  const s = seatOf(state, seat);
+  if (!s) return [];
+  const u = computeUnlocksIn(s.research, []);
+  const now = seatGovernment(state, seat);
+  const out: number[] = [];
+  GOVERNMENT_LIST.forEach((g, i) => {
+    if (!u.governments.has(g.id)) return;
+    if (g.id !== now && s.government.held & governmentBit(g.id)) return;
+    out.push(i);
+  });
+  return out;
+}
+
+/** The record's GOVERNMENT arm: seat `seat` adopts `GOVERNMENT_LIST[index]`
+ *  where `governmentsOpen` holds it, and the choice stands until another
+ *  record names one. A CHANGE marks the new government held and carries the
+ *  slotted cards over (`carryPolicies`). Anything else is refused silently.
+ *  `_adopt_government` is the twin. */
+export function adoptGovernment(state: GameState, seat: number, index: number): void {
+  const s = seatOf(state, seat);
+  const g = GOVERNMENT_LIST[index];
+  if (!s || !g || !governmentsOpen(state, seat).includes(index)) return;
+  const before = seatGovernment(state, seat);
+  s.government.chosen = g.id;
+  if (g.id === before) return;
+  s.government.held |= governmentBit(g.id);
+  carryPolicies(state, seat);
+}
+
+/** A CHANGED government keeps the slotted cards that are still open under it
+ *  and fit its slots, and drops the rest; the freed slots wait for the
+ *  driver's next decision. `_carry_policies` is the twin. */
+export function carryPolicies(state: GameState, seat: number): void {
+  const s = seatOf(state, seat)!;
+  const gov = seatGovernment(state, seat);
+  if (!gov) return;
+  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
+  s.government.policies = fitPoliciesLoose(
+    governmentSlots(state, seat),
+    s.government.policies.filter((p): p is string => !!p && open.has(p)));
+}
+
+/**
+ * The greedy reference fill of government `gov` (by default the newest
+ * `research` unlocks): its slots, then the wonder-granted `extra` slots,
+ * greedily in POLICIES table order among unlocked cards matching the slot
+ * kind (a wildcard slot takes the first unfilled-eligible card). Zero RNG.
+ * `blocked` is the POLICY_LIST index POLICY TREATY outcome B forbids; -1
+ * when nothing stands. A blocked card is simply never slotted.
+ * `_slotted_policies` is the twin.
+ */
+export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
+                                blocked = -1, dark = false, held = 0,
+                                gov: string | null = newestGovernment(research)): {
+  government: string | null;
+  policies: (string | null)[];
+} {
+  const chosen = gov ? GOVERNMENTS[gov] : null;
   if (!chosen) return { government: null, policies: [] };
   // Wonder-granted slots append AFTER the base list so the greedy fill's
   // order stays the government's own; wildcards last, like every base list.
@@ -1537,7 +1608,7 @@ export function faithPrice(state: GameState, seat: number, price: number): numbe
 export function slottedPolicyIndices(state: GameState, seat: number): number[] {
   const s = seatOf(state, seat);
   if (!s) return [];
-  const gov = computeAdoption(s.research).government;
+  const gov = seatGovernment(state, seat);
   if (!gov) return [];
   const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
   const out: number[] = [];
@@ -1550,8 +1621,8 @@ export function slottedPolicyIndices(state: GameState, seat: number): number[] {
 }
 
 /** Lay `cards` into `slots` in TABLE order, DROPPING what finds no slot — a
- *  government change's carry-over (`setGovernment`, the seat phase) and the
- *  greedy reference's own rule; `_fit_policy_set` is the twin. */
+ *  government change's carry-over (`carryPolicies`) and the greedy
+ *  reference's own rule; `_fit_policy_set` is the twin. */
 export function fitPoliciesLoose(slots: readonly SlotKind[], cards: readonly string[]): (string | null)[] {
   const out: (string | null)[] = slots.map(() => null);
   const order = new Map(POLICY_LIST.map((p, i) => [p.id, i] as const));
@@ -1569,7 +1640,8 @@ export function fitPoliciesLoose(slots: readonly SlotKind[], cards: readonly str
  *  sets civics by hand calls in place of the driver's pick. */
 export function slotGreedily(state: GameState, seat: number): void {
   const s = seatOf(state, seat)!;
-  s.government.policies = computeAdoption(s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held).policies;
+  s.government.policies = computeAdoption(s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state),
+    inDarkAge(state, seat), s.government.held, seatGovernment(state, seat)).policies;
 }
 
 /** Lay `cards` (table order) into `slots`: each takes the first open slot of
@@ -1588,12 +1660,11 @@ export function fitPolicies(slots: readonly SlotKind[], cards: readonly string[]
   return out;
 }
 
-function applyGovernment(mods: Modifiers, research: ResearchState, stored: readonly (string | null)[],
-                         blocked = -1, dark = false, held = 0): void {
-  // the government is still what the civics adopt; the CARDS are what the
-  // seat chose (`government.policies`, a driver decision), minus any card
-  // whose unlock has lapsed since
-  const government = computeAdoption(research).government;
+function applyGovernment(mods: Modifiers, government: string | null, research: ResearchState,
+                         stored: readonly (string | null)[], blocked = -1, dark = false, held = 0): void {
+  // the government the seat is in (`seatGovernment`) and the CARDS it chose
+  // (`government.policies`, a driver decision), minus any card whose unlock
+  // has lapsed since
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
   const open = unlockedPolicyIds(research, blocked, dark, held, government!);
@@ -1853,10 +1924,7 @@ export function baseYieldCtx(state: GameState): YieldCtx {
 }
 
 export function governmentSlots(state: GameState, seat: number): SlotKind[] {
-  // the government IN PLAY is the one the seat's civics adopt (`computeAdoption`);
-  // `government.current` is only ever set by a hand-picked `setGovernment`
-  const s = seatOf(state, seat)!;
-  const govId = s.government.current ?? computeAdoption(s.research).government;
+  const govId = seatGovernment(state, seat);
   const gov = govId ? GOVERNMENTS[govId] : null;
   if (!gov) return [];
   const slots = [...gov.slots];
@@ -1886,9 +1954,8 @@ export function containmentBonus(state: GameState, cityState: CityState, sender:
   if (!getModifiers(state, sender.seat).envoyDoubleDiffGov) return 0;
   const suzSeat = suzerainOf(cityState);
   if (suzSeat < 0 || suzSeat === sender.seat) return 0;
-  const suz = seatOf(state, suzSeat);
-  if (!suz) return 0;
-  return computeAdoption(suz.research).government !== computeAdoption(sender.research).government ? 1 : 0;
+  if (!seatOf(state, suzSeat)) return 0;
+  return seatGovernment(state, suzSeat) !== seatGovernment(state, sender.seat) ? 1 : 0;
 }
 
 /** CIV6 (Tamar, MODIFIER_PLAYER_ADJUST_DUPLICATE_INFLUENCE_TOKEN_WHEN_SAME_RELIGION

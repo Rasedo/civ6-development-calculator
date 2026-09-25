@@ -8,7 +8,7 @@ class SimPhase:
     def _seat_phase(self) -> None:
         if self.units_mode:
             self._refresh_aura_mp()
-            self._reset_mp("major")
+            self._reset_mp("major", civ_only=True)
         if self.n_majors > 1:
             # What the standing deals owe each other, before any new one is
             # struck: the per-turn payments, the clock, and the stale offer.
@@ -649,9 +649,9 @@ class SimPhase:
         free row, in the games of `mask` [B], of chassis `unit_type` [B] (-1
         grants nothing). Each stands on the first free land tile beside the
         centre, in direction order, and with none free it is not granted. The
-        unit lands in the hostile pool under FREE_SEAT, where no walker moves
-        it: it defends, blocks and heals; it remembers the city that granted
-        it (`unit_free_city`), whose join takes it."""
+        unit lands in the hostile pool under FREE_SEAT, where the Free Cities'
+        walker moves it (`_free_walk`); it remembers the city that granted it
+        (`unit_free_city`), whose join takes it."""
         mask = mask & (unit_type >= 0)
         if not bool(mask.any()):
             return
@@ -693,7 +693,8 @@ class SimPhase:
         bankruptcy that upkeep may force (`_seat_upkeep_and_bankruptcy`). Then
         each city takes its grant when one falls due — every
         `_free_grant_period`th of its turns, the flip turn its first
-        (`city_freed_turn`), the chassis `_free_grant_type`'s — fires the
+        (`city_freed_turn`), the chassis `_free_grant_type`'s — puts the same
+        walk's Production into its build table (`_free_city_build`), fires the
         ranged strikes any walled city fires (`_city_strikes`), heals as any
         unbesieged city does and runs its loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
         the flat base, the pressure term with every Free City's citizens on
@@ -701,7 +702,8 @@ class SimPhase:
         and the flat loyalty of what stands in it — no amenity, governor,
         policy or roster term, which are an OWNER's and the Free Cities player
         carries none. Each major's share accrues into the city's race
-        (`city_free_press`). A city that reaches 0 joins the race's winner,
+        (`city_free_press`). Then the Free Cities' land units walk
+        (`_free_walk`). A city that reaches 0 joins the race's winner,
         after the walk, in slot order: CIV6 "it will join the Civilization that
         has exerted the most Loyalty pressure on it since the Free City became
         independent". A seat that pulled nothing, or holds no city any more,
@@ -722,7 +724,9 @@ class SimPhase:
         # ITS TREASURY: the Gold of the same loop-top walk, summed in slot
         # order (a dead column adds an exact 0.0), then the upkeep
         acting = alive.any(dim=1)
-        gold = self._seat_city_walk(row, amen_yf=_yf, maint=self._seat_housing(row)[0])[:, :, 2]
+        walk = self._seat_city_walk(row, amen_yf=_yf, maint=self._seat_housing(row)[0])
+        gold = walk[:, :, 2]
+        prod = walk[:, :, 1]
         income = torch.zeros(self.B, dtype=torch.float64, device=self.device)
         for j in range(self.RC):
             income = income + gold[:, j]
@@ -735,6 +739,8 @@ class SimPhase:
         lmax = float(self.rules.seats.get("loyaltyMax", 100))
         alive_c = alive.clone()
         joins = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
+        f_techs, f_civics = self._free_research()
+        f_train = self._trainable_in(f_techs, f_civics, self._free_any_res)
         for j in range(self.RC):
             act = alive_c[:, j]
             if not bool(act.any()):
@@ -745,6 +751,7 @@ class SimPhase:
             due = act & ((int(self.turn) - self.city_freed_turn[:, row, j] + 1) % self._free_grant_period == 0)
             if bool(due.any()):
                 self._grant_free_unit(due, jc, self._free_grant_type(due))
+            self._free_city_build(j, act, prod[:, j].double(), f_techs, f_civics, f_train)
             self._city_strikes(row, jc, act)
             self._city_heal(row, jc, act)
             here = self.city_center[bidx, row, jc].clamp(min=0)
@@ -763,6 +770,7 @@ class SimPhase:
             nxt = torch.where(act, (loy + delta).clamp(min=0, max=lmax), loy)
             self.city_loyalty[bidx, row, jc] = nxt.to(self.city_loyalty.dtype)
             joins[:, j] = act & (self.city_loyalty[bidx, row, jc] <= 0)
+        self._free_walk(acting)
         for j in range(self.RC):
             jl = joins[:, j] & self.city_alive[:, row, j]
             if not bool(jl.any()):
@@ -1609,13 +1617,23 @@ class SimPhase:
         # CIV6 (Grote Rivieren): "Culture Bomb adjacent tiles when
         # completing a Harbor" — the roster's own carrier, a FULL bomb
         # like the Congress's (`CULTURE_BOMB_ROWS`)
+        _rost = torch.zeros_like(bomb)
         for _bc, _bl, _bi, _bd in self._live_rows(row, self._culture_bomb_rows):
             if _bd < 0:
                 continue
             _bw = ~bomb & ~own_bomb & (self.district[dr, dt] == _bd) & self._row_is(row, _bc, _bl)[dr]
+            _rost = _rost | _bw
             if bool(_bw.any()):
                 _br = dr[_bw]
                 self._culture_bomb(row, _br, dt[_bw], col[_br])
+        # CIV6 (Mimar Sinan, MODIFIER_PLAYER_ADD_CULTURE_BOMB_TRIGGER): the same
+        # full bomb on every Industrial Zone the seat completes after him
+        if self._iz_idx >= 0:
+            _sw = (~bomb & ~own_bomb & ~_rost & (self.district[dr, dt] == self._iz_idx)
+                   & (self._gp_perm(row, "izCultureBomb")[dr] > 0))
+            if bool(_sw.any()):
+                _sr = dr[_sw]
+                self._culture_bomb(row, _sr, dt[_sw], col[_sr])
         # CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
         # Center."
         env = self._d_envoy_centre[self.district[dr, dt].clamp(min=0)]
@@ -1979,7 +1997,7 @@ class SimPhase:
         # CAPITAL this row sits in costs it. The rate can go negative, and the
         # bank floors at zero.
         bank(self.civ_diplo_favor,
-             self._adopted_gov_tier(self.civ_civics[:, row])
+             self._adopted_gov_tier(row)
              + self._favor_per_suz * self._suzerain_count(row)
              + self._favor_per_alliance * self._alliance_levels_of(row).sum(dim=1)
              + self._congress_policy_favor(self._seat_slotted(row))
@@ -2008,7 +2026,7 @@ class SimPhase:
         self._grievance_decay(row)
         bank(self.civ_civic_prog, cul_sum)
         bank(self.civ_culture, cul_sum)
-        _gov_before = self._adopted_gov(self.civ_civics[:, row])[0] if self._ngov else None
+        _gov_before = self._adopted_gov(row)[0] if self._ngov else None
         for _ in range(RESEARCH_LOOPS):
             curc = self.civ_cur_civic[:, row]
             cost_c = self._eff_cost(
@@ -2031,30 +2049,20 @@ class SimPhase:
             self.civ_civic_retain[rows, row, curc[rows]] = 0
             self.civ_cur_civic[:, row] = torch.where(fin, torch.full_like(curc, -1), self.civ_cur_civic[:, row])
         # CIV6 (Legacy policy card): the card is unlocked by having BEEN in
-        # its government, so the seat remembers the one it is in now. Only a
-        # completed civic can move it, which is why this sits at the loop's
-        # exit — the position `seatPhase` writes it at.
+        # its government, so the seat remembers the one it is in now. A seat
+        # whose record never chose follows the newest government its civics
+        # unlock, and only a completed civic moves that, which is why this
+        # sits at the loop's exit — the position `seatPhase` writes it at.
         if self._ngov:
-            _adopted, _has = self._adopted_gov(self.civ_civics[:, row])
+            _adopted, _has = self._adopted_gov(row)
             # `active` is the TS loop's `cities.length === 0` continue, which
             # sits ABOVE this line in seatPhase — so a city-less seat writes
             # nothing.
             _gov_on = _has & active
             self.civ_gov_held[:, row] |= torch.where(
                 _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
-            # a CHANGED government keeps the slotted cards that still fit its
-            # slots and drops the rest; the freed slots wait for the driver's
-            # next decision — `setGovernment`'s carry-over, at the one place
-            # each engine notices the change
-            _chg = _gov_on & (_adopted != _gov_before)
-            if self._npol and bool(_chg.any()):
-                _civ = self.civ_civics[:, row]
-                _open = self._policy_unlocked(_civ, self.civ_age[:, row] == 0,
-                                              self._civ_era(self.civ_techs[:, row], _civ),
-                                              self.civ_gov_held[:, row], _adopted)
-                _kept = self._fit_policy_set(self.civ_policies[:, row] & _open, self._seat_policy_slots(row))
-                self.civ_policies[:, row] = torch.where(_chg.unsqueeze(1), _kept, self.civ_policies[:, row])
-                self._eff_version += 1
+            # a CHANGE carries the slotted cards over
+            self._carry_policies(row, _gov_on & (_adopted != _gov_before))
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
         self._advance_great_people(row, active)

@@ -9,8 +9,7 @@ import type { City, GameState, Tile } from './types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { isImpassable, isWater, naturalWonderAt } from '../../world/query';
 import { CITY_MIN_DIST } from '../../world/types';
-import { PLACEABLE_DISTRICTS } from '../data/districts';
-import { GP_SITES, gpSiteOf } from '../data/greatPeople';
+import { GP_SITES, gpSiteArg, gpSiteDistrictOf, gpSiteOf, type GpSite } from '../data/greatPeople';
 import { GW_KINDS, gwKindObjects } from '../data/greatWorks';
 import { fireFeature } from '../data/disasters';
 import { BARB_SEAT, campTiles, cityHolders, civsAtWar, hiddenResourcesFor, tileOwnedByCiv, tileSeat } from './seats';
@@ -129,21 +128,30 @@ export function parkSites(state: GameState, seat: number): number[] {
 }
 
 /** A person's activation site as the wire names it: its `GP_SITES` code and
- *  its site district's `PLACEABLE_DISTRICTS` index (-1 none). */
+ *  its site district's argument (`gpSiteArg`: the `PLACEABLE_DISTRICTS`
+ *  index, -2 the City Center, -1 none). */
 export function gpSiteKey(unit: { type: string; gpAt?: number }): [number, number] | undefined {
   const person = gpPersonOf(unit);
   if (!person) return undefined;
   const { site, district } = gpSiteOf(person);
-  return [GP_SITES.indexOf(site), PLACEABLE_DISTRICTS.indexOf(district)];
+  return [GP_SITES.indexOf(site), gpSiteArg(district)];
 }
 
 /** The tiles a person of this seat walks toward for site key (site, arg).
  *  Answered per SITE, not per person: the `gwSlot` arm takes a city with an
  *  open slot for any created kind, and the `adjacentBarbarian` arm only
- *  ground a unit may stand on. Never site 1 (`anywhere`): nothing to walk to. */
+ *  ground a unit may stand on. Never a site `gpSiteWalks` refuses: a charge
+ *  spent where it stands has nothing to walk to. */
+/** Does a person of this site walk anywhere? Not one spent where it stands:
+ *  `anywhere`, and `relicSlot` (the seat's open Relic slot, wherever it is). */
+export function gpSiteWalks(code: GpSite | undefined): boolean {
+  return code !== undefined && code !== 'anywhere' && code !== 'relicSlot';
+}
+
 export function gpSiteTiles(state: GameState, seat: number, site: number, arg: number): number[] {
   const code = GP_SITES[site];
-  const district = PLACEABLE_DISTRICTS[arg];
+  if (!gpSiteWalks(code)) return [];
+  const district = gpSiteDistrictOf(arg);
   const roomMemo = new Map<number, boolean>();
   const room = (city: City): boolean => {
     let r = roomMemo.get(city.id);

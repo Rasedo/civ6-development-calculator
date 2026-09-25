@@ -1,7 +1,7 @@
 /**
  * A CITY-STATE'S STARTING ARMY. CIV6 (Eras.xml `BonusMinorStartingUnits`):
  * an Ancient-era start gives every minor two Warriors beside its city. They
- * hold where they spawn — nothing moves a minor's unit — and heal, dig in and
+ * walk from there (`walkUnit`) and heal, dig in and
  * defend like any unit; the minor's elimination takes them off the map.
  *
  * The GPU twin is tests/gpu/minor_record_test.py's army scenes.

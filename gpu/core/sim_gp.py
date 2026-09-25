@@ -197,6 +197,14 @@ class SimGp:
         spp = self._gp_perm(row, "spaceProdPct").double().reshape(_sh) / 100.0
         is_unit = (cur == self.NB) | ((cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU))
         out = is_unit.double() * up
+        # CIV6 (Themistocles, Nimitz): the share one promotion class takes
+        if self._gp_unit_prod_classes:
+            _ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
+            _isu = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
+            for _pk, _pc in self._gp_unit_prod_classes:
+                _cp = self._gp_perm(row, self._gp_perm_names[_pk]).double().reshape(_sh) / 100.0
+                _hit = _isu & (self.rules_dev.u_promo_class[_ui] == _pc)
+                out = out + _hit.double() * _cp
         if self._proj_rows:
             _sp = torch.tensor([1 if i in set(self._space_proj_idx) else 0
                                 for i in range(len(self._proj_rows))], dtype=torch.bool, device=self.device)
@@ -227,6 +235,9 @@ class SimGp:
         # pillage fact is the DISTRICT plane, never the improvement one
         a_dist = own & (self.district.gather(1, tc) == sdist) & (sdist >= 0) \
             & self.district_complete.gather(1, tc) & ~self.district_pillaged.gather(1, tc)
+        # ...or the City Center (-2), which the district plane never encodes:
+        # the centre registry answers it
+        a_dist = a_dist | (own & (sdist == -2) & (self.centre_slot_at.gather(1, tc) >= 0))
         # 1 anywhere the unit can already stand
         a_any = torch.ones_like(a_dist)
         # 2 a city of this seat with an open slot taking one of the person's works
@@ -234,8 +245,8 @@ class SimGp:
         # 3 inside a city-state's territory
         _ts_here = self.tile_seat.gather(1, tc)
         a_cs = (_ts_here >= 100) & (_ts_here < BARB_SEAT)
-        # 4 an owned tile carrying a luxury
-        a_lux = own & (self.lux_id.gather(1, tc) >= 0)
+        # 4 a tile carrying a luxury, anyone's or no one's
+        a_lux = self.lux_id.gather(1, tc) >= 0
         # 5 unclaimed ground next to this seat's territory
         _nb = self.neigh[tc.reshape(-1)].reshape(tc.shape[0], tc.shape[1], 6)
         _own_nb = ((self.tile_seat == row).gather(1, _nb.clamp(min=0).reshape(tc.shape[0], -1))
@@ -253,8 +264,18 @@ class SimGp:
         # 8 the territory of a seat at war with this one (Tupac Amaru)
         a_enemy = self._enemy_ground(row, _ts_here)
 
-        arms = torch.stack([a_dist, a_any, a_gw, a_cs, a_lux, a_adj, a_suz, a_barb, a_enemy], dim=0)
+        # 9 anywhere, while a city of this seat has an open Relic slot (Jeanne d'Arc)
+        a_relic = torch.zeros_like(a_dist)
+        if bool((ok & (site == 9)).any()):
+            _rr = (self._gw_room(row, 7) & self.city_alive[:, row, :self.RC]).any(dim=1)  # 7 = GWO_RELIC
+            a_relic = _rr.unsqueeze(1).expand_as(a_dist)
+
+        arms = torch.stack([a_dist, a_any, a_gw, a_cs, a_lux, a_adj, a_suz, a_barb, a_enemy, a_relic], dim=0)
         pick = arms.gather(0, site.clamp(min=0, max=arms.shape[0] - 1).unsqueeze(0)).squeeze(0)
+        # CIV6 (`ActionRequiresNoMilitaryUnit`): a person who grants a unit on
+        # its own plot waits until no military unit shares it
+        nomil = self._gp_no_military[cls.clamp(min=0), at.clamp(min=0, max=self._gp_site.shape[1] - 1)]
+        pick = pick & ~(nomil & (self.military_at.gather(1, tc) >= 0))
         return ok & pick
 
     # ---------------------------------------------------------------- the spend
@@ -354,9 +375,15 @@ class SimGp:
             self._gw_place(row, _km, ccol, _obj, at.clamp(min=0),
                            torch.full((B,), -1, dtype=torch.long, device=dev),
                            torch.full((B,), int(self._ROW_SEAT[row]), dtype=torch.long, device=dev))
+        # CIV6 (Jeanne d'Arc): a Relic, into the seat's first city with room —
+        # the site already asked that one has it
+        _rel = m & (col("grantRelic") != 0)
+        if bool(_rel.any()):
+            self._gw_place_first(row, _rel, 7)  # 7 = GWO_RELIC
 
         # ---- the seat's own ledgers
         self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + col("envoys").to(self.civ_envoys_avail.dtype)
+        self.civ_granted_titles[:, row] = self.civ_granted_titles[:, row] + col("governorTitles").long()
         # CIV6 (Matthew Perry): "Grants enough Envoys to become Suzerain at
         # this City-state, then removes all other players' Envoys" — the
         # rivals' bar is read BEFORE the removal, the clause's own order.
@@ -386,10 +413,9 @@ class SimGp:
         _gpp = col("gppAll")
         if bool((_gpp != 0).any()):
             self.civ_gpp[:, row] = self.civ_gpp[:, row] + _gpp.unsqueeze(1)
-        self._gp_strategic(row, m, cls, at)
 
         # ---- the unit on the tile
-        self._gp_unit_grants(row, m, cls, at, hc)
+        self._gp_unit_grants(row, m, cls, at, hc, ccol)
 
         # ---- the verbs (Raffles moves the city the per-city run lands on)
         ccol = self._gp_verbs(row, m, cls, at, hc, ccol)
@@ -685,27 +711,14 @@ class SimGp:
                         f" cls{int(cls[_gb])} at{int(at[_gb])}"
                         f" n{int(self.civ_gp_lux_n[_gb, row])}")
 
-    def _gp_strategic(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor) -> None:
-        k = self._gp_fx(cls, at, "strategicSlot").long()
-        amt = self._gp_fx(cls, at, "strategicAmount").long() * m.long()
-        live = m & (k >= 0) & (amt > 0)
-        if not bool(live.any()):
-            return
-        cap = self._stockpile_cap(row)
-        for s in range(self.civ_stockpile.shape[2]):
-            hit = live & (k == s)
-            if not bool(hit.any()):
-                continue
-            self.civ_stockpile[:, row, s] = torch.where(
-                hit, torch.minimum(self.civ_stockpile[:, row, s] + amt.to(self.civ_stockpile.dtype),
-                                   cap.to(self.civ_stockpile.dtype)),
-                self.civ_stockpile[:, row, s])
-            self._log_stock(hit.nonzero(as_tuple=True)[0], row, s, "gp")
-
     def _gp_unit_grants(self, row: int, m: torch.Tensor, cls: torch.Tensor,
-                        at: torch.Tensor, hc: torch.Tensor) -> None:
-        """a free chassis at the tile, and a promotion level plus a permanent
-        experience share for whoever is already standing on it."""
+                        at: torch.Tensor, hc: torch.Tensor, ccol: torch.Tensor) -> None:
+        """a free chassis at the tile (a named one, then Hanno's best of a
+        class), a unit raised in the activating city (column `ccol`), and a
+        promotion level plus a permanent experience share for whoever is
+        already standing on the tile."""
+        # a grant stands on the person's plot, or the nearest plot that takes
+        # it (`_spawn_unit`'s `far` probe — a hull granted inland goes to water)
         uidx = self._gp_granted_chassis(row, self._gp_fx(cls, at, "unitIdx").long())
         made = m & (uidx >= 0)
         if bool(made.any()):
@@ -714,9 +727,29 @@ class SimGp:
                 hit = made & (uidx == u)
                 if not bool(hit.any()) or not (0 <= u < self.NU):
                     continue
-                born = self._spawn_unit(row, hit, hc, u)
+                born = self._spawn_unit(row, hit, hc, u, far=True)
                 if bool((born & _xp).any()):
                     self._gp_fill_xp(row, born & _xp)
+        # CIV6 (Hanno the Navigator): the strongest unlocked chassis of the
+        # class, carrying its Movement for life
+        bcls = self._gp_fx(cls, at, "unitBestClass").long()
+        wantb = m & (bcls >= 0)
+        if bool(wantb.any()):
+            mpb = self._gp_fx(cls, at, "unitMpBonus").long()
+            for pc in sorted({int(x) for x in bcls[wantb].tolist()}):
+                best = self._best_unlocked_of_class(row, pc)
+                for u in sorted({int(x) for x in best[wantb & (bcls == pc)].tolist()}):
+                    hit = wantb & (bcls == pc) & (best == u)
+                    if u < 0 or not bool(hit.any()):
+                        continue
+                    self._spawn_unit(row, hit, hc, u, init_mp=mpb, far=True)
+        # CIV6 (Marco Polo, Zheng He): "a free Trader unit in this city"
+        cu = self._gp_fx(cls, at, "cityUnitIdx").long()
+        wantc = m & (cu >= 0) & (cu < self.NU) & (ccol >= 0)
+        if bool(wantc.any()):
+            ctr = self.city_center[torch.arange(self.B, device=self.device), row, ccol.clamp(min=0)]
+            for u in sorted({int(x) for x in cu[wantc].tolist()}):
+                self._spawn_unit(row, wantc & (cu == u), ctr.clamp(min=0), u)
         self._gp_form_up(m, cls, at, hc)
         lvl = self._gp_fx(cls, at, "promotionLevels").long()
         pct = self._gp_fx(cls, at, "xpPct").long()
@@ -733,6 +766,25 @@ class SimGp:
         self.unit_xp[r, t] = torch.where(lvl[r] > 0, need, self.unit_xp[r, t])
         self._log_xp(r, t, "gp")
         self.unit_xp_pct[r, t] = self.unit_xp_pct[r, t] + pct[r]
+
+    def _best_unlocked_of_class(self, row: int, pcls: int) -> torch.Tensor:
+        """[B] long — `bestUnlockedOfClass`: the strongest chassis of
+        promotion class `pcls` this row has UNLOCKED (its technology and civic
+        held, its civilization allowed to field it), ties by catalog order; -1
+        where none. A grant pays no resource and asks no city."""
+        B = self.B
+        ok = ((self._type_tech.unsqueeze(0) < 0)
+              | self.civ_techs[:, row].gather(1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))) \
+            & ((self._type_civic.unsqueeze(0) < 0)
+               | self.civ_civics[:, row].gather(1, self._type_civic.clamp(min=0).unsqueeze(0).expand(B, -1))) \
+            & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).unsqueeze(0) \
+            & self._civ_unit_ok(row) & (self.rules_dev.u_promo_class[: self.NU] == pcls).unsqueeze(0)
+        # rank by strength, ties by the LOWER catalog index
+        key = torch.where(ok, self._type_combat[: self.NU].long().unsqueeze(0) * self.NU
+                          - torch.arange(self.NU, device=self.device).unsqueeze(0),
+                          torch.full((B, self.NU), -(1 << 40), dtype=torch.long, device=self.device))
+        pick = key.argmax(dim=1)
+        return torch.where(ok.any(dim=1), pick, torch.full_like(pick, -1))
 
     def _gp_granted_chassis(self, row: int, uidx: torch.Tensor) -> torch.Tensor:
         """[B] — `grantedChassis`: CIV6 (MODIFIER_PLAYER_UNIT_GRANT_UNIT_WITH_EXPERIENCE

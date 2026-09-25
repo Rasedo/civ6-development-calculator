@@ -171,7 +171,7 @@ def test_democracy_destination_half(rules, path) -> None:
         for c in DEMO:
             sim.civ_civics[B0, row, civ_idx[c]] = True
         sim._eff_version += 1
-        adopted, has = sim._adopted_gov(sim.civ_civics[:, row])
+        adopted, has = sim._adopted_gov(row)
         assert bool(has[B0]) and int(adopted[B0]) == gov_idx["DEMOCRACY"], "the civics must adopt DEMOCRACY"
 
     def dest_food_prod(sim, row, col):

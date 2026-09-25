@@ -12,11 +12,9 @@ import type { GameState } from '../../../cpu/core/types';
  * A GOLD-BOUGHT STRATEGIC UNIT PAYS ITS RESOURCE.
  *
  * CIV6 (GS): a unit that asks for a strategic resource pays it "at the moment
- * you start production (or the moment you purchase it)". `purchaseUnit` and
- * the GPU's gold arm both charged it; the seat phase's gold-unit arm (the
- * record's `buy` kind 2) spawned the unit, took the gold and left the
- * stockpile alone — seed 9300 t237, a Horseman bought for gold, 20 Horses
- * apart. The GPU side of the same arm is exercised by the serve gate.
+ * you start production (or the moment you purchase it)". The seat phase's
+ * gold-unit arm (the record's `buy` kind 2) charges it with the gold; the GPU
+ * side of the same arm is exercised by the serve gate.
  */
 function scene(): { state: GameState; before: number } {
   const state = makeState(makeMap(16, 16, 'GRASSLAND'));

@@ -25,6 +25,7 @@ import { ERAS, TECHS } from '../data/techs';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit, bestTrainableNaval } from './units';
 import { grantFreeProphet } from './greatPeople';
+import { gpPermOf } from '../data/greatPeople';
 import { airTrainTile } from './air';
 import { wallsMax, urbanDefensesFit, fitEncampOuter } from './rules';
 import { applyTrainingGrants } from './combat';
@@ -292,6 +293,11 @@ export function completeQueueItem(
       // Harbor" — the roster's own carrier, a FULL bomb like the Congress's
       else if (dt.district !== null
         && getModifiers(state, city.seat).cultureBombs.some((r) => r.district === dt.district)) {
+        cultureBomb(state, city, item.tileIndex, false);
+      }
+      // CIV6 (Mimar Sinan, MODIFIER_PLAYER_ADD_CULTURE_BOMB_TRIGGER): the same
+      // full bomb on every Industrial Zone the seat completes after him
+      else if (dt.district === 'INDUSTRIAL_ZONE' && gpPermOf(owner, 'izCultureBomb') > 0) {
         cultureBomb(state, city, item.tileIndex, false);
       }
       break;

@@ -16,11 +16,11 @@ import { captureCityStateFor } from './combat';
 import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
-  gpEffectOf, gpSiteOf, personWorkObjects,
+  gpEffectOf, gpNoMilitaryOf, gpSiteOf, personWorkObjects,
   type GpEffect, type GpSite, type GreatPersonDef,
 } from '../data/greatPeople';
-import { gwCountsByObj, gwHasRoom, placeGreatWork } from './greatWorks';
-import { GWO_ARTIFACT, gwKindObjects } from '../data/greatWorks';
+import { gwCountsByObj, gwHasRoom, placeGreatWork, placeGreatWorkIn } from './greatWorks';
+import { GWO_ARTIFACT, GWO_RELIC, gwKindObjects } from '../data/greatWorks';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { isSuzerain, receiveEnvoyTiles, resolveSuzerains } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
@@ -31,8 +31,7 @@ import { isSpaceProject } from '../data/projects';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import { dedicationEvent } from './eras';
 import { nextRandom } from './rand';
-import { spawnUnit, disbandUnit } from './units';
-import { grantStockpile } from './stockpile';
+import { spawnUnit, disbandUnit, bestUnlockedOfClass, unitFullMoves, unitsAt, unitStackSlot } from './units';
 import { repairDrip, urbanDefensesFit } from './rules';
 import { itemCost } from './game';
 import { UNITS, URBAN_DEFENSES_TECH, civReplacement } from '../data/units';
@@ -71,6 +70,9 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
   const tile = state.map.tiles[unit.tileIndex];
   if (!tile) return false;
   const { site, district } = gpSiteOf(person);
+  // CIV6 (`ActionRequiresNoMilitaryUnit`): a person who grants a unit on
+  // its own plot waits until no military unit shares it
+  if (gpNoMilitaryOf(person) && unitsAt(state, tile.index).some((u) => unitStackSlot(u) === 'military')) return false;
   return gpSiteHolds(state, unit.seat, site, district, tile,
     (city) => gwOpen(state, city, person, unit.gpAt ?? 0));
 }
@@ -97,8 +99,7 @@ export function gpSiteHolds(
     case 'cityState':
       return isCityStateSeat(tileSeat(tile));
     case 'luxury':
-      return tileOwnedByCiv(tile, seat)
-        && !!tile.resource && RESOURCES[tile.resource]?.category === 'luxury';
+      return !!tile.resource && RESOURCES[tile.resource]?.category === 'luxury';
     case 'adjacentOwn':
       return tileSeat(tile) < 0
         && neighbors(state.map, tile).some((n) => tileOwnedByCiv(n, seat));
@@ -112,6 +113,8 @@ export function gpSiteHolds(
       const ts = tileSeat(tile);
       return ts >= 0 && ts !== seat && civsAtWar(state, seat, ts);
     }
+    case 'relicSlot':
+      return citiesOf(state, seat).some((c) => gwHasRoom(state, c, GWO_RELIC));
   }
 }
 
@@ -356,8 +359,12 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   if (fx.greatWorkKind !== undefined && city) {
     placeGreatWork(state, city, { obj: gwKindObjects(fx.greatWorkKind)[0]!, maker: unit.gpAt ?? 0, era: -1, seat: unit.seat });
   }
+  // CIV6 (Jeanne d'Arc): a Relic, into the seat's first city with room —
+  // the site already asked that one has it
+  if (fx.grantRelic) placeGreatWorkIn(state, citiesOf(state, unit.seat), { obj: GWO_RELIC, maker: -1, era: -1, seat: unit.seat });
   // THE SEAT'S OWN LEDGERS.
   if (fx.envoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + fx.envoys;
+  if (fx.governorTitles) owner.grantedTitles += fx.governorTitles;
   // CIV6 (Matthew Perry): "Grants enough Envoys to become Suzerain at this
   // City-state, then removes all other players' Envoys" — the rivals' bar is
   // read BEFORE the removal, the clause's own order.
@@ -378,17 +385,32 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     }
   }
   if (fx.gppAll) for (const c of GP_CLASSES) owner.gpp[c] = (owner.gpp[c] ?? 0) + fx.gppAll;
-  if (fx.strategic) grantStockpile(state, unit.seat, fx.strategic.resource, fx.strategic.amount, 'gp');
 
   // THE UNIT ON THE TILE — a granted chassis, or a promotion for whoever is
   // already standing here.
+  // A grant stands on the person's plot, or on the nearest plot that takes
+  // it — a hull granted inland goes to the nearest water (`spawnUnit`'s
+  // `far` probe).
   if (fx.unit && UNITS[fx.unit]) {
-    const made = spawnUnit(state, grantedChassis(state, unit.seat, fx.unit), unit.tileIndex, unit.seat);
+    const made = spawnUnit(state, grantedChassis(state, unit.seat, fx.unit), unit.tileIndex, unit.seat, true);
     if (made && fx.unitPromotions) {
       made.xp = xpToNextLevel(made);
       logXpWrite(state, made, 'gf');
     }
   }
+  // CIV6 (Hanno the Navigator): the strongest unlocked chassis of the class,
+  // carrying its Movement for life — born with it, as a trained unit is
+  if (fx.unitBestClass) {
+    const id = bestUnlockedOfClass(state, unit.seat, fx.unitBestClass);
+    const made = id ? spawnUnit(state, id, unit.tileIndex, unit.seat, true) : null;
+    if (made && fx.unitMpBonus) {
+      made.mpBonus = fx.unitMpBonus;
+      made.movesLeft = unitFullMoves(state, made);
+      made.movesFull = made.movesLeft;
+    }
+  }
+  // CIV6 (Marco Polo, Zheng He): "a free Trader unit in this city"
+  if (fx.cityUnit && UNITS[fx.cityUnit] && city) spawnUnit(state, fx.cityUnit, city.centerIndex, unit.seat);
   // CIV6 (El Cid): "Forms a Corps out of a military land unit" — the tier is
   // handed over outright, no second unit and no civic.
   if (fx.formation) {

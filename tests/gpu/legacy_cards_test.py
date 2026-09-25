@@ -107,7 +107,7 @@ def test_held_is_written(rules, path) -> None:
     sim = fresh(rules, path)
     assert int(sim.civ_gov_held[B0, ROW]) == 0, "a seat starts holding nothing"
     research(sim, ROW, "POLITICAL_PHILOSOPHY")
-    ad, has = sim._adopted_gov(sim.civ_civics[:, ROW])
+    ad, has = sim._adopted_gov(ROW)
     assert GOVS[int(ad[B0])] == "AUTOCRACY" and bool(has[B0])
     # nothing is recorded until the seat phase runs its civic loop
     assert int(sim.civ_gov_held[B0, ROW]) == 0
@@ -120,7 +120,7 @@ def test_held_is_written(rules, path) -> None:
 def test_gate_is_two_sided(rules, path) -> None:
     sim = fresh(rules, path)
     research(sim, ROW, "DIVINE_RIGHT")
-    ad, _ = sim._adopted_gov(sim.civ_civics[:, ROW])
+    ad, _ = sim._adopted_gov(ROW)
     assert GOVS[int(ad[B0])] == "MONARCHY"
     auto = 1 << GOVS.index("AUTOCRACY")
     mon = 1 << GOVS.index("MONARCHY")

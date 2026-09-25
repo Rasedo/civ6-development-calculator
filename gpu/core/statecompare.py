@@ -597,6 +597,7 @@ SEAT = {
     "score": lambda sim, b, rows: [[int(x) for x in sim.score_lines(c)[b].tolist()] for c in rows],
     "age": _civ_scalar("civ_age"),
     "governmentsHeld": _civ_scalar("civ_gov_held"),
+    "governmentChosen": _civ_scalar("civ_gov_chosen"),
     "policySlotsExtra": lambda sim, b, rows: [
         [int(x) for x in sim._wonder_extra_slots(c)[b].tolist()] for c in rows],
     "policiesSlotted": _civ_mask("civ_policies"),
@@ -726,6 +727,9 @@ CITY_STATE = {
     "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],
     "minorBuildFrom": lambda sim, b, rows: [[int(x) for x in sim.citystate_build_from[b, s].tolist()] for s in rows],
     "minorArmyCap": lambda sim, b, rows: [int(sim.citystate_army_cap[b, s]) for s in rows],
+    "minorBuilderBuyRate": lambda sim, b, rows: [int(sim.citystate_builder_buy[b, s]) for s in rows],
+    "minorArmySeen": lambda sim, b, rows: [int(sim.citystate_army_seen[b, s]) for s in rows],
+    "minorLossTurn": lambda sim, b, rows: [int(sim.citystate_loss_turn[b, s]) for s in rows],
     "minorBuildersTrained": lambda sim, b, rows: [int(sim.citystate_builders_trained[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
     "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],
@@ -867,6 +871,7 @@ CITY = {
         [float(x) for x in sim.city_free_press[b, c, s].tolist()] for c, s in rows
     ],
     "freedTurn": _cty("city_freed_turn"),
+    "freePot": _cty("city_free_pot"),
     # every layout slot's work — object, maker, era, civilization; -1s for an
     # empty slot — exactly like the TS extractor.
     "greatWorks": lambda sim, b, rows: _gw_rows(sim, b, rows),
@@ -980,6 +985,7 @@ TILE = {
     "gpRegRange": lambda sim, b, rows: sim.tile_gp_perm[b, :, 0].numpy(),
     "gpRegProd": lambda sim, b, rows: sim.tile_gp_perm[b, :, min(1, sim.tile_gp_perm.shape[2] - 1)].numpy(),
     "gpRegAmen": lambda sim, b, rows: sim.tile_gp_perm[b, :, min(2, sim.tile_gp_perm.shape[2] - 1)].numpy(),
+    "gpFaithAdjSci": lambda sim, b, rows: sim.tile_gp_perm[b, :, min(3, sim.tile_gp_perm.shape[2] - 1)].numpy(),
     "hasResource": lambda sim, b, rows: ((sim.res_cat[b] != 0) & ~sim.res_stripped[b]).long().numpy(),
 }
 

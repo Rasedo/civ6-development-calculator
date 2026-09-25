@@ -302,7 +302,6 @@ class Rules:
     woods_feature: int  # the Woods feature itself — the Stave Church's adjacency source
     worship_bidx: list  # per Worship belief (WORSHIP_BELIEFS order): the building row it unlocks
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
-    workshop_bidx: int  # WORKSHOP row (Leonardo's culture perm), -1 if absent
     worship_faith_cost: float  # a worship building's faith price: its row's scaled Cost x the faith rate
     shrine_bidx: int  # SHRINE row (the missionary buy's gate), -1 if absent
     t_cost: torch.Tensor  # [NT]
@@ -517,11 +516,6 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         woods_feature=int(_P["woodsFeature"]),
         worship_bidx=[int(x) for x in r["worshipBidx"]],
         temple_bidx=int(r.get("templeBidx", -1)),
-        # a HARD read at the path the exporter writes (`seats.workshopBidx`):
-        # `r.get("workshopBidx", -1)` at the top level defaulted to -1 for
-        # every game and Leonardo's +3 Culture per Workshop paid nobody on this
-        # engine (9209 t246)
-        workshop_bidx=int(r["seats"]["workshopBidx"]),
         worship_faith_cost=float(r["worshipFaithCost"]),
         shrine_bidx=int(r.get("shrineBidx", -1)),
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
@@ -822,7 +816,7 @@ _MUTABLE = [
     "citystate_last_levy",
     "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_alliance_type", "seat_alliance_pts", "civ_sci_rate", "civ_cul_rate", "civ_tour_rate", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held", "seat_promise", "seat_promise_broken",
-    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "era_score_past", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank", "city_item_bank", "city_item_amt",
+    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "era_score_past", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank", "city_item_bank", "city_item_amt",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
@@ -883,6 +877,8 @@ _MUTABLE = [
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
     "citystate_treasury", "citystate_faith",
     "citystate_build_from", "citystate_army_cap", "citystate_builders_trained",
+    "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window
+    "city_free_pot",  # a Free City's build pot
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair

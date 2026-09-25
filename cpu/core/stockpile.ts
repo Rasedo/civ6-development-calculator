@@ -12,6 +12,7 @@ import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT } from '../data/units'
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { BUILDINGS, buildingVariantFor } from '../data/buildings';
+import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { governorSum, governorTileSum } from './governors';
 import { RESOURCES } from '../../world/resources';
 import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, hiddenResourcesFor } from './seats';
@@ -131,6 +132,18 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   if (goldenDedication(state, seat, DED_AUTOMATON)) {
     const u = strategicSlot('URANIUM');
     if (u >= 0) bk[u] += AUTOMATON_URANIUM_PER_TURN;
+  }
+  // CIV6 (MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_EXTRACTION): a spent Great
+  // Person's standing grant — the seat's own, then (Rockefeller) each held
+  // city's
+  for (const r of GP_FREE_EXTRACTION) {
+    const k = strategicSlot(r.resource);
+    if (k >= 0) bk[k] += gpPermOf(s, r.perm);
+  }
+  for (const r of GP_CITY_FREE_EXTRACTION) {
+    const k = strategicSlot(r.resource);
+    if (k < 0) continue;
+    for (const city of citiesOf(state, seat)) bk[k] += gpCityPermOf(city, r.perm);
   }
   const cap = stockpileCap(state, seat);
   for (let k = 0; k < bk.length; k++) if (bk[k] > cap) bk[k] = cap;

@@ -7,11 +7,11 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { BARB_SEAT, tileCity } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, expandBorders, orderUnit, standBuilding, standDistrict } from '../helpers';
+import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats, cityMaintenance } from '../../../cpu/core/city';
 import { districtAdjacency } from '../../../cpu/core/yields';
-import { spawnUnit, builderRepair } from '../../../cpu/core/units';
+import { spawnUnit } from '../../../cpu/core/units';
 import { hostileUnitAct } from '../../../cpu/core/combat';
 
 function cityWithCampus(campusCol = 9) {
@@ -23,9 +23,8 @@ function cityWithCampus(campusCol = 9) {
   tileAtCoords(state.map, campusCol, 7).elevation = 'MOUNTAIN';
   tileAtCoords(state.map, campusCol + 1, 8).elevation = 'MOUNTAIN';
   const campus = tileAtCoords(state.map, campusCol, 8);
-  expect(queueDistrict(state, city.id, 'CAMPUS', campus.index, 0).ok).toBe(true);
-  expect(campus.districtComplete).toBe(true);
-  expect(queueBuilding(state, city.id, 'LIBRARY', 0).ok).toBe(true); // +2 science, CAMPUS building
+  standDistrict(state, city, 'CAMPUS', campus.index);
+  standBuilding(state, city, 'LIBRARY'); // +2 science, CAMPUS building
   return { state, city, campus };
 }
 
@@ -78,10 +77,11 @@ describe('district pillage', () => {
     expect(campus.districtPillaged).toBe(true);
     expect(barb.movesLeft).toBe(0); // pillage ends the turn, no heal
 
-    // A builder on the tile repairs the district (builderRepair twin).
+    // A builder on the tile repairs the district (the REPAIR order).
     const builder = spawnUnit(state, 'BUILDER', campus.index, 0)!;
     builder.tileIndex = campus.index;
-    expect(builderRepair(state, builder.id).ok).toBe(true);
+    orderUnit(state, builder, 'REPAIR');
     expect(campus.districtPillaged).toBe(false);
+    expect(builder.movesLeft).toBe(0);
   });
 });

@@ -210,7 +210,7 @@ def poke_missionary_buy(rules, rj, path):
     assert sim._missionary_idx >= 0 and sim._shrine_bidx >= 0 and sim._hs_idx >= 0, "missionary anchors missing"
     SHRINE, TEMPLE = sim._shrine_bidx, sim._temple_bidx
 
-    cost = float(sim._unit_faith_cost(r + 1, sim._missionary_idx)[0])  # the sim's own price key
+    cost = float(sim._faith_price(r + 1, sim._unit_faith_cost(r + 1, sim._missionary_idx))[0])  # the price the buy charges
     isolate_faith(sim, r)
     sim.civ_faith[:, r + 1] = cost
     clear_missionaries(sim, r)

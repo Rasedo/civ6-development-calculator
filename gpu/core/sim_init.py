@@ -240,10 +240,17 @@ class SimInit:
             B, s_pad, len(rules.citystate["buildRows"]), dtype=torch.long, device=device)
         self.citystate_army_cap = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_builders_trained = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # the episode's Builder purchase rate (per mille, -1 undrawn), the
+        # military count at the end of the minor's last turn (-1 before its
+        # first) and the turn it was last seen to lose a unit (-1 none) — the
+        # `builderBuyRate` / `armySeen` / `lossTurn` twins
+        self.citystate_builder_buy = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_army_seen = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_loss_turn = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self._init_minor_build(rules)
-        # the minor city's GOLD and FAITH: what its yield walk pays, banked —
-        # nothing in this engine spends either (the TS `CityState.treasury` /
-        # `.faith` twins)
+        # the minor city's GOLD and FAITH: what its yield walk pays, less its
+        # units' upkeep, spent on its purchases and upgrades (the TS
+        # `CityState.treasury` / `.faith` twins)
         self.citystate_treasury = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_faith = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -749,9 +756,12 @@ class SimInit:
         self.civ_age = torch.ones(B, self.n_majors, dtype=torch.long, device=device)
         # CIV6 (Legacy policy card): the governments this seat HAS BEEN in, as
         # a bitmask over the government roster's own order — what unlocks each
-        # legacy card, and the one fact `_adopted_gov` cannot re-derive because
-        # it depends on the ORDER the civics arrived in.
+        # legacy card, and a fact no plane re-derives because it depends on
+        # the ORDER the seat moved through them.
         self.civ_gov_held = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        # the government the seat's record chose (`_adopt_government`), a
+        # roster position, -1 until one does — `GovernmentState.chosen`
+        self.civ_gov_chosen = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er["darkT"])    # GlobalParameters DARK_AGE_SCORE_BASE_THRESHOLD
@@ -1503,6 +1513,18 @@ class SimInit:
         self._gp_adj_tour_pct = [int(x) for x in rr.get("gpAdjTourismPct", [0] * 6)]
         # CIV6 (World Games): (perm index, building index, district index) per row
         self._gp_building_tourism = [tuple(int(x) for x in r) for r in rr.get("gpBuildingTourism", [])]
+        # (perm index, building index, yield index): a spent person's add to
+        # one building's own yield (`GP_BUILDING_YIELDS`)
+        self._gp_building_yields = [tuple(int(x) for x in r) for r in rr["gpBuildingYields"]]
+        # (perm index, promotion class): production toward one class
+        self._gp_unit_prod_classes = [tuple(int(x) for x in r) for r in rr["gpUnitProdClasses"]]
+        # (perm index, strategic slot): the standing per-turn grants, the
+        # seat's then the city-borne (`GP_FREE_EXTRACTION`)
+        self._gp_free_extraction = [tuple(int(x) for x in r) for r in rr["gpFreeExtraction"]]
+        self._gp_city_free_extraction = [tuple(int(x) for x in r) for r in rr["gpCityFreeExtraction"]]
+        # the amenity tiers Ibn Khaldun's two percents read
+        self._gp_happy_tier = int(rr["gpHappyTier"])
+        self._gp_ecstatic_tier = int(rr["gpEcstaticTier"])
         # A Great Person's city APPEAL grant moves `_tile_appeal`, which is
         # `_eff_version`-cached — the claim has to say so, and only this
         # column can make it necessary.
@@ -1531,6 +1553,7 @@ class SimInit:
         self._gp_site = _gp_pad("gpSite", 0)               # GP_SITES index
         self._gp_site_district = _gp_pad("gpSiteDistrict", -1)
         self._gp_charges = _gp_pad("gpCharges", 1)
+        self._gp_no_military = _gp_pad("gpNoMilitary", 0) > 0     # ActionRequiresNoMilitaryUnit
         self._gp_scientist = int(rr["gpScientist"])
         # the NAMED eurekas and the instant buildings, catalog bitmasks
         _eu = rr.get("gpEureka", [])
@@ -1608,6 +1631,9 @@ class SimInit:
         self._gw_theming_mult = int(_gw["themingMult"])
         self._gw_extra_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _gw["extraSlots"]]  # type: ignore[misc]
+        # (holder, per-city Great Person channel): Giovanni's Bank slots
+        self._gw_gp_extra: list[tuple[int, int]] = [
+            (int(r[0]), int(r[1])) for r in _gw["gpExtraSlots"]]
         self._gw_auto_theme_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _gw["autoTheme"]]  # type: ignore[misc]
         assert self.GW_W == self._gw_slot_holder.numel() == self._gw_slot_type.numel() == self._gw_slot_extra.numel(), "great-work layout width"
@@ -3141,12 +3167,14 @@ class SimInit:
         self._bvar_no_gw = {(bi, c) for bi, c, v in self._bvar_cols if int(v["noGreatWorks"])}
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # missionary buy gate
-        self._workshop_bidx = int(rules.workshop_bidx)  # Leonardo's culture perm
         # The completion-overflow / chop bank on the city-block seat axis
         # (one row per major seat, then the city-state rows and the Free Cities
         # row for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=dtype, device=device)
+        # a FREE CITY's build pot (`City.freePot`), read at the Free Cities row
+        # alone; a full city-block plane so compaction carries it
+        self.city_free_pot = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.float64, device=device)
         # CIV6: production is never lost — a CANCELLED item keeps its own
         # hammers, held against the ITEM's production column until it is
         # queued again (`_q_push` resumes them). Eight columns per city is a
@@ -3936,6 +3964,7 @@ class SimInit:
         self._driven_buy_dist: dict = {}
         self._driven_tech: dict = {}
         self._driven_policies: dict[int, torch.Tensor] = {}
+        self._driven_government: dict[int, torch.Tensor] = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}
         self._driven_picks: dict = {}

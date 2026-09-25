@@ -13,6 +13,15 @@ import { hexDistance } from '../../world/hex';
 import { tilesWithin } from '../../world/hex';
 import { defaultModifiers, type YieldCtx } from '../../cpu/core/effects';
 import { GW_HOLDERS, GW_LAYOUT, slotAccepts, type GreatWork } from '../../cpu/data/greatWorks';
+import type { DistrictId, Unit } from '../../cpu/core/types';
+import { unitsOf } from '../../cpu/core/seats';
+import { applySeatUnitOrders } from '../../cpu/core/phase';
+import { IMPROVEMENT_IDS, unitActionIndex } from '../../cpu/core/unitActions';
+import { availableBuildings, canPlaceDistrict, canPlaceWonder, fitEncampOuter, wallsMax } from '../../cpu/core/rules';
+import { stampBuildingEra } from '../../cpu/core/yields';
+import { BUILDINGS } from '../../cpu/data/buildings';
+import { ENCAMPMENT_HP } from '../../cpu/data/units';
+import { RESOURCES } from '../../world/resources';
 
 export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND'): GameMap {
   const tiles: Tile[] = [];
@@ -104,9 +113,7 @@ export function grantCivics(state: GameState, ...ids: string[]): void {
   // the slotted cards are a DRIVER decision (a stored set, not a fill the
   // engine computes); a scene that grants civics by hand takes the greedy
   // reference into the store
-  // ...unless the scene hand-picked a government (`setGovernment`), in which
-  // case it manages its own cards through `setPolicy`
-  if (seatOf(state, 0)!.government.current === null) slotGreedily(state, 0);
+  slotGreedily(state, 0);
 }
 
 /**
@@ -179,4 +186,53 @@ export function holdWorks(
   }
   city.greatWorks?.sort((a, b) => a.slot - b.slot);
   return out;
+}
+
+/** A scene's COMPLETED district: the ground a placement paves (every feature
+ *  but floodplains, the improvement, a bonus resource), finished on the spot.
+ *  Throws where `canPlaceDistrict` refuses the site. */
+export function standDistrict(state: GameState, city: City, type: DistrictId, tileIndex: number): void {
+  const check = canPlaceDistrict(state, city, type, tileIndex);
+  if (!check.ok) throw new Error(`test district ${type} at ${tileIndex} refused: ${check.reason}`);
+  const tile = state.map.tiles[tileIndex];
+  tile.district = type;
+  tile.districtComplete = true;
+  if (type === 'ENCAMPMENT') tile.encampHp = ENCAMPMENT_HP;
+  tile.improvement = null;
+  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
+  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+  city.districts.push({ type, tileIndex });
+}
+
+/** A scene's STANDING building, the writes a purchase makes. Throws where
+ *  `availableBuildings` refuses it. */
+export function standBuilding(state: GameState, city: City, id: string): void {
+  if (!availableBuildings(state, city).some((b) => b.id === id)) throw new Error(`test building ${id} not available`);
+  city.buildings.push(id);
+  stampBuildingEra(state, city, id);
+  if (BUILDINGS[id]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
+}
+
+/** A scene's COMPLETED wonder on `tileIndex`. Throws where `canPlaceWonder`
+ *  refuses the site. */
+export function standWonder(state: GameState, city: City, id: string, tileIndex: number): void {
+  const check = canPlaceWonder(state, city, id, tileIndex, city.seat);
+  if (!check.ok) throw new Error(`test wonder ${id} at ${tileIndex} refused: ${check.reason}`);
+  const tile = state.map.tiles[tileIndex];
+  tile.builtWonder = id;
+  tile.builtWonderComplete = true;
+  tile.improvement = null;
+  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
+  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+  city.wonders.push({ id, tileIndex });
+}
+
+/** One unit's order through the applier: the named column of the shared
+ *  unit-action enum (`MOVE_0`, `REPAIR`, `BUILD_FARM`, ...) for `unit`, no
+ *  order for the seat's other units. */
+export function orderUnit(state: GameState, unit: Unit, action: string): void {
+  const col = unitActionIndex(IMPROVEMENT_IDS)[action];
+  if (col === undefined) throw new Error(`no unit action ${action}`);
+  const mine = unitsOf(state, unit.seat);
+  applySeatUnitOrders(state, seatOf(state, unit.seat)!, [mine.map((u) => (u === unit ? col : -1))]);
 }

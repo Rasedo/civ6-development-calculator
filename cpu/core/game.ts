@@ -1,8 +1,6 @@
 
-import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
+import type { City, DistrictId, GameState, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { dropQueuedBuilding } from './production';
-import { bankItemProgress } from './prodLayout';
-import { airTrainTile } from './air';
 import { GP_CLASSES } from '../data/greatPeople';
 import { placeGreatWorkIn } from './greatWorks';
 import { GWO_RELIC } from '../data/greatWorks';
@@ -10,8 +8,8 @@ import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/c
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
-import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult, goldPurchasableBuildings } from './rules';
-import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete, fitPoliciesLoose, goldPrice, faithPrice } from './effects';
+import { canFoundCity, availableBuildings, buildingCompletable, type RuleResult } from './rules';
+import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked } from './units';
@@ -27,35 +25,33 @@ import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } f
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { grievanceSettledNear, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
-import { commitProduction, commitResearch } from './seatTurn';
+import { commitProduction } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
-import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH, COMPETITIONS } from '../data/seats';
+import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH, COMPETITIONS } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
+import { UNITS, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
 import { competitionOf } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
 import { isWater, deriveContinents, deriveMountainRanges } from '../../world/query';
-import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
-import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
-import { PANTHEONS, ENHANCER_BELIEFS, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, worshipBuildingOf, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { ENHANCER_BELIEFS, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, worshipBuildingOf, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed } from '../data/constants';
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
+import { BARB_SEAT, allCities, allSeats, cityHolders, grantFoundingPressure, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
@@ -241,17 +237,6 @@ export function settlerCost(state: GameState, seat: number): number {
   );
 }
 
-/** Train a settler in a city (no district requirement). Real Civ 6: a city of
- * 1 population may not train one — completion costs the city a pop. */
-export function queueSettler(state: GameState, cityId: number, seat: number): RuleResult {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city) return { ok: false, reason: 'No such city.' };
-  if (getModifiers(state, seat).noSettlers) return { ok: false, reason: 'Isolationism forbids Settlers.' };
-  if (!state.sandbox && city.population < 2) return { ok: false, reason: 'A city of 1 population cannot train a settler.' };
-  commitProduction(state, city.seat, city, { kind: 'settler', progress: 0, cost: settlerCost(state, seat) });
-  return { ok: true };
-}
-
 function cityName(id: number): string {
   const base = CITY_NAMES[id % CITY_NAMES.length];
   const round = Math.floor(id / CITY_NAMES.length);
@@ -421,105 +406,6 @@ export function dominationWinner(state: GameState): number {
     else if (holder !== o) return -1;
   }
   return holder;
-}
-
-export function placeImprovement(
-  state: GameState,
-  tileIndex: number,
-  imp: ImprovementId, seat: number): RuleResult {
-  if (state.unitsMode && !state.sandbox) {
-    return { ok: false, reason: 'Units mode: move a Builder onto the tile and use its Build action.' };
-  }
-  const tile = state.map.tiles[tileIndex];
-  if (!validImprovements(state, tile, seat).includes(imp)) {
-    return { ok: false, reason: 'Not a valid improvement for this tile.' };
-  }
-  tile.improvement = imp;
-  return { ok: true };
-}
-
-export function removeFeature(state: GameState, tileIndex: number, seat: number): RuleResult {
-  if (state.unitsMode && !state.sandbox) {
-    return { ok: false, reason: 'Units mode: move a Builder onto the tile and use its Remove action.' };
-  }
-  const tile = state.map.tiles[tileIndex];
-  const check = canRemoveFeature(state, tile, seat);
-  if (!check.ok) return check;
-  if (tile.improvement === 'LUMBER_MILL' && tile.feature === 'WOODS') tile.improvement = null;
-  tile.feature = null;
-  return { ok: true };
-}
-
-export function queueDistrict(
-  state: GameState,
-  cityId: number,
-  type: DistrictId,
-  tileIndex: number,
-  seat: number,
-): RuleResult {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city) return { ok: false, reason: 'No such city.' };
-  const check = canPlaceDistrict(state, city, type, tileIndex);
-  if (!check.ok) return check;
-
-  const tile = state.map.tiles[tileIndex];
-  tile.district = type;
-  tile.districtComplete = state.sandbox;
-  if (state.sandbox && type === 'ENCAMPMENT') tile.encampHp = ENCAMPMENT_HP;
-  tile.improvement = null;
-  // CIV6: a district paves every feature EXCEPT floodplains — the feature
-  // stays under the district (GS floods damage districts built on them).
-  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
-  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
-
-  const cost = districtCost(state, seat, type);
-  city.districts.push({ type, tileIndex });
-  if (!state.sandbox) {
-    commitProduction(state, city.seat, city, { kind: 'district', district: type, tileIndex, progress: 0, cost });
-  }
-  return { ok: true };
-}
-
-export function queueBuilding(state: GameState, cityId: number, buildingId: string, seat: number): RuleResult {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city) return { ok: false, reason: 'No such city.' };
-  if (!availableBuildings(state, city).some((b) => b.id === buildingId)) {
-    return { ok: false, reason: 'Building not available in this city.' };
-  }
-  if (state.sandbox) {
-    city.buildings.push(buildingId);
-    stampBuildingEra(state, city, buildingId);
-    if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
-  } else {
-    commitProduction(state, city.seat, city, { kind: 'building', building: buildingId, progress: 0 });
-  }
-  return { ok: true };
-}
-
-export function queueWonder(
-  state: GameState,
-  cityId: number,
-  wonderId: string,
-  tileIndex: number,
-  seat: number,
-): RuleResult {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city) return { ok: false, reason: 'No such city.' };
-  const check = canPlaceWonder(state, city, wonderId, tileIndex, seat);
-  if (!check.ok) return check;
-
-  const tile = state.map.tiles[tileIndex];
-  tile.builtWonder = wonderId;
-  tile.builtWonderComplete = state.sandbox;
-  tile.improvement = null;
-  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
-  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
-
-  city.wonders.push({ id: wonderId, tileIndex });
-  if (!state.sandbox) {
-    commitProduction(state, city.seat, city, { kind: 'wonder', wonder: wonderId, tileIndex, progress: 0 });
-  }
-  return { ok: true };
 }
 
 /** A project's price: its own `Projects.Cost` row (already speed-scaled in
@@ -743,81 +629,6 @@ export function unitPurchaseCost(state: GameState, unitType: string, seat: numbe
   // CIV6 (Ngazargamu): 20% off per Encampment building in the BUYING city
   const suz = city && unitIsLandDomain(unitType) ? suzerainLandPurchaseMult(state, seat, city) : 1;
   return base * GOLD_PURCHASE_MULT * m * merc * suz * landUnitPriceMult(state, seat, unitType);
-}
-
-/**
- * Buy a building with gold (worship buildings with faith instead, as in
- * Civ 6). Unlike queueing, purchasing needs the district finished now.
- */
-export function purchaseBuilding(state: GameState, cityId: number, buildingId: string, seat: number): RuleResult {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city) return { ok: false, reason: 'No such city.' };
-  const buyer = seatOf(state, seat);
-  if (!buyer) return { ok: false, reason: 'No such seat.' };
-  // The applier asks the LIST the mask offers: a worship row sells for faith
-  // off the ordinary list, everything else off the gold one, whose queue term
-  // is dropped so the item under production sells like any other.
-  const sellable = BUILDINGS[buildingId]?.worship
-    ? availableBuildings(state, city)
-    : goldPurchasableBuildings(state, city);
-  if (!sellable.some((b) => b.id === buildingId)) {
-    return { ok: false, reason: 'Building not available in this city.' };
-  }
-  if (!buildingCompletable(state, city, buildingId)) {
-    return { ok: false, reason: 'Its district (or prerequisite building) must be finished first.' };
-  }
-  // CIV6 (Medieval and Renaissance Walls): "Cannot be purchased with Gold."
-  if (BUILDINGS[buildingId]?.noPurchase || wallsGoldBlocked(state, seat, buildingId)) {
-    return { ok: false, reason: 'These walls cannot be purchased with gold.' };
-  }
-  const worship = BUILDINGS[buildingId]?.worship === true;
-  if (!state.sandbox) {
-    if (worship) {
-      const cost = faithPrice(state, seat, buildingFaithCost(state, seat, buildingId));
-      if (!goldAffordable(buyer.faith, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
-      buyer.faith -= cost;
-    } else {
-      const cost = goldPrice(state, seat, buildingPurchaseCost(state, seat, buildingId));
-      if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
-      buyer.treasury -= cost;
-    }
-  }
-  city.buildings.push(buildingId);
-  stampBuildingEra(state, city, buildingId);
-  dropQueuedBuilding(city, buildingId);
-  buildingDedications(state, city.seat, buildingId);
-  if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
-  return { ok: true };
-}
-
-export function purchaseUnit(state: GameState, cityId: number, unitType: string, seat: number): RuleResult {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city) return { ok: false, reason: 'No such city.' };
-  if (!trainableUnits(state, seat, city).some((d) => d.id === unitType)) {
-    return { ok: false, reason: 'Unit not available (enable units mode / research).' };
-  }
-  const buyer = seatOf(state, seat);
-  if (!buyer) return { ok: false, reason: 'No such seat.' };
-  // CIV6 (Spy): "Cannot be purchased with Gold."
-  if (UNITS[unitType]?.noGold) return { ok: false, reason: 'This unit cannot be purchased with Gold.' };
-  if (purchaseSpotBlocked(state, city, seat, unitType)) return { ok: false, reason: 'A unit of that class already stands on the city centre.' };
-  const cost = goldPrice(state, seat, unitPurchaseCost(state, unitType, seat, city));
-  if (!state.sandbox) {
-    if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
-    buyer.treasury -= cost;
-  }
-  const where = UNITS[unitType]?.air
-    ? airTrainTile(state, seat, city) ?? city.centerIndex
-    : city.centerIndex;
-  const unit = spawnUnit(state, unitType, where, seat);
-  if (!unit) {
-    if (!state.sandbox) buyer.treasury += cost; // refund: nowhere to stand
-    return { ok: false, reason: 'No free tile near the city center.' };
-  }
-  if (!state.sandbox) chargeUnitResource(state, seat, unitType);
-  applyTrainingGrants(state, city, unit);
-  if (unitType === 'BUILDER') buyer.buildersTrained += 1;
-  return { ok: true };
 }
 
 /** Buy a settler with gold (cost scales like trained settlers). The unit
@@ -1350,32 +1161,6 @@ export function naturalistCost(state: GameState, seat: number): number {
   return unitFaithCost('NATURALIST', 1, unitsAcquired(state, seat, 'NATURALIST'));
 }
 
-/**
- * CIV6: production is never lost. A CANCELLED item keeps its own hammers —
- * they wait in `City.itemBank` against the item's production column, and the
- * queue sites resume them when it is queued again. Work lost to INVALIDATION
- * (a flipped or razed site) banks to the city's buffer instead
- * (`dropQueuedBuilding`, `wipeConstruction`).
- */
-export function cancelQueueItem(state: GameState, cityId: number, index: number, seat: number): void {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city || index < 0 || index >= city.queue.length) return;
-  const item = city.queue[index];
-  bankItemProgress(city, item);
-  if (item.kind === 'district') {
-    const tile = state.map.tiles[item.tileIndex];
-    tile.district = null;
-    tile.districtComplete = false;
-    city.districts = city.districts.filter((d) => d.tileIndex !== item.tileIndex);
-  } else if (item.kind === 'wonder') {
-    const tile = state.map.tiles[item.tileIndex];
-    tile.builtWonder = null;
-    tile.builtWonderComplete = false;
-    city.wonders = city.wonders.filter((w) => w.tileIndex !== item.tileIndex);
-  }
-  city.queue.splice(index, 1);
-}
-
 export function itemCost(item: QueueItem, state?: GameState, city?: City): number {
   if (item.kind === 'district') return item.cost ?? DISTRICTS[item.district].cost;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
@@ -1580,63 +1365,6 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   // hand-copied `setTileOwner` here would leave `tilesAcquired` behind.
   acquireTile(state, city, tileIndex);
   buyer.tilesPurchased = (buyer.tilesPurchased ?? 0) + 1;
-  return { ok: true };
-}
-
-export function setTechResearch(state: GameState, techId: string, seat: number): RuleResult {
-  if (!availableTechs(state, seat).some((t) => t.id === techId)) {
-    return { ok: false, reason: 'Tech not available (missing prerequisites or already researched).' };
-  }
-  commitResearch(state, seat, 'tech', techId);
-  return { ok: true };
-}
-
-export function setCivicResearch(state: GameState, civicId: string, seat: number): RuleResult {
-  if (!availableCivics(state, seat).some((c) => c.id === civicId)) {
-    return { ok: false, reason: 'Civic not available (missing prerequisites or already researched).' };
-  }
-  commitResearch(state, seat, 'civic', civicId);
-  return { ok: true };
-}
-
-export function setGovernment(state: GameState, governmentId: string, seat: number): RuleResult {
-  const unlocks = computeUnlocks(state, seat);
-  if (!state.sandbox && !unlocks.governments.has(governmentId)) {
-    return { ok: false, reason: 'Government not unlocked yet.' };
-  }
-  const def = GOVERNMENTS[governmentId];
-  if (!def) return { ok: false, reason: 'No such government.' };
-
-  const oldCards = seatOf(state, seat)!.government.policies.filter((p): p is string => p !== null);
-  seatOf(state, seat)!.government.current = governmentId;
-  const slots = governmentSlots(state, seat); // includes wonder-granted extras
-  seatOf(state, seat)!.government.policies = fitPoliciesLoose(slots, oldCards);
-  return { ok: true };
-}
-
-export function setPolicy(state: GameState, slotIndex: number, policyId: string | null, seat: number): RuleResult {
-  const govId = seatOf(state, seat)!.government.current;
-  if (!govId) return { ok: false, reason: 'No government yet (research Code of Laws).' };
-  const slots = governmentSlots(state, seat);
-  if (slotIndex < 0 || slotIndex >= slots.length) return { ok: false, reason: 'No such slot.' };
-  while (seatOf(state, seat)!.government.policies.length < slots.length) seatOf(state, seat)!.government.policies.push(null);
-  if (policyId === null) {
-    seatOf(state, seat)!.government.policies[slotIndex] = null;
-    return { ok: true };
-  }
-  const card = POLICIES[policyId];
-  if (!card) return { ok: false, reason: 'No such policy.' };
-  const unlocks = computeUnlocks(state, seat);
-  if (!state.sandbox && !unlocks.policies.has(policyId)) {
-    return { ok: false, reason: 'Policy not unlocked yet.' };
-  }
-  if (!cardFitsSlot(card, slots[slotIndex])) {
-    return { ok: false, reason: `${card.name} does not fit a ${slots[slotIndex]} slot.` };
-  }
-  if (seatOf(state, seat)!.government.policies.some((p, i) => p === policyId && i !== slotIndex)) {
-    return { ok: false, reason: `${card.name} is already slotted.` };
-  }
-  seatOf(state, seat)!.government.policies[slotIndex] = policyId;
   return { ok: true };
 }
 
@@ -1980,11 +1708,6 @@ function theologicalCombatPhase(state: GameState): void {
   }
 }
 
-/** the per-turn pressure phase, callable alone by a test scene */
-export function spreadReligiousPressureForTest(state: GameState): void {
-  spreadReligiousPressure(state);
-}
-
 /**
  * Religious pressure spread (deterministic, zero-RNG). Religions are indexed
  * by seat: religion g is seat g's. Every city following a founded religion
@@ -1994,7 +1717,7 @@ export function spreadReligiousPressureForTest(state: GameState): void {
  * (founded/flipped cities) carry no pressure — the reset-on-birth KILL
  * hygiene, mirrored on the GPU by zeroing dead/absent slots each turn.
  */
-function spreadReligiousPressure(state: GameState): void {
+export function spreadReligiousPressure(state: GameState): void {
   const nRel = state.seats.length;
   const founded = state.seats.map((sx) => sx.religion.founded && sx.religion.holyTile != null && sx.religion.holyTile >= 0);
   if (!founded.some(Boolean)) return; // no religion exists yet — nothing to spread
@@ -2131,13 +1854,6 @@ function spreadReligiousPressure(state: GameState): void {
   }
 }
 
-export function toggleLockedTile(state: GameState, cityId: number, tileIndex: number, seat: number): void {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  const tile = state.map.tiles[tileIndex];
-  if (!city || !tile || tileCity(tile) !== city.id) return;
-  tile.locked = !tile.locked;
-}
-
 export function serialize(state: GameState): string {
   return JSON.stringify(state);
 }
@@ -2149,10 +1865,13 @@ export function deserialize(json: string): GameState {
   for (const sx of state.seats) {
     sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
     sx.research.boosted ??= [];
-    sx.government ??= { current: null, policies: [], held: 0 };
+    sx.government ??= { chosen: null, policies: [], held: 0 };
     sx.government.held ??= 0;
+    sx.government.chosen ??= null;
     sx.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null };
     sx.religion.enhancer ??= null;
+    // a founded religion with no earned count has earned what it holds
+    if (sx.religion.founded) sx.religion.beliefsEarned ??= beliefsHeld(sx.religion);
     sx.buildersTrained ??= 0;
     sx.relicReserve ??= 0;
     sx.tilesPurchased ??= 0;
@@ -2174,9 +1893,8 @@ export function deserialize(json: string): GameState {
   state.units ??= [];
   state.nextUnitId ??= 0;
   state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
-  const legacyCamps = (state as unknown as { barbCamps?: number[] }).barbCamps;
-  state.barbSeat ??= { ...emptySeat(BARB_SEAT), camps: legacyCamps ?? [] };
-  state.barbSeat.camps ??= legacyCamps ?? [];
+  state.barbSeat ??= { ...emptySeat(BARB_SEAT), camps: [] };
+  state.barbSeat.camps ??= [];
   for (const cityState of state.cityStates ?? []) {
     Object.assign(cityState, { ...emptySeat(seatOfCityState(cityState.id)), ...cityState });
   }
@@ -2205,16 +1923,15 @@ export function deserialize(json: string): GameState {
     sx.envoysAvailable ??= 0;
   }
   state.seats ??= [];
-  // A save in the scalar city shape (growthBox, no queue/districts/…) is
-  // filled in place, ONLY the missing fields: a current-shape save must round-trip byte-identically
-  // (the seat determinism test serializes and compares).
+  // A city is filled in place, ONLY the missing fields: a current-shape save
+  // must round-trip byte-identically (the seat determinism test serializes
+  // and compares).
   for (const r of state.seats) {
     r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
     r.treasury ??= 0;
-    for (const civCity of r.cities as (City & { growthBox?: number })[]) {
+    for (const civCity of r.cities) {
       civCity.seat ??= r.seat;
-      civCity.foodBox ??= civCity.growthBox ?? 0;
-      delete civCity.growthBox;
+      civCity.foodBox ??= 0;
       civCity.cultureBox ??= 0;
       civCity.focus ??= 'balanced';
       civCity.queue ??= [];
@@ -2252,28 +1969,6 @@ export function deserialize(json: string): GameState {
     // here cannot desync serialize(live) vs serialize(roundtripped).
   }
   return state;
-}
-
-function canChoosePantheon(state: GameState, seat: number): RuleResult {
-  if (seatOf(state, seat)!.religion.pantheon) return { ok: false, reason: 'Pantheon already chosen.' };
-  if (!state.sandbox && seatOf(state, seat)!.faith < PANTHEON_FAITH_COST) {
-    return { ok: false, reason: `Needs ${PANTHEON_FAITH_COST} faith (${Math.floor(seatOf(state, seat)!.faith)} banked).` };
-  }
-  return { ok: true };
-}
-
-export function choosePantheon(state: GameState, beliefId: string, seat: number): RuleResult {
-  const check = canChoosePantheon(state, seat);
-  if (!check.ok) return check;
-  if (!PANTHEONS[beliefId]) return { ok: false, reason: 'No such pantheon belief.' };
-  if (state.claimedPantheons.includes(beliefId)) {
-    return { ok: false, reason: 'Another civilization already follows that pantheon.' };
-  }
-  if (!state.sandbox) seatOf(state, seat)!.faith -= PANTHEON_FAITH_COST;
-  seatOf(state, seat)!.religion.pantheon = beliefId;
-  state.claimedPantheons.push(beliefId); // every claim path pushes what it takes — the pool IS the exclusion
-  addEraScore(state, seat, ERA_SCORE_PANTHEON);
-  return { ok: true };
 }
 
 /** can the seat found its religion now? No seat ban, no religion yet, a

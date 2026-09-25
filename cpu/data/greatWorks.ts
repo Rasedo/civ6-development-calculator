@@ -233,6 +233,12 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
     'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_ST_BASILS_CATHEDRAL&GreatWorkSlotType=GREATWORKSLOT_RELIC', 'NumSlots'),
     theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_ST_BASILS_CATHEDRAL', 'BuildingType')] },
   },
+  BANK: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_BANK', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the GreatWorkSlotType Giovanni de\' Medici\'s modifier opens on the Bank', inputs: [xml('ModifierArguments', 'ModifierId=GREATPERSON_BANK_GREAT_WORK_SLOTS&Name=GreatWorkSlotType', 'Value', { expect: 'GREATWORKSLOT_PALACE' })] },
+    'slots.0.count': { derived: '0 where the install writes no Building_GreatWorks row for the Bank', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_BANK&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NumSlots', { absent: true })] },
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_BANK', 'BuildingType')] },
+  },
   APADANA: {
     wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_APADANA', 'IsWonder')] },
     'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_PALACE', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_APADANA&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'GreatWorkSlotType')] },
@@ -262,6 +268,8 @@ const RAW_GW_HOLDERS: readonly GreatWorkHolderDef[] = [
   { id: 'HERMITAGE', wonder: true, slots: [{ type: GWS_ART, count: 4 }], theme: GW_THEME_NONE },
   { id: 'ST_BASILS_CATHEDRAL', wonder: true, slots: [{ type: GWS_RELIC, count: 3 }], theme: GW_THEME_NONE },
   { id: 'APADANA', wonder: true, slots: [{ type: GWS_PALACE, count: 2 }], theme: GW_THEME_NONE },
+  // declares no slot of its own; a Great Person opens its row (`GW_GP_EXTRA_SLOTS`)
+  { id: 'BANK', wonder: false, slots: [{ type: GWS_PALACE, count: 0 }], theme: GW_THEME_NONE },
 ];
 export const GW_HOLDERS: readonly GreatWorkHolderDef[] =
   RAW_GW_HOLDERS.map((h) => ({ ...h, src: GW_HOLDER_SRC[h.id] }));
@@ -281,12 +289,23 @@ export const EXTRA_SLOT_ROWS: readonly ExtraSlotRow[] = [
   { civ: 'KONGO', holder: 'PALACE', type: GWS_PALACE, amount: 4 },
 ];
 
+/** CIV6 (Giovanni de' Medici, GREATPERSON_BANK_GREAT_WORK_SLOTS:
+ *  MODIFIER_SINGLE_CITY_ADJUST_EXTRA_GREAT_WORK_SLOTS, BuildingType BANK,
+ *  GreatWorkSlotType PALACE, Amount 2): "The Bank gets 2 Great Work slots,
+ *  which can hold anything." The CITY the person was spent in carries the
+ *  widening — `perm` names its per-city Great Person channel (`GP_CITY_PERM`). */
+export const GW_GP_EXTRA_SLOTS: readonly { holder: string; type: number; amount: number; perm: string }[] = [
+  { holder: 'BANK', type: GWS_PALACE, perm: 'bankGwSlots',
+    amount: srcConst('greatWorks.GW_BANK_GP_SLOTS', 2,
+      xml('ModifierArguments', 'ModifierId=GREATPERSON_BANK_GREAT_WORK_SLOTS&Name=Amount', 'Value')) },
+];
+
 interface GreatWorkSlotDef {
   /** index into `GW_HOLDERS` */
   holder: number;
   type: number;
   /** -1 for a slot the holder's own row declares; 0.. for one an
-   *  `EXTRA_SLOT_ROWS` row opens, in rank order */
+   *  `EXTRA_SLOT_ROWS` or `GW_GP_EXTRA_SLOTS` row opens, in rank order */
   extraRank: number;
 }
 
@@ -302,7 +321,7 @@ function buildLayout(): GreatWorkSlotDef[] {
         seen.add(o);
       }
       for (let i = 0; i < s.count; i++) out.push({ holder: hi, type: s.type, extraRank: -1 });
-      const widest = EXTRA_SLOT_ROWS
+      const widest = [...EXTRA_SLOT_ROWS, ...GW_GP_EXTRA_SLOTS]
         .filter((r) => r.holder === h.id && r.type === s.type)
         .reduce((m, r) => Math.max(m, r.amount), 0);
       for (let i = 0; i < widest; i++) out.push({ holder: hi, type: s.type, extraRank: i });

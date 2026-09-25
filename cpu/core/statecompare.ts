@@ -37,7 +37,7 @@
  * the browser build
 imports this.
  */
-import { POLICY_LIST, SLOT_KINDS } from '../data/policies';
+import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -499,6 +499,10 @@ const SEAT: Record<string, Extractor> = {
   score: overSeats((s, state) => scoreLines(state, s)),
   age: overSeats((s) => s.age ?? 1),
   governmentsHeld: overSeats((s) => s.government.held ?? 0),
+  // the government the seat's record chose, a GOVERNMENT_LIST position, -1
+  // where none has been
+  governmentChosen: overSeats((s) => (s.government.chosen
+    ? GOVERNMENT_LIST.findIndex((g) => g.id === s.government.chosen) : -1)),
   // the SLOTTED cards as a sorted index set — the stored decision
   // the policy slots a seat holds BEYOND its government's own — a wonder's, a
   // Great Person's, and the kind a conversion moves. Compared beside the cards
@@ -666,6 +670,9 @@ const CITY_STATE_G: Record<string, Extractor> = {
   lastLevyTurn: overCityStates((cityState) => cityState.lastLevyTurn ?? -LEVY_COOLDOWN),
   minorBuildFrom: overCityStates((cityState) => cityState.buildFrom ?? MINOR_BUILD_ROWS.map(() => 0)),
   minorArmyCap: overCityStates((cityState) => cityState.armyCap ?? -1),
+  minorBuilderBuyRate: overCityStates((cityState) => cityState.builderBuyRate ?? -1),
+  minorArmySeen: overCityStates((cityState) => cityState.armySeen ?? -1),
+  minorLossTurn: overCityStates((cityState) => cityState.lossTurn ?? -1),
   minorBuildersTrained: overCityStates((cityState) => cityState.buildersTrained),
   warTurns: overCityStates((cityState, state) => warClockLine(state, cityState.seat)),
   treatyTurns: overCityStates((cityState, state) => treatyClockLine(state, cityState.seat)),
@@ -753,6 +760,8 @@ const CITY: Record<string, Extractor> = {
   // the turn a FREE CITY revolted, which its grants count from; -1 for a
   // city that is not Free
   freedTurn: overCities((r) => (isFreeSeat(r.city.seat) ? r.city.foundedTurn : -1)),
+  // a FREE CITY's build pot (`freeCityBuild`); 0 for any other city
+  freePot: overCities((r) => r.city.freePot ?? 0),
   // every layout slot's work — object, maker, era, civilization; -1s for an
   // empty slot — which is what the theming rules and the yields read.
   greatWorks: overCities((r) => {
@@ -844,6 +853,7 @@ const TILE: Record<string, Extractor> = {
   gpRegRange: overTiles((t) => t.gpPerm?.[0] ?? 0),
   gpRegProd: overTiles((t) => t.gpPerm?.[1] ?? 0),
   gpRegAmen: overTiles((t) => t.gpPerm?.[2] ?? 0),
+  gpFaithAdjSci: overTiles((t) => t.gpPerm?.[3] ?? 0),
   hasResource: overTiles((t) => (t.resource === null ? 0 : 1)),
 };
 

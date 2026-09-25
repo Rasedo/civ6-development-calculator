@@ -232,9 +232,10 @@ plus the slowest lane.
     upkeep/bankruptcy and quest issuance all live inside it.
   - **Rules that live IN the seat phase**: city strikes (`cstk`/`estk`), city
     healing, influence-to-envoy conversion.
-  - **The scripted adoption** (`computeAdoption`): modifiers read the adoption,
-    a pure function of civics — `setPolicy`/`setGovernment` write a store
-    nothing reads in a driven game.
+  - **The government is the record's** (`adoptGovernment`): a seat no record
+    has chosen for is in the newest government its civics unlock
+    (`seatGovernment`), and its cards are the stored set a scene fills with
+    `grantCivics`' greedy reference or the record's `policies`.
   - **One seat model**: `isCiv(0)` is true; a fake seat `{ id, atWar }` builds a
     scene the war axis cannot see; a CityState without
     `emptySeat(seatOfCityState(id))` has no seat id.

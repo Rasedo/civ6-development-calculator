@@ -40,7 +40,7 @@ import {
   CONGRESS_COMPETITION, COMPETITIONS, CONGRESS_INTERVAL, CONGRESS_MIN_ERA,
 } from '../data/seats';
 import { EMG_CALLED } from './emergency';
-import { computeAdoption, slottedPolicyIndices } from './effects';
+import { seatGovernment, slottedPolicyIndices } from './effects';
 import { envoysOf } from './cityStates';
 import { POWER_PLANT_IDS } from '../data/buildings';
 import { SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
@@ -425,17 +425,14 @@ export function dvLeader(state: GameState): number {
  *  government, the cards it CHOSE (a driver decision, not a fill of its own)
  *  and its envoys per city-state type. */
 export function congressVoter(state: GameState, seat: number): CongressVoterCtx {
-  const sx = seatOf(state, seat)!;
-  const adoption = computeAdoption(sx.research);
+  const gov = seatGovernment(state, seat);
   const policies = slottedPolicyIndices(state, seat);
   const envoysByType = CITY_STATE_TYPES.map(() => 0);
   for (const cityState of state.cityStates ?? []) {
     const t = CITY_STATE_TYPES.indexOf(cityState.type);
     if (t >= 0) envoysByType[t] += envoysOf(cityState, seat);
   }
-  const government = adoption.government
-    ? Math.max(0, GOVERNMENT_LIST.findIndex((g) => g.id === adoption.government))
-    : 0;
+  const government = gov ? Math.max(0, GOVERNMENT_LIST.findIndex((g) => g.id === gov)) : 0;
   return { government, policies, envoysByType };
 }
 

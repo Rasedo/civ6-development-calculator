@@ -17,7 +17,7 @@ import { emptySeat } from '../../../cpu/core/seats';
 import {
   GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, GWS_COUNT, GWO_COUNT, GWS_PALACE, GWS_ART, GWS_CATHEDRAL,
   GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING, GWO_RELIC, GWO_ARTIFACT, GWO_MUSIC, GWO_CULTURE, GWO_TOURISM,
-  GWO_LANDSCAPE, THEMING_MULT, slotAccepts, gwKindOf, holderSlots, EXTRA_SLOT_ROWS, GW_THEME_ART, GW_THEME_ARTIFACT,
+  GWO_LANDSCAPE, THEMING_MULT, slotAccepts, gwKindOf, holderSlots, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, GW_THEME_ART, GW_THEME_ARTIFACT,
 } from '../../../cpu/data/greatWorks';
 import { ARTIST_WORKS } from '../../../cpu/data/greatPeople';
 import {
@@ -60,15 +60,17 @@ describe('the great-work holder table', () => {
     }
   });
 
-  it('lays out every slot once, holders in table order, the Palace widened by its widest extra row', () => {
+  it('lays out every slot once, holders in table order, the Palace and the Bank widened by their widest extra row', () => {
     const base = GW_HOLDERS.reduce((n, h) => n + h.slots.reduce((m, s) => m + s.count, 0), 0);
     const extra = EXTRA_SLOT_ROWS.reduce((n, r) => Math.max(n, r.amount), 0);
-    expect(GW_LAYOUT_W).toBe(base + extra);
-    expect(GW_LAYOUT_W).toBe(37);
+    const gp = GW_GP_EXTRA_SLOTS.reduce((n, r) => Math.max(n, r.amount), 0);
+    expect(GW_LAYOUT_W).toBe(base + extra + gp);
+    expect(GW_LAYOUT_W).toBe(39);
     let last = -1;
     for (const s of GW_LAYOUT) { expect(s.holder).toBeGreaterThanOrEqual(last); last = s.holder; }
     expect(holderSlots(holder('PALACE')).length).toBe(1 + 4);
-    expect(GW_LAYOUT.filter((s) => s.extraRank >= 0).map((s) => s.extraRank)).toEqual([0, 1, 2, 3]);
+    expect(holderSlots(holder('BANK')).length).toBe(2);
+    expect(GW_LAYOUT.filter((s) => s.extraRank >= 0).map((s) => s.extraRank)).toEqual([0, 1, 2, 3, 0, 1]);
   });
 
   it('accepts what GreatWork_ValidSubTypes says: a Palace slot anything, a Cathedral slot religious art only', () => {

@@ -16,7 +16,7 @@ import { goldenDedication } from './eras';
 import { promiseBrokenWith } from './grievance';
 import { isSuzerain } from './cityStates';
 import { civEraIndex } from './city';
-import { seatGovernmentId } from './seatTurn';
+import { seatGovernment } from './effects';
 import { hexDistance } from '../../world/hex';
 import { GOVERNMENTS } from '../data/policies';
 import { DED_TO_ARMS } from '../data/seats';
@@ -109,8 +109,8 @@ export function warConditionHolds(state: GameState, seat: number, target: number
     case 'differentLateGovernment': {
       // CIV6 (Ideological War): "a player who is in a different Tier 3
       // government" — both LATE, and not the same one
-      const g1 = seatGovernmentId(state, seat);
-      const g2 = seatGovernmentId(state, target);
+      const g1 = seatGovernment(state, seat);
+      const g2 = seatGovernment(state, target);
       if (!g1 || !g2 || g1 === g2) return false;
       return (GOVERNMENTS[g1]?.tier ?? 0) >= LATE_GOVERNMENT_TIER && (GOVERNMENTS[g2]?.tier ?? 0) >= LATE_GOVERNMENT_TIER;
     }

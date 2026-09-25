@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { setTileOwner, freeSeatOf, FREE_SEAT } from '../../../cpu/core/seats';
-import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodSites, erupt, drought, ageReactors } from '../../../cpu/core/disasters';
 import { ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtCandidate, DROUGHT_DURATION } from '../../../cpu/data/disasters';
 import { validImprovementsIn } from '../../../cpu/core/rules';
-import { builderRepair } from '../../../cpu/core/units';
 import { transferCity, freeCitiesPhase } from '../../../cpu/core/phase';
 // The turn draws ONE random event over every eligible (row, site) pair, so a
 // board's floods, eruptions and storms share the turn: a loop below WAITS for
@@ -741,10 +740,10 @@ describe('the drought\'s rules', () => {
     c.improvement = 'FARM';
     c.pillaged = true;
     const b = spawnUnit(state, 'BUILDER', c.index, 0)!;
-    expect(builderRepair(state, b.id).ok).toBe(false);
+    orderUnit(state, b, 'REPAIR');
     expect(c.pillaged).toBe(true);
     c.droughtTurns = 0;
-    expect(builderRepair(state, b.id).ok).toBe(true);
+    orderUnit(state, b, 'REPAIR');
     expect(c.pillaged).toBe(false);
   });
 

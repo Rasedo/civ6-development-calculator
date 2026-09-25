@@ -3,7 +3,7 @@ import { UNITS, UNIT_ERA_INDEX } from '../../../cpu/data/units';
 import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
 import { RESOURCES } from '../../../world/resources';
 import { endTurn } from '../../../cpu/core/game';
-import { trainableUnits, queueUnit, refreshUnits, spawnUnit } from '../../../cpu/core/units';
+import { trainableUnits, refreshUnits, spawnUnit } from '../../../cpu/core/units';
 import { BARB_SEAT, NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../../cpu/core/seats';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitUpkeep, fuelShortCS, grantStockpile, stockOf, stockpileCap, unitResourceCost } from '../../../cpu/core/stockpile';
 import { commitProduction } from '../../../cpu/core/seatTurn';
@@ -78,12 +78,10 @@ describe('build/purchase gating', () => {
     // HORSEBACK_RIDING but no improved horses tile → HORSEMAN unavailable
     const { state, city, tile } = resState('HORSES', null, 'HORSEBACK_RIDING');
     expect(ids(trainableUnits(state, 0, city))).not.toContain('HORSEMAN');
-    expect(queueUnit(state, city.id, 'HORSEMAN', 0).ok).toBe(false);
 
     // improve the horses tile → HORSEMAN becomes available
     tile.improvement = 'PASTURE';
     expect(ids(trainableUnits(state, 0, city))).toContain('HORSEMAN');
-    expect(queueUnit(state, city.id, 'HORSEMAN', 0).ok).toBe(true);
   });
 
   it('SWORDSMAN needs IRON access on top of IRON_WORKING', () => {
@@ -218,10 +216,9 @@ describe('stockpiles', () => {
     const k = STRATEGIC_IDS.indexOf('IRON');
     bank[k] = 19;
     expect(ids(trainableUnits(state, 0, city))).not.toContain('SWORDSMAN');
-    expect(queueUnit(state, city.id, 'SWORDSMAN', 0).ok).toBe(false);
     bank[k] = 20;
     expect(ids(trainableUnits(state, 0, city))).toContain('SWORDSMAN');
-    expect(queueUnit(state, city.id, 'SWORDSMAN', 0).ok).toBe(true);
+    commitProduction(state, 0, city, { kind: 'unit', unit: 'SWORDSMAN', progress: 0 });
     expect(bank[k]).toBe(0);
     // and the next one cannot start until the mines have paid again
     city.queue.length = 0;
@@ -338,7 +335,7 @@ describe('the fuel bill marks the slot, and the unit fights twenty weaker', () =
 describe('new-unit build path', () => {
   it('a gated SWORDSMAN builds and updates city-defense best-melee', () => {
     const { state, city } = resState('IRON', 'MINE', 'IRON_WORKING');
-    expect(queueUnit(state, city.id, 'SWORDSMAN', 0).ok).toBe(true);
+    commitProduction(state, 0, city, { kind: 'unit', unit: 'SWORDSMAN', progress: 0 });
     // force the queue to completion and run a turn
     city.queue[0].progress = 10_000;
     const before = seatOf(state, 0)!.bestMeleeCS;

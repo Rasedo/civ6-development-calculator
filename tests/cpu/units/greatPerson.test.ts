@@ -625,7 +625,7 @@ describe('the Gathering Storm admirals', () => {
     // GREATPERSON_GRACE_HOPPER_ACTIVE Amount 2; GREATPERSON_1MODERNATOMICTECHBOOST
     // Modern..Atomic; GREATPERSON_SAMORI_TURE_ACTIVE UNIT_SPEC_OPS Experience -1
     expect(GP_ABILITY.GP_GRACE_HOPPER).toEqual({ freeTechRandom: 2 });
-    expect(GP_ABILITY.GP_ALBERT_EINSTEIN).toEqual({ eurekaRandom: 1, eurekaHi: 1 });
+    expect(GP_ABILITY.GP_ALBERT_EINSTEIN).toEqual({ eurekaRandom: 1, eurekaHi: 1, perm: { researchLabScience: 4 } });
     expect(GP_ABILITY.GP_SAMORI_TOURE).toEqual({ unit: 'SPEC_OPS', unitPromotions: 1 });
     const state = newGame();
     const techs = state.seats[0].research.techs;

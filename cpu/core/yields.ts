@@ -15,7 +15,7 @@ import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor, effectiveBuilding } from '../data/buildings';
 import { regionalReach, suzerainEffect } from './cityStates';
-import { gpTilePermOf } from '../data/greatPeople';
+import { GP_BUILDING_YIELDS, gpPermOf, gpTilePermOf } from '../data/greatPeople';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
 import { cityGovernorEffects, cityGovernorPromos, governorSum } from './governors';
@@ -723,6 +723,7 @@ export function regionalEffects(
   const out: RegionalEffects = { yields: emptyYields(), amenities: 0 };
   const civ = civOf(state, city.seat);
   const techs = seatOf(state, city.seat)?.research.techs ?? [];
+  const gpOwner = seatOf(state, city.seat);
   for (const other of citiesOf(state, city.seat)) {
     for (const inst of other.districts) {
       const tile = state.map.tiles[inst.tileIndex];
@@ -741,6 +742,9 @@ export function regionalEffects(
         if (every || !seen.has(id)) {
           seen.add(id);
           if (def.yields) addYields(out.yields, def.yields);
+          // CIV6 (James Watt, `GP_BUILDING_YIELDS`): a spent Great Person's
+          // add to the building's own yield rides the same reach
+          for (const r of GP_BUILDING_YIELDS) if (r.building === id) out.yields[r.yield] += gpPermOf(gpOwner, r.perm);
           // CIV6 (Electronics Factory, ELECTRONICSFACTORY_CULTURE): the
           // yields the row pays once its owner holds the technology ride
           // the same reach as its own

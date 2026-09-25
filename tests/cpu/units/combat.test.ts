@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import type { CityState } from '../../../cpu/core/types';
-import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, orderUnit } from '../helpers';
 import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
 import { seatPhase } from '../../../cpu/core/phase';
-import { spawnUnit, builderRepair } from '../../../cpu/core/units';
+import { spawnUnit } from '../../../cpu/core/units';
 import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, awardDefenseXp, trainXpPct, flankCount, supportCount, flankSupportLive, FLANK_SUPPORT_CIVIC, classMatchupCS, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV } from '../../../cpu/core/combat';
 import {
   XP_PER_LEVEL, MAX_LEVEL, PROMOTE_HEAL, XP_BATTLE_CAP, XP_CITY_DEFEND,
@@ -184,7 +184,7 @@ describe('barbarians', () => {
     // pillaged improvements are dead weight until repaired
     const builder = spawnUnit(state, 'BUILDER', farm.index, 0)!;
     builder.tileIndex = farm.index;
-    expect(builderRepair(state, builder.id).ok).toBe(true);
+    orderUnit(state, builder, 'REPAIR');
     expect(farm.pillaged).toBe(false);
   });
 

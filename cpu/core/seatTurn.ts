@@ -7,9 +7,9 @@ import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { takeItemBank } from './prodLayout';
 import { isSuzerain } from './cityStates';
 import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct, lateEraTourism, civEraIndex } from './city';
-import { computeAdoption, slottedPolicyIndices } from './effects';
+import { seatGovernment, slottedPolicyIndices } from './effects';
 import { selectResearch } from './economy';
-import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
+import { GOVERNMENTS } from '../data/policies';
 import { ALLIANCE_C3_TOUR_PCT, ALLIANCE_CULTURAL, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT } from '../data/seats';
 import { seatWonderFlag } from './wonders';
 import { CITY_STATE_TYPES } from '../data/cityStates';
@@ -61,12 +61,6 @@ function policyTreatyFavor(state: GameState, seat: number): number {
   return congressPolicyFavor(state, slottedPolicyIndices(state, seat));
 }
 
-export function seatGovernmentId(state: GameState, seat: number): string | null {
-  const s = seatOf(state, seat);
-  if (!s) return null;
-  return GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(s.research).government : s.government.current;
-}
-
 /** CIV6 (City-State Emergency, success): "+1 Gold/turn for each Envoy they
  *  have" — every envoy this seat has placed, not just the ones at the minor
  *  the emergency was about. */
@@ -95,7 +89,7 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   s.tourismReligious = (s.tourismReligious ?? 0) + natReligious;
   bankTourismPerRival(state, s, natGeneral, natReligious, late);
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
-    + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
+    + diplomaticFavorPerTurn(seatGovernment(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
                              allianceLevels(state, seat),
                              seatBuildingSum(state, seat, 'favorPerTurn') + cardFavorPerBuilding(state, seat),

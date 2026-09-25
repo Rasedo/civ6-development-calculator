@@ -167,7 +167,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       }),
       fadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id)),
       // the NON-removable feature's lent adjacency (today: the GS REEF's
-      // Campus bonus). queueDistrict nulls ANY feature when it paves the tile,
+      // Campus bonus). A district's pave nulls ANY feature but floodplains,
       // so the engine must withdraw this too — foundCity does NOT
       // (it only clears removable features).
       nfadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id, false)),

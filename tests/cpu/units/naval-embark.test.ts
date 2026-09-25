@@ -2,8 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { emptySeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { MP_SCALE } from '../../../cpu/data/constants';
-import { purchaseUnit } from '../../../cpu/core/game';
-import { moveCostInto, unitPassable, canEmbark, stepUnit, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
+import { moveCostInto, unitPassable, canEmbark, stepUnit, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, findPath, walkPath, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
 import { hostileUnitAct, meleeAttack, rangedAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, encircled, stackDefender, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
 import { neighbors, hexDistance } from '../../../world/hex';
 import { unitSight, SIGHT_RANGE } from '../../../cpu/core/fog';
@@ -35,7 +34,7 @@ function addCivAtWar(state: GameState, col: number, row: number, techs: string[]
     cultureTotal: 0,
     faith: 0,
     tourism: 0,
-    government: { current: null, policies: [], held: 0 },
+    government: { chosen: null, policies: [], held: 0 },
     cities: [],
     nextCityId: 0,
     peaceTurns: 0,
@@ -216,7 +215,7 @@ function bareCiv(state: GameState, atWar = true): Seat {
     cultureTotal: 0,
     faith: 0,
     tourism: 0,
-    government: { current: null, policies: [], held: 0 },
+    government: { chosen: null, policies: [], held: 0 },
     cities: [],
     nextCityId: 0,
     peaceTurns: 0,
@@ -245,18 +244,12 @@ describe('N2 production gating', () => {
     const coastCity = settleAt(state, coastCenter.index);
     expect(cityNavalCapable(state, coastCity)).toBe(true);
     expect(trainableUnits(state, 0, coastCity).some((d) => d.id === 'GALLEY')).toBe(true);
-    expect(queueUnit(state, coastCity.id, 'GALLEY', 0).ok).toBe(true);
 
     // inland city: no water neighbor, no completed Harbor
     const inlandCenter = tileAtCoords(state.map, 11, 5);
     const inlandCity = settleAt(state, inlandCenter.index);
     expect(cityNavalCapable(state, inlandCity)).toBe(false);
     expect(trainableUnits(state, 0, inlandCity).some((d) => d.id === 'GALLEY')).toBe(false);
-    expect(queueUnit(state, inlandCity.id, 'GALLEY', 0).ok).toBe(false);
-    // purchase is gated the same way
-    seatOf(state, 0)!.treasury = 100000;
-    expect(purchaseUnit(state, inlandCity.id, 'GALLEY', 0).ok).toBe(false);
-    expect(purchaseUnit(state, coastCity.id, 'GALLEY', 0).ok).toBe(true);
   });
 
   it('a completed Harbor makes an otherwise-inland city naval-capable', () => {
@@ -425,8 +418,9 @@ describe('N2 naval spawn + combat', () => {
     const startIdx = galley.tileIndex;
     const waterAdj = neighbors(state.map, civCityCenter).find((n) => isWater(n))!;
     // order the sea move; walk it home over a few turns' MP (naval routing)
-    const mv = orderMove(state, galley.id, waterAdj.index);
-    expect(mv.ok).toBe(true);
+    galley.path = findPath(state, galley, waterAdj.index);
+    expect(galley.path).not.toBeNull();
+    walkPath(state, galley);
     expect(galley.tileIndex).not.toBe(startIdx); // the ship actually sailed
     for (let t = 0; t < 8 && galley.tileIndex !== waterAdj.index; t++) {
       galley.movesLeft = 3 * MP_SCALE; // GALLEY moves

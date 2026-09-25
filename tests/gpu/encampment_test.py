@@ -389,7 +389,7 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
         print("  civ encampHarborProdMult SKIPPED (no live civ city)")
         return
     j = int(live[0])
-    _ad, _has = sim._adopted_gov(sim.civ_civics[:, r + 1])
+    _ad, _has = sim._adopted_gov(r + 1)
     if not bool(_has[0]):
         print("  civ encampHarborProdMult SKIPPED (civ has adopted no government)")
         return

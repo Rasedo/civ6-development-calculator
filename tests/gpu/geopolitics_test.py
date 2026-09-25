@@ -1127,7 +1127,7 @@ def main() -> None:
     s5.step()
     f1 = int(s5.civ_diplo_favor[0, 0])
     assert f1 >= f0, "favor never decreases"
-    exp = int(s5._adopted_gov_tier(s5.civ_civics[:, 0])[0]) + s5._favor_per_suz * int(s5._suzerain_count(0)[0])
+    exp = int(s5._adopted_gov_tier(0)[0]) + s5._favor_per_suz * int(s5._suzerain_count(0)[0])
     s5.step()
     assert int(s5.civ_diplo_favor[0, 0]) - f1 == exp, (
         f"favor step must be tier+suzerainties ({exp}), got {int(s5.civ_diplo_favor[0, 0]) - f1}"

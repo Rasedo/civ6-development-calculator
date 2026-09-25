@@ -1,13 +1,12 @@
 /**
  * Unit mechanics: movement with Civ 6 terrain costs and the river-crossing
- * rule, A* pathfinding, one-civilian-per-tile stacking, training,
- * maintenance, and builder actions. Combat lives in combat.ts.
+ * rule, A* pathfinding, one-civilian-per-tile stacking, training and builder
+ * actions. Combat lives in combat.ts.
  */
 
 import { ATHEISM_PRESSURE_PER_POP, ENHANCER_BELIEFS } from '../data/religion';
-import type { GameState, City, Seat, Tile, Unit, QueueItem } from './types';
+import type { GameState, City, Seat, Tile, Unit } from './types';
 import { seatWonderSum } from './wonders';
-import { takeItemBank } from './prodLayout';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC, BUILDER_COST_STEP } from '../data/units';
 
@@ -23,12 +22,12 @@ const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial, DIR_E, DIR_W } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
-import { validImprovements, canRemoveFeature, portalAt, portalExit, type RuleResult } from './rules';
+import { canRemoveFeature, portalAt, portalExit, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
-import { droughtBars, fireFeature, METEOR_GRANT_CLASS } from '../data/disasters';
-import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
+import { fireFeature, METEOR_GRANT_CLASS } from '../data/disasters';
+import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, type YieldCtx } from './effects';
 import { effectiveAdjacency, buildingVariantAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
 import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
@@ -73,7 +72,7 @@ import { suzerainOf } from './cityStates';
 import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
 import { canTrainSpy, isSpy } from './espionage';
-import { canTrainWithStockpile, chargeUnitResource } from './stockpile';
+import { canTrainWithStockpile } from './stockpile';
 import type { ImprovementId } from './types';
 
 import { gpPermOf } from '../data/greatPeople';
@@ -81,8 +80,6 @@ import { irradiated } from './nuclear';
 import { FALLOUT_DAMAGE } from '../data/nuclear';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
-
-export { nextRandom } from './rand';
 
 /**
  * The unit-aware TERRAIN passability plane. A NAVAL unit stands on
@@ -1152,18 +1149,6 @@ export function walkPath(state: GameState, unit: Unit): void {
   if (unit.path && unit.path.length === 0) unit.path = null;
 }
 
-export function orderMove(state: GameState, unitId: number, targetIndex: number): RuleResult {
-  const unit = state.units.find((u) => u.id === unitId);
-  if (!unit) return no('No such unit.');
-  if (targetIndex === unit.tileIndex) return no('Already there.');
-  if (!tileFreeForUnit(state, targetIndex, 0, unit)) return no('Destination blocked or impassable.');
-  const path = findPath(state, unit, targetIndex);
-  if (!path) return no('No path to that tile.');
-  unit.path = path;
-  walkPath(state, unit);
-  return ok;
-}
-
 /**
  * The builder price escalator — the Units row's Cost 50 + its
  * CostProgressionParam1 4 per builder THIS SEAT HAS ALREADY PRODUCED, each
@@ -1234,6 +1219,25 @@ export function bestTrainableOfClass(state: GameState, seat: number, promoClass:
   return best?.id ?? null;
 }
 
+/** CIV6 (Hanno the Navigator, MODIFIER_PLAYER_GRANT_UNIT_OF_ABILITY_WITH_MODIFIER):
+ *  the strongest chassis of a promotion class the seat has UNLOCKED — its
+ *  technology and civic held, its civilization allowed to field it — ties by
+ *  catalog order. A grant pays no resource and asks no city, so neither
+ *  gates it. */
+export function bestUnlockedOfClass(state: GameState, seat: number, promoClass: string): string | null {
+  const civ = civOf(state, seat);
+  const leader = leaderOf(state, seat);
+  let best: UnitDef | undefined;
+  for (const d of Object.values(UNITS)) {
+    if (UNIT_PROMO_CLASS[d.id] !== promoClass || d.faithOnly || d.spawnOnly || d.settler) continue;
+    if (!civUnitAllowed(civ, d.id, leader)) continue;
+    if (d.requiresTech && !isTechComplete(state, d.requiresTech, seat)) continue;
+    if (d.requiresCivic && !isCivicComplete(state, d.requiresCivic, seat)) continue;
+    if (!best || (d.combat ?? 0) > (best.combat ?? 0)) best = d;
+  }
+  return best?.id ?? null;
+}
+
 /** The strongest HULL a seat can train, for the Royal Navy Dockyard's grant.
  *  CIV6 (Royal Navy Dockyard, `MODIFIER_PLAYER_ADJUST_DISTRICT_ADD_NAVAL_UNIT`):
  *  the install names NO chassis, so the grant takes the strongest NAVAL unit
@@ -1271,13 +1275,14 @@ export function trainableUnits(
   if (city && irradiated(state.map.tiles[city.centerIndex])) return [];
   return Object.values(UNITS).filter((d) => {
     // Faith-purchase-only chassis (MISSIONARY) — never trainable or
-    // gold-purchasable (purchaseUnit funnels through here), sandbox included.
+    // gold-purchasable (`goldBuyableUnits` funnels through here), sandbox included.
     if (d.faithOnly) return false;
     // Spawn-only chassis (GENERAL/ADMIRAL) — birthed only by the
     // Great-Person claim, never trained/purchased on any seat (sandbox too).
     if (d.spawnOnly) return false;
     // The SETTLER trains through its own escalating-cost column
-    // (queueSettler/purchaseSettler), never the generic unit columns.
+    // (the record's settler column, `purchaseSettler`), never the generic
+    // unit columns.
     if (d.settler) return false;
     if (!civUnitAllowed(civOf(state, seat), d.id, leaderOf(state, seat))) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech, seat)) return false;
@@ -1682,26 +1687,6 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
   return ok;
 }
 
-export function queueUnit(state: GameState, cityId: number, unitType: string, seat: number): RuleResult {
-  const city = seatOf(state, seat)!.cities.find((c) => c.id === cityId);
-  if (!city) return no('No such city.');
-  if (!trainableUnits(state, seat, city).some((d) => d.id === unitType)) {
-    return no('Unit not available (enable units mode / research).');
-  }
-  if (state.sandbox) {
-    spawnUnit(state, unitType, city.centerIndex, seat);
-    return ok;
-  }
-  chargeUnitResource(state, seat, unitType);
-  const qi: QueueItem =
-    unitType === 'BUILDER'
-      ? { kind: 'unit', unit: unitType, progress: 0, cost: builderCost(state, seat) }
-      : { kind: 'unit', unit: unitType, progress: 0 };
-  qi.progress += takeItemBank(city, qi);
-  city.queue.push(qi);
-  return ok;
-}
-
 /** CIV6: the Pyramids give every Builder an extra build charge, Serfdom and
  *  Public Works give it two more, the Hagia Sophia gives every Missionary
  *  and Apostle an extra spread, and the Mausoleum gives the GREAT Engineer
@@ -1744,21 +1729,35 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
   return best;
 }
 
+/** `far`: a GRANT, which the game places on the nearest plot that takes the
+ *  unit however far that is — past the anchor and its ring, the whole map by
+ *  distance, the lower tile index on a tie. */
 export function spawnUnit(
   state: GameState,
   unitType: string,
   nearIndex: number,
   seat: number,
+  far = false,
 ): Unit | null {
   const def = UNITS[unitType];
   if (!def) return null;
   const near = state.map.tiles[nearIndex];
   const probe = { type: unitType, seat };
-  const spot = isAirUnit(unitType) || isSpy(unitType)
+  let spot = isAirUnit(unitType) || isSpy(unitType)
     ? near
     : [near, ...neighbors(state.map, near)]
       .sort((a, b) => hexDistance(near.col, near.row, a.col, a.row) - hexDistance(near.col, near.row, b.col, b.row))
       .find((t) => tileFreeForUnit(state, t.index, seat, probe));
+  if (!spot && far) {
+    let bd = Infinity;
+    for (const t of state.map.tiles) {
+      const d = hexDistance(near.col, near.row, t.col, t.row);
+      if (d < bd && tileFreeForUnit(state, t.index, seat, probe)) {
+        spot = t;
+        bd = d;
+      }
+    }
+  }
   if (!spot) {
     // THE REFUSAL PRINTS. A probe that found no tile is not the same fact as
     // a spawn nobody asked for, and a log of successes alone cannot tell
@@ -1865,11 +1864,6 @@ export function disbandUnit(state: GameState, unitId: number): void {
 
 export function settlerCount(state: GameState, seat: number): number {
   return state.units.reduce((n, u) => n + (u.seat === seat && u.type === 'SETTLER' ? 1 : 0), 0);
-}
-
-export function unitMaintenance(state: GameState, seat: number): number {
-  const mods = getModifiers(state, seat);
-  return state.units.reduce((s, u) => s + (u.seat === seat ? unitUpkeep(mods, u.type) : 0), 0);
 }
 
 /** CIV6 (Theological combat): "the HP gained per turn is equal to 3 times the
@@ -2091,14 +2085,6 @@ export function refreshUnits(state: GameState): void {
   }
 }
 
-export function setExploreMission(state: GameState, unitId: number, on: boolean): RuleResult {
-  const unit = state.units.find((u) => u.id === unitId);
-  if (!unit) return no('No such unit.');
-  unit.mission = on ? 'explore' : null;
-  if (!on) unit.path = null;
-  return ok;
-}
-
 function builderOn(state: GameState, unitId: number): { unit?: Unit; err?: RuleResult } {
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit) return { err: no('No such unit.') };
@@ -2131,36 +2117,11 @@ export function cleanFallout(state: GameState, unit: Unit): RuleResult {
   return { ok: true };
 }
 
-export function builderImprove(state: GameState, unitId: number, imp: ImprovementId, seat: number): RuleResult {
-  const { unit, err } = builderOn(state, unitId);
-  if (err) return err;
-  const tile = state.map.tiles[unit!.tileIndex];
-  if (!validImprovements(state, tile, seat).includes(imp)) {
-    return no('Not a valid improvement for this tile.');
-  }
-  tile.improvement = imp;
-  spendCharge(state, unit!);
-  return ok;
-}
-
 /* The PILLAGE verb has ONE body, and it is `applySeatUnitOrders`' PILLAGE arm
  * in phase.ts — the same improvement-then-district order, the same +25 heal,
  * gated on `combat > 0` the way `hostileUnitAct` and the GPU's apply both are.
  * A charge test here instead of that combat test is what lets a Great General
  * pillage on one engine and not the other. */
-
-export function builderRepair(state: GameState, unitId: number): RuleResult {
-  const { unit, err } = builderOn(state, unitId);
-  if (err) return err;
-  const tile = state.map.tiles[unit!.tileIndex];
-  // CIV6 (LOC_UNITOPERATION_REPAIR_BLOCKED_BY_DROUGHT)
-  if (droughtBars(tile, tile.improvement)) return no('This improvement cannot be repaired while a drought is in progress.');
-  if (tile.pillaged) tile.pillaged = false;
-  else if (tile.districtPillaged) tile.districtPillaged = false;
-  else return no('Nothing pillaged here.');
-  unit!.movesLeft = 0;
-  return ok;
-}
 
 /**
  * Remove a feature (chop) with the builder standing on the tile (1 charge).

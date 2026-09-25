@@ -10,9 +10,9 @@ import {
   cityRangedStrength, encampmentDefense, encircled, meleeAttack, rangedAttack, siegeAssist,
   siegeMayShoot,
 } from '../../../cpu/core/combat';
-import { availableProjects, projectCost, purchaseBuilding, queueProject } from '../../../cpu/core/game';
+import { availableProjects, projectCost, queueProject } from '../../../cpu/core/game';
 import { completeProject } from '../../../cpu/core/production';
-import { seatPhase } from '../../../cpu/core/phase';
+import { buySeatBuilding, seatPhase } from '../../../cpu/core/phase';
 import { UNITS, WALLS_TIER_CS, WALLS_TIER_HP, REPAIR_QUIET_TURNS } from '../../../cpu/data/units';
 
 // The siege round, against the pages it came from: City combat (Civ6) for the
@@ -150,8 +150,7 @@ describe('the walls tiers', () => {
     city.buildings.push('ANCIENT_WALLS');
     city.outerHp = WALLS_TIER_HP[1];
     seatOf(state, 0)!.treasury = 99999;
-    const r = purchaseBuilding(state, city.id, 'MEDIEVAL_WALLS', 0);
-    expect(r.ok).toBe(false);
+    expect(buySeatBuilding(state, seatOf(state, 0)!, city, 'MEDIEVAL_WALLS')).toBe(false);
   });
 });
 

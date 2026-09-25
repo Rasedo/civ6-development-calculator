@@ -2094,6 +2094,15 @@ class SimMasks:
         (a Trader, a religious unit) included.
         Returns (found [B], spot [B])."""
         cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)
+        ok7 = self._spot_free(cand7, seat, civ_mask=civ_mask, naval_mask=naval_mask, cart=cart,
+                              sup_mask=sup_mask, utype=utype)
+        first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
+        spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
+        return first < 7, spot
+
+    def _spot_free(self, cand7: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None, utype: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, K] bool — `tileFreeForUnit` for the spawn probe over any
+        candidate tiles [B, K] (-1 = none), the arguments `_first_free_spot`'s."""
         okc = cand7.clamp(min=0)
         # The SAME stacking rule the movement probe uses, keyed on the spawning
         # seat; the barbarian seat needs no special case, because "hostile to
@@ -2118,9 +2127,7 @@ class SimMasks:
         if 0 <= seat < self.n_majors:
             ok7 = ok7 & ~self._border_closed(
                 cand7, seat, None if utype is None else utype.unsqueeze(1).expand_as(cand7))
-        first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
-        spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
-        return first < 7, spot
+        return ok7
 
     def _seat_tech(self, seat: torch.Tensor, tech: int) -> torch.Tensor:
         """[B] bool — does the seat named per game in `seat` hold tech `tech`?
@@ -2241,21 +2248,22 @@ class SimMasks:
                            land_ok | self.wpass.gather(1, dc).squeeze(1), out)
 
     def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int | torch.Tensor, naval: bool = False, ladder: bool = True,
-                    seat: int = BARB_SEAT, home: torch.Tensor | None = None) -> None:
+                    seat: int = BARB_SEAT, home: torch.Tensor | None = None) -> torch.Tensor:
         """Spawn into the HOSTILE pool — the barbarians' and the Free Cities'
         (`seat`), the two classes that earn no experience and that no driven
         seat walks. With `ladder` off, `unit_type` may be [B] roster indices,
         one per game; `home` [B] is the id of the Free City a grant comes from
-        (`unit_free_city`), -1 on every other spawn."""
+        (`unit_free_city`), -1 on every other spawn. Returns the games where
+        the unit landed."""
         if not bool(mask.any()):
-            return
+            return mask & False
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
         # exactly as TS's spawnUnit branches on UNITS[type].naval.
         _nm = torch.ones(self.B, dtype=torch.bool, device=self.device) if naval else None
         found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm)
         can = mask & found
         if not bool(can.any()):
-            return
+            return can
         rows = can.nonzero(as_tuple=True)[0]
         slot = self.next_slot[rows]
         assert int(slot.max()) < simbase.BARB_POOL_MAX, "barbarian slot pool exhausted — raise simbase.BARB_POOL_MAX"
@@ -2293,6 +2301,7 @@ class SimMasks:
                     f":{int(at_tile[_sb])}:{int(_ut)}"
                     f" at{int(spot[_sb])}")
         self.next_slot[rows] += 1
+        return can
 
     def _sight_through_plane(self, see_through: bool) -> torch.Tensor:
         """[B, T] long — `sightThrough`: the height a tile puts in the way of a
@@ -2477,7 +2486,10 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
-    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None) -> torch.Tensor:
+    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None, far: bool = False) -> torch.Tensor:
+        """`spawnUnit`. `far`: a GRANT, placed on the nearest plot that takes
+        the unit however far that is — past the anchor and its ring, the whole
+        map by distance, the lower tile index on a tie."""
         if not bool(mask.any()):
             return torch.zeros_like(mask)
         if isinstance(type_idx, int):
@@ -2499,6 +2511,16 @@ class SimMasks:
         found, spot = self._first_free_spot(at_tile, seat, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
                                             utype=type_idx,
                                             sup_mask=self._type_support[type_idx.clamp(min=0)])
+        if far and bool((mask & ~found).any()):
+            _allt = torch.arange(self.T, device=self.device).unsqueeze(0).expand(self.B, self.T)
+            _okt = self._spot_free(_allt, seat, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
+                                   utype=type_idx, sup_mask=self._type_support[type_idx.clamp(min=0)])
+            _key = torch.where(_okt, self.pair_dist[at_tile.clamp(min=0)].long() * self.T + _allt,
+                               torch.full_like(_allt, 1 << 40))
+            _far = _key.argmin(dim=1)
+            _hit = mask & ~found & _okt.any(dim=1)
+            spot = torch.where(_hit, _far, spot)
+            found = found | _hit
         if bool(no_hold.any()):
             found = torch.where(no_hold, at_tile >= 0, found)
             spot = torch.where(no_hold, at_tile.clamp(min=0), spot)
@@ -3071,6 +3093,8 @@ class SimMasks:
             _s = int(seat[b])
             if 0 <= _s < self.n_majors:
                 self.civ_treasury[b, _s] += float(reward)
+            elif _s == FREE_SEAT:
+                self.free_treasury[b] += float(reward)
             elif 100 <= _s < 100 + self.citystate_treasury.shape[1]:
                 self.citystate_treasury[b, _s - 100] += float(reward)
                 # CIV6 (Epic Quest): "Receive a Tribal Village reward each time
@@ -3346,7 +3370,7 @@ class SimMasks:
             & ~self.feat_stripped.gather(1, tc)
             & ~self._congress_chop(self.feat_id.gather(1, tc))[0]
         ).unsqueeze(2)
-        # REPAIR (`builderRepair`): a builder on an OWN tile whose improvement
+        # REPAIR (the TS applier's REPAIR arm): a builder on an OWN tile whose improvement
         # or district is pillaged, and no drought holding its improvement
         # (`droughtBars`). No charge is spent — the turn is.
         repair = (

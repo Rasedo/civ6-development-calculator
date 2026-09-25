@@ -9,21 +9,40 @@ class SimMinors:
             return
         citystate_max = int(self.rules.citystate.get("maxHp", 150))
         self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
-        # each minor in turn: its city's yields, then the research they buy,
-        # then its Builders' work, then the item the Production goes to — the
-        # `minorPhase` order, one minor at a time because a district one minor
-        # lands may lend a neighbour's district adjacency across the border —
-        # and then its city's ranged strikes, the majors' own body
-        # (`cityStrikes`)
+        # each minor in turn — the `minorPhase` order, one minor at a time
+        # because a district one minor lands may lend a neighbour's district
+        # adjacency across the border: the loss its army shows, its city's
+        # yields and its units' upkeep, the research they buy, the episode's
+        # draws, the upgrades a completion triggers, its purchases, its
+        # Builders' work, the item the Production goes to, its city's ranged
+        # strikes (the majors' own body, `cityStrikes`), its army's walk, and
+        # the army it ends the turn with
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
-            if not bool(self.citystate_alive[:, s].any()):
+            alive = self.citystate_alive[:, s]
+            if not bool(alive.any()):
                 continue
+            n_mil = self._minor_military_count(s)
+            seen = self.citystate_army_seen[:, s]
+            lost = alive & (seen >= 0) & (n_mil < seen)
+            self.citystate_loss_turn[:, s] = torch.where(
+                lost, torch.full_like(seen, int(self.turn)), self.citystate_loss_turn[:, s])
             prod = self._minor_accrue(s)
-            self._minor_research(s)
+            gained = self._minor_research(s)
+            self._minor_plan(s)
+            self._minor_upgrades(s, gained)
+            self._minor_purchases(s)
             self._minor_builders(s)
             self._minor_build(s, prod)
-            self._city_strikes(self._CITY_MINOR0 + s, col0, self.citystate_alive[:, s])
+            self._city_strikes(self._CITY_MINOR0 + s, col0, alive)
+            self._minor_walk(s)
+            self.citystate_army_seen[:, s] = torch.where(alive, self._minor_military_count(s), seen)
+
+    def _minor_military_count(self, s: int) -> torch.Tensor:
+        """[B] long — minor `s`'s military units (`minorMilitary`)."""
+        mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
+        mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        return (mine & self._type_military[mt]).sum(dim=1)
 
     def _minor_accrue(self, s: int) -> torch.Tensor:
         """THE MINOR'S CITY PAYS ITS YIELDS, AND THEN GROWS AND CLAIMS ON THEM.
@@ -36,15 +55,22 @@ class SimMinors:
         bodies called on it, and `citystate_pop` is a VIEW of `city_pop` — the
         growth write moves it with no mirror of its own.
 
-        Science and Culture also feed the two research pots; Gold and Faith are
-        banked (`citystate_treasury` / `citystate_faith`) and nothing spends
-        either. The [B] Production is returned for `_minor_build`, which pays
-        it into the pot under the rows of the item it goes toward."""
+        Science and Culture also feed the two research pots; Gold banks into
+        `citystate_treasury` and pays the minor's units' upkeep — each unit's
+        own Maintenance, a minor carrying no card that cuts it — the balance
+        stopping at 0 (the census never read a minor below 0); Faith banks into
+        `citystate_faith`. The [B] Production is returned for `_minor_build`,
+        which pays it into the pot under the rows of the item it goes toward."""
         row = self._CITY_MINOR0 + s
-        keep = self.citystate_alive[:, s].double()
+        alive = self.citystate_alive[:, s]
+        keep = alive.double()
         total, eff, need, _tier = self._seat_city_stats(row)
         tot = total[:, 0]  # [B, 6], zero where the city is dead
-        self.citystate_treasury[:, s] += tot[:, 2] * keep
+        mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
+        upkeep = (self._type_maintenance[self.major_unit_type.clamp(min=0, max=self.NU - 1)].double()
+                  * mine.double()).sum(dim=1)
+        tre = self.citystate_treasury[:, s] + tot[:, 2] * keep
+        self.citystate_treasury[:, s] = torch.where(alive, (tre - upkeep).clamp(min=0), tre)
         self.citystate_tech_prog[:, s] += tot[:, 3] * keep
         self.citystate_civic_prog[:, s] += tot[:, 4] * keep
         self.citystate_faith[:, s] += tot[:, 5] * keep
@@ -125,14 +151,16 @@ class SimMinors:
                 adj_hit = ((tiles[rows].unsqueeze(2) == nb_s.unsqueeze(1)) & (nb_s >= 0).unsqueeze(1)).any(dim=2)  # [n, M]
                 adj_own[rows] = adj_own[rows] | adj_hit
 
-    def _minor_research(self, s: int) -> None:
+    def _minor_research(self, s: int) -> torch.Tensor:
         """The cheapest available row completes (table order on a price tie),
         at most one per pot per turn — the `minorResearch` twin. Early Empire
         is the row the border refusal reads. CIV6 (Urban Defenses): the tech
         "builds modern fortifications around the City Centers of all current
         and future cities and their Encampment districts", so the minor's
-        perimeter arrives at the urban tier's full pool."""
+        perimeter arrives at the urban tier's full pool. Returns [B] long,
+        how many trees completed a row — the upgrade trigger's count."""
         alive = self.citystate_alive[:, s]
+        gained = torch.zeros(self.B, dtype=torch.long, device=self.device)
         rdv = self.rules_dev
         for is_tech, have, prog, cost, pre in (
             (True, self.citystate_techs, self.citystate_tech_prog, rdv.t_cost.to(self.device), self._prereq_t),
@@ -147,6 +175,7 @@ class SimMinors:
             pick = key.argmin(dim=1)
             cval = cost[pick]
             fire = alive & avail.any(dim=1) & (prog[:, s] >= cval)
+            gained = gained + fire.long()
             if bool(fire.any()):
                 have[fire, s, pick[fire]] = True
                 prog[fire, s] = prog[fire, s] - cval[fire]
@@ -154,6 +183,7 @@ class SimMinors:
                 self._eff_version += 1
                 if is_tech and self._urban_def_tech >= 0:
                     self._minor_urban_fit(s, fire & (pick == self._urban_def_tech))
+        return gained
 
     def _minor_urban_fit(self, s: int, hit: torch.Tensor) -> None:
         """`minorResearch`'s Urban Defenses fit: the centre's perimeter and its
@@ -253,11 +283,38 @@ class SimMinors:
         self._mb_builder_pct = float(cs["builderProdPct"])
         self._mb_military_pct = float(cs["militaryProdPct"])
         self._mb_small_military = int(cs["smallMilitary"])
+        # THE MINOR'S PURSE (`minorPurchases`, `minorUpgrades`)
+        self._mb_buy_slots = torch.tensor([int(x) for x in cs["builderBuySlots"]], dtype=torch.long, device=dev)
+        self._mb_buy_floor = float(cs["militaryBuyFloor"])
+        self._mb_buy_bp = [int(x) for x in cs["militaryBuyBp"]]
+        self._mb_loss_mult = int(cs["lossBuyMult"])
+        self._mb_loss_turns = int(cs["lossBuyTurns"])
+        self._mb_upgrade_gold = float(cs["upgradeGold"])
+        _lv = {d["level"]: d for d in rules.civ_levels}
+        self._minor_any_res = bool(_lv["CITY_STATE"]["ignoresUnitStrategicResourceRequirements"])
+        self._free_any_res = bool(_lv["FREE_CITIES"]["ignoresUnitStrategicResourceRequirements"])
+        # THE WALKER (`walkUnit`): per-mille step tables, distance weights
+        tbl = lambda k: torch.tensor([int(x) for x in cs[k]], dtype=torch.long, device=dev)  # noqa: E731
+        self._walk_steps_peace = tbl("walkStepsPeace")
+        self._walk_steps_war = tbl("walkStepsWar")
+        self._walk_steps_damaged = tbl("walkStepsDamaged")
+        self._walk_w_peace = tbl("walkWeightsPeace")
+        self._walk_w_war = tbl("walkWeightsWar")
+        self._free_walk_steps = tbl("freeWalkSteps")
+        self._free_walk_w = tbl("freeWalkWeights")
+        # THE FREE CITY'S BUILD TABLE (`FREE_CITY_BUILD_ROWS`) and the research
+        # it reads — every tech and civic of an era at or below the world's
+        fkinds = list(cs["freeBuildKinds"])
+        self._fb_rows = [(fkinds[int(r["k"])], int(r["c"]), [int(x) for x in r["items"]])
+                         for r in cs["freeBuildRows"]]
+        self._tech_era = torch.tensor([int(x) for x in rules.seats["techEra"]], dtype=torch.long, device=dev)
+        self._civic_era = torch.tensor([int(x) for x in rules.seats["civicEra"]], dtype=torch.long, device=dev)
 
     def _minor_plan(self, s: int) -> None:
-        """`minorPlan` — the episode's draws, once, at the minor's first build:
+        """`minorPlan` — the episode's draws, once, at the minor's first turn:
         one slot of each drawn row in table order (the minor's type), then the
-        army cap. `citystate_army_cap` -1 is the undrawn mark."""
+        army cap, then the Builder purchase rate. `citystate_army_cap` -1 is
+        the undrawn mark."""
         fresh = self.citystate_alive[:, s] & (self.citystate_army_cap[:, s] < 0)
         if not bool(fresh.any()):
             return
@@ -271,20 +328,29 @@ class SimMinors:
                 fresh, self._mb_from[r][typ, k], self.citystate_build_from[:, s, r])
         k = torch.floor(self._next_random(fresh) * sl).long()
         self.citystate_army_cap[:, s] = torch.where(fresh, self._mb_cap_slots[k], self.citystate_army_cap[:, s])
+        nb = int(self._mb_buy_slots.numel())
+        k = torch.floor(self._next_random(fresh) * nb).long().clamp(max=nb - 1)
+        self.citystate_builder_buy[:, s] = torch.where(fresh, self._mb_buy_slots[k], self.citystate_builder_buy[:, s])
 
     def _minor_trainable(self, s: int) -> torch.Tensor:
-        """[B, NU] — `minorTrainable`: the land military chassis minor `s` may
-        train — its own research unlocks it, it asks no strategic resource
-        (a minor holds no stockpile here), it is no civilization's unique, and
-        MinorCivUnitBuilds does not bar its class."""
+        """[B, NU] — the land military chassis minor `s` may train, off its own
+        research; CIV6 (`CivilizationLevels`, CITY_STATE) a minor ignores the
+        strategic resource a chassis asks."""
+        return self._trainable_in(self.citystate_techs[:, s], self.citystate_civics[:, s], self._minor_any_res)
+
+    def _trainable_in(self, techs: torch.Tensor, civics: torch.Tensor, any_res: bool) -> torch.Tensor:
+        """[B, NU] — `trainableIn`: the land military chassis a research record
+        ([B, NT], [B, NC]) unlocks, asking no strategic resource unless
+        `any_res`, no civilization's unique, of a class MinorCivUnitBuilds does
+        not bar."""
         B = self.B
         cls = self.rules_dev.u_promo_class.to(self.device)
         static = (self._type_military & ~self.unit_naval & (self._type_air <= 0) & ~self._type_faith_only
-                  & ~self._type_spawn_only & ~self._type_settler & (self._type_uniq < 0)
-                  & (self._type_resource < 0) & (cls >= 0))
+                  & ~self._type_spawn_only & ~self._type_settler & (self._type_uniq < 0) & (cls >= 0))
+        if not any_res:
+            static = static & (self._type_resource < 0)
         for c in self._mb_excl_cls:
             static = static & (cls != c)
-        techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
         tech_ok = (self._type_tech < 0).unsqueeze(0) | techs.gather(
             1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
         civic_ok = (self._type_civic < 0).unsqueeze(0) | civics.gather(
@@ -357,23 +423,33 @@ class SimMinors:
         return ok
 
     def _minor_train(self, s: int, pay: torch.Tensor, ui: torch.Tensor, cost: torch.Tensor) -> None:
-        """A unit the pot covers lands on the centre or its ring (`spawnUnit`,
-        the ordinary rule) under the minor's seat, carrying what the city's
-        buildings hand a unit trained there (`applyTrainingGrants`); only a
-        unit that lands is paid for."""
-        if not bool(pay.any()):
-            return
+        """A unit the pot covers lands (`_minor_spawn`); only a unit that lands
+        is paid for."""
+        landed = self._minor_spawn(s, pay, ui)
+        self.citystate_prod[:, s] -= torch.where(landed, cost, torch.zeros_like(cost))
+
+    def _minor_spawn(self, s: int, mask: torch.Tensor, ui: torch.Tensor,
+                     grants: bool = True) -> torch.Tensor:
+        """[B] — a unit of chassis `ui` lands on the minor's centre or its ring
+        (`spawnUnit`, the ordinary rule) under its seat, carrying what the
+        city's buildings hand a unit trained there (`applyTrainingGrants`)
+        unless `grants` is off; a Builder counts toward the next one's price.
+        The games where it landed."""
+        if not bool(mask.any()):
+            return torch.zeros_like(mask)
         row = self._CITY_MINOR0 + s
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        bl = self.city_bldg[:, row, 0] & ~self._bldg_dark(
-            self.city_dist_tile[:, row, 0], self.city_bldg_pillaged[:, row, 0])
         u0 = ui.clamp(min=0)
-        xp = self._train_xp_pct(bl, u0, row, col0)
-        landed = self._spawn_unit(row, pay, self.citystate_center[:, s].clamp(min=0), u0, init_xp=xp)
-        self.citystate_prod[:, s] -= torch.where(landed, cost, torch.zeros_like(cost))
+        xp = None
+        if grants:
+            bl = self.city_bldg[:, row, 0] & ~self._bldg_dark(
+                self.city_dist_tile[:, row, 0], self.city_bldg_pillaged[:, row, 0])
+            xp = self._train_xp_pct(bl, u0, row, col0)
+        landed = self._spawn_unit(row, mask, self.citystate_center[:, s].clamp(min=0), u0, init_xp=xp)
         if self._builder_idx >= 0:
             self.citystate_builders_trained[:, s] += (landed & (u0 == self._builder_idx)).long()
         self._gen_ver += 1
+        return landed
 
     def _minor_build(self, s: int, prod: torch.Tensor | None = None) -> None:
         """`minorBuild` — the first row of the build table (`MINOR_BUILD_ROWS`,
@@ -392,7 +468,6 @@ class SimMinors:
         alive = self.citystate_alive[:, s]
         if not bool(alive.any()):
             return
-        self._minor_plan(s)
         B, dev = self.B, self.device
         rd = self.rules_dev
         row = self._CITY_MINOR0 + s
@@ -559,6 +634,407 @@ class SimMinors:
                     self._eff_version += 1
                 halt = halt | avail
         toward(~halt, 0.0)
+
+    def _minor_upgrades(self, s: int, gained: torch.Tensor) -> None:
+        """`minorUpgrades` — CIV6 (Leaders.xml, MinorCivTriggeredTrees): a
+        minor's "Upgrade Units" tree runs on a technology or civic gained; the
+        census reads one upgrade per completion at `upgradeGold` each. Each of
+        the turn's completions (`gained`, [B]) upgrades the first unit in slot
+        order whose chassis' upgrade the minor's research unlocks, standing on
+        the minor's ground with Movement left, while the treasury covers the
+        price; the minor asks no strategic resource. The upgrade spends the
+        unit's turn."""
+        alive = self.citystate_alive[:, s]
+        top = int((gained * alive.long()).max())
+        if top <= 0:
+            return
+        B = self.B
+        seat = 100 + s
+        techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
+        for n in range(top):
+            act = alive & (gained > n) & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold)
+            if not bool(act.any()):
+                return
+            mine = self.major_unit_alive & (self.major_unit_seat == seat)
+            ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+            nxt = self._type_up_to[ut]
+            nc = nxt.clamp(min=0)
+            rt, rc = self._type_tech[nc], self._type_civic[nc]
+            ok_t = (rt < 0) | techs.gather(1, rt.clamp(min=0))
+            ok_c = (rc < 0) | civics.gather(1, rc.clamp(min=0))
+            tile = self.major_unit_tile.clamp(min=0)
+            own = self.tile_seat.gather(1, tile) == seat
+            cand = mine & (nxt >= 0) & ok_t & ok_c & own & (self.major_unit_mp > 0)
+            go = act & cand.any(dim=1)
+            if not bool(go.any()):
+                return
+            first = cand.long().argmax(dim=1)
+            rr = go.nonzero(as_tuple=True)[0]
+            u = first[rr]
+            self.citystate_treasury[rr, s] -= self._mb_upgrade_gold
+            self.major_unit_type[rr, u] = nxt[rr, u]
+            self.major_unit_mp[rr, u] = 0
+            self._gen_ver += 1
+
+    def _minor_monk_ok(self, s: int) -> torch.Tensor:
+        """[B] — `minorMonkOk`: may minor `s`'s city sell a Warrior Monk — its
+        majority religion's follower belief is Warrior Monks, it holds a
+        Temple and a complete, unpillaged Holy Site."""
+        B, dev = self.B, self.device
+        if self._monk_idx < 0 or self._monk_follower < 0 or self._temple_bidx < 0 or self._hs_idx < 0:
+            return torch.zeros(B, dtype=torch.bool, device=dev)
+        row = self._CITY_MINOR0 + s
+        fol = self._minor_followed()[:, s]
+        n = self.civ_follower.shape[1]
+        belief = torch.where((fol >= 0) & (fol < n),
+                             self.civ_follower.gather(1, fol.clamp(min=0, max=n - 1).unsqueeze(1)).squeeze(1),
+                             torch.full_like(fol, -1))
+        hs = self.city_dist_tile[:, row, 0, self._hs_idx]
+        h0 = hs.clamp(min=0).unsqueeze(1)
+        hs_ok = ((hs >= 0) & self.district_complete.gather(1, h0).squeeze(1)
+                 & ~self.district_pillaged.gather(1, h0).squeeze(1))
+        return (belief == self._monk_follower) & self.city_bldg[:, row, 0, self._temple_bidx] & hs_ok
+
+    def _minor_purchases(self, s: int) -> None:
+        """`minorPurchases` (C-38's census). A Builder, on a turn none stands
+        and the treasury covers its price: one draw at the episode's rate
+        (`citystate_builder_buy`). Then a military unit, on a turn the
+        treasury holds the floor — or a Warrior Monk is in reach — one draw at
+        the rate its military count sets (per ten thousand), tripled within the
+        loss window. A drawn purchase buys a Warrior Monk with Faith where the
+        minor may and its faith covers one, else the army row's chassis with
+        Gold where the treasury covers it. Every price is the chassis' own cost
+        at the gold (faith) rate, floored to five. A bought unit lands as a
+        trained one does; with no free tile nothing is paid."""
+        alive = self.citystate_alive[:, s]
+        B, dev = self.B, self.device
+        seat = 100 + s
+        mine = self.major_unit_alive & (self.major_unit_seat == seat)
+        mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        gold_mult = float(self.rules.gold_purchase_mult)
+        if self._builder_idx >= 0:
+            has_b = (mine & (self.major_unit_type == self._builder_idx)).any(dim=1)
+            price_b = self._purchase_step(
+                self._builder_cost(self.citystate_builders_trained[:, s]).double() * gold_mult)
+            elig = alive & ~has_b & self._afford(self.citystate_treasury[:, s], price_b)
+            if bool(elig.any()):
+                r = self._next_random(elig)
+                buy = elig & (torch.floor(r * 1000).long() < self.citystate_builder_buy[:, s])
+                if bool(buy.any()):
+                    landed = self._minor_spawn(s, buy, torch.full((B,), self._builder_idx, dtype=torch.long,
+                                                                  device=dev))
+                    self.citystate_treasury[:, s] -= torch.where(landed, price_b, torch.zeros_like(price_b))
+        n_mil = (mine & self._type_military[mt]).sum(dim=1)
+        nt = len(self._mb_buy_bp)
+        bp_tab = torch.tensor(self._mb_buy_bp, dtype=torch.long, device=dev)
+        bp = torch.where(n_mil < nt, bp_tab[n_mil.clamp(max=nt - 1)], torch.zeros_like(n_mil))
+        if self._monk_idx >= 0:
+            monk_price = self._purchase_step(
+                js_round(self._type_cost[self._monk_idx].double() * float(self.rules.faith_purchase_mult))
+                * torch.ones(B, dtype=torch.float64, device=dev))
+            monk = self._minor_monk_ok(s) & self._afford(self.citystate_faith[:, s], monk_price)
+        else:
+            monk_price = torch.zeros(B, dtype=torch.float64, device=dev)
+            monk = torch.zeros(B, dtype=torch.bool, device=dev)
+        gate = alive & (bp > 0) & (monk | self._afford(self.citystate_treasury[:, s], self._mb_buy_floor))
+        if not bool(gate.any()):
+            return
+        lt = self.citystate_loss_turn[:, s]
+        recent = (lt >= 0) & ((int(self.turn) - lt) <= self._mb_loss_turns)
+        rate = torch.where(recent, bp * self._mb_loss_mult, bp)
+        r = self._next_random(gate)
+        go = gate & (torch.floor(r * 10000).long() < rate)
+        if not bool(go.any()):
+            return
+        gm = go & monk
+        if bool(gm.any()):
+            landed = self._minor_spawn(s, gm, torch.full((B,), self._monk_idx, dtype=torch.long, device=dev),
+                                       grants=False)
+            self.citystate_faith[:, s] -= torch.where(landed, monk_price, torch.zeros_like(monk_price))
+        gg = go & ~monk
+        if not bool(gg.any()):
+            return
+        ucls = self.rules_dev.u_promo_class.to(dev)[mt]
+        n_cls = {c: (mine & (ucls == c)).sum(dim=1) for c, _w in self._mb_army}
+        ui = self._minor_army_unit(self._minor_trainable(s), n_cls)
+        price = self._purchase_step(self._type_cost[ui.clamp(min=0)].double() * gold_mult)
+        can = gg & (ui >= 0) & self._afford(self.citystate_treasury[:, s], price)
+        if bool(can.any()):
+            landed = self._minor_spawn(s, can, ui)
+            self.citystate_treasury[:, s] -= torch.where(landed, price, torch.zeros_like(price))
+
+    def _minor_walk(self, s: int) -> None:
+        """`minorWalk` — minor `s`'s land military, in slot order, walk around
+        its centre (`_walk_units`): the war tables while any major is at war
+        with it, a damaged unit on the damaged step table."""
+        alive = self.citystate_alive[:, s]
+        row = self._CITY_MINOR0 + s
+        at_war = self.war[:, row, : self.n_majors].any(dim=1)
+        home = self.pair_dist[self.citystate_center[:, s].clamp(min=0)].long()  # [B, T]
+        steps_ok = torch.where(at_war.unsqueeze(1), self._walk_steps_war.unsqueeze(0),
+                               self._walk_steps_peace.unsqueeze(0))
+        hp_max = int(self.rules.combat.get("unitHp", 100))
+        self._walk_units("major", 100 + s, alive,
+                         lambda hp: torch.where((hp < hp_max).unsqueeze(1),
+                                                self._walk_steps_damaged.unsqueeze(0), steps_ok),
+                         self._walk_weight_plane(home, at_war, self._walk_w_war, self._walk_w_peace))
+
+    def _walk_weight_plane(self, home: torch.Tensor, which: torch.Tensor, w_a: torch.Tensor,
+                           w_b: torch.Tensor) -> torch.Tensor:
+        """[B, T] long — each plot's weight at its distance from home: table
+        `w_a` where `which`, else `w_b`; 0 past the table."""
+        out = torch.zeros_like(home)
+        for w, sel in ((w_a, which), (w_b, ~which)):
+            n = int(w.numel())
+            plane = torch.where(home < n, w[home.clamp(max=n - 1)], torch.zeros_like(home))
+            out = torch.where(sel.unsqueeze(1), plane, out)
+        return out
+
+    def _walk_ground(self, seat: int) -> torch.Tensor:
+        """[B, T] — `walkerGround`: land, nothing impassable, and no city
+        centre but one of `seat`'s own."""
+        ctr = self._centre_seat_plane()
+        return self.passable & ~self.water & ((ctr < 0) | (ctr == seat))
+
+    def _walk_units(self, pre: str, seat: int, act: torch.Tensor, steps_of, wplane: torch.Tensor) -> None:
+        """`walkUnit` over every land military unit of `seat` in pool `pre`,
+        in slot order, off a list taken before anyone moves, in the games of
+        `act`. `wplane` [B, T] is each plot's weight at its distance from home,
+        `steps_of(hp)` the [B, 4] per-mille step table for a unit
+        of that hit points. A unit's turn: ONE draw over its step table, then
+        — for a step k > 0 — ONE draw over the walker ground exactly k away,
+        weighted, in tile order; then up to k steps toward that plot, each to
+        the first neighbour in direction order strictly closer, walker ground
+        and free for it (`_blocked_for`), paid by `_step_verb`; it stops at
+        the plot, where it cannot step, or with no Movement left."""
+        B, T, dev = self.B, self.T, self.device
+        alive = getattr(self, f"{pre}_unit_alive")
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        cand = (act.unsqueeze(1) & alive & (getattr(self, f"{pre}_unit_seat") == seat)
+                & self._type_military[typ] & ~self.unit_naval[typ] & (self._type_air[typ] <= 0)
+                & ~getattr(self, f"{pre}_unit_emb"))
+        if not bool(cand.any()):
+            return
+        lo = self.POOL_LO[pre]
+        ground = self._walk_ground(seat)
+        rank = cand.long().cumsum(dim=1) - 1
+        arange6 = torch.arange(6, device=dev)
+        zeros_b = torch.zeros(B, dtype=torch.bool, device=dev)
+        for k in range(int(cand.sum(dim=1).max())):
+            here_m = cand & (rank == k)
+            on = here_m.any(dim=1)
+            if not bool(on.any()):
+                continue
+            g = here_m.long().argmax(dim=1) + lo  # the walker's merged slot
+            cur = self.unit_tile.gather(1, g.unsqueeze(1)).squeeze(1).clamp(min=0)
+            hp = self.unit_hp.gather(1, g.unsqueeze(1)).squeeze(1)
+            cum = steps_of(hp).cumsum(dim=1)  # [B, 4]
+            r = self._next_random(on)
+            x = torch.floor(r * 1000).long()
+            kstep = (cum <= x.unsqueeze(1)).sum(dim=1).clamp(max=cum.shape[1] - 1)
+            go = on & (kstep > 0)
+            if not bool(go.any()):
+                continue
+            ring = (self.pair_dist[cur].long() == kstep.unsqueeze(1)) & ground
+            w = torch.where(ring, wplane, torch.zeros_like(wplane))
+            total = w.sum(dim=1)
+            go = go & (total > 0)
+            if not bool(go.any()):
+                continue
+            r2 = self._next_random(go)
+            pick = torch.floor(r2 * total.double()).long()
+            target = (w.cumsum(dim=1) <= pick.unsqueeze(1)).sum(dim=1).clamp(max=T - 1)
+            moving = go & (cur != target)
+            for step in range(int(kstep.max())):
+                mp = self.unit_mp.gather(1, g.unsqueeze(1)).squeeze(1)
+                moving = moving & (step < kstep) & (cur != target) & (mp > 0)
+                if not bool(moving.any()):
+                    break
+                nb = self.neigh[cur]  # [B, 6]
+                nbc = nb.clamp(min=0)
+                d0 = self.pair_dist[target, cur].long()
+                closer = (nb >= 0) & (self.pair_dist[target.unsqueeze(1), nbc].long() < d0.unsqueeze(1))
+                ok = (closer & ground.gather(1, nbc)
+                      & ~self._blocked_for(nb, seat))
+                has = ok.any(dim=1)
+                d_i = torch.where(ok, arange6, torch.full_like(nb, 6)).min(dim=1).values.clamp(max=5)
+                dest = nbc.gather(1, d_i.unsqueeze(1)).squeeze(1)
+                mv = self._step_verb(moving & has, g, cur, dest, d_i, seat, zeros_b)
+                cur = torch.where(mv, dest, cur)
+                moving = mv
+
+    def _free_research(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B, NT], [B, NC]) — `freeCityResearch`: every technology and civic
+        of an era at or below the world's."""
+        era = self._world_era().clamp(min=0).unsqueeze(1)
+        return self._tech_era.unsqueeze(0) <= era, self._civic_era.unsqueeze(0) <= era
+
+    def _free_walls_max(self, j: int) -> torch.Tensor:
+        """[B] long — `wallsMax` of the Free City in column `j`."""
+        B, dev = self.B, self.device
+        return self._walls_max_at(torch.full((B,), self.FREE_ROW, dtype=torch.long, device=dev),
+                                  torch.full((B,), j, dtype=torch.long, device=dev))
+
+    def _free_building_ok(self, j: int, bi: int, techs: torch.Tensor, civics: torch.Tensor) -> torch.Tensor:
+        """[B] — `freeCityBuildingOk`: the Free Cities' research unlocks
+        building `bi`; the city does not hold it; its district stands complete
+        and clean (the centre for a City Center row); the row it requires is
+        held and the one it excludes is not; a Water Mill wants a river at the
+        centre; and no higher Walls while the walls are damaged."""
+        B, dev = self.B, self.device
+        rd = self.rules_dev
+        row = self.FREE_ROW
+        bidx = self._bidx
+        ones = torch.ones(B, dtype=torch.bool, device=dev)
+        ut, uc = int(rd.b_unlock[bi]), int(rd.b_unlock_civic[bi])
+        ok = ~self.city_bldg[:, row, j, bi]
+        ok = ok & (techs[:, ut] if ut >= 0 else ones)
+        ok = ok & (civics[:, uc] if uc >= 0 else ones)
+        ctr = self.city_center[:, row, j].clamp(min=0)
+        rq = int(self._b_req_district[bi])
+        if rq < 0:
+            ok = ok & ~self._fallout()[bidx, ctr]
+        else:
+            home = self.city_dist_tile[:, row, j, rq]
+            ok = ok & (home >= 0) & self.district_complete[bidx, home.clamp(min=0)] \
+                & ~self._fallout()[bidx, home.clamp(min=0)]
+        have = self.city_bldg[:, row, j]
+        reqs = self._b_req_buildings[bi]
+        if reqs:
+            ok = ok & have[:, reqs].any(dim=1)
+        excl = self._b_excl_buildings[bi]
+        if excl:
+            ok = ok & ~have[:, excl].any(dim=1)
+        if bool(rd.b_river[bi]):
+            ok = ok & self.tile_river[bidx, ctr]
+        if int(rd.b_walls[bi]) > 0:
+            ok = ok & (self.city_outer_hp[:, row, j] >= self._free_walls_max(j))
+        return ok
+
+    def _free_repair(self, j: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B] bool, [B] f64) — `repairAvailable` and `projectCost` for the
+        Free City in column `j`: walls standing and breached (the centre's
+        pool or its Encampment's), the centre clean, three quiet turns; the
+        price the HP it puts back, at least 1."""
+        row = self.FREE_ROW
+        mx = self._free_walls_max(j)
+        outer = torch.minimum(self.city_outer_hp[:, row, j], mx)
+        enc_missing = torch.zeros_like(mx)
+        if self._encamp_didx >= 0 and self.districts_on:
+            et = self.city_dist_tile[:, row, j, self._encamp_didx]
+            e0 = et.clamp(min=0).unsqueeze(1)
+            live = (et >= 0) & self.district_complete.gather(1, e0).squeeze(1)
+            ecur = torch.minimum(self.encamp_outer_hp.gather(1, e0).squeeze(1), mx)
+            enc_missing = torch.where(live, mx - ecur, torch.zeros_like(mx))
+        breached = (outer < mx) | (enc_missing > 0)
+        ctr = self.city_center[:, row, j]
+        clean = (ctr >= 0) & ~self._fallout().gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
+        ok = (mx > 0) & breached & clean & ((int(self.turn) - self.city_last_hit[:, row, j]) >= self._repair_quiet)
+        cost = ((mx - outer) + enc_missing).clamp(min=1).double()
+        return ok, cost
+
+    def _free_nearest_col(self) -> torch.Tensor:
+        """[B, U] long — the Free Cities column nearest each hostile-pool
+        unit's plot (`nearestFreeCity`), ties to the lowest column; -1 with no
+        Free City."""
+        row = self.FREE_ROW
+        alive = self.city_alive[:, row]  # [B, RC]
+        ctr = self.city_center[:, row].clamp(min=0)
+        tile = self.barb_unit_tile.clamp(min=0)  # [B, U]
+        d = self.pair_dist[ctr.unsqueeze(2), tile.unsqueeze(1)].long()  # [B, RC, U]
+        rc = self.RC
+        key = torch.where(alive.unsqueeze(2), d * rc + torch.arange(rc, device=self.device).reshape(1, rc, 1),
+                          torch.full_like(d, 1 << 40))
+        best = key.min(dim=1).values
+        return torch.where(best < (1 << 40), best % rc, torch.full_like(best, -1))
+
+    def _free_city_build(self, j: int, act: torch.Tensor, prod: torch.Tensor, techs: torch.Tensor,
+                         civics: torch.Tensor, trainable: torch.Tensor) -> None:
+        """`freeCityBuild` for the Free City in column `j`, in the games of
+        `act`: the turn's Production (`prod`) banks into `city_free_pot`, and
+        the first row of `FREE_CITY_BUILD_ROWS` that wants an item the city
+        can make now completes it when the pot covers it, one item a turn — a
+        unit row its class's strongest chassis the Free Cities may train while
+        no Free Cities unit of the class calls the city its nearest Free City
+        (landing on or beside the centre, paid only where it lands), a
+        building row the first of its items the city may raise, the repair
+        row the walls restored when the repair is available."""
+        B, dev = self.B, self.device
+        rd = self.rules_dev
+        row = self.FREE_ROW
+        pot = self.city_free_pot[:, row, j] + torch.where(act, prod, torch.zeros_like(prod))
+        self.city_free_pot[:, row, j] = torch.where(act, pot, self.city_free_pot[:, row, j])
+        ctr = self.city_center[:, row, j].clamp(min=0)
+        balive = self.barb_unit_alive & (self.barb_unit_seat == FREE_SEAT)
+        bt = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
+        near = balive & self._type_military[bt] & (self._free_nearest_col() == j)
+        bcls = self.rules_dev.u_promo_class.to(dev)[bt]
+        jc = torch.full((B,), j, dtype=torch.long, device=dev)
+        halt = ~act
+        for kind, c, items in self._fb_rows:
+            if bool(halt.all()):
+                return
+            if kind == "unit":
+                ui = self._minor_best_of_class(trainable, c)
+                want = ~halt & ~(near & (bcls == c)).any(dim=1) & (ui >= 0)
+                if not bool(want.any()):
+                    continue
+                cost = self._type_cost[ui.clamp(min=0)].double()
+                pay = want & (self.city_free_pot[:, row, j] >= cost)
+                if bool(pay.any()):
+                    landed = self._spawn_barb(pay, ctr, ui.clamp(min=0), ladder=False, seat=FREE_SEAT,
+                                              home=torch.full((B,), -1, dtype=torch.long, device=dev))
+                    self.city_free_pot[:, row, j] -= torch.where(landed, cost, torch.zeros_like(cost))
+                halt = halt | want
+                continue
+            if kind == "repair":
+                avail, cost = self._free_repair(j)
+                want = ~halt & avail
+                if not bool(want.any()):
+                    continue
+                pay = want & (self.city_free_pot[:, row, j] >= cost)
+                if bool(pay.any()):
+                    rr = pay.nonzero(as_tuple=True)[0]
+                    self.city_free_pot[rr, row, j] -= cost[rr]
+                    full = self._free_walls_max(j)
+                    self.city_outer_hp[rr, row, j] = full[rr].to(self.city_outer_hp.dtype)
+                    self._fit_encamp_outer(rr, row, jc[rr], full[rr])
+                halt = halt | want
+                continue
+            chosen = torch.zeros(B, dtype=torch.bool, device=dev)
+            for bi in items:
+                if bi < 0:
+                    continue
+                sel = ~halt & ~chosen & self._free_building_ok(j, bi, techs, civics)
+                if not bool(sel.any()):
+                    continue
+                chosen = chosen | sel
+                cost = float(rd.b_cost[bi])
+                pay = sel & (self.city_free_pot[:, row, j] >= cost)
+                if bool(pay.any()):
+                    rr = pay.nonzero(as_tuple=True)[0]
+                    self.city_bldg[rr, row, j, bi] = True
+                    self.city_free_pot[rr, row, j] -= cost
+                    if int(rd.b_walls[bi]) > 0:
+                        full = self._free_walls_max(j)
+                        self.city_outer_hp[rr, row, j] = full[rr].to(self.city_outer_hp.dtype)
+                        self._fit_encamp_outer(rr, row, jc[rr], full[rr])
+                    self._bldg_version += 1
+                    self._eff_version += 1
+            halt = halt | chosen
+
+    def _free_walk(self, act: torch.Tensor) -> None:
+        """The Free Cities' land units walk (`walkUnit`, C-60's tables) around
+        the nearest Free City, in the games of `act`."""
+        row = self.FREE_ROW
+        alive = self.city_alive[:, row]
+        ctr = self.city_center[:, row].clamp(min=0)  # [B, RC]
+        d = self.pair_dist[ctr].long()  # [B, RC, T]
+        d = torch.where(alive.unsqueeze(2), d, torch.full_like(d, 1 << 30))
+        home = d.min(dim=1).values
+        wplane = self._walk_weight_plane(home, torch.ones_like(act), self._free_walk_w, self._free_walk_w)
+        steps = self._free_walk_steps.unsqueeze(0).expand(self.B, -1)
+        self._walk_units("barb", FREE_SEAT, act, lambda hp: steps, wplane)
 
     def _minor_imp_legal(self, s: int) -> torch.Tensor:
         """[B, T, K] — `validImprovements(state, tile, 100 + s)` on a LAND plot,

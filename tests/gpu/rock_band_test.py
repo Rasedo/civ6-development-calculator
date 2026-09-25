@@ -151,7 +151,7 @@ def test_intl_pct(rules) -> None:
     civ_hi = int(sim._gov_unlock_civic[g_hi])
     assert civ_hi >= 0, "the intolerant government names no unlocking civic"
     sim.civ_civics[0, 0, civ_hi] = True
-    ga, ha = sim._adopted_gov(sim._seat_civics(0))
+    ga, ha = sim._adopted_gov(0)
     if not bool(ha[0]) or int(ga[0]) != g_hi:
         print("  intl pct OK (the catalog picks a different government here)")
         return

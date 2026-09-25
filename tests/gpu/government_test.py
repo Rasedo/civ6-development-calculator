@@ -2,8 +2,9 @@
 
 The system is live (rules.governmentsLive = True). Drives the deterministic
 adoption + greedy slot-fill directly (the occupancy_test pattern), asserting
-the GPU's `_adopted_gov` / `_adopted_gov_tier` / `_gov_policy_mods` match the
-TS `computeAdoption` / `applyGovernment` rule at the boundaries: newest-tier
+the GPU's `_newest_gov` / `_gov_policy_mods` match the TS
+`newestGovernment` / `computeAdoption` / `applyGovernment` rule at the
+boundaries: newest-tier
 government with table-order tie-break, greedy slot fill incl. the wildcard
 overflow, the influence tier, and the SOURCED government rows — the combat
 CS / xp / weariness / GPP / any-district channels, and the deleted
@@ -69,27 +70,32 @@ def main() -> None:
             c[:, civ_idx[i]] = True
         return c
 
+    def newest_tier(c: torch.Tensor) -> torch.Tensor:
+        # the tier of the newest government `c` unlocks, 0 without one
+        adopted, has = sim._newest_gov(c)
+        return torch.where(has, sim._gov_tier[adopted], torch.zeros_like(adopted))
+
     PROD = 1  # yield column order: food,prod,gold,sci,cul,faith
 
     # 1) No civics -> no government, zero modifiers, tier 0.
     c0 = torch.zeros(B, NC, dtype=torch.bool, device=sim.device)
-    _, has_gov = sim._adopted_gov(c0)
+    _, has_gov = sim._newest_gov(c0)
     assert not bool(has_gov.any()), "no government should be adopted with zero civics"
     city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c0)
     assert float(city_y.abs().sum()) == 0.0 and float(cap_y.abs().sum()) == 0.0 and float(hous.abs().sum()) == 0.0, "no gov/policy mods with zero civics"
-    assert int(sim._adopted_gov_tier(c0)[0]) == 0, "influence tier 0 with no government"
+    assert int(newest_tier(c0)[0]) == 0, "influence tier 0 with no government"
 
     # 2) CODE_OF_LAWS -> CHIEFDOM (tier 0) + URBAN_PLANNING slotted (+1 prod/city).
     #    GOD_KING is also unlocked but CHIEFDOM has one economic slot and no
     #    wildcard -> it stays out (overflow needs a W slot).
     c1 = civics_with(["CODE_OF_LAWS"])
-    adopted, has_gov = sim._adopted_gov(c1)
+    adopted, has_gov = sim._newest_gov(c1)
     assert bool(has_gov.all()), "CHIEFDOM should be adopted once CODE_OF_LAWS is in"
     assert int(adopted[0]) == gov_idx["CHIEFDOM"], "newest unlocked government is CHIEFDOM here"
     city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c1)
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING gives +1 production to every city"
     assert float(cap_y.abs().sum()) == 0.0, "CHIEFDOM has no capital yields and GOD_KING must NOT spill (no W slot)"
-    assert int(sim._adopted_gov_tier(c1)[0]) == 0, "CHIEFDOM influence tier is 0"
+    assert int(newest_tier(c1)[0]) == 0, "CHIEFDOM influence tier is 0"
 
     # 3) + POLITICAL_PHILOSOPHY -> AUTOCRACY (tier 1, table-order tie-break over
     #    OLIGARCHY/CLASSICAL_REPUBLIC): URBAN_PLANNING still slotted in the
@@ -101,7 +107,7 @@ def main() -> None:
     #    inherent bonus counts GOVERNMENT BUILDINGS, so the capital reads
     #    GOD_KING's +1 gold / +1 faith and nothing else.
     c2 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "POLITICAL_PHILOSOPHY"])
-    adopted, has_gov = sim._adopted_gov(c2)
+    adopted, has_gov = sim._newest_gov(c2)
     assert int(adopted[0]) == gov_idx["AUTOCRACY"], "newest tier-1 government, table-order tie-break => AUTOCRACY"
     city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c2)
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING still slotted in AUTOCRACY's economic slot"
@@ -111,7 +117,7 @@ def main() -> None:
             f"AUTOCRACY capital yield column {k}: expected {want} "
             "(GOD_KING's gold/faith in the wildcard, and nothing from the government)"
         )
-    assert int(sim._adopted_gov_tier(c2)[0]) == 1, "AUTOCRACY influence tier is 1"
+    assert int(newest_tier(c2)[0]) == 1, "AUTOCRACY influence tier is 1"
     assert float(hous.abs().sum()) == 0.0, "no housingAll at tier 1"
 
     # The three channels the government rows opened, straight off the loader:
@@ -127,7 +133,7 @@ def main() -> None:
     #    -> +1 gold +1 faith on the capital ON TOP of nothing else (MONARCHY
     #    has no capitalYields).
     c3 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"])
-    adopted, has_gov = sim._adopted_gov(c3)
+    adopted, has_gov = sim._newest_gov(c3)
     assert int(adopted[0]) == gov_idx["MONARCHY"], "newest tier-2 government => MONARCHY"
     city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c3)
     assert float(hous[0]) == 0.0, "MONARCHY's housing is per walls LEVEL, never the flat `housingAll`"
@@ -139,7 +145,7 @@ def main() -> None:
     #     MERCHANT_REPUBLIC (the only unlocked tier-2), which carries no
     #     modeled bonus since its sourced terms are governor-gated.
     c4 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "FOREIGN_TRADE", "MILITARY_TRADITION", "STATE_WORKFORCE", "EARLY_EMPIRE", "POLITICAL_PHILOSOPHY", "CIVIL_SERVICE", "FEUDALISM", "GUILDS", "MEDIEVAL_FAIRES", "GAMES_AND_RECREATION", "EXPLORATION"])
-    adopted, has_gov = sim._adopted_gov(c4)
+    adopted, has_gov = sim._newest_gov(c4)
     assert int(adopted[0]) == gov_idx["MERCHANT_REPUBLIC"], "EXPLORATION without DIVINE_RIGHT => MERCHANT_REPUBLIC"
     city_y, cap_y, hous, ymult, sl4, _em, _tp, *_ = sim._gov_policy_mods(c4)
     assert float((ymult[0] - 1).abs().sum()) == 0.0, "MERCHANT_REPUBLIC carries no modeled bonus (its sourced terms are governor-gated)"
@@ -263,7 +269,7 @@ def main() -> None:
     # 10) FASCISM through the fold: TOTALITARIANISM alone at tier 3 adopts
     #     it, and every new channel lands in the fx dict.
     cF = civics_with(["CODE_OF_LAWS", "POLITICAL_PHILOSOPHY", "TOTALITARIANISM"])
-    adoptedF, hasF = sim._adopted_gov(cF)
+    adoptedF, hasF = sim._newest_gov(cF)
     assert int(adoptedF[0]) == fas and bool(hasF[0]), "TOTALITARIANISM alone at tier 3 => FASCISM"
     fxF = sim._gov_policy_mods(cF)[12]
     assert float(fxF["wwcut"][0]) == 20.0 and float(fxF["xppct"][0]) == 0.0, "FASCISM fx: -20% weariness, no xp term"

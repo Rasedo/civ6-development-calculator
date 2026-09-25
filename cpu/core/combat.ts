@@ -28,7 +28,8 @@ import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT, FREE_C
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, unitReligious } from './units';
-import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
+import { nextRandom } from './rand';
+import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom, interceptorAgainst, priorityDefender, INTERCEPT_SUPPORT_CS } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -53,7 +54,7 @@ import { transferCity } from './phase';
 import type { RuleResult } from './rules';
 import { civOf, isFreeSeat, seatsAllied } from './seats';
 import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent, majorityReligionOf } from './seats';
-import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
+import { inGeneralAura, GENERAL_AURA_CS, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
 // closes a cycle — both directions are called at RUN time, never at module
@@ -564,8 +565,7 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
 //
 // The PREDICATE itself lives in aura.ts so this file and units.ts share ONE
 // definition — combat.ts already imports units.ts, so units.ts cannot import
-// back from here. Re-exported below for rules.ts and the tests.
-export { GENERAL_AURA_CS, GENERAL_AURA_RANGE };
+// back from here.
 
 export function generalAuraCS(state: GameState, unit: Unit, tileIndex: number): number {
   return inGeneralAura(state, unit, tileIndex) ? GENERAL_AURA_CS : 0;

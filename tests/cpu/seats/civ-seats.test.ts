@@ -9,7 +9,7 @@ import { setMet } from '../../../cpu/core/cityStates';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileCity, tileClaimed, tileSeat, unitsOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
-import { createGame, foundCity, endTurn, serialize, deserialize, choosePantheon } from '../../../cpu/core/game';
+import { createGame, foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { canFoundCity, wallsMax } from '../../../cpu/core/rules';
 import { tilesWithin, hexDistance } from '../../../world/hex';
 import { applySeatUnitOrders, assertCityRegistryCoherent, declareWar, seatPhase, sueForPeace, transferCity } from '../../../cpu/core/phase';
@@ -40,7 +40,7 @@ function addCiv(
     cultureTotal: 0,
     faith: 0,
     tourism: 0,
-    government: { current: null, policies: [], held: 0 },
+    government: { chosen: null, policies: [], held: 0 },
     cities: [],
     nextCityId: 0,
     peaceTurns: 0,
@@ -197,8 +197,11 @@ describe('races', () => {
     expect(state.claimedPantheons.length).toBe(1);
     expect(civ.faith ?? 0).toBeLessThan(25); // the claim spent it
     const taken = state.claimedPantheons[0];
-    seatOf(state, 0)!.faith = 100;
-    expect(choosePantheon(state, taken, 0).ok).toBe(false);
+    const next = addCiv(state, 2, 2, { religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 25 });
+    seatPhase(state);
+    expect(state.claimedPantheons.length).toBe(2);
+    expect(next.religion.pantheon).not.toBe(null);
+    expect(next.religion.pantheon).not.toBe(taken);
   });
 
   it('a broke civ claims no pantheon', () => {

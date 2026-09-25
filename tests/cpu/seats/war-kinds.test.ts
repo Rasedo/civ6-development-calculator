@@ -29,7 +29,7 @@ import {
 } from '../../../cpu/core/casusBelli';
 import { rosterCS } from '../../../cpu/core/combat';
 import { spawnUnit, unitFullMoves } from '../../../cpu/core/units';
-import { spreadReligiousPressureForTest } from '../../../cpu/core/game';
+import { spreadReligiousPressure } from '../../../cpu/core/game';
 import { grievanceWith, grievanceWarDeclared } from '../../../cpu/core/grievance';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import {
@@ -215,7 +215,7 @@ describe('the war kinds', () => {
     // seat 1's two cities (6 and ~7 tiles from seat 2's capital) press it at
     // 4 (the Holy City) + 1 per turn; seat 0's stand 12 tiles away and press nothing
     const plain = build();
-    spreadReligiousPressureForTest(plain);
+    spreadReligiousPressure(plain);
     const p0 = plain.seats[2].cities[0].religionPressure!;
     expect(p0[1]).toBe(5);
     expect(p0[0]).toBe(0);
@@ -224,7 +224,7 @@ describe('the war kinds', () => {
     setAllianceTypeWith(allied, 0, 1, ALLIANCE_RELIGIOUS);
     setAllyTurnsWith(allied, 0, 1, AGREEMENT_TURNS);
     setAlliancePtsWith(allied, 0, 1, ALLIANCE_L3_QP);
-    spreadReligiousPressureForTest(allied);
+    spreadReligiousPressure(allied);
     const p1 = allied.seats[2].cities[0].religionPressure!;
     expect(p1[1]).toBe(Math.floor((5 * (100 + ALLIANCE_REL3_PRESSURE_PCT)) / 100));
 
@@ -234,7 +234,7 @@ describe('the war kinds', () => {
     setAllyTurnsWith(seeded, 0, 1, AGREEMENT_TURNS);
     setAlliancePtsWith(seeded, 0, 1, ALLIANCE_L3_QP);
     seeded.seats[2].cities[0].religionPressure = [1, 0, 0];
-    spreadReligiousPressureForTest(seeded);
+    spreadReligiousPressure(seeded);
     expect(seeded.seats[2].cities[0].religionPressure![1]).toBe(5);
   });
 });

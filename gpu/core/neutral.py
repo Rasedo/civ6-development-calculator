@@ -7,7 +7,7 @@ engine can emit the same value. The field names, kinds and meanings live in
 The groups: `buy` (every purchase candidate the seat has), `route` (the
 trade route it would open), `nuke` (the silo launch it would take),
 `research` (the open techs and civics with their prices), `policy` (the cards
-it may slot and the slots), `war` (the open war columns and the kind each
+it may slot, the slots, the government it is in and those it may adopt), `war` (the open war columns and the kind each
 declaration takes), `envoy` (the bank and the courtship per city-state),
 `congress` (the session the coming turn holds and this seat's preference on
 it) and `gp` (the Great Person offers and this seat's points); `war` also says
@@ -119,6 +119,7 @@ class Static:
     deal_kind: dict
     comp_aid: int
     promise_cost: list
+    gov_tier: list
 
     def col(self, name: str) -> int:
         """The unit action column called `name`, -1 where the layout has none."""
@@ -214,6 +215,7 @@ def _static(rules, width: int, height: int, n_majors: int, n_citystates: int, de
         deal_kind={k: kinds.index(k) for k in ("GOLD", "FAVOR", "RESOURCE", "SPY", "OPEN_BORDERS", "JOINT_WAR")},
         comp_aid=comps.index("AID_REQUEST") if "AID_REQUEST" in comps else -1,
         promise_cost=[_whole(p[0]) for p in rules.eras["promises"]],
+        gov_tier=[int(g["tier"]) for g in (rules.governments or [])],
     )
 
 
@@ -353,6 +355,12 @@ def _columns(sim, row: int) -> dict:
     out["policy", "unlocked"] = sim._seat_policy_mask(row)[:, : sim._npol]
     out["policy", "slots"] = (sim._seat_policy_slots(row) if sim._ngov
                               else torch.zeros(B, 4, dtype=torch.long, device=dev))
+    if sim._ngov:
+        gov, has = sim._adopted_gov(row)
+        out["policy", "government"] = torch.where(has, gov, torch.full_like(gov, -1))
+    else:
+        out["policy", "government"] = torch.full((B,), -1, dtype=torch.long, device=dev)
+    out["policy", "gov_open"] = sim._gov_open(row)[:, : sim._ngov]
     wm = sim._seat_war_mask(row)
     n = wm.shape[1] // 2
     declare = wm[:, :n]
@@ -410,7 +418,7 @@ def _congress(sim, row: int) -> dict:
 
 
 # the `list` fields that hold ASCENDING INDICES; every other list is dense
-_INDEX_LISTS = {("policy", "unlocked"), ("war", "declare"), ("war", "sue"),
+_INDEX_LISTS = {("policy", "unlocked"), ("policy", "gov_open"), ("war", "declare"), ("war", "sue"),
                 ("belief", "follower"), ("belief", "worship"), ("belief", "founder"), ("belief", "enhancer")}
 
 
@@ -548,6 +556,8 @@ def gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
     walks toward, so it answers per site rather than per person."""
     own = sim.tile_seat == seat
     if site == 0:  # the class's own completed district
+        if arg == -2:  # the City Center: the centre registry answers it
+            return own & (sim.centre_slot_at >= 0)
         if arg < 0:
             return torch.zeros_like(own)
         # the DISTRICT's pillage fact (`_gp_site_ok`, TS gpActivateOk), never
@@ -566,8 +576,10 @@ def gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
         return out
     if site == 3:  # inside any city-state's territory
         return (sim.tile_seat >= 100) & (sim.tile_seat < simbase.BARB_SEAT)
-    if site == 4:  # an owned tile carrying a luxury
-        return own & (sim.lux_id >= 0)
+    if site == 4:  # a tile carrying a luxury, anyone's or no one's
+        return sim.lux_id >= 0
+    if site == 9:  # spent where it stands (an open Relic slot anywhere)
+        return torch.zeros_like(own)
     if site == 6:  # a city-state's territory this seat is Suzerain of (Raffles)
         if sim.S == 0:
             return torch.zeros_like(own)
@@ -706,7 +718,7 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
     # the Great Person sites: one plane per (site, arg) some charged person
     # walks toward, listed for the games holding such a person
     gs, ga = cols["gpSite"], cols["gpArg"]
-    walk = charged & (gs >= 0) & (gs != 1)
+    walk = charged & (gs >= 0) & (gs != 1) & (gs != 9)
     if bool(walk.any()):
         bb, nn = walk.nonzero(as_tuple=True)
         want = sorted({(s, a, b) for b, s, a in zip(bb.tolist(), gs[bb, nn].tolist(), ga[bb, nn].tolist())})

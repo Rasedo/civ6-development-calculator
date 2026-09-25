@@ -8,8 +8,8 @@
  * is the renewable supply, and it never leaves the city that earns it.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
-import { foundCity, queueDistrict } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, expandBorders, standDistrict } from '../helpers';
+import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
 import { cityPower, regionalEffects } from '../../../cpu/core/yields';
 import { resolveSeatPower } from '../../../cpu/core/stockpile';
@@ -32,9 +32,9 @@ function industrialCity() {
   expandBorders(state, city, 3);
   city.population = 13; // the specialty-district cap is what limits placement
   const iz = tileAtCoords(state.map, 9, 8);
-  expect(queueDistrict(state, city.id, 'INDUSTRIAL_ZONE', iz.index, 0).ok).toBe(true);
+  standDistrict(state, city, 'INDUSTRIAL_ZONE', iz.index);
   const campus = tileAtCoords(state.map, 7, 8);
-  expect(queueDistrict(state, city.id, 'CAMPUS', campus.index, 0).ok).toBe(true);
+  standDistrict(state, city, 'CAMPUS', campus.index);
   return { state, city, iz, campus };
 }
 
@@ -114,7 +114,7 @@ describe('power', () => {
     const { state, city } = industrialCity();
     const harbor = tileAtCoords(state.map, 8, 10);
     harbor.terrain = 'COAST';
-    expect(queueDistrict(state, city.id, 'HARBOR', harbor.index, 0).ok).toBe(true);
+    standDistrict(state, city, 'HARBOR', harbor.index);
     city.buildings.push('LIGHTHOUSE');
     state.cityStates = [cardiff()];
     // one Harbor building at Cardiff's rate is the whole supply
@@ -148,12 +148,12 @@ describe('power', () => {
     expandBorders(state, other, 3);
     other.population = 13;
     const oiz = tileAtCoords(state.map, 12, 8); // 4 from this city's centre, 2 from its own
-    expect(queueDistrict(state, other.id, 'INDUSTRIAL_ZONE', oiz.index, 0).ok).toBe(true);
+    standDistrict(state, other, 'INDUSTRIAL_ZONE', oiz.index);
     // `other` earns Cardiff's renewable supply, which "provide[s] Power only
     // for [its] respective city" — so it powers itself and never this one.
     const harbor = tileAtCoords(state.map, 14, 10);
     harbor.terrain = 'COAST';
-    expect(queueDistrict(state, other.id, 'HARBOR', harbor.index, 0).ok).toBe(true);
+    standDistrict(state, other, 'HARBOR', harbor.index);
     other.buildings.push('LIGHTHOUSE');
     state.cityStates = [cardiff()];
     // both cities hold a Factory; only `other` can meet its own load
@@ -176,7 +176,7 @@ describe('power', () => {
   it('a powered Stadium pays its second pair of amenities', () => {
     const { state, city } = industrialCity();
     const ec = tileAtCoords(state.map, 8, 7);
-    expect(queueDistrict(state, city.id, 'ENTERTAINMENT_COMPLEX', ec.index, 0).ok).toBe(true);
+    standDistrict(state, city, 'ENTERTAINMENT_COMPLEX', ec.index);
     city.buildings.push('STADIUM');
     expect(regionalEffects(state, city).amenities).toBe(1);
     city.buildings.push('COAL_POWER_PLANT');

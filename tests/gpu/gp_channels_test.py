@@ -109,7 +109,7 @@ def main() -> None:
     assert p0 > 0, f"the Factory's own regional Production must reach the owning city: {p0}"
     tesla = find_person({col("tile", "regionalRange"): 3.0, col("tile", "regionalProduction"): 2.0})
     spend(*tesla, t_iz)
-    assert sim.tile_gp_perm[B0, t_iz].tolist() == [3, 2, 0], sim.tile_gp_perm[B0, t_iz].tolist()
+    assert sim.tile_gp_perm[B0, t_iz].tolist()[:3] == [3, 2, 0], sim.tile_gp_perm[B0, t_iz].tolist()
     p1 = float(sim._seat_regional(0)[0][B0, 0, 1])
     assert p1 == p0 + 2, f"Tesla's district must pay +2 Production per regional building: {p0} -> {p1}"
     # the +3 REACH: with the shared range pulled below the centre's distance,
@@ -144,7 +144,7 @@ def main() -> None:
     assert a0 >= 1, f"the Zoo's regional Amenity must reach the owning city: {a0}"
     paxton = find_person({col("tile", "regionalRange"): 3.0, col("tile", "regionalAmenities"): 1.0})
     spend(*paxton, t_ec)
-    assert sim.tile_gp_perm[B0, t_ec].tolist() == [3, 0, 1]
+    assert sim.tile_gp_perm[B0, t_ec].tolist()[:3] == [3, 0, 1]
     a1 = float(sim._seat_regional(0)[1][B0, 0])
     assert a1 == a0 + 1, f"Paxton's district must pay +1 Amenity per regional building: {a0} -> {a1}"
     assert float(sim._seat_regional(0)[0][B0, 0, 1]) == p1, "Paxton moves no Production"
@@ -222,13 +222,13 @@ def main() -> None:
     snap = sim.snapshot()
     sim.tile_gp_perm[B0, t_iz] = 0
     sim.restore(snap)
-    assert sim.tile_gp_perm[B0, t_iz].tolist() == [3, 2, 0], "tile_gp_perm must be in _MUTABLE"
+    assert sim.tile_gp_perm[B0, t_iz].tolist()[:3] == [3, 2, 0], "tile_gp_perm must be in _MUTABLE"
 
-    # ---- 8. Leonardo da Vinci: "+3 Culture per Workshop" — the loader read
-    # `workshopBidx` off the TOP level of rules.json while the exporter writes
-    # it under `seats`, so the index was -1 in every game and the channel
-    # paid nobody on this engine (9209 t246)
-    assert sim._workshop_bidx == bidx["WORKSHOP"], f"the Workshop index must load: {sim._workshop_bidx}"
+    # ---- 8. Leonardo da Vinci: "+3 Culture per Workshop" — one row of the
+    # building-yield table (`GP_BUILDING_YIELDS`), read hard off the wire
+    _wrow = [r for r in sim._gp_building_yields if r[1] == bidx["WORKSHOP"]]
+    assert _wrow and sim._gp_perm_names[_wrow[0][0]] == "workshopCulture" and _wrow[0][2] == 4, \
+        f"the Workshop row must load: {sim._gp_building_yields}"
     leo = find_person({col("perm", "workshopCulture"): 3.0})
     sim.city_bldg[B0, 0, 0, bidx["WORKSHOP"]] = True
     sim._bldg_version += 1

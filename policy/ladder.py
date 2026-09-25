@@ -497,20 +497,6 @@ def unit_roster(units: list[dict]) -> dict:
     }
 
 
-def _best_in_lane(cand: torch.Tensor, strength: torch.Tensor) -> torch.Tensor:
-    """[B] index of the strongest legal unit in a lane, ties to LOWEST index.
-
-    `key = strength*NU - idx` then argmax reproduces the TS scan's strict `>`
-    (first wins over table order) without depending on argmax's undefined
-    tie-break. The engine's own picker uses this identical key — if one changes,
-    both must.
-    """
-    NU = cand.shape[1]
-    ar = torch.arange(NU, device=cand.device)
-    key = (strength * NU - ar).unsqueeze(0).expand(cand.shape[0], -1)
-    return torch.where(cand, key, torch.full_like(key, -(10 ** 9))).argmax(dim=1)
-
-
 def pick_district_tile(elig: torch.Tensor, adj: torch.Tensor) -> torch.Tensor:
     """[B] WHERE to put a district: the eligible tile with the highest
     adjacency, ties to the LOWEST tile index. -1 where nothing is eligible.
@@ -561,8 +547,8 @@ def pick_production(
     which reduces to FIRST LEGAL CLASS in priority order — but only the first
     three classes reduce to "lowest index within the class". The army does not.
 
-    THE SETTLER IS NOT CAPITAL-GATED anywhere: `queueSettler`'s "any city" is
-    the single shared rule, which is also Civ 6's.
+    THE SETTLER IS NOT CAPITAL-GATED anywhere: the applier's settler column
+    takes "any city" of 2+ population, which is also Civ 6's rule.
 
     CITIES ARE WALKED IN ORDER, not scored independently, because the rules
     carry state ACROSS them: the settler latch, the unit count and the
@@ -628,8 +614,9 @@ def pick_production(
         rng_t0, nav0 = roster["is_ranged"][:nu0], roster["naval"][:nu0]
         comb0, rstr0 = roster["combat"][:nu0], roster["ranged_str"][:nu0]
         mel_lane0, rng_lane0 = ~rng_t0 & ~nav0 & (comb0 > 0), rng_t0 & ~nav0
-        # ...and so is each lane's ranking key: `_best_in_lane`'s
-        # `strength*NU - idx`, built once rather than twice per city.
+        # ...and so is each lane's ranking key, `strength*NU - idx`: its
+        # argmax is the strongest legal unit, ties to the LOWEST table index
+        # (argmax's own tie-break is undefined). Built once, not per city.
         _ar0 = torch.arange(nu0, device=dev)
         mel_key = (comb0 * nu0 - _ar0).unsqueeze(0).expand(B, -1)
         rng_key = (rstr0 * nu0 - _ar0).unsqueeze(0).expand(B, -1)

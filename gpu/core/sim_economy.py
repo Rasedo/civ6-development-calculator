@@ -2302,7 +2302,7 @@ class SimEconomy:
         # Republic, Monarchy, or Theocracy)" — the tier of what the seat runs
         # NOW, so a revolution can take an unbuilt row back off the list.
         if bool((self._b_gov_tier > 0).any()):
-            _tier = self._adopted_gov_tier(self.civ_civics[:, row])
+            _tier = self._adopted_gov_tier(row)
             base = base & (self._b_gov_tier.reshape(1, 1, -1) <= _tier.reshape(B, 1, 1))
         if self.districts_on and self._b_has_reqs:
             rq = self._b_req_district  # [NB] the district each building needs, -1 = none
@@ -2573,7 +2573,10 @@ class SimEconomy:
         hit = (self.res_id[:, nbc] == ri) & ~self.res_stripped[:, nbc] & (nb >= 0).unsqueeze(0)
         return hit.any(dim=2)
 
-    def _adopted_gov(self, civics2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _newest_gov(self, civics2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B] roster position, [B] has-one) — the NEWEST government `civics2`
+        unlocks: the highest tier, ties to table order. `newestGovernment`'s
+        twin, what a seat whose record never chose is in."""
         B, dev = civics2.shape[0], self.device
         guc = self._gov_unlock_civic
         gov_unlocked = torch.where(
@@ -2589,16 +2592,79 @@ class SimEconomy:
         )
         return score.argmax(dim=1), has_gov
 
-    def _adopted_gov_tier(self, civics2: torch.Tensor) -> torch.Tensor:
+    def _adopted_gov(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B] roster position, [B] has-one) — the government seat row `row`
+        is IN: the one its record chose (`civ_gov_chosen`), else the newest
+        its civics unlock. A city-state never records one. `seatGovernment`'s
+        twin."""
+        newest, has = self._newest_gov(self._seat_civics(row))
+        if row >= self.n_majors:
+            return newest, has
+        ch = self.civ_gov_chosen[:, row]
+        return torch.where(ch >= 0, ch, newest), has | (ch >= 0)
+
+    def _adopted_gov_tier(self, row: int) -> torch.Tensor:
         """[B] the adopted government's tier (0 if none) — the
         GOV_INFLUENCE_TIER lookup, which equals the government tier by
         definition (data/cityStates.ts) — added to the city-state influence
         rate exactly like cityStatePhase."""
-        B = civics2.shape[0]
         if not self._ngov:
-            return torch.zeros(B, dtype=torch.long, device=self.device)
-        adopted, has_gov = self._adopted_gov(civics2)
-        return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
+            return torch.zeros(self.B, dtype=torch.long, device=self.device)
+        adopted, has_gov = self._adopted_gov(row)
+        return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(self.B, dtype=torch.long, device=self.device))
+
+    def _gov_open(self, row: int) -> torch.Tensor:
+        """[B, nGov] — the governments seat row `row`'s record may name now:
+        unlocked by its civics, and never one it has been in before unless it
+        is in it now (CIV6: a return to a previously adopted government is
+        Anarchy, which no seat enters). `governmentsOpen`'s twin."""
+        B, dev = self.B, self.device
+        if not self._ngov or row >= self.n_majors:
+            return torch.zeros(B, max(self._ngov, 1), dtype=torch.bool, device=dev)
+        civ = self._seat_civics(row)
+        guc = self._gov_unlock_civic
+        unlocked = torch.where(
+            guc.unsqueeze(0) >= 0,
+            civ.gather(1, guc.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            torch.ones(B, self._ngov, dtype=torch.bool, device=dev))
+        now, has = self._adopted_gov(row)
+        been = ((self.civ_gov_held[:, row].unsqueeze(1) >> self._gov_arange.unsqueeze(0)) & 1) > 0
+        is_now = has.unsqueeze(1) & (self._gov_arange.unsqueeze(0) == now.unsqueeze(1))
+        return unlocked & (~been | is_now)
+
+    def _adopt_government(self, row: int, gov: torch.Tensor, ok: torch.Tensor) -> None:
+        """The record's GOVERNMENT arm, where `ok`: seat row `row` adopts roster
+        position `gov` [B] where `_gov_open` holds it, and the choice stands
+        until another record names one. A CHANGE marks the new government held
+        and carries the slotted cards over (`_carry_policies`).
+        `adoptGovernment`'s twin."""
+        g = gov.to(torch.long)
+        inr = (g >= 0) & (g < self._ngov)
+        gc = g.clamp(min=0, max=max(self._ngov - 1, 0))
+        ok = ok & inr & self._gov_open(row).gather(1, gc.unsqueeze(1)).squeeze(1)
+        if not bool(ok.any()):
+            return
+        before, had = self._adopted_gov(row)
+        self.civ_gov_chosen[:, row] = torch.where(ok, gc, self.civ_gov_chosen[:, row])
+        chg = ok & (~had | (gc != before))
+        self.civ_gov_held[:, row] |= torch.where(chg, torch.ones_like(gc) << gc, torch.zeros_like(gc))
+        self._eff_version += 1
+        self._carry_policies(row, chg)
+
+    def _carry_policies(self, row: int, chg: torch.Tensor) -> None:
+        """Where `chg`: a CHANGED government keeps the slotted cards that are
+        still open under it and fit its slots, and drops the rest; the freed
+        slots wait for the driver's next decision. `carryPolicies`' twin."""
+        if not self._npol or not bool(chg.any()):
+            return
+        civ = self._seat_civics(row)
+        adopted, _has = self._adopted_gov(row)
+        _open = self._policy_unlocked(civ, self.civ_age[:, row] == 0,
+                                      self._civ_era(self.civ_techs[:, row], civ),
+                                      self.civ_gov_held[:, row], adopted)
+        kept = self._fit_policy_set(self.civ_policies[:, row] & _open, self._seat_policy_slots(row))
+        self.civ_policies[:, row] = torch.where(chg.unsqueeze(1), kept, self.civ_policies[:, row])
+        self._eff_version += 1
 
     def _policy_unlocked(self, civics2: torch.Tensor, dark: torch.Tensor | None,
                          era: torch.Tensor | None, held: torch.Tensor | None,
@@ -2652,7 +2718,7 @@ class SimEconomy:
         if not self._gov_has_effects or not self._ngov or not self._npol:
             return torch.zeros(self.B, max(self._npol, 1), dtype=torch.bool, device=self.device)
         civ = self._seat_civics(row)
-        adopted, has_gov = self._adopted_gov(civ)
+        adopted, has_gov = self._adopted_gov(row)
         dark = self.civ_age[:, row] == 0
         era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
         return self._policy_unlocked(civ, dark, era, self.civ_gov_held[:, row], adopted) & has_gov.unsqueeze(1)
@@ -2663,8 +2729,7 @@ class SimEconomy:
         taking each kind's overflow and every wildcard-kind card."""
         unlocked = self._seat_policy_mask(row)
         legal = ~(chosen & ~unlocked).any(dim=1)
-        civ = self._seat_civics(row)
-        adopted, has_gov = self._adopted_gov(civ)
+        adopted, has_gov = self._adopted_gov(row)
         nslots = (self._gov_slots[adopted] + self._wonder_extra_slots(row)) * has_gov.long().unsqueeze(1)
         over = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for k in range(3):
@@ -2677,8 +2742,10 @@ class SimEconomy:
                           extra_slots: torch.Tensor | None = None,
                           dark: torch.Tensor | None = None,
                           era: torch.Tensor | None = None,
-                          held: torch.Tensor | None = None) -> torch.Tensor:
-        """[B, nPol] — the cards a seat's adopted government greedily slots,
+                          held: torch.Tensor | None = None,
+                          gov: tuple | None = None) -> torch.Tensor:
+        """[B, nPol] — the cards government `gov` ((roster position, has-one),
+        by default the newest `civics2` unlocks) greedily slots,
         `computeAdoption().policies` as a mask over the card table.
 
         WILDCARD slots fill with the within-kind OVERFLOW in card-table order
@@ -2690,7 +2757,7 @@ class SimEconomy:
         slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
         if not self._gov_has_effects or not self._ngov or not self._npol:
             return slotted
-        adopted, has_gov = self._adopted_gov(civics2)
+        adopted, has_gov = self._newest_gov(civics2) if gov is None else gov
         nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
         # Wonder- and congress-granted slots — TS appends them to
         # computeAdoption's slot list; a seat with no government slots nothing.
@@ -2718,8 +2785,7 @@ class SimEconomy:
         """[B, 4] long — the slots seat row `row`'s adopted government holds by
         kind (military, economic, diplomatic, wildcard), wonder extras included;
         all zero without a government."""
-        civ = self._seat_civics(row)
-        adopted, has_gov = self._adopted_gov(civ)
+        adopted, has_gov = self._adopted_gov(row)
         return (self._gov_slots[adopted] + self._wonder_extra_slots(row)) * has_gov.long().unsqueeze(1)
 
     def _slot_greedily(self, row: int) -> None:
@@ -2728,7 +2794,8 @@ class SimEconomy:
         civ = self._seat_civics(row)
         self.civ_policies[:, row] = self._slotted_policies(
             civ, self._wonder_extra_slots(row), self.civ_age[:, row] == 0,
-            self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]), self.civ_gov_held[:, row])
+            self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]), self.civ_gov_held[:, row],
+            self._adopted_gov(row))
         self._eff_version += 1
 
     def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None,
@@ -2738,10 +2805,10 @@ class SimEconomy:
         [B,6], slotted-mask [B,nPol], encampHarborProdMult [B],
         tilePurchaseMult [B], amenitiesAll [B], housingIfDistricts triples,
         newDeal triples, adjacencyMult [B,nD], buildingYieldBoosts, the
-        remaining effect channels as a dict) for a seat's adopted government
-        + greedily slotted
-        policies, computed from its researched civics [B, NC]. The
-        effects.computeAdoption / applyGovernment twin.
+        remaining effect channels as a dict) for seat row `row`'s government
+        (`_adopted_gov`) and its stored cards — or, with no row, the newest
+        government `civics2` unlocks and its greedy fill. The
+        effects.applyGovernment twin.
 
         WILDCARD slots fill with the within-kind OVERFLOW in card-table order
         (TS findIndex: a card whose kind slots are full takes the first open
@@ -2813,7 +2880,7 @@ class SimEconomy:
         if not self._gov_has_effects or not self._ngov:
             return (city_y, cap_y, hous_all, ymult, slotted, emult, tpmult,
                     amen_all, hid, nd, adjm, byb, fx)
-        adopted, has_gov = self._adopted_gov(civics2)
+        adopted, has_gov = self._newest_gov(civics2) if row is None else self._adopted_gov(row)
         gmask = has_gov.to(dt).unsqueeze(1)
         city_y = city_y + self._gov_city_y[adopted] * gmask
         cap_y = cap_y + self._gov_cap_y[adopted] * gmask
@@ -2874,14 +2941,13 @@ class SimEconomy:
         if self._npol:
             if row is None:
                 # no seat to hold a store: the greedy reference (pokes drive this arm)
-                slotted = self._slotted_policies(civics2, extra_slots, dark, era, held)
+                slotted = self._slotted_policies(civics2, extra_slots, dark, era, held, (adopted, has_gov))
             else:
                 # THE STORE is the truth: what the seat CHOSE, minus any card whose
                 # unlock has lapsed since (a Dark Age ending, the Treaty's ban)
-                _ad, _hg = self._adopted_gov(civics2)
                 slotted = (self._seat_policies(row)
-                           & self._policy_unlocked(civics2, dark, era, held, _ad)
-                           & _hg.unsqueeze(1))
+                           & self._policy_unlocked(civics2, dark, era, held, adopted)
+                           & has_gov.unsqueeze(1))
             # a LEGACY card is an ordinary row: its government's inherent bonus
             cards = slotted
             fx["milpol"] = (cards & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
@@ -3035,16 +3101,19 @@ class SimEconomy:
         held = self.civ_gov_held[:, row].clone() if major else torch.zeros(
             (self.B,) + tuple(self.civ_gov_held.shape[2:]), dtype=self.civ_gov_held.dtype, device=self.device)
         # ...and the STORE: the cards the seat chose are an input now, and a
-        # key that is a view of the live plane would freeze the first answer
+        # key that is a view of the live plane would freeze the first answer —
+        # as is the government it chose
         pols = self._seat_policies(row).clone()
+        chosen = self.civ_gov_chosen[:, row].clone() if major else None
         if ent is not None and ent[0][1] == self._gov_cat_version \
                 and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
                 and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
-                and torch.equal(ent[5], held) and torch.equal(ent[6], pols):
+                and torch.equal(ent[5], held) and torch.equal(ent[6], pols) \
+                and (chosen is None or torch.equal(ent[8], chosen)):
             val = ent[7]
         else:
             val = self._gov_policy_mods(civ, slots, dark, era, held, row=row)
-        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, pols, val)
+        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, pols, val, chosen)
         return val
 
     def _purchase_step(self, price: torch.Tensor) -> torch.Tensor:
@@ -3815,7 +3884,7 @@ class SimEconomy:
             bt = bt_all[rows]
             self.district[rows, bt] = di
             self.district_complete[rows, bt] = False  # queued, not complete
-            self.improvement[rows, bt] = -1           # queueDistrict clears it
+            self.improvement[rows, bt] = -1           # the pave clears it
             # The city registry, written at queue. A REPEATABLE type keeps its
             # FIRST tile: nothing reads the entry for its own sake (no
             # buildings, no projects, no adjacency of its own), and
@@ -3827,7 +3896,7 @@ class SimEconomy:
                 self.city_dist_tile[rows, row, j, di] = bt
             # CIV6: a district paves every feature EXCEPT floodplains — the
             # feature stays under the district and keeps feeding the flood
-            # pick (queueDistrict and _queue_wonder_at share this gate).
+            # pick (`placeSeatDistrict` and _queue_wonder_at share this gate).
             nofp = self.feat_id[rows, bt] != self._fp_fid
             if bool(nofp.any()):
                 self._strip_feature_at(rows[nofp], bt[nofp])
@@ -3893,6 +3962,12 @@ class SimEconomy:
         hp = present[:, :, self._gw_slot_holder]                              # [B, RC, W]
         xr = self._gw_slot_extra.reshape(1, 1, -1)
         allowed = self._gw_seat_extra(row)[:, self._gw_slot_holder].unsqueeze(1)  # [B, 1, W]
+        # CIV6 (Giovanni de' Medici): the CITY's own Great Person widening
+        for _h, _k in self._gw_gp_extra:
+            if _h < 0 or _k < 0:
+                continue
+            _per = self.city_gp_perm[:, row, : hp.shape[1], _k].long()             # [B, RC]
+            allowed = allowed + (self._gw_slot_holder == _h).long().reshape(1, 1, -1) * _per.unsqueeze(2)
         return hp & ((xr < 0) | (xr < allowed))
 
     def _gw_slot_open(self, row: int) -> torch.Tensor:
@@ -5086,15 +5161,28 @@ class SimEconomy:
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         return self._attacks_per_turn(typ, getattr(self, f"{pre}_unit_promos"))
 
-    def _reset_mp(self, pre: str) -> None:
+    def _reset_mp(self, pre: str, civ_only: bool = False) -> None:
         """The movesLeft/movesFull/attacksLeft reset: `granted = full + aura`,
         both movement fields, and the turn's attacks beside them. TS writes the
-        pair together at refreshUnits and again at seatPhase; writing only one
-        breaks next turn's "spent no MP" gate for a seat that never moved."""
+        pair together at refreshUnits (every unit) and again at seatPhase (a
+        civilization's units alone, `civ_only`: a city-state's army has walked
+        by then and keeps what it has left); writing only one breaks next
+        turn's "spent no MP" gate for a seat that never moved."""
         f = self._full_mp(pre)
-        getattr(self, f"{pre}_unit_mp_full").copy_(f)
-        getattr(self, f"{pre}_unit_mp").copy_(f)
-        getattr(self, f"{pre}_unit_attacks").copy_(self._full_attacks(pre))
+        a = self._full_attacks(pre)
+        mp_full = getattr(self, f"{pre}_unit_mp_full")
+        mp = getattr(self, f"{pre}_unit_mp")
+        att = getattr(self, f"{pre}_unit_attacks")
+        if civ_only:
+            seat = getattr(self, f"{pre}_unit_seat")
+            civ = (seat >= 0) & (seat < self.n_majors)
+            mp_full.copy_(torch.where(civ, f, mp_full))
+            mp.copy_(torch.where(civ, f, mp))
+            att.copy_(torch.where(civ, a, att))
+            return
+        mp_full.copy_(f)
+        mp.copy_(f)
+        att.copy_(a)
 
     def _refresh_aura_mp(self) -> None:
         """FREEZE the aura's +generalAuraMp per unit slot, at the refreshUnits
@@ -5905,6 +5993,14 @@ class SimEconomy:
             _st = self._golden_ded(row, self._ded_steam)
             if bool(_st.any()):
                 dist_y[:, :, 1] = dist_y[:, :, 1] + st_adj * _st.double().unsqueeze(1)
+        # CIV6 (Hildegard of Bingen): "This Holy Site district's Faith adjacency
+        # bonus provides Science as well" — the district the charge was spent on
+        if hs_adj is not None and self._hs_idx >= 0:
+            _hl = self._gp_tile_perm("faithAdjScience")
+            if bool((_hl != 0).any()):
+                _hst = dreg[:, :, self._hs_idx]
+                _hon = (_hst >= 0) & (_hl.gather(1, _hst.clamp(min=0)) != 0)
+                dist_y[:, :, 3] = dist_y[:, :, 3] + hs_adj * _hon.double()
         # SPECIALISTS (computeCityStats' specialist loop): count x (base +
         # the tier add when ANY ONE of the top buildings stands; -2 = any
         # worship building). Integer-valued, so the add order is exact at any
@@ -5931,12 +6027,16 @@ class SimEconomy:
         if bool(selb.any()):
             selbf = selb.double()
             bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, bcol["yields"])
-            # CIV6 (Leonardo da Vinci): "Workshops provide +3 Culture" — the
-            # seat-wide permanent, per standing Workshop.
-            if self._workshop_bidx >= 0:
-                _wc = self._gp_perm(row, "workshopCulture").double()
+            # CIV6 (Leonardo da Vinci, Hypatia, Newton, Einstein;
+            # `GP_BUILDING_YIELDS`): a spent Great Person's add to one
+            # building's own yield, per lit copy standing here — `selb` holds no
+            # REGIONAL building, which carries its add in `_seat_regional`
+            for _pk, _bi, _yi in self._gp_building_yields:
+                if _pk < 0 or _bi < 0:
+                    continue
+                _wc = self._gp_perm(row, self._gp_perm_names[_pk]).double()
                 if bool((_wc != 0).any()):
-                    bld_y[:, :, 4] = bld_y[:, :, 4] + _wc.unsqueeze(1) * selbf[:, :, self._workshop_bidx]
+                    bld_y[:, :, _yi] = bld_y[:, :, _yi] + _wc.unsqueeze(1) * selbf[:, :, _bi]
             # CIV6 (Tsikhe, TSIKHE_FAITH_GOLDEN_AGE): a unique row may pay
             # again while its seat stands in a Golden (or Heroic) Age.
             for (_gbi, _gciv), _gy in (self._bvar_golden_y.items()
@@ -6184,6 +6284,20 @@ class SimEconomy:
                     continue  # food takes no tier factor on either engine
                 _at = (_tier == _ht) & self._row_is(row, _hc, _hl).unsqueeze(1)
                 total[:, :, _hy] = torch.where(_at, total[:, :, _hy] * (1.0 + _hp / 100.0), total[:, :, _hy])
+        # CIV6 (Ibn Khaldun, MODIFIER_PLAYER_CITIES_ADJUST_HAPPINESS_YIELD_BAB):
+        # the seat's percent on every non-Food yield at the Happy / Ecstatic
+        # tier, after the roster's rows as TS composes each yield
+        _khh = self._gp_perm(row, "happyYieldPct").double()
+        _khe = self._gp_perm(row, "ecstaticYieldPct").double()
+        if bool((_khh != 0).any()) or bool((_khe != 0).any()):
+            _ktier = self._seat_amenity(row)[0]
+            if j is not None:
+                _ktier = _ktier[:, j:j + 1]
+            _kp = torch.where(_ktier == self._gp_happy_tier, _khh.unsqueeze(1),
+                              torch.where(_ktier == self._gp_ecstatic_tier, _khe.unsqueeze(1),
+                                          torch.zeros_like(_khh).unsqueeze(1)))
+            for _ky in range(1, 6):
+                total[:, :, _ky] = torch.where(_kp != 0, total[:, :, _ky] * (1.0 + _kp / 100.0), total[:, :, _ky])
         # CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for
         # a city with an ESTABLISHED governor, tripled in one this seat did not
         # found

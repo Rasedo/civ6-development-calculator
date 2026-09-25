@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
-import { purchaseUnit } from '../../../cpu/core/game';
 import { seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
 import { trainXpPct } from '../../../cpu/core/combat';
@@ -62,10 +61,12 @@ describe('Encampment', () => {
     city.buildings.push('BARRACKS');
     seatOf(state, 0)!.treasury = 9999;
     const before = state.units.length;
-    const res = purchaseUnit(state, city.id, 'WARRIOR', 0);
-    expect(res.ok).toBe(true);
+    // the record's gold purchase, kind 2 = the strongest military unit
+    state.seatActions = { [state.turn - 1]: { 0: { production: [], tech: null, civic: null, units: [], buy: [2, 0, 0] } } };
+    seatPhase(state);
     expect(state.units.length).toBe(before + 1);
     const u = state.units[state.units.length - 1];
+    expect(u.type).toBe('WARRIOR');
     expect(u.xp).toBe(0); // the line is a MULTIPLIER, never a lump of starting XP
     expect(u.xpPct).toBe(25);
   });

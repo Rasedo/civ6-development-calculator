@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { tileYields, districtAdjacency } from '../../../cpu/core/yields';
-import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, bareCtx, standBuilding, standDistrict } from '../helpers';
+import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
 import { DIR_E } from '../../../world/hex';
 
@@ -123,13 +123,13 @@ describe('shipyard special', () => {
     const city = r.city!;
     // place harbor on coast adjacent to the city center
     const harborTile = tileAtCoords(state.map, 8, 7);
-    expect(queueDistrict(state, city.id, 'HARBOR', harborTile.index, 0).ok).toBe(true);
+    standDistrict(state, city, 'HARBOR', harborTile.index);
     const adjacency = districtAdjacency(state.map, harborTile, 'HARBOR');
     expect(adjacency).toBeGreaterThanOrEqual(2); // GS: adjacent City Center is +2
 
-    expect(queueBuilding(state, city.id, 'LIGHTHOUSE', 0).ok).toBe(true);
+    standBuilding(state, city, 'LIGHTHOUSE');
     const before = computeCityStats(state, city).breakdown.buildings.production;
-    expect(queueBuilding(state, city.id, 'SHIPYARD', 0).ok).toBe(true);
+    standBuilding(state, city, 'SHIPYARD');
     const after = computeCityStats(state, city).breakdown.buildings.production;
     expect(after - before).toBe(adjacency);
   });

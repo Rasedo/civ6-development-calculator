@@ -80,8 +80,8 @@ def main() -> None:
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
 
     # --- the wire contract --------------------------------------------------
-    assert sim.GW_W == int(gw["w"]) == len(gw["slotHolder"]) == 37, (sim.GW_W, gw["w"])
-    assert sim.GW_H == len(gw["holders"]) == 15
+    assert sim.GW_W == int(gw["w"]) == len(gw["slotHolder"]) == 39, (sim.GW_W, gw["w"])
+    assert sim.GW_H == len(gw["holders"]) == 16
     assert ids[0] == "PALACE" and sim._gw_holder_bidx[0] == -2, "the Palace holder stands on the capital flag"
     for h, (b, w, is_w) in enumerate(zip(sim._gw_holder_bidx, sim._gw_holder_widx, sim._gw_holder_wonder)):
         if is_w:
@@ -91,7 +91,7 @@ def main() -> None:
     assert bool((sim._gw_slot_holder[1:] >= sim._gw_slot_holder[:-1]).all()), "holders come in table order"
     palace = sim._gw_slot_holder == 0
     assert int(palace.sum()) == 5 and sim._gw_slot_extra[palace].tolist() == [-1, 0, 1, 2, 3], "the Palace row is widened by Nkisi's four, ranked"
-    assert int((sim._gw_slot_extra >= 0).sum()) == 4
+    assert int((sim._gw_slot_extra >= 0).sum()) == 6, "Nkisi's four and the Bank's two"
     assert bool(sim._gw_accepts[6].all()), "a Palace slot takes every object"
     assert sim._gw_accepts[5].long().tolist() == [0, 0, 0, 1, 0, 0, 0, 0], "a Cathedral slot takes RELIGIOUS art only"
     assert sim._gw_accepts[1].long().tolist() == [1, 1, 1, 1, 0, 0, 0, 0], "an Art slot takes the four arts"

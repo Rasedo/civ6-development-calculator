@@ -24,6 +24,8 @@ policy knew. Per turn, per driven seat:
                                  unit may act several times
         "beliefs": [[c, i], ...] the beliefs the religion adopts (class code,
                                  class catalog row); absent = none
+        "government": g        the government roster position the seat adopts;
+                                 absent = no decision, the standing one holds
     }}
 plus the optional fields the extractors below document (war, warKind, envoys,
 buy, buyFaith, levy, and the geo intents). Codes are the MASK layouts
@@ -121,7 +123,7 @@ def apply_decisions(sim, row: int, dec: dict) -> None:
                            nat=by_slot.get("nat"), cls=by_slot.get("cls"), ucls=by_slot.get("ucls"),
                            pat=dec["pat"], band=by_slot.get("band"), dist=dec["dist"], route=dec["route"], nuke=dec["nuke"],
                            spec=spec, lock=dec["lock"], swap=dec["swap"], vote=dec["vote"],
-                           gp_pass=dec["gp_pass"], beliefs=dec["beliefs"])
+                           gp_pass=dec["gp_pass"], beliefs=dec["beliefs"], government=dec["government"])
 
 
 def stash_units(sim, row: int, seq: torch.Tensor) -> None:
@@ -207,7 +209,7 @@ def extract_geo(geo, row: int, b: int) -> dict:
     return out
 
 
-def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, swap, vote, gp_pass, policies, beliefs, b: int) -> dict:
+def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, swap, vote, gp_pass, policies, beliefs, government, b: int) -> dict:
     nS = 0 if dtile is None else int(dtile.shape[2])
     prod_pairs = []
     for k, (centre, col) in enumerate(zip(prod[0][b].tolist(), prod[1][b].tolist())):
@@ -260,6 +262,8 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
         picks = [[int(c), int(i)] for c, i in beliefs[b].tolist() if c >= 0 or i >= 0]
         if picks:
             rec["beliefs"] = picks
+    if government is not None and int(government[b]) >= 0:
+        rec["government"] = int(government[b])
     return rec
 
 
@@ -453,12 +457,15 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     _blv = rec.get("beliefs") or []
     beliefs = (torch.tensor(_blv, dtype=torch.long, device=dev).reshape(1, -1, 2).expand(sim.B, -1, -1)
                if _blv else None)
+    _gv = rec.get("government")
+    government = None if _gv is None else torch.full((sim.B,), int(_gv), dtype=torch.long, device=dev)
     apply_decisions(sim, row, {
         "prod": prod, "dtile": dtile, "tech": tech, "civic": civic, "policies": policies,
         "war": war, "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
         "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
         "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,
-        "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "beliefs": beliefs})
+        "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "beliefs": beliefs,
+        "government": government})
 
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)

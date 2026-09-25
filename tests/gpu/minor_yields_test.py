@@ -14,7 +14,8 @@ takes no decision), so these scenes are the whole evidence:
      record (research, ownership by seat id 100+s)
   2. the clock: `_city_state_phase` advances the tech pot by exactly that
      Science, the civic pot by the Culture and the build pot by the
-     Production; Gold and Faith bank in `citystate_treasury` / `citystate_faith`
+     Production; Gold banks in `citystate_treasury` less its units' upkeep,
+     stopping at 0, and Faith in `citystate_faith`
   3. a unit levied from a minor holding a Barracks carries its +25% training
      experience, and a pillaged Barracks pays none
   4. power: nothing the minor's build table raises draws or supplies Power — the
@@ -136,7 +137,10 @@ def test_clock(rules, path) -> None:
     took = float(sim.citystate_prod[B0, s]) / (tot[1] * 0.5)
     assert any(abs(took - m) < 1e-9 for m in (1.0, 3.0, 6.0)), \
         f"the build pot did not take the Production ({took} x half the yield)"
-    assert abs(float(sim.citystate_treasury[B0, s]) - tot[2]) < 1e-9, "the Gold did not bank"
+    # the Gold pays the units' upkeep, the balance stopping at 0
+    mine = sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
+    upkeep = float((sim._type_maintenance[sim.major_unit_type[B0].clamp(min=0)].double() * mine.double()).sum())
+    assert abs(float(sim.citystate_treasury[B0, s]) - max(0.0, tot[2] - upkeep)) < 1e-9, "the Gold did not bank"
     assert abs(float(sim.citystate_faith[B0, s]) - tot[5]) < 1e-9, "the Faith did not bank"
     # a dead minor accrues nothing
     sim.citystate_alive[B0, s] = False

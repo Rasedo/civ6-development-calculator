@@ -3,9 +3,10 @@ import { purchaseStep } from '../../../cpu/core/effects';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from '../helpers';
 import {
-  foundCity, purchaseBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith,
+  foundCity, purchaseBuildingWithFaith, purchaseUnitWithFaith,
   faithBuyableClass, faithBuysLandUnits, wallsGoldBlocked, buildingFaithCost, unitFaithCost,
 } from '../../../cpu/core/game';
+import { buySeatBuilding } from '../../../cpu/core/phase';
 import { CITY_STATE_SUZERAIN_BONUS, SUZERAIN_ENVOYS, VALLETTA_WALLS_DISCOUNT_PCT } from '../../../cpu/data/cityStates';
 import { FAITH_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -81,7 +82,7 @@ describe("Valletta's class purchase", () => {
     seat.treasury = 5000;
     seat.faith = 5000;
     expect(wallsGoldBlocked(state, 0, 'ANCIENT_WALLS')).toBe(false);
-    expect(purchaseBuilding(state, city.id, 'ANCIENT_WALLS', 0).ok).toBe(true);
+    expect(buySeatBuilding(state, seat, city, 'ANCIENT_WALLS')).toBe(true);
 
     const b = oneCity();
     suzerainOfValletta(b.state);
@@ -89,7 +90,7 @@ describe("Valletta's class purchase", () => {
     s2.treasury = 5000;
     s2.faith = 5000;
     expect(wallsGoldBlocked(b.state, 0, 'ANCIENT_WALLS')).toBe(true);
-    expect(purchaseBuilding(b.state, b.city.id, 'ANCIENT_WALLS', 0).ok).toBe(false);
+    expect(buySeatBuilding(b.state, s2, b.city, 'ANCIENT_WALLS')).toBe(false);
     expect(purchaseBuildingWithFaith(b.state, b.city.id, 'ANCIENT_WALLS', 0).ok).toBe(true);
     expect(b.city.buildings).toContain('ANCIENT_WALLS');
   });

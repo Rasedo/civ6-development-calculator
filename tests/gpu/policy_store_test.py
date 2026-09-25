@@ -41,11 +41,11 @@ def build() -> BatchSim:
     assert sim._gov_has_effects and sim._ngov and sim._npol, "no government catalog on the wire"
     # a government with slots: every civic through the first tier's unlock
     civ = sim.civ_civics[:, ROW]
-    adopted, has_gov = sim._adopted_gov(civ)
+    adopted, has_gov = sim._adopted_gov(ROW)
     if not bool(has_gov[0]):
         sim.civ_civics[0, ROW, : max(4, int(sim._ngov))] = True
         sim._eff_version += 1
-        adopted, has_gov = sim._adopted_gov(sim.civ_civics[:, ROW])
+        adopted, has_gov = sim._adopted_gov(ROW)
     assert bool(has_gov[0]), "the seat still has no government"
     return sim
 
@@ -55,7 +55,7 @@ def main() -> int:
     mask = sim.seat_masks(ROW)["policies"]
     assert mask.shape == (sim.B, sim._npol), mask.shape
     civ = sim._seat_civics(ROW)
-    adopted, has_gov = sim._adopted_gov(civ)
+    adopted, has_gov = sim._adopted_gov(ROW)
     want = sim._policy_unlocked(civ, sim.civ_age[:, ROW] == 0,
                                 sim._civ_era(sim.civ_techs[:, ROW], sim.civ_civics[:, ROW]),
                                 sim.civ_gov_held[:, ROW], adopted) & has_gov.unsqueeze(1)

@@ -2,10 +2,10 @@ import type { SeatEmitter } from './decideObs';
 import type { GameState } from './types';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
-import { POLICY_LIST, SLOT_KINDS } from '../data/policies';
+import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { PEACE_GOLD_COST, WAR_MIN_TURNS } from '../data/seats';
 import { warKindCode } from '../data/warKinds';
-import { availableCivicsIn, availableTechsIn, computeAdoption, governmentSlots, inDarkAge, unlockedPolicyIds } from './effects';
+import { availableCivicsIn, availableTechsIn, governmentsOpen, governmentSlots, inDarkAge, seatGovernment, unlockedPolicyIds } from './effects';
 import { effectiveResearchCost, goldAffordable } from './game';
 import { congressPolicyBlocked } from './congress';
 import { cityStateById, hasMet, isSuzerain } from './cityStates';
@@ -38,18 +38,24 @@ export function researchObs(state: GameState, seat: number): { tech_cost: number
 }
 
 /** The `policy` group: the card indices the seat may slot under the
- *  government its civics adopt (the record's validator, `unlockedPolicyIds`),
+ *  government it is in (the record's validator, `unlockedPolicyIds`),
  *  ascending, and that government's slots by kind — `governmentSlots`, the
- *  list `fitPolicies` lays the set into. Empty and all zero without one. */
-export function policyObs(state: GameState, seat: number): { unlocked: number[]; slots: number[] } {
+ *  list `fitPolicies` lays the set into; empty and all zero without one.
+ *  Then that government's `GOVERNMENT_LIST` position (-1 none) and the
+ *  positions the record's government arm accepts now (`governmentsOpen`). */
+export function policyObs(state: GameState, seat: number): {
+  unlocked: number[]; slots: number[]; government: number; gov_open: number[];
+} {
   const s = seatOf(state, seat)!;
-  const gov = computeAdoption(s.research).government;
-  if (!gov) return { unlocked: [], slots: [0, 0, 0, 0] };
+  const gov = seatGovernment(state, seat);
+  const government = gov ? GOVERNMENT_LIST.findIndex((g) => g.id === gov) : -1;
+  const gov_open = governmentsOpen(state, seat);
+  if (!gov) return { unlocked: [], slots: [0, 0, 0, 0], government, gov_open };
   const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
   const unlocked: number[] = [];
   POLICY_LIST.forEach((p, i) => { if (open.has(p.id)) unlocked.push(i); });
   const held = governmentSlots(state, seat);
-  return { unlocked, slots: SLOT_KINDS.map((k) => held.filter((x) => x === k).length) };
+  return { unlocked, slots: SLOT_KINDS.map((k) => held.filter((x) => x === k).length), government, gov_open };
 }
 
 export interface WarObs {

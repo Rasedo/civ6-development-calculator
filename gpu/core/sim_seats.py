@@ -157,8 +157,7 @@ class SimSeats:
                 keep.gather(1, order), moved, torch.full_like(moved, empty))
 
     def _cancel_queue_item(self, b: int, row: int, col: int, k: int) -> None:
-        """`cancelQueueItem`'s twin, poke-level — no engine path cancels (the
-        driver never uses the verb). The item keeps its own hammers
+        """A poke — no engine path cancels, on either engine. The item keeps its own hammers
         (`city_item_bank`, merged by column; a FULL ledger banks nothing
         more), a district or wonder still going up vacates its plot and its
         registry entry, and the queue closes the gap."""
@@ -497,6 +496,7 @@ class SimSeats:
         gp_pass: torch.Tensor | None = None,  # [B] the GP class this seat PASSES on (-1 = none)
         nuke: tuple | None = None,  # the MISSILE SILO's launch: (device [B], tile [B]); -1 = none
         beliefs: torch.Tensor | None = None,  # [B, K, 2] (class, index) beliefs the religion adopts; -1 = padding
+        government: torch.Tensor | None = None,  # [B] the government roster position to adopt; -1/None = no decision
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
         seat_masks layout; -1 = no action. Queue writes mirror the picker's exact
@@ -537,6 +537,8 @@ class SimSeats:
             self._driven_gp_pass[row] = gp_pass
         if beliefs is not None:
             self._driven_beliefs[row] = beliefs
+        if government is not None:
+            self._driven_government[row] = government
 
     def _reset_war_clock(self, i: int, j: int, mask: torch.Tensor) -> None:
         self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])
@@ -834,8 +836,8 @@ class SimSeats:
             # government" — both LATE, and not the same one
             if not self._ngov:
                 return zero
-            g1, h1 = self._adopted_gov(self.civ_civics[:, row])
-            g2, h2 = self._adopted_gov(self.civ_civics[:, tgt])
+            g1, h1 = self._adopted_gov(row)
+            g2, h2 = self._adopted_gov(tgt)
             return h1 & h2 & (g1 != g2) & (self._gov_tier[g1] >= 3) & (self._gov_tier[g2] >= 3)
         # 11: the JOINT agreement — not a fact of the state; only the deal's
         # move declares under it (`_declare_war_major`'s `agreed`)
@@ -1058,6 +1060,7 @@ class SimSeats:
         tech = self._driven_tech.pop(row, None)
         civic = self._driven_civic.pop(row, None)
         policies = self._driven_policies.pop(row, None)
+        government = self._driven_government.pop(row, None)
         envoys = self._driven_envoys.pop(row, None)
         war = self._driven_war.pop(row, None)
         war_kind = self._driven_war_kind.pop(row, None)
@@ -1079,6 +1082,11 @@ class SimSeats:
             ok = active & ext & (c_act >= 0) \
                 & self._available_mask(self.civ_civics[:, row], self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
             self._select_research(row, c_act, ok, is_civic=True)
+        if government is not None and self._ngov:
+            # the GOVERNMENT — validated (`_gov_open`) and stored; it lands
+            # before the cards so the set below is laid into the government
+            # the seat is now in, as `applySeatActionRecord` orders it
+            self._adopt_government(row, government, active & ext & (government >= 0))
         if policies is not None:
             # the SLOTTED CARDS — validated whole (every card unlocked,
             # the set fits the slots) and STORED; a set that does not fit is
@@ -1113,10 +1121,10 @@ class SimSeats:
                         _suz = self.citystate_suzerain[rows, ei[rows]]
                         _tw = self._gov_mods(row)[12]["envoy2"][rows] & (_suz >= 0) & (_suz != row)
                         if bool(_tw.any()):
-                            _ga, _ha = self._adopted_gov(self.civ_civics[:, row])
-                            _gb = torch.stack([self._adopted_gov(self.civ_civics[:, _o])[0]
+                            _ga, _ha = self._adopted_gov(row)
+                            _gb = torch.stack([self._adopted_gov(_o)[0]
                                                for _o in range(self.n_majors)], dim=1)
-                            _hb = torch.stack([self._adopted_gov(self.civ_civics[:, _o])[1]
+                            _hb = torch.stack([self._adopted_gov(_o)[1]
                                                for _o in range(self.n_majors)], dim=1)
                             _sc = _suz.clamp(min=0).unsqueeze(1)
                             _gb2 = _gb[rows].gather(1, _sc).squeeze(1)
@@ -2152,7 +2160,7 @@ class SimSeats:
         """Buy-kind 12: Valletta's class purchase. CIV6 (its suzerain): "City
         Center buildings and Encampment district buildings can be bought with
         Faith." Same legality body as the gold buy — `_seat_buildable` is
-        purchaseBuilding's availableBuildings + buildingCompletable pair — and
+        the TS gold buy's (`buySeatBuilding`) list + buildingCompletable pair — and
         the same cheapest-first key, priced in FAITH. Returns (ok [B],
         slot [B], building [B])."""
         B, dev = self.B, self.device
@@ -2186,7 +2194,7 @@ class SimSeats:
         Either is empire-wide, so the answer is the seat's."""
         out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         if self._ngov:
-            gov, has = self._adopted_gov(self._seat_civics(row))
+            gov, has = self._adopted_gov(row)
             out = out | (has & self._gov_faith_units[gov])
         if bool(self._b_faith_units.any()):
             out = out | (self.city_bldg[:, row] & self._b_faith_units.reshape(1, 1, -1)
@@ -3014,7 +3022,7 @@ class SimSeats:
             is_b = act & (a >= 0) & (a < NBn)
             if bool(is_b.any()):
                 bi = a.clamp(min=0, max=NBn - 1)
-                # queueBuilding: availableBuildings, and never a worship
+                # the TS applier's building arm: availableBuildings, and never a worship
                 # building (faith-purchased, never built) — both live in
                 # _seat_buildable, which the mask asks too.
                 is_b = is_b & self._seat_buildable(row)[:, j].gather(1, bi.unsqueeze(1)).squeeze(1)
@@ -4979,8 +4987,8 @@ class SimSeats:
         # CIV6 (Sarah Breedlove): "+25% Tourism from Trade Routes", the card's channel
         extra = extra + self._gp_perm(frm, "tourismRouteBonus").long()
         pct = pct + routed.long() * (int(self.rules.seats.get("tourismRoutePct", 25)) + extra)
-        ga, ha = self._adopted_gov(self._seat_civics(frm))
-        gb, hb = self._adopted_gov(self._seat_civics(to))
+        ga, ha = self._adopted_gov(frm)
+        gb, hb = self._adopted_gov(to)
         same = (ha & hb & (ga == gb)) | (~ha & ~hb)
         ia = torch.where(ha, self._gov_intol[ga], torch.zeros_like(pct))
         ib = torch.where(hb, self._gov_intol[gb], torch.zeros_like(pct))
@@ -6612,7 +6620,7 @@ class SimSeats:
             lowest = torch.where(first & slotted, idx, torch.full_like(idx, 10 ** 9)).min(dim=1).values
             return a, torch.where(lowest < 10 ** 9, lowest, a)
         if name == "WORLD_IDEOLOGY":
-            gov, _has = self._adopted_gov(self._seat_civics(row))
+            gov, _has = self._adopted_gov(row)
             return a, gov
         if name == "BORDER_CONTROL_TREATY":
             # A is the gift (culture bombs), B the attack — a seat votes itself
@@ -8278,7 +8286,10 @@ class SimSeats:
         # of the improvement rows. TS pays Wilhelmina's +2 even after her
         # last outgoing route expires (seed 9001 t90).
         _ally_in = self._incoming_ally_route(row)   # Democracy's destination half, [B, cols, 6] or None
+        _fgk = self._gp_city_perm_names.index("foreignRouteGold")
+        _fg_in = self.city_gp_perm[:, row, : self.RC, _fgk].double()
         _dest_rows = (bool(self._row_leads(row, "CLEOPATRA").any())
+                      or bool((_fg_in != 0).any())
                       or bool(self._live_rows(row, self._incoming_route_yield_rows))
                       or any(r[5] == 1
                              for r in self._live_rows(row, self._route_improvement_rows))
@@ -8314,6 +8325,18 @@ class SimSeats:
         pd = pays_d.double()
         for _yc in range(6):
             inc.scatter_add_(1, from_j * 6 + _yc, dom6[:, :, _yc].gather(1, dest_j) * pd)
+        # CIV6 (Raja Todar Mal): "+0.5 Gold for each specialty district at the
+        # destination" of a route to your own city — `specialtyDistricts`
+        _tdm = self._gp_perm(row, "domesticRouteGoldPerSpecialty").double()
+        if bool((_tdm != 0).any()):
+            _spec_o = (_comp_o & self._is_specialty.reshape(1, 1, -1)).sum(dim=2).double()  # [B, cols]
+            inc.scatter_add_(1, from_j * 6 + 2, _tdm.unsqueeze(1) * _spec_o.gather(1, dest_j) * pd)
+        # CIV6 (John Rockefeller): "+2 Gold for each Strategic resource improved
+        # by the destination city" — each kind it has improved
+        _rkf = self._gp_perm(row, "strategicRouteGold").double()
+        if bool((_rkf != 0).any()):
+            _kd = self._city_improved_res_kinds(row, 2).double()  # 2 = strategic
+            inc.scatter_add_(1, from_j * 6 + 2, _rkf.unsqueeze(1) * _kd.gather(1, dest_j) * pd)
         # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's
         # rows, the same shape the international leg pays
         if self._domestic_route_rows:
@@ -8410,6 +8433,10 @@ class SimSeats:
                 inc.scatter_add_(1, from_j * 6 + 2, self._suz_route_gold * kf)
             # the destination's Trading Post gold (`_route_post_gold`) —
             # added AFTER the yield, so Sovereignty does not double it
+            # CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
+            _fad = self._gp_perm(row, "csRouteFaith").double()
+            if bool((_fad != 0).any()):
+                inc.scatter_add_(1, from_j * 6 + 5, _fad.unsqueeze(1) * pays_c.double())
             pg_c = self._route_post_gold(row, self.citystate_center[:, :S].gather(1, css))
             if bool((pg_c > 0).any()):
                 inc.scatter_add_(1, from_j * 6 + 2, pg_c.double() * pays_c.double())
@@ -8488,6 +8515,17 @@ class SimSeats:
                     _lux_d = self._city_lux_distinct().gather(1, _rx).gather(2, _col).squeeze(2)
                     gold_i = gold_i + (_lux_d.double() * self._suz_dest_lux_gold
                                        * _ven.double().unsqueeze(1))
+            # CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_TO_OTHERS): "This
+            # city provides +2 Gold to foreign Trade Routes" — the destination's
+            _fgd = self.city_gp_perm[:, :, :, _fgk]
+            if bool((_fgd != 0).any()):
+                gold_i = gold_i + _fgd.gather(1, _rx).gather(2, _col).squeeze(2).double()
+            if bool((_rkf != 0).any()):
+                _kall = torch.zeros(B, self.city_id.shape[1], RCw, dtype=torch.float64, device=self.device)
+                for _r2 in range(self.n_majors):
+                    _kr = self._city_improved_res_kinds(_r2, 2).double()
+                    _kall[:, _r2, : _kr.shape[1]] = _kr
+                gold_i = gold_i + _rkf.unsqueeze(1) * _kall.gather(1, _rx).gather(2, _col).squeeze(2)
             # CIV6 (University of Sankore): "Other Civilizations' Trade Routes
             # to this city provide +1 Science and +1 Gold for them" — the
             # DESTINATION's wonder registry pays the sender.
@@ -8698,6 +8736,20 @@ class SimSeats:
                     _addi[:, :, _wy] = _addi[:, :, _wy] + (
                         _wa * _icnt * self.city_alive[:, row, :cols].double() * _ww).to(inc.dtype)
                 inc = inc + _addi.reshape(B, -1)
+        # CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_FROM_OTHERS): "This
+        # city receives +2 Gold from foreign Trade Routes" — the FOREIGN count
+        # Cleopatra's Gold reads (`incomingIntlRoutes`)
+        if bool((_fg_in != 0).any()):
+            _fcnt = torch.zeros(B, cols, dtype=torch.double, device=self.device)
+            for r2 in range(self.n_majors):
+                if r2 == row:
+                    continue
+                _fhit = ((self.seat_route_dseat[:, r2] == row).unsqueeze(2)
+                         & (self.seat_route_dcity[:, r2].unsqueeze(2) == ids.unsqueeze(1)))
+                _fcnt = _fcnt + _fhit.sum(dim=1).double()
+            _addf = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
+            _addf[:, :, 2] = (_fg_in[:, :cols] * _fcnt * alive.double()).to(inc.dtype)
+            inc = inc + _addf.reshape(B, -1)
         # the DESTINATION side of the improvement rows: every route ending in
         # one of this row's cities, own or foreign, pays this row per named
         # improvement of that city (`incomingRoutes` x `cityImprovementCount`)
@@ -8815,7 +8867,7 @@ class SimSeats:
         compw = self._completed_wonders(row)
         out = (torch.zeros(self.B, 4, dtype=torch.long, device=self.device) if compw is None
                else (compw.long().unsqueeze(3) * self._wond_slots.reshape(1, 1, -1, 4)).sum(dim=(1, 2)))
-        gov, _has = self._adopted_gov(self._seat_civics(row))
+        gov, _has = self._adopted_gov(row)
         out[:, 3] = (out[:, 3] + self._congress_wildcard_delta(gov)).clamp(min=0)
         # CIV6 (Adam Smith): "Adds +1 Economic Policy slot to your government."
         out[:, 1] = out[:, 1] + self._gp_perm(row, "policySlotEconomic").long()
@@ -8846,7 +8898,7 @@ class SimSeats:
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
         if not self._slot_favor_rows:
             return out
-        gov, has = self._adopted_gov(self._seat_civics(row))
+        gov, has = self._adopted_gov(row)
         extra = self._wonder_extra_slots(row)
         for _fc, _fl, _fk, _fa in self._live_rows(row, self._slot_favor_rows):
             _fw = self._row_is(row, _fc, _fl) & has
@@ -9232,6 +9284,16 @@ class SimSeats:
         if self._auto_ura_slot >= 0:
             bank[:, self._auto_ura_slot] += (
                 self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_rate)
+        # CIV6 (MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_EXTRACTION): a spent Great
+        # Person's standing grant — the seat's own, then (Rockefeller) each held
+        # city's (`GP_FREE_EXTRACTION`)
+        for _fk, _fs in self._gp_free_extraction:
+            if _fk >= 0 and 0 <= _fs < bank.shape[1]:
+                bank[:, _fs] += self._gp_perm(row, self._gp_perm_names[_fk]).long()
+        for _fk, _fs in self._gp_city_free_extraction:
+            if _fk >= 0 and 0 <= _fs < bank.shape[1]:
+                _cp = self.city_gp_perm[:, row, : self.RC, _fk].long()
+                bank[:, _fs] += (_cp * self.city_alive[:, row, : self.RC].long()).sum(dim=1)
         cap = self._stockpile_cap(row).unsqueeze(1)
         bank.copy_(torch.minimum(bank, cap))
         if self._log_diff:
@@ -9367,6 +9429,12 @@ class SimSeats:
                 y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
                 am = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
             y6 = y6 + hf.unsqueeze(2) * bcol["yields"][:, n, :].reshape(B, 1, 6)
+            # CIV6 (James Watt, `GP_BUILDING_YIELDS`): a spent Great Person's
+            # add to the building's own yield rides the same reach
+            for _pk, _bi, _yi in self._gp_building_yields:
+                if _bi == n and _pk >= 0:
+                    _gy = self._gp_perm(row, self._gp_perm_names[_pk]).double()
+                    y6[:, :, _yi] = y6[:, :, _yi] + hf * _gy.unsqueeze(1)
             # CIV6 (Electronics Factory, ELECTRONICSFACTORY_CULTURE): the
             # yields the row pays once its owner holds the technology ride
             # the same reach as its own
@@ -9805,6 +9873,7 @@ class SimSeats:
         self.city_last_hit[b, row, col] = 0
         self._q_clear(b, row, col)
         self.city_prod_bank[b, row, col] = 0
+        self.city_free_pot[b, row, col] = 0
         self.city_lasers[b, row, col] = 0
         self.city_powered[b, row, col] = False
         for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
@@ -13406,7 +13475,7 @@ class SimSeats:
         seat. Meet is by EXPLORATION (isExplored at the CS centre — fog is
         live; the proximity surrogate is deleted, scouting is what meets, the
         real Civ 6 rule). The accrual is influencePerTurn + this seat's own
-        adopted-government tier (computeAdoption on ITS civics). CONVERSION
+        adopted-government tier (`_adopted_gov`). CONVERSION
         IS A RULE: Civ 6 grants the envoy the moment the meter fills,
         assigned or not — WHERE it goes is the wire's decision, applied at
         each row's own pick position."""
@@ -13422,10 +13491,9 @@ class SimSeats:
         any_met = active & met_live.any(dim=1)
         if not bool(any_met.any()):
             return
-        civics = self.civ_civics[:, row]
         pt = torch.full((B,), float(rr.get("influencePerTurn", 3)), dtype=torch.float64, device=dev)
         if self._gov_live:
-            pt = pt + self._adopted_gov_tier(civics).double()
+            pt = pt + self._adopted_gov_tier(row).double()
             if self._gov_has_effects:
                 pt = pt + self._gov_mods(row)[12]["infl"].double()
         # CIV6 (Consulate, Chancery): "+2/+3 Influence Points per turn."

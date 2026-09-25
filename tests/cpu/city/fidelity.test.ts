@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from '../helpers';
+import { foundCity, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
+import { placeSeatDistrict } from '../../../cpu/core/phase';
+import { computeUnlocks } from '../../../cpu/core/effects';
+import { canPlaceDistrict, validImprovements } from '../../../cpu/core/rules';
 import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import { detectBoosts, toggleBoost, isBoosted } from '../../../cpu/core/boosts';
 import { buildingMaintenance, computeCityStats, computeHousing, cityMaintenance } from '../../../cpu/core/city';
 import { tileAppeal, appealTier } from '../../../cpu/core/appeal';
-import { placeImprovement } from '../../../cpu/core/game';
 
 describe('eurekas & inspirations', () => {
   it('auto-detects observable conditions and discounts the cost', () => {
@@ -16,7 +18,8 @@ describe('eurekas & inspirations', () => {
     const hills = tileAtCoords(state.map, 9, 8);
     hills.elevation = 'HILLS';
     hills.resource = 'STONE';
-    expect(placeImprovement(state, hills.index, 'QUARRY', 0).ok).toBe(true);
+    expect(validImprovements(state, hills, 0)).toContain('QUARRY');
+    hills.improvement = 'QUARRY';
 
     expect(isBoosted(state, 'MASONRY', 0)).toBe(false);
     detectBoosts(state, 0);
@@ -53,7 +56,7 @@ describe('district cost scaling', () => {
     const early = districtCost(state, 0);
     expect(early).toBeGreaterThan(base);
 
-    expect(queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0).ok).toBe(true);
+    expect(placeSeatDistrict(state, seatOf(state, 0)!, city, 'CAMPUS', computeUnlocks(state, 0), tileAtCoords(state.map, 9, 8).index)).toBe(true);
     const locked = itemCost(city.queue[0]);
     expect(locked).toBe(early);
     grantTechs(state, 'POTTERY', 'MINING', 'SAILING', 'ASTROLOGY');
@@ -135,7 +138,7 @@ describe('appeal & neighborhoods', () => {
     tileAtCoords(state.map, 10, 7).elevation = 'MOUNTAIN';
     const expected = appealTier(tileAppeal(state.map, spot)).housing;
     const before = computeHousing(state, city);
-    expect(queueDistrict(state, city.id, 'NEIGHBORHOOD', spot.index, 0).ok).toBe(true);
+    standDistrict(state, city, 'NEIGHBORHOOD', spot.index);
     // placing the district may not change the tile's own appeal inputs
     expect(computeHousing(state, city) - before).toBe(expected);
   });
@@ -153,14 +156,14 @@ describe('appeal & neighborhoods', () => {
     const want = appealTier(tileAppeal(state.map, first)).housing
       + appealTier(tileAppeal(state.map, second)).housing;
 
-    expect(queueDistrict(state, city.id, 'NEIGHBORHOOD', first.index, 0).ok).toBe(true);
-    expect(queueDistrict(state, city.id, 'NEIGHBORHOOD', second.index, 0).ok).toBe(true);
+    standDistrict(state, city, 'NEIGHBORHOOD', first.index);
+    standDistrict(state, city, 'NEIGHBORHOOD', second.index);
     expect(city.districts.filter((d) => d.type === 'NEIGHBORHOOD').length).toBe(2);
     expect(computeHousing(state, city) - before).toBe(want);
 
     // the control: a one-per-city type is still refused the second time
-    expect(queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 7, 8).index, 0).ok).toBe(true);
-    expect(queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 8, 7).index, 0).ok).toBe(false);
+    standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 7, 8).index);
+    expect(canPlaceDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 8, 7).index).ok).toBe(false);
   });
 });
 
@@ -173,12 +176,12 @@ describe('maintenance', () => {
     city.population = 7;
     expect(cityMaintenance(state, city)).toBe(0); // palace + city center are free
 
-    queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0);
-    queueBuilding(state, city.id, 'LIBRARY', 0);
+    standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 9, 8).index);
+    standBuilding(state, city, 'LIBRARY');
     expect(cityMaintenance(state, city)).toBe(2); // campus 1 + library 1
 
-    queueDistrict(state, city.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 7, 8).index, 0);
-    queueBuilding(state, city.id, 'MARKET', 0);
+    standDistrict(state, city, 'COMMERCIAL_HUB', tileAtCoords(state.map, 7, 8).index);
+    standBuilding(state, city, 'MARKET');
     expect(cityMaintenance(state, city)).toBe(2); // hub free (real Civ 6), market free
 
     const stats = computeCityStats(state, city);

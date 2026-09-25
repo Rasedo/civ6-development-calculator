@@ -1,10 +1,11 @@
 import type { SeatEmitter } from './decideObs';
 import type { GameState } from './types';
 import { UNITS } from '../data/units';
+import { GP_SITES } from '../data/greatPeople';
 import { MAX_CITIES_PER_SEAT } from '../data/seats';
 import { atWarWithAny, citiesOf, seatOf } from './seats';
 import {
-  builderJobAt, digSites, engineerJobAt, foundSites, gpSiteKey, gpSiteTiles, jobCtx, parkSites, spreadSites,
+  builderJobAt, digSites, engineerJobAt, foundSites, gpSiteKey, gpSiteTiles, gpSiteWalks, jobCtx, parkSites, spreadSites,
   warCitySites, warImpSites,
 } from './targetSites';
 
@@ -62,7 +63,7 @@ export function targetsObs(state: GameState, seat: number): TargetsObs {
   const keys = new Map<string, [number, number]>();
   for (const u of charged) {
     const k = gpSiteKey(u);
-    if (k && k[0] >= 0 && k[0] !== 1) keys.set(`${k[0]},${k[1]}`, k);
+    if (k && gpSiteWalks(GP_SITES[k[0]])) keys.set(`${k[0]},${k[1]}`, k);
   }
   for (const [site, arg] of [...keys.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1])) {
     for (const t of gpSiteTiles(state, seat, site, arg)) out.gpSites.push([site, arg, t]);

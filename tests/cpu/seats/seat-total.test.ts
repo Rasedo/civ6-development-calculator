@@ -86,15 +86,6 @@ describe('the camps belong to the barbarian seat', () => {
     expect(seatOf(back, BARB_SEAT)).toBe(back.barbSeat);
   });
 
-  it('a save from BEFORE the move keeps its camps', () => {
-    const state = newGame();
-    const old = JSON.parse(serialize(state)) as Record<string, unknown>;
-    delete old.barbSeat;
-    old.barbCamps = [11, 12]; // the field as it was written then
-    const back = deserialize(JSON.stringify(old));
-    expect(back.barbSeat.camps).toEqual([11, 12]);
-  });
-
   it('a city-state reloads as a Seat, not a bare record', () => {
     const state = newGame();
     const back = deserialize(serialize(state));

@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { seatOf, tileCity, tileSeat } from '../../cpu/core/seats';
 import { CIV_LEVELS } from '../../cpu/data/civLevels';
 import { tilesWithin } from '../../world/hex';
-import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from './helpers';
+import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from './helpers';
 import { growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, maxSpecialtyDistricts } from '../../cpu/data/constants';
-import { createGame, foundCity, queueDistrict, queueBuilding, endTurn, toggleLockedTile, itemCost, cancelQueueItem } from '../../cpu/core/game';
-import { canFoundCity, canPlaceDistrict } from '../../cpu/core/rules';
+import { createGame, foundCity, endTurn, itemCost } from '../../cpu/core/game';
+import { availableBuildings, canFoundCity, canPlaceDistrict } from '../../cpu/core/rules';
 import { placeSeatDistrict } from '../../cpu/core/phase';
 import { computeUnlocksIn } from '../../cpu/core/effects';
 import { computeCityStats, assignWorkedTiles, luxuryAmenities } from '../../cpu/core/city';
@@ -129,7 +129,7 @@ describe('citizens and growth', () => {
     better.elevation = 'HILLS'; // 2F1P beats 2F
     expect(assignWorkedTiles(state, city)).toContain(better.index);
 
-    toggleLockedTile(state, city.id, mediocre.index, 0);
+    mediocre.locked = true;
     const worked = assignWorkedTiles(state, city);
     expect(worked).toContain(mediocre.index);
     expect(worked.length).toBe(1);
@@ -162,21 +162,13 @@ describe('districts and buildings', () => {
     return { state, city };
   }
 
-  it('sandbox places districts instantly; normal mode queues them', () => {
+  it('district requires research and completes after enough production', () => {
     const { state, city } = settled();
-    state.sandbox = true;
+    const seat = seatOf(state, 0)!;
     const spot = tileAtCoords(state.map, 9, 8);
-    expect(queueDistrict(state, city.id, 'CAMPUS', spot.index, 0).ok).toBe(true);
-    expect(spot.districtComplete).toBe(true);
-    expect(city.queue.length).toBe(0);
-  });
-
-  it('district requires research outside sandbox and completes after enough production', () => {
-    const { state, city } = settled();
-    const spot = tileAtCoords(state.map, 9, 8);
-    expect(queueDistrict(state, city.id, 'CAMPUS', spot.index, 0).ok).toBe(false); // Writing missing
+    expect(placeSeatDistrict(state, seat, city, 'CAMPUS', computeUnlocksIn(seat.research, []), spot.index)).toBe(false); // Writing missing
     grantTechs(state, 'WRITING');
-    expect(queueDistrict(state, city.id, 'CAMPUS', spot.index, 0).ok).toBe(true);
+    expect(placeSeatDistrict(state, seat, city, 'CAMPUS', computeUnlocksIn(seat.research, []), spot.index)).toBe(true);
     expect(spot.districtComplete).toBe(false);
     const prod = computeCityStats(state, city).total.production;
     const turns = Math.ceil(itemCost(city.queue[0]) / prod);
@@ -187,7 +179,7 @@ describe('districts and buildings', () => {
   it('enforces the population district limit', () => {
     const { state, city } = settled();
     state.sandbox = true;
-    expect(queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0).ok).toBe(true);
+    standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 9, 8).index);
     const second = canPlaceDistrict(state, city, 'HOLY_SITE', tileAtCoords(state.map, 7, 8).index);
     expect(second.ok).toBe(false); // pop 1 -> only 1 specialty district
   });
@@ -252,11 +244,12 @@ describe('districts and buildings', () => {
   it('buildings require their chain and a completed district', () => {
     const { state, city } = settled();
     state.sandbox = true;
-    expect(queueBuilding(state, city.id, 'UNIVERSITY', 0).ok).toBe(false); // no campus at all
-    queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0);
-    expect(queueBuilding(state, city.id, 'UNIVERSITY', 0).ok).toBe(false); // needs library
-    expect(queueBuilding(state, city.id, 'LIBRARY', 0).ok).toBe(true);
-    expect(queueBuilding(state, city.id, 'UNIVERSITY', 0).ok).toBe(true);
+    const offered = (id: string) => availableBuildings(state, city).some((b) => b.id === id);
+    expect(offered('UNIVERSITY')).toBe(false); // no campus at all
+    standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 9, 8).index);
+    expect(offered('UNIVERSITY')).toBe(false); // needs library
+    standBuilding(state, city, 'LIBRARY');
+    standBuilding(state, city, 'UNIVERSITY');
     const sci = computeCityStats(state, city).breakdown.buildings.science;
     expect(sci).toBe(2 + 4 + 2); // library + university + palace
   });
@@ -264,41 +257,10 @@ describe('districts and buildings', () => {
   it('water mill requires a river on the city center', () => {
     const { state, city } = settled();
     state.sandbox = true;
-    expect(queueBuilding(state, city.id, 'WATER_MILL', 0).ok).toBe(false);
+    const offered = (id: string) => availableBuildings(state, city).some((b) => b.id === id);
+    expect(offered('WATER_MILL')).toBe(false);
     state.map.tiles[city.centerIndex].riverMask = 1;
-    expect(queueBuilding(state, city.id, 'WATER_MILL', 0).ok).toBe(true);
-  });
-});
-
-describe('the item keeps its hammers', () => {
-  function settled() {
-    const state = makeState(makeMap(16, 16));
-    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
-    return { state, city };
-  }
-
-  it('a cancelled item banks against ITSELF and resumes when queued again', () => {
-    const { state, city } = settled();
-    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
-    city.queue[0].progress = 12;
-    cancelQueueItem(state, city.id, 0, 0);
-    expect(city.queue.length).toBe(0);
-    expect(city.productionBank ?? 0).toBe(0);
-    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
-    expect(city.queue[0].progress).toBe(12);
-    expect(Object.values(city.itemBank ?? {}).filter((v) => v > 0).length).toBe(0);
-  });
-
-  it('the hammers wait for THAT item, not whatever queues next', () => {
-    const { state, city } = settled();
-    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
-    city.queue[0].progress = 9;
-    cancelQueueItem(state, city.id, 0, 0);
-    grantTechs(state, 'POTTERY');
-    expect(queueBuilding(state, city.id, 'GRANARY', 0).ok).toBe(true);
-    expect(city.queue[0].progress).toBe(0);
-    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
-    expect(city.queue[1].progress).toBe(9);
+    expect(offered('WATER_MILL')).toBe(true);
   });
 });
 

@@ -61,7 +61,9 @@
     ],
     "policy": [
       ["unlocked", "list", "the policy card table indices this seat may slot now (`unlockedPolicyIds`), ascending; empty without a government"],
-      ["slots", "list", "the adopted government's slots by kind (`fitPolicies`' governmentSlots, wonder extras included): [military, economic, diplomatic, wildcard]; all 0 without a government"]
+      ["slots", "list", "the adopted government's slots by kind (`fitPolicies`' governmentSlots, wonder extras included): [military, economic, diplomatic, wildcard]; all 0 without a government"],
+      ["government", "int", "the government table index of the government this seat is in (`seatGovernment`: the one its record chose, else the newest its civics unlock), -1 without one"],
+      ["gov_open", "list", "the government table indices the record's `government` field may name now (`governmentsOpen`: unlocked, and never one the seat has been in before unless it is in it now), ascending"]
     ],
     "war": [
       ["targets", "int", "the war head's width (`warTargets`): every other major in ascending seat order, then the whole city-state roster in index order; a war COLUMN below is a position in that list"],
@@ -120,7 +122,7 @@
     ["foundOk", "list", "the tiles a city may be founded on (`canFoundCity`: unowned, settleable, no fire burning or burnt there, bare of district and wonder, at least 4 from every living city and city-state centre), ascending; empty where the seat holds no Settler or stands at the city cap"],
     ["digs", "list", "the tiles an Archaeologist may excavate (a dig underfoot on unowned or own ground) while a museum slot takes an Artifact, ascending; empty where the seat holds no Archaeologist with a charge"],
     ["parks", "list", "the tiles that ANCHOR a legal National Park rhombus (`parkClusterLegal` on any of the tile's clusters), ascending; empty where the seat holds no Naturalist with a charge"],
-    ["gpSites", "table", "for every Great Person site a living person of this seat with a charge walks toward (its `gpSite`, `gpArg`; never site 1, which activates where it stands): each tile it may be spent on, as [site, arg, tile], ascending"],
+    ["gpSites", "table", "for every Great Person site a living person of this seat with a charge walks toward (its `gpSite`, `gpArg`; never site 1 or 9, which activate where they stand): each tile it may be spent on, as [site, arg, tile], ascending"],
     ["goody", "list", "the tiles holding a Tribal Village or a Meteor Site, ascending"],
     ["warImps", "list", "the tiles a unit at war marches on first: an unpillaged improvement, or a complete unpillaged district, on ground owned by a seat this one is at war with (majors and city-states; Free City ground is not a march target), ascending; empty where the seat is at war with nobody"],
     ["warCities", "table", "every living city of a seat this one is at war with, as [seat, centre]: the owner's seat id (a major's index, 100 + a city-state's index, 300 the Free Cities) and the city's CENTRE tile, ascending; the march takes the nearest, the seat id then the centre breaking a distance tie; empty where the seat is at war with nobody"]
@@ -131,7 +133,7 @@
     ["charges", "int", "the charges it holds"],
     ["gpAt", "int", "a Great Person's roster position within its class, -1 for every other unit"],
     ["gpSite", "int", "a Great Person's site code (GP_SITES: where its charge is spent), -1 for every other unit"],
-    ["gpArg", "int", "that site's argument (the district table index for site 0), -1 where none"],
+    ["gpArg", "int", "that site's argument (the district table index for site 0, -2 the City Center), -1 where none"],
     ["mask", "list", "the unit action columns it may take now (the one unit action layout, rules.json `actions.unit`), ascending"]
   ],
   "head": [
@@ -210,6 +212,7 @@
     ["embassy_cost", "the gold an embassy costs; delegation_cost a delegation's (whole numbers)"],
     ["deal_items", "the slots of one deal bundle; deal_kind names each deal item kind's code"],
     ["comp_aid", "the Aid Request's competition index, -1 none"],
-    ["promise_cost", "per promise kind (rules.json eras.promises order): the favor an ask costs the asker"]
+    ["promise_cost", "per promise kind (rules.json eras.promises order): the favor an ask costs the asker"],
+    ["gov_tier", "per government table row (rules.json `governments` order): its tier"]
   ]
 }

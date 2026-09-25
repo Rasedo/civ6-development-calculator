@@ -89,7 +89,7 @@ def test_the_purchase_discounts(rules, path) -> None:
                                           ("REFORMED_CHURCH", "THEOCRACY", "_faith_price", "_gold_price", 85.0)):
         sim = build(path)
         in_government(sim, rules, civic)
-        adopted, _ = sim._adopted_gov(sim.civ_civics[:, ROW])
+        adopted, _ = sim._adopted_gov(ROW)
         assert int(adopted[0]) == gov_index(rules, gid), f"{civic} did not adopt {gid}"
         hundred = torch.full((sim.B,), 100.0, dtype=torch.float64)
         got = float(getattr(sim, purse)(ROW, hundred)[0])

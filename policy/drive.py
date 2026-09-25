@@ -1345,6 +1345,31 @@ def _decide_beliefs(nobs: list, row: int, seeds, turn, device) -> torch.Tensor |
     return out.to(device)
 
 
+def _decide_government(st, nobs: list, row: int, seeds, device) -> torch.Tensor | None:
+    """[B] — the government roster position the seat adopts, -1 where it
+    names none. The seat's STYLE is one persistent draw per game (turn 0,
+    salt 24): among the newest tier the observation's `gov_open` reaches, it
+    takes the tier-mate at the draw's position in table order, else the next
+    open one after it — so every tier-mate is some seat's pick across games,
+    and a seat keeps its pick until a newer tier opens."""
+    ngov = len(st.gov_tier)
+    if seeds is None or not ngov:
+        return None
+    open_ = _obs_members(nobs, "policy", "gov_open", ngov, "cpu").tolist()
+    if not any(any(o) for o in open_):
+        return None
+    r = _policy_rng("cpu", seeds, 0, row, 24).tolist()
+    out = torch.full((len(nobs),), -1, dtype=torch.long)
+    for b, o in enumerate(open_):
+        tiers = [st.gov_tier[g] for g in range(ngov) if o[g]]
+        if not tiers:
+            continue
+        mates = [g for g in range(ngov) if st.gov_tier[g] == max(tiers)]
+        s0 = min(int(r[b] * len(mates)), len(mates) - 1)
+        out[b] = next(mates[(s0 + k) % len(mates)] for k in range(len(mates)) if o[mates[(s0 + k) % len(mates)]])
+    return out.to(device)
+
+
 def tables(st) -> tuple:
     """(roster, classes) — the unit roster and the production classes the
     ladder picks over, off the static value. Static per game: the caller
@@ -1364,7 +1389,7 @@ DECIDE_FIELDS = (
     "prod", "dtile", "tech", "civic", "war", "war_kind", "env_seq", "seq",
     "buy", "worship", "relig", "levy", "monu", "nat", "cls", "ucls", "pat",
     "band", "dist", "route", "nuke", "spec", "lock", "swap", "vote", "gp_pass",
-    "policies", "beliefs",
+    "policies", "beliefs", "government",
 )
 
 
@@ -1449,12 +1474,13 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
     vote = _decide_vote(nobs, row, dev)
     gp_pass = _decide_gp_pass(nobs, row, seeds, t, dev)
     beliefs = _decide_beliefs(nobs, row, seeds, t, dev)
+    government = _decide_government(st, nobs, row, seeds, dev)
     return {"prod": (cities["centre"], prod), "dtile": dtile, "tech": tech, "civic": civic, "war": war,
             "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
             "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
             "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,
             "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "policies": policies,
-            "beliefs": beliefs}
+            "beliefs": beliefs, "government": government}
 
 
 def plan_units(st, row: int, nobs: list, max_steps: int = 4) -> torch.Tensor:

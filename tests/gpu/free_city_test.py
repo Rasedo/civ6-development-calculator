@@ -337,32 +337,35 @@ def test_grants(rules, path) -> None:
     assert all(int(sim.unit_xp[B0, s]) == 0 for s, _t, _p in units)
     assert all(int(sim.unit_free_city[B0, s]) == cid for s, _t, _p in units)
     sim._check_seat_invariant()
-    # it trains nothing: nothing arrives until the city's fifth turn...
+
+    def grants() -> list[tuple[int, int, int]]:
+        return [u for u in free_units(sim) if int(sim.unit_free_city[B0, u[0]]) == cid]
+
+    # no grant arrives until the city's fifth turn...
     for k in range(1, 4):
         sim.turn = t0 + k
         sim._free_cities_phase()
-        assert len(free_units(sim)) == 2, (k, free_units(sim))
+        assert len(grants()) == 2, (k, grants())
     # ...then one, of a class the era has a chassis for, drawn...
     open_ = {int(x) for x in sim._free_grant_units[:, era].tolist() if int(x) >= 0}
     rng0 = int(sim.rng_state[B0])
     sim.turn = t0 + 4
     sim._free_cities_phase()
-    got = free_units(sim)
+    got = grants()
     assert len(got) == 3 and got[2][1] in open_, got
     assert int(sim.rng_state[B0]) != rng0, "the grant drew nothing"
-    assert int(sim.unit_free_city[B0, got[2][0]]) == cid
     # ...and every fifth turn after, while the city stays Free
     sim.turn = t0 + 5
     sim._free_cities_phase()
-    assert len(free_units(sim)) == 3
+    assert len(grants()) == 3
     sim.turn = t0 + 9
     sim._free_cities_phase()
-    assert len(free_units(sim)) == 4
+    assert len(grants()) == 4
     # no barbarian rule walks them: the raid never moves a Free Cities unit
     before = free_units(sim)
     sim._barbarian_phase()
     assert free_units(sim) == before, "a barbarian walk moved a Free Cities unit"
-    print("  7 the grants OK — the era's melee pair on the flip turn, a drawn unit every fifth turn, never walked")
+    print("  7 the grants OK — the era's melee pair on the flip turn, a drawn unit every fifth turn, no barbarian walk")
 
 
 def test_treasury_and_join(rules, path) -> None:

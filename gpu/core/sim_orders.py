@@ -1181,7 +1181,7 @@ class SimOrders:
                     _r = did.nonzero(as_tuple=True)[0]
                     self._eff_version += 1
                     self._spend_build_charge(_r, sc, hc)
-                # REPAIR (`builderRepair`): improvement first, else district;
+                # REPAIR (the TS applier's REPAIR arm): improvement first, else district;
                 # the turn is spent, NO charge.
                 if self._A_REPAIR in _acmd:
                     _rp = (
@@ -1672,7 +1672,7 @@ class SimOrders:
 
         IDEMPOTENT: TS `tile.feature = null` on an already-bare tile is a
         no-op, but the adjacency withdrawal below is CUMULATIVE, so a second
-        strip of the same tile (queueDistrict paving a chopped tile) would
+        strip of the same tile (a district paving a chopped tile) would
         double-subtract the lent adjacency.
         """
         fresh = ~self.feat_stripped[rows, tiles]
@@ -1690,7 +1690,7 @@ class SimOrders:
                 self.improvement[rows[lm], tiles[lm]] = -1
         self._bare_ground_jobs(rows, tiles)
         # Withdraw BOTH feature classes: every TS strip site that reaches this
-        # function nulls ANY feature (queueDistrict paves a REEF too). A tile
+        # function nulls ANY feature (a district's pave takes a REEF too). A tile
         # has one feature, so exactly one of the two planes is nonzero.
         contrib = self._feat_adj[rows, tiles] + self._nfeat_adj[rows, tiles]
         nb = self.neigh[tiles]

@@ -15,7 +15,7 @@ import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS } from '../data/policies';
-import { seatGovernmentId } from './seatTurn';
+import { seatGovernment } from './effects';
 import { cityLowlands, floodBarrierCost } from './climate';
 import { BUILDINGS, type BuildingDef, buildingVariantFor, buildingsForDistrict, effectiveBuilding } from '../data/buildings';
 import { TECHS } from '../data/techs';
@@ -921,9 +921,9 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
 }
 
 /** The tier of the government this seat is running, 0 for Chiefdom or none.
- *   is the one derivation both engines share. */
+ *  `seatGovernment` is the one derivation both engines share. */
 function governmentTier(state: GameState, seat: number): number {
-  const id = seatGovernmentId(state, seat);
+  const id = seatGovernment(state, seat);
   return id ? GOVERNMENTS[id]?.tier ?? 0 : 0;
 }
 

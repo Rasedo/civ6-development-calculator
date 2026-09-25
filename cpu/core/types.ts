@@ -120,6 +120,9 @@ export interface City {
    *  Loyalty pressure on it since the Free City became independent". Held
    *  only while the city is Free. */
   freePressure?: number[];
+  /** A FREE CITY's build pot: its Production, banked until the Free City
+   *  build table's next item is covered (`freeCityBuild`). */
+  freePot?: number;
   /** CIV6 (Gain Sources): turns each SEAT's spies "operate at 2 levels higher"
    *  in this city, dense over seats. */
   spySources?: number[];
@@ -162,7 +165,10 @@ export interface ResearchState {
 }
 
 export interface GovernmentState {
-  current: string | null;
+  /** the government the seat's record chose (`adoptGovernment`); null until
+   *  one does, and the seat is in the newest its civics unlock
+   *  (`seatGovernment`) */
+  chosen: string | null;
   policies: (string | null)[];
   /** CIV6 (Legacy policy card): a government's legacy card is "unlocked by"
    *  that government, so the seat must remember every government it has been
@@ -273,6 +279,10 @@ export interface SeatActionRecord {
    *  the Follower and then one other class, enhancing every class the
    *  religion still lacks that has a belief left (`adoptBeliefs`). */
   beliefs?: [number, number][];
+  /** the GOVERNMENT this seat adopts, a `GOVERNMENT_LIST` position
+   *  (`adoptGovernment` validates it against `governmentsOpen`); absent = no
+   *  decision, the standing government holds */
+  government?: number | null;
 }
 
 /** One seat's ballot: [outcome, target, extraVotes] per slate slot, or null
@@ -837,9 +847,16 @@ export interface CityState extends Seat {
    *  and the army it keeps. Absent = not drawn yet. */
   buildFrom?: number[];
   armyCap?: number;
-  /** the minor city's GOLD and FAITH, banked — what its yield walk pays and
-   *  nothing spends yet. A Seat's own fields, declared here so the census
-   *  compares them for a minor (`minorTreasury` / `minorFaith`). */
+  /** the episode's Builder purchase rate, per mille (`minorPlan`) */
+  builderBuyRate?: number;
+  /** the minor's military count at the end of its last turn, and the turn a
+   *  count below it was first seen — the loss window its purchases read */
+  armySeen?: number;
+  lossTurn?: number;
+  /** the minor city's GOLD and FAITH: what its yield walk pays, less its
+   *  units' upkeep, spent on purchases and upgrades (`minorPhase`). A Seat's
+   *  own fields, declared here so the census compares them for a minor
+   *  (`minorTreasury` / `minorFaith`). */
   treasury: number;
   faith: number;
   /** CIV6 (City-state): the install has ONE city rule, so a minor's city

@@ -27,7 +27,7 @@ export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
 export const SLOT_KINDS = ['military', 'economic', 'diplomatic', 'wildcard'] as const;
 
 /** Master switch for the whole government/policy layer: adoption
- * (`computeAdoption`), the government modifier layering and the GPU's
+ * (`seatGovernment`), the government modifier layering and the GPU's
  * per-seat modifier tables. The exporter mirrors it into
  * `rules.governmentsLive` so both engines gate on one value. */
 export const GOVERNMENTS_ADOPTION_LIVE = true;

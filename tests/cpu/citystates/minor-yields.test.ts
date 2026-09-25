@@ -72,7 +72,7 @@ describe("the minor's city rides the yield walk", () => {
     expect(computeCityStats(state, minorCity(cs)).total.science).toBeLessThan(lit.total.science);
   });
 
-  it("the walk's Science, Culture and Production fill the three pots; Gold and Faith bank", () => {
+  it("the walk's Science, Culture and Production fill the three pots; Gold pays upkeep, stopping at 0; Faith banks", () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, 'scientific', 5);
     minorDistrict(state, cs, 'CAMPUS', 1);
@@ -89,7 +89,9 @@ describe("the minor's city rides the yield walk", () => {
     expect(cs.research.civicProgress).toBe(y.culture);
     // so the pot takes the city's Production under the minor's own percent
     expect(cs.prodProgress).toBe(y.production * ((100 + MINOR_PRODUCTION_PCT) / 100) * 1);
-    expect(cs.treasury).toBe(y.gold);
+    // the spent Builder costs no upkeep; a city whose buildings' maintenance
+    // outruns its Gold leaves the balance at 0
+    expect(cs.treasury).toBe(Math.max(0, y.gold));
     expect(cs.faith).toBe(y.faith);
     expect(cs.research.techs).toEqual([]);
   });

@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, holdWorks } from '../helpers';
-import { spawnUnit, trainableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain, disbandUnit } from '../../../cpu/core/units';
+import { spawnUnit, trainableUnits, goldBuyableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain, disbandUnit } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner } from '../../../cpu/core/seats';
 import {
@@ -38,7 +38,6 @@ import {
 import { envoysOf } from '../../../cpu/core/cityStates';
 import { DED_BODYGUARD, CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS } from '../../../cpu/data/seats';
 import { SPY_OFFENSIVE_MISSIONS } from '../../../cpu/data/espionage';
-import { purchaseUnit } from '../../../cpu/core/game';
 import { BARB_SEAT } from '../../../cpu/core/seats';
 import type { City, CityState, GameState } from '../../../cpu/core/types';
 import { GWO_PORTRAIT } from '../../../cpu/data/greatWorks';
@@ -112,9 +111,9 @@ describe('a spy is fielded, not stationed', () => {
   });
 
   it('cannot be purchased with Gold', () => {
-    const { state, mine } = spyState();
-    const r = purchaseUnit(state, mine.id, SPY_UNIT, 0);
-    expect(r.ok).toBe(false);
+    const { state } = spyState();
+    expect(UNITS[SPY_UNIT].noGold).toBe(true);
+    expect(goldBuyableUnits(state, 0).some((d) => d.id === SPY_UNIT)).toBe(false);
   });
 
   it('holds no plot: a second unit lands on the same tile', () => {

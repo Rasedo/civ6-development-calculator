@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, grantCivics } from '../helpers';
-import { foundCity, queueDistrict } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, grantCivics, standDistrict } from '../helpers';
+import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
 import { computeUnlocks, computeAdoption, defaultModifiers, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from '../../../cpu/core/effects';
 import { cityBuildingYields } from '../../../cpu/core/yields';
@@ -162,9 +162,9 @@ describe('the building-yield boost', () => {
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     state.sandbox = true;
     const hs = tileAtCoords(state.map, 9, 8);
-    expect(queueDistrict(state, city.id, 'HOLY_SITE', hs.index, 0).ok).toBe(true);
+    standDistrict(state, city, 'HOLY_SITE', hs.index);
     // the two Holy Site buildings this card is about, past the SHRINE-first
-    // chain `queueBuilding` enforces
+    // chain `availableBuildings` enforces
     city.buildings.push('TEMPLE', 'CATHEDRAL');
 
     const ctx = makeYieldCtx(state, 0);

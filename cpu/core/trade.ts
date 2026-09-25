@@ -19,7 +19,7 @@ import { civEraIndex } from './city';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, suzerainEffect } from './cityStates';
-import { completedDistrictCount } from './yields';
+import { cityImprovedResourceKinds, completedDistrictCount } from './yields';
 import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
@@ -28,7 +28,7 @@ import type { RuleResult } from './rules';
 import { goldenDedication } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
-import { gpPermOf } from '../data/greatPeople';
+import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { srcConst, xml } from '../data/provenance';
 import { getModifiers, progressAhead, followerReligionsForCity, followerBeliefForReligion } from './effects';
 import { governorSum } from './governors';
@@ -702,6 +702,12 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     const foreignIn = incomingIntlRoutes(state, city);
     if (foreignIn) for (const r of inRows) out[r.yield] += r.amount * foreignIn;
   }
+  // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_FROM_OTHERS): "This
+  // city receives +2 Gold from foreign Trade Routes"
+  const gpForeign = gpCityPermOf(city, 'foreignRouteGold');
+  if (gpForeign) out.gold += gpForeign * incomingIntlRoutes(state, city);
+  const gpOwner = seatOf(state, seat);
+  const gpStratGold = gpPermOf(gpOwner, 'strategicRouteGold');
   // CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
   // the DESTINATION side): every route ending here pays this seat per
   // named improvement of this city (`ROUTE_IMPROVEMENT_ROWS`)
@@ -736,6 +742,8 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
         out.gold += emergencyCsRouteGold(state, seat);
         out.gold += routePostGold(state, seat, cityState.centerIndex);
         out.gold += routeLengthGold(state, seat, city.centerIndex, cityState.centerIndex, route);
+        // CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
+        out.faith += gpPermOf(gpOwner, 'csRouteFaith');
         // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
         // provide +2 Culture and +1 Gold for every specialty district in the
         // ORIGIN city" — this city, whichever minor the route reaches.
@@ -783,6 +791,12 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
         out.gold += routeLengthGold(state, seat, city.centerIndex, civCity.centerIndex, route);
         // CIV6 (Amsterdam): the destination's own luxuries pay this seat's route
         out.gold += routeDestLuxuryGold(state, seat, civCity);
+        // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_TO_OTHERS): "This
+        // city provides +2 Gold to foreign Trade Routes" — the destination's
+        out.gold += gpCityPermOf(civCity, 'foreignRouteGold');
+        // CIV6 (John Rockefeller): "+2 Gold for each Strategic resource
+        // improved by the destination city" — each kind it has improved
+        if (gpStratGold) out.gold += gpStratGold * cityImprovedResourceKinds(state, civCity, 'strategic').size;
         // CIV6 (University of Sankore): "Other Civilizations' Trade Routes
         // to this city provide +1 Science and +1 Gold for them."
         const snd = wonderRouteSenderYields(state, civCity);
@@ -803,6 +817,10 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     if (dest) {
       addYields(out, routeYields(state, dest));
       out.gold += routeLengthGold(state, seat, city.centerIndex, dest.centerIndex, route);
+      // CIV6 (Raja Todar Mal): "+0.5 Gold for each specialty district at the
+      // destination" of a route to your own city
+      out.gold += gpPermOf(gpOwner, 'domesticRouteGoldPerSpecialty') * specialtyDistricts(state, dest);
+      if (gpStratGold) out.gold += gpStratGold * cityImprovedResourceKinds(state, dest, 'strategic').size;
       // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's rows,
       // the same reader the international leg uses
       addRouteRows(state, out, getModifiers(state, seat).domesticRouteYields, city, dest);

@@ -816,6 +816,7 @@ def _main() -> int:
                 ("minor_yields", [py, "tests/gpu/minor_yields_test.py"], 4),  # the minor's city pays its yields; its research and build pots take them; the levy's Barracks experience
                 ("route_pressure", [py, "tests/gpu/route_pressure_test.py"], 2),  # a trade route carries religious pressure both ways
                 ("policy_store", [py, "tests/gpu/policy_store_test.py"], 2),  # step 1: the slotted-card store, mask and validator
+                ("government_choice", [py, "tests/gpu/government_choice_test.py"], 2),  # the record's government: the tier-mates, the Anarchy refusal, the carry-over, the driver's style pick
                 ("danube_rows", [py, "tests/gpu/danube_rows_test.py"], 4),  # the wonder band, Ortoo, Faces of Peace, Sahel Merchants, Strength in Unity
                 ("slot_rows", [py, "tests/gpu/slot_rows_test.py"], 4),  # Founding Fathers, Eleanor's aura, the Toqui's XP, Isibongo, the Flying Squadron, Roosevelt
                 ("harvest_rows", [py, "tests/gpu/harvest_rows_test.py"], 4),  # the Builder's HARVEST: the column, the table, the mask, the total strip
@@ -851,8 +852,10 @@ def _main() -> int:
                 ("beliefs", [py, "tests/gpu/beliefs_test.py"], 4),  # a religion's four belief classes, the Worship buildings, the Mosque and the Dar-e Mehr
                 ("belief_effects", [py, "tests/gpu/belief_effects_test.py"], 4),  # Lay Ministry, Sacred Places, Missionary Zeal, Monastic Isolation, Holy Waters, the Dar-e Mehr's eras
                 ("minor_builds", [py, "tests/gpu/minor_builds_test.py"], 4),  # the city-state's own walls, type district and Harbor, and the conquest carry
+                ("minor_purse", [py, "tests/gpu/minor_purse_test.py"], 4),  # the minor's upkeep, purchases, upgrades and walker; the Free City's build table and walk
                 ("alliance_levels", [py, "tests/gpu/alliance_levels_test.py"], 4),  # typed alliances: points, levels and the fifteen-effect table
                 ("gs_rows", [py, "tests/gpu/gs_rows_test.py"], 4),  # the three GS admirals and the Offshore Wind Farm: no seed recruits them or reaches Predictive Systems
+                ("gp_census", [py, "tests/gpu/gp_census_test.py"], 4),  # the Great People census: sites, grants, channels and route clauses no seed reaches
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

@@ -3,7 +3,7 @@ import { addYields, emptyYields, type City, type CityState, type DistrictId, typ
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
-import { computeAdoption, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
+import { seatGovernment, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
@@ -37,7 +37,7 @@ import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf,
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
-import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, gpCityPermOf, gpPermOf, gpTilePermOf } from '../data/greatPeople';
 export interface CityStats {
   city: City;
   housing: number;
@@ -1020,8 +1020,8 @@ export function tourismIntlPct(state: GameState, from: number, to: number): numb
   const routed = (seatOf(state, from)?.tradeRoutes ?? []).some((r) => r.toSeat === to);
   // CIV6 (Sarah Breedlove): "+25% Tourism from Trade Routes", the card's channel
   if (routed) pct += TOURISM_ROUTE_PCT + getModifiers(state, from).tourismRouteBonus + gpPermOf(seatOf(state, from), 'tourismRouteBonus');
-  const ga = computeAdoption(seatOf(state, from)!.research).government;
-  const gb = computeAdoption(seatOf(state, to)!.research).government;
+  const ga = seatGovernment(state, from);
+  const gb = seatGovernment(state, to);
   if (ga !== gb) {
     pct -= ((GOV_INTOLERANCE[ga ?? ''] ?? 0) + (GOV_INTOLERANCE[gb ?? ''] ?? 0)) * TOURISM_GOV_MULT;
   }
@@ -1153,6 +1153,14 @@ export function computeCityStats(
       districts.production += effectiveAdjacency(ctx, t, 'CAMPUS');
     }
   }
+  // CIV6 (Hildegard of Bingen): "This Holy Site district's Faith adjacency
+  // bonus provides Science as well" — the district the charge was spent on
+  for (const d of city.districts) {
+    if (d.type !== 'HOLY_SITE') continue;
+    const t = map.tiles[d.tileIndex];
+    if (!t.districtComplete || t.districtPillaged || !gpTilePermOf(t, 'faithAdjScience')) continue;
+    districts.science += effectiveAdjacency(ctx, t, 'HOLY_SITE');
+  }
   for (const [tileIndex, n] of specialists) {
     const inst = city.districts.find((d) => d.tileIndex === tileIndex);
     const y = inst ? specialistYields(inst.type, city.buildings) : undefined;
@@ -1192,10 +1200,17 @@ export function computeCityStats(
   // THIS CITY'S OWNER's dedication, which is the row the GPU reads.
   buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
   buildings.faith += gwy.faith;
-  // CIV6 (Leonardo da Vinci): "Workshops provide +3 Culture" — seat-wide,
-  // per standing Workshop.
-  const wcult = gpPermOf(seatOf(state, city.seat), 'workshopCulture');
-  if (wcult && city.buildings.includes('WORKSHOP')) buildings.culture += wcult;
+  // CIV6 (Leonardo da Vinci, Hypatia, Newton, Einstein; `GP_BUILDING_YIELDS`):
+  // a spent Great Person's add to one building's own yield, paid by each lit
+  // copy standing here; a REGIONAL building carries it in `regionalEffects`
+  const gpOwner = seatOf(state, city.seat);
+  const gpDark = darkBuildings(map, city);
+  for (const r of GP_BUILDING_YIELDS) {
+    const n = gpPermOf(gpOwner, r.perm);
+    if (!n || !city.buildings.includes(r.building) || gpDark.has(r.building)) continue;
+    if (effectiveBuilding(ctx.mods.civ, r.building)?.regional) continue;
+    buildings[r.yield] += n;
+  }
   // CIV6 (Monument): "+1 additional Culture if city is at maximum Loyalty."
   if ((city.loyalty ?? LOYALTY_MAX) >= LOYALTY_MAX) {
     for (const b of city.buildings) if (BUILDINGS[b]?.special === 'MONUMENT') buildings.culture += 1;
@@ -1352,11 +1367,16 @@ export function computeCityStats(
   addYields(total, citizens);
   addYields(total, bonuses);
   addYields(total, trade);
+  // CIV6 (Ibn Khaldun, MODIFIER_PLAYER_CITIES_ADJUST_HAPPINESS_YIELD_BAB): the
+  // seat's percent on every non-Food yield at the Happy / Ecstatic tier
+  const gpHappy = tier.name === 'Happy' ? gpPermOf(seatOf(state, city.seat), 'happyYieldPct')
+    : tier.name === 'Ecstatic' ? gpPermOf(seatOf(state, city.seat), 'ecstaticYieldPct') : 0;
   for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as YieldKey[]) {
     total[k] *= tier.yieldFactor;
     // CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
     // (`HAPPY_YIELD_ROWS`) — a percentage over the same total
     for (const r of m.happyYields) if (r.tier === tier.name && r.yield === k) total[k] *= 1 + r.pct / 100;
+    if (gpHappy) total[k] *= 1 + gpHappy / 100;
     // CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for a
     // city with an ESTABLISHED governor, tripled in one this seat did not found
     if (m.governorYields.length && cityGovernorEffects(state, city).length > 0) {

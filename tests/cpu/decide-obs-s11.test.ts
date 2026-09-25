@@ -10,7 +10,7 @@ import { makeMap, makeState, grantCivics, tileAtCoords } from './helpers';
 import { researchObs, policyObs, warObs, SEAT_GROUPS } from '../../cpu/core/decideObsMasks';
 import { TECHS } from '../../cpu/data/techs';
 import { CIVICS } from '../../cpu/data/civics';
-import { POLICY_LIST } from '../../cpu/data/policies';
+import { GOVERNMENT_LIST, POLICY_LIST } from '../../cpu/data/policies';
 import { BOOST_FRACTION } from '../../cpu/data/boosts';
 import { WAR_MIN_TURNS, PEACE_GOLD_COST } from '../../cpu/data/seats';
 import { WAR_KIND_SURPRISE } from '../../cpu/data/warKinds';
@@ -41,13 +41,16 @@ describe('decision mask groups', () => {
 
   it('policy: nothing without a government, then the Chiefdom cards and slots', () => {
     const state = makeState(makeMap(12, 12));
-    expect(policyObs(state, 0)).toEqual({ unlocked: [], slots: [0, 0, 0, 0] });
+    expect(policyObs(state, 0)).toEqual({ unlocked: [], slots: [0, 0, 0, 0], government: -1, gov_open: [] });
     grantCivics(state, 'CODE_OF_LAWS');
     const want = ['URBAN_PLANNING', 'GOD_KING', 'DISCIPLINE', 'SURVEY']
       .map((id) => POLICY_LIST.findIndex((p) => p.id === id)).sort((a, b) => a - b);
     const obs = policyObs(state, 0);
     expect(obs.unlocked).toEqual(want);
     expect(obs.slots).toEqual([1, 1, 0, 0]);
+    const chiefdom = GOVERNMENT_LIST.findIndex((g) => g.id === 'CHIEFDOM');
+    expect(obs.government).toBe(chiefdom);
+    expect(obs.gov_open).toEqual([chiefdom]);
   });
 
   it('war: the head columns, declare and sue gates, the kind per major column', () => {

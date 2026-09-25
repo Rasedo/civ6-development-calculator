@@ -1,6 +1,7 @@
-/** THE MINOR'S TURN — its city's yields, the research they buy, its Builders'
- * work and the item it produces, in its own module so the legality bodies it
- * borrows (rules.ts, game.ts, effects.ts, city.ts, units.ts) stay upstream of
+/** THE MINOR'S TURN — its city's yields, the research they buy, the upgrades
+ * and purchases its purse makes, its Builders' work, the item it produces and
+ * where its army stands, in its own module so the legality bodies it borrows
+ * (rules.ts, game.ts, effects.ts, city.ts, units.ts) stay upstream of
  * cityStates.ts with no import cycle.
  *
  * CIV6 (City-state): a city-state's city is an ordinary city — its Campus
@@ -8,38 +9,46 @@
  * its turn: `computeCityStats` over `minorCity` pays Science and Culture into
  * the two research pots and Production into the build pot, under the minor's
  * production rows (half its yield, and the toward-rows of the item it goes
- * to), and banks Gold and Faith, which nothing spends. WHAT it produces is
- * the fitted build table (`MINOR_BUILD_ROWS`, C-38's census); what each item
- * needs — the minor's own researched unlock, a legal plot, an intact
- * perimeter below a higher wall, a free tile beside the centre for a unit —
- * is the same rule a major pays.
+ * to), and Gold and Faith into its purse, which pays its units' upkeep and
+ * buys what the census saw a minor buy. WHAT it produces is the fitted build
+ * table (`MINOR_BUILD_ROWS`, C-38's census); what each item needs — the
+ * minor's own researched unlock, a legal plot, an intact perimeter below a
+ * higher wall, a free tile beside the centre for a unit — is the same rule a
+ * major pays.
  */
-import type { CityState, DistrictId, GameState, Tile, Unit } from './types';
+import type { City, CityState, DistrictId, GameState, ResearchState, Tile, Unit } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { TECHS } from '../data/techs';
+import { ERAS, TECHS, type Era } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import {
   CITY_STATE_TYPE_DISTRICT, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS,
-  MINOR_BUILDER_PROD_PCT, MINOR_BUILDER_RADIUS, MINOR_BUILDER_RATE_PERMILLE, MINOR_EXCLUDED_UNIT_CLASSES,
-  MINOR_HARBOR_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY,
-  MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT, type MinorBuildRow,
+  MINOR_BUILDER_BUY_SLOTS, MINOR_BUILDER_PROD_PCT, MINOR_BUILDER_RADIUS, MINOR_BUILDER_RATE_PERMILLE,
+  MINOR_EXCLUDED_UNIT_CLASSES, MINOR_HARBOR_PROD_PCT, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS,
+  MINOR_MILITARY_BUY_BP, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_PROD_PCT, MINOR_PRODUCTION_PCT,
+  MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD, MINOR_WALK_STEPS_DAMAGED,
+  MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_WEIGHTS_PEACE, MINOR_WALK_WEIGHTS_WAR,
+  MINOR_WALLS_PROD_PCT, type MinorBuildRow, FREE_CITY_BUILD_ROWS,
 } from '../data/cityStates';
-import { ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
+import { ENCAMPMENT_HP, UNIT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
-import { canPlaceDistrictIn, outerPool, validImprovements, wallsMax } from './rules';
+import { CIV_LEVELS } from '../data/civLevels';
+import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
+import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, wallsMax } from './rules';
 import { seatGrowth } from './seatTurn';
 import { cityBorderGrowth, cityStrikes } from './phase';
 import { applyTrainingGrants, minorCityCS } from './combat';
-import { districtScaledBase, districtProgressAdd } from './game';
+import { districtScaledBase, districtProgressAdd, goldAffordable, projectCost, repairAvailable } from './game';
 import { computeCityStats } from './city';
 import { minorCity } from './cityStates';
-import { computeUnlocksIn, type Unlocks } from './effects';
-import { tileSeat } from './seats';
+import { computeUnlocksIn, purchaseStep, type Unlocks } from './effects';
+import { FREE_SEAT, civsAtWar, majorityReligionOf, seatOf, tileSeat } from './seats';
 import { builderCost, disbandUnit, spawnUnit, tileFreeForUnit, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
 import { nextRandom } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
-import { tilesWithin } from '../../world/hex';
+import { landWalker, walkUnit } from './walker';
+import { worldEraIndex } from './eras';
+import { hexDistance, tilesWithin } from '../../world/hex';
 import { hasRiver, isWater } from '../../world/query';
 
 /** The first legal plot in TILE-INDEX order — the GPU pick is the argmax of
@@ -61,17 +70,30 @@ function minorDistrictSite(state: GameState, cityState: CityState, district: Dis
 
 /** One minor at a time — a district one minor lands may lend a neighbour's
  *  district adjacency across the border, so the next minor's yields read it.
- *  Its Builders work before its production lands, so a Builder trained this
- *  turn waits for the next; its turn ends with its city's ranged strikes, the
- *  majors' own body fired from the minor's centre strength. */
+ *  A research completion triggers its upgrades, then its purse buys; its
+ *  Builders work before its production lands, so a Builder trained this turn
+ *  waits for the next; then its city's ranged strikes (the majors' own body
+ *  fired from the minor's centre strength), and last its army walks. */
 export function minorPhase(state: GameState): void {
   for (const cityState of state.cityStates) {
+    const military = minorMilitary(state, cityState).length;
+    if (cityState.armySeen !== undefined && military < cityState.armySeen) cityState.lossTurn = state.turn;
     const production = minorAccrue(state, cityState);
-    minorResearch(state, cityState);
+    const gained = minorResearch(state, cityState);
+    minorPlan(state, cityState);
+    minorUpgrades(state, cityState, gained);
+    minorPurchases(state, cityState);
     minorBuilders(state, cityState);
     minorBuild(state, cityState, production);
     cityStrikes(state, minorCity(cityState), minorCityCS(state, cityState));
+    minorWalk(state, cityState);
+    cityState.armySeen = minorMilitary(state, cityState).length;
   }
+}
+
+/** The minor's military units, in unit order. */
+function minorMilitary(state: GameState, cityState: CityState): Unit[] {
+  return state.units.filter((u) => u.seat === cityState.seat && unitIsMilitary(u.type));
 }
 
 /**
@@ -84,14 +106,21 @@ export function minorPhase(state: GameState): void {
  * on the `CityState` record because `minorCity` builds a fresh `City` view
  * every call — so the results are written back.
  *
- * Its Gold and Faith bank. Its Production is returned for `minorBuild`, which
- * pays it into the pot under the rows of the item it goes toward.
+ * Its Gold banks and pays its units' upkeep — each unit's own Maintenance, a
+ * minor carrying no government or policy that cuts it. The census never read
+ * a minor's treasury below 0 (35,081 minor-turns, balances held at 0 for fifty
+ * turns with the army standing), so the balance stops at 0 and nothing is
+ * disbanded. Its Faith banks. Its Production is returned for `minorBuild`,
+ * which pays it into the pot under the rows of the item it goes toward.
  */
-function minorAccrue(state: GameState, cityState: CityState): number {
+export function minorAccrue(state: GameState, cityState: CityState): number {
   const city = minorCity(cityState);
   const stats = computeCityStats(state, city);
   const y = stats.total;
+  let upkeep = 0;
+  for (const u of state.units) if (u.seat === cityState.seat) upkeep += UNITS[u.type]?.maintenance ?? 0;
   cityState.treasury += y.gold;
+  cityState.treasury = Math.max(0, cityState.treasury - upkeep);
   cityState.research.techProgress += y.science;
   cityState.research.civicProgress += y.culture;
   cityState.faith += y.faith;
@@ -115,11 +144,14 @@ function minorProduction(production: number, towardPct: number): number {
  *  CIV6 (Urban Defenses): the tech "builds modern fortifications around the
  *  City Centers of all current and future cities and their Encampment
  *  districts" — a minor's perimeter arrives at the urban tier's full pool,
- *  as `urbanDefensesFit` fits a major's cities. */
-function minorResearch(state: GameState, cityState: CityState): void {
+ *  as `urbanDefensesFit` fits a major's cities. Returns how many trees
+ *  completed a row this turn — the upgrade trigger's count. */
+function minorResearch(state: GameState, cityState: CityState): number {
   const r = cityState.research;
+  let gained = 0;
   const tech = cheapestAvailable(TECHS, r.techs);
   if (tech && r.techProgress >= TECHS[tech].cost) {
+    gained += 1;
     r.techProgress -= TECHS[tech].cost;
     r.techs.push(tech);
     if (tech === URBAN_DEFENSES_TECH) {
@@ -132,8 +164,134 @@ function minorResearch(state: GameState, cityState: CityState): void {
   }
   const civic = cheapestAvailable(CIVICS, r.civics);
   if (civic && r.civicProgress >= CIVICS[civic].cost) {
+    gained += 1;
     r.civicProgress -= CIVICS[civic].cost;
     r.civics.push(civic);
+  }
+  return gained;
+}
+
+/**
+ * THE UPGRADE TRIGGER. CIV6 (Leaders.xml, MinorCivTriggeredTrees): a minor's
+ * "Upgrade Units" tree runs on TRIGGER_TECH_UPGRADE and TRIGGER_CIVIC_UPGRADE
+ * — a technology or a civic gained. The census reads ONE upgrade per such turn
+ * (1,356 of the 1,608 upgrade turns upgrade one unit, 222 two: a tech and a
+ * civic together), the same chassis' remaining units following on later
+ * triggers, at `MINOR_UPGRADE_GOLD` each. So each completion upgrades the
+ * first unit in unit order that may: the chassis' upgrade unlocked by the
+ * minor's own research, standing on the minor's ground with Movement left
+ * (CIV6, Unit: "in friendly territory", "more than 0 Movement"), the treasury
+ * covering the price. A minor ignores the strategic resource the new chassis
+ * asks (`CivilizationLevels.IgnoresUnitStrategicResourceRequirements`,
+ * CITY_STATE true). Which unit goes first is unmeasured. The upgrade spends
+ * the unit's turn, as every upgrade here does.
+ */
+export function minorUpgrades(state: GameState, cityState: CityState, gained: number): void {
+  for (let n = 0; n < gained; n++) {
+    if (!goldAffordable(cityState.treasury, MINOR_UPGRADE_GOLD)) return;
+    const u = state.units.find((x) => x.seat === cityState.seat && minorCanUpgrade(state, cityState, x));
+    if (!u) return;
+    cityState.treasury -= MINOR_UPGRADE_GOLD;
+    u.type = UNITS[u.type].upgradesTo!;
+    u.movesLeft = 0;
+  }
+}
+
+function minorCanUpgrade(state: GameState, cityState: CityState, u: Unit): boolean {
+  const next = UNITS[u.type]?.upgradesTo;
+  const def = next ? UNITS[next] : undefined;
+  if (!def || u.movesLeft <= 0) return false;
+  const r = cityState.research;
+  if (def.requiresTech && !r.techs.includes(def.requiresTech)) return false;
+  if (def.requiresCivic && !r.civics.includes(def.requiresCivic)) return false;
+  return tileSeat(state.map.tiles[u.tileIndex]) === cityState.seat;
+}
+
+/**
+ * THE MINOR'S PURCHASES (C-38's census; the rates in cpu/data/cityStates.ts).
+ * A Builder, on a turn none stands and the treasury covers its price: one draw
+ * at the episode's rate (`builderBuyRate`). Then a military unit, on a turn
+ * the treasury holds `MINOR_MILITARY_BUY_FLOOR` — or a Warrior Monk is in
+ * reach — one draw at the rate its military count sets (`MINOR_MILITARY_BUY_BP`,
+ * tripled within `MINOR_LOSS_BUY_TURNS` of a loss). A drawn purchase buys a
+ * Warrior Monk with Faith where the minor may (CIV6: "a city that has a
+ * majority religion with the Warrior Monks Follower Belief and a Holy Site
+ * with a Temple") and its faith covers one — the census's only faith spend —
+ * else the army row's chassis (`minorArmyUnit`) with Gold where the treasury
+ * covers it. A bought unit stands on or beside the centre and carries the
+ * city's training grants, as a trained one does; with no free tile nothing is
+ * bought.
+ */
+export function minorPurchases(state: GameState, cityState: CityState): void {
+  const units = state.units.filter((u) => u.seat === cityState.seat);
+  if (!units.some((u) => u.type === 'BUILDER')) {
+    const price = purchaseStep(builderCost(state, cityState.seat) * GOLD_PURCHASE_MULT);
+    if (goldAffordable(cityState.treasury, price)
+      && Math.floor(nextRandom(state) * 1000) < (cityState.builderBuyRate ?? 0)) {
+      const u = spawnUnit(state, 'BUILDER', cityState.centerIndex, cityState.seat);
+      if (u) {
+        applyTrainingGrants(state, minorCity(cityState), u);
+        cityState.treasury -= price;
+        cityState.buildersTrained += 1;
+      }
+    }
+  }
+  const military = units.filter((u) => unitIsMilitary(u.type)).length;
+  const bp = military < MINOR_MILITARY_BUY_BP.length ? MINOR_MILITARY_BUY_BP[military] : 0;
+  if (bp <= 0) return;
+  const monkPrice = purchaseStep(Math.round(UNITS.WARRIOR_MONK.cost * FAITH_PURCHASE_MULT));
+  const monk = minorMonkOk(state, cityState) && goldAffordable(cityState.faith, monkPrice);
+  if (!monk && !goldAffordable(cityState.treasury, MINOR_MILITARY_BUY_FLOOR)) return;
+  const recent = cityState.lossTurn !== undefined && state.turn - cityState.lossTurn <= MINOR_LOSS_BUY_TURNS;
+  if (Math.floor(nextRandom(state) * 10000) >= (recent ? bp * MINOR_LOSS_BUY_MULT : bp)) return;
+  if (monk) {
+    const u = spawnUnit(state, 'WARRIOR_MONK', cityState.centerIndex, cityState.seat);
+    if (u) cityState.faith -= monkPrice;
+    return;
+  }
+  const id = minorArmyUnit(trainableIn(cityState.research, minorAnyResource()), units);
+  if (!id) return;
+  const price = purchaseStep(UNITS[id].cost * GOLD_PURCHASE_MULT);
+  if (!goldAffordable(cityState.treasury, price)) return;
+  const u = spawnUnit(state, id, cityState.centerIndex, cityState.seat);
+  if (!u) return;
+  applyTrainingGrants(state, minorCity(cityState), u);
+  cityState.treasury -= price;
+}
+
+/** May the minor's city sell a Warrior Monk — its majority religion's
+ *  follower belief is Warrior Monks, it holds a Temple and a complete,
+ *  unpillaged Holy Site? */
+function minorMonkOk(state: GameState, cityState: CityState): boolean {
+  if (!UNITS.WARRIOR_MONK) return false;
+  const rel = majorityReligionOf(state, cityState.seat);
+  if (rel < 0 || seatOf(state, rel)?.religion.follower !== 'WARRIOR_MONKS') return false;
+  if (!(cityState.buildings ?? []).includes('TEMPLE')) return false;
+  const hs = (cityState.districts ?? []).find((d) => d.type === 'HOLY_SITE');
+  const t = hs ? state.map.tiles[hs.tileIndex] : undefined;
+  return !!t?.districtComplete && !t.districtPillaged;
+}
+
+/** CIV6 (`CivilizationLevels.IgnoresUnitStrategicResourceRequirements`): a
+ *  city-state trains and upgrades into a chassis whatever strategic resource
+ *  it asks. */
+function minorAnyResource(): boolean {
+  return CIV_LEVELS.CITY_STATE.ignoresUnitStrategicResourceRequirements;
+}
+
+/**
+ * THE MINOR'S WALKER (`walkUnit`, C-38's census): each land military unit, in
+ * unit order, walks around the minor's centre on the peace or the war tables
+ * — at war while any major is at war with it — a damaged unit on the damaged
+ * step table. The list is taken before anyone moves.
+ */
+function minorWalk(state: GameState, cityState: CityState): void {
+  const atWar = state.seats.some((s) => civsAtWar(state, cityState.seat, s.seat));
+  const weights = atWar ? MINOR_WALK_WEIGHTS_WAR : MINOR_WALK_WEIGHTS_PEACE;
+  const walkers = state.units.filter((u) => u.seat === cityState.seat && landWalker(u));
+  for (const u of walkers) {
+    const steps = u.hp < UNIT_HP ? MINOR_WALK_STEPS_DAMAGED : atWar ? MINOR_WALK_STEPS_WAR : MINOR_WALK_STEPS_PEACE;
+    walkUnit(state, u, [cityState.centerIndex], steps, weights);
   }
 }
 
@@ -195,33 +353,36 @@ export function minorImprovementPicks(state: GameState, cityState: CityState, bu
 }
 
 /**
- * THE EPISODE'S DRAWS, once, at the minor's first build: one slot of each
- * drawn row (`MINOR_BUILD_ROWS[r].from`, the minor's type) in table order,
- * then the army cap. A row without draws keeps 0.
+ * THE EPISODE'S DRAWS, once, at the minor's first turn with its city: one
+ * slot of each drawn row (`MINOR_BUILD_ROWS[r].from`, the minor's type) in
+ * table order, then the army cap, then the Builder purchase rate. A row
+ * without draws keeps 0.
  */
-function minorPlan(state: GameState, cityState: CityState): void {
+export function minorPlan(state: GameState, cityState: CityState): void {
   if (cityState.armyCap !== undefined) return;
   cityState.buildFrom = MINOR_BUILD_ROWS.map((row) =>
     (row.from ? row.from[cityState.type][Math.floor(nextRandom(state) * MINOR_BUILD_SLOTS)] : 0));
   cityState.armyCap = MINOR_ARMY_CAP_SLOTS[Math.floor(nextRandom(state) * MINOR_BUILD_SLOTS)];
+  cityState.builderBuyRate = MINOR_BUILDER_BUY_SLOTS[Math.floor(nextRandom(state) * MINOR_BUILDER_BUY_SLOTS.length)];
 }
 
-/** The land military chassis a minor may train: its own research unlocks it,
- *  it asks no strategic resource (a minor holds no stockpile here), it is no
- *  civilization's unique, and MinorCivUnitBuilds does not bar its class. */
-function minorTrainable(cityState: CityState): UnitDef[] {
-  const r = cityState.research;
+/** The land military chassis a research record may train: it unlocks it,
+ *  it asks no strategic resource unless `anyResource` (the holder ignores
+ *  the ask, or holds no stockpile to meet it), it is no civilization's
+ *  unique, and MinorCivUnitBuilds does not bar its class. A minor's and a
+ *  Free City's set alike. */
+export function trainableIn(r: { techs: string[]; civics: string[] }, anyResource: boolean): UnitDef[] {
   return Object.values(UNITS).filter((d) =>
     unitIsMilitary(d.id) && !d.naval && !d.air && !d.faithOnly && !d.spawnOnly && !d.settler && !d.uniqueTo
-    && !d.requiresResource
+    && (anyResource || !d.requiresResource)
     && (!d.requiresTech || r.techs.includes(d.requiresTech))
     && (!d.requiresCivic || r.civics.includes(d.requiresCivic))
     && !!UNIT_PROMO_CLASS[d.id] && !MINOR_EXCLUDED_UNIT_CLASSES.includes(UNIT_PROMO_CLASS[d.id]));
 }
 
-/** The strongest chassis of `cls` the minor may train, ties by catalog order
- *  — `bestTrainableOfClass`'s rule over the minor's set. */
-function minorBestOfClass(trainable: UnitDef[], cls: PromoClass): string | null {
+/** The strongest chassis of `cls` in a trainable set, ties by catalog order
+ *  — `bestTrainableOfClass`'s rule over the minor's (or Free City's) set. */
+export function minorBestOfClass(trainable: UnitDef[], cls: PromoClass): string | null {
   let best: UnitDef | undefined;
   for (const d of trainable) {
     if (UNIT_PROMO_CLASS[d.id] !== cls) continue;
@@ -314,7 +475,6 @@ function minorWant(
  *  With no row wanting anything the pot takes it under the city's percent
  *  alone. */
 function minorBuild(state: GameState, cityState: CityState, production: number): void {
-  minorPlan(state, cityState);
   let pot = cityState.prodProgress ?? 0;
   const toward = (pct: number) => {
     pot += minorProduction(production, pct);
@@ -324,7 +484,7 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
   const units = state.units.filter((u) => u.seat === cityState.seat);
   const military = units.filter((u) => unitIsMilitary(u.type)).length;
   let trainable: UnitDef[] | undefined;
-  const lazyTrainable = () => (trainable ??= minorTrainable(cityState));
+  const lazyTrainable = () => (trainable ??= trainableIn(cityState.research, minorAnyResource()));
   for (let r = 0; r < MINOR_BUILD_ROWS.length; r++) {
     const row = MINOR_BUILD_ROWS[r];
     const from = cityState.buildFrom![r];
@@ -386,4 +546,117 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
     return;
   }
   toward(0);
+}
+
+/**
+ * THE FREE CITIES' RESEARCH — what a Free City may raise and train. The Free
+ * Cities player researches nothing of its own (`seatOf(FREE_SEAT).research`
+ * stays empty, which is what its walls tier reads), so its build table reads
+ * the world era, the reading its grants already take (`eraUnitOfClass`):
+ * every technology and civic of an era at or below the world's.
+ */
+export function freeCityResearch(state: GameState): ResearchState {
+  const era = Math.max(0, worldEraIndex(state));
+  const within = (e: Era) => Math.max(0, ERAS.indexOf(e)) <= era;
+  return {
+    tech: null, techProgress: 0, civic: null, civicProgress: 0, boosted: [], techRetained: {}, civicRetained: {},
+    techs: Object.keys(TECHS).filter((id) => within(TECHS[id].era)),
+    civics: Object.keys(CIVICS).filter((id) => within(CIVICS[id].era)),
+  };
+}
+
+/** The Free City nearest `u` — ties to the first in the Free Cities' list. */
+function nearestFreeCity(state: GameState, u: Unit): City | undefined {
+  const at = state.map.tiles[u.tileIndex];
+  let best: City | undefined;
+  let bestD = Infinity;
+  for (const c of state.freeSeat?.cities ?? []) {
+    const t = state.map.tiles[c.centerIndex];
+    const d = hexDistance(at.col, at.row, t.col, t.row);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
+/** May the Free City raise building `id` now? The Free Cities' research
+ *  unlocks it; the city does not hold it; its district stands complete and
+ *  clean (the centre for a City Center row); the row it requires is held and
+ *  the one it excludes is not; a Water Mill wants a river at the centre; and
+ *  CIV6: "While city defenses are damaged, you cannot build higher levels of
+ *  Walls." `minorBuildingOk`'s rule over a real city. */
+function freeCityBuildingOk(state: GameState, city: City, id: string, unlocks: Unlocks): boolean {
+  const def = BUILDINGS[id];
+  if (!def || city.buildings.includes(id) || !unlocks.buildings.has(id)) return false;
+  const centre = state.map.tiles[city.centerIndex];
+  const home = def.district === 'CITY_CENTER' ? centre
+    : city.districts.map((d) => state.map.tiles[d.tileIndex])
+      .find((t) => t.district === def.district && t.districtComplete);
+  if (!home || irradiated(home)) return false;
+  if (def.requiresAny?.length && !def.requiresAny.some((r) => city.buildings.includes(r))) return false;
+  if (def.exclusiveWith?.some((x) => city.buildings.includes(x))) return false;
+  if (def.special === 'WATER_MILL' && !hasRiver(centre)) return false;
+  if (def.walls && outerPool(state, city) < wallsMax(state, city)) return false;
+  return true;
+}
+
+/**
+ * A FREE CITY'S PRODUCTION (`FREE_CITY_BUILD_ROWS`, C-60's census) — the
+ * city-state model over a real city: the turn's Production banks into the
+ * city's pot (`City.freePot`; the Free Cities player carries no production
+ * row of its own), and the first row that wants an item the city can make now
+ * completes it when the pot covers it, one item a turn. A unit row wants its
+ * class's strongest chassis the Free Cities may train (`trainableIn` over
+ * `freeCityResearch`; CIV6 `CivilizationLevels.IgnoresUnitStrategicResource
+ * Requirements` is false for FREE_CITIES and the seat holds no stockpile, so
+ * no chassis that asks a resource) while no Free Cities unit of the class
+ * calls the city its nearest Free City (`nearestFreeCity`) — the one
+ * reading that keeps a walking guard counted; it lands on or beside the centre,
+ * and with no free tile nothing is paid. A building row raises the first of
+ * its items the city may; the repair row restores the walls (the city's and
+ * its Encampment's) when `repairAvailable` allows, at the HP it puts back
+ * (`projectCost`).
+ */
+export function freeCityBuild(state: GameState, city: City, production: number, research: ResearchState): void {
+  const pot = (city.freePot ?? 0) + production;
+  city.freePot = pot;
+  const unlocks = computeUnlocksIn(research, []); // the Free Cities carry no roster row
+  const guards = state.units.filter((u) => u.seat === FREE_SEAT && unitIsMilitary(u.type)
+    && nearestFreeCity(state, u) === city);
+  let trainable: UnitDef[] | undefined;
+  for (const row of FREE_CITY_BUILD_ROWS) {
+    if (row.kind === 'unit') {
+      if (guards.some((u) => UNIT_PROMO_CLASS[u.type] === row.cls)) continue;
+      trainable ??= trainableIn(research, CIV_LEVELS.FREE_CITIES.ignoresUnitStrategicResourceRequirements);
+      const id = minorBestOfClass(trainable, row.cls!);
+      if (!id) continue;
+      const cost = UNITS[id].cost;
+      if (pot < cost) return;
+      if (!spawnUnit(state, id, city.centerIndex, FREE_SEAT)) return;
+      city.freePot = pot - cost;
+      return;
+    }
+    if (row.kind === 'repair') {
+      if (!repairAvailable(state, city)) continue;
+      const cost = projectCost(state, FREE_SEAT, 'REPAIR_DEFENSES', city);
+      if (pot < cost) return;
+      city.freePot = pot - cost;
+      city.outerHp = wallsMax(state, city);
+      fitEncampOuter(state, city);
+      return;
+    }
+    const id = row.items!.find((b) => freeCityBuildingOk(state, city, b, unlocks));
+    if (!id) continue;
+    const cost = BUILDINGS[id].cost;
+    if (pot < cost) return;
+    city.freePot = pot - cost;
+    city.buildings.push(id);
+    if (BUILDINGS[id].walls) {
+      city.outerHp = wallsMax(state, city);
+      fitEncampOuter(state, city);
+    }
+    return;
+  }
 }

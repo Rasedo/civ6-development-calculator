@@ -23,16 +23,17 @@ import { buildingVariantFor } from '../data/buildings';
 import { rowIsFor } from '../data/civilizations';
 import { civOf, leaderOf } from './seats';
 import {
-  AUTO_THEME_ROWS, EXTRA_SLOT_ROWS, GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GW_THEME_ART, GW_THEME_ARTIFACT,
+  AUTO_THEME_ROWS, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GW_THEME_ART, GW_THEME_ARTIFACT,
   GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, THEMING_MULT, gwKindObjects, gwKindOf,
   holderSlots, slotAccepts, type GreatWork,
 } from '../data/greatWorks';
-import { GW_PRINTING_WRITING_MULT } from '../data/greatPeople';
+import { GW_PRINTING_WRITING_MULT, gpCityPermOf } from '../data/greatPeople';
 
 /** the shape every work-holding city answers with — a City, a capture's stub */
 export type WorkCity = {
   seat: number;
   buildings: string[];
+  gpPerm?: number[];
   districts?: City['districts'];
   pillagedBuildings?: string[];
   wonders?: { id: string; tileIndex: number }[];
@@ -112,6 +113,8 @@ export function workContext(state: GameState, city: WorkCity): WorkContext {
     open.push(o);
     let x = 0;
     for (const r of EXTRA_SLOT_ROWS) if (r.holder === h.id && rowIsFor(r, civ, leader)) x += r.amount;
+    // CIV6 (Giovanni de' Medici): the city's own Great Person widening
+    for (const r of GW_GP_EXTRA_SLOTS) if (r.holder === h.id) x += gpCityPermOf(city, r.perm as never);
     extra.push(x);
   });
   return { present, open, extra };

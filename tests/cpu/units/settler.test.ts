@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
 
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity, queueSettler, settlerCost, endTurn } from '../../../cpu/core/game';
+import { foundCity, settlerCost, endTurn } from '../../../cpu/core/game';
+import { applySeatActionRecord } from '../../../cpu/core/phase';
+import { prodLayout } from '../../../cpu/core/prodLayout';
 import { computeCityStats } from '../../../cpu/core/city';
 import { settlerCount, spawnUnit } from '../../../cpu/core/units';
 import { scaleByGameSpeed } from '../../../cpu/data/constants';
@@ -26,10 +28,16 @@ describe('settlers', () => {
     // a second founding needs a settler STANDING on the tile
     expect(foundCity(state, tileAtCoords(state.map, 12, 9).index, 0).ok).toBe(false);
 
-    // a 1-pop city may not train one (completion costs the pop)
-    expect(queueSettler(state, a.id, 0).ok).toBe(false);
+    // a 1-pop city may not train one (completion costs the pop): the
+    // record's settler column is refused, then taken
+    const trainSettler = () => applySeatActionRecord(state, seatOf(state, 0)!, {
+      production: [[a.centerIndex, prodLayout().NB]], tech: null, civic: null, units: [],
+    });
+    trainSettler();
+    expect(a.queue.length).toBe(0);
     a.population = 2;
-    expect(queueSettler(state, a.id, 0).ok).toBe(true);
+    trainSettler();
+    expect(a.queue[0]?.kind).toBe('settler');
     expect(settlerCost(state, 0)).toBe(BASE + STEP); // a queued settler raises the next price
     const prod = computeCityStats(state, a).total.production;
     const turns = Math.ceil(BASE / prod);

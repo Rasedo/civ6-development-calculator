@@ -134,7 +134,7 @@ def poke_catalog(rules, path):
     back = sim._gp_cls_of(torch.tensor(live, dtype=torch.long))
     assert [int(x) for x in back.tolist()] == [chassis.index(u) for u in live], \
         "the chassis -> class map does not invert"
-    n_sites = 9  # GP_SITES' width; the site predicate stacks exactly this many arms
+    n_sites = 10  # GP_SITES' width; the site predicate stacks exactly this many arms
     for c in range(n_cls):
         n = int(sim._gp_roster[c])
         for a in range(n):

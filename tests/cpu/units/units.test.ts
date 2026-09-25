@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity, placeImprovement, endTurn, serialize, deserialize } from '../../../cpu/core/game';
-import { nextRandom, moveCostInto, crossesRiver, findPath, orderMove, spawnUnit, queueUnit, builderImprove, builderRemoveFeature, unitMaintenance, tileFreeForUnit, walkPath } from '../../../cpu/core/units';
+import { makeMap, makeState, tileAtCoords, orderUnit } from '../helpers';
+import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
+import { moveCostInto, crossesRiver, findPath, spawnUnit, builderCost, builderRemoveFeature, tileFreeForUnit, walkPath } from '../../../cpu/core/units';
+import { nextRandom } from '../../../cpu/core/rand';
+import { commitProduction } from '../../../cpu/core/seatTurn';
+import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
 import { DIR_E } from '../../../world/hex';
 import { MP_SCALE, RAILROAD_MP } from '../../../cpu/data/constants';
 
@@ -73,7 +76,9 @@ describe('movement', () => {
 
     const unit = spawnUnit(state, 'BUILDER', from.index, 0)!;
     unit.tileIndex = from.index; // force exact tile
-    expect(orderMove(state, unit.id, to.index).ok).toBe(true);
+    unit.path = findPath(state, unit, to.index);
+    expect(unit.path).not.toBeNull();
+    walkPath(state, unit);
     expect(unit.tileIndex).toBe(to.index);
     expect(unit.movesLeft).toBe(0); // river ate all MP
 
@@ -87,7 +92,9 @@ describe('movement', () => {
     const { state } = unitsState();
     const unit = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 8, 8).index, 0)!;
     const far = tileAtCoords(state.map, 14, 8);
-    expect(orderMove(state, unit.id, far.index).ok).toBe(true);
+    unit.path = findPath(state, unit, far.index);
+    expect(unit.path).not.toBeNull();
+    walkPath(state, unit);
     expect(unit.tileIndex).not.toBe(far.index); // 2 MP can't get there
     let guard = 0;
     while (unit.tileIndex !== far.index && guard++ < 10) endTurn(state);
@@ -144,12 +151,11 @@ describe('movement', () => {
 });
 
 describe('builders', () => {
-  it('units mode blocks free improvements and requires builder charges', () => {
+  it('a trained builder walks to the tile and spends a charge on its improvement', () => {
     const { state, city } = unitsState();
     const farmTile = tileAtCoords(state.map, 9, 8);
-    expect(placeImprovement(state, farmTile.index, 'FARM', 0).ok).toBe(false); // units mode
 
-    expect(queueUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
+    commitProduction(state, 0, city, { kind: 'unit', unit: 'BUILDER', progress: 0, cost: builderCost(state, 0) });
     let guard = 0;
     // a barbarian scout can stand up before the Builder trains — pick by type
     while (!state.units.some((u) => u.type === 'BUILDER' && u.seat === 0) && guard++ < 40) endTurn(state);
@@ -157,10 +163,12 @@ describe('builders', () => {
     expect(builder).toBeDefined();
 
     // walk to the farm tile, then build
-    orderMove(state, builder.id, farmTile.index);
+    builder.path = findPath(state, builder, farmTile.index);
+    walkPath(state, builder);
     let g2 = 0;
     while (builder.tileIndex !== farmTile.index && g2++ < 5) endTurn(state);
-    expect(builderImprove(state, builder.id, 'FARM', 0).ok).toBe(true);
+    builder.movesLeft = Math.max(builder.movesLeft, MP_SCALE); // the order is the next turn's
+    orderUnit(state, builder, 'BUILD_FARM');
     expect(farmTile.improvement).toBe('FARM');
     expect(builder.charges).toBe(2);
   });
@@ -178,17 +186,8 @@ describe('builders', () => {
     expect(state.units.length).toBe(0); // spent its last charge
   });
 
-  it('sandbox trains instantly and still allows free improvements', () => {
-    const { state, city } = unitsState();
-    state.sandbox = true;
-    expect(queueUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
-    expect(state.units.length).toBe(1);
-    expect(placeImprovement(state, tileAtCoords(state.map, 9, 8).index, 'FARM', 0).ok).toBe(true);
-  });
-
-  it('unit maintenance is wired (builders are free)', () => {
+  it('builders pay no upkeep', () => {
     const { state } = unitsState();
-    spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 8, 8).index, 0);
-    expect(unitMaintenance(state, 0)).toBe(0);
+    expect(unitUpkeep(getModifiers(state, 0), 'BUILDER')).toBe(0);
   });
 });

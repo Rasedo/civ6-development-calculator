@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, settleFirstCity } from '../helpers';
-import { boostProject, endTurn, queueSettler, foundCityAt, projectBoostCity } from '../../../cpu/core/game';
+import { boostProject, endTurn, settlerCost, foundCityAt, projectBoostCity } from '../../../cpu/core/game';
+import { commitProduction } from '../../../cpu/core/seatTurn';
 import { transferCity } from '../../../cpu/core/phase';
 import { cityBuildingSum, newCityGrantUnit, seatBuildingSum } from '../../../cpu/core/city';
 import { gwFreeSlot, gwHasRoom, placeGreatWork, workContext } from '../../../cpu/core/greatWorks';
@@ -42,7 +43,7 @@ describe("the Ancestral Hall — settlers and the founding Builder", () => {
         city.buildings.push('ANCESTRAL_HALL');
       }
       city.population = 3;
-      expect(queueSettler(state, city.id, 0).ok).toBe(true);
+      commitProduction(state, 0, city, { kind: 'settler', progress: 0, cost: settlerCost(state, 0) });
       endTurn(state);
       return city.queue[0]?.progress ?? 0;
     };
@@ -107,7 +108,7 @@ describe("the Warlord's Throne — the conquest window", () => {
       city.buildings.push('WARLORDS_THRONE');
       if (open) seatOf(state, 0)!.conquestProdTurns = 5;
       city.population = 3;
-      expect(queueSettler(state, city.id, 0).ok).toBe(true);
+      commitProduction(state, 0, city, { kind: 'settler', progress: 0, cost: settlerCost(state, 0) });
       endTurn(state);
       return city.queue[0]?.progress ?? 0;
     };

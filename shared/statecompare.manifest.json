@@ -787,6 +787,17 @@
           "note": "the bitmask of governments this seat has BEEN in, over the roster's own order. It gates every LEGACY policy card, and no other field can re-derive it: which government a seat held depends on the ORDER its civics arrived in."
         },
         {
+          "name": "governmentChosen",
+          "compare": "exact",
+          "covers": [
+            "GovernmentState.chosen"
+          ],
+          "planes": [
+            "civ_gov_chosen"
+          ],
+          "note": "the government the seat's record chose (a DRIVER decision on the wire, `adoptGovernment` / `_adopt_government`), as a roster position, -1 while none has been: the seat is in it, else in the newest its civics unlock."
+        },
+        {
           "name": "policySlotsExtra",
           "compare": "exact",
           "covers": [],
@@ -1575,7 +1586,7 @@
           "planes": [
             "citystate_treasury"
           ],
-          "note": "the minor city's Gold, banked; nothing spends it yet"
+          "note": "the minor city's Gold: its yield walk pays it, its units' upkeep and its purchases and upgrades spend it"
         },
         {
           "name": "minorPop",
@@ -1705,6 +1716,39 @@
             "citystate_army_cap"
           ],
           "note": "the army the minor keeps, drawn once; -1 until drawn."
+        },
+        {
+          "name": "minorBuilderBuyRate",
+          "compare": "exact",
+          "covers": [
+            "CityState.builderBuyRate"
+          ],
+          "planes": [
+            "citystate_builder_buy"
+          ],
+          "note": "the episode's Builder purchase rate per mille, drawn once with the build table's draws; -1 until drawn."
+        },
+        {
+          "name": "minorArmySeen",
+          "compare": "exact",
+          "covers": [
+            "CityState.armySeen"
+          ],
+          "planes": [
+            "citystate_army_seen"
+          ],
+          "note": "the minor's military count at the end of its last turn; -1 before its first."
+        },
+        {
+          "name": "minorLossTurn",
+          "compare": "exact",
+          "covers": [
+            "CityState.lossTurn"
+          ],
+          "planes": [
+            "citystate_loss_turn"
+          ],
+          "note": "the turn the minor was last seen to have lost a military unit, which its purchase rate reads; -1 for none."
         },
         {
           "name": "minorBuildersTrained",
@@ -2051,6 +2095,17 @@
             "city_freed_turn"
           ],
           "note": "the turn a FREE CITY revolted, which its grants count from; -1 for a city that is not Free. TS reads it off `foundedTurn`, which the transfer that made the city Free writes; `foundedTurn` has no other reader."
+        },
+        {
+          "name": "freePot",
+          "compare": "milli",
+          "covers": [
+            "City.freePot"
+          ],
+          "planes": [
+            "city_free_pot"
+          ],
+          "note": "a FREE CITY's build pot: its Production, banked until its build table's next item is covered; 0 for any other city."
         },
         {
           "name": "greatWorks",
@@ -2862,6 +2917,16 @@
           "planes": [
             "tile_gp_perm"
           ]
+        },
+        {
+          "name": "gpFaithAdjSci",
+          "compare": "exact",
+          "covers": [
+            "Tile.gpPerm"
+          ],
+          "planes": [
+            "tile_gp_perm"
+          ]
         }
       ]
     }
@@ -2938,7 +3003,7 @@
       },
       {
         "path": "Seat.government",
-        "why": "the container; `held` is covered and the other two are excluded one by one — they are STORED per seat on TS and DERIVED per read on the GPU (computeAdoption's twin has no plane), so there is nothing on the GPU side to read back."
+        "why": "the container; its fields are covered one by one (held, chosen, policies)."
       },
       {
         "path": "Seat.religion",
@@ -2947,10 +3012,6 @@
       {
         "path": "Seat.research",
         "why": "the container; its fields are covered one by one."
-      },
-      {
-        "path": "GovernmentState.current",
-        "why": "no GPU plane (see Seat.government)."
       },
       {
         "path": "ReligionState.name",

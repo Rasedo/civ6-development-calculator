@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { greatPeopleEarned, greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
 import { seatOf, tileCity } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding, queueWonder, setGovernment, endTurn } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, standBuilding, standDistrict, standWonder } from '../helpers';
+import { foundCity, endTurn } from '../../../cpu/core/game';
 import { canPlaceWonder, wonderExists } from '../../../cpu/core/rules';
 import { computeCityStats, citySpecialistSlots, workableTiles } from '../../../cpu/core/city';
 import { districtAdjacency } from '../../../cpu/core/yields';
-import { governmentSlots } from '../../../cpu/core/effects';
+import { governmentSlots, seatGovernment } from '../../../cpu/core/effects';
 import { grantCivics, expandBorders } from '../helpers';
 import { GREAT_PEOPLE, GP_ERA_GPP } from '../../../cpu/data/greatPeople';
 import { ensureGpOffer, gpOfferCost } from '../../../cpu/core/greatPeople';
@@ -46,7 +46,7 @@ describe('world wonders', () => {
     const { state, city } = sandboxCity();
     const desert = tileAtCoords(state.map, 9, 8);
     desert.terrain = 'DESERT';
-    expect(queueWonder(state, city.id, 'PYRAMIDS', desert.index, 0).ok).toBe(true);
+    standWonder(state, city, 'PYRAMIDS', desert.index);
     expect(wonderExists(state, 'PYRAMIDS')).toBe(true);
     const other = tileAtCoords(state.map, 7, 8);
     other.terrain = 'DESERT';
@@ -58,7 +58,7 @@ describe('world wonders', () => {
     const before = computeCityStats(state, city).breakdown.buildings.culture;
     const desert = tileAtCoords(state.map, 9, 8);
     desert.terrain = 'DESERT';
-    queueWonder(state, city.id, 'PYRAMIDS', desert.index, 0);
+    standWonder(state, city, 'PYRAMIDS', desert.index);
     const after = computeCityStats(state, city).breakdown.buildings.culture;
     expect(after - before).toBe(2);
 
@@ -74,7 +74,7 @@ describe('world wonders', () => {
     }
     const spot = tileAtCoords(state.map, 9, 8);
     const before = computeCityStats(state, city);
-    expect(queueWonder(state, city.id, 'PETRA', spot.index, 0).ok).toBe(true);
+    standWonder(state, city, 'PETRA', spot.index);
     const after = computeCityStats(state, city);
     // one worked desert tile gains +2f +2g +1p (worked tile itself may shift; check gold delta ≥ 2)
     expect(after.breakdown.tiles.gold).toBeGreaterThanOrEqual(before.breakdown.tiles.gold + 2);
@@ -85,21 +85,19 @@ describe('world wonders', () => {
     expandBorders(state, city, 2);
     const river = tileAtCoords(state.map, 9, 8);
     river.riverMask = 1;
-    expect(
-      queueDistrict(state, city.id, 'INDUSTRIAL_ZONE', tileAtCoords(state.map, 10, 8).index, 0).ok,
-    ).toBe(true);
+    standDistrict(state, city, 'INDUSTRIAL_ZONE', tileAtCoords(state.map, 10, 8).index);
     // CIV6: "adjacent to an Industrial Zone with a FACTORY" — the district
     // alone is not the clause.
     city.buildings.push('FACTORY');
     const base = computeCityStats(state, city);
-    expect(queueWonder(state, city.id, 'RUHR_VALLEY', river.index, 0).ok).toBe(true);
+    standWonder(state, city, 'RUHR_VALLEY', river.index);
     const boosted = computeCityStats(state, city);
     expect(boosted.total.production).toBeCloseTo(base.total.production * 1.2, 5);
 
     const growthBefore = boosted.effectiveFoodSurplus;
     const hg = tileAtCoords(state.map, 8, 9);
     hg.riverMask = 1;
-    expect(queueWonder(state, city.id, 'HANGING_GARDENS', hg.index, 0).ok).toBe(true);
+    standWonder(state, city, 'HANGING_GARDENS', hg.index);
     const growthAfter = computeCityStats(state, city).effectiveFoodSurplus;
     expect(growthAfter).toBeCloseTo(growthBefore * 1.15, 5);
   });
@@ -107,10 +105,10 @@ describe('world wonders', () => {
   it('Forbidden City adds a wildcard policy slot', () => {
     const { state, city } = sandboxCity();
     grantCivics(state, 'CODE_OF_LAWS');
-    expect(setGovernment(state, 'CHIEFDOM', 0).ok).toBe(true);
+    expect(seatGovernment(state, 0)).toBe('CHIEFDOM');
     expect(governmentSlots(state, 0).length).toBe(2);
     const spot = tileAtCoords(state.map, 9, 8);
-    expect(queueWonder(state, city.id, 'FORBIDDEN_CITY', spot.index, 0).ok).toBe(true);
+    standWonder(state, city, 'FORBIDDEN_CITY', spot.index);
     expect(governmentSlots(state, 0).length).toBe(3);
     expect(governmentSlots(state, 0)[2]).toBe('wildcard');
   });
@@ -119,9 +117,9 @@ describe('world wonders', () => {
 describe('specialists', () => {
   it('slots equal buildings in the district; OVERFLOW citizens man them automatically', () => {
     const { state, city } = sandboxCity();
-    queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0);
+    standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 9, 8).index);
     expect(citySpecialistSlots(state, city).size).toBe(0); // no buildings yet
-    queueBuilding(state, city.id, 'LIBRARY', 0);
+    standBuilding(state, city, 'LIBRARY');
     const campusTile = tileAtCoords(state.map, 9, 8).index;
     expect(citySpecialistSlots(state, city).get(campusTile)).toBe(1);
 
@@ -138,8 +136,8 @@ describe('specialists', () => {
 
   it('the assignment clamps to open slots', () => {
     const { state, city } = sandboxCity();
-    queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0);
-    queueBuilding(state, city.id, 'LIBRARY', 0);
+    standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 9, 8).index);
+    standBuilding(state, city, 'LIBRARY');
     city.population = workableTiles(state, city).length + 99;
     expect(computeCityStats(state, city).specialistTotal).toBe(1); // one building, one slot
   });
@@ -148,8 +146,8 @@ describe('specialists', () => {
 describe('great people', () => {
   it('accumulates points and claims people with instant effects', () => {
     const { state, city } = sandboxCity();
-    queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0);
-    queueBuilding(state, city.id, 'LIBRARY', 0);
+    standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 9, 8).index);
+    standBuilding(state, city, 'LIBRARY');
     expect(greatPersonPointsPerTurn(state, 0).SCIENTIST).toBe(2); // district + library
 
     const before = seatOf(state, 0)!.research.techProgress;
@@ -171,8 +169,8 @@ describe('great people', () => {
 
   it('merchants pay out gold', () => {
     const { state, city } = sandboxCity();
-    queueDistrict(state, city.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 8).index, 0);
-    queueBuilding(state, city.id, 'MARKET', 0);
+    standDistrict(state, city, 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 8).index);
+    standBuilding(state, city, 'MARKET');
     const before = seatOf(state, 0)!.treasury;
     const lump = GP_ERA_GPP[GREAT_PEOPLE.MERCHANT[0].era];
     for (let i = 0; i < 60; i++) endTurn(state);

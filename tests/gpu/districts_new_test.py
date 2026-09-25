@@ -422,7 +422,7 @@ def main() -> None:
     tier1 = next(g for g in rj["governments"] if int(g["tier"]) == 1)
     s15.civ_civics[b, row, int(tier1["unlockCivic"])] = True
     s15._eff_version += 1
-    assert int(s15._adopted_gov_tier(s15.civ_civics[:, row])[b]) >= 1
+    assert int(s15._adopted_gov_tier(row)[b]) >= 1
     assert bool(s15._seat_buildable(row)[b, col, hall]), "a tier-1 government opens it"
     assert gcv["CHIEFDOM"]["tier"] == 0
     print("gov tier ok")

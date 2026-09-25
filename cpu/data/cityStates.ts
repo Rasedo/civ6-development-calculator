@@ -19,6 +19,7 @@
 import type { CityStateType, DistrictId, YieldKey } from '../core/types';
 import type { PromoClass } from './promotions';
 import { type SrcMap, srcConst, xml } from './provenance';
+import { GAME_SPEED } from './constants';
 
 export const CITY_STATE_TYPES: CityStateType[] = [
   'scientific',
@@ -546,6 +547,105 @@ export const MINOR_BUILDER_RATE_PERMILLE = srcConst('cityState.builderRatePermil
  *  Builders stand 94% of their turns. WHICH plot and improvement is
  *  unmeasured (LAB C-38-S1), so the pick is one draw over every valid pair. */
 export const MINOR_BUILDER_RADIUS = srcConst('cityState.builderRadius', 2, { lab: 'C-38' });
+
+/**
+ * THE MINOR'S PURSE — what its Gold and Faith buy, fitted to C-38's census
+ * (`tools/civ6lab/minor_play_census.py` over `runs/cs_watch_*.jsonl`, 262
+ * minor-games). Every price is the chassis' own speed-scaled cost at the gold
+ * (or faith) rate, floored to a multiple of five: the 453 bought Builders paid
+ * exactly that (median residual 0), an Archer 120, a Warrior 80, a Catapult
+ * 240, a Warrior Monk 100 faith.
+ *
+ * A Builder is bought on a turn no Builder stands and the treasury covers its
+ * price, at a rate drawn once per episode from these twenty slots (per mille)
+ * — the quantiles of the per-minor rate over minors with ten or more such
+ * turns (pooled 428 of 5,326 turns, 8.0%, flat over banks of 100 to 499).
+ */
+export const MINOR_BUILDER_BUY_SLOTS = srcConst('cityState.builderBuySlots',
+  [0, 0, 0, 24, 29, 39, 45, 53, 59, 67, 71, 80, 87, 97, 105, 120, 143, 167, 182, 211], { lab: 'C-38' });
+/** A military unit is bought on a turn the treasury holds at least the floor
+ *  (the smallest bank any of the 161 paid-for military purchases left from)
+ *  at this rate per ten thousand by the minor's military count (0, 1, ...;
+ *  none at eight or more: 0 of 195 such turns)... */
+export const MINOR_MILITARY_BUY_FLOOR = srcConst('cityState.militaryBuyFloor', 95, { lab: 'C-38' });
+export const MINOR_MILITARY_BUY_BP = srcConst('cityState.militaryBuyBp',
+  [101, 101, 88, 66, 66, 50, 37, 37], { lab: 'C-38', note: 'army 0-1 33/3,273; 2 25/2,857; 3-4 31/4,696; '
+    + '5 19/3,795; 6-7 9/2,417 rich turns, a loss window apart' });
+/** ...and at this multiple of it within this many turns of losing a military
+ *  unit (42 of 2,022 rich turns against 117 of 17,231: x3.06). */
+export const MINOR_LOSS_BUY_MULT = srcConst('cityState.lossBuyMult', 3, { lab: 'C-38' });
+export const MINOR_LOSS_BUY_TURNS = srcConst('cityState.lossBuyTurns', 3, { lab: 'C-38' });
+/** CIV6 (Leaders.xml, MINOR_CIV_GOLD_MILITARY_UPGRADE): a minor upgrades at
+ *  `MODIFIER_PLAYER_ADJUST_UNIT_UPGRADE_DISCOUNT_PERCENT` 100, and the census
+ *  reads every upgrade at exactly 5 Gold (146 of the 171 single-upgrade turns whose
+ *  neighbouring income is flat) — `UPGRADE_BASE_COST` at the online speed, the
+ *  one install figure the discount leaves. */
+export const MINOR_UPGRADE_GOLD = srcConst('cityState.upgradeGold', 5,
+  xml('GlobalParameters', 'Name=UPGRADE_BASE_COST', 'Value', {
+    scale: GAME_SPEED, note: 'C-38 census: exactly 5 per upgrade, whatever the chassis' }));
+
+/**
+ * THE WALKER — where a minor's land military stands, fitted to C-38's census
+ * (100,278 unit-turns at peace, 9,163 at war; a turn's step between two
+ * records, the units of one type paired to the smallest total move since the
+ * records carry no ids). Each turn a unit draws its step k (per mille over
+ * 0, 1, 2, 3 — 3 folds the 4+ tail), then one destination among the plots
+ * exactly k away, each weighted by its distance from home in the table below
+ * (0 past the table), and walks toward it. The weights are the fixed point
+ * that makes the walk's long-run distance the census's on an open grid
+ * (`tools/civ6lab/minor_play_census.py --walk`): at peace d0-d5 8.1, 20.6,
+ * 22.0, 18.0, 15.3, 10.8%; at war 15.9, 25.5, 23.7, 13.4, 9.1, 6.6%. A
+ * damaged unit rests more (52.7% of its turns still). What a unit at war
+ * attacks the census cannot say: it records no combat and no major's unit.
+ */
+export const MINOR_WALK_STEPS_PEACE = srcConst('cityState.walkStepsPeace', [141, 605, 233, 21], { lab: 'C-38' });
+export const MINOR_WALK_STEPS_WAR = srcConst('cityState.walkStepsWar', [305, 440, 210, 45], { lab: 'C-38' });
+export const MINOR_WALK_STEPS_DAMAGED = srcConst('cityState.walkStepsDamaged', [527, 299, 145, 29], { lab: 'C-38' });
+export const MINOR_WALK_WEIGHTS_PEACE = srcConst('cityState.walkWeightsPeace',
+  [1000, 344, 229, 158, 136, 116, 22, 20, 16, 9, 9, 6, 7], { lab: 'C-38' });
+export const MINOR_WALK_WEIGHTS_WAR = srcConst('cityState.walkWeightsWar',
+  [1000, 121, 76, 37, 32, 26, 7, 6, 5, 4, 2, 1, 6], { lab: 'C-38' });
+/** The Free Cities' units walk the same body, from their nearest Free City
+ *  (C-60's census: `cs_watch_*` player 62 and the id-tracked
+ *  `rebel_watch_rebel3b/3c`, 580 unit-turns; d0-d5 12.6, 45.7, 25.9, 10.0,
+ *  2.9, 2.2%; one table, the Free Cities being at war with everyone). */
+export const FREE_WALK_STEPS = srcConst('cityState.freeWalkSteps', [238, 383, 231, 148], { lab: 'C-60' });
+export const FREE_WALK_WEIGHTS = srcConst('cityState.freeWalkWeights', [1000, 594, 134, 39, 15, 24, 6], { lab: 'C-60' });
+
+/**
+ * THE FREE CITY'S BUILD TABLE — the city-state production model over C-60's
+ * census (`cs_watch_*` player 62, 28 Free City records): the first row that
+ * wants an item it can make now takes the city's Production, one item a turn.
+ * A young city's first item is a Slinger (7 of 28), then a Monument or a
+ * Granary; an older one's is its walls (11 of 28), then a Castle, a siege unit
+ * (a Trebuchet, a Catapult) and the buildings its districts hold (University,
+ * Research Lab, Library, Museum, Stock Exchange, Bank, Armory, Military
+ * Academy, Broadcast Center, Lighthouse, Water Mill), with the
+ * repair project whenever its walls are damaged. What the census holds that
+ * this table does not: a district (Aqueduct, Harbor, Campus: 4 of 28), the
+ * Flood Barrier (one city; its Coastal Lowland gate is not asked here) and the
+ * district projects.
+ */
+export interface FreeCityBuildRow {
+  kind: 'unit' | 'building' | 'repair';
+  /** a unit row's class: it trains while no Free Cities unit of the class
+   *  calls the city its nearest Free City */
+  cls?: PromoClass;
+  /** a building row: the first of these (catalog order) the city may raise */
+  items?: readonly string[];
+}
+export const FREE_CITY_BUILD_ROWS: readonly FreeCityBuildRow[] = [
+  { kind: 'unit', cls: 'RANGED' },
+  { kind: 'building', items: ['MONUMENT'] },
+  { kind: 'building', items: ['GRANARY'] },
+  { kind: 'building', items: ['ANCIENT_WALLS'] },
+  { kind: 'repair' },
+  { kind: 'building', items: ['MEDIEVAL_WALLS'] },
+  { kind: 'unit', cls: 'SIEGE' },
+  { kind: 'building', items: ['WATER_MILL', 'BARRACKS', 'LIBRARY', 'LIGHTHOUSE', 'MARKET', 'STABLE',
+    'AMPHITHEATER', 'ARMORY', 'UNIVERSITY', 'ARCHAEOLOGICAL_MUSEUM', 'BANK', 'MUSEUM', 'SHIPYARD', 'MILITARY_ACADEMY',
+    'STOCK_EXCHANGE', 'BROADCAST_CENTER', 'RESEARCH_LAB', 'SEAPORT'] },
+];
 
 export const LEVY_UNITS = 2;
 export const LEVY_GOLD_COST = 120;

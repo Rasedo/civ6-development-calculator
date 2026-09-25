@@ -1,8 +1,9 @@
 
-import type { DistrictId, GreatPersonClass } from '../core/types';
+import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';
 import { srcConst, xml, type SrcMap } from './provenance';
 import { GAME_SPEED, LUXURY_AMENITY_CITIES, scaleByGameSpeed } from './constants';
-import { GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
+import { GW_GP_EXTRA_SLOTS, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
+import { PLACEABLE_DISTRICTS } from './districts';
 
 export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   SCIENTIST: 'CAMPUS',
@@ -571,11 +572,12 @@ export type GpSite =
   | 'anywhere'     // any tile the unit can stand on
   | 'gwSlot'       // a city of this seat with a free slot of the class's work kind
   | 'cityState'    // inside a city-state's territory
-  | 'luxury'       // an owned tile carrying a luxury resource
+  | 'luxury'       // a tile carrying a luxury resource, anyone's or no one's (ActionRequiresVisibleLuxury, ActionRequiresOwnedTile false)
   | 'adjacentOwn'  // an unclaimed tile next to this seat's territory
   | 'suzerainCityState' // inside the territory of a city-state this seat is Suzerain of
   | 'adjacentBarbarian' // beside a barbarian unit
-  | 'enemyTerritory';   // inside the territory of a seat at war with this one
+  | 'enemyTerritory'    // inside the territory of a seat at war with this one
+  | 'relicSlot';        // anywhere, while a city of this seat has an open Relic slot (ActionRequiresPlayerRelicSlot)
 
 /** PERMANENT per-seat channels a Great Person adds to. The array position is
  *  the wire index, so a new channel appends. */
@@ -616,6 +618,37 @@ export const GP_PERM = [
   // CIV6 (Rajendra Chola, ABILITY_CHOLA_NAVAL_COMBAT): Combat Strength on
   // every naval combat unit of the seat, now and later (`rosterCS`).
   'navalCombat',
+  // CIV6 (Themistocles / Nimitz, MODIFIER_PLAYER_CITIES_ADJUST_MILITARY_UNITS_PRODUCTION
+  // with a PromotionClass): production toward one promotion class, percent
+  // (`GP_UNIT_PROD_CLASSES`).
+  'navalRangedProdPct',
+  'navalRaiderProdPct',
+  // CIV6 (MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_EXTRACTION): a strategic
+  // resource into the stockpile every turn (`GP_FREE_EXTRACTION`).
+  'coalPerTurn',
+  'oilPerTurn',
+  // CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_YIELD_CHANGE): one building's
+  // yield in every city of the seat (`GP_BUILDING_YIELDS`).
+  'libraryScience',
+  'universityScience',
+  'researchLabScience',
+  'factoryProduction',
+  // CIV6 (Ibn Khaldun, MODIFIER_PLAYER_CITIES_ADJUST_HAPPINESS_YIELD_BAB): the
+  // percent a Happy / Ecstatic city adds to its five non-Food yields.
+  'happyYieldPct',
+  'ecstaticYieldPct',
+  // CIV6 (Raja Todar Mal): Gold on a domestic route per specialty district
+  // at its destination.
+  'domesticRouteGoldPerSpecialty',
+  // CIV6 (John Rockefeller): Gold on every route per strategic resource the
+  // destination city has improved.
+  'strategicRouteGold',
+  // CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD):
+  // Faith on every route to a city-state.
+  'csRouteFaith',
+  // CIV6 (Mimar Sinan, MODIFIER_PLAYER_ADD_CULTURE_BOMB_TRIGGER): a completed
+  // Industrial Zone claims the tiles around it.
+  'izCultureBomb',
 ] as const;
 export type GpPermKey = (typeof GP_PERM)[number];
 
@@ -625,6 +658,16 @@ export const GP_CITY_PERM = [
   // CIV6 (Kenzo Tange): this city's district adjacency bonuses count as
   // Tourism — Science, Culture and Production at 100%, Gold and Faith at 50%.
   'adjTourism',
+  // CIV6 (Zhang Qian, Marco Polo, Zheng He): "This city provides +2 Gold to
+  // foreign Trade Routes" (..._YIELD_TO_OTHERS) and "receives +2 Gold from
+  // foreign Trade Routes" (..._YIELD_FROM_OTHERS) — one amount, both sides.
+  'foreignRouteGold',
+  // CIV6 (John Rockefeller, MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION):
+  // Oil into the owner's stockpile every turn, carried by the city.
+  'oilPerTurn',
+  // CIV6 (Giovanni de' Medici, MODIFIER_SINGLE_CITY_ADJUST_EXTRA_GREAT_WORK_SLOTS):
+  // the Bank's GREATWORKSLOT_PALACE slots (`GW_GP_EXTRA_SLOTS`).
+  'bankGwSlots',
 ] as const;
 type GpCityPermKey = (typeof GP_CITY_PERM)[number];
 
@@ -634,6 +677,9 @@ export const GP_TILE_PERM = [
   'regionalRange',       // CIV6 (Tesla, Paxton): this district's regional buildings reach 3 tiles farther
   'regionalProduction',  // CIV6 (Tesla): ...and each provides +2 Production
   'regionalAmenities',   // CIV6 (Paxton): ...and each provides +1 Amenity
+  // CIV6 (Hildegard of Bingen): "This Holy Site district's Faith adjacency
+  // bonus provides Science as well."
+  'faithAdjScience',
 ] as const;
 type GpTilePermKey = (typeof GP_TILE_PERM)[number];
 
@@ -650,6 +696,41 @@ export const GP_ADJ_TOURISM_PCT: Partial<Record<string, number>> = {
 export const GP_BUILDING_TOURISM: readonly { perm: GpPermKey; building: string; district: DistrictId }[] = [
   { perm: 'stadiumTourism', building: 'STADIUM', district: 'ENTERTAINMENT_COMPLEX' },
   { perm: 'aquaticsTourism', building: 'AQUATICS_CENTER', district: 'WATER_PARK' },
+];
+
+/** CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_YIELD_CHANGE): a seat-wide add
+ *  to one building's yield — Leonardo da Vinci's Workshop Culture, Hypatia's
+ *  Library, Newton's University, Einstein's Research Lab Science, James Watt's
+ *  Factory Production. It is the building's own yield, so a building standing
+ *  dark pays none of it and a REGIONAL building carries it to the cities its
+ *  own yield reaches. */
+export const GP_BUILDING_YIELDS: readonly { perm: GpPermKey; building: string; yield: YieldKey }[] = [
+  { perm: 'workshopCulture', building: 'WORKSHOP', yield: 'culture' },
+  { perm: 'libraryScience', building: 'LIBRARY', yield: 'science' },
+  { perm: 'universityScience', building: 'UNIVERSITY', yield: 'science' },
+  { perm: 'researchLabScience', building: 'RESEARCH_LAB', yield: 'science' },
+  { perm: 'factoryProduction', building: 'FACTORY', yield: 'production' },
+];
+
+/** CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_MILITARY_UNITS_PRODUCTION, PromotionClass
+ *  set): production toward the units of one promotion class, percent —
+ *  Themistocles' Naval Ranged, Nimitz's Naval Raider. */
+export const GP_UNIT_PROD_CLASSES: readonly { perm: GpPermKey; cls: string }[] = [
+  { perm: 'navalRangedProdPct', cls: 'NAVAL_RANGED' },
+  { perm: 'navalRaiderProdPct', cls: 'NAVAL_RAIDER' },
+];
+
+/** CIV6 (MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_EXTRACTION): a strategic resource
+ *  paid into the stockpile every turn, owed whether or not the seat mines
+ *  any — Yi Sun-sin's and von Hipper's Coal, Nimitz's and MacArthur's Oil. */
+export const GP_FREE_EXTRACTION: readonly { perm: GpPermKey; resource: string }[] = [
+  { perm: 'coalPerTurn', resource: 'COAL' },
+  { perm: 'oilPerTurn', resource: 'OIL' },
+];
+/** ...and the city-borne twin (MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION,
+ *  Rockefeller): paid to whoever holds the city. */
+export const GP_CITY_FREE_EXTRACTION: readonly { perm: GpCityPermKey; resource: string }[] = [
+  { perm: 'oilPerTurn', resource: 'OIL' },
 ];
 
 type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
@@ -732,8 +813,6 @@ export interface GpEffect {
   greatWorkKind?: number;
   /** Great Person points toward EVERY class at once. */
   gppAll?: number;
-  /** a strategic resource straight into the stockpile. */
-  strategic?: { resource: string; amount: number };
   /** CIV6 (Mary Leakey): science "for every Artifact in this city", instant. */
   artifactScience?: number;
   /** CIV6 (Marina Raskova): "District in this tile gains +1 air unit
@@ -749,6 +828,20 @@ export interface GpEffect {
   /** CIV6 (Tupac Amaru, EFFECT_GRANT_UNIT_IN_EACH_DISTRICT): this chassis
    *  once per district of the ENEMY city whose land the general stands on. */
   unitEachDistrict?: string;
+  /** CIV6 (Irene of Athens, Adam Smith; MODIFIER_PLAYER_ADJUST_GOVERNOR_POINTS):
+   *  Governor Titles granted outright. */
+  governorTitles?: number;
+  /** CIV6 (Marco Polo, Zheng He; MODIFIER_SINGLE_CITY_GRANT_UNIT_IN_CITY): a
+   *  unit raised in the activating CITY, at its centre. */
+  cityUnit?: string;
+  /** CIV6 (Hanno the Navigator, MODIFIER_PLAYER_GRANT_UNIT_OF_ABILITY_WITH_MODIFIER):
+   *  the strongest chassis of this promotion class the seat has unlocked,
+   *  granted on the person's plot and carrying `unitMpBonus` Movement for life. */
+  unitBestClass?: string;
+  unitMpBonus?: number;
+  /** CIV6 (Jeanne d'Arc, MODIFIER_PLAYER_GRANT_RELIC): one Relic, into the
+   *  seat's first city with an open slot for it. */
+  grantRelic?: boolean;
   perm?: Partial<Record<GpPermKey, number>>;
   cityPerm?: Partial<Record<GpCityPermKey, number>>;
   /** on the DISTRICT tile the charge is spent on. */
@@ -768,10 +861,10 @@ export const GP_FX = [
   'envoys', 'wonderProduction', 'wonderEraDouble', 'spaceProduction',
   'perAdjSource', 'perAdjYield', 'perAdjAmount', 'perAdjHere',
   'luxuryCopies', 'luxuryAmenities', 'greatWorkKind', 'gppAll',
-  'strategicSlot', 'strategicAmount',
   'artifactScience', 'airSlotBonus', 'suzerainSeize',
   'formation', 'formationNaval', 'wonderBuyout',
   'absorbCityState', 'convertBarbarians', 'unitEachDistrict',
+  'governorTitles', 'cityUnitIdx', 'unitBestClass', 'unitMpBonus', 'grantRelic',
 ] as const;
 
 /** what a `perAdjacent` clause counts, in the wire's own order. */
@@ -782,7 +875,7 @@ export const GP_YIELD_KEYS: readonly GpYieldKey[] = ['science', 'culture', 'gold
 /** the ACTIVATION SITES, in the wire's own order. */
 export const GP_SITES: readonly GpSite[] = [
   'district', 'anywhere', 'gwSlot', 'cityState', 'luxury', 'adjacentOwn',
-  'suzerainCityState', 'adjacentBarbarian', 'enemyTerritory',
+  'suzerainCityState', 'adjacentBarbarian', 'enemyTerritory', 'relicSlot',
 ];
 
 interface GpAbility extends GpEffect {
@@ -816,12 +909,49 @@ const gpScaled = (name: string, modifierId: string, standard: number): number =>
 const gpStandard = (name: string, modifierId: string, standard: number): number =>
   srcConst(`greatPeople.${name}`, standard,
     xml('ModifierArguments', `ModifierId=${modifierId}&Name=Amount`, 'Value'));
+/** any other magnitude a person's modifier writes, read off the argument it
+ *  names (`Amount` unless said otherwise). */
+const gpArg = (name: string, modifierId: string, value: number, arg = 'Amount'): number =>
+  srcConst(`greatPeople.${name}`, value,
+    xml('ModifierArguments', `ModifierId=${modifierId}&Name=${arg}`, 'Value'));
+/** a clause that is on or off: 1, sourced by the argument that names it. */
+const gpFlag = (name: string, modifierId: string, arg: string, expect: string): number =>
+  srcConst(`greatPeople.${name}`, 1, {
+    derived: `1 = the clause is on; the modifier's ${arg} names what it is`,
+    inputs: [xml('ModifierArguments', `ModifierId=${modifierId}&Name=${arg}`, 'Value', { expect })],
+  });
+
+/** CIV6 (MODIFIER_SINGLE_CITY_ADJUST_IDENTITY_PER_TURN): "Grants +N Loyalty per
+ *  turn for this city" — Æthelflæd, Simón Bolívar, Sudirman, Togo Heihachiro. */
+const GP_AETHELFLAED_LOYALTY = gpArg('GP_AETHELFLAED_LOYALTY', 'GREATPERSON_AETHELFLAED_ACTIVE', 2);
+const GP_BOLIVAR_LOYALTY = gpArg('GP_BOLIVAR_LOYALTY', 'GREATPERSON_SIMON_BOLIVAR_ACTIVE', 4);
+const GP_SUDIRMAN_LOYALTY = gpArg('GP_SUDIRMAN_LOYALTY', 'GREATPERSON_SUDIRMAN_ACTIVE', 6);
+const GP_TOGO_LOYALTY = gpArg('GP_TOGO_LOYALTY', 'GREATPERSON_TOGO_HEIHACHIRO_ACTIVE', 6);
+/** CIV6 (..._GOLD_TO_ / _FROM_INCOMING_FOREIGN_ROUTES): +2 Gold each way. */
+const GP_FOREIGN_ROUTE_GOLD = gpArg('GP_FOREIGN_ROUTE_GOLD', 'GREATPERSON_GOLD_TO_INCOMING_FOREIGN_ROUTES', 2);
+const GP_ZHENG_HE_ROUTE_GOLD = gpArg('GP_ZHENG_HE_ROUTE_GOLD', 'GREATPERSON_ZHENG_HE_GOLD_TO_INCOMING_FOREIGN_ROUTES', 2);
+/** CIV6 (GREATPERSON_GOVERNOR_POINTS, MODIFIER_PLAYER_ADJUST_GOVERNOR_POINTS): +1 Title. */
+const GP_GOVERNOR_TITLE = gpArg('GP_GOVERNOR_TITLE', 'GREATPERSON_GOVERNOR_POINTS', 1, 'Delta');
+/** CIV6 (GREATPERSON_GRANT_1_COAL_PER_TURN / _1_OIL_PER_TURN / _3_OIL_PER_TURN). */
+const GP_COAL_PER_TURN = gpArg('GP_COAL_PER_TURN', 'GREATPERSON_GRANT_1_COAL_PER_TURN', 1);
+const GP_OIL_PER_TURN = gpArg('GP_OIL_PER_TURN', 'GREATPERSON_GRANT_1_OIL_PER_TURN', 1);
+const GP_ROCKEFELLER_OIL = gpArg('GP_ROCKEFELLER_OIL', 'GREATPERSON_GRANT_3_OIL_PER_TURN', 3);
+/** CIV6 (Hanno, HANNO_FREE_UNIT_MOVEMENT_BUFF: MODIFIER_PLAYER_UNIT_ADJUST_SEA_MOVEMENT). */
+const GP_HANNO_MOVES = gpArg('GP_HANNO_MOVES', 'HANNO_FREE_UNIT_MOVEMENT_BUFF', 2);
+/** CIV6 (Giovanni de' Medici): the Bank's widening, `GW_GP_EXTRA_SLOTS`' own amount. */
+const GP_BANK_GW_SLOTS = GW_GP_EXTRA_SLOTS.find((r) => r.perm === 'bankGwSlots')!.amount;
+const GP_HANNO_CLASS = srcConst('greatPeople.GP_HANNO_CLASS', 'NAVAL_MELEE',
+  xml('ModifierArguments', 'ModifierId=GREAT_PERSON_INDIVIDUAL_HANNO_THE_NAVIGATOR_FREE_UNIT&Name=UnitPromotionClassType',
+    'Value', { expect: 'PROMOTION_CLASS_NAVAL_MELEE' }));
 
 /**
- * WHAT EACH PERSON DOES, off that class's own wiki roster table. Only the five
- * one-off classes are listed: a Prophet founds a religion and a Writer, Artist
- * or Musician makes Great Works, both of which this engine already models in
- * kind, so those four keep the class lump `gpEffect` sizes by era.
+ * WHAT EACH PERSON DOES, as the install layers the person's action modifiers
+ * (Base <- Expansion1 <- Expansion2 and the DLC packs a Gathering Storm game
+ * loads; `tools/civ6lab/gp_census.py` prints them, and each row here is read
+ * against that census). Only the five one-off classes are listed: a Prophet
+ * founds a religion and a Writer, Artist or Musician makes Great Works, both
+ * of which this engine already models in kind, so those four keep the class
+ * lump `gpEffect` sizes by era.
  *
  * A clause with no carrier is absent from its row, and a person whose WHOLE
  * clause has no carrier is marked `unmodelled` rather than quietly dropped.
@@ -831,61 +961,75 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_ZHANG_HENG: { eurekaTechs: ['CELESTIAL_NAVIGATION', 'MATHEMATICS', 'ENGINEERING'] },
   GP_ARYABHATA: { eurekaRandom: 3, eurekaHi: 1 },
   GP_EUCLID: { eurekaTechs: ['MATHEMATICS'], eurekaRandom: 1, eurekaLo: 1, eurekaHi: 1 },
-  GP_HYPATIA: { buildings: ['LIBRARY'] },
+  GP_HYPATIA: { buildings: ['LIBRARY'], perm: { libraryScience: gpArg('GP_HYPATIA_LIBRARY_SCIENCE', 'GREATPERSON_LIBRARIES_SCIENCE', 1) } },
   GP_ABU_AL_QASIM_AL_ZAHRAWI: { site: 'anywhere', eurekaRandom: 1, eurekaHi: 1, perm: { healBonus: 5 } },
-  GP_HILDEGARD_OF_BINGEN: { siteDistrict: 'HOLY_SITE', faith: gpScaled('GP_HILDEGARD_FAITH', 'GREATPERSON_FAITH', 100) },
+  GP_HILDEGARD_OF_BINGEN: {
+    siteDistrict: 'HOLY_SITE', faith: gpScaled('GP_HILDEGARD_FAITH', 'GREATPERSON_FAITH', 100),
+    tilePerm: { faithAdjScience: gpFlag('GP_HILDEGARD_MIRROR', 'GREATPERSON_HOLY_SITE_ADJACENCY_AS_SCIENCE', 'YieldTypeToGrant', 'YIELD_SCIENCE') },
+  },
   GP_OMAR_KHAYYAM: { eurekaRandom: 2, eurekaHi: 1, inspirationRandom: 1 },
-  GP_IBN_KHALDUN: { cityPerm: { housing: 2, amenities: 1 } },
+  // CIV6 (Babylon pack): "Increases non-Food yield benefits of Happiness in
+  // your empire by 40%" — +2% at Happy, +4% at Ecstatic, per non-Food yield
+  GP_IBN_KHALDUN: {
+    cityPerm: { housing: 2, amenities: 1 },
+    perm: {
+      happyYieldPct: gpArg('GP_KHALDUN_HAPPY', 'GREAT_PERSON_INDIVIDUAL_IBN_KHALDUN_EMPIRE_HAPPY_SCIENCE', 2),
+      ecstaticYieldPct: gpArg('GP_KHALDUN_ECSTATIC', 'GREAT_PERSON_INDIVIDUAL_IBN_KHALDUN_EMPIRE_ECSTATIC_SCIENCE', 4),
+    },
+  },
   GP_EMILIE_DU_CHATELET: { eurekaRandom: 3, eurekaHi: 1 },
   GP_GALILEO_GALILEI: { perAdjacent: { source: 'MOUNTAIN', yield: 'science', amount: gpScaled('GP_GALILEO_SCIENCE', 'GREATPERSON_ADJACENT_GRASSMOUNTAIN_SCIENCE', 250) } },
-  GP_ISAAC_NEWTON: { buildings: ['LIBRARY', 'UNIVERSITY'] },
+  GP_ISAAC_NEWTON: { buildings: ['LIBRARY', 'UNIVERSITY'], perm: { universityScience: gpArg('GP_NEWTON_UNIVERSITY_SCIENCE', 'GREATPERSON_UNIVERSITIES_SMALL_SCIENCE', 2) } },
   GP_CHARLES_DARWIN: { perAdjacent: { source: 'NATURAL_WONDER', yield: 'science', amount: gpScaled('GP_DARWIN_SCIENCE', 'GREATPERSON_ADJACENT_NATURALWONDER_SCIENCE', 500) } },
   GP_DMITRI_MENDELEEV: { eurekaTechs: ['CHEMISTRY'], eurekaRandom: 1 },
   GP_JAMES_YOUNG: { eurekaRandom: 2, eurekaHi: 1 },
   GP_ALAN_TURING: { eurekaTechs: ['COMPUTERS'], eurekaRandom: 1 },
   // CIV6 (GREATPERSON_1MODERNATOMICTECHBOOST): one boost drawn over
   // ERA_MODERN..ERA_ATOMIC
-  GP_ALBERT_EINSTEIN: { eurekaRandom: 1, eurekaHi: 1 },
+  GP_ALBERT_EINSTEIN: { eurekaRandom: 1, eurekaHi: 1, perm: { researchLabScience: gpArg('GP_EINSTEIN_LAB_SCIENCE', 'GREATPERSON_RESEARCHLABS_BIG_SCIENCE', 4) } },
   GP_ALFRED_NOBEL: { eurekaRandom: 1, eurekaHi: 1, gppAll: gpScaled('GP_NOBEL_GPP', 'GREATPERSON_GREAT_PERSON_FREE_POINTS', 100) },
   GP_ERWIN_SCHRODINGER: { eurekaRandom: 3, eurekaHi: 1 },
   GP_JANAKI_AMMAL: { perAdjacent: { source: 'RAINFOREST', yield: 'science', amount: gpScaled('GP_JANAKI_SCIENCE', 'GREATPERSON_ADJACENT_RAINFOREST_SCIENCE', 400), here: true } },
-  GP_MARY_LEAKEY: { artifactScience: gpScaled('GP_LEAKEY_SCIENCE', 'GREATPERSON_ARTIFACT_SCIENCE', 350) }, // the tourism clause waits on the tourism system
+  GP_MARY_LEAKEY: { siteDistrict: 'THEATER_SQUARE', artifactScience: gpScaled('GP_LEAKEY_SCIENCE', 'GREATPERSON_ARTIFACT_SCIENCE', 350) }, // the tourism clause waits on the tourism system
   GP_MARGARET_MEAD: {
     science: gpScaled('GP_MEAD_SCIENCE', 'GREAT_PERSON_GRANT_LOTSO_SCIENCE', 1000),
     culture: gpScaled('GP_MEAD_CULTURE', 'GREAT_PERSON_GRANT_LOTSO_CULTURE', 1000),
   },
-  GP_CARL_SAGAN: { spaceProduction: gpScaled('GP_SAGAN_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_LATE_SPACE_RACE', 3000) },
-  GP_STEPHANIE_KWOLEK: { perm: { spaceProdPct: 100 } },
+  GP_CARL_SAGAN: { siteDistrict: 'SPACEPORT', spaceProduction: gpScaled('GP_SAGAN_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_LATE_SPACE_RACE', 3000) },
+  GP_STEPHANIE_KWOLEK: { siteDistrict: 'SPACEPORT', perm: { spaceProdPct: 100 } },
   GP_ABDUS_SALAM: { eurekaEra: true },
 
   // ---- ENGINEER: wonders, buildings and the Space Race ----
   // the doubled grant is its own row: ..._ANCIENT_CLASSICAL, Amount 350
   GP_IMHOTEP: { charges: 2, wonderProduction: gpStandard('GP_IMHOTEP_PRODUCTION', 'GREAT_PERSON_INDIVIDUAL_IMHOTEP_PRODUCTION_OTHER', 175), wonderEraDouble: 1 },
-  GP_BI_SHENG: { eurekaTechs: ['PRINTING'], cityPerm: { districtLimit: 1 } },
+  GP_BI_SHENG: { siteDistrict: 'CITY_CENTER', eurekaTechs: ['PRINTING'], cityPerm: { districtLimit: 1 } },
   GP_ISIDORE_OF_MILETUS: { charges: 2, wonderProduction: gpStandard('GP_ISIDORE_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_MEDIEVAL', 215) },
-  GP_JAMES_OF_ST_GEORGE: { charges: 3, buildings: ['ANCIENT_WALLS', 'MEDIEVAL_WALLS'] },
+  GP_JAMES_OF_ST_GEORGE: { siteDistrict: 'CITY_CENTER', charges: 3, buildings: ['ANCIENT_WALLS', 'MEDIEVAL_WALLS'] },
   GP_FILIPPO_BRUNELLESCHI: { charges: 2, wonderProduction: gpStandard('GP_BRUNELLESCHI_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_RENAISSANCE', 315) },
   GP_LEONARDO_DA_VINCI: { eurekaRandom: 1, eurekaLo: 2, eurekaHi: 2, perm: { workshopCulture: 3 } },
-  GP_MIMAR_SINAN: { cityPerm: { housing: 1, amenities: 1 } },
-  GP_ADA_LOVELACE: { eurekaTechs: ['COMPUTERS'], cityPerm: { districtLimit: 1 } },
+  GP_MIMAR_SINAN: {
+    siteDistrict: 'CITY_CENTER',
+    perm: { izCultureBomb: gpFlag('GP_SINAN_CULTURE_BOMB', 'GREATPERSON_CULTURE_BOMB_TRIGGER_INDUSTRIAL_ZONE', 'DistrictType', 'DISTRICT_INDUSTRIAL_ZONE') },
+  },
+  GP_ADA_LOVELACE: { siteDistrict: 'CITY_CENTER', eurekaTechs: ['COMPUTERS'], cityPerm: { districtLimit: 1 } },
   GP_GUSTAVE_EIFFEL: { charges: 2, wonderProduction: gpStandard('GP_EIFFEL_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_INDUSTRIAL', 480) },
-  GP_JAMES_WATT: { buildings: ['WORKSHOP', 'FACTORY'] },
+  GP_JAMES_WATT: { buildings: ['WORKSHOP', 'FACTORY'], perm: { factoryProduction: gpArg('GP_WATT_FACTORY_PRODUCTION', 'GREATPERSON_FACTORIES_PRODUCTION', 2) } },
   // CIV6 (Shah Jahan): "Grants Production towards wonder construction,
   // capped at half of your current treasury. Then reduces your Gold by twice
   // the amount of purchased Production."
   GP_SHAH_JAHAN: { wonderBuyout: true },
-  GP_ALVAR_AALTO: { cityPerm: { appeal: 1 } },
+  GP_ALVAR_AALTO: { siteDistrict: 'CITY_CENTER', cityPerm: { appeal: 1 } },
   GP_ROBERT_GODDARD: { eurekaTechs: ['ROCKETRY'], perm: { spaceProdPct: 20 } },
   // CIV6 (Nikola Tesla, DISTRICT_IN_TILE): this Industrial Zone's regional
   // buildings reach 3 tiles farther and each provides +2 Production.
   GP_NIKOLA_TESLA: { siteDistrict: 'INDUSTRIAL_ZONE', tilePerm: { regionalRange: 3, regionalProduction: 2 } },
-  GP_JANE_DREW: { cityPerm: { housing: 4, amenities: 3 } },
-  GP_JOHN_ROEBLING: { charges: 2, cityPerm: { housing: 2, amenities: 1 } },
-  GP_SERGEI_KOROLEV: { spaceProduction: gpScaled('GP_KOROLEV_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_EARLY_SPACE_RACE', 1500) },
+  GP_JANE_DREW: { siteDistrict: 'CITY_CENTER', cityPerm: { housing: 4, amenities: 3 } },
+  GP_JOHN_ROEBLING: { siteDistrict: 'CITY_CENTER', charges: 2, cityPerm: { housing: 2, amenities: 1 } },
+  GP_SERGEI_KOROLEV: { siteDistrict: 'SPACEPORT', spaceProduction: gpScaled('GP_KOROLEV_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_EARLY_SPACE_RACE', 1500) },
   // CIV6 (Joseph Paxton): the same on an Entertainment Complex, +1 Amenity.
   GP_JOSEPH_PAXTON: { siteDistrict: 'ENTERTAINMENT_COMPLEX', tilePerm: { regionalRange: 3, regionalAmenities: 1 } },
-  GP_CHARLES_CORREA: { cityPerm: { appeal: 2 } },
-  GP_WERNHER_VON_BRAUN: { perm: { spaceProdPct: 100 } },
+  GP_CHARLES_CORREA: { siteDistrict: 'CITY_CENTER', cityPerm: { appeal: 2 } },
+  GP_WERNHER_VON_BRAUN: { siteDistrict: 'SPACEPORT', perm: { spaceProdPct: 100 } },
   // CIV6 (Kenzo Tange, ATTACHMENT_TARGET_CITY, no district clause): the
   // city's district adjacency as Tourism.
   GP_KENZO_TANGE: { site: 'anywhere', cityPerm: { adjTourism: 1 } },
@@ -893,25 +1037,39 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   // ---- MERCHANT: gold, envoys, trade capacity and invented luxuries ----
   GP_COLAEUS: { site: 'luxury', faith: gpScaled('GP_COLAEUS_FAITH', 'GREATPERSON_FAITH_SMALL', 100), luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
   GP_MARCUS_LICINIUS_CRASSUS: { site: 'adjacentOwn', charges: 3, gold: gpScaled('GP_CRASSUS_GOLD', 'GREATPERSON_GOLD_TINY', 60) },
-  GP_ZHANG_QIAN: { perm: { tradeCapacity: 1 } },
-  GP_IBN_FADLAN: { perm: { tradeCapacity: 1 } },
-  GP_IRENE_OF_ATHENS: { site: 'luxury', perm: { tradeCapacity: 1 }, luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
-  GP_MARCO_POLO: { unit: 'TRADER', perm: { tradeCapacity: 1 } },
+  GP_ZHANG_QIAN: { perm: { tradeCapacity: 1 }, cityPerm: { foreignRouteGold: GP_FOREIGN_ROUTE_GOLD } },
+  GP_IBN_FADLAN: {
+    perm: { tradeCapacity: 1, csRouteFaith: gpArg('GP_FADLAN_CS_FAITH', 'GREATPERSON_CITY_STATE_TRADE_FAITH', 2) },
+  },
+  GP_IRENE_OF_ATHENS: { governorTitles: GP_GOVERNOR_TITLE },
+  GP_MARCO_POLO: { cityUnit: 'TRADER', perm: { tradeCapacity: 1 }, cityPerm: { foreignRouteGold: GP_FOREIGN_ROUTE_GOLD } },
+  GP_PIERO_DE_BARDI: { gold: gpScaled('GP_PIERO_GOLD', 'GREATPERSON_GOLD_SMALL', 200), envoys: 1 },
   GP_ZHOU_DAGUAN: { site: 'cityState', envoys: 3 },
+  // CIV6 (GREATPERSON_BANK_GREAT_WORK_SLOTS): "The Bank gets 2 Great Work
+  // slots, which can hold anything" (`GW_GP_EXTRA_SLOTS`)
+  GP_GIOVANNI_DE_MEDICI: { buildings: ['MARKET', 'BANK'], cityPerm: { bankGwSlots: GP_BANK_GW_SLOTS } },
   GP_JAKOB_FUGGER: { gold: gpScaled('GP_FUGGER_GOLD', 'GREATPERSON_GOLD_SMALL', 200), envoys: 2 },
-  GP_RAJA_TODAR_MAL: { envoys: 1 },
-  GP_ADAM_SMITH: { perm: { policySlotEconomic: 1 } },
+  GP_RAJA_TODAR_MAL: {
+    envoys: 1,
+    perm: { domesticRouteGoldPerSpecialty: gpArg('GP_TODAR_MAL_ROUTE_GOLD', 'GREATPERSON_DOMESTIC_ROUTE_GOLD_PER_SPECIALTY_DISTRICT', 0.5) },
+  },
+  GP_ADAM_SMITH: { governorTitles: GP_GOVERNOR_TITLE, gold: gpScaled('GP_SMITH_GOLD', 'GREATPERSON_GOLD_LARGE', 500) },
   GP_JOHN_JACOB_ASTOR: { gold: gpScaled('GP_ASTOR_GOLD', 'GREATPERSON_GOLD_LARGE', 500), envoys: 2 },
   GP_JOHN_SPILSBURY: { luxuryCopies: 1, luxuryAmenities: 4 },
   // CIV6 (Stamford Raffles, `ActionRequiresSuzerainTerritory`): the city-state
   // joins the empire and keeps +10 Loyalty per turn (the GS attachment).
   GP_STAMFORD_RAFFLES: { site: 'suzerainCityState', absorbCityState: true, cityPerm: { loyalty: 10 } },
-  GP_JOHN_ROCKEFELLER: { strategic: { resource: 'OIL', amount: 1 } },
+  GP_JOHN_ROCKEFELLER: {
+    perm: { strategicRouteGold: gpArg('GP_ROCKEFELLER_ROUTE_GOLD', 'GREATPERSON_DOMESTIC_ROUTE_GOLD_PER_STRATEGIC', 2) },
+    cityPerm: { oilPerTurn: GP_ROCKEFELLER_OIL },
+  },
   GP_SARAH_BREEDLOVE: { siteDistrict: 'COMMERCIAL_HUB', perm: { tourismRouteBonus: 25 } },
   GP_MARY_KATHERINE_GODDARD: { perm: { visibilityAll: 1 } },
   GP_HELENA_RUBINSTEIN: { luxuryCopies: 2, luxuryAmenities: 4 },
   GP_LEVI_STRAUSS: { luxuryCopies: 2, luxuryAmenities: 4 },
-  GP_MELITTA_BENTZ: { perm: { tradeCapacity: 1 } },
+  GP_MELITTA_BENTZ: {
+    perm: { tradeCapacity: 1, tourismRouteBonus: gpArg('GP_BENTZ_ROUTE_TOURISM', 'GREATPERSON_TRADE_ROUTE_TOURISM_MODIFIER', 25) },
+  },
   GP_ESTEE_LAUDER: { luxuryCopies: 2, luxuryAmenities: 6 },
   GP_JAMSETJI_TATA: { siteDistrict: 'CAMPUS', perm: { campusTourism: 10 } },
   GP_MASARU_IBUKA: { siteDistrict: 'INDUSTRIAL_ZONE', perm: { izTourism: 10 } },
@@ -920,15 +1078,17 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_BOUDICA: { site: 'adjacentBarbarian', convertBarbarians: true },
   GP_HANNIBAL_BARCA: { promotionLevels: 1 },
   GP_SUN_TZU: { greatWorkKind: 0 }, // one Work of Writing (GREATWORK_SUN_TZU)
-  GP_TRUNG_TRAC: { perm: { warWearyPct: 25 } },
-  GP_THELFLD: { unit: 'KNIGHT' },
+  GP_TRUNG_TRAC: { siteDistrict: 'ENCAMPMENT', perm: { warWearyPct: 25 } },
+  GP_THELFLD: { siteDistrict: 'CITY_CENTER', cityPerm: { loyalty: GP_AETHELFLAED_LOYALTY } },
   GP_EL_CID: { formation: 1 },
   GP_TIMUR: { promotionLevels: 1, xpPct: 25 },
   GP_ANA_NZINGA: { envoys: 1 },
   GP_AMINA: { envoys: 1 },
+  GP_JEANNE_D_ARC: { site: 'relicSlot', grantRelic: true },
   GP_GUSTAVUS_ADOLPHUS: { unit: 'BOMBARD', unitPromotions: 1 },
-  GP_DANDARA: { unit: 'WARRIOR_MONK', unitPromotions: 1 }, // "Grants a Warrior Monk with one promotion level."
-  GP_SIMON_BOLIVAR_UNIT: { envoys: 2 },
+  // "Grants a Warrior Monk with one promotion level" — twice (ActionCharges 2)
+  GP_DANDARA: { charges: 2, unit: 'WARRIOR_MONK', unitPromotions: 1 },
+  GP_SIMON_BOLIVAR_UNIT: { siteDistrict: 'CITY_CENTER', cityPerm: { loyalty: GP_BOLIVAR_LOYALTY } },
   GP_JOSE_DE_SAN_MARTIN: { envoys: 2 },
   GP_NAPOLEON_BONAPARTE: { formation: 2 },
   GP_RANI_LAKSHMIBAI: { unit: 'CAVALRY', unitPromotions: 1 },
@@ -939,36 +1099,47 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_MARINA_RASKOVA: { siteDistrict: 'AERODROME', airSlotBonus: 1 },
   // CIV6 (GREATPERSON_SAMORI_TURE_ACTIVE): UNIT_SPEC_OPS, Experience -1
   GP_SAMORI_TOURE: { unit: 'SPEC_OPS', unitPromotions: 1 },
-  GP_DOUGLAS_MACARTHUR: { unit: 'TANK', unitPromotions: 1 },
+  GP_DOUGLAS_MACARTHUR: { unit: 'TANK', unitPromotions: 1, perm: { oilPerTurn: GP_OIL_PER_TURN } },
   GP_DWIGHT_EISENHOWER: { perm: { unitProdPct: 5 } },
   GP_GEORGY_ZHUKOV: { perm: { flankPctLand: 50 } },
-  GP_SUDIRMAN: { promotionLevels: 1, xpPct: 100 },
+  GP_SUDIRMAN: { siteDistrict: 'CITY_CENTER', cityPerm: { loyalty: GP_SUDIRMAN_LOYALTY } },
   GP_AHMAD_SHAH_MASSOUD: { unit: 'MODERN_AT', unitPromotions: 1 },
   GP_VIJAYA_WIMALARATNE: { promotionLevels: 1, xpPct: 100 },
 
   // ---- ADMIRAL: the same shape at sea, plus the plunder rewards ----
   GP_ARTEMISIA: { promotionLevels: 1 },
   GP_GAIUS_DUILIUS: { formation: 1, formationNaval: true },
-  GP_THEMISTOCLES: { unit: 'QUADRIREME' },
-  GP_HANNO_THE_NAVIGATOR: { unit: 'GALLEY' },
+  GP_THEMISTOCLES: {
+    unit: 'QUADRIREME',
+    perm: { navalRangedProdPct: gpArg('GP_THEMISTOCLES_RANGED_PROD', 'GREATPERSON_THEMISTOCLES_NAVAL_RANGED', 20) },
+  },
+  GP_HANNO_THE_NAVIGATOR: { unitBestClass: GP_HANNO_CLASS, unitMpBonus: GP_HANNO_MOVES },
   GP_HIMERIOS: { promotionLevels: 1, xpPct: 25 },
   GP_LEIF_ERIKSON: { perm: { navalOcean: 1, navalSight: 1 } },
   GP_RAJENDRA_CHOLA: { perm: { navalCombat: GP_CHOLA_NAVAL_CS } },
-  GP_ZHENG_HE: { envoys: 1 },
+  GP_ZHENG_HE: { siteDistrict: 'HARBOR', cityUnit: 'TRADER', perm: { tradeCapacity: 1 }, cityPerm: { foreignRouteGold: GP_ZHENG_HE_ROUTE_GOLD } },
   GP_FRANCIS_DRAKE: { unit: GP_DRAKE_UNIT, unitPromotions: 1, perm: { routePlunderPct: 50 } },
   GP_SANTA_CRUZ: { formation: 2, formationNaval: true },
-  GP_YI_SUN_SIN: { unit: 'IRONCLAD', unitPromotions: 1 },
-  GP_FERDINAND_MAGELLAN: { cityPerm: { loyalty: 4 } },
+  GP_YI_SUN_SIN: { unit: 'IRONCLAD', unitPromotions: 1, perm: { coalPerTurn: GP_COAL_PER_TURN } },
+  // CIV6 (GS): "Grants 1 free copy of the Luxury resource on this tile to
+  // your Capital city. Gain 300 Gold (on Standard speed)."
+  GP_FERDINAND_MAGELLAN: {
+    site: 'luxury', luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES,
+    gold: gpScaled('GP_MAGELLAN_GOLD', 'GREATPERSON_FERDINAND_MAGELLAN_ACTIVE', 300),
+  },
   // CIV6 (Ching Shih, GREATPERSON_CHING_SHIH_ACTIVE): "Gain 500 Gold (on
   // Standard speed)", beside the +60% sea-route plunder
   GP_CHING_SHIH: { gold: gpScaled('GP_CHING_SHIH_GOLD', 'GREATPERSON_CHING_SHIH_ACTIVE', 500), perm: { routePlunderPct: 60 } },
   GP_HORATIO_NELSON: { siteDistrict: 'HARBOR', buildings: ['LIGHTHOUSE', 'SHIPYARD'], perm: { flankPctNaval: 50 } },
   GP_LASKARINA_BOUBOULINA: { promotionLevels: 1, xpPct: 50 },
   GP_MATTHEW_PERRY: { site: 'cityState', suzerainSeize: true },
-  GP_FRANZ_VON_HIPPER: { unit: 'BATTLESHIP', unitPromotions: 1 },
+  GP_FRANZ_VON_HIPPER: { unit: 'BATTLESHIP', unitPromotions: 1, perm: { coalPerTurn: GP_COAL_PER_TURN } },
   GP_JOAQUIM_MARQUES_LISBOA: { perm: { warWearyPct: 25 } },
-  GP_TOGO_HEIHACHIRO: { promotionLevels: 1, xpPct: 75 },
-  GP_CHESTER_NIMITZ: { perm: { unitProdPct: 20 } },
+  GP_TOGO_HEIHACHIRO: { siteDistrict: 'HARBOR', cityPerm: { loyalty: GP_TOGO_LOYALTY } },
+  GP_CHESTER_NIMITZ: {
+    unit: 'SUBMARINE', unitPromotions: 1,
+    perm: { navalRaiderProdPct: gpArg('GP_NIMITZ_RAIDER_PROD', 'GREATPERSON_CHESTER_NIMITZ_ACTIVE', 20), oilPerTurn: GP_OIL_PER_TURN },
+  },
   // CIV6 (GREATPERSON_GRACE_HOPPER_ACTIVE, MODIFIER_PLAYER_GRANT_RANDOM_TECHNOLOGY
   // Amount 2): "Gain 2 randomly-chosen free technologies"
   GP_GRACE_HOPPER: { freeTechRandom: 2 },
@@ -978,13 +1149,33 @@ export const GP_ABILITY: Record<string, GpAbility> = {
 
 /** The class's own district is the default activation site; the art classes
  *  need a free Great Work slot and the two military classes may spend their
- *  charge anywhere. */
+ *  charge anywhere. A row naming its own district (the install's
+ *  `ActionRequiresCompletedDistrictType`) is spent there, whatever its class. */
 export function gpSiteOf(person: GreatPersonDef): { site: GpSite; district: DistrictId } {
   const a = GP_ABILITY[person.id];
-  const dflt: GpSite = GW_WORK_CLASSES.has(person.class)
-    ? 'gwSlot'
-    : person.class === 'GENERAL' || person.class === 'ADMIRAL' ? 'anywhere' : 'district';
+  const dflt: GpSite = a?.siteDistrict !== undefined ? 'district'
+    : GW_WORK_CLASSES.has(person.class) ? 'gwSlot'
+      : person.class === 'GENERAL' || person.class === 'ADMIRAL' ? 'anywhere' : 'district';
   return { site: a?.site ?? dflt, district: a?.siteDistrict ?? GP_CLASS_DISTRICT[person.class] };
+}
+
+/** A site district as the wire names it: its `PLACEABLE_DISTRICTS` index, the
+ *  City Center `GP_SITE_CITY_CENTER` (it is no placeable district), -1 none. */
+export const GP_SITE_CITY_CENTER = -2;
+export function gpSiteArg(district: DistrictId | undefined): number {
+  if (district === 'CITY_CENTER') return GP_SITE_CITY_CENTER;
+  return district === undefined ? -1 : PLACEABLE_DISTRICTS.indexOf(district);
+}
+export function gpSiteDistrictOf(arg: number): DistrictId | undefined {
+  return arg === GP_SITE_CITY_CENTER ? 'CITY_CENTER' : PLACEABLE_DISTRICTS[arg];
+}
+
+/** CIV6 (`ActionRequiresNoMilitaryUnit`): true on exactly the rows that grant
+ *  a unit on the person's own plot — the charge waits until no military unit
+ *  shares the tile. */
+export function gpNoMilitaryOf(person: GreatPersonDef): boolean {
+  const a = GP_ABILITY[person.id];
+  return !!a && !a.unmodelled && (a.unit !== undefined || a.unitBestClass !== undefined);
 }
 
 export function gpChargesOf(person: GreatPersonDef): number {

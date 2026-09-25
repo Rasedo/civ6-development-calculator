@@ -3,7 +3,7 @@ import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
-import { spawnUnit, orderMove, setExploreMission } from '../../../cpu/core/units';
+import { spawnUnit, findPath, walkPath } from '../../../cpu/core/units';
 import { fogActive, isExplored, initFog, canSee, hexLineBetween, sightThrough, revealAround } from '../../../cpu/core/fog';
 import { hexDistance, neighbors } from '../../../world/hex';
 import { claimGoodyHut } from '../../../cpu/core/units';
@@ -32,7 +32,8 @@ describe('fog of war', () => {
     expect(canFoundCity(state, dark.index, 0).ok).toBe(false);
 
     const scout = spawnUnit(state, 'SCOUT', tileAtCoords(state.map, 9, 9).index, 0)!;
-    orderMove(state, scout.id, tileAtCoords(state.map, 14, 9).index);
+    scout.path = findPath(state, scout, tileAtCoords(state.map, 14, 9).index);
+    walkPath(state, scout);
     for (let i = 0; i < 6; i++) endTurn(state);
     expect(isExplored(state, 0, tileAtCoords(state.map, 14, 9).index)).toBe(true);
     // dark tile is now within the scout's revealed trail or still dark:
@@ -44,7 +45,7 @@ describe('fog of war', () => {
   it('auto-explore keeps revealing until the map runs out', () => {
     const { state } = foggyState();
     const scout = spawnUnit(state, 'SCOUT', tileAtCoords(state.map, 9, 9).index, 0)!;
-    setExploreMission(state, scout.id, true);
+    scout.mission = 'explore';
     const before = seatOf(state, 0)!.explored.filter((e) => e === 1).length;
     for (let i = 0; i < 30; i++) endTurn(state);
     const after = seatOf(state, 0)!.explored.filter((e) => e === 1).length;
@@ -170,7 +171,8 @@ describe('tribal villages', () => {
     const hut = tileAtCoords(state.map, 11, 9);
     hut.goodyHut = true;
     const scout = spawnUnit(state, 'SCOUT', tileAtCoords(state.map, 9, 9).index, 0)!;
-    orderMove(state, scout.id, hut.index);
+    scout.path = findPath(state, scout, hut.index);
+    walkPath(state, scout);
     for (let i = 0; i < 4 && hut.goodyHut; i++) endTurn(state);
     expect(hut.goodyHut).toBe(false);
     expect(state.eventLog.some((e) => e.startsWith('Tribal village'))).toBe(true);

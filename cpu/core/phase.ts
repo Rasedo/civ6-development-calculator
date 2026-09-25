@@ -26,10 +26,12 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, routePlunderGold, stampTradingPost, TRADE_WALK_EXPIRY_RAIL, claimTileEnRoute } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS } from '../data/cityStates';
+import { freeCityBuild, freeCityResearch } from './minorBuild';
+import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
-import { computeAdoption, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, fitPoliciesLoose, governmentSlots } from './effects';
+import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, governmentSlots } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../../world/terrains';
@@ -702,8 +704,8 @@ export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
  *  (`freeCityGrantType`). Each stands on the first free land tile beside the
  *  centre, in direction order; with none free it is not granted. The unit
  *  remembers the city that granted it (`Unit.freeCity`): when that city
- *  joins a civilization, the grant goes (`joinFromFreeCity`). The units
- *  stand where they are put: they defend, block and heal, and never move. */
+ *  joins a civilization, the grant goes (`joinFromFreeCity`). The units walk
+ *  with the Free Cities' walker (`freeCitiesPhase`). */
 function grantFreeCityUnit(state: GameState, city: City, unitType: string): void {
   const probe = { type: unitType, seat: FREE_SEAT };
   const spot = neighbors(state.map, state.map.tiles[city.centerIndex])
@@ -795,9 +797,12 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  treasury banks the Gold those same stats make, in array order, then pays
  *  its units' upkeep and meets the bankruptcy that upkeep may force — the
  *  majors' own order. Then each city takes its grant when one falls due,
+ *  puts the same stats' Production into its build table (`freeCityBuild`),
  *  fires the ranged strikes any walled city fires, heals as any unbesieged
- *  city does and runs `freeCityLoyaltyDelta`; the ones that reach 0 join
- *  their race's winner, in array order, after the walk. */
+ *  city does and runs `freeCityLoyaltyDelta`. Then the Free Cities' land
+ *  units walk (`walkUnit`, C-60's tables, around the nearest Free City, in
+ *  unit order off a list taken before anyone moves); the cities that reached
+ *  0 join their race's winner, in array order, after the walk. */
 export function freeCitiesPhase(state: GameState): void {
   const free = state.freeSeat;
   if (!free || free.cities.length === 0) return;
@@ -819,13 +824,15 @@ export function freeCitiesPhase(state: GameState): void {
   free.treasury -= upkeep;
   bankruptDisband(state, FREE_SEAT, mods);
   const joiners: City[] = [];
-  for (const city of [...free.cities]) {
+  const research = freeCityResearch(state);
+  [...free.cities].forEach((city, i) => {
     // the city's own turn count, the flip turn its first: `foundedTurn` is
     // the revolt's turn, which the transfer that made it Free wrote
     if ((state.turn - city.foundedTurn + 1) % FREE_CITY_GRANT_PERIOD === 0) {
       const type = freeCityGrantType(state);
       if (type) grantFreeCityUnit(state, city, type);
     }
+    freeCityBuild(state, city, stats[i].total.production, research);
     cityStrikes(state, city, cityStrikeStrength(state, city));
     const centre = state.map.tiles[city.centerIndex];
     if (!encircled(state, centre, FREE_SEAT) && !irradiated(centre)) {
@@ -834,6 +841,10 @@ export function freeCitiesPhase(state: GameState): void {
     const next = (city.loyalty ?? LOYALTY_MAX) + freeCityLoyaltyDelta(state, city);
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
     if (city.loyalty <= 0) joiners.push(city);
+  });
+  const homes = free.cities.map((c) => c.centerIndex);
+  for (const u of state.units.filter((x) => x.seat === FREE_SEAT && landWalker(x))) {
+    walkUnit(state, u, homes, FREE_WALK_STEPS, FREE_WALK_WEIGHTS);
   }
   for (const city of joiners) joinFromFreeCity(state, city);
 }
@@ -1032,6 +1043,29 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
 export function queueSeatProject(state: GameState, civCity: City, projId: string): boolean {
   if (!availableProjects(state, civCity).some((p) => p.id === projId)) return false;
   return queueProject(state, civCity.id, projId, civCity.seat).ok;
+}
+
+/** BUY A BUILDING WITH GOLD — the record's `buy` kind 0. ONE legality body
+ * with the candidate row and the GPU's gold read: the shared gold list paired
+ * with `buildingCompletable`, never a worship row (faith buys those), never a
+ * row the install bars from Gold. The purse keeps the peace reserve. The
+ * building stands at once and a queued copy of it banks its progress. */
+export function buySeatBuilding(state: GameState, actor: Seat, civCity: City, id: string): boolean {
+  const def = BUILDINGS[id];
+  if (!def || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)
+      || def.noPurchase || wallsGoldBlocked(state, actor.seat, def.id)) return false;
+  if (!goldPurchasableBuildings(state, civCity).some((b) => b.id === def.id)
+      || !buildingCompletable(state, civCity, def.id)) return false;
+  const price = goldPrice(state, actor.seat, buildingPurchaseCost(state, actor.seat, def.id));
+  const reserve = PEACE_GOLD_COST(0);
+  if (Math.round((actor.treasury ?? 0) * 1000) < Math.round((price + reserve) * 1000)) return false;
+  actor.treasury = (actor.treasury ?? 0) - price;
+  civCity.buildings.push(def.id);
+  stampBuildingEra(state, civCity, def.id);
+  dropQueuedBuilding(civCity, def.id);
+  buildingDedications(state, civCity.seat, def.id);
+  if (def.walls) { civCity.outerHp = wallsMax(state, civCity); fitEncampOuter(state, civCity); }
+  return true;
 }
 
 /** What a voter knows that `congress` cannot look up itself: the live
@@ -1432,12 +1466,16 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     const c = Object.keys(CIVICS)[civicCol];
     if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) selectResearch(actor.research, c, true);
   }
+  // The GOVERNMENT is a driver decision, validated (`governmentsOpen`) and
+  // stored; it lands before the cards so the set below is laid into the
+  // government the seat is now in.
+  if (rec.government !== null && rec.government !== undefined) adoptGovernment(state, actor.seat, rec.government);
   // The SLOTTED CARDS are a driver decision. Validated whole here —
   // every card unlocked under the live government, the set fitting its
   // slots — and STORED in `government.policies`; a set that does not fit is
   // refused entire. The stored set is what pays the card effects.
   if (rec.policies) {
-    const gov = computeAdoption(actor.research).government;
+    const gov = seatGovernment(state, actor.seat);
     if (gov) {
       const open = unlockedPolicyIds(actor.research, congressPolicyBlocked(state), inDarkAge(state, actor.seat), actor.government.held, gov);
       const ids = rec.policies.map((i) => POLICY_LIST[i]?.id).filter((id): id is string => !!id && open.has(id));
@@ -2379,7 +2417,7 @@ export function seatPhase(state: GameState): void {
         }
       }
       if (state.cityStates.some((cityState) => hasMet(cityState, actor.seat))) {
-        const gov = GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(actor.research).government : null;
+        const gov = GOVERNMENTS_ADOPTION_LIVE ? seatGovernment(state, actor.seat) : null;
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
         // CIV6 (Rogue State): "Earn no influence toward new Envoys."
         if (!getModifiers(state, actor.seat).noEnvoyInfluence) {
@@ -2478,27 +2516,7 @@ export function seatPhase(state: GameState): void {
         if (bv && bv[0] === 0) {
           const civCity = actor.cities.find((c) => c.centerIndex === bv[1]);
           const bid = prodLayout().buildings[bv[2]];
-          const def = bid ? BUILDINGS[bid] : undefined;
-          if (civCity && def && !def.worship && !SCRIPTED_HELD_BUILDINGS.has(def.id)
-              && !def.noPurchase && !wallsGoldBlocked(state, actor.seat, def.id)) {
-            // ONE legality body with the candidate row and the GPU's gold
-            // read: the shared gold list paired with `buildingCompletable`.
-            const okBuy = goldPurchasableBuildings(state, civCity).some((b) => b.id === def.id)
-              && buildingCompletable(state, civCity, def.id);
-            if (okBuy) {
-              const price = goldPrice(state, actor.seat, buildingPurchaseCost(state, actor.seat, def.id));
-              const reserve = PEACE_GOLD_COST(0);
-              if (Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
-                actor.treasury = (actor.treasury ?? 0) - price;
-                civCity.buildings.push(def.id);
-                stampBuildingEra(state, civCity, def.id);
-                dropQueuedBuilding(civCity, def.id);
-                buildingDedications(state, civCity.seat, def.id);
-                if (def.walls) { civCity.outerHp = wallsMax(state, civCity); fitEncampOuter(state, civCity); }
-                bought = true;
-              }
-            }
-          }
+          if (civCity && bid) bought = buySeatBuilding(state, actor, civCity, bid);
         }
       }
       // KIND 5 — a DISTRICT bought with gold (the Contractor's promotion).
@@ -2543,8 +2561,8 @@ export function seatPhase(state: GameState): void {
             bought = true;
             applyTrainingGrants(state, spawnCity, u);
             // CIV6 (GS): a strategic unit pays its resource "the moment you
-            // purchase it" — the same charge `purchaseUnit` and the GPU's
-            // gold arm make; a purchase outside a queue pays full price
+            // purchase it" — the same charge the GPU's gold arm makes; a
+            // purchase outside a queue pays full price
             chargeUnitResource(state, actor.seat, pickId);
           }
         }
@@ -3103,7 +3121,7 @@ export function seatPhase(state: GameState): void {
       if (cap) spawnUnit(state, id, cap.centerIndex, actor.seat);
     }
     const bCivic = rosterBoostPoints(state, actor.seat, true);
-    const _govBefore = computeAdoption(rsr).government;
+    const _govBefore = seatGovernment(state, actor.seat);
     while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic)) {
       rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic);
       for (const fx of CIVICS[rsr.civic].effects) {
@@ -3121,18 +3139,13 @@ export function seatPhase(state: GameState): void {
     }
     if (!rsr.civic && availableCivicsIn(rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
     // CIV6 (Legacy policy card): the card is unlocked by having BEEN in its
-    // government, so the seat remembers the one it is in now. Only a
-    // completed civic can move it, which is why this sits at the loop's exit.
-    const _govNow = computeAdoption(rsr).government;
+    // government, so the seat remembers the one it is in now. A seat whose
+    // record never chose follows the newest government its civics unlock, and
+    // only a completed civic moves that, which is why this sits at the loop's
+    // exit; a CHANGE carries the slotted cards over.
+    const _govNow = seatGovernment(state, actor.seat);
     actor.government.held |= governmentBit(_govNow);
-    // a CHANGED government keeps the slotted cards that still fit its slots
-    // and drops the rest; the freed slots wait for the driver's next decision
-    if (_govNow && _govNow !== _govBefore) {
-      const open = unlockedPolicyIds(rsr, congressPolicyBlocked(state), inDarkAge(state, actor.seat), actor.government.held, _govNow);
-      actor.government.policies = fitPoliciesLoose(
-        governmentSlots(state, actor.seat),
-        actor.government.policies.filter((p): p is string => !!p && open.has(p)));
-    }
+    if (_govNow && _govNow !== _govBefore) carryPolicies(state, actor.seat);
 
     advanceGreatPeople(state, actor.seat);
 

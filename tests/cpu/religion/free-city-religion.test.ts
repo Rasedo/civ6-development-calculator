@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity, spreadReligiousPressureForTest } from '../../../cpu/core/game';
+import { foundCity, spreadReligiousPressure } from '../../../cpu/core/game';
 import { flipCity } from '../../../cpu/core/phase';
 import { FREE_SEAT, grantFoundingPressure, seatOf } from '../../../cpu/core/seats';
 import type { City, GameState } from '../../../cpu/core/types';
@@ -48,7 +48,7 @@ describe('the pressure walk reaches the free row', () => {
     expect(free.followedReligion ?? null).toBeNull();
     // ATHEISM_PRESSURE_PER_POP is 50, so a pop-4 city holds 200 of its own
     // and the Holy City's x4 step needs past that to take the majority.
-    for (let i = 0; i < 120; i++) spreadReligiousPressureForTest(state);
+    for (let i = 0; i < 120; i++) spreadReligiousPressure(state);
     expect((free.religionPressure ?? [])[0] ?? 0).toBeGreaterThan(0);
     expect(free.followedReligion).toBe(0);
   });
@@ -57,13 +57,13 @@ describe('the pressure walk reaches the free row', () => {
     const { state, free } = scene();
     // ATHEISM_PRESSURE_PER_POP is 50, so a pop-4 city holds 200 of its own
     // and the Holy City's x4 step needs past that to take the majority.
-    for (let i = 0; i < 120; i++) spreadReligiousPressureForTest(state);
+    for (let i = 0; i < 120; i++) spreadReligiousPressure(state);
     expect(free.followedReligion).toBe(0);
     // the walk reads `city.followedReligion` for every walked row, so the
     // free row now appears among the sources; nothing about the source step
     // asks who owns the city.
     const before = (free.religionPressure ?? [])[0] ?? 0;
-    spreadReligiousPressureForTest(state);
+    spreadReligiousPressure(state);
     expect((free.religionPressure ?? [])[0] ?? 0).toBeGreaterThan(before);
   });
 });

@@ -1,14 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
-import { queueBuilding, purchaseBuilding, purchaseUnit, purchaseSettler, queueProject, availableProjects, projectCost, buildingPurchaseCost, buildingFaithCost, unitPurchaseCost, settlerCost, endTurn, itemCost } from '../../../cpu/core/game';
-import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount } from '../../../cpu/core/units';
+import { buyWorshipBuilding, purchaseSettler, queueProject, availableProjects, projectCost, buildingPurchaseCost, buildingFaithCost, settlerCost, endTurn, itemCost } from '../../../cpu/core/game';
+import { buySeatBuilding } from '../../../cpu/core/phase';
+import { commitProduction } from '../../../cpu/core/seatTurn';
+import { PEACE_GOLD_COST } from '../../../cpu/data/seats';
+import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount, purchaseSpotBlocked } from '../../../cpu/core/units';
 import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
 import { goldPurchasableBuildings } from '../../../cpu/core/rules';
 import { purchaseStep } from '../../../cpu/core/effects';
-import { GOLD_PURCHASE_MULT, scaleByGameSpeed } from '../../../cpu/data/constants';
-import { UNITS } from '../../../cpu/data/units';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import { TECHS } from '../../../cpu/data/techs';
 import { CIVICS } from '../../../cpu/data/civics';   // every price is floored to a multiple of five (measured)
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
@@ -27,26 +29,30 @@ function addDistrict(state: GameState, city: City, type: DistrictId, col: number
 }
 
 describe('gold & faith purchases', () => {
-  it('buys a building outright at 4x production cost', () => {
+  it('buys a building outright at 4x production cost, keeping the peace reserve', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
+    const s = seatOf(state, 0)!;
     const cost = buildingPurchaseCost(state, 0, 'MONUMENT');
     expect(cost).toBeGreaterThan(0);
-    seatOf(state, 0)!.treasury = purchaseStep(cost) + 10;
-    const r = purchaseBuilding(state, city.id, 'MONUMENT', 0);
-    expect(r.ok).toBe(true);
+    const reserve = PEACE_GOLD_COST(0);
+    s.treasury = purchaseStep(cost) + reserve - 1;
+    expect(buySeatBuilding(state, s, city, 'MONUMENT')).toBe(false); // the reserve is not spent
+    s.treasury = purchaseStep(cost) + reserve + 10;
+    expect(buySeatBuilding(state, s, city, 'MONUMENT')).toBe(true);
     expect(city.buildings).toContain('MONUMENT');
-    expect(seatOf(state, 0)!.treasury).toBe(10);
+    expect(s.treasury).toBe(reserve + 10);
   });
 
   it('refuses purchases you cannot afford or complete', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
-    seatOf(state, 0)!.treasury = 5;
-    expect(purchaseBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(false);
-    seatOf(state, 0)!.treasury = 10000;
+    const s = seatOf(state, 0)!;
+    s.treasury = 5;
+    expect(buySeatBuilding(state, s, city, 'MONUMENT')).toBe(false);
+    s.treasury = 10000;
     // Library needs a completed Campus — not even offered without one.
-    expect(purchaseBuilding(state, city.id, 'LIBRARY', 0).ok).toBe(false);
+    expect(buySeatBuilding(state, s, city, 'LIBRARY')).toBe(false);
   });
 
   it('sells the item under production, and banks what was spent on it', () => {
@@ -55,14 +61,15 @@ describe('gold & faith purchases', () => {
     // back already did.
     const state = makeState();
     const city = foundAt(state, 5, 5);
-    expect(queueBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    const s = seatOf(state, 0)!;
+    commitProduction(state, 0, city, { kind: 'building', building: 'MONUMENT', progress: 0 });
     city.queue[0]!.progress = 7;
     expect(city.queue[0]?.kind).toBe('building');
     expect(goldPurchasableBuildings(state, city).map((b) => b.id)).toContain('MONUMENT');
 
     const bank = city.productionBank ?? 0;
-    seatOf(state, 0)!.treasury = buildingPurchaseCost(state, 0, 'MONUMENT');
-    expect(purchaseBuilding(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    s.treasury = buildingPurchaseCost(state, 0, 'MONUMENT') + PEACE_GOLD_COST(0);
+    expect(buySeatBuilding(state, s, city, 'MONUMENT')).toBe(true);
     expect(city.buildings).toContain('MONUMENT');
     expect(city.queue.some((q) => q.kind === 'building' && q.building === 'MONUMENT')).toBe(false);
     expect(city.productionBank).toBe(bank + 7);
@@ -73,54 +80,48 @@ describe('gold & faith purchases', () => {
     const city = foundAt(state, 5, 5);
     addDistrict(state, city, 'HOLY_SITE', 6, 5);
     city.buildings.push('SHRINE', 'TEMPLE');
+    seatOf(state, 0)!.religion.founded = true;
     seatOf(state, 0)!.religion.worship = 'CATHEDRAL';
     const cost = buildingFaithCost(state, 0, 'CATHEDRAL');
     seatOf(state, 0)!.faith = purchaseStep(cost) + 3;
     seatOf(state, 0)!.treasury = 0;
-    const r = purchaseBuilding(state, city.id, 'CATHEDRAL', 0);
+    // a worship row never sells for gold
+    expect(buySeatBuilding(state, seatOf(state, 0)!, city, 'CATHEDRAL')).toBe(false);
+    const r = buyWorshipBuilding(state, city.id, 0);
     expect(r.ok).toBe(true);
     expect(city.buildings).toContain('CATHEDRAL');
     expect(seatOf(state, 0)!.faith).toBe(3);
     expect(seatOf(state, 0)!.treasury).toBe(0); // gold untouched
   });
 
-  it('a purchased land unit lands on the centre, and a unit of its class already there refuses it', () => {
+  it('a purchased unit lands on the centre, and a unit of its class already there refuses it', () => {
     // CIV6 (measured in the live game): "too many units of one class here" — the
     // purchase does not spill to a neighbour the way a trained unit does.
     const state = makeState();
     state.unitsMode = true;
     const city = foundAt(state, 5, 5);
+    city.population = 2;
     seatOf(state, 0)!.treasury = 100000;
     expect(spawnUnit(state, 'WARRIOR', city.centerIndex, 0)?.tileIndex).toBe(city.centerIndex);
-    const refused = purchaseUnit(state, city.id, 'WARRIOR', 0);
-    expect(refused.ok).toBe(false);
-    expect(refused.reason).toMatch(/already stands on the city centre/);
+    expect(purchaseSpotBlocked(state, city, 0, 'WARRIOR')).toBe(true);
     // a CIVILIAN takes the other slot of the same tile
-    expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
-    expect(state.units.filter((u) => u.tileIndex === city.centerIndex).length).toBe(2);
+    expect(purchaseSpotBlocked(state, city, 0, 'SETTLER')).toBe(false);
+    expect(spawnUnit(state, 'BUILDER', city.centerIndex, 0)?.tileIndex).toBe(city.centerIndex);
     // ...and now the civilian slot is taken too
+    expect(purchaseSpotBlocked(state, city, 0, 'SETTLER')).toBe(true);
     expect(purchaseSettler(state, city.id, 0).ok).toBe(false);
-    expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(false);
   });
 
-  it('buys units and settlers with gold', () => {
+  it('buys settlers with gold', () => {
     const state = makeState();
     state.unitsMode = true;
     const city = foundAt(state, 5, 5);
-    seatOf(state, 0)!.treasury = purchaseStep(unitPurchaseCost(state, 'BUILDER', 0));
-    expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
-    expect(state.units.length).toBe(1);
-    expect(seatOf(state, 0)!.treasury).toBe(0);
-    expect(seatOf(state, 0)!.buildersTrained).toBe(1);
-    // escalated past the first Builder's price
-    expect(unitPurchaseCost(state, 'BUILDER', 0)).toBeGreaterThan(UNITS.BUILDER.cost * GOLD_PURCHASE_MULT);
-    expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(false); // broke
-
     const sCost = purchaseStep(settlerCost(state, 0) * 4);
     seatOf(state, 0)!.treasury = sCost;
     city.population = 2; // a 1-pop city may not buy a settler (real Civ 6)
-    // the Builder stands on the centre and holds its civilian slot: a Settler
-    // is refused until it walks off (real Civ 6 — "too many units of one class")
+    // a Builder on the centre holds its civilian slot: a Settler is refused
+    // until it walks off (real Civ 6 — "too many units of one class")
+    spawnUnit(state, 'BUILDER', city.centerIndex, 0);
     expect(purchaseSettler(state, city.id, 0).ok).toBe(false);
     expect(seatOf(state, 0)!.treasury).toBe(sCost);
     state.units[0].tileIndex = tileAtCoords(state.map, 6, 5).index;
@@ -145,7 +146,7 @@ describe('chops and harvests', () => {
 
   it('chopping woods inside borders grants era-scaled production', () => {
     const { state, city, woods, builder } = chopSetup();
-    queueBuilding(state, city.id, 'MONUMENT', 0);
+    commitProduction(state, 0, city, { kind: 'building', building: 'MONUMENT', progress: 0 });
     const expected = chopValue(state, 0, undefined, CHOP_BASE);
     expect(chopGrant(state, woods, 0)).toEqual({ key: 'production', amount: expected });
     const r = builderRemoveFeature(state, builder.id, 0);
@@ -181,7 +182,7 @@ describe('chops and harvests', () => {
     builderRemoveFeature(state, builder.id, 0);
     const banked = city.productionBank ?? 0;
     expect(banked).toBeGreaterThan(0);
-    queueBuilding(state, city.id, 'MONUMENT', 0);
+    commitProduction(state, 0, city, { kind: 'building', building: 'MONUMENT', progress: 0 });
     endTurn(state);
     const head = city.queue[0];
     if (head) {

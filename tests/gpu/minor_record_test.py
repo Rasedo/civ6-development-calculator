@@ -210,10 +210,12 @@ def test_minor_conversion(rules) -> None:
 def test_minor_army(rules) -> None:
     """CIV6 (Eras.xml `BonusMinorStartingUnits`): an Ancient start gives every
     minor two Warriors. They ride the majors' pool under the minor's seat id,
-    first on its centre and then on its ring; they hold where they spawned,
-    heal as a unit in a city on the centre, and leave the map with the minor's
-    conquest. The TS twin is tests/cpu/minors/minor-army.test.ts."""
-    sim = build(rules)
+    first on its centre and then on its ring (read at load, before the walker
+    moves them), heal as a unit in a city on the centre, and leave the map
+    with the minor's conquest. The TS twin is
+    tests/cpu/minors/minor-army.test.ts."""
+    path = fixture_paths()[0]
+    sim = warm_base(str(path), lambda: opened(rules, path, 0))
     b = 0
     alive = sim.major_unit_alive[b]
     for s in range(sim.S):
@@ -228,8 +230,6 @@ def test_minor_army(rules) -> None:
         assert int(sim.pair_dist[ctr, tiles[1]]) == 1, "the second Warrior is off the ring"
         assert all(int(sim.military_at[b, t]) == int(i) for t, i in zip(tiles, army.tolist())), \
             "a Warrior does not hold its plot"
-        assert all(int(sim.major_unit_fortify[b, i]) >= 1 for i in army.tolist()), \
-            "a Warrior that never moved has not dug in"
     s0 = next(s for s in range(sim.S) if bool(sim.citystate_alive[b, s]))
     army = (alive & (sim.major_unit_seat[b] == 100 + s0)).nonzero(as_tuple=True)[0]
     heal = sim._seat_heal("major")[b]
@@ -244,7 +244,7 @@ def test_minor_army(rules) -> None:
                for t in held), "a removed Warrior still holds its plot"
     assert int((sim.major_unit_alive[b] & (sim.major_unit_seat[b] >= 100)).sum()) == others, \
         "the conquest took another minor's army"
-    print(f"  minor army OK: two Warriors per minor, centre and ring, dug in, 20/15 heal, gone with the minor")
+    print(f"  minor army OK: two Warriors per minor, centre and ring, 20/15 heal, gone with the minor")
 
 
 def main() -> None:

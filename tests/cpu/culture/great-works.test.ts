@@ -9,8 +9,8 @@
  * great_works_test lane mirrors them.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, expandBorders, holdWorks } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, expandBorders, holdWorks, standBuilding, standDistrict } from '../helpers';
+import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
 import { ARTIST_WORKS, GW_WORKS_PER_PERSON, personWorkObjects } from '../../../cpu/data/greatPeople';
 import {
@@ -30,10 +30,8 @@ function cityWithAmphitheater() {
   const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
   expandBorders(state, city, 3);
   const ts = tileAtCoords(state.map, 9, 8);
-  expect(queueDistrict(state, city.id, 'THEATER_SQUARE', ts.index, 0).ok).toBe(true);
-  expect(ts.districtComplete).toBe(true);
-  expect(queueBuilding(state, city.id, 'AMPHITHEATER', 0).ok).toBe(true);
-  expect(city.buildings.includes('AMPHITHEATER')).toBe(true);
+  standDistrict(state, city, 'THEATER_SQUARE', ts.index);
+  standBuilding(state, city, 'AMPHITHEATER');
   // the Palace's own any-object slot comes FIRST in the holder table; these
   // scenes read the Amphitheater alone
   city.buildings = city.buildings.filter((b) => b !== 'PALACE');
@@ -65,8 +63,8 @@ describe('Great Works', () => {
 
   it('a MUSIC work pays double a writing work (4 vs 2) and no gold', () => {
     const { state, city } = cityWithAmphitheater();
-    expect(queueBuilding(state, city.id, 'MUSEUM', 0).ok).toBe(true); // requiresAny AMPHITHEATER
-    expect(queueBuilding(state, city.id, 'BROADCAST_CENTER', 0).ok).toBe(true); // requiresAny MUSEUM
+    standBuilding(state, city, 'MUSEUM'); // requiresAny AMPHITHEATER
+    standBuilding(state, city, 'BROADCAST_CENTER'); // requiresAny MUSEUM
     const b0 = computeCityStats(state, city).breakdown.buildings;
     expect(activate(state, city, 'MUSICIAN')).toBe(1); // 2 works, 1 Broadcast Center slot
     expect(gwCountKind(city, GW_KIND_MUSIC)).toBe(1);
@@ -78,7 +76,7 @@ describe('Great Works', () => {
 
   it('an ARTIST fills the Art Museum (3 slots, +3 culture each)', () => {
     const { state, city } = cityWithAmphitheater();
-    expect(queueBuilding(state, city.id, 'MUSEUM', 0).ok).toBe(true);
+    standBuilding(state, city, 'MUSEUM');
     const cul0 = culture(state, city);
     expect(GW_WORKS_PER_PERSON[GW_KIND_ART]).toBe(3); // real Civ 6: an Artist makes 3
     expect(activate(state, city, 'ARTIST', 2)).toBe(0); // Donatello's three sculptures fit exactly

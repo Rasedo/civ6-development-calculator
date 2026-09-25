@@ -1,12 +1,12 @@
 import { grantFoundingPressure, emptySeat } from '../../../cpu/core/seats';
-import { spreadReligiousPressureForTest } from '../../../cpu/core/game';
+import { spreadReligiousPressure } from '../../../cpu/core/game';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import type { City } from '../../../cpu/core/types';
 import { RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, BELIEF_CATALOGS, WORSHIP_BELIEFS, RELIGION_INITIAL_BELIEFS, beliefClassOf } from '../../../cpu/data/religion';
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, adoptBeliefs, canEnhanceReligion, enhanceableClasses, buyWorshipBuilding, purchaseReligiousUnit, endTurn, beliefPicks, evangelizeOk, evangelizeBelief } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics, standBuilding, standDistrict } from '../helpers';
+import { foundCity, canFoundReligion, adoptBeliefs, canEnhanceReligion, enhanceableClasses, buyWorshipBuilding, purchaseReligiousUnit, endTurn, beliefPicks, evangelizeOk, evangelizeBelief } from '../../../cpu/core/game';
 import { applySeatActionRecord, applySeatUnitOrders } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
 import { IMPROVEMENT_IDS, unitActionIndex, unitActionNames } from '../../../cpu/core/unitActions';
@@ -31,13 +31,10 @@ function sandboxCity() {
 }
 
 describe('pantheons', () => {
-  it('cost 25 faith and apply their effects', () => {
+  it('God of the Open Sky pays Culture on a Pasture', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
-    expect(choosePantheon(state, 'GOD_OF_THE_OPEN_SKY', 0).ok).toBe(false); // no faith yet
-    seatOf(state, 0)!.faith = 30;
-    expect(choosePantheon(state, 'GOD_OF_THE_OPEN_SKY', 0).ok).toBe(true);
-    expect(seatOf(state, 0)!.faith).toBe(5);
+    seatOf(state, 0)!.religion.pantheon = 'GOD_OF_THE_OPEN_SKY';
 
     const pasture = tileAtCoords(state.map, 9, 8);
     pasture.resource = 'CATTLE';
@@ -62,9 +59,9 @@ describe('founding a religion', () => {
   function ready() {
     const { state, city } = sandboxCity();
     seatOf(state, 0)!.religion.pantheon = 'FERTILITY_RITES';
-    queueDistrict(state, city.id, 'HOLY_SITE', tileAtCoords(state.map, 10, 9).index, 0);
-    queueBuilding(state, city.id, 'SHRINE', 0);
-    queueBuilding(state, city.id, 'TEMPLE', 0);
+    standDistrict(state, city, 'HOLY_SITE', tileAtCoords(state.map, 10, 9).index);
+    standBuilding(state, city, 'SHRINE');
+    standBuilding(state, city, 'TEMPLE');
     return { state, city };
   }
   /** a belief id as the wire names it: [class code, class catalog row] */
@@ -218,7 +215,7 @@ describe('founding a religion', () => {
     const buildable = availableBuildings(state, city).map((b) => b.id);
     expect(buildable).toContain('GURDWARA');
     expect(buildable).not.toContain('STUPA');
-    expect(queueBuilding(state, city.id, 'GURDWARA', 0).ok).toBe(true);
+    standBuilding(state, city, 'GURDWARA');
     expect(city.buildings).toContain('GURDWARA');
     // Tithe (GS, TITHE_GOLD_CITY_MODIFIER): +3 gold per CITY following the
     // religion — the Founder belief, added by the enhancement
@@ -319,8 +316,8 @@ describe('trade routes', () => {
     expect(tradeCapacity(state, 0)).toBe(0);
     grantCivics(state, 'FOREIGN_TRADE');
     expect(tradeCapacity(state, 0)).toBe(1);
-    queueDistrict(state, a.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 9).index, 0);
-    queueBuilding(state, a.id, 'MARKET', 0);
+    standDistrict(state, a, 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 9).index);
+    standBuilding(state, a, 'MARKET');
     expect(tradeCapacity(state, 0)).toBe(2);
     void b;
   });
@@ -342,8 +339,8 @@ describe('trade routes', () => {
     // each completed district adds its District_TradeRouteYields row: a
     // Campus +1 food, a Holy Site +1 food (domestic column)
     b.population = 7; // allow the district count
-    expect(queueDistrict(state, b.id, 'CAMPUS', tileAtCoords(state.map, 15, 9).index, 0).ok).toBe(true);
-    expect(queueDistrict(state, b.id, 'HOLY_SITE', tileAtCoords(state.map, 13, 9).index, 0).ok).toBe(true);
+    standDistrict(state, b, 'CAMPUS', tileAtCoords(state.map, 15, 9).index);
+    standDistrict(state, b, 'HOLY_SITE', tileAtCoords(state.map, 13, 9).index);
     expect(routeYields(state, b)).toMatchObject({ food: 3, production: 1 });
   });
 
@@ -383,18 +380,18 @@ describe('religious pressure spread', () => {
     };
     // an EVEN turn: 1 down the route, the half-point back
     state.turn = 10;
-    expect(delta(b, 0, () => spreadReligiousPressureForTest(state))).toBe(1);
-    expect(delta(a, 1, () => spreadReligiousPressureForTest(state))).toBe(1);
+    expect(delta(b, 0, () => spreadReligiousPressure(state))).toBe(1);
+    expect(delta(a, 1, () => spreadReligiousPressure(state))).toBe(1);
     // an ODD turn: 1 down the route, nothing back
     state.turn = 11;
-    expect(delta(b, 0, () => spreadReligiousPressureForTest(state))).toBe(1);
-    expect(delta(a, 1, () => spreadReligiousPressureForTest(state))).toBe(0);
+    expect(delta(b, 0, () => spreadReligiousPressure(state))).toBe(1);
+    expect(delta(a, 1, () => spreadReligiousPressure(state))).toBe(0);
     // each Holy City's own step rides beside it
-    expect(delta(a, 0, () => spreadReligiousPressureForTest(state))).toBe(step);
+    expect(delta(a, 0, () => spreadReligiousPressure(state))).toBe(step);
     // India: +100% on the OWNER's routes — 2 down, 1 back, on an odd turn too
     state.seats[0].civ = CIV_LEADERS.findIndex((l) => l.civ === 'INDIA');
-    expect(delta(b, 0, () => spreadReligiousPressureForTest(state))).toBe(2);
-    expect(delta(a, 1, () => spreadReligiousPressureForTest(state))).toBe(1);
+    expect(delta(b, 0, () => spreadReligiousPressure(state))).toBe(2);
+    expect(delta(a, 1, () => spreadReligiousPressure(state))).toBe(1);
   });
 
   it("a holy city converts cities within range each turn; distant cities stay unconverted", () => {

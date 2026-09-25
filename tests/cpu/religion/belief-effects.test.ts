@@ -11,8 +11,8 @@
  * 10); the Dar-e Mehr's Building_YieldsPerEra.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
-import { foundCity, queueBuilding, condemnHeretic } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, expandBorders, standBuilding } from '../helpers';
+import { foundCity, condemnHeretic } from '../../../cpu/core/game';
 import { seatOf, emptySeat, setWar } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { makeYieldCtx } from '../../../cpu/core/effects';
@@ -164,7 +164,7 @@ describe('the Dar-e Mehr pays +1 Faith per game era since constructed or last re
     const { state, city } = withDarEMehr();
     expect(BUILDINGS.DAR_E_MEHR.yieldsPerEra).toEqual({ faith: 1 });
     state.turn = ERA_LENGTH + 3;
-    expect(queueBuilding(state, city.id, 'DAR_E_MEHR', 0).ok).toBe(true);
+    standBuilding(state, city, 'DAR_E_MEHR');
     expect(city.buildingEras).toEqual({ DAR_E_MEHR: 1 });
     const faith = () => computeCityStats(state, city).breakdown.buildings.faith;
     const f0 = faith();
@@ -184,7 +184,7 @@ describe('the Dar-e Mehr pays +1 Faith per game era since constructed or last re
   it('the stamp rides the city through a capture', () => {
     const { state, city } = withDarEMehr();
     state.turn = 0;
-    queueBuilding(state, city.id, 'DAR_E_MEHR', 0);
+    standBuilding(state, city, 'DAR_E_MEHR');
     state.seats.push(emptySeat(1));
     expect(transferCity(state, 0, seatOf(state, 1)!, city, 'conquered')).toBe(true);
     const held = seatOf(state, 1)!.cities.find((c) => c.centerIndex === city.centerIndex)!;
