@@ -34,7 +34,7 @@ function put(state: GameState, seat: number, type: string, col: number, row: num
 function mover(state: GameState, type: string, col: number, row: number): Unit {
   return {
     id: 9000, type, seat: 0, tileIndex: tileAtCoords(state.map, col, row).index,
-    movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
+    movesLeft: 2 * MP_SCALE, hp: 100, charges: null,
   };
 }
 

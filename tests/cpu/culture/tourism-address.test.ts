@@ -1,8 +1,7 @@
 import { slotGreedily } from '../../../cpu/core/effects';
 import { describe, it, expect } from 'vitest';
 import { seatOf, setBorderTurnsFrom } from '../../../cpu/core/seats';
-import { createGame } from '../../../cpu/core/game';
-import { settleFirstCity, holdWorks } from '../helpers';
+import { seededGame, holdWorks } from '../helpers';
 import { tourismIntlPct, seatTourism, lateEraTourism } from '../../../cpu/core/city';
 import { buildingVariantFor } from '../../../cpu/data/buildings';
 import { ERAS } from '../../../cpu/data/techs';
@@ -30,12 +29,7 @@ import type { GameState, Seat } from '../../../cpu/core/types';
 // the per-rival percent itself.
 
 function newGame(opponents = 1) {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: false,
-    withVillages: false, cityStates: 0, opponents,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 1 + opponents);
   state.autoResearch = false;
   return state;
 }

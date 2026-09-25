@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, tileSeat } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { seededGame, makeMap, makeState, tileAtCoords } from '../helpers';
 import { neighbors } from '../../../world/hex';
 import { spawnUnit } from '../../../cpu/core/units';
 import { hostileUnitAct } from '../../../cpu/core/combat';
 import { BARB_SEAT } from '../../../cpu/core/seats';
-import { createGame, foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
+import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
+import { CITY_STATE_START_DIST } from '../../../seeder/place';
 import { canFoundCity } from '../../../cpu/core/rules';
 import { seatPhase } from '../../../cpu/core/phase';
 import { borderCandidates, computeCityStats } from '../../../cpu/core/city';
@@ -39,10 +40,10 @@ function addCs(
 }
 
 describe('city-state placement', () => {
-  it('places spaced, deterministic city-states that claim territory', () => {
-    const a = createGame({ width: 44, height: 26, seed: 5, withResources: true, withWonders: true, cityStates: true });
-    const b = createGame({ width: 44, height: 26, seed: 5, withResources: true, withWonders: true, cityStates: true });
-    expect(a.cityStates.length).toBeGreaterThanOrEqual(2);
+  it('a seeded world places spaced, deterministic city-states that claim territory', () => {
+    const a = seededGame(5, 1, 3);
+    const b = seededGame(5, 1, 3);
+    expect(a.cityStates.length).toBe(3);
     expect(serialize(a)).toBe(serialize(b));
     for (const cityState of a.cityStates) {
       const center = a.map.tiles[cityState.centerIndex];
@@ -50,7 +51,7 @@ describe('city-state placement', () => {
       for (const other of a.cityStates) {
         if (other.id === cityState.id) continue;
         const oc = a.map.tiles[other.centerIndex];
-        expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(8);
+        expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(CITY_STATE_START_DIST);
       }
     }
   });
@@ -219,9 +220,7 @@ describe('quests and trade', () => {
 
 describe('determinism', () => {
   it('city-state games replay identically from a save', () => {
-    const a = createGame({ width: 30, height: 20, seed: 9, withResources: true, withWonders: true, cityStates: true });
-    const sites = a.map.tiles.filter((t) => canFoundCity(a, t.index, 0).ok);
-    foundCity(a, sites[Math.floor(sites.length / 2)].index, 0);
+    const a = seededGame(9, 1, 3);
     for (let i = 0; i < 5; i++) endTurn(a);
     const b = deserialize(serialize(a));
     for (let i = 0; i < 10; i++) {

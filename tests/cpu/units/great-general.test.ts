@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { isCiv, seatOf, setWar, tileSeat } from '../../../cpu/core/seats';
-import { createGame, endTurn } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { endTurn } from '../../../cpu/core/game';
+import { seededGame } from '../helpers';
 import { spawnUnit, unitDomain, trainableUnits } from '../../../cpu/core/units';
 import { isImpassable } from '../../../world/query';
 import { generalAuraCS, meleeAttack } from '../../../cpu/core/combat';
@@ -16,13 +16,8 @@ import type { GameState, Unit, Seat } from '../../../cpu/core/types';
 // (no ENCAMPMENT flows its GPP), so these pin the catalog, the +5 aura, the
 // spawn-at-claim and capture directly.
 
-function newGame(opts: Partial<Parameters<typeof createGame>[0]> = {}): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 0, opponents: 1, ...opts,
-  });
-  settleFirstCity(state, 0);
+function newGame(): GameState {
+  const state = seededGame(4242, 2);
   state.autoResearch = false;
   return state;
 }

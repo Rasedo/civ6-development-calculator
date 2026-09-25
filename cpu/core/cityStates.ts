@@ -1,5 +1,5 @@
 
-import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
+import type { City, CityState, CityStateQuest, CityStateType, GameState, Yields } from './types';
 import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
 import { grievanceCityStateWar } from './grievance';
@@ -10,66 +10,16 @@ import { tilesWithin, hexDistance } from '../../world/hex';
 // the border-growth pick and its claim: a minor's envoy plots are taken by
 // the city rule's OWN next-tile choice, never a second one
 import { pickBorderTile, acquireTile } from './city';
-import { isWater, isImpassable, hasFreshWater, naturalWonderAt } from '../../world/query';
-import { nextRandom } from './rand';
 import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { CIV_LEVELS } from '../data/civLevels';
-import { TERRAINS } from '../../world/terrains';
-import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
-
-const CITY_STATE_SPACING = 8;
-
-function siteQuality(state: GameState, tile: Tile): number {
-  if (isWater(tile) || isImpassable(tile)) return -1;
-  if (naturalWonderAt(tile) || tile.feature === 'OASIS') return -1;
-  let q = hasFreshWater(state.map, tile) ? 8 : 0;
-  for (const t of tilesWithin(state.map, tile.col, tile.row, 2)) {
-    if (isWater(t) || isImpassable(t)) continue;
-    const terrain = TERRAINS[t.terrain]?.yields ?? {};
-    const feature = t.feature ? FEATURES[t.feature]?.yields ?? {} : {};
-    const res = t.resource ? RESOURCES[t.resource]?.yields ?? {} : {};
-    for (const src of [terrain, feature, res]) {
-      q += (src.food ?? 0) * 1.2 + (src.production ?? 0) + (src.gold ?? 0) * 0.5;
-    }
-    if (t.elevation === 'HILLS') q += 0.5;
-  }
-  return q;
-}
-
-export function placeCityStates(state: GameState, count?: number): void {
-  const land = state.map.tiles.filter((t) => !isWater(t) && !isImpassable(t)).length;
-  const target = count ?? Math.max(2, Math.min(6, Math.round(land / 200)));
-
-  const scored = state.map.tiles
-    .map((t) => ({ t, q: siteQuality(state, t) }))
-    .filter((s) => s.q > 0)
-    .sort((a, b) => b.q - a.q || a.t.index - b.t.index);
-
-  const picked: Tile[] = [];
-  for (const { t } of scored) {
-    if (picked.length >= target) break;
-    if (picked.some((p) => hexDistance(p.col, p.row, t.col, t.row) < CITY_STATE_SPACING)) continue;
-    picked.push(t);
-  }
-
-  const usedNames = new Set<string>();
-  picked.forEach((tile, i) => {
-    const type = CITY_STATE_TYPES[Math.floor(nextRandom(state) * CITY_STATE_TYPES.length)];
-    const names = CITY_STATE_NAMES[type];
-    const name =
-      names.find((n) => !usedNames.has(n)) ?? `${names[0]} ${i}`;
-    usedNames.add(name);
-    placeCityStateAt(state, i, name, type, tile.index);
-  });
-}
 
 export function placeCityStateAt(
   state: GameState,
@@ -526,8 +476,10 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
     return { ok: false, reason: 'This civilization may not declare war on a city-state.' };
   }
   setWar(state, cityState.seat, seat, true);
-  // CIV6: war cancels the routes with the new enemy; the Traders return.
+  // CIV6: war cancels the routes with the new enemy, both ways; the Traders
+  // return.
   cancelRoutes(state, seat, (r) => r.toCs === cityStateId);
+  cancelRoutes(state, cityState.seat, (r) => r.toSeat === seat);
   grievanceCityStateWar(
     state, seat,
     state.seats.find((s) => isSuzerain(state, cityState, s.seat))?.seat ?? -1,
@@ -610,6 +562,8 @@ export function minorCity(cityState: CityState): City {
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
     outerHp: cityState.outerHp,
+    lastHitTurn: cityState.lastHitTurn,
+    powered: cityState.powered,
     religionPressure: cityState.religionPressure,
   };
 }

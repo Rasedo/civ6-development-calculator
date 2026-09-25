@@ -59,14 +59,15 @@ def test_the_mark_is_its_own_plane(rules, path) -> None:
 
 
 def test_the_mark_survives_and_is_permanent(rules, path) -> None:
-    """Nothing in this engine returns a levied unit, so the mark never clears —
-    which is what makes an upgrade discount meaningful at all."""
+    """The mark lasts while the unit is levied — only its return to the
+    minor it came from clears it (`_minor_levy_return`), and a unit marked
+    with no minor to return to keeps it."""
     sim = build(path)
     gs = int((sim.unit_seat[B0] == ROW).nonzero().flatten()[0])
     sim.unit_levied[B0, gs] = True
     sim.step()
     assert bool(sim.unit_levied[B0, gs]), "the mark did not survive a turn"
-    print("  3 the mark OK — permanent across a turn")
+    print("  3 the mark OK — it holds across a turn")
 
 
 def test_it_is_in_the_digest(rules, path) -> None:
@@ -84,8 +85,8 @@ def test_it_is_in_the_digest(rules, path) -> None:
 def test_the_ability_pays_movement_and_combat(rules, path) -> None:
     """CIV6 (The Raven King): a LEVIED unit carries +2 Movement and +5 Combat.
     Both ride the ONE composer on each side — the pool builder and
-    `_roster_cs` — so a levied unit is born with the Movement rather than
-    gaining it at the next refresh (the levy's own lesson)."""
+    `_roster_cs` — so every refresh of a levied unit's pool carries the
+    Movement."""
     sim = build(path)
     _c, li, _pct, _env, moves, combat = sim._levy_rows[0]
     assert moves == 2 and combat == 5, f"the install writes 2 and 5, wire has {moves}/{combat}"
@@ -110,7 +111,7 @@ def test_the_ability_pays_movement_and_combat(rules, path) -> None:
     sim.major_unit_levied[B0, gs] = True
     after = int(sim._full_mp("major")[B0, gs])
     assert after - before == moves * sim._mp_scale,         f"a levied unit got {after - before} MP, expected {moves * sim._mp_scale}"
-    print(f"  5 the ability OK — +{moves} Movement at birth and +{combat} Combat")
+    print(f"  5 the ability OK — +{moves} Movement in the pool and +{combat} Combat")
 
 
 def test_a_seat_without_the_row_gets_neither(rules, path) -> None:

@@ -1188,6 +1188,20 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       healOnKill: xml('ModifierArguments', 'ModifierId=GOV_HEAL_AFTER_DEFEATING_UNIT&Name=Amount', 'Value'),
     },
   },
+  // CIV6 (Expansion1_Buildings.xml, BUILDING_FOOD_MARKET): the Neighborhood's
+  // Replaceable Parts building, +4 Food and +2 more while powered on a load of
+  // 1. The install excludes it with the Shopping Mall, which this catalog does
+  // not carry. APPENDED LAST — a building's catalog index is its action code.
+  { id: 'FOOD_MARKET', name: 'Food Market', district: 'NEIGHBORHOOD', cost: 380, yields: { food: 4 }, power: 1, poweredYields: { food: 2 }, maintenance: 1,
+    src: {
+      cost: xml('Buildings', 'BuildingType=BUILDING_FOOD_MARKET', 'Cost', { scale: GAME_SPEED }),
+      district: xml('Buildings', 'BuildingType=BUILDING_FOOD_MARKET', 'PrereqDistrict', { expect: 'DISTRICT_NEIGHBORHOOD' }),
+      maintenance: xml('Buildings', 'BuildingType=BUILDING_FOOD_MARKET', 'Maintenance'),
+      'yields.food': xml('Building_YieldChanges', 'BuildingType=BUILDING_FOOD_MARKET&YieldType=YIELD_FOOD', 'YieldChange'),
+      'poweredYields.food': xml('Building_YieldChangesBonusWithPower', 'BuildingType=BUILDING_FOOD_MARKET&YieldType=YIELD_FOOD', 'YieldChange'),
+      power: xml('Buildings_XP2', 'BuildingType=BUILDING_FOOD_MARKET', 'RequiredPower'),
+    },
+  },
 ];
 
 const list: BuildingDef[] = rawList.map((b) => ({

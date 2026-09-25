@@ -2,8 +2,8 @@ import { seatOf, unitsOf } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { describe, it, expect } from 'vitest';
 import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } from '../../../cpu/core/seats';
-import { makeState, tileAtCoords } from '../helpers';
-import { createGame, foundCity } from '../../../cpu/core/game';
+import { makeState, seededGame, tileAtCoords } from '../helpers';
+import { foundCity } from '../../../cpu/core/game';
 import { seatPhase, transferCity } from '../../../cpu/core/phase';
 import { encampOuterPool, fitEncampOuter, outerPool, wallsMax } from '../../../cpu/core/rules';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
@@ -17,7 +17,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
-    aggression: 0.5,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
     diplomaticPoints: 0,
@@ -182,9 +181,8 @@ describe('regional yield channel, via seatCityYields', () => {
 });
 describe('PALACE grant on founding and on capture', () => {
   it("a civ's FIRST city carries the PALACE", () => {
-    const game = createGame({ width: 44, height: 26, seed: 3, withResources: true, withWonders: true, opponents: true });
-    expect((game.seats.length - 1)).toBeGreaterThanOrEqual(1);
-    for (const r of game.seats.slice(1)) {
+    const game = seededGame(3, 3);
+    for (const r of game.seats) {
       const capital = r.cities[0];
       expect(capital.isCapital).toBe(true);
       expect(capital.buildings).toContain('PALACE');

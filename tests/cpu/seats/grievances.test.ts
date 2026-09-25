@@ -3,9 +3,9 @@ import type { Seat, Tile } from '../../../cpu/core/types';
 import { hexDistance } from '../../../world/hex';
 import { seatOf, tileSeat, setFriendTurnsWith, setWar, setWarKind, clearWarKind, warIsFormal, warKindWith, warDeclaredBy } from '../../../cpu/core/seats';
 import { WAR_GRIEVANCE_PCT, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_SURPRISE } from '../../../cpu/data/warKinds';
-import { createGame, endTurn } from '../../../cpu/core/game';
+import { endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
-import { grantCivics, settleFirstCity } from '../helpers';
+import { seededGame, grantCivics } from '../helpers';
 import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS,
   GRIEVANCE_WAR_BASE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DENOUNCE,
   GRIEVANCE_FRIEND_SHARE, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_GANG,
@@ -32,12 +32,7 @@ import { GOVERNMENTS } from '../../../cpu/data/policies';
 // penalty that reads the whole bill.
 
 function newGame(opponents = 1) {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: false,
-    withVillages: false, cityStates: 0, opponents,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 1 + opponents);
   // this small map founds seat 0 inside the settled-too-near reach of its
   // neighbour; every poke here starts from a clean ledger
   state.grievances = {};
@@ -87,7 +82,6 @@ describe('diplomatic favor', () => {
 
   it('a founding stamps the original capital, and only the first city', () => {
     const state = newGame(1);
-    settleFirstCity(state, 1);
     const a = seatOf(state, 0)!;
     expect(a.cities[0].origCapitalSeat).toBe(0);
     expect((state.seats[1] as Seat).cities[0].origCapitalSeat).toBe(1);
@@ -98,7 +92,6 @@ describe('diplomatic favor', () => {
 
   it('a captured capital still belongs to its founder, and the bank floors at zero', () => {
     const state = newGame(1);
-    settleFirstCity(state, 1);
     const a = seatOf(state, 0)!, b = state.seats[1] as Seat;
     const taken = b.cities[0];
     transferCity(state, b.seat, a, taken, 'conquered');
@@ -174,7 +167,6 @@ describe('grievances', () => {
     const state = newGame(2);
     const loser = state.seats[1] as Seat;
     const watcher = (state.seats[2] as Seat).seat;
-    settleFirstCity(state, loser.seat);
     const city = loser.cities[0]!;
     loser.cities = [city];  // the one it is about to lose IS its last
     transferCity(state, loser.seat, seatOf(state, 0)!, city, 'conquered');
@@ -186,7 +178,6 @@ describe('grievances', () => {
   it('a LOYALTY FLIP is free: the ledger only reads a conquest', () => {
     const state = newGame(1);
     const loser = state.seats[1] as Seat;
-    settleFirstCity(state, loser.seat);
     transferCity(state, loser.seat, seatOf(state, 0)!, loser.cities[0]!, 'loyalty');
     expect(grievanceWith(state, loser.seat, 0)).toBe(0);
   });
@@ -194,7 +185,6 @@ describe('grievances', () => {
   it('sitting in a captured ORIGINAL CAPITAL charges 3 a turn once the war is over', () => {
     const state = newGame(1);
     const loser = state.seats[1] as Seat;
-    settleFirstCity(state, loser.seat);
     transferCity(state, loser.seat, seatOf(state, 0)!, loser.cities[0]!, 'conquered');
     const before = grievanceWith(state, loser.seat, 0);
     endTurn(state);
@@ -244,7 +234,6 @@ describe('grievances', () => {
     expect(GRIEVANCE_SETTLED_NEAR_RANGE).toBe(3);
     const site = (reach: number) => {
       const state = newGame(1);
-      settleFirstCity(state, 1);
       state.grievances = {};
       const rival = state.map.tiles.filter((t) => tileSeat(t) === 1);
       const border = (t: Tile) => Math.min(...rival.map((r) => hexDistance(t.col, t.row, r.col, r.row)));
@@ -257,7 +246,6 @@ describe('grievances', () => {
     expect(site(4)).toBe(0);
     // and it decays at the ordinary peace rate
     const state = newGame(1);
-    settleFirstCity(state, 1);
     state.grievances = {};
     const rival = state.map.tiles.filter((t) => tileSeat(t) === 1);
     const t =state.map.tiles.find((x) => tileSeat(x) < 0

@@ -223,7 +223,6 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     nRangedWQ,
     cities.length * 2 + (atAny ? 3 : 1),
     seatStrength(state, seat),
-    me?.aggression ?? 0,
     me?.peaceTurns ?? 0,
     atAny ? 1 : 0,
   ];

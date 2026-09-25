@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type { GameState } from '../../../cpu/core/types';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
-import { createGame, endTurn, TURN_LIMIT } from '../../../cpu/core/game';
+import { endTurn, TURN_LIMIT } from '../../../cpu/core/game';
 import { eraBoundary } from '../../../cpu/core/eras';
 import { scoreLeader, scoreLines } from '../../../cpu/core/score';
 import { SCORING_LINE_ITEMS } from '../../../cpu/data/scoring';
 import { ERA_LENGTH } from '../../../cpu/data/seats';
 import { GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
 import { FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS } from '../../../cpu/data/religion';
-import { makeMap, makeState, settleAt, settleFirstCity } from '../helpers';
+import { seededGame, makeMap, makeState, settleAt } from '../helpers';
 
 // CIV 6'S SCORE and the turn-limit victory it decides. No scripted game
 // reaches the turn limit with a tie, so these pokes pin the counting and the
@@ -146,13 +146,7 @@ describe('the score victory', () => {
   });
 
   it('past TURN_LIMIT endTurn ends the game on the score and names the leader', () => {
-    const state = createGame({
-      width: 44, height: 26, seed: 4242,
-      withResources: true, withWonders: false, unitsMode: false,
-      withVillages: false, cityStates: 0, opponents: 1,
-    });
-    settleFirstCity(state, 0);
-    settleFirstCity(state, 1);
+    const state = seededGame(4242, 2);
     state.autoResearch = false;
     seatOf(state, 1)!.research.civics.push('CODE_OF_LAWS', 'CRAFTSMANSHIP', 'FOREIGN_TRADE', 'EARLY_EMPIRE');
     state.turn = TURN_LIMIT - 1;

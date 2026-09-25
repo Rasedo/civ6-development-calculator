@@ -457,8 +457,8 @@ class SimEconomy:
         """traderCost: the roster base x (1 + prog x floor(100 x the furthest
         tree fraction) / 100) — COST_PROGRESSION_GAME_PROGRESS, Param1 400."""
         rdv = self.rules_dev
-        t_pct = self.civ_techs[:, row].sum(dim=1).double() / float(rdv.t_cost.shape[0])
-        c_pct = self.civ_civics[:, row].sum(dim=1).double() / float(rdv.c_cost.shape[0])
+        t_pct = self._seat_techs(row).sum(dim=1).double() / float(rdv.t_cost.shape[0])
+        c_pct = self._seat_civics(row).sum(dim=1).double() / float(rdv.c_cost.shape[0])
         p = torch.floor(100.0 * torch.maximum(t_pct, c_pct)) / 100.0
         return js_round(self._type_cost[self._trader_idx].double() * (1 + self._trader_cost_prog * p))
 
@@ -914,7 +914,7 @@ class SimEconomy:
     def _city_lowland_count(self, row: int) -> torch.Tensor:
         """[B, RC] — the coastal-lowland tiles each of this row's cities holds,
         which is what a Flood Barrier costs and covers (`cityLowlands`)."""
-        low = (self.tile_lowland > 0) & (self.tile_seat == row)  # [B, T]
+        low = (self.tile_lowland > 0) & (self.tile_seat == int(self._ROW_SEAT[row]))  # [B, T]
         ids = self.city_id[:, row]  # [B, RC]
         # a dead column's id is 0, which is a LIVE id on row 0
         per = (low.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1))
@@ -939,6 +939,10 @@ class SimEconomy:
             for j in range(self.RC):
                 ok |= (sl == j) & has[:, j].unsqueeze(1)
             out |= ok
+        # a city-state's ground carries no city id: its one city holds it all
+        for s in range(self.S):
+            has_m = self.city_bldg[:, self._CITY_MINOR0 + s, 0, self._barrier_bidx] & self.citystate_alive[:, s]
+            out |= (self.tile_seat == 100 + s) & has_m.unsqueeze(1)
         return out
 
     def _repair_behind_barrier(self, row: int, col: torch.Tensor, hit: torch.Tensor) -> None:
@@ -948,7 +952,7 @@ class SimEconomy:
         if not bool(hit.any()):
             return
         ids = self.city_id[:, row].gather(1, col.clamp(min=0).unsqueeze(1))  # [B, 1]
-        mine = ((self.tile_seat == row) & (self.tile_city == ids)
+        mine = ((self.tile_seat == int(self._ROW_SEAT[row])) & (self.tile_city == ids)
                 & self.tile_flooded & hit.unsqueeze(1))
         self.tile_flooded &= ~mine
         self.pillaged &= ~mine
@@ -2458,8 +2462,7 @@ class SimEconomy:
         # CIV6: fallout stops production and "prevents any Gold or Faith
         # purchasing of units" there. A unit is raised in the CITY CENTER, so
         # that is the tile that has to be clean.
-        _ctr_clean = ~self._fallout().gather(1, self.city_center[:, row].clamp(min=0))
-        _ctr_clean = _ctr_clean & (self.city_center[:, row] >= 0)
+        _ctr_clean = ~self._fallout().gather(1, self.city_center[:, row])
         ok = ok & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).reshape(1, -1)
         ok = ok & self._civ_unit_ok(row)
         out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True) & _ctr_clean.unsqueeze(2)
@@ -3800,10 +3803,10 @@ class SimEconomy:
             & (self.tile_city == self.city_id[:, row, j].unsqueeze(1))
             & (self.district < 0)
             & (self.built_wonder < 0)
-            & (self.improvement < 0)
             & ((self.res_priority <= 1) | self._res_hidden(row))  # only a BONUS resource may be paved over; an unseen strategic is plain ground
             & (self.pair_dist[center] <= 3)  # CITY_WORK_RADIUS
         )
+        # an improved plot is a site: the pave removes the improvement
         # A district PAVES the tile, so a removable feature still standing on it
         # must be one this seat could clear — `tile_ftu` is that feature's
         # removal tech, -1 where there is nothing to clear.
@@ -3929,7 +3932,7 @@ class SimEconomy:
             bt = bt_all[rows]
             self.district[rows, bt] = di
             self.district_complete[rows, bt] = False  # queued, not complete
-            self.improvement[rows, bt] = -1           # the pave clears it
+            self._pave_plot(rows, bt)
             # The city registry, written at queue. A REPEATABLE type keeps its
             # FIRST tile: nothing reads the entry for its own sake (no
             # buildings, no projects, no adjacency of its own), and
@@ -3939,15 +3942,6 @@ class SimEconomy:
                 self.city_dist_tile[rows, row, j, di] = torch.where(_held < 0, bt, _held)
             else:
                 self.city_dist_tile[rows, row, j, di] = bt
-            # CIV6: a district paves every feature EXCEPT floodplains — the
-            # feature stays under the district and keeps feeding the flood
-            # pick (`placeSeatDistrict` and _queue_wonder_at share this gate).
-            nofp = self.feat_id[rows, bt] != self._fp_fid
-            if bool(nofp.any()):
-                self._strip_feature_at(rows[nofp], bt[nofp])
-            fresh_rs = (self.res_priority[rows, bt] == 1) & ~self.res_stripped[rows, bt]
-            self.res_stripped[rows, bt] = self.res_stripped[rows, bt] | (self.res_priority[rows, bt] == 1)
-            self._withdraw_sea_adj(rows[fresh_rs], bt[fresh_rs])
             self._eff_version += 1
         return place
 
@@ -5071,18 +5065,26 @@ class SimEconomy:
     def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
         """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
         reaches anything AT SEA (a hull or a passenger); the three embark rungs
-        raise the passenger's own pool. A seat with no research desk (a
-        barbarian, a city-state) reads neither."""
+        raise the passenger's own pool. Each reads the unit's seat's own
+        research — a major's, or a city-state's (`citystate_techs`); a
+        barbarian researches nothing."""
         row = self._row_of(seat)
         ok = (row >= 0) & (row < self.n_majors)
         r0 = row.clamp(min=0, max=self.n_majors - 1)  # a minor/barb row is masked, not indexed
+        minor = (seat >= 100) & (seat < 100 + self.S)
+        s0 = (seat - 100).clamp(min=0, max=max(self.S - 1, 0))
+
+        def has_tech(ti: int) -> torch.Tensor:
+            h = self.civ_techs[:, :, ti].gather(1, r0) & ok
+            if self.S > 0:
+                h = h | (self.citystate_techs[:, :, ti].gather(1, s0) & minor)
+            return h
+
         out = torch.zeros_like(row)
         if self._sea_move_tech >= 0:
-            has = self.civ_techs[:, :, self._sea_move_tech].gather(1, r0)
-            out = out + (has & ok & (emb | naval)).long() * self._sea_move_bonus
+            out = out + (has_tech(self._sea_move_tech) & (emb | naval)).long() * self._sea_move_bonus
         for ti, v in self._embark_move_techs:
-            has = self.civ_techs[:, :, ti].gather(1, r0)
-            out = out + (has & ok & emb & ~naval).long() * v
+            out = out + (has_tech(ti) & emb & ~naval).long() * v
         return out
 
     def _full_mp(self, pre: str) -> torch.Tensor:
@@ -5112,8 +5114,8 @@ class SimEconomy:
         if self._war_buff_rows:
             base = base + self._seat_war_buff(getattr(self, f"{pre}_unit_seat"), 2)
         # CIV6 (The Raven King): a LEVIED unit carries
-        # EFFECT_ADJUST_UNIT_MOVEMENT Amount 2. It joins the ONE composer, so a
-        # levied unit is born with it — the levy's own lesson.
+        # EFFECT_ADJUST_UNIT_MOVEMENT Amount 2. It joins the ONE composer, so
+        # every refresh of a levied unit's pool carries it.
         if self._levy_rows:
             _lv = getattr(self, f"{pre}_unit_levied")
             if bool(_lv.any()):

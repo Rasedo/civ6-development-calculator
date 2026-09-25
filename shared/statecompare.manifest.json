@@ -1697,14 +1697,66 @@
           "note": "the minor's one city holds pressure like any other city row."
         },
         {
-          "name": "lastLevyTurn",
+          "name": "levySeat",
           "compare": "exact",
           "covers": [
-            "CityState.lastLevyTurn"
+            "CityState.levySeat"
           ],
           "planes": [
-            "citystate_last_levy"
-          ]
+            "citystate_levy_seat"
+          ],
+          "note": "the seat holding the minor's levied army, -1 while no one does"
+        },
+        {
+          "name": "levyEnds",
+          "compare": "exact",
+          "covers": [
+            "CityState.levyEnds"
+          ],
+          "planes": [
+            "citystate_levy_ends"
+          ],
+          "note": "the turn the levied army comes home, -1 while no one holds it"
+        },
+        {
+          "name": "minorLastHit",
+          "compare": "exact",
+          "covers": [
+            "CityState.lastHitTurn"
+          ],
+          "planes": [
+            "city_last_hit"
+          ],
+          "note": "the minor city's last hit, 0 before any: the quiet its repair project waits on"
+        },
+        {
+          "name": "minorPowered",
+          "compare": "exact",
+          "covers": [
+            "CityState.powered"
+          ],
+          "planes": [
+            "city_powered"
+          ],
+          "note": "the minor city's grid this turn, off its renewables alone"
+        },
+        {
+          "name": "minorRoutes",
+          "compare": "exact",
+          "covers": [
+            "Seat.tradeRoutes"
+          ],
+          "planes": [
+            "seat_routes",
+            "seat_route_dseat",
+            "seat_route_dcity",
+            "seat_route_exp",
+            "seat_route_born",
+            "seat_route_walk",
+            "seat_route_leg",
+            "seat_route_chain"
+          ],
+          "note": "the minor's routes as the seat `routes` rows, the origin its city's centre"
         },
         {
           "name": "minorBuildFrom",
@@ -2050,18 +2102,6 @@
           "planes": [
             "city_cost",
             "city_current"
-          ]
-        },
-        {
-          "name": "itemBank",
-          "compare": "milli",
-          "covers": [
-            "City.itemBank"
-          ],
-          "note": "the per-item hammer ledger a CANCELLED entry banks into — [column, amount] pairs sorted by production column, resumed by the queue sites",
-          "planes": [
-            "city_item_bank",
-            "city_item_amt"
           ]
         },
         {
@@ -2446,13 +2486,15 @@
         {
           "name": "levied",
           "compare": "exact",
-          "why": "CIV6 (The Raven King): the unit came from a city-state LEVY. Permanent — nothing here returns a levied unit — and read by the 75% upgrade discount.",
+          "why": "the city-state seat whose army the unit is while a suzerain holds it by LEVY, -1 otherwise: what the Raven King's clauses read and what brings it home.",
           "covers": [
-            "Unit.levied"
+            "Unit.leviedFrom"
           ],
           "planes": [
-            "unit_levied"
-          ]
+            "unit_levied",
+            "unit_levy_src"
+          ],
+          "note": "compared as the minor's seat (`unit_levy_src`), -1 on every other unit; `unit_levied` is the mark the combat and upgrade readers take, set and cleared with it"
         },
         {
           "name": "formation",
@@ -3005,10 +3047,6 @@
         "why": "presentation."
       },
       {
-        "path": "Seat.aggression",
-        "why": "a personality constant read only by the scripted picker, which the decision server replaces."
-      },
-      {
         "path": "Seat.civ",
         "why": "a roster constant fixed at seed time — the fixture's `leader` — that both engines read off the same file."
       },
@@ -3051,14 +3089,6 @@
       {
         "path": "Unit.id",
         "why": "the join key is (tile, military/civilian); the GPU has no unit-id plane."
-      },
-      {
-        "path": "Unit.path",
-        "why": "a multi-turn movement path. The GPU walkers re-plan every turn and store no path."
-      },
-      {
-        "path": "Unit.mission",
-        "why": "the 'explore' standing order — scripted-policy state, replaced by the decision server; no GPU plane."
       },
       {
         "path": "Tile.col",

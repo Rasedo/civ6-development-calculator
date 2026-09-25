@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, grantTechs } from '../helpers';
 import { emptySeat, setWar, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import {
-  spawnUnit, refreshUnits, unitFullMoves, tileFreeForUnit, findPath, gdrJump,
+  spawnUnit, refreshUnits, unitFullMoves, tileFreeForUnit, gdrJump,
 } from '../../../cpu/core/units';
 import { defenderCS, cityRangedStrength, gdrNavalCS, meleeAttack } from '../../../cpu/core/combat';
 import { airDefenseOf, antiAirAt, antiAirOf } from '../../../cpu/core/air';
@@ -167,7 +167,6 @@ describe('Enhanced Mobility', () => {
     // CIV6: "Can perform a Jump action to cross over mountain terrain."
     expect(gdrJump(state, b, peak)).toBe(true);
     expect(tileFreeForUnit(state, peak.index, 0, b)).toBe(true);
-    expect(findPath(state, b, peak.index)).not.toBeNull();
     // the same research does nothing for any other chassis
     expect(gdrJump(state, foot, peak)).toBe(false);
     expect(tileFreeForUnit(state, peak.index, 0, foot)).toBe(false);

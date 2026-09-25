@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGame } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import { civsAtWar, setWar, seatOfCityState, BARB_SEAT } from '../../../cpu/core/seats';
 import { unitsHostile } from '../../../cpu/core/units';
 import type { GameState } from '../../../cpu/core/types';
@@ -10,12 +9,7 @@ import type { GameState } from '../../../cpu/core/types';
 // has to read back true from either side of the pair.
 
 function newGame(): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 909,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 2, opponents: 2,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(909, 3, 2);
   return state;
 }
 

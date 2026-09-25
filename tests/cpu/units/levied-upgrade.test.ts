@@ -59,13 +59,13 @@ describe('a levied unit upgrades cheaply', () => {
     expect(LEVY_ROWS[0].levyCombat).toBe(5);
   });
 
-  it('gives a levied unit the ability`s Movement AT BIRTH, not a turn later', () => {
+  it('gives a levied unit the ability`s Movement in its pool', () => {
     const s2 = scene('MATTHIAS_CORVINUS');
     const plain = spawnUnit(s2, 'WARRIOR', tileAtCoords(s2.map, 8, 8).index, 0);
     const base = unitFullMoves(s2, plain!);
     // the mark alone is the whole condition
     const lev = spawnUnit(s2, 'WARRIOR', tileAtCoords(s2.map, 10, 10).index, 0);
-    lev!.levied = true;
+    lev!.leviedFrom = 100;
     expect(unitFullMoves(s2, lev!)).toBe(base + MP_SCALE * LEVY_ROWS[0].levyMoves);
   });
 
@@ -73,7 +73,7 @@ describe('a levied unit upgrades cheaply', () => {
     const s2 = scene('MATTHIAS_CORVINUS');
     const u = spawnUnit(s2, 'WARRIOR', tileAtCoords(s2.map, 8, 8).index, 0)!;
     const before = rosterCS(s2, u, 1, null, false);
-    u.levied = true;
+    u.leviedFrom = 100;
     expect(rosterCS(s2, u, 1, null, false)).toBe(before + LEVY_ROWS[0].levyCombat);
   });
 
@@ -82,7 +82,7 @@ describe('a levied unit upgrades cheaply', () => {
     const u = spawnUnit(s2, 'WARRIOR', tileAtCoords(s2.map, 8, 8).index, 0)!;
     const mv = unitFullMoves(s2, u);
     const cs = rosterCS(s2, u, 1, null, false);
-    u.levied = true;
+    u.leviedFrom = 100;
     expect(unitFullMoves(s2, u)).toBe(mv);
     expect(rosterCS(s2, u, 1, null, false)).toBe(cs);
   });
@@ -91,8 +91,8 @@ describe('a levied unit upgrades cheaply', () => {
     const s = scene('MATTHIAS_CORVINUS');
     const u = spawnUnit(s, 'WARRIOR', tileAtCoords(s.map, 8, 8).index, 0);
     expect(u).not.toBeNull();
-    expect(!!u!.levied).toBe(false);              // an ordinary unit carries no mark
-    u!.levied = true;
-    expect(u!.levied).toBe(true);
+    expect(u!.leviedFrom).toBeUndefined();        // an ordinary unit carries no mark
+    u!.leviedFrom = 100;
+    expect(u!.leviedFrom).toBe(100);
   });
 });

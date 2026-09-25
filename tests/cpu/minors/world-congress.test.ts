@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { seatOf } from '../../../cpu/core/seats';
-import { createGame, endTurn, unitPurchaseCost } from '../../../cpu/core/game';
+import { endTurn, unitPurchaseCost } from '../../../cpu/core/game';
 import { seatPhase, worldCongress } from '../../../cpu/core/phase';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION } from '../../../cpu/data/seats';
 import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitBuyMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
 import { congressCancelBannedIntl } from '../../../cpu/core/trade';
@@ -41,12 +41,7 @@ import { setWar } from '../../../cpu/core/seats';
 // The 20-point WIN is not reachable at 250 turns; these pokes are its bar.
 
 function newGame(opponents = 1) {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: false,
-    withVillages: false, cityStates: 0, opponents,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 1 + opponents);
   // this small map founds seat 0 inside the settled-too-near reach of its
   // neighbour; the ledger pokes start clean
   state.grievances = {};
@@ -84,7 +79,6 @@ describe('world congress', () => {
   it('a pre-Modern session runs the two-slot slate, spends NO favor, and pays every winning-combo voter', () => {
     const state = newGame(1);
     medieval(state);
-    settleFirstCity(state, 1); // a cityless civ casts no vote
     state.turn = CONGRESS_INTERVAL;
     seatOf(state, 0)!.diplomaticFavor = 50;
     (state.seats[1] as Seat).diplomaticFavor = 90;
@@ -117,7 +111,6 @@ describe('world congress', () => {
   it('from Modern the DV resolution runs third: the favor curve, the leader pile-on, the refund tiers', () => {
     const state = newGame(1);
     medieval(state);
-    settleFirstCity(state, 1);
     seatOf(state, 0)!.research.techs.push('RADIO'); // the world era is Modern
     state.turn = CONGRESS_INTERVAL;
     seatOf(state, 0)!.diplomaticPoints = 5; // seat 0 leads
@@ -274,7 +267,6 @@ describe('world congress: the wider slate', () => {
 
   it('a passed Trade Policy B cancels the standing legs at both ends and hands the Traders back', () => {
     const state = newGame(1);
-    settleFirstCity(state, 1);
     const a = seatOf(state, 0)!, b = seatOf(state, 1)!;
     a.tradeRoutes = [{ from: a.cities[0].id, to: -1, toSeat: 1, toSeatCity: b.cities[0].id }];
     b.tradeRoutes = [{ from: b.cities[0].id, to: -1, toSeat: 0, toSeatCity: a.cities[0].id }];
@@ -397,8 +389,6 @@ describe('world congress: the wider slate', () => {
     // Competition will compete to contribute to the cause".
     const state = newGame(2);
     medieval(state);
-    settleFirstCity(state, 1);
-    settleFirstCity(state, 2);
     // the highest polluter has nothing to score, so its own line refuses
     seatOf(state, 0)!.co2 = 100;
     state.turn = CONGRESS_INTERVAL;
@@ -416,7 +406,6 @@ describe('world congress: the wider slate', () => {
 describe('the culture bomb', () => {
   it('claims a neighbour of a new district for the bomber, and skips a FINISHED district', () => {
     const state = newGame(1);
-    settleFirstCity(state, 1);
     const city = seatOf(state, 0)!.cities[0];
     state.congress = [{ res: CONGRESS_BORDER_CONTROL, outcome: 0, target: 0 }];
     const around = neighbors(state.map, state.map.tiles[city.centerIndex]);
@@ -441,7 +430,6 @@ describe('the culture bomb', () => {
     // construction and it suffers the effect of a Culture Bomb, construction
     // will immediately stop and it'll disappear".
     const state = newGame(1);
-    settleFirstCity(state, 1);
     const city = seatOf(state, 0)!.cities[0];
     const theirs = seatOf(state, 1)!.cities[0];
     state.congress = [{ res: CONGRESS_BORDER_CONTROL, outcome: 0, target: 0 }];
@@ -598,7 +586,6 @@ describe('the three unwritten resolutions', () => {
     const outcomeWin = (rich: number) => {
       const state = newGame(3);
       medieval(state);
-      for (let s = 1; s < 4; s++) settleFirstCity(state, s);
       state.turn = CONGRESS_INTERVAL;
       for (const sx of state.seats) {
         sx.diplomaticFavor = sx.seat === 3 ? CONGRESS_VOTE_STEP * 6 : 0;  // 1+2 rungs, twice
@@ -613,7 +600,6 @@ describe('the three unwritten resolutions', () => {
 
     const state = newGame(3);
     medieval(state);
-    for (let s = 1; s < 4; s++) settleFirstCity(state, s);
     state.turn = CONGRESS_INTERVAL;
     for (const sx of state.seats) {
       sx.diplomaticFavor = sx.seat === 3 ? CONGRESS_VOTE_STEP * 6 : 0;  // 1+2 rungs, twice
@@ -634,7 +620,6 @@ describe('arms control', () => {
   function session(wmd: readonly (readonly number[])[], vote: readonly [number, number]) {
     const state = newGame(2);
     medieval(state);
-    for (let s = 1; s < 3; s++) settleFirstCity(state, s);
     state.turn = CONGRESS_INTERVAL;
     state.congressSlate = [CONGRESS_ARMS_CONTROL, CONGRESS_HERITAGE];
     state.seats.forEach((sx, c) => { sx.wmd = [...wmd[c]]; });

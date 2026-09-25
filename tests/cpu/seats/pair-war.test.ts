@@ -1,8 +1,7 @@
 import { civsAtWar, seatOf } from '../../../cpu/core/seats';
 import { describe, it, expect } from 'vitest';
 import { setWar, BARB_SEAT } from '../../../cpu/core/seats';
-import { createGame } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { routePlunderer } from '../../../cpu/core/trade';
 import { hostileRangedStrike, attackTargets } from '../../../cpu/core/combat';
@@ -26,12 +25,7 @@ import type { GameState } from '../../../cpu/core/types';
 // PREDICATE both mechanics now share, plus the raid end to end.
 
 function newGame(): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 771,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 0, opponents: 3,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(771, 4);
   return state;
 }
 

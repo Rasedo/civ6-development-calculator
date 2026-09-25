@@ -1600,6 +1600,11 @@ class SimOrders:
             self.seat_route_dseat[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dseat[b], -1), self.seat_route_dseat[b])
             self.seat_route_dcity[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dcity[b], -1), self.seat_route_dcity[b])
             self.seat_route_exp[b] = torch.where(dead_cs, torch.full_like(self.seat_route_exp[b], -1), self.seat_route_exp[b])
+            # ...and the minor's own routes end with it: its record is gone
+            _mr = self._CITY_MINOR0 + s
+            for _pl in (self.seat_routes, self.seat_route_dseat, self.seat_route_dcity, self.seat_route_exp,
+                        self.seat_route_born, self.seat_route_walk, self.seat_route_leg, self.seat_route_chain):
+                _pl[b, _mr] = -1
             ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
             # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear)
             self.tile_locked[b] &= ~ring
@@ -1818,7 +1823,7 @@ class SimOrders:
         pct = self._fx_by_row("wmdup")[:, row].to(self.dtype)
         return gold * (100.0 + pct) / 100.0
 
-    def _bankrupt_disband(self, row: int = 0, active: torch.Tensor | None = None) -> None:
+    def _bankrupt_disband(self, row: int, active: torch.Tensor | None = None) -> None:
         """BANKRUPTCY'S DISBANDS for seat row `row` this turn — the
         `bankruptDisband` twin. CIV6 (the Gold pedia): "at -10 Gold you will
         automatically disband a unit, at -20 two units": `_bankruptcy_count`

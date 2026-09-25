@@ -748,7 +748,7 @@ def _main() -> int:
                 ("great_works_holders", [py, "tests/gpu/great_works_holders_test.py"], 4),  # works held per holder: the slot table, placement, theming, Kristina, Nkisi
                 ("gp_aura", [py, "tests/gpu/gp_aura_test.py"], 4),  # Great General/Admiral spawn/walk/aura/capture (GENERAL unreachable in the gate)
                 ("citystate_bonus", [py, "tests/gpu/cs_bonus_test.py"], 4),  # CS envoy building re-key + suzerain perk (6-envoy tier unreachable in the gate)
-                ("citystate_verbs", [py, "tests/gpu/cs_verbs_test.py"], 4),  # levy + city-state quests
+                ("citystate_verbs", [py, "tests/gpu/cs_verbs_test.py"], 4),  # the levy of a minor's own army + city-state quests
                 ("trade2", [py, "tests/gpu/trade2_test.py"], 4),  # international routes + route duration surfaces
                 ("parks", [py, "tests/gpu/parks_test.py"], 4),  # national parks, shipwrecks, museum theming
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
@@ -813,7 +813,7 @@ def _main() -> int:
                 ("storms", [py, "tests/gpu/storms_test.py"], 2),  # the eight named storms and the roster rows on them
                 ("spy_release_level", [py, "tests/gpu/spy_release_level_test.py"], 2),  # the released spy is the one that was caught
                 ("spy_district", [py, "tests/gpu/spy_district_test.py"], 4),  # the spy stands on the district it works from; Surveillance's reach; Sabotage pillages the Zone's buildings and the queue repairs them
-                ("minor_yields", [py, "tests/gpu/minor_yields_test.py"], 4),  # the minor's city pays its yields; its research and build pots take them; the levy's Barracks experience
+                ("minor_yields", [py, "tests/gpu/minor_yields_test.py"], 4),  # the minor's city pays its yields; its research and build pots take them; its grid
                 ("route_pressure", [py, "tests/gpu/route_pressure_test.py"], 2),  # a trade route carries religious pressure both ways
                 ("policy_store", [py, "tests/gpu/policy_store_test.py"], 2),  # step 1: the slotted-card store, mask and validator
                 ("government_choice", [py, "tests/gpu/government_choice_test.py"], 2),  # the record's government: the tier-mates, the Anarchy refusal, the carry-over, the driver's style pick
@@ -851,7 +851,8 @@ def _main() -> int:
                 ("gp_pass", [py, "tests/gpu/gp_pass_test.py"], 4),  # the Great Person pass: the fee, the discount, the lockout, the rival's claim
                 ("beliefs", [py, "tests/gpu/beliefs_test.py"], 4),  # a religion's four belief classes, the Worship buildings, the Mosque and the Dar-e Mehr
                 ("belief_effects", [py, "tests/gpu/belief_effects_test.py"], 4),  # Lay Ministry, Sacred Places, Missionary Zeal, Monastic Isolation, Holy Waters, the Dar-e Mehr's eras
-                ("minor_builds", [py, "tests/gpu/minor_builds_test.py"], 4),  # the city-state's own walls, type district and Harbor, and the conquest carry
+                ("minor_builds", [py, "tests/gpu/minor_builds_test.py"], 4),  # the city-state's own walls, type district and Harbor, and the conquest carry; its Trader, repair, projects, worship, Flood Barrier, paving and ships
+                ("minor_trade", [py, "tests/gpu/minor_trade_test.py"], 4),  # the city-state's trade routes: capacity, destination, income, round trip, war
                 ("minor_purse", [py, "tests/gpu/minor_purse_test.py"], 4),  # the minor's upkeep, purchases, upgrades and walker; the Free City's build table and walk
                 ("alliance_levels", [py, "tests/gpu/alliance_levels_test.py"], 4),  # typed alliances: points, levels and the fifteen-effect table
                 ("gs_rows", [py, "tests/gpu/gs_rows_test.py"], 4),  # the three GS admirals and the Offshore Wind Farm: no seed recruits them or reaches Predictive Systems

@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { civsAtWar, seatOf } from '../../../cpu/core/seats';
-import { createGame } from '../../../cpu/core/game';
 import { loyaltyDelta, transferCity, worldCongress } from '../../../cpu/core/phase';
-import { settleFirstCity } from '../helpers';
+import { seededGame, settleFirstCity } from '../helpers';
 import {
   EMERGENCIES, EMERGENCY_MILITARY, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR,
   EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY,
@@ -32,12 +31,10 @@ import { neighbors } from '../../../world/hex';
 // every reward — is these pokes' bar.
 
 function twoCivs() {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: false,
-    withVillages: false, cityStates: 0, opponents: 1,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 2);
+  // seat 1's second city, founded sight unseen: it outlives the conquest, so
+  // seat 1 still sits in the Congress that answers it
+  state.fogOfWar = false;
   settleFirstCity(state, 1);
   state.autoResearch = false;
   // Medieval, so the Congress sits at all
@@ -45,7 +42,7 @@ function twoCivs() {
   return state;
 }
 
-/** Seat 0 takes seat 1's only city; the record that follows is the emergency. */
+/** Seat 0 takes seat 1's capital; the record that follows is the emergency. */
 function conquer(state: ReturnType<typeof twoCivs>) {
   const a = seatOf(state, 0)!, b = state.seats[1] as Seat;
   transferCity(state, b.seat, a, b.cities[0], 'conquered');

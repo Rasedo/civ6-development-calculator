@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
+import { canPlaceDistrict, makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
-import { canPlaceDistrict } from '../../../cpu/core/rules';
 import { buildingFaithCost, canFoundReligion } from '../../../cpu/core/game';
 import { greatPersonPointsPerTurn, advanceGreatPeople } from '../../../cpu/core/greatPeople';
 import { emptyGovernors } from '../../../cpu/core/governors';

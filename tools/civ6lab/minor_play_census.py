@@ -7,7 +7,8 @@ and the Free Cities' walker, fitted to the watched games (C-38, C-60).
 What it prints and cpu/data/cityStates.ts carries: the per-minor Builder
 purchase rate's twenty quantiles (`MINOR_BUILDER_BUY_SLOTS`); the military
 purchases' bank floor and rate by military count, a loss window apart
-(`MINOR_MILITARY_BUY_*`, `MINOR_LOSS_BUY_*`); the gold an upgrade spends
+(`MINOR_MILITARY_BUY_*`, `MINOR_LOSS_BUY_*`); the ships it buys and their
+rate (`MINOR_NAVAL_BUY_BP`); the gold an upgrade spends
 (`MINOR_UPGRADE_GOLD`, exact on the single-upgrade turns whose neighbouring
 income is flat); the land military's distance from home and a turn's step, at
 peace, at war and damaged, and the Free Cities' (`MINOR_WALK_*`,
@@ -461,6 +462,32 @@ def main() -> int:
         el, hl = m_elig_loss[a], m_hit_loss[a]
         print(f"  army {a}{'+' if a == 8 else ''}: {h}/{e} = {h / max(e, 1):.4f}   within 3 of a loss "
               f"{hl}/{el} = {hl / max(el, 1):.4f}")
+    # NAVAL BUYS: a ship rise no training or upgrade explains; the rate over
+    # the rich turns (no ship standing, the bank at a Galley's 125) of the
+    # minors whose record shows a coast — a Harbor, Lighthouse, Shipyard,
+    # Seaport or the Harbor's project started, or a ship held
+    coast_items = {"DISTRICT_HARBOR", "BUILDING_LIGHTHOUSE", "BUILDING_SHIPYARD", "BUILDING_SEAPORT",
+                   "PROJECT_ENHANCE_DISTRICT_HARBOR"}
+    n_buys, n_rich, n_hit, coastal = collections.Counter(), 0, 0, 0
+    for key, rows in data.items():
+        if not any(any(u[0] in NAVAL for u in r["units"]) or (r["cities"] and r["cities"][0][3] in coast_items)
+                   for r in rows):
+            continue
+        coastal += 1
+        trs = transitions(rows)
+        inc = income_estimates(trs)
+        for i, (r0, r1, ev) in enumerate(trs):
+            for t in ev["bought"]:
+                if t in NAVAL:
+                    n_buys[t] += 1
+            if any(u[0] in NAVAL for u in r0["units"]) or r0["gold"] < 125:
+                continue
+            n_rich += 1
+            spent = r0["gold"] + inc[i] - r1["gold"] if i in inc else None
+            if any(t in NAVAL for t in ev["bought"]) and (spent is None or spent >= 100):
+                n_hit += 1
+    print(f"\nNAVAL BUYS: {dict(n_buys)} over {coastal} coastal minor-games; with none standing and a bank"
+          f" of 125: {n_hit}/{n_rich} = {10000 * n_hit / max(n_rich, 1):.0f} per ten thousand")
     print("\nFAITH SPENT:", len(faith_buys))
     for fb in faith_buys:
         print("  ", fb)

@@ -5,8 +5,7 @@
 
 OWNER RULING: the queue is depth 1, and the "queue" is the current build.
 Only the HEAD accrues (every `progress +=` reads slot 0); what makes hammers
-survive a switch is `city_prod_bank` and the per-item ledger, both of which
-are independent of depth. Deeper slots would be no mechanic, only promote
+survive a switch is `city_prod_bank`, which is independent of depth. Deeper slots would be no mechanic, only promote
 columns per city asking a policy to reorder a list the observation never
 shows it.
 
@@ -20,10 +19,7 @@ Proven here:
     waits behind it;
   * a city already building is offered NO item column at all;
   * a building on order is not offered twice;
-  * `_q_drop` empties the head;
-  * a CANCELLED entry banks its hammers against the ITEM and `_q_push` of the
-    same column resumes them — the ledger pays ONCE;
-  * a cancelled DISTRICT vacates its plot and its registry entry.
+  * `_q_drop` empties the head.
 """
 
 from __future__ import annotations
@@ -172,52 +168,6 @@ def test_a_drop_empties_the_head(rules, path) -> None:
     print("  7 drop OK — the head goes and the slot comes back empty")
 
 
-def test_a_cancel_banks_against_the_item(rules, path) -> None:
-    """The per-ITEM ledger is what makes hammers survive a switch, and it is
-    independent of depth — which is why collapsing the queue costs nothing
-    here. Cancel the build, take something else, come back: the hammers are
-    waiting, and they are paid ONCE."""
-    sim = build(rules, path)
-    j = a_city(sim)
-    load_queue(sim, j, [unit(sim, 0)], costs=[100], progs=[7])
-    sim._cancel_queue_item(B0, ROW, j, 0)
-    assert q(sim, j)[0] == -1, "the cancelled head did not leave the queue"
-    assert float(sim.city_prod_bank[B0, ROW, j]) == 0,         "a CANCEL banked into the city buffer — that is INVALIDATION's path"
-    ks = sim.city_item_bank[B0, ROW, j].tolist()
-    assert unit(sim, 0) in ks, "the ledger holds no entry for the cancelled item"
-    li = ks.index(unit(sim, 0))
-    assert float(sim.city_item_amt[B0, ROW, j, li]) == 7
-    hit = torch.ones(1, dtype=torch.bool)
-    sim._q_push(ROW, j, hit, torch.tensor([unit(sim, 0)]), torch.tensor([100.0]))
-    assert prg(sim, j)[0] == 7, "queueing the item again did not resume its hammers"
-    assert int(sim.city_item_bank[B0, ROW, j, li]) == -1,         "the ledger entry survived the resume"
-    # ...and a second take of the same item is paid nothing
-    sim._q_drop(torch.tensor([B0]), ROW, j, torch.ones(1, sim.QD, dtype=torch.bool))
-    sim._q_push(ROW, j, hit, torch.tensor([unit(sim, 0)]), torch.tensor([100.0]))
-    assert prg(sim, j)[0] == 0, "the ledger paid TWICE"
-    print("  9 cancel OK — banked 7 against the item, resumed once, paid once")
-
-def test_a_cancelled_district_vacates_its_plot(rules, path) -> None:
-    sim = build(rules, path)
-    j = a_city(sim)
-    t2 = int((sim.district[B0] < 0).nonzero().flatten()[0])
-    di = 0
-    code = sim.DISTRICT_BASE + di
-    load_queue(sim, j, [code], costs=[100], progs=[11])
-    sim.city_qtile[B0, ROW, j, 0] = t2
-    sim.district[B0, t2] = di
-    sim.district_complete[B0, t2] = False
-    sim.city_dist_tile[B0, ROW, j, di] = t2
-    sim._cancel_queue_item(B0, ROW, j, 0)
-    assert int(sim.district[B0, t2]) == -1, "the plot still carries the district"
-    assert int(sim.city_dist_tile[B0, ROW, j, di]) == -1, \
-        "the registry still names the plot"
-    ks = sim.city_item_bank[B0, ROW, j].tolist()
-    assert code in ks and float(sim.city_item_amt[B0, ROW, j, ks.index(code)]) == 11, \
-        "the district's hammers did not bank against the item"
-    print("  10 district OK — plot and registry vacated, 11 hammers held")
-
-
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -227,8 +177,6 @@ def main() -> int:
     test_a_busy_city_is_offered_nothing(rules, path)
     test_a_queued_building_is_not_offered_twice(rules, path)
     test_a_drop_empties_the_head(rules, path)
-    test_a_cancel_banks_against_the_item(rules, path)
-    test_a_cancelled_district_vacates_its_plot(rules, path)
     print("BATTERY OK production_queue")
     return 0
 

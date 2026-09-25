@@ -34,7 +34,6 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
     id,
     name: 'Rome',
     color: '#8e3db8',
-    aggression: 0.5,
     seat: 1,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,

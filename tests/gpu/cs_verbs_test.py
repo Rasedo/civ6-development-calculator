@@ -7,9 +7,10 @@ Both mechanics run from the civ phase (the `_seat_phase` levy block +
 `_seat_quest_phase`, TS twins `seatPhase`'s levy branch + `issueQuest` /
 `questSatisfied`):
 
-  * CIV LEVY — an AT-WAR civ suzerain of a militaristic CS spawns
-    levyUnits units of the 2-step ladder at the CS center, paying
-    levyGoldCost, on a per-CS cooldown SHARED across seats (citystate_last_levy).
+  * CIV LEVY — a civ suzerain of a CS takes its whole standing army
+    (`levyUnits`), paying `levyCostPct` of the units' Gold prices, once while
+    the army is out; it comes home after `levyTurns` or when the suzerain
+    changes (`_minor_levy_return`).
   * CIV QUESTS (zero-draw) — one deterministic quest per (civ, CS):
     the FIRST SATISFIABLE of [clearCamp, buildDistrict, sendTradeRoute],
     NO RNG; completion pays +questEnvoys to that civ's civ_only_citystate_envoys.
@@ -105,18 +106,10 @@ def meet_quota(sim, r: int) -> None:
         sim.unit_next[0] += 1
 
 
-def count_levy(sim, vn0: int, s: int, warr: int) -> int:
-    """New WARRIOR-type R units in the pool since vn0 — the levy's signature.
-    POSITION is deliberately NOT asserted: the levy block precedes R's war-acts
-    in the same phase, so levied units can legally WAR-MARCH off the CS ring
-    before the poke reads them. Isolation comes from the prep instead — queues
-    cleared and the gold-buy unit branch quota-blocked, so every new R unit IS
-    a levy spawn."""
-    n = 0
-    for slot in range(vn0, int(sim.unit_next[0])):
-        if int(sim.major_unit_type[0, slot]) == warr and int((sim.major_unit_seat[0, slot] - 1)) == R:
-            n += 1
-    return n
+def army_of(sim, seat: int) -> int:
+    """the military units standing under `seat`"""
+    t = sim.major_unit_type[0].clamp(min=0, max=sim.NU - 1)
+    return int((sim.major_unit_alive[0] & (sim.major_unit_seat[0] == seat) & sim._type_military[t]).sum())
 
 
 def prep_levy(sim, s: int, envoys: int = 5) -> None:
@@ -128,6 +121,10 @@ def prep_levy(sim, s: int, envoys: int = 5) -> None:
     sim.civ_treasury[0, OTHER + 1] = 0.0  # the shared unit_next pool must not grow from OTHER's buys
     make_suzerain_mil(sim, s, envoys)
     meet_quota(sim, R)
+    # the army the levy takes: two Warriors of the minor's own
+    for _ in range(2):
+        sim._minor_spawn(s, torch.ones(sim.B, dtype=torch.bool),
+                         torch.full((sim.B,), sim._warrior_idx, dtype=torch.long), grants=False)
 
 
 def stash_levy(sim, s: int) -> None:
@@ -156,77 +153,84 @@ def main() -> None:
     # treasury set to EXACTLY the levy price, and each levy case below stashes
     # its own kind-7 intent.
 
-    cd = int(sim.rules.citystate["levyCooldown"])
-    cost = float(sim.rules.citystate["levyGoldCost"])
-    n_units = int(sim.rules.citystate["levyUnits"])
-    warr = sim._warrior_idx
     T = int(sim.turn)
     S0 = 0  # the CS slot under test
+    cs_seat = 100 + S0
+    s0_t = torch.full((sim.B,), S0, dtype=torch.long)
 
     # ============================ CIV LEVY ============================
-    # -- L1: FIRE — at war, suzerain of a militaristic CS, affordable -------
+    # -- L1: FIRE — suzerain, an army standing, the price met --------------
     sim.restore(base)
     prep_levy(sim, S0)
     stash_levy(sim, S0)
+    n_army = army_of(sim, cs_seat)
+    assert n_army >= 1, "the minor fields no army to levy"
+    cost = float(sim._levy_cost(R + 1, s0_t)[0])
+    assert cost > 0
     sim.civ_treasury[0, R + 1] = cost  # exactly the levy price
-    vn0 = unit_next(sim)
+    mine0 = army_of(sim, R + 1)
     sim._seat_phase()
-    assert int(sim.citystate_last_levy[0, S0]) == T, f"L1 levy: citystate_last_levy not stamped ({int(sim.citystate_last_levy[0, S0])} != {T})"
-    assert count_levy(sim, vn0, S0, warr) == n_units, f"L1 levy: expected {n_units} WARRIOR at CS center, got {count_levy(sim, vn0, S0, warr)}"
-    print(f"  L1 levy FIRES OK ({n_units} WARRIOR at CS center, cooldown stamped)")
+    assert int(sim.citystate_levy_seat[0, S0]) == R + 1, "L1 levy: the holder not stamped"
+    assert int(sim.citystate_levy_ends[0, S0]) == T + sim._levy_turns, "L1 levy: the term not stamped"
+    assert army_of(sim, cs_seat) == 0, "L1 levy: the minor kept an army"
+    assert army_of(sim, R + 1) == mine0 + n_army, "L1 levy: the army did not change hands"
+    taken = (sim.major_unit_alive[0] & (sim.major_unit_levy_src[0] == cs_seat))
+    assert int(taken.sum()) == n_army and bool(sim.major_unit_levied[0][taken].all()), "L1 levy: the mark"
+    assert int(sim.major_unit_mp[0][taken].max()) == 0, "L1 levy: a levied unit moves on its levy turn"
+    print(f"  L1 levy FIRES OK ({n_army} units change hands for {cost})")
+
+    # -- L1b: the army comes home at the term's end, or when the suzerain changes
+    sim.citystate_suzerain[0, S0] = R + 1
+    sim.turn = sim.citystate_levy_ends[0, S0].clone() - 1
+    sim._minor_levy_return(S0)
+    assert army_of(sim, cs_seat) == 0, "L1b: home before the term"
+    sim.turn = int(sim.citystate_levy_ends[0, S0])
+    sim._minor_levy_return(S0)
+    assert army_of(sim, cs_seat) == n_army, "L1b: not home at the term"
+    assert int(sim.citystate_levy_seat[0, S0]) == -1
+    assert not bool((sim.major_unit_levy_src[0] == cs_seat).any()), "L1b: the mark stayed"
+    sim.turn = T
+    print("  L1b the army comes home at the end of its term")
 
     # -- L2: at-war is the DRIVER's policy gate, NOT a rule -----------------
-    # TS levyUnits has no war test, so a stashed intent executes at peace on
-    # both engines (refusal parity); the driver simply never emits one.
     sim.restore(base)
     prep_levy(sim, S0)
     sim.war[0, 0, 1 + R] = sim.war[0, 1 + R, 0] = False
     stash_levy(sim, S0)
-    sim.civ_treasury[0, R + 1] = cost
+    sim.civ_treasury[0, R + 1] = float(sim._levy_cost(R + 1, s0_t)[0])
     sim._seat_phase()
-    assert int(sim.citystate_last_levy[0, S0]) == T, "L2: the engine arm refused a stashed levy at peace (at-war is not a rule)"
+    assert int(sim.citystate_levy_seat[0, S0]) == R + 1, "L2: the engine arm refused a stashed levy at peace"
     print("  L2 at-peace intent OK (the engine executes; at-war gating is the driver's)")
 
     # -- L3: NOT-SUZERAIN gate (only 2 envoys) ------------------------------
     sim.restore(base)
     prep_levy(sim, S0, envoys=2)  # below suzerainEnvoys
     stash_levy(sim, S0)
-    sim.civ_treasury[0, R + 1] = cost
+    sim.civ_treasury[0, R + 1] = float(sim._levy_cost(R + 1, s0_t)[0])
     sim._seat_phase()
-    assert int(sim.citystate_last_levy[0, S0]) != T, "L3: a non-suzerain civ levied"
+    assert int(sim.citystate_levy_seat[0, S0]) == -1, "L3: a non-suzerain civ levied"
     print("  L3 not-suzerain gate OK (2 envoys < suzerain minimum)")
 
     # -- L4: AFFORDABILITY gate (one milli-unit short) ----------------------
     sim.restore(base)
     prep_levy(sim, S0)
     stash_levy(sim, S0)
-    sim.civ_treasury[0, R + 1] = cost - 0.001
+    sim.civ_treasury[0, R + 1] = float(sim._levy_cost(R + 1, s0_t)[0]) - 0.001
     sim._seat_phase()
-    assert int(sim.citystate_last_levy[0, S0]) != T, "L4: levied below the gold cost"
+    assert int(sim.citystate_levy_seat[0, S0]) == -1, "L4: levied below the gold cost"
     print("  L4 affordability gate OK (no levy one milli-unit below cost)")
 
-    # -- L5: COOLDOWN gate + SHARED across seats ----------------------------
-    # a recent levy (this-turn − (cd−1)) blocks; exactly cd turns ago is ready.
+    # -- L5: ALREADY LEVIED: "You have already levied the military" ----------
     sim.restore(base)
     prep_levy(sim, S0)
     stash_levy(sim, S0)
-    sim.civ_treasury[0, R + 1] = cost
-    sim.citystate_last_levy[0, S0] = T - (cd - 1)  # one turn short of ready
-    vn0 = unit_next(sim)
+    sim.civ_treasury[0, R + 1] = float(sim._levy_cost(R + 1, s0_t)[0])
+    sim.citystate_levy_seat[0, S0] = R + 1
+    sim.citystate_levy_ends[0, S0] = T + 5
+    n_army = army_of(sim, cs_seat)
     sim._seat_phase()
-    assert int(sim.citystate_last_levy[0, S0]) == T - (cd - 1), "L5 cooldown: levied while on cooldown"
-    assert count_levy(sim, vn0, S0, warr) == 0, "L5 cooldown: WARRIORs spawned at the CS while on cooldown"
-    print(f"  L5 cooldown gate OK (blocked at {cd - 1} turns since levy; shared citystate_last_levy)")
-
-    # ready twin: exactly cd turns ago → levy fires again (shared clock resets)
-    sim.restore(base)
-    prep_levy(sim, S0)
-    stash_levy(sim, S0)
-    sim.civ_treasury[0, R + 1] = cost
-    sim.citystate_last_levy[0, S0] = T - cd
-    sim._seat_phase()
-    assert int(sim.citystate_last_levy[0, S0]) == T, "L5 ready: no levy exactly at cooldown expiry"
-    print(f"  L5 ready twin OK (levy fires at exactly {cd} turns since last)")
+    assert army_of(sim, cs_seat) == n_army, "L5: an army already out was levied again"
+    print("  L5 already-levied gate OK")
 
     # ============================ CIV QUESTS =========================
     # -- Q1: ISSUE buildDistrict (deterministic, no camp, not owned) --------

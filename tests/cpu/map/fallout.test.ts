@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt, grantTechs } from '../helpers';
+import { canPlaceDistrict, makeMap, makeState, tileAtCoords, settleAt, grantTechs } from '../helpers';
 import { NUCLEAR_DEVICES, FALLOUT_DAMAGE } from '../../../cpu/data/nuclear';
 import { wmdHeld, addWmd, wmdUpkeep, irradiated } from '../../../cpu/core/nuclear';
 import { PROJECTS } from '../../../cpu/data/projects';
 import { availableProjects } from '../../../cpu/core/game';
-import { availableBuildings, canPlaceDistrict } from '../../../cpu/core/rules';
+import { availableBuildings } from '../../../cpu/core/rules';
 import { completeProject } from '../../../cpu/core/production';
 import { workableTiles } from '../../../cpu/core/city';
 import { spawnUnit, refreshUnits, cleanFallout, canCleanFallout, trainableUnits } from '../../../cpu/core/units';

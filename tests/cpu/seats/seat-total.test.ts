@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, seatOfCityState, seatOf, allSeats, emptySeat } from '../../../cpu/core/seats';
-import { createGame, serialize, deserialize } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { serialize, deserialize } from '../../../cpu/core/game';
+import { seededGame } from '../helpers';
 import type { GameState } from '../../../cpu/core/types';
 
 // `seatOf` is TOTAL, and the barbarians hold their camps.
@@ -15,12 +15,7 @@ import type { GameState } from '../../../cpu/core/types';
 // the seat it got back is the RIGHT one.
 
 function newGame(): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 909,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 3, opponents: 2,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(909, 3, 3);
   return state;
 }
 

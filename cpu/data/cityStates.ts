@@ -417,19 +417,29 @@ export const MINOR_EXCLUDED_UNIT_CLASSES: readonly PromoClass[] = srcConst('city
  * reaching (fewer than eight minors left in the watch). A by-type row takes
  * the minor's type's id and slots.
  *
- * The rows are in the order the census's medians start them. What the census
- * holds that this table does not: the Trader (a minor runs no trade route in
- * this engine), the district projects and the repair project (no minor
- * project), the Factory, Research Lab, Stock Exchange and Broadcast Center
- * (each draws Power, and a minor's grid is C-1's), the worship buildings, the
- * Flood Barrier and the Food Market, the Aqueduct (disfavoured), and naval
- * units. MinorCivPseudoYields' PSEUDOYIELD_TOURISM -200 names no row here: no
+ * The rows are in the order the census's medians start them; the repair
+ * project, a rule rather than a draw, stands ahead of every drawn row, and the
+ * district projects, which take a minor's Production on 19-55% of the turns
+ * after it first starts one and leave it idle on under 6%, close the table.
+ * What the census holds that this table does not: the Aqueduct (disfavoured),
+ * the Research Lab, Stock Exchange and Broadcast Center past the estimate's
+ * reach (their slots are all -1), and the Supply Convoy, Military Engineer and
+ * Manhattan Project the late watches start a handful of times. A minor BUYS
+ * its ships (`MINOR_NAVAL_BUY_BP`); the census never saw one build a naval
+ * unit. MinorCivPseudoYields' PSEUDOYIELD_TOURISM -200 names no row here: no
  * item in the table pays Tourism.
  */
 export interface MinorBuildRow {
-  kind: 'builder' | 'unit' | 'building' | 'district' | 'army';
-  /** a building or district row's item, per minor type; null = nothing this
-   *  engine hosts for the type */
+  /** `builder` a Builder while none stands; `unit` / `army` a military unit;
+   *  `building` / `district` the row's item; `trader` a Trader while the
+   *  minor's routes and Traders are under its trade capacity and a route is
+   *  open to it (`minorRouteCandidate`); `repair` the
+   *  Repair Outer Defenses project while `repairAvailable` allows; `project`
+   *  the row's district project; `worship` the worship building its majority
+   *  religion's Worship belief names */
+  kind: 'builder' | 'unit' | 'building' | 'district' | 'army' | 'trader' | 'repair' | 'project' | 'worship';
+  /** a building, district or project row's item, per minor type; null =
+   *  nothing for the type */
   item?: Readonly<Record<CityStateType, string | null>>;
   /** a unit row's promotion class: it trains while the minor's military count
    *  is below `below`, or with no `below` while no unit of the class stands */
@@ -438,6 +448,11 @@ export interface MinorBuildRow {
   /** a drawn row's twenty slots, per minor type */
   from?: Readonly<Record<CityStateType, readonly number[]>>;
 }
+
+/** the row kinds in their WIRE order — the exporter's `buildKinds` */
+export const MINOR_BUILD_KINDS: readonly MinorBuildRow['kind'][] = [
+  'builder', 'unit', 'building', 'district', 'army', 'trader', 'repair', 'project', 'worship',
+];
 
 /** the slots a drawn row carries */
 export const MINOR_BUILD_SLOTS = 20;
@@ -454,6 +469,9 @@ const slotsByType = (name: string, v: Record<CityStateType, readonly number[]>) 
 export const MINOR_BUILD_ROWS: readonly MinorBuildRow[] = [
   // a Builder while none stands: 554 of 557 Builder runs began with none
   { kind: 'builder' },
+  // the walls' repair whenever the perimeter is breached and quiet (28 minors
+  // start it, median turn 112)
+  { kind: 'repair' },
   { kind: 'building', item: every('MONUMENT'),
     from: slots('MONUMENT', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1]) },
   // the third military unit beside the two it starts with (165 of the 190
@@ -465,6 +483,10 @@ export const MINOR_BUILD_ROWS: readonly MinorBuildRow[] = [
   // a ranged unit while none stands
   { kind: 'unit', cls: 'RANGED',
     from: slots('RANGED', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1]) },
+  // a Trader while the minor's routes and Traders are under its capacity
+  // and a destination is open (225 of 250 minors start one, median turn 35)
+  { kind: 'trader',
+    from: slots('TRADER', [18, 20, 25, 29, 30, 31, 32, 33, 35, 37, 40, 43, 52, 61, 69, 75, 86, 108, -1, -1]) },
   { kind: 'district', item: CITY_STATE_TYPE_DISTRICT, from: slotsByType('typeDistrict', {
     scientific: [15, 16, 16, 17, 17, 19, 22, 23, 26, 28, 28, 34, 36, 46, 52, 53, 56, -1, -1, -1],
     cultural: [44, 45, 45, 46, 49, 52, 55, 59, 63, 66, 80, 86, 95, -1, -1, -1, -1, -1, -1, -1],
@@ -492,25 +514,30 @@ export const MINOR_BUILD_ROWS: readonly MinorBuildRow[] = [
     from: slots('ANCIENT_WALLS', [47, 51, 53, 54, 55, 57, 58, 60, 62, 63, 64, 65, 67, 68, 70, 72, 74, 79, 88, -1]) },
   { kind: 'building', item: every('LIGHTHOUSE'),
     from: slots('LIGHTHOUSE', [40, 50, 59, 68, 81, 214, 244, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
-  // the industrial second tier, the Factory, draws Power (C-1)
   { kind: 'building', item: {
-    scientific: 'UNIVERSITY', cultural: 'MUSEUM', trade: 'BANK', industrial: null,
+    scientific: 'UNIVERSITY', cultural: 'MUSEUM', trade: 'BANK', industrial: 'FACTORY',
     militaristic: 'ARMORY', religious: 'TEMPLE',
   }, from: slotsByType('typeTier2', {
     scientific: [81, 97, 100, 104, 104, 107, 107, 107, 107, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
     cultural: [98, 101, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
     trade: NEVER,
-    industrial: NEVER,
+    industrial: [155, 191, 191, 198, 198, 199, 199, 199, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
     militaristic: [89, 114, 114, 148, 148, 175, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
     religious: [66, 69, 71, 73, 75, 77, 77, 78, 82, 84, 91, 101, -1, -1, -1, -1, -1, -1, -1, -1],
   }) },
   { kind: 'building', item: every('MEDIEVAL_WALLS'),
     from: slots('MEDIEVAL_WALLS', [82, 86, 90, 92, 92, 93, 94, 96, 97, 98, 99, 101, 104, 107, 108, 110, 112, 115, -1, -1]) },
-  // the third tier: the Research Lab, Stock Exchange and Broadcast Center draw
-  // Power (C-1), and the religious one is a worship building
-  { kind: 'building', item: { ...every<string | null>(null), militaristic: 'MILITARY_ACADEMY' },
-    from: slotsByType('typeTier3', { ...every(NEVER),
-      militaristic: [136, 136, 138, 172, 172, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1] }) },
+  // the third tier (the Industrial Zone's is a power plant, which no minor
+  // starts); the religious one is the worship row below
+  { kind: 'building', item: {
+    scientific: 'RESEARCH_LAB', cultural: 'BROADCAST_CENTER', trade: 'STOCK_EXCHANGE', industrial: null,
+    militaristic: 'MILITARY_ACADEMY', religious: null,
+  }, from: slotsByType('typeTier3', { ...every(NEVER),
+    militaristic: [136, 136, 138, 172, 172, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1] }) },
+  // the worship building (Wat, Gurdwara, Cathedral, Meeting House, Synagogue:
+  // whichever the minor's religion names)
+  { kind: 'worship', from: slotsByType('worship', { ...every(NEVER),
+    religious: [76, 84, 90, 90, 92, 95, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1] }) },
   { kind: 'building', item: every('RENAISSANCE_WALLS'),
     from: slots('RENAISSANCE_WALLS', [110, 118, 121, 123, 125, 126, 129, 130, 130, 131, 132, 135, 138, 138, 140, 141, 146, 151, -1, -1]) },
   { kind: 'building', item: every('SHIPYARD'),
@@ -521,8 +548,27 @@ export const MINOR_BUILD_ROWS: readonly MinorBuildRow[] = [
     from: slots('SEWER', [174, 177, 183, 189, 193, 199, 203, 207, 208, 211, 212, 224, 250, -1, -1, -1, -1, -1, -1, -1]) },
   { kind: 'building', item: every('SEAPORT'),
     from: slots('SEAPORT', [223, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
+  { kind: 'building', item: every('FLOOD_BARRIER'),
+    from: slots('FLOOD_BARRIER', [215, 220, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
+  { kind: 'building', item: every('FOOD_MARKET'),
+    from: slots('FOOD_MARKET', [225, 243, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
   // a military unit while the army is below the episode's cap
   { kind: 'army' },
+  // the type district's project (no militaristic minor starts Encampment
+  // Training), then the Harbor's
+  { kind: 'project', item: {
+    scientific: 'RESEARCH_GRANTS', cultural: 'FESTIVAL', trade: 'INVESTMENT', industrial: 'LOGISTICS',
+    militaristic: 'TRAINING', religious: 'PRAYERS',
+  }, from: slotsByType('typeProject', {
+    scientific: [22, 25, 29, 29, 35, 38, 43, 43, 45, 53, 56, 76, 90, -1, -1, -1, -1, -1, -1, -1],
+    cultural: [54, 60, 61, 69, 75, 77, 81, 99, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    trade: [53, 62, 67, 70, 74, 78, 93, 98, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    industrial: [77, 80, 83, 104, 118, 118, 206, 215, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    militaristic: NEVER,
+    religious: [23, 30, 31, 33, 35, 37, 40, 41, 52, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+  }) },
+  { kind: 'project', item: every('SHIPPING'),
+    from: slots('HARBOR_PROJECT', [60, 76, 121, 136, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) },
 ];
 
 /** The army the minor keeps: it trains a military unit while it holds fewer
@@ -583,6 +629,16 @@ export const MINOR_LOSS_BUY_TURNS = srcConst('cityState.lossBuyTurns', 3, { lab:
 export const MINOR_UPGRADE_GOLD = srcConst('cityState.upgradeGold', 5,
   xml('GlobalParameters', 'Name=UPGRADE_BASE_COST', 'Value', {
     scale: GAME_SPEED, note: 'C-38 census: exactly 5 per upgrade, whatever the chassis' }));
+/** A minor BUYS its ships — the census never saw one build a naval unit: 65
+ *  naval purchases in 42 of 262 minor-games (61 Galleys, 2 Caravels, 2
+ *  Ironclads, the naval melee line), 60 of them with no ship standing, each
+ *  paying the chassis' own gold price (Galley 125). On a turn the minor holds
+ *  no ship and its treasury covers the price, one draw at this rate per ten
+ *  thousand: 31 paid purchases over 4,979 such turns of the 82 minors the
+ *  census shows coastal (a Harbor, a Lighthouse, a ship). */
+export const MINOR_NAVAL_BUY_BP = srcConst('cityState.navalBuyBp', 62, { lab: 'C-38',
+  note: 'tools/civ6lab/minor_play_census.py; the coastal denominator counts only the minors whose record shows a coast' });
+export const MINOR_NAVAL_CLASS: PromoClass = 'NAVAL_MELEE';
 
 /**
  * THE WALKER — where a minor's land military stands, fitted to C-38's census
@@ -647,9 +703,18 @@ export const FREE_CITY_BUILD_ROWS: readonly FreeCityBuildRow[] = [
     'STOCK_EXCHANGE', 'BROADCAST_CENTER', 'RESEARCH_LAB', 'SEAPORT'] },
 ];
 
-export const LEVY_UNITS = 2;
-export const LEVY_GOLD_COST = 120;
-export const LEVY_COOLDOWN = 20;
+/** CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS): "The Suzerain of this
+ *  city-state can pay {1_GoldCost} Gold to take temporary control of all its
+ *  current military units. The units will not be able to move on the turn
+ *  they are levied, but will take orders from the Suzerain on the following
+ *  turn. They will return to the city-state after {2_TurnLimit} Turns, or if
+ *  the Suzerain changes." The turn limit is `LEVY_MILITARY_TURN_DURATION`; the
+ *  price is `LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST` of the units' own
+ *  Gold purchase prices, summed. */
+export const LEVY_TURNS = srcConst('cityState.levyTurns', 30,
+  xml('GlobalParameters', 'Name=LEVY_MILITARY_TURN_DURATION', 'Value'));
+export const LEVY_COST_PCT = srcConst('cityState.levyCostPct', 25,
+  xml('GlobalParameters', 'Name=LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST', 'Value'));
 
 export const GOV_INFLUENCE_TIER: Record<string, number> = {
   CHIEFDOM: 0,

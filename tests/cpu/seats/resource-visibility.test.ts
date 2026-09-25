@@ -10,12 +10,12 @@
  * own modifiers ask). The GPU twin is stockpile_ceiling_test.py's poke 6.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt, grantTechs } from '../helpers';
+import { canPlaceDistrict, makeMap, makeState, tileAtCoords, settleAt, grantTechs } from '../helpers';
 import { setTileOwner, civHasStrategic, hiddenResourcesFor } from '../../../cpu/core/seats';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { tileYields, cityImprovedResourceKinds } from '../../../cpu/core/yields';
 import { accrueStockpiles } from '../../../cpu/core/stockpile';
-import { validImprovements, canPlaceDistrict } from '../../../cpu/core/rules';
+import { validImprovements } from '../../../cpu/core/rules';
 import { RESOURCES } from '../../../world/resources';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import type { GameState } from '../../../cpu/core/types';

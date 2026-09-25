@@ -119,6 +119,30 @@ def test_a_stripped_resource_stops_paying(sim) -> None:
     print("  the stripped resource OK — it stops answering RESOURCE adjacency")
 
 
+def test_an_improved_plot_takes_a_district(sim) -> None:
+    """CIV6: a district stands on an improved plot and removes the improvement
+    (the install's Districts and Improvements carry no clause refusing one) —
+    `_district_elig_site` admits the plot for every seat, and the pave
+    (`_pave_plot`) clears it. The TS twin is tests/cpu/city/district-pave.test.ts."""
+    b = 0
+    row = next(r for r in range(sim.n_majors) if bool(sim.city_alive[b, r].any()))
+    col = int(sim.city_alive[b, row].long().argmax())
+    _claim(sim, b, row, col)
+    di = next(i for i, d in enumerate(sim.districts_cat) if d["id"] == "CAMPUS")
+    elig = sim._district_elig(row, col, di)
+    assert bool(elig[b].any()), "no plot takes a Campus"
+    t = int(elig[b].long().argmax())
+    sim.improvement[b, t] = 0
+    sim._eff_version += 1
+    assert bool(sim._district_elig(row, col, di)[b, t]), "an improved plot stopped being a site"
+    want = torch.zeros(sim.B, dtype=torch.bool)
+    want[b] = True
+    placed = sim._place_district(row, col, di, want, 0, torch.full((sim.B,), t, dtype=torch.long))
+    assert bool(placed[b]), "the district did not place on the improved plot"
+    assert int(sim.improvement[b, t]) == -1, "the pave left the improvement standing"
+    print("  an improved plot OK — the district takes it and removes the improvement")
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -137,6 +161,8 @@ def main() -> None:
     gp, dq, ec = cat["GOVERNMENT_PLAZA"], cat["DIPLOMATIC_QUARTER"], cat["ENTERTAINMENT_COMPLEX"]
     iz = cat["INDUSTRIAL_ZONE"]
     test_a_stripped_resource_stops_paying(sim)
+    test_an_improved_plot_takes_a_district(
+        settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)))
 
     for i, d in enumerate(rj["districts"]):
         assert int(sim._appeal_adj[i]) == int(d.get("appealAdjacent", 0)), f"{d['id']} appeal"

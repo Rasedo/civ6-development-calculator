@@ -20,7 +20,7 @@ import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_TILES_PER_GOLD, HUNZA_ROUTE_GOLD, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
-import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, QUEST_CAMP_RADIUS, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_BUILDER_RATE_PERMILLE, MINOR_BUILDER_RADIUS, MINOR_BUILDER_BUY_SLOTS, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_BUY_BP, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS, MINOR_UPGRADE_GOLD, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_WEIGHTS_PEACE, MINOR_WALK_WEIGHTS_WAR, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, FREE_CITY_BUILD_ROWS } from '../data/cityStates';
+import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_MAX_HP, LEVY_TURNS, LEVY_COST_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, QUEST_CAMP_RADIUS, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_BUILD_KINDS, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_BUILDER_RATE_PERMILLE, MINOR_BUILDER_RADIUS, MINOR_BUILDER_BUY_SLOTS, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_BUY_BP, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS, MINOR_NAVAL_BUY_BP, MINOR_NAVAL_CLASS, MINOR_UPGRADE_GOLD, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_WEIGHTS_PEACE, MINOR_WALK_WEIGHTS_WAR, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, FREE_CITY_BUILD_ROWS } from '../data/cityStates';
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { gpSiteArgOf } from '../core/targetSites';
 import { strategicSlot } from '../core/stockpile';
@@ -828,17 +828,19 @@ export function buildRules() {
       smallMilitary: MINOR_SMALL_MILITARY,
       // THE BUILD TABLE (`MINOR_BUILD_ROWS`), in table order: `k` the row's
       // kind (a `buildKinds` index); `item` per minor type its building (a
-      // buildings index) or district (a PLACEABLE_DISTRICTS index), -1 none;
-      // `c` a unit row's class (PROMO_CLASSES), -1; `n` its `below`, -1;
-      // `d` 1 where the row draws, and `from` its slots per type (zeros where
-      // it draws none)
-      buildKinds: ['builder', 'unit', 'building', 'district', 'army'],
+      // buildings index), district (a PLACEABLE_DISTRICTS index) or project
+      // (a projects index), -1 none; `c` a unit row's class (PROMO_CLASSES),
+      // -1; `n` its `below`, -1; `d` 1 where the row draws, and `from` its
+      // slots per type (zeros where it draws none)
+      buildKinds: [...MINOR_BUILD_KINDS],
       buildRows: MINOR_BUILD_ROWS.map((row) => ({
-        k: ['builder', 'unit', 'building', 'district', 'army'].indexOf(row.kind),
+        k: MINOR_BUILD_KINDS.indexOf(row.kind),
         item: CITY_STATE_TYPES.map((t) => {
           const id = row.item?.[t];
           if (!id) return -1;
-          return row.kind === 'building' ? (buildingIdx.get(id) ?? -1) : (PLACEABLE_DISTRICTS as readonly string[]).indexOf(id);
+          if (row.kind === 'building') return buildingIdx.get(id) ?? -1;
+          if (row.kind === 'project') return Object.keys(PROJECTS).indexOf(id);
+          return (PLACEABLE_DISTRICTS as readonly string[]).indexOf(id);
         }),
         c: row.cls ? PROMO_CLASSES.indexOf(row.cls) : -1,
         n: row.below ?? -1,
@@ -858,6 +860,9 @@ export function buildRules() {
       lossBuyMult: MINOR_LOSS_BUY_MULT,
       lossBuyTurns: MINOR_LOSS_BUY_TURNS,
       upgradeGold: MINOR_UPGRADE_GOLD,
+      // the ships a minor buys: the rate per ten thousand, the class
+      navalBuyBp: MINOR_NAVAL_BUY_BP,
+      navalClass: PROMO_CLASSES.indexOf(MINOR_NAVAL_CLASS),
       // THE WALKER (`walkUnit`): step tables per mille over 0..3, distance
       // weights by distance from home
       walkStepsPeace: [...MINOR_WALK_STEPS_PEACE],
@@ -914,12 +919,10 @@ export function buildRules() {
         // Buenos Aires: reach of a bonus resource turned luxury
         bonusAmenities: BUENOS_AIRES_AMENITIES,
       },
-      // the levy: a militaristic CS's suzerain at war
-      // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown
-      // per CS shared across seats.
-      levyUnits: LEVY_UNITS,
-      levyGoldCost: LEVY_GOLD_COST,
-      levyCooldown: LEVY_COOLDOWN,
+      // THE LEVY: the minor's whole army for `levyTurns`, at `levyCostPct` of
+      // its units' Gold purchase prices
+      levyTurns: LEVY_TURNS,
+      levyCostPct: LEVY_COST_PCT,
     },
     seats: {
       maxCities: MAX_CITIES_PER_SEAT,

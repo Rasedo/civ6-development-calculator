@@ -12,7 +12,7 @@ import type { City, GameState, Seat } from '../../../cpu/core/types';
 /** A rival major with one big city at (col, row) — the pull a revolt needs. */
 function addRival(state: GameState, col: number, row: number): Seat {
   const tile = tileAtCoords(state.map, col, row);
-  const seat: Seat = { ...emptySeat(state.seats.length), name: 'Rival', color: '#8e3db8', aggression: 0.5, civ: -1 };
+  const seat: Seat = { ...emptySeat(state.seats.length), name: 'Rival', color: '#8e3db8', civ: -1 };
   const city: City = {
     id: seat.nextCityId++, name: 'Rival City', seat: seat.seat, centerIndex: tile.index, population: 30,
     foodBox: 0, cultureBox: 0, tilesAcquired: 0, focus: 'balanced', queue: [], isCapital: true,

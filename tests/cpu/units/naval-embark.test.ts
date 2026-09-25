@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { emptySeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
-import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
+import { stepThrough, makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { MP_SCALE } from '../../../cpu/data/constants';
-import { moveCostInto, unitPassable, canEmbark, stepUnit, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, findPath, walkPath, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
+import { moveCostInto, unitPassable, canEmbark, stepUnit, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
 import { hostileUnitAct, meleeAttack, rangedAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, encircled, stackDefender, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
 import { neighbors, hexDistance } from '../../../world/hex';
 import { unitSight, SIGHT_RANGE } from '../../../cpu/core/fog';
@@ -22,7 +22,6 @@ function addCivAtWar(state: GameState, col: number, row: number, techs: string[]
     ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
-    aggression: 0.5,
     seat: 1,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
@@ -108,7 +107,7 @@ describe('movement primitives', () => {
     state.unitsMode = true;
     addCivAtWar(state, 5, 5, []);
     const exerter = state.units.find((u) => isCiv(u.seat))!;
-    const mover: Unit = { id: 999, type: 'WARRIOR', seat: 0, tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null };
+    const mover: Unit = { id: 999, type: 'WARRIOR', seat: 0, tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null };
     // the mover belongs to seat 0; a hostile civ military adjacent exerts ZOC
     expect(inEnemyZoc(state, mover.tileIndex, mover)).toBe(true);
     // once that civ is EMBARKED it exerts nothing
@@ -203,7 +202,6 @@ function bareCiv(state: GameState, atWar = true): Seat {
     ...emptySeat(state.seats.length),
     name: 'Carthage',
     color: '#2d8',
-    aggression: 0.5,
     seat: 1,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
@@ -292,7 +290,7 @@ describe('N2 naval spawn + combat', () => {
     // cannot spawnUnit here) with a fortify counter that must be IGNORED.
     const embarked: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
-      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
+      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null,
       embarked: true, fortifyTurns: 2,
     };
     state.units.push(embarked);
@@ -383,10 +381,7 @@ describe('N2 naval spawn + combat', () => {
     expect(civCity.hp).toBeLessThan(before); // the ship battered the coastal city
   });
 
-  it('a SEAT-0 galley MOVES across water (findPath naval) then attacks a coastal city', () => {
-    // The GPU RL/controlled head cannot order a ship's water move yet (that is
-    // a residual — its move-apply reads the land plane); TS findPath/
-    // walkPath ARE naval-aware, so the seat-0 naval MOVE end-to-end lives here.
+  it('a galley MOVES across water, turn by turn, then attacks a coastal city', () => {
     const state = makeState(makeMap(14, 12, 'COAST')); // all-water map
     state.unitsMode = true;
     const civ = bareCiv(state);
@@ -416,16 +411,11 @@ describe('N2 naval spawn + combat', () => {
     const galley = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 4, 5).index, 0)!;
     expect(isWater(state.map.tiles[galley.tileIndex])).toBe(true);
     const startIdx = galley.tileIndex;
-    const waterAdj = neighbors(state.map, civCityCenter).find((n) => isWater(n))!;
-    // order the sea move; walk it home over a few turns' MP (naval routing)
-    galley.path = findPath(state, galley, waterAdj.index);
-    expect(galley.path).not.toBeNull();
-    walkPath(state, galley);
+    const waterAdj = tileAtCoords(state.map, 8, 5);
+    expect(neighbors(state.map, civCityCenter)).toContain(waterAdj);
+    // sail it along the row, a fresh turn's moves whenever a step runs short
+    stepThrough(state, galley, [5, 6, 7, 8].map((c) => tileAtCoords(state.map, c, 5).index));
     expect(galley.tileIndex).not.toBe(startIdx); // the ship actually sailed
-    for (let t = 0; t < 8 && galley.tileIndex !== waterAdj.index; t++) {
-      galley.movesLeft = 3 * MP_SCALE; // GALLEY moves
-      walkPath(state, galley);
-    }
     expect(galley.tileIndex).toBe(waterAdj.index);
     expect(isWater(state.map.tiles[galley.tileIndex])).toBe(true); // arrived, still afloat
     expect(galley.embarked).toBeFalsy(); // a naval unit is never embarked
@@ -453,7 +443,7 @@ describe('the amphibious attack', () => {
     const sea = neighbors(state.map, land).find((n) => isWater(n))!;
     const att: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
-      tileIndex: sea.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
+      tileIndex: sea.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null,
       embarked: true,
     };
     state.units.push(att);
@@ -506,7 +496,7 @@ describe('the amphibious attack', () => {
     )!;
     const afloat: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: 0,
-      tileIndex: otherSea.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
+      tileIndex: otherSea.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null,
       embarked: true,
     };
     state.units.push(afloat);
@@ -531,13 +521,13 @@ describe('the amphibious attack', () => {
     const water = tileAtCoords(state.map, 5, 5);
     const afloat: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
-      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null,
+      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null,
       embarked: true,
     };
     const escort: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
       tileIndex: neighbors(state.map, water)[0].index, movesLeft: 2 * MP_SCALE, hp: 100,
-      charges: null, path: null, embarked: true,
+      charges: null, embarked: true,
     };
     state.units.push(afloat, escort);
     expect(supportCount(state, water.index, afloat)).toBe(1);
@@ -715,7 +705,7 @@ describe('a hull and its passenger share the hex', () => {
     h.tileIndex = water.index;
     const rider: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat,
-      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, path: null, embarked: true,
+      tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null, embarked: true,
     };
     state.units.push(rider);
     return { hull: h, rider };

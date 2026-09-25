@@ -4,7 +4,6 @@ import { logPopWrite } from './difflog';
 import { seatOf, allianceLevelWith, alliedAtLevel, dominantReligionOf } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
-import { takeItemBank } from './prodLayout';
 import { isSuzerain } from './cityStates';
 import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct, lateEraTourism, civEraIndex } from './city';
 import { seatGovernment, slottedPolicyIndices } from './effects';
@@ -127,7 +126,6 @@ export function commitProduction(state: GameState, seat: number, city: City, ite
   // strategic resource and an Army triple; a merge pays nothing.
   if (item.kind === 'unit') chargeUnitResource(state, seat, item.unit, city, item.formation ?? 0);
   else if (item.kind === 'project') chargeProjectResource(state, seat, item.project);
-  item.progress += takeItemBank(city, item);
   city.queue.push(item);
   if (process.env.CIV6_ALOG) {
     const what =

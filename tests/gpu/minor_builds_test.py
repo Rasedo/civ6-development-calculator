@@ -24,13 +24,21 @@ Proven here:
   * a damaged perimeter blocks the higher wall (the majors' own clause);
   * the conquest CARRIES the buildings, the registry and the perimeter into
     the captured city;
-  * a dead minor builds nothing.
+  * a dead minor builds nothing;
+  * the rows the table grew: the district paves an improved plot, the repair
+    restores a quiet breached perimeter, a district project pays its yield
+    into the minor's own pot, the worship row raises the building the minor's
+    religion names, the Flood Barrier waits on lowland and costs by it, the
+    Trader row trains one under capacity with a route open, and a coastal
+    minor with no ship buys one.
 """
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
+
+import json
 
 import torch
 
@@ -39,6 +47,10 @@ from core import BatchSim, load_rules, fixture_paths
 from warmup import warm_base, opened
 
 B0 = 0
+ROOT = Path(__file__).resolve().parent.parent.parent
+RULES = json.loads((ROOT / "seeder" / "worlds" / "rules.json").read_text())
+BLD = [b["id"] for b in RULES["buildings"]]
+IMP = RULES["improvements"]["ids"]
 
 
 # THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
@@ -270,6 +282,7 @@ def test_the_conquest_carries_the_build(rules, path) -> None:
     sim.city_bldg[B0, row, 0, anc] = True
     full = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     sim.city_outer_hp[B0, row, 0] = full - 5
+    sim.city_last_hit[B0, row, 0] = int(sim.turn)  # just hit: no repair yet
     dv = int(sim._citystate_didx[B0, s])
     grant_district_tech(sim, s, dv)
     sim.citystate_prod[B0, s] = 10_000.0
@@ -504,6 +517,221 @@ def test_a_dead_minor_builds_nothing(rules, path) -> None:
     print("  6 dead OK — nothing accrues, nothing lands")
 
 
+def kind_row(rules, kind: str, item0: int | None = None) -> int:
+    """the build table's first row of `kind` (whose scientific item is `item0`)"""
+    cs = rules.citystate
+    kinds = cs["buildKinds"]
+    for r, row in enumerate(cs["buildRows"]):
+        if kinds[int(row["k"])] == kind and (item0 is None or int(row["item"][0]) == item0):
+            return r
+    raise AssertionError(f"no {kind} row")
+
+
+def test_the_district_paves_an_improved_plot(rules, path) -> None:
+    sim = build(rules, path)
+    s = a_minor(sim)
+    idle_builder(sim, s)
+    plan(sim, s, [district_row(sim, rules)])
+    row = sim._CITY_MINOR0 + s
+    dv = int(sim._citystate_didx[B0, s])
+    grant_district_tech(sim, s, dv)
+    anc = walls_rows(sim)[0]
+    sim.city_bldg[B0, row, 0, anc] = True
+    sim.city_outer_hp[B0, row, 0] = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
+    plane = sim._minor_district_site(s)
+    if not bool(plane[B0].any()):
+        print("  10 pave SKIPPED — no legal plot")
+        return
+    t = int(plane[B0].long().argmax())
+    # an improvement on the plot leaves it a site
+    sim.improvement[B0, t] = IMP.index("FARM")
+    assert bool(sim._minor_district_site(s)[B0, t]), "an improved plot stopped being a site"
+    sim.citystate_prod[B0, s] = 10_000.0
+    sim._minor_build(s)
+    got = int(sim.city_dist_tile[B0, row, 0, dv])
+    if got != t:
+        print(f"  10 pave SKIPPED — the district's surface took plot {got}")
+        return
+    assert int(sim.improvement[B0, t]) == -1, "the district left the improvement standing"
+    print(f"  10 pave OK — the district on plot {t} removed its Farm")
+
+
+def test_the_repair_row(rules, path) -> None:
+    sim = build(rules, path)
+    s = a_minor(sim)
+    idle_builder(sim, s)
+    plan(sim, s, [])
+    row = sim._CITY_MINOR0 + s
+    anc = walls_rows(sim)[0]
+    grant_walls_tech(sim, s, anc)
+    sim.city_bldg[B0, row, 0, anc] = True
+    full = int(sim._walls_tier_hp[sim._minor_walls_tier(s)][B0])
+    sim.city_outer_hp[B0, row, 0] = full - 7
+    sim.city_last_hit[B0, row, 0] = int(sim.turn)
+    sim.citystate_prod[B0, s] = 10_000.0
+    sim._minor_build(s)
+    assert int(sim.city_outer_hp[B0, row, 0]) == full - 7, "repaired while the city is under attack"
+    sim.city_last_hit[B0, row, 0] = int(sim.turn) - 10
+    ok, cost = sim._minor_repair(s)
+    assert bool(ok[B0]) and float(cost[B0]) == 7.0, "the repair's price is the HP it puts back"
+    sim.citystate_prod[B0, s] = 7.0
+    sim._minor_build(s)
+    assert int(sim.city_outer_hp[B0, row, 0]) == full, "the repair did not restore the walls"
+    assert abs(float(sim.citystate_prod[B0, s])) < 1e-9, "the repair did not spend its price"
+    print("  11 repair OK — quiet and breached: restored at the HP it puts back")
+
+
+def test_the_project_row(rules, path) -> None:
+    sim = build(rules, path)
+    s = a_minor(sim)
+    row = sim._CITY_MINOR0 + s
+    sim.citystate_type[B0, s] = 0  # scientific: Campus Research Grants
+    idle_builder(sim, s)
+    grants = next(i for i, p in enumerate(sim._proj_rows) if int(p["d"]) == sim._campus_idx and int(p["y"]) == 3)
+    plan(sim, s, [kind_row(rules, "project", grants)])
+    plane = [t for t in range(sim.T) if int(sim.tile_seat[B0, t]) == 100 + s and int(sim.district[B0, t]) < 0
+             and bool(sim.passable[B0, t]) and t != int(sim.citystate_center[B0, s])]
+    t = plane[0]
+    sim.district[B0, t] = sim._campus_idx
+    sim.district_complete[B0, t] = True
+    sim.city_dist_tile[B0, row, 0, sim._campus_idx] = t
+    sim._eff_version += 1
+    prow = sim._proj_rows[grants]
+    rd = sim.rules_dev
+    tp = float(sim.citystate_techs[B0, s].sum()) / float(rd.t_cost.shape[0])
+    cp = float(sim.citystate_civics[B0, s].sum()) / float(rd.c_cost.shape[0])
+    import math
+    cost = float(max(int(prow["pc"]), 0)) + math.floor(float(prow["pcg"]) * max(tp, cp))
+    sim.citystate_prod[B0, s] = cost
+    sci0 = float(sim.citystate_tech_prog[B0, s])
+    sim._minor_build(s)
+    want = math.floor(cost * sim._proj_yf + 0.5)
+    assert abs(float(sim.citystate_tech_prog[B0, s]) - (sci0 + want)) < 1e-9, \
+        f"the project paid {float(sim.citystate_tech_prog[B0, s]) - sci0} Science, want {want}"
+    assert abs(float(sim.citystate_prod[B0, s])) < 1e-9
+    print(f"  12 project OK — Research Grants for {cost:.0f}, +{want} Science into the minor's pot")
+
+
+def test_the_worship_row(rules, path) -> None:
+    sim = build(rules, path)
+    s = a_minor(sim)
+    row = sim._CITY_MINOR0 + s
+    idle_builder(sim, s)
+    plan(sim, s, [kind_row(rules, "worship")])
+    cath = BLD.index("CATHEDRAL")
+    wi = int((sim._worship_bidx == cath).long().argmax())
+    assert int(sim._worship_bidx[wi]) == cath
+    rel = 0
+    sim.civ_religion_done[B0, rel] = True
+    sim.civ_worship[B0, rel] = wi
+    sim.city_pressure[B0, row, 0, rel] = 100_000
+    assert int(sim._minor_followed()[B0, s]) == rel, "the minor's city does not follow the religion"
+    assert int(sim._minor_worship(s)[B0]) == cath
+    t = [t for t in range(sim.T) if int(sim.tile_seat[B0, t]) == 100 + s and int(sim.district[B0, t]) < 0
+         and bool(sim.passable[B0, t]) and t != int(sim.citystate_center[B0, s])][0]
+    sim.district[B0, t] = sim._hs_idx
+    sim.district_complete[B0, t] = True
+    sim.city_dist_tile[B0, row, 0, sim._hs_idx] = t
+    sim.city_bldg[B0, row, 0, BLD.index("SHRINE")] = True
+    sim.city_bldg[B0, row, 0, BLD.index("TEMPLE")] = True
+    sim._bldg_version += 1
+    sim._eff_version += 1
+    sim.citystate_prod[B0, s] = float(sim.rules_dev.b_cost[cath])
+    sim._minor_build(s)
+    assert bool(sim.city_bldg[B0, row, 0, cath]), "the worship row did not raise the Cathedral"
+    print("  13 worship OK — the building its religion names")
+
+
+def test_the_flood_barrier_row(rules, path) -> None:
+    sim = build(rules, path)
+    s = a_minor(sim)
+    row = sim._CITY_MINOR0 + s
+    idle_builder(sim, s)
+    fb = sim._barrier_bidx
+    plan(sim, s, [row_of(rules, "building", fb)])
+    sim.citystate_techs[B0, s] = True
+    sim.citystate_prod[B0, s] = 100_000.0
+    sim.tile_lowland[B0] = 0
+    sim._minor_build(s)
+    assert not bool(sim.city_bldg[B0, row, 0, fb]), "a barrier with no lowland to cover"
+    low = [t for t in range(sim.T) if int(sim.tile_seat[B0, t]) == 100 + s
+           and t != int(sim.citystate_center[B0, s])][0]
+    sim.tile_lowland[B0, low] = 1
+    cost = float(sim._flood_barrier_cost(row)[B0, 0])
+    assert cost > 0
+    sim.citystate_prod[B0, s] = cost
+    sim._minor_build(s)
+    assert bool(sim.city_bldg[B0, row, 0, fb]), "the barrier did not land on its lowland"
+    assert abs(float(sim.citystate_prod[B0, s])) < 1e-9, "the barrier's price is not the lowland's"
+    print(f"  14 flood barrier OK — lowland-gated, {cost:.0f} for one lowland tile")
+
+
+def test_the_trader_row(rules, path) -> None:
+    sim = build(rules, path)
+    for s in range(sim.S):
+        if not bool(sim.citystate_alive[B0, s]):
+            continue
+        row = sim._CITY_MINOR0 + s
+        ft = sim._trade_ftc
+        sim.citystate_civics[B0, s, ft] = True
+        uc = int(sim._type_civic[sim._trader_idx])
+        if uc >= 0:
+            sim.citystate_civics[B0, s, uc] = True
+        if not bool(sim._minor_route_candidate(s)[0][B0]):
+            continue
+        idle_builder(sim, s)
+        plan(sim, s, [kind_row(rules, "trader")])
+        before = int((sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
+                      & (sim.major_unit_type[B0] == sim._trader_idx)).sum())
+        cost = float(sim._trader_cost(row)[B0])
+        sim.citystate_prod[B0, s] = cost
+        sim._minor_build(s)
+        after = int((sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
+                     & (sim.major_unit_type[B0] == sim._trader_idx)).sum())
+        assert after == before + 1, "the Trader row trained no Trader"
+        # at capacity: no second one
+        sim.citystate_prod[B0, s] = cost * 10
+        sim._minor_build(s)
+        again = int((sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
+                     & (sim.major_unit_type[B0] == sim._trader_idx)).sum())
+        assert again == after, "a Trader past the capacity"
+        print(f"  15 trader OK — minor {s} trains one Trader for {cost:.0f}, none past its capacity")
+        return
+    print("  15 trader SKIPPED — no minor has a destination in range")
+
+
+def test_the_ship_purchase(rules, path) -> None:
+    # the first fixture seating a coastal minor
+    for p in fixture_paths()[:8]:
+        sim = opened(rules, p, 4)
+        if any(bool(sim.citystate_alive[B0, s]) and bool(sim._naval_capable_minor(s)[B0]) for s in range(sim.S)):
+            break
+    for s in range(sim.S):
+        if not bool(sim.citystate_alive[B0, s]) or not bool(sim._naval_capable_minor(s)[B0]):
+            continue
+        base = sim.snapshot()
+        bought = 0
+        for seed in range(1, 401):
+            sim.restore(base)
+            sim.citystate_techs[B0, s] = True
+            sim.citystate_treasury[B0, s] = 10_000.0
+            sim.rng_state[B0] = seed
+            sim._minor_buy_naval(s)
+            naval = (sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
+                     & sim.unit_naval[sim.major_unit_type[B0].clamp(min=0)])
+            if bool(naval.any()):
+                bought += 1
+                assert int(naval.sum()) == 1
+                sim._minor_buy_naval(s)
+                naval = (sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
+                         & sim.unit_naval[sim.major_unit_type[B0].clamp(min=0)])
+                assert int(naval.sum()) == 1, "a second ship while one stands"
+        assert 0 < bought < 40, f"{bought} purchases in 400 draws at {sim._mb_naval_bp} per ten thousand"
+        print(f"  16 ships OK — {bought} of 400 draws buy a ship at {sim._mb_naval_bp} per ten thousand")
+        return
+    print("  16 ships SKIPPED — no coastal minor")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -517,6 +745,13 @@ def main() -> int:
     test_the_walled_minor_strikes(rules, path)
     test_the_production_rows(rules, path)
     test_a_dead_minor_builds_nothing(rules, path)
+    test_the_district_paves_an_improved_plot(rules, path)
+    test_the_repair_row(rules, path)
+    test_the_project_row(rules, path)
+    test_the_worship_row(rules, path)
+    test_the_flood_barrier_row(rules, path)
+    test_the_trader_row(rules, path)
+    test_the_ship_purchase(rules, path)
     print("BATTERY OK minor_builds")
     return 0
 

@@ -1,7 +1,6 @@
-'''Seat-surface self-test: the `seat` parameter routes seat 0 to exactly the
-paths the default-arg calls take (bit-identical obs/masks/rewards on twin
-sims), the observation schema is one shape for every seat, and a civ seat
-renders that schema from its OWN state.'''
+'''Seat-surface self-test: every call names its seat, the observation schema
+is one shape for every seat, a seat's masks drive legal control, and a civ
+seat renders that schema from its OWN state.'''
 
 from __future__ import annotations
 
@@ -21,24 +20,17 @@ def main() -> None:
     paths = fixture_paths()[:4]
     fixtures = [load_fixture(p) for p in paths]
     a = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
-    b = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
-    oa = a.reset()
-    ob = b.reset()
-    assert torch.equal(oa, ob), "reset obs must match across twin envs"
-    for t in range(30):
-        ma = a.masks()
-        mb = b.masks(seat=0)
-        for k in ma:
-            assert torch.equal(ma[k], mb[k]), f"mask {k} differs at t{t}"
-        assert torch.equal(a.unit_features(), b.unit_features(seat=0)), f"unit features differ at t{t}"
-        oa, ra, da = a.step()
-        ob, rb, db = b.step(seat=0)
-        assert torch.equal(oa, ob) and torch.equal(ra, rb) and da == db, f"step outputs differ at t{t}"
-    # seat 1 renders the SAME schema from civ tensors, its masks drive legal
-    # control, and civ-score rewards flow
-    o1 = a.observe(seat=1)
-    assert o1.shape == oa.shape, "seat-1 obs must match the seat-0 schema"
-    assert not torch.isnan(o1).any()
+    a.reset()
+    for _ in range(30):
+        a.step(seat=0)
+    # every seat renders the SAME schema from its own row, and its unit
+    # features are finite
+    oa = a.observe(0)
+    for row in range(a.sim.n_majors):
+        o = a.observe(row)
+        assert o.shape == oa.shape, f"seat-{row} obs must match the one schema"
+        assert not torch.isnan(o).any() and not torch.isnan(a.unit_features(row)).any()
+    # seat 1's masks drive legal control, and civ-score rewards flow
     g = torch.Generator().manual_seed(3)
     for _ in range(20):
         m = a.masks(seat=1)

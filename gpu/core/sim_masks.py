@@ -1709,17 +1709,19 @@ class SimMasks:
         return base + home.long() * self._inquisitor_home_strength
 
     def _trade_water_level(self, row: int) -> torch.Tensor:
-        """[B] long — how far out to sea this seat's Traders may go
-        (`tradeWaterLevel`). CIV6: "The Celestial Navigation technology is
-        required to move on Coast tiles. The Cartography technology is required
-        to move on Ocean tiles."
+        """[B] long — how far out to sea this row's Traders may go
+        (`tradeWaterLevel`), off its holder's own research — a major's or a
+        city-state's. CIV6: "The Celestial Navigation technology is required to
+        move on Coast tiles. The Cartography technology is required to move on
+        Ocean tiles."
         """
         B, dev = self.B, self.device
         out = torch.zeros(B, dtype=torch.long, device=dev)
         if self._celestial_tech < 0:
             return out
-        celnav = self.civ_techs[:, row, self._celestial_tech]
-        carto = (self.civ_techs[:, row, self._cartography_tech]
+        techs = self._seat_techs(row)
+        celnav = techs[:, self._celestial_tech]
+        carto = (techs[:, self._cartography_tech]
                  if self._cartography_tech >= 0 else torch.zeros_like(celnav))
         return torch.where(celnav, torch.where(carto, out + 2, out + 1), out)
 
@@ -2433,18 +2435,6 @@ class SimMasks:
                     continue
                 self.seat_explored[sel, o] |= dsk & ok.unsqueeze(1)
 
-    def _repool_unit(self, rows: torch.Tensor, slots: torch.Tensor) -> None:
-        """Recompute one unit's MOVEMENT pool after a mark that changes it.
-
-        `_spawn_unit` prices the pool at birth, so a flag written AFTER the
-        spawn leaves the unit short until the next refresh — the shape of.
-        The levy is the one caller."""
-        if rows.numel() == 0:
-            return
-        full = self._full_mp("major")
-        self.major_unit_mp[rows, slots] = full[rows, slots]
-        self.major_unit_mp_full[rows, slots] = full[rows, slots]
-
     def _portal_plane(self) -> torch.Tensor:
         """[B, T] bool — `portalAt`: a MOUNTAIN_PORTAL row (the Tunnel,
         Qhapaq Ñan) stands here."""
@@ -2564,6 +2554,8 @@ class SimMasks:
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1
         getattr(self, f"{pre}_unit_patrol")[rows, slot] = -1  # born stationed
         getattr(self, f"{pre}_unit_free_city")[rows, slot] = -1  # no Free City's grant
+        getattr(self, f"{pre}_unit_levied")[rows, slot] = False  # no one's levy
+        getattr(self, f"{pre}_unit_levy_src")[rows, slot] = -1
         getattr(self, f"{pre}_unit_no_res_upkeep")[rows, slot] = False  # no Meteor Site's grant
         # CIV6 (Embrasure): "Military units trained in this city start with a
         # free promotion" — a unit that owes no XP for its first level, which
@@ -3093,17 +3085,18 @@ class SimMasks:
             _s = int(seat[b])
             if 0 <= _s < self.n_majors:
                 self.civ_treasury[b, _s] += float(reward)
-            elif _s == FREE_SEAT:
-                self.free_treasury[b] += float(reward)
-            elif 100 <= _s < 100 + self.citystate_treasury.shape[1]:
-                self.citystate_treasury[b, _s - 100] += float(reward)
                 # CIV6 (Epic Quest): "Receive a Tribal Village reward each time
-                # you capture a barbarian outpost" — the install maps the camp
-                # to a goody hut, so it is the SAME draw (`_camp_goody_rows`)
+                # you capture a barbarian outpost" — a civilization's trait,
+                # so a major's clear alone; the install maps the camp to a
+                # goody hut, so it is the SAME draw (`_camp_goody_rows`)
                 if any(bool(self._row_is(_s, _cc, _cl)[b]) for _cc, _cl in self._camp_goody_rows):
                     _one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                     _one[b] = True
                     self._draw_and_pay_goody(_one, b, _s, int(tile[b]))
+            elif _s == FREE_SEAT:
+                self.free_treasury[b] += float(reward)
+            elif 100 <= _s < 100 + self.citystate_treasury.shape[1]:
+                self.citystate_treasury[b, _s - 100] += float(reward)
 
 
     def _type_civic_slot_ok(self, row: int, per_city: bool) -> torch.Tensor:

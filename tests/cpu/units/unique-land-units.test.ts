@@ -353,10 +353,10 @@ describe('the leader units', () => {
     expect(chassisAbilityCS(state, b, b.tileIndex)).toBe(0);
     const w1 = put(state, 'WARRIOR', 7, 6);
     expect(chassisAbilityCS(state, b, b.tileIndex)).toBe(0); // a plain neighbour is no levy
-    w1.levied = true;
+    w1.leviedFrom = 100;
     expect(chassisAbilityCS(state, b, b.tileIndex)).toBe(3);
     const w2 = put(state, 'WARRIOR', 5, 6);
-    w2.levied = true;
+    w2.leviedFrom = 100;
     expect(chassisAbilityCS(state, b, b.tileIndex)).toBe(6);
   });
 });

@@ -1,7 +1,8 @@
 /**
  * Trade routes. Domestic routes pay the origin food + production based on
  * the destination's development (Civ 6's domestic-route feel); routes to
- * met city-states pay gold plus the city-state's specialty yield.
+ * met city-states pay gold plus the city-state's specialty yield. A
+ * city-state runs routes too, from its one city (`minorTrade`).
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
@@ -18,14 +19,14 @@ import { TRADE_ROAD_MAX_STEPS } from '../data/constants';
 import { civEraIndex } from './city';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
-import { cityStateTradeCapacityBonus, hasMet, isSuzerain, suzerainEffect } from './cityStates';
+import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect } from './cityStates';
 import { cityImprovedResourceKinds, completedDistrictCount } from './yields';
 import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
-import { goldenDedication } from './eras';
+import { dedicationEvent, goldenDedication } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
 import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
@@ -407,6 +408,22 @@ export function routeDestCenter(state: GameState, owner: Seat, r: TradeRoute): n
   return owner.cities.find((c) => c.id === r.to)?.centerIndex ?? -1;
 }
 
+/** The cities a seat's routes leave from: a major's own, or a city-state's
+ *  one city (`minorCity`, id -1 — the `from` its routes carry). */
+export function routeCities(state: GameState, seat: number): City[] {
+  if (isCityStateSeat(seat)) {
+    const cs = seatOf(state, seat) as CityState | undefined;
+    return cs ? [minorCity(cs)] : [];
+  }
+  return citiesOf(state, seat);
+}
+
+/** The CURRENT centre tile a route leaves from — -1 once its origin city is
+ *  gone. */
+export function routeOriginCenter(state: GameState, owner: Seat, r: TradeRoute): number {
+  return routeCities(state, owner.seat).find((c) => c.id === r.from)?.centerIndex ?? -1;
+}
+
 /** Cancel this seat's routes that `hit` names; each hands its Trader back at
  * the origin (a cancel is not a plunder — the unit survives). */
 export function cancelRoutes(state: GameState, seat: number, hit: (r: TradeRoute) => boolean): void {
@@ -416,8 +433,8 @@ export function cancelRoutes(state: GameState, seat: number, hit: (r: TradeRoute
   if (!cut.length) return;
   if (state.unitsMode) {
     for (const r of cut) {
-      const oc = s.cities.find((c) => c.id === r.from);
-      if (oc) spawnUnit(state, 'TRADER', oc.centerIndex, seat);
+      const oc = routeOriginCenter(state, s, r);
+      if (oc >= 0) spawnUnit(state, 'TRADER', oc, seat);
     }
   }
   s.tradeRoutes = s.tradeRoutes.filter((r) => !cut.includes(r));
@@ -435,7 +452,7 @@ export function tradeCapacity(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   let cap = 0;
   if (s?.research.civics.includes('FOREIGN_TRADE')) cap += 1;
-  for (const c of citiesOf(state, seat)) {
+  for (const c of routeCities(state, seat)) {
     if (c.buildings.includes('MARKET') || c.buildings.includes('LIGHTHOUSE')) cap += 1;
     for (const w of c.wonders ?? []) {
       if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
@@ -684,11 +701,43 @@ export function incomingAllyRouteYields(state: GameState, city: City): Yields {
   return out;
 }
 
+/**
+ * What ONE city-state route pays its sender: the destination's own rows —
+ * a city-state's flat Gold and specialty (`cityStateRouteYields`, Sovereignty's
+ * multiplier on its type), a major's city the international column of
+ * `District_TradeRouteYields` over its completed districts. Every other route
+ * adder is a civilization's own (a leader's, a government's, a suzerain's, a
+ * Great Person's, a Trading Post's), and a city-state holds none; the rows a
+ * destination pays its senders (University of Sankore, a Great Merchant's
+ * foreign-route Gold, Trade Policy) name other civilizations' routes, and so
+ * do the rows that pay a city for the routes it receives (`incomingRoutes`) —
+ * this engine reads a city-state as no civilization there. Null where the
+ * destination is gone.
+ */
+export function minorRouteYields(state: GameState, r: TradeRoute): Yields | null {
+  if (r.toCs !== undefined) {
+    const dest = state.cityStates.find((c) => c.id === r.toCs);
+    return dest ? cityStateRouteYields(dest, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(dest.type))) : null;
+  }
+  const civCity = seatOf(state, r.toSeat ?? NO_SEAT)?.cities.find((c) => c.id === r.toSeatCity);
+  return civCity ? districtRouteYields(state, civCity, 'international') : null;
+}
+
 /** `routeGold` is CARAVANSARIES' "+2 Gold from all Trade Routes" — the
  *  seat's own modifier, passed in because the yield walk already holds it. */
 export function cityTradeYields(state: GameState, city: City, routeGold: number): Yields {
   const seat = city.seat;
   const out = emptyYields();
+  if (isCityStateSeat(seat)) {
+    // a city-state's one city: Democracy's destination half of a suzerain's
+    // route in, then its own routes out
+    addYields(out, incomingAllyRouteYields(state, city));
+    for (const r of seatOf(state, seat)?.tradeRoutes ?? []) {
+      const y = minorRouteYields(state, r);
+      if (y) addYields(out, y);
+    }
+    return out;
+  }
   // CIV6 (Mediterranean's Bride): "+2 Gold for Egypt" on every other
   // civilization's route INTO this city.
   if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INCOMING_ROUTE_GOLD * incomingIntlRoutes(state, city);
@@ -976,6 +1025,155 @@ export function addIntlTradeRoute(state: GameState, from: number, toSeat: number
     { from, to: -1, toSeat, toSeatCity: seatCity },
   );
   return { ok: true };
+}
+
+/**
+ * THE WALK and PLUNDER of one holder's routes — a major's or a city-state's.
+ *
+ * THE WALK: each route's Trader advances one descent step toward its leg
+ * target, laying road as it goes; it turns around at the destination and
+ * starts a fresh round trip at home. (The two legs may descend different
+ * lines — the descent is greedy per step, not a stored path — so the return
+ * can lay a second road line.)
+ *
+ * PLUNDER, real Civ 6: a unit hostile to the route's owner standing on the
+ * Trader's tile destroys the route AND its Trader, and the raider's seat
+ * banks the gold — a major, or a city-state into its own treasury.
+ */
+export function tradeRouteWalk(state: GameState, actor: Seat): void {
+  const routes = (actor.tradeRoutes ??= []);
+  const water = tradeWaterLevel(state, actor.seat);
+  for (const r of routes) {
+    if ((r.walkLeg ?? -1) < 0 || r.walkTile === undefined) continue;
+    const originC = routeOriginCenter(state, actor, r);
+    const destC = routeDestCenter(state, actor, r);
+    if (originC < 0 || destC < 0) continue;
+    const target = r.walkLeg === 0 ? destC : originC;
+    const next = tradeWalkStep(state, r.walkTile, target, water);
+    if (next !== r.walkTile) {
+      r.walkTile = next;
+      // roads go on passable LAND only — a sea leg lays nothing, and
+      // neither does a portal's mountain
+      if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) state.map.tiles[next].road = true;
+      claimTileEnRoute(state, actor.seat, next);
+    }
+    if (r.walkLeg === 0 && r.walkTile === destC) r.walkLeg = 1;
+    else if (r.walkLeg === 1 && r.walkTile === originC) r.walkLeg = 0;
+  }
+  const plundered = new Set<TradeRoute>();
+  for (const r of routes) {
+    const raider = r.walkTile === undefined ? null : routePlunderer(state, r.walkTile, actor.seat);
+    if (raider === null) continue;
+    plundered.add(r);
+    const rs = seatOf(state, raider);
+    if (rs) rs.treasury += routePlunderGold(state, raider, r.walkTile!);
+  }
+  if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
+}
+
+/**
+ * THE ROUND-TRIP EXPIRY of one holder's routes. Completion is the minimum
+ * term running out WITH the Trader home (a parked sea walker is always home,
+ * a stuck one ends at the rail); a route whose destination city is gone ends
+ * too. A route that ENDS hands its Trader back at the origin; only plunder
+ * destroys the unit.
+ *
+ * CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
+ * successfully complete a Trade Route" — a route cut short (plunder, war, a
+ * dead destination) never scores. CIV6 (Trading Post): "created in a city
+ * when a civilization finishes a Trade Route to that city for the first
+ * time" — and one at home, "in the origin and destination cities". Only a
+ * FULL term stamps. Both are a civilization's: a city-state holds no
+ * dedication and plants no post.
+ */
+export function tradeRouteExpiry(state: GameState, actor: Seat): void {
+  const cur = actor.tradeRoutes ?? [];
+  const isDone = (x: TradeRoute): boolean => {
+    if (x.expiresTurn === undefined || state.turn < x.expiresTurn) return false;
+    if ((x.walkLeg ?? -1) < 0) return true;
+    if (state.turn >= x.expiresTurn + TRADE_WALK_EXPIRY_RAIL) return true;
+    return x.walkTile === routeOriginCenter(state, actor, x);
+  };
+  const destGone = (x: TradeRoute): boolean =>
+    x.toSeatCity !== undefined && !(seatOf(state, x.toSeat ?? NO_SEAT)?.cities ?? []).some((c) => c.id === x.toSeatCity);
+  const done = cur.filter((x) => isDone(x));
+  if (done.length > 0 && !isCityStateSeat(actor.seat)) {
+    dedicationEvent(state, actor.seat, DED_COINAGE, done.length);
+    for (const r of done) {
+      stampTradingPost(actor, routeOriginCenter(state, actor, r));
+      stampTradingPost(actor, routeDestCenter(state, actor, r));
+    }
+  }
+  const ended = cur.filter((x) => isDone(x) || destGone(x));
+  if (ended.length > 0) {
+    if (state.unitsMode) {
+      for (const r of ended) {
+        const oc = routeOriginCenter(state, actor, r);
+        if (oc >= 0) spawnUnit(state, 'TRADER', oc, actor.seat);
+      }
+    }
+    actor.tradeRoutes = cur.filter((x) => !ended.includes(x));
+  }
+}
+
+/**
+ * THE CITY-STATE'S ROUTE: where its free Trader goes. The census records
+ * no destination, so the engine's own route scorer picks (`routeCandidateRow`'s
+ * key): the new in-range destination whose route pays the most, its yields
+ * summed (`minorRouteYields`) — the other city-states in id order, then every
+ * major's cities in seat and array order, strictly-greater beats, so ties
+ * keep the first. A minor has no fog, meets no one and holds no Trading
+ * Post, so the gates are the range (one leg, `routeInRange`), a route not
+ * already running, no war with the destination's holder, and Trade Policy's
+ * ban on a banned major. Null = none.
+ */
+export function minorRouteCandidate(state: GameState, cityState: CityState): TradeRoute | null {
+  const routes = cityState.tradeRoutes ?? [];
+  const from = cityState.centerIndex;
+  const cands: TradeRoute[] = [];
+  for (const dest of [...state.cityStates].sort((a, b) => a.id - b.id)) {
+    if (dest.id === cityState.id || routes.some((x) => x.toCs === dest.id)) continue;
+    if (!routeInRange(state, cityState.seat, from, dest.centerIndex)) continue;
+    cands.push({ from: -1, to: -1, toCs: dest.id });
+  }
+  for (const other of state.seats) {
+    if (civsAtWar(state, cityState.seat, other.seat) || congressIntlBanned(state, other.seat)) continue;
+    for (const pc of other.cities) {
+      if (routes.some((x) => x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
+      if (!routeInRange(state, cityState.seat, from, pc.centerIndex)) continue;
+      cands.push({ from: -1, to: -1, toSeat: other.seat, toSeatCity: pc.id });
+    }
+  }
+  let best: TradeRoute | null = null;
+  let bestSum = -1;
+  for (const r of cands) {
+    const y = minorRouteYields(state, r)!;
+    const ySum = y.food + y.production + y.gold + y.science + y.culture + y.faith;
+    if (best === null || ySum > bestSum) {
+      best = r;
+      bestSum = ySum;
+    }
+  }
+  return best;
+}
+
+/**
+ * THE CITY-STATE'S TRADE TURN (`minorPhase`): its routes walk and meet their
+ * raiders; a free Trader under its trade capacity takes the scorer's
+ * destination (`minorRouteCandidate`) and is spent on it; then the round
+ * trips that are done end.
+ */
+export function minorTrade(state: GameState, cityState: CityState): void {
+  tradeRouteWalk(state, cityState);
+  const routes = cityState.tradeRoutes ?? [];
+  if (routes.length < tradeCapacity(state, cityState.seat) && freeTrader(state, cityState.seat)) {
+    const r = minorRouteCandidate(state, cityState);
+    if (r) {
+      const dest = routeDestCenter(state, cityState, r);
+      commitRoute(state, cityState.seat, cityState.centerIndex, dest, r);
+    }
+  }
+  tradeRouteExpiry(state, cityState);
 }
 
 /** TRADE POLICY outcome B ends the routes it forbids the moment it passes —

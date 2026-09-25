@@ -668,18 +668,6 @@ export function canalPassageOk(map: GameMap, tile: Tile): boolean {
   return false;
 }
 
-export function canPlaceDistrict(
-  state: GameState,
-  city: City,
-  type: DistrictId,
-  tileIndex: number,
-): RuleResult {
-  return canPlaceDistrictIn(state, city, type, tileIndex, {
-    unlocks: gates(state, city.seat),
-    ownsTile: (t) => tileBelongsTo(t, city),
-  });
-}
-
 /** The walls LEVEL this city has BUILT — Ancient 1, Medieval 2, Renaissance
  *  3, and 0 with none. `wallsTier` is the DEFENCE tier, which Urban Defenses
  *  raises without a wall standing; a housing or yield term wants this one. */

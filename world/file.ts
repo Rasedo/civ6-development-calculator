@@ -22,7 +22,6 @@ interface WorldUnit {
 
 export interface WorldCiv {
   leader: number;
-  aggression: number;
   units: WorldUnit[];
 }
 

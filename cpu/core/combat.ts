@@ -216,7 +216,7 @@ export function chassisAbilityCS(
   if (def.adjacentLeviedCS) {
     for (const n of neighbors(state.map, tile)) {
       for (const o of state.units) {
-        if (o.tileIndex === n.index && o.seat === u.seat && o.levied && o.hp > 0) out += def.adjacentLeviedCS;
+        if (o.tileIndex === n.index && o.seat === u.seat && o.leviedFrom !== undefined && o.hp > 0) out += def.adjacentLeviedCS;
       }
     }
   }
@@ -1166,7 +1166,7 @@ export function captureRoll(state: GameState, strengthDiff: number, t = -1): boo
  * "when attacking" (Holy Roman Emperor, Killer of Cyrus) are display strings
  * the rows outrank.
  */
-export function rosterCS(state: GameState, own: { type: string; seat: number; tileIndex: number; embarked?: boolean; formation?: number; levied?: boolean },
+export function rosterCS(state: GameState, own: { type: string; seat: number; tileIndex: number; embarked?: boolean; formation?: number; leviedFrom?: number },
     foeSeat: number, foeHp: number | null, foeIsCity: boolean): number {
   if (!isCiv(own.seat)) return 0;
   const mods = getModifiers(state, own.seat);
@@ -1175,7 +1175,7 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
   // EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER Amount 5. Flat and clause-free —
   // the mark is the whole condition — so it is added here rather than as a
   // `combatCs` row with a `when`.
-  const levyCs = own.levied
+  const levyCs = own.leviedFrom !== undefined
     ? mods.levy.reduce((n, r) => Math.max(n, r.levyCombat), 0) : 0;
   const def = UNITS[own.type];
   if (!def || !(def.combat ?? 0)) return 0;
@@ -2039,6 +2039,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     const csSplit = cityDamageSplit(csOuter, wallsMax(state, csShape), csRoll, cityHitClass(attacker.type, true));
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
     cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre);
+    cityState.lastHitTurn = state.turn;
     warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, cityState.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
@@ -2141,6 +2142,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     const split = cityDamageSplit(csOuter, wallsMax(state, csShape), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
     csHere.hp = Math.max(1, (csHere.hp ?? CITY_STATE_MAX_HP) - split.centre);
+    csHere.lastHitTurn = state.turn;
     warWearinessBattle(state, attacker.seat, seatOfCityState(csHere.id), targetIndex, { city: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, csHere.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
@@ -2480,6 +2482,7 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
     cityHitClass(attacker.type, false), siegeAssist(state, attacker, cityState.centerIndex, csTier));
   if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
   cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre;
+  cityState.lastHitTurn = state.turn;
   // CIV6: barbarians never capture a city — their assault leaves the minor
   // standing at 1 HP, `hostileRangedStrike`'s own city floor.
   if (capsOf(attacker.seat).alwaysHostile) cityState.hp = Math.max(1, cityState.hp);
@@ -2523,7 +2526,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   // an annexed minor was founded by nobody who keeps a ledger
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
   disbandMinorArmy(state, cityState);
-  for (const sx of state.seats) {
+  for (const sx of [...state.seats, ...state.cityStates]) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }
   const center = state.map.tiles[cityState.centerIndex];
@@ -2585,7 +2588,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   grievanceCityStateTaken(state, actor.seat, actor.cities.length >= MAX_CITIES_PER_SEAT);
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
   disbandMinorArmy(state, cityState);
-  for (const sx of state.seats) {
+  for (const sx of [...state.seats, ...state.cityStates]) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }
   const center = state.map.tiles[cityState.centerIndex];

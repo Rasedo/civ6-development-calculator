@@ -61,9 +61,7 @@ export function loadWorld(world: WorldFile): GameState {
   }
   const map: GameMap = { width: m.width, height: m.height, seed: world.gen.seed, tiles };
 
-  const state = createGameFromMap(map, false, true);
-  state.disasters = true;
-  state.rngState = world.rngInit >>> 0;
+  const state = createGameFromMap(map, world.rngInit);
 
   // the exporter's MAX, not the placed count: placement drops a city-state it
   // cannot site, and the id space stays the width the GPU allocates.
@@ -77,10 +75,10 @@ export function loadWorld(world: WorldFile): GameState {
 
   world.civs.forEach((civ, i) => {
     const leader = CIV_LEADERS[civ.leader % CIV_LEADERS.length];
-    const seat = state.seats[i] ?? (state.seats[i] = emptySeat(i));
+    const seat = emptySeat(i);
+    state.seats.push(seat);
     seat.name = leader.name;
     seat.color = leader.color;
-    seat.aggression = civ.aggression;
     seat.civ = civ.leader % CIV_LEADERS.length;
     // CIV6 (Mana): "Begin the game with the Sailing and Shipbuilding
     // technologies unlocked" (`START_TECH_ROWS`)

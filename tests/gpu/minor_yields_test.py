@@ -16,10 +16,9 @@ takes no decision), so these scenes are the whole evidence:
      Science, the civic pot by the Culture and the build pot by the
      Production; Gold banks in `citystate_treasury` less its units' upkeep,
      stopping at 0, and Faith in `citystate_faith`
-  3. a unit levied from a minor holding a Barracks carries its +25% training
-     experience, and a pillaged Barracks pays none
-  4. power: nothing the minor's build table raises draws or supplies Power — the
-     grid has no minor arm because it would compute zero
+  3. its grid (`_minor_power`): a Factory with nothing to feed it stays dark,
+     a Solar Farm on the minor's own ground lights it, and the lit Factory pays
+     its powered Production
 """
 
 from __future__ import annotations
@@ -151,58 +150,35 @@ def test_clock(rules, path) -> None:
     print(f"  2 clock OK — {tot[3]:.2f} Science, {tot[4]:.2f} Culture, {tot[1]:.2f} Production a turn")
 
 
-def test_levy_xp(rules, path) -> None:
+def test_power(rules, path) -> None:
     sim = fresh(rules, path)
-    mil_idx = int(sim.rules.citystate.get("militaristicIdx", -1))
-    assert mil_idx >= 0 and sim._encamp_didx >= 0
     s = a_minor(sim)
     row = sim._CITY_MINOR0 + s
-    bar = BLD.index("BARRACKS")
-    pct = int(sim.rules_dev.b_train_xp_pct[bar])
-    assert pct == 25, f"the Barracks row reads {pct}%"
-    give_minor_district(sim, s, sim._encamp_didx)
-    sim.city_bldg[B0, row, 0, bar] = True
+    ws, fac = BLD.index("WORKSHOP"), BLD.index("FACTORY")
+    sim._minor_power(s)
+    assert not bool(sim.city_powered[B0, row, 0]), "a minor with no load is lit"
+    iz = give_minor_district(sim, s, sim._iz_idx)
+    sim.city_bldg[B0, row, 0, ws] = True
+    sim.city_bldg[B0, row, 0, fac] = True
     sim._bldg_version += 1
     sim._eff_version += 1
-    sim.citystate_type[B0, s] = mil_idx
-    suz_min = int(sim.rules.citystate.get("suzerainEnvoys", 3))
-    sim.seat_citystate_envoys[B0, :, s] = 0
-    sim.seat_citystate_envoys[B0, 0, s] = suz_min
-    sim.citystate_last_levy[B0, s] = -10_000
-    sim.civ_treasury[B0, 0] = 100_000.0
-    assert bool(sim._suzerain_mask(0)[B0, s])
-    active = torch.ones(sim.B, dtype=torch.bool)
-
-    def levy() -> list[int]:
-        was = set(sim.major_unit_alive[B0].nonzero().flatten().tolist())
-        sim._stash_buy(0, levy=torch.tensor([s]))
-        sim._seat_buy_ladder(0, active, sim._seat_army_count(0))
-        got = sorted(set(sim.major_unit_alive[B0].nonzero().flatten().tolist()) - was)
-        assert got, "the levy spawned nobody"
-        return got
-
-    for slot in levy():
-        assert int(sim.major_unit_xp_pct[B0, slot]) == pct, "the levied unit carries no Barracks experience"
-        assert bool(sim.major_unit_levied[B0, slot])
-    # a pillaged Barracks trains nobody
-    sim.city_bldg_pillaged[B0, row, 0, bar] = True
+    sim._minor_power(s)
+    assert not bool(sim.city_powered[B0, row, 0]), "a Factory with no supply is lit"
+    dark = walk(sim, row)[1]
+    solar = next(i for i, x in enumerate(RULES["improvements"]["ids"] if isinstance(RULES["improvements"], dict)
+                                         else [r["id"] for r in RULES["improvements"]]) if x == "SOLAR_FARM")
+    ctr = int(sim.citystate_center[B0, s])
+    plot = next(t for t in range(sim.T)
+                if int(sim.tile_seat[B0, t]) == 100 + s and t not in (ctr, iz) and int(sim.district[B0, t]) < 0
+                and bool(sim.passable[B0, t]))
+    sim.improvement[B0, plot] = solar
     sim._eff_version += 1
-    sim.citystate_last_levy[B0, s] = -10_000
-    for slot in levy():
-        assert int(sim.major_unit_xp_pct[B0, slot]) == 0, "a pillaged Barracks still trained the levy"
-    print(f"  3 levy OK — +{pct}% from the minor's Barracks, none once it is pillaged")
-
-
-def test_power_vacuous() -> None:
-    cs = RULES["cityState"]
-    kinds = cs["buildKinds"]
-    items = {int(i) for r in cs["buildRows"] if kinds[int(r["k"])] == "building" for i in r["item"] if int(i) >= 0}
-    assert items, "the build table names no building"
-    for bi in sorted(items):
-        b = RULES["buildings"][bi]
-        assert "power" in b and "powerSupply" in b, f"{b['id']}: the wire dropped its power columns"
-        assert int(b["power"]) == 0 and int(b["powerSupply"]) == 0, f"{b['id']} draws or supplies Power"
-    print("  4 power OK — nothing the minor's build table raises draws or supplies Power")
+    sim._minor_power(s)
+    assert bool(sim.city_powered[B0, row, 0]), "a Solar Farm on the minor's ground does not light its Factory"
+    sim._eff_version += 1
+    lit = walk(sim, row)[1]
+    assert lit > dark, f"the lit Factory pays no more Production ({dark} -> {lit})"
+    print(f"  3 grid OK — the Factory dark, then lit by a Solar Farm ({dark:.2f} -> {lit:.2f} Production)")
 
 
 def main() -> None:
@@ -210,8 +186,7 @@ def main() -> None:
     path = fixture_paths()[0]
     test_walk(rules, path)
     test_clock(rules, path)
-    test_levy_xp(rules, path)
-    test_power_vacuous()
+    test_power(rules, path)
     print("BATTERY OK minor_yields")
 
 

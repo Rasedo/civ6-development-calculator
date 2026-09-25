@@ -281,6 +281,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('TechnologyPrereqs', 'Technology=TECH_REPLACEABLE_PARTS&PrereqTech=TECH_ECONOMICS', 'PrereqTech', { expect: 'TECH_ECONOMICS' }),
     'effects.1.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_REPLACEABLE_PARTS', 'ImprovementType', { expect: 'IMPROVEMENT_PASTURE' }),
     'effects.1.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_REPLACEABLE_PARTS', 'BonusYieldChange'),
+    'effects.2.building': xml('Buildings', 'BuildingType=BUILDING_FOOD_MARKET', 'PrereqTech', { expect: 'TECH_REPLACEABLE_PARTS' }),
   },
   IRON_WORKING: {
     era: xml('Technologies', 'TechnologyType=TECH_IRON_WORKING', 'EraType', { expect: 'ERA_CLASSICAL' }),
@@ -672,6 +673,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'farmAdjacency' },
       // Improvement_BonusYieldChanges row 232.
       { kind: 'improvementYields', improvement: 'PASTURE', yields: { production: 1 } },
+      { kind: 'unlockBuilding', building: 'FOOD_MARKET' },
     ]),
 
     T('IRON_WORKING', 'Iron Working', 'Classical', 120, ['BRONZE_WORKING']),

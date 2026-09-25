@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { seatOf } from '../../../cpu/core/seats';
-import { createGame, endTurn } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { endTurn } from '../../../cpu/core/game';
+import { seededGame } from '../helpers';
 
 // religious victory (predominance in EVERY alive civ, >half of each
 // civ's cities). Gate-unreachable at 250t on the current seeds (ambient +1
@@ -11,12 +11,7 @@ import { settleFirstCity } from '../helpers';
 // the not-every-civ refusal, and the cityless-civ exclusion.
 
 function newGame(opponents = 1) {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: false,
-    withVillages: false, cityStates: 0, opponents,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 1 + opponents);
   state.autoResearch = false;
   return state;
 }

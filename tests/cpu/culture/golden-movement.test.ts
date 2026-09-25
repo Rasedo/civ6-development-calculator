@@ -2,8 +2,8 @@ import { seatOf } from '../../../cpu/core/seats';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT } from '../../../cpu/core/seats';
-import { createGame, endTurn } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { endTurn } from '../../../cpu/core/game';
+import { seededGame } from '../helpers';
 import { spawnUnit, refreshUnits, unitFullMoves } from '../../../cpu/core/units';
 import { GOLDEN_MOVE_BONUS, DED_MONUMENTALITY, DED_EXODUS, DED_FREE_INQUIRY } from '../../../cpu/data/seats';
 import { goldenBoostBonus } from '../../../cpu/core/eras';
@@ -30,12 +30,7 @@ import type { GameState, Unit } from '../../../cpu/core/types';
 // everyone +2.
 
 function newGame(): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 0, opponents: 1,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 2);
   state.autoResearch = false;
   return state;
 }

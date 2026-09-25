@@ -3,9 +3,8 @@ import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions'
 
 const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 import { describe, it, expect } from 'vitest';
-import { createGame } from '../../../cpu/core/game';
 import { applySeatUnitOrders } from '../../../cpu/core/phase';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import { spawnUnit } from '../../../cpu/core/units';
 import type { GameState, Seat } from '../../../cpu/core/types';
 import { SPREAD_PRESSURE } from '../../../cpu/data/religion';
@@ -16,12 +15,7 @@ import { SPREAD_PRESSURE } from '../../../cpu/data/religion';
 // semantics: the faith-block missionary branch.
 
 function newGame(opponents = 1): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: false,
-    withVillages: false, cityStates: 0, opponents,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 1 + opponents);
   state.autoResearch = false;
   return state;
 }
@@ -44,6 +38,7 @@ describe('civ missionary chassis', () => {
       target.followedReligion = 0; // != g (1)
       target.religionPressure = [0, 0];
       const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, civSeat.seat)!;
+      u.tileIndex = target.centerIndex; // onto the centre its garrison holds
       u.charges = 2;
       const uid = u.id;
       spreadHere(state, civSeat, uid);
@@ -61,6 +56,7 @@ describe('civ missionary chassis', () => {
       target.followedReligion = 0;
       target.religionPressure = [0, 0];
       const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, civSeat.seat)!;
+      u.tileIndex = target.centerIndex; // onto the centre its garrison holds
       u.charges = 1;
       const uid = u.id;
       spreadHere(state, civSeat, uid);

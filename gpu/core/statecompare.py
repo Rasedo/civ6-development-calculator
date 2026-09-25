@@ -524,7 +524,10 @@ def _routes_of(sim, b: int, seat: int) -> list[int]:
         else:
             kind = 2
             dest = _centre_of(sim, b, d_seat, d_city) if d_seat >= 0 else -1
-        out.append([_centre_of(sim, b, row, frm), dest, kind, int(ex[k]), int(bo[k]),
+        # a city-state's routes leave its one city, origin code 0
+        org = (int(sim.citystate_center[b, row - sim._CITY_MINOR0])
+               if sim._CITY_MINOR0 <= row < sim.FREE_ROW else _centre_of(sim, b, row, frm))
+        out.append([org, dest, kind, int(ex[k]), int(bo[k]),
                     int(wk[k]), int(lg[k])] + [int(x) for x in ch[k]])
     out.sort()
     return [x for t in out for x in t]
@@ -725,7 +728,13 @@ CITY_STATE = {
     "minorOuterHp": lambda sim, b, rows: [int(sim.city_outer_hp[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "religionPressure": lambda sim, b, rows: [
         [int(sim.city_pressure[b, sim._CITY_MINOR0 + s, 0, c]) for c in _civ_seats(sim)] for s in rows],
-    "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],
+    "levySeat": lambda sim, b, rows: [int(sim._ROW_SEAT[int(sim.citystate_levy_seat[b, s])])
+                                      if int(sim.citystate_levy_seat[b, s]) >= 0 else -1 for s in rows],
+    "levyEnds": lambda sim, b, rows: [int(sim.citystate_levy_ends[b, s]) for s in rows],
+    "minorLastHit": lambda sim, b, rows: [int(sim.city_last_hit[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
+    "minorPowered": lambda sim, b, rows: [1 if bool(sim.city_powered[b, sim._CITY_MINOR0 + s, 0]) else 0
+                                          for s in rows],
+    "minorRoutes": lambda sim, b, rows: [_routes_of(sim, b, 100 + s) for s in rows],
     "minorBuildFrom": lambda sim, b, rows: [[int(x) for x in sim.citystate_build_from[b, s].tolist()] for s in rows],
     "minorArmyCap": lambda sim, b, rows: [int(sim.citystate_army_cap[b, s]) for s in rows],
     "minorBuilderBuyRate": lambda sim, b, rows: [int(sim.citystate_builder_buy[b, s]) for s in rows],
@@ -754,17 +763,6 @@ def _cty(plane: str):
         t = getattr(sim, plane)[b].tolist()
         return [t[c][s] for c, s in rows]
     return get
-
-
-def _item_bank(sim, b, c, s):
-    """the per-item hammer ledger, [column, amount] pairs sorted by column —
-    the order the TS extractor emits after mapping its keys."""
-    ks = sim.city_item_bank[b, c, s].tolist()
-    vs = sim.city_item_amt[b, c, s].tolist()
-    out: list[float] = []
-    for k, v in sorted((int(k), float(v)) for k, v in zip(ks, vs) if k >= 0 and v > 0):
-        out.extend([float(k), v])
-    return out
 
 
 def _queue_cost(sim, b, rows):
@@ -863,7 +861,6 @@ CITY = {
     ],
     "queueProgress": _cty("city_progress"),
     "queueCost": _queue_cost,
-    "itemBank": lambda sim, b, rows: [_item_bank(sim, b, c, s) for c, s in rows],
     "followedReligion": _cty("city_followed"),
     "religionPressure": lambda sim, b, rows: [
         [int(x) for x in sim.city_pressure[b, c, s].tolist()] for c, s in rows
@@ -912,7 +909,7 @@ UNIT = {
     "bandAlbum": _unit("unit_band_album"),
     "gpAt": _unit("unit_gp_at"),
     "revealedTurn": _unit("unit_revealed_turn"),
-    "levied": _unit("unit_levied"),
+    "levied": _unit("unit_levy_src"),
     "formation": _unit("unit_formation"),
         "escorted": _unit("unit_escorted"),
     "patrol": _unit("unit_patrol"),

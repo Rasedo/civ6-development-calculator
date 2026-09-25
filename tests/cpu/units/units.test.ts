@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords, orderUnit } from '../helpers';
+import { makeMap, makeState, tileAtCoords, orderUnit, stepThrough } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
-import { moveCostInto, crossesRiver, findPath, spawnUnit, builderCost, builderRemoveFeature, tileFreeForUnit, walkPath } from '../../../cpu/core/units';
+import { moveCostInto, crossesRiver, spawnUnit, builderCost, builderRemoveFeature, tileFreeForUnit, stepUnit, unitPassable } from '../../../cpu/core/units';
 import { nextRandom } from '../../../cpu/core/rand';
 import { commitProduction } from '../../../cpu/core/seatTurn';
 import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
@@ -67,7 +67,7 @@ describe('movement', () => {
     expect(moveCostInto(state, from, t)).toBe(RAILROAD_MP);
   });
 
-  it('river crossings end the turn; pathfinding avoids blockers', () => {
+  it('river crossings end the turn; mountains are impassable', () => {
     const { state } = unitsState();
     const from = tileAtCoords(state.map, 8, 8);
     const to = tileAtCoords(state.map, 9, 8);
@@ -76,30 +76,13 @@ describe('movement', () => {
 
     const unit = spawnUnit(state, 'BUILDER', from.index, 0)!;
     unit.tileIndex = from.index; // force exact tile
-    unit.path = findPath(state, unit, to.index);
-    expect(unit.path).not.toBeNull();
-    walkPath(state, unit);
+    stepUnit(state, unit, to);
     expect(unit.tileIndex).toBe(to.index);
     expect(unit.movesLeft).toBe(0); // river ate all MP
 
-    // mountains are impassable to paths
     const blocked = tileAtCoords(state.map, 11, 8);
     blocked.elevation = 'MOUNTAIN';
-    expect(findPath(state, unit, blocked.index)).toBeNull();
-  });
-
-  it('multi-turn moves continue on end turn', () => {
-    const { state } = unitsState();
-    const unit = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 8, 8).index, 0)!;
-    const far = tileAtCoords(state.map, 14, 8);
-    unit.path = findPath(state, unit, far.index);
-    expect(unit.path).not.toBeNull();
-    walkPath(state, unit);
-    expect(unit.tileIndex).not.toBe(far.index); // 2 MP can't get there
-    let guard = 0;
-    while (unit.tileIndex !== far.index && guard++ < 10) endTurn(state);
-    expect(unit.tileIndex).toBe(far.index);
-    expect(unit.path).toBeNull();
+    expect(unitPassable(blocked, unit)).toBe(false);
   });
 
   it('steps need the full MP cost, except one step from full MP', () => {
@@ -115,18 +98,16 @@ describe('movement', () => {
 
     const unit = spawnUnit(state, 'BUILDER', start.index, 0)!;
     unit.tileIndex = start.index; // force exact tile
-    unit.path = [mid.index, hills.index];
-    walkPath(state, unit);
     // 2 points: the flat step costs one (one left); the hills step costs two,
     // more than the one left and the unit is no longer at full — stop.
+    expect(stepUnit(state, unit, mid)).toBe('moved');
+    expect(stepUnit(state, unit, hills)).toBe('cantAfford');
     expect(unit.tileIndex).toBe(mid.index);
     expect(unit.movesLeft).toBe(MP_SCALE);
-    expect(unit.path).toEqual([hills.index]); // path survives for next turn
 
     unit.movesLeft = 2 * MP_SCALE; // fresh turn
-    walkPath(state, unit);
+    stepUnit(state, unit, hills);
     expect(unit.tileIndex).toBe(hills.index);
-    expect(unit.path).toBeNull();
 
     // Full-MP exception: a 5-cost step (hills + woods + river) is still one
     // legal step from full MP, and eats everything.
@@ -134,8 +115,7 @@ describe('movement', () => {
     hills.feature = 'WOODS';
     const back = spawnUnit(state, 'WARRIOR', mid.index, 0)!;
     back.tileIndex = mid.index;
-    back.path = [hills.index];
-    walkPath(state, back);
+    stepUnit(state, back, hills);
     expect(back.tileIndex).toBe(hills.index);
     expect(back.movesLeft).toBe(0);
   });
@@ -163,10 +143,7 @@ describe('builders', () => {
     expect(builder).toBeDefined();
 
     // walk to the farm tile, then build
-    builder.path = findPath(state, builder, farmTile.index);
-    walkPath(state, builder);
-    let g2 = 0;
-    while (builder.tileIndex !== farmTile.index && g2++ < 5) endTurn(state);
+    stepThrough(state, builder, [farmTile.index]);
     builder.movesLeft = Math.max(builder.movesLeft, MP_SCALE); // the order is the next turn's
     orderUnit(state, builder, 'BUILD_FARM');
     expect(farmTile.improvement).toBe('FARM');

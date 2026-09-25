@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { warWearinessBattle, warWearinessTurn, warWearinessPeace, wwGet, wwMax, wwSum, wwEraBase } from '../../../cpu/core/weariness';
 import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, warWearinessPenalty } from '../../../cpu/data/seats';
-import { createGame } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import { seatOf, setTileOwner, setWar, BARB_SEAT, seatOfCityState } from '../../../cpu/core/seats';
 import type { GameState, Seat } from '../../../cpu/core/types';
 
@@ -18,12 +17,7 @@ import type { GameState, Seat } from '../../../cpu/core/types';
 // per-seat path to test separately.
 
 function newGame(opponents = 2): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 4210,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 1, opponents,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4210, 1 + opponents, 1);
   return state;
 }
 

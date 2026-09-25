@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeState, settleAt, tileAtCoords, grantCivics, settleFirstCity } from '../helpers';
-import { createGame } from '../../../cpu/core/game';
+import { seededGame, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { defaultModifiers, getModifiers, governmentUnitCS, governmentXpPct, prodBoostPct } from '../../../cpu/core/effects';
 import { computeHousing, computeCityStats } from '../../../cpu/core/city';
 import { completedDistrictCount } from '../../../cpu/core/yields';
@@ -135,12 +134,7 @@ describe('FASCISM wwCutPct — "War Weariness reduced by 20%"', () => {
       const saved = GOVERNMENTS.FASCISM.effects;
       if (strip) GOVERNMENTS.FASCISM.effects = {};
       try {
-        const state = createGame({
-          width: 44, height: 26, seed: 4210,
-          withResources: true, withWonders: false, unitsMode: true,
-          withVillages: false, cityStates: 1, opponents: 2,
-        });
-        settleFirstCity(state, 0);
+        const state = seededGame(4210, 3, 1);
         adopt(state, 'TOTALITARIANISM');
         const away = state.map.tiles.find((t) => t.terrain !== 'OCEAN' && t.terrain !== 'COAST')!;
         setTileOwner(away, -1, -1);

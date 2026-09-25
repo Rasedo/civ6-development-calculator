@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GAME_SPEED, MP_SCALE, scaleByGameSpeed } from '../../../cpu/data/constants';
-import { createGame, projectCost, TURN_LIMIT } from '../../../cpu/core/game';
+import { projectCost, TURN_LIMIT } from '../../../cpu/core/game';
 import { UNITS } from '../../../cpu/data/units';
 import { PROJECTS } from '../../../cpu/data/projects';
 import { WONDER_ERA_INDEX } from '../../../cpu/data/builtWonders';
@@ -8,7 +8,7 @@ import { GREAT_PEOPLE, GP_CLASSES, GP_ABILITY, gpChargesOf } from '../../../cpu/
 import { activateGreatPerson } from '../../../cpu/core/gpAbility';
 import { spawnUnit } from '../../../cpu/core/units';
 import { setTileOwner, tileSeat } from '../../../cpu/core/seats';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import type { GameState } from '../../../cpu/core/types';
 
 // THE ONLINE SPEED. CIV6 (GameSpeeds.xml, GAMESPEED_ONLINE): CostMultiplier
@@ -35,11 +35,7 @@ describe('the online game speed', () => {
   });
 
   it('prices a district project off its own row: Cost 25 + 1500 x progress', () => {
-    const state = createGame({
-      width: 44, height: 26, seed: 4242, withResources: true, withWonders: false,
-      unitsMode: false, withVillages: false, cityStates: 0, opponents: 0,
-    });
-    settleFirstCity(state, 0);
+    const state = seededGame(4242, 1);
     for (const id of ['RESEARCH_GRANTS', 'FESTIVAL', 'PRAYERS', 'INVESTMENT', 'SHIPPING', 'TRAINING']) {
       expect(PROJECTS[id].cost, id).toBe(scaleByGameSpeed(25));
       expect(PROJECTS[id].costProgressGame, id).toBe(1500);
@@ -58,11 +54,7 @@ describe('the online game speed', () => {
 
 describe('a Great Person grant the install types ScaleByGameSpeed', () => {
   function newGame(): GameState {
-    const state = createGame({
-      width: 44, height: 26, seed: 909, withResources: true, withWonders: false,
-      unitsMode: true, withVillages: false, cityStates: 0, opponents: 1,
-    });
-    settleFirstCity(state, 0);
+    const state = seededGame(909, 2);
     state.autoResearch = false;
     return state;
   }

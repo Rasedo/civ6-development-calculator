@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { generateMap } from '../../../world/mapgen';
-import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
+import { canPlaceDistrict, makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
 import { tileYields, districtAdjacency } from '../../../cpu/core/yields';
 import { isImpassable, naturalWonderAt } from '../../../world/query';
-import { canFoundCity, canPlaceDistrict, validImprovements } from '../../../cpu/core/rules';
+import { canFoundCity, validImprovements } from '../../../cpu/core/rules';
 import { foundCity } from '../../../cpu/core/game';
 import { workableTiles } from '../../../cpu/core/city';
 import { WONDERS } from '../../../world/wonders';

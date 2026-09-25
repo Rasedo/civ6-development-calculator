@@ -523,46 +523,49 @@ def case_faith_unit(sim, base, row: int) -> None:
 # ---------------------------------------------------------------------------
 
 def case_levy(sim, base, row: int) -> None:
-    mil_idx = int(sim.rules.citystate.get("militaristicIdx", -1))
-    if sim.S == 0 or mil_idx < 0:
-        print(f"  row {row}: levy SKIPPED (no militaristic city-states)")
+    if sim.S == 0:
+        print(f"  row {row}: levy SKIPPED (no city-states)")
         return
-    cost = float(sim.rules.citystate.get("levyGoldCost", 120))
-    n_lv = int(sim.rules.citystate.get("levyUnits", 2))
     suz_min = int(sim.rules.citystate.get("suzerainEnvoys", 3))
+
+    def arm(s: int) -> None:
+        sim.seat_citystate_envoys[0, :, s] = 0
+        sim.seat_citystate_envoys[0, row, s] = suz_min
+        for _ in range(2):
+            sim._minor_spawn(s, torch.ones(sim.B, dtype=torch.bool),
+                             torch.full((sim.B,), sim._warrior_idx, dtype=torch.long), grants=False)
 
     sim.restore(base)
     prep(sim, row)
     s = int(sim.citystate_alive[0].long().argmax())
     assert bool(sim.citystate_alive[0, s]), f"row {row}: no live city-state to levy"
-    sim.citystate_type[0, s] = mil_idx
-    sim.seat_citystate_envoys[0, :, s] = 0
-    sim.seat_citystate_envoys[0, row, s] = suz_min
-    sim.citystate_last_levy[0, s] = -10_000  # cooldown clear
+    arm(s)
     sim.civ_treasury[0, row] = RICH
     assert bool(sim._suzerain_mask(row)[0, s]), f"row {row}: envoys did not make it suzerain"
+    cost = float(sim._levy_cost(row, t1(s))[0])
+    n_army = int((sim.major_unit_alive[0] & (sim.major_unit_seat[0] == 100 + s)
+                  & sim._type_military[sim.major_unit_type[0].clamp(min=0)]).sum())
     n0 = units_of(sim, row)
     sim._stash_buy(row, levy=t1(s))
     sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
-    assert units_of(sim, row) == n0 + n_lv, (
-        f"row {row}: levy spawned {units_of(sim, row) - n0} units, want {n_lv}"
+    assert units_of(sim, row) == n0 + n_army, (
+        f"row {row}: levy took {units_of(sim, row) - n0} units, want {n_army}"
     )
     assert abs((RICH - float(sim.civ_treasury[0, row])) - cost) < 1e-6, f"row {row}: levy price not charged"
-    assert int(sim.citystate_last_levy[0, s]) == int(sim.turn), f"row {row}: levy cooldown not stamped"
+    assert int(sim.citystate_levy_seat[0, s]) == row, f"row {row}: levy holder not stamped"
 
     # NOT suzerain: refused, unpaid
     sim.restore(base)
     prep(sim, row)
-    sim.citystate_type[0, s] = mil_idx
+    arm(s)
     sim.seat_citystate_envoys[0, :, s] = 0
-    sim.citystate_last_levy[0, s] = -10_000
     sim.civ_treasury[0, row] = RICH
     n0 = units_of(sim, row)
     sim._stash_buy(row, levy=t1(s))
     sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert units_of(sim, row) == n0, f"row {row}: levied a city-state it is not suzerain of"
     assert abs(float(sim.civ_treasury[0, row]) - RICH) < 1e-6, f"row {row}: charged for a refused levy"
-    print(f"  row {row}: levy OK ({n_lv} units, {cost:.0f} gold, suzerainty gate holds)")
+    print(f"  row {row}: levy OK ({n_army} units, {cost:.0f} gold, suzerainty gate holds)")
 
 
 def main() -> None:

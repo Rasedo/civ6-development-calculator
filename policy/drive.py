@@ -762,7 +762,7 @@ def _war_kind_of(war: torch.Tensor, kinds: torch.Tensor) -> torch.Tensor:
     return torch.where(on, pick, torch.full_like(pick, -1))
 
 
-def _war_ctx(blocks: dict) -> dict:
+def _war_ctx(blocks: dict, aggression: torch.Tensor) -> dict:
     ctx, cv = blocks["ctx"], blocks["civ"]
     return {
         "cs_envoys": blocks["cs"][:, :, 1],
@@ -771,8 +771,8 @@ def _war_ctx(blocks: dict) -> dict:
         "gang": cv[:, :, 5] > 0.5,
         "has_cities": cv[:, :, 6] > 0.5,
         "own_str": ctx[:, 5],
-        "aggression": ctx[:, 6],
-        "peace_turns": ctx[:, 7].long(),
+        "aggression": aggression,
+        "peace_turns": ctx[:, 6].long(),
     }
 
 
@@ -1453,7 +1453,9 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
         n_tgt = int(nobs[0]["war"]["targets"])
         war_mask = torch.cat([_obs_members(nobs, "war", "declare", n_tgt, dev),
                               _obs_members(nobs, "war", "sue", n_tgt, dev)], dim=1)
-        war = ladder.pick_war(war_mask, _war_ctx(blocks), rng_w, style=style)
+        # the seat's AGGRESSION: one persistent draw per game (turn 0, salt 25)
+        aggression = ladder.AGGRESSION_LO + ladder.AGGRESSION_SPAN * _policy_rng(st.device, seeds, 0, row, 25)
+        war = ladder.pick_war(war_mask, _war_ctx(blocks, aggression), rng_w, style=style)
         # THE KIND the column declares under, off the observation's table —
         # the engine's own validator built it (the cheapest casus belli held,
         # or the leader's buffed kind under the style), so the record can

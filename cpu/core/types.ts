@@ -109,10 +109,6 @@ export interface City {
   districts: { type: DistrictId; tileIndex: number }[];
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
-  /** CIV6: production is never lost — a CANCELLED item keeps its own hammers,
-   *  keyed by its production column (`queueItemColumn`), and picks them back
-   *  up when it is queued again. Invalidated work banks to `productionBank`. */
-  itemBank?: Record<number, number>;
   loyalty?: number;
   /** A FREE CITY's race: the loyalty pressure each major seat has exerted on
    *  it "since the Free City became independent", dense over seats. CIV6:
@@ -490,11 +486,10 @@ export interface Unit {
   /** the id of the FREE CITY that granted this unit (`grantFreeCityUnit`);
    *  absent on every other unit. A join takes that city's grants with it. */
   freeCity?: number;
-  /** CIV6 (The Raven King): this unit came from a city-state LEVY. Nothing
-   *  in this engine returns a levied unit, so the mark is permanent and
-   *  survives an upgrade — which is what makes the upgrade discount
-   *  meaningful. */
-  levied?: boolean;
+  /** the city-state seat whose army this unit is while a suzerain holds it by
+   *  LEVY (`levyUnits`); absent on every other unit. It survives an upgrade
+   *  (the Raven King's discount reads it) and clears when the unit returns. */
+  leviedFrom?: number;
   /** CIV6 (GOODY_METEOR_UNIT_REFUND_COST, IGNORE_RESOURCE_MAINTENANCE): a
    *  Meteor Site's grant "has no resource maintenance cost" — it burns no
    *  fuel and is never short of it, through any upgrade. */
@@ -560,8 +555,6 @@ export interface Unit {
    *  person this chassis is carrying, and so which ability its charge spends.
    *  Undefined on every other unit. */
   gpAt?: number;
-  path: number[] | null;
-  mission?: 'explore' | null;
   /**
    * FORMATION TIER: 0 a lone unit, 1 a Corps or Fleet, 2 an Army or Armada.
    * Undefined is 0 — read it through `formationCS`, never inline, so no site
@@ -721,7 +714,6 @@ export interface Seat {
   explored: number[];
   name: string;
   color: string;
-  aggression: number;
   /** CIV6: the civilization this seat plays — an index into `CIV_LEADERS`
    *  (its unique units and abilities); -1 plays none. */
   civ: number;
@@ -828,7 +820,16 @@ export interface CityState extends Seat {
   envoys: Record<number, number>;
   met: number[];
   hp?: number;
-  lastLevyTurn?: number;
+  /** THE LEVY (`levyUnits`): the seat holding this minor's army, and the turn
+   *  it comes home (`LEVY_TURNS` after the levy). Absent while no one holds
+   *  it. */
+  levySeat?: number;
+  levyEnds?: number;
+  /** the turn the minor's city last took a hit — the quiet the repair
+   *  project waits on (`City.lastHitTurn`) */
+  lastHitTurn?: number;
+  /** its city's power this turn (`City.powered`), set by `minorPower` */
+  powered?: boolean;
   /** The STORED answer to the suzerain contest (-1 none), refreshed at every
    *  envoy write — the fixed point that rules reweighting envoys BY the
    *  current suzerain read (Containment, the border passage). */

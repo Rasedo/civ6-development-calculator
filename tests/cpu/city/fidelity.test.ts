@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from '../helpers';
+import { canPlaceDistrict, makeMap, makeState, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from '../helpers';
 import { foundCity, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
 import { placeSeatDistrict } from '../../../cpu/core/phase';
 import { computeUnlocks } from '../../../cpu/core/effects';
-import { canPlaceDistrict, validImprovements } from '../../../cpu/core/rules';
+import { validImprovements } from '../../../cpu/core/rules';
 import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import { detectBoosts, toggleBoost, isBoosted } from '../../../cpu/core/boosts';
 import { buildingMaintenance, computeCityStats, computeHousing, cityMaintenance } from '../../../cpu/core/city';

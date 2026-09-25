@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE, scaleByGameSpeed } from '../../../cpu/data/constants';
-import { createGame } from '../../../cpu/core/game';
-import { settleAt, settleFirstCity } from '../helpers';
+import { seededGame, settleAt } from '../helpers';
 import { spawnUnit, unitFullMoves } from '../../../cpu/core/units';
 import {
   GREAT_PEOPLE, GP_ABILITY, GP_CLASSES, GP_SITES, GP_SITE_CITY_CENTER,
@@ -34,12 +33,7 @@ import type { City, GameState, Tile, Unit } from '../../../cpu/core/types';
 // against `GP_ABILITY`. The GPU twin is tests/gpu/gp_census_test.py.
 
 function newGame(): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 909,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 0, opponents: 1,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(909, 2);
   state.autoResearch = false;
   return state;
 }

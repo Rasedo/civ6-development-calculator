@@ -50,7 +50,7 @@ import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
-import { ROUTE_CHAIN_MAX } from './trade';
+import { ROUTE_CHAIN_MAX, routeOriginCenter } from './trade';
 import { GP_CITY_PERM, GP_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { scoreLines } from './score';
@@ -73,7 +73,7 @@ import { buildingCostIn } from './rules';
 import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
-import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN, MINOR_BUILD_ROWS } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, MINOR_BUILD_ROWS } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
 
@@ -241,6 +241,32 @@ const overUnits = (fn: (u: Unit) => Val): Extractor => (_state, rows) => (rows a
 const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows as Tile[]).map(fn);
 const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
+
+/** Every route of one holder — a major or a city-state — as flattened
+ *  [fromTile, destTile, kind, exp, born, walkTile, leg, chain...] rows, sorted.
+ *  Destinations are keyed by CENTRE TILE — the digest's own city join key — so
+ *  the comparison does not ride on city-id minting, which the city group
+ *  deliberately does not compare. Kind: 0 domestic, 1 city-state, 2
+ *  international. Sorted, because the GPU holds routes in fixed slots and this
+ *  side holds a filtered array. */
+function routeRowsOf(state: GameState, s: Seat): number[] {
+  const centreOf = (seat: number, cityId: number): number =>
+    seatOf(state, seat)?.cities.find((c) => c.id === cityId)?.centerIndex ?? -1;
+  const rows = (s.tradeRoutes ?? []).map((r) => {
+    const kind = (r.toCs ?? -1) >= 0 ? 1 : (r.toSeat ?? -1) >= 0 ? 2 : 0;
+    const dest =
+      kind === 1
+        ? state.cityStates?.find((c) => c.id === r.toCs)?.centerIndex ?? -1
+        : kind === 2
+          ? centreOf(r.toSeat!, r.toSeatCity ?? -1)
+          : centreOf(s.seat, r.to ?? -1);
+    return [routeOriginCenter(state, s, r), dest, kind, r.expiresTurn ?? -1,
+      r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1,
+      ...Array.from({ length: ROUTE_CHAIN_MAX }, (_, i) => (r.chain ?? [])[i] ?? -1)];
+  });
+  rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
+  return rows.flat();
+}
 
 // FLATTENED pairs (the wwPairs shape): the digest fold is FLAT, so a nested
 // [foe, clock] pair would quantise to NaN and every clock would hash alike.
@@ -541,24 +567,7 @@ const SEAT: Record<string, Extractor> = {
   // ride on city-id minting, which the city group deliberately does not
   // compare. Kind: 0 domestic, 1 city-state, 2 international. Sorted, because
   // the GPU holds routes in fixed slots and this side holds a filtered array.
-  routes: overSeats((s, state) => {
-    const centreOf = (seat: number, cityId: number): number =>
-      seatOf(state, seat)?.cities.find((c) => c.id === cityId)?.centerIndex ?? -1;
-    const rows = (s.tradeRoutes ?? []).map((r) => {
-      const kind = (r.toCs ?? -1) >= 0 ? 1 : (r.toSeat ?? -1) >= 0 ? 2 : 0;
-      const dest =
-        kind === 1
-          ? state.cityStates?.find((c) => c.id === r.toCs)?.centerIndex ?? -1
-          : kind === 2
-            ? centreOf(r.toSeat!, r.toSeatCity ?? -1)
-            : centreOf(s.seat, r.to ?? -1);
-      return [centreOf(s.seat, r.from), dest, kind, r.expiresTurn ?? -1,
-        r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1,
-        ...Array.from({ length: ROUTE_CHAIN_MAX }, (_, i) => (r.chain ?? [])[i] ?? -1)];
-    });
-    rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
-    return rows.flat();
-  }),
+  routes: overSeats((s, state) => routeRowsOf(state, s)),
   // sorted centre tiles — `stampTradingPost` keeps the array sorted, and
   // the GPU's nonzero scan is ascending by construction.
   tradingPosts: overSeats((s) => [...(s.tradingPosts ?? [])]),
@@ -669,7 +678,11 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorDistricts: overCityStates((cityState) => PLACEABLE_DISTRICTS.map((d) => cityState.districts?.find((x) => x.type === d)?.tileIndex ?? -1)),
   minorOuterHp: overCityStates((cityState) => cityState.outerHp ?? 0),
   religionPressure: overCityStates((cityState, st) => perCiv(st, (seat) => cityState.religionPressure?.[seat] ?? 0)),
-  lastLevyTurn: overCityStates((cityState) => cityState.lastLevyTurn ?? -LEVY_COOLDOWN),
+  levySeat: overCityStates((cityState) => cityState.levySeat ?? -1),
+  levyEnds: overCityStates((cityState) => cityState.levyEnds ?? -1),
+  minorLastHit: overCityStates((cityState) => cityState.lastHitTurn ?? 0),
+  minorPowered: overCityStates((cityState) => (cityState.powered ? 1 : 0)),
+  minorRoutes: overCityStates((cityState, state) => routeRowsOf(state, cityState)),
   minorBuildFrom: overCityStates((cityState) => cityState.buildFrom ?? MINOR_BUILD_ROWS.map(() => 0)),
   minorArmyCap: overCityStates((cityState) => cityState.armyCap ?? -1),
   minorBuilderBuyRate: overCityStates((cityState) => cityState.builderBuyRate ?? -1),
@@ -738,13 +751,6 @@ const CITY: Record<string, Extractor> = {
   specialistPref: overCities((r) => PLACEABLE_DISTRICTS.map((_t, di) => r.city.specialistPref?.[di] ?? -1)),
   queueProgress: overCities((r) => overQueue(r.city.queue, (q) => q?.progress ?? 0)),
   queueCost: overCities((r, state) => overQueue(r.city.queue, (q) => queueItemCost(state, r.city, q))),
-  itemBank: overCities((r) =>
-    Object.entries(r.city.itemBank ?? {})
-      .map(([k, v]) => [Number(k), v])
-      .filter(([, v]) => v > 0)
-      .sort((a, b) => a[0] - b[0])
-      .flat(),
-  ),
   followedReligion: overCities((r) => r.city.followedReligion ?? -1),
   // The GPU's pressure vector is one column per RELIGION, and religions are
   // indexed in the civ-seat space, so the vector is exactly as wide as the
@@ -797,7 +803,7 @@ const UNIT_G: Record<string, Extractor> = {
   movesFull: ((state, rows) => (rows as Unit[]).map((u) => grantedMoves(state, u))) as Extractor,
   attacksLeft: overUnits((u) => u.attacksLeft ?? 1),
   revealedTurn: overUnits((u) => u.revealedTurn ?? -1),
-  levied: overUnits((u) => (u.levied ? 1 : 0)),
+  levied: overUnits((u) => u.leviedFrom ?? -1),
   formation: overUnits((u) => u.formation ?? 0),
   escorted: overUnits((u) => (u.escorted ? 1 : 0)),
   patrol: overUnits((u) => u.patrol ?? -1),

@@ -14,7 +14,7 @@ import { SEAT_GROUPS } from '../../cpu/core/decideObsBuy';
 import { patronageCandidate } from '../../cpu/core/buyCandidates';
 import { GP_CLASSES } from '../../cpu/data/greatPeople';
 import { UNITS } from '../../cpu/data/units';
-import type { CityState, GameState } from '../../cpu/core/types';
+import type { CityState, GameState, Unit } from '../../cpu/core/types';
 
 const SCHEMA = JSON.parse(readFileSync('shared/decide.schema.json', 'utf-8')) as {
   seat: Record<string, [string, string, string][]>;
@@ -93,13 +93,18 @@ describe('purchase and route groups', () => {
     expect([b.pat_f_ok, b.pat_f_cls, b.pat_g_ok, b.pat_g_cls]).toEqual([true, 2, false, -1]);
   });
 
-  it('the levy: a militaristic city-state it is suzerain of, lowest id, only at war', () => {
+  it('the levy: a city-state it is suzerain of with an army standing, lowest id, only at war', () => {
     const state = scene();
     state.seats[0].treasury = 10_000;
     state.cityStates.push(
-      { id: 4, type: 'militaristic', met: [0], envoys: { 0: 3 }, centerIndex: 0 } as unknown as CityState,
-      { id: 2, type: 'militaristic', met: [0], envoys: { 0: 3 }, centerIndex: 1 } as unknown as CityState,
+      { id: 4, seat: 104, type: 'scientific', met: [0], envoys: { 0: 3 }, centerIndex: 0 } as unknown as CityState,
+      { id: 2, seat: 102, type: 'militaristic', met: [0], envoys: { 0: 3 }, centerIndex: 1 } as unknown as CityState,
+      // suzerain of it too, but it fields no army to levy
+      { id: 1, seat: 101, type: 'trade', met: [0], envoys: { 0: 3 }, centerIndex: 2 } as unknown as CityState,
     );
+    for (const seat of [104, 102]) {
+      state.units.push({ id: 900 + seat, type: 'WARRIOR', seat, tileIndex: 0, movesLeft: 0, hp: 100, charges: null } as Unit);
+    }
     expect((SEAT_GROUPS.buy(state, 0) as Buy).levy_ok).toBe(false);
     setWar(state, 0, 1, true);
     const b = SEAT_GROUPS.buy(state, 0) as Buy;

@@ -48,8 +48,8 @@ ESCALATORS = 3  # district, settler, builder — the only NON-static prices
 #
 # Everything here is the ASKER'S OWN. What is measured against an opponent
 # lives in the opponent block above, one column per opponent, so a policy can
-# compare them; a seat has one aggression and one peace clock, and those stay.
-CTX_SEAT = 9
+# compare them; a seat has one peace clock, and it stays.
+CTX_SEAT = 8
 CTX_FIELDS = (
     "nCities",        # alive city count, raw
     "nUnitsWQ",       # live units + QUEUED units (current in the unit range)
@@ -57,7 +57,6 @@ CTX_FIELDS = (
     "nRangedWQ",      # live+queued military, rangedStrength > 0
     "unitCap",        # cities*2 + (atWarWithAny ? 3 : 1)
     "ownStr",         # floor(ownCities*8 + Σ own combat + 0.5)
-    "aggression",     # this seat's aggression
     "peaceTurns",     # turns this seat has been at war with nobody
     "atWarAny",       # 0/1: at war with ANYONE (the embark/cap arm's term)
 )
@@ -424,6 +423,11 @@ def pick_monu(builder_ok: torch.Tensor, settler_ok: torch.Tensor) -> torch.Tenso
 # seat that has spent envoys there leaves it alone.
 CS_RAID_STRENGTH = 40.0
 CS_RAID_RATE = 0.02
+# A seat's AGGRESSION, the multiplier `pick_war` puts on both rates: one
+# persistent draw per (game seed, seat), spread uniformly over
+# [AGGRESSION_LO, AGGRESSION_LO + AGGRESSION_SPAN).
+AGGRESSION_LO = 0.3
+AGGRESSION_SPAN = 0.6
 
 # CITIZEN ASSIGNMENT. A city big enough to spare one puts a citizen in the
 # first district that seats one; a city puts one on the first RESOURCE plot it

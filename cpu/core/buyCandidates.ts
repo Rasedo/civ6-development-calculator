@@ -25,7 +25,7 @@ import { worshipBuildingOf, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCE
 import { availableBuildings, buildingCompletable, goldPurchasableBuildings } from './rules';
 import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from './effects';
 import { congressUdtBlockedDistrict } from './congress';
-import { districtSiteCost, districtSiteLegal, levyGoldCost } from './phase';
+import { districtSiteCost, districtSiteLegal, levyGoldCost, minorArmy } from './phase';
 import { gpCapped, patronageCost } from './greatPeople';
 import { governorFlag } from './governors';
 import { prodLayout } from './prodLayout';
@@ -33,7 +33,6 @@ import { UNITS } from '../data/units';
 import { effectiveBuilding } from '../data/buildings';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { GP_CLASSES } from '../data/greatPeople';
-import { LEVY_COOLDOWN } from '../data/cityStates';
 import { tilesWithin } from '../../world/hex';
 
 /** The route CANDIDATE this seat would take — over EVERY legal destination at
@@ -391,10 +390,10 @@ export function buyContext(state: GameState, seat: number): BuyContext {
   // kind 7, the levy — `levyUnits`' checks over the city-states by id, and
   // the seat at war with another major
   const atWar = state.seats.some((o) => o.seat !== seat && civsAtWar(state, seat, o.seat));
-  if (atWar && goldAffordable(treasury, levyGoldCost(state, seat))) {
+  if (atWar) {
     const byId = [...state.cityStates].sort((a, b) => a.id - b.id);
-    const cs = byId.find((c) => c.type === 'militaristic' && isSuzerain(state, c, seat)
-      && state.turn - (c.lastLevyTurn ?? -LEVY_COOLDOWN) >= LEVY_COOLDOWN);
+    const cs = byId.find((c) => isSuzerain(state, c, seat) && c.levySeat === undefined
+      && minorArmy(state, c).length > 0 && goldAffordable(treasury, levyGoldCost(state, seat, c)));
     if (cs) {
       out.levy_ok = true;
       out.levy_cs = cs.id;

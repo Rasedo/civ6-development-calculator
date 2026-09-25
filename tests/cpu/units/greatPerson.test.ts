@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
-import { createGame } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import { spawnUnit } from '../../../cpu/core/units';
 import { setTileOwner, seatOf, tileSeat } from '../../../cpu/core/seats';
 import {
@@ -32,12 +31,7 @@ import type { GameState, QueueItem, Unit } from '../../../cpu/core/types';
 // catalog, the six sites and the spend are pinned here.
 
 function newGame(): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 909,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 0, opponents: 1,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(909, 2);
   state.autoResearch = false;
   return state;
 }

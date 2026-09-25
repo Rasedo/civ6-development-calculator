@@ -8,7 +8,7 @@ import { deriveContinents, deriveMountainRanges } from '../../world/query';
 import { deriveLowlands, standingRemovable } from '../../cpu/core/climate';
 import { canFoundCity } from '../../cpu/core/rules';
 import { GP_CLASSES } from '../../cpu/data/greatPeople';
-import { spawnUnit } from '../../cpu/core/units';
+import { spawnUnit, stepUnit, unitFullMoves } from '../../cpu/core/units';
 import { hexDistance } from '../../world/hex';
 import { tilesWithin } from '../../world/hex';
 import { defaultModifiers, type YieldCtx } from '../../cpu/core/effects';
@@ -17,11 +17,16 @@ import type { DistrictId, Unit } from '../../cpu/core/types';
 import { unitsOf } from '../../cpu/core/seats';
 import { applySeatUnitOrders } from '../../cpu/core/phase';
 import { IMPROVEMENT_IDS, unitActionIndex } from '../../cpu/core/unitActions';
-import { availableBuildings, canPlaceDistrict, canPlaceWonder, fitEncampOuter, wallsMax } from '../../cpu/core/rules';
+import { availableBuildings, canPlaceDistrictIn, canPlaceWonder, fitEncampOuter, wallsMax, type RuleResult } from '../../cpu/core/rules';
+import { computeUnlocks } from '../../cpu/core/effects';
+import { tileBelongsTo } from '../../cpu/core/seats';
 import { stampBuildingEra } from '../../cpu/core/yields';
 import { BUILDINGS } from '../../cpu/data/buildings';
 import { ENCAMPMENT_HP } from '../../cpu/data/units';
 import { RESOURCES } from '../../world/resources';
+import { loadWorld } from '../../cpu/world/load';
+import { buildWorld } from '../../seeder/build';
+import { WORLD_PRESETS } from '../../seeder/presets';
 
 export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND'): GameMap {
   const tiles: Tile[] = [];
@@ -87,6 +92,22 @@ export function makeState(map: GameMap = makeMap()): GameState {
     claimedPantheons: [],
     claimedBeliefs: [],
   };
+}
+
+/**
+ * A SEEDED game: the baseline world the seeder builds for `seed` with `civs`
+ * majors and `cityStates` minors, loaded as the engines load it, and every
+ * civ's capital founded where its starting SETTLER stands, seat by seat.
+ */
+export function seededGame(seed: number, civs: number, cityStates = 0): GameState {
+  const world = buildWorld(seed, { ...WORLD_PRESETS.baseline, civCount: civs, cityStateMax: cityStates }, '');
+  const state = loadWorld(world);
+  for (const s of state.seats) {
+    const settler = state.units.find((u) => u.seat === s.seat && u.type === 'SETTLER');
+    const res = settler ? foundCity(state, settler.tileIndex, s.seat) : { ok: false, reason: 'no settler' };
+    if (!res.ok) throw new Error(`seed ${seed}: seat ${s.seat} cannot found its capital: ${res.reason}`);
+  }
+  return state;
 }
 
 export function tileAtCoords(map: GameMap, col: number, row: number): Tile {
@@ -188,6 +209,15 @@ export function holdWorks(
   return out;
 }
 
+/** The placement rule a scene asks of a district site: `canPlaceDistrictIn`
+ *  with the city's own seat's unlocks (none in sandbox) and its own tiles. */
+export function canPlaceDistrict(state: GameState, city: City, type: DistrictId, tileIndex: number): RuleResult {
+  return canPlaceDistrictIn(state, city, type, tileIndex, {
+    unlocks: state.sandbox ? null : computeUnlocks(state, city.seat),
+    ownsTile: (t) => tileBelongsTo(t, city),
+  });
+}
+
 /** A scene's COMPLETED district: the ground a placement paves (every feature
  *  but floodplains, the improvement, a bonus resource), finished on the spot.
  *  Throws where `canPlaceDistrict` refuses the site. */
@@ -235,4 +265,17 @@ export function orderUnit(state: GameState, unit: Unit, action: string): void {
   if (col === undefined) throw new Error(`no unit action ${action}`);
   const mine = unitsOf(state, unit.seat);
   applySeatUnitOrders(state, seatOf(state, unit.seat)!, [mine.map((u) => (u === unit ? col : -1))]);
+}
+
+/** Walk `unit` through `route` — adjacent tile indices, in order — one
+ *  `stepUnit` a tile, with a fresh turn's moves whenever a step cannot be
+ *  paid. Throws where a step is refused. */
+export function stepThrough(state: GameState, unit: Unit, route: number[]): void {
+  for (const t of route) {
+    if (stepUnit(state, unit, state.map.tiles[t]) === 'cantAfford') {
+      unit.movesLeft = unitFullMoves(state, unit);
+      stepUnit(state, unit, state.map.tiles[t]);
+    }
+    if (unit.tileIndex !== t) throw new Error(`test walk refused at tile ${t}`);
+  }
 }

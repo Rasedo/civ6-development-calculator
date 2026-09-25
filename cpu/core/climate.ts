@@ -6,7 +6,7 @@
  * showing a number, and nothing here does.
  */
 
-import type { GameState, City } from './types';
+import type { CityState, GameState, City } from './types';
 import type { GameMap, Tile } from '../../world/types';
 import { clearableFeatures } from '../../world/features';
 import { isWater } from '../../world/query';
@@ -20,7 +20,7 @@ import {
   climatePhase, deforestationModifier, pollutionPoints,
   FAVOR_PER_POLLUTION_OVER, FAVOR_POLLUTION_CAP,
 } from '../data/climate';
-import { citiesOf, seatOf } from './seats';
+import { citiesOf, isCityStateSeat, seatOf } from './seats';
 import { cityAtIndex, disbandUnit, unitsAt, waterWalks } from './units';
 import { displaceAirFrom } from './air';
 import { UNITS } from '../data/units';
@@ -159,7 +159,12 @@ export function floodBarrierCost(state: GameState, city: City): number {
 }
 
 function barrierAt(state: GameState, tile: Tile): boolean {
-  if (tile.ownerSeat < 0 || tile.ownerCity < 0) return false;
+  if (tile.ownerSeat < 0) return false;
+  // a city-state's ground carries no city id: its one city holds it all
+  if (isCityStateSeat(tile.ownerSeat)) {
+    return !!(seatOf(state, tile.ownerSeat) as CityState | undefined)?.buildings?.includes('FLOOD_BARRIER');
+  }
+  if (tile.ownerCity < 0) return false;
   const city = citiesOf(state, tile.ownerSeat).find((c) => c.id === tile.ownerCity);
   return !!city?.buildings.includes('FLOOD_BARRIER');
 }

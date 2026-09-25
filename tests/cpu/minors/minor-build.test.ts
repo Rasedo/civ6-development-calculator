@@ -2,23 +2,27 @@
  * THE MINOR'S BUILD TABLE — what a city-state's city produces (C-38's
  * census, `MINOR_BUILD_ROWS`), the production rows it pays under
  * (MINOR_CIV_PRODUCTION_*), the units it trains into the pool under its own
- * seat, and its Builders' improvement pick. The GPU twin is
- * tests/gpu/minor_builds_test.py.
+ * seat, its Traders, its repair and district projects, its worship building,
+ * its Flood Barrier, the ships it buys, the plot its district paves, and its
+ * Builders' improvement pick. The GPU twin is tests/gpu/minor_builds_test.py.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
-import { minorImprovementPicks, minorPhase } from '../../../cpu/core/minorBuild';
+import { minorImprovementPicks, minorPhase, minorPurchases } from '../../../cpu/core/minorBuild';
 import { computeCityStats } from '../../../cpu/core/city';
-import { builderCost, spawnUnit } from '../../../cpu/core/units';
+import { builderCost, spawnUnit, traderCost } from '../../../cpu/core/units';
+import { projectCost } from '../../../cpu/core/game';
+import { floodBarrierCost } from '../../../cpu/core/climate';
 import { wallsTier } from '../../../cpu/core/rules';
 import {
   CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPES, MINOR_ARMY_CAP_SLOTS, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS,
   MINOR_BUILDER_PROD_PCT, MINOR_BUILDER_RADIUS, MINOR_DISFAVORED_DISTRICTS, MINOR_EXCLUDED_UNIT_CLASSES,
-  MINOR_HARBOR_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY,
+  MINOR_HARBOR_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_NAVAL_BUY_BP, MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY,
   MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT, type MinorBuildRow,
 } from '../../../cpu/data/cityStates';
+import { PROJECTS, PROJECT_YIELD_FRACTION } from '../../../cpu/data/projects';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { TECHS } from '../../../cpu/data/techs';
 import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../../../cpu/data/units';
@@ -97,12 +101,14 @@ describe('the build table', () => {
         if (row.kind === 'district') {
           // MinorCivDistricts: the type's own district, or one it does not disfavour
           expect(id === CITY_STATE_TYPE_DISTRICT[t] || !MINOR_DISFAVORED_DISTRICTS.includes(id as never), id).toBe(true);
+        } else if (row.kind === 'project') {
+          // the type district's project, or the Harbor's
+          expect(PROJECTS[id], id).toBeTruthy();
+          expect([CITY_STATE_TYPE_DISTRICT[t], 'HARBOR']).toContain(PROJECTS[id].district);
         } else {
           const def = BUILDINGS[id];
           expect(def, id).toBeTruthy();
-          // a minor's grid is C-1's: nothing it builds draws or supplies Power
-          expect(def.power ?? 0, id).toBe(0);
-          expect(def.powerSupply ?? 0, id).toBe(0);
+          // the religion names a worship building: its own row
           expect(def.worship, id).toBeFalsy();
         }
       }
@@ -111,7 +117,7 @@ describe('the build table', () => {
     expect(MINOR_DISFAVORED_DISTRICTS.length).toBe(16);
     expect(MINOR_ARMY_CAP_SLOTS.length).toBe(MINOR_BUILD_SLOTS);
     expect(MINOR_BUILD_ROWS[0].kind).toBe('builder');
-    expect(MINOR_BUILD_ROWS[MINOR_BUILD_ROWS.length - 1].kind).toBe('army');
+    expect(MINOR_BUILD_ROWS[1].kind).toBe('repair');
   });
 
   it('draws the episode once, at the first build: a slot per drawn row, then the cap', () => {
@@ -395,5 +401,165 @@ describe("the minor's Urban Defenses", () => {
     minorPhase(state);
     expect(cs.research.techs).toContain(URBAN_DEFENSES_TECH);
     expect(cs.outerHp).toBe(WALLS_TIER_HP[WALLS_TIER_URBAN]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+const TRADER_ROW = () => rowOf((r) => r.kind === 'trader');
+const PROJECT_ROW = () => rowOf((r) => r.kind === 'project' && r.item?.scientific === 'RESEARCH_GRANTS');
+const WORSHIP_ROW = () => rowOf((r) => r.kind === 'worship');
+const BARRIER_ROW = () => rowOf((r) => r.kind === 'building' && r.item?.scientific === 'FLOOD_BARRIER');
+
+describe('the rows the table grew', () => {
+  it('the Trader row trains one under its capacity while a destination is open', () => {
+    const state = makeState(makeMap(30, 30));
+    const cs = addCs(state, 5, 5);
+    addCs(state, 14, 5, { type: 'trade' });
+    idleBuilder(state, cs);
+    plan(cs, [TRADER_ROW()]);
+    state.turn = 1;
+    cs.prodProgress = 1000;
+    minorPhase(state);
+    // no Foreign Trade: no capacity, no Trader
+    expect(state.units.some((u) => u.seat === cs.seat && u.type === 'TRADER')).toBe(false);
+    cs.research.civics = ['CODE_OF_LAWS', 'FOREIGN_TRADE'];
+    cs.prodProgress = traderCost(state, cs.seat);
+    minorPhase(state);
+    expect(state.units.filter((u) => u.seat === cs.seat && u.type === 'TRADER')).toHaveLength(1);
+  });
+
+  it('the repair row restores the breached walls once the city has been quiet', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12, { buildings: ['ANCIENT_WALLS'], outerHp: 20 });
+    idleBuilder(state, cs);
+    plan(cs, []);
+    cs.research.techs = ['MINING', 'MASONRY'];
+    state.turn = 10;
+    cs.lastHitTurn = 9;
+    cs.prodProgress = 0;
+    minorPhase(state);
+    expect(cs.outerHp).toBe(20); // hit last turn: no repair
+    state.turn = 20;
+    const cost = projectCost(state, cs.seat, 'REPAIR_DEFENSES', minorCity(cs));
+    expect(cost).toBe(WALLS_TIER_HP[1] - 20);
+    cs.prodProgress = cost;
+    minorPhase(state);
+    expect(cs.outerHp).toBe(WALLS_TIER_HP[1]);
+  });
+
+  it("the project row runs its district's project and pays the yield into the minor's own pot", () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12, { buildings: ['ANCIENT_WALLS'] });
+    idleBuilder(state, cs);
+    plan(cs, [PROJECT_ROW()]);
+    state.turn = 1;
+    cs.prodProgress = 0;
+    minorPhase(state);
+    const sci0 = cs.research.techProgress;
+    hold(cs, 'CAMPUS', tileAtCoords(state.map, 13, 12));
+    const cost = projectCost(state, cs.seat, 'RESEARCH_GRANTS');
+    cs.prodProgress = cost;
+    const y = computeCityStats(state, minorCity(cs)).total.science;
+    minorPhase(state);
+    expect(cs.research.techProgress).toBeCloseTo(sci0 + y + Math.round(cost * PROJECT_YIELD_FRACTION), 9);
+  });
+
+  it('the worship row raises the building its majority religion names', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12, { type: 'religious', buildings: ['SHRINE', 'TEMPLE'] });
+    idleBuilder(state, cs);
+    plan(cs, [WORSHIP_ROW()]);
+    const hs = tileAtCoords(state.map, 13, 12);
+    setTileOwner(hs, cs.seat);
+    hs.district = 'HOLY_SITE';
+    hs.districtComplete = true;
+    cs.districts = [{ type: 'HOLY_SITE', tileIndex: hs.index }];
+    // seat 0 founded a religion whose Worship belief is the Cathedral, and the
+    // minor's city follows it
+    state.seats[0].religion = { ...state.seats[0].religion, founded: true, worship: 'CATHEDRAL' };
+    cs.religionPressure = [1000];
+    state.turn = 1;
+    cs.prodProgress = BUILDINGS.CATHEDRAL.cost;
+    minorPhase(state);
+    expect(cs.buildings).toContain('CATHEDRAL');
+  });
+
+  it('the Flood Barrier wants Coastal Lowland and costs by the lowland it covers', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12);
+    idleBuilder(state, cs);
+    plan(cs, [BARRIER_ROW()]);
+    cs.research.techs = Object.keys(TECHS);
+    state.turn = 1;
+    cs.prodProgress = 5000;
+    minorPhase(state);
+    expect(cs.buildings ?? []).not.toContain('FLOOD_BARRIER');
+    const low = tileAtCoords(state.map, 13, 12);
+    low.lowland = 1;
+    const cost = floodBarrierCost(state, minorCity(cs));
+    expect(cost).toBeGreaterThan(0);
+    cs.prodProgress = cost;
+    minorPhase(state);
+    expect(cs.buildings).toContain('FLOOD_BARRIER');
+  });
+
+  it("the type district paves an improved plot: the improvement, the feature and a bonus resource go", () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12, { buildings: ['ANCIENT_WALLS'] });
+    idleBuilder(state, cs);
+    plan(cs, [TYPE_DISTRICT_ROW()]);
+    cs.research.techs = ['POTTERY', 'WRITING'];
+    // every ring plot but the lowest-index one is out of reach: the site is it
+    const ring = tilesWithin(state.map, 12, 12, 1).filter((t) => t.index !== cs.centerIndex)
+      .sort((a, b) => a.index - b.index);
+    const site = ring[0];
+    site.improvement = 'FARM';
+    site.resource = 'WHEAT';
+    state.turn = 1;
+    cs.prodProgress = 1000;
+    minorPhase(state);
+    expect(cs.districts?.[0]).toEqual({ type: 'CAMPUS', tileIndex: site.index });
+    expect(site.district).toBe('CAMPUS');
+    expect(site.improvement).toBeNull();
+    expect(site.resource).toBeNull();
+  });
+});
+
+describe('the ships a minor buys', () => {
+  it("a coastal minor with no ship buys its strongest naval melee chassis at the census rate", () => {
+    expect(MINOR_NAVAL_BUY_BP).toBeGreaterThan(0);
+    let bought = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const state = makeState(makeMap(24, 24));
+      for (let c = 13; c < 24; c++) for (let r = 0; r < 24; r++) tileAtCoords(state.map, c, r).terrain = 'COAST';
+      const cs = addCs(state, 12, 12);
+      cs.research.techs = ['SAILING'];
+      cs.treasury = 1000;
+      state.rngState = seed;
+      minorPurchases(state, cs);
+      const ships = state.units.filter((u) => u.seat === cs.seat && UNITS[u.type]?.naval);
+      if (ships.length) {
+        bought += 1;
+        expect(ships.map((u) => u.type)).toEqual(['GALLEY']);
+        expect(cs.treasury).toBeLessThan(1000);
+        // one standing: no second
+        minorPurchases(state, cs);
+        expect(state.units.filter((u) => u.seat === cs.seat && UNITS[u.type]?.naval)).toHaveLength(1);
+      }
+    }
+    expect(bought).toBeGreaterThan(0);
+    expect(bought).toBeLessThan(40);
+  });
+
+  it('an inland minor buys none', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12);
+    cs.research.techs = ['SAILING'];
+    cs.treasury = 1000;
+    for (let seed = 1; seed <= 200; seed++) {
+      state.rngState = seed;
+      minorPurchases(state, cs);
+    }
+    expect(state.units.some((u) => u.seat === cs.seat && UNITS[u.type]?.naval)).toBe(false);
   });
 });

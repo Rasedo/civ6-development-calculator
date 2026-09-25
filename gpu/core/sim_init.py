@@ -69,46 +69,43 @@ class SimInit:
         self._bpe_col = torch.full((max(len(rules.b_cost), 1),), -1, dtype=torch.long, device=device)
         self._bpe_col[self._bpe_bidx] = torch.arange(self._bpe_n, device=device)
         self._bpe_y = rules.b_per_era.to(device)[self._bpe_bidx].double()   # [NPE, 6]
-        for _k, _dt, _rf, _pf, _ex in (
-            ("alive", torch.bool, False, None, None),
-            ("center", torch.long, 0, -1, None),
-            ("pop", torch.long, 0, None, None),
-            ("hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
-            ("outer_hp", torch.long, 0, None, None),
-            ("last_hit", torch.long, 0, None, None),
-            ("boost_turn", torch.long, 0, None, None),
-            ("is_cap", torch.bool, False, None, None),
-            ("orig_cap", torch.long, -1, None, None),
-            ("founder", torch.long, -1, None, None),
-            ("loyalty", dtype, 100.0, None, None),
-            ("acquired", torch.long, 0, None, None),
-            ("growth", dtype, 0, None, None),
-            ("cbox", dtype, 0, None, None),
-            ("current", torch.long, -1, None, self.QD),
-            ("progress", dtype, 0, None, self.QD),
-            ("cost", dtype, 0, None, self.QD),
-            ("qtile", torch.long, -1, None, self.QD),
+        for _k, _dt, _rf, _ex in (
+            ("alive", torch.bool, False, None),
+            ("center", torch.long, 0, None),
+            ("pop", torch.long, 0, None),
+            ("hp", torch.long, 0, None),
+            ("outer_hp", torch.long, 0, None),
+            ("last_hit", torch.long, 0, None),
+            ("boost_turn", torch.long, 0, None),
+            ("is_cap", torch.bool, False, None),
+            ("orig_cap", torch.long, -1, None),
+            ("founder", torch.long, -1, None),
+            ("loyalty", dtype, 100.0, None),
+            ("acquired", torch.long, 0, None),
+            ("growth", dtype, 0, None),
+            ("cbox", dtype, 0, None),
+            ("current", torch.long, -1, self.QD),
+            ("progress", dtype, 0, self.QD),
+            ("cost", dtype, 0, self.QD),
+            ("qtile", torch.long, -1, self.QD),
             # the GREAT WORKS held, one column per layout slot (`GW_LAYOUT`):
             # object type (-1 = empty), maker, era, civilization
-            ("gw_obj", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
-            ("gw_maker", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
-            ("gw_era", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
-            ("gw_seat", torch.long, -1, None, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
-            ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
+            ("gw_obj", torch.long, -1, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
+            ("gw_maker", torch.long, -1, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
+            ("gw_era", torch.long, -1, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
+            ("gw_seat", torch.long, -1, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
+            ("bldg", torch.bool, False, max(len(rules.b_cost), 1)),
             # the members of `city_bldg` standing PILLAGED — dark until the
             # city's own queue repairs them; `_bldg_dark` folds them with the
             # district's own pillage, `_building_pillaged` reads them alone
-            ("bldg_pillaged", torch.bool, False, None, max(len(rules.b_cost), 1)),
+            ("bldg_pillaged", torch.bool, False, max(len(rules.b_cost), 1)),
             # the game era each `_bpe_bidx` row was constructed or last
             # repaired in (`City.buildingEras`), -1 none
-            ("bldg_era", torch.long, -1, None, max(self._bpe_n, 1)),
-            ("gp_perm", dtype, 0, None, max(len((rules.seats or {}).get("gpCityPermKeys", [])), 1)),
+            ("bldg_era", torch.long, -1, max(self._bpe_n, 1)),
+            ("gp_perm", dtype, 0, max(len((rules.seats or {}).get("gpCityPermKeys", [])), 1)),
         ):
             _shape = (B, self.CITY_ROWS, _rcp) + ((_ex,) if _ex else ())
-            _base = torch.full(_shape, _rf, dtype=_dt, device=device)
-            setattr(self, f"city_{_k}", _base)
-            if _pf is not None:
-                _base[:, 0].fill_(_pf)
+            setattr(self, f"city_{_k}", torch.full(_shape, _rf, dtype=_dt, device=device))
 
         def ften(getter, shape_tail=()):
             return torch.tensor([getter(f) for f in fixtures], dtype=dtype, device=device).reshape(B, *shape_tail)
@@ -271,11 +268,10 @@ class SimInit:
         # every reader addresses one by row, `seat_citystate_met[:, row, s]`.
         # (the asked-for district is never stored: it is always the CS type's
         # own — _citystate_didx — so quest resolve/digest both re-derive it)
-        # LEVY cooldown — per CS, SHARED across seats (the TS cs.lastLevyTurn
-        # twin). Init to -levyCooldown so a never-levied CS reads cooldown-ready
-        # (turn - (-cd) >= cd for turn >= 0).
-        self._levy_cooldown = int(rules.citystate.get("levyCooldown", 20))
-        self.citystate_last_levy = torch.full((B, s_pad), -self._levy_cooldown, dtype=torch.long, device=device)
+        # THE LEVY (`CityState.levySeat` / `levyEnds`): the seat row holding
+        # each minor's army and the turn it comes home, -1 while no one does
+        self.citystate_levy_seat = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_levy_ends = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self._alloc_war(B, self.n_majors, s_pad, device)
         # Siege hit points (attackCityState) — the TS `cs.hp` twin.
         self.citystate_hp = self.city_hp[:, _m0:_m0 + s_pad, 0]
@@ -435,7 +431,6 @@ class SimInit:
         self.appeal_over = torch.tensor([[int(t.get("apo", -999)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.civ_alive = torch.zeros(B, self.n_majors, dtype=torch.bool, device=device)
         self.seat_explored = torch.zeros(B, self.n_majors, self.T, dtype=torch.bool, device=device)
-        self.civ_aggression = torch.zeros(B, self.n_majors, dtype=torch.float64, device=device)
 
         _civ_scalars = (
             ("best_melee", torch.long, 0), ("builders_trained", torch.long, 0),
@@ -1078,11 +1073,13 @@ class SimInit:
             # IN AN ESCORT FORMATION with the military unit on its own tile —
             # the CIVILIAN half carries it, and the tile names the escort.
             ("escorted", torch.bool),
-            # CIV6 (The Raven King): this unit came from a city-state LEVY.
-            # Nothing here returns a levied unit, so the mark is permanent and
-            # survives an upgrade — which is what makes the 75% upgrade
-            # discount meaningful.
+            # CIV6 (The Raven King): this unit is a city-state's, held by LEVY
+            # — the mark its clauses read (the 75% upgrade discount survives
+            # an upgrade); `levy_src` is the minor's seat it returns to
+            # (`Unit.leviedFrom`), -1 on every other unit. Both clear when the
+            # unit comes home.
             ("levied", torch.bool),
+            ("levy_src", torch.long),
             # the hex a deployed FIGHTER patrols (`Unit.patrol`), -1 while it
             # is stationed; `tile` stays its base
             ("patrol", torch.long),
@@ -1109,6 +1106,7 @@ class SimInit:
         self.unit_revealed_turn.fill_(-1)
         self.unit_patrol.fill_(-1)
         self.unit_free_city.fill_(-1)
+        self.unit_levy_src.fill_(-1)
         self.unit_spy_mission.fill_(self._spy_idle)
         self.unit_spy_target.fill_(-1)
         self.barb_unit_seat.fill_(BARB_SEAT)
@@ -1483,7 +1481,6 @@ class SimInit:
             for cv in f["civs"]:
                 row = int(cv["seat"])
                 self.civ_alive[b, row] = True
-                self.civ_aggression[b, row] = cv.get("aggression", 0.0)
                 _row_pair[b][row] = int(cv["leader"])
                 # Nothing is pre-founded — `cities` is [] and every city arrives
                 # through a FOUND verb; the loop stays for the shape.
@@ -1737,7 +1734,6 @@ class SimInit:
         _d2.sort(key=lambda o: (max(abs(o[0]), abs(o[1]), abs(o[0] + o[1])), o[1], o[0]))
         self._storm_offs = torch.tensor(_d2, dtype=torch.long).to(device)  # [19, 2]
         ids = [u["id"] for u in (rules.units or [])]
-        self._spearman_idx = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
         self._archaeologist_idx = ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1
         self._naturalist_idx = next((i for i, u in enumerate(rules.units or []) if bool(u.get("naturalist", 0))), -1)
         self._band_idx = next((i for i, u in enumerate(rules.units or []) if u.get("id") == "ROCK_BAND"), -1)
@@ -3184,15 +3180,6 @@ class SimInit:
         # a FREE CITY's build pot (`City.freePot`), read at the Free Cities row
         # alone; a full city-block plane so compaction carries it
         self.city_free_pot = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.float64, device=device)
-        # CIV6: production is never lost — a CANCELLED item keeps its own
-        # hammers, held against the ITEM's production column until it is
-        # queued again (`_q_push` resumes them). Eight columns per city is a
-        # capacity choice like the queue's own depth; a full ledger banks
-        # nothing more.
-        self.city_item_bank = torch.full((B, self.CITY_ROWS, self.RC, 8), -1,
-                                         dtype=torch.long, device=device)
-        self.city_item_amt = torch.zeros(B, self.CITY_ROWS, self.RC, 8,
-                                         dtype=dtype, device=device)
         self.seat_science_total = torch.zeros(B, self.n_majors, dtype=dtype, device=device)
 
         self.units_mode = bool(f0.get("unitsMode", 0))
@@ -4033,7 +4020,7 @@ class SimInit:
                     self.unit_next[b] += 1
 
         # The FIXTURE-LOADED starting units must seed the best-melee trackers:
-        # TS counts them through spawnUnit at placeSeats, so a seat starting
+        # TS counts them through spawnUnit at loadWorld, so a seat starting
         # with a WARRIOR has city defense 20, not the floor. ONE scan over the
         # merged pool, one row per seat.
         _ut0 = self.major_unit_type.clamp(min=0, max=self.NU - 1)

@@ -16,17 +16,12 @@
  * draws only from its own labelled streams, so the play stream starts at the
  * seed and placement changes can never shift it.
  */
-import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 
-import { generateMap } from '../world/mapgen';
-import { TERRAINS } from '../world/terrains';
-import { FEATURES } from '../world/features';
-import { RESOURCES } from '../world/resources';
-import type { WorldFile } from '../world/file';
-import { placeCivs, placeCityStates, PLACEMENT_VERSION } from './place';
+import { PLACEMENT_VERSION } from './place';
 import { WORLD_PRESETS } from './presets';
 import { genStamp } from './stamp';
+import { buildWorld, worldParams } from './build';
 
 const args = process.argv.slice(2).filter((a) => a !== '--check');
 const CHECK = process.argv.includes('--check');
@@ -40,64 +35,15 @@ const CIV_COUNT = Number(args[2] ?? P.civCount);
 // baseline keeps today's paths; any other preset gets ITS OWN directory and
 // ITS OWN lock, so seeding a preset can never clobber the baseline family.
 const OUT = args[3] ?? (PRESET_NAME === 'baseline' ? 'seeder/worlds' : `seeder/worlds/presets/${PRESET_NAME}`);
-const WIDTH = P.width;
-const HEIGHT = P.height;
 const LOCK_PATH = PRESET_NAME === 'baseline' ? 'seeder/worlds.lock' : `${OUT}/worlds.lock`;
 
 const seeds = Array.from({ length: N_SEEDS }, (_, s) => P.firstSeed + s * 13);
 
-const params = {
-  width: WIDTH, height: HEIGHT, cityStateMax: CITY_STATE_MAX, civCount: CIV_COUNT,
-  layout: P.layout, landFraction: P.landFraction,
-  resourceMult: P.resourceMult, resourceWeights: P.resourceWeights,
-};
+const preset = { ...P, cityStateMax: CITY_STATE_MAX, civCount: CIV_COUNT };
+const params = worldParams(preset);
 const stamp = genStamp({ ...params, seeds, placement: PLACEMENT_VERSION });
 
-const ELEVATIONS = ['FLAT', 'HILLS', 'MOUNTAIN'];
-
-function buildWorld(seed: number): WorldFile {
-  const map = generateMap({
-    width: WIDTH, height: HEIGHT, seed, withResources: true, withWonders: true, withVillages: true,
-    layout: P.layout, landFraction: P.landFraction, resourceMult: P.resourceMult,
-    // the default triple keeps the picker's LITERAL 0.45/0.8 boundaries — the
-    // normalised quotient of the same weights is a different float.
-    resourceWeights: P.resourceWeights[0] === 0.45 && P.resourceWeights[1] === 0.35 && P.resourceWeights[2] === 0.2
-      ? undefined : P.resourceWeights,
-  });
-  const catalogs = {
-    terrains: Object.keys(TERRAINS),
-    elevations: ELEVATIONS,
-    features: Object.keys(FEATURES),
-    resources: Object.keys(RESOURCES),
-  };
-  const idx = (list: string[], v: string | null): number => (v === null ? -1 : list.indexOf(v));
-  const { starts, civs } = placeCivs(map, seed, CIV_COUNT);
-  const cityStates = placeCityStates(map, seed, CITY_STATE_MAX, starts);
-  const world: WorldFile = {
-    format: 'world@1',
-    gen: { seed, placement: PLACEMENT_VERSION, params, genStamp: stamp },
-    catalogs,
-    map: {
-      width: map.width,
-      height: map.height,
-      terrain: map.tiles.map((t) => idx(catalogs.terrains, t.terrain)),
-      elevation: map.tiles.map((t) => idx(catalogs.elevations, t.elevation)),
-      feature: map.tiles.map((t) => idx(catalogs.features, t.feature)),
-      resource: map.tiles.map((t) => idx(catalogs.resources, t.resource)),
-      riverMask: map.tiles.map((t) => t.riverMask),
-      cliffMask: map.tiles.map((t) => t.cliffMask ?? 0),
-      volcano: map.tiles.map((t) => (t.volcano ? 1 : 0)),
-      goodyHut: map.tiles.map((t) => (t.goodyHut ? 1 : 0)),
-    },
-    civs,
-    cityStates,
-    rngInit: (seed ^ 0x9e3779b9) >>> 0,
-  };
-  world.worldHash = createHash('sha256').update(JSON.stringify(world)).digest('hex');
-  return world;
-}
-
-const worlds = seeds.map(buildWorld);
+const worlds = seeds.map((seed) => buildWorld(seed, preset, stamp));
 const lock = {
   placement: PLACEMENT_VERSION,
   params,

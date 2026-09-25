@@ -1,5 +1,5 @@
 
-import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
+import type { City, CityState, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit } from './types';
 import { logPopWrite } from './difflog';
 import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
@@ -8,11 +8,11 @@ import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork 
 import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production';
 import { isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
-import { isWater, isImpassable, naturalWonderAt, hasRiver, isCoastalLand } from '../../world/query';
+import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_MULT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -23,10 +23,10 @@ import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, t
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
-import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
-import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, routePlunderGold, stampTradingPost, TRADE_WALK_EXPIRY_RAIL, claimTileEnRoute } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, minorCity, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS } from '../data/cityStates';
+import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, purchaseStep, unitUpkeep } from './effects';
+import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
+import { LEVY_COST_PCT, LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch } from './minorBuild';
 import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
@@ -34,12 +34,10 @@ import { PROJECT_LIST } from '../data/projects';
 import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
-import { TERRAINS } from '../../world/terrains';
 import { TECHS } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { prodLayout } from './prodLayout';   // ONE column layout, shared with the exporter
 import { CIVICS } from '../data/civics';
-import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, UNIT_TYPE_IDX, UNIT_ERA_INDEX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
 import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
@@ -59,12 +57,11 @@ import { irradiated, wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { logDistrictCost } from './difflog';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, adjacentPlotRowOk, adjacentPlotTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
-import { hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost } from './game';
+import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -114,13 +111,13 @@ import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { addEraScore, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
-import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
+import { unitKillEvent, buildingDedications, goldenDedication } from './eras';
 import { defaultWarKind, warBuffProdPct, warKindAllowed } from './casusBelli';
 import { WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
-import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
+import { DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { INDUSTRIAL_ERA_INDEX, ERAS } from '../data/techs';
 
@@ -128,8 +125,6 @@ import { gpCityPermOf } from '../data/greatPeople';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
-
-const CIV_SPACING = 10;
 
 /**
  * The seats a row's WAR HEAD addresses: every OTHER major in ascending seat
@@ -145,75 +140,11 @@ export function warTargets(state: GameState, seat: number): number[] {
   return majors.concat(minors);
 }
 
-function siteQuality(state: GameState, tile: Tile): number {
-  if (isWater(tile) || isImpassable(tile)) return -1;
-  if (naturalWonderAt(tile) || tile.feature === 'OASIS' || tile.district) return -1;
-  if (tileClaimed(tile)) return -1;
-  let q = hasFreshWater(state.map, tile) ? 8 : 0;
-  for (const t of tilesWithin(state.map, tile.col, tile.row, 2)) {
-    if (isWater(t) || isImpassable(t) || tileClaimed(t)) continue;
-    const terrain = TERRAINS[t.terrain]?.yields ?? {};
-    const feature = t.feature ? FEATURES[t.feature]?.yields ?? {} : {};
-    const res = t.resource ? RESOURCES[t.resource]?.yields ?? {} : {};
-    for (const src of [terrain, feature, res]) {
-      q += (src.food ?? 0) * 1.2 + (src.production ?? 0) + (src.gold ?? 0) * 0.5;
-    }
-    if (t.elevation === 'HILLS') q += 0.5;
-  }
-  return q;
-}
-
 export function nextCityName(actor: Seat): string {
   const leader = CIV_LEADERS.find((l) => l.name === actor.name);
   const names = leader?.cityNames ?? [actor.name];
   const n = actor.nextCityId;
   return n < names.length ? names[n] : `${names[0]} ${n + 1}`;
-}
-
-export function placeSeats(state: GameState, count?: number): void {
-  const land = state.map.tiles.filter((t) => !isWater(t) && !isImpassable(t)).length;
-  const target = Math.min(
-    CIV_LEADERS.length,
-    count ?? Math.max(1, Math.min(3, Math.round(land / 350))),
-  );
-
-  const scored = state.map.tiles
-    .map((t) => ({ t, q: siteQuality(state, t) }))
-    .filter((s) => s.q > 0)
-    .sort((a, b) => b.q - a.q || a.t.index - b.t.index);
-
-  const picked: Tile[] = [];
-  for (const { t } of scored) {
-    if (picked.length >= target) break;
-    if (picked.some((p) => hexDistance(p.col, p.row, t.col, t.row) < CIV_SPACING)) continue;
-    if (
-      state.cityStates.some((cityState) => {
-        const c = state.map.tiles[cityState.centerIndex];
-        return hexDistance(c.col, c.row, t.col, t.row) < 8;
-      })
-    ) {
-      continue;
-    }
-    picked.push(t);
-  }
-
-  picked.forEach((tile, i) => {
-    const leader = CIV_LEADERS[i % CIV_LEADERS.length];
-    const actor: Seat = {
-      ...emptySeat(state.seats.length),
-      name: leader.name,
-      color: leader.color,
-      aggression: 0.3 + nextRandom(state) * 0.6,
-      civ: i % CIV_LEADERS.length,
-    };
-    foundCityAt(state, actor.seat, tile, actor);  // one founding mutation, every seat
-    // Push BEFORE the starting warrior spawns, so spawnUnit's bestMeleeCS
-    // chokepoint can find the seat — "strongest melee ever FIELDED" includes
-    // the starting army (defense 20 from turn 0; the GPU seeds
-    // civ_best_melee from the fixture pools).
-    state.seats.push(actor);
-    spawnUnit(state, 'WARRIOR', tile.index, actor.seat);
-  });
 }
 
 /**
@@ -372,52 +303,58 @@ function makePeace(state: GameState, actor: Seat, foe: number): void {
   state.eventLog.push(`Peace with ${actor.name}.`);
 }
 
-/** CIV6 (Epic Quest): "Levying units from a city-state costs 50% less Gold." */
-export function levyGoldCost(state: GameState, seat: number): number {
-  return LEVY_GOLD_COST * (civOf(state, seat) === 'SUMERIA' ? EPIC_QUEST_LEVY_MULT : 1);
+/** The military units a city-state holds now — what a levy takes. */
+export function minorArmy(state: GameState, cityState: CityState): Unit[] {
+  return state.units.filter((u) => u.seat === cityState.seat && unitIsMilitary(u.type));
 }
 
+/** THE LEVY'S PRICE (`LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST`): that
+ *  share of the Gold purchase prices of the units it takes — each the
+ *  chassis' own price at the purchase rate, floored to five as the minor's own
+ *  purchases pay (`purchaseStep`) — summed and floored. CIV6 (Epic Quest):
+ *  "Levying units from a city-state costs 50% less Gold." */
+export function levyGoldCost(state: GameState, seat: number, cityState: CityState): number {
+  let sum = 0;
+  for (const u of minorArmy(state, cityState)) sum += purchaseStep(UNITS[u.type].cost * GOLD_PURCHASE_MULT);
+  return Math.floor((sum * LEVY_COST_PCT) / 100) * (civOf(state, seat) === 'SUMERIA' ? EPIC_QUEST_LEVY_MULT : 1);
+}
+
+/**
+ * LEVY MILITARY. CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS): "The Suzerain
+ * of this city-state can pay {1_GoldCost} Gold to take temporary control of
+ * all its current military units. The units will not be able to move on the
+ * turn they are levied, but will take orders from the Suzerain on the
+ * following turn. They will return to the city-state after {2_TurnLimit}
+ * Turns, or if the Suzerain changes" (`minorLevyReturn`) — and "You have
+ * already levied the military of this city-state" while they are out.
+ */
 export function levyUnits(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = state.cityStates.find((c) => c.id === cityStateId);
   if (!cityState) return no('No such city-state.');
-  if (cityState.type !== 'militaristic') return no('Only militaristic city-states levy troops.');
   if (!isSuzerain(state, cityState, seat)) return no('You must be suzerain (3+ envoys).');
-  const since = state.turn - (cityState.lastLevyTurn ?? -LEVY_COOLDOWN);
-  if (since < LEVY_COOLDOWN) {
-    return no(`Their troops are spent — ready in ${LEVY_COOLDOWN - since} turns.`);
-  }
+  if (cityState.levySeat !== undefined) return no('Its military is already levied.');
+  const army = minorArmy(state, cityState);
+  if (army.length === 0) return no('It has no military units to levy.');
   if (!state.sandbox) {
-    const cost = levyGoldCost(state, seat);
+    const cost = levyGoldCost(state, seat, cityState);
     if (!goldAffordable(seatOf(state, seat)!.treasury, cost)) return no(`Levy costs ${cost} gold.`);
     seatOf(state, seat)!.treasury -= cost;
   }
-  const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
-  // CIV6 (Barracks, Stable): "+25% combat experience for all <classes> units
-  // trained in this city" — the MINOR's city trained the levy, so its
-  // standing Encampment line pays the same percentage a major's would, and
-  // whatever else that city grants a unit it trains rides the same composer.
-  for (let i = 0; i < LEVY_UNITS; i++) {
-    // CIV6 (The Raven King): the mark the three levy clauses read — the
-    // ability's +2 Movement and +5 Combat, and the 75% upgrade discount. It
-    // is set here because this is the ONLY place a levied unit is born.
-    const lv = spawnUnit(state, type, cityState.centerIndex, seat);
-    if (lv) {
-      lv.levied = true;
-      applyTrainingGrants(state, minorCity(cityState), lv);
-      // ...and RE-POOL: `spawnUnit` priced the pool before the mark existed,
-      // so without this a levied unit is born 2 Movement short and only comes
-      // right at the next refresh — the levy's own lesson exactly.
-      lv.movesLeft = unitFullMoves(state, lv);
-      lv.movesFull = lv.movesLeft;
-    }
+  for (const u of army) {
+    u.seat = seat;
+    // the mark the Raven King's clauses read (its +2 Movement, +5 Combat and
+    // 75% upgrade discount) and what brings the unit home
+    u.leviedFrom = cityState.seat;
+    u.movesLeft = 0;
   }
-  cityState.lastLevyTurn = state.turn;
+  cityState.levySeat = seat;
+  cityState.levyEnds = state.turn + LEVY_TURNS;
   // CIV6 (Raven King, EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY): the levy
   // hands two Envoys back (`LEVY_ROWS`)
   for (const r of getModifiers(state, seat).levy) {
     if (r.envoys) seatOf(state, seat)!.envoysAvailable = (seatOf(state, seat)!.envoysAvailable ?? 0) + r.envoys;
   }
-  state.eventLog.push(`${cityState.name} levies ${LEVY_UNITS} ${type === 'SPEARMAN' ? 'spearmen' : 'warriors'} to your cause.`);
+  state.eventLog.push(`${cityState.name} levies its army of ${army.length} to your cause.`);
   return ok;
 }
 
@@ -907,7 +844,6 @@ export function districtSiteLegal(
   const tile = state.map.tiles[tileIndex];
   if (!tile) return false;
   const owns = (t: Tile) => tileBelongsTo(t, civCity);
-  if (tile.improvement) return false;
   return canPlaceDistrictIn(state, civCity, id, tileIndex, { unlocks, ownsTile: owns }).ok;
 }
 
@@ -931,20 +867,26 @@ export function districtSiteCost(
   return varied + add;
 }
 
+/** The GROUND a district or a wonder takes when it is placed, for every seat.
+ * CIV6: a district stands on an improved plot and REMOVES the improvement
+ * (the install's Districts and Improvements carry no clause refusing one);
+ * it paves every feature EXCEPT floodplains — the feature stays under the
+ * district (GS floods damage districts built on them; the Dam exists for
+ * exactly that), and the flood-target pick draws from it — and removes a
+ * bonus resource (`canPlaceDistrictIn` already refused luxury/strategic). */
+export function paveGround(tile: Tile): void {
+  tile.improvement = null;
+  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
+  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+}
+
 /** The GROUND a district takes when it is placed — the same writes whether the
  * city is going to build it over ten turns or bought it outright. */
 function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileIndex: number): void {
   const tile = state.map.tiles[tileIndex];
   tile.district = id;
   tile.districtComplete = false;
-  tile.improvement = null;
-  // CIV6: a district paves every feature EXCEPT floodplains — the feature
-  // stays under the district (GS floods damage districts built on them; the
-  // Dam exists for exactly that), and the flood-target pick draws from it.
-  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
-  // Placement removes a bonus resource (real Civ 6 rule; canPlaceDistrictIn
-  // already refused luxury/strategic).
-  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+  paveGround(tile);
   civCity.districts.push({ type: id, tileIndex });
 }
 
@@ -1034,9 +976,7 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
   if (!tile) return false;
   tile.builtWonder = def.id;
   tile.builtWonderComplete = false;
-  tile.improvement = null;
-  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
-  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+  paveGround(tile);
   civCity.wonders.push({ id: def.id, tileIndex: tile.index });
   commitProduction(state, civCity.seat, civCity, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
   return true;
@@ -2685,47 +2625,11 @@ export function seatPhase(state: GameState): void {
     // Trade. The route DECISION rides the wire — a real player spends a
     // Trader on a chosen pair — so the engine only re-validates the named
     // pair; the pair-picking scan lives with the deciders (the driver's
-    // candidate row / drive.py). The engine rules stay here: the walk,
-    // plunder, and the round-trip expiry.
+    // candidate row / drive.py). The engine rules are the walk and plunder
+    // (`tradeRouteWalk`) and the round-trip expiry (`tradeRouteExpiry`), the
+    // same two a city-state's routes run (`minorTrade`).
     {
-      const routes = (actor.tradeRoutes ??= []);
-      const water = tradeWaterLevel(state, actor.seat);
-      // THE WALK: each route's Trader advances one descent step toward
-      // its leg target, laying road as it goes; it turns around at the
-      // destination and starts a fresh round trip at home. (The two legs may
-      // descend different lines — the descent is greedy per step, not a
-      // stored path — so the return can lay a second road line.)
-      for (const r of routes) {
-        if ((r.walkLeg ?? -1) < 0 || r.walkTile === undefined) continue;
-        const originC = actor.cities.find((c) => c.id === r.from)?.centerIndex ?? -1;
-        const destC = routeDestCenter(state, actor, r);
-        if (originC < 0 || destC < 0) continue;
-        const target = r.walkLeg === 0 ? destC : originC;
-        const next = tradeWalkStep(state, r.walkTile, target, water);
-        if (next !== r.walkTile) {
-          r.walkTile = next;
-          // roads go on passable LAND only — a sea leg lays nothing, and
-          // neither does a portal's mountain
-          if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) state.map.tiles[next].road = true;
-          claimTileEnRoute(state, actor.seat, next);
-        }
-        if (r.walkLeg === 0 && r.walkTile === destC) r.walkLeg = 1;
-        else if (r.walkLeg === 1 && r.walkTile === originC) r.walkLeg = 0;
-      }
-      // PLUNDER, real Civ 6: a unit hostile to the route's owner standing on
-      // the Trader's tile destroys the route AND its Trader, and the raider's
-      // seat banks the gold — a major, or a city-state into its own treasury.
-      {
-        const plundered = new Set<TradeRoute>();
-        for (const r of routes) {
-          const raider = r.walkTile === undefined ? null : routePlunderer(state, r.walkTile, actor.seat);
-          if (raider === null) continue;
-          plundered.add(r);
-          const rs = seatOf(state, raider);
-          if (rs) rs.treasury += routePlunderGold(state, raider, r.walkTile!);
-        }
-        if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
-      }
+      tradeRouteWalk(state, actor);
       // the wire intent: [origin CENTRE, dest code] — a CENTRE tile, or
       // -(2 + city-state ID) for a city-state: an ID, because
       // `captureCityState` splices the array and a POSITION would shift under
@@ -2754,44 +2658,7 @@ export function seatPhase(state: GameState): void {
           }
         }
       }
-      // CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
-      // successfully complete a Trade Route" — completion is the minimum
-      // term running out WITH the Trader home (the round-trip rule; a parked
-      // sea walker is always home, a stuck one ends at the rail). A route
-      // cut short — plunder, war, a dead destination — never scores.
-      const cur = actor.tradeRoutes ?? [];
-      const isDone = (x: TradeRoute): boolean => {
-        if (x.expiresTurn === undefined || state.turn < x.expiresTurn) return false;
-        if ((x.walkLeg ?? -1) < 0) return true;
-        if (state.turn >= x.expiresTurn + TRADE_WALK_EXPIRY_RAIL) return true;
-        return x.walkTile === actor.cities.find((c) => c.id === x.from)?.centerIndex;
-      };
-      const destGone = (x: TradeRoute): boolean =>
-        x.toSeatCity !== undefined && !(seatOf(state, x.toSeat ?? NO_SEAT)?.cities ?? []).some((c) => c.id === x.toSeatCity);
-      const done = cur.filter((x) => isDone(x));
-      if (done.length > 0) {
-        dedicationEvent(state, actor.seat, DED_COINAGE, done.length);
-        // CIV6 (Trading Post): "created in a city when a civilization
-        // finishes a Trade Route to that city for the first time" -- and one
-        // at home, "in the origin and destination cities". Only a FULL term
-        // stamps; a plundered or dest-dead route plants nothing.
-        for (const r of done) {
-          stampTradingPost(actor, actor.cities.find((c) => c.id === r.from)?.centerIndex ?? -1);
-          stampTradingPost(actor, routeDestCenter(state, actor, r));
-        }
-      }
-      const ended = cur.filter((x) => isDone(x) || destGone(x));
-      if (ended.length > 0) {
-        // a route that ENDS (completes, or loses its destination) hands its
-        // Trader back at the origin; only plunder destroys the unit.
-        if (state.unitsMode) {
-          for (const r of ended) {
-            const oc = actor.cities.find((c) => c.id === r.from);
-            if (oc) spawnUnit(state, 'TRADER', oc.centerIndex, actor.seat);
-          }
-        }
-        actor.tradeRoutes = cur.filter((x) => !ended.includes(x));
-      }
+      tradeRouteExpiry(state, actor);
     }
 
     // Cities: real tile yields drive growth and the production queues.

@@ -382,7 +382,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     for row in seats:
         records.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
-    ctx_lo = env.observe(0).shape[1] - ladder.CTX_SEAT
 
     t0 = 0
     if ckpt_every or resume:
@@ -518,6 +517,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
                     diff = (gobs - tobs).abs()
+                    ctx_lo = diff.shape[0] - ladder.CTX_SEAT
                     badm = torch.zeros_like(diff, dtype=torch.bool)
                     badm[:ctx_lo] = diff[:ctx_lo] > eps
                     badm[ctx_lo:] = diff[ctx_lo:] != 0
@@ -714,7 +714,6 @@ def main() -> None:
     for row in seats:
         records.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
-    ctx_lo = env.observe(0).shape[1] - ladder.CTX_SEAT
 
     # Resume — the batched path's twin (GPU snapshot + TS state dump).
     t0 = 0
@@ -778,6 +777,7 @@ def main() -> None:
                 child.kill()
                 sys.exit(1)
             diff = (gobs - tobs).abs()
+            ctx_lo = diff.shape[0] - ladder.CTX_SEAT
             bad = torch.zeros_like(diff, dtype=torch.bool)
             bad[:ctx_lo] = diff[:ctx_lo] > args.eps
             bad[ctx_lo:] = diff[ctx_lo:] != 0

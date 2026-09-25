@@ -58,7 +58,7 @@ import {
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { tradeCapacity } from './trade';
-import { revealAround, nearestUnexplored, unitSight, unitSeesThrough } from './fog';
+import { revealAround, unitSight, unitSeesThrough } from './fog';
 import { drawGoodyReward } from './goodyHuts';
 import { goodyAmount } from '../data/goodyHuts';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
@@ -762,62 +762,6 @@ export function tileFreeForUnit(
   return true;
 }
 
-export function findPath(state: GameState, unit: Unit, targetIndex: number): number[] | null {
-  const map = state.map;
-  const target = map.tiles[targetIndex];
-  const naval = !!UNITS[unit.type]?.naval;
-  const passOk = (t: Tile): boolean =>
-    // Routing never plans THROUGH a live enemy Encampment or closed ground.
-    !encampmentBlocks(state, t, unit) &&
-    !borderClosedTo(state, unit.seat, t, unit.type) &&
-    (naval
-      ? hullTile(t) && !isImpassable(t) && (canalPassage(t) || waterEnterable(state, t, unit))
-      : unitPassable(t, unit) || gdrJump(state, unit, t) || portalAt(t));
-  if (!passOk(target)) return null;
-  const start = map.tiles[unit.tileIndex];
-
-  const open = new Map<number, { g: number; f: number; from: number }>();
-  const closed = new Set<number>();
-  open.set(start.index, { g: 0, f: hexDistance(start.col, start.row, target.col, target.row), from: -1 });
-  const parents = new Map<number, number>();
-
-  while (open.size > 0) {
-    let bestIdx = -1;
-    let bestF = Infinity;
-    for (const [i, n] of open) {
-      if (n.f < bestF) {
-        bestF = n.f;
-        bestIdx = i;
-      }
-    }
-    const cur = open.get(bestIdx)!;
-    open.delete(bestIdx);
-    closed.add(bestIdx);
-    if (bestIdx === targetIndex) {
-      const path: number[] = [];
-      let at = targetIndex;
-      while (at !== start.index) {
-        path.unshift(at);
-        at = parents.get(at)!;
-      }
-      return path;
-    }
-    const curTile = map.tiles[bestIdx];
-    for (const n of neighbors(map, curTile)) {
-      if (closed.has(n.index) || !passOk(n)) continue;
-      // Rivers cost +3 to cross — the same charge the walker pays (water steps
-      // never pay a river charge, so naval routing skips it).
-      const g = cur.g + moveCostInto(state, curTile, n, unit) + (naval ? 0 : riverCharge(state, curTile, n, unit)); // roads
-      const existing = open.get(n.index);
-      if (!existing || g < existing.g) {
-        open.set(n.index, { g, f: g + hexDistance(n.col, n.row, target.col, target.row), from: bestIdx });
-        parents.set(n.index, bestIdx);
-      }
-    }
-  }
-  return null;
-}
-
 type StepOutcome =
   | 'moved'
   | 'halted'
@@ -949,7 +893,7 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
  * composer, so a bonus added here reaches every one of them. The GPU's twin
  * is `_full_mp`.
  */
-export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number; levied?: boolean; mpBonus?: number }): number {
+export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number; leviedFrom?: number; mpBonus?: number }): number {
   const def = UNITS[unit.type];
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
   // embarked", so the promotion adder joins both arms.
@@ -962,8 +906,8 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
   // CIV6 (The Raven King): ABILITY_THE_RAVEN_KING gives a LEVIED unit
   // EFFECT_ADJUST_UNIT_MOVEMENT Amount 2. It joins the one composer, so
-  // a levied unit is born with it — the levy's own lesson.
-  const levy = unit.levied
+  // every refresh of a levied unit's pool carries it.
+  const levy = unit.leviedFrom !== undefined
     ? getModifiers(state, unit.seat).levy.reduce((n, r) => Math.max(n, r.levyMoves), 0) : 0;
   return MP_SCALE * (
     (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + levy + goldenMoveBonus(state, unit)
@@ -1125,28 +1069,6 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     return 'halted';
   }
   return unit.movesLeft > 0 ? 'moved' : 'halted';
-}
-
-export function walkPath(state: GameState, unit: Unit): void {
-  while (unit.path && unit.path.length > 0 && unit.movesLeft > 0) {
-    const nextIndex = unit.path[0];
-    const to = state.map.tiles[nextIndex];
-    const blockedByEnemy =
-      unitsAt(state, nextIndex).some((u) => u.seat !== unit.seat) ||
-      encampmentBlocks(state, to, unit);
-    if (blockedByEnemy || (unit.path.length === 1 && !tileFreeForUnit(state, nextIndex, unit.seat, unit))) {
-      unit.path = null;
-      return;
-    }
-    const outcome = stepUnit(state, unit, to);
-    if (outcome === 'blocked') {
-      unit.path = null;
-      return;
-    }
-    if (outcome === 'cantAfford') return; // path resumes next turn
-    unit.path.shift();
-  }
-  if (unit.path && unit.path.length === 0) unit.path = null;
 }
 
 /**
@@ -1367,7 +1289,7 @@ export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): bool
   if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) return false;
   const tile = state.map.tiles[unit.tileIndex];
   if (tileSeat(tile) !== seat) return false;
-  if (!canPayUpgradeGold(state, seat, unit.type, !!unit.levied)) return false;
+  if (!canPayUpgradeGold(state, seat, unit.type, unit.leviedFrom !== undefined)) return false;
   const c = upgradeResourceCost(state, seat, unit.type);
   return !c || canPayStockpile(state, seat, c.id, c.n);
 }
@@ -1376,7 +1298,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   if (!canUpgradeUnit(state, unit, seat)) return { ok: false, reason: 'Cannot upgrade here.' };
   const next = civUpgradeTarget(civOf(state, seat), unit.type, leaderOf(state, seat))!;
   const s = seatOf(state, seat)!;
-  s.treasury -= upgradeGoldCost(state, seat, unit.type, !!unit.levied);
+  s.treasury -= upgradeGoldCost(state, seat, unit.type, unit.leviedFrom !== undefined);
   const c = upgradeResourceCost(state, seat, unit.type);
   if (c) spendStockpile(state, seat, c.id, c.n, 'ug');
   unit.type = next;
@@ -1783,7 +1705,6 @@ export function spawnUnit(
     // CIV6 (Flying Squadron): "All spies start as Agents with a free
     // promotion" — the level the unit is BORN at (`SPY_PROMO_ROWS`)
     spyLevel: isSpy(unitType) ? getModifiers(state, seat).spyPromos : undefined,
-    path: null,
   };
   // The pool it was GRANTED, recorded at birth: every "spent no MP" gate
   // reads `movesFull`, and a unit created after seatPhase's reset would
@@ -2072,21 +1993,6 @@ export function refreshUnits(state: GameState): void {
         state.eventLog.push(`${unit.type} was lost to radioactive fallout.`);
         disbandUnit(state, unit.id);
         continue;
-      }
-    }
-    if (unit.path) walkPath(state, unit);
-    if (unit.mission === 'explore' && !unit.path && unit.movesLeft > 0) {
-      const target = nearestUnexplored(state, unit);
-      if (target === null) {
-        unit.mission = null;
-      } else {
-        const path = findPath(state, unit, target);
-        if (path) {
-          unit.path = path;
-          walkPath(state, unit);
-        } else {
-          unit.mission = null;
-        }
       }
     }
   }

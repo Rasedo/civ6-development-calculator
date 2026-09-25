@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
+import { canPlaceDistrict, makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, setWar, tileCity } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { advanceGreatPeople } from '../../../cpu/core/greatPeople';
-import { canPlaceDistrict } from '../../../cpu/core/rules';
 import { computeUnlocks, getModifiers } from '../../../cpu/core/effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from '../../../cpu/core/boosts';
 import { standingLoyalty } from '../../../cpu/core/phase';

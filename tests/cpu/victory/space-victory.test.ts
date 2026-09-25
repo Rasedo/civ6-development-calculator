@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { GameState, Seat } from '../../../cpu/core/types';
 import { seatOf, tileBelongsTo } from '../../../cpu/core/seats';
-import { createGame, endTurn, availableProjects, projectCost, districtCost } from '../../../cpu/core/game';
-import { canPlaceDistrict } from '../../../cpu/core/rules';
+import { endTurn, availableProjects, projectCost, districtCost } from '../../../cpu/core/game';
 import { queueSeatProject } from '../../../cpu/core/phase';
-import { settleFirstCity } from '../helpers';
+import { canPlaceDistrict, seededGame } from '../helpers';
 import { PROJECTS, SPACE_PROJECTS, SPACE_FLIGHT_LY, isSpaceProject } from '../../../cpu/data/projects';
 import { cityPower, laserSpeed } from '../../../cpu/core/yields';
 import { resolveSeatPower } from '../../../cpu/core/stockpile';
@@ -17,12 +16,7 @@ import { CIVICS } from '../../../cpu/data/civics';
 // twin is tests/gpu/space_race_test.py.
 
 function newGame(opponents = 0) {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: false,
-    withVillages: false, cityStates: 0, opponents,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 1 + opponents);
   state.autoResearch = false;
   return { state, city: seatOf(state, 0)!.cities[0] };
 }
@@ -196,8 +190,9 @@ describe('science victory', () => {
     const off = newGameWithSpaceport();
     seatOf(off.state, 0)!.research.techs.push(...GATING_TECHS);
     off.state.fogOfWar = false;
+    const before = [...seatOf(off.state, 0)!.explored];
     completeThroughQueue(off.state, off.city, 'LAUNCH_EARTH_SATELLITE');
-    expect(seatOf(off.state, 0)!.explored.some((v) => v === 1)).toBe(false);
+    expect(seatOf(off.state, 0)!.explored).toEqual(before);
   });
 
   it('Moon Landing pays 10x science/turn as Culture, ONCE; Mars Colony pays nothing', () => {

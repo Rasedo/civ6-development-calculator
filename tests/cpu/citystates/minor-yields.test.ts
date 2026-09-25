@@ -11,15 +11,16 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
-import { minorPhase } from '../../../cpu/core/minorBuild';
+import { minorLevyReturn, minorPhase, minorPower } from '../../../cpu/core/minorBuild';
 import { computeCityStats } from '../../../cpu/core/city';
-import { levyUnits } from '../../../cpu/core/phase';
+import { levyGoldCost, levyUnits } from '../../../cpu/core/phase';
+import { purchaseStep } from '../../../cpu/core/effects';
 import { buildingPillaged, pillageBuilding } from '../../../cpu/core/yields';
-import { trainXpPct } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
-import { CITIZEN_SCIENCE } from '../../../cpu/data/constants';
-import { MINOR_BUILD_ROWS, MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
+import { CITIZEN_SCIENCE, GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
+import { UNITS } from '../../../cpu/data/units';
+import { LEVY_COST_PCT, LEVY_TURNS, MINOR_BUILD_ROWS, MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
 
@@ -110,47 +111,75 @@ describe("the minor's city rides the yield walk", () => {
   });
 });
 
-describe('a levied unit carries the training experience of the minor that raised it', () => {
-  it("the Barracks' +25% rides the levy, and a pillaged Barracks pays none", () => {
+describe("the levy takes the minor's own army", () => {
+  it('pays its share of the units\' prices, takes every military unit still, and holds them until the term or the suzerain ends', () => {
     const state = makeState(makeMap(24, 24));
     state.unitsMode = true;
     const cs = addCs(state, 12, 12, 'militaristic', 4);
-    minorDistrict(state, cs, 'ENCAMPMENT', 1);
-    cs.buildings = ['BARRACKS'];
     cs.envoys = { 0: 3 };
-    state.seats[0].treasury = 100_000;
-    expect(trainXpPct(state, minorCity(cs), 'MELEE')).toBe(BUILDINGS.BARRACKS.trainXpPct);
+    cs.suzerain = 0;
+    state.seats[0].treasury = 1000;
+    // no army, no levy
+    expect(levyUnits(state, cs.id, 0).ok).toBe(false);
+    const w1 = spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat)!;
+    const w2 = spawnUnit(state, 'SLINGER', cs.centerIndex, cs.seat)!;
+    const builder = spawnUnit(state, 'BUILDER', cs.centerIndex, cs.seat)!;
+    const price = (id: string) => purchaseStep(UNITS[id].cost * GOLD_PURCHASE_MULT);
+    const cost = Math.floor(((price('WARRIOR') + price('SLINGER')) * LEVY_COST_PCT) / 100);
+    expect(levyGoldCost(state, 0, cs)).toBe(cost);
 
     expect(levyUnits(state, cs.id, 0).ok).toBe(true);
-    const levied = state.units.filter((u) => u.seat === 0 && u.levied);
-    expect(levied.length).toBeGreaterThan(0);
-    for (const u of levied) expect(u.xpPct).toBe(BUILDINGS.BARRACKS.trainXpPct);
+    expect(state.seats[0].treasury).toBe(1000 - cost);
+    for (const u of [w1, w2]) {
+      expect(u.seat).toBe(0);
+      expect(u.leviedFrom).toBe(cs.seat);
+      expect(u.movesLeft).toBe(0); // "will not be able to move on the turn they are levied"
+    }
+    expect(builder.seat).toBe(cs.seat); // a civilian is no military unit
+    expect(cs.levySeat).toBe(0);
+    expect(cs.levyEnds).toBe(state.turn + LEVY_TURNS);
+    // "You have already levied the military of this city-state."
+    expect(levyUnits(state, cs.id, 0).ok).toBe(false);
 
-    pillageBuilding(cs, 'BARRACKS');
-    cs.lastLevyTurn = -1000;
-    expect(trainXpPct(state, minorCity(cs), 'MELEE')).toBe(0);
+    // the term runs: home at its end
+    state.turn = cs.levyEnds! - 1;
+    minorLevyReturn(state, cs);
+    expect(w1.seat).toBe(0);
+    state.turn = cs.levyEnds!;
+    minorLevyReturn(state, cs);
+    for (const u of [w1, w2]) {
+      expect(u.seat).toBe(cs.seat);
+      expect(u.leviedFrom).toBeUndefined();
+    }
+    expect(cs.levySeat).toBeUndefined();
+
+    // "or if the Suzerain changes"
     expect(levyUnits(state, cs.id, 0).ok).toBe(true);
-    const again = state.units.filter((u) => u.seat === 0 && u.levied && !levied.includes(u));
-    expect(again.length).toBeGreaterThan(0);
-    for (const u of again) expect(u.xpPct).toBe(0);
+    cs.suzerain = -1;
+    minorLevyReturn(state, cs);
+    expect(w1.seat).toBe(cs.seat);
+    expect(cs.levySeat).toBeUndefined();
   });
 });
 
-describe('power at a minor', () => {
-  it("nothing the minor's build table raises draws or supplies Power", () => {
-    // the grid has no minor arm because it would compute zero — the day the
-    // table holds a building with a load, this pin fails and the arm is due
-    const ids = new Set<string>();
-    for (const row of MINOR_BUILD_ROWS) {
-      if (row.kind !== 'building') continue;
-      for (const id of Object.values(row.item ?? {})) if (id) ids.add(id);
-    }
-    expect(ids.size).toBeGreaterThan(0);
-    for (const id of ids) {
-      const def = BUILDINGS[id];
-      expect(def, id).toBeTruthy();
-      expect(def.power ?? 0).toBe(0);
-      expect(def.powerSupply ?? 0).toBe(0);
-    }
+describe("a minor's grid", () => {
+  it('a Factory with nothing to feed it stays dark; a Solar Farm on its ground lights it', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12, 'industrial', 4);
+    minorPower(state, cs);
+    expect(cs.powered).toBe(false); // no load, nothing to light
+    const iz = tileAtCoords(state.map, 13, 12);
+    iz.district = 'INDUSTRIAL_ZONE';
+    iz.districtComplete = true;
+    cs.districts = [{ type: 'INDUSTRIAL_ZONE', tileIndex: iz.index }];
+    cs.buildings = ['WORKSHOP', 'FACTORY'];
+    minorPower(state, cs);
+    expect(cs.powered).toBe(false);
+    const dark = computeCityStats(state, minorCity(cs)).total.production;
+    const farm = tileAtCoords(state.map, 11, 12);
+    farm.improvement = 'SOLAR_FARM';
+    minorPower(state, cs);
+    expect(cs.powered).toBe(true);
+    expect(computeCityStats(state, minorCity(cs)).total.production).toBeGreaterThan(dark);
   });
 });

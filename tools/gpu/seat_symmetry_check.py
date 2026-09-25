@@ -66,7 +66,12 @@ FORK_PATTERNS = (
     (re.compile(r"\b" + _SEAT_PLANE + r"\[[a-z_][a-z_0-9]*,\s*1\s*:"), "plane[rows, 1:] — the civ rows alone"),
     (re.compile(r"\b\w*_seat\b[^\n&|]{0,80}?[=!]=\s*0\b"), "seat expression == 0"),
     (re.compile(r"\.civ_at\b"), "civ-family tile view"),
-    (re.compile(r"\brecs\[\s*\]"), 'recs["0"] — the wire\'s hand-rolled seat-0 record'),
+    # a plane built whole and then row 0 filled apart: seat 0 starts the game
+    # as a different kind of thing, whatever the tensor is called
+    (re.compile(r"\[:,\s*0\]\.fill_\("), "[:, 0].fill_ — row 0 starts apart"),
+    # a seat that defaults: the call that names no seat reads seat 0
+    (re.compile(r"\b(?:row|seat)\s*(?::\s*int\s*)?=\s*0\s*[,)]"), "row / seat defaulting to 0"),
+    (re.compile(r"\bobserve\(\s*0\s*\)"), "observe(0) — seat 0's view standing for every seat's"),
 )
 
 # ---------------------------------------------------------------------------
@@ -79,8 +84,8 @@ FORK_PATTERNS = (
 # does. The oracle is measured exactly as the twin is.
 # ---------------------------------------------------------------------------
 # `cpu/world` belongs here as much as the rest: WORLD CONSTRUCTION is where a
-# seat gets its leader, its colour and its aggression draw, and a fork there is
-# a seat that starts the game as a different kind of thing.
+# seat gets its leader and its colour, and a fork there is a seat that starts
+# the game as a different kind of thing.
 TS_ROOTS = ("cpu/core", "cpu/driver", "cpu/export", "cpu/world")
 
 TS_FORK_ALLOW: dict[tuple[str, str], str] = {
@@ -106,6 +111,8 @@ TS_FORK_PATTERNS = (
     (re.compile(r"\bseat\s*[-+]\s*1\b"), "seat ± 1 — the civ index space"),
     (re.compile(r"seatOf\(\s*state\s*,\s*[A-Za-z_][A-Za-z_0-9]*\s*\+\s*1\s*\)"), "civ index + 1 -> seat"),
     (re.compile(r"\b(?:seatOfIndex|indexOfSeat)\s*\("), "the civ index space, by name"),
+    # a seat 0 made before the roster is read: every other seat arrives later
+    (re.compile(r"\bemptySeat\(\s*0\s*\)"), "emptySeat(0) — seat 0 made apart"),
 )
 
 
@@ -510,6 +517,11 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
         in_core = path.parent == CORE
         scopes: list[ast.AST] = [n for n in ast.walk(tree)
                                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))] + [tree]
+        # outside the engine, `self` in a method is that file's own class: its
+        # methods are bound names too
+        own = set() if in_core else {
+            st.name for c in ast.walk(tree) if isinstance(c, ast.ClassDef)
+            for st in c.body if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef))}
         for fn in scopes:
             recv = _scope_receivers(fn, in_core)
             for node in _scope_nodes(fn):
@@ -518,7 +530,7 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
                 if node.value.id not in recv:
                     continue
                 a = node.attr
-                if a in known or a.startswith("__"):
+                if a in known or a.startswith("__") or (node.value.id == "self" and a in own):
                     continue
                 if any(rx.match(a) for rx in shape_res):
                     continue
@@ -651,10 +663,12 @@ def bad_arity(sigs: dict[str, _Sig | None]) -> list[tuple[str, int, str]]:
 
 
 def rules_fields() -> set[str]:
+    """The `Rules` dataclass's surface: its fields and its methods."""
     tree = ast.parse((CORE / "simbase.py").read_text(encoding="utf-8"))
     for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "Rules"]:
         return {st.target.id for st in cls.body
-                if isinstance(st, ast.AnnAssign) and isinstance(st.target, ast.Name)}
+                if isinstance(st, ast.AnnAssign) and isinstance(st.target, ast.Name)} | {
+                st.name for st in cls.body if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef))}
     return set()
 
 
@@ -796,7 +810,9 @@ _FOREIGN_RE = re.compile(r"^(?:EFFECT|MODIFIER|TRAIT|ABILITY|GLOBAL|COLLECTION|R
 _FOREIGN = {"full_like", "zeros_like", "ones_like", "index_put_", "scatter_add_",
             "index_select", "masked_fill", "argsort", "readFileSync", "writeFileSync",
             "addImportDeclaration", "addNamedImports", "getImportDeclarations",
-            "noUnusedLocals", "noEmit", "skipLibCheck"}
+            "noUnusedLocals", "noEmit", "skipLibCheck",
+            # the game UI's own policy-unlock operation and its option
+            "UNLOCK_POLICIES", "GOVERNMENT_UNLOCK_WITH_FAITH"}
 
 
 # The SOURCE trees. `.venv` and `.claude/scratchpad` are not ours: a vendored
@@ -827,6 +843,10 @@ def _declared_everywhere() -> set[str]:
                 for m in re.finditer(pat, src, re.M):
                     out |= set(re.findall(r"\w{3,}", m.group(1)))
             out |= {m.group(1) for m in _STRING_NAME.finditer(src)}
+            # a TEMPLATE family (`MOVE_${d}`) declares its numbered members
+            if suffix == ".ts":
+                for m in re.finditer(r"`([A-Z][A-Z0-9_]*_)\$\{", src):
+                    out |= {f"{m.group(1)}{i}" for i in range(10)}
     return out
 
 

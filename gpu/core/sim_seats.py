@@ -113,18 +113,6 @@ class SimSeats:
             else:
                 new = val.to(old.dtype)
             p[bidx, row, col, slot] = torch.where(take, new, old)
-        # CIV6: production is never lost — a CANCELLED item kept its hammers
-        # against its own column; queueing that column again resumes them.
-        lb = self.city_item_bank[bidx, row, col]
-        code_l = code if torch.is_tensor(code) else torch.full_like(depth, int(code))
-        m = take.unsqueeze(1) & (lb == code_l.long().unsqueeze(1))
-        if bool(m.any()):
-            amt = self.city_item_amt[bidx, row, col]
-            got = torch.where(m, amt, torch.zeros_like(amt)).sum(dim=1)
-            prog = self.city_progress[bidx, row, col, slot]
-            self.city_progress[bidx, row, col, slot] = prog + got.to(prog.dtype)
-            self.city_item_bank[bidx, row, col] = torch.where(m, torch.full_like(lb, -1), lb)
-            self.city_item_amt[bidx, row, col] = torch.where(m, torch.zeros_like(amt), amt)
 
     def _q_pop(self, row: int, col, hit: torch.Tensor) -> None:
         """`queue.shift()` — drop the head and close the gap, all four planes
@@ -155,49 +143,6 @@ class SimSeats:
             moved = cur.gather(1, order)
             p[rows, row, col] = torch.where(
                 keep.gather(1, order), moved, torch.full_like(moved, empty))
-
-    def _cancel_queue_item(self, b: int, row: int, col: int, k: int) -> None:
-        """A poke — no engine path cancels, on either engine. The item keeps its own hammers
-        (`city_item_bank`, merged by column; a FULL ledger banks nothing
-        more), a district or wonder still going up vacates its plot and its
-        registry entry, and the queue closes the gap."""
-        code = int(self.city_current[b, row, col, k])
-        if code < 0:
-            return
-        amt = float(self.city_progress[b, row, col, k])
-        if amt > 0:
-            lb = self.city_item_bank[b, row, col]
-            at = (lb == code).nonzero(as_tuple=True)[0]
-            if not at.numel():
-                at = (lb < 0).nonzero(as_tuple=True)[0]
-            if at.numel():
-                li = int(at[0])
-                self.city_item_bank[b, row, col, li] = code
-                self.city_item_amt[b, row, col, li] += amt
-        t = int(self.city_qtile[b, row, col, k])
-        nD, nW = self.city_dist_tile.shape[3], self.city_wonder.shape[3]
-        bumped = False
-        if t >= 0 and self.DISTRICT_BASE <= code < self.DISTRICT_BASE + nD:
-            self.district[b, t] = -1
-            self.district_complete[b, t] = False
-            dreg = self.city_dist_tile[b, row, col]
-            self.city_dist_tile[b, row, col] = torch.where(
-                dreg == t, torch.full_like(dreg, -1), dreg)
-            bumped = True
-        if t >= 0 and self.WONDER_BASE <= code < self.WONDER_BASE + nW:
-            self.built_wonder[b, t] = -1
-            self.built_wonder_complete[b, t] = False
-            wreg = self.city_wonder[b, row, col]
-            self.city_wonder[b, row, col] = torch.where(
-                wreg == t, torch.full_like(wreg, -1), wreg)
-            bumped = True
-        rows = torch.tensor([b], dtype=torch.long, device=self.device)
-        gone = torch.zeros(1, self.QD, dtype=torch.bool, device=self.device)
-        gone[0, k] = True
-        self._q_drop(rows, row, col, gone)
-        if bumped:
-            self._claim_version += 1
-            self._eff_version += 1
 
     def _seat_production_mask(self, row: int, sites: dict | None = None) -> torch.Tensor:
         """[B, RC, W] — THE production decision space, for seat row `row`.
@@ -703,8 +648,10 @@ class SimSeats:
         self.war[:, row, crow] |= declare
         self.war[:, crow, row] |= declare
         self._reset_war_clock(row, crow, declare)
-        # CIV6: war cancels the routes with the new enemy; the Traders return.
+        # CIV6: war cancels the routes with the new enemy, both ways; the
+        # Traders return.
         self._cancel_routes_cs(row, s, declare)
+        self._cancel_routes_pair(row, crow, declare)
         # ...and it pays the minor's patrons, suzerain and envoy holder alike.
         self._grievance_cs_war(row, s, declare)
 
@@ -1860,10 +1807,23 @@ class SimSeats:
         self.unit_xp[gr, gu] = self._bank_xp(self.unit_xp[gr, gu], self.unit_level[gr, gu], gain[gr])
         self._log_xp(gr, gu, "ej")
 
-    def _levy_cost(self, row: int) -> torch.Tensor:
-        """[B] f64 `levyGoldCost` — CIV6 (Epic Quest): "Levying units from a
+    def _minor_army(self, sl: torch.Tensor) -> torch.Tensor:
+        """[B, U] — the military units the minor named per game (`sl`, [B])
+        holds now: what a levy takes (`minorArmy`)."""
+        mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        return (self.major_unit_alive & (self.major_unit_seat == (100 + sl).unsqueeze(1))
+                & self._type_military[mt])
+
+    def _levy_cost(self, row: int, sl: torch.Tensor) -> torch.Tensor:
+        """[B] f64 `levyGoldCost` — `LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST`
+        of the Gold purchase prices of the army the levy takes from the minor
+        named per game (`sl`), each the chassis' own price floored to five,
+        summed and floored. CIV6 (Epic Quest): "Levying units from a
         city-state costs 50% less Gold." """
-        base = float(self.rules.citystate["levyGoldCost"])
+        mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        each = self._purchase_step(self._type_cost[mt].double() * float(self.rules.gold_purchase_mult))
+        total = (each * self._minor_army(sl).double()).sum(dim=1)
+        base = torch.floor(total * self._levy_cost_pct / 100.0)
         mult = torch.where(self._row_plays(row, "SUMERIA"),
                            torch.full((self.B,), self._epic_levy_mult, dtype=torch.float64, device=self.device),
                            torch.ones(self.B, dtype=torch.float64, device=self.device))
@@ -2331,22 +2291,24 @@ class SimSeats:
         return js_round(out)
 
     def _seat_levy_candidate(self, row: int, active: torch.Tensor):
-        """Buy-kind 7: the LEVY candidate — the RULE half only (militaristic
-        CS, this seat suzerain, cooldown ready, afford) over the FIRST
-        eligible CS in slot order. At-war is the DRIVER's policy gate, not a
-        rule (TS levyUnits has no war test), so it joins in _buy_ctx.
-        Returns (ok [B], cs [B])."""
+        """Buy-kind 7: the LEVY candidate — the RULE half only (this seat
+        suzerain, the army not already levied and standing, the price
+        afforded) over the FIRST eligible CS in slot order. At-war is the
+        DRIVER's policy gate, not a rule (TS levyUnits has no war test), so it
+        joins in _buy_ctx. Returns (ok [B], cs [B])."""
         B, dev = self.B, self.device
         ok = torch.zeros(B, dtype=torch.bool, device=dev)
         cs = torch.full((B,), -1, dtype=torch.long, device=dev)
         if self.S <= 0:
             return ok, cs
         Sl = self.S
-        mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
-        levy_cost = self._levy_cost(row)
-        ready = (self.turn - self.citystate_last_levy[:, :Sl]) >= self._levy_cooldown
-        elig = active.unsqueeze(1) & (self.citystate_type[:, :Sl] == mil_idx) & self._suzerain_mask(row)[:, :Sl] & ready \
-            & self._afford(self.civ_treasury[:, row], levy_cost).unsqueeze(1)
+        elig = torch.zeros(B, Sl, dtype=torch.bool, device=dev)
+        suz = self._suzerain_mask(row)[:, :Sl]
+        for _s in range(Sl):
+            _sl = torch.full((B,), _s, dtype=torch.long, device=dev)
+            elig[:, _s] = (active & suz[:, _s] & (self.citystate_levy_seat[:, _s] < 0)
+                           & self._minor_army(_sl).any(dim=1)
+                           & self._afford(self.civ_treasury[:, row], self._levy_cost(row, _sl)))
         ok = elig.any(dim=1)
         cs = torch.where(ok, elig.long().argmax(dim=1), cs)
         return ok, cs
@@ -2935,43 +2897,37 @@ class SimSeats:
                        & self._nuke_offer(row, _d).gather(1, nt.unsqueeze(1)).squeeze(1))
                 self._detonate(sel, row, _d, nt)
         if row in self._driven_levy and self.S > 0:
+            # `levyUnits`: CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS) the
+            # suzerain pays "to take temporary control of all its current
+            # military units", which "will not be able to move on the turn
+            # they are levied"; they carry the mark the Raven King's clauses
+            # read and the minor they return to (`_minor_levy_return`)
             lv = self._driven_levy.pop(row)
             Sl = self.S
-            mil_idx_l = int(self.rules.citystate.get("militaristicIdx", -1))
-            levy_cost = self._levy_cost(row)
-            levy_units_n = int(self.rules.citystate.get("levyUnits", 2))
             want_l = active & ext & (lv >= 0) & (lv < Sl)
             if bool(want_l.any()):
                 sl = lv.clamp(min=0, max=Sl - 1)
-                ready_l = (self.turn - self.citystate_last_levy[bidx, sl]) >= self._levy_cooldown
-                do_l = want_l & (self.citystate_type[bidx, sl] == mil_idx_l) & self._suzerain_mask(row)[bidx, sl] \
-                    & ready_l & self._afford(self.civ_treasury[:, row], levy_cost)
+                army = self._minor_army(sl)
+                levy_cost = self._levy_cost(row, sl)
+                do_l = (want_l & self._suzerain_mask(row)[bidx, sl] & (self.citystate_levy_seat[bidx, sl] < 0)
+                        & army.any(dim=1) & self._afford(self.civ_treasury[:, row], levy_cost))
                 if bool(do_l.any()):
-                    at_l = self.citystate_center[bidx, sl].clamp(min=0)
-                    ltype = self._spearman_idx if self.turn > int(self.rules.combat.get("spearmanAfterTurn", 60)) else self._warrior_idx
-                    ltype_t = torch.full((B,), ltype, dtype=torch.long, device=dev)
-                    # CIV6 (Barracks, Stable): "+25% combat experience for all
-                    # <classes> units trained in this city" — the MINOR's city
-                    # trained the levy, so its standing Encampment line pays
-                    # the same percentage a major's would (`trainXpPct`)
-                    _mrow = self._CITY_MINOR0 + sl
-                    _bl_l = self.city_bldg[bidx, _mrow, 0] & ~self._bldg_dark(
-                        self.city_dist_tile[bidx, _mrow, 0], self.city_bldg_pillaged[bidx, _mrow, 0])
-                    xp_l = self._train_xp_pct(_bl_l, ltype_t, self._CITY_MINOR0,
-                                              torch.zeros(B, dtype=torch.long, device=dev))
-                    for _ in range(levy_units_n):
-                        _lslot = self._spawn_unit(row, do_l, at_l, ltype_t)
-                        # the MARK all three levy clauses read, and a re-pool:
-                        # the spawn priced the pool before the mark existed.
-                        if bool(_lslot.any()):
-                            _lr = _lslot.nonzero(as_tuple=True)[0]
-                            _lsl = getattr(self, self.POOL_NEXT["major"])[_lr] - 1
-                            self.major_unit_levied[_lr, _lsl] = True
-                            self.major_unit_xp_pct[_lr, _lsl] = xp_l[_lr]
-                            self._repool_unit(_lr, _lsl)
+                    m = army & do_l.unsqueeze(1)
+                    self.major_unit_seat[m] = row
+                    self.major_unit_levied[m] = True
+                    self.major_unit_levy_src[m] = (100 + sl).unsqueeze(1).expand_as(m)[m]
+                    self.major_unit_mp[m] = 0
+                    self._gen_ver += 1
                     self.civ_treasury[:, row] = torch.where(do_l, self.civ_treasury[:, row] - levy_cost, self.civ_treasury[:, row])
                     rows_l = do_l.nonzero(as_tuple=True)[0]
-                    self.citystate_last_levy[rows_l, sl[rows_l]] = self.turn
+                    self.citystate_levy_seat[rows_l, sl[rows_l]] = row
+                    self.citystate_levy_ends[rows_l, sl[rows_l]] = int(self.turn) + self._levy_turns
+                    # CIV6 (Raven King, EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY):
+                    # the levy hands Envoys back (`LEVY_ROWS`)
+                    for _lc, _ll, _ld, _le, _lm, _lcs in self._live_rows(row, self._levy_rows):
+                        if _le:
+                            _hit = do_l & self._row_is(row, _lc, _ll)
+                            self.civ_envoys_avail[:, row] += _hit.long() * int(_le)
 
     def _apply_seat_pref(self, row: int, pref: torch.Tensor, dtile: torch.Tensor | None = None,
                          max_tries: int = 8) -> None:
@@ -8299,10 +8255,16 @@ class SimSeats:
         overwritten by a different row before the same row is re-requested.
         Consumers read one column, read-only."""
         if row >= self.n_majors:
-            # a minor or the Free row sends no route and carries no roster row;
-            # a MINOR's one city is still a destination — Democracy's "+4 Food
-            # and +4 Production for BOTH CITIES" on its suzerain's route in
-            return self._incoming_ally_route(row) if row < self.FREE_ROW else None
+            # a MINOR's one city: Democracy's "+4 Food and +4 Production for
+            # BOTH CITIES" on its suzerain's route in, then its own routes out
+            # (`_minor_route_income`); the Free row runs none
+            if row >= self.FREE_ROW:
+                return None
+            _ally_m = self._incoming_ally_route(row)
+            _own_m = self._minor_route_income(row - self._CITY_MINOR0)
+            if _ally_m is None:
+                return _own_m
+            return _ally_m if _own_m is None else _ally_m + _own_m
         key = (self.turn, row, self._eff_version, self._rp_kill_version, self._bel_stamp())
         if self._seat_route_cache is not None and self._seat_route_cache[0] == key:
             return self._seat_route_cache[1]
@@ -11542,8 +11504,8 @@ class SimSeats:
         """The `stepUnit` twin for the ACTION appliers — [B] masks in, the
         mask of units that actually stepped out.
 
-        `ok` is the caller's terrain/occupancy verdict (walkPath's
-        blockedByEnemy + tileFreeForUnit); everything downstream of it is the
+        `ok` is the caller's terrain/occupancy verdict (the hostile occupant
+        and `tileFreeForUnit`); everything downstream of it is the
         same for every mover and lives here:
 
           * COST — moveCostInto + riverCharge, road-aware (`_road_terms`).
@@ -12828,6 +12790,7 @@ class SimSeats:
             cs_outer[rows], self._walls_tier_hp[cs_tier][rows], d_cs[rows],
             self._hit_class(at0, False)[rows], cs_assist[rows])
         self.city_outer_hp[rows, cs_mrow[rows], 0] = cs_outer[rows] - cs_wall
+        self.city_last_hit[rows, cs_mrow[rows], 0] = self.turn
         self.citystate_hp[rows, citystate_sc[rows]] -= cs_centre
         if atk_kind == "barb":
             # CIV6: barbarians never capture a city — their assault leaves the
@@ -13122,6 +13085,7 @@ class SimSeats:
             cs_wall, cs_centre = self._city_damage_split(
                 cs_outer[rr], self._walls_tier_hp[cs_tier][rr], d_csv[rr], _klass[rr])
             self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall
+            self.city_last_hit[rr, cs_mrow[rr], 0] = self.turn
             self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre).clamp(min=1)
             _cshp = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1)
             self._award_city_xp(cs_att, atk_kind, u, _type_p[:, u], a_seat,
@@ -13387,6 +13351,7 @@ class SimSeats:
             cs_wall, cs_centre = self._city_damage_split(
                 cs_outer[rr], self._walls_tier_hp[cs_tier][rr], d_cs[rr], _klass[rr])
             self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall
+            self.city_last_hit[rr, cs_mrow[rr], 0] = self.turn
             self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre).clamp(min=1)
             _cshp = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1)
             self._award_city_xp(cs_att, atk_kind, u, a_type[:, u], aseat,
@@ -13652,8 +13617,7 @@ class SimSeats:
         """`tradeRouteRange` — 30 tiles when BOTH ends have maritime access and
         the seat can put a Trader on the water, else 15. `mar_o`/`mar_d`
         broadcast to the caller's pair shape."""
-        sea = (self._trade_water_level(row) > 0) if row < self.n_majors else torch.zeros(
-            self.B, dtype=torch.bool, device=self.device)
+        sea = self._trade_water_level(row) > 0
         wide = sea.reshape((-1,) + (1,) * (max(mar_o.dim(), mar_d.dim()) - 1)) & mar_o & mar_d
         return torch.where(wide, torch.full_like(wide, self._trade_sea_range, dtype=torch.long),
                            torch.full_like(wide, self._trade_range, dtype=torch.long))
@@ -13805,12 +13769,22 @@ class SimSeats:
         living city +1 (non-cumulative), each COMPLETED Colossus/Great
         Zimbabwe in a city's wonder REGISTRY +1 (`c.wonders`, not a tile
         scan), one per trade-type city-state this seat is Suzerain of, and the
-        one TRADE POLICY outcome A hands the seat it names."""
+        one TRADE POLICY outcome A hands the seat it names. A city-state's
+        row holds only its civic and its city's Market or Lighthouse: it has
+        no wonder, is no one's suzerain, is never Trade Policy's target and
+        holds no Great Person or roster row."""
         B, RC, S, dev = self.B, self.RC, self.S, self.device
         alive = self.city_alive[:, row]
         cap = torch.zeros(B, dtype=torch.long, device=dev)
         if self._trade_ftc >= 0:
             cap = cap + self._seat_civics(row)[:, self._trade_ftc].long()
+        if self._CITY_MINOR0 <= row < self.FREE_ROW:
+            mk = torch.zeros(B, dtype=torch.bool, device=dev)
+            if self._trade_mkt >= 0:
+                mk = mk | self.city_bldg[:, row, 0, self._trade_mkt]
+            if self._trade_lgh >= 0:
+                mk = mk | self.city_bldg[:, row, 0, self._trade_lgh]
+            return cap + (mk & alive[:, 0]).long()
         bldg = self.city_bldg[:, row]
         mkt = torch.zeros(B, RC, dtype=torch.bool, device=dev)
         if self._trade_mkt >= 0:
@@ -13844,8 +13818,8 @@ class SimSeats:
             if not rows:
                 continue
             works = self._gw_created_count(r2)                    # [B, RC]
-            live = self.city_alive[:, r2] & (self.city_center[:, r2] >= 0)
-            ctr = self.city_center[:, r2].clamp(min=0)
+            live = self.city_alive[:, r2]
+            ctr = self.city_center[:, r2]
             d = self.pair_dist[here.unsqueeze(1), ctr]            # [n, RC]
             for _ec, _el, _ea, _er in rows:
                 _ew = self._row_is(r2, _ec, _el)
@@ -13928,7 +13902,7 @@ class SimSeats:
         cross-engine key: one civilian per tile makes it unique."""
         al = (
             self.major_unit_alive
-            & (self.major_unit_seat == row)
+            & (self.major_unit_seat == int(self._ROW_SEAT[row]))
             & (self.major_unit_type == self._trader_idx)
         )
         t = torch.where(al, self.major_unit_tile, torch.full_like(self.major_unit_tile, 1 << 30))
@@ -13971,6 +13945,15 @@ class SimSeats:
         self.tile_city[bb[take], tiles[take]] = -1
         self._eff_version += 1
 
+    def _route_origin_ids(self, row: int) -> torch.Tensor:
+        """[B, RC] long — the id a route of this row carries for each origin
+        column: the city ids, and for a city-state's row 0 on its one city,
+        whose own id -1 is the route slot's empty mark."""
+        ids = self.city_id[:, row]
+        if self._CITY_MINOR0 <= row < self.FREE_ROW:
+            ids = ids.clamp(min=0)
+        return ids
+
     def _route_centres(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, K] (origin centre, dest centre) per route slot, -1 where an
         endpoint no longer names a living city — routeDestCenter plus the
@@ -13978,7 +13961,7 @@ class SimSeats:
         B, RC, S, dev = self.B, self.RC, self.S, self.device
         rr = self.seat_routes[:, row]  # [B, K, 2]
         K = rr.shape[1]
-        ids = self.city_id[:, row]
+        ids = self._route_origin_ids(row)
         alive = self.city_alive[:, row]
         ctr = self.city_center[:, row]
         arc = torch.arange(RC, device=dev).reshape(1, 1, -1)
@@ -14048,7 +14031,7 @@ class SimSeats:
                 cur = self.seat_route_walk[bb, row, kk]
                 lg = leg[bb, kk]
                 tgt = torch.where(lg == 0, dc[bb, kk], oc[bb, kk])
-                wl = self._trade_water_level(row)[bb] if row < self.n_majors else torch.zeros_like(cur)
+                wl = self._trade_water_level(row)[bb]
                 nxt = self._trade_walk_step(bb, cur, tgt, wl)
                 self.seat_route_walk[bb, row, kk] = nxt
                 # roads go on passable LAND only — a sea leg lays nothing, and
@@ -14590,15 +14573,14 @@ class SimSeats:
         dest_gone = act & (dc2 >= 0) & ~dst
         drop = completed | dest_gone
         if bool(drop.any()):
-            if row < self.n_majors:
-                # ended routes hand their Traders back at the origin, in slot
-                # order (TS array order) — the spot search fills outward when
-                # the centre is taken.
-                K = self.seat_routes.shape[2]
-                for k in range(K):
-                    m = drop[:, k] & (oc[:, k] >= 0)
-                    if bool(m.any()):
-                        self._spawn_unit(row, m, oc[:, k].clamp(min=0), self._trader_idx)
+            # ended routes hand their Traders back at the origin, in slot
+            # order (TS array order) — the spot search fills outward when the
+            # centre is taken.
+            K = self.seat_routes.shape[2]
+            for k in range(K):
+                m = drop[:, k] & (oc[:, k] >= 0)
+                if bool(m.any()):
+                    self._spawn_unit(row, m, oc[:, k].clamp(min=0), self._trader_idx)
             self.seat_routes[:, row][drop] = -1
             self.seat_route_dseat[:, row][drop] = -1
             self.seat_route_dcity[:, row][drop] = -1

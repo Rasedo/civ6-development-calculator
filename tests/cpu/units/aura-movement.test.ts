@@ -2,8 +2,7 @@ import { seatOf } from '../../../cpu/core/seats';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT } from '../../../cpu/core/seats';
-import { createGame } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import { spawnUnit, refreshUnits } from '../../../cpu/core/units';
 import { generalAuraMP, GENERAL_AURA_MP, inGeneralAura } from '../../../cpu/core/aura';
 import { hexDistance } from '../../../world/hex';
@@ -21,12 +20,7 @@ import type { GameState } from '../../../cpu/core/types';
 // identical and the boolean was deleted.)
 
 function newGame(): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 0, opponents: 1,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 2);
   state.autoResearch = false;
   return state;
 }

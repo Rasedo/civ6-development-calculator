@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { seatOf } from '../../../cpu/core/seats';
-import { createGame, endTurn } from '../../../cpu/core/game';
-import { settleFirstCity, holdWorks } from '../helpers';
+import { endTurn } from '../../../cpu/core/game';
+import { seededGame, holdWorks } from '../helpers';
 import { TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENLIGHTENMENT_CIVIC, HOLY_CITY_TOURISM } from '../../../cpu/data/seats';
 import { GWO_RELIC, GWO_TOURISM } from '../../../cpu/data/greatWorks';
 const RELIC_TOURISM = GWO_TOURISM[GWO_RELIC]!;
@@ -22,12 +22,7 @@ import { seatAccumulators } from '../../../cpu/core/seatTurn';
 // trace column); these pokes are the bar for the CHECK.
 
 function newGame(opponents = 1) {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: false,
-    withVillages: false, cityStates: 0, opponents,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 1 + opponents);
   state.autoResearch = false;
   return state;
 }

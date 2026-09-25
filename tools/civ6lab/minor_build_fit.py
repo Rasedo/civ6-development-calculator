@@ -55,12 +55,24 @@ TYPE_T1 = {"SCIENTIFIC": "BUILDING_LIBRARY", "RELIGIOUS": "BUILDING_SHRINE", "TR
            "CULTURAL": "BUILDING_AMPHITHEATER", "INDUSTRIAL": "BUILDING_WORKSHOP", "MILITARISTIC": "BUILDING_BARRACKS"}
 TYPE_T2 = {"SCIENTIFIC": "BUILDING_UNIVERSITY", "RELIGIOUS": "BUILDING_TEMPLE", "TRADE": "BUILDING_BANK",
            "CULTURAL": "BUILDING_MUSEUM_ART", "INDUSTRIAL": "BUILDING_FACTORY", "MILITARISTIC": "BUILDING_ARMORY"}
-TYPE_T3 = {"MILITARISTIC": "BUILDING_MILITARY_ACADEMY"}
+# the worship buildings: a religious minor's third tier is whichever its
+# majority religion's Worship belief names
+WORSHIP = {"BUILDING_CATHEDRAL", "BUILDING_GURDWARA", "BUILDING_MEETING_HOUSE", "BUILDING_MOSQUE", "BUILDING_PAGODA",
+           "BUILDING_SYNAGOGUE", "BUILDING_WAT", "BUILDING_STUPA", "BUILDING_DAR_E_MEHR"}
+TYPE_T3 = {"MILITARISTIC": "BUILDING_MILITARY_ACADEMY", "SCIENTIFIC": "BUILDING_RESEARCH_LAB",
+           "CULTURAL": "BUILDING_BROADCAST_CENTER", "TRADE": "BUILDING_STOCK_EXCHANGE", "RELIGIOUS": WORSHIP}
+# the type district's project (the Encampment's Training: never started)
+TYPE_PROJECT = {"SCIENTIFIC": "PROJECT_ENHANCE_DISTRICT_CAMPUS", "RELIGIOUS": "PROJECT_ENHANCE_DISTRICT_HOLY_SITE",
+                "TRADE": "PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB", "CULTURAL": "PROJECT_ENHANCE_DISTRICT_THEATER",
+                "INDUSTRIAL": "PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE",
+                "MILITARISTIC": "PROJECT_ENHANCE_DISTRICT_ENCAMPMENT"}
 # the development rows the engine hosts: engine id <- census id
 DEV = [("WATER_MILL", "BUILDING_WATER_MILL"), ("HARBOR", "DISTRICT_HARBOR"), ("ANCIENT_WALLS", "BUILDING_WALLS"),
        ("LIGHTHOUSE", "BUILDING_LIGHTHOUSE"), ("MEDIEVAL_WALLS", "BUILDING_CASTLE"),
        ("RENAISSANCE_WALLS", "BUILDING_STAR_FORT"), ("SHIPYARD", "BUILDING_SHIPYARD"),
-       ("SEAPORT", "BUILDING_SEAPORT"), ("NEIGHBORHOOD", "DISTRICT_NEIGHBORHOOD"), ("SEWER", "BUILDING_SEWER")]
+       ("SEAPORT", "BUILDING_SEAPORT"), ("NEIGHBORHOOD", "DISTRICT_NEIGHBORHOOD"), ("SEWER", "BUILDING_SEWER"),
+       ("TRADER", "UNIT_TRADER"), ("FLOOD_BARRIER", "BUILDING_FLOOD_BARRIER"),
+       ("FOOD_MARKET", "BUILDING_FOOD_MARKET"), ("HARBOR_PROJECT", "PROJECT_ENHANCE_DISTRICT_HARBOR")]
 
 
 def land(r):
@@ -122,11 +134,15 @@ def main():
         first[key] = (fs, rows[-1]["t"], TYPES.get(rows[0]["civ"], "?"))
 
     def ev(item, only_type=None):
+        """the first START of `item` (one census id, or a set of them: the
+        earliest of the set) per minor-game, censored at its last record"""
+        items = item if isinstance(item, set) else {item}
         out = []
         for key, (fs, tend, typ) in first.items():
             if only_type and typ != only_type:
                 continue
-            out.append((fs[item], True) if item in fs else (tend, False))
+            ts = [fs[i] for i in items if i in fs]
+            out.append((min(ts), True) if ts else (tend, False))
         return out
 
     # the opening's propensities are COMPLETIONS by turn 100: a run of a unit
@@ -149,7 +165,7 @@ def main():
     for eng, cen in DEV:
         table[eng] = slots_timed(ev(cen))
     for name, per in (("TYPE_DISTRICT", TYPE_DISTRICT), ("TYPE_T1", TYPE_T1), ("TYPE_T2", TYPE_T2),
-                      ("TYPE_T3", TYPE_T3)):
+                      ("TYPE_T3", TYPE_T3), ("TYPE_PROJECT", TYPE_PROJECT)):
         table[name] = {}
         for typ in TYPE_DISTRICT:
             if typ not in per:
@@ -242,6 +258,15 @@ def main():
         "classWeights": dict(wts),
         "builderSpanMedian": med, "builderSpans": len(spans), "builderRatePermille": lo,
     }
+    if "--compact" in sys.argv:
+        for k, v in out["table"].items():
+            if isinstance(v, dict):
+                for t, (sl, f) in v.items():
+                    print(f"{k}.{t}: {sl}  F={f:.3f}")
+            else:
+                print(f"{k}: {v[0]}  F={v[1]:.3f}")
+        print("armyCap", out["armyCap"], "classWeights", out["classWeights"])
+        return
     print(json.dumps(out, indent=1))
 
 

@@ -467,6 +467,27 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
         competitionOnly: { derived: 'the scored competition whose UnlocksFromEffect opens the row', inputs: [xml('Projects', 'ProjectType=PROJECT_SEND_AID', 'ProjectType')] },
       },
     }),
+    // CIV6 (PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE, Industrial Zone
+    // Logistics): the Industrial Zone's district project — Cost 25 on the
+    // GAME_PROGRESS curve like its five siblings, Great Engineer points and no
+    // yield conversion. `Projects_XP2.FullyPoweredWhileActive` is not modelled.
+    // APPENDED LAST, because a project's catalog index IS its action code.
+    P({
+      id: 'LOGISTICS',
+      name: 'Industrial Zone Logistics',
+      district: 'INDUSTRIAL_ZONE',
+      yield: null,
+      gpClass: 'ENGINEER',
+      description: 'Convert production into Great Engineer points.',
+      cost: 25,
+      costProgressGame: 1500,
+      src: {
+        cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'CostProgressionParam1'),
+        district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'PrereqDistrict', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
+        gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_ENGINEER' }),
+      },
+    }),
   ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: scaleByGameSpeed(p.cost) } : p]),
 );
 

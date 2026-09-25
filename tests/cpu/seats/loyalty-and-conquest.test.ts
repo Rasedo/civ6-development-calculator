@@ -6,10 +6,10 @@ import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { seatPhase, levyUnits, loyaltyDelta, applyLoyalty, flipCity } from '../../../cpu/core/phase';
+import { seatPhase, levyGoldCost, levyUnits, loyaltyDelta, applyLoyalty, flipCity } from '../../../cpu/core/phase';
 import { barbarianPhase, meleeAttack, attackTargets } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
-import { CITY_STATE_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST } from '../../../cpu/data/cityStates';
+import { CITY_STATE_MAX_HP } from '../../../cpu/data/cityStates';
 import { declareWarOnCityState } from '../../../cpu/core/cityStates';
 import { LOYALTY_PRESSURE_SCALE } from '../../../cpu/data/seats';
 import type { CityState, CityStateType, GameState, City, Seat } from '../../../cpu/core/types';
@@ -20,7 +20,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
-    aggression: 0.5,
     seat: 1,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
@@ -200,20 +199,21 @@ describe('city-state conquest and levies', () => {
     expect(attackTargets(state, unit)).toContain(cityState.centerIndex);
   });
 
-  it('suzerains levy militaristic troops for gold, on a cooldown', () => {
+  it("a suzerain levies any city-state's own army for gold, once while it is out", () => {
     const state = makeState();
     state.unitsMode = true;
-    const cityState = addCs(state, 8, 8, 'militaristic', 3);
-    seatOf(state, 0)!.treasury = LEVY_GOLD_COST;
+    const cityState = addCs(state, 8, 8, 'scientific', 3);
+    spawnUnit(state, 'WARRIOR', cityState.centerIndex, cityState.seat);
+    const price = levyGoldCost(state, 0, cityState);
+    seatOf(state, 0)!.treasury = price;
     expect(levyUnits(state, cityState.id, 0).ok).toBe(true);
-    expect(state.units.filter((u) => (u.seat) === 0).length).toBe(LEVY_UNITS);
+    expect(state.units.filter((u) => (u.seat) === 0).length).toBe(1);
     expect(seatOf(state, 0)!.treasury).toBe(0);
-    seatOf(state, 0)!.treasury = LEVY_GOLD_COST;
-    expect(levyUnits(state, cityState.id, 0).ok).toBe(false); // cooldown
+    seatOf(state, 0)!.treasury = price;
+    expect(levyUnits(state, cityState.id, 0).ok).toBe(false); // already levied
 
-    const nonMil = addCs(state, 2, 2, 'scientific', 3);
-    expect(levyUnits(state, nonMil.id, 0).ok).toBe(false);
-    const noSuz = addCs(state, 10, 10, 'militaristic', 1);
+    const noSuz = addCs(state, 2, 2, 'militaristic', 1);
+    spawnUnit(state, 'WARRIOR', noSuz.centerIndex, noSuz.seat);
     expect(levyUnits(state, noSuz.id, 0).ok).toBe(false);
   });
 

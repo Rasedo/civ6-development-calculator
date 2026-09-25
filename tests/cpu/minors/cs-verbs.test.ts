@@ -3,12 +3,13 @@ import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOfCityState, setTileOw
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { initFog } from '../../../cpu/core/fog';
-import { seatPhase } from '../../../cpu/core/phase';
+import { levyGoldCost, seatPhase } from '../../../cpu/core/phase';
+import { spawnUnit } from '../../../cpu/core/units';
 import { envoysOf, isSuzerain, issueQuest, setMet } from '../../../cpu/core/cityStates';
 import { ensureGpOffer } from '../../../cpu/core/greatPeople';
 import { GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { hexDistance, tilesWithin } from '../../../world/hex';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, QUEST_ENVOYS, QUEST_COOLDOWN, QUEST_CAMP_RADIUS, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
+import { LEVY_TURNS, QUEST_ENVOYS, QUEST_COOLDOWN, QUEST_CAMP_RADIUS, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState, Seat, City } from '../../../cpu/core/types';
 
 // A civ with ONE city; opts out of the belief/settle draws by default so a
@@ -19,7 +20,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
-    aggression: 0.5,
     seat: 1,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
@@ -94,97 +94,97 @@ function addCs(state: GameState, col: number, row: number, opts: Partial<CitySta
   return cityState;
 }
 
-// (the old meetQuota guard is gone — every gold rung is record-driven
-// now, so nothing can drain a levy-priced treasury without a record.)
-
-function levyUnitsNear(state: GameState, civ: Seat, cityState: CityState): number {
-  const ct = state.map.tiles[cityState.centerIndex];
-  return unitsOf(state, civ.seat).filter((u) => {
-    const t = state.map.tiles[u.tileIndex];
-    return u.type === 'WARRIOR' && hexDistance(t.col, t.row, ct.col, ct.row) <= 1;
-  }).length;
-}
-
 // ---------------------------------------------------------------------------
 describe('civ levy', () => {
-  function scenario(): { state: GameState; civ: Seat; cityState: CityState } {
+  function scenario(): { state: GameState; civ: Seat; cityState: CityState; price: number } {
     const state = makeState(makeMap(24, 24));
-    state.turn = 20; // > QUEST_COOLDOWN, ≤ 60 → WARRIOR ladder rung
+    state.unitsMode = true;
+    state.turn = 20;
     const civ = addCiv(state, 10, 10);
     const cityState = addCs(state, 16, 10, { type: 'militaristic' });
     cityState.met = [];
     setMet(cityState, civ.seat);
     cityState.envoys = {  };
     cityState.envoys[civ.seat] = 5; // strict suzerain (seat 0 at zero, no other civ)
-    return { state, civ, cityState };
+    cityState.suzerain = civ.seat;
+    spawnUnit(state, 'WARRIOR', cityState.centerIndex, cityState.seat);
+    spawnUnit(state, 'WARRIOR', cityState.centerIndex, cityState.seat);
+    return { state, civ, cityState, price: levyGoldCost(state, civ.seat, cityState) };
   }
 
   /** The levy is a wire DECISION — store the kind-7 record the driver
-   * would emit; seatPhase's arm re-validates the rule half (militaristic,
-   * suzerain, cooldown, afford) through levyUnits itself. */
+   * would emit; seatPhase's arm re-validates the rule half (suzerain, not
+   * already levied, an army to take, the price) through levyUnits itself. */
   function stashLevy(state: GameState, seat: number, cityStateIndex: number): void {
     (state.seatActions ??= {})[state.turn - 1] = {
       [seat]: { production: [], tech: null, civic: null, units: [], levy: cityStateIndex },
     };
   }
 
-  it('a recorded levy on a militaristic CS spawns LEVY_UNITS at its center', () => {
-    const { state, civ, cityState } = scenario();
+  const armyOf = (state: GameState, seat: number) => unitsOf(state, seat).filter((u) => u.type === 'WARRIOR');
+
+  it("a recorded levy takes the minor's own army for the price", () => {
+    const { state, civ, cityState, price } = scenario();
     expect(isSuzerain(state, cityState, civ.seat)).toBe(true);
+    expect(price).toBeGreaterThan(0);
     setWar(state, civ.seat, 0, true);
-    civ.treasury = LEVY_GOLD_COST; // exactly the price — nothing else spends gold without a record
+    civ.treasury = price; // exactly the price — nothing else spends gold without a record
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state);
-    expect(cityState.lastLevyTurn).toBe(state.turn);
-    expect(levyUnitsNear(state, civ, cityState)).toBe(LEVY_UNITS);
+    expect(cityState.levySeat).toBe(civ.seat);
+    expect(cityState.levyEnds).toBe(state.turn + LEVY_TURNS);
+    expect(armyOf(state, civ.seat)).toHaveLength(2);
+    expect(armyOf(state, cityState.seat)).toHaveLength(0);
+    expect(civ.treasury).toBe(0);
   });
 
   it('does not levy without a record (the scripted scan is gone)', () => {
-    const { state, civ, cityState } = scenario();
+    const { state, civ, cityState, price } = scenario();
     setWar(state, civ.seat, 0, true);
-    civ.treasury = LEVY_GOLD_COST;
+    civ.treasury = price;
     seatPhase(state);
-    expect(cityState.lastLevyTurn).toBeUndefined();
+    expect(cityState.levySeat).toBeUndefined();
   });
 
   it('executes a recorded levy at peace — at-war is the driver policy, not a rule', () => {
-    const { state, civ, cityState } = scenario();
+    const { state, civ, cityState, price } = scenario();
     setWar(state, civ.seat, 0, false);
-    civ.treasury = LEVY_GOLD_COST;
+    civ.treasury = price;
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state);
-    expect(cityState.lastLevyTurn).toBe(state.turn);
+    expect(cityState.levySeat).toBe(civ.seat);
   });
 
   it('refuses a recorded levy without suzerainty (2 envoys)', () => {
-    const { state, civ, cityState } = scenario();
+    const { state, civ, cityState, price } = scenario();
     cityState.envoys[civ.seat] = 2;
     setWar(state, civ.seat, 0, true);
-    civ.treasury = LEVY_GOLD_COST;
+    civ.treasury = price;
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state);
-    expect(cityState.lastLevyTurn).toBeUndefined();
+    expect(cityState.levySeat).toBeUndefined();
   });
 
   it('respects the gold cost (one below → no levy)', () => {
-    const { state, civ, cityState } = scenario();
+    const { state, civ, cityState, price } = scenario();
     setWar(state, civ.seat, 0, true);
-    civ.treasury = LEVY_GOLD_COST - 1;
+    civ.treasury = price - 1;
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state);
-    expect(cityState.lastLevyTurn).toBeUndefined();
+    expect(cityState.levySeat).toBeUndefined();
+    expect(armyOf(state, cityState.seat)).toHaveLength(2);
   });
 
-  it('shares one per-CS cooldown across seats (a recent levy blocks)', () => {
-    const { state, civ, cityState } = scenario();
+  it('refuses an army already levied', () => {
+    const { state, civ, cityState, price } = scenario();
     setWar(state, civ.seat, 0, true);
-    civ.treasury = LEVY_GOLD_COST;
-    cityState.lastLevyTurn = state.turn - (LEVY_COOLDOWN - 1); // still cooling down
-    const before = levyUnitsNear(state, civ, cityState);
+    cityState.levySeat = civ.seat;
+    cityState.levyEnds = state.turn + 5;
+    civ.treasury = price;
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state);
-    expect(cityState.lastLevyTurn).toBe(state.turn - (LEVY_COOLDOWN - 1)); // unchanged
-    expect(levyUnitsNear(state, civ, cityState)).toBe(before);
+    expect(civ.treasury).toBe(price);
+    expect(armyOf(state, cityState.seat)).toHaveLength(2);
   });
 });
 

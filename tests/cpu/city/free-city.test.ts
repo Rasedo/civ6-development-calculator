@@ -20,7 +20,7 @@ const leaderRow = (leader: string) => CIV_LEADERS.findIndex((l) => l.leader === 
 /** A second major with one city of `population` at (col, row). */
 function addCiv(state: GameState, col: number, row: number, population: number, civ = -1): Seat {
   const tile = tileAtCoords(state.map, col, row);
-  const seat: Seat = { ...emptySeat(state.seats.length), name: 'Rival', color: '#8e3db8', aggression: 0.5, civ };
+  const seat: Seat = { ...emptySeat(state.seats.length), name: 'Rival', color: '#8e3db8', civ };
   const city: City = {
     id: seat.nextCityId++, name: 'Rival City', seat: seat.seat, centerIndex: tile.index, population,
     foodBox: 0, cultureBox: 0, tilesAcquired: 0, focus: 'balanced', queue: [], isCapital: true,

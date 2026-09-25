@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, seatOfCityState, seatClass, capsOf } from '../../../cpu/core/seats';
 import { SEAT_CAPS } from '../../../cpu/data/seats';
-import { createGame } from '../../../cpu/core/game';
-import { settleFirstCity } from '../helpers';
+import { seededGame } from '../helpers';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { setWar } from '../../../cpu/core/seats';
 import type { GameState } from '../../../cpu/core/types';
@@ -18,12 +17,7 @@ import type { GameState } from '../../../cpu/core/types';
 // seat the same answer — which is the failure mode a capability table invites.
 
 function newGame(): GameState {
-  const state = createGame({
-    width: 44, height: 26, seed: 4242,
-    withResources: true, withWonders: false, unitsMode: true,
-    withVillages: false, cityStates: 2, opponents: 2,
-  });
-  settleFirstCity(state, 0);
+  const state = seededGame(4242, 3, 2);
   return state;
 }
 

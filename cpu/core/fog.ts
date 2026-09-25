@@ -1,10 +1,10 @@
 
-import type { GameState, Tile, Unit } from './types';
+import type { GameState, Tile } from './types';
 import type { GameMap } from '../../world/types';
 import { citiesOf, civOf, isCiv, leaderOf, seatOf, seatsAllied, tileSeat, unitsOf } from './seats';
 import { ALLIANCE_SHARED_VIS_ROWS, rowIsFor } from '../data/civilizations';
 import { tilesWithin, hexDistance, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
-import { isWater, isImpassable, naturalWonderAt } from '../../world/query';
+import { naturalWonderAt } from '../../world/query';
 import { dedicationEvent } from './eras';
 import { promoValue, promoFlag } from './promotions';
 import { ELEVATION_SIGHT, FEATURE_SIGHT_THROUGH } from '../data/sight';
@@ -168,22 +168,4 @@ export function initFog(state: GameState): void {
     for (const c of citiesOf(state, s.seat)) revealAround(state, s.seat, c.centerIndex, 3);
     for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
   }
-}
-
-export function nearestUnexplored(state: GameState, unit: Unit): number | null {
-  const ex = seatOf(state, unit.seat)?.explored;
-  if (!fogActive(state) || !ex || ex.length === 0) return null;
-  const from = state.map.tiles[unit.tileIndex];
-  let best: number | null = null;
-  let bestDist = 25;
-  for (const t of state.map.tiles) {
-    if (ex[t.index] === 1) continue;
-    if (isWater(t) || isImpassable(t)) continue;
-    const d = hexDistance(from.col, from.row, t.col, t.row);
-    if (d < bestDist) {
-      bestDist = d;
-      best = t.index;
-    }
-  }
-  return best;
 }

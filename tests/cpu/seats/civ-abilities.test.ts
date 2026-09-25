@@ -1,16 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, grantTechs } from '../helpers';
-import { emptySeat, setTileOwner, NO_SEAT } from '../../../cpu/core/seats';
+import { emptySeat, seatOfCityState, setTileOwner, NO_SEAT } from '../../../cpu/core/seats';
 import { spawnUnit, refreshUnits, stepUnit, waterEnterable, navalHeal, tradeWalkStep, tradeWaterLevel } from '../../../cpu/core/units';
 import { routeChainGold } from '../../../cpu/core/trade';
 import { levyGoldCost, transferCity, seatPhase } from '../../../cpu/core/phase';
 import { floodTile } from '../../../cpu/core/disasters';
-import { LEVY_GOLD_COST } from '../../../cpu/data/cityStates';
 import { ITERU_RIVER_PROD_MULT } from '../../../cpu/data/civilizations';
 import { CIV_IDS } from '../../../cpu/data/seats';
 import { unitPromoRows } from '../../../cpu/core/promotions';
 import { GP_PERM } from '../../../cpu/data/greatPeople';
-import type { GameState, TradeRoute, Unit } from '../../../cpu/core/types';
+import type { CityState, GameState, TradeRoute, Unit } from '../../../cpu/core/types';
 
 /**
  * THE CIVILIZATION ABILITIES (CIV6, the owner's install: Traits and their
@@ -195,8 +194,16 @@ describe('Knarr', () => {
 describe('Epic Quest', () => {
   it('levies at half price', () => {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
-    expect(levyGoldCost(state, 0)).toBe(LEVY_GOLD_COST);
+    const cs: CityState = {
+      ...emptySeat(seatOfCityState(0)), id: 0, name: 'CS0', type: 'militaristic',
+      centerIndex: tileAtCoords(state.map, 6, 6).index, population: 3, envoys: {}, met: [0],
+    };
+    state.cityStates.push(cs);
+    spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat);
+    spawnUnit(state, 'SLINGER', cs.centerIndex, cs.seat);
+    const full = levyGoldCost(state, 0, cs);
+    expect(full).toBeGreaterThan(0);
     state.seats[0].civ = civ('SUMERIA');
-    expect(levyGoldCost(state, 0)).toBe(LEVY_GOLD_COST / 2);
+    expect(levyGoldCost(state, 0, cs)).toBe(full / 2);
   });
 });

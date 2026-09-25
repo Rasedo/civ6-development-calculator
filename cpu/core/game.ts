@@ -1,11 +1,10 @@
 
-import type { City, DistrictId, GameState, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
+import type { City, DistrictId, GameState, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { dropQueuedBuilding } from './production';
 import { GP_CLASSES } from '../data/greatPeople';
 import { placeGreatWorkIn } from './greatWorks';
 import { GWO_RELIC } from '../data/greatWorks';
 import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
-import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
 import { canFoundCity, availableBuildings, buildingCompletable, type RuleResult } from './rules';
@@ -19,9 +18,9 @@ import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlan
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
-import { placeCityStates, cityStatePhase, resolveSuzerains, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
+import { cityStatePhase, resolveSuzerains, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
 import { minorPhase } from './minorBuild';
-import { placeSeats, seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
+import { seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { grievanceSettledNear, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
@@ -168,26 +167,9 @@ export function districtVariantCost(state: GameState, seat: number, type: Distri
   return v ? Math.floor(cost * v.cost / DISTRICTS[type].cost) : cost;
 }
 
-export function createGame(
-  opts: MapGenOptions & {
-    sandbox?: boolean;
-    unitsMode?: boolean;
-    cityStates?: boolean | number;
-    opponents?: boolean | number;
-  },
-): GameState {
-  const state = createGameFromMap(generateMap(opts), opts.sandbox ?? false, opts.unitsMode ?? false);
-  if (opts.cityStates) {
-    placeCityStates(state, typeof opts.cityStates === 'number' ? opts.cityStates : undefined);
-  }
-  if (opts.opponents) {
-    placeSeats(state, typeof opts.opponents === 'number' ? opts.opponents : undefined);
-  }
-  return state;
-}
-
-/** Fresh game state around an existing map (e.g. one imported from Civ 6). */
-export function createGameFromMap(map: GameState['map'], sandbox = false, unitsMode = false): GameState {
+/** Fresh game state around a loaded world's map, before any seat is placed:
+ *  `loadWorld` seats the roster the world file names. */
+export function createGameFromMap(map: GameState['map'], rngInit: number): GameState {
   // The sea's reach and the two climate denominators are properties of the
   // map as it was made, so they are stamped once, here, and never re-derived
   // from a map the game has already changed.
@@ -200,23 +182,23 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     removableAtStart: standingRemovable(map),
     iceAtStart: map.tiles.filter((t) => t.feature === 'ICE').length,
     turn: 1,
-    sandbox,
+    sandbox: false,
     claimedGreatPeople: [],
     gpOffer: GP_CLASSES.map(() => -1),
     gpPrice: GP_CLASSES.map(() => 0),
-    unitsMode,
+    unitsMode: true,
     units: [],
     nextUnitId: 0,
-    rngState: (map.seed ^ 0x9e3779b9) >>> 0,
+    rngState: rngInit >>> 0,
     barbSeat: emptySeat(BARB_SEAT), // the hostile class has a seat too
-    disasters: false,
+    disasters: true,
     gameOver: false,
     victoryType: 0,
     victoryRow: -1,
-    fogOfWar: unitsMode,
+    fogOfWar: true,
     eventLog: [],
     cityStates: [],
-    seats: [emptySeat(0)],
+    seats: [],
     claimedPantheons: [],
     claimedBeliefs: [],
   };
@@ -1861,8 +1843,6 @@ export function serialize(state: GameState): string {
 
 export function deserialize(json: string): GameState {
   const state = JSON.parse(json) as GameState;
-  state.seats ??= [];
-  if (state.seats.length === 0) state.seats.push(emptySeat(0));
   for (const sx of state.seats) {
     sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
     sx.research.boosted ??= [];

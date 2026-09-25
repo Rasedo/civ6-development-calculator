@@ -212,6 +212,35 @@ def test_epic_quests_outpost_pays_the_same_table(rules, path) -> None:
     print("  7 Epic Quest OK — one carrier, and the outpost pays the village table")
 
 
+def test_a_carriers_clear_draws_the_village(rules, path) -> None:
+    """`_clear_camp_at` is where the outpost pays, `clearCampFor`'s twin: a
+    MAJOR seated as the carrier draws the village reward on top of the gold
+    (its game's stream moves), any other clearer takes the gold alone."""
+    for carrier in (True, False):
+        sim = build(path)
+        ci = sim._camp_goody_rows[0][0]
+        sim.row_civ[B0, ROW] = ci if carrier else -1
+        sim.row_leader[B0, ROW] = sim._pair_civ.index(ci) if carrier else -1
+        sim._eff_version += 1
+        sim._gen_ver += 1
+        t = int(sim.unit_tile[B0, 0])
+        free = int((sim.camp_tile[B0] < 0).nonzero().flatten()[0])
+        sim.camp_tile[B0, free] = t
+        sim.n_camps[B0] += 1
+        rng0 = sim.rng_state[B0].clone()
+        gold0 = float(sim.civ_treasury[B0, ROW])
+        mask = torch.zeros(sim.B, dtype=torch.bool)
+        mask[B0] = True
+        sim._clear_camp_at(mask, torch.full((sim.B,), t, dtype=torch.long),
+                           torch.full((sim.B,), ROW, dtype=torch.long), ROW)
+        assert not bool((sim.camp_tile[B0] == t).any()), "the cleared outpost still stands"
+        assert float(sim.civ_treasury[B0, ROW]) >= gold0 + float(rules.combat["campClearReward"]), \
+            "the clear paid no gold"
+        drew = not torch.equal(sim.rng_state[B0], rng0)
+        assert drew == carrier, f"carrier={carrier}: the village draw fired={drew}"
+    print("  8 Epic Quest OK — a carrier major's clear draws the village, any other clearer does not")
+
+
 def test_the_real_move_path_at_three_games(rules, path) -> None:
     """Drive `_step_verb` itself, at B=3, with only SOME games moving.
 
@@ -247,7 +276,7 @@ def test_the_real_move_path_at_three_games(rules, path) -> None:
     assert not bool(wide.tile_goody[0, dest]), "game 0 did not claim its village"
     assert not bool(wide.tile_goody[2, dest]), "game 2 did not claim its village"
     assert bool(wide.tile_goody[1, dest]), "a game that never moved lost its village"
-    print("  8 the move path OK — B=3 with a subset moving, slots stay per GAME")
+    print("  9 the move path OK — B=3 with a subset moving, slots stay per GAME")
 
 
 def main() -> int:
@@ -260,6 +289,7 @@ def main() -> int:
     test_the_draw_moves_one_games_stream(rules, path)
     test_the_hut_is_its_own_live_plane(rules, path)
     test_epic_quests_outpost_pays_the_same_table(rules, path)
+    test_a_carriers_clear_draws_the_village(rules, path)
     test_the_real_move_path_at_three_games(rules, path)
     print("BATTERY OK tribal_villages")
     return 0

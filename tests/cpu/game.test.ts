@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { seatOf, tileCity, tileSeat } from '../../cpu/core/seats';
 import { CIV_LEVELS } from '../../cpu/data/civLevels';
 import { tilesWithin } from '../../world/hex';
-import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from './helpers';
+import { canPlaceDistrict, makeMap, makeState, seededGame, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from './helpers';
 import { growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, maxSpecialtyDistricts } from '../../cpu/data/constants';
-import { createGame, foundCity, endTurn, itemCost } from '../../cpu/core/game';
-import { availableBuildings, canFoundCity, canPlaceDistrict } from '../../cpu/core/rules';
+import { foundCity, endTurn, itemCost } from '../../cpu/core/game';
+import { availableBuildings, canFoundCity } from '../../cpu/core/rules';
 import { placeSeatDistrict } from '../../cpu/core/phase';
 import { computeUnlocksIn } from '../../cpu/core/effects';
 import { computeCityStats, assignWorkedTiles, luxuryAmenities } from '../../cpu/core/city';
@@ -74,7 +74,7 @@ describe('founding cities', () => {
 
   // CIV6 (CivilizationLevels.StartingTilesForCity): FULL_CIV 6, CITY_STATE 5
   it('a city-state starts with its centre and five of the ring, a civ with all six', () => {
-    const state = createGame({ width: 30, height: 20, seed: 4242, withResources: false, withWonders: false, unitsMode: true, withVillages: false, cityStates: 1, opponents: 1 });
+    const state = seededGame(4242, 1, 1);
     const cs = state.cityStates[0];
     expect(cs).toBeDefined();
     const mine = state.map.tiles.filter((t) => tileSeat(t) === cs.seat);

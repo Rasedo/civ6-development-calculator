@@ -406,10 +406,15 @@ def test_naval_heal(rules, path) -> None:
 def test_epic_quest_levy(rules, path) -> None:
     sim = fresh(rules, path)
     rome = row_of(sim, "ROME")
-    base = float(sim.rules.citystate["levyGoldCost"])
-    assert sim._levy_cost(rome) == base
+    assert sim.S > 0, "the fixture holds no city-state"
+    s0 = torch.zeros(sim.B, dtype=torch.long)
+    for _ in range(2):
+        sim._minor_spawn(0, torch.ones(sim.B, dtype=torch.bool),
+                         torch.full((sim.B,), sim._warrior_idx, dtype=torch.long), grants=False)
+    base = float(sim._levy_cost(rome, s0)[0])
+    assert base > 0
     play(sim, rome, "SUMERIA")
-    assert sim._levy_cost(rome) == base * sim._epic_levy_mult
+    assert float(sim._levy_cost(rome, s0)[0]) == base * sim._epic_levy_mult
     play(sim, rome, "ROME")
     print("  9 Epic Quest OK — half-price levies")
 

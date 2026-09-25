@@ -1,20 +1,21 @@
 """Batched RL environment over BatchSim: masks → actions → score-delta reward.
 
 Fixed-horizon lockstep episodes, every game resetting together: call reset(),
-then step() `horizon` times, reading masks() before each step to constrain the
-policy's heads — per-city production, research, civics, per-unit orders,
-envoys, war. Rewards telescope to the seat's empire score at the horizon, the
-same fitness `cpu/core/score.ts` computes.
+then step(seat) `horizon` times, reading masks(seat) before each step to
+constrain the policy's heads — per-city production, research, civics, per-unit
+orders, envoys, war. Every call names its seat. Rewards telescope to the
+seat's empire score at the horizon, the same fitness `cpu/core/score.ts`
+computes.
 
 Two observation streams feed the policy:
 
-  observe()        [B, F]    — empire, city-state, opponent, per-city-slot,
+  observe(seat)    [B, F]    — empire, city-state, opponent, per-city-slot,
                                escalator, research-cost and ctx blocks, in that
                                order. `policy/ladder.py`'s block widths (EMP /
                                PER_CS / PER_CIV / PER_CITY / CTX_FIELDS) are the
                                ONE layout definition — this file holds no second
                                copy of the arithmetic.
-  unit_features()  [B, P, 8] — per unit slot, for the units head (alive, type,
+  unit_features(seat) [B, P, 8] — per unit slot, for the units head (alive, type,
                                hp, position, and the bearing to the nearest
                                barbarian camp)
 
@@ -64,7 +65,7 @@ class BatchEnv:
         self._ax_q = (col - torch.div(row - (row & 1), 2, rounding_mode="floor")).to(torch.long)
         self._ax_r = row.to(torch.long)
 
-    def reset(self, scramble: int | None = None) -> torch.Tensor:
+    def reset(self, scramble: int | None = None) -> None:
         self.sim.reset()
         if scramble is not None:
             s = self.sim
@@ -72,14 +73,13 @@ class BatchEnv:
             s.rng_state.copy_((h & _M32).to(s.rng_state.dtype).to(s.device))
             self._episode += 1
         self._score_prev.clear()
-        return self.observe()
 
     def _row(self, seat: int) -> int:
         if not 0 <= seat < self.sim.n_majors:
             raise ValueError(f"seat {seat} is not a major row (0..{self.sim.n_majors - 1})")
         return seat
 
-    def masks(self, seat: int = 0) -> dict[str, torch.Tensor]:
+    def masks(self, seat: int) -> dict[str, torch.Tensor]:
         s = self.sim
         row = self._row(seat)
         m = s.seat_masks(row)
@@ -94,6 +94,7 @@ class BatchEnv:
 
     def step(
         self,
+        seat: int,
         production: torch.Tensor | None = None,
         tech: torch.Tensor | None = None,
         civic: torch.Tensor | None = None,
@@ -101,7 +102,6 @@ class BatchEnv:
         envoy: torch.Tensor | None = None,
         war: torch.Tensor | None = None,
         war_kind: torch.Tensor | None = None,
-        seat: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         row = self._row(seat)
         prev = self._score_prev.get(row)
@@ -125,7 +125,7 @@ class BatchEnv:
         d_cost = torch.floor(dcp["base"] * (1 + dcp["scale"] * torch.maximum(t_pct, c_pct)))
         return [d_cost / 1000.0, settler_cost / 1000.0, s._builder_cost(builders).to(d) / 1000.0]
 
-    def observe(self, seat: int = 0) -> torch.Tensor:
+    def observe(self, seat: int) -> torch.Tensor:
         """[B, F] — empire globals, city-state courtship, opponent posture, and
         per-city-slot economy/defense, all roughly unit-scaled.
 
@@ -354,12 +354,11 @@ class BatchEnv:
             n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
             (n_cities * 2 + torch.where(at_war, 3, 1)).to(d),
             self._seat_strength(row).to(d),
-            s.civ_aggression[:, row].to(d),
             s.peace_turns[:, row].to(d),
             at_war.to(d),
         ], dim=1)
 
-    def unit_features(self, seat: int = 0) -> torch.Tensor:
+    def unit_features(self, seat: int) -> torch.Tensor:
         s = self.sim
         d = s.dtype
         B = s.B

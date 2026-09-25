@@ -114,7 +114,6 @@ export function placeCivs(map: GameMap, seed: number, nCivs: number): { starts: 
     starts.push(pick);
     civs.push({
       leader: order[i],
-      aggression: 0.3 + rng() * 0.6,
       units: [
         { type: 'SETTLER', tile: pick.index },
         { type: 'WARRIOR', tile: pick.index },

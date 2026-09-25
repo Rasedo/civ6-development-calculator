@@ -8,10 +8,11 @@ import { computeCityStats } from '../../../cpu/core/city';
 import { setMet } from '../../../cpu/core/cityStates';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileCity, tileClaimed, tileSeat, unitsOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
-import { createGame, foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
+import { makeMap, makeState, seededGame, settleAt, tileAtCoords } from '../helpers';
+import { endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { canFoundCity, wallsMax } from '../../../cpu/core/rules';
 import { tilesWithin, hexDistance } from '../../../world/hex';
+import { MAJOR_START_DIST } from '../../../seeder/place';
 import { applySeatUnitOrders, assertCityRegistryCoherent, declareWar, seatPhase, sueForPeace, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, captureCityState } from '../../../cpu/core/combat';
 import { routePlunderer, tradeCapacity } from '../../../cpu/core/trade';
@@ -29,7 +30,6 @@ function addCiv(
     ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
-    aggression: 0.5,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
     diplomaticPoints: 0,
@@ -96,21 +96,21 @@ function addCivCity(state: GameState, civ: Seat, col: number, row: number): City
 }
 
 describe('civ placement and expansion', () => {
-  it('places deterministic, spaced the other civs with a capital and escort', () => {
-    const a = createGame({ width: 44, height: 26, seed: 3, withResources: true, withWonders: true, opponents: true });
-    const b = createGame({ width: 44, height: 26, seed: 3, withResources: true, withWonders: true, opponents: true });
+  it('a seeded world seats every civ deterministically, spaced, with a capital and its escort', () => {
+    const a = seededGame(3, 3);
+    const b = seededGame(3, 3);
     expect(serialize(a)).toBe(serialize(b));
-    expect((a.seats.length - 1)).toBeGreaterThanOrEqual(1);
-    for (const r of a.seats.slice(1)) {
+    expect(a.seats.length).toBe(3);
+    for (const r of a.seats) {
       expect(r.cities.length).toBe(1);
       const center = a.map.tiles[r.cities[0].centerIndex];
       expect(tileSeat(center)).toBe(r.seat);
       expect(center.district).toBe('CITY_CENTER');
-      expect(unitsOf(a, r.seat).length).toBeGreaterThanOrEqual(1);
-      for (const other of a.seats.slice(1)) {
+      expect(unitsOf(a, r.seat).map((u) => u.type)).toEqual(['WARRIOR']);
+      for (const other of a.seats) {
         if (other.seat === r.seat) continue;
         const oc = a.map.tiles[other.cities[0].centerIndex];
-        expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(10);
+        expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(MAJOR_START_DIST);
       }
     }
   });
@@ -143,7 +143,7 @@ describe('civ placement and expansion', () => {
 
 describe('civ district/tile registry coherence', () => {
   it('stays coherent across a full game (every district/wonder tile registers to its civCity)', () => {
-    const state = createGame({ width: 44, height: 26, seed: 7, withResources: true, withWonders: true, opponents: true });
+    const state = seededGame(7, 3);
     // Run many turns; the scan (called from seatPhase under the env flag)
     // must never fire — placements/captures keep .districts and Tile.ownerCity
     // mutually consistent. Also assert directly each turn for tight failure.
@@ -154,7 +154,7 @@ describe('civ district/tile registry coherence', () => {
     // sanity: the scan still has teeth in this full-grown state — forge one
     // incoherent registration and it must throw. (Undriven seats place no
     // districts on their own, so counting placements would prove nothing.)
-    const civ = state.seats.slice(1).find((r) => r.cities.length > 0)!;
+    const civ = state.seats.find((r) => r.cities.length > 0)!;
     const civCity = civ.cities[0];
     setTileOwner(state.map.tiles[civCity.centerIndex], civ.seat, civCity.id + 999);
     expect(() => assertCityRegistryCoherent(state)).toThrow(/registry incoherence/);
@@ -397,17 +397,7 @@ describe('conquest keeps infrastructure', () => {
 
 describe('determinism', () => {
   it('civ games replay identically from a save', () => {
-    const a = createGame({
-      width: 30,
-      height: 20,
-      seed: 12,
-      withResources: true,
-      withWonders: true,
-      cityStates: true,
-      opponents: true,
-    });
-    const sites = a.map.tiles.filter((t) => canFoundCity(a, t.index, 0).ok);
-    foundCity(a, sites[Math.floor(sites.length / 2)].index, 0);
+    const a = seededGame(12, 3, 3);
     for (let i = 0; i < 5; i++) endTurn(a);
     const b = deserialize(serialize(a));
     for (let i = 0; i < 12; i++) {
