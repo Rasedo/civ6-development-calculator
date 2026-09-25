@@ -181,6 +181,10 @@ class SimOrders:
             is_civ = self._type_civilian[utp.clamp(min=0)]
             u_emb = self.unit_emb.gather(1, sc.unsqueeze(1)).squeeze(1)
             u_charges = self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1)
+            # a SPENT unit takes no verb (TS returns before any verb when
+            # `movesLeft` is 0); the verbs below that read no moves of their
+            # own gate on it here
+            u_moves = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1) > 0
             nb = self.neigh[hc]
 
             if _rk_found[n] and self._settler_idx >= 0:
@@ -340,7 +344,7 @@ class SimOrders:
                                       self.unit_seat.gather(1, rel.clamp(min=0).unsqueeze(1)).squeeze(1),
                                       torch.full_like(rel, -1))
                     okc = (
-                        cdm & (ctg >= 0) & (rel >= 0) & (rsx >= 0) & (rsx != row)
+                        cdm & u_moves & (ctg >= 0) & (rel >= 0) & (rsx >= 0) & (rsx != row)
                         & (self._type_combat[utp.clamp(min=0)] > 0)
                         & self.war[:, row].gather(1, self._seat_row[rsx.clamp(min=0)].unsqueeze(1)).squeeze(1)
                     )
@@ -349,7 +353,7 @@ class SimOrders:
 
             if _rk_heresy[n] and _hx >= 0 and self._inquisitor_idx >= 0:
                 _cslot = self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1)
-                hxm = (act & (a == _hx) & (utp == self._inquisitor_idx) & (u_charges > 0)
+                hxm = (act & u_moves & (a == _hx) & (utp == self._inquisitor_idx) & (u_charges > 0)
                        & (_cslot >= 0)
                        & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row))
                 if bool(hxm.any()):
@@ -375,7 +379,7 @@ class SimOrders:
                     self.unit_mp[hr, sc[hr]] = 0
 
             if _rk_inquis[n] and _lq >= 0 and self._apostle_idx >= 0:
-                lqm = (act & (a == _lq) & (utp == self._apostle_idx)
+                lqm = (act & u_moves & (a == _lq) & (utp == self._apostle_idx)
                        & (u_charges >= self._launch_inquisition_charges)
                        & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row)
                        & ~self.civ_inquisition[:, row])
@@ -389,7 +393,7 @@ class SimOrders:
             # EVANGELIZE BELIEF: the Apostle is spent and its religion earns a
             # belief (`evangelizeBelief`)
             if _rk_evangel[n] and _evc >= 0 and self._apostle_idx >= 0:
-                evm = (act & (a == _evc) & (utp == self._apostle_idx)
+                evm = (act & u_moves & (a == _evc) & (utp == self._apostle_idx)
                        & self._evangelize_ok(row))
                 if bool(evm.any()):
                     er = evm.nonzero(as_tuple=True)[0]
@@ -399,7 +403,7 @@ class SimOrders:
                     self._gen_ver += 1
 
             if _rk_heathen[n] and _hn >= 0:
-                hnm = (act & (a == _hn) & (u_charges > 0)
+                hnm = (act & u_moves & (a == _hn) & (u_charges > 0)
                        & self._promo_flag(utp, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1),
                                           "HEATHEN")
                        & (self._barb_unit_plane().gather(1, nb.clamp(min=0).reshape(B, -1))
@@ -1744,8 +1748,9 @@ class SimOrders:
         the loop position right after its gold lands, the Free Cities seat's
         in its own phase after its cities' gold: charge maintenance for every
         living unit of the row's SEAT off the POOLED planes (the Free Cities'
-        stand in the hostile range), then meet the bankruptcy that charge may
-        force (`_bankrupt_disband`). A game where the seat does not act this
+        stand in the hostile range), then a major meets the bankruptcy that
+        charge may force (`_bankrupt_disband`) and the Free Cities balance
+        stops at 0. A game where the seat does not act this
         turn charges nothing (`active`: the TS loop's eliminated-actor
         continue, the Free Cities phase's no-city return)."""
         if not self.units_mode:
@@ -1766,9 +1771,11 @@ class SimOrders:
         paid = torch.where(active, tre - upkeep.to(tre.dtype), tre)
         if row < self.n_majors:
             self.civ_treasury[:, row] = paid
+            self._bankrupt_disband(row, active)
         else:
-            self.free_treasury.copy_(paid)
-        self._bankrupt_disband(row, active)
+            # the Free Cities balance stops at 0, as a minor's does (no census
+            # row reads it below 0), so it never goes bankrupt
+            self.free_treasury.copy_(paid.clamp(min=0))
 
     def _treasury_of(self, row: int) -> torch.Tensor:
         """[B] the treasury of city ROW `row`'s holder — a major's own, a

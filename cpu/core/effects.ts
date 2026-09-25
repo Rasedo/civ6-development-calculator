@@ -1,5 +1,5 @@
 
-import { PURCHASE_DIVISOR } from '../data/constants';
+import { PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST } from '../data/constants';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { TerrainId, Tile } from '../../world/types';
 import { hiddenResourcesFor } from './seats';
@@ -28,6 +28,7 @@ import { cityStateEnvoyBonuses, isSuzerain, suzerainEffect, suzerainOf, suzerain
 import { NAN_MADOL_WATER_CULTURE } from '../data/cityStates';
 
 import { GP_PERM, GP_UNIT_PROD_CLASSES } from '../data/greatPeople';
+import { unitIsMilitary } from './units';
 import { CLASS_BIT, classBitOf, UNIT_PROMO_CLASS } from '../data/promotions';
 import { isSpaceProject } from '../data/projects';
 import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityGovernorPromos, cityHasGovernor } from './governors';
@@ -1233,7 +1234,9 @@ export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): 
   let pct = 0;
   // A Great Person's permanent share stacks additively with the cards, which
   // is how CIV6 stacks production modifiers.
-  if (q.kind === 'unit' || q.kind === 'settler') pct += (gpPerm?.[GP_PERM.indexOf('unitProdPct')] ?? 0) / 100;
+  // CIV6 (Eisenhower, MODIFIER_PLAYER_CITIES_ADJUST_MILITARY_UNITS_PRODUCTION):
+  // military units only
+  if (q.kind === 'unit' && unitIsMilitary(q.unit)) pct += (gpPerm?.[GP_PERM.indexOf('militaryProdPct')] ?? 0) / 100;
   // CIV6 (Themistocles, Nimitz): the share one promotion class takes
   if (q.kind === 'unit') {
     for (const r of GP_UNIT_PROD_CLASSES) {
@@ -1503,6 +1506,41 @@ export function adoptGovernment(state: GameState, seat: number, index: number): 
   if (g.id === before) return;
   s.government.held |= governmentBit(g.id);
   carryPolicies(state, seat);
+}
+
+/** THE POLICY UNLOCK's Gold for seat `seat` this turn: 0 in the free window
+ *  (the turn after the seat completed a civic, `GovernmentState.civicTurn`),
+ *  else `CIVIC_UNLOCK_MAX_COST` the first turn past it, dropping by
+ *  `CIVIC_UNLOCK_PER_TURN_DROP` each further turn to `CIVIC_UNLOCK_MIN_COST`.
+ *  One payment opens the government and the cards for the turn
+ *  (`UNLOCK_POLICIES`). `_policy_unlock_cost` is the twin. */
+export function policyUnlockCost(state: GameState, seat: number): number {
+  const s = seatOf(state, seat);
+  if (!s) return 0;
+  const past = state.turn - 1 - s.government.civicTurn;
+  if (past <= 0) return 0;
+  return Math.max(CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_MAX_COST - CIVIC_UNLOCK_PER_TURN_DROP * (past - 1));
+}
+
+/** Would `adoptGovernment(state, seat, index)` CHANGE the government the
+ *  seat is in? A seat in none changes for free (the UI opens the choice
+ *  while the current government is nil). */
+export function governmentChanges(state: GameState, seat: number, index: number): boolean {
+  const now = seatGovernment(state, seat);
+  const g = GOVERNMENT_LIST[index];
+  return !!g && now !== null && g.id !== now && governmentsOpen(state, seat).includes(index);
+}
+
+/** Does the card layout `cards` slot a different SET than the seat holds —
+ *  its stored cards still open under its government? */
+export function policySetChanges(state: GameState, seat: number, cards: readonly (string | null)[]): boolean {
+  const s = seatOf(state, seat);
+  const gov = seatGovernment(state, seat);
+  if (!s || !gov) return false;
+  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
+  const now = new Set(s.government.policies.filter((p): p is string => !!p && open.has(p)));
+  const next = new Set(cards.filter((p): p is string => !!p));
+  return now.size !== next.size || [...next].some((p) => !now.has(p));
 }
 
 /** A CHANGED government keeps the slotted cards that are still open under it

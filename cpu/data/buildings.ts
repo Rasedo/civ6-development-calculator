@@ -31,6 +31,8 @@ interface BuildingVariant {
    * through the same GAME_SPEED scale the base row's takes.
    */
   cost?: number;
+  /** the variant's own `buyCost` (BuildingDef.buyCost), set with `cost`. */
+  buyCost?: number;
   yields?: Partial<Yields>;
   housing?: number;
   amenities?: number;
@@ -97,7 +99,7 @@ interface BuildingVariant {
 /** the BuildingDef columns a `BuildingVariant` may override, one list so a
  *  new column is added in exactly one place. */
 export const BUILDING_VARIANT_COLUMNS = [
-  'cost', 'yields', 'housing', 'amenities', 'maintenance', 'power',
+  'cost', 'buyCost', 'yields', 'housing', 'amenities', 'maintenance', 'power',
   'poweredYields', 'regional', 'regionalRange', 'trainXpPct', 'trainXpClasses',
 ] as const;
 
@@ -111,6 +113,12 @@ export interface BuildingDef {
   name: string;
   district: DistrictId;
   cost: number;
+  /** THE PURCHASE BASE: `Cost × CostMultiplier / 100` UNTRUNCATED. The lab's
+   *  purchase record prices every building off the fractional figure — a
+   *  Granary (Cost 65, production 32) buys for 130 gold and 65 faith, the
+   *  Workshop, Armory and Tlachtli the same way — where a unit's price takes
+   *  the truncated cost (a Slinger, Cost 35, buys for 65). */
+  buyCost: number;
   requiresAny?: string[];
   /** Cannot coexist with these buildings. */
   exclusiveWith?: string[];
@@ -270,7 +278,7 @@ export interface BuildingDef {
   floodBarrier?: boolean;
 }
 
-const rawList: BuildingDef[] = [
+const rawList: Omit<BuildingDef, 'buyCost'>[] = [
   { id: 'PALACE', name: 'Palace', district: 'CITY_CENTER', cost: 0, yields: { production: 2, gold: 5, science: 2, culture: 1 }, housing: 1, amenities: 2, autoCapital: true, maintenance: 0,
     src: {
       cost: { stylized: "the Palace is granted with the capital and never produced, so its price is never read; the install's Buildings.Cost 1 is a placeholder for a building nobody builds" },
@@ -1185,10 +1193,11 @@ const rawList: BuildingDef[] = [
 const list: BuildingDef[] = rawList.map((b) => ({
   ...b,
   cost: scaleByGameSpeed(b.cost),
+  buyCost: b.cost * GAME_SPEED,
   // A VARIANT's own price is a catalog cost like any other and rides the same
   // game-speed scale as the row it replaces.
   civVariants: b.civVariants?.map(
-    (v) => (v.cost === undefined ? v : { ...v, cost: scaleByGameSpeed(v.cost) })),
+    (v) => (v.cost === undefined ? v : { ...v, cost: scaleByGameSpeed(v.cost), buyCost: v.cost * GAME_SPEED })),
 }));
 
 /**

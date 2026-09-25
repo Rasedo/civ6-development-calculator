@@ -61,7 +61,9 @@ export type FeatureId =
   | 'BURNING_WOODS'
   | 'BURNT_WOODS'
   | 'BURNING_RAINFOREST'
-  | 'BURNT_RAINFOREST';
+  | 'BURNT_RAINFOREST'
+  | 'EYJAFJALLAJOKULL'
+  | 'VESUVIUS';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 

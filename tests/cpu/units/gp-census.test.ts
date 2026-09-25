@@ -3,7 +3,6 @@ import { MP_SCALE, scaleByGameSpeed } from '../../../cpu/data/constants';
 import { createGame } from '../../../cpu/core/game';
 import { settleAt, settleFirstCity } from '../helpers';
 import { spawnUnit, unitFullMoves } from '../../../cpu/core/units';
-import { tileSeat } from '../../../cpu/core/seats';
 import {
   GREAT_PEOPLE, GP_ABILITY, GP_CLASSES, GP_SITES, GP_SITE_CITY_CENTER,
   gpChargesOf, gpCityPermOf, gpNoMilitaryOf, gpPermOf, gpSiteArg, gpSiteOf, gpTilePermOf,
@@ -17,14 +16,18 @@ import { getModifiers, prodBoostPct } from '../../../cpu/core/effects';
 import { cityTradeYields } from '../../../cpu/core/trade';
 import { governorTitlesEarned } from '../../../cpu/core/governors';
 import { completeQueueItem } from '../../../cpu/core/production';
-import { gwHasRoom, gwWorks, placeGreatWork } from '../../../cpu/core/greatWorks';
-import { GWO_RELIC, GWO_WRITING } from '../../../cpu/data/greatWorks';
+import { greatWorkTourism, gwHasRoom, gwWorks, placeGreatWork } from '../../../cpu/core/greatWorks';
+import { GWO_ARTIFACT, GWO_RELIC, GWO_TOURISM, GWO_WRITING } from '../../../cpu/data/greatWorks';
 import { canFoundCity } from '../../../cpu/core/rules';
+import { itemCost } from '../../../cpu/core/game';
+import { hiddenResourcesFor, tileSeat } from '../../../cpu/core/seats';
+import { centerBuildingIds } from '../../../cpu/core/prodLayout';
 import { placeCityStateAt, setMet } from '../../../cpu/core/cityStates';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { neighbors, hexDistance } from '../../../world/hex';
-import { isImpassable, isWater } from '../../../world/query';
-import type { City, GameState, Unit } from '../../../cpu/core/types';
+import { isImpassable, isWater, naturalWonderAt } from '../../../world/query';
+import { RESOURCES } from '../../../world/resources';
+import type { City, GameState, Tile, Unit } from '../../../cpu/core/types';
 
 // — THE GREAT PEOPLE CENSUS: every person's layered install rows (Base <-
 // Expansion1 <- Expansion2 and the DLC packs, `tools/civ6lab/gp_census.py`)
@@ -47,6 +50,10 @@ const found = (id: string): { cls: string; at: number } => {
     if (at >= 0) return { cls: c, at };
   }
   throw new Error(`${id} is not in the roster`);
+};
+const person = (id: string) => {
+  const { cls, at } = found(id);
+  return GREAT_PEOPLE[cls as keyof typeof GREAT_PEOPLE][at];
 };
 const civRow = (civ: string) => CIV_LEADERS.findIndex((l) => l.civ === civ);
 const free = (state: GameState, i: number) => !state.units.some((x) => x.tileIndex === i);
@@ -102,20 +109,32 @@ describe('the census rows', () => {
     const want: Record<string, string> = {
       GP_THELFLD: 'CITY_CENTER', GP_SIMON_BOLIVAR_UNIT: 'CITY_CENTER', GP_SUDIRMAN: 'CITY_CENTER',
       GP_BI_SHENG: 'CITY_CENTER', GP_MIMAR_SINAN: 'CITY_CENTER', GP_ADA_LOVELACE: 'CITY_CENTER',
-      GP_JAMES_OF_ST_GEORGE: 'CITY_CENTER', GP_ALVAR_AALTO: 'CITY_CENTER', GP_JANE_DREW: 'CITY_CENTER',
+      GP_ALVAR_AALTO: 'CITY_CENTER', GP_JANE_DREW: 'CITY_CENTER',
       GP_JOHN_ROEBLING: 'CITY_CENTER', GP_CHARLES_CORREA: 'CITY_CENTER',
       GP_TRUNG_TRAC: 'ENCAMPMENT', GP_ZHENG_HE: 'HARBOR', GP_TOGO_HEIHACHIRO: 'HARBOR',
       GP_HORATIO_NELSON: 'HARBOR', GP_MARINA_RASKOVA: 'AERODROME',
       GP_SERGEI_KOROLEV: 'SPACEPORT', GP_CARL_SAGAN: 'SPACEPORT', GP_STEPHANIE_KWOLEK: 'SPACEPORT',
-      GP_WERNHER_VON_BRAUN: 'SPACEPORT', GP_MARY_LEAKEY: 'THEATER_SQUARE',
+      GP_WERNHER_VON_BRAUN: 'SPACEPORT',
     };
     for (const [id, d] of Object.entries(want)) {
-      const { cls, at } = found(id);
-      expect(gpSiteOf(GREAT_PEOPLE[cls as keyof typeof GREAT_PEOPLE][at]), id).toEqual({ site: 'district', district: d });
+      expect(gpSiteOf(person(id)), id).toEqual({ site: 'district', district: d });
     }
     expect(gpSiteArg('CITY_CENTER')).toBe(GP_SITE_CITY_CENTER);
-    expect(gpSiteOf(GREAT_PEOPLE.GENERAL[found('GP_JEANNE_D_ARC').at]).site).toBe('relicSlot');
-    expect(gpSiteOf(GREAT_PEOPLE.ADMIRAL[found('GP_FERDINAND_MAGELLAN').at]).site).toBe('luxury');
+    expect(gpSiteOf(person('GP_JEANNE_D_ARC')).site).toBe('relicSlot');
+    expect(gpSiteOf(person('GP_FERDINAND_MAGELLAN')).site).toBe('luxury');
+    // the Action* columns that name a site of their own
+    const own: Record<string, string> = {
+      GP_GALILEO_GALILEI: 'nearMountain', GP_CHARLES_DARWIN: 'nearNaturalWonder', GP_JANAKI_AMMAL: 'nearRainforest',
+      GP_IMHOTEP: 'incompleteWonder', GP_ISIDORE_OF_MILETUS: 'incompleteWonder', GP_FILIPPO_BRUNELLESCHI: 'incompleteWonder',
+      GP_GUSTAVE_EIFFEL: 'incompleteWonder', GP_SHAH_JAHAN: 'incompleteWonder',
+      GP_JAMES_OF_ST_GEORGE: 'centreWithout', GP_MARY_LEAKEY: 'districtArtifact', GP_SUN_TZU: 'gwSlot',
+    };
+    for (const [id, s] of Object.entries(own)) expect(gpSiteOf(person(id)).site, id).toBe(s);
+    expect(gpSiteOf(person('GP_JAMES_OF_ST_GEORGE'))).toEqual({ site: 'centreWithout', district: 'CITY_CENTER', building: 'MEDIEVAL_WALLS' });
+    expect(gpSiteOf(person('GP_MARY_LEAKEY')).district).toBe('THEATER_SQUARE');
+    // the new codes append: every older code keeps its wire index
+    expect(GP_SITES.slice(0, 10)).toEqual(['district', 'anywhere', 'gwSlot', 'cityState', 'luxury', 'adjacentOwn',
+      'suzerainCityState', 'adjacentBarbarian', 'enemyTerritory', 'relicSlot']);
   });
 
   it('exactly the plot-granting rows wait for a tile with no military unit', () => {
@@ -289,7 +308,7 @@ describe('the standing channels', () => {
     addSeatPerm(seat, GP_ABILITY.GP_CHESTER_NIMITZ.perm!);
     expect(pct('SUBMARINE')).toBeCloseTo(s0 + 0.2, 12);
     expect(pct('GALLEY')).toBe(g0);
-    expect(gpPermOf(seat, 'unitProdPct')).toBe(0);
+    expect(gpPermOf(seat, 'militaryProdPct')).toBe(0);
     expect(GP_ABILITY.GP_CHESTER_NIMITZ.unit).toBe('SUBMARINE');
   });
 
@@ -477,5 +496,155 @@ describe('the route clauses', () => {
     expect(activateGreatPerson(state, stand(state, 'GP_MELITTA_BENTZ', hub))).toBe(true);
     expect(gpPermOf(seat, 'tourismRouteBonus')).toBe(25);
     expect(gpPermOf(seat, 'tradeCapacity')).toBe(2);
+  });
+});
+
+describe('the Action columns\' own sites', () => {
+  /** a plot nobody owns, free, bare, with no Mountain, wonder or Rainforest on or around it */
+  function wildPlot(state: GameState): Tile {
+    const t = state.map.tiles.find((x) => tileSeat(x) < 0 && !isWater(x) && !isImpassable(x) && free(state, x.index)
+      && x.feature === null && neighbors(state.map, x).length === 6
+      && neighbors(state.map, x).every((n) => n.elevation !== 'MOUNTAIN' && naturalWonderAt(n) === null && n.feature !== 'RAINFOREST'))!;
+    expect(t).toBeDefined();
+    return t;
+  }
+
+  it('Galileo beside a Mountain, Darwin on or beside a natural wonder, Janaki on or beside a Rainforest — anyone\'s plot', () => {
+    const state = newGame();
+    const wild = wildPlot(state);
+    const nb = neighbors(state.map, wild)[0];
+    const g = stand(state, 'GP_GALILEO_GALILEI', wild.index);
+    expect(gpActivateOk(state, g)).toBe(false);
+    Object.assign(nb, { elevation: 'MOUNTAIN' });
+    expect(gpActivateOk(state, g)).toBe(true);
+    const key = gpSiteKey(g)!;
+    expect(key[0]).toBe(GP_SITES.indexOf('nearMountain'));
+    expect(gpSiteTiles(state, 0, key[0], key[1])).toContain(wild.index);
+    expect(gpSiteTiles(state, 0, key[0], key[1])).not.toContain(nb.index);
+    const sci0 = state.seats[0].research.techProgress;
+    expect(activateGreatPerson(state, g)).toBe(true);
+    expect(state.seats[0].research.techProgress).toBe(sci0 + scaleByGameSpeed(250));
+    Object.assign(nb, { elevation: 'FLAT' });
+
+    const d = stand(state, 'GP_CHARLES_DARWIN', wild.index);
+    expect(gpActivateOk(state, d)).toBe(false);
+    nb.feature = 'MOUNT_EVEREST';
+    expect(gpActivateOk(state, d)).toBe(true);
+    nb.feature = null;
+
+    const j = stand(state, 'GP_JANAKI_AMMAL', wild.index);
+    expect(gpActivateOk(state, j)).toBe(false);
+    nb.feature = 'RAINFOREST';
+    expect(gpActivateOk(state, j)).toBe(true);
+    nb.feature = null;
+    wild.feature = 'RAINFOREST';
+    expect(gpActivateOk(state, j)).toBe(true);
+  });
+
+  it('the wonder engineers: spent on the plot a wonder is being raised on, and paid into that wonder', () => {
+    const state = newGame();
+    const seat = state.seats[0];
+    const city = seat.cities[0];
+    const plot = state.map.tiles[ownBare(state)];
+    plot.builtWonder = 'FORBIDDEN_CITY' as never;
+    plot.builtWonderComplete = false;
+    city.queue = [{ kind: 'wonder', wonder: 'FORBIDDEN_CITY', tileIndex: plot.index, progress: 0 }];
+    const iz = district(state, 'INDUSTRIAL_ZONE');
+    expect(gpActivateOk(state, stand(state, 'GP_ISIDORE_OF_MILETUS', iz))).toBe(false);
+    expect(gpActivateOk(state, stand(state, 'GP_ISIDORE_OF_MILETUS', city.centerIndex))).toBe(false);
+    const u = stand(state, 'GP_ISIDORE_OF_MILETUS', plot.index);
+    expect(gpActivateOk(state, u)).toBe(true);
+    const key = gpSiteKey(u)!;
+    expect(gpSiteTiles(state, 0, key[0], key[1])).toEqual([plot.index]);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(city.queue[0].progress).toBe(scaleByGameSpeed(215));
+    // Shah Jahan on the same plot: half the purse buys production, twice that in gold
+    seat.treasury = 300;
+    const q = city.queue[0];
+    const before = q.progress;
+    const need = itemCost(q, state, city) - before;
+    expect(activateGreatPerson(state, stand(state, 'GP_SHAH_JAHAN', plot.index))).toBe(true);
+    const bought = Math.min(need, 150);
+    expect(q.progress).toBe(before + bought);
+    expect(seat.treasury).toBe(300 - 2 * bought);
+    // a finished wonder is no site
+    plot.builtWonderComplete = true;
+    expect(gpActivateOk(state, u)).toBe(false);
+  });
+
+  it('James of St. George: a City Center whose city has no Castle yet', () => {
+    const state = newGame();
+    const city = state.seats[0].cities[0];
+    const u = stand(state, 'GP_JAMES_OF_ST_GEORGE', city.centerIndex);
+    expect(gpActivateOk(state, u)).toBe(true);
+    const key = gpSiteKey(u)!;
+    expect(key).toEqual([GP_SITES.indexOf('centreWithout'), centerBuildingIds().indexOf('MEDIEVAL_WALLS')]);
+    expect(gpSiteTiles(state, 0, key[0], key[1])).toEqual([city.centerIndex]);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(city.buildings).toContain('ANCIENT_WALLS');
+    expect(city.buildings).toContain('MEDIEVAL_WALLS');
+    expect(u.charges).toBe(2);
+    expect(gpActivateOk(state, u)).toBe(false);
+    expect(gpSiteTiles(state, 0, key[0], key[1])).toEqual([]);
+  });
+
+  it('Mary Leakey: a Theater Square whose city holds an Artifact; then every Artifact pays triple Tourism', () => {
+    const state = newGame();
+    const seat = state.seats[0];
+    const city = seat.cities[0];
+    const ts = district(state, 'THEATER_SQUARE');
+    const u = stand(state, 'GP_MARY_LEAKEY', ts);
+    expect(gpActivateOk(state, u)).toBe(false);
+    expect(placeGreatWork(state, city, { obj: GWO_ARTIFACT, maker: -1, era: 1, seat: 0 })).toBeGreaterThanOrEqual(0);
+    expect(gpActivateOk(state, u)).toBe(true);
+    const key = gpSiteKey(u)!;
+    expect(gpSiteTiles(state, 0, key[0], key[1])).toEqual([ts]);
+    const t0 = greatWorkTourism(state, city, false);
+    const sci0 = seat.research.techProgress;
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(seat.research.techProgress).toBe(sci0 + scaleByGameSpeed(350));
+    expect(gpPermOf(seat, 'artifactTourismPct')).toBe(200);
+    expect(greatWorkTourism(state, city, false)).toBe(t0 + 2 * GWO_TOURISM[GWO_ARTIFACT]!);
+  });
+
+  it('James Young: Oil is seen before Refining', () => {
+    const state = newGame();
+    expect(state.seats[0].research.techs).not.toContain(RESOURCES.OIL.revealTech);
+    expect(hiddenResourcesFor(state, 0).has('OIL')).toBe(true);
+    expect(activateGreatPerson(state, stand(state, 'GP_JAMES_YOUNG', district(state, 'CAMPUS')))).toBe(true);
+    expect(hiddenResourcesFor(state, 0).has('OIL')).toBe(false);
+    expect(hiddenResourcesFor(state, 0).has('COAL')).toBe(!state.seats[0].research.techs.includes('INDUSTRIALIZATION'));
+    expect(hiddenResourcesFor(state, 1).has('OIL')).toBe(true);
+  });
+
+  it('Sun Tzu: no retire; his Work of Writing is made in the seat\'s city he stands in, while it has room', () => {
+    const state = newGame();
+    const city = state.seats[0].cities[0];
+    const wild = wildPlot(state);
+    expect(gpActivateOk(state, stand(state, 'GP_SUN_TZU', wild.index))).toBe(false);
+    const u = stand(state, 'GP_SUN_TZU', ownBare(state));
+    expect(gwHasRoom(state, city, GWO_WRITING)).toBe(true);
+    expect(gpActivateOk(state, u)).toBe(true);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(gwWorks(city).filter((w) => w.obj === GWO_WRITING).length).toBe(1);
+    expect(state.units.some((x) => x.id === u.id)).toBe(false);
+    expect(gwHasRoom(state, city, GWO_WRITING)).toBe(false);
+    expect(gpActivateOk(state, stand(state, 'GP_SUN_TZU', city.centerIndex))).toBe(false);
+  });
+
+  it('Eisenhower: +5% toward military units only', () => {
+    const state = newGame();
+    const seat = state.seats[0];
+    const mods = getModifiers(state, 0);
+    const pct = (q: object) => prodBoostPct(mods, q as never, seat.gpPerm);
+    const warrior = { kind: 'unit', unit: 'WARRIOR', progress: 0 };
+    const builder = { kind: 'unit', unit: 'BUILDER', progress: 0 };
+    const settler = { kind: 'settler', progress: 0, cost: 0 };
+    const [w0, b0, s0] = [pct(warrior), pct(builder), pct(settler)];
+    addSeatPerm(seat, GP_ABILITY.GP_DWIGHT_EISENHOWER.perm!);
+    expect(gpPermOf(seat, 'militaryProdPct')).toBe(5);
+    expect(pct(warrior)).toBeCloseTo(w0 + 0.05, 12);
+    expect(pct(builder)).toBe(b0);
+    expect(pct(settler)).toBe(s0);
   });
 });

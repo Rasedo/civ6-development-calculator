@@ -28,7 +28,7 @@ import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
 import { fireFeature, METEOR_GRANT_CLASS } from '../data/disasters';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, type YieldCtx } from './effects';
-import { effectiveAdjacency, buildingVariantAdjacency } from './yields';
+import { effectiveAdjacency, buildingVariantAdjacency, darkBuildings, gameEraIndex } from './yields';
 import { BUILDINGS } from '../data/buildings';
 import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
 import { nextRandom } from './rand';
@@ -1871,17 +1871,24 @@ export function settlerCount(state: GameState, seat: number): number {
 export const RELIGIOUS_HEAL_PER_FAITH = 3;
 
 /** The FAITH a Holy Site district itself produces: its adjacency plus the faith
- *  of the buildings standing in it. A pillaged or unfinished site produces
- *  nothing, which is the same gate `cityDistrictYields` applies. */
+ *  of the buildings standing in it that pay (`darkBuildings`), a building's
+ *  per-era Faith included (the Dar-e Mehr's, `buildingEraYields`). A pillaged
+ *  or unfinished site produces nothing, which is the same gate
+ *  `cityDistrictYields` applies. */
 export function holySiteFaith(state: GameState, tile: Tile, ctx: YieldCtx): number {
   if (tile.district !== 'HOLY_SITE' || !tile.districtComplete || tile.districtPillaged) return 0;
   const city = cityAtTile(state, tile);
   if (!city) return 0;
   // the adjacency `cityDistrictYields` pays — the unique building's rule included
   let faith = effectiveAdjacency(ctx, tile, 'HOLY_SITE', buildingVariantAdjacency(ctx.mods.civ, city, 'HOLY_SITE'));
+  const dark = darkBuildings(state.map, city);
+  const era = gameEraIndex(state);
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
-    if (def?.district === 'HOLY_SITE') faith += def.yields?.faith ?? 0;
+    if (def?.district !== 'HOLY_SITE' || dark.has(id)) continue;
+    faith += def.yields?.faith ?? 0;
+    const n = era - (city.buildingEras?.[id] ?? era);
+    if (n > 0) faith += (def.yieldsPerEra?.faith ?? 0) * n;
   }
   return faith;
 }

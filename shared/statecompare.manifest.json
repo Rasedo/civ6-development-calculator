@@ -798,6 +798,17 @@
           "note": "the government the seat's record chose (a DRIVER decision on the wire, `adoptGovernment` / `_adopt_government`), as a roster position, -1 while none has been: the seat is in it, else in the newest its civics unlock."
         },
         {
+          "name": "governmentCivicTurn",
+          "compare": "exact",
+          "covers": [
+            "GovernmentState.civicTurn"
+          ],
+          "planes": [
+            "civ_civic_turn"
+          ],
+          "note": "the turn the seat last completed a civic: the next turn's record changes the government and the cards for free, any other turn pays the policy unlock (`policyUnlockCost` / `_policy_unlock_cost`)."
+        },
+        {
           "name": "policySlotsExtra",
           "compare": "exact",
           "covers": [],

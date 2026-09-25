@@ -28,7 +28,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     cultureTotal: 0,
     faith: 0,
     tourism: 0,
-    government: { chosen: null, policies: [], held: 0 },
+    government: { chosen: null, policies: [], held: 0, civicTurn: 0 },
     cities: [],
     nextCityId: 0,
     peaceTurns: 0,

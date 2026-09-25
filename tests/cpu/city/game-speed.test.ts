@@ -73,20 +73,20 @@ describe('a Great Person grant the install types ScaleByGameSpeed', () => {
     }
     throw new Error(`${id} is not in the roster`);
   };
-  /** a complete Industrial Zone on a bare owned tile of the capital, and the
-   *  engineer `id` standing on it */
-  function engineerAtZone(state: GameState, id: string) {
+  /** the capital raising `wonder` on a bare owned plot, and the engineer
+   *  `id` standing on that plot (`ActionRequiresIncompleteWonder`) */
+  function engineerOnWonder(state: GameState, id: string, wonder: string) {
     const city = state.seats[0].cities[0];
     const t = state.map.tiles.find((x) => tileSeat(x) === 0 && x.index !== city.centerIndex
       && !x.district && !x.builtWonder && !x.resource && !state.units.some((u) => u.tileIndex === x.index))!;
-    t.district = 'INDUSTRIAL_ZONE';
-    t.districtComplete = true;
-    city.districts.push({ type: 'INDUSTRIAL_ZONE', tileIndex: t.index });
+    setTileOwner(t, 0, city.id);
+    t.builtWonder = wonder as never;
+    t.builtWonderComplete = false;
+    city.queue = [{ kind: 'wonder', wonder, tileIndex: t.index, progress: 0 }];
     const { cls, at } = found(id);
     const u = spawnUnit(state, cls, t.index, 0)!;
     Object.assign(u, { tileIndex: t.index, gpAt: at, movesLeft: 2 * MP_SCALE });
     u.charges = gpChargesOf(GREAT_PEOPLE[cls as keyof typeof GREAT_PEOPLE][at]);
-    setTileOwner(t, 0, city.id);
     return { city, u };
   }
 
@@ -103,9 +103,8 @@ describe('a Great Person grant the install types ScaleByGameSpeed', () => {
   it('scales Imhotep\'s grant whole: 350 into an Ancient wonder, 175 into a later one', () => {
     for (const [wonder, standard] of [['PYRAMIDS', 350], ['FORBIDDEN_CITY', 175]] as const) {
       const state = newGame();
-      const { city, u } = engineerAtZone(state, 'GP_IMHOTEP');
+      const { city, u } = engineerOnWonder(state, 'GP_IMHOTEP', wonder);
       expect(WONDER_ERA_INDEX[wonder] <= 1).toBe(standard === 350);
-      city.queue = [{ kind: 'wonder', wonder, tileIndex: city.centerIndex, progress: 0 }];
       expect(activateGreatPerson(state, u)).toBe(true);
       expect(city.queue[0].progress).toBe(scaleByGameSpeed(standard));
     }

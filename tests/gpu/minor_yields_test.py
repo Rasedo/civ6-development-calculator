@@ -93,10 +93,11 @@ def test_walk(rules, path) -> None:
     bare = walk(sim, row)
     pop = int(sim.citystate_pop[B0, s])
     yf = float(sim._seat_amenity(row)[2][B0, 0])
-    # nothing but its citizens pays Science yet — and the amenity tier
-    # scales it exactly as it scales a major's
-    assert abs(bare[3] - pop * sim.rules.citizen_science * yf) < 1e-9, \
-        f"the bare city's Science is {bare[3]}, not {pop} citizens x {sim.rules.citizen_science} x {yf}"
+    # nothing but its citizens and its Palace pays Science yet — and the
+    # amenity tier scales it exactly as it scales a major's
+    pal = float(sim._palace_y[3])
+    assert abs(bare[3] - (pop * sim.rules.citizen_science + pal) * yf) < 1e-9, \
+        f"the bare city's Science is {bare[3]}, not ({pop} citizens x {sim.rules.citizen_science} + {pal}) x {yf}"
     assert bare[0] > 0 and bare[1] > 0, "a live city works its centre at least"
     lib = BLD.index("LIBRARY")
     give_minor_district(sim, s, sim._campus_idx)

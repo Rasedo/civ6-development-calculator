@@ -18,7 +18,7 @@ function twoSeatsAtWar(): GameState {
     ...emptySeat(state.seats.length),
     name: 'Rome',
     seat: 1,
-    government: { chosen: null, policies: [], held: 0 },
+    government: { chosen: null, policies: [], held: 0, civicTurn: 0 },
     cities: [],
   } as Seat;
   state.seats.push(civ);

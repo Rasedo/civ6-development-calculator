@@ -26,8 +26,9 @@ the proof.
      fifth of the city's turns
   8. its flat defence and a walled Free City's strike
   9. its units defend and bank no experience
-  10. its treasury banks its cities' Gold and pays its units' upkeep, goes
-     bankrupt as any seat does, and a join takes the city's grants
+  10. its treasury banks its cities' Gold and pays its units' upkeep, its
+     balance stopping at 0 with nothing disbanded, and a join takes the
+     city's grants
 """
 
 from __future__ import annotations
@@ -106,6 +107,28 @@ def free_slot(sim, centre: int) -> int:
     col = int(sim.centre_slot_at[B0, centre])
     assert col >= 0 and bool(sim.city_alive[B0, sim.FREE_ROW, col]), "the city is not on the free row"
     return col
+
+
+def attack_plot(sim, centre: int) -> int:
+    """a land plot beside `centre` with no military unit on it. The Free
+    City's own pair may hold every land plot around it (a coast, a natural
+    wonder): then its unit on the first one steps off to a free land plot
+    more than 3 away."""
+    land = [int(n) for n in sim.neigh[centre].tolist()
+            if n >= 0 and bool(sim.passable[B0, n]) and not bool(sim.wpass[B0, n])]
+    assert land, "the city has no land neighbour to be attacked from"
+    nb = next((n for n in land if int(sim.military_at[B0, n]) < 0), land[0])
+    held = int(sim.military_at[B0, nb])
+    if held >= 0:
+        away = next(t for t in range(sim.T) if bool(sim.passable[B0, t]) and not bool(sim.wpass[B0, t])
+                    and int(sim.military_at[B0, t]) < 0 and int(sim.civilian_at[B0, t]) < 0
+                    and int(sim.pair_dist[centre, t]) > 3)
+        rows = torch.tensor([B0])
+        sim._occ_clear(rows, torch.tensor([nb]), torch.tensor([held]))
+        sim.unit_tile[B0, held] = away
+        sim._occ_set(rows, torch.tensor([away]), torch.tensor([held]))
+        sim._gen_ver += 1
+    return nb
 
 
 def spot_at(sim, centre: int, dist: int) -> int:
@@ -269,10 +292,7 @@ def test_anyone_may_attack(rules, path) -> None:
     assert not bool(sim._seats_hostile(FREE_SEAT, torch.tensor([[FREE_SEAT]]))[B0, 0])
     assert int(sim._centre_target_seat(torch.tensor([FREE_SEAT]))[0]) == FREE_SEAT
     assert int(sim._holder_row(torch.tensor([FREE_SEAT]))[0]) == F
-    nb = next(int(n) for n in sim.neigh[centre].tolist()
-              if n >= 0 and bool(sim.passable[B0, n]) and not bool(sim.wpass[B0, n])
-              and int(sim.military_at[B0, n]) < 0)
-    u = put(sim, 1, nb, "WARRIOR")
+    u = put(sim, 1, attack_plot(sim, centre), "WARRIOR")
     hp0 = int(sim.city_hp[B0, F, col])
     sim._melee_city(torch.tensor([True]), torch.tensor([centre]), "major", u)
     assert int(sim.city_hp[B0, F, col]) < hp0, "the assault did not land"
@@ -394,11 +414,12 @@ def test_treasury_and_join(rules, path) -> None:
     sim._free_cities_phase()
     assert abs(float(sim.free_treasury[B0]) - (50.0 + gold - upkeep)) < 1e-9, \
         (float(sim.free_treasury[B0]), gold, upkeep)
-    # ...and goes bankrupt as any seat does: at -10 the priciest unit goes
-    sim.free_treasury[B0] = -10.0
-    sim._bankrupt_disband(F)
-    assert not bool(sim.unit_alive[B0, other[0]]), "the Tank, the priciest, should have gone"
-    assert all(bool(sim.unit_alive[B0, s]) for s in granted), "a cheaper unit was disbanded"
+    # ...its balance stopping at 0 where the upkeep outruns it: nothing disbands
+    sim.free_treasury[B0] = 0.0
+    alive0 = sim.unit_alive[B0].clone()
+    sim._seat_upkeep_and_bankruptcy(F, torch.tensor([True]))
+    assert float(sim.free_treasury[B0]) == 0.0, float(sim.free_treasury[B0])
+    assert torch.equal(sim.unit_alive[B0], alive0), "a Free Cities unit was disbanded"
     sim.free_treasury[B0] = 50.0
     # a JOIN takes the city's grants with it; another Free Cities unit stays
     sim._spawn_barb(one, torch.tensor([far]), horse, ladder=False, seat=FREE_SEAT)
@@ -412,7 +433,7 @@ def test_treasury_and_join(rules, path) -> None:
     assert all(bool(sim.unit_alive[B0, s]) and int(sim.unit_seat[B0, s]) == FREE_SEAT for s in stay)
     assert all(int(sim.military_at[B0, t]) != s for s, t in zip(granted, granted_at)), "a grant still holds its tile"
     sim._check_seat_invariant()
-    print("  10 the treasury and the join OK — Gold in, upkeep out, bankrupt as any seat; a join takes its grants")
+    print("  10 the treasury and the join OK — Gold in, upkeep out, the balance stops at 0; a join takes its grants")
 
 
 def test_defence_and_strike(rules, path) -> None:
@@ -438,9 +459,7 @@ def test_defence_and_strike(rules, path) -> None:
             s.city_outer_hp[B0, F, j] = int(s._walls_max_at(torch.tensor([F]), torch.tensor([j]))[B0])
             base = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]), no)[0][B0])
             assert base == 72 + int(s._walls_tier_cs[1]), base
-        nb = next(int(n) for n in s.neigh[c].tolist()
-                  if n >= 0 and bool(s.passable[B0, n]) and int(s.military_at[B0, n]) < 0)
-        u = put(s, 1, nb, "WARRIOR")
+        u = put(s, 1, attack_plot(s, c), "WARRIOR")
         s._free_cities_phase()
         hp = int(s.major_unit_hp[B0, u])
         assert (hp < 100) if walled else (hp == 100), (walled, hp)

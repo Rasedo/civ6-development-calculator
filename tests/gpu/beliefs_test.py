@@ -148,10 +148,11 @@ def apostle(sim, row: int) -> tuple[int, int]:
     return slot, rank
 
 
-def evangelize(sim, row: int) -> tuple[bool, int]:
-    """an Apostle takes the EVANGELIZE_BELIEF column: (the mask offered it,
-    its slot)"""
+def evangelize(sim, row: int, mp: int = 4) -> tuple[bool, int]:
+    """an Apostle with `mp` moves left takes the EVANGELIZE_BELIEF column:
+    (the mask offered it, its slot)"""
     slot, rank = apostle(sim, row)
+    sim.major_unit_mp[B0, slot] = mp
     offered = bool(sim._seat_unit_mask(row)[B0, rank, sim._A_EVANGELIZE])
     a = torch.full(sim._seat_slot_map(row).shape, -1, dtype=torch.long)
     a[B0, rank] = sim._A_EVANGELIZE
@@ -169,6 +170,10 @@ def test_enhancing(rules, path) -> None:
     sim.civ_prophets[B0, ROW] = 2
     adopt(sim, ROW, [[WOR, 4]])
     assert held(sim, ROW) == [2, -1, 0, -1], "adopted a belief nobody earned"
+    # a SPENT Apostle (no moves left) takes no verb: it stays, nothing is earned
+    _off, slot = evangelize(sim, ROW, mp=0)
+    assert bool(sim.major_unit_alive[B0, slot]) and int(sim.civ_beliefs_earned[B0, ROW]) == 2, \
+        "an Apostle with no moves evangelized"
     # EVANGELIZE BELIEF: the Apostle is spent, the religion earns one
     offered, slot = evangelize(sim, ROW)
     assert offered, "the mask shut an Apostle's evangelize"

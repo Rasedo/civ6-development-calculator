@@ -503,6 +503,8 @@ const SEAT: Record<string, Extractor> = {
   // where none has been
   governmentChosen: overSeats((s) => (s.government.chosen
     ? GOVERNMENT_LIST.findIndex((g) => g.id === s.government.chosen) : -1)),
+  // the turn the seat last completed a civic — the policy unlock's clock
+  governmentCivicTurn: overSeats((s) => s.government.civicTurn),
   // the SLOTTED cards as a sorted index set — the stored decision
   // the policy slots a seat holds BEYOND its government's own — a wonder's, a
   // Great Person's, and the kind a conversion moves. Compared beside the cards

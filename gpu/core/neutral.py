@@ -594,6 +594,36 @@ def gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
         return near & sim.passable
     if site == 8:  # the territory of a seat at war with this one (Tupac Amaru)
         return sim._enemy_ground(seat, sim.tile_seat)
+    if site in (10, 11, 12):  # beside a Mountain / on or beside a natural wonder / a Rainforest
+        if site == 10:
+            src, here = sim.tile_mountain, False
+        elif site == 11:
+            src, here = sim.nwonder, True
+        elif sim._rainforest_fid >= 0:
+            src, here = (sim.feat_id == sim._rainforest_fid) & ~sim.feat_stripped, True
+        else:
+            return torch.zeros_like(own)
+        nbn = sim.neigh
+        near = (src[:, nbn.clamp(min=0).reshape(-1)].reshape(own.shape[0], sim.T, 6)
+                & (nbn >= 0).unsqueeze(0)).any(dim=2)
+        return (near | (src & here)) & sim.passable
+    if site == 13:  # this seat's plot a wonder is being raised on, its city's queued wonder
+        col = sim.city_slot_at(seat)
+        colc = col.clamp(min=0)
+        hq = sim._q_head(seat).gather(1, colc)
+        isw = (hq >= sim.WONDER_BASE) & (hq < sim.WONDER_BASE + max(sim._wond_n, 1))
+        at = sim.city_qtile[:, seat, :, 0].gather(1, colc)
+        tiles = torch.arange(sim.T, device=own.device).unsqueeze(0)
+        return own & (col >= 0) & (sim.built_wonder >= 0) & ~sim.built_wonder_complete & isw & (at == tiles)
+    if site == 14:  # this seat's City Center whose city lacks building `arg`
+        cc = sim.centre_slot_at
+        has = sim.city_bldg[:, seat, :, max(arg, 0)].gather(1, cc.clamp(min=0))
+        return own & (cc >= 0) & (arg >= 0) & ~has
+    if site == 15:  # this seat's completed district `arg` whose city holds an Artifact
+        col = sim.city_slot_at(seat)
+        na = sim._gw_counts_by_obj(seat)[:, :, 4].gather(1, col.clamp(min=0))   # 4 = GWO_ARTIFACT
+        return own & (sim.district == arg) & (arg >= 0) & sim.district_complete & ~sim.district_pillaged \
+            & (col >= 0) & (na > 0)
     # 5: unclaimed ground next to this seat's territory
     nb = sim.neigh
     adj = (own[:, nb.clamp(min=0).reshape(-1)].reshape(own.shape[0], sim.T, 6)

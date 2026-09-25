@@ -21,12 +21,13 @@ import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityS
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_TILES_PER_GOLD, HUNZA_ROUTE_GOLD, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_DISTRICT_BONUS, CITY_STATE_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, QUEST_CAMP_RADIUS, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_BUILDER_RATE_PERMILLE, MINOR_BUILDER_RADIUS, MINOR_BUILDER_BUY_SLOTS, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_BUY_BP, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS, MINOR_UPGRADE_GOLD, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_WEIGHTS_PEACE, MINOR_WALK_WEIGHTS_WAR, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, FREE_CITY_BUILD_ROWS } from '../data/cityStates';
-import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteArg, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
+import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
+import { gpSiteArgOf } from '../core/targetSites';
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { KILL_SPREAD_RANGE } from '../data/promotions';
 import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_WORKS_PER_PERSON, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, GWO_COUNT, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
@@ -274,7 +275,7 @@ import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS, GOVERNOR_NEUTRALIZE_TURNS, GOVERNANCE_DOCTRINE_FAVOR, WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES, promotionBitValue, type GovernorEffects } from '../data/governors';
 import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BANS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
-import { AMENITY_TIERS, CITY_POP_PER_AMENITY, amenityTierIndex } from '../data/constants';
+import { AMENITY_TIERS, CITY_POP_PER_AMENITY, amenityTierIndex, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST } from '../data/constants';
 import { CIV_LEVELS, CIV_LEVEL_ORDER } from '../data/civLevels';
 
 // CIV6 (Pillaging): the shared plunder-kind enum — 0 none, 1 heal, 2 gold,
@@ -564,7 +565,7 @@ export function buildRules() {
     // amenityTier(balance) thresholds, highest first (see data/constants.ts).
     amenityTiers: AMENITY_TIERS.map((t) => ({ min: t.min, growth: t.growthFactor, yield: t.yieldFactor })),
     amenityPopPer: CITY_POP_PER_AMENITY,
-    scenario: { settlerBase: UNITS.SETTLER.cost, settlerPerCity: scaleByGameSpeed(SETTLER_COST_STEP), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, purchaseDivisor: PURCHASE_DIVISOR, turnLimit: TURN_LIMIT, builderBase: UNITS.BUILDER.cost, builderPer: scaleByGameSpeed(BUILDER_COST_STEP), gameSpeed: GAME_SPEED, spaceLyTarget: SPACE_FLIGHT_LY },
+    scenario: { settlerBase: UNITS.SETTLER.cost, settlerPerCity: scaleByGameSpeed(SETTLER_COST_STEP), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, purchaseDivisor: PURCHASE_DIVISOR, turnLimit: TURN_LIMIT, builderBase: UNITS.BUILDER.cost, builderPer: scaleByGameSpeed(BUILDER_COST_STEP), gameSpeed: GAME_SPEED, spaceLyTarget: SPACE_FLIGHT_LY, civicUnlockMaxCost: CIVIC_UNLOCK_MAX_COST, civicUnlockPerTurnDrop: CIVIC_UNLOCK_PER_TURN_DROP, civicUnlockMinCost: CIVIC_UNLOCK_MIN_COST },
     actions: { unit: unitActionNames(IMPROVEMENT_IDS) },
     districtCost: {
       // the SPECIALTY base, still what a district with no row of its own pays
@@ -640,7 +641,7 @@ export function buildRules() {
     // a worship building's faith price: its own Cost at the faith rate, one
     // figure because the install prices every worship row alike (Cost 190)
     worshipFaithCost: (() => {
-      const costs = new Set(Object.values(BUILDINGS).filter((b) => b.worship).map((b) => b.cost));
+      const costs = new Set(Object.values(BUILDINGS).filter((b) => b.worship).map((b) => b.buyCost));
       if (costs.size !== 1) throw new Error('the worship buildings no longer share one Cost');
       return [...costs][0] * FAITH_PURCHASE_MULT;
     })(),
@@ -1062,10 +1063,10 @@ export function buildRules() {
       // CIV6 (World Games): [perm index, building index, district index] per row
       gpBuildingTourism: GP_BUILDING_TOURISM.map((r) => [GP_PERM.indexOf(r.perm), buildingIdx.get(r.building) ?? -1, PLACEABLE_DISTRICTS.indexOf(r.district)]),
       gpEffects: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => gpFxRow(p))),
-      // the SITE a charge may be spent at, and which district when it names one
+      // the SITE a charge may be spent at, and its argument (`gpSiteArgOf`:
+      // the district it names, or a `centreWithout` site's missing building)
       gpSite: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => GP_SITES.indexOf(gpSiteOf(p).site))),
-      gpSiteDistrict: GP_CLASSES.map((c) =>
-        GREAT_PEOPLE[c].map((p) => gpSiteArg(gpSiteOf(p).district))),
+      gpSiteDistrict: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => gpSiteArgOf(p))),
       // CIV6 (`ActionRequiresNoMilitaryUnit`): the charge waits for a tile
       // no military unit stands on
       gpNoMilitary: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => (gpNoMilitaryOf(p) ? 1 : 0))),
@@ -1076,6 +1077,8 @@ export function buildRules() {
       // [perm index, strategic slot] — the seat's, then the city-borne
       gpFreeExtraction: GP_FREE_EXTRACTION.map((r) => [GP_PERM.indexOf(r.perm), strategicSlot(r.resource)]),
       gpCityFreeExtraction: GP_CITY_FREE_EXTRACTION.map((r) => [GP_CITY_PERM.indexOf(r.perm), strategicSlot(r.resource)]),
+      // [perm index, resource index (RESOURCE_IDS)] — seen before its technology
+      gpResourceReveal: GP_RESOURCE_REVEAL.map((r) => [GP_PERM.indexOf(r.perm), RESOURCE_IDS.indexOf(r.resource)]),
       // the amenity tiers Ibn Khaldun's happyYieldPct / ecstaticYieldPct read
       gpHappyTier: amenityTierIndex('Happy'),
       gpEcstaticTier: amenityTierIndex('Ecstatic'),
@@ -1144,6 +1147,7 @@ export function buildRules() {
       removeHeresyPct: REMOVE_HERESY_PCT,
       launchInquisitionCharges: LAUNCH_INQUISITION_CHARGES,
       religionInitialBeliefs: RELIGION_INITIAL_BELIEFS,
+      prophetMaxPlayerInstances: PROPHET_MAX_PLAYER_INSTANCES,
       condemnPressureRange: CONDEMN_PRESSURE_RANGE,
       condemnPressureSwing: CONDEMN_PRESSURE_SWING,
       // Each ADJ_SRC entry as the FEATURE / the TERRAIN it names, -1 where it
@@ -1473,11 +1477,14 @@ export function buildRules() {
       eruptionDmgHi: [...ERUPTION_DMG_HI],
       soilReplaces: SOIL_REPLACES.map((f) => featIdx.get(f) ?? -1),
       // per eruption row, 1 where it erupts a volcano plot, else the feature
-      // id of the natural wonder it erupts — -1 on a wonder the feature
-      // roster does not carry (Eyjafjallajokull, Vesuvius), which no plot
-      // can hold
+      // id of the natural wonder it erupts (-1 on a volcano's row)
       eruptionOnVolcano: ERUPTION_WONDER.map((w) => (w ? 0 : 1)),
-      eruptionWonderFid: ERUPTION_WONDER.map((w) => (w ? (featIdx.get(w) ?? -1) : -1)),
+      eruptionWonderFid: ERUPTION_WONDER.map((w) => {
+        if (!w) return -1;
+        const f = featIdx.get(w);
+        if (f === undefined) throw new Error(`eruptionWonderFid: ${w} is not in the feature roster`);
+        return f;
+      }),
       // a drought's turns by severity, and its footprint's `STORM_DISC` slots
       droughtDuration: [...DROUGHT_DURATION],
       droughtHexes: DROUGHT_HEXES,
@@ -2353,6 +2360,7 @@ export function buildRules() {
     buildings: centerBuildings.map((b) => ({
       id: b.id,
       cost: b.cost,
+      buyCost: b.buyCost,
       yields: YIELD_KEYS.map((k) => b.yields?.[k] ?? 0),
       housing: b.housing ?? 0,
       amenities: b.amenities ?? 0,
@@ -2371,6 +2379,7 @@ export function buildRules() {
         coastResY: YIELD_KEYS.map((k) => v.coastResourceYields?.[k] ?? 0),
         // the columns `BUILDING_VARIANT_COLUMNS` names, -1 = "the base row's"
         cost: v.cost ?? -1,
+        buyCost: v.buyCost ?? -1,
         hasYields: v.yields ? 1 : 0,
         yields: YIELD_KEYS.map((k) => v.yields?.[k] ?? 0),
         housing: v.housing ?? -1,

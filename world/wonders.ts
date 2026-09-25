@@ -16,6 +16,8 @@ export interface NaturalWonderDef {
     minLat?: number;
     maxLat?: number;
     inland?: boolean; // no adjacent salt water
+    mountain?: boolean; // stands on a Mountain (a *_MOUNTAIN Feature_ValidTerrains row); every other land wonder refuses one
+    noRiver?: boolean; // no river edge on any of its plots (Features.NoRiver)
   };
   color: string;
 }
@@ -119,6 +121,27 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     size: 3,
     spawn: { terrains: ['DESERT'], minLat: 0.1, maxLat: 0.5 },
     color: '#e0c088',
+  },
+  // CIV6 (`VikingsLandmarks_Features.xml`, FEATURE_EYJAFJALLAJOKULL): Tiles 2,
+  // Feature_ValidTerrains Snow and Tundra flat or hills, NoCoast, NoRiver.
+  EYJAFJALLAJOKULL: {
+    id: 'EYJAFJALLAJOKULL',
+    name: 'Eyjafjallajökull',
+    code: 'EY',
+    size: 2,
+    spawn: { terrains: ['SNOW', 'TUNDRA'], inland: true, noRiver: true },
+    color: '#c8ccd4',
+  },
+  // CIV6 (`Expansion2_Features.xml`, FEATURE_VESUVIUS): Tiles 1,
+  // Feature_ValidTerrains TERRAIN_GRASS_MOUNTAIN and TERRAIN_PLAINS_MOUNTAIN,
+  // NoRiver.
+  VESUVIUS: {
+    id: 'VESUVIUS',
+    name: 'Vesuvius',
+    code: 'VE',
+    size: 1,
+    spawn: { terrains: ['GRASSLAND', 'PLAINS'], mountain: true, noRiver: true },
+    color: '#8a6f63',
   },
 };
 

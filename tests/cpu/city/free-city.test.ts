@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { neighbors, tilesWithin } from '../../../world/hex';
-import { bankruptDisband, eraUnitOfClass, flipCity, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
+import { eraUnitOfClass, flipCity, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { computeCityStats, luxuryAmenities } from '../../../cpu/core/city';
@@ -247,7 +247,7 @@ describe('the Free City step', () => {
     expect(state.units.find((u) => u.id === other.id)?.seat).toBe(FREE_SEAT);
   });
 
-  it('the Free Cities seat banks its cities\' Gold, pays its units\' upkeep, and goes bankrupt', () => {
+  it('the Free Cities seat banks its cities\' Gold and pays its units\' upkeep, its balance stopping at 0', () => {
     const { state, border } = scene(30);
     border.loyalty = 0;
     flipCity(state, border);
@@ -262,15 +262,21 @@ describe('the Free City step', () => {
     expect(upkeep).toBeGreaterThan(0);
     freeCitiesPhase(state);
     expect(free.treasury).toBeCloseTo(50 + gold - upkeep, 9);
-    // its bankruptcy is any seat's: at -20 two units go, the priciest first
-    const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 20, 5).index, FREE_SEAT)!;
-    const horse = state.units.find((u) => u.seat === FREE_SEAT && u.type === 'HORSEMAN')!;
-    free.treasury = -20;
-    bankruptDisband(state, FREE_SEAT, mods);
-    expect(state.units.some((u) => u.id === horse.id)).toBe(false);
-    expect(state.units.some((u) => u.id === archer.id)).toBe(false);
-    // the Warriors cost nothing, so nothing takes them
-    expect(state.units.filter((u) => u.seat === FREE_SEAT && u.type === 'WARRIOR').length).toBe(FREE_CITY_PAIR_COUNT);
+    // an upkeep the purse cannot meet leaves it at 0, and nothing disbands
+    const cost = (): number => state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u.type) : 0), 0);
+    // one unit per free land plot away from the city, until the upkeep
+    // outruns the Gold
+    for (const t of state.map.tiles) {
+      if (cost() > gold + 20) break;
+      if (t.col < 15 || isWater(t) || state.units.some((u) => u.tileIndex === t.index)) continue;
+      spawnUnit(state, 'HORSEMAN', t.index, FREE_SEAT);
+    }
+    expect(cost()).toBeGreaterThan(gold + 20);
+    const ids = state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.id);
+    free.treasury = 0;
+    freeCitiesPhase(state);
+    expect(free.treasury).toBe(0);
+    expect(ids.every((id) => state.units.some((u) => u.id === id))).toBe(true);
   });
 
   it('a Free City stands on its own flat base, 72 with no walls', () => {

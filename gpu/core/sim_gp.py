@@ -193,10 +193,13 @@ class SimGp:
         building — `prodBoostPct`'s Great-Person half, which stacks ADDITIVELY
         with the cards exactly as CIV6 stacks production modifiers."""
         _sh = (self.B,) + (1,) * (cur.dim() - 1)  # one city column or a whole row
-        up = self._gp_perm(row, "unitProdPct").double().reshape(_sh) / 100.0
+        up = self._gp_perm(row, "militaryProdPct").double().reshape(_sh) / 100.0
         spp = self._gp_perm(row, "spaceProdPct").double().reshape(_sh) / 100.0
-        is_unit = (cur == self.NB) | ((cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU))
-        out = is_unit.double() * up
+        # CIV6 (Eisenhower, MODIFIER_PLAYER_CITIES_ADJUST_MILITARY_UNITS_PRODUCTION):
+        # military units only (`unitIsMilitary`)
+        is_mil = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
+            & self._type_military[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
+        out = is_mil.double() * up
         # CIV6 (Themistocles, Nimitz): the share one promotion class takes
         if self._gp_unit_prod_classes:
             _ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
@@ -240,8 +243,18 @@ class SimGp:
         a_dist = a_dist | (own & (sdist == -2) & (self.centre_slot_at.gather(1, tc) >= 0))
         # 1 anywhere the unit can already stand
         a_any = torch.ones_like(a_dist)
-        # 2 a city of this seat with an open slot taking one of the person's works
+        # 2 a city of this seat with an open slot taking one of the person's
+        # works — a class's own, or the one work another person carries (Sun
+        # Tzu's Work of Writing)
         a_gw = own & self._gw_activation_room_at(row, cls, at, tc)
+        _gwk = self._gp_fx(cls, at, "greatWorkKind").long()
+        if bool(((_gwk >= 0) & ok & (site == 2)).any()):
+            _col = self.city_slot_at(row).gather(1, tc)
+            _rb = self._gw_room_by_obj(row).reshape(self.B, self.RC * 8)
+            for kind in range(3):
+                _o = self._gw_kind_objs(kind)[0]
+                _hit = _rb.gather(1, _col.clamp(min=0) * 8 + _o) & (_col >= 0) & (_gwk == kind)
+                a_gw = a_gw | (own & _hit)
         # 3 inside a city-state's territory
         _ts_here = self.tile_seat.gather(1, tc)
         a_cs = (_ts_here >= 100) & (_ts_here < BARB_SEAT)
@@ -270,7 +283,51 @@ class SimGp:
             _rr = (self._gw_room(row, 7) & self.city_alive[:, row, :self.RC]).any(dim=1)  # 7 = GWO_RELIC
             a_relic = _rr.unsqueeze(1).expand_as(a_dist)
 
-        arms = torch.stack([a_dist, a_any, a_gw, a_cs, a_lux, a_adj, a_suz, a_barb, a_enemy, a_relic], dim=0)
+        def beside(plane: torch.Tensor) -> torch.Tensor:
+            return (plane.gather(1, _nb.clamp(min=0).reshape(tc.shape[0], -1)).reshape_as(_nb) & (_nb >= 0)).any(dim=2)
+
+        def wants(k: int) -> bool:
+            return bool((ok & (site == k)).any())
+
+        _none = torch.zeros_like(a_dist)
+        # 10 beside a Mountain (Galileo); 11 on or beside a natural wonder
+        # (Darwin); 12 on or beside a Rainforest (Janaki Ammal) — anyone's plot
+        a_mtn = beside(self.tile_mountain) if wants(10) else _none
+        a_nw = (self.nwonder.gather(1, tc) | beside(self.nwonder)) if wants(11) else _none
+        a_rain = _none
+        if wants(12) and self._rainforest_fid >= 0:
+            _rp = (self.feat_id == self._rainforest_fid) & ~self.feat_stripped
+            a_rain = _rp.gather(1, tc) | beside(_rp)
+        _col = self.city_slot_at(row).gather(1, tc)                     # the owning city's column
+        _colc = _col.clamp(min=0)
+        # 13 this seat's plot a wonder is being raised on, the owning city's
+        # queued wonder standing there (the five wonder engineers)
+        a_wond = _none
+        if wants(13):
+            _hq = self._q_head(row).gather(1, _colc)
+            _isw = (_hq >= self.WONDER_BASE) & (_hq < self.WONDER_BASE + max(self._wond_n, 1))
+            a_wond = own & (_col >= 0) & (self.built_wonder.gather(1, tc) >= 0) \
+                & ~self.built_wonder_complete.gather(1, tc) & _isw \
+                & (self.city_qtile[:, row, :, 0].gather(1, _colc) == tc)
+        # 14 this seat's City Center whose city lacks the row's building
+        # (James of St. George's Castle)
+        a_ctr = _none
+        if wants(14):
+            _cc = self.centre_slot_at.gather(1, tc)
+            _nbld = self.city_bldg.shape[3]
+            _has = self.city_bldg[:, row].reshape(self.B, -1).gather(
+                1, _cc.clamp(min=0) * _nbld + sdist.clamp(min=0, max=_nbld - 1))
+            a_ctr = own & (_cc >= 0) & (sdist >= 0) & ~_has
+        # 15 this seat's completed district whose city holds an Artifact (Mary Leakey)
+        a_art = _none
+        if wants(15):
+            _na = self._gw_counts_by_obj(row)[:, :, 4].gather(1, _colc)       # 4 = GWO_ARTIFACT
+            a_art = own & (self.district.gather(1, tc) == sdist) & (sdist >= 0) \
+                & self.district_complete.gather(1, tc) & ~self.district_pillaged.gather(1, tc) \
+                & (_col >= 0) & (_na > 0)
+
+        arms = torch.stack([a_dist, a_any, a_gw, a_cs, a_lux, a_adj, a_suz, a_barb, a_enemy, a_relic,
+                            a_mtn, a_nw, a_rain, a_wond, a_ctr, a_art], dim=0)
         pick = arms.gather(0, site.clamp(min=0, max=arms.shape[0] - 1).unsqueeze(0)).squeeze(0)
         # CIV6 (`ActionRequiresNoMilitaryUnit`): a person who grants a unit on
         # its own plot waits until no military unit shares it
@@ -351,7 +408,7 @@ class SimGp:
 
         # ---- the city the charge lands in
         self._gp_instant_buildings(row, has_city, cls, at, cc)
-        self._gp_wonder_charge(row, has_city, cls, at, cc)
+        self._gp_wonder_charge(row, has_city, cls, at, cc, hc)
         _space = self._gp_fx(cls, at, "spaceProduction").double() * has_city.to(dt)
         if bool((_space != 0).any()) and self._proj_rows:
             _cur = self._q_head(row).gather(1, cc.unsqueeze(1)).squeeze(1)
@@ -612,22 +669,24 @@ class SimGp:
             self._q_drop(r, row, col, gone)
 
     def _gp_wonder_charge(self, row: int, m: torch.Tensor, cls: torch.Tensor,
-                          at: torch.Tensor, cc: torch.Tensor) -> None:
-        """CIV6 (Imhotep and the other four): production into a WONDER under
-        construction, doubled when that wonder's era is at or below the row's
-        own `wonderEraDouble`."""
+                          at: torch.Tensor, cc: torch.Tensor, hc: torch.Tensor) -> None:
+        """CIV6 (Imhotep and the other four, DISTRICT_WONDER_IN_TILE):
+        production into the WONDER being raised on the activating plot `hc`,
+        doubled when that wonder's era is at or below the row's own
+        `wonderEraDouble`."""
         # CIV6 (Shah Jahan): "Grants Production towards wonder construction,
         # capped at half of your current treasury. Then reduces your Gold by
         # twice the amount of purchased Production." The flat charges
-        # (Brunelleschi, Eiffel) and the buyout share the site — the head must
-        # be a WONDER — so the gold arm rides the same body.
+        # (Brunelleschi, Eiffel) and the buyout share the site, so the gold
+        # arm rides the same body.
         buyout = self._gp_fx(cls, at, "wonderBuyout").double()
         amt = self._gp_fx(cls, at, "wonderProduction").double()
         if not bool((((amt != 0) | (buyout != 0)) & m).any()):
             return
         cur = self._q_head(row).gather(1, cc.unsqueeze(1)).squeeze(1)
         wi = cur - self.WONDER_BASE
-        is_w = (wi >= 0) & (wi < max(self._wond_n, 1))
+        is_w = (wi >= 0) & (wi < max(self._wond_n, 1)) \
+            & (self.city_qtile[:, row, :, 0].gather(1, cc.unsqueeze(1)).squeeze(1) == hc)
         dbl_to = self._gp_fx(cls, at, "wonderEraDouble").long()
         w_era = self._wonder_era[wi.clamp(min=0, max=max(self._wond_n - 1, 0))] if self._wond_n else torch.zeros_like(wi)
         mult = torch.where((dbl_to >= 0) & (w_era <= dbl_to), 2.0, 1.0).double()
@@ -635,7 +694,6 @@ class SimGp:
         buy = m & is_w & (buyout != 0)
         if not bool((hit | buy).any()):
             return
-        _drip = self.city_progress[:, row, :, 0].clone()
         r = hit.nonzero(as_tuple=True)[0]
         # at Standard speed on the wire: the whole grant takes the speed
         self.city_progress[r, row, cc[r], 0] += self.rules.scale_by_game_speed(amt[r] * mult[r]).to(self.city_progress.dtype)
@@ -647,7 +705,6 @@ class SimGp:
             prod = torch.minimum(need, self.civ_treasury[rb, row].double() / 2).clamp(min=0)
             self.city_progress[rb, row, cb, 0] += prod.to(self.city_progress.dtype)
             self.civ_treasury[rb, row] = (self.civ_treasury[rb, row].double() - 2 * prod).to(self.civ_treasury.dtype)
-        self._repair_drip(row, _drip)
 
     def _gp_per_adjacent(self, row: int, m: torch.Tensor, cls: torch.Tensor,
                          at: torch.Tensor, hc: torch.Tensor) -> None:

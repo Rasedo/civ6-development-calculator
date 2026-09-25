@@ -81,6 +81,7 @@ def test_wonder_grant(rules, path) -> None:
         ctr = int(sim.city_center[0, ROW, 0])
         assert ctr >= 0, "row has no city to spend in"
         sim.city_current[0, ROW, 0, 0] = sim.WONDER_BASE + wi
+        sim.city_qtile[0, ROW, 0, 0] = ctr  # the grant lands in the wonder raised where the person stands
         sim.city_cost[0, ROW, 0, 0] = 5000.0
         sim.city_progress[0, ROW, 0, 0] = 0.0
         v = make_person(sim, ROW, cls, at, ctr)

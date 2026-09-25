@@ -57,9 +57,10 @@ describe("the minor's city rides the yield walk", () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, 'scientific', 5);
     const bare = computeCityStats(state, minorCity(cs));
-    // nothing but its citizens pays Science yet, scaled by the amenity tier
-    // exactly as a major's would be
-    expect(bare.total.science).toBeCloseTo(5 * CITIZEN_SCIENCE * bare.amenities.tier.yieldFactor, 9);
+    // nothing but its citizens and its Palace pays Science yet, scaled by the
+    // amenity tier exactly as a major's would be
+    expect(bare.total.science).toBeCloseTo(
+      (5 * CITIZEN_SCIENCE + BUILDINGS.PALACE.yields!.science!) * bare.amenities.tier.yieldFactor, 9);
     expect(bare.total.food).toBeGreaterThan(0);
     expect(bare.total.production).toBeGreaterThan(0);
     minorDistrict(state, cs, 'CAMPUS', 1);

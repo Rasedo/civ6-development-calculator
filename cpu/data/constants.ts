@@ -73,6 +73,24 @@ export const FAITH_PURCHASE_MULT = srcConst('scenario.faithPurchaseMult', 2, {
 });
 export const PURCHASE_DIVISOR = srcConst('scenario.purchaseDivisor', 5, gp('PURCHASE_DIVISOR'));
 
+/** THE POLICY UNLOCK. CIV6 (the Governments pedia): "Any time a new
+ *  government or policy is unlocked from the Civics Tree, you will have the
+ *  opportunity to reselect policies or change your government for free.
+ *  Otherwise, there will be a cost to make these changes." The UI reads the
+ *  cost from `GetCostToUnlockPolicies` (0 in the free window) and pays it in
+ *  Gold (`GOVERNMENT_UNLOCK_WITH_FAITH` false) through one `UNLOCK_POLICIES`
+ *  operation that opens both the cards and the government for the turn. The
+ *  online speed's row names the cost's three figures; `policyUnlockCost`
+ *  reads them as the cost starting at the maximum the first turn past the
+ *  window and dropping by the step each further turn, never below the
+ *  minimum. */
+export const CIVIC_UNLOCK_MAX_COST = srcConst('scenario.civicUnlockMaxCost', 50,
+  xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockMaxCost'));
+export const CIVIC_UNLOCK_PER_TURN_DROP = srcConst('scenario.civicUnlockPerTurnDrop', 5,
+  xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockPerTurnDrop'));
+export const CIVIC_UNLOCK_MIN_COST = srcConst('scenario.civicUnlockMinCost', 10,
+  xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockMinCost'));
+
 export const FOOD_PER_CITIZEN = srcConst('foodPerCitizen', 2,
   gp('CITY_FOOD_CONSUMPTION_PER_POPULATION'));
 

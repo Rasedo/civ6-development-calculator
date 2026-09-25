@@ -689,8 +689,8 @@ class SimPhase:
         need of its population and the supply the Free Cities seat holds (its
         own luxuries, buildings and districts; no government, policy or
         governor). Its treasury (`free_treasury`) banks the Gold that same walk
-        makes, in slot order, then pays its units' upkeep and meets the
-        bankruptcy that upkeep may force (`_seat_upkeep_and_bankruptcy`). Then
+        makes, in slot order, then pays its units' upkeep, the balance stopping
+        at 0 as a minor's does (`_seat_upkeep_and_bankruptcy`). Then
         each city takes its grant when one falls due — every
         `_free_grant_period`th of its turns, the flip turn its first
         (`city_freed_turn`), the chassis `_free_grant_type`'s — puts the same
@@ -2039,6 +2039,7 @@ class SimPhase:
                 break
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_civics[rows, row, curc[rows]] = True
+            self.civ_civic_turn[rows, row] = self.turn
             self._eff_version += 1
             # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
             # Diplomatic Victory point" — once, at completion.
@@ -2208,9 +2209,10 @@ class SimPhase:
                 self._gp_ensure_offer(active, cls)
                 has_person = self.gp_offer[:, cls] >= 0
                 gcost = self.gp_price[:, cls]
-                # the PASSER is locked out of this individual — points wait
+                # the PASSER is locked out of this individual, and a seat that
+                # has earned its Great Prophet takes no other — points wait
                 hit = active & has_person & (self.gp_passed_by[:, cls] != row) \
-                    & (self.civ_gpp[:, row, cls] >= gcost) & ~_ban
+                    & (self.civ_gpp[:, row, cls] >= gcost) & ~_ban & ~self._gp_capped(row, cls)
                 if not bool(hit.any()):
                     break
                 self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
@@ -2283,6 +2285,15 @@ class SimPhase:
             self._gp_ensure_offer(due, _cls)
             self._gp_claim(row, due & (self.gp_offer[:, _cls] >= 0), _cls)
 
+    def _gp_capped(self, row: int, cls: int) -> torch.Tensor:
+        """[B] bool — CIV6 (GreatPersonClasses, the Great Prophet's
+        `MaxPlayerInstances`): seat row `row` has earned its Great Prophet and
+        takes no other — no recruit, patronage, pass or free grant. `gpCapped`'s
+        twin."""
+        if cls != self._prophet_cls:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return self.civ_gp_earned[:, row, cls] >= self._prophet_max
+
     def _grant_free_prophet(self, row: int, sto: torch.Tensor, centre: torch.Tensor) -> None:
         """CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle
         if no Prophets are available)" — religion founded or the class spent
@@ -2302,7 +2313,7 @@ class SimPhase:
             standing = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         self._gp_ensure_offer(sto, cls)
         none_m = sto & ~founded & standing  # the page's "you will not receive a unit"
-        free = sto & ~founded & ~standing & (self.gp_offer[:, cls] >= 0)
+        free = sto & ~founded & ~standing & (self.gp_offer[:, cls] >= 0) & ~self._gp_capped(row, cls)
         self._gp_claim(row, free, cls)
         apo = sto & ~none_m & ~free
         if self._apostle_idx >= 0 and bool(apo.any()):

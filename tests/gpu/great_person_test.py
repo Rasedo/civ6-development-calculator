@@ -134,7 +134,7 @@ def poke_catalog(rules, path):
     back = sim._gp_cls_of(torch.tensor(live, dtype=torch.long))
     assert [int(x) for x in back.tolist()] == [chassis.index(u) for u in live], \
         "the chassis -> class map does not invert"
-    n_sites = 10  # GP_SITES' width; the site predicate stacks exactly this many arms
+    n_sites = 16  # GP_SITES' width; the site predicate stacks exactly this many arms
     for c in range(n_cls):
         n = int(sim._gp_roster[c])
         for a in range(n):
@@ -333,8 +333,9 @@ def poke_arms(rules, path):
 def poke_wonder_buyout(rules, path):
     """CIV6 (Shah Jahan): "Grants Production towards wonder construction,
     capped at half of your current treasury. Then reduces your Gold by twice
-    the amount of purchased Production." — and with no wonder at the head,
-    the charge buys nothing and costs nothing."""
+    the amount of purchased Production." — paid into the wonder raised on
+    the plot the charge is spent on, and with no wonder there the charge
+    buys nothing and costs nothing."""
     sim = fresh(rules, path)
     cls, at = 0, 0
     k = sim._GPFX.get("wonderBuyout", -1)
@@ -345,6 +346,7 @@ def poke_wonder_buyout(rules, path):
     sim._gp_effects[cls, at, k] = 1
     ctr = int(sim.city_center[0, ROW, 0])
     assert ctr >= 0, "row has no city to spend in"
+    sim.city_qtile[0, ROW, 0, 0] = ctr  # the head's own plot is where the person stands
 
     # POOR: the treasury is the cap — production = treasury / 2, gold to zero
     sim.city_current[0, ROW, 0, 0] = sim.WONDER_BASE

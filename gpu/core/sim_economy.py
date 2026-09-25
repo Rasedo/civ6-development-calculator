@@ -1194,7 +1194,7 @@ class SimEconomy:
 
     def _wonder_plots(self, fid: int) -> torch.Tensor:
         """[B, T] — the plots of the natural wonder whose feature is `fid`,
-        none where the roster carries no such feature (-1)."""
+        none for -1 (a volcano's row)."""
         if fid < 0:
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         return (self.feat_id == fid) & ~self.feat_stripped
@@ -2632,6 +2632,46 @@ class SimEconomy:
         is_now = has.unsqueeze(1) & (self._gov_arange.unsqueeze(0) == now.unsqueeze(1))
         return unlocked & (~been | is_now)
 
+    def _palace_at(self, row: int, sl) -> torch.Tensor:
+        """[B, n] bool — the city slots `sl` of row `row` that hold the PALACE:
+        a major's capital (`city_is_cap`), and a city-state's one city. CIV6:
+        the Palace is the `Capital` building every player's capital holds, and
+        a city-state has one (`CivilizationLeaders.CapitalName`). The GPU keeps
+        the Palace as a term, never a `city_bldg` bit; `minorCity`'s buildings
+        carry it on TS."""
+        pal = self.city_is_cap[:, row, sl]
+        if self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S:
+            pal = torch.ones_like(pal)
+        return pal
+
+    def _policy_unlock_cost(self, row: int) -> torch.Tensor:
+        """[B] float64 — THE POLICY UNLOCK's Gold this turn: 0 in the free
+        window (the turn after the seat completed a civic), else the maximum
+        the first turn past it, dropping by the step each further turn to the
+        minimum. `policyUnlockCost`'s twin."""
+        mx, drop, mn = self.rules.civic_unlock
+        past = (self.turn - 1 - self.civ_civic_turn[:, row]).double()
+        cost = torch.clamp(mx - drop * (past - 1), min=mn)
+        return torch.where(past <= 0, torch.zeros_like(cost), cost)
+
+    def _government_changes(self, row: int, gov: torch.Tensor, ok: torch.Tensor) -> torch.Tensor:
+        """[B] bool — where `ok`, would `_adopt_government` CHANGE the
+        government the seat is in? A seat in none changes for free.
+        `governmentChanges`' twin."""
+        g = gov.to(torch.long)
+        inr = (g >= 0) & (g < self._ngov)
+        gc = g.clamp(min=0, max=max(self._ngov - 1, 0))
+        before, had = self._adopted_gov(row)
+        return ok & inr & self._gov_open(row).gather(1, gc.unsqueeze(1)).squeeze(1) & had & (gc != before)
+
+    def _policy_set_changes(self, row: int, chosen: torch.Tensor) -> torch.Tensor:
+        """[B] bool — does the card mask `chosen` slot a different SET than
+        the seat holds (its stored cards still open under its government)?
+        `policySetChanges`' twin."""
+        _adopted, has_gov = self._adopted_gov(row)
+        now = self.civ_policies[:, row] & self._seat_policy_mask(row)
+        return has_gov & (now != chosen).any(dim=1)
+
     def _adopt_government(self, row: int, gov: torch.Tensor, ok: torch.Tensor) -> None:
         """The record's GOVERNMENT arm, where `ok`: seat row `row` adopts roster
         position `gov` [B] where `_gov_open` holds it, and the choice stands
@@ -3621,12 +3661,17 @@ class SimEconomy:
         `hiddenResourcesFor`'s twin: the row's own techs — a major's, a
         city-state's (`citystate_techs`, compared like a major's; 9001 t1
         had a minor working Horses it could not yet see), and the Free row's
-        none (it holds no research)."""
+        none (it holds no research). A Great Person's reveal
+        (`_gp_resource_reveal`, James Young's Oil) shows one before its
+        technology."""
         rt = self._res_reveal_tech[self.res_id.clamp(min=0)]
         gated = (rt >= 0) & self._res_live()
         if not bool(gated.any()):
             return gated
         have = self._seat_techs(row).gather(1, rt.clamp(min=0))
+        for _pk, _ri in self._gp_resource_reveal:
+            seen = self._gp_perm(row, self._gp_perm_names[_pk]) > 0          # [B]
+            have = have | ((self.res_id == _ri) & seen.unsqueeze(1))
         return gated & ~have
 
     def _plane_seen(self, name: str, row: int) -> torch.Tensor:
@@ -4269,8 +4314,9 @@ class SimEconomy:
 
     def _gw_tourism_general(self, row: int, printing: torch.Tensor | None, km: torch.Tensor | None) -> torch.Tensor:
         """[B, RC] long — `greatWorkTourism`: every work but a Relic, PRINTING
-        doubling a Work of Writing's, the Congress multiplier by created kind,
-        a themed holder doubling its own."""
+        doubling a Work of Writing's, the row's Artifact percent (Mary
+        Leakey), the Congress multiplier by created kind, a themed holder
+        doubling its own."""
         obj = self.city_gw_obj[:, row]
         held = obj >= 0
         if not bool(held.any()):
@@ -4281,6 +4327,9 @@ class SimEconomy:
             pm = torch.where(printing, torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
                              torch.ones(self.B, dtype=torch.long, device=self.device))
             base = torch.where(obj == 5, base * pm.reshape(-1, 1, 1), base)
+        _am = 100 + self._gp_perm(row, "artifactTourismPct").long()               # [B]
+        if bool((_am != 100).any()):
+            base = torch.where(obj == 4, base * _am.reshape(-1, 1, 1) // 100, base)  # 4 = GWO_ARTIFACT
         if km is not None:
             kind = self._gw_obj_kind[oc]                                     # [B, RC, W]
             kk = torch.cat([km, torch.ones(self.B, 1, dtype=torch.long, device=self.device)], dim=1)  # kind -1 -> column 3
@@ -4875,15 +4924,18 @@ class SimEconomy:
 
     def _holy_site_faith(self) -> torch.Tensor:
         """[B, T] long — each live Holy Site's OWN faith output: its adjacency
-        plus the faith of the buildings standing in it. Every other tile is 0.
-        The `holySiteFaith` twin, memoised on the effect version the district
-        adjacency itself is memoised on."""
-        if self._hs_faith_cache is not None and self._hs_faith_cache[0] == self._eff_version:
+        plus the faith of the buildings standing in it that pay (`_bldg_dark`),
+        a building's per-era Faith included (the Dar-e Mehr's,
+        `_bldg_era_yields`). Every other tile is 0. The `holySiteFaith` twin,
+        memoised on the effect version the district adjacency itself is
+        memoised on, the building version and the game era."""
+        key = (self._eff_version, self._bldg_version, self._game_era())
+        if self._hs_faith_cache is not None and self._hs_faith_cache[0] == key:
             return self._hs_faith_cache[1]
         B, T, dev = self.B, self.T, self.device
         out = torch.zeros(B, T, dtype=torch.long, device=dev)
         if self._hs_idx < 0:
-            self._hs_faith_cache = (self._eff_version, out)
+            self._hs_faith_cache = (key, out)
             return out
         live = ((self.district == self._hs_idx) & self.district_complete
                 & ~self.district_pillaged)
@@ -4896,12 +4948,16 @@ class SimEconomy:
                 mine = (self.tile_seat == r) & (sl >= 0)
                 if not bool(mine.any()):
                     continue
-                fsum = (self.city_bldg[:, r].long()
-                        * self._b_hs_faith.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
+                stand = self.city_bldg[:, r] & ~self._bldg_dark(self.city_dist_tile[:, r],
+                                                                self.city_bldg_pillaged[:, r])
+                fsum = (stand.long() * self._b_hs_faith.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
+                if self._bpe_n:
+                    hs_b = stand & (self._b_req_district == self._hs_idx).reshape(1, 1, -1)
+                    fsum = fsum + self._bldg_era_yields(r, slice(0, self.RC), hs_b)[:, :, 5].long()
                 bf = torch.where(mine, fsum.gather(1, sl.clamp(min=0)), bf)
                 out = torch.where(mine, self._district_adj_seat(r, self._hs_idx).long(), out)
             out = torch.where(live, out + bf, torch.zeros_like(out))
-        self._hs_faith_cache = (self._eff_version, out)
+        self._hs_faith_cache = (key, out)
         return out
 
     def _religious_heal(self, pre: str) -> torch.Tensor:
@@ -5662,6 +5718,7 @@ class SimEconomy:
         dreg = self.city_dist_tile[:, row, sl]  # [B, n, nD] tile per district TYPE
         alivef = alive.double()
         is_cap = (self.city_is_cap[:, row, sl] & alive).double()
+        pal = (self._palace_at(row, sl) & alive).double()
         zeros6 = torch.zeros(B, n, 6, dtype=F64, device=dev)
 
         g = self._rcy_globals()
@@ -6019,7 +6076,7 @@ class SimEconomy:
                 y6 = self._spec_y[di].reshape(1, 1, 6) + has_t.double().unsqueeze(2) * self._spec_ta[di].reshape(1, 1, 6)
                 dist_y = dist_y + cnt.double().unsqueeze(2) * y6
 
-        bld_y = self._palace_y.double().reshape(1, 1, 6) * is_cap.unsqueeze(2)
+        bld_y = self._palace_y.double().reshape(1, 1, 6) * pal.unsqueeze(2)
         # the row this SEAT builds — a unique building's own yields, Power and
         # regional reach all arrive through `_b_cols` (`effectiveBuilding`)
         bcol = self._b_cols(row)
@@ -6248,7 +6305,7 @@ class SimEconomy:
                 # the PALACE is a capital TERM on this engine, never a
                 # `city_bldg` bit, so the count adds it by hand
                 if self._palace_gov_yield:
-                    _n = _n + is_cap
+                    _n = _n + pal
                 bon = bon + (_gby.double().reshape(B, 1, 1) * _n.unsqueeze(2)
                              * alivef.unsqueeze(2))
         # the GOVERNOR's share: its flat cityYields, the per-CITIZEN yields

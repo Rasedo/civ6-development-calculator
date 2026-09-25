@@ -21,13 +21,13 @@ import type { City, GameState } from './types';
 import { darkBuildings } from './yields';
 import { buildingVariantFor } from '../data/buildings';
 import { rowIsFor } from '../data/civilizations';
-import { civOf, leaderOf } from './seats';
+import { civOf, leaderOf, seatOf } from './seats';
 import {
   AUTO_THEME_ROWS, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GW_THEME_ART, GW_THEME_ARTIFACT,
-  GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, THEMING_MULT, gwKindObjects, gwKindOf,
+  GWO_ARTIFACT, GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, THEMING_MULT, gwKindObjects, gwKindOf,
   holderSlots, slotAccepts, type GreatWork,
 } from '../data/greatWorks';
-import { GW_PRINTING_WRITING_MULT, gpCityPermOf } from '../data/greatPeople';
+import { GW_PRINTING_WRITING_MULT, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 
 /** the shape every work-holding city answers with — a City, a capture's stub */
 export type WorkCity = {
@@ -227,18 +227,21 @@ export function greatWorkYields(state: GameState, city: WorkCity): { culture: nu
 
 /**
  * The GENERAL half of the tourism this city's works pay: everything but a
- * Relic, PRINTING doubling a Work of Writing's, the Congress multiplier by
- * created kind, a themed holder doubling its own.
+ * Relic, PRINTING doubling a Work of Writing's, the owner's Artifact percent
+ * (Mary Leakey), the Congress multiplier by created kind, a themed holder
+ * doubling its own.
  */
 export function greatWorkTourism(state: GameState, city: WorkCity, printing: boolean, kmult: readonly [number, number, number] = [1, 1, 1]): number {
   const works = gwWorks(city);
   if (works.length === 0) return 0;
   const mult = gwSlotMults(state, city);
+  const artifact = (100 + gpPermOf(seatOf(state, city.seat), 'artifactTourismPct')) / 100;
   let t = 0;
   for (const w of works) {
     if (w.obj === GWO_RELIC) continue;
     const kind = gwKindOf(w.obj);
     t += GWO_TOURISM[w.obj]! * (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1)
+      * (w.obj === GWO_ARTIFACT ? artifact : 1)
       * (kind >= 0 ? kmult[kind]! : 1) * mult[w.slot]!;
   }
   return t;

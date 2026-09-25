@@ -16,6 +16,7 @@ import { computeCityStats } from './city';
 import { spawnUnit, extraCharges } from './units';
 import { suzerainEffect } from './cityStates';
 import { BOLOGNA_GPP_BUILDING, BOLOGNA_DISTRICT_GPP } from '../data/cityStates';
+import { PROPHET_MAX_PLAYER_INSTANCES } from '../data/religion';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
@@ -91,6 +92,13 @@ function greatPeopleEarnedBy(owner: Seat, cls: GreatPersonClass): number {
   return (owner.gpEarned ?? []).filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
 }
 
+/** CIV6 (GreatPersonClasses, `PROPHET_MAX_PLAYER_INSTANCES`): a seat that has
+ *  earned its Great Prophet takes no other — the offer is not its to recruit,
+ *  patronize, pass or be granted. `_gp_capped` is the twin. */
+export function gpCapped(owner: Seat, cls: GreatPersonClass): boolean {
+  return cls === 'PROPHET' && greatPeopleEarnedBy(owner, cls) >= PROPHET_MAX_PLAYER_INSTANCES;
+}
+
 /** CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle if
  *  no Prophets are available)" — religion founded or the class spent pays
  *  an Apostle; a standing Prophet with no religion pays nothing; otherwise
@@ -102,7 +110,7 @@ export function grantFreeProphet(state: GameState, seat: number, centre: number)
   const founded = owner.religion.founded;
   ensureGpOffer(state, 'PROPHET');
   if (!founded && standing) return; // the page's "you will not receive a unit"
-  if (!founded && gpOffer(state, 'PROPHET') >= 0) {
+  if (!founded && gpOffer(state, 'PROPHET') >= 0 && !gpCapped(owner, 'PROPHET')) {
     owner.gpp.PROPHET = (owner.gpp.PROPHET ?? 0) + recruit(state, seat, 'PROPHET');
     return;
   }
@@ -131,7 +139,7 @@ export function patronageCost(state: GameState, seat: number, cls: GreatPersonCl
 export function patronizeGreatPerson(state: GameState, seat: number, clsIdx: number, currency: 'faith' | 'gold'): { ok: boolean } {
   const cls = GP_CLASSES[clsIdx];
   const owner = cls ? seatOf(state, seat) : undefined;
-  if (!cls || !owner) return { ok: false };
+  if (!cls || !owner || gpCapped(owner, cls)) return { ok: false };
   const gold = currency === 'gold';
   const cost = patronageCost(state, seat, cls, gold);
   const purse = gold ? (owner.treasury ?? 0) : owner.faith;
@@ -317,7 +325,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): number 
 export function passGreatPerson(state: GameState, seat: number, clsIdx: number): { ok: boolean } {
   const cls = GP_CLASSES[clsIdx];
   const owner = cls ? seatOf(state, seat) : undefined;
-  if (!cls || !owner) return { ok: false };
+  if (!cls || !owner || gpCapped(owner, cls)) return { ok: false };
   // a READ of the standing offer, never the draw: `ensureGpOffer` is the
   // seat-phase loop's alone, and a pass while the redraw is pending refuses
   // on both engines rather than moving the RNG stream here
@@ -358,6 +366,8 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
       for (;;) {
         // the PASSER is locked out of this individual — the points wait
         if ((state.gpPassedBy?.[GP_CLASSES.indexOf(cls)] ?? -1) === seat) break;
+        // a seat that has earned its Great Prophet takes no other — the points wait
+        if (gpCapped(owner, cls)) break;
         const cost = gpOfferCost(state, cls); // Infinity while no offer stands
         if (!Number.isFinite(cost) || pts < cost) break;
         pts -= cost;

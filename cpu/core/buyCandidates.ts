@@ -26,7 +26,7 @@ import { availableBuildings, buildingCompletable, goldPurchasableBuildings } fro
 import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from './effects';
 import { congressUdtBlockedDistrict } from './congress';
 import { districtSiteCost, districtSiteLegal, levyGoldCost } from './phase';
-import { patronageCost } from './greatPeople';
+import { gpCapped, patronageCost } from './greatPeople';
 import { governorFlag } from './governors';
 import { prodLayout } from './prodLayout';
 import { UNITS } from '../data/units';
@@ -132,15 +132,15 @@ function bIdx(id: string): number {
 function cheapestBuilding(
   state: GameState, actor: Seat, offers: (city: City) => { id: string }[],
 ): { city: City; id: string } | null {
-  // ordered by the SEAT's own row cost (a unique building's own Cost), the
-  // GPU's `_b_cols` key
+  // ordered by the SEAT's own row purchase base (a unique building's own
+  // Cost), the GPU's `_b_cols` "buyCost" key
   const civ = civOf(state, actor.seat);
   let best: { city: City; id: string; cost: number; b: number } | null = null;
   for (const city of actor.cities) {
     for (const def of offers(city)) {
       const b = bIdx(def.id);
       if (b < 0) continue;
-      const cost = effectiveBuilding(civ, def.id)?.cost ?? 0;
+      const cost = effectiveBuilding(civ, def.id)?.buyCost ?? 0;
       if (!best || cost < best.cost || (cost === best.cost && b < best.b)) {
         best = { city, id: def.id, cost, b };
       }
@@ -242,7 +242,8 @@ export function patronageCandidate(state: GameState, actor: Seat, gold: boolean)
   let best = -1;
   let bestD = Infinity;
   GP_CLASSES.forEach((cls, i) => {
-    if ((state.gpOffer?.[i] ?? -1) < 0 || (state.gpPassedBy?.[i] ?? -1) === actor.seat) return;
+    if ((state.gpOffer?.[i] ?? -1) < 0 || (state.gpPassedBy?.[i] ?? -1) === actor.seat
+      || gpCapped(actor, cls)) return;
     const cost = patronageCost(state, actor.seat, cls, gold);
     if (!Number.isFinite(cost) || !goldAffordable(purse, cost)) return;
     const d = Math.max(0, (state.gpPrice?.[i] ?? 0) - (actor.gpp[cls] ?? 0));

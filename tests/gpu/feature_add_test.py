@@ -216,11 +216,10 @@ def main() -> None:
 
     # 5 — KILIMANJARO: its own two rows, 4 / 2.5 once while it stands, each
     # painting the wonder's ring at its own 50 / 50; with every other row's
-    # weight zeroed the draw fires Kilimanjaro alone, over its ring. The
-    # roster carries no Eyjafjallajokull and no Vesuvius: their rows' wonder
-    # is -1 and they have no site
+    # weight zeroed the draw fires Kilimanjaro alone, over its ring.
+    # Eyjafjallajokull's and Vesuvius's rows name their own roster features
     sim5 = fresh(rules, path, slot=4)
-    assert sim5._er_wonder_fid[0] == sim5._er_wonder_fid[1] == sim5._er_wonder_fid[4] == -1
+    assert sim5._er_wonder_fid[0] == sim5._er_wonder_fid[1] >= 0 and sim5._er_wonder_fid[4] >= 0
     assert sim5._er_wonder_fid[5:] == [-1, -1, -1]
     kf = sim5._er_wonder_fid[2]
     assert kf >= 0 and kf == sim5._er_wonder_fid[3] and sim5._eruption_weight[2:4] == [4, 2.5]

@@ -58,7 +58,16 @@ def main() -> None:
     R = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
     bidx = {b["id"]: i for i, b in enumerate(R["buildings"])}
     uidx = {u["id"]: i for i, u in enumerate(R["units"])}
-    sim = build(rules, fixture_paths()[0])
+    def open_capital(s) -> bool:
+        """the spends stand people on the capital, the probe bumping each
+        next one onto a free land plot around it"""
+        c = int(s.city_center[B0, 0, 0])
+        return all(n >= 0 and bool(s.passable[B0, n]) and not bool(s.water[B0, n]) and int(s.civilian_at[B0, n]) < 0
+                   for n in s.neigh[c].tolist())
+
+    path = next((p for p in fixture_paths() if open_capital(build(rules, p))), None)
+    assert path is not None, "no fixture's capital stands in open land"
+    sim = build(rules, path)
     if not sim.districts_on:
         print("gp_channels: districts off on this fixture — nothing to poke")
         return

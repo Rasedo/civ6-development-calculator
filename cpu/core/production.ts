@@ -52,6 +52,7 @@ function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic'
     } else {
       rsr.civics.push(next.id);
       delete rsr.civicRetained[next.id];
+      owner.government.civicTurn = state.turn;
       if (rsr.civic === next.id) rsr.civic = null;
     }
   }

@@ -518,30 +518,31 @@ export function queueProject(state: GameState, cityId: number, projectId: string
 }
 
 
-/** Gold price to buy a building outright (Civ 6's 4× production cost), at
- *  the SEAT's own row: a unique building costs its own `Buildings.Cost`
- *  (`effectiveBuilding`; the GPU's `_b_cols`). Before the five-step floor. */
+/** Gold price to buy a building outright (Civ 6's 4× production cost) off
+ *  the row's UNTRUNCATED scaled cost (`buyCost`), at the SEAT's own row: a
+ *  unique building costs its own `Buildings.Cost` (`effectiveBuilding`; the
+ *  GPU's `_b_cols`). Before the five-step floor. */
 export function buildingPurchaseCost(state: GameState, seat: number, buildingId: string): number {
-  return (effectiveBuilding(civOf(state, seat), buildingId)?.cost ?? 0) * GOLD_PURCHASE_MULT;
+  return (effectiveBuilding(civOf(state, seat), buildingId)?.buyCost ?? 0) * GOLD_PURCHASE_MULT;
 }
 
-/** Faith price of a building: its own row's Cost at the one faith rate
- * (`FAITH_PURCHASE_MULT`, measured on every priced building), before the
- * five-step floor. A worship building (every one Cost 190 in the install)
- * prices the same way. */
+/** Faith price of a building: its own row's untruncated scaled cost
+ * (`buyCost`) at the one faith rate (`FAITH_PURCHASE_MULT`, measured on every
+ * priced building), before the five-step floor. A worship building (every one
+ * Cost 190 in the install) prices the same way. */
 export function buildingFaithCost(state: GameState, seat: number, buildingId: string): number {
   if (BUILDINGS[buildingId]?.worship) {
     // CIV6 (Righteousness of the Faith): the row pays `costPct` of the price
     let pct = 100;
     for (const r of getModifiers(state, seat).worship) pct = Math.min(pct, r.costPct);
-    return Math.round((BUILDINGS[buildingId].cost * FAITH_PURCHASE_MULT * pct) / 100);
+    return Math.round((BUILDINGS[buildingId].buyCost * FAITH_PURCHASE_MULT * pct) / 100);
   }
   // CIV6 (Valletta's suzerain): the three walls are bought at
   // `VALLETTA_WALLS_DISCOUNT_PCT` off, and by that suzerain alone.
   const cut = (BUILDINGS[buildingId]?.walls ?? 0) > 0 && suzerainEffect(state, seat, 'faithBuildings')
     ? VALLETTA_WALLS_DISCOUNT_PCT : 0;
   // the SEAT's own row: a unique building costs its own Cost (the GPU's `_b_cols`)
-  return Math.round((effectiveBuilding(civOf(state, seat), buildingId)?.cost ?? 0) * FAITH_PURCHASE_MULT * (100 - cut) / 100);
+  return Math.round((effectiveBuilding(civOf(state, seat), buildingId)?.buyCost ?? 0) * FAITH_PURCHASE_MULT * (100 - cut) / 100);
 }
 
 /**
@@ -1865,7 +1866,8 @@ export function deserialize(json: string): GameState {
   for (const sx of state.seats) {
     sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
     sx.research.boosted ??= [];
-    sx.government ??= { chosen: null, policies: [], held: 0 };
+    sx.government ??= { chosen: null, policies: [], held: 0, civicTurn: 0 };
+    sx.government.civicTurn ??= 0;
     sx.government.held ??= 0;
     sx.government.chosen ??= null;
     sx.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null };

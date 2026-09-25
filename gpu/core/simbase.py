@@ -167,6 +167,7 @@ class Rules:
     gold_purchase_mult: float  # gold price = production cost × this (GOLD_PURCHASE_MULT)
     faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
     purchase_divisor: int  # every gold / faith price is floored to a multiple of this (PURCHASE_DIVISOR 5, measured)
+    civic_unlock: tuple  # (CivicUnlockMaxCost, CivicUnlockPerTurnDrop, CivicUnlockMinCost) — `policyUnlockCost`
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
@@ -213,6 +214,7 @@ class Rules:
     palace_maintenance: float  # the Palace row's `Buildings.Maintenance` (buildingMaintenance)
     palace_gov_yield: bool  # does the Palace count for Autocracy's per-government-building yields
     b_cost: torch.Tensor  # [NB]
+    b_buy_cost: torch.Tensor  # [NB] the purchase base, the untruncated scaled cost (`buyCost`)
     b_yields: torch.Tensor  # [NB, 6]
     b_housing: torch.Tensor
     b_amenities: torch.Tensor
@@ -384,6 +386,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
         faith_purchase_mult=r["scenario"].get("faithPurchaseMult", 2),
         purchase_divisor=int(r["scenario"]["purchaseDivisor"]),
+        civic_unlock=(float(r["scenario"]["civicUnlockMaxCost"]), float(r["scenario"]["civicUnlockPerTurnDrop"]),
+                      float(r["scenario"]["civicUnlockMinCost"])),
         turn_limit=r["scenario"]["turnLimit"],
         space_ly_target=r["scenario"]["spaceLyTarget"],
         district_cost=r["districtCost"],
@@ -430,6 +434,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         palace_maintenance=r["palace"].get("maintenance", 0),
         palace_gov_yield=bool(r["palace"].get("govYieldBuilding", 0)),
         b_cost=torch.tensor([b["cost"] for b in B], dtype=torch.float64),
+        b_buy_cost=torch.tensor([b["buyCost"] for b in B], dtype=torch.float64),
         b_yields=torch.tensor([b["yields"] for b in B], dtype=torch.float64),
         b_housing=torch.tensor([b["housing"] for b in B], dtype=torch.float64),
         b_amenities=torch.tensor([b["amenities"] for b in B], dtype=torch.float64),
@@ -816,7 +821,7 @@ _MUTABLE = [
     "citystate_last_levy",
     "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_alliance_type", "seat_alliance_pts", "civ_sci_rate", "civ_cul_rate", "civ_tour_rate", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held", "seat_promise", "seat_promise_broken",
-    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "era_score_past", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank", "city_item_bank", "city_item_amt",
+    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "era_score_past", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_civic_turn", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank", "city_item_bank", "city_item_amt",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)

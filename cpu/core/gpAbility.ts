@@ -5,7 +5,7 @@
  * PERSON's own sourced row, `GP_ABILITY`.
  */
 
-import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit } from './types';
+import type { City, CityState, DistrictId, GameState, GreatPersonClass, QueueItem, Unit } from './types';
 import { dropQueuedBuilding } from './production';
 import type { Tile } from '../../world/types';
 import { neighbors } from '../../world/hex';
@@ -58,9 +58,16 @@ function gpCityAt(state: GameState, seat: number, tile: Tile): City | undefined 
   return citiesOf(state, seat).find((c) => c.isCapital);
 }
 
+/** the object types of the works one person makes: the class's own, or the
+ *  single work a person of another class carries (Sun Tzu's). */
+function gpWorkObjects(person: GreatPersonDef, at: number): number[] {
+  const kind = gpEffectOf(person).greatWorkKind;
+  return kind !== undefined ? [gwKindObjects(kind)[0]!] : personWorkObjects(person.class, at);
+}
+
 /** an open slot in this city that takes at least one of the person's works */
 function gwOpen(state: GameState, city: City, person: GreatPersonDef, at: number): boolean {
-  return personWorkObjects(person.class, at).some((obj) => gwHasRoom(state, city, obj));
+  return gpWorkObjects(person, at).some((obj) => gwHasRoom(state, city, obj));
 }
 
 /** MAY this person's charge be spent on the tile the unit is standing on? */
@@ -69,20 +76,35 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
   if (!person || (unit.charges ?? 0) <= 0) return false;
   const tile = state.map.tiles[unit.tileIndex];
   if (!tile) return false;
-  const { site, district } = gpSiteOf(person);
+  const { site, district, building } = gpSiteOf(person);
   // CIV6 (`ActionRequiresNoMilitaryUnit`): a person who grants a unit on
   // its own plot waits until no military unit shares it
   if (gpNoMilitaryOf(person) && unitsAt(state, tile.index).some((u) => unitStackSlot(u) === 'military')) return false;
   return gpSiteHolds(state, unit.seat, site, district, tile,
-    (city) => gwOpen(state, city, person, unit.gpAt ?? 0));
+    (city) => gwOpen(state, city, person, unit.gpAt ?? 0), building);
+}
+
+/** the wonder a city of `seat` is raising on `tile`, and that city — the
+ *  queued item DISTRICT_WONDER_IN_TILE pays. */
+function wonderRaisedAt(state: GameState, seat: number, tile: Tile): { city: City; q: QueueItem & { kind: 'wonder' } } | undefined {
+  if (!tileOwnedByCiv(tile, seat) || tile.builtWonder === null || tile.builtWonderComplete) return undefined;
+  const city = cityAtTile(state, tile);
+  const q = city?.seat === seat ? city.queue[0] : undefined;
+  return city && q?.kind === 'wonder' && q.tileIndex === tile.index ? { city, q } : undefined;
+}
+
+/** a tile or one of its neighbours answers `hit` */
+function onOrBeside(state: GameState, tile: Tile, hit: (t: Tile) => boolean): boolean {
+  return hit(tile) || neighbors(state.map, tile).some(hit);
 }
 
 /** Does `tile` answer activation site `site` for a person of `seat`?
  *  `district` is the site's district (the `district` arm), `room` whether a
- *  city of the seat has a slot for the person's works (the `gwSlot` arm). */
+ *  city of the seat has a slot for the person's works (the `gwSlot` arm),
+ *  `building` what a `centreWithout` city must not hold. */
 export function gpSiteHolds(
   state: GameState, seat: number, site: GpSite, district: DistrictId | undefined, tile: Tile,
-  room: (city: City) => boolean,
+  room: (city: City) => boolean, building?: string,
 ): boolean {
   switch (site) {
     case 'anywhere':
@@ -90,6 +112,26 @@ export function gpSiteHolds(
     case 'district': {
       if (!tileOwnedByCiv(tile, seat)) return false;
       return district !== undefined && tile.district === district && tile.districtComplete && !tile.districtPillaged;
+    }
+    case 'nearMountain':
+      return neighbors(state.map, tile).some((t) => t.elevation === 'MOUNTAIN');
+    case 'nearNaturalWonder':
+      return onOrBeside(state, tile, (t) => naturalWonderAt(t) !== null);
+    case 'nearRainforest':
+      return onOrBeside(state, tile, (t) => t.feature === 'RAINFOREST');
+    case 'incompleteWonder':
+      return wonderRaisedAt(state, seat, tile) !== undefined;
+    case 'centreWithout': {
+      if (!tileOwnedByCiv(tile, seat) || tile.district !== 'CITY_CENTER') return false;
+      const city = cityAtTile(state, tile);
+      return !!city && city.seat === seat && city.centerIndex === tile.index
+        && building !== undefined && !city.buildings.includes(building);
+    }
+    case 'districtArtifact': {
+      if (!tileOwnedByCiv(tile, seat)) return false;
+      if (district === undefined || tile.district !== district || !tile.districtComplete || tile.districtPillaged) return false;
+      const city = cityAtTile(state, tile);
+      return !!city && city.seat === seat && gwCountsByObj(city)[GWO_ARTIFACT]! > 0;
     }
     case 'gwSlot': {
       if (!tileOwnedByCiv(tile, seat)) return false;
@@ -305,32 +347,25 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       dropQueuedBuilding(city, b);
     }
   }
-  if (fx.wonderProduction && city) {
-    const q = city.queue[0];
-    if (q?.kind === 'wonder') {
-      const dbl = fx.wonderEraDouble !== undefined && (WONDER_ERA_INDEX[q.wonder] ?? 0) <= fx.wonderEraDouble;
-      const before = q.progress;
-      // at Standard speed in the catalog: the whole grant takes the speed
-      q.progress += scaleByGameSpeed(fx.wonderProduction * (dbl ? 2 : 1));
-      repairDrip(state, city, before);
-    }
+  // THE WONDER ON THE TILE (DISTRICT_WONDER_IN_TILE): the site is the plot
+  // the wonder is being raised on, and the grant is paid into that wonder.
+  const raised = fx.wonderProduction || fx.wonderBuyout ? wonderRaisedAt(state, unit.seat, tile) : undefined;
+  if (fx.wonderProduction && raised) {
+    const q = raised.q;
+    const dbl = fx.wonderEraDouble !== undefined && (WONDER_ERA_INDEX[q.wonder] ?? 0) <= fx.wonderEraDouble;
+    // at Standard speed in the catalog: the whole grant takes the speed
+    q.progress += scaleByGameSpeed(fx.wonderProduction * (dbl ? 2 : 1));
   }
-  if (fx.wonderBuyout && city && owner) {
+  if (fx.wonderBuyout && raised) {
     // CIV6 (Shah Jahan): "Grants Production towards wonder construction,
     // capped at half of your current treasury. Then reduces your Gold by
-    // twice the amount of purchased Production." The head is the wonder
-    // being worked; a charge spent with no wonder at the head buys nothing
-    // and costs nothing.
-    const q = city.queue[0];
-    if (q?.kind === 'wonder') {
-      const cost = itemCost(q, state, city);
-      const prod = Math.min(Math.max(0, cost - q.progress), owner.treasury / 2);
-      if (prod > 0) {
-        const before = q.progress;
-        q.progress += prod;
-        owner.treasury -= 2 * prod;
-        repairDrip(state, city, before);
-      }
+    // twice the amount of purchased Production."
+    const q = raised.q;
+    const cost = itemCost(q, state, raised.city);
+    const prod = Math.min(Math.max(0, cost - q.progress), owner.treasury / 2);
+    if (prod > 0) {
+      q.progress += prod;
+      owner.treasury -= 2 * prod;
     }
   }
   if (fx.spaceProduction && city) {

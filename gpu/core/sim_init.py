@@ -762,6 +762,10 @@ class SimInit:
         # the government the seat's record chose (`_adopt_government`), a
         # roster position, -1 until one does — `GovernmentState.chosen`
         self.civ_gov_chosen = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
+        # the turn the seat last completed a civic, `GovernmentState.civicTurn`:
+        # the next turn's record changes the government and the cards for
+        # free, any other turn pays `_policy_unlock_cost`
+        self.civ_civic_turn = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er["darkT"])    # GlobalParameters DARK_AGE_SCORE_BASE_THRESHOLD
@@ -1287,6 +1291,8 @@ class SimInit:
         # CIV6 (RELIGION_INITIAL_BELIEFS): the beliefs a founding earns; each
         # Evangelize Belief earns one more
         self._religion_initial_beliefs = int(_bl["religionInitialBeliefs"])
+        # CIV6 (GreatPersonClasses): the Great Prophet's MaxPlayerInstances
+        self._prophet_max = int(_bl["prophetMaxPlayerInstances"])
         self._condemn_range = int(_bl.get("condemnPressureRange", 6))
         self._condemn_swing = int(_bl.get("condemnPressureSwing", 7))
         _rs = _bl.get("relStrength") or []
@@ -1522,6 +1528,9 @@ class SimInit:
         # seat's then the city-borne (`GP_FREE_EXTRACTION`)
         self._gp_free_extraction = [tuple(int(x) for x in r) for r in rr["gpFreeExtraction"]]
         self._gp_city_free_extraction = [tuple(int(x) for x in r) for r in rr["gpCityFreeExtraction"]]
+        # (perm index, resource index): a resource the seat sees before its
+        # revealing technology (`GP_RESOURCE_REVEAL`, read by `_res_hidden`)
+        self._gp_resource_reveal = [tuple(int(x) for x in r) for r in rr["gpResourceReveal"]]
         # the amenity tiers Ibn Khaldun's two percents read
         self._gp_happy_tier = int(rr["gpHappyTier"])
         self._gp_ecstatic_tier = int(rr["gpEcstaticTier"])
@@ -2647,7 +2656,7 @@ class SimInit:
         self._er_dmg_hi = torch.tensor([int(x) for x in _ds["eruptionDmgHi"]], dtype=torch.long, device=device)
         # what the soil replaces, and per eruption row whether it erupts a
         # volcano plot, else the natural wonder whose plots are its one site
-        # (-1: a wonder the feature roster does not carry, which has none)
+        # (-1 on a volcano's row)
         self._soil_replaces = [int(x) for x in _ds["soilReplaces"] if int(x) >= 0]
         self._er_on_volcano = [bool(x) for x in _ds["eruptionOnVolcano"]]
         self._er_wonder_fid = [int(x) for x in _ds["eruptionWonderFid"]]

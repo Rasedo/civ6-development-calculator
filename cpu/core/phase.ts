@@ -31,7 +31,7 @@ import { freeCityBuild, freeCityResearch } from './minorBuild';
 import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
-import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, governmentSlots } from './effects';
+import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../../world/terrains';
@@ -795,8 +795,8 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  luxuries, buildings and districts; no government, policy or governor) —
  *  and the tier is recorded off a loop-top snapshot of every Free City. Its
  *  treasury banks the Gold those same stats make, in array order, then pays
- *  its units' upkeep and meets the bankruptcy that upkeep may force — the
- *  majors' own order. Then each city takes its grant when one falls due,
+ *  its units' upkeep, the balance stopping at 0 as a minor's does. Then each
+ *  city takes its grant when one falls due,
  *  puts the same stats' Production into its build table (`freeCityBuild`),
  *  fires the ranged strikes any walled city fires, heals as any unbesieged
  *  city does and runs `freeCityLoyaltyDelta`. Then the Free Cities' land
@@ -821,8 +821,10 @@ export function freeCitiesPhase(state: GameState): void {
   if (_dlu) _dlu.push(`up:${FREE_SEAT}:${state.turn}`
     + ` n${state.units.filter((u) => u.seat === FREE_SEAT).length}`
     + ` cost${upkeep.toFixed(3)} purse${free.treasury.toFixed(3)}`);
-  free.treasury -= upkeep;
-  bankruptDisband(state, FREE_SEAT, mods);
+  // the balance stops at 0, as a minor's does: no census row reads a Free
+  // Cities treasury below 0 (runs/cs_watch_*.jsonl, 0 on 223 of 296
+  // city-turns), so it never goes bankrupt
+  free.treasury = Math.max(0, free.treasury - upkeep);
   const joiners: City[] = [];
   const research = freeCityResearch(state);
   [...free.cities].forEach((city, i) => {
@@ -1466,10 +1468,27 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     const c = Object.keys(CIVICS)[civicCol];
     if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) selectResearch(actor.research, c, true);
   }
+  // THE POLICY UNLOCK: outside the free window a change of government or of
+  // the slotted cards pays `policyUnlockCost` once for the turn, and a seat
+  // that cannot afford it keeps what it has.
+  let unlocked = false;
+  const unlock = (): boolean => {
+    if (unlocked) return true;
+    const cost = policyUnlockCost(state, actor.seat);
+    if (cost > 0) {
+      if (!goldAffordable(actor.treasury ?? 0, cost)) return false;
+      actor.treasury = (actor.treasury ?? 0) - cost;
+    }
+    unlocked = true;
+    return true;
+  };
   // The GOVERNMENT is a driver decision, validated (`governmentsOpen`) and
   // stored; it lands before the cards so the set below is laid into the
   // government the seat is now in.
-  if (rec.government !== null && rec.government !== undefined) adoptGovernment(state, actor.seat, rec.government);
+  if (rec.government !== null && rec.government !== undefined
+      && (!governmentChanges(state, actor.seat, rec.government) || unlock())) {
+    adoptGovernment(state, actor.seat, rec.government);
+  }
   // The SLOTTED CARDS are a driver decision. Validated whole here —
   // every card unlocked under the live government, the set fitting its
   // slots — and STORED in `government.policies`; a set that does not fit is
@@ -1480,7 +1499,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       const open = unlockedPolicyIds(actor.research, congressPolicyBlocked(state), inDarkAge(state, actor.seat), actor.government.held, gov);
       const ids = rec.policies.map((i) => POLICY_LIST[i]?.id).filter((id): id is string => !!id && open.has(id));
       const fit = ids.length === rec.policies.length ? fitPolicies(governmentSlots(state, actor.seat), ids) : null;
-      if (fit) actor.government.policies = fit;
+      if (fit && (!policySetChanges(state, actor.seat, fit) || unlock())) actor.government.policies = fit;
     }
   }
   // the WAR verb: the recorded declare/peace applies HERE — before the
@@ -3134,6 +3153,7 @@ export function seatPhase(state: GameState): void {
       }
       rsr.civics.push(rsr.civic);
       delete rsr.civicRetained[rsr.civic];
+      actor.government.civicTurn = state.turn;
       rsr.civic = null;
       pickNext();
     }

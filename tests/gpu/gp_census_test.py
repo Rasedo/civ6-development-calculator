@@ -21,6 +21,11 @@ and the exact twin is driven:
              Mimar Sinan's Industrial Zone culture bomb, and the route
              clauses (foreign-route Gold both ways, Todar Mal, Rockefeller,
              Ibn Fadlan)
+  own sites  Galileo beside a Mountain, Darwin and Janaki on or beside a
+             wonder or a Rainforest, the wonder engineers on the wonder's own
+             plot, James of St. George's missing Castle, Mary Leakey's
+             Artifact city and its triple Tourism, James Young's Oil, Sun
+             Tzu's Work of Writing, Eisenhower's military units
 """
 
 from __future__ import annotations
@@ -34,7 +39,8 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import load_rules, fixture_paths, FIXTURES
-from warmup import opened, warm_base
+from core.neutral import gp_site_plane
+from warmup import clear_works, opened, warm_base
 
 B0, ROW = 0, 0
 GWO_RELIC = 7
@@ -420,10 +426,176 @@ def test_culture_bomb(rules, path, R) -> None:
     print(f"  1 Mimar Sinan OK — {len(wild)} plots claimed around the Industrial Zone")
 
 
+def test_action_sites(rules, path, R) -> None:
+    """the Action* columns that name a site of their own, and the clauses
+    that ride them — `gp-census.test.ts`'s last block, poked the same way"""
+    p = Poke(fresh(rules, path), R)
+    sim = p.sim
+    sp = lambda v: float(sim.rules.scale_by_game_speed(torch.tensor([float(v)], dtype=torch.float64))[0])  # noqa: E731
+    full = lambda v: torch.full((sim.B,), v, dtype=torch.long)  # noqa: E731
+    SITES = {"nearMountain": 10, "nearNaturalWonder": 11, "nearRainforest": 12, "incompleteWonder": 13,
+             "centreWithout": 14, "districtArtifact": 15}
+
+    # a plot nobody owns, free, with no Mountain, wonder or Rainforest on or around it
+    taken = set(sim.unit_tile[B0][sim.unit_alive[B0]].tolist())
+    rain = (sim.feat_id[B0] == sim._rainforest_fid) & ~sim.feat_stripped[B0]
+    bad = sim.tile_mountain[B0] | sim.nwonder[B0] | rain
+
+    def clear(t: int) -> bool:
+        nb = sim.neigh[t].tolist()
+        return all(n >= 0 and not bool(bad[n]) for n in nb) and not bool(bad[t])
+
+    wild = next(t for t in range(sim.T) if int(sim.tile_seat[B0, t]) < 0 and bool(sim.passable[B0, t])
+                and not bool(sim.water[B0, t]) and t not in taken and clear(t))
+    nb0 = int(sim.neigh[wild][0])
+    gal = p.person({p.fx("perAdjSource"): 0.0})
+    assert int(sim._gp_site[gal]) == SITES["nearMountain"]
+    assert not p.site_ok(*gal, wild)
+    sim.tile_mountain[B0, nb0] = True
+    assert p.site_ok(*gal, wild), "a plot beside a Mountain, owned by nobody, is Galileo's site"
+    sci0 = float(sim.civ_tech_prog[B0, ROW])
+    p.spend(*gal, wild)
+    assert float(sim.civ_tech_prog[B0, ROW]) == sci0 + sp(250)
+    sim.tile_mountain[B0, nb0] = False
+    dar = p.person({p.fx("perAdjSource"): 1.0})
+    assert int(sim._gp_site[dar]) == SITES["nearNaturalWonder"]
+    assert not p.site_ok(*dar, wild)
+    sim.nwonder[B0, nb0] = True
+    assert p.site_ok(*dar, wild)
+    sim.nwonder[B0, nb0] = False
+    jan = p.person({p.fx("perAdjSource"): 2.0})
+    assert int(sim._gp_site[jan]) == SITES["nearRainforest"]
+    assert not p.site_ok(*jan, wild)
+    f0, s0 = int(sim.feat_id[B0, wild]), bool(sim.feat_stripped[B0, wild])
+    sim.feat_id[B0, wild] = sim._rainforest_fid
+    sim.feat_stripped[B0, wild] = False
+    assert p.site_ok(*jan, wild), "a Rainforest underfoot is Janaki Ammal's site"
+    sim.feat_id[B0, wild], sim.feat_stripped[B0, wild] = f0, s0
+    print("  1 Galileo / Darwin / Janaki OK — beside a Mountain, on or beside a wonder or a Rainforest")
+
+    # the wonder engineers: the plot the capital raises its wonder on
+    sim = p.sim = fresh(rules, path)
+    plot = p.own_bare()
+    wi = 0
+    sim.built_wonder[B0, plot] = wi
+    sim.built_wonder_complete[B0, plot] = False
+    sim.city_current[B0, ROW, 0, 0] = sim.WONDER_BASE + wi
+    sim.city_qtile[B0, ROW, 0, 0] = plot
+    sim.city_cost[B0, ROW, 0, 0] = 5000.0
+    sim.city_progress[B0, ROW, 0, 0] = 0.0
+    iz = p.put_district("INDUSTRIAL_ZONE")
+    isi = p.person({p.fx("wonderProduction"): 215.0})
+    assert int(sim._gp_site[isi]) == SITES["incompleteWonder"]
+    assert not p.site_ok(*isi, iz), "the Industrial Zone is no site of a wonder engineer"
+    assert p.site_ok(*isi, plot)
+    p.spend(*isi, plot)
+    assert float(sim.city_progress[B0, ROW, 0, 0]) == sp(215), "Isidore's 215 lands in the wonder"
+    shah = p.person({p.fx("wonderBuyout"): 1.0})
+    sim.civ_treasury[B0, ROW] = 300.0
+    before = float(sim.city_progress[B0, ROW, 0, 0])
+    p.spend(*shah, plot)
+    assert float(sim.city_progress[B0, ROW, 0, 0]) == before + 150.0 and float(sim.civ_treasury[B0, ROW]) == 0.0
+    sim.built_wonder_complete[B0, plot] = True
+    assert not p.site_ok(*isi, plot), "a finished wonder is no site"
+    print("  2 wonder engineers OK — spent on the wonder's own plot, paid into it")
+
+    # James of St. George: a City Center whose city holds no Castle
+    sim = p.sim = fresh(rules, path)
+    cap = int(sim.city_center[B0, ROW, 0])
+    jam = next((c, a) for c in range(sim._gp_site.shape[0]) for a in range(int(sim._gp_roster[c]))
+               if int(sim._gp_site[c, a]) == SITES["centreWithout"])
+    castle = p.bidx["MEDIEVAL_WALLS"]
+    assert int(sim._gp_site_district[jam]) == castle, "the site's argument is the missing building"
+    sim.city_bldg[B0, ROW, 0, castle] = False
+    assert p.site_ok(*jam, cap)
+    plane = gp_site_plane(sim, ROW, SITES["centreWithout"], castle)[B0]
+    assert cap in plane.nonzero().flatten().tolist()
+    p.spend(*jam, cap)
+    assert bool(sim.city_bldg[B0, ROW, 0, castle]) and bool(sim.city_bldg[B0, ROW, 0, p.bidx["ANCIENT_WALLS"]])
+    assert not p.site_ok(*jam, cap), "a city holding its Castle is no site"
+    assert cap not in gp_site_plane(sim, ROW, SITES["centreWithout"], castle)[B0].nonzero().flatten().tolist()
+    print("  3 James of St. George OK — walls and Castle, then the centre is no site")
+
+    # Mary Leakey: a Theater Square whose city holds an Artifact; the Artifact's Tourism triples
+    sim = p.sim = fresh(rules, path)
+    ts = p.put_district("THEATER_SQUARE")
+    lea = p.person({p.fx("artifactScience"): sp(350)})
+    assert int(sim._gp_site[lea]) == SITES["districtArtifact"]
+    clear_works(sim)
+    assert not p.site_ok(*lea, ts)
+    assert bool(sim._gw_place(ROW, p.ones.clone(), full(0), full(4), full(0), full(1), full(ROW))[B0])
+    assert p.site_ok(*lea, ts)
+    t0 = int(sim._gw_tourism_general(ROW, None, None)[B0, 0])
+    sci0 = float(sim.civ_tech_prog[B0, ROW])
+    p.spend(*lea, ts)
+    assert float(sim.civ_tech_prog[B0, ROW]) == sci0 + sp(350)
+    assert float(sim._gp_perm(ROW, "artifactTourismPct")[B0]) == 200.0
+    assert int(sim._gw_tourism_general(ROW, None, None)[B0, 0]) == t0 + 2 * int(sim._gw_obj_tourism[4])
+    print("  4 Mary Leakey OK — waits for an Artifact, then triples its Tourism")
+
+    # James Young: Oil seen before its technology
+    sim = p.sim = fresh(rules, path)
+    pk, oil = sim._gp_resource_reveal[0]
+    assert sim._gp_perm_names[pk] == "oilVisible"
+    t = p.own_bare()
+    r0 = int(sim.res_id[B0, t])
+    sim.res_id[B0, t] = oil
+    sim._eff_version += 1
+    if bool(sim._res_hidden(ROW)[B0, t]):
+        you = p.person({p.perm("oilVisible"): 1.0})
+        p.spend(*you, p.put_district("CAMPUS"))
+        assert not bool(sim._res_hidden(ROW)[B0, t]), "James Young's Oil is seen"
+        assert bool(sim._res_hidden(1)[B0, t]) or bool(sim._seat_techs(1)[B0, int(sim._res_reveal_tech[oil])])
+        print("  5 James Young OK — Oil seen before Refining")
+    else:
+        print("  5 James Young: the row already sees Oil on this fixture — the TS twin pins it")
+    sim.res_id[B0, t] = r0
+
+    # Sun Tzu: his Work of Writing, in the seat's city he stands in, while it has room
+    sim = p.sim = fresh(rules, path)
+    sun = p.person({p.fx("greatWorkKind"): 0.0}, only=int(R["seats"]["generalClassIdx"]))
+    assert int(sim._gp_site[sun]) == 2, "Sun Tzu's charge is the Great Work arm"
+    clear_works(sim)
+    assert not p.site_ok(*sun, wild), "nobody's plot is no site"
+    home = p.own_bare()
+    assert p.site_ok(*sun, home)
+    p.spend(*sun, home)
+    assert int((sim.city_gw_obj[B0, ROW, 0] == 5).sum()) == 1, "one Work of Writing in the city"
+    while bool(sim._gw_room(ROW, 5)[B0, 0]):
+        sim._gw_place(ROW, p.ones.clone(), full(0), full(5), full(0), full(-1), full(ROW))
+    assert not p.site_ok(*sun, p.own_bare()), "no room: no charge"
+    print("  6 Sun Tzu OK — his Work of Writing where the city has room")
+
+    # Eisenhower: military units only
+    sim = p.sim = fresh(rules, path)
+    cur = lambda u: torch.full((sim.B, 1), sim.UNIT_BASE + p.uidx[u], dtype=torch.long)  # noqa: E731
+    settler = torch.full((sim.B, 1), sim.SETTLER, dtype=torch.long)
+    w0, b0, s0 = (float(sim._gp_prod_pct(ROW, c)[B0, 0]) for c in (cur("WARRIOR"), cur("BUILDER"), settler))
+    sim.civ_gp_perm[:, ROW, sim._gp_perm_names.index("militaryProdPct")] = 5.0
+    assert abs(float(sim._gp_prod_pct(ROW, cur("WARRIOR"))[B0, 0]) - (w0 + 0.05)) < 1e-12
+    assert float(sim._gp_prod_pct(ROW, cur("BUILDER"))[B0, 0]) == b0
+    assert float(sim._gp_prod_pct(ROW, settler)[B0, 0]) == s0
+    print("  7 Eisenhower OK — +5% toward a Warrior, nothing toward a Builder or a Settler")
+
+
 def main() -> None:
     rules = load_rules()
     R = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
-    path = fixture_paths()[0]
+
+    def roomy(path) -> bool:
+        """the pokes stand people on six of the capital's bare plots"""
+        p = Poke(fresh(rules, path), R)
+        for _ in range(6):
+            try:
+                t = p.own_bare()
+            except AssertionError:
+                return False
+            p.sim.district[B0, t] = 0  # a marker: the next plot is another one
+        return True
+
+    path = next((q for q in fixture_paths() if roomy(q)), None)
+    assert path is not None, "no fixture's capital owns six bare plots"
+    print(f"gp_census on {path.name}")
     sim = fresh(rules, path)
     if not sim.districts_on:
         print("gp_census: districts off on this fixture — nothing to poke")
@@ -433,6 +605,7 @@ def main() -> None:
     test_channels(rules, path, R)
     test_routes(rules, path, R)
     test_culture_bomb(rules, path, R)
+    test_action_sites(rules, path, R)
     print("BATTERY OK gp_census")
 
 

@@ -515,9 +515,8 @@ export const ERUPTION_WEIGHT = srcConst('disasters.eruptionWeight', [4, 2.5, 4, 
  * erupts a volcano plot. A wonder is ONE site however many plots it covers
  * (Eyjafjallajokull covers two: lab 4's four eruptions in 251 turns fit one
  * site at 6.5, not two), and its ring is every plot touching one of its
- * plots (`Callback GetAffectedPlots_NaturalWonder`). The seeder places no
- * Eyjafjallajokull and no Vesuvius, and the feature roster carries neither,
- * so their rows have no site in any world yet.
+ * plots (`Callback GetAffectedPlots_NaturalWonder`). A world lacking the
+ * wonder offers its rows no site.
  */
 export const ERUPTION_WONDER: readonly string[] = srcConst('disasters.eruptionWonder',
   ['EYJAFJALLAJOKULL', 'EYJAFJALLAJOKULL', 'MOUNT_KILIMANJARO', 'MOUNT_KILIMANJARO', 'VESUVIUS', '', '', ''], {

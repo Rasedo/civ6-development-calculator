@@ -13,6 +13,15 @@ import { featureDefense } from '../../../cpu/core/combat';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { tileYields } from '../../../cpu/core/yields';
 import { neighbors } from '../../../world/hex';
+import { FEATURES } from '../../../world/features';
+import { WONDERS } from '../../../world/wonders';
+import { generateMap } from '../../../world/mapgen';
+import { isImpassable } from '../../../world/query';
+import { FEATURE_SIGHT_THROUGH } from '../../../cpu/data/sight';
+import { WORLD_PRESETS } from '../../../seeder/presets';
+import { loadWorld } from '../../../cpu/world/load';
+import { readFileSync } from 'node:fs';
+import type { WorldFile } from '../../../world/file';
 import { bareCtx } from '../helpers';
 import type { GameState, Tile } from '../../../cpu/core/types';
 
@@ -318,14 +327,15 @@ describe('the natural wonders\' eruptions', () => {
     const e1 = tileAtCoords(state.map, 5, 5);
     const e2 = neighbors(state.map, e1)[0];
     const v = tileAtCoords(state.map, 12, 12);
-    for (const t of [e1, e2, v]) {
+    // Mountain plots start no blizzard, so the draw names only the wonders
+    for (const t of [e1, e2]) {
       t.terrain = 'TUNDRA';
       t.elevation = 'MOUNTAIN';
+      t.feature = 'EYJAFJALLAJOKULL';
     }
-    // the roster carries neither wonder: a plot is marked by its id alone
-    e1.feature = 'EYJAFJALLAJOKULL' as Tile['feature'];
-    e2.feature = 'EYJAFJALLAJOKULL' as Tile['feature'];
-    v.feature = 'VESUVIUS' as Tile['feature'];
+    v.terrain = 'GRASSLAND';
+    v.elevation = 'MOUNTAIN';
+    v.feature = 'VESUVIUS';
     // the draw names only them: 6.5 + 7
     const N = 3000;
     let eyj = 0;
@@ -345,6 +355,7 @@ describe('the natural wonders\' eruptions', () => {
     state.unitsMode = true;
     const v = tileAtCoords(state.map, 8, 8);
     v.elevation = 'MOUNTAIN';
+    v.feature = 'VESUVIUS';
     const ring = neighbors(state.map, v);
     const city = settleAt(state, ring[0].index);
     const row = ERUPTION_ROWS.indexOf('VESUVIUS_MEGACOLOSSAL');
@@ -362,5 +373,78 @@ describe('the natural wonders\' eruptions', () => {
       expect(1000 - w.hp >= 70 && 1000 - w.hp <= 90).toBe(true);
       state.units = state.units.filter((x) => x.id !== w.id);
     }
+  });
+});
+
+describe('Eyjafjallajokull and Vesuvius on the map', () => {
+  it('the roster carries both as the install writes them', () => {
+    const e = FEATURES.EYJAFJALLAJOKULL;
+    const v = FEATURES.VESUVIUS;
+    expect([e.naturalWonder, e.impassable, v.naturalWonder, v.impassable]).toEqual([true, true, true, true]);
+    // Feature_AdjacentYields: Food 1 (the Expansion2 update) and Culture 1; Production 1
+    expect(e.adjacentYields).toEqual({ food: 1, culture: 1 });
+    expect(v.adjacentYields).toEqual({ production: 1 });
+    expect([FEATURE_SIGHT_THROUGH.EYJAFJALLAJOKULL, FEATURE_SIGHT_THROUGH.VESUVIUS]).toEqual([2, 2]);
+    expect([WONDERS.EYJAFJALLAJOKULL.size, WONDERS.VESUVIUS.size]).toEqual([2, 1]);
+    // a neighbour takes the adjacent yields and the wonder's Appeal 2, a plot on it is out of reach
+    const map = makeMap();
+    const w = tileAtCoords(map, 5, 5);
+    Object.assign(w, { elevation: 'MOUNTAIN', feature: 'VESUVIUS' });
+    const next = tileAtCoords(map, 6, 5);
+    const bare = tileYields(bareCtx(map), next);
+    w.feature = 'EYJAFJALLAJOKULL';
+    w.elevation = 'FLAT';
+    const eyj = tileYields(bareCtx(map), next);
+    expect(eyj.food).toBe(bare.food + 1);
+    expect(eyj.culture).toBe(bare.culture + 1);
+    expect(eyj.production).toBe(bare.production - 1);
+    expect(tileAppeal(map, w)).toBe(5);
+    expect(isImpassable(w)).toBe(true);
+  });
+
+  it('every generated placement keeps its plots\' rules (Feature_ValidTerrains, NoCoast, NoRiver)', () => {
+    const P = WORLD_PRESETS.baseline;
+    const seen = { EYJAFJALLAJOKULL: 0, VESUVIUS: 0 };
+    for (let s = 0; s < 240; s++) {
+      const map = generateMap({
+        width: P.width, height: P.height, seed: 20000 + s, withResources: true, withWonders: true,
+        withVillages: true, layout: P.layout, landFraction: P.landFraction, resourceMult: P.resourceMult,
+      });
+      for (const id of ['EYJAFJALLAJOKULL', 'VESUVIUS'] as const) {
+        const plots = map.tiles.filter((t) => t.feature === id);
+        if (plots.length === 0) continue;
+        seen[id] += 1;
+        expect(plots.length).toBe(WONDERS[id].size);
+        for (const t of plots) {
+          expect(t.riverMask).toBe(0);
+          if (id === 'VESUVIUS') {
+            expect(['GRASSLAND', 'PLAINS']).toContain(t.terrain);
+            expect(t.elevation).toBe('MOUNTAIN');
+            expect(t.volcano).toBe(false);
+          } else {
+            expect(['SNOW', 'TUNDRA']).toContain(t.terrain);
+            expect(t.elevation).not.toBe('MOUNTAIN');
+            expect(neighbors(map, t).some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN')).toBe(false);
+          }
+        }
+      }
+    }
+    expect(seen.EYJAFJALLAJOKULL).toBeGreaterThan(0);
+    expect(seen.VESUVIUS).toBeGreaterThan(0);
+  });
+
+  it('a locked world holding Vesuvius offers its row a real site', () => {
+    const state = loadWorld(JSON.parse(readFileSync('seeder/worlds/seed9027.world.json', 'utf-8')) as WorldFile);
+    const v = state.map.tiles.find((t) => t.feature === 'VESUVIUS')!;
+    expect(v).toBeDefined();
+    state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
+    let hit = false;
+    for (let i = 0; i < 600 && !hit; i++) {
+      state.eventLog = [];
+      disasterPhase(state);
+      hit = state.eventLog.some((e) => e.startsWith(`Volcanic eruption at (${v.col}, ${v.row})`));
+    }
+    expect(hit).toBe(true);
   });
 });

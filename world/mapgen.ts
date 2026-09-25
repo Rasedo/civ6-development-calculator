@@ -303,10 +303,12 @@ function wonderTileValid(
   if (def.spawn.water) {
     return t.terrain === 'COAST' && t.feature !== 'ICE';
   }
-  if (TERRAINS[t.terrain].water || t.elevation === 'MOUNTAIN') return false;
-  if (isAnchor && def.spawn.terrains && !def.spawn.terrains.includes(t.terrain)) return false;
+  // CIV6 (Feature_ValidTerrains, NoCoast, NoRiver): rules of every plot the
+  // wonder covers, not only its anchor
+  if (TERRAINS[t.terrain].water || (t.elevation === 'MOUNTAIN') !== !!def.spawn.mountain) return false;
+  if (def.spawn.terrains && !def.spawn.terrains.includes(t.terrain)) return false;
+  if (def.spawn.noRiver && t.riverMask !== 0) return false;
   if (
-    isAnchor &&
     def.spawn.inland &&
     neighbors(map, t).some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN')
   ) {

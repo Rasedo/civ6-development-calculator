@@ -599,6 +599,13 @@ export const BELIEF_CLASS_FOLLOWER = BELIEF_CLASSES.indexOf('FOLLOWER');
 export const RELIGION_INITIAL_BELIEFS = srcConst('religion.initialBeliefs', 2,
   xml('GlobalParameters', 'Name=RELIGION_INITIAL_BELIEFS', 'Value'));
 
+/** CIV6 (GreatPersonClasses): the Great Prophet's `MaxPlayerInstances` — a
+ *  seat earns this many Great Prophets in a game and no more; once it has, a
+ *  Prophet offer is not its to take (no recruit, patronage, pass or free
+ *  grant), and its Prophet points wait. */
+export const PROPHET_MAX_PLAYER_INSTANCES = srcConst('religion.prophetMaxPlayerInstances', 1,
+  xml('GreatPersonClasses', 'GreatPersonClassType=GREAT_PERSON_CLASS_PROPHET', 'MaxPlayerInstances'));
+
 /** each class's catalog, by class code */
 export const BELIEF_CATALOGS: readonly Record<string, BeliefDef>[] = [
   FOLLOWER_BELIEFS, WORSHIP_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS,

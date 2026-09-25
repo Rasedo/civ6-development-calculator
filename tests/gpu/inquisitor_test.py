@@ -105,6 +105,12 @@ def test_launch(sim, ctr: int) -> None:
     sim.major_unit_charges[0, ap] = sim._launch_inquisition_charges
     um = sim._seat_unit_mask(ROW)
     assert bool(um[0, rank, sim._A_INQUISITION]), "Launch is shut with three charges in own territory"
+    # a SPENT Apostle (no moves left) takes no verb
+    sim.major_unit_mp[0, ap] = 0
+    order(sim, ROW, ap, sim._A_INQUISITION)
+    assert not bool(sim.civ_inquisition[0, ROW]) and bool(sim.major_unit_alive[0, ap]), \
+        "an Apostle with no moves launched the Inquisition"
+    sim.major_unit_mp[0, ap] = 4
     order(sim, ROW, ap, sim._A_INQUISITION)
     assert bool(sim.civ_inquisition[0, ROW]), "the Inquisition did not open"
     assert not bool(sim.major_unit_alive[0, ap]), "Launch Inquisition did not consume the Apostle"

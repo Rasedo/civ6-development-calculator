@@ -1082,17 +1082,39 @@ class SimSeats:
             ok = active & ext & (c_act >= 0) \
                 & self._available_mask(self.civ_civics[:, row], self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
             self._select_research(row, c_act, ok, is_civic=True)
+        # THE POLICY UNLOCK: outside the free window a change of government or
+        # of the slotted cards pays `_policy_unlock_cost` once for the turn,
+        # and a seat that cannot afford it keeps what it has
+        unlocked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+
+        def _unlock(want: torch.Tensor) -> torch.Tensor:
+            """[B] — where `want`, the change may land: already unlocked this
+            turn, free, or paid now (the treasury charged here)."""
+            nonlocal unlocked
+            cost = self._policy_unlock_cost(row)
+            need = want & ~unlocked & (cost > 0)
+            pay = need & self._afford(self.civ_treasury[:, row], cost)
+            self.civ_treasury[:, row] = torch.where(pay, self.civ_treasury[:, row] - cost.to(self.civ_treasury.dtype),
+                                                    self.civ_treasury[:, row])
+            go = want & (~need | pay)
+            unlocked = unlocked | go
+            return go
+
         if government is not None and self._ngov:
             # the GOVERNMENT — validated (`_gov_open`) and stored; it lands
             # before the cards so the set below is laid into the government
             # the seat is now in, as `applySeatActionRecord` orders it
-            self._adopt_government(row, government, active & ext & (government >= 0))
+            g_ok = active & ext & (government >= 0)
+            chg = self._government_changes(row, government, g_ok)
+            self._adopt_government(row, government, g_ok & (~chg | _unlock(chg)))
         if policies is not None:
             # the SLOTTED CARDS — validated whole (every card unlocked,
             # the set fits the slots) and STORED; a set that does not fit is
             # refused entire, as `applySeatActionRecord` refuses it
             chosen = policies.to(torch.bool)
             ok = active & ext & self._policy_set_ok(row, chosen)
+            chg = ok & self._policy_set_changes(row, chosen)
+            ok = ok & (~chg | _unlock(chg))
             if bool(ok.any()):
                 self.civ_policies[:, row] = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
                 # the government memo's fast path trusts this version alone
@@ -1167,7 +1189,8 @@ class SimSeats:
             ok_g = (active & ext & (g >= 0) & (g < self._gp_nc)
                     & (self.gp_offer.gather(1, gi.unsqueeze(1)).squeeze(1) >= 0)
                     & (self.gp_passed_by.gather(1, gi.unsqueeze(1)).squeeze(1) < 0)
-                    & (self.civ_gpp[:, row].gather(1, gi.unsqueeze(1)).squeeze(1) >= price_g))
+                    & (self.civ_gpp[:, row].gather(1, gi.unsqueeze(1)).squeeze(1) >= price_g)
+                    & ~((gi == self._prophet_cls) & self._gp_capped(row, self._prophet_cls)))
             if bool(ok_g.any()):
                 pts_g = self.civ_gpp[:, row].gather(1, gi.unsqueeze(1)).squeeze(1)
                 self.civ_gpp[:, row] = self.civ_gpp[:, row].scatter(
@@ -1328,8 +1351,9 @@ class SimSeats:
             elig6 = elig6 & (self._walls_build_ok(row).unsqueeze(2)
                              | (self._b_walls.reshape(1, 1, -1) == 0))
         # the SEAT's own prices: a unique building may be cheaper than the row
-        # it replaces, and the cheapest-first key has to see that
-        _bc6 = self._b_cols(row)["cost"]                              # [B, NB]
+        # it replaces, and the cheapest-first key has to see that. A purchase
+        # prices off the untruncated scaled cost (`buyCost`).
+        _bc6 = self._b_cols(row)["buyCost"]                           # [B, NB]
         key6 = (_bc6.reshape(B, 1, NB6) * 1024 + torch.arange(NB6, device=dev, dtype=_bc6.dtype).reshape(1, 1, -1)) * 32 \
             + torch.arange(self.RC, device=dev, dtype=_bc6.dtype).reshape(1, -1, 1)
         key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=_bc6.dtype, device=dev))
@@ -1474,6 +1498,7 @@ class SimSeats:
 
         out = {
             "cost": _s(rd.b_cost),
+            "buyCost": _s(rd.b_buy_cost),
             "yields": rd.b_yields.double().reshape(1, NB, 6).expand(B, NB, 6),
             "housing": _s(rd.b_housing),
             "amenities": _s(rd.b_amenities),
@@ -1494,7 +1519,7 @@ class SimSeats:
         out = {k: t.clone() for k, t in out.items()}
         for bi, civ, v in live:
             who = self._row_plays_idx(row, civ)                      # [B]
-            for key, col in (("cost", "cost"), ("housing", "housing"),
+            for key, col in (("cost", "cost"), ("buyCost", "buyCost"), ("housing", "housing"),
                              ("amenities", "amenities"), ("maintenance", "maintenance"),
                              ("power", "power"), ("regionalRange", "regionalRange")):
                 x = float(v[col])
@@ -2175,7 +2200,7 @@ class SimSeats:
         elig = self._seat_buildable(row, True) & (held.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)             & cls_b.unsqueeze(1)
         if self._walls_rows:
             elig = elig & (self._walls_build_ok(row).unsqueeze(2) | (self._b_walls.reshape(1, 1, -1) == 0))
-        _bcf = self._b_cols(row)["cost"]                               # [B, NB]
+        _bcf = self._b_cols(row)["buyCost"]                            # [B, NB]
         key = (_bcf.reshape(B, 1, NB) * 1024 + torch.arange(NB, device=dev, dtype=_bcf.dtype).reshape(1, 1, -1)) * 32             + torch.arange(self.RC, device=dev, dtype=_bcf.dtype).reshape(1, -1, 1)
         key = torch.where(elig, key.expand(B, -1, -1), torch.tensor(float("inf"), dtype=_bcf.dtype, device=dev))
         flat = key.reshape(B, -1)
@@ -2233,7 +2258,7 @@ class SimSeats:
             cut = torch.where(
                 self._suz_effect(row, self._suz_c_faith_bldg) & (self._b_walls[bi] > 0),
                 torch.full_like(cut, self._valletta_walls_pct), cut)
-        return js_round(self._b_cols(row)["cost"].gather(1, bi.unsqueeze(1)).squeeze(1)
+        return js_round(self._b_cols(row)["buyCost"].gather(1, bi.unsqueeze(1)).squeeze(1)
                         * self.rules.faith_purchase_mult * (100 - cut).double() / 100.0)
 
     def _seat_naturalist_candidate(self, row: int, active: torch.Tensor):
@@ -2390,6 +2415,8 @@ class SimSeats:
         # the passer's lockout hides the class from the DRIVER too — the
         # applier's own refusal is the clause this mirrors
         stand = (self.gp_offer >= 0) & (self.gp_passed_by != row)  # [B, nC]
+        if 0 <= self._prophet_cls < self._gp_nc:
+            stand[:, self._prophet_cls] &= ~self._gp_capped(row, self._prophet_cls)
         d = (self.gp_price - self.civ_gpp[:, row, :].double()).clamp(min=0)
         aff_f = stand & self._afford(self.civ_faith[:, row].unsqueeze(1), fcost) & active.unsqueeze(1)
         aff_g = stand & self._afford(self.civ_treasury[:, row].unsqueeze(1), gcost) & active.unsqueeze(1)
@@ -2415,7 +2442,7 @@ class SimSeats:
             if c < 0 or c >= self._gp_nc:
                 continue
             sel = want & (cls_t == c) & (self.gp_offer[:, c] >= 0) \
-                & (self.gp_passed_by[:, c] != row)
+                & (self.gp_passed_by[:, c] != row) & ~self._gp_capped(row, c)
             price = gcost[:, c] if gold else fcost[:, c]
             purse = self.civ_treasury[:, row] if gold else self.civ_faith[:, row]
             ok = sel & self._afford(purse, price)
@@ -2579,7 +2606,7 @@ class SimSeats:
                 _, _, _, _, elig = self._seat_buy_candidates(row, active)
                 jc = jjw.clamp(min=0, max=self.RC - 1)
                 bc = bbw.clamp(min=0, max=self.rules_dev.b_cost.shape[0] - 1)
-                price = self._gold_price(row, self._b_cols(row)["cost"].gather(1, bc.unsqueeze(1)).squeeze(1) * mult)
+                price = self._gold_price(row, self._b_cols(row)["buyCost"].gather(1, bc.unsqueeze(1)).squeeze(1) * mult)
                 reserve = float(self.rules.seats.get("peaceGold0", 150))
                 ok = want & elig[torch.arange(B, device=dev), jc, bc] \
                     & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price + reserve) * 1000))
@@ -3983,13 +4010,15 @@ class SimSeats:
             ok = ok | _gok
         # THE WATER-ONLY rows (the Offshore Wind Farm): a water plot with no
         # resource to insist on a different improvement, on the row's own
-        # clause. `builderJobAt` names no civilization and no governor, so a
-        # unique or a governor-gated water row is no job.
+        # clause. `builderJobAt` names no civilization, so a unique water row
+        # is no job; it reads the owning city's governor, as the ground arm
+        # above does (`_imp_gov_ok`).
         for _w, _wet in enumerate(self._imp_water):
-            if not _wet or self._imp_uniq[_w] >= 0 or self._imp_gov_promo[_w] >= 0:
+            if not _wet or self._imp_uniq[_w] >= 0:
                 continue
             _wok = (self._imp_ground_ok(_w) & self._res_bare(row)
-                    & self.wpass & ~self.tile_submerged & ~self.nwonder)
+                    & self.wpass & ~self.tile_submerged & ~self.nwonder
+                    & self._imp_gov_ok(row, _w))
             _wu, _wc = int(self._imp_unlock[_w]), int(self._imp_unlock_civic[_w])
             if _wu >= 0:
                 _wok = _wok & tk[:, _wu].unsqueeze(1)
@@ -7425,6 +7454,7 @@ class SimSeats:
                 if is_civic:
                     self.civ_civics[r, row, pick[r]] = True
                     self.civ_civic_retain[r, row, pick[r]] = 0
+                    self.civ_civic_turn[r, row] = self.turn
                     cur = self.civ_cur_civic[:, row]
                     self.civ_cur_civic[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)
                 else:
@@ -9529,7 +9559,7 @@ class SimSeats:
         B = self.B
         cols = self.RC
         alive = self.city_alive[:, row, :cols]
-        is_cap_a = (self.city_is_cap[:, row, :cols] & alive).double()
+        is_cap_a = (self._palace_at(row, slice(0, cols)) & alive).double()
         ctr = self.city_center[:, row, :cols].clamp(min=0)
         bldg = self.city_bldg[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
@@ -9732,7 +9762,7 @@ class SimSeats:
         # PALACE amenity on the capital — baseHave sums city.buildings, which
         # hold the founding PALACE, so it joins BEFORE the luxury ranking.
         # CITY_CENTER never pillages.
-        have = have + self._palace_amenities * (is_cap & alive).double()
+        have = have + self._palace_amenities * (self._palace_at(row, slice(0, cols)) & alive).double()
         # regional BUILDING amenities (Zoo/Stadium) join baseHave BEFORE the
         # luxury ranking — the city.ts luxuryAmenities mirror.
         _regional = self._seat_regional(row)

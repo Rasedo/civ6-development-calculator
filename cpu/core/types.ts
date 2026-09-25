@@ -175,6 +175,10 @@ export interface GovernmentState {
    *  in. A bitmask over `GOVERNMENT_LIST` positions — the roster is a fixed
    *  catalog both engines derive from one export. */
   held: number;
+  /** the turn the seat last completed a civic. The next turn's record may
+   *  change the government and the cards for free (the UI's
+   *  `CivicCompletedThisTurn`); any other turn pays `policyUnlockCost`. */
+  civicTurn: number;
 }
 
 export interface SeatActionRecord {

@@ -581,6 +581,12 @@ export function cityStatePhase(state: GameState): void {
  * is -1: a city-state's ground carries no `ownerCity`, and `tileBelongsTo`
  * matches on exactly that. Its centre is the CITY_CENTER instance every real
  * city's district list opens with.
+ *
+ * It holds the PALACE: the install's Palace is the `Capital` building every
+ * player's capital holds, and a city-state has a capital
+ * (`CivilizationLeaders.CapitalName`). The census reads its Gold: +5 a turn
+ * from the turn after founding, flat across pop 1-3 cities (the Palace's
+ * `YIELD_GOLD` 5; runs/cs_watch_*.jsonl). The GPU twin is `_palace_at`.
  */
 export function minorCity(cityState: CityState): City {
   return {
@@ -599,7 +605,7 @@ export function minorCity(cityState: CityState): City {
     focus: 'balanced',
     queue: [],
     isCapital: false,
-    buildings: cityState.buildings ?? [],
+    buildings: ['PALACE', ...(cityState.buildings ?? [])],
     pillagedBuildings: cityState.pillagedBuildings,
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],

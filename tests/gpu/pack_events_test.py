@@ -20,7 +20,9 @@ Proven here:
     pillages, kills civilians and strikes land units 50-101 on turns 0-2 and
     costs one citizen on turn 0; while it lasts the plot takes no Lumber Mill,
     city, district or wonder, and lends the fire's Appeal;
-  * a two-plot wonder's eruption ring holds every plot touching either, once.
+  * a two-plot wonder's eruption ring holds every plot touching either, once;
+  * Eyjafjallajokull's, Kilimanjaro's and Vesuvius's rows name their roster
+    features, and a locked world holding Vesuvius (seed9027) erupts it.
 """
 
 from __future__ import annotations
@@ -45,6 +47,11 @@ STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
 
 def fresh(rules, path, slot: int = 0):
     return warm_base((str(path), slot), lambda: opened(rules, path))
+
+
+def _world(path) -> dict:
+    """the seeded t0 world a fixture was compiled from"""
+    return json.loads((FIXTURES / path.name.replace(".json", ".world.json")).read_text(encoding="utf-8"))
 
 
 def draws(s0: int, s1: int) -> int:
@@ -87,9 +94,13 @@ def main() -> None:
     sim = fresh(rules, path)
     assert sim._eruption_weight == [4, 2.5, 4, 2.5, 7, 4, 2.5, 1.5]
     assert sim._er_on_volcano == [False] * 5 + [True] * 3
-    assert sim._er_wonder_fid[0] == sim._er_wonder_fid[1] == sim._er_wonder_fid[4] == -1, \
-        "the roster carries no Eyjafjallajokull and no Vesuvius"
-    assert sim._er_wonder_fid[2] >= 0 and sim._er_wonder_fid[2] == sim._er_wonder_fid[3]
+    fids = sim._er_wonder_fid
+    feats = _world(path)["catalogs"]["features"]
+    assert fids[0] == fids[1] >= 0 and fids[2] == fids[3] >= 0 and fids[4] >= 0, \
+        f"every wonder row names its roster feature: {fids}"
+    assert fids[5:] == [-1, -1, -1]
+    assert (feats[fids[0]], feats[fids[2]], feats[fids[4]]) == ("EYJAFJALLAJOKULL", "MOUNT_KILIMANJARO", "VESUVIUS")
+    assert bool(sim._feat_natural[fids[0]]) and bool(sim._feat_natural[fids[4]]), "both are natural wonders"
     assert sim._er_dmg_lo.tolist() == [40, 60, 0, 40, 70, 0, 40, 60]
     assert sim._er_pop_p.tolist() == [0.3, 0.4, 0, 0.2, 1, 0, 0.2, 0.35]
     assert sim._meteor_weight == 6 and sim._fire_weight == [6, 6] and sim._fire_cipd == [50, 50]
@@ -175,15 +186,21 @@ def main() -> None:
     assert int((sim.major_unit_alive[B0] & (sim.major_unit_type[B0] == tank)).sum()) == before + 1
     print(f"  4 meteor grant OK — {line[3]} at city {near}, no fuel bill")
 
-    # 5 — THE FIRE's chain on one isolated Woods plot the row-0 city owns
+    # 5 — THE FIRE's chain on one isolated Woods plot the row-0 city owns,
+    # on the first fixture where it owns one
+    def owned_woods(s) -> list:
+        wf = s._fire_start_fid[1]
+        s0 = s.city_slot_at(0)[B0]
+        return [x for x in range(s.T) if int(s.feat_id[B0, x]) == wf and not bool(s.feat_stripped[B0, x])
+                and int(s0[x]) >= 0]
+
+    path = next((p for p in fixture_paths() if owned_woods(fresh(rules, p, slot=3))), None)
+    assert path is not None, "no fixture's row 0 owns Woods"
     sim = fresh(rules, path, slot=3)
     woods = sim._fire_start_fid[1]
     burning, burnt = sim._fire_burning_fid[1], sim._fire_burnt_fid[1]
     slot0 = sim.city_slot_at(0)[B0]
-    pick = [x for x in range(sim.T) if int(sim.feat_id[B0, x]) == woods and not bool(sim.feat_stripped[B0, x])
-            and int(slot0[x]) >= 0]
-    assert pick, "row 0 owns no Woods"
-    w = pick[0]
+    w = owned_woods(sim)[0]
     for n in sim.neigh[w].tolist():
         if n >= 0 and int(sim.feat_id[B0, n]) in sim._fire_start_fid:
             sim.feat_id[B0, n] = -1  # nothing to spread to
@@ -310,6 +327,31 @@ def main() -> None:
     single[B0, a] = True
     assert sim._eruption_ring(one, single)[B0].tolist() == sim.neigh[a].tolist(), "one plot's ring is its neighbours"
     print("  8 wonder ring OK — eight plots around a two-plot wonder, a volcano's ring its neighbours")
+
+    # 9 — a locked world holding Vesuvius offers its row a real site: with
+    # every other row zeroed, the turn's draw erupts it and rings its plot
+    vpath = next((p for p in fixture_paths() if p.name == "seed9027.json"), None)
+    assert vpath is not None, "the locked world seed9027 is missing"
+    sim = fresh(rules, vpath, slot=6)
+    vfid = sim._er_wonder_fid[4]
+    plots = (sim.feat_id[B0] == vfid).nonzero().flatten().tolist()
+    assert len(plots) == 1, f"seed9027 holds Vesuvius on one plot, got {plots}"
+    v = plots[0]
+    assert bool(sim.tile_mountain[B0, v]) and not bool(sim.passable[B0, v])
+    only(sim, "eruption")
+    sim._eruption_weight = [0.0 if r != 4 else w for r, w in enumerate(sim._eruption_weight)]
+    got: list = []
+    real = sim._erupt
+
+    def spy(hit, ring, row):
+        got.append((bool(hit[B0]), ring[B0].tolist(), int(row[B0])))
+        real(hit, ring, row)
+
+    sim._erupt = spy
+    sim._random_event(sim._desertification_live())
+    assert got and got[0][0] and got[0][2] == 4, f"Vesuvius's row did not fire: {got}"
+    assert [n for n in got[0][1] if n >= 0] == [n for n in sim.neigh[v].tolist() if n >= 0], "its ring is its plot's neighbours"
+    print(f"  9 Vesuvius OK — plot {v} on seed9027, its MEGACOLOSSAL row erupts it")
 
     print("PACK EVENTS OK — the meteor, the fires, the wonders' rings")
 

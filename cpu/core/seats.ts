@@ -6,7 +6,7 @@ import { ENKIDU_WAR_CS, ENKIDU_ALLIED_WAR_DISCOUNT, DIPLO_VIS_ROWS, WAR_BAN_ROWS
 import { WAR_KIND_SURPRISE } from '../data/warKinds';
 import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL , CIV_LEADERS } from '../data/seats';
-import { gpPermOf } from '../data/greatPeople';
+import { GP_RESOURCE_REVEAL, gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
 import { RESOURCES } from '../../world/resources';
 import { emptyStockpile } from '../data/constants';
@@ -80,14 +80,16 @@ export function tileClaimed(t: Tile): boolean {
  *  resource" asks this set; the GPU twin is `_res_hidden(row)`. A city-state
  *  is a player too and reads its own research; a seat with no research (the
  *  Free Cities) sees none of them; a seat with no record here at all (a
- *  test's phantom owner) hides nothing. */
+ *  test's phantom owner) hides nothing. A Great Person's reveal
+ *  (`GP_RESOURCE_REVEAL`, James Young's Oil) shows one before its technology. */
 export function hiddenResourcesFor(state: GameState, seat: number): ReadonlySet<string> {
   const s = seatOf(state, seat);
   if (!s) return NOTHING_HIDDEN;
   const techs = s.research?.techs ?? [];
   const out = new Set<string>();
   for (const def of Object.values(RESOURCES)) {
-    if (def.revealTech && !techs.includes(def.revealTech)) out.add(def.id);
+    if (def.revealTech && !techs.includes(def.revealTech)
+      && !GP_RESOURCE_REVEAL.some((r) => r.resource === def.id && gpPermOf(s, r.perm) > 0)) out.add(def.id);
   }
   return out;
 }
@@ -138,7 +140,7 @@ export function emptySeat(seat: number): Seat {
     peaceTurns: 0,
     treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
-    government: { chosen: null, policies: [], held: 0 },
+    government: { chosen: null, policies: [], held: 0, civicTurn: 0 },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     grantedTitles: 0,
     gpp: {}, gpEarned: [],

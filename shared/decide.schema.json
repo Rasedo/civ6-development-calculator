@@ -133,7 +133,7 @@
     ["charges", "int", "the charges it holds"],
     ["gpAt", "int", "a Great Person's roster position within its class, -1 for every other unit"],
     ["gpSite", "int", "a Great Person's site code (GP_SITES: where its charge is spent), -1 for every other unit"],
-    ["gpArg", "int", "that site's argument (the district table index for site 0, -2 the City Center), -1 where none"],
+    ["gpArg", "int", "that site's argument (the district table index for sites 0 and 15, -2 the City Center; the missing building's index for site 14), -1 where none"],
     ["mask", "list", "the unit action columns it may take now (the one unit action layout, rules.json `actions.unit`), ascending"]
   ],
   "head": [

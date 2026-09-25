@@ -153,3 +153,14 @@ Object.assign(FEATURES, {
   BURNING_RAINFOREST: { id: 'BURNING_RAINFOREST', name: 'Burning Rainforest', yields: {}, terrains: ['GRASSLAND', 'PLAINS'], allowHills: true, removable: false },
   BURNT_RAINFOREST: { id: 'BURNT_RAINFOREST', name: 'Burnt Rainforest', yields: {}, terrains: ['GRASSLAND', 'PLAINS'], allowHills: true, removable: false },
 } satisfies Record<string, FeatureDef>);
+
+// THE GATHERING STORM VOLCANO WONDERS, appended after the fires. CIV6
+// (`VikingsLandmarks_Features.xml` with its `_Expansion2.xml` update, and
+// `Expansion2_Features.xml`): both Impassable, Appeal 2 like every wonder
+// here, no Feature_YieldChanges row. Eyjafjallajokull's Feature_AdjacentYields
+// are Food 1 (the Expansion2 update of the pack's 2) and Culture 1; Vesuvius's
+// Production 1.
+Object.assign(FEATURES, {
+  EYJAFJALLAJOKULL: { id: 'EYJAFJALLAJOKULL', name: 'Eyjafjallajökull', yields: {}, impassable: true, adjacentYields: { food: 1, culture: 1 }, ...NW },
+  VESUVIUS: { id: 'VESUVIUS', name: 'Vesuvius', yields: {}, impassable: true, adjacentYields: { production: 1 }, ...NW },
+} satisfies Record<string, FeatureDef>);

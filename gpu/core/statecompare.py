@@ -598,6 +598,7 @@ SEAT = {
     "age": _civ_scalar("civ_age"),
     "governmentsHeld": _civ_scalar("civ_gov_held"),
     "governmentChosen": _civ_scalar("civ_gov_chosen"),
+    "governmentCivicTurn": _civ_scalar("civ_civic_turn"),
     "policySlotsExtra": lambda sim, b, rows: [
         [int(x) for x in sim._wonder_extra_slots(c)[b].tolist()] for c in rows],
     "policiesSlotted": _civ_mask("civ_policies"),

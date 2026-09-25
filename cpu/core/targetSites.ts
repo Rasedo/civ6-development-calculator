@@ -9,10 +9,12 @@ import type { City, GameState, Tile } from './types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { isImpassable, isWater, naturalWonderAt } from '../../world/query';
 import { CITY_MIN_DIST } from '../../world/types';
-import { GP_SITES, gpSiteArg, gpSiteDistrictOf, gpSiteOf, type GpSite } from '../data/greatPeople';
+import { GP_SITES, gpSiteArg, gpSiteDistrictOf, gpSiteOf, type GpSite, type GreatPersonDef } from '../data/greatPeople';
+import { centerBuildingIds } from './prodLayout';
 import { GW_KINDS, gwKindObjects } from '../data/greatWorks';
 import { fireFeature } from '../data/disasters';
-import { BARB_SEAT, campTiles, cityHolders, civsAtWar, hiddenResourcesFor, tileOwnedByCiv, tileSeat } from './seats';
+import { BARB_SEAT, campTiles, cityAtTile, cityHolders, civsAtWar, hiddenResourcesFor, tileOwnedByCiv, tileSeat } from './seats';
+import { cityGovernorPromos } from './governors';
 import { computeUnlocks, type Unlocks } from './effects';
 import { canBuildRoad, validImprovementsIn } from './rules';
 import { engineerFinishCity } from './game';
@@ -47,11 +49,16 @@ export function jobCtx(state: GameState, seat: number): JobCtx {
  *  asks no water question of its own: `validImprovementsIn` decides which
  *  ground carries what. */
 export function builderJobAt(state: GameState, ctx: JobCtx, t: Tile): boolean {
-  return ctx.owns(t)
-    && (t.pillaged || t.districtPillaged
-      || (!t.improvement && validImprovementsIn(t, {
-        unlocks: ctx.unlocks, ownsTile: ctx.owns, map: state.map, camps: ctx.camps, hidden: ctx.hidden,
-      }).length > 0));
+  if (!ctx.owns(t)) return false;
+  if (t.pillaged || t.districtPillaged) return true;
+  if (t.improvement) return false;
+  // the OWNING city's governor promotions, the gate the governor rows (the
+  // City Park, the Fishery) read at placement (`validImprovements`)
+  const city = cityAtTile(state, t);
+  return validImprovementsIn(t, {
+    unlocks: ctx.unlocks, ownsTile: ctx.owns, map: state.map, camps: ctx.camps, hidden: ctx.hidden,
+    govPromos: city ? cityGovernorPromos(state, city) : undefined,
+  }).length > 0;
 }
 
 /** A Military Engineer has work here: a road it may lay, an engineer
@@ -127,14 +134,26 @@ export function parkSites(state: GameState, seat: number): number[] {
     .map((t) => t.index);
 }
 
+let centreBuildingOrder: string[] | undefined;
+/** the City Center building catalog in the wire's order (`centerBuildingIds`) */
+function centreBuildings(): string[] {
+  return (centreBuildingOrder ??= centerBuildingIds());
+}
+
+/** A person's site ARGUMENT as the wire names it: a `centreWithout` site's
+ *  missing building (its `centerBuildingIds` index), else its site district
+ *  (`gpSiteArg`: the `PLACEABLE_DISTRICTS` index, -2 the City Center, -1 none). */
+export function gpSiteArgOf(person: GreatPersonDef): number {
+  const { site, district, building } = gpSiteOf(person);
+  return site === 'centreWithout' ? centreBuildings().indexOf(building!) : gpSiteArg(district);
+}
+
 /** A person's activation site as the wire names it: its `GP_SITES` code and
- *  its site district's argument (`gpSiteArg`: the `PLACEABLE_DISTRICTS`
- *  index, -2 the City Center, -1 none). */
+ *  its argument (`gpSiteArgOf`). */
 export function gpSiteKey(unit: { type: string; gpAt?: number }): [number, number] | undefined {
   const person = gpPersonOf(unit);
   if (!person) return undefined;
-  const { site, district } = gpSiteOf(person);
-  return [GP_SITES.indexOf(site), gpSiteArg(district)];
+  return [GP_SITES.indexOf(gpSiteOf(person).site), gpSiteArgOf(person)];
 }
 
 /** The tiles a person of this seat walks toward for site key (site, arg).
@@ -151,7 +170,12 @@ export function gpSiteWalks(code: GpSite | undefined): boolean {
 export function gpSiteTiles(state: GameState, seat: number, site: number, arg: number): number[] {
   const code = GP_SITES[site];
   if (!gpSiteWalks(code)) return [];
-  const district = gpSiteDistrictOf(arg);
+  const centre = code === 'centreWithout';
+  const district = centre ? 'CITY_CENTER' : gpSiteDistrictOf(arg);
+  const building = centre ? centreBuildings()[arg] : undefined;
+  // the sites that are anyone's ground list only a plot a unit may stand on
+  const standOn = code === 'adjacentBarbarian' || code === 'nearMountain' || code === 'nearNaturalWonder'
+    || code === 'nearRainforest';
   const roomMemo = new Map<number, boolean>();
   const room = (city: City): boolean => {
     let r = roomMemo.get(city.id);
@@ -163,8 +187,8 @@ export function gpSiteTiles(state: GameState, seat: number, site: number, arg: n
     return r;
   };
   return state.map.tiles
-    .filter((t) => gpSiteHolds(state, seat, code, district, t, room)
-      && (code !== 'adjacentBarbarian' || unitPassable(t)))
+    .filter((t) => gpSiteHolds(state, seat, code, district, t, room, building)
+      && (!standOn || unitPassable(t)))
     .map((t) => t.index);
 }
 

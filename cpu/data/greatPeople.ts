@@ -577,7 +577,13 @@ export type GpSite =
   | 'suzerainCityState' // inside the territory of a city-state this seat is Suzerain of
   | 'adjacentBarbarian' // beside a barbarian unit
   | 'enemyTerritory'    // inside the territory of a seat at war with this one
-  | 'relicSlot';        // anywhere, while a city of this seat has an open Relic slot (ActionRequiresPlayerRelicSlot)
+  | 'relicSlot'         // anywhere, while a city of this seat has an open Relic slot (ActionRequiresPlayerRelicSlot)
+  | 'nearMountain'      // any plot beside a Mountain (ActionRequiresAdjacentMountain, ActionRequiresOwnedTile false)
+  | 'nearNaturalWonder' // any plot on or beside a natural wonder (ActionRequiresOnOrAdjacentNaturalWonder)
+  | 'nearRainforest'    // any plot on or beside a Rainforest (ActionRequiresOnOrAdjacentFeatureType FEATURE_JUNGLE)
+  | 'incompleteWonder'  // this seat's plot holding a wonder under construction (ActionRequiresIncompleteWonder)
+  | 'centreWithout'     // this seat's City Center whose city lacks `siteBuilding` (ActionRequiresMissingBuildingType)
+  | 'districtArtifact'; // this seat's completed `siteDistrict` whose city holds an Artifact (ActionRequiresCityGreatWorkObjectType)
 
 /** PERMANENT per-seat channels a Great Person adds to. The array position is
  *  the wire index, so a new channel appends. */
@@ -586,7 +592,7 @@ export const GP_PERM = [
   'warWearyPct',         // war weariness accrued, percent off
   'flankPctLand',        // flanking bonus for LAND units, percent
   'flankPctNaval',       // flanking bonus for NAVAL units, percent
-  'unitProdPct',         // unit production, percent
+  'militaryProdPct',     // military unit production, percent (`unitIsMilitary`)
   'routePlunderPct',     // gold from plundering a sea trade route, percent
   'healBonus',           // extra HP healed per turn
   'tradeCapacity',       // extra simultaneous trade routes
@@ -649,6 +655,12 @@ export const GP_PERM = [
   // CIV6 (Mimar Sinan, MODIFIER_PLAYER_ADD_CULTURE_BOMB_TRIGGER): a completed
   // Industrial Zone claims the tiles around it.
   'izCultureBomb',
+  // CIV6 (James Young, MODIFIER_PLAYER_GRANT_FREE_RESOURCE_VISIBILITY): Oil is
+  // seen before its revealing technology (`GP_RESOURCE_REVEAL`).
+  'oilVisible',
+  // CIV6 (Mary Leakey, MODIFIER_PLAYER_CITIES_ADJUST_TOURISM with a
+  // GreatWorkObjectType): the percent an Artifact's Tourism ADDS in every city.
+  'artifactTourismPct',
 ] as const;
 export type GpPermKey = (typeof GP_PERM)[number];
 
@@ -731,6 +743,13 @@ export const GP_FREE_EXTRACTION: readonly { perm: GpPermKey; resource: string }[
  *  Rockefeller): paid to whoever holds the city. */
 export const GP_CITY_FREE_EXTRACTION: readonly { perm: GpCityPermKey; resource: string }[] = [
   { perm: 'oilPerTurn', resource: 'OIL' },
+];
+
+/** CIV6 (MODIFIER_PLAYER_GRANT_FREE_RESOURCE_VISIBILITY): a resource the seat
+ *  SEES before its revealing technology — James Young's Oil
+ *  (`hiddenResourcesFor`). */
+export const GP_RESOURCE_REVEAL: readonly { perm: GpPermKey; resource: string }[] = [
+  { perm: 'oilVisible', resource: 'OIL' },
 ];
 
 type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
@@ -876,11 +895,14 @@ export const GP_YIELD_KEYS: readonly GpYieldKey[] = ['science', 'culture', 'gold
 export const GP_SITES: readonly GpSite[] = [
   'district', 'anywhere', 'gwSlot', 'cityState', 'luxury', 'adjacentOwn',
   'suzerainCityState', 'adjacentBarbarian', 'enemyTerritory', 'relicSlot',
+  'nearMountain', 'nearNaturalWonder', 'nearRainforest', 'incompleteWonder', 'centreWithout', 'districtArtifact',
 ];
 
 interface GpAbility extends GpEffect {
   site?: GpSite;
   siteDistrict?: DistrictId;
+  /** the building a `centreWithout` site's city must NOT hold. */
+  siteBuilding?: string;
   charges?: number;
   /** this person's page clause has no carrier in this engine, so the class
    *  lump stands in for it and the clause is an open audit item. */
@@ -940,6 +962,17 @@ const GP_ROCKEFELLER_OIL = gpArg('GP_ROCKEFELLER_OIL', 'GREATPERSON_GRANT_3_OIL_
 const GP_HANNO_MOVES = gpArg('GP_HANNO_MOVES', 'HANNO_FREE_UNIT_MOVEMENT_BUFF', 2);
 /** CIV6 (Giovanni de' Medici): the Bank's widening, `GW_GP_EXTRA_SLOTS`' own amount. */
 const GP_BANK_GW_SLOTS = GW_GP_EXTRA_SLOTS.find((r) => r.perm === 'bankGwSlots')!.amount;
+/** CIV6 (Mary Leakey, GREATPERSON_ARTIFACT_TOURISM_MODIFIER): ScalingFactor
+ *  300 on an Artifact's Tourism — the catalog carries the ADDED percent. */
+const GP_LEAKEY_ARTIFACT_TOURISM = srcConst('greatPeople.GP_LEAKEY_ARTIFACT_TOURISM', 200, {
+  derived: 'ScalingFactor - 100 — the install writes 300 (triple), the catalog the ADDED percentage',
+  inputs: [xml('ModifierArguments', 'ModifierId=GREATPERSON_ARTIFACT_TOURISM_MODIFIER&Name=ScalingFactor', 'Value')],
+});
+/** CIV6 (James of St. George, `ActionRequiresMissingBuildingType`): a city
+ *  already holding a Castle is no site. */
+const GP_JAMES_MISSING = srcConst('greatPeople.GP_JAMES_MISSING', 'MEDIEVAL_WALLS',
+  xml('GreatPersonIndividuals', 'GreatPersonIndividualType=GREAT_PERSON_INDIVIDUAL_JAMES_OF_ST_GEORGE',
+    'ActionRequiresMissingBuildingType', { expect: 'BUILDING_CASTLE' }));
 const GP_HANNO_CLASS = srcConst('greatPeople.GP_HANNO_CLASS', 'NAVAL_MELEE',
   xml('ModifierArguments', 'ModifierId=GREAT_PERSON_INDIVIDUAL_HANNO_THE_NAVIGATOR_FREE_UNIT&Name=UnitPromotionClassType',
     'Value', { expect: 'PROMOTION_CLASS_NAVAL_MELEE' }));
@@ -978,19 +1011,26 @@ export const GP_ABILITY: Record<string, GpAbility> = {
     },
   },
   GP_EMILIE_DU_CHATELET: { eurekaRandom: 3, eurekaHi: 1 },
-  GP_GALILEO_GALILEI: { perAdjacent: { source: 'MOUNTAIN', yield: 'science', amount: gpScaled('GP_GALILEO_SCIENCE', 'GREATPERSON_ADJACENT_GRASSMOUNTAIN_SCIENCE', 250) } },
+  GP_GALILEO_GALILEI: { site: 'nearMountain', perAdjacent: { source: 'MOUNTAIN', yield: 'science', amount: gpScaled('GP_GALILEO_SCIENCE', 'GREATPERSON_ADJACENT_GRASSMOUNTAIN_SCIENCE', 250) } },
   GP_ISAAC_NEWTON: { buildings: ['LIBRARY', 'UNIVERSITY'], perm: { universityScience: gpArg('GP_NEWTON_UNIVERSITY_SCIENCE', 'GREATPERSON_UNIVERSITIES_SMALL_SCIENCE', 2) } },
-  GP_CHARLES_DARWIN: { perAdjacent: { source: 'NATURAL_WONDER', yield: 'science', amount: gpScaled('GP_DARWIN_SCIENCE', 'GREATPERSON_ADJACENT_NATURALWONDER_SCIENCE', 500) } },
+  GP_CHARLES_DARWIN: { site: 'nearNaturalWonder', perAdjacent: { source: 'NATURAL_WONDER', yield: 'science', amount: gpScaled('GP_DARWIN_SCIENCE', 'GREATPERSON_ADJACENT_NATURALWONDER_SCIENCE', 500) } },
   GP_DMITRI_MENDELEEV: { eurekaTechs: ['CHEMISTRY'], eurekaRandom: 1 },
-  GP_JAMES_YOUNG: { eurekaRandom: 2, eurekaHi: 1 },
+  GP_JAMES_YOUNG: {
+    eurekaRandom: 2, eurekaHi: 1,
+    perm: { oilVisible: gpFlag('GP_YOUNG_REVEAL_OIL', 'GREATPERSON_REVEAL_OIL', 'ResourceType', 'RESOURCE_OIL') },
+  },
   GP_ALAN_TURING: { eurekaTechs: ['COMPUTERS'], eurekaRandom: 1 },
   // CIV6 (GREATPERSON_1MODERNATOMICTECHBOOST): one boost drawn over
   // ERA_MODERN..ERA_ATOMIC
   GP_ALBERT_EINSTEIN: { eurekaRandom: 1, eurekaHi: 1, perm: { researchLabScience: gpArg('GP_EINSTEIN_LAB_SCIENCE', 'GREATPERSON_RESEARCHLABS_BIG_SCIENCE', 4) } },
   GP_ALFRED_NOBEL: { eurekaRandom: 1, eurekaHi: 1, gppAll: gpScaled('GP_NOBEL_GPP', 'GREATPERSON_GREAT_PERSON_FREE_POINTS', 100) },
   GP_ERWIN_SCHRODINGER: { eurekaRandom: 3, eurekaHi: 1 },
-  GP_JANAKI_AMMAL: { perAdjacent: { source: 'RAINFOREST', yield: 'science', amount: gpScaled('GP_JANAKI_SCIENCE', 'GREATPERSON_ADJACENT_RAINFOREST_SCIENCE', 400), here: true } },
-  GP_MARY_LEAKEY: { siteDistrict: 'THEATER_SQUARE', artifactScience: gpScaled('GP_LEAKEY_SCIENCE', 'GREATPERSON_ARTIFACT_SCIENCE', 350) }, // the tourism clause waits on the tourism system
+  GP_JANAKI_AMMAL: { site: 'nearRainforest', perAdjacent: { source: 'RAINFOREST', yield: 'science', amount: gpScaled('GP_JANAKI_SCIENCE', 'GREATPERSON_ADJACENT_RAINFOREST_SCIENCE', 400), here: true } },
+  GP_MARY_LEAKEY: {
+    site: 'districtArtifact', siteDistrict: 'THEATER_SQUARE',
+    artifactScience: gpScaled('GP_LEAKEY_SCIENCE', 'GREATPERSON_ARTIFACT_SCIENCE', 350),
+    perm: { artifactTourismPct: GP_LEAKEY_ARTIFACT_TOURISM },
+  },
   GP_MARGARET_MEAD: {
     science: gpScaled('GP_MEAD_SCIENCE', 'GREAT_PERSON_GRANT_LOTSO_SCIENCE', 1000),
     culture: gpScaled('GP_MEAD_CULTURE', 'GREAT_PERSON_GRANT_LOTSO_CULTURE', 1000),
@@ -1000,24 +1040,26 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_ABDUS_SALAM: { eurekaEra: true },
 
   // ---- ENGINEER: wonders, buildings and the Space Race ----
-  // the doubled grant is its own row: ..._ANCIENT_CLASSICAL, Amount 350
-  GP_IMHOTEP: { charges: 2, wonderProduction: gpStandard('GP_IMHOTEP_PRODUCTION', 'GREAT_PERSON_INDIVIDUAL_IMHOTEP_PRODUCTION_OTHER', 175), wonderEraDouble: 1 },
+  // the five wonder engineers are spent ON the wonder under construction
+  // (`ActionRequiresIncompleteWonder`, DISTRICT_WONDER_IN_TILE). Imhotep's
+  // doubled grant is its own row: ..._ANCIENT_CLASSICAL, Amount 350
+  GP_IMHOTEP: { site: 'incompleteWonder', charges: 2, wonderProduction: gpStandard('GP_IMHOTEP_PRODUCTION', 'GREAT_PERSON_INDIVIDUAL_IMHOTEP_PRODUCTION_OTHER', 175), wonderEraDouble: 1 },
   GP_BI_SHENG: { siteDistrict: 'CITY_CENTER', eurekaTechs: ['PRINTING'], cityPerm: { districtLimit: 1 } },
-  GP_ISIDORE_OF_MILETUS: { charges: 2, wonderProduction: gpStandard('GP_ISIDORE_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_MEDIEVAL', 215) },
-  GP_JAMES_OF_ST_GEORGE: { siteDistrict: 'CITY_CENTER', charges: 3, buildings: ['ANCIENT_WALLS', 'MEDIEVAL_WALLS'] },
-  GP_FILIPPO_BRUNELLESCHI: { charges: 2, wonderProduction: gpStandard('GP_BRUNELLESCHI_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_RENAISSANCE', 315) },
+  GP_ISIDORE_OF_MILETUS: { site: 'incompleteWonder', charges: 2, wonderProduction: gpStandard('GP_ISIDORE_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_MEDIEVAL', 215) },
+  GP_JAMES_OF_ST_GEORGE: { site: 'centreWithout', siteDistrict: 'CITY_CENTER', siteBuilding: GP_JAMES_MISSING, charges: 3, buildings: ['ANCIENT_WALLS', 'MEDIEVAL_WALLS'] },
+  GP_FILIPPO_BRUNELLESCHI: { site: 'incompleteWonder', charges: 2, wonderProduction: gpStandard('GP_BRUNELLESCHI_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_RENAISSANCE', 315) },
   GP_LEONARDO_DA_VINCI: { eurekaRandom: 1, eurekaLo: 2, eurekaHi: 2, perm: { workshopCulture: 3 } },
   GP_MIMAR_SINAN: {
     siteDistrict: 'CITY_CENTER',
     perm: { izCultureBomb: gpFlag('GP_SINAN_CULTURE_BOMB', 'GREATPERSON_CULTURE_BOMB_TRIGGER_INDUSTRIAL_ZONE', 'DistrictType', 'DISTRICT_INDUSTRIAL_ZONE') },
   },
   GP_ADA_LOVELACE: { siteDistrict: 'CITY_CENTER', eurekaTechs: ['COMPUTERS'], cityPerm: { districtLimit: 1 } },
-  GP_GUSTAVE_EIFFEL: { charges: 2, wonderProduction: gpStandard('GP_EIFFEL_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_INDUSTRIAL', 480) },
+  GP_GUSTAVE_EIFFEL: { site: 'incompleteWonder', charges: 2, wonderProduction: gpStandard('GP_EIFFEL_PRODUCTION', 'GREATPERSON_GRANT_PRODUCTION_IN_CITY_INDUSTRIAL', 480) },
   GP_JAMES_WATT: { buildings: ['WORKSHOP', 'FACTORY'], perm: { factoryProduction: gpArg('GP_WATT_FACTORY_PRODUCTION', 'GREATPERSON_FACTORIES_PRODUCTION', 2) } },
   // CIV6 (Shah Jahan): "Grants Production towards wonder construction,
   // capped at half of your current treasury. Then reduces your Gold by twice
   // the amount of purchased Production."
-  GP_SHAH_JAHAN: { wonderBuyout: true },
+  GP_SHAH_JAHAN: { site: 'incompleteWonder', wonderBuyout: true },
   GP_ALVAR_AALTO: { siteDistrict: 'CITY_CENTER', cityPerm: { appeal: 1 } },
   GP_ROBERT_GODDARD: { eurekaTechs: ['ROCKETRY'], perm: { spaceProdPct: 20 } },
   // CIV6 (Nikola Tesla, DISTRICT_IN_TILE): this Industrial Zone's regional
@@ -1077,7 +1119,10 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   // ---- GENERAL: promotions, free units, and the war-weariness cut ----
   GP_BOUDICA: { site: 'adjacentBarbarian', convertBarbarians: true },
   GP_HANNIBAL_BARCA: { promotionLevels: 1 },
-  GP_SUN_TZU: { greatWorkKind: 0 }, // one Work of Writing (GREATWORK_SUN_TZU)
+  // CIV6 (Sun Tzu, ActionCharges 0): no retire action; his one charge is the
+  // Work of Writing (GREATWORK_SUN_TZU), made as a Writer makes his — in a
+  // city of the seat with an open slot for it, the one he stands in.
+  GP_SUN_TZU: { site: 'gwSlot', greatWorkKind: 0 },
   GP_TRUNG_TRAC: { siteDistrict: 'ENCAMPMENT', perm: { warWearyPct: 25 } },
   GP_THELFLD: { siteDistrict: 'CITY_CENTER', cityPerm: { loyalty: GP_AETHELFLAED_LOYALTY } },
   GP_EL_CID: { formation: 1 },
@@ -1100,7 +1145,9 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   // CIV6 (GREATPERSON_SAMORI_TURE_ACTIVE): UNIT_SPEC_OPS, Experience -1
   GP_SAMORI_TOURE: { unit: 'SPEC_OPS', unitPromotions: 1 },
   GP_DOUGLAS_MACARTHUR: { unit: 'TANK', unitPromotions: 1, perm: { oilPerTurn: GP_OIL_PER_TURN } },
-  GP_DWIGHT_EISENHOWER: { perm: { unitProdPct: 5 } },
+  // CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_MILITARY_UNITS_PRODUCTION, no
+  // PromotionClass): military units only
+  GP_DWIGHT_EISENHOWER: { perm: { militaryProdPct: gpArg('GP_EISENHOWER_MILITARY_PROD', 'GREATPERSON_DWIGHT_EISENHOWER_ACTIVE', 5) } },
   GP_GEORGY_ZHUKOV: { perm: { flankPctLand: 50 } },
   GP_SUDIRMAN: { siteDistrict: 'CITY_CENTER', cityPerm: { loyalty: GP_SUDIRMAN_LOYALTY } },
   GP_AHMAD_SHAH_MASSOUD: { unit: 'MODERN_AT', unitPromotions: 1 },
@@ -1150,13 +1197,14 @@ export const GP_ABILITY: Record<string, GpAbility> = {
 /** The class's own district is the default activation site; the art classes
  *  need a free Great Work slot and the two military classes may spend their
  *  charge anywhere. A row naming its own district (the install's
- *  `ActionRequiresCompletedDistrictType`) is spent there, whatever its class. */
-export function gpSiteOf(person: GreatPersonDef): { site: GpSite; district: DistrictId } {
+ *  `ActionRequiresCompletedDistrictType`) is spent there, whatever its class;
+ *  `building` is a `centreWithout` site's missing building. */
+export function gpSiteOf(person: GreatPersonDef): { site: GpSite; district: DistrictId; building?: string } {
   const a = GP_ABILITY[person.id];
   const dflt: GpSite = a?.siteDistrict !== undefined ? 'district'
     : GW_WORK_CLASSES.has(person.class) ? 'gwSlot'
       : person.class === 'GENERAL' || person.class === 'ADMIRAL' ? 'anywhere' : 'district';
-  return { site: a?.site ?? dflt, district: a?.siteDistrict ?? GP_CLASS_DISTRICT[person.class] };
+  return { site: a?.site ?? dflt, district: a?.siteDistrict ?? GP_CLASS_DISTRICT[person.class], building: a?.siteBuilding };
 }
 
 /** A site district as the wire names it: its `PLACEABLE_DISTRICTS` index, the
