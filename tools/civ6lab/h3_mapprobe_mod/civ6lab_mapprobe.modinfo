@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Mod id="e6d8f6ba-a2bf-4f6b-ba4b-f5446f403033" version="1">
+	<Properties>
+		<Name>civ6lab_mapprobe</Name>
+		<Description>civ6lab H-3 instrument: a map script that runs Continents.lua and records the map generator's random stream into plot properties.</Description>
+		<Authors>civ6lab</Authors>
+		<CompatibleVersions>2.0</CompatibleVersions>
+	</Properties>
+	<InGameActions>
+		<ImportFiles id="civ6lab_mapprobe_files">
+			<File>Maps/civ6lab_mapprobe.lua</File>
+		</ImportFiles>
+	</InGameActions>
+	<Files>
+		<File>Maps/civ6lab_mapprobe.lua</File>
+	</Files>
+</Mod>

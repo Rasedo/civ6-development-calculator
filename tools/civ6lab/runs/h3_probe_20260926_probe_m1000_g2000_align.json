@@ -1,0 +1,1263 @@
+{
+ "segments": [
+  {
+   "from": "SEED",
+   "to": "load",
+   "steps": 45287432,
+   "lua": 0,
+   "native": 45287432,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": "load",
+   "to": "entry",
+   "steps": null,
+   "lua": 0,
+   "native": null
+  },
+  {
+   "from": "entry",
+   "to": "<Fractal.Create(44,26,2,{},6,5)",
+   "steps": 4,
+   "lua": 4,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Random World Age - Lua": 1,
+    "Random Sea Level - Lua": 1,
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,2,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 106,
+   "lua": 81,
+   "native": 25,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0,
+    1,
+    2
+   ],
+   "one_gap_n": 3,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 28,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 27,
+    "FractalWorld Center Rift Direction - Lua": 25
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,2,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,2,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 93,
+   "lua": 68,
+   "native": 25,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 17,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 25,
+    "FractalWorld Center Rift Direction - Lua": 25
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,1,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,1,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 92,
+   "lua": 68,
+   "native": 24,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0,
+    1
+   ],
+   "one_gap_n": 2,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 29,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 19,
+    "FractalWorld Center Rift Direction - Lua": 19
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,1,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,1,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 108,
+   "lua": 84,
+   "native": 24,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 22,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 33,
+    "FractalWorld Center Rift Direction - Lua": 28
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,2,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,2,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 110,
+   "lua": 83,
+   "native": 27,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0,
+    1
+   ],
+   "one_gap_n": 2,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 40,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 23,
+    "FractalWorld Center Rift Direction - Lua": 19
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,1,{FRAC_POLAR=true},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,1,{FRAC_POLAR=true},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 85,
+   "lua": 61,
+   "native": 24,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 12,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 24,
+    "FractalWorld Center Rift Direction - Lua": 24
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,1,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,1,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 99,
+   "lua": 73,
+   "native": 26,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 12,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 30,
+    "FractalWorld Center Rift Direction - Lua": 30
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,1,{FRAC_POLAR=true},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,1,{FRAC_POLAR=true},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 106,
+   "lua": 83,
+   "native": 23,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 29,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 27,
+    "FractalWorld Center Rift Direction - Lua": 26
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,2,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,2,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 89,
+   "lua": 65,
+   "native": 24,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 23,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 21,
+    "FractalWorld Center Rift Direction - Lua": 20
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,1,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,1,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 105,
+   "lua": 79,
+   "native": 26,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0,
+    1
+   ],
+   "one_gap_n": 2,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 21,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 29,
+    "FractalWorld Center Rift Direction - Lua": 28
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,1,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,1,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 99,
+   "lua": 75,
+   "native": 24,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0,
+    1,
+    2
+   ],
+   "one_gap_n": 3,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 10,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 32,
+    "FractalWorld Center Rift Direction - Lua": 32
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,2,{},6,5)",
+   "steps": 2,
+   "lua": 2,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Continental Grain roll - LUA Continents": 1,
+    "Rift Grain roll - LUA Continents": 1
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,2,{},6,5)",
+   "to": ">Fractal.Create",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.CreateRifts",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.CreateRifts",
+   "to": ">Fractal.CreateRifts",
+   "steps": 2145,
+   "lua": 0,
+   "native": 2145,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.CreateRifts",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 110,
+   "lua": 89,
+   "native": 21,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "Random Region Edges",
+   "lua_reasons": {
+    "Random Region Edges": 36,
+    "FractalWorld Center Rift Lean - Lua": 1,
+    "FractalWorld Center Rift Segment Length - Lua": 27,
+    "FractalWorld Center Rift Direction - Lua": 25
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "to": ">Fractal.Create",
+   "steps": 8320,
+   "lua": 0,
+   "native": 8320,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "to": ">Fractal.Create",
+   "steps": 8320,
+   "lua": 0,
+   "native": 8320,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "steps": 295535,
+   "lua": 384,
+   "native": 295151,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "Coastal Mountain Removal",
+   "lua_reasons": {
+    "Coastal Mountain Removal": 17,
+    "Shuffling table entry - Lua": 367
+   }
+  },
+  {
+   "from": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "to": ">Fractal.Create",
+   "steps": 8320,
+   "lua": 0,
+   "native": 8320,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "to": ">Fractal.Create",
+   "steps": 8320,
+   "lua": 0,
+   "native": 8320,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+   "to": ">Fractal.Create",
+   "steps": 8320,
+   "lua": 0,
+   "native": 8320,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">Fractal.Create",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 453,
+   "lua": 453,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "add shallows": 453
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 542,
+   "lua": 502,
+   "native": 40,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [],
+   "one_gap_n": 0,
+   "lua_reasons": {
+    "River Rand": 214,
+    "MapGenerator AddRivers": 217,
+    "MapGenerator AddLakes": 71
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<AreaBuilder.Recalculate",
+   "steps": 341,
+   "lua": 341,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Resource Placement Score Adjust": 310,
+    "Oasis Random": 4,
+    "Natural Wonder Selection Roll": 8,
+    "Natural Wonder Placement Score Adjust": 19
+   }
+  },
+  {
+   "from": "<AreaBuilder.Recalculate",
+   "to": ">AreaBuilder.Recalculate",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">AreaBuilder.Recalculate",
+   "to": "<TerrainBuilder.AnalyzeChokepoints",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<TerrainBuilder.AnalyzeChokepoints",
+   "to": ">TerrainBuilder.AnalyzeChokepoints",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">TerrainBuilder.AnalyzeChokepoints",
+   "to": "<TerrainBuilder.StampContinents",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": "<TerrainBuilder.StampContinents",
+   "to": ">TerrainBuilder.StampContinents",
+   "steps": 43,
+   "lua": 0,
+   "native": 43,
+   "values_all_match_no_gap": false,
+   "one_gap_positions": [
+    0
+   ],
+   "one_gap_n": 1,
+   "gap_after": "(segment start)",
+   "gap_before": "(segment end)",
+   "lua_reasons": {}
+  },
+  {
+   "from": ">TerrainBuilder.StampContinents",
+   "to": "<StartPositioner.DivideMapIntoMajorRegions(2,150,50,false)",
+   "steps": 2468,
+   "lua": 2468,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Shuffling table entry - Lua": 49,
+    "Resource Placement Score Adjust": 2419
+   }
+  },
+  {
+   "from": "<StartPositioner.DivideMapIntoMajorRegions(2,150,50,false)",
+   "to": ">StartPositioner.DivideMapIntoMajorRegions",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">StartPositioner.DivideMapIntoMajorRegions",
+   "to": "<StartPositioner.DivideMapIntoMinorRegions(3)",
+   "steps": 22,
+   "lua": 22,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Random Direction": 3,
+    "Shuffling table entry - Lua": 19
+   }
+  },
+  {
+   "from": "<StartPositioner.DivideMapIntoMinorRegions(3)",
+   "to": ">StartPositioner.DivideMapIntoMinorRegions",
+   "steps": 0,
+   "lua": 0,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {}
+  },
+  {
+   "from": ">StartPositioner.DivideMapIntoMinorRegions",
+   "to": "exit",
+   "steps": 22,
+   "lua": 22,
+   "native": 0,
+   "values_all_match_no_gap": true,
+   "lua_reasons": {
+    "Goody Hut - LUA Goody Hut": 22
+   }
+  }
+ ],
+ "math_random": [
+  "1252,563586,193305,808741"
+ ],
+ "lua_by_reason": {
+  "Resource Placement Score Adjust": 2729,
+  "add shallows": 453,
+  "Shuffling table entry - Lua": 435,
+  "FractalWorld Center Rift Segment Length - Lua": 317,
+  "FractalWorld Center Rift Direction - Lua": 301,
+  "Random Region Edges": 279,
+  "MapGenerator AddRivers": 217,
+  "River Rand": 214,
+  "MapGenerator AddLakes": 71,
+  "Goody Hut - LUA Goody Hut": 22,
+  "Natural Wonder Placement Score Adjust": 19,
+  "Coastal Mountain Removal": 17,
+  "Continental Grain roll - LUA Continents": 12,
+  "Rift Grain roll - LUA Continents": 12,
+  "FractalWorld Center Rift Lean - Lua": 12,
+  "Natural Wonder Selection Roll": 8,
+  "Oasis Random": 4,
+  "Random Direction": 3,
+  "Random World Age - Lua": 1,
+  "Random Sea Level - Lua": 1
+ }
+}

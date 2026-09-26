@@ -1,0 +1,37 @@
+﻿    mod handle 43
+    enabled in this configuration: 1 e6d8f6ba-a2bf-4f6b-ba4b-f5446f403033
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=civ6lab_mapprobe.lua size=388991850 cs=3 realism=2 majors=2 map_seed=1000 game_seed=2000 autostart=true
+    hosting
+in game {"turn": 1, "map_seed": 1000, "game_seed": 2000, "humans": 1, "minors": 3, "majors": {"0": "LEADER_TOMYRIS", "1": "LEADER_GORGO"}}
+{"tag": "h3_duel_probe_m1000_g2000", "config": "tools/civ6lab/h3_duel_probe.json", "map_seed": 1000, "game_seed": 2000, "first_draws": [15746, 25749, 13402, 16229], "state_after_first": [2063930821], "draws_before_probe": 389820, "sync_seed_now": 466740873, "map_dump": "C:\\civ6-development-calculator\\tools\\civ6lab\\runs\\h3_map_h3_duel_probe_m1000_g2000.json", "probe_entries": 5223}
+    mod handle 43
+    enabled in this configuration: 1 e6d8f6ba-a2bf-4f6b-ba4b-f5446f403033
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=civ6lab_mapprobe.lua size=388991850 cs=3 realism=2 majors=2 map_seed=1000 game_seed=4000 autostart=true
+    hosting
+in game {"turn": 1, "map_seed": 1000, "game_seed": 4000, "humans": 1, "minors": 3, "majors": {"0": "LEADER_TRAJAN", "1": "LEADER_VICTORIA"}}
+{"tag": "h3_duel_probe_m1000_g4000", "config": "tools/civ6lab/h3_duel_probe.json", "map_seed": 1000, "game_seed": 4000, "first_draws": [2281, 15746, 25749, 13402], "state_after_first": [298980412], "draws_before_probe": 389819, "sync_seed_now": -1100649959, "map_dump": "C:\\civ6-development-calculator\\tools\\civ6lab\\runs\\h3_map_h3_duel_probe_m1000_g4000.json", "probe_entries": 5222}
+-> C:\civ6-development-calculator\tools\civ6lab\runs\h3_session_20260926T134647Z.jsonl

@@ -1,0 +1,19 @@
+{"range": 65535, "value": 65338, "steps": 1, "state": 4282061300, "fits": ["hi16", "hi16_32", "hi16_r16", "mulhi"], "tag": ""}
+{"range": 65536, "value": 0, "steps": 1, "state": 3258875417, "fits": ["hi15", "hi16_r16"], "tag": ""}
+{"range": 0, "value": 0, "steps": 1, "state": 717138666, "fits": ["hi15", "hi16_r16", "mulhi"], "tag": ""}
+{"range": 65537, "value": 0, "steps": 1, "state": 676667575, "fits": ["hi15", "hi16_r16"], "tag": ""}
+{"range": 100000, "value": 5820, "steps": 1, "state": 725473936, "fits": ["hi15", "hi16_r16"], "tag": ""}
+{"range": 1000000, "value": 6720, "steps": 1, "state": 1701849925, "fits": ["hi15", "hi16_r16"], "tag": ""}
+{"range": 6, "value": 1, "steps": 1, "state": 1391808102, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mulhi"], "tag": ""}
+{"range": 11, "value": 8, "steps": 1, "state": 3226531139, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mulhi"], "tag": ""}
+{"range": 13, "value": 5, "steps": 1, "state": 1712513004, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mulhi"], "tag": ""}
+{"range": 256, "value": 38, "steps": 1, "state": 646992433, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mulhi"], "tag": ""}
+{"range": 4096, "value": 2063, "steps": 1, "state": 2164061346, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mulhi"], "tag": ""}
+{"range": 5000, "value": 2473, "steps": 1, "state": 2124444047, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mulhi"], "tag": ""}
+{"range": -1, "value": 2499, "steps": 1, "state": 163896840, "fits": ["hi15", "hi16_r16"], "tag": ""}
+{"range": -7, "value": 47879, "steps": 1, "state": 3138240221, "fits": ["hi16_r16"], "tag": ""}
+{"range": 1, "value": 0, "steps": 1, "state": 1704737182, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mod16", "mod15", "mulhi"], "tag": ""}
+{"range": 2, "value": 0, "steps": 1, "state": 2054603163, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mod16", "mulhi"], "tag": ""}
+{"range": 3, "value": 2, "steps": 1, "state": 2917486820, "fits": ["hi15", "hi16", "hi16_32", "hi16_r16", "mulhi"], "tag": ""}
+{"range": 131072, "value": 0, "steps": 1, "state": 661847369, "fits": ["hi15", "hi16_r16"], "tag": ""}
+{"range": 2147483647, "value": 6453, "steps": 1, "state": 423000410, "fits": ["hi15", "hi16_r16"], "tag": ""}
