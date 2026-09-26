@@ -98,10 +98,20 @@ saves play on after a load); a read whose turn moved is repeated twice
   `cpu/data`, exported through `rules.ts`; TS `endTurn` names the argmax with
   `TieBreakerPriority` (its direction is unread — note it from any tie); the
   GPU's `leader()` over the new score; `seat_score` stays the env reward.
-- **B-82-S2, only if S1 leaves a tie.** In `lab4_t150` place one building, one
-  district and +1 population at a time (`CreateBuilding`, `CreateDistrict`,
-  `ChangePopulation`) and read `GetCategoryScore(EMPIRE)` after each; this
-  also confirms the 5 / 2 / 1 split, which the category total alone cannot.
+- **S1's result.** Civics, techs, wonders, era score and Great People fit every
+  seat-row; Empire does not. With 5 x cities + 2 x districts + population
+  fixed by `ScoringLineItems`, no count of the buildings fits (plain, without
+  pillaged / walls / Palace, distinct types: best 48 of 242 rows), nor each
+  building's unlock era (best 33 of 242). S2 decides it.
+- **B-82-S2.** In `lab4_t150` place one building, one district and +1
+  population at a time (`score_step.lua`: the tuner's
+  `WorldBuilder.CityManager():CreateBuilding`) and read Empire after each.
+  Learned so far: the score is NOT recomputed on placement (`GetScore`
+  unchanged until a turn is processed); `GetCategoryScore` exists in InGame
+  only; an invalid placement (a Water Mill with no river) returns true and
+  places nothing, so check `HasBuilding`. So the scene is: two copies of one
+  save, the same one-turn pass, one with the placement — the Empire
+  difference is the building's worth; this also confirms the 5 / 2 / 1 split.
 
 ### B-D-S0. Does war weariness cost each city the same?
 - **Unknown.** H1 (engines): `floor(WWP/400)` in every city. H2: plus an
