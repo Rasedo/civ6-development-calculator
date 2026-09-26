@@ -352,7 +352,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     E = len(ents)
     centre = torch.tensor([int(e[0]) for e in ents], dtype=torch.long, device=dev).reshape(1, E).expand(sim.B, -1)
     pcol = torch.tensor([int(e[1]) for e in ents], dtype=torch.long, device=dev).reshape(1, E).expand(sim.B, -1)
-    nS = len(sim._scaffold) if sim.districts_on else 0
+    nS = len(sim._scaffold)
     dtile = None
     if nS:
         dtile = torch.full((sim.B, E, nS), -1, dtype=torch.long, device=dev)

@@ -740,10 +740,6 @@ export function followedReligionOf(pres: readonly number[], population: number, 
 }
 export const MISSIONARY_CAP = 2;
 export const APOSTLE_CAP = 1;
-/** Master switch for the city-attack religion adder, written and mirrored at
- * all six sites. */
-export const CITY_RELIGION_ADDER_LIVE = true;
-
 /**
  * THEOLOGICAL COMBAT. CIV6: the winner's religion gains pressure "in all
  * cities within 10 tiles" and the loser's sheds the same —
@@ -768,14 +764,3 @@ export const REMOVE_HERESY_PCT = 75;
  *  tiles" — RELIGION_SPREAD_UNIT_CAPTURE 125, the duel's 250 halved. */
 export const CONDEMN_PRESSURE_RANGE = 6;
 export const CONDEMN_PRESSURE_SWING = Math.floor(THEO_PRESSURE_SWING / 2);
-
-/**
- * Master switch for the pressure->yields coupling. LIVE: a city's
- * FOLLOWER-belief yields key on the CITY's `followedReligion`, so a city
- * following another seat's religion draws THAT religion's follower belief and
- * a city following none gets no follower-belief yields. INERT: they key on the
- * OWNER's religion instead. PANTHEON, FOUNDER and ENHANCER beliefs stay
- * per-civ either way. The lookup is `withFollowerBelief`, not `getModifiers`.
- * Mirrored to the GPU via `rules.followerCoupling`.
- */
-export const B18_FOLLOWER_COUPLING_LIVE = true;

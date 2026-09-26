@@ -3,8 +3,8 @@ import { HOLY_CITY_FOUNDING_PRESSURE_PER_POP, followedReligionOf } from '../data
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
 import { ENKIDU_WAR_CS, ENKIDU_ALLIED_WAR_DISCOUNT, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
-import { WAR_KIND_SURPRISE } from '../data/warKinds';
-import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
+import { FORMAL_WAR_MIN_TURNS, WAR_KIND_SURPRISE } from '../data/warKinds';
+import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
   VISIBILITY_CS_PER_LEVEL , CIV_LEADERS } from '../data/seats';
 import { GP_RESOURCE_REVEAL, gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';

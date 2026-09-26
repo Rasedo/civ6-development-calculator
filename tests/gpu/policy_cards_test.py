@@ -32,8 +32,6 @@ def main() -> None:
     paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    sim._gov_live = True
-    sim._gov_has_effects = True
 
     B, NC = sim.B, sim.civ_civics.shape[2]
 

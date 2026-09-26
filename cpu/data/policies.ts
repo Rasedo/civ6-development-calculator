@@ -26,12 +26,6 @@ export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
  *  own list, and the order the GPU's per-kind slot counts are packed in. */
 export const SLOT_KINDS = ['military', 'economic', 'diplomatic', 'wildcard'] as const;
 
-/** Master switch for the whole government/policy layer: adoption
- * (`seatGovernment`), the government modifier layering and the GPU's
- * per-seat modifier tables. The exporter mirrors it into
- * `rules.governmentsLive` so both engines gate on one value. */
-export const GOVERNMENTS_ADOPTION_LIVE = true;
-
 /**
  * CIV6 (Simultaneum / Rationalism / Grand Opéra / Free Market, GS): "Extra
  * <yield> from buildings in <district>: +50% if city population is 15 or

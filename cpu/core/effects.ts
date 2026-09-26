@@ -11,9 +11,9 @@ import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
-import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
+import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { alliedAtLevel, civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity, majorityReligionOf } from './seats';
 import { hexDistance } from '../../world/hex';
 import { cityGreatWorks } from './greatWorks';
@@ -1182,10 +1182,8 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
     if (rowIsFor(r, mods.civ, mods.leader)) (mods.districtAdjacencyAdd[r.district] ??= []).push({ source: r.source ?? 'DISTRICT', amount: r.amount });
   }
 
-  if (GOVERNMENTS_ADOPTION_LIVE) {
-    applyGovernment(mods, seatGovernment(state, seat), s.research, s.government.policies,
-                    congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);
-  }
+  applyGovernment(mods, seatGovernment(state, seat), s.research, s.government.policies,
+                  congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);
 
   const beliefSeat = { followers: pop, cities: cities.length };
   applyBeliefEffects(mods, rel?.pantheon ? PANTHEONS[rel.pantheon] : undefined, beliefSeat);
@@ -1820,14 +1818,6 @@ export function withFollowerBelief(
   return m;
 }
 
-function followerReligionForCity(
-  followedReligion: number | null | undefined,
-  ownerReligionId: number,
-): number {
-  if (B18_FOLLOWER_COUPLING_LIVE) return followedReligion ?? -1;
-  return ownerReligionId;
-}
-
 /**
  * The religions whose FOLLOWER belief a city pays.
  *
@@ -1843,7 +1833,7 @@ function followerReligionForCity(
  */
 export function followerReligionsForCity(base: Modifiers, city: City): readonly number[] {
   if (base.allFollowerBeliefs) return religionsPresent(city);
-  const one = followerReligionForCity(city.followedReligion, city.seat);
+  const one = city.followedReligion ?? -1;
   return one < 0 ? [] : [one];
 }
 

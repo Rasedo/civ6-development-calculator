@@ -7,7 +7,7 @@ class SimMinors:
     def _city_state_phase(self) -> None:
         if self.S == 0:
             return
-        citystate_max = int(self.rules.citystate.get("maxHp", 150))
+        citystate_max = int(self.rules.citystate["maxHp"])
         self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
         # each minor in turn — the `minorPhase` order, one minor at a time
         # because a district one minor lands may lend a neighbour's district
@@ -253,7 +253,7 @@ class SimMinors:
         mx = self._walls_tier_hp[self._minor_walls_tier(s)].long()
         outer = torch.minimum(self.city_outer_hp[:, row, 0], mx)
         enc_missing = torch.zeros_like(mx)
-        if self._encamp_didx >= 0 and self.districts_on:
+        if self._encamp_didx >= 0:
             et = self.city_dist_tile[:, row, 0, self._encamp_didx]
             e0 = et.clamp(min=0).unsqueeze(1)
             live = (et >= 0) & self.district_complete.gather(1, e0).squeeze(1)
@@ -448,7 +448,7 @@ class SimMinors:
         full = int(self._walls_tier_hp[self._walls_tier_urban])
         self.city_outer_hp[:, row, 0] = torch.where(hit, torch.full_like(self.city_outer_hp[:, row, 0], full),
                                                     self.city_outer_hp[:, row, 0])
-        if self._encamp_didx >= 0 and self.districts_on:
+        if self._encamp_didx >= 0:
             et = self.city_dist_tile[:, row, 0, self._encamp_didx]
             w = (hit & (et >= 0) & self.district_complete.gather(1, et.clamp(min=0).unsqueeze(1)).squeeze(1)
                  ).nonzero(as_tuple=True)[0]
@@ -484,7 +484,7 @@ class SimMinors:
         """[B] long — `minorCityCS`: the minor's centre strength, 15 plus its
         population, +6 for a militaristic minor, and its walls tier's adder.
         Its city's ranged strike leaves from it."""
-        mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
+        mil_idx = int(self.rules.citystate["militaristicIdx"])
         return (15 + self.citystate_pop[:, s].long()
                 + (self.citystate_type[:, s] == mil_idx).long() * 6
                 + self._walls_tier_cs[self._minor_walls_tier(s)].long())
@@ -924,8 +924,6 @@ class SimMinors:
                     halt = halt | avail
                 continue
             # a DISTRICT row: the type's district, the Harbor, the Neighborhood
-            if not self.districts_on:
-                continue
             site_s = self._minor_district_site(s)
             for dv in sorted(set(int(x) for x in item[gate].tolist())):
                 if dv < 0 or dv not in sc_map:
@@ -960,7 +958,7 @@ class SimMinors:
                 d_cost = (torch.full_like(d_fac, _b_dv) + torch.floor(_g_dv * _mprog)
                           if _g_dv > 0 else torch.floor(_b_dv * d_fac))
                 if self._log_diff:
-                    _nm = self.districts_cat[dv].get('id')
+                    _nm = self.districts_cat[dv]['id']
                     for _b in range(B):
                         if not bool(avail[_b]):
                             continue
@@ -1169,7 +1167,7 @@ class SimMinors:
         home = self.pair_dist[self.citystate_center[:, s].clamp(min=0)].long()  # [B, T]
         steps_ok = torch.where(at_war.unsqueeze(1), self._walk_steps_war.unsqueeze(0),
                                self._walk_steps_peace.unsqueeze(0))
-        hp_max = int(self.rules.combat.get("unitHp", 100))
+        hp_max = int(self.rules.combat["unitHp"])
         self._walk_units("major", 100 + s, alive,
                          lambda hp: torch.where((hp < hp_max).unsqueeze(1),
                                                 self._walk_steps_damaged.unsqueeze(0), steps_ok),
@@ -1316,7 +1314,7 @@ class SimMinors:
         mx = self._free_walls_max(j)
         outer = torch.minimum(self.city_outer_hp[:, row, j], mx)
         enc_missing = torch.zeros_like(mx)
-        if self._encamp_didx >= 0 and self.districts_on:
+        if self._encamp_didx >= 0:
             et = self.city_dist_tile[:, row, j, self._encamp_didx]
             e0 = et.clamp(min=0).unsqueeze(1)
             live = (et >= 0) & self.district_complete.gather(1, e0).squeeze(1)
@@ -1493,7 +1491,7 @@ class SimMinors:
         a minor picks is unmeasured (LAB C-38-S1), so the pick is uniform. The
         Builder stands on the plot, spends a charge and its turn, and is gone
         with its last charge (`_spend_build_charge`). No pair, no draw."""
-        if self._builder_idx < 0 or not self.improvements_on:
+        if self._builder_idx < 0:
             return
         seat = 100 + s
         mine = (self.major_unit_alive & (self.major_unit_seat == seat)
@@ -1568,14 +1566,14 @@ class SimMinors:
         requirement sits outside the compact tree (-3: the TS includes() never
         matches, so the wonder is unbuildable for every seat)."""
         wrow = self._wond_rows[wi]
-        if int(wrow.get("ut", -1)) == -3 or int(wrow.get("uc", -1)) == -3:
+        if int(wrow["ut"]) == -3 or int(wrow["uc"]) == -3:
             return None
-        if int(wrow.get("adjD", -1)) == -3:
+        if int(wrow["adjD"]) == -3:
             return None
         ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
-        if int(wrow.get("ut", -1)) >= 0:
+        if int(wrow["ut"]) >= 0:
             ok = ok & self.civ_techs[:, row, int(wrow["ut"])]
-        if int(wrow.get("uc", -1)) >= 0:
+        if int(wrow["uc"]) >= 0:
             ok = ok & self.civ_civics[:, row, int(wrow["uc"])]
         return ok
 
@@ -1601,8 +1599,8 @@ class SimMinors:
         wrow = self._wond_rows[wi]
         # ...and `canPlaceWonder` refuses a fire's plot (`fireFeature`)
         cand_w = base_ok & ((self.wok >> wi) & 1).bool() & ~self._fire_plots()
-        adjD = int(wrow.get("adjD", -1))
-        adjDB = int(wrow.get("adjDB", -1))
+        adjD = int(wrow["adjD"])
+        adjDB = int(wrow["adjDB"])
         if adjD == -2:
             cand_w = cand_w & self._wadj_plane(("ctr",), lambda: self._adj_center_count() > 0)
         elif adjD >= 0:
@@ -1610,15 +1608,15 @@ class SimMinors:
                     if adjDB >= 0
                     else self._wadj_plane(("dt", adjD), lambda: self._adj_dtype_complete(adjD)))
             cand_w = cand_w & near
-        if int(wrow.get("adjR", -1)) >= 0:
+        if int(wrow["adjR"]) >= 0:
             ri = int(wrow["adjR"])
             cand_w = cand_w & self._wadj_plane(("res", ri), lambda: self._adj_res_live(ri))
-        if int(wrow.get("adjI", -1)) >= 0:
+        if int(wrow["adjI"]) >= 0:
             ii = int(wrow["adjI"])
             cand_w = cand_w & self._wadj_plane(("imp", ii), lambda: self._adj_improvement(ii))
-        if int(wrow.get("adjCap", 0)):
+        if int(wrow["adjCap"]):
             cand_w = cand_w & self._wadj_plane(("cap", row), lambda: self._adj_capital(row))
-        if int(wrow.get("needRel", 0)):
+        if int(wrow["needRel"]):
             cand_w = cand_w & self.civ_religion_done[:, row].unsqueeze(1)
         return cand_w
 

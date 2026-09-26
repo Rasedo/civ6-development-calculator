@@ -43,11 +43,11 @@ class SimInit:
         # rules.seats.citySlots (CITY_SLOTS_PER_SEAT) so the observation head
         # and this storage cannot drift. Settling caps at maxCities; loyalty
         # flips exceed it. Empty slots are city_alive=False.
-        self.RC = int(rules.seats.get("citySlots", 24))
+        self.RC = int(rules.seats["citySlots"])
         # A city's production QUEUE is a tensor dimension: `city_current`,
         # `city_progress`, `city_cost` and `city_qtile` are dense over it, slot
         # 0 the head, -1 an empty slot. `_q_*` is the only way in or out.
-        self.QD = max(int(rules.seats.get("productionQueueMax", 1)), 1)
+        self.QD = max(int(rules.seats["productionQueueMax"]), 1)
         self.S = int(f0.get("cityStateMax", 0))
         # FOG rides the fixture (`fogOfWar`). Reveals gate on this exactly as
         # TS's revealAround gates on state.fogOfWar, so a fog-off world
@@ -90,10 +90,10 @@ class SimInit:
             ("qtile", torch.long, -1, self.QD),
             # the GREAT WORKS held, one column per layout slot (`GW_LAYOUT`):
             # object type (-1 = empty), maker, era, civilization
-            ("gw_obj", torch.long, -1, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
-            ("gw_maker", torch.long, -1, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
-            ("gw_era", torch.long, -1, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
-            ("gw_seat", torch.long, -1, max(int((rules.seats or {})["greatWorks"]["w"]), 1)),
+            ("gw_obj", torch.long, -1, max(int(rules.seats["greatWorks"]["w"]), 1)),
+            ("gw_maker", torch.long, -1, max(int(rules.seats["greatWorks"]["w"]), 1)),
+            ("gw_era", torch.long, -1, max(int(rules.seats["greatWorks"]["w"]), 1)),
+            ("gw_seat", torch.long, -1, max(int(rules.seats["greatWorks"]["w"]), 1)),
             ("bldg", torch.bool, False, max(len(rules.b_cost), 1)),
             # the members of `city_bldg` standing PILLAGED — dark until the
             # city's own queue repairs them; `_bldg_dark` folds them with the
@@ -102,7 +102,7 @@ class SimInit:
             # the game era each `_bpe_bidx` row was constructed or last
             # repaired in (`City.buildingEras`), -1 none
             ("bldg_era", torch.long, -1, max(self._bpe_n, 1)),
-            ("gp_perm", dtype, 0, max(len((rules.seats or {}).get("gpCityPermKeys", [])), 1)),
+            ("gp_perm", dtype, 0, max(len(rules.seats["gpCityPermKeys"]), 1)),
         ):
             _shape = (B, self.CITY_ROWS, _rcp) + ((_ex,) if _ex else ())
             setattr(self, f"city_{_k}", torch.full(_shape, _rf, dtype=_dt, device=device))
@@ -136,7 +136,7 @@ class SimInit:
         # target space must agree with `LUXURY_IDS.length` even when the last
         # luxury never spawned on any map in the batch.
         self._n_lux = int(rules.improvements["nLuxuries"])
-        self._lux_k = int((rules.improvements or {}).get("luxAmenityCities", 4))
+        self._lux_k = int(rules.improvements["luxAmenityCities"])
         self.camp_ok = torch.tensor([[t["camp"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # TRIBAL VILLAGES — MUTABLE: a village is claimed and gone, and
         # `camp_ok` deliberately does NOT bake it, so every camp-placement read
@@ -278,7 +278,7 @@ class SimInit:
         self._alloc_war(B, self.n_majors, s_pad, device)
         # Siege hit points (attackCityState) — the TS `cs.hp` twin.
         self.citystate_hp = self.city_hp[:, _m0:_m0 + s_pad, 0]
-        self.citystate_hp.fill_(int(rules.citystate.get("maxHp", 150)))
+        self.citystate_hp.fill_(int(rules.citystate["maxHp"]))
         self.register_alias("citystate_hp", lambda sim: sim.city_hp[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         # `war_turns[b, i, j]` is how long i and j have been at war — one cell
         # per WAR, symmetric like the matrix it counts, because that is what
@@ -301,12 +301,12 @@ class SimInit:
         # `conquest_turns[b, row]` is the WARLORD'S THRONE window: turns of
         # empire-wide bonus production still to run after a capture.
         self.conquest_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
-        citystate_yidx = rules.citystate.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
+        citystate_yidx = rules.citystate["typeYieldIdx"]
         self._cs_type_n = len(citystate_yidx)  # CITY_STATE_TYPES' width
         self._citystate_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
-        citystate_didx = rules.citystate.get("typeDistrictIdx", [0, 2, 3, 5, 6, 1])  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
+        citystate_didx = rules.citystate["typeDistrictIdx"]  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] district each CS boosts at 3/6 envoys
-        self._citystate_district_bonus = float(rules.citystate.get("districtBonus", 2))  # per-district amount at each of the 3-/6-envoy thresholds
+        self._citystate_district_bonus = float(rules.citystate["districtBonus"])  # per-district amount at each of the 3-/6-envoy thresholds
         # CIV6 (Rise and Fall): the 3-/6-envoy bonus lands on the type's
         # TIER-1 / TIER-2 building rows — either member of an exclusive pair
         # (a city holds at most one); -1 pads the narrower types. Constant,
@@ -375,7 +375,7 @@ class SimInit:
             [list(x) + [-1] * (_pbw - len(x)) for x in _pb], dtype=torch.long, device=device)
         self._suz_bonus_amen = int(_suz["bonusAmenities"])
         rr = rules.seats
-        n_gp = len(rr.get("gpClassDistrict", [])) or 5
+        n_gp = len(rr["gpClassDistrict"]) or 5
 
         # City slots append at last-alive+1 (order-preserving) and compact at
         # the step end whenever any major row holds a hole, so the layout is
@@ -579,13 +579,12 @@ class SimInit:
         # entered — the per-civ threshold drift's memory.
         self.dark_ages = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.golden_ages = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
-        self.ded_picks = torch.full((B, self.n_majors, max(int(rules.eras.get("heroicDedications", 3)), 1)), -1, dtype=torch.long, device=device)
+        self.ded_picks = torch.full((B, self.n_majors, max(int(rules.eras["heroicDedications"]), 1)), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             esi = f.get("eraScoreInit", [])
             for c, v in enumerate(esi[: self.n_majors]):
                 self.era_score[b, c] = int(v)
         _er = rules.eras
-        self._formal_war_min = int(rules.seats.get("formalWarMinTurns", 5))
         self._agreement_turns = int(rules.seats["agreementTurns"])
         self._alliance_civic = int(rules.seats["allianceCivic"])
         self._open_borders_civic = int(rules.seats["openBordersCivic"])
@@ -703,8 +702,8 @@ class SimInit:
         # the Aid Request: TRIGGERED, never on the ballot — the ballot's target
         # space is the VOTED rows, which the catalog keeps first
         self._comp_aid = _cids.index("AID_REQUEST") if "AID_REQUEST" in _cids else -1
-        self._comp_voted_n = sum(1 for c in self._comps if not int(c.get("triggered", 0)))
-        assert all(int(c.get("triggered", 0)) == 0 for c in self._comps[:self._comp_voted_n]), "a triggered competition must sit LAST"
+        self._comp_voted_n = sum(1 for c in self._comps if not int(c["triggered"]))
+        assert all(int(c["triggered"]) == 0 for c in self._comps[:self._comp_voted_n]), "a triggered competition must sit LAST"
         # ONE <EmergencyScoreSources> table per competition, as [kind, amount,
         # of] rows: kind indexes the SCORE_* constants, `of` names the Great
         # Person class / project / building / district the kind reads, and -1
@@ -722,9 +721,9 @@ class SimInit:
         self._emg_slots = int(_er2["emergencySlots"])
         self._special_slot = 3  # the special session's slot in the vote head
         # a Deforestation Treaty target `k` is the tile feature `_congress_feat[k]`
-        self._congress_feat = [int(x) for x in _er2.get("congressFeatures", [])]
+        self._congress_feat = [int(x) for x in _er2["congressFeatures"]]
         # the terrains the Lighthouse pays its food on
-        self._coast_food_terr = [int(x) for x in _er2.get("coastFoodTerrains", [])]
+        self._coast_food_terr = [int(x) for x in _er2["coastFoodTerrains"]]
         self._loyalty_max = float(rules.seats["loyaltyMax"])
         self._special_cost = float(_er2["specialSessionCost"])
         self._special_gap = int(_er2["specialSessionGap"])
@@ -742,7 +741,7 @@ class SimInit:
         self._c_grow_b = float(_er2["congressGrowthB"])
         self._c_mig_loy = float(_er2["congressMigLoyalty"])
         self._c_gw_mult = int(_er2["congressGwMult"])
-        self._era_len = int(_er.get("length", 50))
+        self._era_len = int(_er["length"])
         self._era_count = int(_er["count"])
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
         self._era_moment_min = int(_er["momentMin"])
@@ -768,7 +767,7 @@ class SimInit:
         self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er["darkT"])    # GlobalParameters DARK_AGE_SCORE_BASE_THRESHOLD
         self._era_gold = int(_er["goldenT"])  # GOLDEN_AGE_SCORE_BASE_THRESHOLD
-        self._age_step = int(_er.get("agePrevStep", 5))
+        self._age_step = int(_er["agePrevStep"])
         self._age_pressure = torch.tensor([float(x) for x in _er["agePressure"]], dtype=torch.float64, device=device)
         # CIV6 (the Loyalty pedia): each citizen's base pressure and a capital's extra
         self._citizen_press_base = float(rules.seats["citizenPressureBase"])
@@ -786,7 +785,7 @@ class SimInit:
                                           dtype=torch.bool, device=device)
         self._gov_base_promo = torch.tensor([int(g["base"]) for g in _gv] or [0],
                                             dtype=torch.long, device=device)
-        self._gov_title_civics = torch.tensor(_er.get("governorTitleCivics", []) or [-1],
+        self._gov_title_civics = torch.tensor(_er["governorTitleCivics"] or [-1],
                                               dtype=torch.long, device=device)
         self._gov_neutralize = int(_er["governorNeutralizeTurns"])
         self._gov_doctrine_favor = int(_er["governanceDoctrineFavor"])
@@ -821,21 +820,20 @@ class SimInit:
         # gate on the version bump `_governor_phase` owes that cache.
         self._gov_appeal_any = bool(
             self._gpromo and float(self._gpromo["appealNearFeature"].abs().sum()) > 0)
-        self._water_works_housing = int(_er.get("waterWorksHousing", 2))
-        self._water_works_amenities = int(_er.get("waterWorksAmenities", 1))
-        self._ded_payouts_live = bool(_er.get("dedicationPayoutsLive", False))
-        self._ded_monumentality = int(_er.get("dedMonumentality", 0))
-        self._ded_free_inquiry = int(_er.get("dedFreeInquiry", 1))
-        self._ded_pen_brush = int(_er.get("dedPenBrush", 2))
+        self._water_works_housing = int(_er["waterWorksHousing"])
+        self._water_works_amenities = int(_er["waterWorksAmenities"])
+        self._ded_monumentality = int(_er["dedMonumentality"])
+        self._ded_free_inquiry = int(_er["dedFreeInquiry"])
+        self._ded_pen_brush = int(_er["dedPenBrush"])
         # +Movement from MONUMENTALITY (Builders) / EXODUS (Missionaries,
         # Apostles). Defaults to 0 so a stale rules.json fails LOUDLY at the
         # parity gate instead of quietly disagreeing with TS.
-        self._golden_move = int(_er.get("goldenMoveBonus", 0))
-        self._ded_exodus = int(_er.get("dedExodus", 3))
-        self._heroic_ded = int(_er.get("heroicDedications", 3))
-        self._ded_event_score = [int(x) for x in _er.get("dedEventScore", [1, 1, 1, 2])]
+        self._golden_move = int(_er["goldenMoveBonus"])
+        self._ded_exodus = int(_er["dedExodus"])
+        self._heroic_ded = int(_er["heroicDedications"])
+        self._ded_event_score = [int(x) for x in _er["dedEventScore"]]
         self._n_ded = len(self._ded_event_score)
-        self._gov_loy = float(_er.get("governorLoyalty", 8))
+        self._gov_loy = float(_er["governorLoyalty"])
         self._ded_to_arms = int(_er["dedToArms"])
         self._ded_dracones = int(_er["dedDracones"])
         self._ded_coinage = int(_er["dedCoinage"])
@@ -937,7 +935,7 @@ class SimInit:
         # Civ-city district registry [.., nD]: the tile of each placed district
         # type, -1 = none. A queued district already occupies its column, so it
         # counts toward the cap and the one-per-type rule (city.districts in TS).
-        nd_b4 = max(len(rules.districts or []), 1)
+        nd_b4 = max(len(rules.districts), 1)
         # ... spanning the MINOR rows too: a city-state's one city keeps its
         # district registry at [:, n_majors+s, 0] like every other city fact.
         self.city_dist_tile = torch.full((B, self.CITY_ROWS, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
@@ -962,7 +960,7 @@ class SimInit:
         # which is the `capitalTile ?? -1` the digest compares against and the
         # missing capital `dominationWinner` refuses to name a winner over.
         self.civ_cap_tile = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
-        k_routes = 1 + int(self.rules.seats.get("maxCities", 6)) + 2 + max(int(self.S), 0) + 2
+        k_routes = 1 + int(self.rules.seats["maxCities"]) + 2 + max(int(self.S), 0) + 2
         self.seat_routes = torch.full((B, self.NS, k_routes, 2), -1, dtype=torch.long, device=device)
         # An INTERNATIONAL leg's destination, keyed the way TS keys it: the
         # (seat, city id) pair, not a tile. A city id is only unique WITHIN a
@@ -981,7 +979,7 @@ class SimInit:
         # route rides through, walk order, -1-padded — `routeChain` computes it
         # ONCE at commit on both engines, the pass-through gold reads it every
         # turn, and a freed slot is wiped at its next commit.
-        self._route_chain_max = max(int(self.rules.seats.get("routeChainMax", 6)), 1)
+        self._route_chain_max = max(int(self.rules.seats["routeChainMax"]), 1)
         self.seat_route_chain = torch.full(
             (B, self.NS, k_routes, self._route_chain_max), -1,
             dtype=torch.long, device=device)
@@ -1145,8 +1143,8 @@ class SimInit:
         # pantheon count above is the race's gate mirror). Ids are -1 until
         # claimed; effects gather rows id+1 from tables whose row 0 is the
         # neutral pad (zeros for adds, ones for multipliers).
-        _bl = rules.beliefs or {}
-        self.pan_claimed = torch.zeros(B, max(len(_bl.get("pantheons", [])), 1), dtype=torch.bool, device=device)
+        _bl = rules.beliefs
+        self.pan_claimed = torch.zeros(B, max(len(_bl["pantheons"]), 1), dtype=torch.bool, device=device)
         # a RELIGION's classes in `BELIEF_CLASSES` order — Follower, Worship,
         # Founder, Enhancer — each its catalog's size and its claim mask
         self._bel_class_n = [len(_bl["followers"]), int(_bl["worshipPool"]), len(_bl["founders"]), len(_bl["enhancers"])]
@@ -1154,7 +1152,7 @@ class SimInit:
         self.wor_claimed = torch.zeros(B, max(self._bel_class_n[1], 1), dtype=torch.bool, device=device)
         self.fou_claimed = torch.zeros(B, max(self._bel_class_n[2], 1), dtype=torch.bool, device=device)
         self.enh_claimed = torch.zeros(B, max(self._bel_class_n[3], 1), dtype=torch.bool, device=device)
-        self._enh_any = len(_bl.get("enhancers", [])) > 0
+        self._enh_any = len(_bl["enhancers"]) > 0
         # Religious pressure spread. A religion is indexed by the MAJOR SEAT
         # that founded it, so there are exactly `n_majors` of them and group g
         # IS seat g. holy_tile[:, g] = religion g's frozen holy tile (its
@@ -1162,7 +1160,7 @@ class SimInit:
         # accumulators and the followed religion id (-1 = none) live on the city
         # block below. Dead/absent slots are zeroed each turn, mirroring the TS
         # fresh-object reset on founding/flip.
-        self._pressure_range = int(rr.get("pressureRange", 10))  # a following city's spread radius
+        self._pressure_range = int(rr["pressureRange"])  # a following city's spread radius
         # CIV6 (GlobalParameters, the RELIGION_SPREAD_* rows): what one following
         # city presses per turn, the Holy City's and a Holy Site city's steps,
         # the atheism baseline per citizen and the Holy City's founding grant
@@ -1173,10 +1171,6 @@ class SimInit:
         self._holy_founding_per_pop = int(rr["holyCityFoundingPerPop"])
         self._route_dest_pressure = float(rr["routeDestPressure"])
         self._route_origin_pressure = float(rr["routeOriginPressure"])
-        # pressure -> yields coupling. True: a city's FOLLOWER-belief yields key
-        # on its own followedReligion (city_followed). False: on the owning
-        # seat's religion.
-        self._b18_couple = bool(rr.get("followerCoupling", False))
         self.holy_tile = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
         # ONE religion plane pair over every seat row, matching TS's single
         # `allCities(state)` loop over one religionPressure field.
@@ -1213,7 +1207,7 @@ class SimInit:
         self.city_spy_sources = torch.zeros(B, self.CITY_ROWS, civ_city_pad, self.n_majors, dtype=torch.long, device=device)
         self.city_followed = torch.full((B, self.CITY_ROWS, civ_city_pad), -1, dtype=torch.long, device=device)
         self._bel = {}
-        for _pool, _rows in (("pan", _bl.get("pantheons", [])), ("fol", _bl.get("followers", [])), ("fou", _bl.get("founders", []))):
+        for _pool, _rows in (("pan", _bl["pantheons"]), ("fol", _bl["followers"]), ("fou", _bl["founders"])):
             _nf = len(_rows[0]["featY"]) if _rows else 1
             _nb = len(_rows[0]["bldgY"]) if _rows else 1
             _ng = len(_rows[0]["gpp"]) if _rows else 1
@@ -1226,7 +1220,7 @@ class SimInit:
                 "bldgH": torch.tensor([[0.0] * _nb] + [x["bldgH"] for x in _rows], dtype=torch.float64, device=device),
                 # CIV6 (Religious Community, GS): gold per worship building on an
                 # international route out of a following ORIGIN city
-                "intlWorship": torch.tensor([0.0] + [float(x.get("intlWorship", 0)) for x in _rows], dtype=torch.float64, device=device),
+                "intlWorship": torch.tensor([0.0] + [float(x["intlWorship"]) for x in _rows], dtype=torch.float64, device=device),
                 "border": torch.tensor([1.0] + [x["border"] for x in _rows], dtype=torch.float64, device=device),
                 "growth": torch.tensor([1.0] + [x["growth"] for x in _rows], dtype=torch.float64, device=device),
                 "gpp": torch.tensor([[0] * _ng] + [x["gpp"] for x in _rows], dtype=torch.long, device=device),
@@ -1238,10 +1232,10 @@ class SimInit:
                 # Lay Ministry [district, 6] and Sacred Places [6]
                 "perD": torch.tensor([[[0.0] * 6] * _nad] + [x["perD"] for x in _rows], dtype=torch.float64, device=device),
                 "perW": torch.tensor([[0.0] * 6] + [x["perW"] for x in _rows], dtype=torch.float64, device=device),
-                "impRes": torch.tensor([[[0.0] * 6] * 4] + [x.get("impRes", [[0.0] * 6] * 4) for x in _rows], dtype=torch.float64, device=device),
-                "fpw": torch.tensor([0.0] + [float(x.get("fpw", 0)) for x in _rows], dtype=torch.float64, device=device),
+                "impRes": torch.tensor([[[0.0] * 6] * 4] + [x["impRes"] for x in _rows], dtype=torch.float64, device=device),
+                "fpw": torch.tensor([0.0] + [float(x["fpw"]) for x in _rows], dtype=torch.float64, device=device),
                 "impY": torch.tensor(
-                    [[[0.0] * 6] * _ni] + [x.get("impY", [[0.0] * 6] * _ni) for x in _rows],
+                    [[[0.0] * 6] * _ni] + [x["impY"] for x in _rows],
                     dtype=torch.float64, device=device,
                 ),
                 # the ADJACENCY a belief hands a district type, [district,
@@ -1256,9 +1250,9 @@ class SimInit:
         # it is neither. `_district_adj_raw` reads the district catalog's own
         # sources off the static export; a BELIEF names one the export never
         # counted, so those are counted live from these two tables.
-        self._adj_src_feat = [int(x) for x in _bl.get("adjSrcFeat", [])]
-        self._adj_src_terr = [int(x) for x in _bl.get("adjSrcTerr", [])]
-        self._adj_src_names = [str(x) for x in _bl.get("adjSrcNames", [])]
+        self._adj_src_feat = [int(x) for x in _bl["adjSrcFeat"]]
+        self._adj_src_terr = [int(x) for x in _bl["adjSrcTerr"]]
+        self._adj_src_names = [str(x) for x in _bl["adjSrcNames"]]
         # ...and the sources any belief row actually names, per district type.
         self._bel_adj_srcs: dict[int, list[int]] = {}
         if self._bel_any:
@@ -1270,7 +1264,7 @@ class SimInit:
                 assert self._adj_src_feat[_s] >= 0 or self._adj_src_terr[_s] >= 0, (
                     f"a belief hands district {_di} adjacency source {_s}, which names "
                     "neither a feature nor a terrain — _adj_src_count cannot count it")
-        _erows = _bl.get("enhancers", [])
+        _erows = _bl["enhancers"]
         # The missionary chassis anchors + per-enhancer channels. The exporter
         # pre-rounds mlump to an INTEGER (Math.round on the TS side), so both
         # engines read the identical value; the pad row (index 0 = no enhancer)
@@ -1278,41 +1272,40 @@ class SimInit:
         # pads of the other channels. The PRICE itself is `_unit_faith_cost`,
         # which charges the progression before this discount.
         _mlump0 = int(_bl["spreadPressure"])
-        self._missionary_idx = int(_bl.get("missionaryIdx", -1))
-        self._missionary_cap = int(_bl.get("missionaryCap", 2))
-        self._apostle_idx = int(_bl.get("apostleIdx", -1))
-        self._apostle_cap = int(_bl.get("apostleCap", 1))
-        self._inquisitor_idx = int(_bl.get("inquisitorIdx", -1))
-        self._inquisitor_cap = int(_bl.get("inquisitorCap", 2))
-        self._monk_idx = int(_bl.get("warriorMonkIdx", -1))
-        self._monk_follower = int(_bl.get("warriorMonkFollower", -1))
-        self._inquisitor_home_strength = int(_bl.get("inquisitorHomeStrength", 35))
-        self._remove_heresy_pct = int(_bl.get("removeHeresyPct", 75))
-        self._launch_inquisition_charges = int(_bl.get("launchInquisitionCharges", 3))
+        self._missionary_idx = int(_bl["missionaryIdx"])
+        self._missionary_cap = int(_bl["missionaryCap"])
+        self._apostle_idx = int(_bl["apostleIdx"])
+        self._apostle_cap = int(_bl["apostleCap"])
+        self._inquisitor_idx = int(_bl["inquisitorIdx"])
+        self._inquisitor_cap = int(_bl["inquisitorCap"])
+        self._monk_idx = int(_bl["warriorMonkIdx"])
+        self._monk_follower = int(_bl["warriorMonkFollower"])
+        self._inquisitor_home_strength = int(_bl["inquisitorHomeStrength"])
+        self._remove_heresy_pct = int(_bl["removeHeresyPct"])
+        self._launch_inquisition_charges = int(_bl["launchInquisitionCharges"])
         # CIV6 (RELIGION_INITIAL_BELIEFS): the beliefs a founding earns; each
         # Evangelize Belief earns one more
         self._religion_initial_beliefs = int(_bl["religionInitialBeliefs"])
         # CIV6 (GreatPersonClasses): the Great Prophet's MaxPlayerInstances
         self._prophet_max = int(_bl["prophetMaxPlayerInstances"])
-        self._condemn_range = int(_bl.get("condemnPressureRange", 6))
-        self._condemn_swing = int(_bl.get("condemnPressureSwing", 7))
-        _rs = _bl.get("relStrength") or []
+        self._condemn_range = int(_bl["condemnPressureRange"])
+        self._condemn_swing = int(_bl["condemnPressureSwing"])
+        _rs = _bl["relStrength"] or []
         self._rel_strength = torch.tensor(list(_rs) + [0] * 64, dtype=torch.long, device=device)
-        self._city_rel_live = bool(_bl.get("cityReligionAdderLive", False))
-        self._theo_swing = float(_bl.get("theoPressureSwing", 15))
-        self._theo_range = int(_bl.get("theoPressureRange", 6))
-        self._relig_heal_per_faith = int(_bl.get("religiousHealPerFaith", 3))
-        self._theo_holy_ground = int(_bl.get("theoHolyGround", 5))
-        self._theo_holy_city = int(_bl.get("theoHolyCity", 15))
+        self._theo_swing = float(_bl["theoPressureSwing"])
+        self._theo_range = int(_bl["theoPressureRange"])
+        self._relig_heal_per_faith = int(_bl["religiousHealPerFaith"])
+        self._theo_holy_ground = int(_bl["theoHolyGround"])
+        self._theo_holy_city = int(_bl["theoHolyCity"])
         self._enh = {
-            "presR": torch.tensor([0.0] + [float(x.get("presR", 0)) for x in _erows], dtype=torch.float64, device=device),
-            "tradeRel": torch.tensor([[0.0] * 6] + [list(x.get("tradeRel", [0.0] * 6)) for x in _erows], dtype=torch.float64, device=device),
-            "cnear": torch.tensor([0.0] + [float(x.get("cnear", 0)) for x in _erows], dtype=torch.float64, device=device),
-            "cdef": torch.tensor([0.0] + [float(x.get("cdef", 0)) for x in _erows], dtype=torch.float64, device=device),
-            "cvs": torch.tensor([0.0] + [float(x.get("cvs", 0)) for x in _erows], dtype=torch.float64, device=device),
-            "mchg": torch.tensor([0] + [int(x.get("mchg", 0)) for x in _erows], dtype=torch.long, device=device),
-            "mlump": torch.tensor([_mlump0] + [int(x.get("mlump", _mlump0)) for x in _erows], dtype=torch.long, device=device),
-            "mcostMult": torch.tensor([1.0] + [float(x.get("mcostMult", 1.0)) for x in _erows], dtype=torch.float64, device=device),
+            "presR": torch.tensor([0.0] + [float(x["presR"]) for x in _erows], dtype=torch.float64, device=device),
+            "tradeRel": torch.tensor([[0.0] * 6] + [list(x["tradeRel"]) for x in _erows], dtype=torch.float64, device=device),
+            "cnear": torch.tensor([0.0] + [float(x["cnear"]) for x in _erows], dtype=torch.float64, device=device),
+            "cdef": torch.tensor([0.0] + [float(x["cdef"]) for x in _erows], dtype=torch.float64, device=device),
+            "cvs": torch.tensor([0.0] + [float(x["cvs"]) for x in _erows], dtype=torch.float64, device=device),
+            "mchg": torch.tensor([0] + [int(x["mchg"]) for x in _erows], dtype=torch.long, device=device),
+            "mlump": torch.tensor([_mlump0] + [int(x["mlump"]) for x in _erows], dtype=torch.long, device=device),
+            "mcostMult": torch.tensor([1.0] + [float(x["mcostMult"]) for x in _erows], dtype=torch.float64, device=device),
             # Missionary Zeal, Monastic Isolation's kept percent, Holy Waters
             "zeal": torch.tensor([0] + [int(x["zeal"]) for x in _erows], dtype=torch.long, device=device),
             "theoKeep": torch.tensor([0] + [int(x["theoKeep"]) for x in _erows], dtype=torch.long, device=device),
@@ -1322,25 +1315,25 @@ class SimInit:
         self._enh_zeal_any = bool((self._enh["zeal"] != 0).any())
         self._enh_theo_any = bool((self._enh["theoKeep"] != 0).any())
         self._enh_hw_any = bool((self._enh["hwHeal"] != 0).any())
-        self._just_war_range = int(_bl.get("justWarRange", 3))
+        self._just_war_range = int(rules.seats["justWarRange"])
         self._enh_combat_any = bool((self._enh["cnear"] != 0).any() or (self._enh["cdef"] != 0).any() or (self._enh["cvs"] != 0).any())
         self._rel_planes_cache = None  # ((turn, _eff_version), (near3 [B,O,T], terr [B,O,T]))
         # Projects — rows {d: district idx, y: yield col, g: GP class}
-        _pj = rules.projects or {}
-        self._proj_rows = list(_pj.get("rows", []))
-        self._proj_didx = torch.tensor([int(p.get("d", -1)) for p in self._proj_rows]
+        _pj = rules.projects
+        self._proj_rows = list(_pj["rows"])
+        self._proj_didx = torch.tensor([int(p["d"]) for p in self._proj_rows]
                                        or [-1], dtype=torch.long, device=device)
         # a civilization-UNIQUE row: [civ, leaderRow] like every roster row
         # (-1/-1 for everyone's), and the row that moves the ORIGINAL capital
         # on completion (`ProjectDef.civ` / `.leader` / `.movesCapital`)
         self._proj_seat_rows: list[tuple[int, int]] = [
-            (int(p.get("cv", -1)), int(p.get("ld", -1))) for p in self._proj_rows]
-        self._proj_move_cap = {i for i, p in enumerate(self._proj_rows) if int(p.get("mc", 0))}
+            (int(p["cv"]), int(p["ld"])) for p in self._proj_rows]
+        self._proj_move_cap = {i for i, p in enumerate(self._proj_rows) if int(p["mc"])}
         # each row's yield conversion (`yieldPct`, 0 for none) and the rows
         # that power their city while they head its queue (`fullyPowered`)
         self._proj_yp = [int(p["yp"]) for p in self._proj_rows]
         self._proj_fp = [i for i, p in enumerate(self._proj_rows) if int(p["fp"])]
-        self._proj_gf = float(_pj.get("gppFraction", 0.22))
+        self._proj_gf = float(_pj["gppFraction"])
         # The space-race chain. Space rows carry sp/vic flags (+ rt tech gate,
         # rp previous-step link) and sit LAST in the projects table, in chain
         # order. space_proj_idx = the projects-table rows that are space steps;
@@ -1350,7 +1343,7 @@ class SimInit:
         self._once_proj_idx = [i for i, row in enumerate(self._proj_rows) if int(row["one"])]
         self._n_once = len(self._once_proj_idx)
         self._once_step = {pi: k for k, pi in enumerate(self._once_proj_idx)}
-        self._once_victory_idx = {i for i in self._once_proj_idx if int(self._proj_rows[i].get("vic", 0))}
+        self._once_victory_idx = {i for i in self._once_proj_idx if int(self._proj_rows[i]["vic"])}
         # the SPACE-RACE subset, which is what a Great Engineer's space
         # production acts on — a one-time project elsewhere is not one.
         self._space_proj_idx = [i for i, row in enumerate(self._proj_rows) if int(row["spc"])]
@@ -1364,15 +1357,15 @@ class SimInit:
         # ORBITAL one (`orb`) pays unconditionally; the terrestrial one draws
         # `laser_power_load` from the city it stands in and pays only while
         # that city is powered — cpu/data/projects.ts.
-        self._laser_proj_idx = {i for i, row in enumerate(self._proj_rows) if int(row.get("ls", 0))}
-        self._orbital_proj_idx = {i for i in self._laser_proj_idx if int(self._proj_rows[i].get("orb", 0))}
+        self._laser_proj_idx = {i for i, row in enumerate(self._proj_rows) if int(row["ls"])}
+        self._orbital_proj_idx = {i for i in self._laser_proj_idx if int(self._proj_rows[i]["orb"])}
         # The REPAIR row, whose production pays the perimeter as it accrues.
         self._repair_proj_idx = next(
-            (i for i, row in enumerate(self._proj_rows) if int(row.get("rep", 0))), -1)
-        _wd = rules.wonders or {}
-        self._wond_rows = list(_wd.get("rows", []))
+            (i for i, row in enumerate(self._proj_rows) if int(row["rep"])), -1)
+        _wd = rules.wonders
+        self._wond_rows = list(_wd["rows"])
         self._wond_n = len(self._wond_rows)
-        self._fp_fid = int(_wd.get("fpFid", -1))
+        self._fp_fid = int(_wd["fpFid"])
         self.built_wonder = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.built_wonder_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.city_wonder = torch.full((B, self.CITY_ROWS, civ_city_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
@@ -1391,20 +1384,20 @@ class SimInit:
             # ...and the ones a wonder pays only to the city that holds it.
             self._wond_cityamen = torch.tensor([float(w["cityAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_cityhouse = torch.tensor([float(w["cityHousing"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
-            self._wond_faithflood = torch.tensor([float(w.get("faithPerFlood", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            self._wond_faithflood = torch.tensor([float(w["faithPerFlood"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
-            self._wond_grant_unit = torch.tensor([int(w.get("grantUnit", -1)) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] unit granted FREE at completion
+            self._wond_grant_unit = torch.tensor([int(w["grantUnit"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] unit granted FREE at completion
             self._wond_bonusres_gold = torch.tensor([float(w["bonusResRouteGold"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] gold per bonus resource on outgoing routes
             self._wond_routes_sci = torch.tensor([float(w["routesToSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] science per route TO the city
             self._wond_routes_faithdom = torch.tensor([float(w["routesToFaithDom"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] faith per own DOMESTIC route to it
             self._wond_sender_sci = torch.tensor([float(w["routesToSenderSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] the foreign SENDER's science
             self._wond_sender_gold = torch.tensor([float(w["routesToSenderGold"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] ...and gold
-            self._wond_grant_prophet = torch.tensor([bool(w.get("grantProphet", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
-            self._wond_rival_sci = torch.tensor([bool(w.get("rivalSciBoost", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
-            self._wond_religion_site = torch.tensor([bool(w.get("religionSite", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_grant_prophet = torch.tensor([bool(w["grantProphet"]) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_rival_sci = torch.tensor([bool(w["rivalSciBoost"]) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_religion_site = torch.tensor([bool(w["religionSite"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             # CIV6 (Biosphere): every renewable Power source the seat holds pays
             # `_biosphere_mult` times its published figure.
-            self._wond_renew_power = torch.tensor([bool(w.get("renewablePower", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_renew_power = torch.tensor([bool(w["renewablePower"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             # Policy slots [nW, 4] in SLOT_KINDS order (military, economic,
             # diplomatic, wildcard) — the counts `_gov_policy_mods` adds.
             self._wond_slots = torch.tensor([list(w["slots"]) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -1432,17 +1425,17 @@ class SimInit:
             self._wond_boost_era = torch.tensor([int(w["boostTechEra"]) for w in self._wond_rows], dtype=torch.long, device=device)
             # Oracle: what each of the holding city's districts adds to its own class.
             self._wond_distgpp = torch.tensor([float(w["distGpp"]) for w in self._wond_rows], dtype=torch.float64, device=device)
-            self._wond_patron = torch.tensor([float(w.get("patronPct", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)
+            self._wond_patron = torch.tensor([float(w["patronPct"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_envoy = torch.tensor([int(w["envoysPerWonder"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_spread = torch.tensor([int(w["spreadCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_build_ch = torch.tensor([int(w["buildCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
-            self._wond_eng_ch = torch.tensor([int(w.get("engineerCharges", 0)) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_eng_ch = torch.tensor([int(w["engineerCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_martyr = torch.tensor([bool(w["apostleMartyr"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_floodmit = torch.tensor([bool(w["floodMitigation"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_dupnaval = torch.tensor([bool(w["dupNaval"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_relictour = torch.tensor([float(w["relicTourismMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_resorttour = torch.tensor([float(w["resortTourismMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
-            self._wond_holy_shield = torch.tensor([bool(w.get("holyShield", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_holy_shield = torch.tensor([bool(w["holyShield"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_loyalty = torch.tensor([int(w["loyaltyAura"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_occdef = torch.tensor([int(w["occupyDefense"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_freeciv = torch.tensor([int(w["freeCivics"]) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -1494,34 +1487,34 @@ class SimInit:
                     self.city_alive[b, row, j] = True
                     self.city_center[b, row, j] = rc["center"]
                     self.city_pop[b, row, j] = rc["pop"]
-                    self.city_hp[b, row, j] = rr.get("cityMaxHp", 200)
+                    self.city_hp[b, row, j] = rr["cityMaxHp"]
                     self.city_id[b, row, j] = rc["id"]
                     self.centre_slot_at[b, rc["center"]] = j
                 self.civ_next_city_id[b, row] = len(cv.get("cities", []))
         # [person era, eras the world is BEHIND that person] -> GPP price,
         # floored by the exporter so both engines read the same doubles.
         self._gp_cost_table = torch.tensor(
-            rr.get("gpCostTable", [[60] * 9] * 9), dtype=torch.float64, device=device)
-        self._gp_roster = torch.tensor(rr.get("gpRoster", [4, 4, 4, 4, 4]), dtype=torch.long, device=device)
+            rr["gpCostTable"], dtype=torch.float64, device=device)
+        self._gp_roster = torch.tensor(rr["gpRoster"], dtype=torch.long, device=device)
         # who is CLAIMED, per (class, roster position) — the draw pool's
         # complement (`GameState.claimedGreatPeople`)
         self.gp_claimed = torch.zeros(B, n_gp, int(self._gp_roster.max()) if self._gp_roster.numel() else 1,
                                       dtype=torch.bool, device=device)
         self._gp_flat_cost = torch.tensor(
-            rr.get("gpFlatCost", [0] * n_gp), dtype=torch.bool, device=device)
-        gp_cd = rr.get("gpClassDistrict", [])
+            rr["gpFlatCost"], dtype=torch.bool, device=device)
+        gp_cd = rr["gpClassDistrict"]
         self._gp_class_district = torch.tensor(gp_cd if gp_cd else [-1] * n_gp, dtype=torch.long, device=device)
         # THE PERSON'S OWN ROW. `gpFx` names the dense columns and the two
         # permanent runs ride its tail, so nothing here writes a position down.
-        self._gp_fx_names = list(rr.get("gpFx", []))
-        self._gp_perm_names = list(rr.get("gpPermKeys", []))
-        self._gp_city_perm_names = list(rr.get("gpCityPermKeys", []))
+        self._gp_fx_names = list(rr["gpFx"])
+        self._gp_perm_names = list(rr["gpPermKeys"])
+        self._gp_city_perm_names = list(rr["gpCityPermKeys"])
         # ...and the per-TILE run (Tesla's / Paxton's district), the third tail
-        self._gp_tile_perm_names = list(rr.get("gpTilePermKeys", []))
+        self._gp_tile_perm_names = list(rr["gpTilePermKeys"])
         # CIV6 (Kenzo Tange): adjacency-as-tourism percent per yield, wire order
-        self._gp_adj_tour_pct = [int(x) for x in rr.get("gpAdjTourismPct", [0] * 6)]
+        self._gp_adj_tour_pct = [int(x) for x in rr["gpAdjTourismPct"]]
         # CIV6 (World Games): (perm index, building index, district index) per row
-        self._gp_building_tourism = [tuple(int(x) for x in r) for r in rr.get("gpBuildingTourism", [])]
+        self._gp_building_tourism = [tuple(int(x) for x in r) for r in rr["gpBuildingTourism"]]
         # (perm index, building index, yield index): a spent person's add to
         # one building's own yield (`GP_BUILDING_YIELDS`)
         self._gp_building_yields = [tuple(int(x) for x in r) for r in rr["gpBuildingYields"]]
@@ -1547,8 +1540,8 @@ class SimInit:
         self._GP_CPERM0 = self._GP_PERM0 + len(self._gp_perm_names)
         self._GP_TPERM0 = self._GP_CPERM0 + len(self._gp_city_perm_names)
         _fxw = self._GP_TPERM0 + len(self._gp_tile_perm_names)
-        gp_fx = rr.get("gpEffects", []) or [[[0] * max(1, _fxw)] * 4] * n_gp
-        gp_ea = rr.get("gpEra", []) or [[0] * len(c) for c in gp_fx]
+        gp_fx = rr["gpEffects"] or [[[0] * max(1, _fxw)] * 4] * n_gp
+        gp_ea = rr["gpEra"] or [[0] * len(c) for c in gp_fx]
         _maxN = max(1, max(len(c) for c in gp_fx))
         _fxw = max(_fxw, max((len(r) for c in gp_fx for r in c), default=1))
         # the rosters are RAGGED (each class has as many people as its page
@@ -1568,8 +1561,8 @@ class SimInit:
         self._gp_no_military = _gp_pad("gpNoMilitary", 0) > 0     # ActionRequiresNoMilitaryUnit
         self._gp_scientist = int(rr["gpScientist"])
         # the NAMED eurekas and the instant buildings, catalog bitmasks
-        _eu = rr.get("gpEureka", [])
-        _bl_gp = rr.get("gpBuildings", [])
+        _eu = rr["gpEureka"]
+        _bl_gp = rr["gpBuildings"]
         _euw = max((len(r) for c in _eu for r in c), default=1)
         _blw = max((len(r) for c in _bl_gp for r in c), default=1)
         self._gp_eureka = torch.tensor(
@@ -1579,19 +1572,19 @@ class SimInit:
             [c + [[0] * _blw] * (_maxN - len(c)) for c in _bl_gp] if _bl_gp
             else [[[0] * _blw] * _maxN for _ in range(n_gp)], dtype=torch.bool, device=device)
         self._gp_class_unit = torch.tensor(
-            rr.get("gpClassUnitIdx", [-1] * n_gp), dtype=torch.long, device=device)
-        self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
+            rr["gpClassUnitIdx"], dtype=torch.long, device=device)
+        self._prophet_cls = int(rr["prophetCls"])  # PROPHET's class index
         # CIV6 (Expansion2_Emergencies.xml): the World's Fair scores eight
         # `WORLDS_FAIR_SCORE_GPP_*` rows — every Great Person class but the
         # Prophet.
-        _ngp = int(rr.get("gpClasses", len(rr.get("gpClassDistrict", [])) or 9))
+        _ngp = len(rr["gpClassDistrict"])
         self._fair_gp_classes = [i for i in range(_ngp) if i != self._prophet_cls]
         self._writer_cls = int(rr["writerCls"])  # WRITER's class index
-        self._gp_engineer_cls = int(rr.get("engineerCls", -1))  # the Great ENGINEER's
-        self._promo_max_level = int(rr.get("promoMaxLevel", 8))
-        self._kill_spread_range = int(rr.get("killSpreadRange", 10))
-        self._promo_xp_per_level = int(rr.get("promoXpPerLevel", 15))
-        self._rainforest_fid = int(rr.get("rainforestFid", -1))
+        self._gp_engineer_cls = int(rr["engineerCls"])  # the Great ENGINEER's
+        self._promo_max_level = int(rr["promoMaxLevel"])
+        self._kill_spread_range = int(rr["killSpreadRange"])
+        self._promo_xp_per_level = int(rr["promoXpPerLevel"])
+        self._rainforest_fid = int(rr["rainforestFid"])
         self._gp_nc = int(self._gp_class_district.numel())
         # PERMANENT channels a spent Great Person leaves behind, the count of
         # charges actually spent (which is what a founded religion reads), and
@@ -1618,7 +1611,7 @@ class SimInit:
         # lump. Every write bumps _eff_version — this is yield-bearing state.
         self._gw_cls = [int(x) for x in rr["gwClsByKind"]]
         self._gw_works_k = [int(x) for x in rr["gwWorksByKind"]]
-        self._modern_era_index = int(rr.get("modernEraIndex", 5))
+        self._modern_era_index = int(rr["modernEraIndex"])
         # the three works each Great Artist makes, as object types [NA, 3]
         self._gw_artist_objs = torch.tensor([[int(x) for x in w] for w in rr["artistWorks"]], dtype=torch.long, device=device).reshape(-1, 3)
         # GREAT WORKS PER HOLDER: the layout every city's works index into
@@ -1656,43 +1649,43 @@ class SimInit:
             _col_ok = (_w >= 0 and _b < 0 and _w < max(self._wond_n, 1)) if _is_w else (_w < 0 and (_b == -2 or 0 <= _b < len(rules.b_cost)))
             assert _col_ok, f"great-work holder {_h} names no catalog column"
         assert tuple(self._gw_accepts.shape) == (7, 8) and self._gw_obj_kind.numel() == 8, "great-work object tables"
-        _ri = rules.improvements or {}
+        _ri = rules.improvements
         self._park_min_appeal = int(_ri["parkMinAppeal"])
         self._park_amen_owner = int(_ri["parkAmenitiesOwner"])
         self._park_amen_near = int(_ri["parkAmenitiesNear"])
         self._park_amen_cities = int(_ri["parkAmenityCities"])
         self._shipwreck_civic = int(_ri["shipwreckCivic"])
-        self._gw_printing_tech = int(rr.get("gwPrintingTech", -1))
-        self._gw_printing_mult = int(rr.get("gwPrintingWritingMult", 2))
-        self._wonder_tour_base = int(rr.get("wonderTourismBase", 2))
-        self._tourism_per_visitor = int(rr.get("tourismPerVisitorPerCiv", 200))
+        self._gw_printing_tech = int(rr["gwPrintingTech"])
+        self._gw_printing_mult = int(rr["gwPrintingWritingMult"])
+        self._wonder_tour_base = int(rr["wonderTourismBase"])
+        self._tourism_per_visitor = int(rr["tourismPerVisitorPerCiv"])
         # (building idx, district idx, venue value) — the exporter carries the
         # district because no other wire row does
         self._band_venue = [(int(_b), int(_d), int(_v))
-                            for _b, _d, _v in rr.get("rockBandVenues", [])
+                            for _b, _d, _v in rr["rockBandVenues"]
                             if int(_b) >= 0 and int(_d) >= 0]
-        self._band_wonder_venue = int(rr.get("rockBandWonderVenue", 1000))
-        self._band_tiers = torch.tensor(rr.get("rockBandTiers", []), dtype=torch.long, device=device)
-        self._band_odds = torch.tensor(rr.get("rockBandOdds", []), dtype=torch.long, device=device)
-        self._band_max_level = int(rr.get("rockBandMaxLevel", 4))
+        self._band_wonder_venue = int(rr["rockBandWonderVenue"])
+        self._band_tiers = torch.tensor(rr["rockBandTiers"], dtype=torch.long, device=device)
+        self._band_odds = torch.tensor(rr["rockBandOdds"], dtype=torch.long, device=device)
+        self._band_max_level = int(rr["rockBandMaxLevel"])
         self._band_max_promos = int(rr["rockBandMaxPromotions"])
         # the venue KIND bits a band promotion's mask names, and the districts
         # among them as (bit, district idx)
         self._band_venue_bits = {str(_k): int(_v) for _k, _v in rr["bandVenueBits"].items()}
         self._band_venue_districts = [(int(_b), int(_d)) for _b, _d in rr["bandVenueDistricts"] if int(_d) >= 0]
         self._concert_share_range = int(rr["concertShareRange"])
-        self._holy_city_tour = int(rr.get("holyCityTourism", 8))
-        self._enl_cidx = int(rr.get("enlightenmentCidx", -3))
-        self._culture_per_tourist = int(rr.get("culturePerDomesticTourist", 100))
-        self._tech_era = torch.tensor(rr.get("techEra", []) or [0], dtype=torch.long, device=device)
-        self._civic_era = torch.tensor(rr.get("civicEra", []) or [0], dtype=torch.long, device=device)
+        self._holy_city_tour = int(rr["holyCityTourism"])
+        self._enl_cidx = int(rr["enlightenmentCidx"])
+        self._culture_per_tourist = int(rr["culturePerDomesticTourist"])
+        self._tech_era = torch.tensor(rr["techEra"] or [0], dtype=torch.long, device=device)
+        self._civic_era = torch.tensor(rr["civicEra"] or [0], dtype=torch.long, device=device)
         # the wonder CATALOG cost — `itemCost` reads a wonder off the catalog
         # and never its queued price, which is what "the ORIGINAL wonder
         # cost" means for the Builder's charge
         self._wond_cost = torch.tensor(
             [float(w["cost"]) for w in self._wond_rows] or [0.0],
             dtype=torch.float64, device=device)
-        _wera = (rules.wonders or {}).get("eras", []) or [0]
+        _wera = rules.wonders["eras"] or [0]
         self._wonder_era = torch.tensor(list(_wera), dtype=torch.long, device=device)
         self.antiquity = torch.zeros(B, self.T, dtype=torch.bool, device=device)
         # CIV6 (Coastal Lowlands): the sea has taken this tile FOREVER
@@ -1739,10 +1732,10 @@ class SimInit:
         _d2 = [tuple(o) for o in tiles_within_offsets(2).tolist()]
         _d2.sort(key=lambda o: (max(abs(o[0]), abs(o[1]), abs(o[0] + o[1])), o[1], o[0]))
         self._storm_offs = torch.tensor(_d2, dtype=torch.long).to(device)  # [19, 2]
-        ids = [u["id"] for u in (rules.units or [])]
+        ids = [u["id"] for u in rules.units]
         self._archaeologist_idx = ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1
-        self._naturalist_idx = next((i for i, u in enumerate(rules.units or []) if bool(u.get("naturalist", 0))), -1)
-        self._band_idx = next((i for i, u in enumerate(rules.units or []) if u.get("id") == "ROCK_BAND"), -1)
+        self._naturalist_idx = next((i for i, u in enumerate(rules.units) if bool(u["naturalist"])), -1)
+        self._band_idx = next((i for i, u in enumerate(rules.units) if u["id"] == "ROCK_BAND"), -1)
 
         self.disasters = bool(f0.get("disasters", 0))
         self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -1774,9 +1767,8 @@ class SimInit:
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
         self._init_climate(fixtures)
 
-        imp = rules.improvements or {}
-        ids = imp.get("ids", [])
-        self.improvements_on = bool(ids)
+        imp = rules.improvements
+        ids = imp["ids"]
         self._imp_ids = list(ids)  # roster names, index-aligned
         # The unit-action enum, exported from cpu/core/unitActions.ts
         # (unitActionNames). Every dispatch indexes BY NAME, never by a
@@ -1785,46 +1777,46 @@ class SimInit:
         self._act = {n: i for i, n in enumerate(self._act_names)}
         self._snipe_on = "SNIPE_0" in self._act
         self._snipe3_on = "SNIPE3_0" in self._act
-        self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # religious spread head
-        self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
-        self._A_EXCAVATE = self._act.get("EXCAVATE", -1)  # the archaeologist's
-        self._A_PARK = self._act.get("PARK", -1)          # the naturalist's
-        self._A_PROMOTE = self._act.get("PROMOTE_0", -1)  # the level-up head
-        self._A_CONDEMN = self._act.get("CONDEMN_0", -1)  # vs an adjacent religious unit
-        self._A_HERESY = self._act.get("REMOVE_HERESY", -1)
-        self._A_INQUISITION = self._act.get("LAUNCH_INQUISITION", -1)
-        self._A_EVANGELIZE = self._act.get("EVANGELIZE_BELIEF", -1)   # the Apostle earns its religion a belief
-        self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
-        self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
-        self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
-        self._A_NUKE = self._act.get("NUKE_0_0", -1)   # one head per device row
-        self._A_AIR_PILLAGE = self._act.get("AIR_PILLAGE_0", -1)
-        self._A_REBASE = self._act.get("REBASE_0", -1)
-        self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
-        self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
-        self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
-        self._A_RAIL = self._act.get("BUILD_RAILROAD", -1)       # ...and its second route
-        self._A_CLEAN = self._act.get("CLEAN_FALLOUT", -1)       # a build charge against the fallout
-        self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
-        self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
-        self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
-        self._A_BOOST = self._act.get("BOOST_PROJECT", -1)       # the Royal Society's
-        self._A_FORM_UP = self._act.get("FORM_UP_0", -1)          # merge into a same-type neighbour
-        self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
-        self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
-        self._A_REMOVE_IMP = self._act.get("REMOVE_IMPROVEMENT", -1)  # gone, not pillaged; no charge
+        self._A_SPREAD = self._act["SPREAD_HERE"]  # religious spread head
+        self._A_FOUND = self._act["FOUND_CITY"]  # the settler's verb
+        self._A_EXCAVATE = self._act["EXCAVATE"]  # the archaeologist's
+        self._A_PARK = self._act["PARK"]          # the naturalist's
+        self._A_PROMOTE = self._act["PROMOTE_0"]  # the level-up head
+        self._A_CONDEMN = self._act["CONDEMN_0"]  # vs an adjacent religious unit
+        self._A_HERESY = self._act["REMOVE_HERESY"]
+        self._A_INQUISITION = self._act["LAUNCH_INQUISITION"]
+        self._A_EVANGELIZE = self._act["EVANGELIZE_BELIEF"]   # the Apostle earns its religion a belief
+        self._A_HEATHEN = self._act["CONVERT_HEATHEN"]
+        self._A_UPGRADE = self._act["UPGRADE"]   # the ladder's own verb
+        self._A_AIR_STRIKE = self._act["AIR_STRIKE_0"]
+        self._A_NUKE = self._act["NUKE_0_0"]   # one head per device row
+        self._A_AIR_PILLAGE = self._act["AIR_PILLAGE_0"]
+        self._A_REBASE = self._act["REBASE_0"]
+        self._A_SPY_TRAVEL = self._act["SPY_TRAVEL_0"]
+        self._A_SPY_MISSION = self._act["SPY_MISSION_0"]
+        self._A_ROAD = self._act["BUILD_ROAD"]          # the engineer's
+        self._A_RAIL = self._act["BUILD_RAILROAD"]       # ...and its second route
+        self._A_CLEAN = self._act["CLEAN_FALLOUT"]       # a build charge against the fallout
+        self._A_FINISH = self._act["FINISH_DISTRICT"]   # its 20% charge
+        self._A_GP = self._act["ACTIVATE_GP"]           # the great person's
+        self._A_PERFORM = self._act["PERFORM_CONCERT"]   # the rock band's
+        self._A_BOOST = self._act["BOOST_PROJECT"]       # the Royal Society's
+        self._A_FORM_UP = self._act["FORM_UP_0"]          # merge into a same-type neighbour
+        self._A_ESCORT = self._act["ESCORT"]              # a civilian joins the tile's military unit
+        self._A_UNESCORT = self._act["BREAK_ESCORT"]      # and leaves again
+        self._A_REMOVE_IMP = self._act["REMOVE_IMPROVEMENT"]  # gone, not pillaged; no charge
         # CIV6 (Builder): the resource goes for its own lump
-        self._A_HARVEST = self._act.get("HARVEST", -1)
+        self._A_HARVEST = self._act["HARVEST"]
         # CIV6 (The First Emperor): a charge into the wonder underfoot
-        self._A_WONDER_CHARGE = self._act.get("WONDER_CHARGE", -1)
+        self._A_WONDER_CHARGE = self._act["WONDER_CHARGE"]
         # CIV6 (Mountain Tunnel): the portal step, 2 Movement
-        self._A_PORTAL = self._act.get("PORTAL", -1)
+        self._A_PORTAL = self._act["PORTAL"]
         # PATROL (UNITOPERATION_DEPLOY): the fighter's deployment head and
         # its way back; PRIORITY TARGET: the strike head's twin aimed at the
         # tile's Support-class unit
-        self._A_DEPLOY = self._act.get("DEPLOY_0", -1)
-        self._A_RETURN = self._act.get("RETURN_TO_BASE", -1)
-        self._A_PRIORITY = self._act.get("PRIORITY_TARGET_0", -1)
+        self._A_DEPLOY = self._act["DEPLOY_0"]
+        self._A_RETURN = self._act["RETURN_TO_BASE"]
+        self._A_PRIORITY = self._act["PRIORITY_TARGET_0"]
         self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
         _apc = sum(1 for n in self._act_names if n.startswith("AIR_PILLAGE_"))
         assert _apc in (0, self._air_strike_cols), (
@@ -1838,7 +1830,7 @@ class SimInit:
         # patrol's +5 (`INTERCEPT_RANGE`, `INTERCEPT_SUPPORT_CS`)
         self._intercept_range = int(rules.combat["interceptRange"])
         self._intercept_support_cs = int(rules.combat["interceptSupportCs"])
-        self._nuke_cols = int((rules.nuclear or {}).get("nukeCols", 0))
+        self._nuke_cols = int(rules.nuclear["nukeCols"])
         _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
         assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
             f"the nuclear head is {_nkc} columns over a width of {self._nuke_cols}")
@@ -1875,8 +1867,8 @@ class SimInit:
         self._A_CHOP = self._act["CHOP"]
         self._A_REPAIR = self._act["REPAIR"]
         self._A_PILLAGE = self._act["PILLAGE"]
-        self._A_SNIPE = self._act.get("SNIPE_0", self._A_PILLAGE + 1)
-        self._A_SNIPE3 = self._act.get("SNIPE3_0", -1)
+        self._A_SNIPE = self._act["SNIPE_0"]
+        self._A_SNIPE3 = self._act["SNIPE3_0"]
         self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
@@ -1887,32 +1879,31 @@ class SimInit:
         # CIV6 (Pillaging): each improvement's plunder row — kind (0 none,
         # 1 heal, 2 gold, 3 faith, 4 science, 5 culture) and base amount.
         self._imp_plun_kind = torch.tensor(
-            [int(r.get("plun", [0, 0])[0]) for r in imp.get("rows", [])] or [0], dtype=torch.long, device=device)
+            [int(r["plun"][0]) for r in imp["rows"]] or [0], dtype=torch.long, device=device)
         self._imp_plun_amt = torch.tensor(
-            [int(r.get("plun", [0, 0])[1]) for r in imp.get("rows", [])] or [0], dtype=torch.long, device=device)
-        self._farm_food = float(imp.get("farmFood", 1))
-        self._mine_prod = float(imp.get("mineProd", 1))       # base MINE production
-        self._lumber_prod = float(imp.get("lumberProd", 1))   # LUMBER_MILL production (no tech boost)
-        self._builder_idx = int(imp.get("builderIdx", -1))
-        self._eng_idx = int(imp.get("engineerIdx", -1))
-        self._seat_eng_live = bool(imp.get("engineerLive", False))
-        self._eng_finish_frac = float(imp.get("engineerFinishFraction", 0.2))
-        self._hillfarms_civic = int(imp.get("hillFarmsCivic", -1))
-        self._farmadj_civic = int(imp.get("farmAdjCivic", -1))  # GS: Feudalism farm-adjacency +1 food
-        self._farmadj_tech = int(imp.get("farmAdjTech", -1))    # GS: Replaceable Parts +1 more
-        self._mine_unlock_tech = int(imp.get("mineUnlockTech", -1))       # MINING
-        self._lumber_unlock_tech = int(imp.get("lumberUnlockTech", -1))   # CONSTRUCTION
-        self._seaside_unlock_tech = int(imp.get("seasideUnlockTech", -1))  # RADIO
-        self._seaside_min_appeal = int(imp.get("seasideMinAppeal", 4))     # BREATHTAKING
+            [int(r["plun"][1]) for r in imp["rows"]] or [0], dtype=torch.long, device=device)
+        self._farm_food = float(imp["farmFood"])
+        self._mine_prod = float(imp["mineProd"])       # base MINE production
+        self._lumber_prod = float(imp["lumberProd"])   # LUMBER_MILL production (no tech boost)
+        self._builder_idx = int(imp["builderIdx"])
+        self._eng_idx = int(imp["engineerIdx"])
+        self._eng_finish_frac = float(imp["engineerFinishFraction"])
+        self._hillfarms_civic = int(imp["hillFarmsCivic"])
+        self._farmadj_civic = int(imp["farmAdjCivic"])  # GS: Feudalism farm-adjacency +1 food
+        self._farmadj_tech = int(imp["farmAdjTech"])    # GS: Replaceable Parts +1 more
+        self._mine_unlock_tech = int(imp["mineUnlockTech"])       # MINING
+        self._lumber_unlock_tech = int(imp["lumberUnlockTech"])   # CONSTRUCTION
+        self._seaside_unlock_tech = int(imp["seasideUnlockTech"])  # RADIO
+        self._seaside_min_appeal = int(imp["seasideMinAppeal"])     # BREATHTAKING
         # What RESEARCH adds to an improvement's own yields — the TS
         # `mods.improvementYields` map, which techs and civics both write.
-        self._tech_imp_y = torch.tensor(imp.get("techImpY", [[[0.0] * 6]]), dtype=dtype, device=device)
-        self._civic_imp_y = torch.tensor(imp.get("civicImpY", [[[0.0] * 6]]), dtype=dtype, device=device)
+        self._tech_imp_y = torch.tensor(imp["techImpY"], dtype=dtype, device=device)
+        self._civic_imp_y = torch.tensor(imp["civicImpY"], dtype=dtype, device=device)
         self._research_imp_y_any = bool((self._tech_imp_y != 0).any() or (self._civic_imp_y != 0).any())
         # CIV6 (Lumber Mill): "+1 Production if adjacent to River."
-        self._imp_river_y = torch.tensor(imp.get("impRiverY", [[0.0] * 6]), dtype=dtype, device=device)
+        self._imp_river_y = torch.tensor(imp["impRiverY"], dtype=dtype, device=device)
         self._imp_river_any = bool((self._imp_river_y != 0).any())
-        irows = imp.get("rows", [])
+        irows = imp["rows"]
         nI = max(len(ids), 1)
         self._imp_yields = torch.zeros(nI, 6, dtype=dtype, device=device)
         self._imp_housing = torch.zeros(nI, dtype=dtype, device=device)
@@ -1925,7 +1916,7 @@ class SimInit:
         # ground it may stand on, the ban on standing beside its own kind,
         # what its neighbours pay it, and the three tails (housing civic,
         # religious healing, tourism) it carries.
-        self._imp_suz = [bool(r.get("suz", 0)) for r in imp["rows"]]
+        self._imp_suz = [bool(r["suz"]) for r in imp["rows"]]
         # THE UNIQUE ROWS (`uniqueTo`): the civilization index, the civic that
         # opens the row beside `_imp_unlock`'s tech, the features it may stand
         # on, and the yields it pays while standing on one of `featY`'s.
@@ -1936,68 +1927,68 @@ class SimInit:
         self._imp_feat_y = torch.tensor(
             [list(r["featY"]["y"]) if r["featY"] else [0.0] * 6 for r in imp["rows"]], dtype=dtype, device=device)
         self._imp_feat_any = any(self._imp_feat_list)
-        self._imp_terr = [list(r.get("terr", [])) for r in imp["rows"]]
-        self._imp_xterr = [list(r.get("xterr", [])) for r in imp["rows"]]
-        self._imp_elev = [list(r.get("elev", [])) for r in imp["rows"]]
-        self._imp_no_adj_same = [bool(r.get("noAdjSame", 0)) for r in imp["rows"]]
-        self._imp_adj = [list(r.get("adj", [])) for r in imp["rows"]]
+        self._imp_terr = [list(r["terr"]) for r in imp["rows"]]
+        self._imp_xterr = [list(r["xterr"]) for r in imp["rows"]]
+        self._imp_elev = [list(r["elev"]) for r in imp["rows"]]
+        self._imp_no_adj_same = [bool(r["noAdjSame"]) for r in imp["rows"]]
+        self._imp_adj = [list(r["adj"]) for r in imp["rows"]]
         self._imp_adj_live = any(self._imp_adj)
         self._imp_house_civic = torch.tensor(
-            [int(r.get("houseCivic", -1)) for r in imp["rows"]], dtype=torch.long, device=device)
+            [int(r["houseCivic"]) for r in imp["rows"]], dtype=torch.long, device=device)
         self._imp_rel_heal = torch.tensor(
-            [float(r.get("relHeal", 0)) for r in imp["rows"]], dtype=dtype, device=device)
-        self._imp_tour_y = [int(r.get("tourY", -1)) for r in imp["rows"]]
-        self._imp_tour_tech = [int(r.get("tourTech", -1)) for r in imp["rows"]]
+            [float(r["relHeal"]) for r in imp["rows"]], dtype=dtype, device=device)
+        self._imp_tour_y = [int(r["tourY"]) for r in imp["rows"]]
+        self._imp_tour_tech = [int(r["tourTech"]) for r in imp["rows"]]
         # THE MILITARY ENGINEER'S ROWS. `eng` marks the ones it — and only it —
         # builds; `air` is what an Airstrip bases; `appeal` is what ANY
         # improvement takes off its neighbours, the `DistrictDef.appealAdjacent`
         # twin.
-        self._imp_eng = [bool(r.get("eng", 0)) for r in imp["rows"]]
+        self._imp_eng = [bool(r["eng"]) for r in imp["rows"]]
         # the ONE feature a row may stand on (-1 = free) — the Geothermal Plant
-        self._imp_req_feat = [int(r.get("reqFeat", -1)) for r in imp["rows"]]
+        self._imp_req_feat = [int(r["reqFeat"]) for r in imp["rows"]]
         self._imp_air_slots = torch.tensor(
-            [int(r.get("air", 0)) for r in imp["rows"]], dtype=torch.long, device=device)
+            [int(r["air"]) for r in imp["rows"]], dtype=torch.long, device=device)
         self._imp_appeal_adj = torch.tensor(
-            [int(r.get("appeal", 0)) for r in imp["rows"]], dtype=torch.long, device=device)
+            [int(r["appeal"]) for r in imp["rows"]], dtype=torch.long, device=device)
         self._imp_appeal_any = bool((self._imp_appeal_adj != 0).any())
         # THE UNIQUE IMPROVEMENTS' own columns (`ImprovementDef`'s second
         # half). Every one of these is -1 or 0 on a row that names none.
         _R = imp["rows"]
-        self._imp_one_per_city = [bool(r.get("onePerCity", 0)) for r in _R]
+        self._imp_one_per_city = [bool(r["onePerCity"]) for r in _R]
         # "Tiles with <row> cannot be swapped" — the tile-swap verb's refusal
         self._imp_no_swap = torch.tensor([bool(r["noSwap"]) for r in _R], dtype=torch.bool, device=device)
-        self._imp_min_appeal = [int(r.get("minAppeal", -1)) for r in _R]
+        self._imp_min_appeal = [int(r["minAppeal"]) for r in _R]
         # [(yield idx, percent)] — the Chemamull's Culture off the tile's Appeal
-        self._imp_appeal_y = [(int(r.get("appealY", [-1, 0])[0]), float(r.get("appealY", [-1, 0])[1])) for r in _R]
+        self._imp_appeal_y = [(int(r["appealY"][0]), float(r["appealY"][1])) for r in _R]
         self._imp_appeal_y_any = any(y >= 0 for y, _ in self._imp_appeal_y)
-        self._imp_def_cs = torch.tensor([int(r.get("defCs", 0)) for r in _R], dtype=torch.long, device=device)
-        self._imp_fortify = torch.tensor([int(r.get("fortify", 0)) for r in _R], dtype=torch.long, device=device)
+        self._imp_def_cs = torch.tensor([int(r["defCs"]) for r in _R], dtype=torch.long, device=device)
+        self._imp_fortify = torch.tensor([int(r["fortify"]) for r in _R], dtype=torch.long, device=device)
         self._imp_fortify_any = bool((self._imp_fortify > 0).any())
-        self._imp_frontier = [bool(r.get("frontier", 0)) for r in _R]
-        self._imp_req_adj_res = [bool(r.get("reqAdjRes", 0)) for r in _R]
-        self._imp_move_cost = torch.tensor([int(r.get("moveCost", 0)) for r in _R], dtype=torch.long, device=device)
+        self._imp_frontier = [bool(r["frontier"]) for r in _R]
+        self._imp_req_adj_res = [bool(r["reqAdjRes"]) for r in _R]
+        self._imp_move_cost = torch.tensor([int(r["moveCost"]) for r in _R], dtype=torch.long, device=device)
         self._imp_move_cost_any = bool((self._imp_move_cost > 0).any())
-        self._imp_adj_land_min = [int(r.get("adjLandMin", 0)) for r in _R]
-        self._imp_built_by = [int(r.get("builtBy", -1)) for r in _R]
-        self._imp_outside = [bool(r.get("outside", 0)) for r in _R]
-        self._imp_heals_after = torch.tensor([bool(r.get("healsAfter", 0)) for r in _R], dtype=torch.bool, device=device)
+        self._imp_adj_land_min = [int(r["adjLandMin"]) for r in _R]
+        self._imp_built_by = [int(r["builtBy"]) for r in _R]
+        self._imp_outside = [bool(r["outside"]) for r in _R]
+        self._imp_heals_after = torch.tensor([bool(r["healsAfter"]) for r in _R], dtype=torch.bool, device=device)
         self._imp_heals_after_any = bool(self._imp_heals_after.any())
-        self._imp_loyalty = torch.tensor([float(r.get("loyalty", 0)) for r in _R], dtype=torch.float64, device=device)
+        self._imp_loyalty = torch.tensor([float(r["loyalty"]) for r in _R], dtype=torch.float64, device=device)
         self._imp_loyalty_adj_off = torch.tensor(
-            [float(r.get("loyaltyAdjOff", 0)) for r in _R], dtype=torch.float64, device=device)
+            [float(r["loyaltyAdjOff"]) for r in _R], dtype=torch.float64, device=device)
         self._imp_loyalty_any = bool((self._imp_loyalty != 0).any()) or bool((self._imp_loyalty_adj_off != 0).any())
         # "additional yields as you advance through the tree": [(tech, civic, [6])]
-        self._imp_res_y = [[(int(x["t"]), int(x["c"]), [float(v) for v in x["y"]]) for x in r.get("resY", [])] for r in _R]
+        self._imp_res_y = [[(int(x["t"]), int(x["c"]), [float(v) for v in x["y"]]) for x in r["resY"]] for r in _R]
         self._imp_res_y_any = any(self._imp_res_y)
         self._imp_off_cont_y = torch.tensor(
-            [[float(v) for v in r.get("offContY", [0.0] * 6)] for r in _R], dtype=dtype, device=device)
+            [[float(v) for v in r["offContY"]] for r in _R], dtype=dtype, device=device)
         self._imp_off_cont_any = bool((self._imp_off_cont_y != 0).any())
         # the Open-Air Museum's per-terrain-kind yields: [(terrains, [6])]
         self._imp_terr_kind_y = [
-            (list(r["terrKindY"]["terr"]), [float(v) for v in r["terrKindY"]["y"]]) if r.get("terrKindY") else None
+            (list(r["terrKindY"]["terr"]), [float(v) for v in r["terrKindY"]["y"]]) if r["terrKindY"] else None
             for r in _R]
         self._imp_terr_kind_any = any(x is not None for x in self._imp_terr_kind_y)
-        self._imp_disaster_ok = [bool(r.get("disasterOk", 0)) for r in _R]
+        self._imp_disaster_ok = [bool(r["disasterOk"]) for r in _R]
         # CIV6 (MOUNTAIN_PORTAL): the rows that are a movement portal on a
         # mountain range (the Tunnel, Qhapaq Ñan) — one network per range
         self._imp_portal = torch.tensor([bool(r["portal"]) for r in _R] or [False],
@@ -2019,25 +2010,25 @@ class SimInit:
         # CIV6 (Solar Farm, Wind Farm): what a RENEWABLE generator supplies the
         # city that owns its plot, per turn.
         self._imp_power = torch.tensor(
-            [float(r.get("power", 0)) for r in imp["rows"]], dtype=torch.float64, device=device)
+            [float(r["power"]) for r in imp["rows"]], dtype=torch.float64, device=device)
         self._imp_power_any = bool((self._imp_power > 0).any())
         # The rows a Builder places on their own catalog GROUND alone — no
         # resource under them, no suzerainty, no appeal bar, not the
         # Engineer's (`validImprovementsIn`'s ground-only arm).
-        self._imp_ground = [bool(r.get("gnd", 0)) for r in imp["rows"]]
+        self._imp_ground = [bool(r["gnd"]) for r in imp["rows"]]
         self._imp_ground_idx = [i for i, g in enumerate(self._imp_ground) if g]
         # a Builder row standing on WATER on its own terrain list alone
-        self._imp_water = [bool(r.get("wtr", 0)) for r in imp["rows"]]
+        self._imp_water = [bool(r["wtr"]) for r in imp["rows"]]
         # CIV6 (Aquaculture, Parks and Recreation): the GOVERNOR PROMOTION the
         # owning city's governor must hold before the row may be laid (-1 =
         # none), and the SEPARATE promotion + yields the plot is paid while
         # that governor stays. Two columns because the install writes two
         # modifiers: the gate is on the build, the payment on the plot.
-        self._imp_gov_promo = [int(r.get("govPromo", -1)) for r in imp["rows"]]
-        self._imp_gov_yield = [r.get("govY") for r in imp["rows"]]
+        self._imp_gov_promo = [int(r["govPromo"]) for r in imp["rows"]]
+        self._imp_gov_yield = [r["govY"] for r in imp["rows"]]
         self._imp_gov_yield_any = any(g is not None for g in self._imp_gov_yield)
         # amenities the row pays its city for standing beside water
-        self._imp_water_amenity = [int(r.get("watAmen", 0)) for r in imp["rows"]]
+        self._imp_water_amenity = [int(r["watAmen"]) for r in imp["rows"]]
         self._imp_water_amenity_any = any(a > 0 for a in self._imp_water_amenity)
         self.res_imp = torch.tensor(
             [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
@@ -2062,8 +2053,7 @@ class SimInit:
         self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
 
-        self.districts_cat = list(rules.districts or [])
-        self.districts_on = bool(self.districts_cat)
+        self.districts_cat = list(rules.districts)
         # -1 none, else PLACEABLE_DISTRICTS idx. CENTRES ARE NOT IN HERE —
         # they live in `centre_slot_at`, while TS keeps one `tile.district`
         # that `foundCity` sets to 'CITY_CENTER'. Every twin of a TS test that
@@ -2136,30 +2126,29 @@ class SimInit:
         self._ftr0 = self.tile_ftr.clone()
         self._ftu0 = self.tile_ftu.clone()
         self._frm0 = self.feat_removable.clone()
-        sc = rules.district_scaffold or {}
-        self.CAMPUS = int(sc.get("campusIdx", 0))
-        self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
-        self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p.get("unlockCivic", -1)), int(p.get("placement", 0)), int(p.get("fixedCost", -1))) for p in sc.get("place", [])]  # (district idx, unlock tech idx, unlock CIVIC idx — at most one of the two >= 0, placement: 0 land / 1 aqueduct / 2 coastal / 3 encampment / 4 flat, fixed cost or -1 = the research curve)
+        sc = rules.district_scaffold
+        self.CAMPUS = int(sc["campusIdx"])
+        self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p["unlockCivic"]), int(p["placement"]), int(p["fixedCost"])) for p in sc["place"]]  # (district idx, unlock tech idx, unlock CIVIC idx — at most one of the two >= 0, placement: 0 land / 1 aqueduct / 2 coastal / 3 encampment / 4 flat, fixed cost or -1 = the research curve)
         # VETERANCY's encampHarborProdMult needs the ENCAMPMENT and HARBOR
         # district idxs and scaffold slots (the queue head codes for the
         # district and its buildings — cpu/core/game.ts isEncampHarborItem).
-        self._encamp_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "ENCAMPMENT"), -1)
-        self._harbor_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
+        self._encamp_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "ENCAMPMENT"), -1)
+        self._harbor_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "HARBOR"), -1)
         # The Urban Development Treaty ban on HOLY_SITE also refuses the
         # worship faith-buy (a purchase still CREATES the building).
-        self._holy_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
+        self._holy_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "HOLY_SITE"), -1)
         # What each district type does to its NEIGHBOURS' appeal, straight off
         # the catalog column (`tileAppeal`'s `appealAdjacent`) — no type is
         # named here, so a new district row carries its own term.
         self._appeal_adj = torch.tensor(
-            [int(d.get("appealAdjacent", 0)) for d in self.districts_cat],
+            [int(d["appealAdjacent"]) for d in self.districts_cat],
             dtype=torch.long, device=device)  # [nD]
         self._appeal_adj_any = bool((self._appeal_adj != 0).any())
-        self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "NEIGHBORHOOD"), -1)
+        self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "NEIGHBORHOOD"), -1)
         # The columns the three per-district-type adjacency sources count.
-        self._dam_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "DAM"), -1)
-        self._canal_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "CANAL"), -1)
-        self._govplaza_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "GOVERNMENT_PLAZA"), -1)
+        self._dam_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "DAM"), -1)
+        self._canal_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "CANAL"), -1)
+        self._govplaza_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "GOVERNMENT_PLAZA"), -1)
         self._appeal_cuts = [(4, 6), (2, 5), (-1, 4), (-3, 3)]
         self._appeal_floor = 2
         # the same five bands, as the CUTS alone — what `appealBand` returns and
@@ -2170,7 +2159,6 @@ class SimInit:
         self._scaffold_di = torch.tensor([p[0] for p in self._scaffold] or [-1], dtype=torch.long, device=device)
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._harbor_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._harbor_didx), -1)
-        self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         # The diplomacy head (declareWar / sueForPeace), the same for every
         # seat row. While False, every row's `_seat_war_mask` is all-False, so
         # the head offers no war verb to any seat.
@@ -2244,7 +2232,7 @@ class SimInit:
         # catalog (a district with no such row scores 0, which is not the same
         # as a hardwired default). The static sources live in d_static_adj.
         def _src_amt(d, src):
-            return float(next((a["amount"] for a in d.get("adjacency", []) if int(a["src"]) == src), 0.0))
+            return float(next((a["amount"] for a in d["adjacency"] if int(a["src"]) == src), 0.0))
         self._dyn_district = torch.tensor([_src_amt(d, 7) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent completed district (src 7)
         self._dyn_bwonder = torch.tensor([_src_amt(d, 5) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent COMPLETED world wonder (matchesAdjacency BUILT_WONDER)
         self._dyn_center = torch.tensor([_src_amt(d, 8) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent center
@@ -2264,13 +2252,13 @@ class SimInit:
         self._dyn_govplaza = torch.tensor([_src_amt(d, 16) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
         # CIV6: an Aqueduct beside a Geothermal Fissure provides 1 Amenity —
         # an AMENITY per adjacent tile of one kind, which no yield row carries.
-        self._d_amen_adj = [(int(d.get("amenAdj", (-1, 0))[0]), float(d.get("amenAdj", (-1, 0))[1]))
+        self._d_amen_adj = [(int(d["amenAdj"][0]), float(d["amenAdj"][1]))
                             for d in self.districts_cat]
         self._d_amen_adj_any = any(s >= 0 and a != 0 for s, a in self._d_amen_adj)
         self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
         self._quarry_iidx = 3
-        _govs = rules.governments or []
-        _pols = rules.policies or []
+        _govs = rules.governments
+        _pols = rules.policies
         self._ngov = len(_govs)
         self._npol = len(_pols)
         # the cards a seat has SLOTTED — a DRIVER decision carried on the
@@ -2279,43 +2267,43 @@ class SimInit:
         self.civ_policies = torch.zeros(self.B, self.n_majors, max(self._npol, 1), dtype=torch.bool, device=device)
         if self._ngov:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
-            self._gov_intol = torch.tensor([int(g.get("intolerance", 0)) for g in _govs], dtype=torch.long, device=device)
+            self._gov_intol = torch.tensor([int(g["intolerance"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_unlock_civic = torch.tensor([int(g["unlockCivic"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_slots = torch.tensor([[int(x) for x in g["slots"]] for g in _govs], dtype=torch.long, device=device)  # [nGov,4] m/e/d/w
             self._gov_city_y = torch.tensor([[float(x) for x in g["cityYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             self._gov_cap_y = torch.tensor([[float(x) for x in g["capitalYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             # housingAll: +housing to every city of the adopting seat.
-            self._gov_housing = torch.tensor([float(g.get("housingAll", 0)) for g in _govs], dtype=dtype, device=device)  # [nGov]
+            self._gov_housing = torch.tensor([float(g["housingAll"]) for g in _govs], dtype=dtype, device=device)  # [nGov]
             # yieldMult: tier-2/3 governments multiply one yield
             # (MERCHANT_REPUBLIC gold, THEOCRACY faith, DEMOCRACY culture,
             # COMMUNISM production).
-            self._gov_ymult = torch.tensor([[float(x) for x in g.get("yieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
+            self._gov_ymult = torch.tensor([[float(x) for x in g["yieldMult"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             # the two channels a GOVERNOR gates: Merchant Republic's gold wants
             # an ESTABLISHED one, Theocracy's and Communism's per-citizen
             # yields only a seated one.
-            self._gov_gov_ymult = torch.tensor([[float(x) for x in g.get("governorYieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)
-            self._gov_gov_percit = torch.tensor([[float(x) for x in g.get("governorPerCitizen", [0] * 6)] for g in _govs], dtype=dtype, device=device)
+            self._gov_gov_ymult = torch.tensor([[float(x) for x in g["governorYieldMult"]] for g in _govs], dtype=dtype, device=device)
+            self._gov_gov_percit = torch.tensor([[float(x) for x in g["governorPerCitizen"]] for g in _govs], dtype=dtype, device=device)
             # CIV6 (Democracy): the ally/suzerain route yields and the extra
             # quarter-point a turn, both the GOVERNMENT's own
-            self._gov_ally_route = torch.tensor([[float(x) for x in g.get("allyRouteYield", [0] * 6)] for g in _govs], dtype=dtype, device=device)
-            self._gov_ally_pts = torch.tensor([int(g.get("alliancePointsPerTurn", 0)) for g in _govs], dtype=torch.long, device=device)
-            self._gov_ehprod = torch.tensor([float(g.get("encampHarborProdMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] channel-complete; no government carries it
-            self._gov_tpmult = torch.tensor([float(g.get("tilePurchaseMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov]
+            self._gov_ally_route = torch.tensor([[float(x) for x in g["allyRouteYield"]] for g in _govs], dtype=dtype, device=device)
+            self._gov_ally_pts = torch.tensor([int(g["alliancePointsPerTurn"]) for g in _govs], dtype=torch.long, device=device)
+            self._gov_ehprod = torch.tensor([float(g["encampHarborProdMult"]) for g in _govs], dtype=dtype, device=device)  # [nGov] channel-complete; no government carries it
+            self._gov_tpmult = torch.tensor([float(g["tilePurchaseMult"]) for g in _govs], dtype=dtype, device=device)  # [nGov]
             # The amenity + district-conditional channels, applied for EVERY
             # seat (computeHousing / computeCityStats). newDeal carries housing
             # AND amenities; both it and housingIfDistricts key on SPECIALTY
             # district counts.
-            self._gov_amen = torch.tensor([float(g.get("amenitiesAll", 0)) for g in _govs], dtype=dtype, device=device)
-            _ghid = [g.get("housingIfDistricts", [-1, 0]) for g in _govs]
+            self._gov_amen = torch.tensor([float(g["amenitiesAll"]) for g in _govs], dtype=dtype, device=device)
+            _ghid = [g["housingIfDistricts"] for g in _govs]
             self._gov_hid_min = torch.tensor([int(x[0]) for x in _ghid], dtype=torch.long, device=device)
             self._gov_hid_house = torch.tensor([float(x[1]) for x in _ghid], dtype=dtype, device=device)
-            _gnd = [g.get("newDeal", [-1, 0, 0]) for g in _govs]
+            _gnd = [g["newDeal"] for g in _govs]
             self._gov_nd_min = torch.tensor([int(x[0]) for x in _gnd], dtype=torch.long, device=device)
             self._gov_nd_house = torch.tensor([float(x[1]) for x in _gnd], dtype=dtype, device=device)
             self._gov_nd_amen = torch.tensor([float(x[2]) for x in _gnd], dtype=dtype, device=device)
             # amenitiesIfSpecialty (Liberalism's shape, +1 amenity at 2+
             # specialty districts): an amenity-only newDeal, keyed the same way
-            _gai = [g.get("amenitiesIfSpecialty", [-1, 0]) for g in _govs]
+            _gai = [g["amenitiesIfSpecialty"] for g in _govs]
             self._gov_ais_min = torch.tensor([int(x[0]) for x in _gai], dtype=torch.long, device=device)
             self._gov_ais_amen = torch.tensor([float(x[1]) for x in _gai], dtype=dtype, device=device)
             # adjacencyMult: a MULTIPLIER on one district type's adjacency
@@ -2323,7 +2311,7 @@ class SimInit:
             # [district, yield, popMin, popPct, adjMin, adjPct] row.
             _nd_pl = len(self.districts_cat)
             self._gov_adj_mult = torch.tensor(
-                [[float(x) for x in g.get("adjacencyMult", [1] * _nd_pl)] for g in _govs],
+                [[float(x) for x in g["adjacencyMult"]] for g in _govs],
                 dtype=dtype, device=device)  # [nGov, nD]
             self._gov_byb = torch.tensor(
                 [[float(x) for x in g["buildingYieldBoost"]] for g in _govs],
@@ -2331,43 +2319,43 @@ class SimInit:
             # prodBoost: [wonderTarget, unit-class mask, eraMax, pct], the
             # production cards' two axes. wonderTarget -1 = no boost.
             self._gov_prodb = torch.tensor(
-                [[float(x) for x in r.get("prodBoost", [-1, 0, 0, 0])] for r in _govs],
+                [[float(x) for x in r["prodBoost"]] for r in _govs],
                 dtype=torch.float64, device=device)
-            self._gov_bcharge = torch.tensor([float(r.get("builderCharges", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_mcut = torch.tensor([float(r.get("unitMaintenanceCut", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_wmdup = torch.tensor([float(r.get("wmdUpkeepPct", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_vbarb = torch.tensor([float(r.get("combatVsBarbarians", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_cdef = torch.tensor([float(r.get("cityDefense", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_rxp = torch.tensor([float(r.get("reconXpMult", 1)) for r in _govs], dtype=dtype, device=device)
-            self._gov_rplun = torch.tensor([float(r.get("routePlunderMult", 1)) for r in _govs], dtype=dtype, device=device)
-            self._gov_pillm = torch.tensor([float(r.get("pillageMult", 1)) for r in _govs], dtype=dtype, device=device)
-            self._gov_faith_units = torch.tensor([bool(r.get("faithBuyLandUnits", 0)) for r in _govs], dtype=torch.bool, device=device)
-            self._gov_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _govs], dtype=torch.bool, device=device)
-            self._gov_envoy2 = torch.tensor([bool(r.get("envoyDoubleDiffGov", 0)) for r in _govs], dtype=torch.bool, device=device)
-            self._gov_culsuz = torch.tensor([float(r.get("culturePerSuzerain", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_bcharge = torch.tensor([float(r["builderCharges"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_mcut = torch.tensor([float(r["unitMaintenanceCut"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_wmdup = torch.tensor([float(r["wmdUpkeepPct"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_vbarb = torch.tensor([float(r["combatVsBarbarians"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_cdef = torch.tensor([float(r["cityDefense"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_crng = torch.tensor([float(r["cityRanged"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_rxp = torch.tensor([float(r["reconXpMult"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_rplun = torch.tensor([float(r["routePlunderMult"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_pillm = torch.tensor([float(r["pillageMult"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_faith_units = torch.tensor([bool(r["faithBuyLandUnits"]) for r in _govs], dtype=torch.bool, device=device)
+            self._gov_rgold = torch.tensor([float(r["routeGold"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_infl = torch.tensor([float(r["influencePerTurn"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _govs], dtype=torch.bool, device=device)
+            self._gov_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _govs], dtype=torch.bool, device=device)
+            self._gov_culsuz = torch.tensor([float(r["culturePerSuzerain"]) for r in _govs], dtype=dtype, device=device)
             self._gov_gpp = torch.tensor(
-                [[float(x) for x in r.get("gpp", [0] * n_gp)] for r in _govs],
+                [[float(x) for x in r["gpp"]] for r in _govs],
                 dtype=torch.float64, device=device)
             # unitCombatCS [promotion-class mask, allCombat, cs] — the
             # PROMOTION-class axis (`governmentUnitCS`): Oligarchy names
             # MELEE, ANTICAV and NAVAL_MELEE; Fascism's `all` arm reaches
             # every combat unit.
-            _gucs = [r.get("unitCombatCS", [0, 0, 0]) for r in _govs]
+            _gucs = [r["unitCombatCS"] for r in _govs]
             self._gov_ucs_mask = torch.tensor([int(x[0]) for x in _gucs], dtype=torch.long, device=device)
             self._gov_ucs_allc = torch.tensor([bool(x[1]) for x in _gucs], dtype=torch.bool, device=device)
             self._gov_ucs_cs = torch.tensor([float(x[2]) for x in _gucs], dtype=torch.float64, device=device)
-            self._gov_xppct = torch.tensor([float(r.get("xpPct", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_wwcut = torch.tensor([float(r.get("wwCutPct", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_gppmult = torch.tensor([float(r.get("gppMult", 1)) for r in _govs], dtype=torch.float64, device=device)
-            _gdc = [r.get("cityWithDistrict", [0, 0]) for r in _govs]
+            self._gov_xppct = torch.tensor([float(r["xpPct"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_wwcut = torch.tensor([float(r["wwCutPct"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_gppmult = torch.tensor([float(r["gppMult"]) for r in _govs], dtype=torch.float64, device=device)
+            _gdc = [r["cityWithDistrict"] for r in _govs]
             self._gov_dc_house = torch.tensor([float(x[0]) for x in _gdc], dtype=dtype, device=device)
             self._gov_dc_amen = torch.tensor([float(x[1]) for x in _gdc], dtype=dtype, device=device)
-            self._gov_wallhouse = torch.tensor([float(r.get("housingPerWallLevel", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_theocs = torch.tensor([float(r.get("theologyCS", 0)) for r in _govs], dtype=dtype, device=device)
-            self._gov_govbldy = torch.tensor([float(r.get("yieldsPerGovBuilding", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_wallhouse = torch.tensor([float(r["housingPerWallLevel"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_theocs = torch.tensor([float(r["theologyCS"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_govbldy = torch.tensor([float(r["yieldsPerGovBuilding"]) for r in _govs], dtype=dtype, device=device)
             # the Gathering Storm FLAT bonus's channels (the government row
             # carries its inherent and its flat bonus as one)
             self._gov_distprod = torch.tensor([float(r["districtProdMult"]) for r in _govs], dtype=dtype, device=device)
@@ -2398,30 +2386,30 @@ class SimInit:
             self._pol_unlock_civic = torch.tensor([int(p["unlockCivic"]) for p in _pols], dtype=torch.long, device=device)
             self._pol_city_y = torch.tensor([[float(x) for x in p["cityYields"]] for p in _pols], dtype=dtype, device=device)
             self._pol_cap_y = torch.tensor([[float(x) for x in p["capitalYields"]] for p in _pols], dtype=dtype, device=device)
-            self._pol_housing = torch.tensor([float(p.get("housingAll", 0)) for p in _pols], dtype=dtype, device=device)  # [nPol]
+            self._pol_housing = torch.tensor([float(p["housingAll"]) for p in _pols], dtype=dtype, device=device)  # [nPol]
             # housingIfDistricts (INSULAE {min 2, +1}): +housing to a city with
             # >= min completed SPECIALTY districts.
-            _hid = [p.get("housingIfDistricts", [-1, 0]) for p in _pols]
+            _hid = [p["housingIfDistricts"] for p in _pols]
             self._pol_hid_min = torch.tensor([int(x[0]) for x in _hid], dtype=torch.long, device=device)  # [nPol] (-1 = none)
             self._pol_hid_house = torch.tensor([float(x[1]) for x in _hid], dtype=dtype, device=device)  # [nPol]
             # VETERANCY: a production multiplier toward Encampment and Harbor
             # items (cpu/core/game.ts isEncampHarborItem).
-            self._pol_ehprod = torch.tensor([float(p.get("encampHarborProdMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol]
-            self._pol_tpmult = torch.tensor([float(p.get("tilePurchaseMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol] (LAND_SURVEYORS = 0.8)
-            self._pol_amen = torch.tensor([float(p.get("amenitiesAll", 0)) for p in _pols], dtype=dtype, device=device)
-            _pnd = [p.get("newDeal", [-1, 0, 0]) for p in _pols]
+            self._pol_ehprod = torch.tensor([float(p["encampHarborProdMult"]) for p in _pols], dtype=dtype, device=device)  # [nPol]
+            self._pol_tpmult = torch.tensor([float(p["tilePurchaseMult"]) for p in _pols], dtype=dtype, device=device)  # [nPol] (LAND_SURVEYORS = 0.8)
+            self._pol_amen = torch.tensor([float(p["amenitiesAll"]) for p in _pols], dtype=dtype, device=device)
+            _pnd = [p["newDeal"] for p in _pols]
             self._pol_nd_min = torch.tensor([int(x[0]) for x in _pnd], dtype=torch.long, device=device)
             self._pol_nd_house = torch.tensor([float(x[1]) for x in _pnd], dtype=dtype, device=device)
             self._pol_nd_amen = torch.tensor([float(x[2]) for x in _pnd], dtype=dtype, device=device)
             # amenitiesIfSpecialty — LIBERALISM: TS pays it beside newDeal in
             # `computeCityStats`; this loader skipped the column and no seed
             # had reached the card with the districts (the reader census named it)
-            _pai = [p.get("amenitiesIfSpecialty", [-1, 0]) for p in _pols]
+            _pai = [p["amenitiesIfSpecialty"] for p in _pols]
             self._pol_ais_min = torch.tensor([int(x[0]) for x in _pai], dtype=torch.long, device=device)
             self._pol_ais_amen = torch.tensor([float(x[1]) for x in _pai], dtype=dtype, device=device)
             _nd_pl = len(self.districts_cat)
             self._pol_adj_mult = torch.tensor(
-                [[float(x) for x in p.get("adjacencyMult", [1] * _nd_pl)] for p in _pols],
+                [[float(x) for x in p["adjacencyMult"]] for p in _pols],
                 dtype=dtype, device=device)  # [nPol, nD]
             self._pol_byb = torch.tensor(
                 [[float(x) for x in p["buildingYieldBoost"]] for p in _pols],
@@ -2429,60 +2417,60 @@ class SimInit:
             # prodBoost: [wonderTarget, unit-class mask, eraMax, pct], the
             # production cards' two axes. wonderTarget -1 = no boost.
             self._pol_prodb = torch.tensor(
-                [[float(x) for x in r.get("prodBoost", [-1, 0, 0, 0])] for r in _pols],
+                [[float(x) for x in r["prodBoost"]] for r in _pols],
                 dtype=torch.float64, device=device)
-            self._pol_bcharge = torch.tensor([float(r.get("builderCharges", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_mcut = torch.tensor([float(r.get("unitMaintenanceCut", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_wmdup = torch.tensor([float(r.get("wmdUpkeepPct", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_vbarb = torch.tensor([float(r.get("combatVsBarbarians", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_cdef = torch.tensor([float(r.get("cityDefense", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_rxp = torch.tensor([float(r.get("reconXpMult", 1)) for r in _pols], dtype=dtype, device=device)
-            self._pol_rplun = torch.tensor([float(r.get("routePlunderMult", 1)) for r in _pols], dtype=dtype, device=device)
-            self._pol_pillm = torch.tensor([float(r.get("pillageMult", 1)) for r in _pols], dtype=dtype, device=device)
-            self._pol_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _pols], dtype=torch.bool, device=device)
-            self._pol_envoy2 = torch.tensor([bool(r.get("envoyDoubleDiffGov", 0)) for r in _pols], dtype=torch.bool, device=device)
-            self._pol_tourroute = torch.tensor([int(r.get("tourismRouteBonus", 0)) for r in _pols], dtype=torch.long, device=device)
-            self._pol_culsuz = torch.tensor([float(r.get("culturePerSuzerain", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_bcharge = torch.tensor([float(r["builderCharges"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_mcut = torch.tensor([float(r["unitMaintenanceCut"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_wmdup = torch.tensor([float(r["wmdUpkeepPct"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_vbarb = torch.tensor([float(r["combatVsBarbarians"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_cdef = torch.tensor([float(r["cityDefense"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_crng = torch.tensor([float(r["cityRanged"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_rxp = torch.tensor([float(r["reconXpMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_rplun = torch.tensor([float(r["routePlunderMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_pillm = torch.tensor([float(r["pillageMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_rgold = torch.tensor([float(r["routeGold"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_infl = torch.tensor([float(r["influencePerTurn"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_tourroute = torch.tensor([int(r["tourismRouteBonus"]) for r in _pols], dtype=torch.long, device=device)
+            self._pol_culsuz = torch.tensor([float(r["culturePerSuzerain"]) for r in _pols], dtype=dtype, device=device)
             self._pol_gpp = torch.tensor(
-                [[float(x) for x in r.get("gpp", [0] * n_gp)] for r in _pols],
+                [[float(x) for x in r["gpp"]] for r in _pols],
                 dtype=torch.float64, device=device)
             # yieldMult, the channel a card gained with COLLECTIVE_ACTIVISM's
             # per-suzerainty culture; the government table has always had it.
-            self._pol_ymult = torch.tensor([[float(x) for x in p.get("yieldMult", [1] * 6)] for p in _pols], dtype=dtype, device=device)  # [nPol,6]
+            self._pol_ymult = torch.tensor([[float(x) for x in p["yieldMult"]] for p in _pols], dtype=dtype, device=device)  # [nPol,6]
             # THE DARK-AGE window: [firstEra, lastEra], [-1, -1] on every
             # ordinary card. A Dark Age card needs no unlocking civic — the
             # seat's AGE and this window are its whole gate.
             # CIV6 (Legacy policy card): the government whose inherent bonus
             # the card carries, -1 on an ordinary card. Having BEEN in that
             # government unlocks it; being in it still forbids the slot.
-            self._pol_legacy = torch.tensor([int(r.get("legacy", -1)) for r in _pols], dtype=torch.long, device=device)
-            _pdk = [r.get("dark", [-1, -1]) for r in _pols]
+            self._pol_legacy = torch.tensor([int(r["legacy"]) for r in _pols], dtype=torch.long, device=device)
+            _pdk = [r["dark"] for r in _pols]
             self._pol_dark_lo = torch.tensor([int(x[0]) for x in _pdk], dtype=torch.long, device=device)
             self._pol_dark_hi = torch.tensor([int(x[1]) for x in _pdk], dtype=torch.long, device=device)
-            self._pol_route_ymult = torch.tensor([float(r.get("routeYieldMult", 1)) for r in _pols], dtype=dtype, device=device)
-            self._pol_dom_route = torch.tensor([[float(x) for x in r.get("domesticRouteYield", [0] * 6)] for r in _pols], dtype=dtype, device=device)
-            self._pol_no_settlers = torch.tensor([bool(r.get("noSettlers", 0)) for r in _pols], dtype=torch.bool, device=device)
-            self._pol_heal_home = torch.tensor([bool(r.get("healOnlyHome", 0)) for r in _pols], dtype=torch.bool, device=device)
-            self._pol_relig_home = torch.tensor([float(r.get("religiousCsHome", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_raider_prod = torch.tensor([float(r.get("navalRaiderProdMult", 1)) for r in _pols], dtype=dtype, device=device)
-            self._pol_raider_moves = torch.tensor([int(r.get("navalRaiderMoves", 0)) for r in _pols], dtype=torch.long, device=device)
-            self._pol_griev_hold = torch.tensor([bool(r.get("grievanceNoDecay", 0)) for r in _pols], dtype=torch.bool, device=device)
-            self._pol_proj_prod = torch.tensor([float(r.get("projectProdMult", 1)) for r in _pols], dtype=dtype, device=device)
-            self._pol_loyalty_all = torch.tensor([float(r.get("loyaltyAll", 0)) for r in _pols], dtype=dtype, device=device)
-            _pfb = [r.get("favorPerBuilding", [-1, 0]) for r in _pols]
+            self._pol_route_ymult = torch.tensor([float(r["routeYieldMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_dom_route = torch.tensor([[float(x) for x in r["domesticRouteYield"]] for r in _pols], dtype=dtype, device=device)
+            self._pol_no_settlers = torch.tensor([bool(r["noSettlers"]) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_heal_home = torch.tensor([bool(r["healOnlyHome"]) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_relig_home = torch.tensor([float(r["religiousCsHome"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_raider_prod = torch.tensor([float(r["navalRaiderProdMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_raider_moves = torch.tensor([int(r["navalRaiderMoves"]) for r in _pols], dtype=torch.long, device=device)
+            self._pol_griev_hold = torch.tensor([bool(r["grievanceNoDecay"]) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_proj_prod = torch.tensor([float(r["projectProdMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_loyalty_all = torch.tensor([float(r["loyaltyAll"]) for r in _pols], dtype=dtype, device=device)
+            _pfb = [r["favorPerBuilding"] for r in _pols]
             self._pol_favor_b = torch.tensor([int(x[0]) for x in _pfb], dtype=torch.long, device=device)
             self._pol_favor_n = torch.tensor([float(x[1]) for x in _pfb], dtype=dtype, device=device)
-            self._pol_no_envoy = torch.tensor([bool(r.get("noEnvoyInfluence", 0)) for r in _pols], dtype=torch.bool, device=device)
-            _pve = [r.get("unitCsVsEra", [-1, 0]) for r in _pols]
+            self._pol_no_envoy = torch.tensor([bool(r["noEnvoyInfluence"]) for r in _pols], dtype=torch.bool, device=device)
+            _pve = [r["unitCsVsEra"] for r in _pols]
             self._pol_era_cs_min = torch.tensor([int(x[0]) for x in _pve], dtype=torch.long, device=device)
             self._pol_era_cs = torch.tensor([float(x[1]) for x in _pve], dtype=torch.float64, device=device)
-            self._pol_land_cost = torch.tensor([float(r.get("landUnitCostMult", 1)) for r in _pols], dtype=dtype, device=device)
-            self._pol_concert = torch.tensor([float(r.get("concertShare", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_mil_maint = torch.tensor([float(r.get("militaryMaintenanceAdd", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_imp_y = torch.tensor([[[float(y) for y in i] for i in r.get("improvementYields", [])] or [[0.0] * 6] for r in _pols], dtype=dtype, device=device)
+            self._pol_land_cost = torch.tensor([float(r["landUnitCostMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_concert = torch.tensor([float(r["concertShare"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_mil_maint = torch.tensor([float(r["militaryMaintenanceAdd"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_imp_y = torch.tensor([[[float(y) for y in i] for i in r["improvementYields"]] or [[0.0] * 6] for r in _pols], dtype=dtype, device=device)
             # [target, yield, x1000 multiplier] rows, padded to the widest
             # card with a -1 target that matches nothing
             for _nm, _key in (("_pol_dist_ym", "districtYieldMult"), ("_pol_bldg_ym", "buildingYieldMult")):
@@ -2491,22 +2479,22 @@ class SimInit:
                 _pad = [[list(map(int, y)) for y in x] + [[-1, 0, 1000]] * (_w - len(x)) for x in _rows]
                 setattr(self, _nm, torch.tensor(_pad, dtype=torch.long, device=device))
             # the two GOVERNOR-GATED government channels
-            self._pol_gov_ymult = torch.tensor([[float(x) for x in r.get("governorYieldMult", [1] * 6)] for r in _pols], dtype=dtype, device=device)
-            self._pol_gov_percit = torch.tensor([[float(x) for x in r.get("governorPerCitizen", [0] * 6)] for r in _pols], dtype=dtype, device=device)
+            self._pol_gov_ymult = torch.tensor([[float(x) for x in r["governorYieldMult"]] for r in _pols], dtype=dtype, device=device)
+            self._pol_gov_percit = torch.tensor([[float(x) for x in r["governorPerCitizen"]] for r in _pols], dtype=dtype, device=device)
             # the civic that RETIRES the card; -1 = it never leaves the pool
-            _pucs = [r.get("unitCombatCS", [0, 0, 0]) for r in _pols]
+            _pucs = [r["unitCombatCS"] for r in _pols]
             self._pol_ucs_mask = torch.tensor([int(x[0]) for x in _pucs], dtype=torch.long, device=device)
             self._pol_ucs_allc = torch.tensor([bool(x[1]) for x in _pucs], dtype=torch.bool, device=device)
             self._pol_ucs_cs = torch.tensor([float(x[2]) for x in _pucs], dtype=torch.float64, device=device)
-            self._pol_xppct = torch.tensor([float(r.get("xpPct", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_wwcut = torch.tensor([float(r.get("wwCutPct", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_gppmult = torch.tensor([float(r.get("gppMult", 1)) for r in _pols], dtype=torch.float64, device=device)
-            _pdc = [r.get("cityWithDistrict", [0, 0]) for r in _pols]
+            self._pol_xppct = torch.tensor([float(r["xpPct"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_wwcut = torch.tensor([float(r["wwCutPct"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_gppmult = torch.tensor([float(r["gppMult"]) for r in _pols], dtype=torch.float64, device=device)
+            _pdc = [r["cityWithDistrict"] for r in _pols]
             self._pol_dc_house = torch.tensor([float(x[0]) for x in _pdc], dtype=dtype, device=device)
             self._pol_dc_amen = torch.tensor([float(x[1]) for x in _pdc], dtype=dtype, device=device)
-            self._pol_wallhouse = torch.tensor([float(r.get("housingPerWallLevel", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_theocs = torch.tensor([float(r.get("theologyCS", 0)) for r in _pols], dtype=dtype, device=device)
-            self._pol_govbldy = torch.tensor([float(r.get("yieldsPerGovBuilding", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_wallhouse = torch.tensor([float(r["housingPerWallLevel"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_theocs = torch.tensor([float(r["theologyCS"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_govbldy = torch.tensor([float(r["yieldsPerGovBuilding"]) for r in _pols], dtype=dtype, device=device)
             # Democracy's ally-route yields and alliance points: a legacy
             # card carries its government's inherent bonus, these included
             self._pol_ally_route = torch.tensor([[float(x) for x in r["allyRouteYield"]] for r in _pols], dtype=dtype, device=device)
@@ -2534,24 +2522,15 @@ class SimInit:
                 + (self._pol_distprod - 1).abs().sum() + (self._pol_inflmult - 1).abs().sum()
                 + self._pol_goldbuy.abs().sum() + self._pol_faithbuy.abs().sum()
                 + self._pol_ally_route.abs().sum() + self._pol_ally_pts.abs().sum())
-            self._pol_obsolete_civic = torch.tensor([int(p.get("obsoleteCivic", -1)) for p in _pols], dtype=torch.long, device=device)
-        # Master switch (rules.governmentsLive), mirroring the TS
-        # GOVERNMENTS_ADOPTION_LIVE. Gates every gov/policy application and the
-        # influence-tier addition, so the two engines flip in lockstep; when
-        # False the tables load but change nothing.
-        self._gov_live = bool(getattr(rules, "governments_live", False))
-        self._gov_has_effects = self._gov_live and bool(
-            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum() + (self._gov_ehprod - 1).abs().sum() + (self._gov_tpmult - 1).abs().sum() + (self._gov_adj_mult - 1).abs().sum() + (self._gov_byb[:, 0] >= 0).sum()) > 0 or self._gov_fx_mag > 0)
-            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_ehprod - 1).abs().sum() + (self._pol_tpmult - 1).abs().sum() + (self._pol_adj_mult - 1).abs().sum() + (self._pol_byb[:, 0] >= 0).sum() + (self._pol_ymult - 1).abs().sum()) > 0 or self._pol_fx_mag > 0)
-        )
-        self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
-        self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
-        self._campus_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "CAMPUS"), -1)
-        self._commhub_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "COMMERCIAL_HUB"), -1)
-        self._entcomplex_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "ENTERTAINMENT_COMPLEX"), -1)
-        self._iz_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "INDUSTRIAL_ZONE"), -1)
-        self._aerodrome_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AERODROME"), -1)
-        self._spaceport_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "SPACEPORT"), -1)
+            self._pol_obsolete_civic = torch.tensor([int(p["obsoleteCivic"]) for p in _pols], dtype=torch.long, device=device)
+        self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "HARBOR"), -1)
+        self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "HOLY_SITE"), -1)
+        self._campus_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "CAMPUS"), -1)
+        self._commhub_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "COMMERCIAL_HUB"), -1)
+        self._entcomplex_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "ENTERTAINMENT_COMPLEX"), -1)
+        self._iz_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "INDUSTRIAL_ZONE"), -1)
+        self._aerodrome_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "AERODROME"), -1)
+        self._spaceport_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "SPACEPORT"), -1)
 
         # CIV6 (Districts.xml): DISTRICT_CITY_CENTER AirSlots 1,
         # DISTRICT_AERODROME AirSlots 4 before its buildings.
@@ -2573,18 +2552,18 @@ class SimInit:
         self._seaport_bidx = int(rules.seaport_bidx)
         self._nuclear_bidx = int(rules.nuclear_plant_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
-        _tr = rules.trade or {}
-        self._trade_mkt = int(_tr.get("marketBidx", -1))
-        self._trade_lgh = int(_tr.get("lighthouseBidx", -1))
-        self._trade_ftc = int(_tr.get("foreignTradeCidx", -3))
-        self._trade_wonders = [int(x) for x in _tr.get("capWonderWidx", [])]
-        self._trade_range = int(_tr.get("range", 15))
-        self._trade_sea_range = int(_tr.get("seaRange", 30))
+        _tr = rules.trade
+        self._trade_mkt = int(_tr["marketBidx"])
+        self._trade_lgh = int(_tr["lighthouseBidx"])
+        self._trade_ftc = int(_tr["foreignTradeCidx"])
+        self._trade_wonders = [int(x) for x in _tr["capWonderWidx"]]
+        self._trade_range = int(_tr["range"])
+        self._trade_sea_range = int(_tr["seaRange"])
         # District_TradeRouteYields' CITY_CENTER row: the flat head of every
         # route, domestic and international (engine yield order)
-        self._route_centre_dom = torch.tensor([float(x) for x in _tr.get("centreRouteDom", [1, 1, 0, 0, 0, 0])], dtype=torch.float64, device=device)  # [6]
-        self._route_centre_intl = torch.tensor([float(x) for x in _tr.get("centreRouteIntl", [0, 0, 3, 0, 0, 0])], dtype=torch.float64, device=device)  # [6]
-        self._trade_duration = int(_tr.get("duration", 20))  # route lifetime
+        self._route_centre_dom = torch.tensor([float(x) for x in _tr["centreRouteDom"]], dtype=torch.float64, device=device)  # [6]
+        self._route_centre_intl = torch.tensor([float(x) for x in _tr["centreRouteIntl"]], dtype=torch.float64, device=device)  # [6]
+        self._trade_duration = int(_tr["duration"])  # route lifetime
         self._trade_plunder_gold = int(_tr["plunderGold"])
         self._trader_guard_radius = int(_tr["guardRadius"])  # an escort's reach (`routePlunderer`)
         self._trade_walk_rail = int(_tr["walkRail"])
@@ -2743,30 +2722,30 @@ class SimInit:
         self._wall_breach = float(rules.combat["wallBreachFraction"])
         self._ranged_city_pen = float(rules.combat["rangedCityPenalty"])
         self._formation_cs = torch.tensor(
-            [int(x) for x in rules.combat.get("formationCs", [0])], dtype=torch.long, device=device)
-        self._formation_civic = [int(x) for x in rules.combat.get("formationCivic", [-1])]
+            [int(x) for x in rules.combat["formationCs"]], dtype=torch.long, device=device)
+        self._formation_civic = [int(x) for x in rules.combat["formationCivic"]]
         self._form_cost_mult = torch.tensor(
-            [float(x) for x in rules.combat.get("formationCostMult", [1.0])],
+            [float(x) for x in rules.combat["formationCostMult"]],
             dtype=torch.float64, device=device)
         # CIV6 (Formations): a DIRECT-trained Corps pays DOUBLE the chassis'
         # strategic resource and an Army TRIPLE, by tier.
         self._form_res_mult = [int(x) for x in rules.combat["formationResourceMult"]]
-        self._form_train_disc = float(rules.combat.get("formationTrainDiscount", 1.0))
+        self._form_train_disc = float(rules.combat["formationTrainDiscount"])
         self._form_max = self._formation_cs.numel() - 1
         # The ENCAMPMENT garrison pool cap (TS ENCAMPMENT_HP).
-        self._encamp_hp_max = int(rules.combat.get("encampHp", 100))
+        self._encamp_hp_max = int(rules.combat["encampHp"])
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
-        self._is_specialty = torch.tensor([bool(d.get("countsTowardLimit", True)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
+        self._is_specialty = torch.tensor([bool(d["countsTowardLimit"]) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
         # Types a city may hold SEVERAL of (CIV 6: the Neighborhood). The
         # registry keeps ONE tile per type, so these are counted off the tile
         # plane in `_district_counts`; the registry entry is the first of them.
-        self._is_repeatable = torch.tensor([bool(d.get("allowMultiple", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
+        self._is_repeatable = torch.tensor([bool(d["allowMultiple"]) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
         self._rep_any = bool(self._is_repeatable.any())
         if self._rep_any and bool((self._is_repeatable & self._is_specialty).any()):
             raise ValueError("a repeatable district that counts toward the specialty cap: "
                              "the cap and the discount both read the registry, which holds one tile per type")
-        self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AQUEDUCT"), -1)
+        self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "AQUEDUCT"), -1)
         # CIV6 (Military Engineer): its charge finishes 20% of "an engineering
         # type of district (Aqueduct, Bath, Canal, Dam)". The Bath is Rome's
         # unique Aqueduct, which this model has no carrier for. Held as
@@ -2779,49 +2758,49 @@ class SimInit:
         # one-per-civilization limit, the types it refuses to share a city
         # with, its appeal-based housing, its flood shield, and what it takes
         # off an enemy spy's level.
-        self._d_amenity = torch.tensor([float(d.get("amenities", 0)) for d in self.districts_cat], dtype=dtype, device=device)
+        self._d_amenity = torch.tensor([float(d["amenities"]) for d in self.districts_cat], dtype=dtype, device=device)
         # CIV6 (DistrictReplaces): a civilization's unique district standing in
         # for a row — {district idx: [{civ, costMult, housing, amenities}]}
-        self._d_variants = {i: list(d["variants"]) for i, d in enumerate(self.districts_cat) if d.get("variants")}
+        self._d_variants = {i: list(d["variants"]) for i, d in enumerate(self.districts_cat) if d["variants"]}
         # a UNIQUE district's OWN adjacency rows, {districtIdx: {civ: [(src, amount)]}}
         self._d_variant_adj: dict[int, dict[int, list[tuple[int, float]]]] = {}
         for _di, _vs in self._d_variants.items():
             for _v in _vs:
-                _rows = [(int(a), float(b)) for a, b in _v.get("adj", [])]
+                _rows = [(int(a), float(b)) for a, b in _v["adj"]]
                 if _rows:
                     self._d_variant_adj.setdefault(_di, {})[int(_v["civ"])] = _rows
         # the flat yields a unique district pays of its own, {di: {civ: [6]}}
         self._d_variant_flat: dict[int, dict[int, list[float]]] = {}
         for _di, _vs in self._d_variants.items():
             for _v in _vs:
-                _f = [float(x) for x in _v.get("flat", [])]
+                _f = [float(x) for x in _v["flat"]]
                 if any(_f):
                     self._d_variant_flat.setdefault(_di, {})[int(_v["civ"])] = _f
         # finishing one grants a unit (-1 none) or the strongest hull
         self._d_variant_grant: dict[int, dict[int, tuple[int, bool]]] = {}
         for _di, _vs in self._d_variants.items():
             for _v in _vs:
-                _gu, _gn = int(_v.get("grantUnit", -1)), bool(_v.get("grantNaval", 0))
+                _gu, _gn = int(_v["grantUnit"]), bool(_v["grantNaval"])
                 if _gu >= 0 or _gn:
                     self._d_variant_grant.setdefault(_di, {})[int(_v["civ"])] = (_gu, _gn)
-        self._d_loyalty = torch.tensor([float(d.get("loyalty", 0)) for d in self.districts_cat], dtype=dtype, device=device)
-        self._d_gov_title = torch.tensor([int(d.get("governorTitle", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
-        self._d_envoy_centre = torch.tensor([int(d.get("envoysNextToCenter", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
-        self._d_one_civ = torch.tensor([bool(d.get("oneCivWide", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
-        self._d_exclusive = [[int(x) for x in d.get("exclusive", [])] for d in self.districts_cat]
-        self._d_appeal_housing = torch.tensor([bool(d.get("appealHousing", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
-        self._d_flood_shield = torch.tensor([bool(d.get("floodShield", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
-        self._d_bomb_unowned = torch.tensor([bool(d.get("cultureBombUnowned", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
-        self._d_spy_pen = torch.tensor([int(d.get("spyLevelPenalty", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_loyalty = torch.tensor([float(d["loyalty"]) for d in self.districts_cat], dtype=dtype, device=device)
+        self._d_gov_title = torch.tensor([int(d["governorTitle"]) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_envoy_centre = torch.tensor([int(d["envoysNextToCenter"]) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_one_civ = torch.tensor([bool(d["oneCivWide"]) for d in self.districts_cat], dtype=torch.bool, device=device)
+        self._d_exclusive = [[int(x) for x in d["exclusive"]] for d in self.districts_cat]
+        self._d_appeal_housing = torch.tensor([bool(d["appealHousing"]) for d in self.districts_cat], dtype=torch.bool, device=device)
+        self._d_flood_shield = torch.tensor([bool(d["floodShield"]) for d in self.districts_cat], dtype=torch.bool, device=device)
+        self._d_bomb_unowned = torch.tensor([bool(d["cultureBombUnowned"]) for d in self.districts_cat], dtype=torch.bool, device=device)
+        self._d_spy_pen = torch.tensor([int(d["spyLevelPenalty"]) for d in self.districts_cat], dtype=torch.long, device=device)
         # CIV6 (Pillaging): the district plunder rows, same enum as the
         # improvements'
-        self._d_plun_kind = torch.tensor([int(d.get("plun", [0, 0])[0]) for d in self.districts_cat], dtype=torch.long, device=device)
-        self._d_plun_amt = torch.tensor([int(d.get("plun", [0, 0])[1]) for d in self.districts_cat], dtype=torch.long, device=device)
-        self._preserve_housing = [int(x) for x in _er2.get("preserveHousing", [0, 0, 0, 0, 0])]
-        self._d_unlock_t = torch.tensor([int(d.get("unlockTech", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
-        self._d_unlock_c = torch.tensor([int(d.get("unlockCivic", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
-        self._d_maint = torch.tensor([float(d.get("maintenance", 1)) for d in self.districts_cat], dtype=dtype, device=device)
-        self._d_housing = torch.tensor([float(d.get("housing", 0)) for d in self.districts_cat], dtype=dtype, device=device)
+        self._d_plun_kind = torch.tensor([int(d["plun"][0]) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_plun_amt = torch.tensor([int(d["plun"][1]) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._preserve_housing = [int(x) for x in _er2["preserveHousing"]]
+        self._d_unlock_t = torch.tensor([int(d["unlockTech"]) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_unlock_c = torch.tensor([int(d["unlockCivic"]) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_maint = torch.tensor([float(d["maintenance"]) for d in self.districts_cat], dtype=dtype, device=device)
+        self._d_housing = torch.tensor([float(d["housing"]) for d in self.districts_cat], dtype=dtype, device=device)
         # The NEIGHBORHOOD ladder as a plain per-band list, the shape the
         # Preserve's own table already has.
         self._nbhd_housing = [v for _c, v in sorted(self._appeal_cuts, reverse=True)] + [self._appeal_floor]
@@ -2989,7 +2968,7 @@ class SimInit:
         self._bldg_version = 0  # every `city_bldg` write moves it
         # CIV6 (Water Works): housing per Neighborhood/Aqueduct, amenities per
         # Canal/Dam — the district roster, by catalog id.
-        _dids = [str(d.get("id", "")) for d in self.districts_cat]
+        _dids = [str(d["id"]) for d in self.districts_cat]
         self._d_water_house = torch.tensor(
             [float(self._water_works_housing) if i in ("NEIGHBORHOOD", "AQUEDUCT") else 0.0 for i in _dids] or [0.0],
             dtype=torch.float64, device=device)
@@ -3047,11 +3026,11 @@ class SimInit:
         # CIV6 (Resource_Harvests): the HARVEST's yield column, its own base
         # before the progress scale, and the improvement whose unlock gates it
         self._res_harvest_y = torch.tensor(
-            [int(x) for x in _rsc.get("harvestYield", [])] or [-1], dtype=torch.long, device=device)
+            [int(x) for x in _rsc["harvestYield"]] or [-1], dtype=torch.long, device=device)
         self._res_harvest_amt = torch.tensor(
-            [int(x) for x in _rsc.get("harvestAmount", [])] or [0], dtype=torch.long, device=device)
+            [int(x) for x in _rsc["harvestAmount"]] or [0], dtype=torch.long, device=device)
         self._res_harvest_imp = torch.tensor(
-            [int(x) for x in _rsc.get("improvement", [])] or [-1], dtype=torch.long, device=device)
+            [int(x) for x in _rsc["improvement"]] or [-1], dtype=torch.long, device=device)
         # CIV6 (Resources.PrereqTech): the technology that REVEALS a resource
         # (-1 = always visible), and every resource's own tile yields — the
         # part of the static plane a seat that cannot see the resource is not
@@ -3080,8 +3059,8 @@ class SimInit:
         # for this district standing at its DESTINATION, domestic and
         # international columns (engine yield order). A repeatable type has
         # no row, which is what lets the ONE-tile-per-type registry read it.
-        self._route_dom_y = torch.tensor([[float(x) for x in d.get("routeDom", [0] * 6)] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
-        self._route_intl_y = torch.tensor([[float(x) for x in d.get("routeIntl", [0] * 6)] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
+        self._route_dom_y = torch.tensor([[float(x) for x in d["routeDom"]] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
+        self._route_intl_y = torch.tensor([[float(x) for x in d["routeIntl"]] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
         if self._rep_any:
             assert float((self._route_dom_y[self._is_repeatable].abs().sum() + self._route_intl_y[self._is_repeatable].abs().sum())) == 0.0, \
                 "a repeatable district with a trade-route row would need a tile-plane count, not the registry"
@@ -3251,46 +3230,44 @@ class SimInit:
         # exactly like major_unit_type and major_unit_type, so combat / moves / ranged strength /
         # ranged range / naval all come from the one roster table. The exporter
         # is the source of truth for the ladder's contents.
-        _bl = list(cb.get("barbLadder") or [])
+        _bl = list(cb["barbLadder"] or [])
         if not _bl:
             raise ValueError(
                 "rules.json has no combat.barbLadder — this export predates the ladder. "
                 "Re-run the exporter for this fixture set (`npm run seed && npm run export`)."
             )
         self._barb_ladder = torch.tensor(_bl, dtype=torch.long, device=device)
-        _bn = rules.combat.get("barbNavalTypes", []) or []
+        _bn = rules.combat["barbNavalTypes"] or []
         self._barb_galley_idx = int(_bn[0]) if len(_bn) > 0 else -1
         self._barb_quad_idx = int(_bn[1]) if len(_bn) > 1 else -1
-        _bc = rules.combat.get("barbCavalryTypes", []) or []
+        _bc = rules.combat["barbCavalryTypes"] or []
         self._barb_horseman_idx = int(_bc[0]) if len(_bc) > 0 else -1
         self._barb_knight_idx = int(_bc[1]) if len(_bc) > 1 else -1
         self._barb_horse_res = int(rules.combat["barbHorseRes"])
         self._barb_horse_range = int(rules.combat["barbHorseRange"])
         # EMBARK: the Classical embarked pool, the rungs that raise it, the
-        # Mathematics rung every hull and passenger reads, the water-step
-        # master switch (`embarkState.live` on the TS side) and the
+        # Mathematics rung every hull and passenger reads, and the
         # embark/ocean tech gate indices (military embarks on SHIPBUILDING,
         # civilians on SAILING, OCEAN needs CARTOGRAPHY).
-        self._embark_moves = int(cb.get("embarkMoves", 2))
-        self._embark_move_techs = [(int(a), int(b)) for a, b in cb.get("embarkMoveTechs", [])
+        self._embark_moves = int(cb["embarkMoves"])
+        self._embark_move_techs = [(int(a), int(b)) for a, b in cb["embarkMoveTechs"]
                                    if int(a) >= 0]
-        self._sea_move_tech = int(cb.get("seaMoveTech", -1))
-        self._sea_move_bonus = int(cb.get("seaMoveBonus", 1))
+        self._sea_move_tech = int(cb["seaMoveTech"])
+        self._sea_move_bonus = int(cb["seaMoveBonus"])
         # CIV6 (Combat): the CS an embarked unit DEFENDS at, by the OWNER's
         # technological era; and the two "Unit class modifiers", with the civic
         # that unlocks flanking and support at all.
         self._embarked_def_by_era = torch.tensor(
-            [int(x) for x in cb.get("embarkedDefenseCsByEra", [15])], dtype=torch.long, device=device)
-        self._class_melee_vs_anticav = int(cb.get("classMeleeVsAnticav", 5))
-        self._class_anticav_vs_cav = int(cb.get("classAnticavVsCav", 10))
-        self._flank_support_civic = int(cb.get("flankSupportCivic", -1))
-        self._amphibious_attack_cs = int(cb.get("amphibiousAttackCs", 10))
-        self._fort_def_cs = int(cb.get("fortDefenseCs", 4))
-        self._embark_live = bool(cb.get("embarkLive", 0))
-        self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
-        self._sailing_tech = int(cb.get("sailingTech", -1))
-        self._cartography_tech = int(cb.get("cartographyTech", -1))
-        self._celestial_tech = int(cb.get("celestialTech", -1))
+            [int(x) for x in cb["embarkedDefenseCsByEra"]], dtype=torch.long, device=device)
+        self._class_melee_vs_anticav = int(cb["classMeleeVsAnticav"])
+        self._class_anticav_vs_cav = int(cb["classAnticavVsCav"])
+        self._flank_support_civic = int(cb["flankSupportCivic"])
+        self._amphibious_attack_cs = int(cb["amphibiousAttackCs"])
+        self._fort_def_cs = int(cb["fortDefenseCs"])
+        self._shipbuilding_tech = int(cb["shipbuildingTech"])
+        self._sailing_tech = int(cb["sailingTech"])
+        self._cartography_tech = int(cb["cartographyTech"])
+        self._celestial_tech = int(cb["celestialTech"])
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
         self.NU = len(ru)
         # how many copies of each chassis a seat has ever acquired — what a
@@ -3314,36 +3291,36 @@ class SimInit:
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
         # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): the flat
         # CostProgressionParam1 each copy already acquired adds to the next.
-        self._type_cost_step = torch.tensor([u.get("costStep", 0) for u in ru], dtype=dtype, device=device)
+        self._type_cost_step = torch.tensor([u["costStep"] for u in ru], dtype=dtype, device=device)
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._type_maintenance = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)
         # NONCOMBAT — the set `unitIsNoncombat` names on TS, the support rows
         # included. Their STACKING slot is `_type_support` below.
         self._type_civilian = torch.tensor([bool(u["civilian"]) for u in ru], dtype=torch.bool, device=device)
-        self._type_support = torch.tensor([bool(u.get("support", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_support = torch.tensor([bool(u["support"]) for u in ru], dtype=torch.bool, device=device)
         self._type_military = torch.tensor([bool(u["military"]) for u in ru], dtype=torch.bool, device=device)
-        self._type_ranged_strength = torch.tensor([u.get("rangedStrength", 0) for u in ru], dtype=torch.long, device=device)  # 0 = melee-only
-        self._type_ranged_range = torch.tensor([u.get("rangedRange", 0) for u in ru], dtype=torch.long, device=device)  # strike range
-        self._type_moves = torch.tensor([u.get("moves", 2) for u in ru], dtype=torch.long, device=device)  # full MP per turn
+        self._type_ranged_strength = torch.tensor([u["rangedStrength"] for u in ru], dtype=torch.long, device=device)  # 0 = melee-only
+        self._type_ranged_range = torch.tensor([u["rangedRange"] for u in ru], dtype=torch.long, device=device)  # strike range
+        self._type_moves = torch.tensor([u["moves"] for u in ru], dtype=torch.long, device=device)  # full MP per turn
         # NAVAL unit flag per roster index. A naval mover stands on water
         # natively; an embarked LAND mover stands on water via the embark gate.
         # Read at the war-march passability composition.
-        self.unit_naval = torch.tensor([bool(u.get("naval", 0)) for u in ru], dtype=torch.bool, device=device)
+        self.unit_naval = torch.tensor([bool(u["naval"]) for u in ru], dtype=torch.bool, device=device)
         # CIV6 (Giant Death Robot): "Can move and fight in Ocean and Coast
         # tiles as it would on land" — water is simply ground to such a
         # chassis, so it never embarks and asks no seafaring tech.
-        self.unit_water_walk = torch.tensor([bool(u.get("ww", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_heal_friendly = torch.tensor([bool(u.get("healFriendly", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_nuke_carry = torch.tensor([bool(u.get("nukeCarry", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_cavalry = torch.tensor([bool(u.get("cavalry", 0)) for u in ru], dtype=torch.bool, device=device)  # light+heavy cavalry (Preslav)
+        self.unit_water_walk = torch.tensor([bool(u["ww"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_heal_friendly = torch.tensor([bool(u["healFriendly"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_nuke_carry = torch.tensor([bool(u["nukeCarry"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_cavalry = torch.tensor([bool(u["cavalry"]) for u in ru], dtype=torch.bool, device=device)  # light+heavy cavalry (Preslav)
         # THE SIEGE CLASSES. `_type_bombard` > 0 marks a unit whose attack
         # "uses Bombard Strength": full damage to a perimeter, no city penalty,
         # and no melee attack at all. `_type_siege_support` is the support
         # chassis (1 Battering Ram, 2 Siege Tower) and `_type_siege_max_walls`
         # the highest walls tier it still works against. The ram and the tower
         # help MELEE and ANTI-CAVALRY attackers and nobody else.
-        self._type_melee = torch.tensor([bool(u.get("melee", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_anticav = torch.tensor([bool(u.get("antiCavalry", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_melee = torch.tensor([bool(u["melee"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_anticav = torch.tensor([bool(u["antiCavalry"]) for u in ru], dtype=torch.bool, device=device)
         # the per-TYPE flat Combat Strength each government/policy row grants
         # (`_gov_unit_cs`): a promotion-class mask hit, or the all-combat
         # arm, both gated on the chassis carrying any strength at all.
@@ -3358,69 +3335,69 @@ class SimInit:
             _phit = (((self._pol_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0)
                      | self._pol_ucs_allc.unsqueeze(1)) & _pcbt.unsqueeze(0)
             self._pol_ucs_by_type = self._pol_ucs_cs.unsqueeze(1) * _phit.double()
-        self._type_bombard = torch.tensor([int(u.get("bombard", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_bombard = torch.tensor([int(u["bombard"]) for u in ru], dtype=torch.long, device=device)
         # the CLASS bit mask and the ERA index a production card reads
-        self._type_cls = torch.tensor([int(u.get("cls", 0)) for u in ru], dtype=torch.long, device=device)
-        self._type_era = torch.tensor([int(u.get("era", 0)) for u in ru], dtype=torch.long, device=device)
-        self._type_recon = torch.tensor([bool(u.get("recon", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_cls = torch.tensor([int(u["cls"]) for u in ru], dtype=torch.long, device=device)
+        self._type_era = torch.tensor([int(u["era"]) for u in ru], dtype=torch.long, device=device)
+        self._type_recon = torch.tensor([bool(u["recon"]) for u in ru], dtype=torch.bool, device=device)
         # CIV6 (PROMOTION_CLASS_LIGHT_CAVALRY): `COPY_CLASSES[0]`'s plane
         self._type_lightcav = torch.tensor([bool(u["lightcav"]) for u in ru], dtype=torch.bool, device=device)
         # THE NAVAL RAIDER AXIS. `_type_sight` is the chassis override; 0 means
         # the SIGHT_RANGE default, which `_unit_sight` supplies.
-        self._type_stealth = torch.tensor([bool(u.get("stealth", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_stealth = torch.tensor([bool(u["stealth"]) for u in ru], dtype=torch.bool, device=device)
         # CIV6: the NAVAL RAIDER class — "Can perform Coastal Raids."
-        self._type_raider = torch.tensor([bool(u.get("raider", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_raider = torch.tensor([bool(u["raider"]) for u in ru], dtype=torch.bool, device=device)
         # CIV6 (Anti-Air Gun, Mobile SAM): "Provides cover from air attacks up
         # to 1 hex away from the weapon"; -1 covers nothing. `_air_cover_scan`
         # walks the target hex and its own ring, so a wider weapon would need a
         # wider walk — the assert is the tripwire for that.
         self._type_anti_air_range = torch.tensor(
-            [int(u.get("antiAirRange", -1)) for u in ru], dtype=torch.long, device=device)
+            [int(u["antiAirRange"]) for u in ru], dtype=torch.long, device=device)
         self._air_cover_max = int(self._type_anti_air_range.max().item()) if len(ru) else -1
         assert self._air_cover_max <= 1, (
             f"a chassis covers {self._air_cover_max} hexes; _air_cover_scan walks one ring")
-        self._type_reveal = torch.tensor([bool(u.get("revealStealth", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_zoc_ignore = torch.tensor([bool(u.get("ignoresZoc", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_zoc_none = torch.tensor([bool(u.get("exertsNoZoc", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_sight = torch.tensor([int(u.get("sight", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_reveal = torch.tensor([bool(u["revealStealth"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_zoc_ignore = torch.tensor([bool(u["ignoresZoc"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_zoc_none = torch.tensor([bool(u["exertsNoZoc"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_sight = torch.tensor([int(u["sight"]) for u in ru], dtype=torch.long, device=device)
         # a chassis is not the only hider: Twilight Veil is a PROMOTION.
-        _veil = self._pk.get("STEALTH", -1)
+        _veil = self._pk["STEALTH"]
         self._stealth_live = bool(self._type_stealth.any()) or (
             _veil >= 0 and bool((rules.promo_kind == _veil).any()))
-        self._type_siege_support = torch.tensor([int(u.get("siegeSupport", 0)) for u in ru], dtype=torch.long, device=device)
-        self._type_siege_max_walls = torch.tensor([int(u.get("siegeMaxWalls", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_siege_support = torch.tensor([int(u["siegeSupport"]) for u in ru], dtype=torch.long, device=device)
+        self._type_siege_max_walls = torch.tensor([int(u["siegeMaxWalls"]) for u in ru], dtype=torch.long, device=device)
         self._siege_support_any = bool((self._type_siege_support > 0).any())
         self._siege_support_idx = [i for i, v in enumerate(self._type_siege_support.tolist()) if int(v) > 0]
         self._type_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
-        self._type_civic = torch.tensor([u.get("requiresCivic", -1) for u in ru], dtype=torch.long, device=device)
-        self._type_needs_slot = torch.tensor([bool(u.get("needsArtifactSlot", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_civic = torch.tensor([u["requiresCivic"] for u in ru], dtype=torch.long, device=device)
+        self._type_needs_slot = torch.tensor([bool(u["needsArtifactSlot"]) for u in ru], dtype=torch.bool, device=device)
         # a building the TRAINING city must hold (the Military Engineer's Armory)
-        self._type_req_bldg = torch.tensor([int(u.get("requiresBuilding", -1)) for u in ru], dtype=torch.long, device=device)
-        self._type_resource = torch.tensor([int(u.get("requiresResource", -1)) for u in ru], dtype=torch.long, device=device)
-        self._res_unit_pairs = [(i, int(u.get("requiresResource", -1))) for i, u in enumerate(ru) if int(u.get("requiresResource", -1)) >= 0]
+        self._type_req_bldg = torch.tensor([int(u["requiresBuilding"]) for u in ru], dtype=torch.long, device=device)
+        self._type_resource = torch.tensor([int(u["requiresResource"]) for u in ru], dtype=torch.long, device=device)
+        self._res_unit_pairs = [(i, int(u["requiresResource"])) for i, u in enumerate(ru) if int(u["requiresResource"]) >= 0]
         self._res_pair_vecs = (
             torch.tensor([u for u, _ in self._res_unit_pairs], dtype=torch.long, device=device),
             torch.tensor([r for _, r in self._res_unit_pairs], dtype=torch.long, device=device))
         # GS: the STOCKPILE slot a unit charges, and what it charges.
-        self._type_res_slot = torch.tensor([int(u.get("resSlot", -1)) for u in ru], dtype=torch.long, device=device)
-        self._type_res_cost = torch.tensor([int(u.get("resCost", 0)) for u in ru], dtype=torch.long, device=device)
-        self._res_slot_units = [(i, int(u.get("resSlot", -1)), int(u.get("resCost", 0)))
-                                for i, u in enumerate(ru) if int(u.get("resSlot", -1)) >= 0]
+        self._type_res_slot = torch.tensor([int(u["resSlot"]) for u in ru], dtype=torch.long, device=device)
+        self._type_res_cost = torch.tensor([int(u["resCost"]) for u in ru], dtype=torch.long, device=device)
+        self._res_slot_units = [(i, int(u["resSlot"]), int(u["resCost"]))
+                                for i, u in enumerate(ru) if int(u["resSlot"]) >= 0]
         # GS: a FUEL unit bills its resource EVERY turn it lives.
-        self._type_res_upkeep = torch.tensor([int(u.get("resUpkeep", 0)) for u in ru], dtype=torch.long, device=device)
-        self._upkeep_units = [(i, int(u.get("resSlot", -1)), int(u.get("resUpkeep", 0)))
+        self._type_res_upkeep = torch.tensor([int(u["resUpkeep"]) for u in ru], dtype=torch.long, device=device)
+        self._upkeep_units = [(i, int(u["resSlot"]), int(u["resUpkeep"]))
                               for i, u in enumerate(ru)
-                              if int(u.get("resSlot", -1)) >= 0 and int(u.get("resUpkeep", 0)) > 0]
+                              if int(u["resSlot"]) >= 0 and int(u["resUpkeep"]) > 0]
         # the upgrade ladder: the roster index this chassis becomes.
-        self._type_up_to = torch.tensor([int(u.get("upTo", -1)) for u in ru], dtype=torch.long, device=device)
-        self._type_anti_air = torch.tensor([int(u.get("antiAir", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_up_to = torch.tensor([int(u["upTo"]) for u in ru], dtype=torch.long, device=device)
+        self._type_anti_air = torch.tensor([int(u["antiAir"]) for u in ru], dtype=torch.long, device=device)
         # AIR: 0 = not an aircraft, 1 = fighter, 2 = bomber; `airSlots` is what
         # a chassis provides as a BASE (the Aircraft Carrier).
-        self._type_air = torch.tensor([int(u.get("air", 0)) for u in ru], dtype=torch.long, device=device)
-        self._type_air_slots = torch.tensor([int(u.get("airSlots", 0)) for u in ru], dtype=torch.long, device=device)
-        self._gdr_idx = next((i for i, u in enumerate(ru) if int(u.get("gdr", 0))), -1)
-        self._spy_idx = next((i for i, u in enumerate(ru) if int(u.get("spy", 0))), -1)
-        self._type_no_gold = torch.tensor([bool(u.get("noGold", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_air = torch.tensor([int(u["air"]) for u in ru], dtype=torch.long, device=device)
+        self._type_air_slots = torch.tensor([int(u["airSlots"]) for u in ru], dtype=torch.long, device=device)
+        self._gdr_idx = next((i for i, u in enumerate(ru) if int(u["gdr"])), -1)
+        self._spy_idx = next((i for i, u in enumerate(ru) if int(u["spy"])), -1)
+        self._type_no_gold = torch.tensor([bool(u["noGold"]) for u in ru], dtype=torch.bool, device=device)
         self._any_air = bool((self._type_air > 0).any())
         # THE TWO CLASS SENTENCES THE RULES ACTUALLY SPEAK, named here so no
         # rule has to spell one out of the flags. `_type_military` is the wire
@@ -3435,12 +3412,12 @@ class SimInit:
         if self._spy_idx >= 0:
             _nc = _nc & (torch.arange(_nc.numel(), device=device) != self._spy_idx)
         self._type_noncombat = _nc
-        self._type_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
-        self._type_faith_only = torch.tensor([bool(u.get("fo", 0)) for u in ru], dtype=torch.bool, device=device)
-        self._type_spawn_only = torch.tensor([bool(u.get("so", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_charges = torch.tensor([u["charges"] for u in ru], dtype=torch.long, device=device)
+        self._type_faith_only = torch.tensor([bool(u["fo"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_spawn_only = torch.tensor([bool(u["so"]) for u in ru], dtype=torch.bool, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
-        self._settler_idx = next((i for i, u in enumerate(ru) if bool(u.get("settler", 0))), -1)
-        self._type_settler = torch.tensor([bool(u.get("settler", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._settler_idx = next((i for i, u in enumerate(ru) if bool(u["settler"])), -1)
+        self._type_settler = torch.tensor([bool(u["settler"]) for u in ru], dtype=torch.bool, device=device)
         # THE UNIQUE UNITS (`uniqueTo` / `replaces` and the chassis terms only
         # a unique carries): `_civ_unit_ok` hands each to its civilization.
         self._type_uniq = torch.tensor([int(u["uniq"]) for u in ru], dtype=torch.long, device=device)
@@ -3697,7 +3674,7 @@ class SimInit:
         # CIV6 (Mediterranean Colonies): whose COASTAL cities on their home
         # continent are 100% Loyal, by civilization index
         self._coastal_home_loyal = torch.tensor(
-            [int(x) for x in _uq.get("coastalHomeLoyal", [])] or [0],
+            [int(x) for x in _uq["coastalHomeLoyal"]] or [0],
             dtype=torch.bool, device=device)
         self._culture_bomb_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["cultureBombs"]]  # type: ignore[misc]
@@ -3899,21 +3876,20 @@ class SimInit:
         # that is neither a raider nor a carrier
         self._type_naval_melee = (self.unit_naval & (self._type_ranged_strength == 0)
                                   & ~self._type_raider & (self._type_air_slots == 0))
-        self._trader_idx = next(i for i, u in enumerate(ru) if bool(u.get("trader", 0)))
+        self._trader_idx = next(i for i, u in enumerate(ru) if bool(u["trader"]))
         # SCOUT is a military explorer (combat 10) but never in the civ roster
         # (BUY_UNITS and the ladder exclude it). The production ladder
         # prefers WARRIOR anyway, but the gold buy's affordability gate can
         # leave SCOUT the only affordable candidate, so it is masked out of the
         # buy set to mirror TS.
         self._scout_idx = next((i for i, u in enumerate(ru) if u["id"] == "SCOUT"), -1)
-        self._general_unit_idx = int(rr.get("generalUnitIdx", -1))
-        self._admiral_unit_idx = int(rr.get("admiralUnitIdx", -1))
-        self._admiral_march_live = bool(rr.get("admiralMarchLive", False))
-        self._general_cls = int(rr.get("generalClassIdx", -1))
-        self._admiral_cls = int(rr.get("admiralClassIdx", -1))
-        self._gen_aura_cs_val = float(rr.get("generalAuraCs", 5))
-        self._gen_aura_range = int(rr.get("generalAuraRange", 2))
-        self._gen_aura_mp = int(rr.get("generalAuraMp", 1))  # the aura's movement half, already in mp_scale units
+        self._general_unit_idx = int(rr["generalUnitIdx"])
+        self._admiral_unit_idx = int(rr["admiralUnitIdx"])
+        self._general_cls = int(rr["generalClassIdx"])
+        self._admiral_cls = int(rr["admiralClassIdx"])
+        self._gen_aura_cs_val = float(rr["generalAuraCs"])
+        self._gen_aura_range = int(rr["generalAuraRange"])
+        self._gen_aura_mp = int(rr["generalAuraMp"])  # the aura's movement half, already in mp_scale units
         self._gen_off = tiles_within_offsets(self._gen_aura_range).to(device)  # aura disk (hexDistance ≤ range)
 
         self._prereq_t = self._prereq_matrix(rules.t_prereqs, NT).to(device)
@@ -4001,7 +3977,7 @@ class SimInit:
                     self.major_unit_seat[b, i] = seat
                     self.major_unit_type[b, i] = ti
                     self.major_unit_tile[b, i] = int(u_["tile"])
-                    self.major_unit_hp[b, i] = rules.combat.get("unitHp", 100)
+                    self.major_unit_hp[b, i] = rules.combat["unitHp"]
                     self.major_unit_charges[b, i] = int(self._type_charges[ti])
                     _m0u = self._mp_scale * int(self._type_moves[ti])
                     self.major_unit_mp[b, i] = _m0u

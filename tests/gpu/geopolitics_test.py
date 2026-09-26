@@ -27,7 +27,7 @@ Covered:
      the weaker side never stamps back; a STANDING denouncement is never
      re-stamped and an EXPIRED one may be renewed; an at-war pair does not
      stamp.
-  c. DoW kind: a stamp between formalWarMinTurns and agreementTurns old makes
+  c. DoW kind: a stamp between the Formal kind's denouncement age and agreementTurns old makes
      the war FORMAL; a younger stamp, an expired one or no stamp is SURPRISE;
      war writes are symmetric — for a civ↔civ pair AND for a war seat 0
      declares, through the one applier.
@@ -459,11 +459,11 @@ def poke_denounce(rules, path):
 
 
 def poke_dow_kind(rules, path):
-    """c. DoW FORMAL iff the aggressor's stamp is >= formalWarMinTurns old —
+    """c. DoW FORMAL iff the aggressor's stamp is >= the Formal kind's denouncement age —
     for a civ↔civ pair AND for a war seat 0 declares, through the ONE applier
     each row's head calls."""
     sim, _, _ = controlled_pair(rules, path)
-    fmin = int(sim.rules.seats.get("formalWarMinTurns", 5))
+    fmin = sim._war_kinds[1][1]  # the Formal row's denouncement turns
     t = int(sim.turn)
 
     sim.seat_denounced[0, 1, 2] = t - fmin  # exactly at the bar -> FORMAL

@@ -69,6 +69,11 @@ ALLOWLIST: dict[str, str] = {
     # ---- prose columns ----
     "desc": "prose: the eureka's Civilopedia sentence (cpu/data/boosts.ts:36)",
     "title": "prose: the governor's Civilopedia epithet (cpu/data/governors.ts:30)",
+    "color": "prose: a district's display colour (cpu/data/districts.ts), no rule reads it",
+    # ---- the catalog's own row order ----
+    "tieBreak": "SCORING_LINE_ITEMS is sorted by TieBreakerPriority (cpu/data/scoring.ts), so "
+                "scoreLeader (cpu/core/score.ts) and the GPU walk the lines in this column's "
+                "order by position (sim_economy.py `rules.scoring` order)",
     # ---- read through a cpu/data helper the census does not walk ----
     "powerPlant": "TS reads it as POWER_PLANT_IDS (cpu/data/buildings.ts:1078), consumed at "
                   "cpu/core/yields.ts:605, climate.ts:43, congress.ts:231; the GPU reads the wire "
@@ -83,6 +88,8 @@ ALLOWLIST: dict[str, str] = {
     "defenseCS": "TS reads it in improvementDefenseCS (cpu/data/improvements.ts:1500), called "
                  "from cpu/core/combat.ts:108 and :655; the GPU reads the wire's `defCs` "
                  "(gpu/core/sim_init.py:1855)",
+    "worshipBuilding": "TS reads it in worshipBuildingOf (cpu/data/religion.ts:629), called from "
+                       "cpu/core/rules.ts:888, cpu/core/game.ts:647 and cpu/core/buyCandidates.ts:349",
     "gpClasses": "TS reads it in gpClassesOf (cpu/data/projects.ts:468), called from "
                  "cpu/core/production.ts:165",
     "gppFraction": "TS reads it in gppFractionOf (cpu/data/projects.ts:472), called from "

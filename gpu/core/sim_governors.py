@@ -642,7 +642,7 @@ class SimGovernors:
         if bool((self._b_house_gov != 0).any()):
             house = house + seated.double() * self._seat_building_sum(row, self._b_house_gov).double().unsqueeze(1)
         works = self._governor_flag(row, "waterWorks")
-        if bool(works.any()) and self.districts_on:
+        if bool(works.any()):
             cnt = self._dist_counts(row)                                  # [B, RC, nD]
             h = torch.einsum("bjn,n->bj", cnt.double(), self._d_water_house)
             a = torch.einsum("bjn,n->bj", cnt.double(), self._d_water_amen)

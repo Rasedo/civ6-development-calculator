@@ -54,7 +54,6 @@ def _lux_on(sim, tile: int, lux: int, imp: int) -> None:
 
 def test_need_and_supply(rules, path) -> None:
     sim = fresh(rules, path)
-    assert sim.improvements_on, "the fixture carries no improvements"
     # solvent seats: bankruptcy's amenity loss is its own lane
     sim.civ_treasury[B0, 0] = 50.0
     imp = RULES["improvements"]["ids"].index("PLANTATION")

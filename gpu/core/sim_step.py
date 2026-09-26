@@ -8,7 +8,7 @@ class SimStep:
     def step(self) -> None:
         dev = self.device
         if self.units_mode:
-            cap = self.rules.combat.get("unitHp", 100)
+            cap = self.rules.combat["unitHp"]
             for _pre in ("barb", "major"):
                 _hp = getattr(self, f"{_pre}_unit_hp")
                 _hp.copy_(torch.where(

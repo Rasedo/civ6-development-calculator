@@ -33,10 +33,10 @@ import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnU
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom, interceptorAgainst, priorityDefender, INTERCEPT_SUPPORT_CS } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
-import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
+import { ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
 import { isExplored, revealAround, unexploredByAll } from './fog';
 import { wipeConstruction } from './production';
 import {
@@ -1328,7 +1328,7 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
     promoCS(attacker, {
       attacking: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex],
     }) +
-    (CITY_RELIGION_ADDER_LIVE && isCiv(attacker.seat)
+    (isCiv(attacker.seat)
       ? religionAttackCS(state, attacker, targetIndex)
       : 0) +
     cavalryHillCS(state, attacker, attacker.tileIndex) + // Preslav's suzerain
@@ -1998,10 +1998,10 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   // ranged attack resolves the same way for every seat (the GPU's
   // `_ranged_attack`, which the applier dispatches by unit type alone).
   // The enhancer attacker adders key on where the unit STANDS rather than
-  // on what it hits, so they join the city arms behind the same live flag
-  // every other city-attack path asks.
+  // on what it hits, so they join the city arms as every other city-attack
+  // path does.
   const atkSeat = unitSeat(attacker);
-  const relCity = CITY_RELIGION_ADDER_LIVE && isCiv(attacker.seat)
+  const relCity = isCiv(attacker.seat)
     ? religionAttackCS(state, attacker, targetIndex)
     : 0;
   const civCity = cityAtIndex(state, targetIndex);
@@ -2113,7 +2113,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (enemyCity) {
     const defCS = cityDefenseStrength(state, enemyCity);
     const outer = outerPool(state, enemyCity);
-    const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, held!.holder.seat, null, true)) - defCS, 'vrngc', targetIndex);
+    const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, held!.holder.seat, null, true)) - defCS, 'vrngc', targetIndex);
     const split = cityDamageSplit(outer, wallsMax(state, enemyCity), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
     enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
@@ -2127,7 +2127,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (encampV) {
     rangedStrikeEncampment(
       state, attacker, targetIndex, encampV.defCS,
-      CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0, 'vrnge');
+      religionAttackCS(state, attacker, targetIndex), 'vrnge');
     return true;
   }
   // CIV6: a minor's city is a CITY to ranged fire too — `cityStateAttackable`
@@ -2138,7 +2138,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     const csShape = { buildings: csHere.buildings ?? [], seat: csHere.seat, outerHp: csHere.outerHp };
     const csOuter = outerPool(state, csShape);
     const defCS = minorCityCS(state, csHere);
-    const roll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, csHere.seat, null, true)) - defCS, 'vrngcs', targetIndex);
+    const roll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, csHere.seat, null, true)) - defCS, 'vrngcs', targetIndex);
     const split = cityDamageSplit(csOuter, wallsMax(state, csShape), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
     csHere.hp = Math.max(1, (csHere.hp ?? CITY_STATE_MAX_HP) - split.centre);
@@ -2764,13 +2764,12 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     target = best;
   }
   if (!target) return;
-  const allowEmbark = embarkState.live;
   for (;;) {
     const at = tile();
     const step = neighbors(map, at)
       .filter(
         (n) =>
-          tileFreeForUnit(state, n.index, 0, unit, allowEmbark) &&
+          tileFreeForUnit(state, n.index, 0, unit, true) &&
           // A CLIFF closes the embark/disembark edge for the
           // war-march too — the GPU's _apply_seat_unit_actions war-march scan
           // masks it out of its step candidates, and TS did not, so a seat
@@ -2849,21 +2848,6 @@ function campNearHorses(state: GameState, campIdx: number): boolean {
     .some((t) => t.resource === 'HORSES');
 }
 
-/**
- * SCOUT-THEN-RAID. Real Civ 6 camps open with a scout that goes
- * looking for a target, and only then start producing raiders. Mirrored as
- * the spawn TYPE of a BRAND-NEW camp: its first unit is a SCOUT, while the
- * regarrison and raid sites keep the melee/ranged ladders. Draw-count neutral
- * (the camp-spawn roll above is untouched), and the scout rides the existing
- * barb walker — it marches and can attack like any melee barb, it is simply
- * weaker, which is exactly the early-camp pressure Civ 6 models.
- */
-export const BARB_SCOUT_OPENER_LIVE = true; // see the spawn site
-
-function barbScoutType(): string {
-  return 'SCOUT';
-}
-
 export function barbarianPhase(state: GameState): void {
   const map = state.map;
   for (const u of state.units) {
@@ -2880,7 +2864,11 @@ export function barbarianPhase(state: GameState): void {
     if (candidates.length > 0) {
       const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];
       state.barbSeat.camps.push(spot.index);
-      spawnUnit(state, BARB_SCOUT_OPENER_LIVE ? barbScoutType() : barbMeleeType(state.turn), spot.index, BARB_SEAT);
+      // SCOUT-THEN-RAID: a brand-new camp opens with a scout that goes
+      // looking for a target; the regarrison and raid sites below keep the
+      // melee/ranged ladders. The scout rides the barb walker and attacks
+      // like any melee barb.
+      spawnUnit(state, 'SCOUT', spot.index, BARB_SEAT);
     }
   }
 

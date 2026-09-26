@@ -856,10 +856,6 @@ export const HOLY_CITY_TOURISM = srcConst('seats.holyCityTourism', 8,
 export const ENLIGHTENMENT_CIVIC = srcConst('seats.enlightenmentCidx', 'ENLIGHTENMENT',
   xml('Civics', 'CivicType=CIVIC_THE_ENLIGHTENMENT', 'CivicType', { expect: 'CIVIC_THE_ENLIGHTENMENT' }));
 
-/** dedications granted on a HEROIC age (Dark -> Golden). Real
- * Civ 6 grants three; every other transition grants one. */
-export const ADMIRAL_MARCH_LIVE = true;
-
 /**
  * The NAMED DEDICATION CATALOG. Real Civ 6 has each civ commit to a NAMED
  * dedication per
@@ -997,19 +993,6 @@ export const AUTOMATON_URANIUM_PER_TURN = srcConst('eras.automatonUraniumPerTurn
 export const AUTOMATON_URANIUM_PER_MINE = srcConst('eras.automatonUraniumPerMine', 1,
   { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept (Automaton Warfare, Golden face): "Uranium mines accumulate +1 more resource per turn"' });
 
-export const DEDICATION_PAYOUTS_LIVE = true;
-
-/**
- * Seat MILITARY ENGINEER production.
- *
- * The unit's own data and its Armory gate are sourced (`data/units.ts`). What
- * is authored is this: at war, one engineer at a time, forting only tiles
- * adjacent to a hostile civ's territory. Real Civ 6's AI forts chokepoints and
- * publishes no rule that quantifies it, so no source can settle this one.
- */
-export const ENGINEER_LIVE = srcConst('improvements.engineerLive', true,
-  { stylized: 'the seat\'s engineer POLICY — one at a time, forting only tiles next to a hostile civ; real Civ 6 publishes no rule that quantifies its AI\'s chokepoint forting' });
-
 export const HEROIC_DEDICATIONS = srcConst('eras.heroicDedications', 3,
   { pedia: 'the Gathering Storm Civilopedia \'Dedications\' concept: a HEROIC age (Dark -> Golden) commits three dedications where every other transition commits one' });
 /** MONUMENTALITY / EXODUS OF THE EVANGELISTS grant +2 Movement to
@@ -1021,7 +1004,6 @@ export const GOLDEN_MOVE_BONUS = srcConst('eras.goldenMoveBonus', 2,
 
 export const GOVERNOR_LOYALTY = srcConst('eras.governorLoyalty', 8,
   { stylized: 'a GOVERNOR constant — the file header names the governor constants as deliberate model tuning, not Civ 6 values' });
-export { FORMAL_WAR_MIN_TURNS } from './warKinds';
 
 /**
  * EVERY DIPLOMATIC AGREEMENT RUNS THE SAME CLOCK.

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { emptySeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
 import { stepThrough, makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { MP_SCALE } from '../../../cpu/data/constants';
@@ -8,14 +8,10 @@ import { neighbors, hexDistance } from '../../../world/hex';
 import { unitSight, SIGHT_RANGE } from '../../../cpu/core/fog';
 import { UNITS } from '../../../cpu/data/units';
 import { isWater } from '../../../world/query';
-import { EMBARKED_DEFENSE_CS_BY_ERA, setEmbarkLive, EMBARK_MOVES, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS } from '../../../cpu/data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, EMBARK_MOVES, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS } from '../../../cpu/data/constants';
 import type { CityState, GameState, City, Seat, Tile, Unit } from '../../../cpu/core/types';
 
-// the MOVEMENT + EMBARKATION model. Every water step on both engines rides the
-// `embarkState.live` master switch, which SHIPS ON; the tests below poke it OFF
-// to prove the land-only fallback still holds.
-
-afterEach(() => setEmbarkLive(true)); // restore the shipped default
+// the MOVEMENT + EMBARKATION model.
 
 function addCivAtWar(state: GameState, col: number, row: number, techs: string[]): Seat {
   const civ: Seat = {
@@ -129,7 +125,7 @@ describe('spawn stays ashore', () => {
   });
 });
 
-describe('war-march water steps (behind the inert live switch)', () => {
+describe('war-march water steps', () => {
   function marchScenario(techs: string[]): { state: GameState; unit: Unit } {
     // Almost-all-water map: unit start + seat-0 city are the only land, so the
     // strictly-closer march step is always a water tile (forces an embark).
@@ -145,8 +141,7 @@ describe('war-march water steps (behind the inert live switch)', () => {
     return { state, unit };
   }
 
-  it('LIVE + SHIPBUILDING: the war-march embarks (all MP spent, now on water)', () => {
-    setEmbarkLive(true);
+  it('SHIPBUILDING: the war-march embarks (all MP spent, now on water)', () => {
     const { state, unit } = marchScenario(['SAILING', 'SHIPBUILDING']);
     expect(isWater(state.map.tiles[unit.tileIndex])).toBe(false); // starts ashore
     hostileUnitAct(state, unit);
@@ -158,8 +153,7 @@ describe('war-march water steps (behind the inert live switch)', () => {
   // A CLIFF closes the embark edge for the WAR-MARCH, not just for the
   // ordinary walker. Both engines must mask it out of the march's step set, or
   // one embarks over a cliff where the other holds.
-  it('LIVE + SHIPBUILDING but CLIFFED: the war-march stays ashore', () => {
-    setEmbarkLive(true);
+  it('SHIPBUILDING but CLIFFED: the war-march stays ashore', () => {
     const { state, unit } = marchScenario(['SAILING', 'SHIPBUILDING']);
     const start = state.map.tiles[unit.tileIndex];
     start.cliffMask = 0b111111; // wall every land/water edge of the start tile
@@ -169,22 +163,12 @@ describe('war-march water steps (behind the inert live switch)', () => {
     expect(unit.tileIndex).toBe(start.index); // no legal step remained
   });
 
-  it('LIVE but NO SHIPBUILDING: the unit cannot embark and stays ashore', () => {
-    setEmbarkLive(true);
+  it('NO SHIPBUILDING: the unit cannot embark and stays ashore', () => {
     const { state, unit } = marchScenario(['SAILING']); // civilian tech only
     const before = unit.tileIndex;
     hostileUnitAct(state, unit);
     expect(!!unit.embarked).toBe(false);
     expect(unit.tileIndex).toBe(before); // no land-or-water step available
-  });
-
-  it('SWITCH OFF: even with SHIPBUILDING the war-march stays land-only', () => {
-    setEmbarkLive(false);
-    const { state, unit } = marchScenario(['SAILING', 'SHIPBUILDING']);
-    const before = unit.tileIndex;
-    hostileUnitAct(state, unit);
-    expect(!!unit.embarked).toBe(false);
-    expect(unit.tileIndex).toBe(before);
   });
 
   it('tileFreeForUnit gates embark on allowEmbark + owner tech', () => {

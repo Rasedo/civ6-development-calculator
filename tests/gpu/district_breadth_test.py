@@ -410,9 +410,9 @@ def poke_civ_palace(rules, rj, path):
     py = sim._palace_y  # [food, prod, gold, sci, cul, faith]
     assert py.tolist() == [0, 2, 5, 2, 1, 0], f"palace yields drifted: {py.tolist()}"
 
-    # neutralise the OTHER capital-only terms (gov / beliefs / CS-envoy) so the
-    # civ_city_is_cap toggle isolates the palace; pass amen_yf=1 so nothing scales.
-    sim._gov_has_effects = False
+    # neutralise the OTHER capital-only terms (beliefs / CS-envoy; a seat with
+    # no government pays no capital card) so the civ_city_is_cap toggle
+    # isolates the palace; pass amen_yf=1 so nothing scales.
     sim.civ_pantheon[:, r + 1] = -1
     sim.civ_follower[:, r + 1] = -1
     sim.seat_citystate_envoys[:, r + 1] = 0

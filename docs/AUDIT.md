@@ -194,7 +194,3 @@ commit.
 
 ## Harness — not weighted
 
-- **A-52. SWITCHES THAT ARE ALWAYS ON, AND RULE READS WITH DEFAULTS.**
-  - BUILD: `GOVERNMENTS_ADOPTION_LIVE`, `CITY_RELIGION_ADDER_LIVE`, `BARB_SCOUT_OPENER_LIVE`, `ADMIRAL_MARCH_LIVE`, `DEDICATION_PAYOUTS_LIVE`, `ENGINEER_LIVE`, `SCRIPTED_CAMPUS`, `B18_FOLLOWER_COUPLING_LIVE` and `embarkState.live` are all `true` in play (`setEmbarkLive` and two GPU tests' `_gov_has_effects = False` switch arms off for tests only). Delete each flag, its arms, its key and its switch-off test.
-  - BUILD: keys exported and applied by neither engine: `admiralMarchLive`, the campus scaffold's `active` and `campusUnlockTech`, and `formalWarMinTurns` (the GPU reads it into `_formal_war_min` and never uses it; both engines take the formal war's 5 turns from `WAR_KINDS`). Stop exporting them and delete the reads; the other war kinds' literal 5s read `FORMAL_WAR_MIN_TURNS`.
-  - BUILD: the GPU's `improvements_on` / `districts_on` gate sections the exporter always ships, and about 590 `.get("key", <number>)` rules reads in `gpu/core` (about 167 with a real magnitude) carry a second copy of each value. Index the rules directly so a missing key fails loudly.

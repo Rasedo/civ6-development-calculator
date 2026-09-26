@@ -42,8 +42,9 @@ import { gwAt, gwCountKind } from '../../../cpu/core/greatWorks';
 import { GW_HOLDERS, GWO_LANDSCAPE, holderSlots } from '../../../cpu/data/greatWorks';
 import {
   AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_L2_QP, ALLIANCE_MILITARY, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_RESEARCH,
-  FAVOR_PER_ALLIANCE, FORMAL_WAR_MIN_TURNS, OPEN_BORDERS_CIVIC,
+  FAVOR_PER_ALLIANCE, OPEN_BORDERS_CIVIC,
 } from '../../../cpu/data/seats';
+import { FORMAL_WAR_MIN_TURNS } from '../../../cpu/data/warKinds';
 import { TECHS } from '../../../cpu/data/techs';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat, SeatActionRecord } from '../../../cpu/core/types';

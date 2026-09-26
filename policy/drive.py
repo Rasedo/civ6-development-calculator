@@ -101,7 +101,7 @@ def _prod_ctx(st, blocks: dict, cities: dict, seat: int, turn: int) -> dict:
     # ONE city cap for every seat — the ladder's maxCities heuristic
     style = _seat_style(seat)
     cap = st.max_cities if style["city_cap"] is None else int(style["city_cap"])
-    nS = len(st.scaffold) if st.districts_on else 0
+    nS = len(st.scaffold)
     # WHICH district to place is a decision, and the driver rotates it so
     # the whole scaffold is reached rather than only its head; a style's
     # dist_pref pins the rotation START to a named district, keeping the
@@ -337,8 +337,6 @@ def _builder_jobs(st, nobs: list, units=None) -> torch.Tensor:
     dev = st.device
     present, tiles, types, charges, _gs, _ga = _obs_units(st, nobs) if units is None else units
     out = torch.full(present.shape, -1, dtype=torch.long, device=dev)
-    if not st.improvements_on:
-        return out
     # BUILDERS take the improvement jobs — a missionary's charge is a spread,
     # not a build. The MILITARY ENGINEER walks to its own list instead: its
     # improvements, an unroaded tile, or a 20% charge waiting to be spent.
@@ -1221,7 +1219,7 @@ def _district_tiles(st, prod: torch.Tensor, sites: dict):
     column whose tile is -1. The plots and their adjacency are the
     observation's (`_obs_cities`' `sites`).
     """
-    nS = len(st.scaffold) if st.districts_on else 0
+    nS = len(st.scaffold)
     if nS == 0:
         return None
     B, C = prod.shape
@@ -1376,8 +1374,8 @@ def tables(st) -> tuple:
     builds them once and hands them to every `decide_seat`."""
     nS = len(st.scaffold)
     return (ladder.unit_roster(st.units),
-            ladder.prod_classes(st.NB, st.NU, nS, st.n_wonders if st.districts_on else 0,
-                                st.n_projects if st.districts_on else 0))
+            ladder.prod_classes(st.NB, st.NU, nS, st.n_wonders,
+                                st.n_projects))
 
 
 # Every decision a seat takes in a turn, by name: `decide_seat` answers all of

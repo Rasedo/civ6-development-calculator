@@ -148,9 +148,6 @@ def test_building_pillage(rules, path) -> None:
     _force_scientific_cs0(sim)
     if sim.S > 1:
         sim.citystate_alive[0, 1:] = False
-    if not sim.districts_on:
-        print("  pillage test SKIPPED (districts off)")
-        return
     # plant a COMPLETE CAMPUS on an owned tile in city 0's window, holding a LIBRARY
     campus_idx = None
     for d in sim.districts_cat:

@@ -251,7 +251,7 @@ class SimOrders:
                         self.unit_xp[pr, ps] = 0
                         # "Upon selecting a promotion, a unit recovers 50 HP
                         # and its turn ends."
-                        _cap = int(self.rules.combat.get("unitHp", 100))
+                        _cap = int(self.rules.combat["unitHp"])
                         self.unit_hp[pr, ps] = (self.unit_hp[pr, ps] + PROMOTE_HEAL).clamp(max=_cap)
                         self.unit_mp[pr, ps] = 0
                         # CIV6 (Orator): "Can spread Religion 2 extra times" —
@@ -749,13 +749,10 @@ class SimOrders:
                 # opens the ocean for this one
                 _hull = (_wet & (~self.ocean_tile.gather(1, _tc1).squeeze(1) | cart
                                  | (self._gp_perm(row, "navalOcean") > 0))) | _canal
-                if self._embark_live:
-                    ship = (techs[:, self._shipbuilding_tech] if self._shipbuilding_tech >= 0
-                            else torch.zeros(B, dtype=torch.bool, device=dev))
-                    any_war = self.war[:, row].any(dim=1)
-                    terr = torch.where(is_nav, _hull, terr | (_water & ship & ~is_nav & any_war))
-                else:
-                    terr = torch.where(is_nav, _hull, terr)
+                ship = (techs[:, self._shipbuilding_tech] if self._shipbuilding_tech >= 0
+                        else torch.zeros(B, dtype=torch.bool, device=dev))
+                any_war = self.war[:, row].any(dim=1)
+                terr = torch.where(is_nav, _hull, terr | (_water & ship & ~is_nav & any_war))
                 _wlk = self.unit_water_walk[ut]
                 if bool(_wlk.any()):
                     terr = torch.where(_wlk, _pass | _wet, terr)
@@ -997,7 +994,7 @@ class SimOrders:
                         self.unit_alive[dr, sc[dr]] = False
                         self._occ_clear(dr, hc[dr], sc[dr])
 
-            if _rk_imp[n] and self.improvements_on and self._builder_idx >= 0:
+            if _rk_imp[n] and self._builder_idx >= 0:
                 # WHICH improvement columns any game actually COMMANDED at this
                 # rank. Every row below is `base & (a == _col) & <the row's own
                 # ground plane>`, so a column nobody asked for is all-False
@@ -1337,7 +1334,7 @@ class SimOrders:
                     _hl = (_kind == 1) & (_amt > 0)
                     if bool(_hl.any()):
                         _hr = _r[_hl]
-                        _cap = int(self.rules.combat.get("unitHp", 100))
+                        _cap = int(self.rules.combat["unitHp"])
                         self.unit_hp[_hr, sc[_hr]] = (self.unit_hp[_hr, sc[_hr]] + _amt[_hl]).clamp(max=_cap)
                     _bk = (_kind >= 2) & (_amt > 0)
                     if bool(_bk.any()):
@@ -1346,9 +1343,7 @@ class SimOrders:
                         _br = _r[_bk]
                         _psc = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
                                                          civics.sum(dim=1).double() / 50.0)
-                        _mult = torch.ones(len(_br), dtype=torch.float64, device=self.device)
-                        if self._gov_has_effects:
-                            _mult = self._fx_at_seat("pillm", torch.full_like(_br, row), _br).double()
+                        _mult = self._fx_at_seat("pillm", torch.full_like(_br, row), _br).double()
                         _lump = js_round(_amt[_bk].double() * _psc[_br] * _mult).to(self.dtype)
                         _kk = _kind[_bk]
                         for _kv, _purse in ((2, self.civ_treasury), (3, self.civ_faith),
@@ -1368,9 +1363,7 @@ class SimOrders:
                             _hr = _r[_hm]
                             _psc_h = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
                                                                civics.sum(dim=1).double() / 50.0)
-                            _mult_h = torch.ones(len(_hr), dtype=torch.float64, device=self.device)
-                            if self._gov_has_effects:
-                                _mult_h = self._fx_at_seat("pillm", torch.full_like(_hr, row), _hr).double()
+                            _mult_h = self._fx_at_seat("pillm", torch.full_like(_hr, row), _hr).double()
                             _lump_h = js_round(self._hard_plun_amt[_iv[_hm]].double() * _psc_h[_hr] * _mult_h).to(self.dtype)
                             for _kv, _purse in ((4, self.civ_tech_prog), (5, self.civ_civic_prog)):
                                 _m3 = _hk[_hm] == _kv
@@ -1576,8 +1569,8 @@ class SimOrders:
         `dst_rows` is the receiving block row: an int, or a [B] tensor when the
         row is the conquering unit's and so is read per game."""
         dev = self.device
-        half_hp = (int(self.rules.combat.get("cityMaxHp", 200)) + 1) // 2
-        max_cities = int(self.rules.seats.get("maxCities", 6))
+        half_hp = (int(self.rules.combat["cityMaxHp"]) + 1) // 2
+        max_cities = int(self.rules.seats["maxCities"])
         for i in range(len(rows)):
             b = int(rows[i]); s = int(citystate_of[rows[i]])
             row = dst_rows if isinstance(dst_rows, int) else int(dst_rows[b])
@@ -1633,7 +1626,7 @@ class SimOrders:
             self.city_founder[b, row, col] = -1     # a minor founded it, and minors keep no ledger
             # CIV6 (City-State Emergency): the minor's PATRONS — met, with at
             # least one envoy — are who may bring it to the Congress.
-            _cs_kind = self._emg_at.get("CITY_STATE", -1)
+            _cs_kind = self._emg_at["CITY_STATE"]
             if _cs_kind >= 0:
                 _aff = torch.zeros(self.B, self.n_majors, dtype=torch.bool, device=dev)
                 _aff[b] = (self.seat_citystate_met[b, : self.n_majors, s]
@@ -1886,29 +1879,28 @@ class SimOrders:
         # it feeds ALL THREE spawn sites (new camp, empty-camp regarrison, the
         # 0.1-roll raid). Barbarian barb_unit_type 6 = SCOUT in the unitCombat table.
         self._barb_scout_type = 6 if self._barb_ladder.numel() > 6 else 0
-        self._barb_scout_live = bool(self.rules.combat.get("barbScoutOpenerLive", False))
         melee_type = (
-            3 if self.turn > cb.get("musketmanAfterTurn", 180)
-            else 2 if self.turn > cb.get("pikemanAfterTurn", 120)
-            else 1 if self.turn > cb.get("spearmanAfterTurn", 60)
+            3 if self.turn > cb["musketmanAfterTurn"]
+            else 2 if self.turn > cb["pikemanAfterTurn"]
+            else 1 if self.turn > cb["spearmanAfterTurn"]
             else 0
         )
-        ranged_type = 5 if self.turn > cb.get("crossbowmanAfterTurn", 120) else 4
+        ranged_type = 5 if self.turn > cb["crossbowmanAfterTurn"] else 4
         self._barb_naval_type = (
             self._barb_quad_idx
-            if self.turn > cb.get("crossbowmanAfterTurn", 120)
+            if self.turn > cb["crossbowmanAfterTurn"]
             else self._barb_galley_idx
         )
         cav_type = (
             self._barb_knight_idx
-            if self.turn > cb.get("crossbowmanAfterTurn", 120)
+            if self.turn > cb["crossbowmanAfterTurn"]
             else self._barb_horseman_idx
         )
 
         any_city = self.city_alive[:, :self.n_majors].reshape(B, -1).any(dim=1)
         can_roll = any_city & (self.n_camps < self.max_camps)
         r1 = self._next_random(can_roll)
-        want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
+        want = can_roll & (r1 < cb["campSpawnChance"])
         if bool(want.any()):
             wr = want.nonzero(as_tuple=True)[0]
             # campCandidates excludes t.district LIVE: camp_ok is static, but
@@ -1946,10 +1938,10 @@ class SimOrders:
                 self._eff_version += 1  # a new outpost lowers its neighbours' appeal
                 self.n_camps[rows] += 1
                 # SCOUT-THEN-RAID: a BRAND-NEW camp opens with a SCOUT
-                # (barb_unit_type 6), the TS barbScoutType twin, while regarrison and
+                # (barb_unit_type 6), as TS's camp spawn does, while regarrison and
                 # raid sites keep the melee/ranged ladders. Spawn TYPE only, so
                 # the camp roll above is untouched and this is draw-neutral.
-                self._spawn_barb(has, spot, self._barb_scout_type if self._barb_scout_live else melee_type)
+                self._spawn_barb(has, spot, self._barb_scout_type)
 
         # Garrisons + growth. The near-camp check uses the unit list as it
         # stood BEFORE this loop (TS snapshots `barbs` first); the cap check
@@ -1988,9 +1980,9 @@ class SimOrders:
             _rg = active & ~near_any
             self._spawn_barb(_rg & horse, camp, cav_type)
             self._spawn_barb(_rg & ~horse, camp, melee_type)
-            can_grow = active & near_any & (_barbs().sum(dim=1) < self.n_camps * cb.get("maxBarbPerCamp", 3))
+            can_grow = active & near_any & (_barbs().sum(dim=1) < self.n_camps * cb["maxBarbPerCamp"])
             r = self._next_random(can_grow)
-            _raid = can_grow & (r < cb.get("garrisonGrowChance", 0.1))
+            _raid = can_grow & (r < cb["garrisonGrowChance"])
             # The raid ROTATES: the camp's CLASS unit, then ranged, then melee,
             # so every camp fields melee and ranged whatever it stands on. `k`
             # IS the TS `campNo`: camps append at n_camps and _clear_camp_at
@@ -2192,72 +2184,65 @@ class SimOrders:
             # (seed 9092 t137: a raider beside a Free City's Campus)
             h_owned = (_h_seat >= 0) & ((_h_seat < BARB_SEAT) | (_h_seat == FREE_SEAT))
             pillage = torch.zeros_like(act)
-            if self.improvements_on:
-                h_imp = self.improvement.gather(1, _here1).squeeze(1) >= 0
-                h_unpil = ~self.pillaged.gather(1, _here1).squeeze(1)
-                pillage = act & ~attack & h_imp & h_unpil & h_owned
-                if bool(pillage.any()):
-                    rows = pillage.nonzero(as_tuple=True)[0]
-                    _impv = self.improvement[rows, here[rows]].clamp(min=0)
-                    # the plunder row's HEAL pays anyone; a barbarian has no
-                    # purse to bank the other kinds (`pillagePlunder`)
-                    heal_amt = torch.where(self._imp_plun_kind[_impv] == 1,
-                                           self._imp_plun_amt[_impv], torch.zeros_like(_impv))
-                    self.pillaged[rows, here[rows]] = True
-                    self.barb_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
-                    self._eff_version += 1  # a farm's yield just dropped
-                    hp_cap = self.rules.combat.get("unitHp", 100)
-                    self.barb_unit_hp[rows, u] = torch.where(
-                        heal_amt > 0, (self.barb_unit_hp[rows, u] + heal_amt).clamp(max=hp_cap),
-                        self.barb_unit_hp[rows, u]
-                    )
+            h_imp = self.improvement.gather(1, _here1).squeeze(1) >= 0
+            h_unpil = ~self.pillaged.gather(1, _here1).squeeze(1)
+            pillage = act & ~attack & h_imp & h_unpil & h_owned
+            if bool(pillage.any()):
+                rows = pillage.nonzero(as_tuple=True)[0]
+                _impv = self.improvement[rows, here[rows]].clamp(min=0)
+                # the plunder row's HEAL pays anyone; a barbarian has no
+                # purse to bank the other kinds (`pillagePlunder`)
+                heal_amt = torch.where(self._imp_plun_kind[_impv] == 1,
+                                       self._imp_plun_amt[_impv], torch.zeros_like(_impv))
+                self.pillaged[rows, here[rows]] = True
+                self.barb_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
+                self._eff_version += 1  # a farm's yield just dropped
+                hp_cap = self.rules.combat["unitHp"]
+                self.barb_unit_hp[rows, u] = torch.where(
+                    heal_amt > 0, (self.barb_unit_hp[rows, u] + heal_amt).clamp(max=hp_cap),
+                    self.barb_unit_hp[rows, u]
+                )
 
             dist_pillage = torch.zeros_like(act)
-            if self.districts_on:
-                h_dist = self.district.gather(1, _here1).squeeze(1)
-                h_dcomp = self.district_complete.gather(1, _here1).squeeze(1)
-                h_dunpil = ~self.district_pillaged.gather(1, _here1).squeeze(1)
-                # CIV6: the Encampment "cannot be pillaged normally".
-                dist_pillage = (act & ~attack & ~pillage & (h_dist >= 0)
-                                & (h_dist != self._encamp_didx)
-                                & h_dcomp & h_dunpil & h_owned)
-                if bool(dist_pillage.any()):
-                    rows = dist_pillage.nonzero(as_tuple=True)[0]
-                    _dvv = h_dist[rows].clamp(min=0)
-                    # a HEAL-plunder district pays its wrecker like a farm
-                    _dheal = torch.where(self._d_plun_kind[_dvv] == 1,
-                                         self._d_plun_amt[_dvv], torch.zeros_like(_dvv))
-                    self.district_pillaged[rows, here[rows]] = True
-                    self._air_scatter_from(rows, here[rows])
-                    self.barb_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
-                    hp_cap = self.rules.combat.get("unitHp", 100)
-                    self.barb_unit_hp[rows, u] = torch.where(
-                        _dheal > 0, (self.barb_unit_hp[rows, u] + _dheal).clamp(max=hp_cap),
-                        self.barb_unit_hp[rows, u]
-                    )
-                    self._eff_version += 1  # district yields just dropped
+            h_dist = self.district.gather(1, _here1).squeeze(1)
+            h_dcomp = self.district_complete.gather(1, _here1).squeeze(1)
+            h_dunpil = ~self.district_pillaged.gather(1, _here1).squeeze(1)
+            # CIV6: the Encampment "cannot be pillaged normally".
+            dist_pillage = (act & ~attack & ~pillage & (h_dist >= 0)
+                            & (h_dist != self._encamp_didx)
+                            & h_dcomp & h_dunpil & h_owned)
+            if bool(dist_pillage.any()):
+                rows = dist_pillage.nonzero(as_tuple=True)[0]
+                _dvv = h_dist[rows].clamp(min=0)
+                # a HEAL-plunder district pays its wrecker like a farm
+                _dheal = torch.where(self._d_plun_kind[_dvv] == 1,
+                                     self._d_plun_amt[_dvv], torch.zeros_like(_dvv))
+                self.district_pillaged[rows, here[rows]] = True
+                self._air_scatter_from(rows, here[rows])
+                self.barb_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
+                hp_cap = self.rules.combat["unitHp"]
+                self.barb_unit_hp[rows, u] = torch.where(
+                    _dheal > 0, (self.barb_unit_hp[rows, u] + _dheal).clamp(max=hp_cap),
+                    self.barb_unit_hp[rows, u]
+                )
+                self._eff_version += 1  # district yields just dropped
 
             march = act & ~attack & ~pillage & ~dist_pillage
             if not bool(march.any()):
                 continue
             arangeT = self._arangeT
-            if self.improvements_on or self.districts_on:
-                # `isTerritorial(tileSeat(t))` — owned by any major or
-                # city-state. A barbarian is hostile to all of them, so no war
-                # term joins it.
-                _owned = ((self.tile_seat >= 0)
-                          & ((self.tile_seat < BARB_SEAT) | (self.tile_seat == FREE_SEAT)))  # [B, T]
-                imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
-                if self.districts_on:  # pillageable districts join the union
-                    imp_job = imp_job | ((self.district >= 0) & (self.district != self._encamp_didx)
-                                         & self.district_complete & ~self.district_pillaged & _owned)
-                d_imp = self.pair_dist[here].to(torch.long)
-                ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, self._march_miss)
-                imp_min, imp_tgt = ikey.min(dim=1)
-                has_imp = imp_min < 10**9
-            else:
-                has_imp = torch.zeros_like(act)
-                imp_tgt = here.clamp(min=0)
+            # `isTerritorial(tileSeat(t))` — owned by any major or
+            # city-state. A barbarian is hostile to all of them, so no war
+            # term joins it.
+            _owned = ((self.tile_seat >= 0)
+                      & ((self.tile_seat < BARB_SEAT) | (self.tile_seat == FREE_SEAT)))  # [B, T]
+            imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
+            imp_job = imp_job | ((self.district >= 0) & (self.district != self._encamp_didx)
+                                 & self.district_complete & ~self.district_pillaged & _owned)
+            d_imp = self.pair_dist[here].to(torch.long)
+            ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, self._march_miss)
+            imp_min, imp_tgt = ikey.min(dim=1)
+            has_imp = imp_min < 10**9
             # BARBARIANS MARCH ON ANYONE — `hostileUnitAct`'s city scan over
             # majors, city-states AND the Free Cities (real Civ 6 barbarians
             # raid whoever is near the camp), on its key: distance, then the seat id, then the

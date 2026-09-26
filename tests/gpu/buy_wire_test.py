@@ -88,9 +88,6 @@ def mult(sim) -> float:
 # ---------------------------------------------------------------------------
 
 def case_building(sim, base, row: int, mon: int) -> None:
-    if not sim.districts_on:
-        print(f"  row {row}: building buy SKIPPED (districts off)")
-        return
     reserve = float(sim.rules.seats.get("peaceGold0", 150))
 
     sim.restore(base)

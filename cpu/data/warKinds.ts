@@ -108,17 +108,17 @@ interface WarKindDef {
 export const WAR_KINDS: readonly WarKindDef[] = [
   { id: 'surprise', civic: null, denounceTurns: -1, condition: 'none', pct: [150, 150, 450] },
   { id: 'formal', civic: null, denounceTurns: FORMAL_WAR_MIN_TURNS, condition: 'none', pct: [100, 100, 300] },
-  { id: 'holy', civic: 'DIPLOMATIC_SERVICE', denounceTurns: 5, condition: 'convertedCity', pct: [50, 50, 50] },
-  { id: 'liberation', civic: 'DIPLOMATIC_SERVICE', denounceTurns: 5, condition: 'occupiedFriendlyCity', pct: [0, 100, 600] },
+  { id: 'holy', civic: 'DIPLOMATIC_SERVICE', denounceTurns: FORMAL_WAR_MIN_TURNS, condition: 'convertedCity', pct: [50, 50, 50] },
+  { id: 'liberation', civic: 'DIPLOMATIC_SERVICE', denounceTurns: FORMAL_WAR_MIN_TURNS, condition: 'occupiedFriendlyCity', pct: [0, 100, 600] },
   // Expansion1_DiplomaticActions.xml moves the next two from Diplomatic
   // Service to Defensive Tactics
-  { id: 'reconquest', civic: 'DEFENSIVE_TACTICS', denounceTurns: 5, condition: 'occupiedCity', pct: [0, 0, 0] },
+  { id: 'reconquest', civic: 'DEFENSIVE_TACTICS', denounceTurns: FORMAL_WAR_MIN_TURNS, condition: 'occupiedCity', pct: [0, 0, 0] },
   { id: 'protectorate', civic: 'DEFENSIVE_TACTICS', denounceTurns: 0, condition: 'warOnMyCityState', pct: [0, 100, 300] },
-  { id: 'colonial', civic: 'NATIONALISM', denounceTurns: 5, condition: 'leadTwoEras', pct: [50, 50, 300] },
-  { id: 'territorial', civic: 'MOBILIZATION', denounceTurns: 5, condition: 'adjacentEmpires', pct: [75, 75, 150] },
+  { id: 'colonial', civic: 'NATIONALISM', denounceTurns: FORMAL_WAR_MIN_TURNS, condition: 'leadTwoEras', pct: [50, 50, 300] },
+  { id: 'territorial', civic: 'MOBILIZATION', denounceTurns: FORMAL_WAR_MIN_TURNS, condition: 'adjacentEmpires', pct: [75, 75, 150] },
   { id: 'golden', civic: null, denounceTurns: 0, condition: 'toArms', pct: [25, 25, 300] },
-  { id: 'retribution', civic: 'EARLY_EMPIRE', denounceTurns: 5, condition: 'brokenPromise', pct: [50, 50, 200] },
-  { id: 'ideological', civic: 'IDEOLOGY', denounceTurns: 5, condition: 'differentLateGovernment', pct: [50, 50, 150] },
+  { id: 'retribution', civic: 'EARLY_EMPIRE', denounceTurns: FORMAL_WAR_MIN_TURNS, condition: 'brokenPromise', pct: [50, 50, 200] },
+  { id: 'ideological', civic: 'IDEOLOGY', denounceTurns: FORMAL_WAR_MIN_TURNS, condition: 'differentLateGovernment', pct: [50, 50, 150] },
   // Expansion1_DiplomaticActions.xml, DIPLOACTION_THIRD_PARTY_WAR. No
   // denouncement column at all, which is what makes it worth having: a
   // Formal war's price without a Formal war's five-turn denouncement.

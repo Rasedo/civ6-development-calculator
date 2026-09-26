@@ -32,7 +32,6 @@ import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
 import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
-import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TECHS } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
@@ -2381,7 +2380,7 @@ export function seatPhase(state: GameState): void {
         }
       }
       if (state.cityStates.some((cityState) => hasMet(cityState, actor.seat))) {
-        const gov = GOVERNMENTS_ADOPTION_LIVE ? seatGovernment(state, actor.seat) : null;
+        const gov = seatGovernment(state, actor.seat);
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
         // CIV6 (Rogue State): "Earn no influence toward new Envoys."
         if (!getModifiers(state, actor.seat).noEnvoyInfluence) {

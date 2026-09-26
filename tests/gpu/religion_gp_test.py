@@ -196,62 +196,60 @@ def main() -> None:
     # is spent. Fresh turn 1 with no AMPHITHEATER, so the spend overflows both
     # of the Writer's Great Works to the instant culture lump (2 x the
     # Classical 60 = 120).
-    if sim.districts_on:
-        civic0 = sim.civ_civic_prog[:, 0].clone()
-        earned0 = sim.gp_earned[:, 7].clone()
-        # the capital's Palace slot would take one work: fill it, so both lump
-        for _b in range(sim.B):
-            hold_works(sim, _b, 0, 0, 7, 1)
-        gw0 = int((sim.city_gw_obj[:, 0] >= 0).sum())
-        live0 = sim.major_unit_alive[0].sum().item()
-        sim.civ_gpp[:, 0, 7] = 100.0  # >= the Writer's flat Classical 60
-        sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
-        assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
-        assert sim.major_unit_alive[0].sum().item() == live0 + 1, "the claim did not spawn the Writer as a unit"
-        assert bool((sim.civ_civic_prog[:, 0] == civic0).all()), "the claim paid a lump it no longer owes"
+    civic0 = sim.civ_civic_prog[:, 0].clone()
+    earned0 = sim.gp_earned[:, 7].clone()
+    # the capital's Palace slot would take one work: fill it, so both lump
+    for _b in range(sim.B):
+        hold_works(sim, _b, 0, 0, 7, 1)
+    gw0 = int((sim.city_gw_obj[:, 0] >= 0).sum())
+    live0 = sim.major_unit_alive[0].sum().item()
+    sim.civ_gpp[:, 0, 7] = 100.0  # >= the Writer's flat Classical 60
+    sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
+    assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
+    assert sim.major_unit_alive[0].sum().item() == live0 + 1, "the claim did not spawn the Writer as a unit"
+    assert bool((sim.civ_civic_prog[:, 0] == civic0).all()), "the claim paid a lump it no longer owes"
 
-        guidx = int(sim._gp_class_unit[7])
-        mine = sim.major_unit_alive & (sim.major_unit_seat == 0) & (sim.major_unit_type == guidx) \
-            & (sim.major_unit_gp_at >= 0)
-        assert bool(mine.any(dim=1).all()), "no Writer unit standing after the claim"
-        sc_w = mine.long().argmax(dim=1)
-        hc_w = sim.city_center[:, 0, 0].clamp(min=0)
-        sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_w, hc_w)
-        d_civic = (sim.civ_civic_prog[:, 0] - civic0)
-        assert bool((d_civic == 120.0).all()), f"Writer overflow lump wrong (want 2x60): {d_civic.tolist()}"
-        assert int((sim.city_gw_obj[:, 0] >= 0).sum()) == gw0, "no AMPHITHEATER -> no slotted work"
+    guidx = int(sim._gp_class_unit[7])
+    mine = sim.major_unit_alive & (sim.major_unit_seat == 0) & (sim.major_unit_type == guidx) \
+        & (sim.major_unit_gp_at >= 0)
+    assert bool(mine.any(dim=1).all()), "no Writer unit standing after the claim"
+    sc_w = mine.long().argmax(dim=1)
+    hc_w = sim.city_center[:, 0, 0].clamp(min=0)
+    sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_w, hc_w)
+    d_civic = (sim.civ_civic_prog[:, 0] - civic0)
+    assert bool((d_civic == 120.0).all()), f"Writer overflow lump wrong (want 2x60): {d_civic.tolist()}"
+    assert int((sim.city_gw_obj[:, 0] >= 0).sum()) == gw0, "no AMPHITHEATER -> no slotted work"
 
     # --- a seat-0 PROPHET banks its faith-column effect at the SPEND --------
     # Confucius (PROPHET class 3, roster idx 0) carries fx.faith; `_gp_apply`
     # banks it into the seat's faith total, and the claim before it only
     # stands the Prophet up as a unit.
-    if sim.districts_on:
-        assert sim._gp_effects.shape[2] > 4, "gpEffects must carry the faith column"
-        pc = int(rr["prophetCls"])  # 3
-        assert float(sim._gp_effects[pc, 0, 4]) == 60.0, "Confucius pays the Classical lump"
-        faith0 = sim.civ_faith[:, 0].clone()
-        pe0 = sim.gp_earned[:, pc].clone()
-        # the draw is random within the era pool — claim the OTHER Classical
-        # Prophets so it lands Confucius (roster idx 0), leaving the later
-        # eras open so the class does not exhaust (and convert the leftover)
-        sim.gp_offer[:, pc] = -1
-        _nr_p = int(sim._gp_roster[pc])
-        _cls_same = sim._gp_era[pc, :_nr_p] == sim._gp_era[pc, 0]
-        _cls_same[0] = False
-        sim.gp_claimed[:, pc, :_nr_p] |= _cls_same.reshape(1, -1)
-        sim.civ_gpp[:, 0, pc] = 100.0  # >= the flat Classical 60, earns one Prophet
-        sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
-        assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
-        assert bool((sim.civ_faith[:, 0] == faith0).all()), "the claim banked faith it no longer owes"
-        puidx = int(sim._gp_class_unit[pc])
-        pmine = sim.major_unit_alive & (sim.major_unit_seat == 0) & (sim.major_unit_type == puidx) \
-            & (sim.major_unit_gp_at >= 0)
-        assert bool(pmine.any(dim=1).all()), "no Prophet unit standing after the claim"
-        sc_p = pmine.long().argmax(dim=1)
-        hc_p = sim.city_center[:, 0, 0].clamp(min=0)
-        sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_p, hc_p)
-        d_faith = sim.civ_faith[:, 0] - faith0
-        assert bool((d_faith == 60.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
+    assert sim._gp_effects.shape[2] > 4, "gpEffects must carry the faith column"
+    pc = int(rr["prophetCls"])  # 3
+    assert float(sim._gp_effects[pc, 0, 4]) == 60.0, "Confucius pays the Classical lump"
+    faith0 = sim.civ_faith[:, 0].clone()
+    pe0 = sim.gp_earned[:, pc].clone()
+    # the draw is random within the era pool — claim the OTHER Classical
+    # Prophets so it lands Confucius (roster idx 0), leaving the later
+    # eras open so the class does not exhaust (and convert the leftover)
+    sim.gp_offer[:, pc] = -1
+    _nr_p = int(sim._gp_roster[pc])
+    _cls_same = sim._gp_era[pc, :_nr_p] == sim._gp_era[pc, 0]
+    _cls_same[0] = False
+    sim.gp_claimed[:, pc, :_nr_p] |= _cls_same.reshape(1, -1)
+    sim.civ_gpp[:, 0, pc] = 100.0  # >= the flat Classical 60, earns one Prophet
+    sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
+    assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
+    assert bool((sim.civ_faith[:, 0] == faith0).all()), "the claim banked faith it no longer owes"
+    puidx = int(sim._gp_class_unit[pc])
+    pmine = sim.major_unit_alive & (sim.major_unit_seat == 0) & (sim.major_unit_type == puidx) \
+        & (sim.major_unit_gp_at >= 0)
+    assert bool(pmine.any(dim=1).all()), "no Prophet unit standing after the claim"
+    sc_p = pmine.long().argmax(dim=1)
+    hc_p = sim.city_center[:, 0, 0].clamp(min=0)
+    sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_p, hc_p)
+    d_faith = sim.civ_faith[:, 0] - faith0
+    assert bool((d_faith == 60.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
 
     # snapshot/restore round-trips the GP tensors + the faith bank
     # and the belief state (all registered in _MUTABLE).
@@ -329,13 +327,9 @@ def main() -> None:
         full = sim._bel_add("bldgY", 0)
         folrow = sim._bel["fol"]["bldgY"][sim.civ_follower[:, 1] + 1]
         assert bool(((pf + folrow - full).abs().sum() == 0)), "pan+founder + follower must reconstruct the full bldgY"
-        # flag routing: LIVE -> followedReligion; INERT -> owner religion.
-        if sim._b18_couple:
-            assert bool((sim._city_rel(0) == sim.city_followed[:, 0, :sim.RC]).all()), "LIVE: seat 0 draws followedReligion"
-            assert bool((sim._city_rel(2) == sim.city_followed[:, 1 + 1]).all()), "LIVE: civ draws civ_city_followed"
-        else:
-            assert bool((sim._city_rel(0) == 0).all()), "INERT: seat 0 draws religion 0"
-            assert bool((sim._city_rel(2) == 2).all()), "INERT: civ 1 draws owner religion 2"
+        # a city's follower belief keys on the religion it follows
+        assert bool((sim._city_rel(0) == sim.city_followed[:, 0, :sim.RC]).all()), "seat 0 draws followedReligion"
+        assert bool((sim._city_rel(2) == sim.city_followed[:, 1 + 1]).all()), "civ draws civ_city_followed"
 
     print("SLICE-Q RELIGION+GP OK")
     print("SLICE-U FOLLOWER-COUPLING OK")

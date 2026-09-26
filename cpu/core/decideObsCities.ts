@@ -5,7 +5,7 @@ import { CITY_WORK_RADIUS } from '../data/constants';
 import { PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { UNITS } from '../data/units';
-import { ENGINEER_LIVE, PRODUCTION_QUEUE_MAX } from '../data/seats';
+import { PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { DISTRICT_ADJ_ROWS, rowIsFor } from '../data/civilizations';
 import { citiesOf, seatOf, tileCity } from './seats';
 import { computeUnlocks, getModifiers } from './effects';
@@ -59,9 +59,7 @@ function unitGates(state: GameState, seat: number): Map<string, () => boolean> {
   let builder: boolean | undefined;
   let engineer: boolean | undefined;
   out.set('BUILDER', () => (builder ??= !heldOrQueued(state, seat, 'BUILDER') && builderHasJob(state, seat)));
-  if (ENGINEER_LIVE) {
-    out.set('MILITARY_ENGINEER', () => (engineer ??= !heldOrQueued(state, seat, 'MILITARY_ENGINEER') && engineerHasJob(state, seat)));
-  }
+  out.set('MILITARY_ENGINEER', () => (engineer ??= !heldOrQueued(state, seat, 'MILITARY_ENGINEER') && engineerHasJob(state, seat)));
   if (UNITS.ARCHAEOLOGIST) out.set('ARCHAEOLOGIST', () => !heldOrQueued(state, seat, 'ARCHAEOLOGIST'));
   for (const u of Object.values(UNITS)) {
     if (u.siegeSupport) out.set(u.id, () => true);

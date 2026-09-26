@@ -75,7 +75,7 @@ class SimGp:
         every district yield. `col_mask` [B, RC] narrows the sum to some
         of the row's cities (a city's own tourism)."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        if row >= self.n_majors or not self.districts_on:
+        if row >= self.n_majors:
             return out
         alive = self.city_alive[:, row]                     # [B, RC]
         if col_mask is not None:
@@ -105,7 +105,7 @@ class SimGp:
         adj = self._gp_city_perm(row, "adjTourism")         # [B, RC]
         if bool((adj != 0).any()):
             for di, dd in enumerate(self.districts_cat):
-                yc = int(dd.get("adjYield", -1))
+                yc = int(dd["adjYield"])
                 pct = self._gp_adj_tour_pct[yc] if 0 <= yc < len(self._gp_adj_tour_pct) else 0
                 if pct == 0:
                     continue
@@ -453,7 +453,7 @@ class SimGp:
                 _r = _ok.nonzero(as_tuple=True)[0]
                 _cs2 = _cst[_r]
                 _env = self.seat_citystate_envoys
-                _suzmin = int(self.rules.citystate.get("suzerainEnvoys", 3))
+                _suzmin = int(self.rules.citystate["suzerainEnvoys"])
                 _rmax = torch.zeros_like(_cs2)
                 for _o in range(self.n_majors):
                     if _o != row:

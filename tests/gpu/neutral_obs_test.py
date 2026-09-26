@@ -82,9 +82,8 @@ def target_ctx(sim, row: int) -> dict:
            "spread": spread, "goody": sim.tile_goody | sim.tile_meteor,
            "digs": (sim._dig_here(row, allt) & ((sim.tile_seat < 0) | (sim.tile_seat == row))
                     & sim._museum_room(row).unsqueeze(1))}
-    if sim.improvements_on:
-        ctx["jobs"] = sim._seat_job_mask(row)
-        ctx["engJobs"] = sim._seat_engineer_job_mask(row)
+    ctx["jobs"] = sim._seat_job_mask(row)
+    ctx["engJobs"] = sim._seat_engineer_job_mask(row)
     if sim._naturalist_idx >= 0:
         ctx["parks"] = sim._park_cluster_legal(row, sim._park_cluster(allt)).any(dim=2)
     return ctx
@@ -115,10 +114,8 @@ def war_ref(sim, row: int, b: int) -> tuple:
         s = int(sim.tile_seat[b, t])
         if s < 0 or s >= simbase.BARB_SEAT or not bool(wr[int(sim._seat_row[s])]):
             continue
-        if not (sim.improvements_on or sim.districts_on):
-            continue
         imp = int(sim.improvement[b, t]) >= 0 and not bool(sim.pillaged[b, t])
-        dis = (sim.districts_on and int(sim.district[b, t]) >= 0 and bool(sim.district_complete[b, t])
+        dis = (int(sim.district[b, t]) >= 0 and bool(sim.district_complete[b, t])
                and not bool(sim.district_pillaged[b, t]))
         if imp or dis:
             imps.append(t)
@@ -177,8 +174,8 @@ def check_targets(sim, row: int, b: int, ob: dict, ctx: dict) -> Counter:
 
     tg = ob["targets"]
     want = {
-        "jobs": tiles(ctx["jobs"]) if sim.improvements_on and holds(sim._builder_idx) else [],
-        "engJobs": tiles(ctx["engJobs"]) if sim.improvements_on and holds(getattr(sim, "_eng_idx", -1)) else [],
+        "jobs": tiles(ctx["jobs"]) if holds(sim._builder_idx) else [],
+        "engJobs": tiles(ctx["engJobs"]) if holds(getattr(sim, "_eng_idx", -1)) else [],
         "spread": (tiles(ctx["spread"]) if bool(sim.civ_religion_done[b, row])
                    and (holds(sim._missionary_idx) or holds(sim._apostle_idx)) else []),
         "foundOk": (found_ok(sim, b) if sim._settler_idx >= 0 and sim._A_FOUND >= 0 and holds(sim._settler_idx, units)
@@ -251,8 +248,8 @@ def check_static(sim, st, twin) -> None:
         "NC": sim.civ_civics.shape[2], "NB": sim.NB, "NU": sim.NU, "max_cities": int(sim.rules.seats.get("maxCities", 6)),
         "unit_slots": simbase.UNIT_SLOTS, "spec_keep": simbase.SPEC_KEEP,
         "unit_base": sim.UNIT_BASE, "district_base": sim.DISTRICT_BASE, "form_base": sim.FORM_BASE, "prod_w": sim.PROD_W,
-        "districts_on": sim.districts_on, "n_wonders": sim._wond_n, "n_projects": len(sim._proj_rows),
-        "improvements_on": sim.improvements_on, "builder": sim._builder_idx, "engineer": sim._eng_idx,
+        "n_wonders": sim._wond_n, "n_projects": len(sim._proj_rows),
+        "builder": sim._builder_idx, "engineer": sim._eng_idx,
         "missionary": sim._missionary_idx, "apostle": sim._apostle_idx, "settler": sim._settler_idx,
         "archaeologist": sim._archaeologist_idx, "naturalist": sim._naturalist_idx,
         "act_w": len(sim._act_names), "a_pillage": sim._A_PILLAGE, "a_snipe": sim._A_SNIPE, "a_snipe3": sim._A_SNIPE3,
@@ -266,7 +263,7 @@ def check_static(sim, st, twin) -> None:
         "delegation_cost": sim._deleg_cost, "deal_items": sim._deal_items, "comp_aid": sim._comp_aid,
         "deal_kind": {"GOLD": sim._deal_k_gold, "FAVOR": sim._deal_k_favor, "RESOURCE": sim._deal_k_res,
                       "SPY": sim._deal_k_spy, "OPEN_BORDERS": sim._deal_k_borders, "JOINT_WAR": sim._deal_k_joint},
-        "scaffold": [sim.districts_cat[di].get("id") for di, *_r in sim._scaffold] if sim.districts_on else st.scaffold,
+        "scaffold": [sim.districts_cat[di].get("id") for di, *_r in sim._scaffold],
     }
     for f, w in want.items():
         assert getattr(st, f) == w, f"static {f} = {getattr(st, f)!r}, the sim's {w!r}"

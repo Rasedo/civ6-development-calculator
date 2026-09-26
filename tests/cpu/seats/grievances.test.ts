@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import type { Seat, Tile } from '../../../cpu/core/types';
 import { hexDistance } from '../../../world/hex';
 import { seatOf, tileSeat, setFriendTurnsWith, setWar, setWarKind, clearWarKind, warIsFormal, warKindWith, warDeclaredBy } from '../../../cpu/core/seats';
-import { WAR_GRIEVANCE_PCT, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_SURPRISE } from '../../../cpu/data/warKinds';
+import { FORMAL_WAR_MIN_TURNS, WAR_GRIEVANCE_PCT, WAR_KIND_FORMAL, WAR_KIND_GOLDEN, WAR_KIND_SURPRISE } from '../../../cpu/data/warKinds';
 import { endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
 import { seededGame, grantCivics } from '../helpers';
-import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS,
+import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, AGREEMENT_TURNS,
   GRIEVANCE_WAR_BASE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DENOUNCE,
   GRIEVANCE_FRIEND_SHARE, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_GANG,
   GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_OCCUPIED_CAPITAL_DECAY,

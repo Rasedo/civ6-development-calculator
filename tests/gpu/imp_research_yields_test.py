@@ -19,9 +19,7 @@ Proven here:
   * the raise is the ASKING SEAT's own research — a seat without the row is
     paid nothing on the identical tile;
   * a pillaged improvement is paid none of it;
-  * the river column pays only where a river runs, and stacks with Steel;
-  * `_tile_add_any` names every half `_seat_tile_add` sums, so no half can
-    be dropped by a gate that asked about beliefs alone.
+  * the river column pays only where a river runs, and stacks with Steel.
 """
 
 from __future__ import annotations
@@ -184,25 +182,12 @@ def test_river_column(rules, path) -> None:
     print("  3 river column OK — only on a river, stacking with Steel, dark under pillage")
 
 
-def test_gate_names_every_half(rules, path) -> None:
-    sim = fresh(rules, path)
-    assert sim._tile_add_any(ROW), "the gate refuses a seat the plane can pay"
-    # the gate must survive losing ANY single half — a catalog that drops the
-    # appeal buildings must not take the research and river halves with it.
-    saved = sim._b_appeal_rows
-    sim._b_appeal_rows = []
-    assert sim._tile_add_any(ROW), "the gate leans on the appeal-building rows alone"
-    sim._b_appeal_rows = saved
-    print("  4 gate OK — it names every half `_seat_tile_add` sums")
-
-
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
     test_wire(rules, path)
     test_paid_per_seat(rules, path)
     test_river_column(rules, path)
-    test_gate_names_every_half(rules, path)
     print("BATTERY OK imp_research_yields")
     return 0
 

@@ -183,9 +183,6 @@ def test_containment(rules) -> None:
     if its Suzerain has a different government than you" — the CHANNEL, poked
     at the modifier the send reads."""
     sim = build(rules)
-    if not sim._gov_has_effects:
-        print("  containment SKIPPED: no government effects in this catalog")
-        return
     assert hasattr(sim, "_pol_envoy2"), "the policy column is not exported"
     assert int(sim._pol_envoy2.sum()) >= 1, "no card carries the envoy-doubling effect"
     fx = sim._gov_mods(0)[12]

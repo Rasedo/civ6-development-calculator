@@ -86,9 +86,6 @@ def main() -> None:
         assert t.shape == (B, sim.CITY_ROWS, RC, W), (p, t.shape)
         assert bool((t == -1).all()), f"fresh: {p} holds nothing"
 
-    if not sim.districts_on:
-        print("GREAT-WORKS OK (districts off — placement paths skipped)")
-        return
 
     # the capital's own Palace slot comes FIRST in the table; these scenes read
     # the buildings alone

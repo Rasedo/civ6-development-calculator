@@ -222,7 +222,7 @@ class SimSpy:
             else:
                 ok = maj & (mine if mdef["athome"] else ~mine)
                 di = mdef["district"]
-                if mdef.get("anyDistrict", 0):
+                if mdef["anyDistrict"]:
                     pass  # the counterspy post stands on any district of the city
                 elif di >= 0:
                     ok = ok & (under_d == di) & under_live

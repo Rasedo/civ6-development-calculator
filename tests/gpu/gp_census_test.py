@@ -597,9 +597,6 @@ def main() -> None:
     assert path is not None, "no fixture's capital owns six bare plots"
     print(f"gp_census on {path.name}")
     sim = fresh(rules, path)
-    if not sim.districts_on:
-        print("gp_census: districts off on this fixture — nothing to poke")
-        return
     test_sites(rules, path, R)
     test_grants(rules, path, R)
     test_channels(rules, path, R)

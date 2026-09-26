@@ -39,7 +39,7 @@ def n_unit_acts(rules: Rules) -> int:
     `rules.actions.unit` is exported alongside the engine, so the head width
     cannot drift away from the mask width.
     """
-    names = (rules.actions or {}).get("unit", [])
+    names = rules.actions["unit"]
     if not names:
         raise ValueError("rules.actions.unit missing - re-export (npm run seed && npm run export)")
     return len(names)
@@ -386,7 +386,7 @@ class BatchEnv:
         return torch.stack(
             [
                 alive.to(d),
-                torch.where(alive, utype, torch.zeros_like(utype)).to(d) / max(len(s.rules.units or []), 1),
+                torch.where(alive, utype, torch.zeros_like(utype)).to(d) / max(len(s.rules.units), 1),
                 torch.where(alive, uhp, torch.zeros_like(uhp)).to(d) / 100.0,
                 torch.where(alive, (tile % s.W).to(d) / s.W, z),
                 torch.where(alive, torch.div(tile, s.W, rounding_mode="floor").to(d) / s.H, z),

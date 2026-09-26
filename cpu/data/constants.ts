@@ -215,16 +215,6 @@ export const CAPTURE_BASE_STRENGTH_DIFF = srcConst('combat.captureBaseDiff', 20,
 export const CAPTURED_UNIT_HP = srcConst('combat.capturedHp', 25,
   { stylized: 'the hit points a captured unit arrives with; the install publishes none' });
 
-/** master switch for WATER movement (a land unit embarking and taking water
- * steps). It is on: walkers embark under the full embark/movement model and
- * the embarked/naval combat overrides. With `live=false` every walker stays
- * land-only. The exporter ships it as rules.embarkLive so the GPU mirror
- * (`_embark_live`) stays in lockstep; tests flip it with setEmbarkLive. */
-export const embarkState = { live: true };
-export function setEmbarkLive(v: boolean): void {
-  embarkState.live = v;
-}
-
 /** Each citizen contributes these yields directly (Civ 6). */
 export const CITIZEN_SCIENCE = srcConst('citizenScience', 0.5, {
   derived: 'SCIENCE_PERCENTAGE_YIELD_PER_POP / 100 — the install writes the share as a percentage',

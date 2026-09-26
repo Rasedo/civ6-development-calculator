@@ -78,11 +78,9 @@ class Static:
     district_base: int
     form_base: int
     prod_w: int
-    districts_on: bool
     scaffold: list
     n_wonders: int
     n_projects: int
-    improvements_on: bool
     builder: int
     engineer: int
     missionary: int
@@ -158,46 +156,44 @@ def _static(rules, width: int, height: int, n_majors: int, n_citystates: int, de
     ring2 = torch.where(pair_dist == 2, ar, torch.full_like(ar, T)).sort(dim=1).values[:, :12]
     ring2 = torch.where(ring2 < T, ring2, torch.full_like(ring2, -1))
     units = list(rules.units or [{"id": "WARRIOR"}])
-    ids = [u.get("id") for u in units]
+    ids = [u["id"] for u in units]
     NB, NU = len(rules.b_cost), len(units)
-    imp = rules.improvements or {}
-    bel = rules.beliefs or {}
-    districts = list(rules.districts or [])
-    place = list((rules.district_scaffold or {}).get("place", []))
-    n_wonders = len((rules.wonders or {}).get("rows", []))
-    n_projects = len((rules.projects or {}).get("rows", []))
+    imp = rules.improvements
+    bel = rules.beliefs
+    districts = list(rules.districts)
+    place = list(rules.district_scaffold["place"])
+    n_wonders = len(rules.wonders["rows"])
+    n_projects = len(rules.projects["rows"])
     unit_base = NB + 2
     district_base = unit_base + NU
     form_base = district_base + len(place) + n_wonders + n_projects
-    names = list((rules.actions or {}).get("unit", []))
+    names = list(rules.actions["unit"])
     assert names, "rules.actions.unit missing — the unit action layout is the exporter's"
     act = {n: i for i, n in enumerate(names)}
     sp = rules.eras["espionage"]
     mids = [str(m["id"]) for m in sp["missions"]]
-    pols = list(rules.policies or [])
+    pols = list(rules.policies)
     kinds = [str(k) for k in rules.eras["dealItemKinds"]]
     comps = [c["id"] for c in rules.eras["competitions"]]
     seats = rules.seats
     return Static(
         device=device, T=T, neigh=neigh, ring2=ring2, pair_dist=pair_dist,
-        n_majors=n_majors, S=n_citystates, RC=int(seats.get("citySlots", 24)),
+        n_majors=n_majors, S=n_citystates, RC=int(seats["citySlots"]),
         NT=len(rules.t_cost), NC=len(rules.c_cost), NB=NB, NU=NU,
-        max_cities=int(seats.get("maxCities", 6)),
+        max_cities=int(seats["maxCities"]),
         unit_slots=simbase.UNIT_SLOTS, spec_keep=simbase.SPEC_KEEP, units=units,
         unit_base=unit_base, district_base=district_base, form_base=form_base, prod_w=form_base + 2 * NU,
-        districts_on=bool(districts),
-        scaffold=[districts[int(p["idx"])].get("id") if districts else None for p in place],
+        scaffold=[districts[int(p["idx"])]["id"] for p in place],
         n_wonders=n_wonders, n_projects=n_projects,
-        improvements_on=bool(imp.get("ids", [])),
-        builder=int(imp.get("builderIdx", -1)), engineer=int(imp.get("engineerIdx", -1)),
-        missionary=int(bel.get("missionaryIdx", -1)), apostle=int(bel.get("apostleIdx", -1)),
-        settler=next((i for i, u in enumerate(units) if bool(u.get("settler", 0))), -1),
+        builder=int(imp["builderIdx"]), engineer=int(imp["engineerIdx"]),
+        missionary=int(bel["missionaryIdx"]), apostle=int(bel["apostleIdx"]),
+        settler=next((i for i, u in enumerate(units) if bool(u["settler"])), -1),
         archaeologist=ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1,
-        naturalist=next((i for i, u in enumerate(units) if bool(u.get("naturalist", 0))), -1),
+        naturalist=next((i for i, u in enumerate(units) if bool(u["naturalist"])), -1),
         act=act, act_w=len(names),
-        a_pillage=act["PILLAGE"], a_snipe=act.get("SNIPE_0", act["PILLAGE"] + 1),
-        a_snipe3=act.get("SNIPE3_0", -1), a_repair=act["REPAIR"],
-        a_imp=[act.get(f"BUILD_{n}", -1) for n in imp.get("ids", [])],
+        a_pillage=act["PILLAGE"], a_snipe=act["SNIPE_0"],
+        a_snipe3=act["SNIPE3_0"], a_repair=act["REPAIR"],
+        a_imp=[act.get(f"BUILD_{n}", -1) for n in imp["ids"]],
         promo_cols=int(rules.promo_cols),
         air_strike_cols=sum(1 for n in names if n.startswith("AIR_STRIKE_")),
         air_rebase_cols=sum(1 for n in names if n.startswith("REBASE_")),
@@ -205,9 +201,9 @@ def _static(rules, width: int, height: int, n_majors: int, n_citystates: int, de
         spy_counterspy=mids.index("COUNTERSPY"),
         npol=len(pols),
         pol_kind=torch.tensor([int(p["kind"]) for p in pols], dtype=torch.long, device=device),
-        pol_legacy=torch.tensor([int(p.get("legacy", -1)) >= 0 for p in pols], dtype=torch.bool, device=device),
-        pol_dark=torch.tensor([int(p.get("dark", [-1, -1])[0]) >= 0 for p in pols], dtype=torch.bool, device=device),
-        dow_proximity=int(seats.get("dowProximity", 9)), war_min_turns=int(seats["warMinTurns"]),
+        pol_legacy=torch.tensor([int(p["legacy"]) >= 0 for p in pols], dtype=torch.bool, device=device),
+        pol_dark=torch.tensor([int(p["dark"][0]) >= 0 for p in pols], dtype=torch.bool, device=device),
+        dow_proximity=int(seats["dowProximity"]), war_min_turns=int(seats["warMinTurns"]),
         open_borders_civic=int(seats["openBordersCivic"]), alliance_civic=int(seats["allianceCivic"]),
         embassy_civic=int(rules.eras["embassyCivic"]), joint_war_civic=int(seats["jointWarCivic"]),
         embassy_cost=_whole(rules.eras["embassyCost"]), delegation_cost=_whole(rules.eras["delegationCost"]),
@@ -215,7 +211,7 @@ def _static(rules, width: int, height: int, n_majors: int, n_citystates: int, de
         deal_kind={k: kinds.index(k) for k in ("GOLD", "FAVOR", "RESOURCE", "SPY", "OPEN_BORDERS", "JOINT_WAR")},
         comp_aid=comps.index("AID_REQUEST") if "AID_REQUEST" in comps else -1,
         promise_cost=[_whole(p[0]) for p in rules.eras["promises"]],
-        gov_tier=[int(g["tier"]) for g in (rules.governments or [])],
+        gov_tier=[int(g["tier"]) for g in rules.governments],
     )
 
 
@@ -666,11 +662,8 @@ def _war_targets(sim, war_row: torch.Tensor) -> tuple:
     _ts = sim.tile_seat
     owned = (_ts >= 0) & (_ts < simbase.BARB_SEAT)
     at_war_t = owned & war_row.gather(1, sim._seat_row[torch.where(owned, _ts, torch.zeros_like(_ts))])
-    imps = torch.zeros_like(at_war_t)
-    if sim.improvements_on or sim.districts_on:
-        imps = (sim.improvement >= 0) & ~sim.pillaged & at_war_t
-        if sim.districts_on:
-            imps = imps | ((sim.district >= 0) & sim.district_complete & ~sim.district_pillaged & at_war_t)
+    imps = (sim.improvement >= 0) & ~sim.pillaged & at_war_t
+    imps = imps | ((sim.district >= 0) & sim.district_complete & ~sim.district_pillaged & at_war_t)
     B, CB = sim.B, sim.city_center.shape[1]
     live = sim.city_alive.reshape(B, -1) & war_row[:, :CB].repeat_interleave(sim.RC, dim=1)
     bb, cell = live.nonzero(as_tuple=True)
@@ -698,13 +691,12 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
 
     allt = torch.arange(T, device=dev).reshape(1, -1).expand(B, -1)
     planes: dict = {}                                                  # field -> (gate [B], plane [B, T])
-    if sim.improvements_on:
-        g = holds(sim._builder_idx)
-        if bool(g.any()):
-            planes["jobs"] = (g, sim._seat_job_mask(row))
-        g = holds(getattr(sim, "_eng_idx", -1))
-        if bool(g.any()):
-            planes["engJobs"] = (g, sim._seat_engineer_job_mask(row))
+    g = holds(sim._builder_idx)
+    if bool(g.any()):
+        planes["jobs"] = (g, sim._seat_job_mask(row))
+    g = holds(getattr(sim, "_eng_idx", -1))
+    if bool(g.any()):
+        planes["engJobs"] = (g, sim._seat_engineer_job_mask(row))
     relig = no.unsqueeze(1).expand(B, types.shape[1])
     for idx in (sim._missionary_idx, sim._apostle_idx):
         if idx >= 0:
@@ -718,7 +710,7 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
         planes["spread"] = (g, acc > 0)
     if sim._settler_idx >= 0 and sim._A_FOUND >= 0:
         g = holds(sim._settler_idx, need_charge=False) \
-            & (sim.city_alive[:, row].sum(dim=1) < int(sim.rules.seats.get("maxCities", 6)))
+            & (sim.city_alive[:, row].sum(dim=1) < int(sim.rules.seats["maxCities"]))
         if bool(g.any()):
             planes["foundOk"] = (g, _found_ok(sim, row, g))
     if sim._archaeologist_idx >= 0 and sim._A_EXCAVATE >= 0:

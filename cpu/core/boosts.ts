@@ -6,7 +6,6 @@ import type { GameState, ResearchState } from './types';
 import { neighbors } from '../../world/hex';
 import { BOOSTS, BOOST_FRACTION, type BoostCheck } from '../data/boosts';
 import { getModifiers, slottedPolicyIndices } from './effects';
-import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import { DISTRICTS } from '../data/districts';
 import { TECHS } from '../data/techs';
 import { GREAT_PEOPLE } from '../data/greatPeople';
@@ -90,8 +89,8 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
       );
     case 'policies': {
       // the cards the seat CHOSE (a driver decision, the stored set) — the
-      // GPU's `_seat_slotted` count; False with adoption off
-      if (!GOVERNMENTS_ADOPTION_LIVE || !seatOf(state, seat)) return false;
+      // GPU's `_seat_slotted` count
+      if (!seatOf(state, seat)) return false;
       return slottedPolicyIndices(state, seat).length >= check.count;
     }
     case 'cities':

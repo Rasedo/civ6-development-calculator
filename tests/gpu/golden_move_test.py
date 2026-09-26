@@ -134,18 +134,17 @@ def main() -> None:
     print("  5 barbarian seat: no dedication, no bonus, even with every civ golden")
 
     # ---- 6. an EMBARKED unit keeps the flat pool -------------------------
-    if sim3._embark_live:
-        sim4 = build()
-        v_b = put(sim4, "major", bld, 1)
-        golden(sim4, 1, mono)
-        assert full(sim4, "major", v_b) == base(sim4, bld) + bonus
-        sim4.major_unit_emb[0, v_b] = True
-        assert full(sim4, "major", v_b) == sim4._mp_scale * sim4._embark_moves, (
-            "an EMBARKED builder took the dedication onto the embark pool — "
-            "embarkation speed is not a unit's own movement (TS unitFullMoves)"
-        )
-        print(f"  6 embarked: {base(sim4, bld) + bonus} -> "
-              f"{sim4._mp_scale * sim4._embark_moves} (the flat pool, bonus dropped)")
+    sim4 = build()
+    v_b = put(sim4, "major", bld, 1)
+    golden(sim4, 1, mono)
+    assert full(sim4, "major", v_b) == base(sim4, bld) + bonus
+    sim4.major_unit_emb[0, v_b] = True
+    assert full(sim4, "major", v_b) == sim4._mp_scale * sim4._embark_moves, (
+        "an EMBARKED builder took the dedication onto the embark pool — "
+        "embarkation speed is not a unit's own movement (TS unitFullMoves)"
+    )
+    print(f"  6 embarked: {base(sim4, bld) + bonus} -> "
+          f"{sim4._mp_scale * sim4._embark_moves} (the flat pool, bonus dropped)")
 
     # ---- 7. the OTHER three faces are keyed on the seat too --------------
     # The research discount / prophet points / culture answer for the civ that

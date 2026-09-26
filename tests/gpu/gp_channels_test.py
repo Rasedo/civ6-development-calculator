@@ -68,9 +68,6 @@ def main() -> None:
     path = next((p for p in fixture_paths() if open_capital(build(rules, p))), None)
     assert path is not None, "no fixture's capital stands in open land"
     sim = build(rules, path)
-    if not sim.districts_on:
-        print("gp_channels: districts off on this fixture — nothing to poke")
-        return
     dcat = {d["id"]: i for i, d in enumerate(sim.districts_cat)}
     ones = torch.ones(sim.B, dtype=torch.bool)
 

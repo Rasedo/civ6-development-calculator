@@ -1,6 +1,6 @@
 """Government/policy adoption self-test.
 
-The system is live (rules.governmentsLive = True). Drives the deterministic
+Drives the deterministic
 adoption + greedy slot-fill directly (the occupancy_test pattern), asserting
 the GPU's `_newest_gov` / `_gov_policy_mods` match the TS
 `newestGovernment` / `computeAdoption` / `applyGovernment` rule at the
@@ -25,18 +25,16 @@ from warmup import opened, warm_base
 
 # THE WARMED BASE, ONE PER (fixture, slot). A scene pays a `restore` —
 # milliseconds — instead of a fixture load and a settle. `_CAT` names the
-# government catalog tensors scene 11/12 overwrite and `_ATTRS` the two master
-# switches scenes 1, 5 and 11 replace; neither is in `_MUTABLE`, so the helper
-# puts both back by hand and bumps the catalog version the rows are keyed on.
-# `slot` keys a SECOND base for the one sim that stays live across the others:
-# `sim` forces both switches on and is still read at steps 6, 9 and 10, after
-# `sim2` has forced one of them off, so it cannot share an object with them.
+# government catalog tensors scene 11/12 overwrite; they are not in
+# `_MUTABLE`, so the helper puts them back by hand and bumps the catalog
+# version the rows are keyed on. `slot` keys a SECOND base for the one sim
+# that stays live across the others: `sim` is still read at steps 6, 9 and
+# 10, so it cannot share an object with the scenes built in between.
 _CAT = ("_gov_ucs_by_type", "_gov_dc_house", "_gov_dc_amen")
-_ATTRS = ("_gov_live", "_gov_has_effects")
 
 
 def build(rules, path, slot: int = 0) -> BatchSim:
-    sim = warm_base((str(path), slot), lambda: opened(rules, path), _CAT, _ATTRS)
+    sim = warm_base((str(path), slot), lambda: opened(rules, path), _CAT)
     sim._gov_cat_version += 1
     return sim
 
@@ -56,10 +54,6 @@ def main() -> None:
     paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     sim = build(rules, paths[0], slot=0)
-
-    # Force the master switch on in-memory so the pokes are export-independent.
-    sim._gov_live = True
-    sim._gov_has_effects = True
 
     B = sim.B
     NC = sim.civ_civics.shape[2]
@@ -160,14 +154,6 @@ def main() -> None:
         "INSULAE must NOT be slotted — MERCHANT_REPUBLIC has one Wildcard, not two, "
         "and LAND_SURVEYORS wins it on table order"
     )
-
-    # 5) The master switch ships LIVE — a real sim computes the mods; forcing
-    #    the switch off in-memory silences them.
-    sim2 = build(rules, paths[0], slot=1)
-    assert sim2._gov_live is True, "governments ship LIVE (rules.governmentsLive True)"
-    sim2._gov_has_effects = False  # force-off in memory
-    cy, cpy, ch, cym, _s2, _e2, _tp2, *_ = sim2._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
-    assert float(cy.abs().sum()) == 0.0 and float(cpy.abs().sum()) == 0.0 and float(ch.abs().sum()) == 0.0, "switch off => no mods"
 
     # 6) A card slots at its civic boundary. CODE_OF_LAWS also grants
     #    DISCIPLINE + SURVEY. CHIEFDOM has ONE military slot; DISCIPLINE
@@ -281,8 +267,6 @@ def main() -> None:
     #     a city-state seat adopts nothing; OLIGARCHY's row borrowed onto
     #     the adopted slot proves the promotion-class mask arms.
     simc = build(rules, paths[0], slot=1)
-    simc._gov_live = True
-    simc._gov_has_effects = True
     simc.civ_civics[:, 0].copy_(cF)
     simc._eff_version += 1
     s0 = torch.zeros(simc.B, dtype=torch.long)

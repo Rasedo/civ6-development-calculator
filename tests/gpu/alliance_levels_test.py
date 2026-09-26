@@ -165,8 +165,6 @@ def test_democracy_destination_half(rules, path) -> None:
     DEMO = ["CODE_OF_LAWS", "COLONIALISM", "ENLIGHTENMENT", "SUFFRAGE"]
 
     def adopt_democracy(sim, row):
-        sim._gov_live = True
-        sim._gov_has_effects = True
         sim.civ_civics[B0, row] = False
         for c in DEMO:
             sim.civ_civics[B0, row, civ_idx[c]] = True

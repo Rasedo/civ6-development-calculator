@@ -133,9 +133,8 @@ def find_melee(rules, paths):
                 sim.barb_unit_tile[0, bslot] = x
                 sim.barb_unit_hp[0, bslot] = 100
                 sim.barb_unit_seat[0, bslot] = BARB_SEAT
-                if sim._embark_live:
-                    sim.major_unit_emb[0, aslot] = False
-                    sim.barb_unit_emb[0, bslot] = False
+                sim.major_unit_emb[0, aslot] = False
+                sim.barb_unit_emb[0, bslot] = False
                 sim.military_at[0, a_tile] = aslot + sim.POOL_LO["major"]
                 sim.military_at[0, x] = bslot + sim.POOL_LO["barb"]
                 p = aslot + sim.POOL_LO["major"]

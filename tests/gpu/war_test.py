@@ -413,7 +413,7 @@ def test_golden_war(rules, path):
     assert pct == (25, 25, 300), f"the golden columns should be 25/25/300, got {pct}"
     sim.civ_age[0, 0] = 2
     sim.ded_picks[0, 0, 0] = sim._ded_to_arms
-    sim.seat_denounced[:, 0, 1] = int(sim.turn) - sim._formal_war_min
+    sim.seat_denounced[:, 0, 1] = int(sim.turn) - sim._war_kinds[1][1]
     g0 = float(sim.civ_grievance[0, 1, 0])
     sim._declare_war_major(0, 1, one)
     assert bool(sim._war_formal(0, 1)), "the golden war is FORMAL"
@@ -452,7 +452,7 @@ def test_golden_war(rules, path):
     sim._make_peace(0, 1, one)
     # WITHOUT the Golden age the same declaration is formal at full price
     sim.civ_age[0, 0] = 1
-    sim.seat_denounced[:, 0, 1] = int(sim.turn) - sim._formal_war_min
+    sim.seat_denounced[:, 0, 1] = int(sim.turn) - sim._war_kinds[1][1]
     g3 = float(sim.civ_grievance[0, 1, 0])
     sim._declare_war_major(0, 1, one)
     assert int(sim._war_kind_code(0, 1)[0]) == FORMAL

@@ -113,7 +113,7 @@ def build_strike_scene(rules, path):
     """A seat-0 city (slot 0) owning a COMPLETE Encampment, one AT-WAR civ
     warrior adjacent, no barbs. Returns (sim, enc_tile, tgt_tile, vslot)."""
     sim = opened(rules, path)
-    assert sim.districts_on and sim._encamp_didx >= 0, "encampment district not exported"
+    assert sim._encamp_didx >= 0, "encampment district not exported"
     # advance a little so the seat-0 city has borders/tiles
     for _ in range(6):
         sim.step()
@@ -380,8 +380,8 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
             s.step()
         return s
     sim = _prep()
-    if not sim._gov_has_effects or sim._encamp_si < 0 or sim.n_majors < 2:
-        print("  civ encampHarborProdMult SKIPPED (no gov effects / no Encampment scaffold)")
+    if sim._encamp_si < 0 or sim.n_majors < 2:
+        print("  civ encampHarborProdMult SKIPPED (no Encampment scaffold)")
         return
     r = 0
     live = (sim.city_alive[0, r + 1]).nonzero(as_tuple=True)[0]

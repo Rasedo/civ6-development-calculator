@@ -12,7 +12,7 @@ import { BUILDINGS, BUILDING_ERA_INDEX, buildingVariantFor } from '../data/build
 import { GW_HOLDERS } from '../data/greatWorks';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { ROAD_TIER_ERA } from '../data/constants';
-import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
+import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, HEROIC_DEDICATIONS, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 /** CIV6 (Great People): the WORLD era — "the era of the Great Person and the
  *  World Era when the Great Person appears in the queue". The furthest any seat
@@ -109,7 +109,7 @@ export function eraBoundary(state: GameState): void {
  * sites.
  */
 export function dedicationEvent(state: GameState, civ: number, kind: number, events = 1): void {
-  if (!DEDICATION_PAYOUTS_LIVE || events <= 0) return;
+  if (events <= 0) return;
   // CIV6 (Strength in Unity): "When making Dedications at the beginning of a
   // Golden Age or Heroic Age, receive the Normal Age bonus towards improving
   // Era Score IN ADDITION to the other bonus" — the one row that reaches past

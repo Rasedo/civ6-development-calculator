@@ -152,7 +152,7 @@ def poke_default_kind(rules, path):
     lead(sim, 0, None)
     assert int(sim._default_war_kind(sim._war_kinds_allowed(0, 1))[0]) == SURPRISE
     # CIV6 (Formal War): "a player that Denounced you or that you have Denounced"
-    sim.seat_denounced[0, 1, 0] = t - sim._formal_war_min
+    sim.seat_denounced[0, 1, 0] = t - sim._war_kinds[FORMAL][1]
     assert bool(sim._war_kinds_allowed(0, 1)[0, FORMAL])
     assert int(sim._default_war_kind(sim._war_kinds_allowed(0, 1))[0]) == FORMAL
     # the To Arms! dedicant's war is a quarter of the formal price

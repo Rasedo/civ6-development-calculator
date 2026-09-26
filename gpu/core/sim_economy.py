@@ -19,7 +19,7 @@ class SimEconomy:
         cols = self.RC
         dt = amen_have.dtype
         out = torch.zeros(B, cols, dtype=dt, device=self.device)
-        if self._n_lux == 0 or not self.improvements_on:
+        if self._n_lux == 0:
             return out
         alive = self.city_alive[:, row, :cols]
         improved = (self.lux_id >= 0) & (self.tile_seat == int(self._ROW_SEAT[row])) & (self.improvement == self.lux_req)
@@ -215,8 +215,8 @@ class SimEconomy:
         harsher column, so the default costs the defaulting seat.
         """
         rww = self.rules.war_weariness
-        formal = torch.tensor(rww.get("eraFormal", [16, 22, 28, 34, 40]), dtype=torch.long, device=self.device)
-        surprise = torch.tensor(rww.get("eraSurprise", [16, 25, 34, 43, 52]), dtype=torch.long, device=self.device)
+        formal = torch.tensor(rww["eraFormal"], dtype=torch.long, device=self.device)
+        surprise = torch.tensor(rww["eraSurprise"], dtype=torch.long, device=self.device)
         civ = row.clamp(0, self.n_majors - 1)
         T, C = self.civ_techs.shape[2], self.civ_civics.shape[2]
         techs = self.civ_techs.gather(1, civ.view(-1, 1, 1).expand(-1, 1, T)).squeeze(1)
@@ -247,8 +247,8 @@ class SimEconomy:
         """
         self._ww_hooked += hit.long()
         rww = self.rules.war_weariness
-        abroad = int(rww.get("abroad", 2))
-        death = int(rww.get("death", 3))
+        abroad = int(rww["abroad"])
+        death = int(rww["death"])
         zeros = torch.zeros(self.B, dtype=torch.long, device=self.device)
         a_row = zeros + a_row if isinstance(a_row, int) else a_row.long()
         d_row = zeros + d_row if isinstance(d_row, int) else d_row.long()
@@ -361,7 +361,7 @@ class SimEconomy:
         NS = self.NS
         flat_ww = self.ww.view(self.B, NS * NS)
         flat_turn = self.ww_turn.view(self.B, NS * NS)
-        mult = int(self._ww_wmd_launched) + int(self.rules.war_weariness.get("abroad", 2))
+        mult = int(self._ww_wmd_launched) + int(self.rules.war_weariness["abroad"])
         gain = self._ww_era_base(self_row, foe) * mult
         _cut = (self._gp_perm_at(self_row, "warWearyPct").long()
                 + self._fx_at_seat("wwcut", self_row).long()).clamp(min=0, max=100)
@@ -385,8 +385,8 @@ class SimEconomy:
         rww = self.rules.war_weariness
         at_war = self.war[:, row, :].any(dim=1, keepdim=True)
         shed = torch.where(at_war,
-                           torch.tensor(int(rww.get("decayAtWar", 50)), dtype=torch.long, device=self.device),
-                           torch.tensor(int(rww.get("decayAtPeace", 200)), dtype=torch.long, device=self.device))
+                           torch.tensor(int(rww["decayAtWar"]), dtype=torch.long, device=self.device),
+                           torch.tensor(int(rww["decayAtPeace"]), dtype=torch.long, device=self.device))
         fought = self.ww_turn[:, row, :] == int(self.turn)
         if mask is not None:
             fought = fought | ~mask.unsqueeze(1)
@@ -397,7 +397,7 @@ class SimEconomy:
         """A peace treaty sheds 2000 from THAT war on both sides - deliberately
         larger than any plausible accumulation, which is how the source stops a
         settled war haunting a civ forever. The `warWearinessPeace` twin."""
-        shed = int(self.rules.war_weariness.get("peaceTreaty", 2000))
+        shed = int(self.rules.war_weariness["peaceTreaty"])
         for i, j in ((a_row, b_row), (b_row, a_row)):
             if not self._ww_holds(i) or i == j:
                 continue
@@ -428,7 +428,7 @@ class SimEconomy:
             self._ww_peace(rel[:, _s], foe, _cs0 + _s)
 
     def _ww_penalty(self, row: int, dtype=None) -> torch.Tensor:
-        per = int(self.rules.war_weariness.get("perAmenity", 400))
+        per = int(self.rules.war_weariness["perAmenity"])
         return torch.div(self._ww_max(row), per, rounding_mode="floor").to(dtype or self.dtype)
 
     def _amenity_factors(self, balance: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -599,17 +599,16 @@ class SimEconomy:
         gone = self._feat_gone()
         if bool(gone.any()):
             base = base - self.feat_yields[:, :, 0] * gone.to(self.dtype) + self._feat_add_y()[:, :, 0]
-        if self.improvements_on:
-            live = ~self.pillaged
-            base = base + ((self.improvement == self.FARM) & live).to(self.dtype) * self._farm_food
-            # `_neutral_prod`'s arm, on the other column tileYields' improvement
-            # block writes: FARM, MINE and LUMBER_MILL are the three the loader
-            # names, and every row past them pays its catalog yield — the
-            # FISHING_BOATS food a sea resource is worked for.
-            new_imp = self.improvement >= 3
-            if bool(new_imp.any()):
-                base = base + (new_imp & live).to(self.dtype) * self._imp_yields[
-                    self.improvement.clamp(min=0), 0]
+        live = ~self.pillaged
+        base = base + ((self.improvement == self.FARM) & live).to(self.dtype) * self._farm_food
+        # `_neutral_prod`'s arm, on the other column tileYields' improvement
+        # block writes: FARM, MINE and LUMBER_MILL are the three the loader
+        # names, and every row past them pays its catalog yield — the
+        # FISHING_BOATS food a sea resource is worked for.
+        new_imp = self.improvement >= 3
+        if bool(new_imp.any()):
+            base = base + (new_imp & live).to(self.dtype) * self._imp_yields[
+                self.improvement.clamp(min=0), 0]
         self._fbase_cache = (self._eff_version, base)
         return base
 
@@ -688,8 +687,6 @@ class SimEconomy:
         # fertility lines, so silt that lands there never pays
         base = torch.where(self.nwonder, self.tile_yields[:, :, 1],
                            self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype))
-        if not self.improvements_on:
-            return base
         if self._nprod_cache is not None and self._nprod_cache[0] == self._eff_version:
             return self._nprod_cache[1]
         live = ~self.pillaged
@@ -2308,7 +2305,7 @@ class SimEconomy:
         if bool((self._b_gov_tier > 0).any()):
             _tier = self._adopted_gov_tier(row)
             base = base & (self._b_gov_tier.reshape(1, 1, -1) <= _tier.reshape(B, 1, 1))
-        if self.districts_on and self._b_has_reqs:
+        if self._b_has_reqs:
             rq = self._b_req_district  # [NB] the district each building needs, -1 = none
             reg = self.city_dist_tile[:, row][:, :, rq.clamp(min=0)]  # [B, C, NB] registry tile per building
             has_d = reg >= 0
@@ -2758,7 +2755,7 @@ class SimEconomy:
         FIT is a property of the SET, so the mask is per card; the picker
         enforces the fit and the record's apply re-validates it
         (`_policy_set_ok`). A seat with no government slots nothing."""
-        if not self._gov_has_effects or not self._ngov or not self._npol:
+        if not self._ngov or not self._npol:
             return torch.zeros(self.B, max(self._npol, 1), dtype=torch.bool, device=self.device)
         civ = self._seat_civics(row)
         adopted, has_gov = self._adopted_gov(row)
@@ -2798,7 +2795,7 @@ class SimEconomy:
         pool entirely, exactly as `computeAdoption`'s `blocked` does."""
         B, dev = civics2.shape[0], self.device
         slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
-        if not self._gov_has_effects or not self._ngov or not self._npol:
+        if not self._ngov or not self._npol:
             return slotted
         adopted, has_gov = self._newest_gov(civics2) if gov is None else gov
         nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
@@ -2920,7 +2917,7 @@ class SimEconomy:
             "govpercit": torch.zeros(B, 6, dtype=dt, device=dev),
             "wallhouse": _z.clone(), "theocs": _z.clone(), "govbldy": _z.clone(),
         }
-        if not self._gov_has_effects or not self._ngov:
+        if not self._ngov:
             return (city_y, cap_y, hous_all, ymult, slotted, emult, tpmult,
                     amen_all, hid, nd, adjm, byb, fx)
         adopted, has_gov = self._newest_gov(civics2) if row is None else self._adopted_gov(row)
@@ -3173,18 +3170,16 @@ class SimEconomy:
         — applied where the purchase is priced and paid. READING: not an
         upgrade, a tile or a patronage. Then the five-step floor. `goldPrice`'s
         twin; `price` [B] or [B/1, N]."""
-        if self._gov_has_effects:
-            f = 1 - self._gov_mods(row)[12]["goldbuydisc"].to(torch.float64) / 100
-            price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
+        f = 1 - self._gov_mods(row)[12]["goldbuydisc"].to(torch.float64) / 100
+        price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
         return self._purchase_step(price)
 
     def _faith_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
         """CIV6 (Theocracy, GOVERNMENTBONUS_FAITH_PURCHASES): the percent
         off every FAITH purchase, then the five-step floor —
         `faithPrice`'s twin."""
-        if self._gov_has_effects:
-            f = 1 - self._gov_mods(row)[12]["faithbuydisc"].to(torch.float64) / 100
-            price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
+        f = 1 - self._gov_mods(row)[12]["faithbuydisc"].to(torch.float64) / 100
+        price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
         return self._purchase_step(price)
 
     def _seat_slotted(self, row: int) -> torch.Tensor:
@@ -3199,8 +3194,6 @@ class SimEconomy:
         turn for each Broadcast Center." The card names a building and pays per
         copy standing."""
         out = torch.zeros(self.B, dtype=torch.float64, device=self.device)
-        if not self._gov_has_effects:
-            return out
         alive = self.city_alive[:, row]
         for on, bi, amt in self._gov_mods(row)[12]["favorb"]:
             n = (self.city_bldg[:, row, :, bi] & alive).sum(dim=1).double()
@@ -3238,8 +3231,6 @@ class SimEconomy:
         roster (a barbarian or a city-state adopts no government). `rows`
         names the BATCH rows when the caller has already narrowed."""
         z = torch.zeros_like(seat, dtype=self.dtype)
-        if not self._gov_has_effects:
-            return z
         ok = (seat >= 0) & (seat < self.n_majors)
         s0 = seat.clamp(min=0, max=self.n_majors - 1)
         tab = self._fx_by_row(key)
@@ -3412,15 +3403,13 @@ class SimEconomy:
         Barbarians". A barbarian adopts no government, so the bonus only ever
         runs one way."""
         z = torch.zeros_like(own, dtype=self.dtype)
-        if not self._gov_has_effects:
-            return z
         return torch.where(foe == BARB_SEAT, self._fx_at_seat("vbarb", own), z)
 
     def _recon_xp_mult(self, seat: torch.Tensor, types: torch.Tensor,
                        rows: torch.Tensor | None = None) -> torch.Tensor:
         """long — CIV6 (Survey): "Doubles experience for recon units"."""
         one = torch.ones_like(seat, dtype=torch.long)
-        if not self._gov_has_effects or not bool(self._type_recon.any()):
+        if not bool(self._type_recon.any()):
             return one
         m = self._fx_at_seat("rxp", seat, rows).long()
         return torch.where(self._type_recon[types.clamp(min=0, max=self.NU - 1)], m.clamp(min=1), one)
@@ -3429,8 +3418,6 @@ class SimEconomy:
         """The gold each unit costs this seat per turn — Conscription and
         Levee en Masse take it down, never below free."""
         base = self._type_maintenance[types.clamp(min=0, max=self.NU - 1)]
-        if not self._gov_has_effects:
-            return base
         cut = self._gov_mods(row)[12]["mcut"]
         # CIV6 (Elite Forces): "+2 Gold to maintain each military unit."
         add = self._gov_mods(row)[12]["milmaint"]
@@ -3625,7 +3612,7 @@ class SimEconomy:
                     acc = acc + amt * _pl
                 v = torch.floor(acc)
                 if self._log_diff:
-                    _nm3 = self.districts_cat[di].get('id')
+                    _nm3 = self.districts_cat[di]['id']
                     for _b in range(self.B):
                         for _t in (self.district[_b] == di).nonzero().flatten().tolist():
                             _bits = ",".join(
@@ -4794,10 +4781,9 @@ class SimEconomy:
             heal = torch.where(_fh & home, torch.full_like(heal, 100), heal)
         # CIV6 (Twilight Valor): "Cannot heal outside your territory" - the
         # seat's OWN ground.
-        if self._gov_has_effects:
-            _s0 = seat.clamp(min=0, max=self.n_majors - 1)
-            _hh = self._fx_by_row("healhome").gather(1, _s0) & (seat >= 0) & (seat < self.n_majors)
-            heal = torch.where(_hh & ~home, torch.zeros_like(heal), heal)
+        _s0 = seat.clamp(min=0, max=self.n_majors - 1)
+        _hh = self._fx_by_row("healhome").gather(1, _s0) & (seat >= 0) & (seat < self.n_majors)
+        heal = torch.where(_hh & ~home, torch.zeros_like(heal), heal)
         # CIV6 (Giant Death Robot): "Can only heal in friendly territory" -
         # its own ground or an ally's, which is a wider bar than the card's.
         if bool(self._type_heal_friendly.any()):
@@ -4891,7 +4877,7 @@ class SimEconomy:
         t = getattr(self, f"{pre}_unit_tile").clamp(min=0)
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         out = torch.zeros_like(t)
-        if self._pk.get("CHAPLAIN", -1) < 0:
+        if self._pk["CHAPLAIN"] < 0:
             return out
         # every tile's chaplain value, by the RELIGIOUS occupant standing on it
         # — ashore on the civilian plane, at sea on the passenger one.
@@ -5134,12 +5120,11 @@ class SimEconomy:
             base = base + getattr(self, f"{pre}_unit_mp_bonus")
         # CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2
         # Movement."
-        if self._gov_has_effects:
-            _sd = getattr(self, f"{pre}_unit_seat")
-            _s0 = _sd.clamp(min=0, max=self.n_majors - 1)
-            _rm = self._fx_by_row("raidermove").gather(1, _s0) \
-                * ((_sd >= 0) & (_sd < self.n_majors)).long()
-            base = base + _rm * self._type_raider[typ].long()
+        _sd = getattr(self, f"{pre}_unit_seat")
+        _s0 = _sd.clamp(min=0, max=self.n_majors - 1)
+        _rm = self._fx_by_row("raidermove").gather(1, _s0) \
+            * ((_sd >= 0) & (_sd < self.n_majors)).long()
+        base = base + _rm * self._type_raider[typ].long()
         # CIV6 (Enhanced Mobility): "+3 Moves." It rides the LAND arm only, as
         # `unitFullMoves` does — the embarked arm below returns its own pool.
         if self._gdr_idx >= 0:
@@ -5147,14 +5132,13 @@ class SimEconomy:
                 typ, getattr(self, f"{pre}_unit_seat"), self._gdr_u_moves
             ).long() * self._gdr_enhanced_moves
         naval = self.unit_naval[typ]
-        emb = getattr(self, f"{pre}_unit_emb") if self._embark_live else torch.zeros_like(naval)
-        if self._embark_live:
-            # CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT while embarked): the roster's rows
-            base = torch.where(
-                emb & ~naval,
-                torch.full_like(base, self._embark_moves) + self._roster_embark_mp(getattr(self, f"{pre}_unit_seat"), typ),
-                base,
-            )
+        emb = getattr(self, f"{pre}_unit_emb")
+        # CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT while embarked): the roster's rows
+        base = torch.where(
+            emb & ~naval,
+            torch.full_like(base, self._embark_moves) + self._roster_embark_mp(getattr(self, f"{pre}_unit_seat"), typ),
+            base,
+        )
         base = base + self._sea_move_mp(getattr(self, f"{pre}_unit_seat"), emb, naval)
         # ONE multiply, at the end: every figure above is in WHOLE points, and
         # the aura's is already in `mp_scale` units (`unitFullMoves` scales its
@@ -5730,19 +5714,16 @@ class SimEconomy:
         g = self._rcy_globals()
         f_plane = self._rcy_food_plane(row, g)
         p_plane, ty_oth, oth_sc, w = g["p_plane"], g["ty_oth"], g["oth_score"], g["w"]
-        tile_add = self._tile_add_any(row)
         has_bel = self._seat_has_beliefs(row)  # PANTHEON + FOUNDER: a seat's own claim
-        # The FOLLOWER half keys on the religion each CITY follows, which under
-        # live coupling need not be one this seat founded (withFollowerBelief
-        # has no owner test), so it gates on _follower_live, not the own claim.
-        fol_live = self._follower_live(row)
-        featP = None
-        if tile_add:
-            featP = self._seat_tile_add(row)
-            f_plane = f_plane + featP[:, :, 0]
-            p_plane = p_plane + featP[:, :, 1]
-            ty_oth = ty_oth + featP
-            oth_sc = oth_sc + (featP[:, :, 2:].double() * w[2:].reshape(1, 1, 4)).sum(dim=2)
+        # The FOLLOWER half keys on the religion each CITY follows, which need
+        # not be one this seat founded (withFollowerBelief has no owner test),
+        # so it gates on any belief in the catalog, not the own claim.
+        fol_live = self._bel_any
+        featP = self._seat_tile_add(row)
+        f_plane = f_plane + featP[:, :, 0]
+        p_plane = p_plane + featP[:, :, 1]
+        ty_oth = ty_oth + featP
+        oth_sc = oth_sc + (featP[:, :, 2:].double() * w[2:].reshape(1, 1, 4)).sum(dim=2)
         # CIV6 (Resources.PrereqTech): a strategic this row cannot see yet pays
         # it nothing — the static plane baked the yield, so it comes off here,
         # worked tile and centre alike, whatever else the row is paid
@@ -5972,7 +5953,7 @@ class SimEconomy:
         fi_adj = None
         st_adj = None
         for di, dd in enumerate(self.districts_cat):
-            yc = int(dd.get("adjYield", -1))
+            yc = int(dd["adjYield"])
             if yc < 0:
                 continue
             t_d = dreg[:, :, di]  # [B, n] this city's tile of type di (-1 none)
@@ -5985,7 +5966,7 @@ class SimEconomy:
                 # could not name a tile and its log never paired.
                 _raw = self._district_adj_raw(
                     di, self._adj_district_count().to(self.dtype))
-                _nm2 = dd.get('id')
+                _nm2 = dd['id']
                 for _b in range(B):
                     for _j in range(t_d.shape[1]):
                         _t = int(t_d[_b, _j])
@@ -5994,7 +5975,7 @@ class SimEconomy:
                         self._diff_events.setdefault(_b, []).append(
                             f"dr:{_t}:{_nm2} raw{float(_raw[_b, _t]):.3f}")
             if self._log_diff:
-                _nm = dd.get('id')
+                _nm = dd['id']
                 _yn = ('food', 'production', 'gold', 'science', 'culture', 'faith')[yc]
                 for _b in range(B):
                     for _j in range(t_d.shape[1]):
@@ -6264,16 +6245,14 @@ class SimEconomy:
         # once, and after the citizen term that grouping is not free).
         b_city = torch.zeros(B, 6, dtype=F64, device=dev)
         b_cap = torch.zeros(B, 6, dtype=F64, device=dev)
-        gym = None
-        if self._gov_has_effects:
-            _gcity, _gcap, _gh, gym, *_ = self._gov_mods(row)
-            b_city = b_city + _gcity.double()
-            b_cap = b_cap + _gcap.double()
+        _gcity, _gcap, _gh, gym, *_ = self._gov_mods(row)
+        b_city = b_city + _gcity.double()
+        b_cap = b_cap + _gcap.double()
         if self.S > 0 and row < self.n_majors:  # only a major sends envoys or holds a suzerain
             _env, _acs = self._envoys_here(row), self.citystate_alive
             b_cap = b_cap.scatter_add(
                 1, self._citystate_yidx,
-                ((_env >= 1) & _acs).double() * float(self.rules.citystate.get("capitalBonus", 2)))
+                ((_env >= 1) & _acs).double() * float(self.rules.citystate["capitalBonus"]))
         if has_bel:
             # Founder capital incomes — perF (per-N followers, empire-wide) +
             # perC (per live city). Followers = this row's own live pop sum
@@ -6289,7 +6268,7 @@ class SimEconomy:
             # row's own cities — `beliefCapitalYields`
             perD = self._bel_add("perD", row)  # [B, nD, 6]
             perW = self._bel_add("perW", row)  # [B, 6]
-            if bool((perD != 0).any()) and self.districts_on:
+            if bool((perD != 0).any()):
                 _dreg = self.city_dist_tile[:, row, :cols]
                 _dcomp = (_dreg >= 0) & self.district_complete.gather(
                     1, _dreg.clamp(min=0).reshape(B, -1)).reshape_as(_dreg) & _liv.unsqueeze(2)
@@ -6303,25 +6282,22 @@ class SimEconomy:
         bon = b_city.unsqueeze(1) * alivef.unsqueeze(2) + b_cap.unsqueeze(1) * is_cap.unsqueeze(2)
         # CIV6 (Autocracy): "+1 to all yields for each Government Plaza
         # building, Diplomatic Quarter building, and palace in a city."
-        if self._gov_has_effects:
-            _gby = self._gov_mods(row)[12]["govbldy"]
-            if bool((_gby != 0).any()):
-                _stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols], self.city_bldg_pillaged[:, row, :cols])
-                _n = (_stand & self._b_gov_yield.reshape(1, 1, -1)).sum(dim=2).double()
-                # the PALACE is a capital TERM on this engine, never a
-                # `city_bldg` bit, so the count adds it by hand
-                if self._palace_gov_yield:
-                    _n = _n + pal
-                bon = bon + (_gby.double().reshape(B, 1, 1) * _n.unsqueeze(2)
-                             * alivef.unsqueeze(2))
+        _gby = self._gov_mods(row)[12]["govbldy"]
+        if bool((_gby != 0).any()):
+            _stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols], self.city_bldg_pillaged[:, row, :cols])
+            _n = (_stand & self._b_gov_yield.reshape(1, 1, -1)).sum(dim=2).double()
+            # the PALACE is a capital TERM on this engine, never a
+            # `city_bldg` bit, so the count adds it by hand
+            if self._palace_gov_yield:
+                _n = _n + pal
+            bon = bon + (_gby.double().reshape(B, 1, 1) * _n.unsqueeze(2)
+                         * alivef.unsqueeze(2))
         # the GOVERNOR's share: its flat cityYields, the per-CITIZEN yields
         # (the promotions' plus the two governments that pay by citizen in a
         # governed city) and the faith per SPECIALTY district.
         if self.n_governors and row < self.n_majors:
-            _gpc = self._gov_mods(row)[12]["govpercit"] if self._gov_has_effects \
-                else torch.zeros(B, 6, dtype=F64, device=dev)
-            _spec = self._district_counts(row)[1] if self.districts_on \
-                else torch.zeros(B, self.RC, dtype=torch.long, device=dev)
+            _gpc = self._gov_mods(row)[12]["govpercit"]
+            _spec = self._district_counts(row)[1]
             _gb = self._governor_bonus(row, self.city_pop[:, row, :cols], _spec, _gpc)[:, sl] \
                 * alivef.unsqueeze(2)
             bon = bon + _gb
@@ -6395,53 +6371,45 @@ class SimEconomy:
         # civilization — a percent on `m.yieldMult`, ahead of the two rows that
         # count suzerain HEADS, which is the order TS composes them in.
         _gsci = self._suz_science_pct(row)
-        if gym is None and bool((_gsci > 0).any()):
-            gym = torch.ones(B, 6, dtype=F64, device=dev)
-        if gym is not None and bool((_gsci > 0).any()):
+        if bool((_gsci > 0).any()):
             gym = gym.clone()
             gym[:, 3] = gym[:, 3] * (1 + _gsci.to(gym.dtype) / 100.0)
-        if gym is not None:
-            # a suzerainty pays CULTURE by the head, not by what Treaty
-            # Organization does to its favor — `suzerainCount`'s weighting is
-            # the favor's, and TS counts `isSuzerain` heads here
-            _suz_n = self._suzerains_held(row)
-            if self._gov_has_effects:
-                _cz = self._gov_mods(row)[12]["culsuz"]
-                if bool((_cz != 0).any()):
-                    gym = gym.clone()
-                    gym[:, 4] = gym[:, 4] * (1 + _cz * _suz_n.to(gym.dtype))
-            # CIV6 (Surrounded by Glory): "+5% Culture per city-state you are
-            # the Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
-            for _yc, _yl, _yy, _yp in self._live_rows(row, self._yield_per_suzerain_rows):
-                _yw = self._row_is(row, _yc, _yl)
-                if not bool(_yw.any()):
-                    continue
-                gym = gym.clone()
-                gym[:, _yy] = gym[:, _yy] * (1 + _yw.to(gym.dtype) * _suz_n.to(gym.dtype) * (_yp / 100.0))
-            gymc = gym.double().unsqueeze(1)
-            # The governor's own multipliers are part of `m.yieldMult` on TS —
-            # ONE number scales the total, so they fold in before it lands.
-            if self.n_governors and row < self.n_majors:
-                _gy = self._gov_mods(row)[12]["govymul"] if self._gov_has_effects \
-                    else torch.ones(B, 6, dtype=F64, device=dev)
-                gymc = gymc * self._governor_ymult(row, _gy)[:, sl]
-            total = total * gymc
+        # a suzerainty pays CULTURE by the head, not by what Treaty
+        # Organization does to its favor — `suzerainCount`'s weighting is
+        # the favor's, and TS counts `isSuzerain` heads here
+        _suz_n = self._suzerains_held(row)
+        _cz = self._gov_mods(row)[12]["culsuz"]
+        if bool((_cz != 0).any()):
+            gym = gym.clone()
+            gym[:, 4] = gym[:, 4] * (1 + _cz * _suz_n.to(gym.dtype))
+        # CIV6 (Surrounded by Glory): "+5% Culture per city-state you are
+        # the Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
+        for _yc, _yl, _yy, _yp in self._live_rows(row, self._yield_per_suzerain_rows):
+            _yw = self._row_is(row, _yc, _yl)
+            if not bool(_yw.any()):
+                continue
+            gym = gym.clone()
+            gym[:, _yy] = gym[:, _yy] * (1 + _yw.to(gym.dtype) * _suz_n.to(gym.dtype) * (_yp / 100.0))
+        gymc = gym.double().unsqueeze(1)
+        # The governor's own multipliers are part of `m.yieldMult` on TS —
+        # ONE number scales the total, so they fold in before it lands.
+        if self.n_governors and row < self.n_majors:
+            _gy = self._gov_mods(row)[12]["govymul"]
+            gymc = gymc * self._governor_ymult(row, _gy)[:, sl]
+        total = total * gymc
         # CIV6 (Monasticism): "+75% Science in cities with a Holy Site";
         # (Robber Barons): "+50% Gold in cities with a Stock Exchange. +25%
         # Production in cities with a Factory." Each names one city FACT and
         # multiplies AFTER m.yieldMult, one card at a time.
-        if self._gov_has_effects:
-            _fxm = self._gov_mods(row)[12]
-            for _on, _di, _yi, _m in _fxm["distym"]:
-                if not self.districts_on:
-                    continue
-                _has = self._dist_counts(row)[:, sl, _di] > 0
-                total[:, :, _yi] = total[:, :, _yi] * torch.where(
-                    _on.unsqueeze(1) & _has, torch.full_like(alivef, _m), torch.ones_like(alivef))
-            for _on, _bi, _yi, _m in _fxm["bldgym"]:
-                _has = self.city_bldg[:, row, sl, _bi]
-                total[:, :, _yi] = total[:, :, _yi] * torch.where(
-                    _on.unsqueeze(1) & _has, torch.full_like(alivef, _m), torch.ones_like(alivef))
+        _fxm = self._gov_mods(row)[12]
+        for _on, _di, _yi, _m in _fxm["distym"]:
+            _has = self._dist_counts(row)[:, sl, _di] > 0
+            total[:, :, _yi] = total[:, :, _yi] * torch.where(
+                _on.unsqueeze(1) & _has, torch.full_like(alivef, _m), torch.ones_like(alivef))
+        for _on, _bi, _yi, _m in _fxm["bldgym"]:
+            _has = self.city_bldg[:, row, sl, _bi]
+            total[:, :, _yi] = total[:, :, _yi] * torch.where(
+                _on.unsqueeze(1) & _has, torch.full_like(alivef, _m), torch.ones_like(alivef))
         if compw is not None and bool(compw.any()):
             # Each wonder's cityYieldMult (Ruhr production, Big Ben gold) LAST
             # of the three scalings, as an EXPLICIT ascending wonder-index
