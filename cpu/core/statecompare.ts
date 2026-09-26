@@ -414,6 +414,7 @@ const GAME: Record<string, Extractor> = {
   iceAtStart: (s) => [s.iceAtStart ?? 0],
   // the Free Cities seat's treasury: 0 until its first revolt makes the seat
   freeTreasury: (s) => [s.freeSeat?.treasury ?? 0],
+  freeShortfall: (s) => [s.freeSeat?.goldShortfall ?? 0],
 };
 
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {
@@ -431,6 +432,7 @@ const SEAT: Record<string, Extractor> = {
   // at t0, so the empty state never survives to a digest in practice.
   explored: overSeats((s, st) => (s.explored?.length ? s.explored : new Array(st.map.tiles.length).fill(0))),
   treasury: overSeats((s) => s.treasury),
+  goldShortfall: overSeats((s) => s.goldShortfall),
   co2: overSeats((s) => s.co2 ?? 0),
   co2Turn: overSeats((s) => s.co2Turn ?? 0),
   cultureTotal: overSeats((s) => s.cultureTotal),
@@ -531,6 +533,8 @@ const SEAT: Record<string, Extractor> = {
     ? GOVERNMENT_LIST.findIndex((g) => g.id === s.government.chosen) : -1)),
   // the turn the seat last completed a civic — the policy unlock's clock
   governmentCivicTurn: overSeats((s) => s.government.civicTurn),
+  // the first turn a returned-to government takes office — Anarchy's end
+  governmentAnarchyEnd: overSeats((s) => s.government.anarchyEnd),
   // the SLOTTED cards as a sorted index set — the stored decision
   // the policy slots a seat holds BEYOND its government's own — a wonder's, a
   // Great Person's, and the kind a conversion moves. Compared beside the cards
@@ -668,6 +672,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   civicProgress: overCityStates((cityState) => cityState.research.civicProgress),
   prodProgress: overCityStates((cityState) => cityState.prodProgress ?? 0),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
+  minorShortfall: overCityStates((cityState) => cityState.goldShortfall),
   minorPop: overCityStates((cityState) => cityState.population),
   minorFoodBox: overCityStates((cityState) => cityState.foodBox ?? 0),
   minorCultureBox: overCityStates((cityState) => cityState.cultureBox ?? 0),

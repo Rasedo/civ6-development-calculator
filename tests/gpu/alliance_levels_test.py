@@ -345,7 +345,7 @@ def test_research_cadence_and_rates(rules, path) -> None:
     sim = build(rules, path)
     ally_pair(sim, 0, 1, RESEARCH, qp=int(sim._al_l2_qp))
     n = int(sim._al_r2_boost_turns)
-    assert n == 30, "the cadence is the alliance table's 30"
+    assert n == 20, "the cadence is the alliance table's 30, 20 online (GameSpeed_Durations ONLINE_HALF)"
     sim.turn = n  # the tick reads the pre-increment turn, the congress alignment
     # level the two sides first (the warm-up hands out Eurekas unevenly), then
     # seat 1 knows two techs seat 0 lacks: one researched, one merely boosted;
@@ -394,7 +394,7 @@ def test_research_cadence_and_rates(rules, path) -> None:
     got = deltas[True][0] - deltas[False][0]
     want = float(s2._al_r3_sci_pct) * 100.0
     assert abs(got - want) < 1e-6, f"Research 3 paid {got}, wanted {want}"
-    print("  8 research OK — the 30-turn Eureka from the ally's techs and the +10% co-research read")
+    print("  8 research OK — the 20-turn (online) Eureka from the ally's techs and the +10% co-research read")
 
 
 def test_cultural_dividends(rules, path) -> None:

@@ -19,7 +19,7 @@
 import type { CityStateType, DistrictId, YieldKey } from '../core/types';
 import type { PromoClass } from './promotions';
 import { type SrcMap, srcConst, xml } from './provenance';
-import { GAME_SPEED } from './constants';
+import { GAME_SPEED, speedTurns, speedTurnsSrc } from './constants';
 
 export const CITY_STATE_TYPES: CityStateType[] = [
   'scientific',
@@ -710,9 +710,10 @@ export const FREE_CITY_BUILD_ROWS: readonly FreeCityBuildRow[] = [
  *  turn. They will return to the city-state after {2_TurnLimit} Turns, or if
  *  the Suzerain changes." The turn limit is `LEVY_MILITARY_TURN_DURATION`; the
  *  price is `LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST` of the units' own
- *  Gold purchase prices, summed. */
-export const LEVY_TURNS = srcConst('cityState.levyTurns', 30,
-  xml('GlobalParameters', 'Name=LEVY_MILITARY_TURN_DURATION', 'Value'));
+ *  Gold purchase prices, summed. The turn limit runs online through
+ *  `speedTurns`. */
+export const LEVY_TURNS = srcConst('cityState.levyTurns', speedTurns(30),
+  speedTurnsSrc(xml('GlobalParameters', 'Name=LEVY_MILITARY_TURN_DURATION', 'Value'), 30));
 export const LEVY_COST_PCT = srcConst('cityState.levyCostPct', 25,
   xml('GlobalParameters', 'Name=LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST', 'Value'));
 

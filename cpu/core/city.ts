@@ -1331,8 +1331,8 @@ export function computeCityStats(
       : 0);
   have -= warWearinessPenalty(wwMax(seatOf(state, city.seat)));
   // CIV6 (GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE): every city of a seat
-  // whose treasury has fallen to the line loses amenities to bankruptcy
-  have -= bankruptAmenities(seatOf(state, city.seat)?.treasury ?? 0);
+  // whose last upkeep fell short loses amenities to bankruptcy
+  have -= bankruptAmenities(seatOf(state, city.seat)?.goldShortfall ?? 0);
   const specialtyCount = completedDistrictCount(state, city, true);
   for (const rule of m.amenitiesIfSpecialty) {
     if (specialtyCount >= rule.min) have += rule.amenities;

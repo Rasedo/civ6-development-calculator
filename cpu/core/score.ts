@@ -13,6 +13,7 @@ import type { YieldKey } from './types';
 import { SCORING_LINE_ITEMS, type ScoreCount } from '../data/scoring';
 import { completedDistrictCount } from './yields';
 import { seatWonders } from './wonders';
+import { majorityReligionOf } from './seats';
 
 export const BALANCED_WEIGHTS: Partial<Record<YieldKey, number>> = {
   food: 1,
@@ -23,12 +24,27 @@ export const BALANCED_WEIGHTS: Partial<Record<YieldKey, number>> = {
   faith: 0.75,
 };
 
+/** The FOREIGN cities whose majority follows `seat`'s religion (religion ids
+ *  are founder seat ids): every other major's and the Free Cities' cities by
+ *  their followed religion, and every city-state by its majority
+ *  (`majorityReligionOf`). */
+function convertedCities(state: GameState, seat: number): number {
+  let n = 0;
+  for (const o of state.seats) {
+    if (o.seat === seat) continue;
+    for (const c of o.cities) if (c.followedReligion === seat) n += 1;
+  }
+  for (const c of state.freeSeat?.cities ?? []) if (c.followedReligion === seat) n += 1;
+  for (const cs of state.cityStates ?? []) if (majorityReligionOf(state, cs.seat) === seat) n += 1;
+  return n;
+}
+
 /** What each line item counts for one major seat. */
 function scoreCounts(state: GameState, s: Seat): Record<ScoreCount, number> {
   const wonders = seatWonders(state, s.seat).length;
-  let districts = wonders; // each completed wonder stands on its own district
+  let districts = 0;
   let population = 0;
-  let buildings = 0;
+  let buildings = wonders; // a wonder counts once among the buildings
   for (const c of s.cities) {
     districts += completedDistrictCount(state, c, false);
     population += c.population;
@@ -43,6 +59,7 @@ function scoreCounts(state: GameState, s: Seat): Record<ScoreCount, number> {
     population,
     greatPeople: s.gpEarned.length,
     religion: [r.follower, r.founder, r.worship, r.enhancer].filter((b) => b != null).length,
+    converted: convertedCities(state, s.seat),
     techs: s.research.techs.length,
     wonders,
     buildings,
@@ -56,19 +73,17 @@ export function scoreLines(state: GameState, s: Seat): number[] {
 }
 
 /** THE SCORE VICTORY's seat: the living major (one that holds a city) with
- *  the highest Score. A tie goes to the higher line in `TieBreakerPriority`
- *  order, then to the lower seat. -1 when no major holds a city. */
+ *  the highest Score, a tie to the lower seat. -1 when no major holds a
+ *  city. */
 export function scoreLeader(state: GameState): number {
   let best = -1;
-  let bestKey: number[] = [];
+  let bestTotal = 0;
   for (const s of state.seats) {
     if (s.cities.length === 0) continue;
-    const lines = scoreLines(state, s);
-    const key = [lines.reduce((a, b) => a + b, 0), ...lines];
-    const k = key.findIndex((v, i) => v !== bestKey[i]);
-    if (best < 0 || (k >= 0 && key[k] > bestKey[k])) {
+    const total = scoreLines(state, s).reduce((a, b) => a + b, 0);
+    if (best < 0 || total > bestTotal) {
       best = s.seat;
-      bestKey = key;
+      bestTotal = total;
     }
   }
   return best;

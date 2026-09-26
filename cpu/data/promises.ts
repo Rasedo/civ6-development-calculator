@@ -21,6 +21,7 @@
  *     `SETTLE_PROMISE_REACH` of the asker's border.
  */
 import { srcConst, xml, type SrcMap } from './provenance';
+import { speedTurns, speedTurnsSrc } from './constants';
 
 export interface PromiseDef {
   id: 'dontSpy' | 'dontConvert' | 'dontDig' | 'dontSettleNear';
@@ -56,9 +57,10 @@ export const PROMISE_SETTLE = 3;
 
 /** CIV6 (Civilopedia, DIPLO_7): "All Deals, Demands, and Promises last for
  *  30 turns, at which point they need to be renewed." A kept promise runs
- *  this long, and so does a refused one (the Demand it answered). */
-export const PROMISE_TURNS = srcConst('eras.promiseTurns', 30,
-  { pedia: 'Civilopedia_Concepts_Text LOC_PEDIA_CONCEPTS_PAGE_DIPLO_7_CHAPTER_CONTENT_PARA_5: "All Deals, Demands, and Promises last for 30 turns"' });
+ *  this long, and so does a refused one (the Demand it answered) — online
+ *  through `speedTurns`. */
+export const PROMISE_TURNS = srcConst('eras.promiseTurns', speedTurns(30), speedTurnsSrc(
+  { pedia: 'Civilopedia_Concepts_Text LOC_PEDIA_CONCEPTS_PAGE_DIPLO_7_CHAPTER_CONTENT_PARA_5: "All Deals, Demands, and Promises last for 30 turns"' }, 30));
 
 /** CIV6 (LOC_NOTIFICATION_DIPLO_PROMISE_FROM_BROKEN_SUMMARY): "The promise
  *  made to you ... has been broken (100 Grievances generated)." */
@@ -87,6 +89,7 @@ export const SETTLE_PROMISE_REACH = srcConst('eras.settlePromiseReach', 3, {
 });
 
 /** CIV6 (DIPLOACTION_DECLARE_WAR_OF_RETRIBUTION): "a player who has broken a
- *  promise to you within the past 30 turns" — the window a break opens. */
-export const RETRIBUTION_TURNS = srcConst('eras.retributionTurns', 30,
-  { pedia: 'LOC_DIPLOACTION_DECLARE_WAR_OF_RETRIBUTION_DESCRIPTION: "a player who has broken a promise to you within the past 30 turns"' });
+ *  promise to you within the past 30 turns" — the window a break opens,
+ *  online through `speedTurns`. */
+export const RETRIBUTION_TURNS = srcConst('eras.retributionTurns', speedTurns(30), speedTurnsSrc(
+  { pedia: 'LOC_DIPLOACTION_DECLARE_WAR_OF_RETRIBUTION_DESCRIPTION: "a player who has broken a promise to you within the past 30 turns"' }, 30));

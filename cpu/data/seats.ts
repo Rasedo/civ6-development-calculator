@@ -1,5 +1,6 @@
 import type { GpPermKey } from './greatPeople';
 import { srcConst, xml, type SrcMap } from './provenance';
+import { speedTurns, speedTurnsSrc } from './constants';
 
 /** shorthand: one `GlobalParameters` row's `Value` */
 const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
@@ -85,16 +86,18 @@ export const CITY_SLOTS_PER_SEAT = srcConst('seats.citySlots', 24,
  */
 export const PRODUCTION_QUEUE_MAX = srcConst('seats.productionQueueMax', 1,
   { stylized: 'OWNER RULING 2026-09-08 — the city builds ONE thing; the deeper slots were never a mechanic (only the head accrues) and cost an action head nobody could use' });
-/** CIV 6: a war must run **10** turns before either side may negotiate peace
- *  (the leaders' action panel unlocks the offer then). One floor for every
- *  pairing here, majors and city-states alike. */
-export const WAR_MIN_TURNS = srcConst('seats.warMinTurns', 10,
-  gp('DIPLOMACY_WAR_MIN_TURNS'));
-/** CIV 6: a peace treaty BINDS for **10** turns — once peace is made neither
- *  side may declare on the other again until the term runs out. One term for
- *  every pairing, majors and city-states alike. */
-export const PEACE_TREATY_TURNS = srcConst('seats.peaceTreatyTurns', 10,
-  gp('DIPLOMACY_PEACE_MIN_TURNS'));
+/** CIV 6: a war must run 10 turns at Standard speed, 8 online
+ *  (`speedTurns`), before either side may negotiate peace (the leaders'
+ *  action panel unlocks the offer then). One floor for every pairing here,
+ *  majors and city-states alike. */
+export const WAR_MIN_TURNS = srcConst('seats.warMinTurns', speedTurns(10),
+  speedTurnsSrc(gp('DIPLOMACY_WAR_MIN_TURNS'), 10));
+/** CIV 6: a peace treaty BINDS for 10 turns at Standard speed, 8 online
+ *  (`GetMinPeaceDuration` read 8, runs/bds4_durations_lab4_t161.jsonl) — once
+ *  peace is made neither side may declare on the other again until the term
+ *  runs out. One term for every pairing, majors and city-states alike. */
+export const PEACE_TREATY_TURNS = srcConst('seats.peaceTreatyTurns', speedTurns(10),
+  speedTurnsSrc(gp('DIPLOMACY_PEACE_MIN_TURNS'), 10));
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
 
 export const LOYALTY_MAX = srcConst('seats.loyaltyMax', 100,
@@ -361,8 +364,8 @@ export const DIPLO_FAVOR_PER_SUZERAIN = srcConst('eras.diplomaticFavorPerSuzerai
  * lower target index / the lower seat. The real slate is a random draw among
  * era-eligible resolutions; here it rotates deterministically by session.
  */
-export const CONGRESS_INTERVAL = srcConst('eras.congressInterval', 30,
-  gp('WORLD_CONGRESS_MAX_TIME_BETWEEN_MEETINGS'));
+export const CONGRESS_INTERVAL = srcConst('eras.congressInterval', speedTurns(30),
+  speedTurnsSrc(gp('WORLD_CONGRESS_MAX_TIME_BETWEEN_MEETINGS'), 30));
 export const CONGRESS_MIN_ERA = srcConst('eras.congressMinEra', 2,
   gp('WORLD_CONGRESS_INITIAL_ERA'));
 export const DVP_PER_RESOLUTION = srcConst('eras.dvpPerResolution', 1,
@@ -725,8 +728,8 @@ export const FAVOR_OCCUPIED_CAPITAL = srcConst('eras.favorOccupiedCapital', 5,
 // ---------------------------------------------------------------------------
 export const SPECIAL_SESSION_COST = srcConst('eras.specialSessionCost', 30,
   gp('FAVOR_COST_FOR_EMERGENCY'));
-export const SPECIAL_SESSION_GAP = srcConst('eras.specialSessionGap', 15,
-  gp('WORLD_CONGRESS_MIN_TIME_BETWEEN_SPECIAL_SESSIONS'));
+export const SPECIAL_SESSION_GAP = srcConst('eras.specialSessionGap', speedTurns(15),
+  speedTurnsSrc(gp('WORLD_CONGRESS_MIN_TIME_BETWEEN_SPECIAL_SESSIONS'), 15));
 /** Concurrent emergencies both engines carry. Real Civ 6 has no such cap. */
 export const EMERGENCY_SLOTS = srcConst('eras.emergencySlots', 2,
   { stylized: 'concurrent emergencies both engines carry — a tensor width; real Civ 6 has no such cap' });
@@ -739,9 +742,12 @@ interface EmergencyDef {
 
 /** PROVENANCE (cpu/data/provenance.ts): the install's readable Gameplay data
  *  carries no `Emergencies` rows (only `Emergencies_XP2` texts survive the
- *  layering), so the duration is the Civilopedia's own. */
+ *  layering), so the duration is the Civilopedia's own at Standard speed,
+ *  online through `speedTurns` (the Nuclear emergency ran 40 turns online,
+ *  runs/bds4_durations_lab4_t161.jsonl). */
 const EMERGENCY_SRC: SrcMap = {
-  turns: { pedia: 'the GS Emergency page duration (30 turns; 60 for the nuclear emergency)' },
+  turns: { derived: 'the Standard duration through GameSpeed_Durations ONLINE_HALF (speedTurns)',
+    inputs: [{ pedia: 'the GS Emergency page duration (30 turns; 60 for the nuclear emergency)' }] },
 };
 
 const RAW_EMERGENCIES: readonly EmergencyDef[] = [
@@ -764,7 +770,7 @@ const RAW_EMERGENCIES: readonly EmergencyDef[] = [
   { id: 'NUCLEAR', name: 'Nuclear Emergency', turns: 60 },
 ];
 export const EMERGENCIES: readonly EmergencyDef[] =
-  RAW_EMERGENCIES.map((e) => ({ ...e, src: EMERGENCY_SRC }));
+  RAW_EMERGENCIES.map((e) => ({ ...e, turns: speedTurns(e.turns), src: EMERGENCY_SRC }));
 export const EMERGENCY_CITY_STATE = 0;
 export const EMERGENCY_MILITARY = 1;
 export const EMERGENCY_NUCLEAR = 2;
@@ -1018,10 +1024,12 @@ export const GOVERNOR_LOYALTY = srcConst('eras.governorLoyalty', 8,
  * after which they have to be renewed." The Declaration of Friendship
  * ("for 30 turns"), the Alliance ("Alliances expire after 30 turns on
  * Standard speed") and the Denunciation ("A Denunciation lasts for 30 turns,
- * after which its effects expire") all publish the same number.
+ * after which its effects expire") all publish the same number — 20 online
+ * (`speedTurns`): a denouncement, a friendship and an alliance each ran 20
+ * (`GetDenounceTimeLimit`, runs/bds4_durations_lab4_t161.jsonl).
  */
-export const AGREEMENT_TURNS = srcConst('seats.agreementTurns', 30,
-  gp('DIPLOMACY_ALLIANCE_TIME_LIMIT'));
+export const AGREEMENT_TURNS = srcConst('seats.agreementTurns', speedTurns(30),
+  speedTurnsSrc(gp('DIPLOMACY_ALLIANCE_TIME_LIMIT'), 30));
 
 // ---------------------------------------------------------------------------
 // SCORED COMPETITIONS (GS), which a Regular Session enacts.
@@ -1040,7 +1048,7 @@ export const AGREEMENT_TURNS = srcConst('seats.agreementTurns', 30,
 // the Bronze Tier rewards."
 // ---------------------------------------------------------------------------
 export const COMPETITION_TURNS = srcConst('eras.competitionTurns', AGREEMENT_TURNS,
-  { derived: 'the same 30-turn clock AGREEMENT_TURNS reads — CIV6 (Competition): each runs for exactly 30 turns', inputs: [gp('DIPLOMACY_ALLIANCE_TIME_LIMIT')] });
+  { derived: 'the same clock AGREEMENT_TURNS holds, 30 turns at Standard speed through GameSpeed_Durations ONLINE_HALF (speedTurns) — CIV6 (Competition): each runs for exactly 30 turns', inputs: [gp('DIPLOMACY_ALLIANCE_TIME_LIMIT')] });
 /** The score fractions the two lower podiums cut at, as published. */
 export const COMPETITION_SILVER_PCT = srcConst('eras.competitionSilverPct', 25,
   { pedia: 'CIV6 (Competition): "all civs whose scores fall within the top 25%% ... win the Silver Tier rewards" — no install row' });
@@ -1270,7 +1278,7 @@ export const DEAL_PERMANENT: readonly boolean[] = DEAL_ITEM_KINDS.map(
 /** CIV6: "All Deals, Demands, and Promises last for 30 turns, at which point
  *  they need to be renewed" — the clock every other agreement runs on. */
 export const DEAL_TURNS = srcConst('eras.dealTurns', AGREEMENT_TURNS,
-  { derived: 'the same 30-turn clock AGREEMENT_TURNS reads — CIV6: "All Deals, Demands, and Promises last for 30 turns"', inputs: [gp('DIPLOMACY_ALLIANCE_TIME_LIMIT')] });
+  { derived: 'the same clock AGREEMENT_TURNS holds, 30 turns at Standard speed through GameSpeed_Durations ONLINE_HALF (speedTurns) — CIV6: "All Deals, Demands, and Promises last for 30 turns"', inputs: [gp('DIPLOMACY_ALLIANCE_TIME_LIMIT')] });
 
 /** How many items ONE side of a deal may carry. A representation bound: real
  *  Civ 6 bounds neither the table nor the number of deals a pair may run, and
@@ -1402,9 +1410,10 @@ export const ALLIANCE_M2_MIL_PROD_PCT = srcConst('seats.allianceM2MilProdPct', 1
   modArg('ALLIANCE_INCREASE_PRODUCTION_WHEN_WAR'));
 /** CIV6 (Research alliance 2): "Every 30 turns (on Standard), you unlock a
  *  Eureka for a tech that your ally has researched or boosted, but you have
- *  not" — the alliance table's ALLIANCE_RESEARCH_AGREEMENT, Amount 30. */
-export const ALLIANCE_R2_BOOST_TURNS = srcConst('seats.allianceR2BoostTurns', 30,
-  modArg('ALLIANCE_RESEARCH_AGREEMENT'));
+ *  not" — the alliance table's ALLIANCE_RESEARCH_AGREEMENT, Amount 30,
+ *  online through `speedTurns`. */
+export const ALLIANCE_R2_BOOST_TURNS = srcConst('seats.allianceR2BoostTurns', speedTurns(30),
+  speedTurnsSrc(modArg('ALLIANCE_RESEARCH_AGREEMENT'), 30));
 /** CIV6 (Research alliance 3): "+10% of your ally's Science" while
  *  researching a tech the ally completed, or the tech the ally is on. */
 export const ALLIANCE_R3_SCI_PCT = srcConst('seats.allianceR3SciPct', 0.1,
@@ -1544,38 +1553,47 @@ export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.max(0, weariness) / WAR_WEARINESS_PER_AMENITY);
 }
 
-/** BANKRUPTCY. CIV6 (the Gold pedia): "-1 penalty to your Amenities per every
- *  10 Gold you drop below 0 ... at -10 Gold you will automatically disband a
- *  unit, at -20 two units" — the four `GOLD_NEGATIVE_BALANCE_*` rows, one line
- *  and one step for each penalty. */
+/** BANKRUPTCY, on the turn's SHORTFALL. CIV6 (the Gold pedia): "-1 penalty to
+ *  your Amenities per every 10 Gold you drop below 0 ... at -10 Gold you will
+ *  automatically disband a unit" — the `GOLD_NEGATIVE_BALANCE_*` lines. The
+ *  live game never holds a balance below 0 (runs/bankrupt_*.jsonl): the
+ *  treasury clamps at 0 every turn, and the lines are read on the turn's
+ *  SHORTFALL S, the whole Gold the balance would have dropped below 0 — from
+ *  an empty treasury, the turn's maintenance less its whole-gold yield
+ *  (`goldShortfall`). Every city of the seat loses 1 + floor(S / 10) amenities
+ *  while S > 0, flat however long it lasts (S 5 → 1, 10–17 → 2, 21–26 → 3,
+ *  30–35 → 4 over 19 rows), and one unit disbands a turn while S ≥ 10. */
 export const GOLD_AMENITY_LOSS_LINE = srcConst('seats.goldAmenityLossLine', 0,
   gp('GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE'));
 export const GOLD_AMENITY_LOSS_STEP = srcConst('seats.goldAmenityLossStep', -10,
   gp('GOLD_NEGATIVE_BALANCE_SUBSEQUENT_AMENITY_LOSS'));
 export const GOLD_DISBAND_LINE = srcConst('seats.goldDisbandLine', -10,
   gp('GOLD_NEGATIVE_BALANCE_DISBAND_UNIT_LINE'));
-export const GOLD_DISBAND_STEP = srcConst('seats.goldDisbandStep', -10,
-  gp('GOLD_NEGATIVE_BALANCE_SUBSEQUENT_DISBAND_UNIT'));
+/** exactly ONE unit a turn however deep the shortfall: eight turns in a row
+ *  at S 35 falling to 11 lost one each, none at S 5–6 — the install's
+ *  GOLD_NEGATIVE_BALANCE_SUBSEQUENT_DISBAND_UNIT step never adds a second */
+export const GOLD_DISBANDS_PER_TURN = srcConst('seats.goldDisbandsPerTurn', 1,
+  { lab: 'runs/bankrupt_m35_20260926T083304Z.jsonl' });
 
-/** 0 while `treasury` stands above `line` (or on it, when `onLine` is false);
- *  past it 1, and one more for every whole `step` further down. Read on the
- *  milli-rounded treasury, the digest's own quantum, so a sub-milli float
- *  drift never crosses a line on one engine and not the other. */
-function bankruptcyCount(treasury: number, line: number, step: number, onLine: boolean): number {
-  const m = Math.round(treasury * 1000);
-  if (onLine ? m > line * 1000 : m >= line * 1000) return 0;
-  return 1 + Math.floor((line * 1000 - m) / (-step * 1000));
+/** THE TURN'S SHORTFALL off the balance its charges left: the whole Gold it
+ *  stands below 0, 0 when it does not. Read on the milli-rounded balance, the
+ *  digest's own quantum, so a sub-milli float drift never crosses a line on
+ *  one engine and not the other. */
+export function goldShortfall(balance: number): number {
+  const m = Math.round(balance * 1000);
+  return m < 0 ? Math.ceil(-m / 1000) : 0;
 }
 
-/** the amenities EACH city of a seat holding `treasury` loses — from the first
- *  gold "below 0", so a seat standing at 0 loses none */
-export function bankruptAmenities(treasury: number): number {
-  return bankruptcyCount(treasury, GOLD_AMENITY_LOSS_LINE, GOLD_AMENITY_LOSS_STEP, false);
+/** the amenities EACH city of a seat loses to the shortfall `s` of its last
+ *  turn — from the first Gold "below 0", 1 more per further 10 */
+export function bankruptAmenities(s: number): number {
+  return -s < GOLD_AMENITY_LOSS_LINE ? 1 + Math.floor((GOLD_AMENITY_LOSS_LINE + s) / -GOLD_AMENITY_LOSS_STEP) : 0;
 }
 
-/** the units a seat holding `treasury` disbands this turn — "at -10 Gold" */
-export function bankruptDisbands(treasury: number): number {
-  return bankruptcyCount(treasury, GOLD_DISBAND_LINE, GOLD_DISBAND_STEP, true);
+/** the units a seat whose turn fell `s` short disbands this turn — "at -10
+ *  Gold", one a turn */
+export function bankruptDisbands(s: number): number {
+  return -s <= GOLD_DISBAND_LINE ? GOLD_DISBANDS_PER_TURN : 0;
 }
 
 export const DOW_PROXIMITY = 9;

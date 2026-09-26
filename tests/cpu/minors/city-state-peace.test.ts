@@ -45,7 +45,7 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
     cultureTotal: 0,
     faith: 0,
     tourism: 0,
-    government: { chosen: null, policies: [], held: 0, civicTurn: 0 },
+    government: { chosen: null, policies: [], held: 0, civicTurn: 0, anarchyEnd: 0 },
     cities: [],
     nextCityId: 0,
     wars: [], warKinds: {}, denounced: {}, allies: [],

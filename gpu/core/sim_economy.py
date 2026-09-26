@@ -2743,14 +2743,23 @@ class SimEconomy:
 
     def _adopted_gov(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B] roster position, [B] has-one) — the government seat row `row`
-        is IN: the one its record chose (`civ_gov_chosen`), else the newest
-        its civics unlock. A city-state never records one. `seatGovernment`'s
-        twin."""
+        is IN: none in Anarchy (`_in_anarchy`: position 0, has-one false,
+        what a seat with no government unlocked reads), else the one its
+        record chose (`civ_gov_chosen`), else the newest its civics unlock. A
+        city-state never records one. `seatGovernment`'s twin."""
         newest, has = self._newest_gov(self._seat_civics(row))
         if row >= self.n_majors:
             return newest, has
         ch = self.civ_gov_chosen[:, row]
-        return torch.where(ch >= 0, ch, newest), has | (ch >= 0)
+        anarch = self._in_anarchy(row)
+        pos = torch.where(ch >= 0, ch, newest)
+        return torch.where(anarch, torch.zeros_like(pos), pos), (has | (ch >= 0)) & ~anarch
+
+    def _in_anarchy(self, row: int) -> torch.Tensor:
+        """[B] bool — is major row `row` in ANARCHY, a return to a government
+        it held before not yet in office (`civ_gov_anarchy_end`)?
+        `inAnarchy`'s twin."""
+        return self.turn < self.civ_gov_anarchy_end[:, row]
 
     def _adopted_gov_tier(self, row: int) -> torch.Tensor:
         """[B] the adopted government's tier (0 if none) — the
@@ -2764,9 +2773,8 @@ class SimEconomy:
 
     def _gov_open(self, row: int) -> torch.Tensor:
         """[B, nGov] — the governments seat row `row`'s record may name now:
-        unlocked by its civics, and never one it has been in before unless it
-        is in it now (CIV6: a return to a previously adopted government is
-        Anarchy, which no seat enters). `governmentsOpen`'s twin."""
+        every one its civics unlock, a return to one it held before included;
+        none while it is in Anarchy. `governmentsOpen`'s twin."""
         B, dev = self.B, self.device
         if not self._ngov or row >= self.n_majors:
             return torch.zeros(B, max(self._ngov, 1), dtype=torch.bool, device=dev)
@@ -2776,10 +2784,7 @@ class SimEconomy:
             guc.unsqueeze(0) >= 0,
             civ.gather(1, guc.clamp(min=0).unsqueeze(0).expand(B, -1)),
             torch.ones(B, self._ngov, dtype=torch.bool, device=dev))
-        now, has = self._adopted_gov(row)
-        been = ((self.civ_gov_held[:, row].unsqueeze(1) >> self._gov_arange.unsqueeze(0)) & 1) > 0
-        is_now = has.unsqueeze(1) & (self._gov_arange.unsqueeze(0) == now.unsqueeze(1))
-        return unlocked & (~been | is_now)
+        return unlocked & ~self._in_anarchy(row).unsqueeze(1)
 
     def _palace_at(self, row: int, sl) -> torch.Tensor:
         """[B, n] bool — the city slots `sl` of row `row` that hold the PALACE:
@@ -2831,7 +2836,9 @@ class SimEconomy:
         """The record's GOVERNMENT arm, where `ok`: seat row `row` adopts roster
         position `gov` [B] where `_gov_open` holds it, and the choice stands
         until another record names one. A CHANGE marks the new government held
-        and carries the slotted cards over (`_carry_policies`).
+        and carries the slotted cards over (`_carry_policies`); a change to one
+        the seat held before is a RETURN, and the seat is in no government for
+        `anarchy_turns` turns, this one included (`civ_gov_anarchy_end`).
         `adoptGovernment`'s twin."""
         g = gov.to(torch.long)
         inr = (g >= 0) & (g < self._ngov)
@@ -2842,9 +2849,13 @@ class SimEconomy:
         before, had = self._adopted_gov(row)
         self.civ_gov_chosen[:, row] = torch.where(ok, gc, self.civ_gov_chosen[:, row])
         chg = ok & (~had | (gc != before))
+        back = chg & (((self.civ_gov_held[:, row] >> gc) & 1) > 0)
         self.civ_gov_held[:, row] |= torch.where(chg, torch.ones_like(gc) << gc, torch.zeros_like(gc))
         self._eff_version += 1
         self._carry_policies(row, chg)
+        self.civ_gov_anarchy_end[:, row] = torch.where(
+            back, torch.full_like(gc, int(self.turn) + int(self.rules.anarchy_turns)), self.civ_gov_anarchy_end[:, row])
+        self._eff_version += 1
 
     def _carry_policies(self, row: int, chg: torch.Tensor) -> None:
         """Where `chg`: a CHANGED government keeps the slotted cards that are
@@ -3297,9 +3308,10 @@ class SimEconomy:
             (self.B,) + tuple(self.civ_gov_held.shape[2:]), dtype=self.civ_gov_held.dtype, device=self.device)
         # ...and the STORE: the cards the seat chose are an input now, and a
         # key that is a view of the live plane would freeze the first answer —
-        # as is the government it chose
+        # as is the government it chose, read -2 in Anarchy
         pols = self._seat_policies(row).clone()
-        chosen = self.civ_gov_chosen[:, row].clone() if major else None
+        chosen = torch.where(self._in_anarchy(row), torch.full_like(self.civ_gov_chosen[:, row], -2),
+                             self.civ_gov_chosen[:, row]) if major else None
         if ent is not None and ent[0][1] == self._gov_cat_version \
                 and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
                 and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
@@ -6705,47 +6717,53 @@ class SimEconomy:
         comp_w = self._completed_wonders(row)
         wonders = (torch.zeros(self.B, dtype=torch.long, device=dev) if comp_w is None
                    else (comp_w & alive.unsqueeze(2)).long().sum(dim=(1, 2)))
+        # the FOREIGN cities whose majority follows this row's religion
+        # (religion ids are founder seat ids): every other major's and the
+        # Free Cities' by their followed religion, every city-state by its
+        # composed majority (`convertedCities`)
+        converted = torch.zeros(self.B, dtype=torch.long, device=dev)
+        for _o in [r for r in range(self.n_majors) if r != row] + [self.FREE_ROW]:
+            converted = converted + (self.city_alive[:, _o, : self.RC]
+                                     & (self.city_followed[:, _o, : self.RC] == row)).long().sum(dim=1)
+        if self.S > 0:
+            converted = converted + (self.citystate_alive[:, : self.S]
+                                     & (self._minor_followed() == row)).long().sum(dim=1)
         counts = {
             # the whole game's era score: the closed eras' and this one's
             "eraScore": self.era_score_past[:, row] + self.era_score[:, row],
             "civics": self.civ_civics[:, row].long().sum(dim=1),
             "cities": alive.long().sum(dim=1),
-            # completed districts, the centre excluded, and each completed
-            # wonder's own district
-            "districts": (self._district_counts(row)[0] * alive.long()).sum(dim=1) + wonders,
+            # completed districts, the centre and a wonder's own excluded
+            "districts": (self._district_counts(row)[0] * alive.long()).sum(dim=1),
             "population": (self.city_pop[:, row, : self.RC].long() * alive.long()).sum(dim=1),
             "greatPeople": self.civ_gp_earned[:, row].sum(dim=1),
             # the founded religion's beliefs; the pantheon is not one of them
             "religion": ((self.civ_follower[:, row] >= 0).long() + (self.civ_worship[:, row] >= 0).long()
                          + (self.civ_founder[:, row] >= 0).long() + (self.civ_enhancer[:, row] >= 0).long()),
+            "converted": converted,
             "techs": self.civ_techs[:, row].long().sum(dim=1),
             "wonders": wonders,
-            # every building the cities hold, pillaged ones too; the Palace
-            # is the capital's term here, a `buildings` entry on TS
+            # every building the cities hold, pillaged ones too, and every
+            # completed wonder once more; the Palace is the capital's term
+            # here, a `buildings` entry on TS
             "buildings": ((self.city_bldg[:, row, : self.RC].long().sum(dim=2)
-                           + self._palace_at(row, slice(0, self.RC)).long()) * alive.long()).sum(dim=1),
+                           + self._palace_at(row, slice(0, self.RC)).long()) * alive.long()).sum(dim=1) + wonders,
         }
         return torch.stack([counts[ln["count"]] * int(ln["value"]) for ln in self.rules.scoring], dim=1)
 
     def leader(self) -> torch.Tensor:
         """[B] the ROW with the highest Civ 6 Score among the majors that hold
         a city (the `scoreLeader` twin); -1 where none does. A tie goes to the
-        higher line in `rules.scoring` order (TieBreakerPriority), then to the
-        lower row — the ascending scan takes a row only when it is strictly
-        ahead."""
+        lower row whatever the line items — the ascending scan takes a row
+        only when its total is strictly ahead."""
         best = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-        best_key = torch.zeros(self.B, 1 + len(self.rules.scoring), dtype=torch.long, device=self.device)
+        best_total = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for row in range(self.n_majors):
-            lines = self.score_lines(row)
-            key = torch.cat((lines.sum(dim=1, keepdim=True), lines), dim=1)  # [B, 1 + L]
+            total = self.score_lines(row).sum(dim=1)
             live = self.city_alive[:, row, : self.RC].any(dim=1)
-            # lexicographic `key > best_key`, folded from the last column
-            ahead = torch.zeros_like(live)
-            for k in range(key.shape[1] - 1, -1, -1):
-                ahead = (key[:, k] > best_key[:, k]) | ((key[:, k] == best_key[:, k]) & ahead)
-            take = live & ((best < 0) | ahead)
+            take = live & ((best < 0) | (total > best_total))
             best = torch.where(take, torch.full_like(best, row), best)
-            best_key = torch.where(take.unsqueeze(1), key, best_key)
+            best_total = torch.where(take, total, best_total)
         return best
 
     def _domination(self) -> torch.Tensor:

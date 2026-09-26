@@ -104,7 +104,7 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
@@ -653,15 +653,28 @@ export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
  *  `FREE_CITY_PAIR_COUNT` of the former owner's best melee on the flip turn
  *  (`freeCityPairType`), and
  *  every `FREE_CITY_GRANT_PERIOD`th of its turns while it stays Free one more
- *  (`freeCityGrantType`). Each stands on the first free land tile beside the
- *  centre, in direction order; with none free it is not granted. The unit
- *  remembers the city that granted it (`Unit.freeCity`): when that city
- *  joins a civilization, the grant goes (`joinFromFreeCity`). The units walk
- *  with the Free Cities' walker (`freeCitiesPhase`). */
+ *  (`freeCityGrantType`). Each stands on the NEAREST free land plot outward
+ *  from the centre, never the centre itself: with every plot of ring 1 held
+ *  the grant landed 2 away, with rings 1 and 2 held 3 away
+ *  (runs/c60s3_r1_20260926T081910Z.jsonl, runs/c60s3_r1_20260926T082156Z.jsonl,
+ *  runs/c60s3_r2_20260926T082415Z.jsonl). Among the plots at one distance the
+ *  lowest tile index takes it. The unit remembers the city that granted it
+ *  (`Unit.freeCity`): when that city joins a civilization, the grant goes
+ *  (`joinFromFreeCity`). The units walk with the Free Cities' walker
+ *  (`freeCitiesPhase`). */
 function grantFreeCityUnit(state: GameState, city: City, unitType: string): void {
   const probe = { type: unitType, seat: FREE_SEAT };
-  const spot = neighbors(state.map, state.map.tiles[city.centerIndex])
-    .find((t) => tileFreeForUnit(state, t.index, FREE_SEAT, probe));
+  const centre = state.map.tiles[city.centerIndex];
+  let spot: Tile | undefined;
+  let bd = Infinity;
+  for (const t of state.map.tiles) {
+    if (t.index === centre.index) continue;
+    const d = hexDistance(centre.col, centre.row, t.col, t.row);
+    if (d < bd && tileFreeForUnit(state, t.index, FREE_SEAT, probe)) {
+      spot = t;
+      bd = d;
+    }
+  }
   if (!spot) return;
   const u = spawnUnit(state, unitType, spot.index, FREE_SEAT);
   if (u) u.freeCity = city.id;
@@ -690,28 +703,23 @@ function freeCityGrantType(state: GameState): string | null {
   return null;
 }
 
-/** BANKRUPTCY'S DISBANDS for `seat` this turn, off the treasury its upkeep
- *  left: `bankruptDisbands` units, each the priciest still standing, a TIE to
- *  the EARLIEST in `state.units` — spawn order, the one order both engines
- *  own (the GPU's pool appends, so its lowest slot is the same unit). The
- *  lowest UNIT ID is not spawn order for a unit the seat re-seated: a
- *  converted barbarian keeps its barbarian-era id, lower than anything the
- *  seat owns (seed 9053 t164). A unit that costs nothing is never taken, and
- *  nothing is refunded. */
-export function bankruptDisband(state: GameState, seat: number, mods: ReturnType<typeof getModifiers>): void {
-  const n = bankruptDisbands(seatOf(state, seat)?.treasury ?? 0);
+/** BANKRUPTCY for seat `s` once its turn's charges have landed, every seat
+ *  alike — a major's, a city-state's and the Free Cities': the whole Gold its
+ *  treasury stands below 0 is the turn's shortfall (`goldShortfall`, which
+ *  its cities' amenities read until its next upkeep), the treasury clamps at
+ *  0, and `bankruptDisbands` units go: each the FIRST unit of the seat's
+ *  roster with upkeep (`upkeepOf` > 0) — a Crossbowman went before four
+ *  Musketmen, a Warrior with none was skipped, 8 of 8
+ *  (runs/bankrupt_m15_20260926T083048Z.jsonl,
+ *  runs/bankrupt_m35_20260926T083304Z.jsonl). The roster order is
+ *  `state.units`, spawn order, the one order both engines own (the GPU's pool
+ *  appends, so its lowest slot is the same unit); nothing is refunded. */
+export function bankruptcy(state: GameState, s: Seat, upkeepOf: (type: string) => number): void {
+  s.goldShortfall = goldShortfall(s.treasury);
+  if (s.treasury < 0) s.treasury = 0;
+  const n = bankruptDisbands(s.goldShortfall);
   for (let k = 0; k < n; k++) {
-    let victim: Unit | undefined;
-    let vm = 0;
-    for (const u of state.units) {
-      if (u.seat !== seat) continue;
-      const m = unitUpkeep(mods, u.type);
-      if (m <= 0) continue;
-      if (!victim || m > vm) {
-        victim = u;
-        vm = m;
-      }
-    }
+    const victim = state.units.find((u) => u.seat === s.seat && upkeepOf(u.type) > 0);
     if (!victim) return;
     disbandUnit(state, victim.id);
   }
@@ -747,7 +755,7 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  luxuries, buildings and districts; no government, policy or governor) —
  *  and the tier is recorded off a loop-top snapshot of every Free City. Its
  *  treasury banks the Gold those same stats make, in array order, then pays
- *  its units' upkeep, the balance stopping at 0 as a minor's does. Then each
+ *  its units' upkeep and meets the `bankruptcy` that may force. Then each
  *  city takes its grant when one falls due,
  *  puts the same stats' Production into its build table (`freeCityBuild`),
  *  fires the ranged strikes any walled city fires, heals as any unbesieged
@@ -773,10 +781,8 @@ export function freeCitiesPhase(state: GameState): void {
   if (_dlu) _dlu.push(`up:${FREE_SEAT}:${state.turn}`
     + ` n${state.units.filter((u) => u.seat === FREE_SEAT).length}`
     + ` cost${upkeep.toFixed(3)} purse${free.treasury.toFixed(3)}`);
-  // the balance stops at 0, as a minor's does: no census row reads a Free
-  // Cities treasury below 0 (runs/cs_watch_*.jsonl, 0 on 223 of 296
-  // city-turns), so it never goes bankrupt
-  free.treasury = Math.max(0, free.treasury - upkeep);
+  free.treasury -= upkeep;
+  bankruptcy(state, free, (t) => unitUpkeep(mods, t));
   const joiners: City[] = [];
   const research = freeCityResearch(state);
   [...free.cities].forEach((city, i) => {
@@ -3016,7 +3022,7 @@ export function seatPhase(state: GameState): void {
       + ` cost${_upk.toFixed(3)} purse${(actor.treasury ?? 0).toFixed(3)}`);
     actor.treasury -= _upk;
     actor.treasury -= wmdUpkeep(state, actor.seat);
-    bankruptDisband(state, actor.seat, seatMods);
+    bankruptcy(state, actor, (t) => unitUpkeep(seatMods, t));
     // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's technology grants, after
     // the upkeep they do not yet owe AND after the bankruptcy that upkeep may
     // force — the GPU's tech loop sits on the same side of both.

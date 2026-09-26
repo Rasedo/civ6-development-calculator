@@ -82,28 +82,30 @@ def poke_rows(rules, path):
     """a. The install rows reach the engine."""
     sim = build(rules, path)
     assert sim._promises == [(30, 25, 25)] * 4, sim._promises
-    assert (sim._promise_turns, sim._promise_broken_griev, sim._retribution_turns) == (30, 100, 30)
+    # the 30-turn clocks online through GameSpeed_Durations ONLINE_HALF
+    assert (sim._promise_turns, sim._promise_broken_griev, sim._retribution_turns) == (20, 100, 20)
     assert (sim._promise_broken_mult, sim._settle_promise_reach) == (200, 3)
     assert sim.n_majors >= 3, "the scene wants three majors"
     print("  a rows OK")
 
 
 def poke_ask_keep_refuse(rules, path):
-    """b. A kept promise costs the asker its favor and runs 30 turns; a
+    """b. A kept promise costs the asker its favor and runs its term (30 turns
+    at Standard speed, 20 online); a
     refusal refunds it and earns GrievancesForRefusal; an ask the asker
     cannot pay, one already standing, and one at war are refused outright."""
     sim = build(rules, path)
     settle(sim, {0: [(1, SPY)], 2: [(1, DIG)]}, {1: [(0, SPY)]})
     assert float(sim.civ_diplo_favor[0, 0]) == 70.0, "the asker pays FavorCost"
-    assert int(sim.seat_promise[0, 0, 1, SPY]) == 30, "the kept promise runs 30"
+    assert int(sim.seat_promise[0, 0, 1, SPY]) == sim._promise_turns, "the kept promise runs its term"
     assert int(sim.seat_promise[0, 1, 0, SPY]) == 0, "the ledger is directed"
     assert int(sim.civ_grievance[0, 0, 1]) == 0
     assert float(sim.civ_diplo_favor[0, 2]) == 100.0, "a refusal refunds the favor"
-    assert int(sim.seat_promise[0, 2, 1, DIG]) == -30, "the refusal stands 30"
+    assert int(sim.seat_promise[0, 2, 1, DIG]) == -sim._promise_turns, "the refusal stands its term"
     assert int(sim.civ_grievance[0, 2, 1]) == 25 and int(sim.civ_grievance[0, 1, 2]) == -25
     # standing already: a second ask of the kind is refused before it is paid
     settle(sim, {0: [(1, SPY)]}, {1: [(0, SPY)]})
-    assert float(sim.civ_diplo_favor[0, 0]) == 70.0 and int(sim.seat_promise[0, 0, 1, SPY]) == 30
+    assert float(sim.civ_diplo_favor[0, 0]) == 70.0 and int(sim.seat_promise[0, 0, 1, SPY]) == sim._promise_turns
     # an empty purse
     sim.civ_diplo_favor[0, 0] = 29
     settle(sim, {0: [(2, CONVERT)]}, {2: [(0, CONVERT)]})
@@ -136,7 +138,8 @@ def poke_incursion(rules, path):
     sim._promise_incursion(0, 1, SPY, n1(sim, 3))
     assert int(sim.seat_promise[0, 0, 1, SPY]) == 0, "a broken promise ends"
     assert int(sim.civ_grievance[0, 0, 1]) == 100, "Promise Broken: 100"
-    assert sim.seat_promise_broken[0, 0, 1].tolist() == [30, 0, 0, 0], "the break's window is its kind's"
+    assert sim.seat_promise_broken[0, 0, 1].tolist() == [sim._retribution_turns, 0, 0, 0], \
+        "the break's window is its kind's"
     assert bool(sim._war_condition(0, 1, 8)[0]) and not bool(sim._war_condition(1, 0, 8)[0])
     # the kind still asks its civic and a five-turn denouncement
     civic = sim._war_kinds[RETRIBUTION][0]
@@ -158,14 +161,16 @@ def poke_clock(rules, path):
     """d. The promises, the refusals and the window run toward 0."""
     sim = build(rules, path)
     settle(sim, {0: [(1, SPY), (2, CONVERT)]}, {1: [(0, SPY)]})
-    assert int(sim.seat_promise[0, 0, 2, CONVERT]) == -30, "each ask of a record is settled on its own"
+    term = sim._promise_turns
+    assert sim._retribution_turns == term, "the scene runs both clocks as one"
+    assert int(sim.seat_promise[0, 0, 2, CONVERT]) == -term, "each ask of a record is settled on its own"
     sim._promise_incursion(0, 1, SPY, n1(sim))
     settle(sim, {0: [(1, DIG)]}, {1: [(0, DIG)]})
     sim._deal_phase()
-    assert int(sim.seat_promise[0, 0, 1, DIG]) == 29
-    assert int(sim.seat_promise[0, 0, 2, CONVERT]) == -29
-    assert int(sim.seat_promise_broken[0, 0, 1, SPY]) == 29
-    for _ in range(29):
+    assert int(sim.seat_promise[0, 0, 1, DIG]) == term - 1
+    assert int(sim.seat_promise[0, 0, 2, CONVERT]) == -(term - 1)
+    assert int(sim.seat_promise_broken[0, 0, 1, SPY]) == term - 1
+    for _ in range(term - 1):
         sim._deal_phase()
     assert not bool(sim.seat_promise.any()) and not bool(sim.seat_promise_broken.any())
     assert not bool(sim._war_condition(0, 1, 8)[0]), "the window closed"
@@ -199,12 +204,12 @@ def poke_settle_promise(rules, path):
     # kept: the break's 100, then 50 a founding
     sim = build(rules, path)
     settle(sim, {1: [(0, SETTLE)]}, {0: [(1, SETTLE)]})
-    assert int(sim.seat_promise[0, 1, 0, SETTLE]) == 30
+    assert int(sim.seat_promise[0, 1, 0, SETTLE]) == sim._promise_turns
     sim._settle_incursion(0, everywhere, n1(sim, at4))
     assert int(sim.civ_grievance[0, 1, 0]) == 0
     sim._settle_incursion(0, everywhere, n1(sim, at3))
     assert int(sim.civ_grievance[0, 1, 0]) == 100, "a kept promise breaks for 100"
-    assert int(sim.seat_promise_broken[0, 1, 0, SETTLE]) == 30
+    assert int(sim.seat_promise_broken[0, 1, 0, SETTLE]) == sim._retribution_turns
     sim._settle_incursion(0, everywhere, n1(sim, at3))
     assert int(sim.civ_grievance[0, 1, 0]) == 150, "broken and continued: 50"
     # the founding verb pays it: a legal site for seat 0 within 3 of a rival

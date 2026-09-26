@@ -644,22 +644,27 @@ class SimPhase:
     def _grant_free_unit(self, mask: torch.Tensor, col: torch.Tensor, unit_type: torch.Tensor) -> None:
         """`grantFreeCityUnit` for the Free City in column `col` [B] of the
         free row, in the games of `mask` [B], of chassis `unit_type` [B] (-1
-        grants nothing). Each stands on the first free land tile beside the
-        centre, in direction order, and with none free it is not granted. The
+        grants nothing). Each stands on the NEAREST free land plot outward from
+        the centre, never the centre itself, the lowest tile index among the
+        plots at one distance; with none free anywhere it is not granted. The
         unit lands in the hostile pool under FREE_SEAT, where the Free Cities'
         walker moves it (`_free_walk`); it remembers the city that granted it
         (`unit_free_city`), whose join takes it."""
         mask = mask & (unit_type >= 0)
         if not bool(mask.any()):
             return
+        T = self.T
         ctr = self.city_center[self._bidx, self.FREE_ROW, col.clamp(min=0)].clamp(min=0)
-        nb = self.neigh[ctr]  # [B, 6], direction order
-        nbc = nb.clamp(min=0)
-        ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, FREE_SEAT)
-        first = torch.where(ok, torch.arange(6, device=self.device), 6).min(dim=1).values
-        spot = nbc.gather(1, first.clamp(max=5).unsqueeze(1)).squeeze(1)
+        tiles = torch.arange(T, device=self.device).unsqueeze(0).expand(self.B, T)
+        ground = self.passable
+        if self._imp_portal_any:
+            ground = ground | self._portal_plane()
+        ok = ground & ~self._blocked_for(tiles, FREE_SEAT) & (tiles != ctr.unsqueeze(1))
+        key = torch.where(ok, self.pair_dist[ctr].long() * T + tiles, torch.full_like(tiles, T * T))
+        best = key.min(dim=1).values
+        spot = torch.remainder(best, T)
         home = self.city_id[self._bidx, self.FREE_ROW, col.clamp(min=0)]
-        self._spawn_barb(mask & (first < 6), spot, unit_type.clamp(min=0), ladder=False, seat=FREE_SEAT, home=home)
+        self._spawn_barb(mask & (best < T * T), spot, unit_type.clamp(min=0), ladder=False, seat=FREE_SEAT, home=home)
 
     def _free_grant_type(self, due: torch.Tensor) -> torch.Tensor:
         """[B] long — `freeCityGrantType` in the games of `due`: ONE draw over

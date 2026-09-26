@@ -37,7 +37,7 @@ import { CIV_LEVELS } from '../data/civLevels';
 import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, wallsMax } from './rules';
 import { seatGrowth } from './seatTurn';
-import { cityBorderGrowth, cityStrikes, paveGround } from './phase';
+import { bankruptcy, cityBorderGrowth, cityStrikes, paveGround } from './phase';
 import { applyTrainingGrants, centreStrength } from './combat';
 import { districtScaledBase, districtProgressAdd, goldAffordable, projectCost, repairAvailable } from './game';
 import { computeCityStats } from './city';
@@ -148,11 +148,10 @@ function minorMilitary(state: GameState, cityState: CityState): Unit[] {
  * every call — so the results are written back.
  *
  * Its Gold banks and pays its units' upkeep — each unit's own Maintenance, a
- * minor carrying no government or policy that cuts it. The census never read
- * a minor's treasury below 0 (35,081 minor-turns, balances held at 0 for fifty
- * turns with the army standing), so the balance stops at 0 and nothing is
- * disbanded. Its Faith banks. Its Production is returned for `minorBuild`,
- * which pays it into the pot under the rows of the item it goes toward.
+ * minor carrying no government or policy that cuts it — and meets the
+ * `bankruptcy` every seat meets. Its Faith banks. Its Production is returned
+ * for `minorBuild`, which pays it into the pot under the rows of the item it
+ * goes toward.
  */
 export function minorAccrue(state: GameState, cityState: CityState): number {
   const city = minorCity(cityState);
@@ -161,7 +160,8 @@ export function minorAccrue(state: GameState, cityState: CityState): number {
   let upkeep = 0;
   for (const u of state.units) if (u.seat === cityState.seat) upkeep += UNITS[u.type]?.maintenance ?? 0;
   cityState.treasury += y.gold;
-  cityState.treasury = Math.max(0, cityState.treasury - upkeep);
+  cityState.treasury -= upkeep;
+  bankruptcy(state, cityState, (t) => UNITS[t]?.maintenance ?? 0);
   cityState.research.techProgress += y.science;
   cityState.research.civicProgress += y.culture;
   cityState.faith += y.faith;

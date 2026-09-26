@@ -8918,7 +8918,8 @@ class SimSeats:
         out = (torch.zeros(self.B, 4, dtype=torch.long, device=self.device) if compw is None
                else (compw.long().unsqueeze(3) * self._wond_slots.reshape(1, 1, -1, 4)).sum(dim=(1, 2)))
         gov, _has = self._adopted_gov(row)
-        out[:, 3] = (out[:, 3] + self._congress_wildcard_delta(gov)).clamp(min=0)
+        # a seat in no government (none unlocked, or Anarchy) matches no type
+        out[:, 3] = (out[:, 3] + self._congress_wildcard_delta(torch.where(_has, gov, -1))).clamp(min=0)
         # CIV6 (Adam Smith): "Adds +1 Economic Policy slot to your government."
         out[:, 1] = out[:, 1] + self._gp_perm(row, "policySlotEconomic").long()
         # CIV6 (EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE): the roster's own

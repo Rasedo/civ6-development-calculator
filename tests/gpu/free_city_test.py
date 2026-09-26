@@ -358,12 +358,12 @@ def test_grants(rules, path) -> None:
     F = sim.FREE_ROW
     cid = int(sim.city_id[B0, F, col])
     assert int(sim.city_freed_turn[B0, F, col]) == t0
-    # the former owner's melee pair exists on the flip turn itself, on the first
-    # free land tiles beside the centre in direction order, in the hostile
+    # the former owner's melee pair exists on the flip turn itself, on the
+    # nearest free land plots, the lowest tile index first, in the hostile
     # pool, each remembering the city that granted it
     units = free_units(sim)
     assert [u[1] for u in units] == [pair, pair], units
-    nbs = [int(n) for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n])]
+    nbs = sorted(int(n) for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n]))
     assert [u[2] for u in units] == nbs[:2], (units, nbs)
     lo = sim.POOL_LO["barb"]
     assert all(s >= lo for s, _t, _p in units), "a Free Cities unit left the hostile pool"
@@ -401,6 +401,34 @@ def test_grants(rules, path) -> None:
     print("  7 the grants OK — the former owner's melee pair on the flip turn, a drawn unit every fifth turn, no barbarian walk")
 
 
+def test_grant_outward(rules, path) -> None:
+    """With every land plot beside the centre held, the pair lands on the
+    NEAREST free land plots outward — 2 away, the lowest tile index first —
+    never on the centre (runs/c60s3_r*.jsonl)."""
+    sim = fresh(rules, path)
+    plant_city(sim, 0)
+    col = int(sim.city_alive[B0, 0].nonzero()[-1])
+    centre = int(sim.city_center[B0, 0, col])
+    sim.city_pop[B0, 0, col] = 3
+    ring1 = [int(n) for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n])]
+    for n in ring1:
+        if int(sim.military_at[B0, n]) < 0:
+            put(sim, 1, n, "WARRIOR")
+    assert all(int(sim.military_at[B0, n]) >= 0 for n in ring1)
+    flip = torch.zeros(sim.B, sim.RC, dtype=torch.bool)
+    flip[B0, col] = True
+    sim._seat_loyalty_flips(0, flip)
+    units = free_units(sim)
+    assert len(units) == 2, units
+    d = sim.pair_dist[centre].to(torch.long)
+    held = sim.military_at[B0] >= 0
+    held[[u[2] for u in units]] = False
+    free2 = ((d == 2) & sim.passable[B0] & ~held).nonzero(as_tuple=True)[0].tolist()
+    assert [u[2] for u in units] == free2[:2], (units, free2[:2])
+    assert all(u[2] != centre for u in units)
+    print("  7b the outward grant OK — ring 1 held, the pair lands 2 away, lowest index first, never the centre")
+
+
 def test_treasury_and_join(rules, path) -> None:
     sim = fresh(rules, path)
     centre = revolt(sim)
@@ -427,12 +455,15 @@ def test_treasury_and_join(rules, path) -> None:
     sim._free_cities_phase()
     assert abs(float(sim.free_treasury[B0]) - (50.0 + gold - upkeep)) < 1e-9, \
         (float(sim.free_treasury[B0]), gold, upkeep)
-    # ...its balance stopping at 0 where the upkeep outruns it: nothing disbands
+    # ...its balance clamping at 0 where the upkeep outruns it: the shortfall
+    # is recorded, and one unit goes only at a shortfall of 10 or more
     sim.free_treasury[B0] = 0.0
     alive0 = sim.unit_alive[B0].clone()
     sim._seat_upkeep_and_bankruptcy(F, torch.tensor([True]))
     assert float(sim.free_treasury[B0]) == 0.0, float(sim.free_treasury[B0])
-    assert torch.equal(sim.unit_alive[B0], alive0), "a Free Cities unit was disbanded"
+    short = int(sim.seat_shortfall[B0, F])
+    lost = int((alive0 & ~sim.unit_alive[B0]).sum())
+    assert short > 0 and lost == (1 if short >= 10 else 0), (short, lost)
     sim.free_treasury[B0] = 50.0
     # a JOIN takes the city's grants with it; another Free Cities unit stays
     sim._spawn_barb(one, torch.tensor([far]), horse, ladder=False, seat=FREE_SEAT)
@@ -446,7 +477,7 @@ def test_treasury_and_join(rules, path) -> None:
     assert all(bool(sim.unit_alive[B0, s]) and int(sim.unit_seat[B0, s]) == FREE_SEAT for s in stay)
     assert all(int(sim.military_at[B0, t]) != s for s, t in zip(granted, granted_at)), "a grant still holds its tile"
     sim._check_seat_invariant()
-    print("  10 the treasury and the join OK — Gold in, upkeep out, the balance stops at 0; a join takes its grants")
+    print("  10 the treasury and the join OK — Gold in, upkeep out, bankruptcy at 0; a join takes its grants")
 
 
 def test_defence_and_strike(rules, path) -> None:
@@ -532,6 +563,7 @@ def main() -> int:
     test_anyone_may_attack(rules, path)
     test_heal_and_pressure(rules, path)
     test_grants(rules, path)
+    test_grant_outward(rules, path)
     test_defence_and_strike(rules, path)
     test_free_unit_defends(rules, path)
     test_treasury_and_join(rules, path)

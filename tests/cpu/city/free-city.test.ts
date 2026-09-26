@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
-import { neighbors, tilesWithin } from '../../../world/hex';
+import { hexDistance, neighbors, tilesWithin } from '../../../world/hex';
 import { eraUnitOfClass, flipCity, freeCityPairType, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
@@ -183,11 +183,12 @@ describe('the Free City step', () => {
     const centre = state.map.tiles[city.centerIndex];
     const free = () => state.units.filter((u) => u.seat === FREE_SEAT);
     // CIV6 (the live watches): the former owner's best melee, twice, on the
-    // flip turn itself, on the first free tiles beside the centre in
-    // direction order — seat 0 has researched nothing, so the Warrior
+    // flip turn itself, on the nearest free land plots, the lowest tile index
+    // first — seat 0 has researched nothing, so the Warrior
     const era = Math.max(0, worldEraIndex(state));
     expect(pair).toBe('WARRIOR');
-    const want = neighbors(state.map, centre).filter((t) => !isWater(t)).slice(0, FREE_CITY_PAIR_COUNT);
+    const want = neighbors(state.map, centre).filter((t) => !isWater(t))
+      .sort((a, b) => a.index - b.index).slice(0, FREE_CITY_PAIR_COUNT);
     expect(free().map((u) => u.type)).toEqual(Array(FREE_CITY_PAIR_COUNT).fill(pair));
     expect(free().map((u) => u.tileIndex)).toEqual(want.map((t) => t.index));
     expect(free().every((u) => u.freeCity === city.id)).toBe(true);
@@ -216,6 +217,25 @@ describe('the Free City step', () => {
     expect(free().length).toBe(FREE_CITY_PAIR_COUNT + 2);
     // the Free Cities' units are no barbarians: no camp counts or walks them
     expect(free().every((u) => !isBarbSeat(u.seat) && u.xp === undefined)).toBe(true);
+  });
+
+  it('a grant with every plot beside the centre held lands on the nearest free land plot outward, never the centre', () => {
+    const { state, border, rival } = scene(30);
+    const centre = state.map.tiles[border.centerIndex];
+    // every land plot of ring 1 held by the rival
+    const ring1 = neighbors(state.map, centre).filter((t) => !isWater(t));
+    for (const t of ring1) if (!state.units.some((u) => u.tileIndex === t.index)) spawnUnit(state, 'WARRIOR', t.index, rival.seat);
+    const held = new Set(state.units.map((u) => u.tileIndex));
+    expect(ring1.every((t) => held.has(t.index))).toBe(true);
+    border.loyalty = 0;
+    flipCity(state, border);
+    // the pair lands 2 away, on the two lowest-index free land plots there
+    const want = tilesWithin(state.map, centre.col, centre.row, 2)
+      .filter((t) => hexDistance(centre.col, centre.row, t.col, t.row) === 2 && !isWater(t) && !held.has(t.index))
+      .sort((a, b) => a.index - b.index).slice(0, FREE_CITY_PAIR_COUNT);
+    const got = state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.tileIndex);
+    expect(got).toEqual(want.map((t) => t.index));
+    expect(got).not.toContain(centre.index);
   });
 
   it("the pair follows the former owner's techs, not the world era", () => {
@@ -259,7 +279,7 @@ describe('the Free City step', () => {
     expect(state.units.find((u) => u.id === other.id)?.seat).toBe(FREE_SEAT);
   });
 
-  it('the Free Cities seat banks its cities\' Gold and pays its units\' upkeep, its balance stopping at 0', () => {
+  it('the Free Cities seat banks its cities\' Gold and pays its units\' upkeep, and meets bankruptcy', () => {
     const { state, border } = scene(30);
     border.loyalty = 0;
     flipCity(state, border);
@@ -274,7 +294,8 @@ describe('the Free City step', () => {
     expect(upkeep).toBeGreaterThan(0);
     freeCitiesPhase(state);
     expect(free.treasury).toBeCloseTo(50 + gold - upkeep, 9);
-    // an upkeep the purse cannot meet leaves it at 0, and nothing disbands
+    // an upkeep the purse cannot meet: the treasury clamps at 0, the shortfall
+    // is recorded and ONE unit disbands, the first with upkeep
     const cost = (): number => state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u.type) : 0), 0);
     // one unit per free land plot away from the city, until the upkeep
     // outruns the Gold
@@ -285,10 +306,12 @@ describe('the Free City step', () => {
     }
     expect(cost()).toBeGreaterThan(gold + 20);
     const ids = state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.id);
+    const first = state.units.find((u) => u.seat === FREE_SEAT && unitUpkeep(mods, u.type) > 0)!.id;
     free.treasury = 0;
     freeCitiesPhase(state);
     expect(free.treasury).toBe(0);
-    expect(ids.every((id) => state.units.some((u) => u.id === id))).toBe(true);
+    expect(free.goldShortfall).toBeGreaterThanOrEqual(10);
+    expect(ids.filter((id) => !state.units.some((u) => u.id === id))).toEqual([first]);
   });
 
   it('a Free City stands on its own flat base, 72 with no walls', () => {

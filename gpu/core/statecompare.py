@@ -270,6 +270,7 @@ GAME = {
     "removableAtStart": lambda sim, b, rows: [int(sim._removable_at_start[b])],
     "iceAtStart": lambda sim, b, rows: [int(sim._ice_at_start[b])],
     "freeTreasury": lambda sim, b, rows: [float(sim.free_treasury[b])],
+    "freeShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim.FREE_ROW])],
 }
 
 
@@ -539,6 +540,7 @@ SEAT = {
     # extractor renders its empty-array state dense the same way).
     "explored": _civ_scalar("seat_explored"),
     "treasury": _civ_scalar("civ_treasury"),
+    "goldShortfall": _civ_scalar("seat_shortfall"),
     "co2": _civ_scalar("civ_co2"),
     "co2Turn": _civ_scalar("civ_co2_turn"),
     "gppTurn": lambda sim, b, rows: [
@@ -603,6 +605,7 @@ SEAT = {
     "governmentsHeld": _civ_scalar("civ_gov_held"),
     "governmentChosen": _civ_scalar("civ_gov_chosen"),
     "governmentCivicTurn": _civ_scalar("civ_civic_turn"),
+    "governmentAnarchyEnd": _civ_scalar("civ_gov_anarchy_end"),
     "policySlotsExtra": lambda sim, b, rows: [
         [int(x) for x in sim._wonder_extra_slots(c)[b].tolist()] for c in rows],
     "policiesSlotted": _civ_mask("civ_policies"),
@@ -713,6 +716,7 @@ CITY_STATE = {
     "civicProgress": lambda sim, b, rows: [float(sim.citystate_civic_prog[b, s]) for s in rows],
     "prodProgress": lambda sim, b, rows: [float(sim.citystate_prod[b, s]) for s in rows],
     "minorTreasury": lambda sim, b, rows: [float(sim.citystate_treasury[b, s]) for s in rows],
+    "minorShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim._CITY_MINOR0 + s]) for s in rows],
     # a minor's row is a row of the CITY BLOCK, so its population and its
     # three boxes are read straight off it — no second name for one fact
     "minorPop": lambda sim, b, rows: [int(sim.citystate_pop[b, s]) for s in rows],

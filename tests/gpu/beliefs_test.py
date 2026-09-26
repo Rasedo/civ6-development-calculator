@@ -163,7 +163,7 @@ def evangelize(sim, row: int, mp: int = 4) -> tuple[bool, int]:
 def test_enhancing(rules, path) -> None:
     sim = build(rules, path)
     ready(sim, ROW)
-    assert sim._act_names[-1] == "EVANGELIZE_BELIEF" == sim._act_names[sim._A_EVANGELIZE], "the column is not last"
+    assert sim._act_names[sim._A_EVANGELIZE] == "EVANGELIZE_BELIEF", "the column is not Evangelize Belief"
     adopt(sim, ROW, [[FOL, 2], [FOU, 0]])
     assert bool(sim.civ_religion_done[B0, ROW])
     # the founding's two are held: nothing to adopt, and a second prophet earns none

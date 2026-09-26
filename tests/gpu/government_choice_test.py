@@ -6,16 +6,16 @@ The TS twin is tests/cpu/seats/government-choice.test.ts.
 
 A seat's government is a DRIVER decision on the wire: the record's
 `government` names a roster position, `_adopt_government` validates it
-against `_gov_open` (unlocked by the civics, never a government the seat has
-been in before — a return is Anarchy, which no seat enters) and stores it in
-`civ_gov_chosen`, where it stands until another record names one. A seat no
-record has chosen for is in the newest government its civics unlock
+against `_gov_open` (unlocked by the civics; nothing in Anarchy) and stores it
+in `civ_gov_chosen`, where it stands until another record names one. A seat
+no record has chosen for is in the newest government its civics unlock
 (`_adopted_gov`). A change marks the new government held and carries the
-slotted cards that still fit.
+slotted cards that still fit; a return to one held before leaves the seat in
+no government for `anarchy_turns` turns (runs/bds3_anarchy_20260926T102305Z.jsonl).
 
   1. the default is the newest tier; the record reaches every tier-mate and
      pays its bonus.
-  2. a locked government and a return to a held one are refused.
+  2. a locked government is refused; a return costs Anarchy, a new one none.
   3. the choice stands when a newer tier unlocks; a change carries the cards.
   4. the record round-trips (`extract_record` / `replay_seat`), the
      observation carries `government` and `gov_open`, the compare renders
@@ -100,13 +100,30 @@ def main() -> int:
     assert now() == "CHIEFDOM" and int(sim.civ_gov_chosen[0, ROW]) == -1, "a locked government was adopted"
     assert sim._gov_open(ROW)[0].nonzero().flatten().tolist() == [gov["CHIEFDOM"]]
     scene("CODE_OF_LAWS", "POLITICAL_PHILOSOPHY")
+    record(gov["CLASSICAL_REPUBLIC"])
     record(gov["OLIGARCHY"])
-    record(gov["AUTOCRACY"])
+    assert now() == "OLIGARCHY" and not bool(sim._in_anarchy(ROW)[0]), "a new government cost Anarchy"
     op = sim._gov_open(ROW)[0]
-    assert not bool(op[gov["OLIGARCHY"]]) and bool(op[gov["AUTOCRACY"]]) and bool(op[gov["CLASSICAL_REPUBLIC"]])
-    record(gov["OLIGARCHY"])
-    assert now() == "AUTOCRACY", "a return to a held government was accepted"
-    print("  2 the refusals OK - a locked government and a return to a held one")
+    assert bool(op[gov["CLASSICAL_REPUBLIC"]]) and bool(op[gov["OLIGARCHY"]]), "a return is not open"
+    t0 = int(sim.turn)
+    assert int(sim.rules.anarchy_turns) == 2
+    record(gov["CLASSICAL_REPUBLIC"])
+    assert int(sim.civ_gov_chosen[0, ROW]) == gov["CLASSICAL_REPUBLIC"]
+    assert int(sim.civ_gov_anarchy_end[0, ROW]) == t0 + 2
+    assert now() is None and bool(sim._in_anarchy(ROW)[0]), "a return did not enter Anarchy"
+    assert float(sim._gov_mods(ROW)[12]["gppmult"][0]) == 1.0, "Anarchy paid a government's bonus"
+    assert int(sim._seat_policy_slots(ROW)[0].sum()) == 0, "Anarchy holds policy slots"
+    assert not bool(sim._gov_open(ROW)[0].any()), "a government is open in Anarchy"
+    record(gov["AUTOCRACY"])
+    assert int(sim.civ_gov_chosen[0, ROW]) == gov["CLASSICAL_REPUBLIC"], "a change landed in Anarchy"
+    sim.turn = t0 + 1
+    assert now() is None
+    sim.turn = t0 + 2
+    sim._eff_version += 1  # the step's turn advance bumps it where Anarchy ends
+    assert now() == "CLASSICAL_REPUBLIC", "the returned-to government did not take office"
+    assert abs(float(sim._gov_mods(ROW)[12]["gppmult"][0]) - 1.15) < 1e-12, "its bonus is not paid after Anarchy"
+    sim.turn = t0
+    print("  2 the refusal and Anarchy OK - a locked government refused; a return costs 2 turns in none, a new one none")
 
     # 3) the choice stands; a change carries the cards
     scene("CODE_OF_LAWS", "POLITICAL_PHILOSOPHY")
@@ -144,10 +161,12 @@ def main() -> int:
     assert st.gov_tier == [int(g["tier"]) for g in rj["governments"]]
     tier1 = {gov[k] for k in ("AUTOCRACY", "OLIGARCHY", "CLASSICAL_REPUBLIC")}
     nob = {"policy": {"gov_open": sorted(tier1 | {gov["CHIEFDOM"]})}}
-    picks = drive._decide_government(st, [nob] * 64, ROW, list(range(64)), "cpu")
+    picks = drive._decide_government(st, [nob] * 64, ROW, list(range(64)), 0, "cpu")
     assert set(picks.tolist()) == tier1, f"the style draw does not reach every tier-mate: {set(picks.tolist())}"
-    again = drive._decide_government(st, [nob] * 64, ROW, list(range(64)), "cpu")
-    assert torch.equal(picks, again), "the style draw is not persistent"
+    again = drive._decide_government(st, [nob] * 64, ROW, list(range(64)), drive.ladder.GOV_STYLE_TURNS - 1, "cpu")
+    assert torch.equal(picks, again), "the style draw does not hold for its window"
+    later = drive._decide_government(st, [nob] * 64, ROW, list(range(64)), drive.ladder.GOV_STYLE_TURNS, "cpu")
+    assert not torch.equal(picks, later), "the style draw never changes, so no seat returns"
     assert "government" == drive.DECIDE_FIELDS[-1], "the government field is not appended at the end"
     print("  4 the wire OK - the record round-trips, the observation and the compare carry it, the driver reaches every tier-mate")
     print("BATTERY OK government_choice")

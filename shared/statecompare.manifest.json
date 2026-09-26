@@ -277,7 +277,18 @@
           "planes": [
             "free_treasury"
           ],
-          "note": "the Free Cities seat's treasury (`freeSeat.treasury`): its cities' Gold less its units' upkeep, which bankruptcy reads; 0 before the first revolt makes the seat."
+          "note": "the Free Cities seat's treasury (`freeSeat.treasury`): its cities' Gold less its units' upkeep, clamped at 0 by bankruptcy; 0 before the first revolt makes the seat."
+        },
+        {
+          "name": "freeShortfall",
+          "compare": "exact",
+          "covers": [
+            "GameState.freeSeat"
+          ],
+          "planes": [
+            "seat_shortfall"
+          ],
+          "note": "the Free Cities seat's last turn shortfall (`freeSeat.goldShortfall`), which its cities' bankruptcy amenities read; 0 before the first revolt makes the seat."
         }
       ]
     },
@@ -309,6 +320,17 @@
           "planes": [
             "civ_treasury"
           ]
+        },
+        {
+          "name": "goldShortfall",
+          "compare": "exact",
+          "covers": [
+            "Seat.goldShortfall"
+          ],
+          "planes": [
+            "seat_shortfall"
+          ],
+          "note": "the whole Gold the seat's last upkeep fell short (`bankruptcy` / `_bankruptcy`); its cities' amenities read it until the next upkeep. The minors' and the Free Cities' are `minorShortfall` and `freeShortfall`."
         },
         {
           "name": "cultureTotal",
@@ -807,6 +829,17 @@
             "civ_civic_turn"
           ],
           "note": "the turn the seat last completed a civic: the next turn's record changes the government and the cards for free, any other turn pays the policy unlock (`policyUnlockCost` / `_policy_unlock_cost`)."
+        },
+        {
+          "name": "governmentAnarchyEnd",
+          "compare": "exact",
+          "covers": [
+            "GovernmentState.anarchyEnd"
+          ],
+          "planes": [
+            "civ_gov_anarchy_end"
+          ],
+          "note": "ANARCHY: the first turn the chosen government takes office after a return to one the seat held before; below it the seat is in no government (`seatGovernment` / `_adopted_gov`)."
         },
         {
           "name": "policySlotsExtra",
@@ -1598,6 +1631,15 @@
             "citystate_treasury"
           ],
           "note": "the minor city's Gold: its yield walk pays it, its units' upkeep and its purchases and upgrades spend it"
+        },
+        {
+          "name": "minorShortfall",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "seat_shortfall"
+          ],
+          "note": "the minor's last turn shortfall (its `goldShortfall`, `bankruptcy` / `_bankruptcy`), which its city's bankruptcy amenities read"
         },
         {
           "name": "minorPop",

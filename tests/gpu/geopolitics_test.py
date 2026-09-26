@@ -1159,7 +1159,8 @@ def main() -> None:
     for _f in ("congress_sessions", "congress_active", "civ_diplo_points"):
         assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
     s6 = build(rules, path, steps=0)
-    assert s6._congress_interval == 30, f"GS convenes every 30 turns, got {s6._congress_interval}"
+    assert s6._congress_interval == 20, \
+        f"GS convenes every 30 turns at Standard speed, 20 online, got {s6._congress_interval}"
     assert s6._congress_min_era == 2, f"GS starts at the MEDIEVAL era (index 2), got {s6._congress_min_era}"
     assert s6._dvp_win == 20, f"GS diplomatic victory is 20 points, got {s6._dvp_win}"
     assert s6._congress_dv_min == 5, "the DV resolution enters at MODERN (index 5)"

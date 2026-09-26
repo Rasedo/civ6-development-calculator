@@ -1769,16 +1769,21 @@ class SimOrders:
         the loop position right after its gold lands, the Free Cities seat's
         in its own phase after its cities' gold: charge maintenance for every
         living unit of the row's SEAT off the POOLED planes (the Free Cities'
-        stand in the hostile range), then a major meets the bankruptcy that
-        charge may force (`_bankrupt_disband`) and the Free Cities balance
-        stops at 0. A game where the seat does not act this
+        stand in the hostile range), then meet the bankruptcy that charge may
+        force (`_bankruptcy`). A game where the seat does not act this
         turn charges nothing (`active`: the TS loop's eliminated-actor
-        continue, the Free Cities phase's no-city return)."""
-        if not self.units_mode:
-            return
+        continue, the Free Cities phase's no-city return); a game with no
+        units charges none and still meets the bankruptcy its balance
+        forces."""
         seat = int(self._ROW_SEAT[row])
-        mine = self.unit_alive & (self.unit_seat == seat)
-        upkeep = (self._unit_upkeep(row, self.unit_type) * mine.to(self.dtype)).sum(dim=1)
+        if self.units_mode:
+            mine = self.unit_alive & (self.unit_seat == seat)
+            maint = self._unit_upkeep(row, self.unit_type)
+            upkeep = (maint * mine.to(self.dtype)).sum(dim=1)
+        else:
+            mine = torch.zeros(self.B, 1, dtype=torch.bool, device=self.device)
+            maint = torch.zeros(self.B, 1, dtype=self.dtype, device=self.device)
+            upkeep = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         if row < self.n_majors:
             upkeep = upkeep + self._wmd_upkeep(row)
         tre = self._treasury_of(row)
@@ -1790,13 +1795,44 @@ class SimOrders:
                     f" cost{float(upkeep[_b]):.3f}"
                     f" purse{float(tre[_b]):.3f}")
         paid = torch.where(active, tre - upkeep.to(tre.dtype), tre)
+        paid = self._bankruptcy(row, paid, active, maint)
         if row < self.n_majors:
             self.civ_treasury[:, row] = paid
-            self._bankrupt_disband(row, active)
         else:
-            # the Free Cities balance stops at 0, as a minor's does (no census
-            # row reads it below 0), so it never goes bankrupt
-            self.free_treasury.copy_(paid.clamp(min=0))
+            self.free_treasury.copy_(paid)
+
+    def _bankruptcy(self, row: int, bal: torch.Tensor, active: torch.Tensor,
+                    maint: torch.Tensor) -> torch.Tensor:
+        """`bankruptcy` for city row `row`'s holder, every seat alike, in the
+        games of `active`: `bal` [B] is the balance its turn's charges left;
+        the whole Gold it stands below 0 (milli-rounded, `goldShortfall`) is
+        the turn's shortfall, kept in `seat_shortfall` for its cities'
+        amenities; `_bk_disbands` units go while S >= 10, each the FIRST alive unit of
+        the row's SEAT with upkeep (`maint` [B, W] > 0) — the lowest slot,
+        which is TS's first in `state.units`: the pool only appends, so one
+        seat's slots ascend in its own spawn order. Returns the balance
+        clamped at 0 (unchanged outside `active`); nothing is refunded."""
+        m = js_round(bal.double() * 1000).to(torch.long)
+        short = torch.where(m < 0, -torch.div(m, 1000, rounding_mode="floor"), torch.zeros_like(m))
+        self.seat_shortfall[:, row] = torch.where(active, short, self.seat_shortfall[:, row])
+        left = torch.where(active & (-short <= self._bk_disband_line),
+                           torch.full_like(short, self._bk_disbands), torch.zeros_like(short))
+        seat = int(self._ROW_SEAT[row])
+        W = maint.shape[1]
+        slots = torch.arange(W, device=self.device).unsqueeze(0)  # [1, W]
+        while bool((left > 0).any()):
+            cand = self.unit_alive & (self.unit_seat == seat) & (maint > 0)
+            do_kill = (left > 0) & cand.any(dim=1)
+            if not bool(do_kill.any()):
+                break
+            victim = torch.where(cand, slots, torch.full_like(slots, W)).min(dim=1).values
+            rows = do_kill.nonzero(as_tuple=True)[0]
+            vslot = victim[rows]
+            vtile = self.unit_tile[rows, vslot]
+            self._occ_clear(rows, vtile, vslot)
+            self.unit_alive[rows, vslot] = False
+            left = left - do_kill.long()
+        return torch.where(active, bal.clamp(min=0), bal)
 
     def _treasury_of(self, row: int) -> torch.Tensor:
         """[B] the treasury of city ROW `row`'s holder — a major's own, a
@@ -1811,22 +1847,14 @@ class SimOrders:
             return self.citystate_treasury[:, s]
         return torch.zeros(self.B, dtype=self.civ_treasury.dtype, device=self.device)
 
-    def _bankruptcy_count(self, row: int, line: int, step: int, on_line: bool) -> torch.Tensor:
-        """[B] long — `bankruptcyCount` over row `row`'s treasury: 0 while the
-        milli-rounded treasury stands above `line` (or on it, when `on_line`
-        is false), past it 1 and one more for every whole `step` further down
-        (`line`, `step` in milli-gold). Integer arithmetic past the rounding,
-        so both engines floor the same quotient."""
-        m = js_round(self._treasury_of(row).double() * 1000).to(torch.long)
-        n = 1 + torch.div(line - m, -step, rounding_mode="floor")
-        clear = (m > line) if on_line else (m >= line)
-        return torch.where(clear, torch.zeros_like(n), n)
-
     def _bankrupt_amenities(self, row: int) -> torch.Tensor:
         """[B] f64 — `bankruptAmenities`: the amenities EVERY city of row
-        `row` loses to its holder's treasury. CIV6 (the Gold pedia): "-1
-        penalty to your Amenities per every 10 Gold you drop below 0"."""
-        return self._bankruptcy_count(row, self._bk_amen_line, self._bk_amen_step, False).double()
+        `row` loses to its holder's last turn shortfall S (`seat_shortfall`):
+        1 + floor(S / 10) while S > 0. CIV6 (the Gold pedia): "-1 penalty to
+        your Amenities per every 10 Gold you drop below 0"."""
+        s = self.seat_shortfall[:, row]
+        n = 1 + torch.div(self._bk_amen_line + s, -self._bk_amen_step, rounding_mode="floor")
+        return torch.where(-s < self._bk_amen_line, n, torch.zeros_like(n)).double()
 
     def _wmd_upkeep(self, row: int) -> torch.Tensor:
         '''[B] gold the seat's nuclear devices bill this turn. CIV6: 14 Gold
@@ -1838,43 +1866,6 @@ class SimOrders:
         gold = (self.civ_wmd[:, row].to(self.dtype) * up.unsqueeze(0)).sum(dim=1)
         pct = self._fx_by_row("wmdup")[:, row].to(self.dtype)
         return gold * (100.0 + pct) / 100.0
-
-    def _bankrupt_disband(self, row: int, active: torch.Tensor | None = None) -> None:
-        """BANKRUPTCY'S DISBANDS for seat row `row` this turn — the
-        `bankruptDisband` twin. CIV6 (the Gold pedia): "at -10 Gold you will
-        automatically disband a unit, at -20 two units": `_bankruptcy_count`
-        over the disband line and step, read off the treasury the upkeep left.
-        Each is the priciest alive unit of the row's SEAT still standing; ties
-        break to the lowest slot (= oldest, matching TS's FIRST in
-        `state.units` — spawn order, NOT the unit id: a converted barbarian
-        keeps its barbarian-era id and took a new slot, and the two parted on
-        it once. The window only ever appends, so ONE seat's slots ascend in
-        that seat's own spawn order even though every seat interleaves into
-        it). Only upkeep>0 units are candidates, and there is no refund.
-        `active` is the TS loop's eliminated-actor continue."""
-        left = self._bankruptcy_count(row, self._bk_disband_line, self._bk_disband_step, True)
-        if active is not None:
-            left = torch.where(active, left, torch.zeros_like(left))
-        if not bool((left > 0).any()):
-            return
-        seat = int(self._ROW_SEAT[row])
-        maint = self._unit_upkeep(row, self.unit_type)
-        W = maint.shape[1]
-        slots = torch.arange(W, device=self.device, dtype=maint.dtype).unsqueeze(0)  # [1, W]
-        while True:
-            cand = self.unit_alive & (self.unit_seat == seat) & (maint > 0)
-            do_kill = (left > 0) & cand.any(dim=1)
-            if not bool(do_kill.any()):
-                return
-            # maximize (upkeep, -slot): upkeep*(W+1) - slot lets upkeep dominate, tie -> lowest slot
-            score = torch.where(cand, maint * float(W + 1) - slots, torch.full_like(maint, -1e30))
-            victim = score.argmax(dim=1)
-            rows = do_kill.nonzero(as_tuple=True)[0]
-            vslot = victim[rows]
-            vtile = self.unit_tile[rows, vslot]
-            self._occ_clear(rows, vtile, vslot)
-            self.unit_alive[rows, vslot] = False
-            left = left - do_kill.long()
 
     def _barb_reset_mp(self) -> None:
         """Reset barbarian MP: `u.movesLeft = UNITS[u.type].moves`.

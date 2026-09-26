@@ -4,7 +4,7 @@
  * has NOT been swept (AUDIT B-D).
  */
 
-import { srcConst, xml } from './provenance';
+import { srcConst, xml, type Src } from './provenance';
 
 /** shorthand: one `GlobalParameters` row's `Value` */
 const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
@@ -52,6 +52,38 @@ export const GAME_SPEED = srcConst('scenario.gameSpeed', 0.5,
  */
 export function scaleByGameSpeed(n: number): number {
   return Math.floor(n * GAME_SPEED);
+}
+
+/** a `GameSpeed_Durations` ONLINE_HALF row: the online count of `standard` */
+const onlineRow = (standard: number) => xml('GameSpeed_Durations',
+  `GameSpeedScalingType=ONLINE_HALF&NumberOfTurnsOnStandard=${standard}`, 'NumberOfTurnsScaled');
+
+/**
+ * THE ONLINE SPEED'S DURATIONS. CIV6 (GameSpeeds.xml, GameSpeed_Durations):
+ * the ONLINE_HALF rows map a Standard-speed turn count to the online one —
+ * 5 → 5, 10 → 8, 15 → 10, 29 → 19, 30 → 20, 60 → 40. Online the Nuclear
+ * emergency ran 40 turns, a denouncement, a friendship and an alliance 20
+ * and the peace minimum 8 (runs/bds4_durations_lab4_t161.jsonl).
+ */
+const ONLINE_DURATIONS: ReadonlyMap<number, number> = new Map(
+  ([[5, 5], [10, 8], [15, 10], [29, 19], [30, 20], [60, 40]] as const).map(([standard, online]) =>
+    [standard, srcConst(`scenario.onlineTurns${standard}`, online, onlineRow(standard))]));
+
+/** A Standard-speed duration at the online speed, through its
+ *  `GameSpeed_Durations` ONLINE_HALF row — the one composer every turn count
+ *  the install writes at Standard speed goes through where it is read. A count
+ *  the table has no row for has no online reading, and asking for one throws. */
+export function speedTurns(standard: number): number {
+  const online = ONLINE_DURATIONS.get(standard);
+  if (online === undefined) throw new Error(`speedTurns: GameSpeed_Durations has no ONLINE_HALF row for ${standard}`);
+  return online;
+}
+
+/** the provenance of a duration read through `speedTurns`: its Standard
+ *  source and the ONLINE_HALF row that scales it */
+export function speedTurnsSrc(standard: Src, n: number): Src {
+  return { derived: `the Standard ${n} turns through GameSpeed_Durations ONLINE_HALF (speedTurns)`,
+    inputs: [standard, onlineRow(n)] };
 }
 
 /** THE PURCHASE PRICE, measured live (lab 2 scene G — all 302 priced rows of
@@ -104,6 +136,17 @@ export const POLICY_UNLOCK_K_PER_TECH = srcConst('scenario.policyUnlockKPerTech'
 export const POLICY_UNLOCK_ROUND = srcConst('scenario.policyUnlockRound', 5, {
   lab: 'runs/policy_cost_bdprice_20260926T082243Z.jsonl',
   note: 'every read price is a multiple of 5; nearest, halves up, is this engine\'s reading of the rounding',
+});
+
+/** ANARCHY. CIV6 (the Governments pedia): "If you switch to a previously
+ *  adopted government, you will enter a state of Anarchy". Measured: a return
+ *  to any government the seat held before, requested at turn T, left it in no
+ *  government at T+1 and T+2 and in the new one at T+3, where a new
+ *  government is in at T+1 (`GetAnarchyTurns` 3 for every held government, 0
+ *  for the rest; repeats cost no more) — two turns more than a change to a new
+ *  one, and none for it. */
+export const ANARCHY_TURNS = srcConst('scenario.anarchyTurns', 2, {
+  lab: 'runs/bds3_anarchy_20260926T102305Z.jsonl and runs/bds3_anarchy_xsec_lab4_t150.jsonl',
 });
 
 export const FOOD_PER_CITIZEN = srcConst('foodPerCitizen', 2,

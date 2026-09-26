@@ -41,12 +41,14 @@
  * (`warKindAllowed`'s `agreed`), which keeps it out of every default pick.
  */
 import { srcConst, xml } from './provenance';
+import { speedTurns, speedTurnsSrc } from './constants';
 
 /** CIV6 (Formal War, DenouncementTurnsRequired): "Denounced ... at least 5
- *  turns ago" — the age the Formal kind's denouncement must have reached. */
-export const FORMAL_WAR_MIN_TURNS = srcConst('seats.formalWarMinTurns', 5,
+ *  turns ago" — the age the Formal kind's denouncement must have reached,
+ *  online through `speedTurns`. */
+export const FORMAL_WAR_MIN_TURNS = srcConst('seats.formalWarMinTurns', speedTurns(5), speedTurnsSrc(
   xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_DECLARE_FORMAL_WAR',
-    'DenouncementTurnsRequired'));
+    'DenouncementTurnsRequired'), 5));
 
 export type WarKindId =
   | 'surprise' | 'formal' | 'holy' | 'liberation' | 'reconquest' | 'protectorate'
@@ -169,8 +171,9 @@ export const LATE_GOVERNMENT_TIER = srcConst('warKinds.LATE_GOVERNMENT_TIER', 3,
 
 /** CIV6 (TRAIT_TERRITORIAL_WAR_*, TRAIT_LIBERATION_WAR_*): every declared-war
  *  modifier of the roster carries `TurnsActive` 10 — the buff lives while the
- *  war the seat declared is under this many turns old. */
-export const WAR_BUFF_TURNS = srcConst('seats.warBuffTurns', 10, {
+ *  war the seat declared is under this many turns old, online through
+ *  `speedTurns`. */
+export const WAR_BUFF_TURNS = srcConst('seats.warBuffTurns', speedTurns(10), speedTurnsSrc({
   pedia: 'TRAIT_TERRITORIAL_WAR_* / TRAIT_LIBERATION_WAR_* carry TurnsActive 10; the install writes '
     + 'it on the modifier, not as a table column a checker can read back',
-});
+}, 10));

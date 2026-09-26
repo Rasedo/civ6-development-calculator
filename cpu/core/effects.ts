@@ -1,5 +1,5 @@
 
-import { PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, POLICY_UNLOCK_K_BASE, POLICY_UNLOCK_K_PER_TECH, POLICY_UNLOCK_ROUND } from '../data/constants';
+import { ANARCHY_TURNS, PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, POLICY_UNLOCK_K_BASE, POLICY_UNLOCK_K_PER_TECH, POLICY_UNLOCK_ROUND } from '../data/constants';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { TerrainId, Tile } from '../../world/types';
 import { hiddenResourcesFor } from './seats';
@@ -991,6 +991,8 @@ function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): 
   fpPush(m, FP_MARK);
   fpPush(m, gov.held);
   fpPush(m, gov.chosen);
+  // Anarchy ends with the turn and no record behind it
+  fpPush(m, inAnarchy(state, seat));
   // the government ROWS are a catalog, but they are still an input `applyGovernment`
   // reads: a test borrows a row onto the adopted government by SWAPPING the
   // effects object in memory (`borrowingRow`), exactly as the GPU poke does, so
@@ -1471,31 +1473,33 @@ export function newestGovernment(research: ResearchState): string | null {
   return chosen ? chosen.id : null;
 }
 
-/** The government seat `seat` is IN: the one its record chose
- *  (`government.chosen`, `adoptGovernment`), else the newest its civics
- *  unlock. A city-state never records one. `_adopted_gov` is the twin. */
+/** Is seat `seat` in ANARCHY — a return to a government it held before
+ *  (`adoptGovernment`) not yet in office? */
+export function inAnarchy(state: GameState, seat: number): boolean {
+  const s = seatOf(state, seat);
+  return !!s && state.turn < s.government.anarchyEnd;
+}
+
+/** The government seat `seat` is IN: none in Anarchy, else the one its
+ *  record chose (`government.chosen`, `adoptGovernment`), else the newest its
+ *  civics unlock. A city-state never records one. `_adopted_gov` is the
+ *  twin. */
 export function seatGovernment(state: GameState, seat: number): string | null {
   const s = seatOf(state, seat);
-  if (!s) return null;
+  if (!s || inAnarchy(state, seat)) return null;
   return s.government.chosen ?? newestGovernment(s.research);
 }
 
 /** The governments seat `seat`'s record may name now, as `GOVERNMENT_LIST`
- *  positions ascending: unlocked by its civics, and never one it has been in
- *  before unless it is in it now. CIV6 (the Governments pedia): "If you switch
- *  to a previously adopted government, you will enter a state of Anarchy" —
- *  a return is refused here, so no seat enters Anarchy. `_gov_open` is the
- *  twin. */
+ *  positions ascending: every one its civics unlock, a return to one it held
+ *  before included; none while it is in Anarchy. `_gov_open` is the twin. */
 export function governmentsOpen(state: GameState, seat: number): number[] {
   const s = seatOf(state, seat);
-  if (!s) return [];
+  if (!s || inAnarchy(state, seat)) return [];
   const u = computeUnlocksIn(s.research, []);
-  const now = seatGovernment(state, seat);
   const out: number[] = [];
   GOVERNMENT_LIST.forEach((g, i) => {
-    if (!u.governments.has(g.id)) return;
-    if (g.id !== now && s.government.held & governmentBit(g.id)) return;
-    out.push(i);
+    if (u.governments.has(g.id)) out.push(i);
   });
   return out;
 }
@@ -1503,8 +1507,10 @@ export function governmentsOpen(state: GameState, seat: number): number[] {
 /** The record's GOVERNMENT arm: seat `seat` adopts `GOVERNMENT_LIST[index]`
  *  where `governmentsOpen` holds it, and the choice stands until another
  *  record names one. A CHANGE marks the new government held and carries the
- *  slotted cards over (`carryPolicies`). Anything else is refused silently.
- *  `_adopt_government` is the twin. */
+ *  slotted cards over (`carryPolicies`); a change to one the seat held before
+ *  is a RETURN, and the seat is in no government for `ANARCHY_TURNS` turns,
+ *  this one included (`government.anarchyEnd`). Anything else is refused
+ *  silently. `_adopt_government` is the twin. */
 export function adoptGovernment(state: GameState, seat: number, index: number): void {
   const s = seatOf(state, seat);
   const g = GOVERNMENT_LIST[index];
@@ -1512,8 +1518,10 @@ export function adoptGovernment(state: GameState, seat: number, index: number): 
   const before = seatGovernment(state, seat);
   s.government.chosen = g.id;
   if (g.id === before) return;
+  const back = (s.government.held & governmentBit(g.id)) !== 0;
   s.government.held |= governmentBit(g.id);
   carryPolicies(state, seat);
+  if (back) s.government.anarchyEnd = state.turn + ANARCHY_TURNS;
 }
 
 /** THE POLICY UNLOCK's Gold for seat `seat` this turn: 0 in the free window

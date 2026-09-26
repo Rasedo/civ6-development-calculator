@@ -325,10 +325,10 @@ class SimMinors:
 
         Science and Culture also feed the two research pots; Gold banks into
         `citystate_treasury` and pays the minor's units' upkeep — each unit's
-        own Maintenance, a minor carrying no card that cuts it — the balance
-        stopping at 0 (the census never read a minor below 0); Faith banks into
-        `citystate_faith`. The [B] Production is returned for `_minor_build`,
-        which pays it into the pot under the rows of the item it goes toward."""
+        own Maintenance, a minor carrying no card that cuts it — and meets the
+        `_bankruptcy` every seat meets; Faith banks into `citystate_faith`.
+        The [B] Production is returned for `_minor_build`, which pays it into
+        the pot under the rows of the item it goes toward."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         keep = alive.double()
@@ -338,7 +338,9 @@ class SimMinors:
         upkeep = (self._type_maintenance[self.major_unit_type.clamp(min=0, max=self.NU - 1)].double()
                   * mine.double()).sum(dim=1)
         tre = self.citystate_treasury[:, s] + tot[:, 2] * keep
-        self.citystate_treasury[:, s] = torch.where(alive, (tre - upkeep).clamp(min=0), tre)
+        paid = torch.where(alive, tre - upkeep, tre)
+        maint = self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)].double()
+        self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
         self.citystate_tech_prog[:, s] += tot[:, 3] * keep
         self.citystate_civic_prog[:, s] += tot[:, 4] * keep
         self.citystate_faith[:, s] += tot[:, 5] * keep

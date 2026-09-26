@@ -175,6 +175,10 @@ export interface GovernmentState {
    *  change the government and the cards for free (the UI's
    *  `CivicCompletedThisTurn`); any other turn pays `policyUnlockCost`. */
   civicTurn: number;
+  /** ANARCHY: the first turn `chosen` takes office after a return to a
+   *  government the seat held before; the seat is in no government while
+   *  the turn is below it (`seatGovernment`) */
+  anarchyEnd: number;
 }
 
 export interface SeatActionRecord {
@@ -631,6 +635,9 @@ export interface Seat {
   grantedTitles: number;
 
   treasury: number;
+  /** the whole Gold the seat's last upkeep fell short of its treasury
+   *  (`goldShortfall`) — what its cities' bankruptcy amenities read */
+  goldShortfall: number;
   scienceTotal: number;
   cultureTotal: number;
   faith: number;

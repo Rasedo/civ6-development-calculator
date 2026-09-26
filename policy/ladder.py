@@ -210,6 +210,10 @@ DEEP_SHARE = 0.34
 # city-state war in any seed and a minor-war mean of 0.0, which is the
 # collapse this knob exists to avoid.
 DIPLO_SHARE = 0.5
+# The GOVERNMENT style — which tier-mate a seat takes — is re-drawn every
+# this many turns, so a seat sometimes goes back to a government it held
+# before: a return, which the engines charge in Anarchy.
+GOV_STYLE_TURNS = 60
 # Writing, art, music — the Great Work kinds the gift verb indexes.
 GW_KINDS = 3
 

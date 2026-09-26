@@ -767,6 +767,9 @@ class SimInit:
         # the next turn's record changes the government and the cards for
         # free, any other turn pays `_policy_unlock_cost`
         self.civ_civic_turn = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        # ANARCHY, `GovernmentState.anarchyEnd`: the first turn a returned-to
+        # government takes office; below it the seat is in none
+        self.civ_gov_anarchy_end = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er["darkT"])    # GlobalParameters DARK_AGE_SCORE_BASE_THRESHOLD
@@ -1192,6 +1195,9 @@ class SimInit:
         # no civ block
         self.free_next_city_id = torch.zeros(B, dtype=torch.long, device=device)
         self.free_treasury = torch.zeros(B, dtype=dtype, device=device)
+        # every city row's holder's last turn SHORTFALL in whole Gold
+        # (`Seat.goldShortfall`) — majors, minors and the Free Cities alike
+        self.seat_shortfall = torch.zeros(B, self.CITY_ROWS, dtype=torch.long, device=device)
         # THE GOVERNOR ROSTER, one slot per catalog governor per major row.
         # The neutralize clock follows the PERSON, not the city — a governor a
         # spy turns out keeps counting down in the Palace.
@@ -3921,12 +3927,13 @@ class SimInit:
         self._free_grant_w = [int(x) for x in rules.seats["freeCityGrantWeights"]]
         self._free_grant_units = torch.tensor(
             [[int(x) for x in row] for row in rules.seats["freeCityGrantUnits"]], dtype=torch.long, device=device)
-        # BANKRUPTCY (GOLD_NEGATIVE_BALANCE_*), in milli-gold: each penalty's
-        # line and step
-        self._bk_amen_line = int(rules.seats["goldAmenityLossLine"]) * 1000
-        self._bk_amen_step = int(rules.seats["goldAmenityLossStep"]) * 1000
-        self._bk_disband_line = int(rules.seats["goldDisbandLine"]) * 1000
-        self._bk_disband_step = int(rules.seats["goldDisbandStep"]) * 1000
+        # BANKRUPTCY on the turn's shortfall (GOLD_NEGATIVE_BALANCE_*), in
+        # whole Gold: the amenity line and step, the disband line, the
+        # disbands a turn
+        self._bk_amen_line = int(rules.seats["goldAmenityLossLine"])
+        self._bk_amen_step = int(rules.seats["goldAmenityLossStep"])
+        self._bk_disband_line = int(rules.seats["goldDisbandLine"])
+        self._bk_disbands = int(rules.seats["goldDisbandsPerTurn"])
         self._captured_hp = int(rules.combat["capturedHp"])
         self._capture_base_diff = int(rules.combat["captureBaseDiff"])
         self._embark_move_rows: list[tuple[int, int, int, int]] = [

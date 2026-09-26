@@ -169,6 +169,7 @@ class Rules:
     purchase_divisor: int  # every gold / faith price is floored to a multiple of this (PURCHASE_DIVISOR 5, measured)
     civic_unlock: tuple  # (CivicUnlockMaxCost, CivicUnlockPerTurnDrop, CivicUnlockMinCost) — `policyUnlockCost`
     policy_unlock_k: tuple  # (k's base, k's per-tech step, both in tenths; the rounding step) — `policyUnlockCost`
+    anarchy_turns: int  # the turns a return to a held government leaves the seat in none (ANARCHY_TURNS)
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
@@ -392,6 +393,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
                       int(r["scenario"]["civicUnlockMinCost"])),
         policy_unlock_k=(int(r["scenario"]["policyUnlockKBase"]), int(r["scenario"]["policyUnlockKPerTech"]),
                          int(r["scenario"]["policyUnlockRound"])),
+        anarchy_turns=int(r["scenario"]["anarchyTurns"]),
         turn_limit=r["scenario"]["turnLimit"],
         space_ly_target=r["scenario"]["spaceLyTarget"],
         district_cost=r["districtCost"],
@@ -826,7 +828,7 @@ _MUTABLE = [
     "citystate_levy_seat", "citystate_levy_ends",
     "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_alliance_type", "seat_alliance_pts", "civ_sci_rate", "civ_cul_rate", "civ_tour_rate", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held", "seat_promise", "seat_promise_broken",
-    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "era_score_past", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_civic_turn", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
+    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "era_score_past", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_civic_turn", "civ_gov_anarchy_end", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
@@ -844,6 +846,7 @@ _MUTABLE = [
     "city_free_press", "free_next_city_id",  # a FREE CITY's race per major, and the Free Cities seat's city-id counter
     "city_freed_turn",  # the turn a Free City became free, which its grants count from
     "free_treasury",  # the Free Cities seat's treasury
+    "seat_shortfall",  # every city row's holder's last turn shortfall, which bankruptcy reads
     # THE GOVERNOR ROSTER — one slot per catalog governor per major row
     "civ_gov_appointed", "civ_gov_city", "civ_gov_minor", "civ_gov_establish", "civ_gov_out", "civ_gov_promos",
     "antiquity",  # ANTIQUITY SITES (bool tile plane)

@@ -60,7 +60,8 @@ describe('the promise rows', () => {
   it('carries the install row on every kind', () => {
     expect(PROMISES.map((p) => [p.favorCost, p.refusal, p.incursion])).toEqual([
       [30, 25, 25], [30, 25, 25], [30, 25, 25], [30, 25, 25]]);
-    expect([PROMISE_TURNS, PROMISE_BROKEN_GRIEVANCE, RETRIBUTION_TURNS]).toEqual([30, 100, 30]);
+    // the 30-turn clocks online through GameSpeed_Durations ONLINE_HALF
+    expect([PROMISE_TURNS, PROMISE_BROKEN_GRIEVANCE, RETRIBUTION_TURNS]).toEqual([20, 100, 20]);
   });
 });
 

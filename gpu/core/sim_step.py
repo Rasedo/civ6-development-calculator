@@ -96,6 +96,10 @@ class SimStep:
 
         self._ww_audit()
         self.turn += 1
+        # a return's Anarchy ends as the turn reaches `civ_gov_anarchy_end`:
+        # the government channels change with no record behind them
+        if self._ngov and bool((self.civ_gov_anarchy_end == self.turn).any()):
+            self._eff_version += 1
         if self._era_len > 0 and self.turn % self._era_len == 0:
             # CIV6: "all roads in your territory will upgrade to the next
             # level automatically" on reaching the era that brings the tier,
