@@ -9485,8 +9485,11 @@ class SimSeats:
         all_n = comp.sum(dim=2)
         spec_n = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
         if self._rep_any:
+            # a city id is unique only within its seat, so the tile's SEAT
+            # must be this row's before its id may name one of these cities
             rep_t = (self.district >= 0) & self.district_complete \
-                & self._is_repeatable[self.district.clamp(min=0)]  # [B, T]
+                & self._is_repeatable[self.district.clamp(min=0)] \
+                & (self.tile_seat == int(self._ROW_SEAT[row]))  # [B, T]
             if bool(rep_t.any()):
                 ids = self.city_id[:, row, :cols]
                 alive = self.city_alive[:, row, :cols]

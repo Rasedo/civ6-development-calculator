@@ -1299,9 +1299,9 @@ class SimEconomy:
 
     def _regrow(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """A burnt plot REGROWS (`RandomEvent_Yields` Turn 6): its Woods or
-        Rainforest comes back with the t0 chop planes and the adjacency it
-        lends, +1 Production silt (YIELD_PRODUCTION Amount 1), and the fire's
-        record goes."""
+        Rainforest comes back with its chop planes (a harvested plot's
+        resource-free key) and the adjacency it lends, +1 Production silt
+        (YIELD_PRODUCTION Amount 1), and the fire's record goes."""
         if not rows.numel():
             return
         fid = self.feat_id[rows, tiles]
@@ -1310,7 +1310,10 @@ class SimEconomy:
             back = torch.where(fid == f, torch.full_like(fid, self._fire_start_fid[s]), back)
         self.feat_id[rows, tiles] = back
         self.fire_start[rows, tiles] = -1
-        self.tile_ftr[rows, tiles] = self._ftr0[rows, tiles]
+        # the chop grant key as the plot stands: a HARVESTED plot's resource no
+        # longer holds the feature, so it takes the resource-free key
+        self.tile_ftr[rows, tiles] = torch.where(
+            self.res_stripped[rows, tiles], self._nr_bare["tile_ftr"][rows, tiles], self._ftr0[rows, tiles])
         self.tile_ftu[rows, tiles] = self._ftu0[rows, tiles]
         self.feat_removable[rows, tiles] = self._frm0[rows, tiles]
         self._lend_feature_adj(rows, tiles, 1.0)
