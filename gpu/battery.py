@@ -857,6 +857,9 @@ def _main() -> int:
                 ("alliance_levels", [py, "tests/gpu/alliance_levels_test.py"], 4),  # typed alliances: points, levels and the fifteen-effect table
                 ("gs_rows", [py, "tests/gpu/gs_rows_test.py"], 4),  # the three GS admirals and the Offshore Wind Farm: no seed recruits them or reaches Predictive Systems
                 ("gp_census", [py, "tests/gpu/gp_census_test.py"], 4),  # the Great People census: sites, grants, channels and route clauses no seed reaches
+                ("game_speed", [py, "tests/gpu/game_speed_test.py"], 4),  # the online speed: CostMultiplier, the truncating helper, scaled grants
+                ("pack_events", [py, "tests/gpu/pack_events_test.py"], 4),  # the GS pack events: meteor sites, forest and jungle fires, Eyjafjallajokull and Vesuvius
+                ("eco_residue", [py, "tests/gpu/eco_residue_test.py"], 4),  # fractional purchase price, policy-unlock gold, the minor's Palace, the Free City floor
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane
