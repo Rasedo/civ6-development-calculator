@@ -1008,4 +1008,8 @@ def _main() -> int:
 
 
 if __name__ == "__main__":
+    # A lane's tail may carry any character; the console's codepage (cp1251
+    # here) must not turn printing it into a crash that hides the failure.
+    sys.stdout.reconfigure(errors="replace")
+    sys.stderr.reconfigure(errors="replace")
     raise SystemExit(main())

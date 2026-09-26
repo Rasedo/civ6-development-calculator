@@ -142,7 +142,9 @@ def main() -> None:
     # The scripted patrol moves 2.78 tiles per moving unit-turn, so one order
     # per turn would cut civ mobility by ~two thirds. The action is a SEQUENCE
     # and the engine walks it, validating each step — it never extends a move.
-    def setup():
+    def setup(at=None):
+        """The row's first soldier with the scene's MP; `at` stands it on that
+        tile instead of its own (occ bookkeeping by hand, the scene-8 idiom)."""
         s2 = fresh(rules, path)
         s2.seat_ext[0, row] = True
         sl = next(
@@ -150,6 +152,10 @@ def main() -> None:
             if bool(s2.major_unit_alive[0, v]) and int(s2.major_unit_seat[0, v]) == row
             and float(s2._type_combat[int(s2.major_unit_type[0, v])]) > 0
         )
+        if at is not None:
+            s2.military_at[0, int(s2.major_unit_tile[0, sl])] = -1
+            s2.major_unit_tile[0, sl] = at
+            s2.military_at[0, at] = sl + s2.POOL_LO["major"]
         # two plain steps' worth, in the pool's own quarter points
         s2.major_unit_mp[0, sl] = float(2 * s2._mp_scale * s2._mp_scale)
         sm = s2._seat_slot_map(row)[0]
@@ -190,27 +196,44 @@ def main() -> None:
     # Find a direction that is legal NOW but illegal from where it lands, so the
     # refusal happens mid-sequence rather than at rank 0 — that is the case the
     # walk has to get right.
-    # The probe runs FIRST and hands out two ints (the direction and the tile
-    # one step of it reaches), so the sim under test is restored AFTER the
-    # search and the whole scene lives on the one base.
+    # The loaded world decides where such a step exists: the probe tries the
+    # soldier's own tile first, then free land tiles nearest it, and the mask
+    # judges every step. It runs FIRST and hands out three ints (the start,
+    # the direction and the tile one step of it reaches), so the sim under
+    # test is restored AFTER the search and the whole scene lives on the one
+    # base.
+    s5b, sl5b, _, _ = setup()
+    home = int(s5b.major_unit_tile[0, sl5b])
+    starts = [None] + sorted(
+        (t for t in range(s5b.T)
+         if t != home and bool(s5b.passable[0, t]) and not bool(s5b.water[0, t])
+         and int(s5b.military_at[0, t]) < 0),
+        key=lambda t: int(s5b.pair_dist[home, t]),
+    )
     dead = None
-    for d in range(6):
-        probe, slp, rwp, nrp = setup()
-        if not bool(probe._seat_unit_mask(row)[0, rwp][d]):
-            continue
-        probe.apply_seat_unit_sequence(row, seq_of([d], nrp, rwp))
-        if not bool(probe._seat_unit_mask(row)[0, rwp][d]):
-            dead = (d, int(probe.major_unit_tile[0, slp]))
+    for at in starts:
+        for d in range(6):
+            probe, slp, rwp, nrp = setup(at)
+            if not bool(probe._seat_unit_mask(row)[0, rwp][d]):
+                continue
+            t0 = int(probe.major_unit_tile[0, slp])
+            probe.apply_seat_unit_sequence(row, seq_of([d], nrp, rwp))
+            t1 = int(probe.major_unit_tile[0, slp])
+            assert t1 != t0, f"a legal step {d} from {t0} did not move the unit"
+            if not bool(probe._seat_unit_mask(row)[0, rwp][d]):
+                dead = (at, d, t1)
+                break
+        if dead is not None:
             break
-    assert dead is not None, "no direction becomes illegal after one step — pick another fixture"
-    d_dead, stop_tile = dead
-    s7, sl7, rw7, nrows3 = setup()
+    assert dead is not None, "no land tile has a direction that becomes illegal after one step"
+    at_dead, d_dead, stop_tile = dead
+    s7, sl7, rw7, nrows3 = setup(at_dead)
     s7.apply_seat_unit_sequence(row, seq_of([d_dead, d_dead], nrows3, rw7))
     assert int(s7.major_unit_tile[0, sl7]) == stop_tile, (
         f"the walk did not stop at the illegal rank — ended {int(s7.major_unit_tile[0, sl7])}, "
         f"expected {stop_tile}"
     )
-    print(f"  5b the walk STOPS at an illegal later step (dir {d_dead}, halted at {stop_tile}) OK")
+    print(f"  5b the walk STOPS at an illegal later step (from {home if at_dead is None else at_dead}, dir {d_dead}, halted at {stop_tile}) OK")
 
     # -- 6: a NON-MOVE verb at rank 0 consumes the turn ---------------------
     # PILLAGE then a move: the move must NOT happen (mp spent), which is what
