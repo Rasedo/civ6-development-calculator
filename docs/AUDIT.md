@@ -54,12 +54,12 @@ re-adds them.
 | C-26 civilization abilities, the residue | 1 | Trajan on a capture, the Knarr's Trader path, a damaged city as a wounded foe (LAB); the struck unit's other terms (audit) |
 | C-34 air combat's second half | 1 | the interception's strength and damage, whether a shot-down sortie is a battle (LAB) |
 | C-38 a city-state's play | 1 | quests, builders' improvements, research, coastal and naval rates, what its units attack, the levy discounts' stacking (LAB); later-era starts (no start era) |
-| C-41 Volcanic Soil | 1 | the plot condition, bonus-resource loss, Marsh / Oasis, built plots, the yield rows (LAB) |
+| C-41 Volcanic Soil | 2 | the owned-plot damage gate, the bonus-resource loss, the production and science rows (BUILD); plot vs improvement owner, Marsh / Oasis, floods and storms under the same gate (LAB) |
 | C-49 named storms | 1 | the step drops against an ocean mask, the resultants' bimodality (LAB) |
 | C-60 the Free City's own play | 1 | bankruptcy's shape, its techs, the grant's type rule, a grant with no free tile, the grants' fate on a fall (LAB) |
 | C-74 the turn's one random event, the residue | 3 | the empty mass, active volcano sites, the flood's start plot, the city-anchored drought (BUILD); Duel's normalisers, the activity clock, `CanBeFlooded`'s gate, `Spacing`, the per-site drift, the fire clock, the meteor's grant, a blizzard on a wonder, a minor's pillaged buildings (LAB) |
-| **C. Absent systems** | **14** | |
-| **OPEN, TOTAL** | **24** | |
+| **C. Absent systems** | **15** | |
+| **OPEN, TOTAL** | **25** | |
 
 ## The question ledger — owner asks
 
@@ -175,12 +175,14 @@ commit.
   - The centre strength's base is B-95's LAB tail; its terms ship for every holder.
   - BLOCKER, no start era: `BonusMinorStartingUnits`' later-era rows (Classical to Information, GS swapping Pikeman for Pike and Shot) wait on a later-era start existing on either engine.
   - LAB: the naval-buy rate (31 buys over 4,979 coastal-evidence minor turns) and the Research Lab, Stock Exchange and Broadcast Center rows the census never saw built.
-- **C-41. VOLCANIC SOIL.** Weight 1.
+- **C-41. VOLCANIC SOIL.** Weight 2.
   Both engines paint the RADIUS-1 RING as measured (`erupt` / `_erupt`): one draw per eligible plot in ring order (`soilPaintable` / `_soil_paintable` — land, no Mountain, no district, city centre or wonder, bare or Woods / Rainforest), Volcanic Soil at the severity's YIELD_FOOD row (35 / 50 / 75), replacing the Woods or Rainforest and a Lumber Mill; then they scorch (pillage) and fertilize the ring. The radius is sourced: `RealismSettings.ExtraRange` is false at MODERATE. REACHED by `tests/cpu/map/feature-add.test.ts` and the `feature_add` lane.
   The eruption's `RandomEvent_Damages` rows ship (`ERUPTION_*` over the five eruption rows, `eruptTile` / `_erupt_tile`): pillage, `IMPROVEMENT_DESTROYED`, `DISTRICT_PILLAGED`, `BUILDING_PILLAGED`, the city centre, `UNIT_DAMAGE_LAND` with its band, `UNIT_KILLED_CIVILIAN` and `POPULATION_LOSS` (only where the plot has an owning city), on every ring plot whoever owns it, with six draws per plot.
   - MEASURED, lab 4 (`volcano_scene.py`, `runs/volcano_20260923T191337Z.jsonl`, 78 eruptions): the paint is a per-plot chance applied at once — bare land 30 / 52 / 74%, Forest and Jungle 6/28, 11/28, 18/28, Floodplains and Geothermal Fissure never. The damage switched ON per plot as the run went on and then followed the rows (GENTLE pillage 3/3; CATASTROPHIC 8 destroyed + 1 pillaged; MEGACOLOSSAL 12 + 2); strategic and luxury resources were never lost (0/42), bonus resources on 21/21 painted and 9/21 unpainted plots.
   - MEASURED (C-74-S1): only ACTIVE volcanoes erupt — 239 eruptions from 47 ever-active volcanoes, 1 from the 4 never seen active (between snapshots) — and activity changes during play (C-74).
-  - LAB C-41-S1: what switches the damage on (plot ownership is the leading candidate: the scene laid improvements with owner -1); whether only bonus resources are lost and on which plots; whether Marsh and Oasis (`ValidForReplacement`) are painted; a district, centre or wonder on the ring; and the `YIELD_PRODUCTION` (15/25/35) and `YIELD_SCIENCE` (10/15) rows under Volcanic Soil, read by neither engine.
+  - MEASURED (C-41-S1, `tools/civ6lab/volcano_own.py`, `runs/volcano_own_20260926T074139Z.jsonl`, lab4_t100, 13 volcanoes x 3 severities x 3 repeats read in the same turn, 657 land ring plot-rows; each ring's improvements laid under the plot's own owner): the damage rows apply on OWNED plots only — unowned improvements intact 81/81 at every severity; owned ones pillaged 75/78 at GENTLE, destroyed 62/78 and 56/78 at CATASTROPHIC and MEGACOLOSSAL (the rest pillaged). EVERY bonus resource on the ring is lost, painted or not, owned or not (36/36); strategic resources never (36/36). A city centre and a wonder district are never pillaged; a Campus or Holy Site on the ring is, 4 / 5 / 6 of 12 by severity. Painted plots gain +1 Food, some +1 Production, and +1 Science at CATASTROPHIC and MEGACOLOSSAL only (the `YIELD_SCIENCE` 10 / 15 rows).
+  - BUILD (C-41, both engines): gate the eruption's damage rows (`eruptTile` / `_erupt_tile`: destroy, pillage, district, building, population, units) on an owned plot; remove every BONUS resource on the ring plots, whoever owns them; the `YIELD_PRODUCTION` (15 / 25 / 35) and `YIELD_SCIENCE` (0 / 10 / 15) fertility rolls on painted plots.
+  - LAB: whether the owner of the plot or of the improvement gates the damage (the scene tied them); the production and science rows' per-plot rates (fit from this record); whether Marsh and Oasis are painted (no ring in lab4_t100 holds one); whether floods and storms take the same owned-plot gate.
 - **C-49. NAMED STORMS.** Weight 1.
   `stormWalk` / `_storm_walk` ship the measured model: eight unit steps on the movement turn from the `PrevailingWinds` band at the centre's current latitude, eight more with no footprint on dissipation.
   - MEASURED (C-74-S1, 94 natural hurricanes of 205 finished storms, `runs/event_turns_*`): the persistent-heading laws die — a heading kept 16 steps predicts 16 hexes in open water and a heading per turn 16 in ~36%; no resultant reaches 16 (median 7.5, max 15), and the final `CurrentDirection` lies along the resultant in 59 of 194 (chance ~1/3). The shipped independent band walk survives: tropical hurricanes (5–30°) drift west (mean E–W −5.8), mid-latitude ones east (+5.1).
