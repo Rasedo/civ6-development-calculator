@@ -140,7 +140,8 @@ saves play on after a load); a read whose turn moved is repeated twice
   neighbouring major city's defence for contrast. Record
   `runs/freecity_def_<stamp>.jsonl`.
 - **Fit.** H2: `FREE_CITY_DEFENSE` becomes an era table in `holderStrength` /
-  `_holder_base`. H3: walls and garrison added there.
+  `_holder_strength`. H3: walls and garrison added there (`centreStrength` /
+  `_centre_strength` carry both).
 
 ### C-74-S1. The event record, turn by turn, beside the map
 - **Unknown.** Which turns are empty (turn 1 under `RANDOM_EVENT_START_TURN`
@@ -187,13 +188,13 @@ saves play on after a load); a read whose turn moved is repeated twice
 
 ### C-38-S2 (mid-game half). A minor's centre strength
 - **Unknown.** What `StartEras.StartingMeleeStrengthMinor` (25 at Ancient)
-  applies to. H1: the minor centre's base. H2: the engines' 15 + population
+  applies to. H1: the minor centre's base. H2: 15 + population
   + 6 (militaristic) + walls. H3: the minor's units.
 - **Reads.** In the `lab4_t50/t100/t150` saves: every minor's centre and
   Encampment `GetDefenseStrength`, population, type, walls, the units on the
   centre; the majors' centres for contrast. H1 and H2 differ by 3 or more at
   every point. The era-start half is under instrument 5.
-- **Fit.** `minorCityCS` / `_minor_centre_cs`.
+- **Fit.** the minor's base in `holderStrength` / `_holder_strength`.
 
 ## 3. Instrument 2 — deterministic previews
 
@@ -224,6 +225,26 @@ saves play on after a load); a read whose turn moved is repeated twice
   refused too) from `attackTargets` / `hostileRangedStrike` and the GPU scans
   over `_civclass_at` / `_nonbarb_unit_plane`. Same-tile condemn: the six
   directional `A_CONDEMN` actions become one own-tile action on both engines.
+- **S1's result** (`lab4_t225`, seat 0 at war with Georgia; `b89_setup.lua`,
+  `scene2_spawn.lua`, `b89_read.lua`, `b89_pairs.lua`, `b89_fire.py`; records
+  `runs/religious_target_20260926T_{read,pairs,fire}.jsonl`). No turn is
+  needed: GameCore `UnitManager.RestoreMovement` / `RestoreUnitAttacks` give a
+  unit spawned this turn its moves and target lists. `CombatManager.
+  CanAttackTarget(att, def, CombatTypes.X)` (UnitPanel.lua:3598) answers the
+  same in GameCore and InGame, for AI and barbarian attackers too, and ignores
+  range. Ranged (Crossbowman, Archer; seat 0, Georgia, barbarians) and the
+  walled city's strike: refused against Missionary, Apostle and Builder alike
+  (`SimulateAttackVersus` nil, `CanStartOperation` / `CanStartCommand` false,
+  absent from the target lists; fired requests did nothing), accepted against
+  every combat unit. Melee (Swordsman, Warrior; all three owners): accepted,
+  but it is a MOVE ONTO the tile — the preview reads defender strength 0,
+  damage 0; fired, the Swordsman shared the Missionary's tile and the
+  Missionary was untouched; onto a Builder it CAPTURED it. Condemn Heretic is
+  same-tile: `CanStartCommand` false (loose and real) from every adjacent
+  tile, true on the heretic's tile (spawned there, or moved in by the melee
+  order); fired, the religious unit dies and the condemner's moves go to 0.
+  One endturn with a barbarian Warrior on a seat-0 Missionary's tile: the
+  Missionary and Apostle survived, a barbarian Swordsman captured the Builder.
 
 ### C-20-S1 (with C-26-S3). The route's transportation efficiency
 - **Sourced already.** `Expansion2_GlobalParameters.xml` 274–282:
@@ -253,6 +274,31 @@ saves play on after a load); a read whose turn moved is repeated twice
   Navigation but not Cartography (`SetTech`); read `GetTradeRoutePath` across
   Ocean and count OCEAN plots; control on a fresh load without the attach.
   Fit: a Norway branch in `tradeWaterLevel` and its GPU twin.
+- **S1's result** (`trade_path.lua`, `c20_step.py`, `trade_sweep.lua`,
+  `trade_eff_fit.py`, `trade_eff_alt.py`; records
+  `runs/trade_path_20260926T_c20.jsonl`, `runs/trade_sweep_20260926T.jsonl`).
+  `GetTradeRoutePath` takes ANY origin player, returns the plots and two
+  per-plot arrays (portal entrance / exit, -1 = none); the path gold is
+  fractional. Railroads laid one plot at a time (`WorldBuilder.MapManager():
+  SetRouteType`) on three routes of 6, 10 and 15 plots add exactly
+  D·floor(256·2/n)/256 per plot and stop at D. The whole map's 2,493 pathed
+  routes (every major's origin, lab4_t225, seat 0 given every tech) then fit
+  exactly, 1,948 of 1,948 rows with gold:
+  P = D·min(1, floor(256·S/n)/256) + (foreign cities on the path, destination
+  included, where the origin holds an ACTIVE trading post), S = 2·water plots
+  + 2·railroad plots (origin plot excluded, destination included) + 15 per
+  portal entrance, n = every plot of the path, D = the destination
+  districts' gold (`…FromPotentialRoute`). Each single change breaks 89–1,307
+  rows; `_SCORE_MULTIPLE_DOMAINS` 15 enters nowhere (171 unsaturated rows with
+  a land↔water switch). A Mountain Tunnel placed by `ImprovementBuilder`
+  (WorldBuilder refuses it) created no portal the path used.
+- **C-26-S3's result** (`runs/trade_path_20260926T_c26s3.jsonl`). The
+  control already crosses Ocean: seat 0 with Shipbuilding and Celestial
+  Navigation and no Cartography, Tikal → Opango runs 24 plots with 5 OCEAN
+  plots although a coast-only line exists; after
+  `AttachModifierByID("TRAIT_EARLY_OCEAN_NAVIGATION")` the path is plot for plot
+  the same. The Trader's path is not gated on Cartography at all, so
+  Norway's clause has nothing to add.
 
 ### C-34-S1. Patrol and Priority Target by preview
 - **Sourced already.** Patrol is `UNITOPERATION_DEPLOY`; the pedia's Air
@@ -275,6 +321,32 @@ saves play on after a load); a read whose turn moved is repeated twice
 - **Fit.** A deployed air state with interception (tile, radius, +5 support,
   abort) in `airStrike` / `airPillage` / `_air_strike`; a priority flag in the
   air-strike record and in `stackDefender`'s pick.
+- **S1's result** (`lab4_t225`, seat 0 given every tech; Georgia's bomber into
+  seat-0 Warriors under seat-0 patrols; `scene2_op.lua`, `air_preview.lua`,
+  `c34_step.py`, `c34_strike.py`, `c34_bomb50.py`, `air_summary.py`; records
+  `runs/air_patrol_20260926T.jsonl`, `runs/air_strike_20260926T.jsonl`,
+  `runs/air_bomb50_20260926T.jsonl`). DEPLOY works from the tuner only after a
+  REBASE: an aircraft spawned by `Create` (or standing in an over-full base)
+  has no DEPLOY targets; rebased, then `RestoreMovement`, it deploys and reads
+  `ACTIVITY_INTERCEPT`. A non-local attacker previews fully once the target
+  is VISIBLE to its owner (a spotter unit). Measured: radius 1 (d0, d1
+  intercept, d2 none); stationed fighters (city, airstrip) never intercept;
+  the interception is a TWO-SIDED combat at the ordinary law — interceptor
+  strength = its Combat (Biplane 80, not its Ranged 75), the bomber defends
+  with its Combat (85), both take damage (e.g. 34 to the bomber, 27 to the
+  fighter at Δ3); each other covering patrol adds +5·hp/100 (+10 for two
+  full, +7.5 with one at 50 HP); the pick is the patrol ON the struck tile
+  even when wounded or weaker (a Fighter on the tile over an adjacent Jet),
+  and among equidistant patrols the stronger (the Jet over a Fighter). The
+  AA gun on a struck stack fires first (one draw), then the strike (a second
+  draw) at the bomber's post-burst health; a lone AA gun is the defender (two
+  draws: its damage, then the bomber's). PRIORITY_TARGET, fired
+  (`RequestCommand(u, UnitCommandTypes.PRIORITY_TARGET, {PARAM_X, PARAM_Y})`),
+  does NOT match its preview: 5 of 5 strikes dealt a flat 65 to the AA gun
+  (`COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT` 65; 0→65, 30→95), no draw consumed, no
+  damage to the bomber, whatever its health. The bomb's line: an unoccupied
+  Holy Site under AA cover was pillaged at 51 and 50 HP left, not at 49, 48,
+  46 — "50% health or higher".
 
 ### B-86-S2. The emergency term against an anti-air sortie
 Needs an emergency (B-86-S0, instrument 4). While one runs:
@@ -287,6 +359,19 @@ on the block ID). If S0 fails, the Military alliance's
 and shows at least whether the AA burst counts as unit-against-unit. Fit: the
 emergency term (`emergencyAttackCS` and its GPU twin) in the anti-air answer
 in `cpu/core/air.ts`, or "measured: none".
+
+**S2's result.** The gate is unmet in `lab4_t225`: the running emergencies
+are Religious (target Nubia) and the Nobel Prize, neither with a combat
+term. The fallback ran: GameCore `SetPermanentAlliance(4, 3)` (with
+`SetHasAllied`) makes seat 0 and Egypt a level-1 MILITARY alliance
+(`GetAllianceType` 3; `SetHasAllied` alone gives 0, Research), Egypt declared
+on Georgia. The bomber's "+5 from the military alliance" then appears twice
+in its preview, and the AA burst it takes fell from 80 to 66 (95 against 70,
+then 75) — the anti-air answer is a unit-against-unit combat
+(`REQUIRES_COMBAT_UNIT_VS_UNIT` holds); four real strikes matched the
+alliance preview draw for draw. The interception fight takes the same +5.
+Which side is the "attacker" in the burst (the emergency modifiers split
+attacker / defender) is not shown by a role-free term.
 
 ## 4. Instrument 3 — forced events, read in the same turn
 
