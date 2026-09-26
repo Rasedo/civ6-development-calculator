@@ -56,7 +56,7 @@ re-adds them.
 | C-41 Volcanic Soil | 1 | the plot condition, bonus-resource loss, Marsh / Oasis, built plots, the yield rows (LAB) |
 | C-49 named storms | 1 | the per-step heading law (LAB) |
 | C-60 the Free City's own play | 1 | bankruptcy's shape, its defence across eras, its techs, the grant's type rule, a grant with no free tile, the grants' fate on a fall (LAB) |
-| C-74 the turn's one random event, the residue | 1 | the empty turns, what a site is, `Spacing`, the first-time boost, the warming form, the drought's start and shield, the fire clock, the meteor's grant, a blizzard on a wonder (LAB) |
+| C-74 the turn's one random event, the residue | 1 | the empty turns, what a site is, `Spacing`, the first-time boost, the warming form, the drought's start and shield, the fire clock, the meteor's grant, a blizzard on a wonder, a minor's pillaged buildings (LAB) |
 | **C. Absent systems** | **11** | |
 | **OPEN, TOTAL** | **20** | |
 
@@ -192,6 +192,7 @@ commit.
   Eyjafjallajokull and Vesuvius stand in the natural-wonder roster (`world/features.ts`, `world/wonders.ts`); a wonder's terrain list and inland rule hold for every plot it covers. In the locked worlds Vesuvius stands on five seeds (9027, 9209, 9235, 9287, 9300) and Eyjafjallajokull on none — the placement rules put it on about 5% of maps.
   Kilimanjaro stands on a lone Mountain as its rows say, and every wonder's placement reads its own rows (B-94).
   - LAB: whether a Blizzard starts on a Tundra wonder plot (`stormFamilyAt` reads terrain alone).
+  - LAB: a disaster's BUILDING_PILLAGED on a city-state's district, and how the minor repairs it. Both engines pillage the buildings of a major's and a Free City's district (`pillageTileBuildings` / `_pillage_tile_buildings`); a minor's buildings stand, since nothing in its play repairs one.
   - LAB: the fire clock (regrowth at turn 6 by the Yields row, 8 by the notification; whether spread plots share the event's clock; whether a Forest Fire spreads into Rainforest); the meteor's grant ("a more powerful unit" of the class) and who may claim a site; the fire features are `ValidForReplacement` yet an eruption does not paint them (with Marsh and Oasis, C-41).
   - LAB C-74-S1 / S2: the empty turns — the normaliser and the map factor, measured at Duel, the engine's own size; what a site is (active volcanoes under `PercentVolcanoesActive` 70; a river or a floodplain plot); `Spacing` 15 (a distance or a gap); `RANDOM_EVENT_FIRST_TIME_OCCURRENCE_BOOST` 30. Also: whether warming steps by half degrees or can fall (both engines read ΔT continuous); the drought's start (the tooltip's "devoid of all Features", shipped, against the pedia's "four featureless Grassland/Plains tiles adjacent"); whether a pillaged shield protects and which plots count as the city's.
 

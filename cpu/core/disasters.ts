@@ -91,7 +91,7 @@ function pillageTileBuildings(state: GameState, tile: Tile): void {
 
 /** the city whose registry holds the district standing on this tile. */
 function cityHoldingDistrict(state: GameState, tile: Tile): City | undefined {
-  for (const s of state.seats) {
+  for (const s of cityHolders(state)) {
     for (const c of s.cities) {
       if (c.districts.some((d) => d.tileIndex === tile.index)) return c;
     }

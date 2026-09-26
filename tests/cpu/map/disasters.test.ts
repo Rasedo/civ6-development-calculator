@@ -778,6 +778,28 @@ describe('the drought\'s rules', () => {
   });
 });
 
+describe('a Free City\'s district buildings', () => {
+  it('an eruption pillages them as it pillages a major\'s', () => {
+    const state = makeState(makeMap(18, 18));
+    const v = tileAtCoords(state.map, 8, 8);
+    v.elevation = 'MOUNTAIN';
+    v.volcano = true;
+    const ring = neighbors(state.map, v);
+    const city = settleAt(state, ring[0].index);
+    const site = ring[1];
+    site.district = 'HOLY_SITE';
+    site.districtComplete = true;
+    setTileOwner(site, 0);
+    site.ownerCity = city.id;
+    city.districts.push({ type: 'HOLY_SITE', tileIndex: site.index });
+    city.buildings.push('SHRINE');
+    transferCity(state, 0, freeSeatOf(state), city, 'revolted');
+    const free = state.freeSeat!.cities[0];
+    erupt(state, [v], volcanoRow(0));
+    expect(free.pillagedBuildings).toEqual(['SHRINE']);
+  });
+});
+
 describe('a Free City\'s reactor', () => {
   it('keeps its clock through the flip, ages on, and is an accident site', () => {
     const state = makeState(makeMap(18, 18, 'COAST'));
