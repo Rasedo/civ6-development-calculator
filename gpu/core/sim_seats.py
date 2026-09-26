@@ -3939,7 +3939,13 @@ class SimSeats:
         return self._job_mask_core(self.civ_techs[:, row], self.civ_civics[:, row], self.tile_seat == row, row)
 
     def _job_mask_core(self, tk: torch.Tensor, cv: torch.Tensor, owned: torch.Tensor, row: int) -> torch.Tensor:
+        # CIV6 (LOC_UNITOPERATION_IMPROVEMENT_BLOCKED_BY_DROUGHT): a drought's
+        # own improvements wait for the rain (`droughtBars`, the filter over
+        # every row `validImprovementsIn` returns)
+        dry = self.drought > 0
         ok = self._farm_ground(row, cv)
+        if self.FARM in self._drought_imps:
+            ok = ok & ~dry
         if self.MINE >= 0 and self._mine_unlock_tech >= 0:
             ok = ok | (self._plane_seen("mine_ok", row) & tk[:, self._mine_unlock_tech].unsqueeze(1))
         if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0:
@@ -3961,6 +3967,8 @@ class SimSeats:
             if _gc >= 0:
                 _gok = _gok & cv[:, _gc].unsqueeze(1)
             _gok = _gok & self._imp_gov_ok(row, _g)
+            if _g in self._drought_imps:
+                _gok = _gok & ~dry
             ok = ok | _gok
         # THE WATER-ONLY rows (the Offshore Wind Farm): a water plot with no
         # resource to insist on a different improvement, on the row's own
@@ -3978,11 +3986,16 @@ class SimSeats:
                 _wok = _wok & tk[:, _wu].unsqueeze(1)
             if _wc >= 0:
                 _wok = _wok & cv[:, _wc].unsqueeze(1)
+            if _w in self._drought_imps:
+                _wok = _wok & ~dry
             ok = ok | _wok
         new_res = self.res_imp >= 3
         if bool(new_res.any()):
             unlocked = tk.gather(1, self._imp_unlock[self.res_imp.clamp(min=0)].clamp(min=0))
-            ok = ok | (new_res & unlocked)
+            res_dry = torch.zeros_like(new_res)
+            for i in self._drought_imps:
+                res_dry |= self.res_imp == i
+            ok = ok | (new_res & unlocked & ~(res_dry & dry))
         return (
             owned
             & (self.improvement < 0)

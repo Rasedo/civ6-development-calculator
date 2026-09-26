@@ -429,6 +429,16 @@ def main() -> int:
     assert bool(s._drought_barred()[0, t]), "a drought bars its own improvement"
     s.improvement[0, t] = s.MINE
     assert not bool(s._drought_barred()[0, t]), "...and no other"
+    # ...and a Builder finds no job on a Farm plot the drought holds
+    # (`builderJobAt` reads `validImprovementsIn`, which drops the Farm)
+    s = fresh(rules)
+    farm_only = (s._seat_job_mask(0)[0] & s._farm_ground(0)[0] & ~s.mine_ok[0] & ~s.lumber_ok[0]
+                 & (s.res_imp[0] <= 0) & ~s.pillaged[0] & ~s.district_pillaged[0])
+    t = int(farm_only.nonzero()[0][0])
+    s.drought[0, t] = 3
+    assert not bool(s._seat_job_mask(0)[0, t]), "a drought's Farm plot is a Builder job"
+    s.drought[0, t] = 0
+    assert bool(s._seat_job_mask(0)[0, t]), "the rain gives the job back"
     # the shield: a plot's city with a complete Aqueduct keeps its food
     s = fresh(rules)
     owned = (s.tile_seat[0] == 0) & (s.centre_slot_at[0] < 0) & ~s.water[0] & (s.district[0] < 0)
