@@ -40,12 +40,18 @@ for d = 0, 5 do
       local ok, v = pcall(function() return CityManager.GetDistrictAt(p):IsPillaged() end)
       dp = ok and tostring(v) or "\\"err\\""
     end
+    local iown = "null"
+    if im >= 0 then
+      local ok, v = pcall(function() return p:GetImprovementOwner() end)
+      iown = (ok and type(v) == "number") and tostring(v) or "\\"err\\""
+    end
     print("{\\"i\\":" .. p:GetIndex() .. ",\\"water\\":" .. tostring(p:IsWater()) .. ",\\"hills\\":" .. tostring(p:IsHills())
       .. ",\\"mountain\\":" .. tostring(p:IsMountain()) .. ",\\"owner\\":" .. p:GetOwner()
       .. ",\\"f\\":\\"" .. (f >= 0 and GameInfo.Features[f].FeatureType or "-") .. "\\""
       .. ",\\"r\\":\\"" .. (r >= 0 and GameInfo.Resources[r].ResourceType or "-") .. "\\",\\"rc\\":\\"" .. cls .. "\\""
       .. ",\\"im\\":\\"" .. (im >= 0 and GameInfo.Improvements[im].ImprovementType or "-") .. "\\""
       .. ",\\"pil\\":" .. tostring(im >= 0 and p:IsImprovementPillaged())
+      .. ",\\"iown\\":" .. iown
       .. ",\\"d\\":\\"" .. (di >= 0 and GameInfo.Districts[di].DistrictType or "-") .. "\\""
       .. ",\\"dpil\\":" .. dp .. "}")
   end
@@ -74,7 +80,7 @@ if r ~= "-" then ResourceBuilder.SetResourceType(p, GameInfo.Resources[r].Index,
 else ResourceBuilder.SetResourceType(p, -1) end
 ImprovementBuilder.SetImprovementType(p, -1)
 local imp = "IMP"
-if imp ~= "-" then ImprovementBuilder.SetImprovementType(p, GameInfo.Improvements[imp].Index, p:GetOwner()) end
+if imp ~= "-" then ImprovementBuilder.SetImprovementType(p, GameInfo.Improvements[imp].Index, IOWN) end
 print("ok")
 """
 
@@ -97,7 +103,13 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--repeats", type=int, default=3)
+    p.add_argument("--imp-owner", choices=("plot", "swap"), default="plot",
+                   help="lay each improvement under the plot's owner, or swapped: none on an owned plot, "
+                        "player 0 on an unowned one")
+    p.add_argument("--wetlands", action="store_true",
+                   help="set Marsh on every second bare flat plot and Oasis on every third, instead of an improvement")
     a = p.parse_args(argv)
+    iown = "p:GetOwner()" if a.imp_owner == "plot" else "(p:GetOwner() >= 0 and -1 or 0)"
     t = Tuner(a.host).connect()
     erupt = (pathlib.Path(__file__).parent / "volcano_erupt.lua").read_text(encoding="utf-8")
     volcanoes = [tuple(map(int, ln.split())) for ln in t.run(GC, vs.LUA_LIST) if ln.strip()]
@@ -109,15 +121,19 @@ def main(argv=None) -> int:
         for rep in range(a.repeats):
             for sev in vs.SEVERITIES:
                 for v in volcanoes:
-                    for pl in base[v]:
+                    for k, pl in enumerate(base[v]):
                         if pl["water"] or pl["mountain"] or pl["d"] != "-":
                             continue
                         f = "-" if pl["f"] == "FEATURE_VOLCANIC_SOIL" else pl["f"]
                         imp = "-"
                         if f == "-" and pl["r"] == "-":
                             imp = "IMPROVEMENT_MINE" if pl["hills"] else "IMPROVEMENT_FARM"
+                            if a.wetlands and not pl["hills"] and k % 3 == 0:
+                                f, imp = "FEATURE_OASIS", "-"
+                            elif a.wetlands and not pl["hills"] and k % 2 == 0:
+                                f, imp = "FEATURE_MARSH", "-"
                         t.run(GC, LUA_RESET.replace("PI", str(pl["i"])).replace("BF", f)
-                              .replace("BR", pl["r"]).replace("IMP", imp))
+                              .replace("BR", pl["r"]).replace("IMP", imp).replace("IOWN", iown))
                     before = {x["i"]: x for x in ring(t, *v)}
                     yb = yields(t, *v)
                     res = t.run(GC, erupt.replace("EVENT", sev).replace("VX", str(v[0])).replace("VY", str(v[1])))
