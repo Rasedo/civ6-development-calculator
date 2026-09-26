@@ -1,0 +1,2 @@
+{"turn":150,"winner":"err","alive":{"0":false,"1":true,"2":true,"3":true,"4":true,"5":true,"6":true,"7":true}}
+{"kind": "game_over", "turn": 150, "target": 153, "why": "defeat", "winner": null, "alive": false, "menu": true, "more": false}

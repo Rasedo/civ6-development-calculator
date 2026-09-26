@@ -1,0 +1,12 @@
+{
+  "save": "lab4_t150", "tag": "bds2_policy", "turns": 8, "controls": 2,
+  "pre":  [{"state": "InGame", "file": "policy_cost.lua"}],
+  "each": [{"state": "InGame", "file": "policy_cost.lua"}],
+  "post": [],
+  "arms": [
+    {"name": "tech_plus1", "gc": "bds2_techs.lua", "set": {"ZN": "1"}},
+    {"name": "tech_plus2", "gc": "bds2_techs.lua", "set": {"ZN": "2"}},
+    {"name": "tech_plus3", "gc": "bds2_techs.lua", "set": {"ZN": "3"}},
+    {"name": "tech_plus5", "gc": "bds2_techs.lua", "set": {"ZN": "5"}}
+  ]
+}

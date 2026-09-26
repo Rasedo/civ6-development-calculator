@@ -26,7 +26,11 @@ Two ways to pass the turns:
   else is read.
 While a turn stands still, `lab.wait_turn` reads what holds it (a blocker,
 an open session, a visible screen) and answers the cause at once, with the
-blind sweep only after 30 s with no named cause.
+blind sweep only after 30 s with no named cause. A game that ENDS first (the
+seat defeated, or a victory: `lab.endgame`) is written to every reader's log
+as a `game_over` line with its turn, and the watch proceeds to `--at-end`;
+a victory whose end screen offers Just One More Turn while the seat lives is
+played through instead, so the watch reaches its target.
 `--at-end` then decides the game's fate: `menu` exits to the main menu
 (ready for the next game), `close` ends this instance's process, `stay`
 leaves it. `--min-free-mb` stops the run (saving first) when the box's free
@@ -36,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import pathlib
 import subprocess
 import sys
@@ -124,12 +129,21 @@ def main(argv=None) -> int:
         while last < target:
             try:
                 if a.observer:
-                    tn = lab.wait_turn(t, last, -1, a.wait, log)
+                    tn = lab.wait_turn(t, last, -1, a.wait, log, one_more_turn=True)
                     if tn >= target:
                         # the game plays on by itself: stop it before any read
                         log("    " + t.run(IG, LUA_HALT)[-1])
                 else:
-                    tn = lab.advance(t, "autoplay", lp, a.wait, log)
+                    tn = lab.advance(t, "autoplay", lp, a.wait, log, one_more_turn=True)
+            except lab.GameOver as e:
+                # a defeat, or a victory with no Just One More Turn to play
+                # through: the game has ended short of the target
+                rec = json.dumps({"kind": "game_over", "turn": lab.turn(t), "target": target, **e.info})
+                log(f"    {rec}")
+                for fh in handles:
+                    fh.write(rec + "\n")
+                    fh.flush()
+                break
             except TunerError as e:
                 log(f"    {e} - reconnecting")
                 t.close()

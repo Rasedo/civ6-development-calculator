@@ -28,6 +28,8 @@ missing one:
      "size": "MAPSIZE_STANDARD", "city_states": 12, "realism": 2,
      "map_seed": 1234, "game_seed": 5678, "start_era": "ERA_ANCIENT",
      "turn_limit": "none", "all_ai": false, "majors": 6}
+`max_turns` sets a CUSTOM turn limit (the score victory's turn; a running
+game ignores a later change);
 `realism` is Gathering Storm's disaster intensity (GAME_REALISM, 0-4, default 2);
 `majors` overrides the map size's default number of major civs; `all_ai` turns the human slot into an AI one, for an observer-only autoplay
 game (the smoke test does the same). The keys map onto the install's
@@ -198,6 +200,12 @@ if cfg.map_seed then try("map_seed", function() MapConfiguration.SetValue("RANDO
 if cfg.game_seed then try("game_seed", function() GameConfiguration.SetValue("GAME_SYNC_RANDOM_SEED", cfg.game_seed) end) end
 if cfg.start_era then try("start_era", function() GameConfiguration.SetStartEra(cfg.start_era) end) end
 if cfg.turn_limit == "none" then try("turn_limit", function() GameConfiguration.SetTurnLimitType(TurnLimitTypes.NONE) end) end
+if cfg.max_turns then
+  try("max_turns", function()
+    GameConfiguration.SetTurnLimitType(TurnLimitTypes.CUSTOM)
+    GameConfiguration.SetMaxTurns(cfg.max_turns)
+  end)
+end
 if cfg.all_ai then
   try("all_ai", function()
     for _, id in ipairs(GameConfiguration.GetHumanPlayerIDs()) do

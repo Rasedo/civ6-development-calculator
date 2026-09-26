@@ -1,0 +1,12 @@
+{
+  "save": "lab4_t150", "tag": "b82s3b", "turns": 1, "controls": 1,
+  "pre":  [],
+  "post": [{"state": "InGame", "file": "lab5_survey.lua"}, {"state": "GameCore", "file": "b82s3_gc.lua"}],
+  "arms": [
+    {"name": "bigben_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "54", "ZY": "11", "ZWHAT": "BUILDING_BIG_BEN"}},
+    {"name": "alhambra_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "54", "ZY": "11", "ZWHAT": "BUILDING_ALHAMBRA"}},
+    {"name": "mahabodhi_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "54", "ZY": "11", "ZWHAT": "BUILDING_MAHABODHI_TEMPLE"}},
+    {"name": "goteborg_potala_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "73", "ZY": "12", "ZWHAT": "BUILDING_POTALA_PALACE"}},
+    {"name": "thebes_palace_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "23", "ZY": "19", "ZWHAT": "BUILDING_PALACE"}}
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "save": "b82s4_t6", "tag": "b82s4_tie", "turns": 1, "controls": 0,
+  "pre":  [],
+  "post": [{"state": "InGame", "file": "lab5_survey.lua"}, {"state": "GameCore", "file": "lab5_endgame_probe.lua"}],
+  "arms": [
+    {"name": "p1_pop2_p0_era1", "gc": "b82s3_arm.lua", "set": {"ZKIND": "pop", "ZX": "37", "ZY": "11", "ZWHAT": "2"},
+     "steps": [{"file": "b82s3_arm.lua", "set": {"ZKIND": "era", "ZX": "8", "ZY": "9", "ZWHAT": "1"}}]},
+    {"name": "p1_pop2_p0_era1_rep", "burn": 0, "gc": "b82s3_arm.lua", "set": {"ZKIND": "pop", "ZX": "37", "ZY": "11", "ZWHAT": "2"},
+     "steps": [{"file": "b82s3_arm.lua", "set": {"ZKIND": "era", "ZX": "8", "ZY": "9", "ZWHAT": "1"}}]}
+  ]
+}

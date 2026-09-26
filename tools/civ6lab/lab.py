@@ -339,12 +339,73 @@ def _seat(lua: str, lp: int) -> str:
     return lua.replace("ZSEAT", str(lp))
 
 
+# The end of a game, read two ways: GameCore's winner (`Game.GetWinningTeam()`
+# reads nil until a team has won) and the seat's `IsAlive()`; and the
+# EndGameMenu context (its own Lua state), shown for the local seat's defeat
+# or any team's victory while a seat is local. Its "Just One More Turn"
+# (`BackButton`) is enabled only while the seat lives and is no observer
+# (EndGameMenu.lua `UpdateButtonStates`); `OnBack` is that button's handler.
+LUA_ENDGAME_GC = """
+local ok, w = pcall(function() return Game.GetWinningTeam() end)
+local alive = "none"
+if ZSEAT >= 0 and Players[ZSEAT] ~= nil then alive = tostring(Players[ZSEAT]:IsAlive()) end
+print("endgame winner " .. tostring(ok and w or "err") .. " alive " .. alive)
+"""
+LUA_ENDGAME_UI = """
+if ContextPtr:IsHidden() then print("endmenu hidden") return end
+print("endmenu shown more " .. tostring(not Controls.BackButton:IsDisabled() and not Controls.BackButton:IsHidden()))
+"""
+ENDGAME_STATE = "EndGameMenu"
+LUA_ONE_MORE_TURN = 'OnBack(); print("one more turn")'
+
+
+class GameOver(RuntimeError):
+    """The game has ended for the watched seat (defeat) or for everyone (a
+    victory); `info` is `endgame`'s read."""
+
+    def __init__(self, info: dict):
+        super().__init__(f"game over: {info}")
+        self.info = info
+
+
+def endgame(t: Tuner, lp: int) -> dict | None:
+    """The end of the game, or None while it goes on: {"why": "defeat" |
+    "victory", "winner": team or None, "alive": the seat's IsAlive,
+    "menu": the end screen shown, "more": its Just One More Turn enabled}."""
+    words = t.run(GC, _seat(LUA_ENDGAME_GC, lp))[-1].split()
+    winner = None if words[2] in ("nil", "err") else int(float(words[2]))
+    alive = {"true": True, "false": False}.get(words[4])
+    menu, more = False, False
+    if ENDGAME_STATE in t.states:
+        try:
+            out = t.run(ENDGAME_STATE, LUA_ENDGAME_UI, timeout=5)[-1].split()
+            menu = out[1] == "shown"
+            more = menu and out[-1] == "true"
+        except (TunerError, IndexError):
+            pass
+    if alive is False:
+        why = "defeat"
+    elif winner is not None:
+        why = "victory"
+    elif menu:
+        why = "defeat" if not more else "victory"
+    else:
+        return None
+    return {"why": why, "winner": winner, "alive": alive, "menu": menu, "more": more}
+
+
 def diagnose(t: Tuner, lp: int) -> list[tuple[str, str]]:
     """What holds the turn, as (kind, name) causes: the seat's first end-turn
     blocker ("blocker"), each open diplomacy session with the seat
     ("session", "<player>:<id>"), and each visible screen ("popup", its
-    context). With no seat (lp < 0, an observer game) only the screens."""
+    context). With no seat (lp < 0, an observer game) only the screens. A
+    finished game (`endgame`) comes first: ("endgame", its read as JSON)."""
     causes: list[tuple[str, str]] = []
+    over = endgame(t, lp)
+    if over is not None:
+        causes.append(("endgame", json.dumps(over)))
+        if over["why"] == "defeat":
+            return causes
     if lp >= 0:
         name = t.run(IG, _seat(LUA_BLOCKER, lp))[-1].split()[-1]
         if name != "none":
@@ -408,8 +469,12 @@ def unstick(t: Tuner, lp: int) -> list[str]:
 
 def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None] = print,
               nudge: Callable[[], None] | None = None, session_lua: str | None = None,
-              first: float = 5.0, poll: float = 3.0, blind: float = 30.0, ai_blockers: float = 15.0) -> int:
-    """Wait for the turn counter to pass `t0` and return the new turn. Once
+              first: float = 5.0, poll: float = 3.0, blind: float = 30.0, ai_blockers: float = 15.0,
+              one_more_turn: bool = False) -> int:
+    """Wait for the turn counter to pass `t0` and return the new turn. A
+    finished game raises `GameOver` — unless `one_more_turn` and the end
+    screen offers Just One More Turn, which is then pressed and the game
+    plays on (and a victory already played past is ignored). Once
     the turn has stood `first` seconds, every `poll` seconds `diagnose` reads
     what holds it and each named cause is answered at once (`handle`) and
     logged by name — except a blocker the seat's AI answers itself under
@@ -444,6 +509,17 @@ def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None
                 causes = []
             acted = False
             for c in causes:
+                if c[0] == "endgame":
+                    info = json.loads(c[1])
+                    if one_more_turn and info["menu"] and info["more"]:
+                        log(f"    cause endgame {c[1]} -> "
+                            + t.run(ENDGAME_STATE, LUA_ONE_MORE_TURN, timeout=5)[-1])
+                        acted = True
+                        continue
+                    if one_more_turn and not info["menu"] and info["why"] == "victory" and info["alive"]:
+                        continue  # a game already extended past its victory plays on
+                    log(f"    cause endgame {c[1]}: the game is over")
+                    raise GameOver(info)
                 if c[0] == "blocker" and c[1] != COMMEMORATION and now - start < ai_blockers:
                     continue
                 try:
@@ -473,8 +549,9 @@ def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None
 
 
 def advance(t: Tuner, how: str, lp: int, wait: float, log: Callable[[str], None] = print,
-            session_lua: str | None = None, **waits: float) -> int:
-    """Move the game ONE turn and return the new turn number. `autoplay`
+            session_lua: str | None = None, one_more_turn: bool = False, **waits: float) -> int:
+    """Move the game ONE turn and return the new turn number (`GameOver`
+    when the game has ended; `one_more_turn` as in `wait_turn`). `autoplay`
     hands the seat to the AI for one turn; `endturn` answers the seat's
     blocker (`unblock.lua`) and requests the end of the turn, again after
     each answered cause and every 20 s. `session_lua` and `waits` (first,
@@ -497,10 +574,10 @@ def advance(t: Tuner, how: str, lp: int, wait: float, log: Callable[[str], None]
 
     if how == "autoplay":
         log("    " + t.run(GC, LUA_AUTOPLAY % lp)[0])
-        return wait_turn(t, t0, lp, wait, log, session_lua=session_lua, **waits)
+        return wait_turn(t, t0, lp, wait, log, session_lua=session_lua, one_more_turn=one_more_turn, **waits)
     log("    " + t.run(IG, _seat(UNBLOCK.read_text(encoding="utf-8"), lp), timeout=30)[-1])
     end_turn()
-    return wait_turn(t, t0, lp, wait, log, nudge=end_turn, session_lua=session_lua,
+    return wait_turn(t, t0, lp, wait, log, nudge=end_turn, session_lua=session_lua, one_more_turn=one_more_turn,
                      **{"first": 1.0, **waits, "ai_blockers": 0.0})
 
 
@@ -572,6 +649,8 @@ def cmd_lua(a) -> int:
     for kv in a.set or []:
         k, v = kv.split("=", 1)
         code = code.replace(k, v)
+    if a.json:
+        code = (HERE / "lab_json.lua").read_text(encoding="utf-8") + "\n" + code
     t = Tuner(a.host, a.port).connect()
     for ln in t.run(a.state, code, timeout=a.timeout):
         print(ln)
@@ -681,6 +760,7 @@ def main(argv=None) -> int:
     q.add_argument("--set", action="append", metavar="TOKEN=VALUE",
                    help="textual substitution applied to the Lua before it runs (repeatable)")
     q.add_argument("--state", default=GC)
+    q.add_argument("--json", action="store_true", help="prepend lab_json.lua (J, P, OUT)")
     q.add_argument("--timeout", type=float, default=15.0)
     q.set_defaults(fn=cmd_lua)
     s = sub.add_parser("storm", help="ASK 16: trigger a storm and record its walk")

@@ -1,0 +1,19 @@
+{
+  "save": "lab4_t150", "tag": "b82s3", "turns": 1, "controls": 2,
+  "pre":  [{"state": "GameCore", "file": "b82s3_gc.lua"}],
+  "post": [{"state": "InGame", "file": "lab5_survey.lua"}, {"state": "GameCore", "file": "b82s3_gc.lua"}],
+  "arms": [
+    {"name": "palace_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "54", "ZY": "11", "ZWHAT": "BUILDING_PALACE"}},
+    {"name": "palace_move", "gc": "b82s3_arm.lua", "set": {"ZKIND": "movepal", "ZX2": "54", "ZY2": "15", "ZX": "54", "ZY": "11", "ZWHAT": "-"}},
+    {"name": "monument_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "54", "ZY": "11", "ZWHAT": "BUILDING_MONUMENT"}},
+    {"name": "monument_pillage", "gc": "b82s3_arm.lua", "set": {"ZKIND": "pillage", "ZX": "54", "ZY": "11", "ZWHAT": "BUILDING_MONUMENT"}},
+    {"name": "goteborg_cathedral_pillaged_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "73", "ZY": "12", "ZWHAT": "BUILDING_CATHEDRAL"}},
+    {"name": "goteborg_amphitheater_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "73", "ZY": "12", "ZWHAT": "BUILDING_AMPHITHEATER"}},
+    {"name": "thebes_university_pillaged_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "23", "ZY": "19", "ZWHAT": "BUILDING_UNIVERSITY"}},
+    {"name": "thebes_temple_remove", "gc": "b82s3_arm.lua", "set": {"ZKIND": "remove", "ZX": "23", "ZY": "19", "ZWHAT": "BUILDING_TEMPLE"}},
+    {"name": "convert_iwnw_to_2", "gc": "b82s3_arm.lua", "set": {"ZKIND": "convert", "ZX": "28", "ZY": "12", "ZWHAT": "2"}},
+    {"name": "convert_bologna_to_2", "gc": "b82s3_arm.lua", "set": {"ZKIND": "convert", "ZX": "57", "ZY": "19", "ZWHAT": "2"}},
+    {"name": "convert_halifax_to_2", "gc": "b82s3_arm.lua", "set": {"ZKIND": "convert", "ZX": "65", "ZY": "16", "ZWHAT": "2"}},
+    {"name": "convert_tehokianga_to_7", "gc": "b82s3_arm.lua", "set": {"ZKIND": "convert", "ZX": "16", "ZY": "9", "ZWHAT": "7"}}
+  ]
+}
