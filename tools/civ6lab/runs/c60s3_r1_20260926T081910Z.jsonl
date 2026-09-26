@@ -1,0 +1,91 @@
+{"rings": 1, "kind": "rig", "turn": 250, "x": 69, "y": 20, "ring": 1, "water": false, "made": "UNIT_MODERN_ARMOR:4718607"}
+{"rings": 1, "kind": "rig", "turn": 250, "x": 70, "y": 20, "ring": 1, "water": true, "made": "UNIT_DESTROYER:4784142"}
+{"rings": 1, "kind": "rig", "turn": 250, "x": 68, "y": 21, "ring": 1, "water": false, "made": "UNIT_MODERN_ARMOR:4849682"}
+{"rings": 1, "kind": "rig", "turn": 250, "x": 70, "y": 21, "ring": 1, "water": true, "made": "UNIT_DESTROYER:4915209"}
+{"rings": 1, "kind": "rig", "turn": 250, "x": 69, "y": 22, "ring": 1, "water": true, "made": "skip", "units": 1}
+{"rings": 1, "kind": "rig", "turn": 250, "x": 70, "y": 22, "ring": 1, "water": true, "made": "UNIT_DESTROYER:4980747"}
+{"rings": 1, "kind": "city", "turn": 250, "owner": 62}
+{"rings": 1, "kind": "ring", "turn": 250, "x": 68, "y": 20, "ring": 2, "owner": 2, "id": 9633815, "type": "UNIT_INFANTRY", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 250, "x": 69, "y": 20, "ring": 1, "owner": 0, "id": 4718607, "type": "UNIT_MODERN_ARMOR", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 250, "x": 70, "y": 20, "ring": 1, "owner": 0, "id": 4784142, "type": "UNIT_DESTROYER", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 250, "x": 68, "y": 21, "ring": 1, "owner": 0, "id": 4849682, "type": "UNIT_MODERN_ARMOR", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 250, "x": 70, "y": 21, "ring": 1, "owner": 0, "id": 4915209, "type": "UNIT_DESTROYER", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 250, "x": 69, "y": 22, "ring": 1, "owner": 6, "id": 11599905, "type": "UNIT_NUCLEAR_SUBMARINE", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 250, "x": 70, "y": 22, "ring": 1, "owner": 0, "id": 4980747, "type": "UNIT_DESTROYER", "damage": 0}
+{"rings": 1, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"rings": 1, "kind": "city", "turn": 251, "owner": 62}
+{"rings": 1, "kind": "ring", "turn": 251, "x": 69, "y": 20, "ring": 1, "owner": 0, "id": 4718607, "type": "UNIT_MODERN_ARMOR", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 251, "x": 70, "y": 20, "ring": 1, "owner": 0, "id": 4784142, "type": "UNIT_DESTROYER", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 251, "x": 68, "y": 21, "ring": 1, "owner": 0, "id": 4849682, "type": "UNIT_MODERN_ARMOR", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 251, "x": 70, "y": 22, "ring": 1, "owner": 0, "id": 4980747, "type": "UNIT_DESTROYER", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 251, "x": 71, "y": 22, "ring": 2, "owner": 2, "id": 9306140, "type": "UNIT_INFANTRY", "damage": 63}
+{"rings": 1, "kind": "ring", "turn": 251, "x": 70, "y": 23, "ring": 2, "owner": 2, "id": 2686982, "type": "UNIT_GREAT_ADMIRAL", "damage": 0}
+{"rings": 1, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"rings": 1, "kind": "log", "text": "    cause session 1:1 -> closed sessions [1:1]"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"rings": 1, "kind": "log", "text": "    cause session 2:2 -> closed sessions [2:2]"}
+{"rings": 1, "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"rings": 1, "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":252}"}
+{"rings": 1, "kind": "city", "turn": 252, "owner": 62}
+{"rings": 1, "kind": "p62", "turn": 252, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "x": 68, "y": 19, "damage": 0, "dist": 2}
+{"rings": 1, "kind": "p62", "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "x": 69, "y": 21, "damage": 22, "dist": 0}
+{"rings": 1, "kind": "ring", "turn": 252, "x": 68, "y": 19, "ring": 2, "owner": 62, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 252, "x": 68, "y": 20, "ring": 2, "owner": 2, "id": 9306140, "type": "UNIT_INFANTRY", "damage": 63}
+{"rings": 1, "kind": "ring", "turn": 252, "x": 69, "y": 20, "ring": 1, "owner": 0, "id": 4718607, "type": "UNIT_MODERN_ARMOR", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 252, "x": 68, "y": 21, "ring": 1, "owner": 0, "id": 4849682, "type": "UNIT_MODERN_ARMOR", "damage": 41}
+{"rings": 1, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"rings": 1, "kind": "city", "turn": 253, "owner": 62}
+{"rings": 1, "kind": "p62", "turn": 253, "id": 2752517, "type": "UNIT_AT_CREW", "x": 69, "y": 21, "damage": 44, "dist": 0}
+{"rings": 1, "kind": "ring", "turn": 253, "x": 68, "y": 19, "ring": 2, "owner": 2, "id": 8781832, "type": "UNIT_LINE_INFANTRY", "damage": 9}
+{"rings": 1, "kind": "ring", "turn": 253, "x": 68, "y": 20, "ring": 2, "owner": 2, "id": 9568271, "type": "UNIT_INFANTRY", "damage": 31}
+{"rings": 1, "kind": "ring", "turn": 253, "x": 68, "y": 21, "ring": 1, "owner": 0, "id": 4849682, "type": "UNIT_MODERN_ARMOR", "damage": 96}
+{"rings": 1, "kind": "ring", "turn": 253, "x": 68, "y": 23, "ring": 2, "owner": 6, "id": 11599905, "type": "UNIT_NUCLEAR_SUBMARINE", "damage": 0}
+{"rings": 1, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"rings": 1, "kind": "city", "turn": 254, "owner": 62}
+{"rings": 1, "kind": "p62", "turn": 254, "id": 2752517, "type": "UNIT_AT_CREW", "x": 68, "y": 21, "damage": 58, "dist": 1}
+{"rings": 1, "kind": "ring", "turn": 254, "x": 69, "y": 20, "ring": 1, "owner": 2, "id": 8781832, "type": "UNIT_LINE_INFANTRY", "damage": 9}
+{"rings": 1, "kind": "ring", "turn": 254, "x": 68, "y": 21, "ring": 1, "owner": 62, "id": 2752517, "type": "UNIT_AT_CREW", "damage": 58}
+{"rings": 1, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"rings": 1, "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"rings": 1, "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"rings": 1, "kind": "city", "turn": 255, "owner": 62}
+{"rings": 1, "kind": "ring", "turn": 255, "x": 68, "y": 20, "ring": 2, "owner": 2, "id": 9633815, "type": "UNIT_INFANTRY", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 255, "x": 68, "y": 23, "ring": 2, "owner": 6, "id": 11599905, "type": "UNIT_NUCLEAR_SUBMARINE", "damage": 0}
+{"rings": 1, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"rings": 1, "kind": "city", "turn": 256, "owner": 62}
+{"rings": 1, "kind": "ring", "turn": 256, "x": 68, "y": 21, "ring": 1, "owner": 2, "id": 8781832, "type": "UNIT_LINE_INFANTRY", "damage": 9}
+{"rings": 1, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_BUILDER"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_BUILDER"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_BUILDER"}
+{"rings": 1, "kind": "city", "turn": 257, "owner": 62}
+{"rings": 1, "kind": "p62", "turn": 257, "id": 2883589, "type": "UNIT_CROSSBOWMAN", "x": 69, "y": 20, "damage": 0, "dist": 1}
+{"rings": 1, "kind": "ring", "turn": 257, "x": 69, "y": 20, "ring": 1, "owner": 62, "id": 2883589, "type": "UNIT_CROSSBOWMAN", "damage": 0}
+{"rings": 1, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_BUILDER"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DEFENSIVE_TACTICS"}
+{"rings": 1, "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DEFENSIVE_TACTICS"}
+{"rings": 1, "kind": "log", "text": "    cause session 2:2 -> closed sessions [2:2]"}
+{"rings": 1, "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"rings": 1, "kind": "log", "text": "    cause popup DiplomacyDealView -> hidden"}
+{"rings": 1, "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DEFENSIVE_TACTICS"}
+{"rings": 1, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DEFENSIVE_TACTICS"}
+{"rings": 1, "kind": "city", "turn": 258, "owner": 62}
+{"rings": 1, "kind": "p62", "turn": 258, "id": 2883589, "type": "UNIT_CROSSBOWMAN", "x": 69, "y": 20, "damage": 0, "dist": 1}
+{"rings": 1, "kind": "ring", "turn": 258, "x": 69, "y": 20, "ring": 1, "owner": 62, "id": 2883589, "type": "UNIT_CROSSBOWMAN", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 258, "x": 68, "y": 21, "ring": 1, "owner": 2, "id": 8781832, "type": "UNIT_LINE_INFANTRY", "damage": 9}
+{"rings": 1, "kind": "ring", "turn": 258, "x": 68, "y": 23, "ring": 2, "owner": 6, "id": 11599905, "type": "UNIT_NUCLEAR_SUBMARINE", "damage": 0}
+{"rings": 1, "kind": "ring", "turn": 258, "x": 70, "y": 23, "ring": 2, "owner": 2, "id": 2686982, "type": "UNIT_GREAT_ADMIRAL", "damage": 0}

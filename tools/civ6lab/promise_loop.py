@@ -1,9 +1,9 @@
 """civ6lab promise_loop — ask 18: pass turns on a human-seat game (by
 Autoplay, or `--advance endturn`: the seat's blockers answered and the turn
 ended, no AI playing it), answering every AI diplomacy session with the seat
-POSITIVE (the leader screen's AddResponse) instead of closing it, and log the
-Don't-Settle-Near-Me promises, grievance totals and the game's grievance log
-entries (`settle_watch.lua`, the city lines dropped) once before the first
+--answer (POSITIVE or NEGATIVE, the leader screen's AddResponse) instead of closing it, and log the
+Don't-Settle-Near-Me promises, grievance totals, the game's grievance log
+entries and the seat's cities (`settle_watch.lua`) once before the first
 turn passes — the turn of the act — and after every turn, plus every session
 seen.
 
@@ -34,8 +34,8 @@ for p = 0, 62 do
       local info = DiplomacyManager.GetSessionInfo(sid)
       local parts = {}
       if info then for k, v in pairs(info) do parts[#parts + 1] = tostring(k) .. "=" .. tostring(v) end end
-      pcall(function() DiplomacyManager.AddResponse(sid, me, "POSITIVE") end)
-      print("session p" .. p .. " sid " .. sid .. " " .. table.concat(parts, " ") .. " -> POSITIVE")
+      pcall(function() DiplomacyManager.AddResponse(sid, me, "ZANSWER") end)
+      print("session p" .. p .. " sid " .. sid .. " " .. table.concat(parts, " ") .. " -> ZANSWER")
     end
   end
 end
@@ -49,12 +49,15 @@ def main(argv=None) -> int:
     p.add_argument("--tag", default="promise")
     p.add_argument("--wait", type=float, default=300.0)
     p.add_argument("--advance", choices=("autoplay", "endturn"), default="autoplay")
+    p.add_argument("--answer", choices=("POSITIVE", "NEGATIVE"), default="POSITIVE",
+                   help="the seat's answer to every AI session (NEGATIVE refuses an ask)")
     a = p.parse_args(argv)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     path = lab.RUNS / f"promise_{a.tag}_{stamp}.log"
     watch = (HERE / "settle_watch.lua").read_text(encoding="utf-8")
     t = Tuner(a.host).connect()
     lp = lab.local_player(t)
+    accept = LUA_ACCEPT.replace("ZANSWER", a.answer)
     with open(path, "w", encoding="utf-8") as fh:
         def log(s: str) -> None:
             fh.write(s + "\n")
@@ -62,7 +65,7 @@ def main(argv=None) -> int:
             print(s, flush=True)
         def read() -> None:
             for ln in t.run(lab.IG, watch, timeout=60):
-                if '"city"' not in ln:
+                if '"city"' not in ln or f'"p":{lp},' in ln:
                     log(ln)
 
         # the turn of the act (near_probe's founding lands just before this
@@ -70,10 +73,10 @@ def main(argv=None) -> int:
         log(f"turn {lab.turn(t)} (start)")
         read()
         for _ in range(a.turns):
-            # an open session is answered POSITIVE within a second; the other
+            # an open session is answered (--answer) within a second; the other
             # causes (a blocker, a screen) as lab.wait_turn answers them
-            lab.advance(t, a.advance, lp, a.wait, log, session_lua=LUA_ACCEPT, first=0.5, poll=1.0)
-            for ln in t.run(lab.IG, LUA_ACCEPT.replace("ZSEAT", str(lp))):
+            lab.advance(t, a.advance, lp, a.wait, log, session_lua=accept, first=0.5, poll=1.0)
+            for ln in t.run(lab.IG, accept.replace("ZSEAT", str(lp))):
                 log(ln)
             read()
             log(f"turn {lab.turn(t)}")

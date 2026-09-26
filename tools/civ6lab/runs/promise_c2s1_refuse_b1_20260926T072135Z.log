@@ -1,0 +1,45 @@
+turn 100 (start)
+{"kind":"city","turn":100,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":100,"p":0,"id":196609,"x":50,"y":11,"orig":0}
+{"kind":"promise","turn":100,"a":2,"b":1,"made":true}
+{"kind":"grievance","turn":100,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":100,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"promise","turn":100,"a":7,"b":2,"made":true}
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":3,"picked":"COMMEMORATION_INFRASTRUCTURE,COMMEMORATION_RELIGIOUS,COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":100}
+    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION
+    cause session 1:1 -> session p1 sid 1 ToPlayer=0 FromPlayer=1 -> NEGATIVE
+    cause popup DiplomacyActionView -> closed
+    cause popup LeaderScene -> hidden
+    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION
+    cause session 3:3 -> session p3 sid 3 ToPlayer=0 FromPlayer=3 -> NEGATIVE
+    cause popup DiplomacyActionView -> closed
+    cause popup LeaderScene -> hidden
+    cause popup HistoricMoments -> closed
+    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION
+{"kind":"grievance","turn":101,"a":0,"b":1,"g":-18,"perTurn":-7}
+{"kind":"grievlog","turn":101,"a":0,"b":1,"entry":{"Amount":25,"Description":"Отказ дать обещание","Initiator":0,"Target":1,"Turn":100}}
+{"kind":"city","turn":101,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":101,"p":0,"id":196609,"x":50,"y":11,"orig":0}
+{"kind":"promise","turn":101,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":101,"a":1,"b":0,"g":18,"perTurn":-7}
+{"kind":"grievlog","turn":101,"a":1,"b":0,"entry":{"Amount":25,"Description":"Отказ дать обещание","Initiator":0,"Target":1,"Turn":100}}
+{"kind":"promise","turn":101,"a":2,"b":1,"made":true}
+{"kind":"grievance","turn":101,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":101,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"promise","turn":101,"a":7,"b":2,"made":true}
+turn 101
+    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_GRANARY
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_GRANARY
+    cause blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION: no handler
+    cause popup WorldCongressIntro -> closed
+{"kind":"grievance","turn":102,"a":0,"b":1,"g":-11,"perTurn":-7}
+{"kind":"city","turn":102,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":102,"p":0,"id":196609,"x":50,"y":11,"orig":0}
+{"kind":"promise","turn":102,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":102,"a":1,"b":0,"g":11,"perTurn":-7}
+{"kind":"promise","turn":102,"a":2,"b":1,"made":true}
+{"kind":"grievance","turn":102,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":102,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"promise","turn":102,"a":7,"b":2,"made":true}
+turn 102

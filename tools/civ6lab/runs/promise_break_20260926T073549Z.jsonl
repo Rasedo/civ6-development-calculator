@@ -1,0 +1,35 @@
+{"log": "promise_c2s1_break2a_20260926T072252Z.log", "tag": "c2s1_break2a", "promisee": 1, "Amount": 200, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_break2b_20260926T072253Z.log", "tag": "c2s1_break2b", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_break2b_20260926T072253Z.log", "tag": "c2s1_break2b", "promisee": 1, "Amount": 200, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_break3_t103_20260926T072325Z.log", "tag": "c2s1_break3_t103", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_break3_t103_20260926T072325Z.log", "tag": "c2s1_break3_t103", "promisee": 1, "Amount": 200, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_break3_t103_20260926T072325Z.log", "tag": "c2s1_break3_t103", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 103}
+{"log": "promise_c2s1_ctrl_b1_20260926T071321Z.log", "tag": "c2s1_ctrl_b1", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_prom_b1_20260926T071452Z.log", "tag": "c2s1_prom_b1", "promisee": 1, "Amount": 200, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_prom_b2_20260926T071547Z.log", "tag": "c2s1_prom_b2", "promisee": 1, "Amount": 200, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_prom_b3_20260926T071645Z.log", "tag": "c2s1_prom_b3", "promisee": 1, "Amount": 200, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_prom_b3c6_20260926T072023Z.log", "tag": "c2s1_prom_b3c6", "promisee": 1, "Amount": 200, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_prom_b4_20260926T071719Z.log", "tag": "c2s1_prom_b4", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_prom_b5_20260926T071754Z.log", "tag": "c2s1_prom_b5", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_prom_b6_20260926T071827Z.log", "tag": "c2s1_prom_b6", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_prom_b7_20260926T071900Z.log", "tag": "c2s1_prom_b7", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_prom_b8_20260926T071939Z.log", "tag": "c2s1_prom_b8", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_refuse_b1_20260926T072135Z.log", "tag": "c2s1_refuse_b1", "promisee": 1, "Amount": 25, "Description": "Отказ дать обещание", "Initiator": 0, "Target": 1, "Turn": 100}
+{"log": "promise_c2s1_refused_then_b1_20260926T072201Z.log", "tag": "c2s1_refused_then_b1", "promisee": 1, "Amount": 50, "Description": "Обещание отвергнуто, деятельность продолжается", "Initiator": 0, "Target": 1, "Turn": 102}
+{"log": "promise_c2s1_t125_break2_b2_20260926T073406Z.log", "tag": "c2s1_t125_break2_b2", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 126}
+{"log": "promise_c2s1_t125_break2_b2_20260926T073418Z.log", "tag": "c2s1_t125_break2_b2", "promisee": 1, "Amount": 50, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 126}
+{"log": "promise_c2s1_t125_break2_b2_20260926T073418Z.log", "tag": "c2s1_t125_break2_b2", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 126}
+{"log": "promise_c2s1_t125_break_b1_20260926T072855Z.log", "tag": "c2s1_t125_break_b1", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 126}
+{"log": "promise_c2s1_t125_break_b1_20260926T073405Z.log", "tag": "c2s1_t125_break_b1", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 126}
+{"log": "promise_c2s1_t125_ctrl_b1_20260926T072836Z.log", "tag": "c2s1_t125_ctrl_b1", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_t125_refuse_b1_20260926T073459Z.log", "tag": "c2s1_t125_refuse_b1", "promisee": 1, "Amount": 25, "Description": "Отказ дать обещание", "Initiator": 0, "Target": 1, "Turn": 125}
+{"log": "promise_c2s1_t125_refused_then_b1_20260926T073512Z.log", "tag": "c2s1_t125_refused_then_b1", "promisee": 1, "Amount": 25, "Description": "Отказ дать обещание", "Initiator": 0, "Target": 1, "Turn": 125}
+{"log": "promise_c2s1_t125_refused_then_b1_20260926T073512Z.log", "tag": "c2s1_t125_refused_then_b1", "promisee": 1, "Amount": 25, "Description": "Обещание отвергнуто, деятельность продолжается", "Initiator": 0, "Target": 1, "Turn": 126}
+{"log": "promise_c2s1_t150_break_b2_20260926T072716Z.log", "tag": "c2s1_t150_break_b2", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 153}
+{"log": "promise_c2s1_t150_ctrl_b1_20260926T072638Z.log", "tag": "c2s1_t150_ctrl_b1", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_t225_ctrl_b1_20260926T072430Z.log", "tag": "c2s1_t225_ctrl_b1", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_t225_ctrl_p3_20260926T072534Z.log", "tag": "c2s1_t225_ctrl_p3", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_t75_break_b2_20260926T073135Z.log", "tag": "c2s1_t75_break_b2", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_t75_break_b2_20260926T073148Z.log", "tag": "c2s1_t75_break_b2", "promisee": 1, "entries": 0}
+{"log": "promise_c2s1_t75_break_b2_20260926T073206Z.log", "tag": "c2s1_t75_break_b2", "promisee": 1, "Amount": 100, "Description": "Обещание нарушено", "Initiator": 0, "Target": 1, "Turn": 77}
+{"log": "promise_c2s1_t75_ctrl_b1_20260926T073118Z.log", "tag": "c2s1_t75_ctrl_b1", "promisee": 1, "entries": 0}

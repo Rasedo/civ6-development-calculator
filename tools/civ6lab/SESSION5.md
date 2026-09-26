@@ -500,6 +500,17 @@ the fertility half of `floodTile` for Egypt only if Egypt's plots never gain.
 - **Risks.** Lisbon, Mandekalu/Bireme escorts (guard radius 4 in the install)
   and an Economic golden age block plunder: read the failure reason. Traders
   reroute on a declaration.
+- **Result (host 3)** (`b31r_rig.lua`, `b31r_run.py`, `b31r_turn.lua`,
+  `b31r_plunder.lua`, `runs/plunder_*.jsonl`): the command is offered only to
+  a unit standing ON the Trader's plot (attack-move onto it: the unit shares
+  the tile), with moves left, and not on the turn the unit was created; it
+  lands on the game's clock. Routes carry `TraderUnitID`, so the cut route is
+  read. Ten paying plunders: Renaissance (t101–102, land) 60, 70, 110, 50,
+  100, 50; Modern (t151, t157, land) 72, 85; Information (t227) 80 (sea, a
+  Destroyer) and 50 (land). Faith, science and culture progress never moved
+  in a clean row. Flat 50 dies on 7 of 10, an era-only table on the
+  Renaissance spread (50–110); no fit to the route's origin yields or city
+  distance was found (a sum of 7 paid both 70 and 50).
 
 ### B-D-S1. A war watched turn by turn
 - **Unknown.** The step from war-weariness points to amenities, the decay
@@ -547,6 +558,20 @@ the fertility half of `floodTile` for Egypt only if Egypt's plots never gain.
   `emergencyPressureCut` term in `citizenPressure` / `_citizen_pressure_from`.
   The same read measures the capital's +1 and the age term, which neither
   engine carries as the pedia states (see the report's loyalty note).
+- **Result (host 3).** S0 WORKS (`b86s0_run.py`, `runs/emergency_t225_*`,
+  `emergency_t240_*`): in `lab4_t225` seat 0's Jet Bomber (created in Kawhia
+  30:48) dropped a Nuclear Device on p6-held Naranjo (36:42); no emergency
+  for 15 turns; the World Congress met at t241 and at t242
+  `GetEmergencyInfoTable(p)` shows `EMERGENCY_NUCLEAR`, target 0, members
+  every other major, TurnsLeft 39 (a 40-turn duration: the online
+  `GameSpeed_Durations` 60 → 40), members' goal "capture Tikal" (36:46).
+  `GetEmergencyInfoTable` answers for every p (lab 3's "empty" was a game
+  with none). Saved `b86s0_nuclear_t244`. S1 not reached: under Autoplay p5
+  took Tikal at t248 (the members WON; `runs/emergency_loyalty_
+  20260926T091947Z.jsonl` holds the pressure reads t248–252 after a won
+  emergency); a second run holding Tikal's ring (`b86s1_run.py --rig 2`,
+  endturn) ended with seat 0 eliminated at t246. S1 needs the target's
+  every city held (or a target with one city held), then 36 turns.
 
 ### B-87-S1. Which buildings pay Pen, Brush and Voice
 The install text ("+1 Era Score for constructing a building with a Great Work
@@ -564,6 +589,18 @@ and after each. Record `runs/ded_penbrush_<stamp>.jsonl`. The Temple also
 settles whether the Temple, Stave Church and Cathedral belong in the trigger
 set. Fit if no fire: `buildingDedications` checks the seat's variant
 (`noGreatWorks`), and the GPU needs a per-seat mask beside `_b_gwslot`.
+**Result (host 3)** (`b87s1_run.py`, `b87s1_place.lua`, `b87s1_state.lua`,
+`runs/ded_penbrush_*.jsonl`): no Maori human needed — Pen, Brush and Voice's
+clause (`COMMEMORATION_CULTURAL_BUILDING_QUEST`,
+`MODIFIER_PLAYER_ADJUST_PLAYER_ERA_SCORE_PER_CULTURE_BUILDING_CONSTRUCTED`,
+eligible outside a golden age) attached to the Maori AI (p2) in `lab4_t125`
+(dark age), buildings placed whole by the tuner's `CreateBuilding`, which
+fires the event. Era score, attached / control without it: Marae (second
+Marae, clear of the first-unique moment) +0 / +0; Art Museum +1 / +0 (×2);
+Amphitheater +1 / +0; Temple +1 / +0; Stave Church +1; Cathedral +1; Shrine
++0 / +0; Pagoda +0. No moment is logged for the +1. Every building with a
+Great Work slot pays, the Temple's relic slot included; the slot-less ones
+never.
 
 ### C-2-S1. The promise's break and the broken-promise operand
 - **Answered from the records.** The seat that holds `IsPromiseMade(b, DSNM)`
@@ -595,6 +632,22 @@ set. Fit if no fire: `buildingDedications` checks the seat's variant
   from `grievanceSettledNear` / `_grievance_settled_near`, and `_promise_turn`
   asks the promise. Never: ask 18 closes. The operand re-sources
   `PROMISE_BROKEN_GRIEVANCE` / `_promise_broken_griev`.
+- **Result (host 3).** `near_probe.py --site` (sites by BORDER distance from
+  `c2s1_sites.lua`), `--answer POSITIVE|NEGATIVE`; `c2s1_table.py` →
+  `runs/promise_break_20260926T073549Z.jsonl`. `GetGrievanceLogEntries(b, a)`
+  WORKS from the tuner (both initiators' entries in either order; a
+  description built from a format string comes back UTF-8 read as cp1251).
+  A founding within 3 of the rival's border with NO ask standing costs
+  nothing (0 of 4 saves: t75, t100, t125, t150); the rival then asks.
+  Refused: "Отказ дать обещание" 25; a later founding within 3: "Обещание
+  отвергнуто, деятельность продолжается" 25. Promised, then founded within 3
+  (border 1, 2, 3; border 3 at city distance 6 too): "Обещание нарушено" 100;
+  every further founding within 3: 50 (= 25 × `GRIEVANCE_MULTIPLIER_FOR_
+  BROKEN_PROMISE` 200%). Border 4–8: nothing (5 of 5). The same in Medieval,
+  Industrial, Modern. The t100 base doubled everything (200 / 100 / 50):
+  a World Congress Public Relations "more grievances" on seat 0
+  (`wc_resolutions.lua`). `IsPromiseMade` reads true after a refusal and
+  after a break. No ask at t225 (2 rivals of 2).
 
 ### C-16-S1. A counterspy as the pursuer
 - **Unknown.** Does `ESPIONAGE_ESCAPE_COUNTERSPY_LEVEL_MODIFIER` -1 per level
@@ -622,6 +675,13 @@ set. Fit if no fire: `buildingDedications` checks the seat's variant
   `counterspiesGuarding` / `_counterspies_guarding`.
 - **Risks.** Spies must be bought, never created (a created spy crashes on
   capture); an unconditional `GetNextEscapingSpyID()` crashes the game.
+- **Result (host 3): blocked on the defender's post.** `SetReturnAsPlayer(1)`
+  + one Autoplay turn makes `Game.GetLocalPlayer()` 1 and `IsHuman()` true,
+  but p1's commands are dropped: PURCHASE of a Spy refused (5,000 gold, three
+  `CIVIC_GRANT_SPY` attached, `CanProduce` true, cost 745), a BUILD request
+  accepted and never applied, `IsTurnActive()` false through two turns. An
+  InGame COUNTERSPY request on an AI's spy is accepted and never starts. No
+  AI counterspy stands in `lab4_t150/t200/t225/t250` (`spy_census_ops.lua`).
 
 ### C-26-S1. Trajan's grant on a captured city
 Attach `TRAIT_ADJUST_NON_CAPITAL_FREE_CHEAPEST_BUILDING` to seat 0 in
@@ -632,6 +692,12 @@ without a Monument, one with) through `capture_setup` / `_war` / `_move` /
 and after. Record `runs/trajan_<stamp>.jsonl`. About 40 min. Fit: call
 `trajansColumn` / `_trajans_column` from `transferCity` and the GPU capture
 path if the grant fires.
+**Result (host 3), `lab4_t150`** (`c26s1_read.lua`, `c26s1_capture.lua`,
+`runs/trajan_20260926T092000Z.jsonl`): the attach grants the Monument at
+once to the non-capital that lacks one (Calakmul), not the capital; a city
+founded after it holds a Monument at founding; two captured cities without
+one (Winnipeg, Iwnw) get nothing at the capture, the Keep or a turn later;
+the captured Saint John keeps its Monument and gains nothing.
 
 ### C-38-S3. The purchase trigger by intervention
 - **Unknown.** Builder buy: H1 "no Builder and bank ≥ price → buys next turn",
@@ -650,6 +716,17 @@ path if the grant fires.
   loads, 45 min.
 - **Fit.** A purchase body in `minorPhase` / `_city_state_phase`. A threshold
   is BUILD; a rate becomes a per-episode randomised parameter (owner ruling).
+- **Result (host 3).** `c38s3_run.py` / `c38s3_setup.lua` / `c38s3_fit.py`,
+  `runs/c38s3_*.jsonl` (5 turns of Autoplay per load; the burn advances the
+  game's own `Game.GetRandNum` stream — `TerrainBuilder.GetRandomNumber`
+  alone left four repeats byte-identical). Builder arm, minors at peace:
+  bank 300: 16 of 30 bought within 5 turns (3 in 1, 9 in 2, all 16 by turn
+  3); 160: 6 of 20 (4 more trained one); 110: 2 of 20, the buy landing once
+  the bank reached 133 against a 121.8 price. The same minors buy across
+  repeats; the burn moves the turn. Builders were also bought with one
+  standing (2 cases). Military arm, bank 300, k = 0…10: 0 purchases in 600
+  minor-turns. `cs_watch.lua`'s GameCore progress reads do not exist; the
+  InGame `minor_prod.lua` reads them.
 
 ### C-60-S3. A grant with no free tile
 `lab4_t250`: Ngaruawahia (69,21) grants at t252 and t257, always on (69,20).
@@ -660,6 +737,14 @@ units by id and position and the blockers' health through t257. Two grants
 per variant, each decisive; a blocker killed before the grant voids the
 trial. Fit: H1 nearest free tile → `grantFreeCityUnit` / `_grant_free_unit`
 search outward; H3 the centre → allow it; H2 none → nothing.
+**Result (host 3)** (`c60s3_run.py --rings 0|1|2 --rerig 251 256`,
+`c60s3_fit.py`, `runs/c60s3_r*.jsonl`): the ring-1 plots are two land, four
+water. Control: Line Infantry on (69,20) at t252 and t257. Every land plot
+of ring 1 held: the military grant lands 2 away ((68,19) t252, (69,19)
+t257); rings 1 and 2 held: 3 away ((67,19), (67,20)). The t252 AT Crew
+stands on the centre whenever the ring is held. The grant's type drifts
+with the state (Line Infantry in the control, Crossbowman in the rigged
+t257).
 
 ### C-60-S4. Bankruptcy over the turns of insolvency
 - **Sourced already.** `GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE` 0,
@@ -686,6 +771,16 @@ search outward; H3 the centre → allow it; H2 none → nothing.
   amenity composers, `bankruptDisband` / `_bankrupt_disband` after the upkeep
   (`phase.ts`, `_seat_upkeep_and_bankruptcy`). The reads confirm or replace
   its counts, its line at 0 and its victim order.
+- **Result (host 3)** (`c60s4_run.py`, `c60s4_read.lua`, `c60s4_fit.py`,
+  `runs/bankrupt_*.jsonl`): the balance never reads below 0. With S = the
+  turn's maintenance minus the whole gold yield: each city loses
+  1 + floor(S / 10) amenities (S = 5 → 1, 10–17 → 2, 21–26 → 3, 30–35 → 4;
+  19 rows), flat however long the deficit runs; both cities of a two-city
+  seat lose the same. Exactly ONE unit disbands a turn while S ≥ 10 (8 turns
+  in a row at S 35 → 11; none at S 5–6), the first unit with upkeep in the
+  seat's unit list (8 of 8; a Crossbowman went before four Musketmen), a
+  Warrior (no upkeep) skipped. The `lab4_t150` arm lost two units on two
+  turns and nothing on its first insolvent turn, unexplained.
 
 ## 6. Instrument 5 — observer watches
 
@@ -729,6 +824,15 @@ search outward; H3 the centre → allow it; H2 none → nothing.
   `minorResearch` / `_minor_research`. Free Cities: the flip pair, the grant
   draw, the build queue, the treasury, the fate in `transferCity` /
   `_transfer_city`.
+- **Run (2026-09-26, host 127.0.0.4).** One Standard game, 12 majors, 12
+  minors (`c38s1_ext.json`), 250 turns by `c74s2_games.py` with
+  `c38s1_watch.lua` (InGame: quests, every minor's and p62's units by id,
+  cities, treasury, techs; the city-states' improved plots within 5) and
+  `c74s2_turn.lua` (GameCore). Records `runs/c38s1_watch_c38s1_ext1_*.jsonl`,
+  `runs/c74s2_turn_c38s1_ext1_*.jsonl`, `runs/event_history_c38s1_ext1_*.txt`;
+  summaries `c38s1_fit.py` and `c60s2_fate.py`. The quest texts arrive as
+  UTF-8 read as cp1251 (`c38s1_fit.fix`). One game only: the quest mix and the
+  flip pairs want the second and third games the scene planned.
 
 ### C-38-S2 (era half). Later-era starts
 Eight new games, one per `start_era` (the `game.py` config key), 12 minors
@@ -737,6 +841,22 @@ type against `BonusMinorStartingUnits` (GS swaps Pikeman for Pike and Shot at
 Industrial and Modern). Deterministic; about 1 h. The engines have no start
 era, so the unit rows wait on one (a BLOCKER, not LAB); the centre strength
 feeds C-38-S2's fit.
+
+**Run (2026-09-26, host 127.0.0.4).** `.claude/scratchpad/c38s2_run.sh`: eight
+Small games (6 majors, 14 minors, Prince, `c38s2_era.json` with
+`--set start_era=...`), each played three reads (turns 1–3) by
+`c74s2_games.py` with `c38s2_era.lua` + `city_defense_preview.lua` (InGame).
+Records `runs/c38s2_era_c38s2_era<k>_*.jsonl`,
+`runs/city_defense_preview_c38s2_era<k>_*.jsonl`; `c38s2_fit.py` and
+`c38s2_garrison.py` summarise them. Result: the centre's preview base is
+`StartingMeleeStrength{Major,Minor} - 10` at every start era for a minor
+(its granted units — Pike and Shot 55, Infantry 75 — never raise it) and
+`max(StartingMeleeStrengthMajor, the melee unit a major's first city is
+granted) - 10` for a major; the minors' units are exactly the era's
+`BonusMinorStartingUnits` rows below Emperor (with Expansion1's Pike and Shot
+swap); the garrison line is `max(0, the garrison's Combat - base)` on 98 of
+98 garrisoned centres. `pl:GetEras()` is absent in InGame (the first game's
+era field reads err).
 
 ### C-74-S2. Event watch at Duel size
 The engine's world is Duel (44×26); the tallies show the event rate and the
@@ -748,6 +868,25 @@ factor of 0.25 pin the factor to ±15% and the empty share to ±3%. About 25 min
 Fit: the map factor in `randomEvent` / `_random_event`. Risks:
 `AutoSaveFrequency 0` crashes the game (keep 50); autosaves collide across
 instances.
+
+**Run (2026-09-26, host 127.0.0.4).** Eight Duel games (`c74s2_duel.json`: 2
+majors, 3 minors, Continents, Online, Prince, realism 2; seeds 74200 + 2k),
+played one Autoplay turn at a time by `c74s2_games.py` → `c74s2_watch.py`
+(victories switched off from the main menu; a won game stops the watch) with
+the per-turn reader `c74s2_turn.lua` (GameCore: chances, temperature, every
+volcano's `IsActiveVolcano`, every river and floodplain plot with owner,
+revealers and `CanBeFlooded`, every river's own plots, the cities, a whole-map
+read on a drought's turn). Games 1–3 ended at 97, 203 and 196 (seat 0 won or
+was eliminated), 4–8 reached 250: 1,680 read turns. Records
+`runs/c74s2_turn_c74s2_duel<k>_*.jsonl`, `runs/event_history_c74s2_duel<k>_*.txt`,
+`runs/c74s2_duel<k>_watch.log`; fits `c74s2_boost.py` (the normalisers and the
+first-occurrence boost), `c74s2_empty.py`, `c74s2_volc_fit.py`,
+`c74s2_drought_cands.py` / `c74s2_drought_rules.py` / `c74s2_drought_pick.py`,
+`c74s2_lag.py`, `c74s2_series.py` (one game's chances as a series),
+`c74s2_s1check.py` (the boost on the C-74-S1 sweep). Two tooling facts:
+`game.py new`'s `all_ai` leaves slot 0 SS_TAKEN on this box, so the observer
+mode never advances (the watch autoplays the seat instead), and a Duel with
+victories on is won by turn ~100.
 
 ## 7. Loose ends from SESSION2 with no AUDIT entry
 

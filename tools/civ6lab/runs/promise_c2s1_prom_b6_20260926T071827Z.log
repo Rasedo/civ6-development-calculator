@@ -1,0 +1,6 @@
+turn 102 (start)
+{"kind":"promise","turn":102,"a":1,"b":0,"made":true}
+{"kind":"promise","turn":102,"a":2,"b":1,"made":true}
+{"kind":"grievance","turn":102,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":102,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"promise","turn":102,"a":7,"b":2,"made":true}

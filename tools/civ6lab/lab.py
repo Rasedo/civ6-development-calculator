@@ -484,9 +484,15 @@ def advance(t: Tuner, how: str, lp: int, wait: float, log: Callable[[str], None]
         raise TunerError("refusing to autoplay with no seat to return to (lp=-1)")
 
     def end_turn() -> None:
+        # a request sent once the next turn has begun ends that turn too,
+        # leaving the seat a turn whose operations are all refused: request
+        # only while the turn is still t0 (`IsTurnActive` is no guard — it
+        # reads false at the start of some ordinary turns)
         try:
+            if turn(t) != t0:
+                return
             t.run(IG, LUA_ENDTURN)
-        except TunerError as e:
+        except (TunerError, IndexError) as e:
             log(f"    end turn: {e}")
 
     if how == "autoplay":

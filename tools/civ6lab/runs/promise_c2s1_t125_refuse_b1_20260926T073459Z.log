@@ -1,0 +1,32 @@
+turn 125 (start)
+{"kind":"city","turn":125,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":125,"p":0,"id":196609,"x":50,"y":11,"orig":0}
+{"kind":"grievance","turn":125,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievlog","turn":125,"a":2,"b":3,"entry":{"Amount":150,"Description":"РћРґРёРЅ РёР· РЅР°С\u0081 РѕР±СЉС\u008fРІРёР» РІРѕР№РЅСѓ РґСЂСѓРіРѕРјСѓ","Initiator":3,"Target":2,"Turn":124}}
+{"kind":"grievance","turn":125,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievlog","turn":125,"a":3,"b":2,"entry":{"Amount":150,"Description":"РћРґРёРЅ РёР· РЅР°С\u0081 РѕР±СЉС\u008fРІРёР» РІРѕР№РЅСѓ РґСЂСѓРіРѕРјСѓ","Initiator":3,"Target":2,"Turn":124}}
+{"kind":"grievance","turn":125,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":125,"a":5,"b":4,"g":-138,"perTurn":0}
+    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> UXMAL builds BUILDING_GRANARY
+    cause popup HistoricMoments -> closed
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+    cause session 1:1 -> session p1 sid 1 FromPlayer=1 ToPlayer=0 -> NEGATIVE
+    cause popup DiplomacyActionView -> closed
+    cause popup LeaderScene -> hidden
+{"kind":"grievance","turn":126,"a":0,"b":1,"g":-19,"perTurn":-6}
+{"kind":"grievlog","turn":126,"a":0,"b":1,"entry":{"Amount":25,"Description":"Отказ дать обещание","Initiator":0,"Target":1,"Turn":125}}
+{"kind":"city","turn":126,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":126,"p":0,"id":196609,"x":50,"y":11,"orig":0}
+{"kind":"promise","turn":126,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":126,"a":1,"b":0,"g":19,"perTurn":-6}
+{"kind":"grievlog","turn":126,"a":1,"b":0,"entry":{"Amount":25,"Description":"Отказ дать обещание","Initiator":0,"Target":1,"Turn":125}}
+{"kind":"grievance","turn":126,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":126,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":126,"a":3,"b":7,"g":19,"perTurn":-6}
+{"kind":"grievlog","turn":126,"a":3,"b":7,"entry":{"Amount":25,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":7,"Target":3,"Turn":125}}
+{"kind":"grievance","turn":126,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":126,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":126,"a":7,"b":3,"g":-19,"perTurn":-6}
+{"kind":"grievlog","turn":126,"a":7,"b":3,"entry":{"Amount":25,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":7,"Target":3,"Turn":125}}
+turn 126

@@ -1,0 +1,91 @@
+turn 150 (start)
+{"kind":"city","turn":150,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":150,"p":0,"id":196609,"x":37,"y":38,"orig":0}
+{"kind":"city","turn":150,"p":0,"id":262146,"x":51,"y":19,"orig":0}
+{"kind":"grievance","turn":150,"a":1,"b":6,"g":126,"perTurn":-6}
+{"kind":"grievance","turn":150,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":150,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":150,"a":2,"b":6,"g":-13,"perTurn":-6}
+{"kind":"grievance","turn":150,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":150,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":150,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":150,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":150,"a":5,"b":6,"g":38,"perTurn":-6}
+{"kind":"grievlog","turn":150,"a":5,"b":6,"entry":{"Amount":25,"Description":"РћР±РµС‰Р°РЅРёРµ РѕС‚РІРµСЂРіРЅСѓС‚Рѕ, РґРµС\u008fС‚РµР»СЊРЅРѕС\u0081С‚СЊ РїСЂРѕРґРѕР»Р¶Р°РµС‚С\u0081С\u008f","Initiator":6,"Target":5,"Turn":149}}
+{"kind":"grievance","turn":150,"a":5,"b":7,"g":-46,"perTurn":-6}
+{"kind":"grievance","turn":150,"a":6,"b":1,"g":-126,"perTurn":-6}
+{"kind":"grievance","turn":150,"a":6,"b":2,"g":13,"perTurn":-6}
+{"kind":"grievance","turn":150,"a":6,"b":5,"g":-38,"perTurn":-6}
+{"kind":"grievlog","turn":150,"a":6,"b":5,"entry":{"Amount":25,"Description":"РћР±РµС‰Р°РЅРёРµ РѕС‚РІРµСЂРіРЅСѓС‚Рѕ, РґРµС\u008fС‚РµР»СЊРЅРѕС\u0081С‚СЊ РїСЂРѕРґРѕР»Р¶Р°РµС‚С\u0081С\u008f","Initiator":6,"Target":5,"Turn":149}}
+{"kind":"promise","turn":150,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":150,"a":7,"b":5,"g":46,"perTurn":-6}
+    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> UXMAL builds BUILDING_GRANARY
+    cause session 1:1 -> session p1 sid 1 ToPlayer=0 FromPlayer=1 -> POSITIVE
+    cause popup DiplomacyActionView -> closed
+    cause popup LeaderScene -> hidden
+    cause popup HistoricMoments -> closed
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> UXMAL builds BUILDING_GRANARY
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> UXMAL builds BUILDING_GRANARY
+    cause session 7:7 -> session p7 sid 7 ToPlayer=0 FromPlayer=7 -> POSITIVE
+    cause popup DiplomacyActionView -> closed
+    cause popup DiplomacyDealView -> hidden
+    cause popup LeaderScene -> hidden
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing
+    cause popup WorldCongressIntro -> closed
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> UXMAL builds BUILDING_GRANARY
+{"kind":"city","turn":150,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":150,"p":0,"id":196609,"x":37,"y":38,"orig":0}
+{"kind":"city","turn":150,"p":0,"id":262146,"x":51,"y":19,"orig":0}
+{"kind":"promise","turn":150,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":150,"a":1,"b":6,"g":126,"perTurn":-5}
+{"kind":"grievance","turn":150,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":150,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":150,"a":2,"b":6,"g":-13,"perTurn":-5}
+{"kind":"grievance","turn":150,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":150,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":150,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":150,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":150,"a":5,"b":6,"g":38,"perTurn":-5}
+{"kind":"grievlog","turn":150,"a":5,"b":6,"entry":{"Amount":25,"Description":"РћР±РµС‰Р°РЅРёРµ РѕС‚РІРµСЂРіРЅСѓС‚Рѕ, РґРµС\u008fС‚РµР»СЊРЅРѕС\u0081С‚СЊ РїСЂРѕРґРѕР»Р¶Р°РµС‚С\u0081С\u008f","Initiator":6,"Target":5,"Turn":149}}
+{"kind":"grievance","turn":150,"a":5,"b":7,"g":-46,"perTurn":-5}
+{"kind":"grievance","turn":150,"a":6,"b":1,"g":-126,"perTurn":-5}
+{"kind":"grievance","turn":150,"a":6,"b":2,"g":13,"perTurn":-5}
+{"kind":"grievance","turn":150,"a":6,"b":5,"g":-38,"perTurn":-5}
+{"kind":"grievlog","turn":150,"a":6,"b":5,"entry":{"Amount":25,"Description":"РћР±РµС‰Р°РЅРёРµ РѕС‚РІРµСЂРіРЅСѓС‚Рѕ, РґРµС\u008fС‚РµР»СЊРЅРѕС\u0081С‚СЊ РїСЂРѕРґРѕР»Р¶Р°РµС‚С\u0081С\u008f","Initiator":6,"Target":5,"Turn":149}}
+{"kind":"promise","turn":150,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":150,"a":7,"b":5,"g":46,"perTurn":-5}
+turn 151
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":0,"picked":"","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":150}
+    cause popup NaturalDisasterPopup -> closed
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":151}
+    cause popup EraCompletePopup -> closed
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":151}
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":151}
+    cause session 4:4 -> session p4 sid 4 ToPlayer=0 FromPlayer=4 -> POSITIVE
+    cause popup DiplomacyActionView -> closed
+    cause popup LeaderScene -> hidden
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":152}
+{"kind":"city","turn":152,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":152,"p":0,"id":196609,"x":37,"y":38,"orig":0}
+{"kind":"city","turn":152,"p":0,"id":262146,"x":51,"y":19,"orig":0}
+{"kind":"promise","turn":152,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":152,"a":1,"b":6,"g":115,"perTurn":-5}
+{"kind":"grievance","turn":152,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":152,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":152,"a":2,"b":6,"g":-2,"perTurn":-5}
+{"kind":"grievance","turn":152,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":152,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":152,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":152,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":152,"a":5,"b":6,"g":52,"perTurn":-5}
+{"kind":"grievlog","turn":152,"a":5,"b":6,"entry":{"Amount":25,"Description":"РћР±РµС‰Р°РЅРёРµ РѕС‚РІРµСЂРіРЅСѓС‚Рѕ, РґРµС\u008fС‚РµР»СЊРЅРѕС\u0081С‚СЊ РїСЂРѕРґРѕР»Р¶Р°РµС‚С\u0081С\u008f","Initiator":6,"Target":5,"Turn":151}}
+{"kind":"grievance","turn":152,"a":5,"b":7,"g":-35,"perTurn":-5}
+{"kind":"grievance","turn":152,"a":6,"b":1,"g":-115,"perTurn":-5}
+{"kind":"grievance","turn":152,"a":6,"b":2,"g":2,"perTurn":-5}
+{"kind":"grievance","turn":152,"a":6,"b":5,"g":-52,"perTurn":-5}
+{"kind":"grievlog","turn":152,"a":6,"b":5,"entry":{"Amount":25,"Description":"РћР±РµС‰Р°РЅРёРµ РѕС‚РІРµСЂРіРЅСѓС‚Рѕ, РґРµС\u008fС‚РµР»СЊРЅРѕС\u0081С‚СЊ РїСЂРѕРґРѕР»Р¶Р°РµС‚С\u0081С\u008f","Initiator":6,"Target":5,"Turn":151}}
+{"kind":"promise","turn":152,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":152,"a":7,"b":5,"g":35,"perTurn":-5}
+turn 152

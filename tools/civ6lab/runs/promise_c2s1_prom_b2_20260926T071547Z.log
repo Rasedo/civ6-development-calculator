@@ -1,0 +1,23 @@
+turn 102 (start)
+{"kind":"grievance","turn":102,"a":0,"b":1,"g":-200,"perTurn":-7}
+{"kind":"grievlog","turn":102,"a":0,"b":1,"entry":{"Amount":200,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":102}}
+{"kind":"promise","turn":102,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":102,"a":1,"b":0,"g":200,"perTurn":-7}
+{"kind":"grievlog","turn":102,"a":1,"b":0,"entry":{"Amount":200,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":102}}
+{"kind":"promise","turn":102,"a":2,"b":1,"made":true}
+{"kind":"grievance","turn":102,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":102,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"promise","turn":102,"a":7,"b":2,"made":true}
+    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> COBA builds BUILDING_GRANARY
+    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_EARLY_EMPIRE
+    cause popup HistoricMoments -> closed
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+{"kind":"grievance","turn":103,"a":0,"b":1,"g":-193,"perTurn":-7}
+{"kind":"grievlog","turn":103,"a":0,"b":1,"entry":{"Amount":200,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":102}}
+{"kind":"promise","turn":103,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":103,"a":1,"b":0,"g":193,"perTurn":-7}
+{"kind":"grievlog","turn":103,"a":1,"b":0,"entry":{"Amount":200,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":102}}
+{"kind":"grievance","turn":103,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":103,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"promise","turn":103,"a":7,"b":2,"made":true}
+turn 103

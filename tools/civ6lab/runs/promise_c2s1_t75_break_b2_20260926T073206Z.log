@@ -1,0 +1,15 @@
+turn 77 (start)
+{"kind":"grievance","turn":77,"a":0,"b":1,"g":-100,"perTurn":-8}
+{"kind":"grievlog","turn":77,"a":0,"b":1,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":77}}
+{"kind":"city","turn":77,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":77,"p":0,"id":131073,"x":37,"y":38,"orig":0}
+{"kind":"city","turn":77,"p":0,"id":196610,"x":50,"y":11,"orig":0}
+{"kind":"city","turn":77,"p":0,"id":262147,"x":57,"y":13,"orig":0}
+{"kind":"promise","turn":77,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":77,"a":1,"b":0,"g":100,"perTurn":-8}
+{"kind":"grievlog","turn":77,"a":1,"b":0,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":77}}
+{"kind":"promise","turn":77,"a":2,"b":1,"made":true}
+{"kind":"promise","turn":77,"a":3,"b":1,"made":true}
+{"kind":"grievance","turn":77,"a":4,"b":5,"g":100,"perTurn":0}
+{"kind":"grievance","turn":77,"a":5,"b":4,"g":-100,"perTurn":0}
+{"kind":"promise","turn":77,"a":7,"b":2,"made":true}

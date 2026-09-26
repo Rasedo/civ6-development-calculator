@@ -1,0 +1,16 @@
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "before attach", "line": "city t150 owner 0 orig 0 id 65536 LOC_CITY_NAME_NARANJO 36:42 capital true pop 6: MONUMENT,PALACE,GRANARY,SHRINE,WALLS"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "before attach", "line": "city t150 owner 0 orig 0 id 196609 LOC_CITY_NAME_CALAKMUL 37:38 capital false pop 3: GRANARY,WALLS"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "AttachModifierByID(TRAIT_ADJUST_NON_CAPITAL_FREE_CHEAPEST_BUILDING) on seat 0", "line": "5561"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "after attach", "line": "city t150 owner 0 orig 0 id 65536 LOC_CITY_NAME_NARANJO 36:42 capital true pop 6: MONUMENT,PALACE,GRANARY,SHRINE,WALLS"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "after attach", "line": "city t150 owner 0 orig 0 id 196609 LOC_CITY_NAME_CALAKMUL 37:38 capital false pop 3: MONUMENT,GRANARY,WALLS"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "targets before capture (InGame HasBuilding)", "line": "1 524295 WINNIPEG 63:20 pop 2 mon false walls false; 4 393220 IWNW 28:12 pop 4 mon false walls false; 1 393221 SAINT_JOHN 59:23 pop 7 mon true walls false"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "capture rig (c26s1_capture.lua)", "line": "capture rig city 524295 LOC_CITY_NAME_WINNIPEG owner 1 war true garrison 199/200 outer 399/400 unit 3080210 | capture rig city 393220 LOC_CITY_NAME_IWNW owner 4 war true garrison 199/200 outer 0/0 unit 3145745 | capture rig city 393221 LOC_CITY_NAME_SAINT_JOHN owner 1 war true garrison 199/200 outer 399/400 unit 3211279"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "captured, before Keep", "line": "city t150 owner 0 orig 1 id 262146 LOC_CITY_NAME_WINNIPEG 63:20 capital false pop 1: "}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "captured, before Keep", "line": "city t150 owner 0 orig 4 id 327683 LOC_CITY_NAME_IWNW 28:12 capital false pop 3: "}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "captured, before Keep", "line": "city t150 owner 0 orig 1 id 393220 LOC_CITY_NAME_SAINT_JOHN 59:23 capital false pop 5: MONUMENT,LIGHTHOUSE,SHIPYARD"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "after Keep (capture_keep.lua x3, all keep can=true requested=true)", "line": "WINNIPEG: (none); IWNW: (none); SAINT_JOHN: MONUMENT,LIGHTHOUSE,SHIPYARD"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "control founding at 37:20 (pop_foundcity.lua), same turn", "line": "city t150 owner 0 orig 0 id 458757 LOC_CITY_NAME_COPAN 37:20 capital false pop 1: MONUMENT"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "after one endturn", "line": "city t151 owner 0 orig 1 id 262146 LOC_CITY_NAME_WINNIPEG 63:20 capital false pop 1: "}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "after one endturn", "line": "city t151 owner 0 orig 4 id 327683 LOC_CITY_NAME_IWNW 28:12 capital false pop 3: "}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "after one endturn", "line": "city t151 owner 0 orig 1 id 393220 LOC_CITY_NAME_SAINT_JOHN 59:23 capital false pop 5: MONUMENT,LIGHTHOUSE,SHIPYARD"}
+{"scene": "C-26-S1", "save": "lab4_t150", "step": "after one endturn", "line": "city t151 owner 0 orig 0 id 458757 LOC_CITY_NAME_COPAN 37:20 capital false pop 1: MONUMENT"}

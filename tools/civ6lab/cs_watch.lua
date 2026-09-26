@@ -1,7 +1,8 @@
 -- GameCore_Tuner: one JSON line per living minor this turn (the city-states
 -- and the Free Cities player) — the C-38 watch (what a city-state spends,
 -- builds and fields). Gold and faith banks, each city's
--- [x, y, population, current item, progress on it, its cost], every unit
+-- [x, y, population, current item] (the progress and cost getters do not
+-- exist on the GameCore queue: `minor_prod.lua` reads them in InGame), every unit
 -- (type, plot, damage), the majors it is at war with, its suzerain and the
 -- envoys each major holds there. `watch.py` calls it once a turn and appends
 -- the lines. A pcall read prints its value, or "err:<msg>" when the call
@@ -19,29 +20,6 @@ for p = 0, 62 do
   local pl = Players[p]
   if pl ~= nil and pl:IsAlive() and pl:IsMajor() then majors[#majors + 1] = p end
 end
--- the current item's row: by the queue's hash when it answers, else by the
--- type name CurrentlyBuilding gives
-local function itemRow(bq, name)
-  local okh, h = pcall(function() return bq:GetCurrentProductionTypeHash() end)
-  local key = (okh and type(h) == "number" and h ~= 0) and h or name
-  if key == nil then return nil end
-  return GameInfo.Buildings[key] or GameInfo.Districts[key] or GameInfo.Units[key] or GameInfo.Projects[key]
-end
-local function progress(bq, row)
-  if row == nil then return "null", "null" end
-  if row.BuildingType then
-    return J(pcall(function() return bq:GetBuildingProgress(row.Index) end)),
-           J(pcall(function() return bq:GetBuildingCost(row.Index) end))
-  elseif row.DistrictType then
-    return J(pcall(function() return bq:GetDistrictProgress(row.Index) end)),
-           J(pcall(function() return bq:GetDistrictCost(row.Index) end))
-  elseif row.UnitType then
-    return J(pcall(function() return bq:GetUnitProgress(row.Index) end)),
-           J(pcall(function() return bq:GetUnitCost(row.Index) end))
-  end
-  return J(pcall(function() return bq:GetProjectProgress(row.Index) end)),
-         J(pcall(function() return bq:GetProjectCost(row.Index) end))
-end
 for p = 0, 62 do
   local pl = Players[p]
   if pl ~= nil and pl:IsAlive() and not pl:IsMajor() and not pl:IsBarbarian() then
@@ -52,9 +30,8 @@ for p = 0, 62 do
     for _, c in pl:GetCities():Members() do
       local bq = c:GetBuildQueue()
       local okb, cur = pcall(function() return bq:CurrentlyBuilding() end)
-      local prog, cost = progress(bq, itemRow(bq, okb and cur or nil))
       cities[#cities + 1] = "[" .. c:GetX() .. "," .. c:GetY() .. "," .. c:GetPopulation() .. ","
-        .. J(okb, cur) .. "," .. prog .. "," .. cost .. "]"
+        .. J(okb, cur) .. "]"
     end
     local units = {}
     for _, u in pl:GetUnits():Members() do

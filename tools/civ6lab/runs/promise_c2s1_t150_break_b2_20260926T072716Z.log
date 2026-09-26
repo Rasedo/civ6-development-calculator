@@ -1,0 +1,50 @@
+turn 153 (start)
+{"kind":"grievance","turn":153,"a":0,"b":1,"g":-100,"perTurn":-5}
+{"kind":"grievlog","turn":153,"a":0,"b":1,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":153}}
+{"kind":"city","turn":153,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":153,"p":0,"id":196609,"x":37,"y":38,"orig":0}
+{"kind":"city","turn":153,"p":0,"id":262146,"x":51,"y":19,"orig":0}
+{"kind":"city","turn":153,"p":0,"id":327683,"x":46,"y":8,"orig":0}
+{"kind":"promise","turn":153,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":153,"a":1,"b":0,"g":100,"perTurn":-5}
+{"kind":"grievlog","turn":153,"a":1,"b":0,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":153}}
+{"kind":"grievance","turn":153,"a":1,"b":6,"g":110,"perTurn":-5}
+{"kind":"grievance","turn":153,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":153,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":153,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":153,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":153,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":153,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":153,"a":5,"b":6,"g":47,"perTurn":-5}
+{"kind":"grievance","turn":153,"a":5,"b":7,"g":-30,"perTurn":-5}
+{"kind":"grievance","turn":153,"a":6,"b":1,"g":-110,"perTurn":-5}
+{"kind":"grievance","turn":153,"a":6,"b":5,"g":-47,"perTurn":-5}
+{"kind":"promise","turn":153,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":153,"a":7,"b":5,"g":30,"perTurn":-5}
+    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> COPAN builds BUILDING_GRANARY
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup BoostUnlockedPopup -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+{"kind":"grievance","turn":154,"a":0,"b":1,"g":-95,"perTurn":-5}
+{"kind":"grievlog","turn":154,"a":0,"b":1,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":153}}
+{"kind":"city","turn":154,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":154,"p":0,"id":196609,"x":37,"y":38,"orig":0}
+{"kind":"city","turn":154,"p":0,"id":262146,"x":51,"y":19,"orig":0}
+{"kind":"city","turn":154,"p":0,"id":327683,"x":46,"y":8,"orig":0}
+{"kind":"promise","turn":154,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":154,"a":1,"b":0,"g":95,"perTurn":-5}
+{"kind":"grievlog","turn":154,"a":1,"b":0,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":153}}
+{"kind":"grievance","turn":154,"a":1,"b":6,"g":105,"perTurn":-5}
+{"kind":"grievance","turn":154,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":154,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":154,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":154,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":154,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":154,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":154,"a":5,"b":6,"g":42,"perTurn":-5}
+{"kind":"grievance","turn":154,"a":5,"b":7,"g":-25,"perTurn":-5}
+{"kind":"grievance","turn":154,"a":6,"b":1,"g":-105,"perTurn":-5}
+{"kind":"grievance","turn":154,"a":6,"b":5,"g":-42,"perTurn":-5}
+{"kind":"promise","turn":154,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":154,"a":7,"b":5,"g":25,"perTurn":-5}
+turn 154

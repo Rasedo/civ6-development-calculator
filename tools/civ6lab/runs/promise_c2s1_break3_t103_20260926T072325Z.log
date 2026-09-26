@@ -1,0 +1,26 @@
+turn 103 (start)
+{"kind":"grievance","turn":103,"a":0,"b":1,"g":-393,"perTurn":-7}
+{"kind":"grievlog","turn":103,"a":0,"b":1,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":102}}
+{"kind":"grievlog","turn":103,"a":0,"b":1,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":103}}
+{"kind":"grievlog","turn":103,"a":0,"b":1,"entry":{"Amount":200,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":102}}
+{"kind":"grievance","turn":103,"a":0,"b":2,"g":43,"perTurn":-7}
+{"kind":"grievlog","turn":103,"a":0,"b":2,"entry":{"Amount":50,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":2,"Target":0,"Turn":102}}
+{"kind":"grievance","turn":103,"a":0,"b":4,"g":43,"perTurn":-7}
+{"kind":"grievlog","turn":103,"a":0,"b":4,"entry":{"Amount":50,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":4,"Target":0,"Turn":102}}
+{"kind":"city","turn":103,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"city","turn":103,"p":0,"id":196609,"x":50,"y":11,"orig":0}
+{"kind":"city","turn":103,"p":0,"id":262146,"x":58,"y":12,"orig":0}
+{"kind":"city","turn":103,"p":0,"id":327683,"x":56,"y":5,"orig":0}
+{"kind":"city","turn":103,"p":0,"id":393220,"x":51,"y":19,"orig":0}
+{"kind":"promise","turn":103,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":103,"a":1,"b":0,"g":393,"perTurn":-7}
+{"kind":"grievlog","turn":103,"a":1,"b":0,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":102}}
+{"kind":"grievlog","turn":103,"a":1,"b":0,"entry":{"Amount":100,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":103}}
+{"kind":"grievlog","turn":103,"a":1,"b":0,"entry":{"Amount":200,"Description":"Обещание нарушено","Initiator":0,"Target":1,"Turn":102}}
+{"kind":"grievance","turn":103,"a":2,"b":0,"g":-43,"perTurn":-7}
+{"kind":"grievlog","turn":103,"a":2,"b":0,"entry":{"Amount":50,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":2,"Target":0,"Turn":102}}
+{"kind":"grievance","turn":103,"a":4,"b":0,"g":-43,"perTurn":-7}
+{"kind":"grievlog","turn":103,"a":4,"b":0,"entry":{"Amount":50,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":4,"Target":0,"Turn":102}}
+{"kind":"grievance","turn":103,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":103,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"promise","turn":103,"a":7,"b":2,"made":true}
