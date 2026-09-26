@@ -34,6 +34,11 @@ CD = re.compile(r"(^|[;&|(]\s*)(?:cd|Set-Location|sl|pushd)\s+(\"[^\"]+\"|'[^']+
 # `python -` / `python3 -X utf8 -`: the script on stdin
 PY_STDIN = re.compile(r"(^|[;&|(]\s*)python3?(\s+-X\s+\S+)*\s+-(\s|$)")
 SLEEP = re.compile(r"(^|[;&|(]\s*)sleep\s+[\d.]|Start-Sleep", re.I)
+# a whole-directory GPU test sweep: the sweep script, a glob over tests/gpu,
+# pytest over the directory, or a directory listing feeding a loop
+GPU_SWEEP = re.compile(
+    r"run_gpu_tests|tests[\\/]gpu[\\/]\*|pytest\s+(\S+\s+)*tests[\\/]gpu[\\/]?(\s|$)"
+    r"|(Get-ChildItem|ls|dir|find)\s+[^|;&]*tests[\\/]gpu[^|;&]*\|", re.I)
 
 
 def main() -> int:
@@ -65,6 +70,12 @@ def main() -> int:
             "BLOCKED: `python -` reads the script from stdin, and with no stdin "
             "it hangs until the tool times out. Write the script to a file and "
             "run `python <path>`.\n")
+        return 2
+    if GPU_SWEEP.search(cmd):
+        sys.stderr.write(
+            "BLOCKED: whole-directory GPU test sweeps are banned (owner: they "
+            "waste the box and are battery work). Run only the named GPU test "
+            "files your change touches, one per call: `python tests/gpu/<name>_test.py`.\n")
         return 2
     if SLEEP.search(cmd):
         sys.stderr.write(
