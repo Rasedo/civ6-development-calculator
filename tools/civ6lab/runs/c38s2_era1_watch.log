@@ -1,0 +1,23 @@
+config {"ruleset": "RULESET_EXPANSION_2", "speed": "GAMESPEED_ONLINE", "difficulty": "DIFFICULTY_PRINCE", "map": "Continents.lua", "size": "MAPSIZE_SMALL", "city_states": 14, "realism": 2, "start_era": "ERA_ANCIENT", "turn_limit": "none", "all_ai": true, "map_seed": 74202, "game_seed": 74203}
+victories off: VICTORY_CONQUEST=false VICTORY_CULTURE=false VICTORY_RELIGIOUS=false VICTORY_SCORE=false VICTORY_TECHNOLOGY=false VICTORY_DIPLOMATIC=false
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=-1837222328 cs=14 realism=2 majors=6 autostart=true
+    hosting
+in game; turn 1
+watching 127.0.0.4 from turn 1 to 3 (seat 0) -> c38s2_era_c38s2_era1_20260926T081728Z.jsonl, city_defense_preview_c38s2_era1_20260926T081728Z.jsonl
+turn 2 at 1790410651.2
+turn 3 at 1790410652.9
+event history -> event_history_c38s2_era1_20260926T081728Z.txt
+    {"kind":"victory","turn":3,"winningTeam":"nil","victoryType":"nil","settings":{"VICTORY_SCORE":"false","VICTORY_DEFAULT":"nil","VICTORY_CONQUEST":"false","VICTORY_CULTURE":"false","VICTORY_RELIGIOUS":"false","VICTORY_TECHNOLOGY":"false","VICTORY_DIPLOMATIC":"false"}}
+    at end (menu): left the game at turn 3

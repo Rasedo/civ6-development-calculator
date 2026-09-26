@@ -1,0 +1,12 @@
+{
+  "ruleset": "RULESET_EXPANSION_2",
+  "speed": "GAMESPEED_ONLINE",
+  "difficulty": "DIFFICULTY_PRINCE",
+  "map": "Continents.lua",
+  "size": "MAPSIZE_DUEL",
+  "city_states": 3,
+  "realism": 2,
+  "start_era": "ERA_ANCIENT",
+  "turn_limit": "none",
+  "all_ai": true
+}

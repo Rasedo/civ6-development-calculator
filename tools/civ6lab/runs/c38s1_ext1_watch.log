@@ -1,0 +1,335 @@
+config {"ruleset": "RULESET_EXPANSION_2", "speed": "GAMESPEED_ONLINE", "difficulty": "DIFFICULTY_PRINCE", "map": "Continents.lua", "size": "MAPSIZE_STANDARD", "majors": 12, "city_states": 12, "realism": 2, "start_era": "ERA_ANCIENT", "turn_limit": "none", "all_ai": true, "map_seed": 74202, "game_seed": 74203}
+victories off: VICTORY_CONQUEST=false VICTORY_CULTURE=false VICTORY_RELIGIOUS=false VICTORY_SCORE=false VICTORY_TECHNOLOGY=false VICTORY_DIPLOMATIC=false
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    majors=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=-2055278946 cs=12 realism=2 majors=12 autostart=true
+    hosting
+in game; turn 1
+watching 127.0.0.4 from turn 1 to 250 (seat 0) -> c38s1_watch_c38s1_ext1_20260926T084640Z.jsonl, c74s2_turn_c38s1_ext1_20260926T084640Z.jsonl
+turn 2 at 1790412402.9
+turn 3 at 1790412404.8
+turn 4 at 1790412407.1
+turn 5 at 1790412409.5
+turn 6 at 1790412411.7
+turn 7 at 1790412414.0
+turn 8 at 1790412416.3
+turn 9 at 1790412418.6
+turn 10 at 1790412421.2
+turn 11 at 1790412423.9
+turn 12 at 1790412426.3
+turn 13 at 1790412428.6
+turn 14 at 1790412430.8
+turn 15 at 1790412433.0
+turn 16 at 1790412435.4
+turn 17 at 1790412437.9
+turn 18 at 1790412440.5
+turn 19 at 1790412443.2
+    cause session 10:10 -> closed sessions [10:10]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup TechCivicCompletedPopup -> closed
+    rearmed 19
+    cause popup BoostUnlockedPopup -> closed
+    rearmed 20
+turn 20 at 1790412454.3
+turn 21 at 1790412456.2
+turn 22 at 1790412458.7
+turn 23 at 1790412461.3
+turn 24 at 1790412463.7
+turn 25 at 1790412466.5
+turn 26 at 1790412469.6
+turn 27 at 1790412472.8
+turn 28 at 1790412475.8
+turn 29 at 1790412478.4
+turn 30 at 1790412481.1
+turn 31 at 1790412484.4
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_SCIENTIFIC","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":32}
+    cause popup TechCivicCompletedPopup -> closed
+    rearmed 32
+turn 32 at 1790412492.5
+turn 33 at 1790412494.3
+turn 34 at 1790412497.3
+turn 35 at 1790412500.2
+turn 36 at 1790412503.1
+turn 37 at 1790412506.1
+turn 38 at 1790412508.7
+turn 39 at 1790412511.5
+turn 40 at 1790412514.7
+turn 41 at 1790412517.8
+turn 42 at 1790412520.8
+turn 43 at 1790412523.7
+turn 44 at 1790412526.8
+turn 45 at 1790412530.2
+turn 46 at 1790412533.9
+turn 47 at 1790412537.8
+turn 48 at 1790412541.2
+turn 49 at 1790412544.9
+turn 50 at 1790412549.0
+turn 51 at 1790412552.5
+turn 52 at 1790412555.9
+turn 53 at 1790412559.5
+turn 54 at 1790412562.9
+    cause session 6:6 -> closed sessions [6:6]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup TechCivicCompletedPopup -> hidden
+    rearmed 54
+    cause popup HistoricMoments -> closed
+    rearmed 55
+turn 55 at 1790412574.3
+turn 56 at 1790412577.3
+turn 57 at 1790412580.9
+turn 58 at 1790412584.5
+turn 59 at 1790412588.2
+turn 60 at 1790412592.0
+    cause session 10:10 -> closed sessions [10:10]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup TechCivicCompletedPopup -> closed
+    rearmed 60
+    cause popup BoostUnlockedPopup -> hidden
+    rearmed 61
+turn 61 at 1790412603.3
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_SCIENTIFIC","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":62}
+    cause popup BoostUnlockedPopup -> hidden
+    cause popup WorldCongressPopup -> closed
+    rearmed 62
+turn 62 at 1790412611.8
+turn 63 at 1790412614.6
+turn 64 at 1790412618.5
+turn 65 at 1790412622.4
+turn 66 at 1790412626.4
+turn 67 at 1790412630.4
+turn 68 at 1790412634.7
+turn 69 at 1790412639.0
+turn 70 at 1790412642.8
+turn 71 at 1790412646.6
+turn 72 at 1790412651.2
+turn 73 at 1790412655.2
+turn 74 at 1790412659.0
+turn 75 at 1790412663.0
+turn 76 at 1790412667.3
+    cause session 6:6 -> closed sessions [6:6]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup HistoricMoments -> closed
+    rearmed 76
+    cause popup TechCivicCompletedPopup -> closed
+    rearmed 77
+turn 77 at 1790412678.7
+turn 78 at 1790412682.4
+turn 79 at 1790412686.4
+    cause session 3:3 -> closed sessions [3:3]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup HistoricMoments -> closed
+    rearmed 79
+    cause popup TechCivicCompletedPopup -> closed
+    rearmed 80
+turn 80 at 1790412697.9
+turn 81 at 1790412701.5
+turn 82 at 1790412705.1
+turn 83 at 1790412709.3
+turn 84 at 1790412713.6
+turn 85 at 1790412717.6
+turn 86 at 1790412721.2
+turn 87 at 1790412725.5
+turn 88 at 1790412729.7
+turn 89 at 1790412733.6
+turn 90 at 1790412737.6
+turn 91 at 1790412741.9
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_INFRASTRUCTURE","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":92}
+    cause popup WorldCongressPopup -> closed
+    rearmed 92
+turn 92 at 1790412750.2
+turn 93 at 1790412753.7
+turn 94 at 1790412758.1
+turn 95 at 1790412763.3
+turn 96 at 1790412767.3
+turn 97 at 1790412771.7
+turn 98 at 1790412776.8
+turn 99 at 1790412782.3
+turn 100 at 1790412787.9
+turn 101 at 1790412792.2
+turn 102 at 1790412796.1
+    cause session 6:6 -> closed sessions [6:6]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup TechCivicCompletedPopup -> closed
+    rearmed 102
+    cause popup BoostUnlockedPopup -> closed
+    rearmed 102
+turn 103 at 1790412807.8
+turn 104 at 1790412812.1
+turn 105 at 1790412817.1
+turn 106 at 1790412821.9
+    cause popup WonderBuiltPopup -> closed
+    rearmed 106
+    cause popup TechCivicCompletedPopup -> closed
+    rearmed 106
+    cause popup BoostUnlockedPopup -> closed
+    rearmed 107
+turn 107 at 1790412836.1
+turn 108 at 1790412839.3
+turn 109 at 1790412844.1
+turn 110 at 1790412848.8
+turn 111 at 1790412853.4
+turn 112 at 1790412857.9
+turn 113 at 1790412863.2
+turn 114 at 1790412867.7
+turn 115 at 1790412871.7
+turn 116 at 1790412876.9
+turn 117 at 1790412881.9
+turn 118 at 1790412886.1
+turn 119 at 1790412891.7
+turn 120 at 1790412896.7
+turn 121 at 1790412901.5
+    cause popup BoostUnlockedPopup -> closed
+    rearmed 122
+turn 122 at 1790412909.8
+turn 123 at 1790412913.2
+turn 124 at 1790412918.2
+turn 125 at 1790412923.4
+turn 126 at 1790412927.9
+turn 127 at 1790412932.6
+turn 128 at 1790412938.0
+turn 129 at 1790412942.6
+turn 130 at 1790412947.5
+turn 131 at 1790412953.0
+turn 132 at 1790412958.2
+turn 133 at 1790412963.1
+turn 134 at 1790412968.7
+turn 135 at 1790412973.5
+turn 136 at 1790412977.5
+turn 137 at 1790412983.7
+turn 138 at 1790412988.9
+turn 139 at 1790412994.2
+turn 140 at 1790412999.3
+turn 141 at 1790413004.1
+turn 142 at 1790413009.3
+turn 143 at 1790413014.9
+turn 144 at 1790413019.8
+turn 145 at 1790413025.0
+    cause popup BoostUnlockedPopup -> closed
+    rearmed 146
+turn 146 at 1790413033.8
+turn 147 at 1790413037.8
+    cause popup BoostUnlockedPopup -> closed
+    rearmed 148
+turn 148 at 1790413046.5
+turn 149 at 1790413050.1
+turn 150 at 1790413058.5
+turn 151 at 1790413063.3
+turn 152 at 1790413068.7
+turn 153 at 1790413074.5
+turn 154 at 1790413079.5
+turn 155 at 1790413087.6
+turn 156 at 1790413092.4
+turn 157 at 1790413097.5
+turn 158 at 1790413105.9
+turn 159 at 1790413110.9
+turn 160 at 1790413116.5
+turn 161 at 1790413125.1
+turn 162 at 1790413130.3
+turn 163 at 1790413136.0
+turn 164 at 1790413141.7
+turn 165 at 1790413150.5
+turn 166 at 1790413155.2
+turn 167 at 1790413164.8
+turn 168 at 1790413171.1
+turn 169 at 1790413179.5
+turn 170 at 1790413184.9
+turn 171 at 1790413190.1
+turn 172 at 1790413195.6
+turn 173 at 1790413201.2
+turn 174 at 1790413206.2
+turn 175 at 1790413215.4
+turn 176 at 1790413224.3
+turn 177 at 1790413230.3
+turn 178 at 1790413239.2
+turn 179 at 1790413243.8
+turn 180 at 1790413252.8
+turn 181 at 1790413261.1
+turn 182 at 1790413266.6
+turn 183 at 1790413276.2
+turn 184 at 1790413281.1
+turn 185 at 1790413290.7
+turn 186 at 1790413300.1
+turn 187 at 1790413309.7
+turn 188 at 1790413318.4
+turn 189 at 1790413327.3
+turn 190 at 1790413333.0
+turn 191 at 1790413342.6
+turn 192 at 1790413351.5
+turn 193 at 1790413360.3
+turn 194 at 1790413365.7
+turn 195 at 1790413377.3
+turn 196 at 1790413383.0
+turn 197 at 1790413392.2
+turn 198 at 1790413401.5
+turn 199 at 1790413409.9
+turn 200 at 1790413419.1
+turn 201 at 1790413428.4
+turn 202 at 1790413437.9
+turn 203 at 1790413447.2
+turn 204 at 1790413455.6
+turn 205 at 1790413464.9
+turn 206 at 1790413471.0
+turn 207 at 1790413480.8
+turn 208 at 1790413490.5
+turn 209 at 1790413499.4
+turn 210 at 1790413509.1
+turn 211 at 1790413518.3
+turn 212 at 1790413527.6
+turn 213 at 1790413539.4
+turn 214 at 1790413548.4
+turn 215 at 1790413557.8
+turn 216 at 1790413567.1
+turn 217 at 1790413576.2
+turn 218 at 1790413585.7
+turn 219 at 1790413595.4
+turn 220 at 1790413604.7
+turn 221 at 1790413613.5
+turn 222 at 1790413623.4
+turn 223 at 1790413633.1
+turn 224 at 1790413642.6
+turn 225 at 1790413652.2
+turn 226 at 1790413661.5
+turn 227 at 1790413670.2
+turn 228 at 1790413683.7
+turn 229 at 1790413695.4
+turn 230 at 1790413704.8
+turn 231 at 1790413714.4
+turn 232 at 1790413723.1
+turn 233 at 1790413736.3
+turn 234 at 1790413745.3
+turn 235 at 1790413758.2
+turn 236 at 1790413767.0
+turn 237 at 1790413780.3
+turn 238 at 1790413790.2
+turn 239 at 1790413799.4
+turn 240 at 1790413811.9
+turn 241 at 1790413821.2
+turn 242 at 1790413834.2
+turn 243 at 1790413843.4
+turn 244 at 1790413852.3
+turn 245 at 1790413866.1
+turn 246 at 1790413877.8
+turn 247 at 1790413886.2
+turn 248 at 1790413899.3
+turn 249 at 1790413909.0
+turn 250 at 1790413920.8
+event history -> event_history_c38s1_ext1_20260926T084640Z.txt
+    {"kind":"victory","turn":250,"winningTeam":"nil","victoryType":"nil","settings":{"VICTORY_SCORE":"false","VICTORY_DEFAULT":"nil","VICTORY_CONQUEST":"false","VICTORY_CULTURE":"false","VICTORY_RELIGIOUS":"false","VICTORY_TECHNOLOGY":"false","VICTORY_DIPLOMATIC":"false"}}
+    at end (menu): left the game at turn 250

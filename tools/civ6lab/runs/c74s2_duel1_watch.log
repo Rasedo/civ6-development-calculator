@@ -1,0 +1,218 @@
+config {"ruleset": "RULESET_EXPANSION_2", "speed": "GAMESPEED_ONLINE", "difficulty": "DIFFICULTY_PRINCE", "map": "Continents.lua", "size": "MAPSIZE_DUEL", "city_states": 3, "realism": 2, "start_era": "ERA_ANCIENT", "turn_limit": "none", "all_ai": true, "map_seed": 74202, "game_seed": 74203}
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=2 autostart=true
+    hosting
+in game; turn 1
+watching 127.0.0.4 from turn 1 to 250 (seat 0) -> c74s2_turn_c74s2_duel1_20260926T074416Z.jsonl
+    autoplay false
+turn 2 at 1790408658.6 free_mb 9566
+    autoplay false
+turn 3 at 1790408659.8 free_mb 9555
+    autoplay false
+turn 4 at 1790408660.8 free_mb 10217
+    autoplay false
+turn 5 at 1790408661.9 free_mb 10234
+    autoplay false
+turn 6 at 1790408663.0 free_mb 10211
+    autoplay false
+turn 7 at 1790408664.1 free_mb 10208
+    autoplay false
+turn 8 at 1790408665.1 free_mb 10196
+    autoplay false
+turn 9 at 1790408666.1 free_mb 10200
+    autoplay false
+turn 10 at 1790408667.1 free_mb 10936
+    autoplay false
+turn 11 at 1790408668.3 free_mb 10957
+    autoplay false
+turn 12 at 1790408669.3 free_mb 10975
+    autoplay false
+turn 13 at 1790408670.3 free_mb 10993
+    autoplay false
+turn 14 at 1790408671.3 free_mb 10984
+    autoplay false
+turn 15 at 1790408672.3 free_mb 10484
+    autoplay false
+turn 16 at 1790408673.3 free_mb 11004
+    autoplay false
+turn 17 at 1790408674.3 free_mb 11006
+    autoplay false
+turn 18 at 1790408675.3 free_mb 11285
+    autoplay false
+turn 19 at 1790408676.3 free_mb 11274
+    autoplay false
+turn 20 at 1790408677.3 free_mb 11295
+    autoplay false
+turn 21 at 1790408678.3 free_mb 11304
+    autoplay false
+turn 22 at 1790408679.3 free_mb 11110
+    autoplay false
+turn 23 at 1790408680.3 free_mb 10494
+    autoplay false
+turn 24 at 1790408681.2 free_mb 11015
+    autoplay false
+turn 25 at 1790408682.6 free_mb 11042
+    autoplay false
+turn 26 at 1790408684.0 free_mb 10925
+    autoplay false
+turn 27 at 1790408685.0 free_mb 10908
+    autoplay false
+turn 28 at 1790408686.0 free_mb 10894
+    autoplay false
+turn 29 at 1790408687.4 free_mb 10890
+    autoplay false
+turn 30 at 1790408688.8 free_mb 10891
+    autoplay false
+turn 31 at 1790408689.8 free_mb 10869
+    autoplay false
+turn 32 at 1790408695.3 free_mb 10109
+    autoplay false
+turn 33 at 1790408696.7 free_mb 10103
+    autoplay false
+turn 34 at 1790408698.2 free_mb 10088
+    autoplay false
+turn 35 at 1790408699.7 free_mb 10193
+    autoplay false
+turn 36 at 1790408700.6 free_mb 9627
+    autoplay false
+turn 37 at 1790408702.0 free_mb 9508
+    autoplay false
+turn 38 at 1790408703.4 free_mb 9495
+    autoplay false
+turn 39 at 1790408704.7 free_mb 9495
+    autoplay false
+turn 40 at 1790408705.7 free_mb 9476
+    autoplay false
+turn 41 at 1790408706.7 free_mb 9480
+    autoplay false
+turn 42 at 1790408708.1 free_mb 10156
+    autoplay false
+turn 43 at 1790408709.1 free_mb 10189
+    autoplay false
+turn 44 at 1790408710.1 free_mb 10200
+    autoplay false
+turn 45 at 1790408711.1 free_mb 10216
+    autoplay false
+turn 46 at 1790408712.2 free_mb 10217
+    autoplay false
+turn 47 at 1790408713.2 free_mb 10179
+    autoplay false
+turn 48 at 1790408714.4 free_mb 10182
+    autoplay false
+turn 49 at 1790408715.4 free_mb 10177
+    autoplay false
+turn 50 at 1790408716.8 free_mb 10231
+    autoplay false
+turn 51 at 1790408718.2 free_mb 10230
+    autoplay false
+turn 52 at 1790408719.2 free_mb 10272
+    autoplay false
+turn 53 at 1790408720.5 free_mb 10071
+    autoplay false
+turn 54 at 1790408721.9 free_mb 9372
+    autoplay false
+turn 55 at 1790408723.3 free_mb 10221
+    autoplay false
+turn 56 at 1790408724.6 free_mb 10189
+    autoplay false
+turn 57 at 1790408725.6 free_mb 10236
+    autoplay false
+turn 58 at 1790408726.6 free_mb 10225
+    autoplay false
+turn 59 at 1790408728.2 free_mb 10198
+    autoplay false
+turn 60 at 1790408729.6 free_mb 10164
+    autoplay false
+turn 61 at 1790408731.0 free_mb 10098
+    autoplay false
+turn 62 at 1790408736.3 free_mb 9999
+    autoplay false
+turn 63 at 1790408737.8 free_mb 9978
+    autoplay false
+turn 64 at 1790408739.2 free_mb 9997
+    autoplay false
+turn 65 at 1790408740.5 free_mb 10153
+    autoplay false
+turn 66 at 1790408741.9 free_mb 9497
+    autoplay false
+turn 67 at 1790408743.3 free_mb 9466
+    autoplay false
+turn 68 at 1790408744.7 free_mb 9467
+    autoplay false
+turn 69 at 1790408745.8 free_mb 9462
+    autoplay false
+turn 70 at 1790408747.1 free_mb 9470
+    autoplay false
+turn 71 at 1790408748.5 free_mb 9490
+    autoplay false
+turn 72 at 1790408749.8 free_mb 9481
+    autoplay false
+turn 73 at 1790408751.2 free_mb 9481
+    autoplay false
+turn 74 at 1790408752.6 free_mb 9497
+    autoplay false
+turn 75 at 1790408753.9 free_mb 9499
+    autoplay false
+turn 76 at 1790408754.9 free_mb 9491
+    autoplay false
+turn 77 at 1790408755.9 free_mb 9486
+    autoplay false
+turn 78 at 1790408757.3 free_mb 10116
+    autoplay false
+turn 79 at 1790408758.7 free_mb 10126
+    autoplay false
+turn 80 at 1790408760.2 free_mb 10148
+    autoplay false
+turn 81 at 1790408761.6 free_mb 10180
+    autoplay false
+turn 82 at 1790408763.1 free_mb 10176
+    autoplay false
+turn 83 at 1790408764.5 free_mb 10167
+    autoplay false
+turn 84 at 1790408765.8 free_mb 10185
+    autoplay false
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_SCIENTIFIC","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":84}
+    cause popup WonderBuiltPopup -> closed
+    cause popup WorldCongressPopup -> closed
+turn 85 at 1790408774.5 free_mb 10820
+    autoplay false
+turn 86 at 1790408776.0 free_mb 10817
+    autoplay false
+turn 87 at 1790408777.4 free_mb 10818
+    autoplay false
+turn 88 at 1790408778.7 free_mb 11085
+    autoplay false
+turn 89 at 1790408780.3 free_mb 11118
+    autoplay false
+turn 90 at 1790408781.7 free_mb 11001
+    autoplay false
+turn 91 at 1790408783.1 free_mb 10722
+    autoplay false
+turn 92 at 1790408788.6 free_mb 10771
+    autoplay false
+turn 93 at 1790408789.9 free_mb 10173
+    autoplay false
+turn 94 at 1790408791.3 free_mb 10139
+    autoplay false
+turn 95 at 1790408792.6 free_mb 10080
+    autoplay false
+turn 96 at 1790408794.0 free_mb 10151
+    autoplay false
+turn 97 at 1790408795.5 free_mb 10037
+    autoplay false
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_INFRASTRUCTURE","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":97}
+    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_FOREIGN_TRADE
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NICAEA builds BUILDING_GRANARY
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+{"kind":"victory","turn":97,"winningTeam":"1","victoryType":"nil","settings":{"VICTORY_SCORE":"nil","VICTORY_DEFAULT":"nil","VICTORY_CONQUEST":"nil","VICTORY_CULTURE":"nil","VICTORY_RELIGIOUS":"nil","VICTORY_TECHNOLOGY":"nil","VICTORY_DIPLOMATIC":"nil"}}

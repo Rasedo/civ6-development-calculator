@@ -1,0 +1,250 @@
+in a game; to the main menu: left the game at turn 97
+config {"ruleset": "RULESET_EXPANSION_2", "speed": "GAMESPEED_ONLINE", "difficulty": "DIFFICULTY_PRINCE", "map": "Continents.lua", "size": "MAPSIZE_DUEL", "city_states": 3, "realism": 2, "start_era": "ERA_ANCIENT", "turn_limit": "none", "all_ai": true, "map_seed": 74204, "game_seed": 74205}
+victories off: VICTORY_CONQUEST=false VICTORY_CULTURE=false VICTORY_RELIGIOUS=false VICTORY_SCORE=false VICTORY_TECHNOLOGY=false VICTORY_DIPLOMATIC=false
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=2 autostart=true
+    hosting
+in game; turn 1
+watching 127.0.0.4 from turn 1 to 250 (seat 0) -> c74s2_turn_c74s2_duel2_20260926T075129Z.jsonl
+turn 2 at 1790409090.5
+turn 3 at 1790409091.4
+turn 4 at 1790409092.2
+turn 5 at 1790409093.1
+turn 6 at 1790409093.9
+turn 7 at 1790409094.9
+turn 8 at 1790409095.9
+turn 9 at 1790409096.7
+turn 10 at 1790409097.5
+turn 11 at 1790409098.5
+turn 12 at 1790409099.4
+turn 13 at 1790409100.2
+turn 14 at 1790409101.1
+turn 15 at 1790409102.0
+turn 16 at 1790409102.9
+turn 17 at 1790409103.8
+turn 18 at 1790409104.7
+turn 19 at 1790409105.5
+turn 20 at 1790409106.4
+turn 21 at 1790409107.3
+turn 22 at 1790409108.1
+turn 23 at 1790409109.0
+turn 24 at 1790409109.9
+turn 25 at 1790409110.8
+turn 26 at 1790409111.7
+turn 27 at 1790409112.6
+turn 28 at 1790409113.5
+turn 29 at 1790409114.3
+turn 30 at 1790409115.2
+turn 31 at 1790409116.0
+turn 32 at 1790409121.3
+turn 33 at 1790409122.1
+turn 34 at 1790409123.0
+turn 35 at 1790409123.9
+turn 36 at 1790409125.0
+turn 37 at 1790409125.9
+turn 38 at 1790409126.9
+turn 39 at 1790409127.7
+turn 40 at 1790409128.6
+turn 41 at 1790409129.6
+turn 42 at 1790409130.4
+turn 43 at 1790409131.3
+turn 44 at 1790409132.1
+turn 45 at 1790409133.0
+turn 46 at 1790409133.9
+turn 47 at 1790409134.7
+turn 48 at 1790409135.7
+turn 49 at 1790409136.5
+turn 50 at 1790409137.4
+turn 51 at 1790409138.3
+turn 52 at 1790409139.2
+turn 53 at 1790409140.0
+turn 54 at 1790409140.9
+turn 55 at 1790409141.8
+turn 56 at 1790409142.6
+turn 57 at 1790409143.5
+turn 58 at 1790409144.4
+turn 59 at 1790409145.3
+turn 60 at 1790409146.1
+turn 61 at 1790409147.3
+turn 62 at 1790409152.3
+turn 63 at 1790409153.5
+turn 64 at 1790409154.7
+turn 65 at 1790409155.9
+turn 66 at 1790409157.1
+turn 67 at 1790409158.3
+turn 68 at 1790409159.1
+turn 69 at 1790409160.0
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_SCIENTIFIC","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":69}
+    cause popup WonderBuiltPopup -> closed
+    cause popup WorldCongressPopup -> closed
+    rearmed 69
+turn 70 at 1790409168.1
+turn 71 at 1790409168.9
+turn 72 at 1790409169.8
+turn 73 at 1790409170.7
+turn 74 at 1790409171.6
+turn 75 at 1790409172.5
+turn 76 at 1790409173.4
+turn 77 at 1790409174.2
+turn 78 at 1790409175.1
+turn 79 at 1790409175.9
+turn 80 at 1790409176.8
+turn 81 at 1790409178.1
+turn 82 at 1790409179.0
+turn 83 at 1790409179.9
+turn 84 at 1790409180.9
+turn 85 at 1790409182.0
+turn 86 at 1790409182.9
+turn 87 at 1790409183.8
+turn 88 at 1790409185.0
+turn 89 at 1790409190.0
+turn 90 at 1790409190.9
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_INFRASTRUCTURE","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":90}
+    cause session 1:1 -> closed sessions [1:1]
+    cause popup DiplomacyActionView -> closed
+    cause popup LeaderScene -> hidden
+    cause popup HistoricMoments -> closed
+    rearmed 90
+turn 91 at 1790409199.2
+turn 92 at 1790409200.6
+turn 93 at 1790409201.9
+turn 94 at 1790409203.3
+turn 95 at 1790409204.5
+turn 96 at 1790409205.3
+turn 97 at 1790409206.2
+turn 98 at 1790409207.5
+turn 99 at 1790409208.7
+turn 100 at 1790409210.0
+turn 101 at 1790409211.3
+turn 102 at 1790409212.7
+turn 103 at 1790409214.0
+turn 104 at 1790409215.3
+turn 105 at 1790409216.6
+turn 106 at 1790409217.9
+turn 107 at 1790409219.1
+turn 108 at 1790409220.3
+turn 109 at 1790409225.8
+turn 110 at 1790409227.2
+turn 111 at 1790409228.6
+turn 112 at 1790409230.0
+turn 113 at 1790409231.2
+turn 114 at 1790409232.5
+turn 115 at 1790409233.8
+turn 116 at 1790409234.9
+turn 117 at 1790409236.2
+turn 118 at 1790409237.6
+turn 119 at 1790409239.1
+turn 120 at 1790409240.4
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":120}
+    cause popup WonderBuiltPopup -> closed
+    cause popup WorldCongressPopup -> closed
+    rearmed 120
+turn 121 at 1790409248.9
+turn 122 at 1790409250.1
+turn 123 at 1790409251.4
+turn 124 at 1790409252.9
+turn 125 at 1790409254.1
+turn 126 at 1790409255.6
+turn 127 at 1790409257.2
+turn 128 at 1790409258.8
+turn 129 at 1790409264.2
+turn 130 at 1790409265.5
+turn 131 at 1790409266.8
+turn 132 at 1790409268.3
+turn 133 at 1790409269.6
+turn 134 at 1790409271.1
+turn 135 at 1790409272.4
+turn 136 at 1790409273.6
+turn 137 at 1790409274.9
+turn 138 at 1790409276.6
+turn 139 at 1790409277.8
+turn 140 at 1790409279.2
+turn 141 at 1790409280.4
+turn 142 at 1790409282.3
+turn 143 at 1790409284.1
+turn 144 at 1790409285.9
+turn 145 at 1790409287.6
+turn 146 at 1790409289.3
+turn 147 at 1790409291.0
+turn 148 at 1790409292.7
+turn 149 at 1790409293.9
+turn 150 at 1790409295.5
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_INDUSTRIAL","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":151}
+    cause popup WorldCongressPopup -> closed
+    rearmed 151
+turn 151 at 1790409303.5
+turn 152 at 1790409304.5
+turn 153 at 1790409306.1
+turn 154 at 1790409307.3
+turn 155 at 1790409308.7
+turn 156 at 1790409310.0
+turn 157 at 1790409311.4
+turn 158 at 1790409313.5
+turn 159 at 1790409315.3
+turn 160 at 1790409317.3
+turn 161 at 1790409319.3
+turn 162 at 1790409320.8
+turn 163 at 1790409322.8
+turn 164 at 1790409324.3
+turn 165 at 1790409326.0
+turn 166 at 1790409328.0
+turn 167 at 1790409330.2
+turn 168 at 1790409332.2
+turn 169 at 1790409334.2
+turn 170 at 1790409336.1
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_TOURISM","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":171}
+    cause popup WorldCongressPopup -> closed
+    cause popup WorldCrisisPopup -> closed
+    rearmed 171
+turn 171 at 1790409344.4
+turn 172 at 1790409345.6
+turn 173 at 1790409347.8
+turn 174 at 1790409349.9
+turn 175 at 1790409351.8
+turn 176 at 1790409353.4
+turn 177 at 1790409355.2
+turn 178 at 1790409357.1
+turn 179 at 1790409358.6
+turn 180 at 1790409360.5
+turn 181 at 1790409362.7
+turn 182 at 1790409364.6
+turn 183 at 1790409366.6
+turn 184 at 1790409368.5
+turn 185 at 1790409370.3
+turn 186 at 1790409371.9
+turn 187 at 1790409373.9
+turn 188 at 1790409376.7
+turn 189 at 1790409379.0
+turn 190 at 1790409381.1
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":3,"picked":"COMMEMORATION_TOURISM,COMMEMORATION_AERONAUTICAL,COMMEMORATION_ESPIONAGE","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":191}
+    cause popup WorldCongressPopup -> closed
+    cause popup WorldCrisisPopup -> closed
+    rearmed 191
+turn 191 at 1790409389.3
+turn 192 at 1790409390.9
+turn 193 at 1790409393.1
+turn 194 at 1790409395.0
+turn 195 at 1790409397.2
+turn 196 at 1790409399.4
+turn 197 at 1790409401.7
+turn 198 at 1790409404.2
+turn 199 at 1790409406.4
+turn 200 at 1790409408.8
+turn 201 at 1790409411.1
+turn 202 at 1790409413.6
+turn 203 at 1790409415.8
+    the game is WON at turn 203; stopping
+event history -> event_history_c74s2_duel2_20260926T075129Z.txt
+    {"kind":"victory","turn":202,"winningTeam":"1","victoryType":"nil","settings":{"VICTORY_SCORE":"false","VICTORY_DEFAULT":"nil","VICTORY_CONQUEST":"false","VICTORY_CULTURE":"false","VICTORY_RELIGIOUS":"false","VICTORY_TECHNOLOGY":"false","VICTORY_DIPLOMATIC":"false"}}
+    at end (menu): left the game at turn 202
