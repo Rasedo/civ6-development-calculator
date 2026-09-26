@@ -26,6 +26,12 @@ for p = 0, 62 do
       .. ',"progressing":' .. P(function() return cu:GetProgressingCivic() end)
       .. ',"turnsLeft":' .. P(function() return cu:GetTurnsLeft() end)
       .. ',"gold":' .. P(function() return pl:GetTreasury():GetGoldBalance() end)
-      .. ',"government":' .. P(function() return cu:GetCurrentGovernment() end) .. '}')
+      .. ',"government":' .. P(function() return cu:GetCurrentGovernment() end)
+      .. ',"era":' .. P(function() return pl:GetEra() end)
+      .. ',"cities":' .. P(function() return pl:GetCities():GetCount() end)
+      .. ',"culture":' .. P(function() return cu:GetCultureYield() end)
+      .. ',"goldPerTurn":' .. P(function() return pl:GetTreasury():GetGoldYield() - pl:GetTreasury():GetTotalMaintenance() end)
+      .. ',"techs":' .. P(function() local n = 0; for t in GameInfo.Technologies() do if pl:GetTechs():HasTech(t.Index) then n = n + 1 end end; return n end)
+      .. '}')
   end
 end
