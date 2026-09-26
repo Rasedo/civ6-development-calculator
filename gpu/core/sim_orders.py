@@ -2136,7 +2136,9 @@ class SimOrders:
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
             _csp = _cplane.gather(1, ttc.unsqueeze(1)).squeeze(1)
             cs_here = (_csp >= 100) & (_csp < BARB_SEAT)
-            _csi = (_csp - 100).clamp(min=0)
+            # the minor's slot where the tile is a minor's, 0 elsewhere: the
+            # assault gathers on every game, and a Free City plot's 300 is no slot
+            _csi = torch.where(cs_here, _csp - 100, torch.zeros_like(_csp))
             has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
             _enc_here = (
                 self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
