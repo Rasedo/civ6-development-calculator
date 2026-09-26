@@ -1625,9 +1625,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       if (a < 0 || a === 12) return;            // no instruction, or HOLD
       // died, or spent its turn. A SPY has no movement AT ALL (moves 0), and
       // its verbs cost none — the GPU's applier gates on `present` alone, so
-      // the spent gate must not silence the one chassis that never moves.
+      // the spent gate must not silence the one chassis that never moves. Its
+      // steps and attacks stay behind the gate: `stepUnit`'s one-step
+      // allowance reads 0 of a full 0 as "spent nothing" and would walk it,
+      // where the GPU's move arm carries `mp > 0`.
       if (!state.units.includes(unit)) return;
-      if (unit.movesLeft <= 0 && !isSpy(unit.type)) {
+      if (unit.movesLeft <= 0 && !(isSpy(unit.type) && a >= 12)) {
         // A SPENT UNIT PRINTS ITS REFUSAL. The GPU has no gate here at all:
         // its move arm carries `mp > 0` as a term of `ok`, so it logs a
         // blocked step where this engine simply returns. One-sided output

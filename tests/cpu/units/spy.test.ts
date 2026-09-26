@@ -10,7 +10,8 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, holdWorks } from '../helpers';
 import { spawnUnit, trainableUnits, goldBuyableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain, disbandUnit } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
-import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner } from '../../../cpu/core/seats';
+import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner, unitsOf } from '../../../cpu/core/seats';
+import { applySeatUnitOrders } from '../../../cpu/core/phase';
 import {
   canTrainSpy, spyCapacity, spiesOf, spyDestinations, spyTravelTurns,
   beginTravel, beginMission, missionOffered, spyMissionMask, missionTurns,
@@ -124,6 +125,20 @@ describe('a spy is fielded, not stationed', () => {
     expect(tileFreeForUnit(state, mine.centerIndex, 0, { type: 'BUILDER', seat: 0 })).toBe(true);
     const second = spawnUnit(state, SPY_UNIT, mine.centerIndex, 0)!;
     expect(second.tileIndex).toBe(mine.centerIndex);
+  });
+
+  it('never walks: a replayed step order leaves it where it stands', () => {
+    const { state, mine, me } = spyState();
+    const spy = spyAt(state, 0, mine);
+    const j = unitsOf(state, 0).indexOf(spy);
+    expect(j).toBeGreaterThanOrEqual(0);
+    expect(spy.movesLeft).toBe(0);
+    for (let dir = 0; dir < 6; dir++) {
+      const row = unitsOf(state, 0).map((_, k) => (k === j ? dir : -1));
+      applySeatUnitOrders(state, me, [row]);
+      expect(spy.tileIndex).toBe(mine.centerIndex);
+      expect(spy.embarked ?? false).toBe(false);
+    }
   });
 
   it('carries no Combat Strength: no zone of control, and it never digs in', () => {
