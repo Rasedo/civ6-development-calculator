@@ -34,7 +34,19 @@ played through instead, so the watch reaches its target.
 `--at-end` then decides the game's fate: `menu` exits to the main menu
 (ready for the next game), `close` ends this instance's process, `stay`
 leaves it. `--min-free-mb` stops the run (saving first) when the box's free
-memory falls below it, so a fleet of instances cannot starve the machine.
+memory falls below it, so a fleet of instances cannot starve the machine;
+`--stop-at` (epoch seconds) stops it at a wall-clock time.
+
+A lost tuner is reconnected and each reconnect recorded. The instance counts
+as CRASHED — the watch ends at once, exit code 3, no event history and no
+`--at-end` — when its process (the one carrying `-TunerIP <host>` at the
+start) is gone, when the tuner stays unreachable for `--unreachable`
+seconds, or when a turn stands still for the whole `--wait`.
+`--result <file>` is rewritten after every turn as one JSON object: host,
+tag, wall start and end, start turn, target, the turn reached, the end
+(`target`, `game_over`, `stop`, `crash`, or null while it runs) and why, the
+reader logs, the event history file and the reconnects — what `fleet.py`
+builds its manifest from.
 """
 from __future__ import annotations
 
@@ -63,13 +75,31 @@ print("pause " .. (ok and "requested" or ("err:" .. tostring(err)))
 """
 
 
-def _connect(host: str, port: int) -> Tuner:
-    for _ in range(40):
+class Crash(RuntimeError):
+    """The instance is gone: its process died, its tuner stayed unreachable
+    past the limit, or its turn stood still past `--wait`."""
+
+
+def _connect(host: str, port: int, limit: float, pids: list[int]) -> Tuner:
+    """a tuner connection within `limit` seconds; `Crash` when the limit
+    passes, or at once when every one of `pids` (the instance's processes
+    when the watch began; empty for a game started without -TunerIP) has
+    ended"""
+    deadline = time.monotonic() + limit
+    checked = 0.0
+    while True:
         try:
             return Tuner(host, port).connect()
-        except TunerError:
-            time.sleep(3.0)
-    raise TunerError("no tuner")
+        except TunerError as e:
+            err = e
+        now = time.monotonic()
+        if now >= deadline:
+            raise Crash(f"tuner unreachable for {limit:.0f}s: {err}")
+        if pids and now - checked >= 10.0:
+            checked = now
+            if not set(pids) & set(game.instance_pids(host)):
+                raise Crash(f"process died (pid {pids})")
+        time.sleep(3.0)
 
 
 def free_mb() -> float:
@@ -95,6 +125,10 @@ def main(argv=None) -> int:
     p.add_argument("--state", action="append", help="the Lua state of the --lua in the same position")
     p.add_argument("--at-end", choices=game.AT_END, default="menu",
                    help="at the target: exit to the main menu, close the instance, or stay")
+    p.add_argument("--unreachable", type=float, default=300.0,
+                   help="seconds the tuner may stay unreachable before the instance counts as crashed")
+    p.add_argument("--stop-at", type=float, help="a wall-clock time (epoch seconds) at which the watch stops")
+    p.add_argument("--result", type=pathlib.Path, help="a JSON file rewritten every turn with the watch's state")
     a = p.parse_args(argv)
     luas = a.lua or ["cs_watch.lua"]
     states = a.state or [lab.GC] * len(luas)
@@ -105,13 +139,37 @@ def main(argv=None) -> int:
     readers = [(lab.RUNS / f"{pathlib.Path(n).stem}_{a.tag}_{stamp}.jsonl", (HERE / n).read_text(encoding="utf-8"), s)
                for n, s in zip(luas, states)]
     save = (HERE / "save_named.lua").read_text(encoding="utf-8")
+    hist = lab.RUNS / f"event_history_{a.tag}_{stamp}.txt"
+    res: dict = {"host": a.host, "tag": a.tag, "wall_start": time.time(), "wall_end": None,
+                 "start_turn": None, "target": None, "turn": None, "end": None, "why": None,
+                 "readers": [str(r[0]) for r in readers], "event_history": None, "reconnects": []}
+
+    def write_result() -> None:
+        if a.result is None:
+            return
+        tmp = a.result.with_suffix(".tmp")
+        tmp.write_text(json.dumps(res), encoding="utf-8")
+        tmp.replace(a.result)
 
     def log(s: str) -> None:
         print(s, flush=True)
 
-    t = _connect(a.host, a.port)
-    t0 = lab.turn(t)
+    def ended(end: str, why: str) -> None:
+        res["end"], res["why"] = end, why
+        log(f"    end: {end} ({why})")
+
+    pids = game.instance_pids(a.host)
+    try:
+        t = _connect(a.host, a.port, a.unreachable, pids)
+        t0 = lab.turn(t)
+    except (Crash, TunerError) as e:
+        ended("crash", str(e))
+        res["wall_end"] = time.time()
+        write_result()
+        return 3
     target = t0 + a.turns
+    res.update(start_turn=t0, target=target, turn=t0)
+    write_result()
     lp = -1 if a.observer else lab.local_player(t)
     log(f"watching {a.host} from turn {t0} to {target}"
         f" ({'observer' if a.observer else f'seat {lp}'}) -> {', '.join(r[0].name for r in readers)}")
@@ -124,10 +182,21 @@ def main(argv=None) -> int:
             fh.flush()
 
     last = t0
+    fresh = True  # the readers have not read turn `last` yet
     try:
-        read()
-        while last < target:
+        while True:
             try:
+                if fresh:
+                    read()
+                    fresh = False
+                if last >= target:
+                    ended("target", f"turn {last}")
+                    break
+                if a.stop_at is not None and time.time() >= a.stop_at:
+                    if a.observer:
+                        log("    " + t.run(IG, LUA_HALT)[-1])
+                    ended("stop", "wall-clock budget")
+                    break
                 if a.observer:
                     tn = lab.wait_turn(t, last, -1, a.wait, log, one_more_turn=True)
                     if tn >= target:
@@ -135,43 +204,68 @@ def main(argv=None) -> int:
                         log("    " + t.run(IG, LUA_HALT)[-1])
                 else:
                     tn = lab.advance(t, "autoplay", lp, a.wait, log, one_more_turn=True)
+                last, fresh = tn, True
+                read()
+                fresh = False
+                res["turn"] = tn
+                write_result()
+                if a.save_every and tn % a.save_every == 0:
+                    log("    " + t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}"))[-1])
+                # the throughput record: wall clock and the box's free memory
+                # per turn, so configurations compare turn window for turn window
+                log(f"turn {tn} at {time.time():.1f} free_mb {free_mb():.0f}")
+                if free_mb() < a.min_free_mb:
+                    log(f"    free memory {free_mb():.0f} MB below {a.min_free_mb:.0f} — saving and stopping")
+                    if a.observer:
+                        log("    " + t.run(IG, LUA_HALT)[-1])
+                    log("    " + t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}_oom"))[-1])
+                    ended("stop", "free memory")
+                    break
             except lab.GameOver as e:
                 # a defeat, or a victory with no Just One More Turn to play
                 # through: the game has ended short of the target
-                rec = json.dumps({"kind": "game_over", "turn": lab.turn(t), "target": target, **e.info})
+                try:
+                    now_turn = lab.turn(t)
+                except TunerError:
+                    now_turn = last
+                rec = json.dumps({"kind": "game_over", "turn": now_turn, "target": target, **e.info})
                 log(f"    {rec}")
                 for fh in handles:
                     fh.write(rec + "\n")
                     fh.flush()
+                res["game_over"] = e.info
+                ended("game_over", e.info.get("why", ""))
+                break
+            except lab.TurnStalled as e:
+                ended("crash", f"stalled: {e}")
                 break
             except TunerError as e:
                 log(f"    {e} - reconnecting")
+                res["reconnects"].append({"at": time.time(), "turn": last, "error": str(e)})
+                write_result()
                 t.close()
-                t = _connect(a.host, a.port)
-                continue
-            last = tn
-            read()
-            if a.save_every and tn % a.save_every == 0:
-                log("    " + t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}"))[-1])
-            # the throughput record: wall clock and the box's free memory per
-            # turn, so configurations compare turn window for turn window
-            log(f"turn {tn} at {time.time():.1f} free_mb {free_mb():.0f}")
-            if free_mb() < a.min_free_mb:
-                log(f"    free memory {free_mb():.0f} MB below {a.min_free_mb:.0f} — saving and stopping")
-                if a.observer:
-                    log("    " + t.run(IG, LUA_HALT)[-1])
-                log("    " + t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}_oom"))[-1])
-                break
+                t = _connect(a.host, a.port, a.unreachable, pids)
+    except Crash as e:
+        ended("crash", str(e))
     finally:
         for fh in handles:
             fh.close()
-    hist = lab.RUNS / f"event_history_{a.tag}_{stamp}.txt"
-    with open(hist, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("\n".join(t.run(IG, (HERE / "event_history.lua").read_text(encoding="utf-8"), timeout=120)))
-    log(f"event history -> {hist.name}")
-    log(f"    at end ({a.at_end}): {game.finish(t, a.host, a.at_end)}")
+        res["wall_end"] = time.time()
+        write_result()
+    if res["end"] == "crash":
+        return 3
+    try:
+        with open(hist, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("\n".join(t.run(IG, (HERE / "event_history.lua").read_text(encoding="utf-8"), timeout=120)))
+        res["event_history"] = str(hist)
+        log(f"event history -> {hist.name}")
+        log(f"    at end ({a.at_end}): {game.finish(t, a.host, a.at_end)}")
+    except TunerError as e:
+        log(f"    after the end: {e}")
     if a.at_end != "close":
         t.close()
+    res["wall_end"] = time.time()
+    write_result()
     return 0
 
 

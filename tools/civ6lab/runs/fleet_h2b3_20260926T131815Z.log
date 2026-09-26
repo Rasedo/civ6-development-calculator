@@ -1,0 +1,77 @@
+[16:18:21] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\game.py --host 127.0.0.3 new --config C:\civ6-development-calculator\tools\civ6lab\c74s2_duel.json --map-seed 943024562 --game-seed 1646799260
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    slots 1:1 2:1 slot0=4
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=3 map_seed=943024562 game_seed=1646799260 autostart=true
+    hosting
+in game {"turn": 2, "map_seed": 943024562, "game_seed": 1646799260, "humans": 0, "minors": 4, "majors": {"1": "LEADER_TRAJAN", "2": "LEADER_ROBERT_THE_BRUCE"}}
+[16:18:52] setup {"turn": 2, "map_seed": 943024562, "game_seed": 1646799260, "humans": 0, "minors": 4, "majors": {"1": "LEADER_TRAJAN", "2": "LEADER_ROBERT_THE_BRUCE"}}
+[16:18:52] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\watch.py --host 127.0.0.3 --turns 60 --tag h2b3g0 --save-every 0 --min-free-mb 2048.0 --at-end menu --wait 600.0 --unreachable 300.0 --result C:\civ6-development-calculator\tools\civ6lab\runs\fleet_h2b3_20260926T131815Z_result.json --stop-at 1790428965 --observer
+watching 127.0.0.3 from turn 3 to 63 (observer) -> cs_watch_h2b3g0_20260926T131852Z.jsonl
+turn 4 at 1790428737.2 free_mb 14642
+turn 5 at 1790428741.2 free_mb 14622
+turn 6 at 1790428744.2 free_mb 14594
+    the game reset the tuner socket: [WinError 10054] Удаленный хост принудительно разорвал существующее подключение - reconnecting
+    end: crash (process died (pid [35968]))
+[16:19:08] game 0 watch exit 3
+[16:19:08] game 0: crash (process died (pid [35968])) at turn 6
+[16:19:08] closed pid []
+[16:19:08] relaunched
+[16:19:23] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\game.py --host 127.0.0.3 new --config C:\civ6-development-calculator\tools\civ6lab\c74s2_duel.json --map-seed 1252915665 --game-seed 1826857723
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    slots 1:1 2:1 slot0=4
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=3 map_seed=1252915665 game_seed=1826857723 autostart=true
+    hosting
+in game {"turn": 3, "map_seed": 1252915665, "game_seed": 1826857723, "humans": 0, "minors": 4, "majors": {"1": "LEADER_NZINGA_MBANDE", "2": "LEADER_TOMYRIS"}}
+[16:19:54] setup {"turn": 3, "map_seed": 1252915665, "game_seed": 1826857723, "humans": 0, "minors": 4, "majors": {"1": "LEADER_NZINGA_MBANDE", "2": "LEADER_TOMYRIS"}}
+[16:19:54] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\watch.py --host 127.0.0.3 --turns 60 --tag h2b3g1 --save-every 0 --min-free-mb 2048.0 --at-end menu --wait 600.0 --unreachable 300.0 --result C:\civ6-development-calculator\tools\civ6lab\runs\fleet_h2b3_20260926T131815Z_result.json --stop-at 1790428965 --observer
+watching 127.0.0.3 from turn 3 to 63 (observer) -> cs_watch_h2b3g1_20260926T131954Z.jsonl
+turn 4 at 1790428796.2 free_mb 14782
+turn 5 at 1790428801.0 free_mb 14788
+turn 6 at 1790428806.5 free_mb 14780
+turn 7 at 1790428811.9 free_mb 14776
+turn 8 at 1790428813.2 free_mb 14772
+turn 9 at 1790428818.3 free_mb 14760
+turn 10 at 1790428820.6 free_mb 14759
+turn 11 at 1790428821.8 free_mb 14756
+turn 12 at 1790428825.2 free_mb 14801
+turn 13 at 1790428828.2 free_mb 14803
+turn 14 at 1790428849.7 free_mb 15116
+turn 15 at 1790428864.6 free_mb 14538
+turn 16 at 1790428867.9 free_mb 14531
+turn 17 at 1790428873.2 free_mb 15250
+turn 18 at 1790428876.9 free_mb 14572
+turn 19 at 1790428881.7 free_mb 15276
+turn 20 at 1790428902.7 free_mb 15163
+turn 21 at 1790428911.3 free_mb 15272
+turn 22 at 1790428932.6 free_mb 14532
+turn 23 at 1790428959.9 free_mb 14537
+turn 25 at 1790428977.9 free_mb 14547
+    pause requested paused false at turn 25
+    end: stop (wall-clock budget)
+event history -> event_history_h2b3g1_20260926T131954Z.txt
+    at end (menu): left the game at turn 25
+[16:22:58] game 1 watch exit 0
+[16:22:58] game 1: stop (wall-clock budget) at turn 25
+[16:22:58] done: wall-clock budget

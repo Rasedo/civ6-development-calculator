@@ -40,7 +40,7 @@ def load(path: str) -> dict[int, list[dict]]:
         if not ln.startswith("{"):
             continue
         r = json.loads(ln)
-        if r.get("civ") == FREE_CITIES:
+        if "p" not in r or r.get("civ") == FREE_CITIES:  # the watch's game_over line is no city-state
             continue
         by_cs[r["p"]].append(r)
     for rows in by_cs.values():

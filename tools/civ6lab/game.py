@@ -31,8 +31,12 @@ missing one:
 `max_turns` sets a CUSTOM turn limit (the score victory's turn; a running
 game ignores a later change);
 `realism` is Gathering Storm's disaster intensity (GAME_REALISM, 0-4, default 2);
-`majors` overrides the map size's default number of major civs; `all_ai` turns the human slot into an AI one, for an observer-only autoplay
-game (the smoke test does the same). The keys map onto the install's
+`majors` overrides the map size's default number of major civs; `all_ai`
+makes every major an AI and the host an OBSERVER in slot 0 (the majors take
+slots 1..n), a game that plays itself with no local player. `--map-seed` /
+`--game-seed` override the config's seeds. `new` prints the game's own
+readback once it is up: turn, seeds, humans, minors and the major seats
+(`game_info`). The keys map onto the install's
 Configuration Parameters rows; those with Hash="1" take DB.MakeHash of the
 value name.
 """
@@ -208,12 +212,29 @@ if cfg.max_turns then
 end
 if cfg.all_ai then
   try("all_ai", function()
+    -- the host takes a slot of its own when it hosts: turning the human
+    -- slots into AI ones (the smoke test's way) leaves slot 0 SS_TAKEN again
+    -- once the game starts. So slot 0 becomes the host's OBSERVER slot and
+    -- the majors move up one: n + 1 participants, slots 1..n AI majors.
+    -- The map places the ALIVE majors (AssignStartingPlots reads
+    -- PlayerManager.GetAliveMajorsCount), which the observer is not.
+    local n = MapConfiguration.GetMaxMajorPlayers()
     for _, id in ipairs(GameConfiguration.GetHumanPlayerIDs()) do
       PlayerConfigurations[id]:SetSlotStatus(SlotStatus.SS_COMPUTER)
     end
+    MapConfiguration.SetMaxMajorPlayers(n + 1)
+    GameConfiguration.SetParticipatingPlayerCount(n + 1 + GameConfiguration.GetHiddenPlayerCount())
+    PlayerConfigurations[n]:SetSlotStatus(SlotStatus.SS_COMPUTER)
+    PlayerConfigurations[n]:SetMajorCiv()
+    PlayerConfigurations[0]:SetSlotStatus(SlotStatus.SS_OBSERVER)
   end)
 end
 for _, s in ipairs(out) do print(s) end
+local slots = {}
+for _, id in ipairs(GameConfiguration.GetParticipatingPlayerIDs()) do
+  slots[#slots + 1] = id .. ":" .. tostring(PlayerConfigurations[id]:GetSlotStatus())
+end
+print("slots " .. table.concat(slots, " ") .. " slot0=" .. tostring(PlayerConfigurations[0]:GetSlotStatus()))
 print("readback ruleset=" .. tostring(GameConfiguration.GetRuleSet())
   .. " speed=" .. tostring(GameConfiguration.GetValue("GAME_SPEED_TYPE"))
   .. " handicap=" .. tostring(GameConfiguration.GetValue("GAME_HANDICAP"))
@@ -222,6 +243,8 @@ print("readback ruleset=" .. tostring(GameConfiguration.GetRuleSet())
   .. " cs=" .. tostring(GameConfiguration.GetValue("CITY_STATE_COUNT"))
   .. " realism=" .. tostring(GameConfiguration.GetValue("GAME_REALISM"))
   .. " majors=" .. tostring(MapConfiguration.GetMaxMajorPlayers())
+  .. " map_seed=" .. tostring(MapConfiguration.GetValue("RANDOM_SEED"))
+  .. " game_seed=" .. tostring(GameConfiguration.GetValue("GAME_SYNC_RANDOM_SEED"))
   .. " autostart=" .. tostring(Automation.IsAutoStartEnabled()))
 if not NOHOST then
   Network.HostGame(ServerType.SERVER_TYPE_NONE)
@@ -255,6 +278,34 @@ print("query sent autostart=" .. tostring(Automation.IsAutoStartEnabled()))
 """
 
 LUA_LOAD_STATUS = 'print(tostring(ExposedMembers and ExposedMembers.LabLoad))'
+
+# GameCore, once a game is up: the turn, the seeds the game was set up with,
+# and who holds each living major seat
+LUA_GAME_INFO = """
+local majors, minors, humans = {}, 0, 0
+for p = 0, 62 do
+  local pl = Players[p]
+  if pl ~= nil and pl:IsAlive() then
+    if pl:IsMajor() then
+      majors[#majors + 1] = "\\"" .. p .. "\\":\\"" .. tostring(PlayerConfigurations[p]:GetLeaderTypeName()) .. "\\""
+      if pl:IsHuman() then humans = humans + 1 end
+    else
+      minors = minors + 1
+    end
+  end
+end
+print("{\\"turn\\":" .. Game.GetCurrentGameTurn()
+  .. ",\\"map_seed\\":" .. tostring(MapConfiguration.GetValue("RANDOM_SEED"))
+  .. ",\\"game_seed\\":" .. tostring(GameConfiguration.GetValue("GAME_SYNC_RANDOM_SEED"))
+  .. ",\\"humans\\":" .. humans .. ",\\"minors\\":" .. minors
+  .. ",\\"majors\\":{" .. table.concat(majors, ",") .. "}}")
+"""
+
+
+def game_info(t: Tuner) -> dict:
+    """the running game's turn, seeds, human count and major seats
+    (`LUA_GAME_INFO`)"""
+    return json.loads(t.run(GC, LUA_GAME_INFO)[-1])
 
 
 def _lua_table(cfg: dict) -> str:
@@ -362,6 +413,16 @@ def instance_pids(host: str) -> list[int]:
     return [int(x) for x in out.split() if x.isdigit()]
 
 
+def instance_private_mb(host: str) -> float | None:
+    """the private memory (commit) of the instance launched for `host`, MB;
+    None when no process carries its -TunerIP"""
+    pat = r"-TunerIP\s+" + re.escape(host) + r"(\s|$)"
+    out = _ps("Get-CimInstance Win32_Process -Filter \"Name LIKE 'CivilizationVI%'\" | "
+              f"Where-Object {{ $_.CommandLine -match '{pat}' }} | ForEach-Object {{ $_.PrivatePageCount }}")
+    vals = [int(x) for x in out.split() if x.isdigit()]
+    return sum(vals) / 2**20 if vals else None
+
+
 def close_instance(host: str) -> list[int]:
     """terminate the instance launched for `host`, and no other; returns the
     pids stopped"""
@@ -405,6 +466,10 @@ def cmd_close(a) -> int:
 
 def cmd_new(a) -> int:
     cfg = json.loads(pathlib.Path(a.config).read_text(encoding="utf-8")) if a.config else {}
+    if a.map_seed is not None:
+        cfg["map_seed"] = a.map_seed
+    if a.game_seed is not None:
+        cfg["game_seed"] = a.game_seed
     t = _connect(a.host, a.port, 30)
     if FE not in t.refresh_states() or GC in t.states:
         print(f"a new game is hosted from the main menu; the game lists {sorted(t.states)}")
@@ -423,7 +488,7 @@ def cmd_new(a) -> int:
     if a.dry:
         return 0
     t = wait_for_state(a.host, a.port, GC, a.wait, "print(Game.GetCurrentGameTurn())")
-    print("in game; turn", t.run(GC, "print(Game.GetCurrentGameTurn())")[0])
+    print("in game", json.dumps(game_info(t)))
     t.close()
     return 0
 
@@ -511,6 +576,8 @@ def main(argv=None) -> int:
     s = sub.add_parser("new", help="host a new single-player game from the main menu")
     s.add_argument("--config", help="JSON setup (see the module doc)")
     s.add_argument("--dry", action="store_true", help="write the setup and read it back, do not host")
+    s.add_argument("--map-seed", type=int, help="the map seed (MapConfiguration RANDOM_SEED), over the config's")
+    s.add_argument("--game-seed", type=int, help="the game seed (GAME_SYNC_RANDOM_SEED), over the config's")
     s.add_argument("--wait", type=float, default=600.0)
     s.set_defaults(fn=cmd_new)
     s = sub.add_parser("load", help="load a named single-player save")

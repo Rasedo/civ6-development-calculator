@@ -28,7 +28,7 @@ import time
 from collections.abc import Callable
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from tuner import Tuner, TunerError  # noqa: E402
+from tuner import Tuner, TunerError, TunerLost  # noqa: E402
 
 GC = "GameCore_Tuner"
 RE = "TunerGameRandomEvents"
@@ -368,6 +368,10 @@ class GameOver(RuntimeError):
         self.info = info
 
 
+class TurnStalled(TunerError):
+    """The turn stood still for the whole wait with the tuner answering."""
+
+
 def endgame(t: Tuner, lp: int) -> dict | None:
     """The end of the game, or None while it goes on: {"why": "defeat" |
     "victory", "winner": team or None, "alive": the seat's IsAlive,
@@ -495,6 +499,8 @@ def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None
         time.sleep(0.25)
         try:
             tn = turn(t)
+        except TunerLost:
+            raise  # the connection is gone: polling it again cannot succeed
         except TunerError:
             continue
         if tn > t0:
@@ -545,7 +551,7 @@ def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None
         if nudge is not None and now - nudged >= 20:
             nudged = now
             nudge()
-    raise TunerError(f"turn did not advance past {t0} within {wait}s")
+    raise TurnStalled(f"turn did not advance past {t0} within {wait}s")
 
 
 def advance(t: Tuner, how: str, lp: int, wait: float, log: Callable[[str], None] = print,

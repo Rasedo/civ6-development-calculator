@@ -1,0 +1,66 @@
+[16:15:45] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\game.py --host 127.0.0.3 new --config C:\civ6-development-calculator\tools\civ6lab\c74s2_duel.json --map-seed 4200 --game-seed 4201
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    slots 1:1 2:1 slot0=4
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=3 map_seed=4200 game_seed=4201 autostart=true
+    hosting
+in game {"turn": 2, "map_seed": 4200, "game_seed": 4201, "humans": 0, "minors": 4, "majors": {"1": "LEADER_PERICLES", "2": "LEADER_CLEOPATRA_ALT"}}
+[16:16:16] setup {"turn": 2, "map_seed": 4200, "game_seed": 4201, "humans": 0, "minors": 4, "majors": {"1": "LEADER_PERICLES", "2": "LEADER_CLEOPATRA_ALT"}}
+[16:16:16] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\watch.py --host 127.0.0.3 --turns 5 --tag h2a3g0 --save-every 0 --min-free-mb 2048.0 --at-end menu --wait 600.0 --unreachable 300.0 --result C:\civ6-development-calculator\tools\civ6lab\runs\fleet_h2a3_20260926T131535Z_result.json --observer
+watching 127.0.0.3 from turn 3 to 8 (observer) -> cs_watch_h2a3g0_20260926T131616Z.jsonl
+turn 4 at 1790428585.7 free_mb 14377
+turn 5 at 1790428589.8 free_mb 14352
+turn 6 at 1790428593.5 free_mb 14349
+turn 7 at 1790428596.5 free_mb 14348
+    pause requested paused false at turn 8
+turn 8 at 1790428605.2 free_mb 15490
+    end: target (turn 8)
+event history -> event_history_h2a3g0_20260926T131616Z.txt
+    at end (menu): left the game at turn 8
+[16:16:45] game 0 watch exit 0
+[16:16:45] game 0: target (turn 8) at turn 8
+[16:16:45] private memory 5067 MB past the cap 1000
+[16:16:46] closed pid [2720]
+[16:16:48] relaunched
+[16:17:02] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\game.py --host 127.0.0.3 new --config C:\civ6-development-calculator\tools\civ6lab\c74s2_duel.json --map-seed 4202 --game-seed 4203
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    slots 1:1 2:1 slot0=4
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=3 map_seed=4202 game_seed=4203 autostart=true
+    hosting
+in game {"turn": 3, "map_seed": 4202, "game_seed": 4203, "humans": 0, "minors": 4, "majors": {"1": "LEADER_TOMYRIS", "2": "LEADER_CLEOPATRA_ALT"}}
+[16:17:41] setup {"turn": 3, "map_seed": 4202, "game_seed": 4203, "humans": 0, "minors": 4, "majors": {"1": "LEADER_TOMYRIS", "2": "LEADER_CLEOPATRA_ALT"}}
+[16:17:41] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\watch.py --host 127.0.0.3 --turns 5 --tag h2a3g1 --save-every 0 --min-free-mb 2048.0 --at-end menu --wait 600.0 --unreachable 300.0 --result C:\civ6-development-calculator\tools\civ6lab\runs\fleet_h2a3_20260926T131535Z_result.json --observer
+watching 127.0.0.3 from turn 3 to 8 (observer) -> cs_watch_h2a3g1_20260926T131741Z.jsonl
+turn 4 at 1790428664.0 free_mb 14485
+turn 5 at 1790428667.4 free_mb 14824
+turn 6 at 1790428669.7 free_mb 14765
+turn 7 at 1790428673.1 free_mb 15091
+    pause requested paused false at turn 8
+turn 8 at 1790428677.3 free_mb 14850
+    end: target (turn 8)
+event history -> event_history_h2a3g1_20260926T131741Z.txt
+    at end (menu): left the game at turn 8
+[16:17:57] game 1 watch exit 0
+[16:17:57] game 1: target (turn 8) at turn 8
+[16:17:57] done: games done

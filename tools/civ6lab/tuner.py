@@ -48,6 +48,11 @@ class TunerError(RuntimeError):
     """A Lua error inside the game, or a protocol failure."""
 
 
+class TunerLost(TunerError):
+    """The connected socket is gone (the game reset or closed it): every
+    later call on this connection fails too."""
+
+
 class Tuner:
     def __init__(self, host: str = "127.0.0.1", port: int = DEFAULT_PORT,
                  timeout: float = 5.0):
@@ -105,7 +110,7 @@ class Tuner:
         try:
             self.sock.sendall(HEADER.pack(len(data), tag) + data)
         except OSError as e:
-            raise TunerError(f"the game reset the tuner socket: {e}") from e
+            raise TunerLost(f"the game reset the tuner socket: {e}") from e
 
     def _recv(self, timeout: float) -> tuple[int, str] | None:
         assert self.sock is not None
@@ -118,7 +123,7 @@ class Tuner:
             return None
         except OSError as e:
             # a load or a new game resets the socket as the Lua states go
-            raise TunerError(f"the game reset the tuner socket: {e}") from e
+            raise TunerLost(f"the game reset the tuner socket: {e}") from e
         raw = body.rstrip(b"\x00")
         # the game's own text (Locale lookups) comes in the system codepage,
         # everything else in UTF-8
@@ -133,7 +138,7 @@ class Tuner:
         while len(buf) < n:
             chunk = self.sock.recv(n - len(buf))
             if not chunk:
-                raise TunerError("the game closed the tuner socket")
+                raise TunerLost("the game closed the tuner socket")
             buf += chunk
         return buf
 

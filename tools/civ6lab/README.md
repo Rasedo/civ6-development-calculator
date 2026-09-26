@@ -59,18 +59,53 @@ Two box facts it needed:
     python tools/civ6lab/game.py profile restore    # the owner's options back, byte for byte
     python tools/civ6lab/game.py patch revert
     python tools/civ6lab/game.py --host 127.0.0.2 close    # end THAT instance's process (its -TunerIP), no other
-    python tools/civ6lab/fleet.py --hosts 3 --config tools/civ6lab/obs_small.json --games 2 --turns 250 --tag obs
+    python tools/civ6lab/fleet.py run --hosts 3 --config tools/civ6lab/obs_small.json --games 2 --turns 250 --tag obs
+    python tools/civ6lab/fleet.py run --hosts 2 --first-host 3 --config tools/civ6lab/c74s2_duel.json \
+        --games 0 --budget-min 120 --mem-cap-mb 8000 --tag duel
+    python tools/civ6lab/fleet.py summary tools/civ6lab/runs/fleet_duel_<stamp>_manifest.jsonl
 
-`fleet.py` is the observer fleet: it launches every instance at once, waits
-for all main menus in parallel, retiles once, then per host in parallel runs
-new game (or load) → `watch.py` → main menu → next game until `--games` or
-the stop file (`runs/fleet.stop`), waiting for `--min-free-mb` before each
-game; one log per host, `runs/fleet_<tag><n>_<stamp>.log`. `watch.py`,
-`spy_loop.py` and `game.py bench` take `--at-end menu|close|stay` (default
-`menu`): at the target an observer game is paused first
-(`Automation.Pause(true)`, UNVERIFIED from the tuner), a human-seat game
-simply holds its turn, the event history is read, and the game exits to the
-menu, has its process closed, or stays.
+**An observer game.** `game.py new` with `"all_ai": true` makes slot 0 the
+host's OBSERVER slot (`SS_OBSERVER`) and the majors AI in slots 1..n: the
+game plays itself with `Game.GetLocalPlayer()` -1 and
+`Game.GetLocalObserver()` 1000. Turning the human slot into an AI one (the
+smoke test's way) is not enough — the host re-takes slot 0 (`SS_TAKEN`,
+human) when it hosts. The map places the ALIVE majors
+(`AssignStartingPlots` reads `PlayerManager.GetAliveMajorsCount`), so the
+observer slot changes no start. A Duel observer game runs ~4 s a turn early.
+`Automation.Pause(true)` does NOT pause it from the tuner (`IsPaused` reads
+false and the turns go on): readers taken at the target may see a later
+turn. `--map-seed` / `--game-seed` override a config's seeds and hold
+through the host (read back in the game).
+
+**The fleet.** `fleet.py run` launches every instance at once
+(127.0.0.K..K+N-1: `--first-host` K, `--hosts` N), waits for all main menus
+in parallel, retiles once, then per host in parallel runs new game (fresh
+map and game seed each, or `--seed-base`) or load → `watch.py` → main menu
+→ next game until `--games` (0 = no limit), the stop file
+(`runs/fleet.stop`, read before each game), the wall-clock budget
+(`--budget-min`: no game starts after it and the running watch stops at
+it) or `--max-crashes`; before each game it waits for `--min-free-mb`. A
+crash — the game would not start, the watch's instance died (its process
+gone, its tuner unreachable past `--unreachable`, a turn stood past
+`--turn-wait`), or no main menu after a game — closes and relaunches the
+instance and the loop goes on with the next game; an instance whose private
+memory passes `--mem-cap-mb` after a game is relaunched the same way. One
+log per host, `runs/fleet_<tag><n>_<stamp>.log`; one manifest per run,
+`runs/fleet_<tag>_<stamp>_manifest.jsonl`, a JSON line per `game` (host,
+number, config, seeds asked for and read back, wall start and end, start
+turn, turn reached, the end — `target`, `game_over`, `stop`, `crash` — and
+why, reader logs, event history, host log, reconnects, private memory) and
+per `reconnect`, `crash`, `relaunch` and host `stop`. `fleet.py summary`
+reads a manifest: games, turns, turns and games per hour, crashes, endings,
+per host and in all, and a `cs_analyze.py` command per `cs_watch` log.
+
+`watch.py`, `spy_loop.py` and `game.py bench` take `--at-end
+menu|close|stay` (default `menu`): at the target an observer game is asked
+to pause (see above), a human-seat game simply holds its turn, the event
+history is read, and the game exits to the menu, has its process closed, or
+stays. `watch.py --result <file>` rewrites one JSON object every turn (the
+turn reached, the end and why, the reader logs, the reconnects) — what the
+fleet's manifest is built from.
 
 Measured 2026-09-23 (Ryzen 9 3900X, RTX 4070 SUPER, 32 GB; save lab4_t100,
 15 Autoplay turns):

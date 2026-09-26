@@ -1,0 +1,16 @@
+{"t":3,"p":3,"civ":"CIVILIZATION_BUENOS_AIRES","gold":21.00,"faith":0,"cities":[[30,18,1,"UNIT_BUILDER"]],"units":[["UNIT_WARRIOR",29,19,0],["UNIT_WARRIOR",32,21,0]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":3,"p":4,"civ":"CIVILIZATION_MUSCAT","gold":10.00,"faith":0,"cities":[[37,21,1,"NONE"]],"units":[["UNIT_WARRIOR",36,22,0],["UNIT_WARRIOR",35,21,0]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":3,"p":5,"civ":"CIVILIZATION_SINGAPORE","gold":10.00,"faith":0,"cities":[[4,10,1,"BUILDING_MONUMENT"]],"units":[["UNIT_WARRIOR",2,9,0],["UNIT_WARRIOR",4,10,0]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":3,"p":62,"civ":"CIVILIZATION_FREE_CITIES","gold":0.00,"faith":0,"cities":[],"units":[],"war":[1,2],"suz":-1,"envoys":[0,0]}
+{"t":4,"p":3,"civ":"CIVILIZATION_BUENOS_AIRES","gold":21.00,"faith":0,"cities":[[30,18,1,"UNIT_BUILDER"]],"units":[["UNIT_WARRIOR",29,19,0],["UNIT_WARRIOR",32,21,0]],"war":[],"suz":-1,"envoys":[0,1]}
+{"t":4,"p":4,"civ":"CIVILIZATION_MUSCAT","gold":15.00,"faith":0,"cities":[[37,21,1,"UNIT_BUILDER"]],"units":[["UNIT_WARRIOR",36,22,24],["UNIT_WARRIOR",36,21,0]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":4,"p":5,"civ":"CIVILIZATION_SINGAPORE","gold":15.00,"faith":0,"cities":[[4,10,1,"BUILDING_MONUMENT"]],"units":[["UNIT_WARRIOR",3,10,0],["UNIT_WARRIOR",4,11,0]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":4,"p":62,"civ":"CIVILIZATION_FREE_CITIES","gold":0.00,"faith":0,"cities":[],"units":[],"war":[1,2],"suz":-1,"envoys":[0,0]}
+{"t":5,"p":3,"civ":"CIVILIZATION_BUENOS_AIRES","gold":37.00,"faith":0,"cities":[[30,18,2,"UNIT_BUILDER"]],"units":[["UNIT_WARRIOR",30,21,0],["UNIT_WARRIOR",32,21,71]],"war":[],"suz":-1,"envoys":[0,1]}
+{"t":5,"p":4,"civ":"CIVILIZATION_MUSCAT","gold":25.00,"faith":0,"cities":[[37,21,2,"UNIT_BUILDER"]],"units":[["UNIT_WARRIOR",36,22,14],["UNIT_WARRIOR",36,20,63]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":5,"p":5,"civ":"CIVILIZATION_SINGAPORE","gold":20.00,"faith":0,"cities":[[4,10,1,"BUILDING_MONUMENT"]],"units":[["UNIT_WARRIOR",4,10,0],["UNIT_WARRIOR",4,12,0]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":5,"p":62,"civ":"CIVILIZATION_FREE_CITIES","gold":0.00,"faith":0,"cities":[],"units":[],"war":[1,2],"suz":-1,"envoys":[0,0]}
+{"t":6,"p":3,"civ":"CIVILIZATION_BUENOS_AIRES","gold":37.00,"faith":0,"cities":[[30,18,2,"UNIT_BUILDER"]],"units":[["UNIT_WARRIOR",30,21,0],["UNIT_WARRIOR",32,21,71]],"war":[],"suz":-1,"envoys":[0,1]}
+{"t":6,"p":4,"civ":"CIVILIZATION_MUSCAT","gold":25.00,"faith":0,"cities":[[37,21,2,"UNIT_BUILDER"]],"units":[["UNIT_WARRIOR",36,22,4],["UNIT_WARRIOR",36,20,53]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":6,"p":5,"civ":"CIVILIZATION_SINGAPORE","gold":25.00,"faith":0,"cities":[[4,10,2,"BUILDING_MONUMENT"]],"units":[["UNIT_WARRIOR",3,10,0],["UNIT_WARRIOR",3,12,0]],"war":[],"suz":-1,"envoys":[0,0]}
+{"t":6,"p":62,"civ":"CIVILIZATION_FREE_CITIES","gold":0.00,"faith":0,"cities":[],"units":[],"war":[1,2],"suz":-1,"envoys":[0,0]}
