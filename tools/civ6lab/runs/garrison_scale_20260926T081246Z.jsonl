@@ -1,0 +1,18 @@
+{"unit": "UNIT_WARRIOR", "combat": 20, "damage": 0, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 0}
+{"unit": "UNIT_WARRIOR", "combat": 20, "damage": 10, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 10}
+{"unit": "UNIT_WARRIOR", "combat": 20, "damage": 25, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 25}
+{"unit": "UNIT_WARRIOR", "combat": 20, "damage": 50, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 50}
+{"unit": "UNIT_WARRIOR", "combat": 20, "damage": 75, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 75}
+{"unit": "UNIT_WARRIOR", "combat": 20, "damage": 90, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 90}
+{"unit": "UNIT_MUSKETMAN", "combat": 55, "damage": 0, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 0}
+{"unit": "UNIT_MUSKETMAN", "combat": 55, "damage": 10, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 10}
+{"unit": "UNIT_MUSKETMAN", "combat": 55, "damage": 25, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 25}
+{"unit": "UNIT_MUSKETMAN", "combat": 55, "damage": 50, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 50}
+{"unit": "UNIT_MUSKETMAN", "combat": 55, "damage": 75, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 75}
+{"unit": "UNIT_MUSKETMAN", "combat": 55, "damage": 90, "def": 73, "base": 55, "defenses": ["+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 90}
+{"unit": "UNIT_INFANTRY", "combat": 75, "damage": 0, "def": 93, "base": 55, "defenses": ["+20 от гарнизона (Пехотинцы)", "+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 0}
+{"unit": "UNIT_INFANTRY", "combat": 75, "damage": 10, "def": 92.0234375, "base": 55, "defenses": ["+19 от гарнизона (Пехотинцы)", "+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 10}
+{"unit": "UNIT_INFANTRY", "combat": 75, "damage": 25, "def": 90.5, "base": 55, "defenses": ["+18 от гарнизона (Пехотинцы)", "+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 25}
+{"unit": "UNIT_INFANTRY", "combat": 75, "damage": 50, "def": 88, "base": 55, "defenses": ["+15 от гарнизона (Пехотинцы)", "+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 50}
+{"unit": "UNIT_INFANTRY", "combat": 75, "damage": 75, "def": 85.5, "base": 55, "defenses": ["+13 от гарнизона (Пехотинцы)", "+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 75}
+{"unit": "UNIT_INFANTRY", "combat": 75, "damage": 90, "def": 84.015625, "base": 55, "defenses": ["+11 от гарнизона (Пехотинцы)", "+3 от стен", "+12 от районов", "+3 от охраны дворца"], "save": "lab4_t150", "player": 1, "setDamage": 90}

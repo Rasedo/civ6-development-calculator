@@ -45,8 +45,8 @@ re-adds them.
 | B-91 a religion's beliefs | 1 | Religious Colonization's pressure, Holy Waters' reach, "cities following", whose religion a worship building follows (LAB) |
 | B-93 Great People as Gathering Storm layers them | 1 | whether Darwin counts the plot underfoot (LAB) |
 | B-94 an improvement's and a wonder's ground | 1 | the generator's ResetTerrain and natural cliffs on wonder plots (BUILD); the ice radius (ASK); `Feature_AdjacentTerrains`' reading, the unpublished multi-plot shapes, a water wonder on a lake (LAB) |
-| B-95 a city centre's strength | 1 | the base's "ever built" and a garrison's health scaling (LAB) |
-| **B. Fidelity vs real Civ 6** | **12** | |
+| B-95 a city centre's strength | 2 | the garrison term as measured, a fractional centre strength (BUILD); the base's "ever built" (LAB) |
+| **B. Fidelity vs real Civ 6** | **13** | |
 | C-1 power | 2 | the accident's unit rows on the reactor plot (BUILD); the building rows' shape, the CATASTROPHIC band, the unexplained MINOR and ring losses (LAB) |
 | C-2 diplomatic agreements | 1 | the promise's break and the broken-promise operand (LAB) |
 | C-16 the spy's second half | 1 | the counterspy's escape term (LAB) |
@@ -59,7 +59,7 @@ re-adds them.
 | C-60 the Free City's own play | 1 | bankruptcy's shape, its techs, the grant's type rule, a grant with no free tile, the grants' fate on a fall (LAB) |
 | C-74 the turn's one random event, the residue | 3 | the empty mass, active volcano sites, the flood's start plot, the city-anchored drought (BUILD); Duel's normalisers, the activity clock, `CanBeFlooded`'s gate, `Spacing`, the per-site drift, the fire clock, the meteor's grant, a blizzard on a wonder, a minor's pillaged buildings (LAB) |
 | **C. Absent systems** | **17** | |
-| **OPEN, TOTAL** | **29** | |
+| **OPEN, TOTAL** | **30** | |
 
 ## The question ledger — owner asks
 
@@ -127,11 +127,12 @@ commit.
   - ASK: the water wonders' `NotNearFeatures` ICE radius ("Far based on map size", DLL-only); only the plot itself refuses Ice.
   - LAB: the shape of a multi-plot wonder with no `CustomPlacement` (Dead Sea, Pantanal, Everest, Eye of the Sahara, the water wonders — laid by the DLL's `SetFeatureType`); whether a water wonder may stand on a lake (a lake is TERRAIN_COAST in the install, a separate terrain here).
   - LAB: `Feature_AdjacentTerrains` read as "at least one neighbour" (the other reading: every neighbour) — `TerrainBuilder.CanHaveFeature` over the tuner settles it.
-- **B-95. A CITY CENTRE'S STRENGTH.** Weight 1.
+- **B-95. A CITY CENTRE'S STRENGTH.** Weight 2.
   MEASURED (`tools/civ6lab/city_defense_preview.lua`, the combat preview's own terms via `CombatManager.SimulateAttackVersus`, 1,774 centres over the 37 named saves, `runs/citydef_20260926T061603Z.jsonl`): the centre's `GetDefenseStrength` is the preview's base plus its DEFENSES lines on 1,752 of 1,774 (the rest carry a wounded garrison, the line fractional), one rule for majors, minors and Free Cities; a governor's +5 in one non-capital per major rides under the Palace line's label; the terrain lines (+3 hills, +5 river, -2 rough) are the fight's, not the centre's standing strength.
   Both engines ship it as ONE composer for every holder (`centreStrength` / `_centre_strength`): the holder's base (`holderStrength` / `_holder_strength`) + `Districts.CityStrengthModifier` over the city's complete, unpillaged districts (`DistrictDef.cityStrength`, exported per district: 2 each, 0 on the City Center, Aqueduct, Dam, Canal and Preserve; 704 of 706 census cities) + 3 per pre-modern walls tier + the Palace's 3 where the city holds it, a capital or any minor's city (`PALACE_ADJUST_GARRISON_STRENGTH`; `MODIFIER_PLAYER_CITIES_ADJUST_INNER_DEFENSE` carries no requirement set, the lab read it in the capital alone) + 10 for a military unit of the holder on the centre (`COMBAT_GARRISON_MILITIA_MODIFIER`, at full value) + a minor's 1 per envoy it holds from every major together (`COMBAT_STRENGTH_FROM_ENVOYS`; `envoysReceived` / `_minor_envoys_received`, the raw store: a posted governor is no envoy received). The base is the strongest melee the holder has fielded floored at 15, a minor's too (`Seat.bestMeleeCS`; the GPU's `citystate_best_melee`, digest `minorBestMeleeCS`), and the Free City's flat 72. The defence, the city strike and the minors' strike and assault read it, a major's government and governor terms on top; the Encampment reads it without the garrison. REACHED by `tests/cpu/units/city-combat.test.ts`, `tests/gpu/centre_strength_test.py` and every city fight in the serve gate.
   - LAB: the base. One value per player per save (the Free Cities player per CITY: 45 and 55 at `lab4_t200`), most often the strongest melee its roster holds or can build minus 10 (88 of 247 player-saves over the 13 census saves) — the Civilopedia's "strongest melee unit built by your civilization, minus 10" — with residues (+7, +17, -10, -20) the held / producible reads cannot explain; a per-player "ever built" read (or its unit history) settles it, and whether `COMBAT_DISTRICT_STRENGTH_REDUCTION` 15 enters.
-  - LAB: a garrison's health scaling — the preview's line falls below 10 under a wounded garrison (22 of 1,774); both engines pay the full 10.
+  - MEASURED (B-95 garrison, `tools/civ6lab/garrison_scale.py`, `runs/garrison_scale_20260926T081246Z.jsonl`, lab4_t150, player 1's capital, base 55 = its Line Infantry 65 - 10): the garrison line is NOT a flat +10 — it is (the garrison's Combat - the base) x (1 - damage/200), and nothing when the garrison is no stronger than the base: a Warrior (20) and a Musketman (55) add 0 at every damage; an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage 0, 10, 25, 50, 75, 90 (the centre's strength fractional, 92.02 … 84.02). The census's "+10 at full health" was the base's own minus 10: a garrison of the strongest melee adds exactly 10. The Civilopedia: "the strongest melee unit built by your civilization, minus 10, or … the Combat Strength of a garrisoned military unit". `COMBAT_GARRISON_MILITIA_MODIFIER` 10 is not this term.
+  - BUILD (B-95, both engines): the garrison term max(0, garrison Combat - base) x (1 - damage/200) in place of the flat `GARRISON_CITY_CS` 10 (`centreStrength` / `_centre_strength`); the centre's strength becomes fractional, so the GPU composer and its consumers carry a float (the digest's rounding decided with it).
 
 ## C. Absent systems — the blockers, and the gaps waiting on them
 
