@@ -235,8 +235,11 @@ def test_grants(rules, path, R) -> None:
     print(f"  1 inland grant OK — the Privateer stands {int(d[at])} plots off, on the nearest water")
 
     hanno = p.person({p.fx("unitMpBonus"): 2.0})
+    # a Coast plot with land beside it: the person stands on the shore
+    shore = lambda t: any(n >= 0 and not bool(sim.water[B0, n]) and bool(sim.passable[B0, n])  # noqa: E731
+                          for n in sim.neigh[t].tolist())
     coast = next(t for t in range(sim.T) if bool(sim.wpass[B0, t]) and not bool(sim.ocean_tile[B0, t])
-                 and int(sim.military_at[B0, t]) < 0 and int(sim.civilian_at[B0, t]) < 0)
+                 and int(sim.military_at[B0, t]) < 0 and int(sim.civilian_at[B0, t]) < 0 and shore(t))
     p.tech("SAILING")
     p.tech("CARTOGRAPHY")
     p.spend(*hanno, coast)

@@ -489,9 +489,28 @@ def test_free_unit_defends(rules, path) -> None:
     print("  9 the defenders OK — attackable by anyone, no experience, whole turns run")
 
 
+def a_fitting_revolt(rules, path) -> bool:
+    """The scenes revolt the city `plant_city` gives row 0. Rows 1 and 2 must
+    exert no pull on it: then row 1 (Eleanor) wins the flip's tie, the city
+    row 1 founds beside it is its only pull, and the race scene can hand row 2
+    a lead no live pull explains. And four land plots must ring its centre:
+    the melee pair takes two, and each later grant stands on a free one or is
+    not granted."""
+    sim = fresh(rules, path)
+    plant_city(sim, 0)
+    col = int(sim.city_alive[B0, 0].nonzero()[-1])
+    centre = int(sim.city_center[B0, 0, col])
+    land = [n for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n])]
+    here = torch.tensor([centre])
+    quiet = all(float(sim._citizen_pressure_from(here, r)[B0]) == 0.0 for r in (1, 2))
+    return quiet and len(land) >= 4
+
+
 def main() -> int:
     rules = load_rules()
-    path = fixture_paths()[0]
+    path = next((p for p in fixture_paths() if a_fitting_revolt(rules, p)), None)
+    assert path is not None, "no fixture plants row 0 a land-ringed city out of row 2's range"
+    print(f"free_city on {path.name}")
     test_wire(rules, path)
     test_revolt_makes_free_city(rules, path)
     test_eleanor_skips(rules, path)

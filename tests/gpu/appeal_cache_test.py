@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, fixture_paths
 from warmup import warm_base, opened
 
-B0, ROW = 0, 0
+B0 = 0
 
 
 # THE WARMED BASE, ONE PER FIXTURE. A scene pays a `restore` — milliseconds —
@@ -67,7 +67,8 @@ def promo_with(sim, channel: str) -> int:
 
 def a_tile_beside_a_feature(sim, row: int, col: int) -> int:
     """A tile this city owns that stands next to an unimproved feature — what
-    Forestry Management pays and the only place the term can show."""
+    Forestry Management pays and the only place the term can show. -1 when it
+    owns none."""
     slot = sim.city_slot_at(row)
     un = sim._unimproved_feature()
     for t in range(sim.T):
@@ -77,7 +78,19 @@ def a_tile_beside_a_feature(sim, row: int, col: int) -> int:
             n = int(sim.neigh[t, d])
             if n >= 0 and bool(un[B0, n]):
                 return t
-    raise AssertionError(f"city ({row}, {col}) owns no tile beside an unimproved feature")
+    return -1
+
+
+def a_forested_city(rules) -> tuple[Path, int, int]:
+    """The first (fixture, seat, city) whose city owns a tile beside an
+    unimproved feature."""
+    for path in fixture_paths():
+        sim = fresh(rules, path)
+        for row in range(sim.n_majors):
+            for col in sim.city_alive[B0, row].nonzero(as_tuple=True)[0].tolist():
+                if a_tile_beside_a_feature(sim, row, col) >= 0:
+                    return path, row, col
+    raise AssertionError("no fixture's city owns a tile beside an unimproved feature")
 
 
 # ---------------------------------------------------------------------------
@@ -93,55 +106,54 @@ def test_the_catalog_still_carries_the_term(rules, path) -> None:
     print("  1 catalog OK — Forestry Management carries +1, and the gate is live")
 
 
-def test_the_establishment_clock_bumps(rules, path) -> None:
+def test_the_establishment_clock_bumps(rules, path, row: int, col: int) -> None:
     sim = fresh(rules, path)
     p = promo_with(sim, "appealNearFeature")
     g = int(sim._gpromo_gov[p])
-    col = int(sim.city_alive[B0, ROW].nonzero(as_tuple=True)[0][0])
-    t = a_tile_beside_a_feature(sim, ROW, col)
+    t = a_tile_beside_a_feature(sim, row, col)
+    assert t >= 0, f"city ({row}, {col}) owns no tile beside an unimproved feature"
 
     before = int(sim._tile_appeal()[B0, t])
     # seated, promoted, and ONE turn short of established: it pays nothing yet
-    sim.civ_gov_appointed[B0, ROW, g] = True
-    sim.civ_gov_city[B0, ROW, g] = int(sim.city_id[B0, ROW, col])
-    sim.civ_gov_promos[B0, ROW, g] = 1 << p
-    sim.civ_gov_establish[B0, ROW, g] = 1
+    sim.civ_gov_appointed[B0, row, g] = True
+    sim.civ_gov_city[B0, row, g] = int(sim.city_id[B0, row, col])
+    sim.civ_gov_promos[B0, row, g] = 1 << p
+    sim.civ_gov_establish[B0, row, g] = 1
     sim._eff_version += 1
     assert int(sim._tile_appeal()[B0, t]) == before, "an establishing governor already paid"
 
     # the tick that lands it — the write `_governor_phase` owes the cache
-    sim._governor_phase(ROW, sim.civ_alive[:, ROW] & sim.city_alive[:, ROW].any(dim=1))
-    assert int(sim.civ_gov_establish[B0, ROW, g]) == 0, "the clock did not run out"
+    sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
+    assert int(sim.civ_gov_establish[B0, row, g]) == 0, "the clock did not run out"
     got, want = int(sim._tile_appeal()[B0, t]), int(uncached_appeal(sim)[B0, t])
     assert got == want, f"the cached appeal is stale: {got} vs a fresh {want}"
     assert got == before + 1, f"the governor's +1 never arrived ({before} -> {got})"
     print(f"  2 establishment OK — tile {t} appeal {before} -> {got}, cache fresh")
 
 
-def test_a_quiet_turn_invalidates_nothing(rules, path) -> None:
+def test_a_quiet_turn_invalidates_nothing(rules, path, row: int) -> None:
     sim = fresh(rules, path)
     sim._tile_appeal()
     v = sim._eff_version
-    sim._governor_phase(ROW, sim.civ_alive[:, ROW] & sim.city_alive[:, ROW].any(dim=1))
-    sim._governor_phase(ROW, sim.civ_alive[:, ROW] & sim.city_alive[:, ROW].any(dim=1))
+    sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
+    sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert sim._eff_version == v, (
         f"a governor phase that changed nothing bumped the version {sim._eff_version - v}x — "
         "the fingerprint gate is not holding")
     print("  3 quiet turn OK — nothing changed, nothing invalidated")
 
 
-def test_the_great_person_grant_bumps(rules, path) -> None:
+def test_the_great_person_grant_bumps(rules, path, row: int, col: int) -> None:
     sim = fresh(rules, path)
     if sim._gp_appeal_col < 0:
         print("  4 great person SKIPPED — no city-perm appeal column in this catalog")
         return
-    col = int(sim.city_alive[B0, ROW].nonzero(as_tuple=True)[0][0])
-    slot = sim.city_slot_at(ROW)
+    slot = sim.city_slot_at(row)
     t = int((slot[B0] == col).nonzero(as_tuple=True)[0][0])
     sim._tile_appeal()
     before = int(sim._tile_appeal()[B0, t])
     # the write the claim makes, without the claim's own machinery
-    sim.city_gp_perm[B0, ROW, col, sim._gp_appeal_col] += 1
+    sim.city_gp_perm[B0, row, col, sim._gp_appeal_col] += 1
     sim._eff_version += 1
     got, want = int(sim._tile_appeal()[B0, t]), int(uncached_appeal(sim)[B0, t])
     assert got == want == before + 1, f"the grant read {got}, fresh {want}, was {before}"
@@ -150,11 +162,12 @@ def test_the_great_person_grant_bumps(rules, path) -> None:
 
 def main() -> int:
     rules = load_rules()
-    path = fixture_paths()[0]
+    path, row, col = a_forested_city(rules)
+    print(f"appeal_cache on {path.name}, city ({row}, {col})")
     test_the_catalog_still_carries_the_term(rules, path)
-    test_the_establishment_clock_bumps(rules, path)
-    test_a_quiet_turn_invalidates_nothing(rules, path)
-    test_the_great_person_grant_bumps(rules, path)
+    test_the_establishment_clock_bumps(rules, path, row, col)
+    test_a_quiet_turn_invalidates_nothing(rules, path, row)
+    test_the_great_person_grant_bumps(rules, path, row, col)
     print("BATTERY OK appeal_cache")
     return 0
 

@@ -543,8 +543,8 @@ def test_generator_ground(sim) -> None:
     sol, wnd = sim._imp_ground_ok(solar_i)[0], sim._imp_ground_ok(wind_i)[0]
     hills, snow = sim.hills[0], sim.terrain[0] == sim._imp_xterr[solar_i][0]
     # neither row has an Improvement_ValidFeatures row: any live feature,
-    # Volcanic Soil included, refuses the plot
-    bare = ~((sim.feat_id >= 0) & ~sim.feat_stripped)[0]
+    # Volcanic Soil and the volcano its plot carries included, refuses the plot
+    bare = ~(((sim.feat_id >= 0) & ~sim.feat_stripped) | sim.volcano_at)[0]
     assert sim._imp_feats_ok[solar_i] == [] and sim._imp_feats_ok[wind_i] == []
     assert bool((wnd == (hills & bare)).all()), "CIV6 (Wind Farm): featureless Hills, and only those"
     assert bool((sol == (~hills & ~snow & bare)).all()), \
@@ -707,9 +707,19 @@ def test_spec_tier(sim) -> None:
     print("  spec tier OK: any ONE of the three plants lifts the Industrial Zone's specialists")
 
 
+def carries_the_sources(rules, path) -> bool:
+    """The unit charge and the starved heal each hand the seat a source of a
+    named strategic resource: the map has to carry one of each."""
+    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    want = {int(sim._type_resource[sim._res_slot_units[0][0]]), int(sim._res_unit_pairs[0][1])}
+    return want <= set(sim.res_id[0].tolist())
+
+
 def main() -> None:
     rules = load_rules()
-    path = fixture_paths()[0]
+    path = next((p for p in fixture_paths() if carries_the_sources(rules, p)), None)
+    assert path is not None, "no fixture's map carries the strategic resources the scenes hand out"
+    print(f"power_test on {path.name}")
     for fn in (test_demand, test_plant_reach, test_cardiff, test_powered_yields,
                test_regional_powered, test_fuel, test_logistics, test_shopping_mall,
                test_accrual, test_unit_charge,
