@@ -40,7 +40,6 @@ def build() -> BatchSim:
     sim = settle_all(BatchSim([load_fixture(fixture_paths()[0])], load_rules(), device="cpu", dtype=torch.float64))
     assert sim._ngov and sim._npol, "no government catalog on the wire"
     # a government with slots: every civic through the first tier's unlock
-    civ = sim.civ_civics[:, ROW]
     adopted, has_gov = sim._adopted_gov(ROW)
     if not bool(has_gov[0]):
         sim.civ_civics[0, ROW, : max(4, int(sim._ngov))] = True

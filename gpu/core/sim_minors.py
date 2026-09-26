@@ -168,7 +168,6 @@ class SimMinors:
         chain (a city-state holds no Trading Post), leg 0 on a land descent and
         road on the centre, -1 parked where none reaches; then the round trips
         that are done end (`_expire_seat_routes`)."""
-        B, dev = self.B, self.device
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         self._trade_walk_tick(row, alive)
@@ -997,7 +996,6 @@ class SimMinors:
         top = int((gained * alive.long()).max())
         if top <= 0:
             return
-        B = self.B
         seat = 100 + s
         techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
         for n in range(top):
@@ -1127,8 +1125,6 @@ class SimMinors:
         that chassis' Gold price: one draw at the census rate, and the
         strongest such chassis lands."""
         alive = self.citystate_alive[:, s]
-        B, dev = self.B, self.device
-        row = self._CITY_MINOR0 + s
         mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         has_ship = (mine & self.unit_naval[mt]).any(dim=1)

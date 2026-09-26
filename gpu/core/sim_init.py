@@ -2317,7 +2317,6 @@ class SimInit:
             # adjacencyMult: a MULTIPLIER on one district type's adjacency
             # bonus, per PLACEABLE district column. buildingYieldBoost: one
             # [district, yield, popMin, popPct, adjMin, adjPct] row.
-            _nd_pl = len(self.districts_cat)
             self._gov_adj_mult = torch.tensor(
                 [[float(x) for x in g["adjacencyMult"]] for g in _govs],
                 dtype=dtype, device=device)  # [nGov, nD]
@@ -2415,7 +2414,6 @@ class SimInit:
             _pai = [p["amenitiesIfSpecialty"] for p in _pols]
             self._pol_ais_min = torch.tensor([int(x[0]) for x in _pai], dtype=torch.long, device=device)
             self._pol_ais_amen = torch.tensor([float(x[1]) for x in _pai], dtype=dtype, device=device)
-            _nd_pl = len(self.districts_cat)
             self._pol_adj_mult = torch.tensor(
                 [[float(x) for x in p["adjacencyMult"]] for p in _pols],
                 dtype=dtype, device=device)  # [nPol, nD]

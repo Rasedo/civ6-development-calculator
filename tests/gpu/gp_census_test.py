@@ -599,7 +599,6 @@ def main() -> None:
     path = next((q for q in fixture_paths() if roomy(q)), None)
     assert path is not None, "no fixture's capital owns six bare plots"
     print(f"gp_census on {path.name}")
-    sim = fresh(rules, path)
     test_sites(rules, path, R)
     test_grants(rules, path, R)
     test_channels(rules, path, R)

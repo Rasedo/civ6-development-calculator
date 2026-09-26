@@ -133,7 +133,7 @@ def transitions(rows):
                 up.append((a, b))
                 c0[a] -= 1
                 c0[b] += 1
-        item0, item1 = r0["cities"][0][3], r1["cities"][0][3]
+        item0 = r0["cities"][0][3]
         trained, bought, lost = [], [], []
         for ty in sorted(set(c0) | set(c1)):
             d = c1[ty] - c0[ty]
