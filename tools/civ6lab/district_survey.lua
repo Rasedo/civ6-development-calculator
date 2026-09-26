@@ -1,6 +1,16 @@
 -- InGame: every city that owns an ENCAMPMENT (or any district named by ZD),
 -- with the city centre's and the district's damage pools. Scene C's scouting.
 --   --set ZD=DISTRICT_ENCAMPMENT
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 for p = 0, 62 do
   local pl = Players[p]
   if pl ~= nil and pl:IsAlive() then
@@ -14,7 +24,7 @@ for p = 0, 62 do
         local parts = {}
         for _, d in c:GetDistricts():Members() do
           local t = GameInfo.Districts[d:GetType()]
-          local function n(f) local ok, v = pcall(f); return tostring(ok and v or -1) end
+          local function n(f) local ok, v = pcall(f); return tri(ok, v) end
           parts[#parts + 1] = (t and t.DistrictType or "?") .. "@" .. d:GetX() .. ":" .. d:GetY()
             .. " def=" .. n(function() return d:GetDefenseStrength() end)
             .. " gar=" .. n(function() return d:GetDamage(DefenseTypes.DISTRICT_GARRISON) end)

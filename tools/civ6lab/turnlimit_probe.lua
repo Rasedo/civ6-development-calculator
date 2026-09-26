@@ -3,10 +3,20 @@
 -- configuration key that could carry it and tries the obvious setters, then
 -- re-reads the limit so a silent no-op is visible.
 --   --set ZTRY=0   (read only)   --set ZTRY=1   (attempt the setters)
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local function T(label, f)
   local ok, v = pcall(f)
   print("{\"kind\":\"turnlimit\",\"field\":\"" .. label .. "\",\"ok\":" .. tostring(ok)
-    .. ",\"value\":\"" .. tostring(ok and v or "err") .. "\"}")
+    .. ",\"value\":\"" .. tri(ok, v) .. "\"}")
 end
 T("Game.GetMaxGameTurns", function() return Game.GetMaxGameTurns() end)
 T("cfg GAME_MAX_TURNS", function() return GameConfiguration.GetValue("GAME_MAX_TURNS") end)

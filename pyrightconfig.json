@@ -7,6 +7,7 @@
   "exclude": [
     "**/__pycache__",
     "gpu/runs",
+    "tools/civ6lab",
     ".venv"
   ],
   "venvPath": ".",

@@ -6,6 +6,16 @@
 --       so every plausible shape is tried once
 -- Keys are decoded through CombatResultParameters.
 --   --set ZAP=0 --set ZAU=123 --set ZX=36 --set ZY=15 --set ZTYPE=AIR
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local name = {}
 if type(CombatResultParameters) == "table" then
   for k, v in pairs(CombatResultParameters) do
@@ -32,7 +42,7 @@ for _, n in ipairs({ "AIR", "ICBM", "RANGED" }) do
     return CombatManager.SimulateAttackInto(acid, CombatTypes[n], ZX, ZY)
   end)
   if ok and type(res) == "table" then dump("into_" .. n, res, 2)
-  else print("{\"kind\":\"sim4\",\"into_" .. n .. "\":\"" .. tostring(ok and res or "err") .. "\"}") end
+  else print("{\"kind\":\"sim4\",\"into_" .. n .. "\":\"" .. tri(ok, res) .. "\"}") end
 end
 local function T(label2, f)
   local ok, v = pcall(f)
@@ -43,7 +53,7 @@ local function T(label2, f)
     out = table.concat(parts, " ")
   end
   print("{\"kind\":\"sim4\",\"call\":\"" .. label2 .. "\",\"ok\":" .. tostring(ok)
-    .. ",\"value\":\"" .. tostring(ok and out or "err") .. "\"}")
+    .. ",\"value\":\"" .. tri(ok, out) .. "\"}")
 end
 T("GetBestInterceptor(acid,x,y)", function() return CombatManager.GetBestInterceptor(acid, ZX, ZY) end)
 T("GetBestInterceptor(x,y)", function() return CombatManager.GetBestInterceptor(ZX, ZY) end)

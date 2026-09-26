@@ -3,6 +3,16 @@
 -- something the UI would normally be asked about. Names the blocker rather
 -- than acting on it — a forced end turn from outside its UI context crashed
 -- the game twice in session 1.
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local me = Game.GetLocalPlayer()
 print("{\"kind\":\"blocker\",\"localPlayer\":" .. tostring(me)
   .. ",\"turn\":" .. Game.GetCurrentGameTurn() .. "}")
@@ -15,7 +25,7 @@ end
 print("{\"kind\":\"blocker\",\"firstEndTurnBlocking\":\"" .. bname .. "\",\"ok\":" .. tostring(okb) .. "}")
 -- every notification the local player is holding
 local okn, n = pcall(function() return NotificationManager.GetCount(me) end)
-print("{\"kind\":\"blocker\",\"notificationCount\":\"" .. tostring(okn and n or "err") .. "\"}")
+print("{\"kind\":\"blocker\",\"notificationCount\":\"" .. tri(okn, n) .. "\"}")
 if okn and n ~= nil and n > 0 then
   for i = 0, math.min(n - 1, 20) do
     local oki, id = pcall(function() return NotificationManager.GetIDByIndex(me, i) end)
@@ -26,11 +36,11 @@ if okn and n ~= nil and n > 0 then
         for r in GameInfo.Notifications() do if r.Hash == nt then row = r end end
       end
       print("{\"kind\":\"blocker\",\"notification\":" .. i
-        .. ",\"type\":\"" .. (row and row.NotificationType or tostring(okt and nt or "err")) .. "\""
-        .. ",\"blocking\":\"" .. tostring(select(2, pcall(function() return NotificationManager.IsBlocking(me, id) end))) .. "\"}")
+        .. ",\"type\":\"" .. (row and row.NotificationType or tri(okt, nt)) .. "\""
+        .. ",\"blocking\":\"" .. tri(pcall(function() return NotificationManager.IsBlocking(me, id) end)) .. "\"}")
     end
   end
 end
 local oka, act = pcall(function() return AutoplayManager.IsActive() end)
-print("{\"kind\":\"blocker\",\"autoplayActive\":\"" .. tostring(oka and act or "err") .. "\""
-  .. ",\"turnActive\":\"" .. tostring(select(2, pcall(function() return Players[me]:IsTurnActive() end))) .. "\"}")
+print("{\"kind\":\"blocker\",\"autoplayActive\":\"" .. tri(oka, act) .. "\""
+  .. ",\"turnActive\":\"" .. tri(pcall(function() return Players[me]:IsTurnActive() end)) .. "\"}")

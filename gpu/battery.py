@@ -563,7 +563,10 @@ def _main() -> int:
         # or hang deep inside a lane instead of an import error. F841 rides
         # along because a dangling local is what a half-finished edit leaves,
         # and `tests` is in scope because a poke lane is engine code too.
-        ("f821", [str(ruff), "check", "--select", "F821,F841", "gpu", "policy", "tools", "tests"]),
+        # The lab's scripts (tools/civ6lab) drive the live game and feed no
+        # lane, so no static lane reads them.
+        ("f821", [str(ruff), "check", "--select", "F821,F841", "--extend-exclude", "tools/civ6lab",
+                  "gpu", "policy", "tools", "tests"]),
         ("pyright", [npx, "pyright"]),
     )
     _ths = [threading.Thread(target=run, args=(name, cmd), kwargs={"threads": 24}, daemon=True)
@@ -587,7 +590,7 @@ def _main() -> int:
         # knows the standing disagreements, so the step
         # is a RATCHET: red only on a NEW disagreement or a tag that stopped
         # resolving. A box without the install prints SKIPPED and passes.
-        ("provenance", [py, "tools/civ6lab/xml_check.py", "check", "--baseline", "docs/PROVENANCE.md"]),
+        ("provenance", [py, "tools/install/xml_check.py", "check", "--baseline", "docs/PROVENANCE.md"]),
         # ...and a constant can be RIGHT and read by nobody: the reader
         # census, ratcheted the same way against its committed baseline.
         ("census", [py, "tools/gpu/rules_reader_census.py", "--baseline", "tools/gpu/rules_reader_census_baseline.txt"]),

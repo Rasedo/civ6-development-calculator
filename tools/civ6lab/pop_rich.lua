@@ -9,12 +9,22 @@
 --                flag, district + complete/pillaged, resource, feature, yields,
 --                fallout turns, whether fallout prevents work there
 --   --set ZCX=36 --set ZCY=22 --set ZR=3 --set ZTAG=before
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local c = Cities.GetCityInPlot(ZCX, ZCY)
 if c == nil then print("{\"error\":\"nocity\",\"x\":" .. ZCX .. ",\"y\":" .. ZCY .. "}") return end
 local cz, cb, g = c:GetCitizens(), c:GetBuildings(), c:GetGrowth()
 local fm = Game.GetFalloutManager()
 local function N(f, d) local ok, v = pcall(f); if ok and v ~= nil then return v end return d end
-local function S(f) local ok, v = pcall(f); if ok and v ~= nil then return tostring(v) end return "err" end
+local function S(f) return trij(pcall(f)) end
 local YF = GameInfo.Yields["YIELD_FOOD"].Index
 local YP = GameInfo.Yields["YIELD_PRODUCTION"].Index
 

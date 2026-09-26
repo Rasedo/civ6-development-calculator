@@ -3,10 +3,20 @@
 -- can be read (and possibly written) from the tuner while the game is being
 -- configured — which is the only place a turn limit or a disaster intensity
 -- can be chosen at all.
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local function T(label, f)
   local ok, v = pcall(f)
   print("{\"kind\":\"setup\",\"field\":\"" .. label .. "\",\"ok\":" .. tostring(ok)
-    .. ",\"value\":\"" .. tostring(ok and v or "err") .. "\"}")
+    .. ",\"value\":\"" .. tri(ok, v) .. "\"}")
 end
 local acc = {}
 local okg, gc = pcall(function() return GameConfiguration end)

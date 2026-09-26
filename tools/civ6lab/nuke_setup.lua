@@ -5,6 +5,16 @@
 --   Players[0]:GetWMDs():ChangeWeaponCount(GameInfo.WMDs[...].Index, n)
 --   Debug/Player.ltp: pPlayerTechs:SetTech(i, true)
 --   --set ZCX=23 --set ZCY=26 --set ZTP=1 --set ZBX=27 --set ZBY=24 --set ZN=5
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local p0 = Players[0]
 local techs = p0:GetTechs()
 local granted = 0
@@ -19,7 +29,7 @@ local nd = GameInfo.WMDs["WMD_NUCLEAR_DEVICE"].Index
 pcall(function() w:ChangeWeaponCount(tn, ZN) end)
 pcall(function() w:ChangeWeaponCount(nd, ZN) end)
 print("wmd thermo=" .. tostring(w:GetWeaponCount(tn)) .. " nuclear=" .. tostring(w:GetWeaponCount(nd))
-  .. " canDeploy=" .. tostring(select(2, pcall(function() return w:CanDeployWMD(tn) end))))
+  .. " canDeploy=" .. tri(pcall(function() return w:CanDeployWMD(tn) end)))
 local b = p0:GetUnits():Create(GameInfo.Units["UNIT_BOMBER"].Index, ZBX, ZBY)
 print("bomber " .. tostring(b and b:GetID()) .. " at " .. ZBX .. ":" .. ZBY
   .. " dist " .. Map.GetPlotDistance(ZBX, ZBY, ZCX, ZCY))

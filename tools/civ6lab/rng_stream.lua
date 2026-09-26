@@ -8,8 +8,18 @@
 -- The original seed is read first and put back at the end, so the game's own
 -- stream is disturbed as little as possible.
 --   --set ZSEED=12345 --set ZN=24 --set ZRANGE=32768
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local ok0, seed0 = pcall(function() return Game.GetRandomSeed() end)
-print("{\"kind\":\"rngstream\",\"originalSeed\":\"" .. tostring(ok0 and seed0 or "err") .. "\"}")
+print("{\"kind\":\"rngstream\",\"originalSeed\":\"" .. tri(ok0, seed0) .. "\"}")
 local function run(tag)
   pcall(function() Game.SetRandomSeed(ZSEED) end)
   local acc = {}

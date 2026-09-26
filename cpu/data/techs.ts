@@ -59,7 +59,7 @@ export interface TechDef {
 /** PROVENANCE (cpu/data/provenance.ts), keyed by row id and attached by the row
  *  builder below — these rows are built through a positional helper, so the tag
  *  cannot ride inside the call. Stripped by the exporter; checked by
- *  tools/civ6lab/xml_check.py. */
+ *  tools/install/xml_check.py. */
 const TECH_SRC: Readonly<Record<string, SrcMap>> = {
   POTTERY: {
     era: xml('Technologies', 'TechnologyType=TECH_POTTERY', 'EraType', { expect: 'ERA_ANCIENT' }),

@@ -93,7 +93,7 @@ export interface GreatPersonDef {
   id: string;
   name: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). Stripped by the
-   *  exporter; checked by tools/civ6lab/xml_check.py. */
+   *  exporter; checked by tools/install/xml_check.py. */
   src?: SrcMap;
   class: GreatPersonClass;
   /** the ERA this person belongs to, which is what orders the class's queue

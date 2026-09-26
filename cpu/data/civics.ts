@@ -17,7 +17,7 @@ export interface CivicDef {
 /** PROVENANCE (cpu/data/provenance.ts), keyed by row id and attached by the row
  *  builder below — these rows are built through a positional helper, so the tag
  *  cannot ride inside the call. Stripped by the exporter; checked by
- *  tools/civ6lab/xml_check.py. */
+ *  tools/install/xml_check.py. */
 const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
   CODE_OF_LAWS: {
     era: xml('Civics', 'CivicType=CIVIC_CODE_OF_LAWS', 'EraType', { expect: 'ERA_ANCIENT' }),

@@ -1,6 +1,16 @@
 -- InGame: every operation a named unit can currently start, with the target
 -- the WMD ones are offered. Faster than guessing why a launch was refused.
 --   --set ZPLAYER=0 --set ZUNIT=123 --set ZTX=35 --set ZTY=11
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local u = nil
 for _, x in Players[ZPLAYER]:GetUnits():Members() do if x:GetID() == ZUNIT then u = x end end
 if u == nil then print("{\"kind\":\"unitops\",\"error\":\"nounit\"}") return end
@@ -28,5 +38,5 @@ if okt and type(targets) == "table" then
   end
   print("{\"kind\":\"unitops\",\"wmdTargetEntries\":" .. n .. "}")
 else
-  print("{\"kind\":\"unitops\",\"wmdTargets\":\"" .. tostring(okt and targets or "err") .. "\"}")
+  print("{\"kind\":\"unitops\",\"wmdTargets\":\"" .. tri(okt, targets) .. "\"}")
 end

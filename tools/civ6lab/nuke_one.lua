@@ -7,6 +7,16 @@
 -- a "first bomber with moves" rule hands the same unit to every call and only
 -- ONE of the queued strikes ever lands.
 --   --set ZCX=23 --set ZCY=26 --set ZD=0 --set ZWMD=WMD_THERMONUCLEAR_DEVICE --set ZBX=21 --set ZBY=22 --set ZSKIP=0
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local u = nil
 local seen = 0
 for _, x in Players[0]:GetUnits():Members() do
@@ -42,4 +52,4 @@ print("{\"scene\":\"D\",\"kind\":\"one-strike\",\"turn\":" .. Game.GetCurrentGam
   .. ",\"aimOffset\":" .. ZD .. ",\"wmd\":\"ZWMD\""
   .. ",\"bomber\":" .. u:GetID() .. ",\"bomberDist\":" .. Map.GetPlotDistance(u:GetX(), u:GetY(), ax, ay)
   .. ",\"aimRevealed\":" .. tostring(v:IsRevealed(ax, ay))
-  .. ",\"can\":" .. tostring(okc and can or false) .. ",\"fired\":" .. tostring(fired) .. "}")
+  .. ",\"can\":" .. trij(okc, can) .. ",\"fired\":" .. tostring(fired) .. "}")

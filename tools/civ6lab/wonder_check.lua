@@ -4,19 +4,21 @@
 -- BOTH pillage readers side by side:
 --   district:IsPillaged()            on the DISTRICT_WONDER tile
 --   city:GetBuildings():IsPillaged() on the wonder BUILDING itself
--- NB booleans are printed with an explicit nil/err guard: `ok and v or "err"`
--- collapses a legitimate FALSE to "err" in Lua, which is exactly how the first
--- pass mis-read this.
+-- Each read prints true / false / null, or "err:<msg>" when the call threw.
 --   --set ZCX=23 --set ZCY=26 --set ZR=2
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local c = Cities.GetCityInPlot(ZCX, ZCY)
 if c == nil then print("{\"error\":\"nocity\"}") return end
 local cb = c:GetBuildings()
-local function B(f)
-  local ok, v = pcall(f)
-  if not ok then return "err" end
-  if v == nil then return "nil" end
-  return tostring(v)
-end
+local function B(f) return trij(pcall(f)) end
 -- locate every wonder by walking the map for plot:GetWonderType()
 for i = 0, Map.GetPlotCount() - 1 do
   local q = Map.GetPlotByIndex(i)
@@ -26,7 +28,7 @@ for i = 0, Map.GetPlotCount() - 1 do
     if dist <= ZR + 2 then
       local row = GameInfo.Buildings[wt]
       local name = row and row.BuildingType or ("id" .. wt)
-      local dPil = "nodistrict"
+      local dPil = "\"nodistrict\""
       for _, d in c:GetDistricts():Members() do
         if d:GetX() == q:GetX() and d:GetY() == q:GetY() then dPil = B(function() return d:IsPillaged() end) end
       end
@@ -35,7 +37,7 @@ for i = 0, Map.GetPlotCount() - 1 do
         .. ",\"inBlast\":" .. tostring(dist <= ZR)
         .. ",\"cityHasIt\":" .. B(function() return row ~= nil and cb:HasBuilding(row.Index) end)
         .. ",\"districtIsPillaged\":" .. dPil
-        .. ",\"buildingIsPillaged\":" .. (row and B(function() return cb:IsPillaged(row.Hash) end) or "norow")
+        .. ",\"buildingIsPillaged\":" .. (row and B(function() return cb:IsPillaged(row.Hash) end) or "\"norow\"")
         .. ",\"plotImprovementPillaged\":" .. B(function() return q:IsImprovementPillaged() end) .. "}")
     end
   end

@@ -3,6 +3,16 @@
 -- from the city centre in plot-index order, so the choice is deterministic
 -- and is printed with the reading.
 -- Prints one JSON line per strike with the population before it.
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local PLAN = {
   { x = 23, y = 26, owner = 1, pop = 18, d = 0, wmd = "WMD_THERMONUCLEAR_DEVICE", tag = "pop18-d0-thermo" },
   { x = 20, y = 29, owner = 1, pop = 12, d = 0, wmd = "WMD_THERMONUCLEAR_DEVICE", tag = "pop12-d0-thermo" },
@@ -61,6 +71,6 @@ for _, r in ipairs(PLAN) do
       .. ",\"aimOffset\":" .. r.d .. ",\"wmd\":\"" .. r.wmd .. "\""
       .. ",\"popBefore\":" .. popBefore
       .. ",\"bomber\":" .. u:GetID() .. ",\"bomberDist\":" .. Map.GetPlotDistance(u:GetX(), u:GetY(), ax, ay)
-      .. ",\"can\":" .. tostring(okc and can or false) .. ",\"fired\":" .. tostring(fired) .. "}")
+      .. ",\"can\":" .. trij(okc, can) .. ",\"fired\":" .. tostring(fired) .. "}")
   end
 end

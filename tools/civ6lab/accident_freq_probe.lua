@@ -4,6 +4,16 @@
 -- ".6"). This reads the three accident rows against THIS game's realism
 -- setting, the setting table's own order, and whatever counter the random
 -- event manager exposes.
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 for r in GameInfo.RandomEvent_Frequencies() do
   if string.find(r.RandomEventType or "", "NUCLEAR_ACCIDENT", 1, true) then
     print("{\"kind\":\"freq\",\"event\":\"" .. r.RandomEventType
@@ -18,7 +28,7 @@ for r in GameInfo.RealismSettings() do
   i = i + 1
 end
 local okr, rs = pcall(function() return GameConfiguration.GetValue("GAME_REALISM") end)
-print("{\"kind\":\"freq\",\"gameRealismValue\":\"" .. tostring(okr and rs or "err") .. "\"}")
+print("{\"kind\":\"freq\",\"gameRealismValue\":\"" .. tri(okr, rs) .. "\"}")
 local okg, gre = pcall(function() return GameRandomEvents end)
 if okg and gre ~= nil then
   local names = {}

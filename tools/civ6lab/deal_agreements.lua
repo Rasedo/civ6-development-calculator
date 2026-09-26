@@ -3,10 +3,20 @@
 -- "DIPLOACTION_RESEARCH_AGREEMENT"/> and Expansion2 re-ships that file, so the
 -- Civ5-style Research Agreement should be gone from the running game and the
 -- Research ALLIANCE should be what replaced it. This asks the game, not the XML.
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local function row(t, key)
   local ok, r = pcall(function() return GameInfo[t][key] end)
   print("{\"kind\":\"db\",\"table\":\"" .. t .. "\",\"key\":\"" .. key .. "\",\"present\":"
-    .. tostring(ok and r ~= nil) .. "}")
+    .. (ok and tostring(r ~= nil) or trij(ok, r)) .. "}")
 end
 row("DiplomaticActions", "DIPLOACTION_RESEARCH_AGREEMENT")
 row("DiplomaticActions", "DIPLOACTION_DECLARE_FRIENDSHIP")

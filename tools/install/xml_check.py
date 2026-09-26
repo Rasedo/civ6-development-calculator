@@ -1,10 +1,10 @@
 """THE CONSTANT CHECKER — every tagged constant re-read from the install.
 
-    python tools/civ6lab/xml_check.py get Units UnitType=UNIT_BUILDER Cost
-    python tools/civ6lab/xml_check.py row Units UnitType=UNIT_BUILDER
-    python tools/civ6lab/xml_check.py check [seeder/worlds/provenance.json]
-    python tools/civ6lab/xml_check.py check --baseline docs/PROVENANCE.md   # the battery's form
-    python tools/civ6lab/xml_check.py suggest Units UnitType=UNIT_ 50 --col Cost
+    python tools/install/xml_check.py get Units UnitType=UNIT_BUILDER Cost
+    python tools/install/xml_check.py row Units UnitType=UNIT_BUILDER
+    python tools/install/xml_check.py check [seeder/worlds/provenance.json]
+    python tools/install/xml_check.py check --baseline docs/PROVENANCE.md   # the battery's form
+    python tools/install/xml_check.py suggest Units UnitType=UNIT_ 50 --col Cost
 
 `get` prints one cell and the file that last wrote it; `row` the whole row
 with each column's last writer; `check` reads the provenance dump that

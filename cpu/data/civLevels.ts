@@ -23,7 +23,7 @@ export type CivLevelId = 'TRIBE' | 'CITY_STATE' | 'FULL_CIV' | 'FREE_CITIES';
 
 export interface CivLevelDef {
   /** PROVENANCE, per column (cpu/data/provenance.ts). Stripped by the
-   *  exporter; checked by tools/civ6lab/xml_check.py. */
+   *  exporter; checked by tools/install/xml_check.py. */
   readonly src?: SrcMap;
   /** may found NEW cities with a Settler */
   readonly canFoundCities: boolean;

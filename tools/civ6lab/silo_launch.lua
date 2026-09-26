@@ -8,6 +8,16 @@
 -- and the city is Cities.GetPlotPurchaseCity(siloPlot), not the nearest one.
 --   --set ZSX=38 --set ZSY=16 --set ZTX=36 --set ZTY=15
 --   --set ZWMD=WMD_NUCLEAR_DEVICE --set ZFIRE=0
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local silo = Map.GetPlot(ZSX, ZSY)
 if silo == nil then print("{\"kind\":\"silolaunch\",\"error\":\"noplot\"}") return end
 local imp = silo:GetImprovementType()
@@ -50,4 +60,4 @@ end
 print("{\"kind\":\"silolaunch\",\"silo\":\"" .. ZSX .. ":" .. ZSY .. "\",\"improvement\":\"" .. impName
   .. "\",\"city\":" .. city:GetID() .. ",\"cityAt\":\"" .. city:GetX() .. ":" .. city:GetY() .. "\""
   .. ",\"targets\":" .. nTargets .. ",\"targetOffered\":" .. tostring(hasTarget)
-  .. ",\"canStart\":" .. tostring(okC and can) .. ",\"requested\":" .. tostring(fired) .. "}")
+  .. ",\"canStart\":" .. trij(okC, can) .. ",\"requested\":" .. tostring(fired) .. "}")

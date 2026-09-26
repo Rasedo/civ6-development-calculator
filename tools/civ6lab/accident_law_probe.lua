@@ -6,6 +6,16 @@
 --   * the game's realism setting and the per-game occurrence caps, which may
 --     be the whole law: "at most N per game" rather than a per-turn chance
 --   * the random-event manager's own names, for an occurrence counter
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local d = GameInfo.Districts["DISTRICT_INDUSTRIAL_ZONE"]
 print("{\"kind\":\"law\",\"district\":\"DISTRICT_INDUSTRIAL_ZONE\",\"OnePerCity\":\"" .. tostring(d.OnePerCity)
   .. "\",\"RequiresPopulation\":\"" .. tostring(d.RequiresPopulation) .. "\"}")
@@ -23,7 +33,7 @@ for r in GameInfo.RandomEvents() do
   end
 end
 local okr, rs = pcall(function() return GameConfiguration.GetValue("GAME_REALISM") end)
-print("{\"kind\":\"law\",\"realismSetting\":\"" .. tostring(okr and rs or "err") .. "\"}")
+print("{\"kind\":\"law\",\"realismSetting\":\"" .. tri(okr, rs) .. "\"}")
 for r in GameInfo.RandomEvent_RealismSettings() do
   if string.find(r.RandomEventType or "", "NUCLEAR_ACCIDENT", 1, true) then
     print("{\"kind\":\"law\",\"cap\":\"" .. r.RandomEventType .. "\",\"realism\":\"" .. tostring(r.RealismSettingType)

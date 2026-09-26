@@ -4,6 +4,16 @@
 -- MILITARY or SURVIVORS reward adds a unit) and the draws consumed can be
 -- counted by stepping the LCG outside the game.
 --   --set ZX=37 --set ZY=16 --set ZUNIT=131073 --set ZTAG=after
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local p0 = Players[0]
 local q = Map.GetPlot(ZX, ZY)
 local imp = q:GetImprovementType()
@@ -28,6 +38,6 @@ print("{\"kind\":\"goodyread\",\"stage\":\"ZTAG\",\"turn\":" .. Game.GetCurrentG
   .. ",\"faith\":" .. string.format("%.2f", p0:GetReligion():GetFaithBalance())
   .. ",\"units\":" .. n
   .. ",\"hist\":\"" .. table.concat(parts, " ") .. "\""
-  .. ",\"science\":" .. string.format("%.2f", select(2, pcall(function() return p0:GetTechs():GetScienceYield() end)) or -1)
-  .. ",\"culture\":" .. string.format("%.2f", select(2, pcall(function() return p0:GetCulture():GetCultureYield() end)) or -1)
+  .. ",\"science\":" .. trij(pcall(function() return p0:GetTechs():GetScienceYield() end))
+  .. ",\"culture\":" .. trij(pcall(function() return p0:GetCulture():GetCultureYield() end))
   .. ",\"seed\":" .. tostring(Game.GetRandomSeed()) .. "}")

@@ -1,6 +1,16 @@
 -- FrontEnd: decode the setup's hashes into names, so the game that is about to
 -- start is on the record: era, speed, map, players, and the turn limit the
 -- menus do not expose.
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local function nameFor(tbl, hash, field)
   local ok, it = pcall(function() return GameInfo[tbl]() end)
   if not ok or it == nil then return "?" end
@@ -28,5 +38,5 @@ print("{\"kind\":\"setupdecode\""
 for _, key in ipairs({ "GAME_NO_BARBARIANS", "GAME_NO_DISASTERS", "MAP_SCRIPT_NAME", "GAME_DIFFICULTY",
                        "GAME_START_YEAR", "GAME_SYNC_RANDOM_SEED", "GAME_RANDOM_SEED" }) do
   local ok, v = pcall(function() return GameConfiguration.GetValue(key) end)
-  print("{\"kind\":\"setupdecode\",\"key\":\"" .. key .. "\",\"value\":\"" .. tostring(ok and v or "err") .. "\"}")
+  print("{\"kind\":\"setupdecode\",\"key\":\"" .. key .. "\",\"value\":\"" .. tri(ok, v) .. "\"}")
 end

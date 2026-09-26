@@ -1,33 +1,44 @@
--- Any state: which Dedication is legal right now? COMMEMORATION rows carry
--- MinimumGameEra / MaximumGameEra, so the first row in the table is the WRONG
--- one late in the game. Everything is pcall-guarded because the player's Eras
--- object lives in GameCore while Game.GetEras() answers in InGame.
-local me = Game.GetLocalPlayer and Game.GetLocalPlayer() or 0
-local function J(k, v) print("{\"kind\":\"era\",\"" .. k .. "\":\"" .. tostring(v) .. "\"}") end
-local okp, pl = pcall(function() return Players[me] end)
-if okp and pl ~= nil then
+-- Any state: the eras and which Dedication is legal now. COMMEMORATION rows
+-- carry MinimumGameEra / MaximumGameEra, so the first row in the table is the
+-- WRONG one late in the game. Every read is pcall'd and prints its value or
+-- "err:<message>": the player's Eras object lives in GameCore while
+-- Game.GetEras() answers in InGame.
+local function esc(s)
+  s = tostring(s):gsub('\\', '\\\\'):gsub('"', '\\"')
+  return (s:gsub('%c', function(c) return string.format('\\u%04x', c:byte()) end))
+end
+local function V(ok, v)
+  if not ok then return '"err:' .. esc(v) .. '"' end
+  if type(v) == "number" or type(v) == "boolean" then return tostring(v) end
+  if v == nil then return "null" end
+  return '"' .. esc(v) .. '"'
+end
+local function J(k, ok, v) print('{"kind":"era","' .. k .. '":' .. V(ok, v) .. '}') end
+local okm, me = pcall(function() return Game.GetLocalPlayer() end)
+if not okm or type(me) ~= "number" or me < 0 then me = 0 end
+local pl = Players[me]
+if pl ~= nil then
   local oke, eras = pcall(function() return pl:GetEras() end)
   if oke and eras ~= nil then
     local acc = {}
-    local mt = getmetatable(eras)
-    local okx, idx = pcall(function() return mt and mt["__index"] end)
+    local okx, idx = pcall(function() local mt = getmetatable(eras); return mt and mt["__index"] end)
     local src = (okx and type(idx) == "table") and idx or eras
-    for k, v in pairs(src) do if type(k) == "string" then acc[#acc + 1] = k end end
+    for k in pairs(src) do if type(k) == "string" then acc[#acc + 1] = k end end
     table.sort(acc)
-    J("playerErasObject", table.concat(acc, " "))
+    J("playerErasObject", true, table.concat(acc, " "))
   else
-    J("playerErasObject", "nil")
+    J("playerErasObject", oke, eras)
   end
-  local oke2, e = pcall(function() return pl:GetEra() end)
-  J("playerEra", oke2 and e or "err")
+  J("player", true, me)
+  J("playerEra", pcall(function() return pl:GetEra() end))
 end
 local okg, ge = pcall(function() return Game.GetEras():GetCurrentEra() end)
-J("gameEra", okg and ge or "err")
-if okg and ge ~= nil then
+J("gameEra", okg, ge)
+if okg and type(ge) == "number" then
   local r = GameInfo.Eras[ge]
-  J("gameEraType", r and r.EraType or "?")
+  J("gameEraType", true, r and r.EraType)
 end
 for r in GameInfo.CommemorationTypes() do
-  print("{\"kind\":\"era\",\"commemoration\":\"" .. r.CommemorationType
-    .. "\",\"min\":\"" .. tostring(r.MinimumGameEra) .. "\",\"max\":\"" .. tostring(r.MaximumGameEra) .. "\"}")
+  print('{"kind":"era","commemoration":"' .. r.CommemorationType .. '","min":' .. V(true, r.MinimumGameEra)
+    .. ',"max":' .. V(true, r.MaximumGameEra) .. '}')
 end

@@ -3,17 +3,22 @@ severity DOES, measured over many reactors at once.
 
     python tools/civ6lab/reactor_fleet.py --host 127.0.0.3 setup --cities 8
     python tools/civ6lab/reactor_fleet.py --host 127.0.0.3 trials --loads 3
+    python tools/civ6lab/reactor_fleet.py --host 127.0.0.3 trials --save reactor_units --loads 5 --no-later
 
 `setup` (a fresh human-seat game): found N cities for seat 0 on spaced land
 plots, give each population 12, an Industrial Zone with Workshop, Factory and
 the nuclear Power Plant (`reactor_scene.lua`, its guards against the double
 create that crashed the game), a Farm on every free featureless land plot of
 its ring, and save `reactor_base`.
-`trials`: per load of `reactor_base`, for each severity in turn on a FRESH
-load — snapshot every reactor city, fire the accident at every reactor, pass a
-turn, snapshot again. One JSONL row per city per accident under runs/: the
+`trials`: per load of `--save` (a failed load stops the run), for each
+severity in turn on a FRESH load — snapshot every reactor city, fire the
+accident at every reactor, snapshot at once, then (unless `--no-later`) pass a
+turn and snapshot again. Each snapshot is read in BOTH states: GameCore (the
 population, the Industrial Zone's pillage, each building's presence and
-pillage, the ring improvements' pillage, the fallout.
+pillage, the ring improvements' pillage, the fallout) and InGame (the
+building pillage reader that answers, `CanProduce`, the district, the plant's
+age and threshold). Every pillage read prints true / false / "err:<msg>".
+One JSONL row per city per accident, `runs/reactor_<save>_<stamp>.jsonl`.
 The damage table's Percentages (`RandomEvent_Damages`) are either per-object
 CHANCES or PROPORTIONS; enough accidents per severity tell which.
 """
@@ -80,8 +85,20 @@ end
 print("farms " .. n)
 """
 
-# one JSON line per reactor city: what an accident can touch
-LUA_SNAP = """
+# A pcall read as a JSON value: a number or boolean bare, nil as null, a string
+# quoted, a call that threw as "err:<msg>" — so a clean false stays false.
+LUA_J = r"""
+local function esc(s) return (tostring(s):gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end)) end
+local function J(ok, v)
+  if not ok then return "\"err:" .. esc(v) .. "\"" end
+  if type(v) == "number" or type(v) == "boolean" then return tostring(v) end
+  if v == nil then return "null" end
+  return "\"" .. esc(v) .. "\""
+end
+"""
+
+# GameCore: one JSON line per reactor city — what an accident can touch
+LUA_SNAP = LUA_J + """
 local fm = Game.GetFalloutManager()
 local iz = GameInfo.Districts["DISTRICT_INDUSTRIAL_ZONE"].Index
 for k = 0, fm:GetReactorCount() - 1 do
@@ -90,12 +107,11 @@ for k = 0, fm:GetReactorCount() - 1 do
   if c then
     local bl, ds = c:GetBuildings(), c:GetDistricts()
     local d = ds:GetDistrict(iz)
-    local izPil = d and d:IsPillaged() or false
+    local izPil = d and J(pcall(function() return d:IsPillaged() end)) or "null"
     local bs = {}
     for row in GameInfo.Buildings() do
       if bl:HasBuilding(row.Index) then
-        local okp, pil = pcall(function() return bl:IsPillaged(row.Hash) end)
-        bs[#bs + 1] = "\\"" .. row.BuildingType .. "\\":" .. tostring(okp and pil or false)
+        bs[#bs + 1] = "\\"" .. row.BuildingType .. "\\":" .. J(pcall(function() return bl:IsPillaged(row.Hash) end))
       end
     end
     local imps, pils = 0, 0
@@ -117,10 +133,47 @@ for k = 0, fm:GetReactorCount() - 1 do
       end
     end
     print("{\\"reactor\\":" .. k .. ",\\"city\\":" .. r.CityID .. ",\\"pop\\":" .. c:GetPopulation()
-      .. ",\\"izPillaged\\":" .. tostring(izPil) .. ",\\"buildings\\":{" .. table.concat(bs, ",") .. "}"
+      .. ",\\"izPillaged\\":" .. izPil .. ",\\"buildings\\":{" .. table.concat(bs, ",") .. "}"
       .. ",\\"improvements\\":" .. imps .. ",\\"impPillaged\\":" .. pils
       .. ",\\"falloutPlots\\":" .. fall .. ",\\"falloutMaxDist\\":" .. fallMax
       .. ",\\"falloutAtReactor\\":" .. fm:GetFalloutTurnsRemaining(r.PlotIndex) .. "}")
+  end
+end
+"""
+
+# InGame: the same reactors through the UI's readers — the building pillage
+# reader lab 2 proved (`city:GetBuildings():IsPillaged(row.Hash)`, where the
+# GameCore object answers false for a building the InGame one calls
+# pillaged), `CanProduce(row.Hash, true)` as a second reader (UNVERIFIED as a
+# pillage test: ProductionPanel.lua asks it before listing a repair), the
+# Industrial Zone's `IsPillaged`, and the plant's age and accident threshold
+# (`GetReactorAge` / `GetReactorAccidentThreshold` take the CITY).
+LUA_SNAP_IG = LUA_J + """
+local fm = Game.GetFalloutManager()
+local iz = GameInfo.Districts["DISTRICT_INDUSTRIAL_ZONE"].Index
+for k = 0, fm:GetReactorCount() - 1 do
+  local r = fm:GetReactorByIndex(k)
+  local okc, c = pcall(function() return Players[r.Owner]:GetCities():FindID(r.CityID) end)
+  if not okc or c == nil then
+    print("{\\"reactor\\":" .. k .. ",\\"city\\":" .. J(okc, c) .. "}")
+  else
+    local bl, bq = c:GetBuildings(), c:GetBuildQueue()
+    local izPil = "null"
+    for _, d in c:GetDistricts():Members() do
+      if d:GetType() == iz then izPil = J(pcall(function() return d:IsPillaged() end)) end
+    end
+    local bs, cp = {}, {}
+    for row in GameInfo.Buildings() do
+      if bl:HasBuilding(row.Index) then
+        bs[#bs + 1] = "\\"" .. row.BuildingType .. "\\":" .. J(pcall(function() return bl:IsPillaged(row.Hash) end))
+        cp[#cp + 1] = "\\"" .. row.BuildingType .. "\\":" .. J(pcall(function() return bq:CanProduce(row.Hash, true) end))
+      end
+    end
+    print("{\\"reactor\\":" .. k .. ",\\"city\\":" .. r.CityID .. ",\\"pop\\":" .. c:GetPopulation()
+      .. ",\\"izPillaged\\":" .. izPil .. ",\\"buildings\\":{" .. table.concat(bs, ",") .. "}"
+      .. ",\\"canProduce\\":{" .. table.concat(cp, ",") .. "}"
+      .. ",\\"age\\":" .. J(pcall(function() return fm:GetReactorAge(c) end))
+      .. ",\\"threshold\\":" .. J(pcall(function() return fm:GetReactorAccidentThreshold(c) end)) .. "}")
   end
 end
 """
@@ -138,7 +191,21 @@ print("fired " .. n)
 
 
 def snap(t: Tuner) -> dict[int, dict]:
-    return {r["reactor"]: r for r in (json.loads(x) for x in t.run(GC, LUA_SNAP, timeout=120) if x.startswith("{"))}
+    """reactor index -> {"gc": the GameCore read, "ig": the InGame read}"""
+    out: dict[int, dict] = {}
+    for key, state, lua in (("gc", GC, LUA_SNAP), ("ig", IG, LUA_SNAP_IG)):
+        for x in t.run(state, lua, timeout=120):
+            if x.startswith("{"):
+                r = json.loads(x)
+                out.setdefault(r["reactor"], {})[key] = r
+    return out
+
+
+def load(host: str, save: str) -> None:
+    """load `save` through `game.py load`; a failed load stops the run"""
+    rc = game.cmd_load(argparse.Namespace(host=host, port=4318, name=save, wait=600.0))
+    if rc != 0:
+        raise SystemExit(f"load of {save!r} on {host} failed (game.py load returned {rc})")
 
 
 def cmd_setup(a) -> int:
@@ -163,21 +230,24 @@ def cmd_setup(a) -> int:
 
 def cmd_trials(a) -> int:
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = lab.RUNS / f"reactor_{stamp}.jsonl"
+    out = lab.RUNS / f"reactor_{a.save}_{stamp}.jsonl"
     with open(out, "w", encoding="utf-8") as fh:
-        for load in range(a.loads):
+        for n in range(a.loads):
             for sev in SEVERITIES:
-                game.cmd_load(argparse.Namespace(host=a.host, port=4318, name="reactor_base", wait=600.0))
+                load(a.host, a.save)
                 t = Tuner(a.host).connect()
                 lp = lab.local_player(t)
+                turn = lab.turn(t)
                 before = snap(t)
-                print(f"load {load} {sev.split('_')[-1]}:", t.run(GC, LUA_FIRE.replace("ZEVENT", sev))[-1], flush=True)
+                print(f"load {n} {sev.split('_')[-1]}:", t.run(GC, LUA_FIRE.replace("ZEVENT", sev))[-1], flush=True)
                 now = snap(t)
-                lab.advance(t, "autoplay", lp, 300.0)
-                later = snap(t)
+                later = {}
+                if a.later:
+                    lab.advance(t, "autoplay", lp, 300.0)
+                    later = snap(t)
                 for k, b in before.items():
-                    fh.write(json.dumps({"load": load, "sev": sev, "before": b, "now": now.get(k),
-                                         "later": later.get(k)}) + "\n")
+                    fh.write(json.dumps({"save": a.save, "load": n, "turn": turn, "sev": sev, "before": b,
+                                         "now": now.get(k), "later": later.get(k)}) + "\n")
                 fh.flush()
                 t.close()
     print("->", out.name)
@@ -193,6 +263,9 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_setup)
     s = sub.add_parser("trials")
     s.add_argument("--loads", type=int, default=3)
+    s.add_argument("--save", default="reactor_base", help="the named save each trial loads")
+    s.add_argument("--no-later", dest="later", action="store_false",
+                   help="read only before and right after the accident; pass no turn")
     s.set_defaults(fn=cmd_trials)
     a = p.parse_args(argv)
     return a.fn(a)

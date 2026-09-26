@@ -51,8 +51,33 @@ drops a read whose turn moved.
 
 ## 2. Instrument 1 — the save sweep (no play)
 
-One loader loop (`game.py load <save>`, then the readers in InGame and
-GameCore), one record per save per reader.
+**Run.** `save_sweep.py` loads each save (`game.cmd_load`), runs the chosen
+readers, and appends one record per save per reader. The instances are up
+first (at the main menu or in a game); one worker per `--hosts` entry, each
+save loaded on exactly one of them.
+
+    python tools/civ6lab/save_sweep.py --list                          # the plan: saves x readers still pending
+    python tools/civ6lab/save_sweep.py --hosts 3                       # every reader on its default saves
+    python tools/civ6lab/save_sweep.py --hosts 3 --readers score,ww    # B-82-S1 + B-D-S0, all 37 saves
+    python tools/civ6lab/save_sweep.py --readers freecity_def          # C-60-S1, its six saves
+    python tools/civ6lab/save_sweep.py --readers minor_def             # C-38-S2, lab4_t50/t100/t150
+    python tools/civ6lab/save_sweep.py --hosts 3 --readers events      # C-74-S1 (+ C-49, C-41), all 37 saves
+
+| reader | scene | Lua (state) | default saves | record under `runs/` |
+|---|---|---|---|---|
+| `score` | B-82-S1 | `score_read.lua` (InGame) | all | `score_xsec_<stamp>.jsonl` |
+| `ww` | B-D-S0 | `freecity_amenity.lua` `ZALL=1` (InGame) | all | `ww_xsec_<stamp>.log` (jsonl) |
+| `freecity_def` | C-60-S1 | `city_probe.lua` `ZWHO=free` (InGame): every Free City and its nearest major city; the listed coordinates checked in `expected` | the six listed | `freecity_def_<stamp>.jsonl` |
+| `minor_def` | C-38-S2 | `city_probe.lua` (InGame): every city of every player | `lab4_t50/t100/t150` | `minor_def_<stamp>.jsonl` |
+| `events` | C-74-S1 | `event_history.lua` (InGame); `event_map.lua` (InGame and GameCore) | all | `event_turns_<save>.jsonl`, `event_map_<save>.json` |
+
+`Game.GetCurrentGameTurn()` is read before and after each reader (observer
+saves play on after a load); a read whose turn moved is repeated twice
+(`--retries`) and then kept with `"moved": true`. The ledger
+`runs/save_sweep_ledger.jsonl` makes a rerun skip every pair already `ok`;
+`--redo` reads them again, `--saves <glob>...` replaces the default lists,
+`--at-end menu|close|stay` (default `menu`). One city by hand:
+`lab.py lua --state InGame --file tools/civ6lab/city_probe.lua --set ZX=69 --set ZY=21`.
 
 ### B-82-S1. What `ERA_BUILDINGS` and `Converted` count
 - **Unknown.** Empire's `LINE_ITEM_ERA_BUILDINGS` residue (10–43): every

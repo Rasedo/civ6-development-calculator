@@ -3,11 +3,21 @@
 -- half point from COMBAT_POPULATION_PER_STRENGTH = 2 on an odd population
 -- would be visible rather than hidden by tostring's integer formatting.
 --   --set ZX=36 --set ZY=15
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local c = Cities.GetCityInPlot(ZX, ZY)
 if c == nil then print("{\"kind\":\"fracread\",\"error\":\"nocity\"}") return end
 local function show(f)
   local ok, v = pcall(f)
-  if not ok or type(v) ~= "number" then return "null,\"raw\":\"" .. tostring(ok and v or "err") .. "\"" end
+  if not ok or type(v) ~= "number" then return "null,\"raw\":\"" .. tri(ok, v) .. "\"" end
   return string.format("%.6f", v) .. ",\"raw\":\"" .. tostring(v) .. "\""
 end
 for _, d in c:GetDistricts():Members() do

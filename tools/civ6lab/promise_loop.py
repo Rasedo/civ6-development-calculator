@@ -1,10 +1,14 @@
-"""civ6lab promise_loop — ask 18: pass turns on a human-seat game by
-Autoplay, answering every AI diplomacy session with the local seat POSITIVE
-(the leader screen's AddResponse) instead of closing it, and log each turn's
-Don't-Settle-Near-Me promises and grievances (`settle_watch.lua`, the city
-lines dropped) plus every session seen.
+"""civ6lab promise_loop — ask 18: pass turns on a human-seat game (by
+Autoplay, or `--advance endturn`: the seat's blockers answered and the turn
+ended, no AI playing it), answering every AI diplomacy session with the seat
+POSITIVE (the leader screen's AddResponse) instead of closing it, and log the
+Don't-Settle-Near-Me promises, grievance totals and the game's grievance log
+entries (`settle_watch.lua`, the city lines dropped) once before the first
+turn passes — the turn of the act — and after every turn, plus every session
+seen.
 
     python tools/civ6lab/promise_loop.py --host 127.0.0.2 --turns 10 --tag near5
+    python tools/civ6lab/promise_loop.py --turns 1 --advance endturn --tag border1
 """
 from __future__ import annotations
 
@@ -12,16 +16,16 @@ import argparse
 import datetime as dt
 import pathlib
 import sys
-import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from tuner import Tuner, TunerError  # noqa: E402
+from tuner import Tuner  # noqa: E402
 import lab  # noqa: E402
 
 HERE = pathlib.Path(__file__).parent
 
+# the seat is ZSEAT (the UI's local player reads -1 while Autoplay holds it)
 LUA_ACCEPT = """
-local me = Game.GetLocalPlayer()
+local me = tonumber("ZSEAT") or Game.GetLocalPlayer()
 if me == nil or me < 0 then return end
 for p = 0, 62 do
   if p ~= me and Players[p] ~= nil and Players[p]:IsMajor() then
@@ -44,6 +48,7 @@ def main(argv=None) -> int:
     p.add_argument("--turns", type=int, default=10)
     p.add_argument("--tag", default="promise")
     p.add_argument("--wait", type=float, default=300.0)
+    p.add_argument("--advance", choices=("autoplay", "endturn"), default="autoplay")
     a = p.parse_args(argv)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     path = lab.RUNS / f"promise_{a.tag}_{stamp}.log"
@@ -55,21 +60,22 @@ def main(argv=None) -> int:
             fh.write(s + "\n")
             fh.flush()
             print(s, flush=True)
-        for _ in range(a.turns):
-            t0 = lab.turn(t)
-            t.run(lab.GC, lab.LUA_AUTOPLAY % lp)
-            deadline = time.monotonic() + a.wait
-            while lab.turn(t) == t0 and time.monotonic() < deadline:
-                time.sleep(0.5)
-                for ln in t.run(lab.IG, LUA_ACCEPT):
-                    log(ln)
-                lab.commemorate_if_blocked(t)
-                lab.dismiss_popups(t)
-            for ln in t.run(lab.IG, LUA_ACCEPT):
-                log(ln)
+        def read() -> None:
             for ln in t.run(lab.IG, watch, timeout=60):
                 if '"city"' not in ln:
                     log(ln)
+
+        # the turn of the act (near_probe's founding lands just before this
+        # call): the promise, the grievances and the log before any turn ends
+        log(f"turn {lab.turn(t)} (start)")
+        read()
+        for _ in range(a.turns):
+            # an open session is answered POSITIVE within a second; the other
+            # causes (a blocker, a screen) as lab.wait_turn answers them
+            lab.advance(t, a.advance, lp, a.wait, log, session_lua=LUA_ACCEPT, first=0.5, poll=1.0)
+            for ln in t.run(lab.IG, LUA_ACCEPT.replace("ZSEAT", str(lp))):
+                log(ln)
+            read()
             log(f"turn {lab.turn(t)}")
     t.close()
     print("->", path.name)

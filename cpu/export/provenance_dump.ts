@@ -2,7 +2,7 @@
  * PROVENANCE ONLY — the dump without the fixtures, for the tagging loop:
  *
  *   npx vite-node cpu/export/provenance_dump.ts [out.json]
- *   python tools/civ6lab/xml_check.py check out.json
+ *   python tools/install/xml_check.py check out.json
  *
  * `npm run export` writes the same file beside rules.json; this is the
  * two-second path a catalog edit re-checks by, and it writes wherever it is

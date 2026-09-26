@@ -271,7 +271,7 @@ export const STORM_MOVEMENT = srcConst('disasters.stormMovement', 8,
 export interface StormEvent {
   id: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). Stripped by the
-   *  exporter; checked by tools/civ6lab/xml_check.py. */
+   *  exporter; checked by tools/install/xml_check.py. */
   src?: SrcMap;
   family: StormFamily;
   /** the install's Severity, 1 or 2 */

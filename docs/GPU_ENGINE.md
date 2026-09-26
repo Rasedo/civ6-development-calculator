@@ -114,7 +114,7 @@ recomputed in libm.
 below depends on it: five static checks at once (`tsc`, `parse`, `lint`,
 ruff `f821`, `pyright`), then the ordered chain — the seeder-drift check
 against the committed `seeder/worlds.lock`, `seed`, `export`, the
-constant-provenance ratchet (`tools/civ6lab/xml_check.py` against
+constant-provenance ratchet (`tools/install/xml_check.py` against
 `docs/PROVENANCE.md`, SKIPPED on a box without the install) and the
 reader census (`tools/gpu/rules_reader_census.py` against its committed
 baseline). Then the lanes run concurrently: up to twelve serve shards

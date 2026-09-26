@@ -6,6 +6,16 @@
 -- does not, the roll waits for the mission's completion turn, where the stream
 -- is shared with every other actor and seed accounting cannot isolate it.
 --   --set ZSPY=123 --set ZTX=8 --set ZTY=12 --set ZOP=UNITOPERATION_SPY_SIPHON_FUNDS
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local spy = nil
 for _, u in Players[0]:GetUnits():Members() do
   if u:GetID() == ZSPY then spy = u end
@@ -23,7 +33,7 @@ if (okc and can) or (okc2 and can2) then
   fired = pcall(function() UnitManager.RequestOperation(spy, op.Hash, params) end)
 end
 print("{\"kind\":\"spymission\",\"op\":\"ZOP\",\"spy\":" .. ZSPY
-  .. ",\"can\":" .. tostring(okc and can) .. ",\"canNoParams\":" .. tostring(okc2 and can2)
+  .. ",\"can\":" .. trij(okc, can) .. ",\"canNoParams\":" .. trij(okc2, can2)
   .. ",\"fired\":" .. tostring(fired)
   .. ",\"spyAt\":\"" .. spy:GetX() .. ":" .. spy:GetY() .. "\""
   .. ",\"moves\":" .. spy:GetMovesRemaining() .. "}")

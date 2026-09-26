@@ -2,7 +2,7 @@
 -- `rawget` are all absent from the tuner's wrapped chunk, so each name is
 -- referenced literally inside a pcall.
 local out = {}
-local function T(n, f) local ok, v = pcall(f); out[#out + 1] = n .. "=" .. (ok and type(v) or "err") end
+local function T(n, f) local ok, v = pcall(f); out[#out + 1] = n .. "=" .. (ok and type(v) or ("err:" .. tostring(v))) end
 T("ImprovementBuilder", function() return ImprovementBuilder end)
 T("BuildingBuilder", function() return BuildingBuilder end)
 T("DistrictBuilder", function() return DistrictBuilder end)

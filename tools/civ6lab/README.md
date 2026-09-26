@@ -58,6 +58,19 @@ Two box facts it needed:
     python tools/civ6lab/game.py --host 127.0.0.2 bench --save lab4_t100 --turns 15
     python tools/civ6lab/game.py profile restore    # the owner's options back, byte for byte
     python tools/civ6lab/game.py patch revert
+    python tools/civ6lab/game.py --host 127.0.0.2 close    # end THAT instance's process (its -TunerIP), no other
+    python tools/civ6lab/fleet.py --hosts 3 --config tools/civ6lab/obs_small.json --games 2 --turns 250 --tag obs
+
+`fleet.py` is the observer fleet: it launches every instance at once, waits
+for all main menus in parallel, retiles once, then per host in parallel runs
+new game (or load) → `watch.py` → main menu → next game until `--games` or
+the stop file (`runs/fleet.stop`), waiting for `--min-free-mb` before each
+game; one log per host, `runs/fleet_<tag><n>_<stamp>.log`. `watch.py`,
+`spy_loop.py` and `game.py bench` take `--at-end menu|close|stay` (default
+`menu`): at the target an observer game is paused first
+(`Automation.Pause(true)`, UNVERIFIED from the tuner), a human-seat game
+simply holds its turn, the event history is read, and the game exits to the
+menu, has its process closed, or stays.
 
 Measured 2026-09-23 (Ryzen 9 3900X, RTX 4070 SUPER, 32 GB; save lab4_t100,
 15 Autoplay turns):
@@ -158,7 +171,7 @@ and twice it was the only one that had the right call shape.
 | `UI.RequestPlayerOperation(0, PlayerOperations.GIVE_INFLUENCE_TOKEN, {[PlayerOperations.PARAM_PLAYER_ONE]=id})` | one envoy per call |
 | **`CombatManager.SimulateAttackInto(unit:GetComponentID(), CombatTypes.AIR, x, y)`** | the UI's own preview: ATTACKER / DEFENDER / **ANTI_AIR** / **INTERCEPTOR** blocks keyed by `CombatResultParameters` hashes, giving the chosen interceptor's ID and tile, its base anti-air strength, the support bonus as TEXT and `DAMAGE_FROM`. **Deterministic** — seven seeds give byte-identical output — so the whole damage curve can be swept without firing. `SimulateAttackVersus(att, def [, CombatTypes.X])` is the same shape for a normal attack and refuses pairings that are not a legal attack |
 | `Game.GetFalloutManager():GetReactorAge(pCity)` / `:GetReactorAccidentThreshold(pCity)` | **InGame only, and they take a CITY object** — not an index, a plot or the reactor record (`ToolTipLoader_Expansion2.lua:172`) |
-| `Network.SaveGame{Name=, Location=SaveLocations.LOCAL_STORAGE, Type=SaveTypes.SINGLE_PLAYER, IsAutosave=false, IsQuicksave=false}` / `Network.LoadGame(...)` | saves land in `Documents\My Games\Sid Meier's Civilization VI\Saves\Single\`. **A LOAD COSTS THE OWNER A CLICK** — the call returns true, the game loads and then stops on a Start Game button unless `Automation.SetAutoStartEnabled(true)` was called first — `game.py load` does, and needs no click |
+| `Network.SaveGame{Name=, Location=SaveLocations.LOCAL_STORAGE, Type=SaveTypes.SINGLE_PLAYER, IsAutosave=false, IsQuicksave=false}` / `Network.LoadGame(...)` | saves land in `Documents\My Games\Sid Meier's Civilization VI\Saves\Single\`. A bare `Network.LoadGame` stops on the Start Game button; `game.py load` calls `Automation.SetAutoStartEnabled(true)` first, so the loading screen presses it and the load needs no click |
 | `GameRandomEvents.GetEventsForTurn(t)` | one record per turn: `{RandomEvent, Name, StartTurn, EndTurn, CurrentLocation, PopLost, UnitsLost, TilesDamaged, FertilityAdded, Volcano, River}` — walking every turn is a complete event history |
 | `Game.GetEmergencyManager():GetEmergencyInfoTable(0)` | empty after 21 warheads |
 | `NotificationManager.GetFirstEndTurnBlocking(me)` | names the blocker when autoplay stalls |
@@ -315,8 +328,13 @@ Each one produced a confident wrong number or cost a session.
   Sources boost running). Spawn fresh actors, or read before advancing turns.
 * **Refusal texts arrive in the game's locale** — decode `FAILURE_REASONS`
   bytes as cp1251 on this box.
-* **`Network.LoadGame` costs the owner's click** (above). A run that needs N
-  reloads needs the owner present for N clicks; never plan an unattended loop.
+* **`tostring(ok and v or "err")` prints `err` for a clean `false`.** Every
+  reader prints three states — the value (`true` / `false` / a number),
+  `null`, or `"err:<msg>"` when the call threw — through the `tri` (inside a
+  string) / `trij` (a bare JSON value) helpers at the top of each file.
+* **Load through `game.py load`, never a bare `Network.LoadGame`** (above): the
+  bare call stops on Start Game; `game.py load` arms auto-start, so a run of N
+  reloads runs unattended.
 * **`sleep`, shell heredocs and `python -` are banned here.** A stray `python -`
   at the head of a compound command burned a core for 169 minutes: whenever the
   harness reports a command as backgrounded, check for orphans with
@@ -367,7 +385,7 @@ One line each; the detail and the evidence are in `reports/`.
 | "no Missile Cruiser exists in this install" | it exists at `AntiAirCombat` 110 — the AIR-domain unit list was searched, which contains no ships |
 | "a missile silo launch is unreachable from the socket" | the parameter list was wrong: `PARAM_X0/Y0` + `PARAM_X1/Y1`, 143 targets offered |
 | "silo and submarine launches are stopped outright" | they obey the damage law with a fixed warhead defence (75 / 80 minus the aim tile's modifier) |
-| "`Network.LoadGame` needs no human click" | it does — the owner was clicking Start each time |
+| "`Network.LoadGame` needs no human click" | the bare call does need one — the owner was clicking Start each time; `game.py load` arms `Automation.SetAutoStartEnabled(true)` and needs none |
 | "a forward base cannot be founded" | it can; `IsValidFoundLocation` is the broken reader |
 
 ---
@@ -402,6 +420,8 @@ One line each; the detail and the evidence are in `reports/`.
 
 | script | purpose |
 |---|---|
+| `watch.py`, `fleet.py` | play games forward with per-turn readers (`--lua` / `--state` pairs), one instance or a fleet |
+| `cs_analyze.py` | a `cs_watch.lua` log per city-state: units, upgrades (paired through the install's `UnitUpgrades`; a minor's upgrade is free, `MINOR_CIV_GOLD_MILITARY_UPGRADE` 100%), builds, purchases, wars |
 | `rng_fit.py` | fits the LCG transition and the range fold against the recorded streams |
 | `combat_roll_fit.py` | fits damage against the known draw; `combat_clean.py`, `combat_endpoint.py`, `combat_roll_run.py` drive the shots |
 | `curve_fit.py`, `frac_curve.py` | the damage curve — `1.04^Δ` against `e^(0.04Δ)` |
@@ -416,7 +436,6 @@ One line each; the detail and the evidence are in `reports/`.
 | `escape_fit.py` | escape rates against the candidate readings of `ESPIONAGE_ESCAPE_BASE_CHANCE` (session 1) |
 | **`evidence.py`** | scores every claim against a stated null (an exact prediction in a window of width W gives `W^-k`, a binary outcome `0.5^k`) so weak claims are visible instead of buried in adjectives |
 | `steelman.py` | the rival-model predictions written down before firing |
-| `xml_modifiers.py`, `xml_check.py` | the install's modifier ledger (see below) |
 
 **`INTERCEPT_SUITE.md`** is the interception test matrix, cell by cell, with
 each round's pre-registered prediction and its result — written before the
@@ -460,11 +479,23 @@ does. `local_player()` falls back to the human major in GameCore and
 `advance()` refuses -1.
 
 Turn rate, measured: ~2.3 s/turn early, ~5.9 s/turn by the Medieval era
-(about 10 turns a minute) with the game in the foreground. Autoplay also
+(about 10 turns a minute) with the game in the foreground. A turn that
+stands still is read by CAUSE (`lab.wait_turn`, used by `advance`, both
+`watch.py` modes, `spy_loop.py`, `promise_loop.py`): after 5 s, every 3 s,
+`lab.diagnose` names the seat's end-turn blocker, each open diplomacy
+session and each visible screen (the `lab.POPUPS` contexts), and each is
+answered at once and logged by name (under Autoplay a blocker other than
+the Dedication, which the seat's AI answers itself, only after the turn has
+stood 15 s) — the blocker by `unblock.lua` or
+`commemorate.lua`, a session by `close_sessions.lua` (or the caller's
+answer), a screen by the close its own script defines. The blind sweep
+(close every session and screen) runs only after 30 s with no named cause.
+`unblock.lua`'s pantheon, governor, government, influence and raze handlers
+copy the install's screens and are UNVERIFIED from the tuner. Autoplay
 stalls on end-turn blockers — read the blocker with
 `NotificationManager.GetFirstEndTurnBlocking(me)`; a new era's Dedication
-(`ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE`) cannot be cleared from the
-socket and costs the owner a click. The table is `CommemorationTypes`, not
+(`ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE`) is answered by `commemorate.lua`
+(the row's INDEX, see the failed calls). The table is `CommemorationTypes`, not
 `Commemorations`, and each row has a `MinimumGameEra`/`MaximumGameEra` window.
 
 ### `storm` — ASK 16, the storm walk
@@ -535,14 +566,8 @@ counterspy's term is unmeasured (every pursuer was the police).
 | formation turn-spend (stylized) | forming a Corps leaves the merged unit at 0 moves that turn (2/2 + 2/2 -> 0/2, formation 1) |
 | GDR jump | `UNITCOMMAND_MOVE_JUMP` refused on a fresh GDR at 5/5 moves everywhere within 3 — needs the Enhanced Mobility project; not measured |
 
-### `xml_modifiers.py` — the install's modifier ledger, both XML styles
-
-    python tools/civ6lab/xml_modifiers.py MODIFIER_PLAYER_ADJUST_SPY_BONUS ...
-
-Policies.xml and friends write modifier rows as child ELEMENTS, not
-attributes; a line grep for `ModifierType="..."` returns nothing there and
-reads as "no such modifier exists". This parses the XML and prints each
-modifier's arguments and what attaches it.
+The install's XML readers (`xml_check.py`, `xml_modifiers.py`) live in
+`tools/install/`.
 
 ### `lua` — anything else
 

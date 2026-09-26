@@ -167,7 +167,7 @@ export interface PromoDef {
 /** PROVENANCE (cpu/data/provenance.ts), keyed by promotion id and attached by `P`
  *  below — these rows are built through a positional helper with a REST effects
  *  list, so the tag cannot ride inside the call. Stripped by the exporter; checked
- *  by tools/civ6lab/xml_check.py. */
+ *  by tools/install/xml_check.py. */
 const PROMO_SRC: Readonly<Record<string, SrcMap>> = {
   RANGER: {
     cls: xml('UnitPromotions', 'UnitPromotionType=PROMOTION_RANGER', 'PromotionClass', { expect: 'PROMOTION_CLASS_RECON' }),

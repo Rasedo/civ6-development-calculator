@@ -7,6 +7,16 @@
 -- SEV2. Prints one line per reactor per call, so a turn-by-turn watch is just
 -- this probe between `advance` calls.
 --   --set ZTAG=t131
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local fm = Game.GetFalloutManager()
 local n = fm:GetReactorCount()
 for i = 0, n - 1 do
@@ -21,7 +31,7 @@ for i = 0, n - 1 do
         end
       end
     end
-    local function T(f) local ok, v = pcall(f); if ok and v ~= nil then return tostring(v) end return "err" end
+    local function T(f) return tri(pcall(f)) end
     local q = Map.GetPlotByIndex(r.PlotIndex)
     print("{\"kind\":\"reactor-city\",\"stage\":\"ZTAG\",\"turn\":" .. Game.GetCurrentGameTurn()
       .. ",\"i\":" .. i .. ",\"owner\":" .. tostring(r.Owner)

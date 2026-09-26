@@ -7,10 +7,11 @@ Loads the save, grants the seat the four spy civics (and --extra copies of
 their grant), sets its gold, then each turn: `spy_turn.lua` (buy a
 spy up to --cap, send idle ones to foreign major cities, start --op on the
 city centre, take the Technologist promotion), then ends the turn through
-`unblock.lua` — which answers every escape prompt with a route the city
-offers, rotated by the spy's id, and logs it — and reads the mission history
-(`spy_history.lua`). Everything lands in one log under runs/;
-`escape_fit.py <log>` reads it.
+`lab.advance` in the endturn mode — `unblock.lua` answers every escape
+prompt with a route the city offers, rotated by the spy's id, and the answer
+is logged — and reads the mission history (`spy_history.lua`). At the target
+`--at-end` exits to the main menu (default), closes the instance or stays.
+Everything lands in one log under runs/; `escape_fit.py <log>` reads it.
 """
 from __future__ import annotations
 
@@ -18,10 +19,9 @@ import argparse
 import datetime as dt
 import pathlib
 import sys
-import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from tuner import Tuner, TunerError  # noqa: E402
+from tuner import Tuner  # noqa: E402
 import lab  # noqa: E402
 import game  # noqa: E402
 
@@ -41,34 +41,6 @@ print("setup: four spy civics granted, " .. ZEXTRA .. " extra grants")
 """
 
 
-def end_turn(t: Tuner, log, wait: float) -> int:
-    """Resolve blockers one at a time (each escape is its own prompt) until
-    the turn passes."""
-    t0 = lab.turn(t)
-    unblock = lab.UNBLOCK.read_text(encoding="utf-8")
-    deadline = time.monotonic() + wait
-    last = 0.0
-    while time.monotonic() < deadline:
-        if time.monotonic() - last > 3:
-            last = time.monotonic()
-            try:
-                out = t.run(IG, unblock, timeout=30)[-1]
-                log(out)
-            except TunerError as e:
-                log(f"unblock error {e}")
-            lab.commemorate_if_blocked(t)
-            for msg in lab.unstick(t):
-                log(f"unstuck: {msg}")
-        time.sleep(0.25)
-        try:
-            tn = lab.turn(t)
-        except TunerError:
-            continue
-        if tn > t0:
-            return tn
-    raise TunerError(f"turn did not advance past {t0} within {wait}s")
-
-
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--host", default="127.0.0.1")
@@ -79,6 +51,8 @@ def main(argv=None) -> int:
     p.add_argument("--gold", type=int, default=50000)
     p.add_argument("--extra", type=int, default=0, help="extra CIVIC_GRANT_SPY copies attached")
     p.add_argument("--wait", type=float, default=300.0)
+    p.add_argument("--at-end", choices=game.AT_END, default="menu",
+                   help="at the target: exit to the main menu, close the instance, or stay")
     a = p.parse_args(argv)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     path = lab.RUNS / f"escape_{a.save}_{stamp}.log"
@@ -88,7 +62,8 @@ def main(argv=None) -> int:
         fh.write(s + "\n")
         fh.flush()
 
-    game.cmd_load(argparse.Namespace(host=a.host, port=4318, name=a.save, wait=600.0))
+    if game.cmd_load(argparse.Namespace(host=a.host, port=4318, name=a.save, wait=600.0)) != 0:
+        raise SystemExit(f"load of {a.save!r} on {a.host} failed")
     t = Tuner(a.host).connect()
     lp = lab.local_player(t)
     turn_lua = (HERE / "spy_turn.lua").read_text(encoding="utf-8").replace("ZOP", a.op).replace("ZCAP", str(a.cap))
@@ -99,12 +74,17 @@ def main(argv=None) -> int:
         t.run(GC, f"Players[{lp}]:GetTreasury():SetGoldBalance({a.gold})")
         for ln in t.run(IG, turn_lua, timeout=60):
             log(ln)
-        tn = end_turn(t, log, a.wait)
+        # each blocker is answered as it comes (each escape is its own
+        # prompt), and the end of turn requested again after each answer
+        tn = lab.advance(t, "endturn", lp, a.wait, log)
         for ln in t.run(IG, hist_lua, timeout=60):
             if ln.startswith(("mission ", "tally ", "turn ")):
                 log(ln)
         print(f"{a.save} turn {tn}", flush=True)
-    t.close()
+    # the seat holds its turn at the target until `finish` acts
+    print("   ", game.finish(t, a.host, a.at_end), flush=True)
+    if a.at_end != "close":
+        t.close()
     print("->", path.name)
     return 0
 

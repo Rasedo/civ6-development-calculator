@@ -1,7 +1,7 @@
 /**
  * PROVENANCE.JSON — every catalog constant with its source tag (or none),
  * written beside rules.json by `npm run export` and read by
- * tools/civ6lab/xml_check.py.
+ * tools/install/xml_check.py.
  *
  * Two kinds of entry:
  *   * a ROW COLUMN — `<catalog>.<rowId>.<column>` for every scalar leaf of a

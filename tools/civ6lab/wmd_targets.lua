@@ -4,6 +4,16 @@
 -- distance from the launcher — which says whether a refusal is about range,
 -- visibility or something else entirely.
 --   --set ZPLAYER=0 --set ZUNIT=123 --set ZWMD=WMD_NUCLEAR_DEVICE
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local u = nil
 for _, x in Players[ZPLAYER]:GetUnits():Members() do if x:GetID() == ZUNIT then u = x end end
 if u == nil then print("{\"kind\":\"wmdtargets\",\"error\":\"nounit\"}") return end
@@ -13,7 +23,7 @@ local ok, res = pcall(function()
   return UnitManager.GetOperationTargets(u, UnitOperationTypes.WMD_STRIKE, p)
 end)
 if not ok or type(res) ~= "table" then
-  print("{\"kind\":\"wmdtargets\",\"result\":\"" .. tostring(ok and res or "err") .. "\"}")
+  print("{\"kind\":\"wmdtargets\",\"result\":\"" .. tri(ok, res) .. "\"}")
   return
 end
 local total, sample = 0, {}

@@ -8,7 +8,9 @@
 -- It asks once per allowed Dedication (`GetPlayerNumAllowedCommemorations`).
 -- ZPICK names a preferred row (e.g. --set ZPICK=COMMEMORATION_MILITARY); the
 -- rest of the allowance takes the offered choices in the order offered.
-local me = Game.GetLocalPlayer()
+-- The seat is ZSEAT when set (the UI's local player reads -1 while Autoplay
+-- holds it), else the local player.
+local me = tonumber("ZSEAT") or Game.GetLocalPlayer()
 local eras = Game.GetEras()
 local function blocker()
   local b = NotificationManager.GetFirstEndTurnBlocking(me)

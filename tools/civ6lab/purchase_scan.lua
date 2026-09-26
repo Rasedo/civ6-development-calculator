@@ -3,6 +3,16 @@
 --   city:GetGold():GetPurchaseCost(yieldIndex, row.Hash [, formation])
 --   city:GetBuildQueue():GetUnitCost(idx) / :GetBuildingCost(idx)
 -- One JSON object per line -> runs/purchase_<stamp>.jsonl
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local city = Players[0]:GetCities():GetCapitalCity()
 if city == nil then print("{\"error\":\"nocity\"}") return end
 local bq = city:GetBuildQueue()
@@ -39,7 +49,7 @@ for r in GameInfo.Units() do
       local okg, cg = pcall(function() return g:GetPurchaseCost(YG, r.Hash, MilitaryFormationTypes.STANDARD_MILITARY_FORMATION) end)
       local okf, cf = pcall(function() return g:GetPurchaseCost(YF, r.Hash, MilitaryFormationTypes.STANDARD_MILITARY_FORMATION) end)
       local okp, pg = pcall(function() return bq:GetUnitProgress(r.Index) end)
-      emit("unit", r.UnitType, r.Cost, cb, okp and pg or -1, okg and cg or -1, okf and cf or -1)
+      emit("unit", r.UnitType, r.Cost, cb, trij(okp, pg), trij(okg, cg), trij(okf, cf))
     end
   end
 end
@@ -50,7 +60,7 @@ for r in GameInfo.Buildings() do
       local okg, cg = pcall(function() return g:GetPurchaseCost(YG, r.Hash) end)
       local okf, cf = pcall(function() return g:GetPurchaseCost(YF, r.Hash) end)
       local okp, pg = pcall(function() return bq:GetBuildingProgress(r.Index) end)
-      emit("building", r.BuildingType, r.Cost, cb, okp and pg or -1, okg and cg or -1, okf and cf or -1)
+      emit("building", r.BuildingType, r.Cost, cb, trij(okp, pg), trij(okg, cg), trij(okf, cf))
     end
   end
 end
@@ -61,7 +71,7 @@ for r in GameInfo.Districts() do
       local okg, cg = pcall(function() return g:GetPurchaseCost(YG, r.Hash) end)
       local okf, cf = pcall(function() return g:GetPurchaseCost(YF, r.Hash) end)
       local okp, pg = pcall(function() return bq:GetDistrictProgress(r.Index) end)
-      emit("district", r.DistrictType, r.Cost, cb, okp and pg or -1, okg and cg or -1, okf and cf or -1)
+      emit("district", r.DistrictType, r.Cost, cb, trij(okp, pg), trij(okg, cg), trij(okf, cf))
     end
   end
 end

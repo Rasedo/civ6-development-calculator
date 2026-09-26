@@ -21,6 +21,7 @@
   },
   "ignorePatterns": [
     "dist",
-    "node_modules"
+    "node_modules",
+    "tools/civ6lab"
   ]
 }

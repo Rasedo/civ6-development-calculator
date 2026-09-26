@@ -58,7 +58,7 @@ if (/"src":\{"(xml|lab|stylized|derived)"/.test(rulesJson)) {
 writeFileSync(`${DIR}/rules.json`, rulesJson);
 console.log(`rules.json: srcStamp ${srcStamp.slice(0, 16)}`);
 
-// every catalog constant with its source tag, for tools/civ6lab/xml_check.py
+// every catalog constant with its source tag, for tools/install/xml_check.py
 const prov = buildProvenance();
 writeFileSync(`${DIR}/provenance.json`, JSON.stringify(prov));
 const tagged = Object.values(prov.coverage).reduce((s, c) => s + c.tagged, 0);

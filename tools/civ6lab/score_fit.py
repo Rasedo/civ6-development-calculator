@@ -1,9 +1,12 @@
-"""civ6lab score_fit — B-82: read `score_read.lua` lines and test the
+"""civ6lab score_fit — B-82: read `score_read.lua`'s seat lines and test the
 ScoringLineItems as flat per-item counts (GS multipliers: civics 3, techs 2,
 wonders 15, cities 5, districts 2, population 1, era score 1), printing each
 category's residue (what the counted items leave unexplained).
 
-    python tools/civ6lab/score_fit.py <score_read output>
+    python tools/civ6lab/score_fit.py <score_read output | score_xsec_*.jsonl>
+
+Takes either the reader's raw output or the save sweep's records (the
+reader's lines under `rows`, one record per save).
 """
 from __future__ import annotations
 
@@ -11,11 +14,18 @@ import json
 import sys
 
 
-def main(path: str) -> int:
+def seat_rows(path: str):
     for line in open(path, encoding="utf-8"):
         if not line.startswith("{"):
             continue
         r = json.loads(line)
+        for row in r["rows"] if "rows" in r else (r,):
+            if row.get("kind") == "seat":
+                yield r.get("save", ""), row
+
+
+def main(path: str) -> int:
+    for save, r in seat_rows(path):
         c = r["cats"]
         pred = {
             "CATEGORY_CIVICS": 3 * len(r["civics"]),
@@ -27,7 +37,7 @@ def main(path: str) -> int:
         }
         parts = [f"{k.split('_', 1)[1]} {c[k]}-{v}={c[k] - v}" for k, v in pred.items()]
         total = sum(v for k, v in c.items())
-        print(f"p{r['p']} score {r['score']} (sum of cats {total}); " + "; ".join(parts)
+        print(f"{save} p{r['p']} score {r['score']} (sum of cats {total}); " + "; ".join(parts)
               + f"; RELIGION {c['CATEGORY_RELIGION']} (founded {r['religion'] >= 0}, own cities {r['relMine']},"
               f" foreign {r['relForeign']})")
     return 0

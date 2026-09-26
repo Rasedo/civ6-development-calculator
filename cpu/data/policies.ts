@@ -203,7 +203,7 @@ export interface PolicyEffects {
 export interface PolicyDef {
   id: string;
   /** PROVENANCE, per column (cpu/data/provenance.ts). Stripped by the
-   *  exporter; checked by tools/civ6lab/xml_check.py. */
+   *  exporter; checked by tools/install/xml_check.py. */
   src?: SrcMap;
   name: string;
   kind: SlotKind;

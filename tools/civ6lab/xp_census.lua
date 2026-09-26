@@ -2,6 +2,16 @@
 -- experience constants are. A zero XP gain after a real anti-air attack means
 -- either "interception awards none" or "this unit cannot earn any" -- the
 -- database tells them apart.
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local off = {}
 for r in GameInfo.Units() do
   if r.CanEarnExperience == false then off[#off + 1] = "\"" .. r.UnitType .. "\"" end
@@ -16,6 +26,6 @@ local want = { "EXPERIENCE_COMBAT_RANGED", "EXPERIENCE_NOT_COMBAT_RANGED",
 local vals = {}
 for _, n in ipairs(want) do
   local ok, v = pcall(function() return GlobalParameters[n] end)
-  vals[#vals + 1] = "\"" .. n .. "\":" .. tostring(ok and v or "nil")
+  vals[#vals + 1] = "\"" .. n .. "\":" .. trij(ok, v)
 end
 print("{\"kind\":\"xpparams\"," .. table.concat(vals, ",") .. "}")

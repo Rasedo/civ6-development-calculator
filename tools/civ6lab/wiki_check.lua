@@ -10,6 +10,16 @@
 --   district:GetDefenseStrength()              -- the wiki says a City Center
 --       or Encampment in the blast drops to 0 defence.
 --   --set ZCX=23 --set ZCY=26 --set ZR=2
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local c = Cities.GetCityInPlot(ZCX, ZCY)
 if c == nil then print("{\"error\":\"nocity\"}") return end
 local cb, cz = c:GetBuildings(), c:GetCitizens()
@@ -45,7 +55,7 @@ for b in GameInfo.Buildings() do
     print("{\"scene\":\"D-validate\",\"kind\":\"building\",\"b\":\"" .. b.BuildingType
       .. "\",\"isWonder\":" .. tostring(b.IsWonder == true)
       .. ",\"prereqDistrict\":\"" .. tostring(b.PrereqDistrict) .. "\",\"x\":" .. bx .. ",\"y\":" .. by
-      .. ",\"dist\":" .. dist .. ",\"buildingPillaged\":" .. tostring(okp and pil or "err") .. "}")
+      .. ",\"dist\":" .. dist .. ",\"buildingPillaged\":" .. trij(okp, pil) .. "}")
   end
 end
 -- which tiles inside the blast this city is actually working

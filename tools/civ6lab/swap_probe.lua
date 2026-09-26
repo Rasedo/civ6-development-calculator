@@ -3,6 +3,16 @@
 -- Every parameter variant goes to CanStartCommand (both bTest values) and to
 -- GetCommandTargets; every returned table is dumped, failure reasons included.
 --   --set ZA=65536 --set ZX=18 --set ZY=14
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local a = CityManager.GetCity(0, ZA)
 local plot = Map.GetPlot(ZX, ZY)
 local T = CityCommandTypes
@@ -33,8 +43,8 @@ for _, v in ipairs(variants) do
   if v[3] then t[T.PARAM_X] = ZX; t[T.PARAM_Y] = ZY end
   for _, bt in ipairs({true, false}) do
     local ok, can, res = pcall(function() return CityManager.CanStartCommand(a, T.SWAP_TILE_OWNER, t, bt) end)
-    print(v[1] .. " bTest=" .. tostring(bt) .. " can=" .. tostring(ok and can or ("ERR " .. tostring(can))) .. " res=" .. dump(res))
+    print(v[1] .. " bTest=" .. tostring(bt) .. " can=" .. tri(ok, can) .. " res=" .. dump(res))
   end
   local ok2, tr = pcall(function() return CityManager.GetCommandTargets(a, T.SWAP_TILE_OWNER, t) end)
-  print(v[1] .. " targets=" .. dump(ok2 and tr or ("ERR " .. tostring(tr))))
+  print(v[1] .. " targets=" .. (ok2 and dump(tr) or tri(ok2, tr)))
 end

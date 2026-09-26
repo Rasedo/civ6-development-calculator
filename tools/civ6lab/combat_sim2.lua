@@ -6,6 +6,16 @@
 -- every key of whatever comes back, including nested tables, so the modified
 -- strengths can be read rather than inferred from damage.
 --   --set ZAP=0 --set ZAU=123 --set ZDP=1 --set ZDU=456
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local a = Players[ZAP]:GetUnits():FindID(ZAU)
 local d = Players[ZDP]:GetUnits():FindID(ZDU)
 if a == nil or d == nil then print("{\"kind\":\"sim2\",\"error\":\"nounit\"}") return end
@@ -36,6 +46,6 @@ for _, n in ipairs(names) do
   if ok and type(res) == "table" then
     dump("bomberAttacks_" .. n, res, 2)
   else
-    print("{\"kind\":\"sim2\",\"bomberAttacks_" .. n .. "\":\"" .. tostring(ok and res or "err") .. "\"}")
+    print("{\"kind\":\"sim2\",\"bomberAttacks_" .. n .. "\":\"" .. tri(ok, res) .. "\"}")
   end
 end

@@ -5,7 +5,8 @@ from the new city to the promisee's nearest city, whether the promise is
 still standing --after turns later, and how the promisee's grievances
 against the founder moved over that window. A broken promise shows as the
 promise gone and a grievance jump; the distances of kept and broken ones
-bracket the reach.
+bracket the reach. The game's grievance log entries of the promisee against
+the founder in that window follow each line, each entry once.
 
     python tools/civ6lab/settle_analyze.py tools/civ6lab/runs/settle_watch_*.jsonl
 """
@@ -28,16 +29,20 @@ def main(argv=None) -> int:
         promises = defaultdict(set)      # turn -> {(a, b)}
         griev = defaultdict(dict)        # turn -> {(a, b): g}
         cities = defaultdict(dict)       # turn -> {(p, id): row}
+        glog = defaultdict(dict)         # (a, b) -> {entry key: entry}, each entry once
         for line in open(path, encoding="utf-8"):
             if not line.startswith("{"):
                 continue
             r = json.loads(line)
             t = r["turn"]
-            if r["kind"] == "promise":
+            if r["kind"] == "promise" and r.get("made", True) is True:
                 promises[t].add((r["a"], r["b"]))
             elif r["kind"] == "grievance":
                 griev[t][(r["a"], r["b"])] = r["g"]
-            else:
+            elif r["kind"] == "grievlog" and "entry" in r:
+                e = r["entry"]
+                glog[(r["a"], r["b"])][json.dumps(e, sort_keys=True)] = e
+            elif r["kind"] == "city":
                 cities[t][(r["p"], r["id"])] = r
         turns = sorted(cities)
         print(f"== {path}: turns {turns[0]}..{turns[-1]}, promise-turns {sum(len(v) for v in promises.values())}")
@@ -59,6 +64,10 @@ def main(argv=None) -> int:
                     print(f"  t{t} p{founder} founds at {c['x']}:{c['y']}, promised to p{pb}: nearest p{pb} "
                           f"city {d} away; promise {'KEPT' if kept else 'GONE'} at t{later}; "
                           f"p{pb}'s grievances vs p{founder} {g0} -> {g1}")
+                    for e in glog[(pb, pa)].values():
+                        if isinstance(e.get("Turn"), int) and prev <= e["Turn"] <= later:
+                            print(f"      log t{e['Turn']}: {e.get('Amount')} {e.get('Description')}"
+                                  f" (initiator p{e.get('Initiator')}, target p{e.get('Target')})")
     return 0
 
 

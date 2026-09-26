@@ -10,7 +10,7 @@ and `<Delete>` applied with the schema's foreign-key cascades — so a modifier
 Expansion2_RemoveData.xml deletes is not listed, and a scenario's files are
 never read.
 
-    python tools/civ6lab/xml_modifiers.py MODIFIER_PLAYER_ADJUST_SPY_BONUS ...
+    python tools/install/xml_modifiers.py MODIFIER_PLAYER_ADJUST_SPY_BONUS ...
 """
 from __future__ import annotations
 

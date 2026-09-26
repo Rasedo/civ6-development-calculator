@@ -65,7 +65,7 @@ export interface ImprovementDef {
   id: ImprovementId;
   /** PROVENANCE, per column (cpu/data/provenance.ts): the install row and column
    *  each number came from. Stripped by the exporter; checked by
-   *  tools/civ6lab/xml_check.py. */
+   *  tools/install/xml_check.py. */
   src?: SrcMap;
   name: string;
   code: string;

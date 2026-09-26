@@ -16,7 +16,7 @@ in git history.
   must cite an AUDIT item that exists and is not CLOSED; every `AI:` row
   must quote the ruling it rests on; no third state exists, so a deferral
   has nowhere to hide.
-- **The owner's install is the source.** `tools/civ6lab/xml_check.py`'s
+- **The owner's install is the source.** `tools/install/xml_check.py`'s
   `Install` layers Base <- Expansion1 <- Expansion2 in each pack's
   `.modinfo` order and takes the last write. The census turns a trait into
   its effect types with their arguments by walking

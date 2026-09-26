@@ -4,6 +4,16 @@
 -- the loop index. Their arity is undocumented, so every plausible shape is
 -- tried once and whichever answers is the signature. Also greps the LIVE
 -- database for the parameters an accident rule would be spelled with.
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local fm = Game.GetFalloutManager()
 local r = nil
 local okr, rec = pcall(function() return fm:GetReactorByIndex(0) end)
@@ -13,7 +23,7 @@ local pi, own, cid = r.PlotIndex, r.Owner, r.CityID
 local function T(label, f)
   local ok, v = pcall(f)
   print("{\"kind\":\"reactor-threshold\",\"call\":\"" .. label .. "\",\"ok\":" .. tostring(ok)
-    .. ",\"value\":\"" .. tostring(ok and v or "err") .. "\"}")
+    .. ",\"value\":\"" .. tri(ok, v) .. "\"}")
 end
 T("Age(plotIndex)", function() return fm:GetReactorAge(pi) end)
 T("Age(owner,plotIndex)", function() return fm:GetReactorAge(own, pi) end)

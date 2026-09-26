@@ -30,7 +30,7 @@
  * in `SRC_REGISTRY` under a name the dump script reports — the same name
  * the wire uses where the scalar is exported, so the checker can pair them.
  *
- * `tools/civ6lab/xml_check.py` reads the dump (`seeder/worlds/provenance.json`,
+ * `tools/install/xml_check.py` reads the dump (`seeder/worlds/provenance.json`,
  * written beside rules.json by `npm run export`) and the install, and prints
  * MATCH / MISMATCH / UNSOURCED per constant.
  */

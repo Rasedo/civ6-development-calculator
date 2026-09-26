@@ -6,10 +6,20 @@
 -- is read back after each. Prints the before/after worked flag and the city's
 -- population, so a mode that does nothing is visible as "no change".
 --   --set ZCX=36 --set ZCY=22 --set ZPX=38 --set ZPY=23 --set ZMODE=1
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local c = Cities.GetCityInPlot(ZCX, ZCY)
 if c == nil then print("{\"error\":\"nocity\"}") return end
 local cz = c:GetCitizens()
-local function worked() local ok, v = pcall(function() return cz:IsPlotWorked(ZPX, ZPY) end); return tostring(ok and v) end
+local function worked() local ok, v = pcall(function() return cz:IsPlotWorked(ZPX, ZPY) end); return trij(ok, v) end
 local before, pop0 = worked(), c:GetPopulation()
 local params = {}
 params[CityCommandTypes.PARAM_MANAGE_CITIZEN] = ZMODE
@@ -18,6 +28,6 @@ params[CityCommandTypes.PARAM_Y] = ZPY
 local okc, can = pcall(function() return CityManager.CanStartCommand(c, CityCommandTypes.MANAGE, params) end)
 local okr = pcall(function() CityManager.RequestCommand(c, CityCommandTypes.MANAGE, params) end)
 print("{\"kind\":\"manage\",\"city\":\"" .. c:GetName():gsub("LOC_CITY_NAME_", "") .. "\",\"plot\":\"" .. ZPX .. ":" .. ZPY
-  .. "\",\"mode\":\"ZMODE\",\"can\":" .. tostring(okc and can) .. ",\"requested\":" .. tostring(okr)
+  .. "\",\"mode\":\"ZMODE\",\"can\":" .. trij(okc, can) .. ",\"requested\":" .. tostring(okr)
   .. ",\"workedBefore\":" .. before .. ",\"workedAfter\":" .. worked()
   .. ",\"popBefore\":" .. pop0 .. ",\"popAfter\":" .. c:GetPopulation() .. "}")

@@ -11,7 +11,6 @@ import argparse
 import json
 import pathlib
 import sys
-import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from tuner import Tuner  # noqa: E402
@@ -38,15 +37,8 @@ def main(argv=None) -> int:
                     print(f"t{q['turn']}->{r['turn']} p{k[0]} {r['build']}: +{d} on yield {q['yield']:.2f}"
                           f" -> x{d / q['yield'] if q['yield'] else 0:.3f}", flush=True)
         prev = rows
-        t0 = lab.turn(t)
-        waited = time.monotonic()
-        while lab.turn(t) == t0:
-            time.sleep(0.5)
-            if time.monotonic() - waited > 20:
-                # a popup can hold an all-AI game; close what is open
-                waited = time.monotonic()
-                for msg in lab.unstick(t):
-                    print("    unstuck:", msg, flush=True)
+        # the game plays by itself; a screen that holds it is closed by cause
+        lab.wait_turn(t, lab.turn(t), -1, 600.0)
     t.close()
     return 0
 

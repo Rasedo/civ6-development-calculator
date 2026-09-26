@@ -5,6 +5,16 @@
 -- WITH whatever bonuses it currently has, can be read directly instead of being
 -- inferred backwards from the damage it did.
 --   --set ZAP=1 --set ZAU=123 --set ZDP=0 --set ZDU=456
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local a = Players[ZAP]:GetUnits():FindID(ZAU)
 local d = Players[ZDP]:GetUnits():FindID(ZDU)
 if a == nil or d == nil then print("{\"kind\":\"sim\",\"error\":\"nounit\"}") return end
@@ -17,7 +27,7 @@ if okc and ct ~= nil then
 end
 local function dump(label, res)
   if type(res) ~= "table" then
-    print("{\"kind\":\"sim\",\"" .. label .. "\":\"" .. tostring(res) .. "\"}")
+    print("{\"kind\":\"sim\",\"" .. label .. "\":\"" .. tri(true, res) .. "\"}")
     return
   end
   local parts = {}
@@ -30,7 +40,7 @@ end
 local okp, res = pcall(function()
   return CombatManager.SimulateAttackVersus(a:GetComponentID(), d:GetComponentID())
 end)
-dump("default", okp and res or "err")
+dump("default", okp and res or ("err:" .. tostring(res)))
 if okc and ct ~= nil then
   for k, v in pairs(ct) do
     local ok2, r2 = pcall(function()

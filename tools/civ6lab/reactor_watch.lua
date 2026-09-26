@@ -5,6 +5,16 @@
 -- printed first and then fed to the other two both ways (as the handle it
 -- returned, and as a plot index) — whichever answers is the signature.
 --   --set ZTAG=t0
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local fm = Game.GetFalloutManager()
 local n = -1
 local okn, cnt = pcall(function() return fm:GetReactorCount() end)
@@ -13,7 +23,7 @@ print("{\"kind\":\"reactor-watch\",\"stage\":\"ZTAG\",\"turn\":" .. Game.GetCurr
   .. ",\"reactorCount\":" .. n .. "}")
 for i = 0, math.max(n - 1, -1) do
   local okr, h = pcall(function() return fm:GetReactorByIndex(i) end)
-  local htype = okr and type(h) or "err"
+  local htype = okr and type(h) or tri(okr, h)
   local hval = "?"
   if okr and type(h) == "number" then hval = tostring(h) end
   if okr and type(h) == "table" then
@@ -22,11 +32,7 @@ for i = 0, math.max(n - 1, -1) do
     table.sort(acc)
     hval = table.concat(acc, " ")
   end
-  local function T(f)
-    local ok, v = pcall(f)
-    if ok and v ~= nil then return tostring(v) end
-    return "err"
-  end
+  local function T(f) return tri(pcall(f)) end
   local where = "?"
   if okr and type(h) == "number" then
     local okp, q = pcall(function() return Map.GetPlotByIndex(h) end)

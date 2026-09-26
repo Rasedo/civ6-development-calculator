@@ -819,6 +819,9 @@ _FOREIGN = {"full_like", "zeros_like", "ones_like", "index_put_", "scatter_add_"
 # package's docstrings would flood this check with names from code nobody here
 # maintains, and a spent codemod script quotes the very symbols it deleted.
 SRC_ROOTS = ("gpu", "policy", "tools", "cpu", "world", "seeder", "tests", "shared")
+# The lab's scripts drive the live game and feed no lane: their names still
+# resolve an engine comment that cites them, their own comments go unchecked.
+LAB = "tools/civ6lab/"
 
 
 def _src_files(suffix: str):
@@ -855,6 +858,8 @@ def _comment_texts() -> list[tuple[str, int, str]]:
     out: list[tuple[str, int, str]] = []
     for p in _src_files(".py"):
         rel = str(p.relative_to(ROOT)).replace("\\", "/")
+        if rel.startswith(LAB):
+            continue
         try:
             src = p.read_text(encoding="utf-8")
             tree = ast.parse(src)
@@ -870,6 +875,8 @@ def _comment_texts() -> list[tuple[str, int, str]]:
                 out.append((rel, getattr(node, "lineno", 1), doc))
     for p in _src_files(".ts"):
         rel = str(p.relative_to(ROOT)).replace("\\", "/")
+        if rel.startswith(LAB):
+            continue
         try:
             src = p.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):

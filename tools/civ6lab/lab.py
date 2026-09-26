@@ -25,6 +25,7 @@ import json
 import pathlib
 import sys
 import time
+from collections.abc import Callable
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from tuner import Tuner, TunerError  # noqa: E402
@@ -218,14 +219,20 @@ print("autoplay " .. tostring(AutoplayManager.IsActive()))
 """
 
 LUA_ENDTURN = 'UI.RequestAction(ActionTypes.ACTION_ENDTURN); print("endturn requested")'
-# the End Turn path resolves blockers first (escape routes, research, civic,
-# idle cities) and then requests a FORCED end of turn, the way the Action
-# Panel does for the soft blockers
+# the blocker resolver (`unblock.lua`: escape routes, research, civic, idle
+# cities, pantheon, governors, ...) — it never ends the turn itself
 UNBLOCK = pathlib.Path(__file__).parent / "unblock.lua"
+# the seat's first end-turn blocker, by name ("none" when nothing blocks) —
+# a pending escape prompt first, found by its notification, since it can sit
+# behind another blocker (`unblock.lua` answers it the same way)
 LUA_BLOCKER = """
-local b = NotificationManager.GetFirstEndTurnBlocking(Game.GetLocalPlayer())
+local b = NotificationManager.GetFirstEndTurnBlocking(ZSEAT)
 local name = "none"
 for k, v in pairs(EndTurnBlockingTypes) do if v == b then name = k end end
+for _, nid in ipairs(NotificationManager.GetList(ZSEAT) or {}) do
+  local n = NotificationManager.Find(ZSEAT, nid)
+  if n ~= nil and n:GetType() == NotificationTypes.SPY_CHOOSE_ESCAPE_ROUTE then name = "ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE" end
+end
 print("blocker " .. name)
 """
 
@@ -262,90 +269,161 @@ def local_player(t: Tuner) -> int:
         return 0
 
 
-COMMEMORATE = pathlib.Path(__file__).parent / "commemorate.lua"
+HERE = pathlib.Path(__file__).parent
+COMMEMORATE = HERE / "commemorate.lua"
+CLOSE_SESSIONS = HERE / "close_sessions.lua"
 
-# The popup and leader screens Autoplay leaves stacked on the human seat's UI.
-# Each lives in its own Lua state; the snippet runs THERE and calls that
-# screen's own close (the diplomacy view's `OnForceClose`, what the game runs
-# when a turn ends under a timer; `OnClose` / `Close` elsewhere) when the
-# context is visible. Autoplay is never blocked by them; the screen fills up.
-POPUP_STATES = (
-    "DiplomacyActionView", "DiplomacyDealView", "LeaderScene", "InGamePopup",
-    "EraCompletePopup", "EraReviewPopup", "HistoricMoments", "NaturalWonderPopup",
-    "NaturalDisasterPopup", "WonderBuiltPopup", "ProjectBuiltPopup", "BoostUnlockedPopup",
-    "TechCivicCompletedPopup", "GreatPeoplePopup", "WorldCongressIntro", "WorldCongressPopup",
-    "WorldCrisisPopup", "RockBandPopup", "EventPopup", "UnitCaptured", "PlayerChange",
-)
-LUA_DISMISS = """
-if ContextPtr == nil or ContextPtr:IsHidden() then return end
-local f = OnForceClose or OnClose or Close
+# The screens that can stand over a turn, each with the close its own script
+# defines (the install's UI Lua: the diplomacy view's `OnForceClose` is what
+# the game runs when a turn ends under a timer). None: the first of
+# OnForceClose / OnClose / Close the context has. Each lives in its own Lua
+# state, named after its context.
+POPUPS: dict[str, str | None] = {
+    "DiplomacyActionView": "OnForceClose",
+    "DiplomacyDealView": "OnUserRequestClose",
+    "LeaderScene": None,
+    "InGamePopup": "OnClosePopup",
+    "EraCompletePopup": "Close",
+    "EraReviewPopup": "OnClose",
+    "HistoricMoments": "Close",
+    "NaturalWonderPopup": "Close",
+    "NaturalDisasterPopup": "Close",
+    "WonderBuiltPopup": "Close",
+    "ProjectBuiltPopup": "Close",
+    "BoostUnlockedPopup": "OnClose",
+    "TechCivicCompletedPopup": "Close",
+    "GreatPeoplePopup": "Close",
+    "GreatWorkShowcase": "HideScreen",
+    "WorldCongressIntro": "OnClose",
+    "WorldCongressPopup": "OnClose",
+    "WorldCrisisPopup": "Close",
+    "RockBandPopup": "Close",
+    "RockBandMoviePopup": "Close",
+    "EventPopup": "OnClose",
+    "DeclareWarPopup": "OnClose",
+    "UnitPromotionPopup": "Close",
+    "EspionagePopup": "Close",
+    "UnitCaptured": None,
+    "PlayerChange": "OnRequestClose",
+}
+LUA_VISIBLE = 'print((ContextPtr ~= nil and not ContextPtr:IsHidden()) and "open" or "hidden")'
+LUA_CLOSE = """
+if ContextPtr == nil or ContextPtr:IsHidden() then print("hidden") return end
+local f = ZCLOSE
 if f == nil then print("open, no close") return end
 local ok, err = pcall(f)
 print(ok and "closed" or ("close failed: " .. tostring(err)))
 """
+GENERIC_CLOSE = "OnForceClose or OnClose or Close"
+# the open diplomacy sessions between the seat and anyone
+LUA_SESSIONS = """
+local open = {}
+for p = 0, 62 do
+  if p ~= ZSEAT and Players[p] ~= nil then
+    local ok, id = pcall(function() return DiplomacyManager.FindOpenSessionID(ZSEAT, p) end)
+    if ok and id ~= nil and id >= 0 then open[#open + 1] = p .. ":" .. id end
+  end
+end
+print("sessions " .. table.concat(open, ","))
+"""
+COMMEMORATION = "ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE"
+# the blockers `unblock.lua` answers (the escape prompt, found by its
+# notification, whatever the first blocker is)
+UNBLOCKED = frozenset("ENDTURN_BLOCKING_" + n for n in (
+    "SPY_CHOOSE_ESCAPE_ROUTE", "RESEARCH", "CIVIC", "PRODUCTION", "PANTHEON",
+    "GOVERNOR_APPOINTMENT", "GOVERNOR_PROMOTION", "CONSIDER_GOVERNMENT_CHANGE",
+    "GIVE_INFLUENCE_TOKEN", "CONSIDER_RAZE_CITY"))
 
 
-CLOSE_SESSIONS = pathlib.Path(__file__).parent / "close_sessions.lua"
+def _seat(lua: str, lp: int) -> str:
+    return lua.replace("ZSEAT", str(lp))
 
 
-def unstick(t: Tuner) -> list[str]:
-    """What holds an Autoplay turn with no end-turn blocker: an AI's open
-    diplomacy session with the human seat (`close_sessions.lua`) and the
-    screens it raised. Returns what was done."""
+def diagnose(t: Tuner, lp: int) -> list[tuple[str, str]]:
+    """What holds the turn, as (kind, name) causes: the seat's first end-turn
+    blocker ("blocker"), each open diplomacy session with the seat
+    ("session", "<player>:<id>"), and each visible screen ("popup", its
+    context). With no seat (lp < 0, an observer game) only the screens."""
+    causes: list[tuple[str, str]] = []
+    if lp >= 0:
+        name = t.run(IG, _seat(LUA_BLOCKER, lp))[-1].split()[-1]
+        if name != "none":
+            causes.append(("blocker", name))
+        out = t.run(IG, _seat(LUA_SESSIONS, lp))[-1].split()
+        causes += [("session", s) for s in (out[1].split(",") if len(out) > 1 else [])]
+    for s in POPUPS:
+        if s in t.states:
+            try:
+                if t.run(s, LUA_VISIBLE, timeout=5)[-1] == "open":
+                    causes.append(("popup", s))
+            except (TunerError, IndexError):
+                continue
+    return causes
+
+
+def handle(t: Tuner, lp: int, cause: tuple[str, str], session_lua: str | None = None) -> str | None:
+    """Answer one cause the way its screen would; None when there is no
+    handler for it. `session_lua` answers a session (default: close it)."""
+    kind, name = cause
+    if kind == "blocker":
+        if name == COMMEMORATION:
+            lua = COMMEMORATE.read_text(encoding="utf-8").replace("ZPICK", "")
+        elif name in UNBLOCKED:
+            lua = UNBLOCK.read_text(encoding="utf-8")
+        else:
+            return None
+        return t.run(IG, _seat(lua, lp), timeout=30)[-1]
+    if kind == "session":
+        lua = session_lua if session_lua is not None else CLOSE_SESSIONS.read_text(encoding="utf-8")
+        out = t.run(IG, _seat(lua, lp), timeout=30)
+        return " | ".join(out) if out else "answered"
+    if kind == "popup":
+        return t.run(name, LUA_CLOSE.replace("ZCLOSE", POPUPS.get(name) or GENERIC_CLOSE), timeout=5)[-1]
+    return None
+
+
+def unstick(t: Tuner, lp: int) -> list[str]:
+    """The blind sweep, for a turn held by nothing `diagnose` names: close
+    every session of the seat and every visible screen. Returns what was
+    done."""
     done = []
-    try:
-        out = t.run(IG, CLOSE_SESSIONS.read_text(encoding="utf-8"))[-1]
-        if not out.endswith("[]"):
-            done.append(out)
-    except (TunerError, IndexError):
-        pass
-    return done + dismiss_popups(t)
-
-
-def dismiss_popups(t: Tuner) -> list[str]:
-    """Close every visible popup / leader screen; return what was closed."""
-    closed = []
-    for s in POPUP_STATES:
+    if lp >= 0:
+        try:
+            out = t.run(IG, _seat(CLOSE_SESSIONS.read_text(encoding="utf-8"), lp))[-1]
+            if not out.endswith("[]"):
+                done.append(out)
+        except (TunerError, IndexError):
+            pass
+    for s, fn in POPUPS.items():
         if s not in t.states:
             continue
         try:
-            out = t.run(s, LUA_DISMISS, timeout=5)
+            out = t.run(s, LUA_CLOSE.replace("ZCLOSE", fn or GENERIC_CLOSE), timeout=5)
         except TunerError:
             continue
-        if out:
-            closed.append(f"{s}: {out[-1]}")
-    return closed
+        if out and out[-1] != "hidden":
+            done.append(f"{s}: {out[-1]}")
+    return done
 
 
-def commemorate_if_blocked(t: Tuner) -> bool:
-    """A new era's Dedication blocks the turn for the human seat, Autoplay
-    included; answer it with the offered choices (`commemorate.lua`). True
-    when it was the blocker."""
-    try:
-        name = t.run(IG, LUA_BLOCKER)[-1].split()[-1]
-    except (TunerError, IndexError):
-        return False
-    if name != "ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE":
-        return False
-    print("   ", t.run(IG, COMMEMORATE.read_text(encoding="utf-8").replace("ZPICK", ""))[-1])
-    return True
-
-
-def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
-    """Move the game ONE turn and return the new turn number."""
-    t0 = turn(t)
-    if lp < 0:
-        raise TunerError("refusing to autoplay with no seat to return to (lp=-1)")
-    def end_turn() -> None:
-        lua = UNBLOCK.read_text(encoding="utf-8") if UNBLOCK.exists() else LUA_ENDTURN
-        print("   ", t.run(IG, lua, timeout=30)[-1])
-
-    if how == "autoplay":
-        print("   ", t.run(GC, LUA_AUTOPLAY % lp)[0])
-    else:
-        end_turn()
-    deadline = time.monotonic() + wait
-    nagged = time.monotonic()
+def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None] = print,
+              nudge: Callable[[], None] | None = None, session_lua: str | None = None,
+              first: float = 5.0, poll: float = 3.0, blind: float = 30.0, ai_blockers: float = 15.0) -> int:
+    """Wait for the turn counter to pass `t0` and return the new turn. Once
+    the turn has stood `first` seconds, every `poll` seconds `diagnose` reads
+    what holds it and each named cause is answered at once (`handle`) and
+    logged by name — except a blocker the seat's AI answers itself under
+    Autoplay (every one but the Dedication), which waits until the turn has
+    stood `ai_blockers` seconds (0 in the endturn mode, where no AI plays the
+    seat). `nudge` (the endturn mode's end-turn request) runs after an answer
+    and every 20 s. The blind sweep (`unstick`) runs only when `blind`
+    seconds pass with no cause answered."""
+    start = time.monotonic()
+    deadline = start + wait
+    looked = start + first - poll
+    answered = start
+    nudged = start
+    unknown: set[tuple[str, str]] = set()
     while time.monotonic() < deadline:
         # a short poll: the turn's own time is the AI's, and a coarse poll
         # adds up to its whole interval to every turn
@@ -356,23 +434,68 @@ def advance(t: Tuner, how: str, lp: int, wait: float) -> int:
             continue
         if tn > t0:
             return tn
-        if time.monotonic() - nagged > 5:
-            # a stalled turn: a Dedication, an AI's open diplomacy session, or
-            # the screens it raised — popups alone never hold Autoplay
-            nagged = time.monotonic()
-            if commemorate_if_blocked(t):
-                continue
-            for msg in unstick(t):
-                print("    unstuck:", msg)
-        if how == "endturn" and time.monotonic() - nagged > 20:
-            # a blocker raised AFTER the request (an escape prompt, a city
-            # that just finished) needs the resolver again
-            nagged = time.monotonic()
+        now = time.monotonic()
+        if now - looked >= poll:
+            looked = now
             try:
-                end_turn()
-            except TunerError as e:
-                print("   ", e)
+                causes = diagnose(t, lp)
+            except (TunerError, IndexError) as e:
+                log(f"    diagnose failed: {e}")
+                causes = []
+            acted = False
+            for c in causes:
+                if c[0] == "blocker" and c[1] != COMMEMORATION and now - start < ai_blockers:
+                    continue
+                try:
+                    out = handle(t, lp, c, session_lua)
+                except (TunerError, IndexError) as e:
+                    out = f"failed: {e}"
+                if out is None:
+                    if c not in unknown:
+                        unknown.add(c)
+                        log(f"    cause {c[0]} {c[1]}: no handler")
+                    continue
+                acted = True
+                log(f"    cause {c[0]} {c[1]} -> {out}")
+            if acted:
+                answered = now
+                if nudge is not None:
+                    nudge()
+                    nudged = now
+            elif now - answered >= blind:
+                answered = now
+                for msg in unstick(t, lp):
+                    log(f"    blind sweep: {msg}")
+        if nudge is not None and now - nudged >= 20:
+            nudged = now
+            nudge()
     raise TunerError(f"turn did not advance past {t0} within {wait}s")
+
+
+def advance(t: Tuner, how: str, lp: int, wait: float, log: Callable[[str], None] = print,
+            session_lua: str | None = None, **waits: float) -> int:
+    """Move the game ONE turn and return the new turn number. `autoplay`
+    hands the seat to the AI for one turn; `endturn` answers the seat's
+    blocker (`unblock.lua`) and requests the end of the turn, again after
+    each answered cause and every 20 s. `session_lua` and `waits` (first,
+    poll, blind) go to `wait_turn`."""
+    t0 = turn(t)
+    if lp < 0:
+        raise TunerError("refusing to autoplay with no seat to return to (lp=-1)")
+
+    def end_turn() -> None:
+        try:
+            t.run(IG, LUA_ENDTURN)
+        except TunerError as e:
+            log(f"    end turn: {e}")
+
+    if how == "autoplay":
+        log("    " + t.run(GC, LUA_AUTOPLAY % lp)[0])
+        return wait_turn(t, t0, lp, wait, log, session_lua=session_lua, **waits)
+    log("    " + t.run(IG, _seat(UNBLOCK.read_text(encoding="utf-8"), lp), timeout=30)[-1])
+    end_turn()
+    return wait_turn(t, t0, lp, wait, log, nudge=end_turn, session_lua=session_lua,
+                     **{"first": 1.0, **waits, "ai_blockers": 0.0})
 
 
 def parse_storms(lines: list[str]) -> list[dict]:

@@ -5,6 +5,7 @@ one, with no click from the owner.
     python tools/civ6lab/game.py new --config lab4.json     # host a game from the main menu
     python tools/civ6lab/game.py load lab4_fresh            # load a named single-player save
     python tools/civ6lab/game.py save lab4_fresh            # write one (InGame)
+    python tools/civ6lab/game.py --host 127.0.0.2 close     # end the instance launched with -TunerIP 127.0.0.2
 
 Every path the owner used to click through rides the game's OWN automation
 hooks, the ones Firaxis's smoke test uses (Base/Assets/UI/Automation/
@@ -301,27 +302,97 @@ def wait_for_state(host: str, port: int, state: str, wait: float, probe: str | N
         time.sleep(3.0)
 
 
-def cmd_launch(a) -> int:
+def up(host: str, port: int) -> bool:
+    """the instance's tuner answers"""
     try:
-        Tuner(a.host, a.port).connect().close()
+        Tuner(host, port).connect().close()
+        return True
+    except TunerError:
+        return False
+
+
+def spawn(host: str, exe: pathlib.Path) -> None:
+    """start one instance; `-TunerIP` is the address its tuner LISTENS on:
+    one instance per loopback address (127.0.0.1, 127.0.0.2, ...), all on
+    port 4318"""
+    subprocess.Popen([str(exe), "-TunerIP", host], cwd=str(exe.parent))
+
+
+def retile() -> None:
+    grid = pathlib.Path(__file__).parent / "window.ps1"
+    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(grid), "grid"],
+                   capture_output=True, text=True)
+
+
+def cmd_launch(a) -> int:
+    if up(a.host, a.port):
         print("the game is already up (tuner answers)")
         return 0
-    except TunerError:
-        pass
     exe = pathlib.Path(a.exe)
     if not exe.exists():
         print(f"no game binary at {exe}; pass --exe")
         return 1
-    # `-TunerIP` is the address the tuner LISTENS on: one instance per
-    # loopback address (127.0.0.1, 127.0.0.2, ...), all on port 4318
-    subprocess.Popen([str(exe), "-TunerIP", a.host], cwd=str(exe.parent))
+    spawn(a.host, exe)
     t = wait_for_state(a.host, a.port, FE, a.wait)
     print("main menu up; states:", ", ".join(sorted(t.states)))
     t.close()
-    grid = pathlib.Path(__file__).parent / "window.ps1"
-    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(grid), "grid"],
-                   capture_output=True, text=True)
+    retile()
     return 0
+
+
+def _ps(cmd: str) -> str:
+    return subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace").stdout
+
+
+def instance_pids(host: str) -> list[int]:
+    """the Civ 6 processes whose command line carries `-TunerIP <host>` —
+    the one instance `game.py --host <host> launch` started"""
+    pat = r"-TunerIP\s+" + re.escape(host) + r"(\s|$)"
+    out = _ps("Get-CimInstance Win32_Process -Filter \"Name LIKE 'CivilizationVI%'\" | "
+              f"Where-Object {{ $_.CommandLine -match '{pat}' }} | ForEach-Object {{ $_.ProcessId }}")
+    return [int(x) for x in out.split() if x.isdigit()]
+
+
+def close_instance(host: str) -> list[int]:
+    """terminate the instance launched for `host`, and no other; returns the
+    pids stopped"""
+    pids = instance_pids(host)
+    for pid in pids:
+        _ps(f"Stop-Process -Id {pid} -Force")
+    return pids
+
+
+AT_END = ("menu", "close", "stay")
+LUA_EXIT = ('pcall(function() Automation.Pause(false) end); '
+            'print("left the game at turn " .. Game.GetCurrentGameTurn()); Events.ExitToMainMenu()')
+
+
+def finish(t: Tuner | None, host: str, how: str) -> str:
+    """what a run does with its game at its target: `menu` exits to the main
+    menu (ready to host the next game without a relaunch), `close` ends the
+    instance's process (`close_instance`), `stay` leaves the game where it
+    stopped"""
+    if how == "menu":
+        if t is None:
+            return "no tuner to exit through"
+        try:
+            out = t.run(IG, LUA_EXIT)
+            return out[-1] if out else "exit requested"
+        except TunerError as e:
+            return f"exit requested ({e})"
+    if how == "close":
+        if t is not None:
+            t.close()
+        pids = close_instance(host)
+        return f"closed pid {pids}" if pids else f"no process carries -TunerIP {host}; nothing closed"
+    return "left the game as it stands"
+
+
+def cmd_close(a) -> int:
+    pids = close_instance(a.host)
+    print(f"closed {pids}" if pids else f"no Civ 6 process carries -TunerIP {a.host}")
+    return 0 if pids else 1
 
 
 def cmd_new(a) -> int:
@@ -409,7 +480,11 @@ def cmd_bench(a) -> int:
         lab.advance(t, "autoplay", lp, 600.0)
         per.append(time.monotonic() - s)
         peak = max(peak, _game_ram_mb())
-    t.close()
+    # the human seat holds its turn once Autoplay hands it back: the game
+    # stands at the target until `finish` acts
+    print("   ", finish(t, a.host, a.at_end))
+    if a.at_end != "close":
+        t.close()
     per.sort()
     print(f"bench {a.label}: turns {t0}->{t0 + a.turns}  mean {sum(per) / len(per):.2f} s/turn"
           f"  median {per[len(per) // 2]:.2f}  max {per[-1]:.2f}  peak RAM {peak:.0f} MB")
@@ -444,10 +519,14 @@ def main(argv=None) -> int:
     s.add_argument("--save", default="lab4_t100")
     s.add_argument("--turns", type=int, default=15)
     s.add_argument("--label", default="")
+    s.add_argument("--at-end", choices=AT_END, default="menu",
+                   help="at the target: exit to the main menu, close the instance, or stay")
     s.set_defaults(fn=cmd_bench)
     s = sub.add_parser("save", help="write a named single-player save (InGame)")
     s.add_argument("name")
     s.set_defaults(fn=cmd_save)
+    s = sub.add_parser("close", help="terminate the instance launched with -TunerIP <--host>, and no other")
+    s.set_defaults(fn=cmd_close)
     a = p.parse_args(argv)
     try:
         return a.fn(a)

@@ -89,7 +89,7 @@ export interface UnitDef {
   /** PROVENANCE, per column (cpu/data/provenance.ts): the install row and
    *  column each number came from, `expect` where the install spells an id
    *  differently, `scale: GAME_SPEED` on a cost. Stripped by the exporter;
-   *  checked by tools/civ6lab/xml_check.py. */
+   *  checked by tools/install/xml_check.py. */
   src?: SrcMap;
   cost: number;
   maintenance: number;

@@ -3,6 +3,16 @@
 -- operations first (the category the UI uses), then starts the first one that
 -- CanStartOperation accepts for the spy standing at ZX:ZY owned by ZDEFENDER.
 --   --set ZX=23 --set ZY=26 --set ZDEFENDER=1
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 for op in GameInfo.UnitOperations() do
   local c = tostring(op.CategoryInUI)
   if c == "DEFENSIVESPY" or string.find(op.OperationType, "COUNTER", 1, true) then
@@ -25,8 +35,8 @@ if op ~= nil then
   params[UnitOperationTypes.PARAM_Y] = ZY
   local okc, can = pcall(function() return UnitManager.CanStartOperation(spy, op.Hash, nil, params) end)
   local okc2, can2 = pcall(function() return UnitManager.CanStartOperation(spy, op.Hash, nil, true) end)
-  print("{\"kind\":\"counterspy\",\"can\":" .. tostring(okc and can)
-    .. ",\"canNoParams\":" .. tostring(okc2 and can2)
+  print("{\"kind\":\"counterspy\",\"can\":" .. trij(okc, can)
+    .. ",\"canNoParams\":" .. trij(okc2, can2)
     .. ",\"moves\":" .. tostring(spy:GetMovesRemaining())
     .. ",\"at\":\"" .. spy:GetX() .. ":" .. spy:GetY() .. "\"}")
   -- the counterspy operation takes NO location: CanStartOperation(spy, hash,

@@ -44,10 +44,11 @@ for i = 0, Map.GetPlotCount() - 1 do
         end
       end
     end
-    -- NB: `ok and v or "err"` collapses a legitimate FALSE to "err" in Lua.
+    -- true / false / null, or "err:<msg>" when the call threw
     local function b(f)
       local ok, v = pcall(f)
-      if not ok then return "\"err\"" end
+      if not ok then return "\"err:" .. tostring(v):gsub('[%c"\\]', "'") .. "\"" end
+      if v == nil then return "null" end
       return tostring(v)
     end
     print("{\"scene\":\"D\",\"tag\":\"ZTAG\",\"turn\":" .. turn .. ",\"kind\":\"plot\",\"ring\":" .. d

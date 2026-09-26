@@ -2,6 +2,16 @@
 -- with every idle Apostle of player 0 that is standing on it, and print the
 -- city's religion ledger before and after.
 --   --set ZCX=38 --set ZCY=19
+-- a pcall read in three states: its value, or "err:<msg>" when the call threw
+local function tri(ok, v)
+  local s = ok and tostring(v) or ("err:" .. tostring(v))
+  return (s:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end))
+end
+local function trij(ok, v)
+  if ok and (type(v) == "boolean" or type(v) == "number") then return tostring(v) end
+  if ok and v == nil then return "null" end
+  return "\"" .. tri(ok, v) .. "\""
+end
 local cx, cy = ZCX, ZCY
 local op = GameInfo.UnitOperations["UNITOPERATION_SPREAD_RELIGION"].Hash
 local city = Cities.GetCityInPlot(cx, cy)
@@ -32,7 +42,7 @@ for _, u in Players[0]:GetUnits():Members() do
     local urel = -1
     pcall(function() urel = u:GetReligion():GetReligionType() end)
     print("spread unit=" .. u:GetID() .. " rel=" .. relname(urel)
-      .. " can=" .. tostring(okc and can or "ERR") .. " requested=" .. tostring(oko) .. " err=" .. tostring(erro))
+      .. " can=" .. tri(okc, can) .. " requested=" .. tostring(oko) .. " err=" .. tostring(erro))
   end
 end
 ledger("after")

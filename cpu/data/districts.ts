@@ -92,7 +92,7 @@ export interface DistrictDef {
   id: DistrictId;
   /** PROVENANCE, per column (cpu/data/provenance.ts): the install row and
    *  column each number came from. Stripped by the exporter; checked by
-   *  tools/civ6lab/xml_check.py. */
+   *  tools/install/xml_check.py. */
   src?: SrcMap;
   civVariants?: DistrictVariant[];
   /** an AMENITY this district pays per adjacent tile of one kind, which no
