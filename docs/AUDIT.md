@@ -51,7 +51,7 @@ re-adds them.
 | C-2 diplomatic agreements | 1 | the promise's break and the broken-promise operand (LAB) |
 | C-16 the spy's second half | 1 | the counterspy's escape term (LAB) |
 | C-20 the route's transportation efficiency | 2 | the measured path term (BUILD); the Trader's walk and range against the game's pathfinder (LAB) |
-| C-26 civilization abilities, the residue | 1 | no Cartography gate on trade paths (BUILD); Trajan on a capture, a damaged city as a wounded foe (LAB); the struck unit's other terms (audit) |
+| C-26 civilization abilities, the residue | 1 | no Cartography gate on trade paths (BUILD); Trajan on a capture (LAB); the struck unit's other terms (audit) |
 | C-34 air combat's second half | 2 | the two-sided interception, support, the pick, Priority Target's flat 65, the 50-HP pillage line (BUILD); an interception's XP and war weariness (LAB) |
 | C-38 a city-state's play | 1 | quests, builders' improvements, research, coastal and naval rates, what its units attack, the levy discounts' stacking (LAB); later-era starts (no start era) |
 | C-41 Volcanic Soil | 2 | the owned-plot damage gate, the bonus-resource loss, the production and science rows (BUILD); plot vs improvement owner, Marsh / Oasis, floods and storms under the same gate (LAB) |
@@ -161,7 +161,7 @@ commit.
   - LAB: the Trader walks a greedy step toward its destination (`tradeWalkStep`) and a route's range is a hex distance, where the game runs its pathfinder over both.
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   The census is `docs/roster_ledger.json`, read as `docs/ROSTER.md` says (354 of 356 rows `shipped`, two `AI:`). A city's strike composes the struck unit with the roster's rows (`cityStrikeDefenderCS`, `_seat_city_strike`); no roster row carries an attacking or defending requirement, so one composer serves both sides. Qhapaq Ñan ships (`MOUNTAIN_ROAD`), and a wonder takes floodplains as GS allows (`Features_XP2.ValidWonderPlacement`).
-  - LAB: whether a damaged city is a "wounded" opponent (`REQUIREMENT_OPPONENT_IS_WOUNDED`, Tomyris); both engines read a city as never wounded.
+  - MEASURED (lab 5, `lab4_t150`, `tools/civ6lab/wounded_preview.lua`): a damaged city is NOT a wounded opponent — with `BONUS_VS_WOUNDED_UNITS` attached, the attacker's preview against a city whose garrison pool stood at 60 damage and walls at 150 carried no "+5 bonus against damaged units", while the same attacker against a wounded Carolean did. Both engines read a city as never wounded, as the game does.
   - The city strike's defender still omits `defenderCS`'s other unit-vs-unit terms (`chassisAbilityCS`, `barbarianCombatCS`, `visibilityCS`, `allianceWarCS`, `eraMatchupCS`); audit which apply to a struck unit before building.
   - LAB C-26-S1: whether Trajan's grant (`TRAIT_ADJUST_NON_CAPITAL_FREE_CHEAPEST_BUILDING`, no requirement set, no RunOnce) fires on a CAPTURED city; founding ships (`trajansColumn` / `_trajans_column`).
   - MEASURED (C-26-S3, lab 5): a Trader's route path crosses Ocean with Shipbuilding and Celestial Navigation and WITHOUT Cartography (Tikal → Opango, 24 plots, 5 Ocean, a coast-only line existing); attaching `TRAIT_EARLY_OCEAN_NAVIGATION` leaves the path identical plot for plot.
