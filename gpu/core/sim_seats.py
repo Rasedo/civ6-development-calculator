@@ -6704,9 +6704,11 @@ class SimSeats:
         if kind == 3:
             return a, me
         if kind == 0:
-            reg = self.city_dist_tile[:, row]  # [B, C, nD]
-            comp = self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
-            counts = ((reg >= 0) & comp & self.city_alive[:, row].unsqueeze(2)).long().sum(dim=1).double()
+            # every COMPLETE district INSTANCE, pillaged or not: a Canal,
+            # Dam or Neighborhood repeats within one city (OnePerCity false)
+            # and each copy counts, which the one-tile-per-type registry
+            # cannot say
+            counts = self._dist_counts(row, pillage_gate=False).sum(dim=1).double()
         elif kind == 1:
             counts = self.civ_gpp[:, row].double()
         else:

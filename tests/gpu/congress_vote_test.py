@@ -377,6 +377,36 @@ def main() -> None:
     assert int(out9[0]) == 0 and int(tgt9[0]) == t0, "the AI line missed its own woods"
     print("  the Deforestation Treaty bans and pays on the FEATURE its target names")
 
+    # --- 10. the Urban Development Treaty counts every district INSTANCE ----
+    # CIV6 (Districts.OnePerCity false): a city holds more than one Canal, Dam
+    # or Neighborhood, and the free vote names the type the seat holds the
+    # most COMPLETE copies of — two Canals in one city outvote one Campus,
+    # though the one-tile-per-type registry holds a single Canal address.
+    simU = build()
+    ud = simU._congress_at["URBAN_DEVELOPMENT_TREATY"]
+    canal, campus = simU._canal_didx, 0
+    assert canal > campus, "the Canal must sit after the Campus for the tie rule to matter"
+    row = 0
+    j = int(simU.city_alive[0, row].long().argmax())
+    simU.district[0, simU.tile_seat[0] == row] = -1
+    simU.district_complete[0, simU.tile_seat[0] == row] = False
+    simU.city_dist_tile[0, row] = -1
+    ctr = int(simU.city_center[0, row, j])
+    plots = [t for t in (simU.city_slot_at(row)[0] == j).nonzero(as_tuple=True)[0].tolist() if t != ctr]
+    assert len(plots) >= 3, f"city {j} owns {len(plots)} plots besides its centre"
+    for t, di in ((plots[0], campus), (plots[1], canal), (plots[2], canal)):
+        simU.district[0, t] = di
+        simU.district_complete[0, t] = True
+    simU.city_dist_tile[0, row, j, campus] = plots[0]
+    simU.city_dist_tile[0, row, j, canal] = plots[1]
+    outU, tgtU = simU._congress_pref(ud, row)
+    assert (int(outU[0]), int(tgtU[0])) == (0, canal), (
+        f"two Canals against one Campus voted {(int(outU[0]), int(tgtU[0]))}, wanted {(0, canal)}")
+    # ...and only a COMPLETE copy counts
+    simU.district_complete[0, plots[2]] = False
+    assert int(simU._congress_pref(ud, row)[1][0]) == campus, "an unfinished Canal broke the tie"
+    print("  the Urban Development Treaty counts two Canals in one city twice")
+
     # --- PUBLIC RELATIONS, MILITARY ADVISORY, WORLD RELIGION ----------------
     pr = sim._congress_at["PUBLIC_RELATIONS"]
     sim.congress_active[:] = -1
