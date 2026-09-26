@@ -1,0 +1,1 @@
+{"save": "lab4_t100", "reader": "freecity_def", "scene": "C-60-S1", "host": "127.0.0.1", "turnBefore": 100, "turnAfter": 100, "moved": false, "attempts": 1, "state": "InGame", "lua": "city_probe.lua", "sets": {"ZWHO": "free"}, "rows": [], "raw": [], "error": null, "expected": []}

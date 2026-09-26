@@ -84,6 +84,45 @@ for q = 0, 63 do
   end
 end
 
+-- per player: the strongest land melee it holds, and the strongest its cities
+-- can produce now (CanProduce, InGame), by the unit row's Combat
+local melee = {}
+for row in GameInfo.Units() do
+  if row.FormationClass == "FORMATION_CLASS_LAND_COMBAT" and (row.PromotionClass == "PROMOTION_CLASS_MELEE"
+      or row.PromotionClass == "PROMOTION_CLASS_ANTI_CAVALRY") and (tonumber(row.Combat) or 0) > 0 then
+    melee[#melee + 1] = row
+  end
+end
+local isMelee = {}
+for _, row in ipairs(melee) do isMelee[row.Index] = row end
+for q = 0, 63 do
+  local o = Players[q]
+  if o ~= nil and o:IsAlive() then
+    local held, heldType, heldAny = 0, nil, 0
+    for _, u in o:GetUnits():Members() do
+      local row = isMelee[u:GetType()]
+      if row ~= nil and row.Combat > held then held, heldType = row.Combat, row.UnitType end
+      local ur = GameInfo.Units[u:GetType()]
+      if ur ~= nil and ur.FormationClass == "FORMATION_CLASS_LAND_COMBAT" then heldAny = math.max(heldAny, ur.Combat or 0) end
+    end
+    local can, canType = 0, nil
+    for _, c in o:GetCities():Members() do
+      local bq = c:GetBuildQueue()
+      for _, row in ipairs(melee) do
+        if row.Combat > can then
+          local ok, v = pcall(function() return bq:CanProduce(row.Hash, true) end)
+          if ok and v == true then can, canType = row.Combat, row.UnitType end
+        end
+      end
+    end
+    print(J({kind = "player", turn = turn, p = q, isMajor = P(function() return o:IsMajor() end),
+      isFree = P(function() return o:IsFreeCities() end),
+      civ = P(function() return PlayerConfigurations[q]:GetCivilizationTypeName() end),
+      era = P(function() return o:GetEra() end),
+      heldMelee = held, heldMeleeType = heldType, heldLandCombat = heldAny, canMelee = can, canMeleeType = canType}))
+  end
+end
+
 local function producing(c)
   local h = P(function() return c:GetBuildQueue():GetCurrentProductionTypeHash() end)
   if type(h) ~= "number" or h == 0 then return h end
@@ -117,6 +156,12 @@ local function emit(c, role, extra)
     if bl:HasBuilding(b.Index) then w[#w + 1] = {b.BuildingType, P(function() return bl:IsPillaged(b.Hash) end)} end
   end
   local cx, cy = c:GetX(), c:GetY()
+  local cplot = Map.GetPlot(cx, cy)
+  local terrain = P(function() return GameInfo.Terrains[cplot:GetTerrainType()].TerrainType end)
+  local nDist = 0
+  for _, d in ipairs(ds) do
+    if d.d ~= "DISTRICT_CITY_CENTER" and d.complete == true and d.pillaged ~= true then nDist = nDist + 1 end
+  end
   local near = {}
   for dx = -2, 2 do
     for dy = -2, 2 do
@@ -134,6 +179,8 @@ local function emit(c, role, extra)
     origOwner = P(function() return c:GetOriginalOwner() end),
     gameEra = gameEra, ownerEra = P(function() return pl:GetEra() end),
     centreDef = centreDef, encampmentDef = encDef, walls = w, districts = ds,
+    centreTerrain = terrain, liveDistricts = nDist,
+    centreRanged = P(function() return c:GetStrengthRanged() end),
     unitsOnCentre = unitsAt[cx .. ":" .. cy] or {}, unitsWithin2 = near,
     loyalty = loy("GetLoyalty"), loyaltyMax = loy("GetMaxLoyalty"), loyaltyPerTurn = loy("GetLoyaltyPerTurn"),
     loyaltyLevel = loy("GetLoyaltyLevel"),

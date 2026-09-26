@@ -45,20 +45,21 @@ re-adds them.
 | B-91 a religion's beliefs | 1 | Religious Colonization's pressure, Holy Waters' reach, "cities following", whose religion a worship building follows (LAB) |
 | B-93 Great People as Gathering Storm layers them | 1 | whether Darwin counts the plot underfoot (LAB) |
 | B-94 an improvement's and a wonder's ground | 1 | the generator's ResetTerrain and natural cliffs on wonder plots (BUILD); the ice radius (ASK); `Feature_AdjacentTerrains`' reading, the unpublished multi-plot shapes, a water wonder on a lake (LAB) |
-| **B. Fidelity vs real Civ 6** | **9** | |
+| B-95 a city centre's strength | 3 | the district, Palace, garrison and envoy terms on both engines (BUILD); the base's "ever built" and a garrison's health scaling (LAB) |
+| **B. Fidelity vs real Civ 6** | **12** | |
 | C-1 power | 1 | the accident's building and unit rows (LAB) |
 | C-2 diplomatic agreements | 1 | the promise's break and the broken-promise operand (LAB) |
 | C-16 the spy's second half | 1 | the counterspy's escape term (LAB) |
 | C-20 the route's transportation efficiency | 1 | how the score becomes the multiplier; the Trader's walk and range against the game's pathfinder (LAB) |
 | C-26 civilization abilities, the residue | 1 | Trajan on a capture, the Knarr's Trader path, a damaged city as a wounded foe (LAB); the struck unit's other terms (audit) |
 | C-34 air combat's second half | 1 | the interception's strength and damage, whether a shot-down sortie is a battle (LAB) |
-| C-38 a city-state's play | 1 | quests, builders' improvements, research, centre strength, coastal and naval rates, what its units attack, the levy discounts' stacking (LAB); later-era starts (no start era) |
+| C-38 a city-state's play | 1 | quests, builders' improvements, research, coastal and naval rates, what its units attack, the levy discounts' stacking (LAB); later-era starts (no start era) |
 | C-41 Volcanic Soil | 1 | the plot condition, bonus-resource loss, Marsh / Oasis, built plots, the yield rows (LAB) |
 | C-49 named storms | 1 | the per-step heading law (LAB) |
-| C-60 the Free City's own play | 1 | bankruptcy's shape, its defence across eras, its techs, the grant's type rule, a grant with no free tile, the grants' fate on a fall (LAB) |
+| C-60 the Free City's own play | 1 | bankruptcy's shape, its techs, the grant's type rule, a grant with no free tile, the grants' fate on a fall (LAB) |
 | C-74 the turn's one random event, the residue | 1 | the empty turns, what a site is, `Spacing`, the first-time boost, the warming form, the drought's start and shield, the fire clock, the meteor's grant, a blizzard on a wonder, a minor's pillaged buildings (LAB) |
 | **C. Absent systems** | **11** | |
-| **OPEN, TOTAL** | **20** | |
+| **OPEN, TOTAL** | **23** | |
 
 ## The question ledger — owner asks
 
@@ -120,6 +121,18 @@ commit.
   - ASK: the water wonders' `NotNearFeatures` ICE radius ("Far based on map size", DLL-only); only the plot itself refuses Ice.
   - LAB: the shape of a multi-plot wonder with no `CustomPlacement` (Dead Sea, Pantanal, Everest, Eye of the Sahara, the water wonders — laid by the DLL's `SetFeatureType`); whether a water wonder may stand on a lake (a lake is TERRAIN_COAST in the install, a separate terrain here).
   - LAB: `Feature_AdjacentTerrains` read as "at least one neighbour" (the other reading: every neighbour) — `TerrainBuilder.CanHaveFeature` over the tuner settles it.
+- **B-95. A CITY CENTRE'S STRENGTH.** Weight 3.
+  Both engines build a major's centre from its seat's best melee (floored at 15) + 3 per walls tier + 5 for a garrison (`holderStrength` / `cityBaseStrength`), a Free City's from a flat 72, a minor's from 15 + population + 6 (militaristic) + walls (`minorCityCS` / `_minor_centre_cs`).
+  MEASURED (`tools/civ6lab/city_defense_preview.lua`, the combat preview's own terms via `CombatManager.SimulateAttackVersus`, 1,774 centres over the 37 named saves, `runs/citydef_20260926T061603Z.jsonl`): the centre's `GetDefenseStrength` is the preview's base plus its DEFENSES lines on 1,752 of 1,774 (the rest carry a wounded garrison, the line fractional). The lines, one rule for majors, minors and Free Cities:
+  - districts: `Districts.CityStrengthModifier` summed over the city's complete, unpillaged districts (2 each, Walled Quarter 4; none on Wonder, Aqueduct, Dam, Canal, Preserve) — 704 of 706 census cities;
+  - walls 3 / 6 / 9 by tier (as shipped);
+  - the Palace +3 (`PALACE_ADJUST_GARRISON_STRENGTH`, Amount 3) in the capital, every minor's city included;
+  - a garrison +10 at full health (`COMBAT_GARRISON_MILITIA_MODIFIER` 10), less when wounded — the engines give 5;
+  - a minor +1 per envoy (`COMBAT_STRENGTH_FROM_ENVOYS` 1.0; +1..+14 seen);
+  - a governor's +5 in one non-capital per major, under the Palace line's label.
+  The terrain lines (+3 hills, +5 river, -2 rough) are the fight's, not the centre's standing strength.
+  - BUILD: the district, Palace, garrison and envoy terms on both engines, one composer for every holder.
+  - LAB: the base. One value per player per save (the Free Cities player per CITY: 45 and 55 at `lab4_t200`), most often the strongest melee its roster holds or can build minus 10 (88 of 247 player-saves over the 13 census saves) — the Civilopedia's "strongest melee unit built by your civilization, minus 10" — with residues (+7, +17, -10, -20) the held / producible reads cannot explain; a per-player "ever built" read (or its unit history) settles it, and whether `COMBAT_DISTRICT_STRENGTH_REDUCTION` 15 enters; a garrison's health scaling.
 
 ## C. Absent systems — the blockers, and the gaps waiting on them
 
@@ -163,7 +176,7 @@ commit.
   - SHIPPED, both engines: ITS PURSE AND ITS WALK (`tools/civ6lab/minor_play_census.py`): a Builder bought when none stands at a per-episode rate (about 8% a turn), a military unit bought above a 95-gold floor at a rate falling with army size (0 at 8+, ×3 within 3 turns of a loss), one upgrade per completed tech or civic at 5 gold (`UPGRADE_BASE_COST` × speed), a Warrior Monk for faith where the belief allows; the minor pays unit upkeep and its treasury floors at 0; it ignores strategic requirements (`CivilizationLevels`); its land units walk the measured step and distance tables for peace, war and damage (`cpu/core/walker.ts`, `_walk_units`).
   A city-state's city holds the Palace (`BUILDING_PALACE` `Capital`, each minor a `CapitalName`): the census's +5 Gold a turn from founding, with the Palace's Production, Science, Culture, Housing and Amenities.
   - LAB C-38-S1: the quest pool (eight kinds in `Quests.xml`, no weights; `QUEST_COOLDOWN` 12 and `QUEST_ENVOYS` 1 unsourced), what builders improve, the research order, and unit tracks by id — an extended observer watch. The same watch reads the Harbor, Water Mill and Lighthouse rates over coastal and river minors (the census has no such denominator), and why the engines' minors lag the census (a Monument at turn 25–42 against 15; about 9 techs by turn 150). What its units attack at war (the census records no combat).
-  - LAB C-38-S2: the centre strength. `minorCityCS` / `_minor_centre_cs` read 15 + population + 6 (militaristic) with no row; the install's only minor strength is `StartEras.StartingMeleeStrengthMinor` (25 at Ancient), and a garrison adds nothing where a major's centre takes +5.
+  - The centre strength is B-95 (the measured terms and the base, one rule for every holder).
   - BLOCKER, no start era: `BonusMinorStartingUnits`' later-era rows (Classical to Information, GS swapping Pikeman for Pike and Shot) wait on a later-era start existing on either engine.
   - LAB: the naval-buy rate (31 buys over 4,979 coastal-evidence minor turns) and the Research Lab, Stock Exchange and Broadcast Center rows the census never saw built.
 - **C-41. VOLCANIC SOIL.** Weight 1.
@@ -180,7 +193,7 @@ commit.
   BANKRUPTCY ships for every seat, the Free Cities and city-states included (`GOLD_NEGATIVE_BALANCE_*`, `bankruptAmenities` / `bankruptDisbands`, `_bankruptcy_count`): each city loses 1 amenity once the treasury drops below 0 and one more per further 10; at -10 one unit disbands and one more per further 10, the priciest first, never a free unit; the treasury may go negative. The Free Cities play ships too: the revolt grants two of the world era's melee unit (`eraUnitOfClass` walks the class's upgrade chain by unlock era), a unit every 5 turns while the city stays Free drawn over the census's class mix (`FREE_CITY_GRANT_WEIGHTS`, `tools/civ6lab/free_city_census.py`), a treasury (`freeSeat.treasury` / `free_treasury`) banking its cities' gold and paying its units' upkeep, and on a join the city's own grants (`Unit.freeCity` / `unit_free_city`) are removed.
   It trains and builds from `FREE_CITY_BUILD_ROWS` (a ranged unit, Monument, Granary, walls, the repair project, a siege unit, district buildings), its research read as every tech and civic of the world era, and its units walk the minors' body with its own tables. Its treasury floors at 0 as the minors' does, and bankruptcy reaches the majors alone.
   - LAB C-60-S2 also: its own techs (Slingers at turns 90–114 where the world era's research gives Archers); its districts (4 of 28 records), the Flood Barrier and district projects are not hosted.
-  - LAB C-60-S1: whether the 72 follows the era, and whether walls and a garrison add to it (zero-turn reads of the Free Cities standing in the saved games).
+  - The centre strength is B-95 (a Free City's base is set per city; the terms are every holder's).
   - LAB C-60-S2: the flip pair's rule (world era, the former owner's best melee, or its own techs), the grant's type draw, the grants' fate on a join or fall (removed or transferred), its income, its walker's targets.
   - LAB C-60-S3: a grant with every ring tile occupied.
   - LAB C-60-S4: bankruptcy's shape over the turns of insolvency (per city or empire, whether the balance goes negative — no read below 0 in 35,000 rows — and which unit goes). Both engines read the pedia's "below 0" strictly (a seat at 0 loses nothing) and its "at -10" inclusively; open: whether the game clamps the balance at 0 and counts the shortfall instead (the lab read a loss of 1 at a Free City holding 0).

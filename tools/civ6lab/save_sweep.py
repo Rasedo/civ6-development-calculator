@@ -27,6 +27,8 @@ The readers (Lua under tools/civ6lab/, state, output under runs/):
   minor_def     C-38-S2  city_probe.lua (every city), InGame minor_def_<stamp>.jsonl
   events        C-74-S1  event_history.lua, InGame           event_turns_<save>.jsonl
                          event_map.lua, InGame and GameCore  event_map_<save>.json
+  citydef       C-60-S1  city_defense_preview.lua, InGame    citydef_<stamp>.jsonl
+                         (every centre's strength by the combat preview's own terms; C-38-S2 too)
   ladder        -        ladder_read.lua, InGame             ladder_read_<stamp>.jsonl
 `ladder` (every city's amenity balance beside the tier the game reports) has
 no scene and runs only when named.
@@ -100,6 +102,8 @@ READERS: dict[str, Reader] = {r.name: r for r in (
     Reader("events", "C-74-S1", (Part(IG, "event_history.lua", key="turns"),
                                  Part(IG, "event_map.lua", key=IG),
                                  Part(GC, "event_map.lua", key=GC)), "event_turns_{save}.jsonl"),
+    Reader("citydef", "C-60-S1", (Part(IG, "city_defense_preview.lua", (("ZMAX", "-1"),)),),
+           "citydef_{stamp}.jsonl"),
     Reader("ladder", "", (Part(IG, "ladder_read.lua"),), "ladder_read_{stamp}.jsonl"),
 )}
 SCENES = ",".join(r.name for r in READERS.values() if r.scene)

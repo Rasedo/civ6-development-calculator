@@ -119,7 +119,13 @@ class Tuner:
         except OSError as e:
             # a load or a new game resets the socket as the Lua states go
             raise TunerError(f"the game reset the tuner socket: {e}") from e
-        return tag, body.rstrip(b"\x00").decode("utf-8", errors="replace")
+        raw = body.rstrip(b"\x00")
+        # the game's own text (Locale lookups) comes in the system codepage,
+        # everything else in UTF-8
+        try:
+            return tag, raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return tag, raw.decode("cp1251", errors="replace")
 
     def _exactly(self, n: int) -> bytes:
         assert self.sock is not None
