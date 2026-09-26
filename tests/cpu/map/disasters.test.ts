@@ -281,8 +281,9 @@ describe('disasters', () => {
     b2.up.district = 'DAM';
     b2.up.districtComplete = true;
     b2.up.districtPillaged = true;
+    // one strike proves the pillaged DAM shields nothing
     let struck = 0;
-    for (let i = 0; i < 6000; i++) {
+    for (let i = 0; i < 6000 && struck === 0; i++) {
       disasterPhase(b2.state);
       if (b2.plain.pillaged || b2.plain.improvement === null) struck++;
       b2.plain.improvement = 'FARM';
