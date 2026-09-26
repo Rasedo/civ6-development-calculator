@@ -790,14 +790,6 @@ export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleRes
   return { ok: true };
 }
 
-/**
- * CIV6 (Theological combat): "When a hostile military unit uses the Condemn
- * Heretic action on a religious unit, the same effect is observed; however,
- * only the losing side loses religious influence, the Religious Pressure lost
- * is halved ... and it only affects cities within 6 tiles. The religion of the
- * military unit does not gain influence." The action's own condition is "Must
- * be at war with the owner of the religious unit."
- */
 /** CIV6 (Monastic Isolation, EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS): the
  *  pressure religion `rel` sheds to a lost theological combat, `swing` less
  *  the ReductionPercent its Enhancer belief keeps. The pedia's Theological
@@ -809,8 +801,23 @@ function theoLoss(state: GameState, rel: number, swing: number): number {
   return Math.floor((swing * (100 - Math.min(100, keep))) / 100);
 }
 
-export function condemnHeretic(state: GameState, unit: Unit, tileIndex: number): RuleResult {
+/**
+ * CIV6 (Theological combat): "When a hostile military unit uses the Condemn
+ * Heretic action on a religious unit, the same effect is observed; however,
+ * only the losing side loses religious influence, the Religious Pressure lost
+ * is halved ... and it only affects cities within 6 tiles. The religion of the
+ * military unit does not gain influence." The action's own condition is "Must
+ * be at war with the owner of the religious unit."
+ *
+ * It is an OWN-TILE verb: legal only on the heretic's own tile, never from
+ * beside it (runs/religious_target_20260926T_*.jsonl:
+ * `CanStartCommand` false from every adjacent tile, true on the heretic's,
+ * spawned there or moved in by the melee order); it kills the religious unit
+ * and ends the condemner's moves.
+ */
+export function condemnHeretic(state: GameState, unit: Unit): RuleResult {
   if ((UNITS[unit.type]?.combat ?? 0) <= 0) return { ok: false, reason: 'Not a military unit.' };
+  const tileIndex = unit.tileIndex;
   const target = state.units.find(
     (u) => u.tileIndex === tileIndex && (UNITS[u.type]?.religiousStrength ?? 0) > 0
       && unitSeat(u) !== unitSeat(unit),

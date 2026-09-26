@@ -33,7 +33,7 @@ import {
   seatOf, tileBelongsTo, tileSeat, unitsOf,
 } from './seats';
 import { attacksLeftOf, promoAvailable, promoFlag, promoReady, promoValue } from './promotions';
-import { cityStateAttackable, nukeTargets, siegeMayShoot } from './combat';
+import { cityStateAttackable, nukeTargets, shootable, siegeMayShoot } from './combat';
 import {
   airPillageFit, airRange, airStrikeTargets, deployTargets, isAirUnit, priorityTargets, rebaseTargets,
 } from './air';
@@ -70,7 +70,7 @@ const A_FOUND = col('FOUND_CITY');
 const A_EXCAVATE = col('EXCAVATE');
 const A_PARK = col('PARK');
 const A_PROMOTE = col('PROMOTE_0');
-const A_CONDEMN = col('CONDEMN_0');
+const A_CONDEMN = col('CONDEMN');
 const A_REMOVE_HERESY = col('REMOVE_HERESY');
 const A_LAUNCH_INQUISITION = col('LAUNCH_INQUISITION');
 const A_EVANGELIZE = col('EVANGELIZE_BELIEF');
@@ -202,11 +202,12 @@ function inEscortHere(ctx: MaskCtx, u: Unit): boolean {
 // ---- ATTACK 6-11 ------------------------------------------------------------
 
 /** May `u` attack `to`? A hostile unit there (the military one as this seat
- *  sees it, the civilian or support one, the passenger), a hostile major or
- *  Free City centre, an attackable city-state centre, or a live enemy
- *  Encampment; a fighter with movement and an attack left that may shoot;
- *  an embarked unit only as a melee blow ashore over no cliff. The ranged
- *  unit's reach is the neighbour ring here, as on the GPU. */
+ *  sees it, the civilian or support one, the passenger — a RANGED unit never
+ *  a civilian, `shootable`), a hostile major or Free City centre, an
+ *  attackable city-state centre, or a live enemy Encampment; a fighter with
+ *  movement and an attack left that may shoot; an embarked unit only as a
+ *  melee blow ashore over no cliff. The ranged unit's reach is the neighbour
+ *  ring here, as on the GPU. */
 function attackOk(ctx: MaskCtx, u: Unit, here: Tile, to: Tile): boolean {
   const { state } = ctx;
   const def = UNITS[u.type];
@@ -221,9 +222,10 @@ function attackOk(ctx: MaskCtx, u: Unit, here: Tile, to: Tile): boolean {
   const me = { seat };
   const m = ctx.occ.military.get(to.index);
   if (m && unitVisibleTo(state, m, seat) && unitsHostile(state, me, m)) return true;
+  const ranged = (def.ranged?.strength ?? 0) > 0;
   for (const p of ['civilian', 'support', 'embarked'] as const) {
     const o = ctx.occ[p].get(to.index);
-    if (o && unitsHostile(state, me, o)) return true;
+    if (o && unitsHostile(state, me, o) && (!ranged || shootable(o))) return true;
   }
   const holder = ctx.centre.get(to.index);
   if (holder !== undefined && unitsHostile(state, me, { seat: holder })) return true;
@@ -235,15 +237,15 @@ function attackOk(ctx: MaskCtx, u: Unit, here: Tile, to: Tile): boolean {
 // ---- the SNIPE rings --------------------------------------------------------
 
 /** A ranged strike's target at ring distance 2 or 3. A major's ranged fire
- *  engages BARBARIAN units only (`hostileRangedStrike`'s scope-out), a
- *  hostile MAJOR centre, an attackable city-state centre, or a live enemy
- *  Encampment. The GPU reads the military occupant unfiltered by stealth
- *  here, and names a Free City's centre no target. */
+ *  engages BARBARIAN units only (`hostileRangedStrike`'s scope-out) and never
+ *  a civilian (`shootable`), a hostile MAJOR centre, an attackable city-state
+ *  centre, or a live enemy Encampment. The GPU reads the military occupant
+ *  unfiltered by stealth here, and names a Free City's centre no target. */
 function ringTarget(ctx: MaskCtx, t: Tile): boolean {
   const { state, seat } = ctx;
   for (const p of PLANES) {
     const o = ctx.occ[p].get(t.index);
-    if (o && o.seat === BARB_SEAT) return true;
+    if (o && o.seat === BARB_SEAT && shootable(o)) return true;
   }
   const holder = ctx.centre.get(t.index);
   if (holder !== undefined && holder < 100 && unitsHostile(state, { seat }, { seat: holder })) return true;
@@ -412,15 +414,11 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   if (promoReady(u)) {
     for (let k = 0; k < PROMO_COLS; k++) if (promoAvailable(u, k)) out.add(A_PROMOTE + k);
   }
-  // CONDEMN: a fighter beside a religious unit (the civilian occupant, else
-  // the passenger) of a seat this one is at WAR with.
+  // CONDEMN: a fighter on the tile of a religious unit (the civilian
+  // occupant, else the passenger) of a seat this one is at WAR with.
   if (fights) {
-    for (let d = 0; d < 6; d++) {
-      const nb = neighborTile(state.map, here, d);
-      if (!nb) continue;
-      const r = religiousAt(ctx, nb.index);
-      if (r && civsAtWar(state, seat, r.seat)) out.add(A_CONDEMN + d);
-    }
+    const r = religiousAt(ctx, here.index);
+    if (r && r.seat !== seat && civsAtWar(state, seat, r.seat)) out.add(A_CONDEMN);
   }
   // REMOVE_HERESY: an Inquisitor with a charge on an own city centre.
   if (u.type === 'INQUISITOR' && charges > 0 && ctx.centre.has(here.index) && tileSeat(here) === seat) {

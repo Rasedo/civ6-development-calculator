@@ -83,13 +83,28 @@ export const PURCHASE_DIVISOR = srcConst('scenario.purchaseDivisor', 5, gp('PURC
  *  online speed's row names the cost's three figures; `policyUnlockCost`
  *  reads them as the cost starting at the maximum the first turn past the
  *  window and dropping by the step each further turn, never below the
- *  minimum. */
+ *  minimum, the whole scaled by k = (POLICY_UNLOCK_K_BASE +
+ *  POLICY_UNLOCK_K_PER_TECH × the seat's techs) / 10 and rounded to the
+ *  nearest POLICY_UNLOCK_ROUND. */
 export const CIVIC_UNLOCK_MAX_COST = srcConst('scenario.civicUnlockMaxCost', 50,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockMaxCost'));
 export const CIVIC_UNLOCK_PER_TURN_DROP = srcConst('scenario.civicUnlockPerTurnDrop', 5,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockPerTurnDrop'));
 export const CIVIC_UNLOCK_MIN_COST = srcConst('scenario.civicUnlockMinCost', 10,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockMinCost'));
+/** k's intercept and per-tech slope, in tenths (k = 1.5 + techs/10). */
+export const POLICY_UNLOCK_K_BASE = srcConst('scenario.policyUnlockKBase', 15, {
+  lab: 'runs/policy_cost_bdprice_20260926T082243Z.jsonl and runs/policy_cost_bdprice2_20260926T082716Z.jsonl',
+  note: 'GetCostToUnlockPolicies over 30 turns, 8 majors: the jump 50k = 75 + 5 x techs, the floor 10k, k following the tech count alone',
+});
+export const POLICY_UNLOCK_K_PER_TECH = srcConst('scenario.policyUnlockKPerTech', 1, {
+  lab: 'runs/policy_cost_bdprice2_20260926T082716Z.jsonl',
+  note: 'k rises by 1/10 per researched tech (techs 26-28: k 4.1-4.3 ... 40: 5.5)',
+});
+export const POLICY_UNLOCK_ROUND = srcConst('scenario.policyUnlockRound', 5, {
+  lab: 'runs/policy_cost_bdprice_20260926T082243Z.jsonl',
+  note: 'every read price is a multiple of 5; nearest, halves up, is this engine\'s reading of the rounding',
+});
 
 export const FOOD_PER_CITIZEN = srcConst('foodPerCitizen', 2,
   gp('CITY_FOOD_CONSUMPTION_PER_POPULATION'));
@@ -212,9 +227,32 @@ export const EMBARKED_DEFENSE_CS_BY_ERA: readonly number[] =
 export const PALACE_CITY_CS = srcConst('combat.palaceCityCs', 3,
   xml('ModifierArguments', 'ModifierId=PALACE_ADJUST_GARRISON_STRENGTH&Name=Amount', 'Value',
     { note: 'MODIFIER_PLAYER_CITIES_ADJUST_INNER_DEFENSE on BUILDING_PALACE; the lab read it in the capital alone' }));
-/** a military unit of the holder standing on the centre, at full value (the
- *  preview scales it down for a wounded garrison) */
-export const GARRISON_CITY_CS = srcConst('combat.garrisonCityCs', 10, gp('COMBAT_GARRISON_MILITIA_MODIFIER'));
+/** THE HOLDER'S BASE a centre stands on: max(the start era's melee strength,
+ *  the strongest melee the holder has fielded) - 10 (`holderStrength`). The
+ *  engines start at Ancient, so the start value is the ERA_ANCIENT row's —
+ *  the major's and the minor's each their own column. The Civilopedia: "the
+ *  strongest melee unit built by your civilization, minus 10". */
+export const CITY_START_MELEE_MAJOR = srcConst('combat.cityStartMeleeMajor', 20,
+  xml('StartEras', 'EraType=ERA_ANCIENT', 'StartingMeleeStrengthMajor',
+    { note: 'runs/city_defense_preview_c38s2_era*: a major\'s base is max(this, the melee its first city is granted) - 10 at every start era' }));
+export const CITY_START_MELEE_MINOR = srcConst('combat.cityStartMeleeMinor', 25,
+  xml('StartEras', 'EraType=ERA_ANCIENT', 'StartingMeleeStrengthMinor',
+    { note: 'runs/city_defense_preview_c38s2_era*: a minor\'s base is this - 10 at every start era (25 -> 15 Ancient ... 70 -> 60 Atomic)' }));
+export const CITY_BASE_MELEE_CUT = srcConst('combat.cityBaseMeleeCut', 10, {
+  lab: 'runs/city_defense_preview_c38s2_era1_20260926T081728Z.jsonl through runs/city_defense_preview_c38s2_era8_20260926T082547Z.jsonl (112 minor and 48 major start centres, one start era each) and runs/garrison_scale_20260926T081246Z.jsonl (base 55 under a Line Infantry 65)',
+  note: 'the Civilopedia\'s "strongest melee unit built by your civilization, minus 10"',
+});
+
+/** THE GARRISON TERM: a land military unit of the holder on the centre adds
+ *  what its Combat stands above the holder's base, scaled down as it is
+ *  wounded — max(0, Combat - base) x (1 - damage / 200), nothing when it is
+ *  no stronger than the base (`garrisonCS`). The Civilopedia: "the strongest
+ *  melee unit built by your civilization, minus 10, or ... the Combat
+ *  Strength of a garrisoned military unit". */
+export const GARRISON_DAMAGE_SCALE = srcConst('combat.garrisonDamageScale', 200, {
+  lab: 'runs/garrison_scale_20260926T081246Z.jsonl',
+  note: 'lab4_t150, player 1\'s capital, base 55: an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage 0, 10, 25, 50, 75, 90; a Warrior (20) and a Musketman (55) add 0 at every damage',
+});
 /** a city-state's centre, per envoy it holds from every major together */
 export const ENVOY_CITY_CS = srcConst('combat.envoyCityCs', 1, gp('COMBAT_STRENGTH_FROM_ENVOYS'));
 

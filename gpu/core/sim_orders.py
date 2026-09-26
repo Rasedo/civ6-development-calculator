@@ -125,7 +125,7 @@ class SimOrders:
             ((_ab == _xc) if _xc >= 0 else _no).any(dim=0),                     # excavate
             ((_ab == _pk) if _pk >= 0 else _no).any(dim=0),                     # park
             (((_ab >= _pm) & (_ab < _pm + _pcol)) if _pm >= 0 else _no).any(dim=0),  # promote
-            (((_ab >= _cn) & (_ab < _cn + 6)) if _cn >= 0 else _no).any(dim=0),  # condemn
+            ((_ab == _cn) if _cn >= 0 else _no).any(dim=0),                     # condemn
             ((_ab == _hx) if _hx >= 0 else _no).any(dim=0),                     # remove heresy
             ((_ab == _lq) if _lq >= 0 else _no).any(dim=0),                     # launch inquisition
             ((_ab == _hn) if _hn >= 0 else _no).any(dim=0),                      # convert heathen
@@ -334,17 +334,16 @@ class SimOrders:
                         self._form_up(row, okf, hcl, sc, tier)
 
             if _rk_condemn[n] and _cn >= 0:
-                cdm = act & (a >= _cn) & (a < _cn + 6)
+                # CONDEMN HERETIC, on the condemner's OWN tile
+                cdm = act & (a == _cn)
                 if bool(cdm.any()):
-                    dcn = (a - _cn).clamp(min=0, max=5)
-                    ctg = nb.gather(1, dcn.unsqueeze(1)).squeeze(1)
-                    ctc = ctg.clamp(min=0)
+                    ctc = hc
                     rel = self._religious_at(ctc.unsqueeze(1)).squeeze(1)
                     rsx = torch.where(rel >= 0,
                                       self.unit_seat.gather(1, rel.clamp(min=0).unsqueeze(1)).squeeze(1),
                                       torch.full_like(rel, -1))
                     okc = (
-                        cdm & u_moves & (ctg >= 0) & (rel >= 0) & (rsx >= 0) & (rsx != row)
+                        cdm & u_moves & (here >= 0) & (rel >= 0) & (rsx >= 0) & (rsx != row)
                         & (self._type_combat[utp.clamp(min=0)] > 0)
                         & self.war[:, row].gather(1, self._seat_row[rsx.clamp(min=0)].unsqueeze(1)).squeeze(1)
                     )
@@ -819,9 +818,13 @@ class SimOrders:
                     # this seat? `unitsHostile` answers for every pair, so no
                     # seat needs a clause of its own.
                     _ms = self._visible_military_at(row).gather(1, tc.unsqueeze(1)).squeeze(1)
-                    _cs = self._civclass_at(tc)  # civilian OR support: both are targets
+                    # civilian OR support, a RELIGIOUS unit never: a melee
+                    # order onto one is a move (`_melee_coloc`)
+                    _cs = self._melee_class_at(tc)
                     _es = self.embarked_at.gather(1, tc.unsqueeze(1)).squeeze(1)
                     neg = torch.full_like(_ms, -1)
+                    _es_t = self.unit_type.gather(1, _es.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+                    _es = torch.where((_es >= 0) & (self._rel_strength[_es_t] > 0), neg, _es)
                     m_seat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
                     c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
                     e_seat = torch.where(_es >= 0, self.unit_seat.gather(1, _es.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
@@ -829,6 +832,11 @@ class SimOrders:
                     host_m = (self._seats_hostile(row, m_seat.unsqueeze(1))
                               | self._seats_hostile(row, e_seat.unsqueeze(1))).squeeze(1)
                     host_c = self._seats_hostile(row, c_seat.unsqueeze(1)).squeeze(1)
+                    _rs = self._religious_civ_at(tc)
+                    r_seat = torch.where(_rs >= 0, self.unit_seat.gather(1, _rs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+                    host_r = (self._seats_hostile(row, r_seat.unsqueeze(1)).squeeze(1)
+                              & ~self.water.gather(1, tc.unsqueeze(1)).squeeze(1)
+                              & ~self.unit_naval[ut])
                     ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
                     city_t = self._seats_hostile(
                         row, self._centre_target_seat(ctr).unsqueeze(1)).squeeze(1)
@@ -854,6 +862,7 @@ class SimOrders:
                     city_hit = city_t
                     cs_hit = cs_t & ~city_t
                     unit_hit = (host_m | host_c) & ~city_hit & ~cs_hit & ~enc_t
+                    coloc = host_r & ~host_m & ~host_c & ~city_hit & ~cs_hit & ~enc_t
                     _css = self.citystate_at.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)
                     for b_ in valid.nonzero(as_tuple=True)[0].tolist():
                         v = int(sc[b_])
@@ -872,6 +881,10 @@ class SimOrders:
                             elif bool(unit_hit[b_]):
                                 # spends through `spendAttack`, inside the body
                                 self._hostile_vs_unit(one, tgt, "major", v)
+                                continue
+                            elif bool(coloc[b_]):
+                                # a MOVE onto a religious unit's tile: no attack
+                                self._melee_coloc(one, tc, "major", v, row)
                                 continue
                             else:
                                 continue  # nothing to attack — TS's `no(...)`, no MP spent
@@ -2147,6 +2160,19 @@ class SimOrders:
             # assault gathers on every game, and a Free City plot's 300 is no slot
             _csi = torch.where(cs_here, _csp - 100, torch.zeros_like(_csp))
             has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
+            # a RELIGIOUS unit is no melee target: with nothing else there the
+            # blow is a MOVE onto its tile (`_melee_coloc`)
+            _rb = self._religious_civ_at(ttc)
+            _eb = self.embarked_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            _eb_t = self.unit_type.gather(1, _eb.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+            _mb = self._visible_military_at(BARB_SEAT).gather(1, ttc.unsqueeze(1)).squeeze(1)
+            _mb_seat = torch.where(_mb >= 0, self.unit_seat.gather(1, _mb.clamp(min=0).unsqueeze(1)).squeeze(1),
+                                   torch.full_like(_mb, -1))
+            fight_u = (((_mb >= 0) & (_mb_seat != BARB_SEAT))
+                       | (self._melee_class_at(ttc) >= 0)
+                       | ((_eb >= 0) & ~(self._rel_strength[_eb_t] > 0)))
+            rel_u = ((_rb >= 0) & ~self.water.gather(1, ttc.unsqueeze(1)).squeeze(1)
+                     & ~self.unit_naval[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)])
             _enc_here = (
                 self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
                 if self._encamp_didx >= 0
@@ -2155,7 +2181,8 @@ class SimOrders:
             city_att = attack & ~rngd & ctr_here
             cs_att = attack & ~rngd & cs_here & ~ctr_here
             # the district shelters whoever stands on it, so it answers first
-            unit_att = attack & ~rngd & has_u & ~ctr_here & ~cs_here & ~_enc_here
+            unit_att = attack & ~rngd & has_u & fight_u & ~ctr_here & ~cs_here & ~_enc_here
+            coloc_att = attack & ~rngd & has_u & ~fight_u & rel_u & ~ctr_here & ~cs_here & ~_enc_here
             enc_att = attack & ~rngd & ~ctr_here & ~cs_here & _enc_here
 
             if bool(city_att.any()):
@@ -2166,6 +2193,8 @@ class SimOrders:
                 self._assault_city_state(cs_att, _csi.clamp(min=0), ttc, "barb", u)
             if bool(unit_att.any()):
                 self._hostile_vs_unit(unit_att, ttc, "barb", u)
+            if bool(coloc_att.any()):
+                self._melee_coloc(coloc_att, ttc, "barb", u, BARB_SEAT)
             if bool(enc_att.any()):
                 self._attack_encampment(enc_att, ttc, "barb", u)
             # A blow at a CITY or an Encampment ends the raider's turn

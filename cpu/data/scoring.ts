@@ -26,13 +26,16 @@
  *   - eraScore: the era score the seat has earned over the whole game —
  *     `GetPlayerCurrentScore`, which the Ages panel adds up from the previous
  *     eras' total and the current era's moments (EraProgressPanel.lua), and
- *     which the Score's era category matched on all six seats.
+ *     which the Score's era category matched on all six seats;
+ *   - buildings: every building the seat's cities hold, the Palace included
+ *     and pillaged ones too, wonders never (they score on the Wonder row) —
+ *     one per building whatever its era (tools/civ6lab/score_pair.py,
+ *     runs/score_pair_*: a building placed or removed moves Empire by 1).
  *
- * TWO GS rows are not scored here: Empire's LINE_ITEM_ERA_BUILDINGS
- * (Multiplier 1, TieBreakerPriority 1030) and Religion's
- * LINE_ITEM_ERA_CONVERTED (Multiplier 2, TieBreakerPriority 1020). The live
- * game leaves a residue in each category the measured counts do not explain,
- * and no reading of what they count fits every seat.
+ * ONE GS row is not scored here: Religion's LINE_ITEM_ERA_CONVERTED
+ * (Multiplier 2, TieBreakerPriority 1020). The live game leaves a residue in
+ * Religion the measured counts do not explain, and no reading of what it
+ * counts fits every seat.
  *
  * ROW ORDER IS THE TIE ORDER: `TieBreakerPriority` descending. The install
  * never says which way the column runs; Base's eight rows carry 100 down to 30
@@ -43,7 +46,7 @@ import { xml, type SrcMap } from './provenance';
 
 export type ScoreCount =
   | 'eraScore' | 'civics' | 'cities' | 'districts' | 'population'
-  | 'greatPeople' | 'religion' | 'techs' | 'wonders';
+  | 'greatPeople' | 'religion' | 'techs' | 'wonders' | 'buildings';
 
 export interface ScoringLineItem {
   /** the install's LineItemType */
@@ -80,6 +83,7 @@ const row = (
 };
 
 export const SCORING_LINE_ITEMS: readonly ScoringLineItem[] = [
+  row('LINE_ITEM_ERA_BUILDINGS', 'CATEGORY_EMPIRE', 'buildings', 'Buildings', 1, 1, 1030),
   row('LINE_ITEM_ERA_SCORE', 'CATEGORY_ERA_SCORE', 'eraScore', 'EraScore', 1, 1, 1010),
   row('LINE_ITEM_CIVICS', 'CATEGORY_CIVICS', 'civics', 'Civics', 3, 1, 100),
   row('LINE_ITEM_CITIES', 'CATEGORY_EMPIRE', 'cities', 'Cities', 5, 1, 90),

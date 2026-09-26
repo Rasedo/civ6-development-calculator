@@ -7,7 +7,8 @@ The TS twin is tests/cpu/city/eco-residue.test.ts.
   1. a building buys off its fractional scaled cost (`_b_cols` "buyCost"): the
      Granary (Cost 65) for 130 gold, where a unit keeps its truncated cost.
   2. the policy unlock (`_policy_unlock_cost`): free the turn after a civic,
-     then 50 dropping 5 a turn to 10; a government change outside the window
+     then 50 dropping 5 a turn to 10, times k = 1.5 + techs/10 rounded to 5;
+     a government change outside the window
      pays it once, and one the purse cannot meet is refused.
   3. a city-state's city holds the Palace (`_palace_at`): +5 Gold.
   4. the Great Prophet, one per player (`_gp_capped`): the race, the patronage
@@ -76,17 +77,23 @@ def test_policy_unlock(sim, rj) -> None:
         g, has = sim._adopted_gov(ROW)
         return int(g[0]) if bool(has[0]) else -1
 
-    mx, drop, mn = sim.rules.civic_unlock
-    assert (mx, drop, mn) == (50.0, 5.0, 10.0)
+    assert sim.rules.civic_unlock == (50, 5, 10)
+    assert sim.rules.policy_unlock_k == (15, 1, 5)
     sim.civ_civic_turn[:, ROW] = 10
-    for t, want in ((11, 0.0), (12, mx), (13, mx - drop), (100, mn)):
-        sim.turn = t
-        assert float(sim._policy_unlock_cost(ROW)[0]) == want, (t, float(sim._policy_unlock_cost(ROW)[0]))
-    # three turns past the window: 40, refused one short of it
+    # no techs: k = 1.5 (75, 67.5 half up to 70, the floor 15); 31 techs:
+    # k = 4.6 (the lab's 230, 207 to 205, 46 to 45)
+    for n, wants in ((0, (0.0, 75.0, 70.0, 15.0)), (31, (0.0, 230.0, 205.0, 45.0))):
+        sim.civ_techs[:, ROW] = False
+        sim.civ_techs[:, ROW, :n] = True
+        for t, want in zip((11, 12, 13, 100), wants):
+            sim.turn = t
+            assert float(sim._policy_unlock_cost(ROW)[0]) == want, (n, t, float(sim._policy_unlock_cost(ROW)[0]))
+    # three turns past the window: the row's 40 at k = 1.5, refused one short
+    sim.civ_techs[:, ROW] = False
     sim.civ_civic_turn[:, ROW] = 1
     sim.turn = 5
     cost = float(sim._policy_unlock_cost(ROW)[0])
-    assert cost == mx - 2 * drop
+    assert cost == 60.0
     sim.civ_treasury[:, ROW] = cost - 1
     record(gov["OLIGARCHY"])
     assert now() == gov["AUTOCRACY"] and float(sim.civ_treasury[0, ROW]) == cost - 1
@@ -103,7 +110,7 @@ def test_policy_unlock(sim, rj) -> None:
     assert now() == gov["CLASSICAL_REPUBLIC"] and float(sim.civ_treasury[0, ROW]) == 0.0
     sim.turn = turn0
     sim.restore(snap)
-    print("  2 the policy unlock: free, 50 dropping 5 to 10, paid once, refused short OK")
+    print("  2 the policy unlock: free, 50 dropping 5 to 10 times k, paid once, refused short OK")
 
 
 def test_minor_palace(sim) -> None:

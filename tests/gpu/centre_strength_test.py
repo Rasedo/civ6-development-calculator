@@ -3,9 +3,10 @@
     python tests/gpu/centre_strength_test.py
 
 One rule for every holder, the combat preview's DEFENSES lines: the holder's
-base (its strongest melee fielded, floored at 15), `Districts.CityStrengthModifier`
-over the complete, unpillaged districts, the walls tier, the Palace's +3, a
-garrison's +10, and a city-state's +1 per envoy. Each scene asserts the number
+base (max(the start era's melee, its strongest melee fielded) - 10: an Ancient
+major's 20, a minor's 25), `Districts.CityStrengthModifier`
+over the complete, unpillaged districts, the walls tier, the Palace's +3, the
+garrison term, and a city-state's +1 per envoy. Each scene asserts the number
 the TS twin (tests/cpu/units/city-combat.test.ts, "a city centre's standing
 strength") asserts for the same scene.
 """
@@ -31,10 +32,10 @@ def build():
                                device="cpu", dtype=torch.float64))
 
 
-def strength(sim, row: int, col: int, garrisoned: bool = True) -> int:
+def strength(sim, row: int, col: int, garrisoned: bool = True) -> float:
     r = torch.full((sim.B,), row, dtype=torch.long)
     c = torch.full((sim.B,), col, dtype=torch.long)
-    return int(sim._centre_strength(r, c, garrisoned)[B0])
+    return float(sim._centre_strength(r, c, garrisoned)[B0])
 
 
 def clear(sim, tile: int) -> None:
@@ -81,11 +82,15 @@ def test_base_and_palace(sim) -> None:
     clear(sim, int(sim.city_center[B0, r, j]))
     sim.civ_best_melee[B0, r] = 0
     assert int(sim._palace_city_cs) == 3
-    assert strength(sim, r, j) == 15 + 3, strength(sim, r, j)
+    assert (sim._city_start_melee_major, sim._city_start_melee_minor, sim._city_base_melee_cut) == (20, 25, 10)
+    assert strength(sim, r, j) == 10 + 3, strength(sim, r, j)
     sim.city_is_cap[B0, r, j] = False
-    assert strength(sim, r, j) == 15, strength(sim, r, j)
+    assert strength(sim, r, j) == 10, strength(sim, r, j)
+    sim.civ_best_melee[B0, r] = 65
+    assert strength(sim, r, j) == 55, strength(sim, r, j)
+    sim.civ_best_melee[B0, r] = 0
     sim.city_is_cap[B0, r, j] = True
-    print("  1 the base and the Palace OK — 15 floored, +3 in the capital")
+    print("  1 the base and the Palace OK — max(20, best) - 10, +3 in the capital")
 
 
 def test_districts(sim) -> None:
@@ -96,13 +101,13 @@ def test_districts(sim) -> None:
     a, b = own_tiles(sim, r, j, 2)
     lay(sim, a, "CAMPUS")
     lay(sim, b, "AQUEDUCT")
-    assert strength(sim, r, j) == 15 + 2, "a Campus and an Aqueduct add 2, not 4"
+    assert strength(sim, r, j) == 10 + 2, "a Campus and an Aqueduct add 2, not 4"
     lay(sim, b, "COMMERCIAL_HUB")
-    assert strength(sim, r, j) == 15 + 4
+    assert strength(sim, r, j) == 10 + 4
     sim.district_pillaged[B0, a] = True
-    assert strength(sim, r, j) == 15 + 2, "a pillaged district added strength"
+    assert strength(sim, r, j) == 10 + 2, "a pillaged district added strength"
     sim.district_complete[B0, b] = False
-    assert strength(sim, r, j) == 15, "an unfinished district added strength"
+    assert strength(sim, r, j) == 10, "an unfinished district added strength"
     for t in (a, b):
         sim.district[B0, t] = -1
         sim.district_complete[B0, t] = False
@@ -112,20 +117,35 @@ def test_districts(sim) -> None:
 
 
 def test_garrison(sim) -> None:
+    """runs/garrison_scale_20260926T081246Z.jsonl: base 55 (a Line Infantry
+    65 less 10), an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage
+    0, 10, 25, 50, 75, 90."""
     r, j = a_capital(sim)
     sim.city_is_cap[B0, r, j] = False
     ctr = int(sim.city_center[B0, r, j])
     clear(sim, ctr)
+    inf = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "INFANTRY")
     one = torch.ones(sim.B, dtype=torch.bool)
     sim._spawn_unit(r, one, torch.full((sim.B,), ctr, dtype=torch.long),
-                    torch.full((sim.B,), sim._warrior_idx, dtype=torch.long))
-    assert int(sim.military_at[B0, ctr]) >= 0, "the garrison did not take the centre"
-    sim.civ_best_melee[B0, r] = 35
-    assert int(sim._garrison_city_cs) == 10
-    assert strength(sim, r, j) == 35 + 10, strength(sim, r, j)
-    assert strength(sim, r, j, garrisoned=False) == 35, "the Encampment's read kept the garrison"
+                    torch.full((sim.B,), inf, dtype=torch.long))
+    g = int(sim.military_at[B0, ctr])
+    assert g >= 0, "the garrison did not take the centre"
+    assert int(sim._garrison_damage_scale) == 200
+    sim.civ_best_melee[B0, r] = 75
+    assert strength(sim, r, j) == 65 + 10, "the strongest melee on its centre adds the cut"
+    sim.civ_best_melee[B0, r] = 85
+    assert strength(sim, r, j) == 75, "a garrison no stronger than the base added strength"
+    sim.civ_best_melee[B0, r] = 65
+    got = []
+    for hp in (100, 90, 75, 50, 25, 10):
+        sim.unit_hp[B0, g] = hp
+        got.append(strength(sim, r, j))
+    assert got == [75, 74, 72.5, 70, 67.5, 66], got
+    assert strength(sim, r, j, garrisoned=False) == 55, "the Encampment's read kept the garrison"
+    sim.unit_hp[B0, g] = 100
+    clear(sim, ctr)
     sim.city_is_cap[B0, r, j] = True
-    print("  3 the garrison OK — +10, and none on the Encampment's read")
+    print("  3 the garrison OK — max(0, Combat - base) x (1 - damage/200), none on the Encampment's read")
 
 
 def test_minor(sim) -> None:
@@ -139,7 +159,8 @@ def test_minor(sim) -> None:
     sim.seat_citystate_envoys[B0, 0, s] = 2
     sim.seat_citystate_envoys[B0, 1, s] = 1
     assert strength(sim, row, 0) == 15 + 3 + 3, strength(sim, row, 0)
-    # the strongest melee it fields, not its population or its type
+    # a Warrior stays under the minor's own start value 25; the strongest
+    # melee it fields, not its population or its type, raises the base
     ring2 = ((sim.pair_dist[ctr] == 2) & ~sim.water[B0] & (sim.military_at[B0] < 0)
              & (sim.civilian_at[B0] < 0) & sim.passable[B0])
     at = int(ring2.long().argmax())
@@ -148,8 +169,10 @@ def test_minor(sim) -> None:
     sim._spawn_unit(row, one, torch.full((sim.B,), at, dtype=torch.long),
                     torch.full((sim.B,), sim._warrior_idx, dtype=torch.long))
     assert int(sim.citystate_best_melee[B0, s]) == 20, "the minor's tracker missed its Warrior"
-    assert strength(sim, row, 0) == 20 + 3 + 3, strength(sim, row, 0)
-    print("  4 the city-state OK — its best melee, the Palace, +1 per envoy from every major")
+    assert strength(sim, row, 0) == 15 + 3 + 3, strength(sim, row, 0)
+    sim.citystate_best_melee[B0, s] = 35
+    assert strength(sim, row, 0) == 25 + 3 + 3, strength(sim, row, 0)
+    print("  4 the city-state OK — max(25, its best melee) - 10, the Palace, +1 per envoy")
 
 
 def test_seeded_tracker() -> None:

@@ -407,10 +407,12 @@ def main() -> None:
                 float(s.major_unit_mp[0, bo]))
 
     assert bomb(100, False) == (True, 0, 0.0), f"a healthy bomber wrecked {bomb(100, False)}"
-    assert bomb(50, False) is None, "CIV6: a bomber needs MORE than 50% health"
-    assert bomb(50, True) == (True, 0, 0.0), "Superfortress waives the health gate"
+    # runs/air_bomb50_20260926T.jsonl: "50% health or higher" — 50 wrecks, 49 not
+    assert bomb(50, False) == (True, 0, 0.0), "a bomber at half health wrecks"
+    assert bomb(49, False) is None, "CIV6: a bomber needs 50% health or higher"
+    assert bomb(49, True) == (True, 0, 0.0), "Superfortress waives the health gate"
     print("  10 air pillage OK (wrecked, no spoils, the sortie spent; "
-          "half health refused, Superfortress waives it)")
+          "49 HP refused, Superfortress waives it)")
 
     print("AIR PROMO OK — four trees, both new conditions, the sortie's XP, Sky "
           "and Stars, Tactical Maintenance, Ground Crews, Loot, the carrier deck and air pillage")

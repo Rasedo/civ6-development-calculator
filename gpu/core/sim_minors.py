@@ -214,6 +214,11 @@ class SimMinors:
             return None
         B, S, dev = self.B, self.S, self.device
         inc = torch.zeros(B, 6, dtype=torch.float64, device=dev)
+        # the PATH TERM's inputs per paying leg (`routePathGold`): the
+        # destination centre and D, the Gold the destination's rows pay
+        _p_dest = torch.full_like(rr[:, :, 1], -1)
+        _p_d = torch.zeros(rr.shape[:2], dtype=torch.float64, device=dev)
+        _p_want = torch.zeros_like(act)
         if S > 0:
             raw = -rr[:, :, 1] - 2
             css = raw.clamp(min=0, max=S - 1)
@@ -222,6 +227,9 @@ class SimMinors:
             inc[:, 2] = inc[:, 2] + (self._minor_cs_route_gold * m).sum(dim=1)
             ycol = self._citystate_yidx[:, :S].gather(1, css)
             inc.scatter_add_(1, ycol, self._minor_cs_route_spec * m)
+            _p_dest = torch.where(ok_c, self.citystate_center[:, :S].gather(1, css), _p_dest)
+            _p_d = torch.where(ok_c, self._minor_cs_route_gold * m, _p_d)
+            _p_want = _p_want | ok_c
         rd_c = self.seat_route_dcity[:, row]
         intl = act & (rd_c >= 0)
         if bool(intl.any()):
@@ -239,6 +247,13 @@ class SimMinors:
                 2, _col.unsqueeze(3).expand(B, K, 1, _nD)).squeeze(2)  # [B, K, nD]
             intl6 = self._route_centre_intl.reshape(1, 1, 6) + _comp_d.double() @ self._route_intl_y  # [B, K, 6]
             inc = inc + (intl6 * valid.double().unsqueeze(2)).sum(dim=1)
+            _p_dest = torch.where(valid, self.city_center.gather(1, _rx).gather(2, _col).squeeze(2), _p_dest)
+            _p_d = torch.where(valid, intl6[:, :, 2], _p_d)
+            _p_want = _p_want | valid
+        if bool(_p_want.any()):
+            _p_o = self.citystate_center[:, s].unsqueeze(1).expand_as(_p_dest)
+            inc[:, 2] = inc[:, 2] + self._route_path_gold(
+                row, torch.where(_p_want, _p_o, torch.full_like(_p_o, -1)), _p_dest, _p_d, _p_want).sum(dim=1)
         out = torch.zeros(B, self.RC, 6, dtype=torch.float64, device=dev)
         out[:, 0] = inc * self.city_alive[:, row, 0].double().unsqueeze(1)
         return out

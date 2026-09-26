@@ -55,8 +55,6 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // PROMOTE: column k takes row k of the acting unit's OWN class list, so one
   // fixed-width head serves nine different promotion tables.
   for (let k = 0; k < PROMO_COLS; k++) names.push(`PROMOTE_${k}`);
-  // CONDEMN HERETIC: a military unit's verb against an adjacent religious one.
-  for (let d = 0; d < 6; d++) names.push(`CONDEMN_${d}`);
   names.push('REMOVE_HERESY');
   names.push('LAUNCH_INQUISITION');
   // HEATHEN CONVERSION: the Apostle promotion's own verb, adjacent-ring wide
@@ -157,6 +155,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // spent and its religion earns a belief. Appended last, like every verb
   // since FOUND_CITY.
   names.push('EVANGELIZE_BELIEF');
+  // CONDEMN HERETIC: a military unit's verb against the religious unit on its
+  // OWN tile — one column, no direction. Appended last, like every verb since
+  // FOUND_CITY.
+  names.push('CONDEMN');
   return names;
 }
 

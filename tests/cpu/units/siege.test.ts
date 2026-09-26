@@ -14,7 +14,6 @@ import { availableProjects, projectCost, queueProject } from '../../../cpu/core/
 import { completeProject } from '../../../cpu/core/production';
 import { buySeatBuilding, seatPhase } from '../../../cpu/core/phase';
 import { UNITS, WALLS_TIER_CS, WALLS_TIER_HP, REPAIR_QUIET_TURNS } from '../../../cpu/data/units';
-import { GARRISON_CITY_CS } from '../../../cpu/data/constants';
 
 // The siege round, against the pages it came from: City combat (Civ6) for the
 // perimeter, the damage classes and the siege; Battering Ram / Siege Tower for
@@ -454,17 +453,19 @@ describe('the Encampment perimeter', () => {
 
     // ...and "excluding any bonus obtained for a Garrisoned unit": a defender
     // standing on the centre moves the CITY's strength and not the district's.
-    // The seat's best melee is pinned first, because SPAWNING the garrison
-    // would otherwise raise it and move both numbers for the wrong reason.
+    // The seat's base is pinned below the garrison's Combat, and again after
+    // SPAWNING it, which would otherwise raise the base to its own 35.
     const gar = withEncampment();
-    seatOf(gar.state, 0)!.bestMeleeCS = 50;
+    seatOf(gar.state, 0)!.bestMeleeCS = 20;
     const att3 = spawnUnit(gar.state, 'SWORDSMAN',
       tileAtCoords(gar.state.map, gar.enc.col + 1, gar.enc.row).index, ATK)!;
     const encBefore = encampmentDefense(gar.state, att3, gar.enc)!.defCS;
     const cityBefore = cityDefenseStrength(gar.state, gar.city);
     spawnUnit(gar.state, 'SWORDSMAN', gar.city.centerIndex, 0);
+    seatOf(gar.state, 0)!.bestMeleeCS = 20;
     expect(encampmentDefense(gar.state, att3, gar.enc)!.defCS).toBe(encBefore);
-    expect(cityDefenseStrength(gar.state, gar.city)).toBe(cityBefore + GARRISON_CITY_CS);
+    // base max(20, 20) - 10: the Swordsman adds 35 - 10
+    expect(cityDefenseStrength(gar.state, gar.city)).toBe(cityBefore + 35 - 10);
   });
 
   it("with the DISTRICT's perimeter gone the whole roll reaches the garrison", () => {

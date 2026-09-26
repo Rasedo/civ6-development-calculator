@@ -332,10 +332,11 @@ def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
     d, _hrow, hcol, wtier, held = sim._encamp_terms(tt)
     csx = torch.full((sim.B,), s, dtype=torch.long)
     tier = int(sim._minor_walls_tier_at(csx)[B0])
-    # the centre's standing strength less its garrison: the best melee
-    # (floor 15), the walls, the Palace, the Encampment's own district
-    # term and the envoys the minor holds
-    want = (max(15, int(sim.citystate_best_melee[B0, s])) + int(sim._walls_tier_cs[tier])
+    # the centre's standing strength less its garrison: max(the minor's
+    # start melee, its best melee) - 10, the walls, the Palace, the
+    # Encampment's own district term and the envoys the minor holds
+    want = (max(int(sim._city_start_melee_minor), int(sim.citystate_best_melee[B0, s]))
+            - int(sim._city_base_melee_cut) + int(sim._walls_tier_cs[tier])
             + int(sim._palace_city_cs) + int(sim._d_city_str[dv])
             + int(sim._minor_envoys_received()[B0, s]) * int(sim._envoy_city_cs))
     assert tier >= 1, "the walls did not reach the tier read"
@@ -417,10 +418,13 @@ def test_the_walled_minor_strikes(rules, path) -> None:
     tier = int(sim._minor_walls_tier(s)[B0])
     g = int(sim.military_at[B0, ctr])
     gar = g >= 0 and int(sim.unit_seat[B0, g]) == 100 + s
-    want = (max(15, int(sim.citystate_best_melee[B0, s])) + int(sim._walls_tier_cs[tier])
-            + int(sim._palace_city_cs) + (int(sim._garrison_city_cs) if gar else 0)
+    base = max(int(sim._city_start_melee_minor), int(sim.citystate_best_melee[B0, s])) - int(sim._city_base_melee_cut)
+    # the garrison term: max(0, Combat - base) x (1 - damage / 200)
+    gcs = (max(0, int(sim._type_combat[int(sim.unit_type[B0, g])]) - base)
+           * (200 - (100 - int(sim.unit_hp[B0, g]))) / 200) if gar else 0.0
+    want = (base + int(sim._walls_tier_cs[tier]) + int(sim._palace_city_cs) + gcs
             + int(sim._minor_envoys_received()[B0, s]) * int(sim._envoy_city_cs))
-    got = int(sim._centre_strength(torch.full((sim.B,), row, dtype=torch.long), col0)[B0])
+    got = float(sim._centre_strength(torch.full((sim.B,), row, dtype=torch.long), col0)[B0])
     assert got == want, f"the strike leaves from {got}, the centre says {want}"
     print("  8 strike OK — the walled minor fires at war, holds at peace, from its centre")
 

@@ -20,6 +20,7 @@ const total = (state: GameState, seat: number) => scoreLines(state, seatOf(state
 describe('the Score catalog', () => {
   it('carries the GS rows in TieBreakerPriority order, highest first', () => {
     expect(SCORING_LINE_ITEMS.map((l) => [l.id, l.multiplier, l.tieBreak])).toEqual([
+      ['LINE_ITEM_ERA_BUILDINGS', 1, 1030],
       ['LINE_ITEM_ERA_SCORE', 1, 1010],
       ['LINE_ITEM_CIVICS', 3, 100],
       ['LINE_ITEM_CITIES', 5, 90],
@@ -72,8 +73,14 @@ describe('the Score', () => {
     s.religion.enhancer = Object.keys(ENHANCER_BELIEFS)[0];
     s.eraScore = 9;
     s.eraScorePast = 30;
+    // the capital's Palace, a Monument and a pillaged Granary are buildings;
+    // the wonders are not
+    a.buildings.push('MONUMENT');
+    b.buildings.push('GRANARY');
+    b.pillagedBuildings = ['GRANARY'];
 
     const got = scoreLines(state, s);
+    expect(got[line('buildings')]).toBe(3);
     expect(got[line('eraScore')]).toBe(39);
     expect(got[line('civics')]).toBe(2 * 3);
     expect(got[line('cities')]).toBe(2 * 5);
@@ -83,7 +90,7 @@ describe('the Score', () => {
     expect(got[line('religion')]).toBe(4 * 5);
     expect(got[line('techs')]).toBe(3 * 2);
     expect(got[line('wonders')]).toBe(15);
-    expect(got.reduce((x, y) => x + y, 0)).toBe(39 + 6 + 10 + 4 + 7 + 10 + 20 + 6 + 15);
+    expect(got.reduce((x, y) => x + y, 0)).toBe(3 + 39 + 6 + 10 + 4 + 7 + 10 + 20 + 6 + 15);
   });
 
   it('the era boundary banks the closed era into the whole game\'s era score', () => {
@@ -127,6 +134,13 @@ describe('the score victory', () => {
     seatOf(era, 1)!.eraScore = (seatOf(era, 1)!.eraScore ?? 0) + 4;
     expect(total(era, 0)).toBe(total(era, 1));
     expect(scoreLeader(era)).toBe(1);
+    // equal totals: seat 0 holds one more era score, seat 1 one more building
+    // (+1) — the building line (1030) outranks the era (1010)
+    const bld = twoSeats();
+    seatOf(bld, 0)!.eraScore = (seatOf(bld, 0)!.eraScore ?? 0) + 1;
+    seatOf(bld, 1)!.cities[0].buildings.push('MONUMENT');
+    expect(total(bld, 0)).toBe(total(bld, 1));
+    expect(scoreLeader(bld)).toBe(1);
     // equal totals: seat 0 holds 3 more techs (+6), seat 1 2 more civics (+6)
     // — the civic line (100) outranks the techs (40)
     const civ = twoSeats();

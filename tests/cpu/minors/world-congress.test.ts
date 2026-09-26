@@ -570,11 +570,13 @@ describe('the three unwritten resolutions', () => {
       const s2 = newGame(1);
       const c2 = seatOf(s2, 0)!.cities[0];
       const heretic = spawnUnit(s2, 'APOSTLE', c2.centerIndex, s2.seats[1].seat)!;
+      // Condemn Heretic is an own-tile verb: the soldier shares the tile
       const soldier = spawnUnit(s2, 'WARRIOR', heretic.tileIndex, 0)!;
+      soldier.tileIndex = heretic.tileIndex;
       setWar(s2, 0, s2.seats[1].seat, true);
       s2.congress = [{ res: CONGRESS_WORLD_RELIGION, outcome, target: s2.seats[1].seat }];
       seatOf(s2, 0)!.diplomaticFavor = 0;
-      expect(condemnHeretic(s2, soldier, heretic.tileIndex).ok).toBe(true);
+      expect(condemnHeretic(s2, soldier).ok).toBe(true);
       expect(seatOf(s2, 0)!.diplomaticFavor).toBe(outcome === 1 ? CONGRESS_WORLD_RELIGION_FAVOR : 0);
     }
   });

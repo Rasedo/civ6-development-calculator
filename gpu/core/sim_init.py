@@ -1803,7 +1803,7 @@ class SimInit:
         self._A_EXCAVATE = self._act["EXCAVATE"]  # the archaeologist's
         self._A_PARK = self._act["PARK"]          # the naturalist's
         self._A_PROMOTE = self._act["PROMOTE_0"]  # the level-up head
-        self._A_CONDEMN = self._act["CONDEMN_0"]  # vs an adjacent religious unit
+        self._A_CONDEMN = self._act["CONDEMN"]  # vs the religious unit on the own tile
         self._A_HERESY = self._act["REMOVE_HERESY"]
         self._A_INQUISITION = self._act["LAUNCH_INQUISITION"]
         self._A_EVANGELIZE = self._act["EVANGELIZE_BELIEF"]   # the Apostle earns its religion a belief
@@ -1848,9 +1848,11 @@ class SimInit:
         self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
         self._air_deploy_cols = sum(1 for n in self._act_names if n.startswith("DEPLOY_"))
         # CIV6 (Patrols, Interceptions): the intercept radius and each backing
-        # patrol's +5 (`INTERCEPT_RANGE`, `INTERCEPT_SUPPORT_CS`)
+        # patrol's +5 x its hp / 100 (`INTERCEPT_RANGE`, `INTERCEPT_SUPPORT_CS`)
         self._intercept_range = int(rules.combat["interceptRange"])
         self._intercept_support_cs = int(rules.combat["interceptSupportCs"])
+        # PRIORITY TARGET's flat blow (`PRIORITY_TARGET_DAMAGE`)
+        self._priority_target_damage = int(rules.combat["priorityTargetDamage"])
         self._nuke_cols = int(rules.nuclear["nukeCols"])
         _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
         assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
@@ -1865,7 +1867,7 @@ class SimInit:
             + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
             + (1 if self._A_PARK >= 0 else 0) \
             + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
-            + (6 if self._A_CONDEMN >= 0 else 0) \
+            + (1 if self._A_CONDEMN >= 0 else 0) \
             + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
             + (1 if self._A_UPGRADE >= 0 else 0) \
             + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
@@ -2589,6 +2591,14 @@ class SimInit:
         self._trade_plunder_gold = int(_tr["plunderGold"])
         self._trader_guard_radius = int(_tr["guardRadius"])  # an escort's reach (`routePlunderer`)
         self._trade_walk_rail = int(_tr["walkRail"])
+        # the path term (`routePathGold`): the score per water plot, railroad
+        # plot and portal taken, the ratio's cap (in denominators) and its
+        # floor's denominator
+        self._path_water = int(_tr["pathWater"])
+        self._path_rail = int(_tr["pathRail"])
+        self._path_portal = int(_tr["pathPortal"])
+        self._path_denom = int(_tr["pathDenom"])
+        self._path_cap = int(round(float(_tr["pathMaxRatio"]) * self._path_denom))
         self._trade_dur_bumps = [int(x) for x in _tr["durEraBumps"]]  # eras adding +10/+20/+30
         self._trader_cost_prog = int(_tr["traderCostProg"])
         # RIVER FLOOD, the Flood (Civ6) tables by severity.
@@ -2742,9 +2752,15 @@ class SimInit:
         self._walls_tier_hp = torch.tensor([int(x) for x in rules.combat["wallsTierHp"]], dtype=torch.long, device=device)
         self._walls_tier_cs = torch.tensor([int(x) for x in rules.combat["wallsTierCs"]], dtype=torch.long, device=device)
         # a city centre's standing terms beside its base and walls
-        # (`_centre_strength`): the Palace's, a garrison's, a minor's per envoy
+        # (`_centre_strength`): the Palace's, the garrison term's damage scale
+        # (`_garrison_cs`), a minor's per envoy
         self._palace_city_cs = int(rules.combat["palaceCityCs"])
-        self._garrison_city_cs = int(rules.combat["garrisonCityCs"])
+        # the holder's base: max(the start era's melee, the best melee
+        # fielded) less the cut (`_holder_strength`)
+        self._city_start_melee_major = int(rules.combat["cityStartMeleeMajor"])
+        self._city_start_melee_minor = int(rules.combat["cityStartMeleeMinor"])
+        self._city_base_melee_cut = int(rules.combat["cityBaseMeleeCut"])
+        self._garrison_damage_scale = int(rules.combat["garrisonDamageScale"])
         self._envoy_city_cs = int(rules.combat["envoyCityCs"])
         self._walls_tier_urban = int(rules.combat["wallsTierUrban"])
         self._urban_def_tech = int(rules.combat["urbanDefensesTech"])
@@ -3892,15 +3908,14 @@ class SimInit:
         self._free_city_loyalty = float(rules.seats["freeCityLoyaltyPerTurn"])
         self._loyalty_after_cultural = float(rules.seats["loyaltyAfterCulturalTransfer"])
         # the Free Cities player's own strength floor, and the units it is
-        # granted (`FREE_CITY_*`, measured in the live game): the world era's
-        # melee pair on the flip turn (`_free_pair[era]`), then every
-        # `_free_grant_period`th of the city's turns one unit, its class drawn
-        # over `_free_grant_w` and its chassis `_free_grant_units[class, era]`
-        # (-1 where the era has none)
+        # granted (`FREE_CITY_*`, measured in the live game): the former
+        # owner's best chassis of class `_free_pair_cls` on the flip turn
+        # (`_free_pair_type`), then every `_free_grant_period`th of the city's
+        # turns one unit, its class drawn over `_free_grant_w` and its chassis
+        # `_free_grant_units[class, era]` (-1 where the era has none)
         self._free_def = int(rules.seats["freeCityDefense"])
         self._free_pair_n = int(rules.seats["freeCityPairCount"])
-        self._free_pair = torch.tensor([int(x) for x in rules.seats["freeCityPair"]],
-                                       dtype=torch.long, device=device)
+        self._free_pair_cls = int(rules.seats["freeCityPairClass"])
         self._free_grant_period = int(rules.seats["freeCityGrantPeriod"])
         self._free_grant_w = [int(x) for x in rules.seats["freeCityGrantWeights"]]
         self._free_grant_units = torch.tensor(

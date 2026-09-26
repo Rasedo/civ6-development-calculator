@@ -73,10 +73,12 @@ class SimPhase:
         # measures from the district's tile, the centre's otherwise.
         org = ctr if origin is None else origin.clamp(min=0)
         dist = self.pair_dist[org].to(torch.long)  # [B, T]
-        _mil, _civ = self._visible_military_at(seat), self._civclass_plane()
+        # a strike is a SHOT: a support chassis is a target, a civilian never
+        # (`shootable`), ashore or afloat
+        _mil, _civ = self._visible_military_at(seat), self.support_at
         _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
         _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
-        _emb = self.embarked_at
+        _emb = self._shot_embarked_plane()
         _eseat = torch.where(_emb >= 0, self.unit_seat.gather(1, _emb.clamp(min=0)), torch.full_like(_emb, -1))
         hm = self._seats_hostile(seat, _mseat)
         hc = self._seats_hostile(seat, _cseat)
@@ -94,6 +96,7 @@ class SimPhase:
         _ms_t, _mq_t, _okm, _cs_t, _cq_t, _okc = self._stack_fold(
             tt, seat, _mil[bidx, tt], _mseat[bidx, tt], _okm,
             _civ[bidx, tt], _cseat[bidx, tt], _okc, ranged=True)
+        _okc = self._shot_ok(_cs_t, _okc)
         d_slot = torch.where(_okm, _ms_t, torch.where(_okc, _cs_t, torch.full_like(tt, -1)))
         d_seat = torch.where(_okm, _mq_t, torch.where(_okc, _cq_t, torch.full_like(tt, -1)))
         ds0 = d_slot.clamp(min=0)
@@ -621,16 +624,22 @@ class SimPhase:
                 if win >= 0 and bool(self._skips_free_city(win)[b]):
                     self._transfer_city(b, row, j, win, conquest=False)
                 else:
+                    pair = self._free_pair_type(row)
                     self._transfer_city(b, row, j, self.FREE_ROW, conquest=False)
-                    # the revolt GRANTS the Free City the world era's melee
-                    # pair on the flip turn itself (`flipCity`)
+                    # the revolt GRANTS the Free City the former owner's best
+                    # melee pair on the flip turn itself (`flipCity`)
                     one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                     one[b] = True
                     fcol = self.centre_slot_at[:, int(here[b])].clamp(min=0)
-                    era = self._world_era().clamp(min=0, max=self._free_pair.numel() - 1)
-                    pair = self._free_pair[era]
                     for _k in range(self._free_pair_n):
                         self._grant_free_unit(one, fcol, pair)
+
+    def _free_pair_type(self, row: int) -> torch.Tensor:
+        """[B] long — `freeCityPairType`: the strongest chassis of the pair's
+        class the FORMER OWNER row's techs and civics unlock (a grant asks no
+        strategic resource), ties by catalog order; -1 where none."""
+        train = self._trainable_in(self._seat_techs(row), self._seat_civics(row), True)
+        return self._minor_best_of_class(train, self._free_pair_cls)
 
     def _grant_free_unit(self, mask: torch.Tensor, col: torch.Tensor, unit_type: torch.Tensor) -> None:
         """`grantFreeCityUnit` for the Free City in column `col` [B] of the

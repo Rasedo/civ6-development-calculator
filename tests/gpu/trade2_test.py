@@ -366,8 +366,8 @@ def main() -> None:
 
     # --- SEA LEGS: the water level, the two ranges, and roads on land only --
     # CIV6: "The base range for land trade routes is 15 tiles ... The base range
-    # for sea trade routes is 30 tiles"; Celestial Navigation opens Coast and
-    # Cartography opens Ocean.
+    # for sea trade routes is 30 tiles"; Celestial Navigation opens the water,
+    # Ocean included — the lab's route crossed Ocean with no Cartography.
     s8 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert s8._trade_sea_range == 2 * s8._trade_range, (s8._trade_sea_range, s8._trade_range)
     assert s8._celestial_tech >= 0 and s8._cartography_tech >= 0
@@ -378,20 +378,19 @@ def main() -> None:
     s8.civ_techs[:, row, s8._celestial_tech] = True
     assert int(s8._trade_water_level(row)[0]) == 1
     s8.civ_techs[:, row, s8._cartography_tech] = True
-    assert int(s8._trade_water_level(row)[0]) == 2
+    assert int(s8._trade_water_level(row)[0]) == 1, "Cartography opens nothing more"
 
-    # a WATER tile is walkable only from level 1, and an OCEAN one from 2
+    # a WATER tile, shallow or Ocean, is walkable from level 1
     water = [t for t in range(s8.T) if bool(s8.wpass[0, t]) and not bool(s8.ocean_tile[0, t])]
     ocean = [t for t in range(s8.T) if bool(s8.ocean_tile[0, t]) and bool(s8.wpass[0, t])]
     assert water, "fixture has no shallow water"
     r1 = torch.zeros(1, dtype=torch.long)
-    for lvl, want in ((0, False), (1, True), (2, True)):
-        got = bool(s8._trade_walkable(r1, torch.tensor([water[0]]), torch.tensor([lvl]))[0])
-        assert got == want, f"shallow water at level {lvl}: {got}"
-    if ocean:
-        for lvl, want in ((1, False), (2, True)):
-            got = bool(s8._trade_walkable(r1, torch.tensor([ocean[0]]), torch.tensor([lvl]))[0])
-            assert got == want, f"ocean at level {lvl}: {got}"
+    for tiles in (water, ocean):
+        if not tiles:
+            continue
+        for lvl, want in ((0, False), (1, True)):
+            got = bool(s8._trade_walkable(r1, torch.tensor([tiles[0]]), torch.tensor([lvl]))[0])
+            assert got == want, f"water tile {tiles[0]} at level {lvl}: {got}"
 
     # MARITIME ACCESS decides which range a pair gets
     yes = torch.ones(s8.B, dtype=torch.bool)
@@ -415,9 +414,11 @@ def main() -> None:
     # check the tile stays roadless.
     s9 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     s9.civ_techs[:, 0, s9._celestial_tech] = True
-    wt = next(t for t in range(s9.T) if bool(s9.wpass[0, t]) and not bool(s9.ocean_tile[0, t]))
-    nb = [int(x) for x in s9.neigh[wt] if int(x) >= 0 and bool(s9.passable[0, int(x)])]
-    assert nb, "the water tile has no passable land neighbour"
+    def _land_nb(t: int) -> list[int]:
+        return [int(x) for x in s9.neigh[t] if int(x) >= 0 and bool(s9.passable[0, int(x)])]
+    wt = next((t for t in range(s9.T) if bool(s9.wpass[0, t]) and _land_nb(t)), -1)
+    assert wt >= 0, "no water tile beside passable land"
+    nb = _land_nb(wt)
     col9 = int(s9.city_alive[0, 0].nonzero()[0])
     s9.seat_routes[0, 0, 0, 0] = int(s9.city_id[0, 0, col9])
     s9.seat_routes[0, 0, 0, 1] = -1
@@ -441,8 +442,7 @@ def main() -> None:
     assert "trading_post" in _MUTABLE and s10.trading_post.dtype == torch.bool
     assert tuple(s10.trading_post.shape) == (s10.B, s10.n_majors, s10.T)
     row10 = 0
-    s10.civ_techs[:, row10, s10._celestial_tech] = False
-    s10.civ_techs[:, row10, s10._cartography_tech] = False  # land ranges only
+    s10.civ_techs[:, row10, s10._celestial_tech] = False  # land ranges only
     colA = int(s10.city_alive[0, row10].nonzero()[0])
     oA = int(s10.city_center[0, row10, colA])
     rngL = s10._trade_range
@@ -560,7 +560,8 @@ def main() -> None:
     assert chained > 0, "no tile reachable only through a post — the cross-check proved nothing"
     print(f"  reach == course walk on every tile ({chained} tiles only a post reaches)")
 
-    # chain gold: each live course city pays 1 + the other civs' posts there
+    # chain gold: a course city pays nothing of its own — the post's +1 is
+    # the path's — and neither does a rival's post there
     s13 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     fid = int(s13.city_id[0, 0, 0])
     assert bool(s13.city_alive[0, 1, 0])
@@ -570,18 +571,72 @@ def main() -> None:
     g_a = float(s13._seat_route_income(0)[0, 0, 2])
     s13.seat_route_chain[0, 0, 0, 0] = mid_c
     s13._eff_version += 1
-    g_b = float(s13._seat_route_income(0)[0, 0, 2])
-    assert g_b - g_a == 1.0, f"one own-post course city should pay 1, paid {g_b - g_a}"
+    assert float(s13._seat_route_income(0)[0, 0, 2]) == g_a, "a course city paid on its own"
     s13.trading_post[0, 1, mid_c] = True
     s13._eff_version += 1
-    g_c = float(s13._seat_route_income(0)[0, 0, 2])
-    assert g_c - g_a == 2.0, "the rival's post at the course city should pay 1 more"
-    dead_t = int((~s13._centre_city_map()[0]).nonzero(as_tuple=True)[0][0])
-    s13.seat_route_chain[0, 0, 0, 1] = dead_t
-    s13._eff_version += 1
-    assert float(s13._seat_route_income(0)[0, 0, 2]) - g_a == 2.0, \
-        "a course entry with no living city must pay nothing"
-    print("  chain gold OK (1 per live course city, +1 per rival post, dead entries dark)")
+    assert float(s13._seat_route_income(0)[0, 0, 2]) == g_a, "a rival's post paid this row"
+    print("  chain gold OK (no course city and no rival post pays of its own)")
+
+    # THE PATH TERM (`routePathGold`): D x min(1, floor(256 S / n) / 256) + T
+    # over the Trader's descent — 2 per railroad plot past the origin, 2 per
+    # water plot, T the crossed foreign cities holding this row's post
+    s15 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    assert (s15._path_water, s15._path_rail, s15._path_portal, s15._path_denom, s15._path_cap) == (2, 2, 15, 256, 256)
+    one_b = torch.zeros(1, dtype=torch.long)
+    wl15 = s15._trade_water_level(0)
+
+    def _walk(a: int, z: int) -> list[int]:
+        cur = torch.tensor([a])
+        out = [a]
+        for _ in range(32):
+            if int(cur[0]) == z:
+                break
+            nxt = s15._trade_walk_step(one_b, cur, torch.tensor([z]), wl15)
+            if int(nxt[0]) == int(cur[0]):
+                return []
+            cur = nxt
+            out.append(int(cur[0]))
+        return out if out[-1] == z else []
+
+    def _pg(a: int, z: int, d: float) -> float:
+        return float(s15._route_path_gold(0, torch.tensor([[a]]), torch.tensor([[z]]),
+                                          torch.tensor([[d]], dtype=torch.float64),
+                                          torch.ones(1, 1, dtype=torch.bool))[0, 0])
+
+    o15 = int(s15.city_center[0, 0, 0])
+    # a foreign city (a major's or a minor's) and a destination past it whose
+    # descent from row 0's city crosses it
+    c1 = far = -1
+    for c in s15._centre_city_map()[0].nonzero(as_tuple=True)[0].tolist():
+        if int(s15.tile_seat[0, c]) == 0 or int(s15.pair_dist[o15, c]) > 20:
+            continue
+        beyond = ((s15.pair_dist[c] <= 3) & (s15.pair_dist[o15] > s15.pair_dist[o15, c])).nonzero(as_tuple=True)[0]
+        far = next((int(t) for t in beyond.tolist() if c in _walk(o15, int(t))[1:-1]), -1)
+        if far >= 0:
+            c1 = c
+            break
+    assert far >= 0, "no descent from row 0's city crosses a foreign city"
+    path = _walk(o15, far)
+    n = len(path)
+    s15.railroad[0] = False
+    base = (s15.water[0, torch.tensor(path[1:])].long() * 2).sum().item()
+    assert _pg(o15, far, 4.0) == 4.0 * min(256, (256 * base) // n) / 256
+    # the crossed foreign city with this row's post pays 1; a rival's own post there nothing
+    s15.trading_post[0, 1, c1] = True
+    assert _pg(o15, far, 0.0) == 0.0
+    s15.trading_post[0, 0, c1] = True
+    assert _pg(o15, far, 0.0) == 1.0, "the crossed city holding this row's post pays 1"
+    # railroads past the origin, one plot at a time, up to D
+    s15.railroad[0, path[0]] = True
+    for k in range(1, n):
+        s15.railroad[0, path[k]] = True
+        want = 4.0 * min(256, (256 * (base + 2 * k)) // n) / 256 + 1.0
+        assert _pg(o15, far, 4.0) == want, (k, _pg(o15, far, 4.0), want)
+    assert _pg(o15, far, 4.0) == 5.0
+    # no descent, no path term: a destination nobody stands on
+    wall = next(t for t in range(s15.T) if not bool(s15.passable[0, t]) and not bool(s15.wpass[0, t]))
+    assert _pg(o15, wall, 4.0) == 0.0
+    print(f"  path term OK ({n} plots: rails to D, the crossed post +1)")
 
     # CIV6 (Land Acquisition): +3 per FOREIGN route whose course crosses the
     # city — Reyna's BASE ability, own routes never counted, dead routes dark

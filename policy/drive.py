@@ -575,11 +575,9 @@ def _seat_unit_orders(st, seat: int, nobs: list):
     A_HX = st.col("REMOVE_HERESY")
     if _live(A_HX):
         orders0 = torch.where(present & um[:, :, A_HX], torch.full_like(orders0, A_HX), orders0)
-    A_CN = st.col("CONDEMN_0")
-    if _live(A_CN, 6):
-        cn = um[:, :, A_CN:A_CN + 6]
-        hit = present & cn.any(dim=2)
-        orders0 = torch.where(hit, A_CN + cn.float().argmax(dim=2), orders0)
+    A_CN = st.col("CONDEMN")
+    if _live(A_CN):
+        orders0 = torch.where(present & um[:, :, A_CN], torch.full_like(orders0, A_CN), orders0)
     A_PM = st.col("PROMOTE_0")
     if _live(A_PM, st.promo_cols):
         pm = um[:, :, A_PM:A_PM + st.promo_cols]

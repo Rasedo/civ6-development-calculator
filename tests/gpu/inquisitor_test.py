@@ -184,25 +184,34 @@ def test_condemn(sim) -> None:
 
     smap = sim._seat_slot_map(ROW)
     rank = int((smap[0] == sol + sim.POOL_LO["major"]).long().argmax())
-    d = [i for i, n in enumerate(sim.neigh[t_mil].tolist()) if n == t_rel][0]
 
-    # CIV6: "Must be at war with the owner of the religious unit."
+    # CIV6: "Must be at war with the owner of the religious unit." The lab:
+    # the verb is the heretic's OWN tile's, never an adjacent one's.
+    sim.war[:, ROW, 1] = True
+    sim.war[:, 1, ROW] = True
+    assert not bool(sim._seat_unit_mask(ROW)[0, rank, sim._A_CONDEMN]), \
+        "Condemn offered from beside the heretic"
+    sim.military_at[0, t_mil] = -1
+    sim.major_unit_tile[0, sol] = t_rel
+    sim.military_at[0, t_rel] = sol + sim.POOL_LO["major"]
     sim.war[:, ROW, 1] = False
     sim.war[:, 1, ROW] = False
-    assert not bool(sim._seat_unit_mask(ROW)[0, rank, sim._A_CONDEMN + d]), \
+    assert not bool(sim._seat_unit_mask(ROW)[0, rank, sim._A_CONDEMN]), \
         "Condemn offered at peace"
     sim.war[:, ROW, 1] = True
     sim.war[:, 1, ROW] = True
-    assert bool(sim._seat_unit_mask(ROW)[0, rank, sim._A_CONDEMN + d]), \
-        "Condemn shut against an adjacent enemy religious unit at war"
+    assert bool(sim._seat_unit_mask(ROW)[0, rank, sim._A_CONDEMN]), \
+        "Condemn shut on the tile of an enemy religious unit at war"
 
     sim.city_pressure[0, ROW, 0, 1] = 400
-    order(sim, ROW, sol, sim._A_CONDEMN + d)
+    order(sim, ROW, sol, sim._A_CONDEMN)
     assert not bool(sim.major_unit_alive[0, heretic]), "Condemn did not kill the religious unit"
     assert int(sim.civilian_at[0, t_rel]) < 0, "the condemned unit still holds its tile"
+    assert int(sim.military_at[0, t_rel]) == sol + sim.POOL_LO["major"], "the condemner left its tile"
+    assert int(sim.major_unit_mp[0, sol]) == 0, "Condemn did not end the condemner's moves"
     got = int(sim.city_pressure[0, ROW, 0, 1])
     assert got == 400 - sim._condemn_swing, f"the loser's pressure fell to {got}"
-    print("  condemn OK — a war, a kill, and only the loser's halved swing")
+    print("  condemn OK — its own tile, a war, a kill, and only the loser's halved swing")
 
 
 def test_theological(sim) -> None:

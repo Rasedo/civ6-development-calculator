@@ -2,6 +2,7 @@
 tests/cpu/victory/score-victory.test.ts.
 
 `score_lines` counts the install's ScoringLineItems (cpu/data/scoring.ts): the
+buildings the cities hold 1 (the Palace and pillaged ones included), the
 whole game's era score, civics 3, cities 5, completed districts 2 (a completed
 wonder's own district included), citizens 1, Great People earned 5, the
 founded religion's beliefs 5, techs 2, completed wonders 15. Past the turn
@@ -39,6 +40,7 @@ def level(sim) -> None:
         sim.era_score[B0, r] = 0
         sim.era_score_past[B0, r] = 0
         sim.civ_gp_earned[B0, r] = 0
+        sim.city_bldg[B0, r] = False
         for p in ("civ_follower", "civ_founder", "civ_enhancer"):
             getattr(sim, p)[B0, r] = -1
         alive = sim.city_alive[B0, r, : sim.RC]
@@ -62,9 +64,9 @@ def free_ring(sim, centre: int, n: int) -> list[int]:
 def test_counts(rules, path) -> None:
     sim = fresh(rules, path)
     lines = [ln["count"] for ln in sim.rules.scoring]
-    assert lines == ["eraScore", "civics", "cities", "districts", "population",
+    assert lines == ["buildings", "eraScore", "civics", "cities", "districts", "population",
                      "greatPeople", "religion", "techs", "wonders"], lines
-    assert [int(ln["value"]) for ln in sim.rules.scoring] == [1, 3, 5, 2, 1, 5, 5, 2, 15]
+    assert [int(ln["value"]) for ln in sim.rules.scoring] == [1, 1, 3, 5, 2, 1, 5, 5, 2, 15]
     r = 0
     plant_city(sim, r)
     cols = sim.city_alive[B0, r, : sim.RC].nonzero(as_tuple=True)[0].tolist()
@@ -101,8 +103,16 @@ def test_counts(rules, path) -> None:
     sim.civ_enhancer[B0, r] = 0
     sim.era_score[B0, r] = 9
     sim.era_score_past[B0, r] = 30
+    # the capital's Palace, a Monument and a pillaged Granary are buildings;
+    # the wonders are not
+    bids = [bd["id"] for bd in sim.rules.buildings]
+    assert bool(sim.city_is_cap[B0, r, a]) and not bool(sim.city_is_cap[B0, r, b])
+    sim.city_bldg[B0, r] = False
+    sim.city_bldg[B0, r, a, bids.index("MONUMENT")] = True
+    sim.city_bldg[B0, r, b, bids.index("GRANARY")] = True
+    sim.city_bldg_pillaged[B0, r, b, bids.index("GRANARY")] = True
     got = dict(zip(lines, (int(x) for x in sim.score_lines(r)[B0].tolist())))
-    want = {"eraScore": 39, "civics": 6, "cities": 10, "districts": 4, "population": 7,
+    want = {"buildings": 3, "eraScore": 39, "civics": 6, "cities": 10, "districts": 4, "population": 7,
             "greatPeople": 10, "religion": 15, "techs": 6, "wonders": 15}
     assert got == want, f"score lines {got}, wanted {want}"
     print(f"  1 counts OK — {got}")
@@ -134,6 +144,14 @@ def test_ties(rules, path) -> None:
     sim.era_score[B0, 1] = 4
     assert total(sim, 0) == total(sim, 1)
     assert int(sim.leader()[B0]) == 1, "the era line breaks the tie"
+    # the building line (1030) outranks the era (1010)
+    sim = fresh(rules, path)
+    level(sim)
+    sim.era_score[B0, 0] = 1
+    c1 = int(sim.city_alive[B0, 1, : sim.RC].nonzero(as_tuple=True)[0][0])
+    sim.city_bldg[B0, 1, c1, [bd["id"] for bd in sim.rules.buildings].index("MONUMENT")] = True
+    assert total(sim, 0) == total(sim, 1)
+    assert int(sim.leader()[B0]) == 1, "the building line breaks the tie"
     # the civic line (100) outranks the techs (40)
     sim = fresh(rules, path)
     level(sim)
@@ -147,7 +165,8 @@ def test_ties(rules, path) -> None:
     sim.civ_techs[B0, 1, :3] = True
     sim.city_alive[B0, 1] = False
     assert int(sim.leader()[B0]) == 0, "a seat with no city won the Score"
-    print("  3 ties OK — era line, then civics over techs, then the lower row; a cityless seat never")
+    print("  3 ties OK — the building line over the era line over the techs, civics over techs, then the lower row;"
+          " a cityless seat never")
 
 
 def test_turn_limit(rules, path) -> None:

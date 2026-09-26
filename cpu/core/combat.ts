@@ -30,10 +30,10 @@ import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, unitReligious } from './units';
 import { nextRandom } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
-import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom, interceptorAgainst, priorityDefender, INTERCEPT_SUPPORT_CS } from './air';
+import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_CITY_CS, ENVOY_CITY_CS, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_DAMAGE_SCALE, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
@@ -749,6 +749,18 @@ export function stackDefenceCS(state: GameState, u: Unit): number {
     + formationCS(u) + convoyCS(state, u) - fuelShortCS(state, u);
 }
 /**
+ * May a SHOT take this unit — a ranged attack, a city's or an Encampment's
+ * strike, an air strike? Never a civilian, a religious unit included, ashore
+ * or embarked: `CombatManager.CanAttackTarget` refused a Missionary, an
+ * Apostle and a Builder to every ranged attacker and to a walled city's
+ * strike, from every owner (runs/religious_target_20260926T_*.jsonl),
+ * and accepted every combat unit. A support chassis stays a target.
+ */
+export function shootable(u: Unit): boolean {
+  return unitDomain(u.type) !== 'civilian';
+}
+
+/**
  * Who takes the blow on a STACKED hex. CIV6 (Combat): "When a naval unit and an
  * embarked unit occupy the same hex, the unit with the higher Combat Strength
  * will defend against ranged attacks" — and the page's own note that "strong
@@ -1012,13 +1024,34 @@ export function rangedCityPenalty(unitType: string, outerHp: number): number {
   return outerHp > 0 ? RANGED_CITY_PENALTY : 0;
 }
 
-/** The base a holder's centres and Encampments stand on: the strongest melee
- *  unit the seat has fielded (`Seat.bestMeleeCS`, a city-state's included),
- *  floored at 15 — and for the Free Cities player a flat base of its own,
- *  measured at 72 with no walls standing. */
+/** The base a holder's centres and Encampments stand on: max(the start era's
+ *  melee strength — a major's and a minor's each its own row — the strongest
+ *  melee unit the seat has fielded, `Seat.bestMeleeCS`) - 10
+ *  (`CITY_BASE_MELEE_CUT`); for the Free Cities player a flat base of its
+ *  own, measured at 72 with no walls standing. */
 function holderStrength(state: GameState, seat: number): number {
   if (isFreeSeat(seat)) return FREE_CITY_DEFENSE;
-  return Math.max(15, seatOf(state, seat)?.bestMeleeCS ?? 0);
+  const start = isCityStateSeat(seat) ? CITY_START_MELEE_MINOR : CITY_START_MELEE_MAJOR;
+  return Math.max(start, seatOf(state, seat)?.bestMeleeCS ?? 0) - CITY_BASE_MELEE_CUT;
+}
+
+/**
+ * THE GARRISON TERM — what a land military unit of the holder standing on the
+ * centre adds: max(0, its Combat - `base`) x (1 - damage / 200), measured on
+ * the preview (`GARRISON_DAMAGE_SCALE`), written as one product over one
+ * division so the GPU's float64 lands on the same double. With several on
+ * the centre, the strongest by this term. A naval unit, an aircraft and a
+ * passenger are no garrison.
+ */
+function garrisonCS(state: GameState, city: City, base: number): number {
+  let best = 0;
+  for (const u of unitsAt(state, city.centerIndex)) {
+    if (u.seat !== city.seat || unitDomain(u.type) !== 'military' || UNITS[u.type]?.naval || u.embarked) continue;
+    const over = Math.max(0, (UNITS[u.type]?.combat ?? 0) - base);
+    const g = (over * (GARRISON_DAMAGE_SCALE - (UNIT_HP - u.hp))) / GARRISON_DAMAGE_SCALE;
+    if (g > best) best = g;
+  }
+  return best;
 }
 
 /**
@@ -1030,23 +1063,24 @@ function holderStrength(state: GameState, seat: number): number {
  *   districts (`DistrictDef.cityStrength`);
  * - each pre-modern walls tier's "+3 Combat Strength", stacking;
  * - the Palace's +3 where the city holds it (a city-state's city does);
- * - a garrison's +10: a military unit of the holder on the centre. The
- *   Encampment asks without it (`garrisoned` false) — CIV6: it fights
- *   "similar to the parent City Center, excluding any bonus obtained for a
- *   Garrisoned unit";
+ * - the garrison term (`garrisonCS`). The Encampment asks without it
+ *   (`garrisoned` false) — CIV6: it fights "similar to the parent City
+ *   Center, excluding any bonus obtained for a Garrisoned unit";
  * - a city-state's +1 per envoy it holds (`envoysReceived`).
- * The governor and policy terms ride on top in `cityDefenseStrength` and
- * `cityStrikeStrength`. The GPU twin is `_centre_strength`.
+ * The garrison term is fractional, so the strength is; the damage law takes
+ * it as it stands. The governor and policy terms ride on top in
+ * `cityDefenseStrength` and `cityStrikeStrength`. The GPU twin is
+ * `_centre_strength`.
  */
 export function centreStrength(state: GameState, city: City, garrisoned = true): number {
-  let n = holderStrength(state, city.seat) + (WALLS_TIER_CS[wallsTier(state, city)] ?? 0);
+  const base = holderStrength(state, city.seat);
+  let n = base + (WALLS_TIER_CS[wallsTier(state, city)] ?? 0);
   for (const d of city.districts) {
     const t = state.map.tiles[d.tileIndex];
     if (t.districtComplete && !t.districtPillaged) n += DISTRICTS[d.type].cityStrength;
   }
   if (city.buildings.includes('PALACE')) n += PALACE_CITY_CS;
-  if (garrisoned && unitsAt(state, city.centerIndex).some(
-    (u) => u.seat === city.seat && unitDomain(u.type) === 'military')) n += GARRISON_CITY_CS;
+  if (garrisoned) n += garrisonCS(state, city, base);
   if (isCityStateSeat(city.seat)) {
     const minor = seatOf(state, city.seat) as CityState | undefined;
     if (minor) n += envoysReceived(minor) * ENVOY_CITY_CS;
@@ -1623,7 +1657,7 @@ function disciplesSpread(
  *  sieging a peaceful city-state) reads as one diff line. */
 export function meleeAttack(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const r = meleeAttackInner(state, attackerId, targetIndex, seat);
-  if (r.ok) {
+  if (r.ok && r !== MOVED_ONTO) {
     const u = state.units.find((x) => x.id === attackerId);
     if (u) {
       markStealthAttack(state, u);
@@ -1632,6 +1666,9 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   }
   return r;
 }
+/** a melee order that became a MOVE onto a religious unit's tile: no attack
+ *  is spent or revealed, and `stepUnit` logs the step itself */
+const MOVED_ONTO: RuleResult = { ok: true, reason: 'Moved onto a religious unit.' };
 function meleeAttackInner(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId);
   if (!attacker) return no('No such unit.');
@@ -1649,8 +1686,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   }
   if (!amphibiousReach(state, attacker, targetIndex)) return no('Embarked units strike an open shore only.');
 
+  // A RELIGIOUS unit is no melee defender and is never taken: a melee order
+  // onto one is a MOVE — the attacker shares its tile and nothing happens to
+  // it (runs/religious_target_20260926T_fire.jsonl; a barbarian's
+  // too). Onto a Builder it still captures.
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type) && !unitReligious(u.type)
       && unitVisibleTo(state, u, attacker.seat),
   );
   const seatTarget = (() => {
@@ -1674,6 +1715,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // city/Encampment stands" — the same district-first rule the centre gets
   // below, and the conquest is what destroys the shelterers.
   const encamp = encampmentDefense(state, attacker, target);
+  if (enemies.length === 0 && !seatTarget && !cityStateTarget && !encamp && !isWater(target) && !def.naval
+      && unitsAt(state, targetIndex).some((u) => unitReligious(u.type) && unitsHostile(state, attacker, u)
+        && unitVisibleTo(state, u, attacker.seat))) {
+    const r = stepUnit(state, attacker, target);
+    return r === 'moved' || r === 'halted' ? MOVED_ONTO : no('Cannot move there.');
+  }
   if (enemies.length === 0 && !seatTarget && !cityStateTarget && !encamp) {
     const civCityHere = cityAtIndex(state, targetIndex);
     if (civCityHere && !unitsHostile(state, attacker, { seat: civCityHere.holder.seat })) {
@@ -1790,29 +1837,63 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   return ok;
 }
 
-/** One answer a sortie takes, rolled against the AIRCRAFT, which is the
- *  defender of this roll. The anti-air gun, the anti-air hull and the
- *  intercepting fighter share this body: the answerer's strength against
- *  an aircraft (`airDefenseOf`) plus `support`, against the plane's Ranged
- *  Strength. `vsAntiAir` says the answerer is an anti-air weapon, which the
- *  "+7 Combat Strength when defending vs. anti-air" rows ask
- *  (OPPONENT_IS_ANTI_AIR_REQUIREMENT, tag CLASS_ANTI_AIR); a fighter is
- *  none. `at` is the hex the answerer fights from. */
-function airAnswer(
-  state: GameState, attacker: Unit, answerer: Unit, support: number, vsAntiAir: boolean,
-  k: string, at: number, targetIndex: number,
-): void {
+/** THE SEAT-PAIR TERMS an air sub-combat carries — the emergencies' and the
+ *  Military alliance's. Both satisfy `REQUIREMENT_COMBAT_UNIT_VS_UNIT`, and
+ *  the lab read the alliance's +5 once per sub-combat of a sortie (the
+ *  anti-air burst, the interception, the strike; lab4_t225). The
+ *  emergency term is the attacker's net difference, written on the sortie's
+ *  plane; the alliance term rides each side for its own seat. */
+function airPlaneTerms(state: GameState, plane: Unit, foe: Unit): number {
+  return emergencyAttackCS(state, plane.seat, foe.seat) + allianceWarCS(state, plane.seat, foe.seat);
+}
+
+/** The ANTI-AIR BURST a sortie takes, rolled against the AIRCRAFT, which is
+ *  the defender of this one-sided roll: the weapon's strength against an
+ *  aircraft (`airDefenseOf`) against the plane's Ranged Strength, each side
+ *  with its seat-pair terms. The weapon asks the "+7 Combat Strength when
+ *  defending vs. anti-air" rows (OPPONENT_IS_ANTI_AIR_REQUIREMENT, tag
+ *  CLASS_ANTI_AIR) of the plane. */
+function airCoverAnswer(state: GameState, attacker: Unit, answerer: Unit, targetIndex: number): void {
   const fromTile = state.map.tiles[attacker.tileIndex];
-  const ansE = airDefenseOf(state, answerer) - woundPenalty(answerer) + support
+  const ansE = airDefenseOf(state, answerer) - woundPenalty(answerer)
     + promoCS(answerer, {
       attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
-      tile: state.map.tiles[at],
-    });
+      tile: state.map.tiles[answerer.tileIndex],
+    })
+    + allianceWarCS(state, answerer.seat, attacker.seat);
   const airD = (UNITS[attacker.type]?.ranged?.strength ?? 0) - woundPenalty(attacker)
     + promoCS(attacker, {
-      attacking: false, vsAntiAir, foeType: answerer.type, tile: fromTile,
-    });
-  attacker.hp -= damageRoll(state, ansE - airD, k, targetIndex);
+      attacking: false, vsAntiAir: true, foeType: answerer.type, tile: fromTile,
+    })
+    + airPlaneTerms(state, attacker, answerer);
+  attacker.hp -= damageRoll(state, ansE - airD, 'airc', targetIndex);
+}
+
+/** THE INTERCEPTION — a TWO-SIDED combat at the ordinary damage law, as the
+ *  preview measures it (runs/air_patrol_20260926T.jsonl): the interceptor at
+ *  its Combat (a Biplane 80, not its Ranged 75) plus the other patrols'
+ *  support, against the plane at its Combat (a Bomber 85, not its Bombard),
+ *  each with its seat-pair terms; both take damage (Δ3: 34 to the bomber, 27
+ *  to the fighter). The interceptor's damage is drawn first, as a struck
+ *  defender's is, then the plane's. A side at 0 HP or less is gone. */
+function interceptFight(
+  state: GameState, attacker: Unit, icp: { unit: Unit; support: number }, targetIndex: number,
+): void {
+  const it = icp.unit;
+  const iE = (UNITS[it.type]?.combat ?? 0) - woundPenalty(it) + icp.support
+    + promoCS(it, {
+      attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
+      tile: state.map.tiles[it.patrol!],
+    })
+    + allianceWarCS(state, it.seat, attacker.seat);
+  const aE = (UNITS[attacker.type]?.combat ?? 0) - woundPenalty(attacker)
+    + promoCS(attacker, {
+      attacking: false, foeType: it.type, tile: state.map.tiles[attacker.tileIndex],
+    })
+    + airPlaneTerms(state, attacker, it);
+  it.hp -= damageRoll(state, aE - iE, 'airid', targetIndex);
+  attacker.hp -= damageRoll(state, iE - aE, 'airi', targetIndex);
+  if (it.hp <= 0) disbandUnit(state, it.id);
 }
 
 /**
@@ -1823,22 +1904,21 @@ function airAnswer(
  * another fighter on its way to a ground target, it is forced to only engage
  * the enemy fighter and will not attack the ground target. Bombers do not
  * have this restriction." The patrol answers first (`interceptorAgainst`,
- * its backers' +5 apiece), then the anti-air cover (`airCoverAgainst`: a
- * parked weapon "provides cover from air attacks up to 1 hex away", and
- * "SHIPS with the Anti-Air Strength stat" answer for their own hex). A plane
- * shot down leaves; a fighter turned back has spent its sortie. True when the
- * plane flies on to its target.
+ * `interceptFight`), then the anti-air cover (`airCoverAgainst`: a parked
+ * weapon "provides cover from air attacks up to 1 hex away", and "SHIPS with
+ * the Anti-Air Strength stat" answer for their own hex). A plane shot down
+ * leaves; a fighter turned back has spent its sortie. True when the plane
+ * flies on to its target.
  */
 function airAnswers(state: GameState, attacker: Unit, targetIndex: number): boolean {
   const icp = interceptorAgainst(state, attacker, targetIndex);
   if (icp) {
-    airAnswer(state, attacker, icp.unit, INTERCEPT_SUPPORT_CS * icp.others, false, 'airi',
-      icp.unit.patrol!, targetIndex);
+    interceptFight(state, attacker, icp, targetIndex);
     if (attacker.hp <= 0 || UNITS[attacker.type]?.air === 'FIGHTER') return sortieEnded(state, attacker);
   }
   const cover = airCoverAgainst(state, attacker, targetIndex);
   if (cover) {
-    airAnswer(state, attacker, cover, 0, true, 'airc', cover.tileIndex, targetIndex);
+    airCoverAnswer(state, attacker, cover, targetIndex);
     if (attacker.hp <= 0) return sortieEnded(state, attacker);
   }
   return true;
@@ -1896,7 +1976,9 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
  * Combat Strength if it doesn't have any".
  *
  * `priority` is PRIORITY TARGET: the tile's Support-class unit takes the blow
- * (`priorityDefender`), whoever else stands there.
+ * (`priorityDefender`), whoever else stands there, at the flat
+ * `PRIORITY_TARGET_DAMAGE` and with no answers. A civilian is never struck
+ * (`shootable`).
  */
 export function airStrike(
   state: GameState, attackerId: number, targetIndex: number, seat: number, priority = false,
@@ -1922,31 +2004,42 @@ export function airStrike(
     return r;
   }
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type) && shootable(u)
       && unitVisibleTo(state, u, attacker.seat),
   );
   if (enemies.length === 0) return { ok: false, reason: 'Nothing to strike.' };
   attacker.patrol = undefined;
   logUnitOrder(state, seat, attackerId, 'ranged', targetIndex);
-  if (!airAnswers(state, attacker, targetIndex)) return { ok: true };
+  if (support) {
+    // PRIORITY TARGET, as fired: a flat share of the support unit's hit
+    // points, no draw, no answer from the ground or the air, nothing back
+    // (`PRIORITY_TARGET_DAMAGE`).
+    support.hp -= PRIORITY_TARGET_DAMAGE;
+  } else {
+    if (!airAnswers(state, attacker, targetIndex)) return { ok: true };
+  }
   // CIV6 (Air combat): "all air attacks are ranged", so the naval hex's
   // higher-chassis rule answers this blow too.
   const defender = support ?? stackDefender(state, enemies, true);
-  const atk = UNITS[attacker.type]?.ranged?.strength ?? 0;
-  const def = airDefenseOf(state, defender);
-  // CIV6 (Air combat): "all air attacks are ranged", so the sortie is a ranged
-  // roll and both trees speak into it — the striker's class terms, and the
-  // defender's own "+7 Combat Strength when defending vs. air attacks".
-  const fromTile = state.map.tiles[attacker.tileIndex];
-  const atkE = atk - woundPenalty(attacker)
-    + promoCS(attacker, { attacking: true, ranged: true, foeType: defender.type, tile: fromTile })
-    + emergencyAttackCS(state, attacker.seat, defender.seat);
-  const defE = def - woundPenalty(defender)
-    + promoCS(defender, {
-      attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
-      tile: state.map.tiles[targetIndex],
-    });
-  defender.hp -= damageRoll(state, atkE - defE, 'air', targetIndex);
+  if (!support) {
+    const atk = UNITS[attacker.type]?.ranged?.strength ?? 0;
+    const def = airDefenseOf(state, defender);
+    // CIV6 (Air combat): "all air attacks are ranged", so the sortie is a
+    // ranged roll and both trees speak into it — the striker's class terms,
+    // the defender's own "+7 Combat Strength when defending vs. air attacks",
+    // and each side's seat-pair terms.
+    const fromTile = state.map.tiles[attacker.tileIndex];
+    const atkE = atk - woundPenalty(attacker)
+      + promoCS(attacker, { attacking: true, ranged: true, foeType: defender.type, tile: fromTile })
+      + airPlaneTerms(state, attacker, defender);
+    const defE = def - woundPenalty(defender)
+      + promoCS(defender, {
+        attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
+        tile: state.map.tiles[targetIndex],
+      })
+      + allianceWarCS(state, defender.seat, attacker.seat);
+    defender.hp -= damageRoll(state, atkE - defE, 'air', targetIndex);
+  }
   spendAttack(attacker, true);
   awardBattleXp(state, attacker, defender,
     { ranged: true, aDied: false, dDied: defender.hp <= 0 });
@@ -1991,7 +2084,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     return no('Out of range.');
   }
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type) && shootable(u)
       && unitVisibleTo(state, u, attacker.seat),
   );
   // Ranged units CAN bombard cities — same fallback
@@ -2162,7 +2255,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   // on a centre this strike could otherwise reach therefore makes the strike a
   // no-op rather than a hit.
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type) && shootable(u)
       && !(isCiv(attacker.seat) && isCiv(u.seat))
       && unitVisibleTo(state, u, attacker.seat),
   );
@@ -2203,7 +2296,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     if (d < 1 || d > range) continue;
     if (!amphibiousReach(state, unit, t.index)) continue;
     const hasEnemy = unitsAt(state, t.index).some(
-      (u) => unitsHostile(state, unit, u) && !(def.ranged && isCiv(unit.seat) && isCiv(u.seat))
+      (u) => unitsHostile(state, unit, u) && !(def.ranged && (isCiv(unit.seat) && isCiv(u.seat) || !shootable(u)))
         && unitVisibleTo(state, u, unit.seat),
     );
     const holder = cityAtIndex(state, t.index);

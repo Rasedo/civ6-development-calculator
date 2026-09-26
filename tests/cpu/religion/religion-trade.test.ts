@@ -9,7 +9,7 @@ import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics, standBuil
 import { foundCity, canFoundReligion, adoptBeliefs, canEnhanceReligion, enhanceableClasses, buyWorshipBuilding, purchaseReligiousUnit, endTurn, beliefPicks, evangelizeOk, evangelizeBelief } from '../../../cpu/core/game';
 import { applySeatActionRecord, applySeatUnitOrders } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
-import { IMPROVEMENT_IDS, unitActionIndex, unitActionNames } from '../../../cpu/core/unitActions';
+import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
 import { maskCtx, unitMask } from '../../../cpu/core/unitMask';
 import { seatBuildingSum } from '../../../cpu/core/city';
 import { scoreLines } from '../../../cpu/core/score';
@@ -164,7 +164,6 @@ describe('founding a religion', () => {
     state.sandbox = false;
     const a = apostle(state, city);
     const col = unitActionIndex(IMPROVEMENT_IDS).EVANGELIZE_BELIEF;
-    expect(unitActionNames(IMPROVEMENT_IDS).at(-1)).toBe('EVANGELIZE_BELIEF');
     expect(unitMask(maskCtx(state, 0), a)).toContain(col);
     const units = state.units.filter((u) => u.seat === 0);
     applySeatUnitOrders(state, s, [units.map((u) => (u === a ? col : -1))]);

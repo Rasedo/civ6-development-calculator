@@ -128,12 +128,18 @@ export const FREE_CITY_DEFENSE = srcConst('seats.freeCityDefense', 72, {
 const FREE_CITY_CENSUS = 'C-60: runs/cs_watch_obs1_20260923T173434Z.jsonl, runs/cs_watch_obs2_20260923T173434Z.jsonl,'
   + ' runs/cs_watch_lab4_20260923T135005Z.jsonl, runs/rebel_watch_rebel3b_20260924T043843Z.jsonl,'
   + ' runs/rebel_watch_rebel3c_20260924T043919Z.jsonl and the other cs_watch games';
-/** A revolt hands the Free City this many of the WORLD era's melee chassis on
- *  the flip turn itself (`eraUnitOfClass`: Swordsman, Man-at-Arms, Musketman,
- *  Line Infantry, Infantry, Mechanized Infantry as the eras run). */
+/** A revolt hands the Free City this many of the FORMER OWNER's best chassis
+ *  of FREE_CITY_PAIR_CLASS on the flip turn itself (`freeCityPairType`: the
+ *  strongest the owner's techs and civics unlock; a grant asks no strategic
+ *  resource). */
 export const FREE_CITY_PAIR_COUNT = srcConst('seats.freeCityPairCount', 2, {
   lab: `${FREE_CITY_WATCH}: two UNIT_MAN_AT_ARMS of player 62 beside the centre on the flip turn (115);`
     + ` ${FREE_CITY_CENSUS}: two of the era's melee at the first read of the Free City`,
+});
+export const FREE_CITY_PAIR_CLASS = srcConst('seats.freeCityPairClass', 'MELEE' as const, {
+  lab: 'runs/c38s1_watch_c38s1_ext1_20260926T084640Z.jsonl (tools/civ6lab/c60s2_fate.py, 14 flips): the pair\'s'
+    + ' melee type orders with the former owner\'s tech count on 12 of 12 — Warriors at 13 techs, Swordsmen'
+    + ' at 14, Line Infantry at 38, Infantry at 56 — whatever the world era',
 });
 /** ...then ONE unit every this many of the city's turns while it stays Free,
  *  the flip turn counted as its first: the 5th, the 10th, ... — a grant, not

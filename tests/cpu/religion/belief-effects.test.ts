@@ -122,10 +122,11 @@ describe('Enhancer beliefs', () => {
       rel1.founded = true;
       rel1.enhancer = enhancer;
       city.religionPressure = [0, 500];
-      const heretic = spawnUnit(state, 'MISSIONARY', city.centerIndex, 1)!;
+      spawnUnit(state, 'MISSIONARY', city.centerIndex, 1);
       const soldier = spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!;
+      soldier.tileIndex = city.centerIndex;   // an own-tile verb: it shares the heretic's tile
       setWar(state, 0, 1, true);
-      expect(condemnHeretic(state, soldier, heretic.tileIndex).ok).toBe(true);
+      expect(condemnHeretic(state, soldier).ok).toBe(true);
       expect(city.religionPressure![1]).toBe(500 - lost);
     }
   });

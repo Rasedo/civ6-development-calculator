@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { neighbors, tilesWithin } from '../../../world/hex';
-import { eraUnitOfClass, flipCity, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
+import { eraUnitOfClass, flipCity, freeCityPairType, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { computeCityStats, luxuryAmenities } from '../../../cpu/core/city';
@@ -162,9 +162,8 @@ describe('the Free City step', () => {
 
   it("each era's chassis of a class follows the install's upgrade chain and unlock eras", () => {
     const at = (cls: Parameters<typeof eraUnitOfClass>[0]) => ERAS.map((_, e) => eraUnitOfClass(cls, e));
-    // CIV6 (Units.PrereqTech's era, UnitUpgrades): the measured pairs —
-    // Swordsman, Man-at-Arms, Musketman, Line Infantry, Infantry, Mechanized
-    // Infantry — are the melee chain's era by era
+    // CIV6 (Units.PrereqTech's era, UnitUpgrades): the recurring grants'
+    // chassis, class by class and era by era
     expect(at('MELEE')).toEqual(['WARRIOR', 'SWORDSMAN', 'MAN_AT_ARMS', 'MUSKETMAN', 'LINE_INFANTRY',
       'INFANTRY', 'INFANTRY', 'MECHANIZED_INFANTRY', 'MECHANIZED_INFANTRY']);
     expect(at('RANGED')).toEqual(['ARCHER', 'ARCHER', 'CROSSBOWMAN', 'CROSSBOWMAN', 'FIELD_CANNON',
@@ -175,18 +174,18 @@ describe('the Free City step', () => {
       'RANGER', 'SPEC_OPS', 'SPEC_OPS', 'SPEC_OPS']);
   });
 
-  it("a revolt grants the world era's melee pair beside the centre, then a unit every fifth of its turns", () => {
+  it("a revolt grants the former owner's best melee pair beside the centre, then a unit every fifth of its turns", () => {
     const { state, border } = scene(30);
     border.loyalty = 0;
+    const pair = freeCityPairType(state, border.seat);
     flipCity(state, border);
     const city = state.freeSeat!.cities[0];
     const centre = state.map.tiles[city.centerIndex];
     const free = () => state.units.filter((u) => u.seat === FREE_SEAT);
-    // CIV6 (the live watches): the world era's melee, twice, on the flip turn
-    // itself, on the first free tiles beside the centre in direction order —
-    // this world has researched nothing, so the Ancient era's Warrior
+    // CIV6 (the live watches): the former owner's best melee, twice, on the
+    // flip turn itself, on the first free tiles beside the centre in
+    // direction order — seat 0 has researched nothing, so the Warrior
     const era = Math.max(0, worldEraIndex(state));
-    const pair = eraUnitOfClass('MELEE', era);
     expect(pair).toBe('WARRIOR');
     const want = neighbors(state.map, centre).filter((t) => !isWater(t)).slice(0, FREE_CITY_PAIR_COUNT);
     expect(free().map((u) => u.type)).toEqual(Array(FREE_CITY_PAIR_COUNT).fill(pair));
@@ -219,15 +218,28 @@ describe('the Free City step', () => {
     expect(free().every((u) => !isBarbSeat(u.seat) && u.xp === undefined)).toBe(true);
   });
 
-  it('a later era grants its own chassis: the pair is the Swordsman once anyone reaches the Classical', () => {
+  it("the pair follows the former owner's techs, not the world era", () => {
+    // the rival's Iron Working (Classical) lifts the world era; seat 0 still
+    // gives Warriors
+    const behind = scene(30);
+    behind.rival.research.techs.push('IRON_WORKING');
+    expect(worldEraIndex(behind.state)).toBe(1);
+    behind.border.loyalty = 0;
+    flipCity(behind.state, behind.border);
+    expect(behind.state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.type))
+      .toEqual(Array(FREE_CITY_PAIR_COUNT).fill('WARRIOR'));
+    // seat 0's own Iron Working gives Swordsmen, with no Iron to its name
     const { state, border } = scene(30);
-    // Iron Working is a Classical technology
     seatOf(state, 0)!.research.techs.push('IRON_WORKING');
-    expect(worldEraIndex(state)).toBe(1);
     border.loyalty = 0;
     flipCity(state, border);
     expect(state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.type))
       .toEqual(Array(FREE_CITY_PAIR_COUNT).fill('SWORDSMAN'));
+    // the strongest melee the owner's research opens: Military Science's
+    // Line Infantry over the Swordsman
+    expect(freeCityPairType(state, 0)).toBe('SWORDSMAN');
+    seatOf(state, 0)!.research.techs.push('MILITARY_SCIENCE');
+    expect(freeCityPairType(state, 0)).toBe('LINE_INFANTRY');
   });
 
   it('a join takes the grants of the city that joins; any other Free Cities unit stays Free', () => {
@@ -285,7 +297,7 @@ describe('the Free City step', () => {
     border.loyalty = 0;
     flipCity(state, border);
     const city = state.freeSeat!.cities[0];
-    expect(before).toBe(15);
+    expect(before).toBe(10);   // an Ancient major's base: max(20, its best melee) - 10
     expect(cityDefenseStrength(state, city)).toBe(FREE_CITY_DEFENSE);
     expect(FREE_CITY_DEFENSE).toBe(72);
     city.buildings.push('ANCIENT_WALLS');

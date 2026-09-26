@@ -17,10 +17,10 @@ import { BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { citiesOf, isTerritorial, tileSeat } from './seats';
-import { cityAtIndex, gdrHas, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
+import { cityAtIndex, gdrHas, unitDomain, unitStackSlot, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import { promoFlag, promoValue } from './promotions';
 import { governorTileSum } from './governors';
-import { srcConst } from '../data/provenance';
+import { srcConst, xml } from '../data/provenance';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
 const CITY_CENTER_AIR_SLOTS = 1;
@@ -38,6 +38,14 @@ export const INTERCEPT_SUPPORT_CS = srcConst('combat.interceptSupportCs', 5, {
   pedia: 'Civilopedia_Concepts_Text.xml LOC_PEDIA_CONCEPTS_PAGE_AIRCOMBAT_5_CHAPTER_CONTENT_PARA_1: '
     + '"adding +5 to the strength of the main interceptor"',
 });
+/** PRIORITY TARGET's blow: a flat share of the struck unit's hit points, no
+ *  draw, nothing back — the preview shows an ordinary combat, the fired order
+ *  does not (runs/air_strike_20260926T.jsonl: 4 of 4 fired strikes took an
+ *  anti-air gun 0 -> 65 with the random seed untouched, and the covering gun
+ *  beside it never fired). */
+export const PRIORITY_TARGET_DAMAGE = srcConst('combat.priorityTargetDamage', 65,
+  xml('GlobalParameters', 'Name=COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT', 'Value',
+    { note: 'a percent of the unit\'s 100 HP; the lab read it as the fired Priority Target\'s damage' }));
 
 export function isAirUnit(type: string): boolean {
   return UNITS[type]?.air !== undefined;
@@ -203,37 +211,40 @@ export function returnToBase(unit: Unit): boolean {
 }
 
 /**
- * The patrol that answers a sortie at `tileIndex`, and how many others back
- * it. CIV6 (Interceptions): "If an air unit tries an air strike against a
- * target within the range of an intercepting unit, the interceptor will fire
- * on the attacker"; "If an attacking aircraft enters the defensive radius of
- * more than one patrolling aircraft, the highest strength aircraft is chosen
- * to intercept. The remaining aircraft act in support of the defense by
- * adding +5 to the strength of the main interceptor." (Patrols): "Aircraft
- * stationed at an air base do not intercept attacking aircraft." The
- * strength is the one an aircraft meets (`airDefenseOf`'s base); ties go to
- * the lower patrolled tile, then to the unit order.
+ * The patrol that answers a sortie at `tileIndex`, and the support the other
+ * covering patrols lend it. CIV6 (Interceptions): "If an air unit tries an
+ * air strike against a target within the range of an intercepting unit, the
+ * interceptor will fire on the attacker"; (Patrols) "Aircraft stationed at an
+ * air base do not intercept attacking aircraft." As the preview measures it
+ * (runs/air_patrol_20260926T.jsonl): the patrol ON the struck tile answers
+ * first, wounded or weaker; among the nearest the strongest Combat does; ties
+ * go to the lower patrolled tile, then to the unit order. Each other covering
+ * patrol lends +5 x its hp / 100 (+10 for two at full health, +7.5 with one
+ * at 50 HP), summed over the hit points first so no order enters the double.
  */
 export function interceptorAgainst(
   state: GameState, striker: Unit, tileIndex: number,
-): { unit: Unit; others: number } | undefined {
+): { unit: Unit; support: number } | undefined {
   const at = state.map.tiles[tileIndex];
   if (!at) return undefined;
   let best: Unit | undefined;
+  let bestD = 0;
   let bestS = 0;
-  let n = 0;
+  let hpSum = 0;
   for (const u of state.units) {
     if (u.patrol === undefined || !unitsHostile(state, striker, u)) continue;
     const p = state.map.tiles[u.patrol];
-    if (hexDistance(p.col, p.row, at.col, at.row) > INTERCEPT_RANGE) continue;
-    n += 1;
-    const s = antiAirAt(state, u) || (UNITS[u.type]?.combat ?? 0);
-    if (!best || s > bestS || (s === bestS && u.patrol < best.patrol!)) {
+    const d = hexDistance(p.col, p.row, at.col, at.row);
+    if (d > INTERCEPT_RANGE) continue;
+    hpSum += u.hp;
+    const s = UNITS[u.type]?.combat ?? 0;
+    if (!best || d < bestD || (d === bestD && (s > bestS || (s === bestS && u.patrol < best.patrol!)))) {
       best = u;
+      bestD = d;
       bestS = s;
     }
   }
-  return best ? { unit: best, others: n - 1 } : undefined;
+  return best ? { unit: best, support: (INTERCEPT_SUPPORT_CS * (hpSum - best.hp)) / UNIT_HP } : undefined;
 }
 
 /**
@@ -337,10 +348,12 @@ export function airPillageOffers(state: GameState, unit: Unit, tileIndex: number
     && !!t.districtComplete && !t.districtPillaged;
 }
 
-/** CIV6 (Bomber): a bomber needs "more than 50% health" to wreck a tile;
- *  (Superfortress): "No minimum health requirement to air pillage." */
+/** CIV6 (Air Strikes): a bomber wrecks a tile "at 50% health or higher" —
+ *  measured at the line (runs/air_bomb50_20260926T.jsonl: pillaged at 51 and
+ *  50 HP left, not at 49, 48, 46); (Superfortress): "No minimum health
+ *  requirement to air pillage." */
 export function airPillageFit(unit: Unit): boolean {
-  return unit.hp * 2 > UNIT_HP || promoFlag(unit, 'AIR_PILLAGE_ANY_HP');
+  return unit.hp * 2 >= UNIT_HP || promoFlag(unit, 'AIR_PILLAGE_ANY_HP');
 }
 
 export function airPillageTargets(state: GameState, unit: Unit, width: number): number[] {
@@ -377,7 +390,8 @@ export function airStrikeTargets(state: GameState, unit: Unit, width: number): n
 /**
  * What `tileIndex` offers THIS aircraft. Which enemies STAND there, never
  * which one is first in the list: a list-order rule would let the two engines
- * point the same column at different tiles.
+ * point the same column at different tiles. A civilian is never an air
+ * strike's target (`shootable`).
  */
 export function airStrikeOffers(state: GameState, unit: Unit, tileIndex: number): boolean {
   const t = state.map.tiles[tileIndex];
@@ -385,7 +399,7 @@ export function airStrikeOffers(state: GameState, unit: Unit, tileIndex: number)
   let land = false;
   let sea = false;
   for (const u of unitsAt(state, tileIndex)) {
-    if (isAirUnit(u.type) || !unitsHostile(state, unit, u)) continue;
+    if (isAirUnit(u.type) || unitDomain(u.type) === 'civilian' || !unitsHostile(state, unit, u)) continue;
     if (!unitVisibleTo(state, u, unit.seat)) continue;
     if (UNITS[u.type]?.naval) sea = true;
     else land = true;

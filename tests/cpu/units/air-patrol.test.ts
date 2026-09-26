@@ -9,10 +9,11 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
 import { UNITS } from '../../../cpu/data/units';
 import { spawnUnit, refreshUnits } from '../../../cpu/core/units';
-import { emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
+import { emptySeat, seatOf, setAllianceTypeWith, setAllyTurnsWith, setTileOwner, setWar } from '../../../cpu/core/seats';
+import { ALLIANCE_M1_CS, ALLIANCE_MILITARY } from '../../../cpu/data/seats';
 import { RESOURCES } from '../../../world/resources';
 import {
-  INTERCEPT_RANGE, INTERCEPT_SUPPORT_CS, canDeployTo, deployAir, deployRange, deployTargets,
+  INTERCEPT_RANGE, INTERCEPT_SUPPORT_CS, PRIORITY_TARGET_DAMAGE, canDeployTo, deployAir, deployRange, deployTargets,
   interceptorAgainst, priorityDefender, priorityTargets, rebaseAir, returnToBase,
 } from '../../../cpu/core/air';
 import { airPillage, airStrike, damageRoll } from '../../../cpu/core/combat';
@@ -182,47 +183,70 @@ describe('the interception', () => {
     // an own patrol is no answer
     const mine = spawnUnit(state, FIGHTER, pad.index, 0)!;
     mine.patrol = target.index;
-    expect(interceptorAgainst(state, striker, target.index)?.others).toBe(0);
+    expect(interceptorAgainst(state, striker, target.index)?.support).toBe(0);
   });
 
-  it('the strongest fights, and every other patrol in reach adds +5', () => {
-    // CIV6 (Interceptions): "the highest strength aircraft is chosen to
-    // intercept. The remaining aircraft act in support of the defense by
-    // adding +5 to the strength of the main interceptor."
+  // runs/air_patrol_20260926T.jsonl: the patrol ON the struck tile answers
+  // even when wounded or weaker; among equidistant patrols the stronger; each
+  // other covering patrol adds +5 x hp / 100
+  it('the patrol on the struck tile answers first; among the nearest the strongest', () => {
     expect(INTERCEPT_SUPPORT_CS).toBe(5);
     const { state, pad } = airState();
     const striker = spawnUnit(state, BOMBER, pad.index, 0)!;
     const target = tileAtCoords(state.map, 8, 11);
     const weak = patrolOf(state, FIGHTER, target.index);
+    weak.hp = 40;
     const strong = patrolOf(state, JET, tileAtCoords(state.map, 8, 12).index);
-    const got = interceptorAgainst(state, striker, target.index)!;
+    let got = interceptorAgainst(state, striker, target.index)!;
+    expect(got.unit).toBe(weak);
+    expect(got.support).toBe(5);
+    weak.patrol = tileAtCoords(state.map, 8, 10).index;
+    got = interceptorAgainst(state, striker, target.index)!;
     expect(got.unit).toBe(strong);
-    expect(got.others).toBe(1);
-    expect(weak).toBeTruthy();
+    expect(got.support).toBe(2);   // one backer at 40 HP
+    const half = patrolOf(state, FIGHTER, tileAtCoords(state.map, 9, 11).index);
+    half.hp = 50;
+    weak.hp = 100;
+    expect(interceptorAgainst(state, striker, target.index)!.support).toBe(7.5);
+  });
 
-    /** the damage a bomber takes striking a ship under `n` patrols */
-    function taken(n: number): number {
+  it('the interception is a two-sided fight at Combat: the interceptor draws first', () => {
+    /** a bomber strikes a ship under `n` patrols; the damage both sides take */
+    function fight(n: number): { toBomber: number; toFighter: number } {
       const s = airState();
       const b = spawnUnit(s.state, BOMBER, s.pad.index, 0)!;
       const water = tileAtCoords(s.state.map, 8, 12);
       water.terrain = 'COAST';
       const ship = spawnUnit(s.state, 'IRONCLAD', water.index, 1)!;
       ship.tileIndex = water.index;
-      for (let i = 0; i < n; i += 1) patrolOf(s.state, FIGHTER, ship.tileIndex);
+      const pats = Array.from({ length: n }, () => patrolOf(s.state, FIGHTER, ship.tileIndex));
       const r0 = s.state.rngState;
       expect(airStrike(s.state, b.id, ship.tileIndex, 0).ok).toBe(true);
-      // the interception is the sortie's first roll: the interceptor's
-      // strength against an aircraft plus +5 per backer, against the bomber's
-      // Ranged Strength (the anti-air answer's body; the GPU lane pins the
-      // same number)
-      const diff = UNITS[FIGHTER].combat + INTERCEPT_SUPPORT_CS * (n - 1) - UNITS[BOMBER].ranged!.strength;
-      expect(100 - b.hp).toBe(damageRoll({ ...s.state, rngState: r0 } as GameState, diff));
-      return 100 - b.hp;
+      // the interceptor at its Combat (a Biplane 80, not its Ranged 75) plus
+      // +5 per full-health backer, the bomber at its Combat (85)
+      const iE = UNITS[FIGHTER].combat + INTERCEPT_SUPPORT_CS * (n - 1);
+      const aE = UNITS[BOMBER].combat;
+      const replay = { ...s.state, rngState: r0 } as GameState;
+      const toFighter = damageRoll(replay, aE - iE);
+      const toBomber = damageRoll(replay, iE - aE);
+      expect(100 - pats[0].hp).toBe(toFighter);
+      expect(100 - b.hp).toBe(toBomber);
+      return { toBomber, toFighter };
     }
-    const one = taken(1);
-    const three = taken(3);
-    expect(one).toBeGreaterThan(0);
-    expect(three).toBeGreaterThan(one);   // the same draw, +10 behind it
+    const one = fight(1);
+    const three = fight(3);
+    expect(one.toFighter).toBeGreaterThan(0);
+    expect(three.toBomber).toBeGreaterThan(one.toBomber);   // +10 behind the interceptor
+  });
+
+  it('an interceptor brought to 0 HP is gone', () => {
+    const { state, pad, sea } = airState();
+    const bomber = spawnUnit(state, BOMBER, pad.index, 0)!;
+    spawnUnit(state, 'IRONCLAD', sea.index, 1);
+    const p = patrolOf(state, FIGHTER, sea.index);
+    p.hp = 1;
+    expect(airStrike(state, bomber.id, sea.index, 0).ok).toBe(true);
+    expect(state.units).not.toContain(p);
   });
 
   it('an intercepted fighter aborts, an intercepted bomber flies on', () => {
@@ -296,9 +320,55 @@ describe('the order of a sortie', () => {
     }
     expect(bomb(false).t.pillaged).toBe(true);
     const hit = bomb(true);
-    expect(hit.plane.hp).toBeLessThanOrEqual(50);
+    expect(hit.plane.hp).toBeLessThan(50);
     expect(hit.t.pillaged).toBe(false);
     expect(hit.plane.movesLeft).toBe(0);   // the sortie is spent all the same
+  });
+
+  it('the bomb pillages at 50 HP or more, not at 49', () => {
+    // runs/air_bomb50_20260926T.jsonl: pillaged at 51 and 50 HP left, not at
+    // 49, 48, 46
+    function at(hp: number) {
+      const { state, pad } = airState();
+      const plane = spawnUnit(state, BOMBER, pad.index, 0)!;
+      plane.hp = hp;
+      const t = tileAtCoords(state.map, 8, 12);
+      setTileOwner(t, 1, 1);
+      t.improvement = 'FARM';
+      t.pillaged = false;
+      return { ok: airPillage(state, plane.id, t.index, 0).ok, pillaged: t.pillaged };
+    }
+    expect(at(50)).toEqual({ ok: true, pillaged: true });
+    expect(at(49)).toEqual({ ok: false, pillaged: false });
+  });
+});
+
+describe("the seat-pair terms in a sortie's answers", () => {
+  it("the Military alliance's +5 rides the plane in the anti-air burst", () => {
+    // lab4_t225: a level-1 Military alliance's "+5" once per
+    // sub-combat — the burst a bomber took fell from 80 to 66
+    function burst(allied: boolean): { got: number; want: number } {
+      const { state, pad } = airState();
+      state.seats.push(emptySeat(2));
+      if (allied) {
+        setAllyTurnsWith(state, 0, 2, 10);
+        setAllianceTypeWith(state, 0, 2, ALLIANCE_MILITARY);
+        setWar(state, 2, 1, true);
+      }
+      const foeCity = settleAt(state, tileAtCoords(state.map, 8, 14).index, 1);
+      const bomber = spawnUnit(state, BOMBER, pad.index, 0)!;
+      spawnUnit(state, GUNNER, tileAtCoords(state.map, 8, 15).index, 1);
+      const r0 = state.rngState;
+      expect(airStrike(state, bomber.id, foeCity.centerIndex, 0).ok).toBe(true);
+      const plane = UNITS[BOMBER].ranged!.strength + (allied ? ALLIANCE_M1_CS : 0);
+      const want = damageRoll({ ...state, rngState: r0 } as GameState, UNITS[GUNNER].antiAir! - plane);
+      return { got: 100 - bomber.hp, want };
+    }
+    const plain = burst(false);
+    const ally = burst(true);
+    expect(plain.got).toBe(plain.want);
+    expect(ally.got).toBe(ally.want);
+    expect(ally.got).toBeLessThan(plain.got);
   });
 });
 
@@ -316,9 +386,16 @@ describe('priority target', () => {
     expect(priorityTargets(state, plane, AIR_STRIKE_COLS)).toContain(t.index);
     expect(unitMask(maskCtx(state, 0), plane)).toContain(
       ACT.PRIORITY_TARGET_0 + priorityTargets(state, plane, AIR_STRIKE_COLS).indexOf(t.index));
+    // fired, it deals a flat 65 with no draw and nothing back, and the gun
+    // covering the tile never answers (runs/air_strike_20260926T.jsonl)
+    spawnUnit(state, GUNNER, tileAtCoords(state.map, 8, 12).index, 1);
+    const r0 = state.rngState;
+    expect(PRIORITY_TARGET_DAMAGE).toBe(65);
     expect(airStrike(state, plane.id, t.index, 0, true).ok).toBe(true);
-    expect(medic.hp).toBeLessThan(100);
+    expect(medic.hp).toBe(100 - PRIORITY_TARGET_DAMAGE);
     expect(guard.hp).toBe(100);
+    expect(plane.hp).toBe(100);
+    expect(state.rngState).toBe(r0);
 
     // the plain strike takes the combat unit
     const s2 = airState();

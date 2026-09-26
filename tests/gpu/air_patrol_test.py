@@ -1,7 +1,9 @@
 """AIR COMBAT'S SECOND HALF on the GPU side: the patrol, the interception,
 Priority Target and the order a sortie resolves in — the twin of
 `tests/cpu/units/air-patrol.test.ts`. The Civilopedia's Air Combat chapters
-(`LOC_PEDIA_CONCEPTS_PAGE_AIRCOMBAT_3..5`) are the source every check quotes.
+(`LOC_PEDIA_CONCEPTS_PAGE_AIRCOMBAT_3..5`) and the lab's
+records (`tools/civ6lab/runs/air_patrol_20260926T.jsonl`, `air_strike_*`,
+`air_bomb50_*`) are the sources the checks quote.
 
 No seed trains an aircraft, so this lane is what reaches the rules. Every
 check is poked into the bodies `policy/drive.py` drives: `_seat_unit_mask`,
@@ -199,17 +201,26 @@ def main() -> None:
     sim.unit_patrol[0, stationed] = far[0]
     assert not bool(sim._interceptor_scan(seat, tg)[1][0]), "nor a patrol out of range"
     sim.unit_patrol[0, stationed] = near[0]
-    slot, has, n = sim._interceptor_scan(seat, tg)
-    assert bool(has[0]) and int(slot[0]) == stationed and int(n[0]) == 1
+    slot, has, sup = sim._interceptor_scan(seat, tg)
+    assert bool(has[0]) and int(slot[0]) == stationed and float(sup[0]) == 0.0
+    # runs/air_patrol_20260926T.jsonl: the patrol ON the struck tile answers,
+    # even wounded or weaker; among the nearest the stronger; each other
+    # covering patrol backs it with +5 x hp / 100
     strong = spawn(sim, foe, JET, fctr)
-    sim.unit_patrol[0, strong] = mark
-    slot, has, n = sim._interceptor_scan(seat, tg)
-    assert int(slot[0]) == strong and int(n[0]) == 2, (
-        "CIV6: 'the highest strength aircraft is chosen to intercept'")
+    sim.unit_patrol[0, strong] = near[1]
+    sim.unit_patrol[0, stationed] = mark
+    sim.unit_hp[0, stationed] = 40
+    slot, has, sup = sim._interceptor_scan(seat, tg)
+    assert int(slot[0]) == stationed and float(sup[0]) == 5.0, (
+        f"the weaker, wounded patrol on the struck tile answers first — {int(slot[0])}, {float(sup[0])}")
+    sim.unit_patrol[0, stationed] = near[0]
+    slot, has, sup = sim._interceptor_scan(seat, tg)
+    assert int(slot[0]) == strong and float(sup[0]) == 2.0, (
+        f"among the nearest the stronger, a 40-HP backer lends 2 — {int(slot[0])}, {float(sup[0])}")
     mine = spawn(sim, row, FIGHTER, aero)
     sim.unit_patrol[0, mine] = mark
-    assert int(sim._interceptor_scan(seat, tg)[2][0]) == 2, "an own patrol is no answer"
-    print("  3 interception scan OK (range, stationed, strongest, own seat)")
+    assert float(sim._interceptor_scan(seat, tg)[2][0]) == 2.0, "an own patrol is no answer"
+    print("  3 interception scan OK (range, stationed, the struck tile first, strongest, hp-scaled support)")
 
     # -- 4: a fighter turned back, a bomber flying on -----------------------
     sim = fresh(rules, path)
@@ -234,7 +245,9 @@ def main() -> None:
 
     def bomber_run(n_patrols):
         """a bomber striking a ship under `n_patrols` foe patrols: (the
-        bomber's damage, the ship's damage)"""
+        bomber's damage, the ship's damage). The interception is TWO-SIDED
+        at Combat: the interceptor's damage is drawn first, then the
+        bomber's."""
         s = fresh(rules, path)
         at_war(s, row, foe)
         jj = a_city(s, row)
@@ -246,23 +259,28 @@ def main() -> None:
                and bool(s.wpass[0, t]) and int(s.military_at[0, t]) < 0]
         assert sea, "no water in the bomber's operational range"
         sh = spawn(s, foe, SHIP, sea[0])
+        pats = []
         for _ in range(n_patrols):
             p = spawn(s, foe, FIGHTER, fc)
             s.unit_patrol[0, p] = sea[0]
+            pats.append(p)
         bc = s._air_strike_targets(row, torch.tensor([[b]]), torch.tensor([[ae]]),
                                    torch.tensor([[BOMBER]]))[0, 0].tolist()
         assert sea[0] in bc, f"CIV6: a bomber answers naval units — {bc}"
         r0 = s.rng_state.clone()
         order(s, row, b, s._A_AIR_STRIKE + bc.index(sea[0]))
         taken = 100 - int(s.unit_hp[0, b])
-        # the interception is the sortie's first roll: the interceptor's
-        # strength against an aircraft plus +5 per backer, against the
-        # bomber's Ranged Strength (the TS lane pins the same number)
+        dealt = 100 - int(s.unit_hp[0, pats[0]])
+        # the interceptor at its Combat plus +5 per full-health backer, the
+        # bomber at its Combat (the TS lane pins the same numbers)
         s.rng_state.copy_(r0)
-        diff = (int(s._type_combat[FIGHTER]) + s._intercept_support_cs * (n_patrols - 1)
-                - int(s._type_ranged_strength[BOMBER]))
-        want = int(s._damage_roll(torch.ones(1, dtype=torch.bool), torch.tensor([diff]), k="pin")[0])
-        assert taken == want, f"the interception dealt {taken}, the body says {want} (diff {diff})"
+        i_e = int(s._type_combat[FIGHTER]) + s._intercept_support_cs * (n_patrols - 1)
+        a_e = int(s._type_combat[BOMBER])
+        one = torch.ones(1, dtype=torch.bool)
+        want_i = int(s._damage_roll(one, torch.tensor([a_e - i_e]), k="pin")[0])
+        want_b = int(s._damage_roll(one, torch.tensor([i_e - a_e]), k="pin")[0])
+        assert (dealt, taken) == (want_i, want_b), (
+            f"the interception dealt {dealt} / {taken}, the law says {want_i} / {want_b}")
         return taken, 100 - int(s.unit_hp[0, sh])
 
     one_b, one_s = bomber_run(1)
@@ -332,9 +350,31 @@ def main() -> None:
 
     assert bomb(False)[0], "an unanswered bomb wrecks"
     wrecked, hp, mp = bomb(True)
-    assert hp <= 50 and not wrecked and mp == 0, (
+    assert hp < 50 and not wrecked and mp == 0, (
         "CIV6: 'at 50% health or higher after resolving any damage taken from ... anti-air'")
-    print(f"  7 the bomb's 50% after the answers OK (hp {hp}, nothing wrecked)")
+
+    def bomb_at(hp):
+        """runs/air_bomb50_20260926T.jsonl: pillaged at 50 HP left, not at 49"""
+        s = fresh(rules, path)
+        at_war(s, row, foe)
+        fc = int(s.city_center[0, foe, a_city(s, foe)])
+        t = next(t for t in bare_land(s, fc, 1, 3) if int(s.tile_seat[0, t]) == foe)
+        s.improvement[0, t] = 0
+        s.pillaged[0, t] = False
+        s._eff_version += 1
+        perch2 = [p for p in range(s.T) if int(s.pair_dist[t, p]) == 3]
+        b = spawn(s, row, BOMBER, perch2[0])
+        s.unit_hp[0, b] = hp
+        pc = s._air_pillage_targets(row, torch.tensor([[b]]), torch.tensor([[perch2[0]]]),
+                                    torch.tensor([[BOMBER]]))[0, 0].tolist()
+        if t not in pc:
+            return False, False
+        order(s, row, b, s._A_AIR_PILLAGE + pc.index(t))
+        return True, bool(s.pillaged[0, t])
+
+    assert bomb_at(50) == (True, True), "a bomber at 50 HP wrecks"
+    assert bomb_at(49) == (False, False), "a bomber at 49 HP is offered nothing"
+    print(f"  7 the bomb's 50% after the answers OK (hp {hp}, nothing wrecked; 50 wrecks, 49 not)")
 
     # -- 8: PRIORITY TARGET --------------------------------------------------
     def priority(prio):
@@ -346,25 +386,32 @@ def main() -> None:
         t = bare_land(s, ae, 1, int(s._type_ranged_range[FIGHTER]))[0]
         guard = spawn(s, foe, SOFT, t)
         med = spawn(s, foe, MEDIC, t)
+        # a gun covering the tile: the fired Priority Target takes no answer
+        gun_at = bare_land(s, t, 1, 1)
+        if gun_at:
+            spawn(s, foe, GUNNER, gun_at[0])
         pt = s._priority_targets(row, torch.tensor([[f]]), torch.tensor([[ae]]),
                                  torch.tensor([[FIGHTER]]))[0, 0].tolist()
         assert t in pt, f"the Support unit's tile is a priority target — {pt}"
         assert bool(mask_of(s, row, f)[s._A_PRIORITY + pt.index(t)])
+        r0 = s.rng_state.clone()
         if prio:
             order(s, row, f, s._A_PRIORITY + pt.index(t))
         else:
             ac = s._air_strike_targets(row, torch.tensor([[f]]), torch.tensor([[ae]]),
                                        torch.tensor([[FIGHTER]]))[0, 0].tolist()
             order(s, row, f, s._A_AIR_STRIKE + ac.index(t))
-        return int(s.unit_hp[0, guard]), int(s.unit_hp[0, med]), bool(s.unit_alive[0, med])
+        return (int(s.unit_hp[0, guard]), int(s.unit_hp[0, med]), int(s.unit_hp[0, f]),
+                bool(torch.equal(r0, s.rng_state)))
 
-    g_hp, m_hp, m_alive = priority(True)
-    assert g_hp == 100 and (m_hp < 100 or not m_alive), (
-        "CIV6: Priority Target attacks 'Support class units directly, without first having to "
-        "eliminate the enemy combat unit placed in the same location'")
-    g_hp, m_hp, _ = priority(False)
+    assert int(sim._priority_target_damage) == 65
+    g_hp, m_hp, f_hp, quiet = priority(True)
+    assert g_hp == 100 and m_hp == 100 - 65 and f_hp == 100 and quiet, (
+        "runs/air_strike_20260926T.jsonl: a fired Priority Target deals a flat 65 to the Support "
+        f"unit, no draw, nothing back — guard {g_hp}, medic {m_hp}, plane {f_hp}, rng quiet {quiet}")
+    g_hp, m_hp, _, _ = priority(False)
     assert g_hp < 100 and m_hp == 100, "the plain strike takes the combat unit"
-    print("  8 PRIORITY TARGET OK (the Support unit struck past its guard)")
+    print("  8 PRIORITY TARGET OK (a flat 65 past the guard, no draw, no answer)")
 
     # -- 9: an order other than the patrol ends it --------------------------
     sim = fresh(rules, path)
@@ -430,8 +477,44 @@ def main() -> None:
     assert got == s._A_RETURN, f"at peace a patrol comes home — ordered column {got}"
     print("  10 the driver deploys at war and brings the patrol home at peace OK")
 
+    # -- 11: the seat-pair terms in the anti-air burst ------------------------
+    # lab4_t225: a level-1 Military alliance's "+5" once per sub-combat — the
+    # burst a bomber took fell from 80 to 66
+    def burst(allied):
+        s = fresh(rules, path)
+        at_war(s, row, foe)
+        ally = next(a for a in range(s.n_majors) if a not in (row, foe))
+        if allied:
+            for a, b in ((row, ally), (ally, row)):
+                s.seat_alliance_type[0, a, b] = 3
+                s.seat_ally_turns[0, a, b] = 10
+            at_war(s, ally, foe)
+        fj = a_city(s, foe)
+        fc = int(s.city_center[0, foe, fj])
+        perch3 = [t for t in range(s.T) if int(s.pair_dist[fc, t]) == 3]
+        b = spawn(s, row, BOMBER, perch3[0])
+        g = spawn(s, foe, GUNNER, bare_land(s, fc, 1, 1)[0])
+        bc = s._air_strike_targets(row, torch.tensor([[b]]), torch.tensor([[perch3[0]]]),
+                                   torch.tensor([[BOMBER]]))[0, 0].tolist()
+        terms = float(s._ally_war_cs(torch.tensor([row]), torch.tensor([foe]))[0])
+        r0 = s.rng_state.clone()
+        order(s, row, b, s._A_AIR_STRIKE + bc.index(fc))
+        taken = 100 - int(s.unit_hp[0, b])
+        s.rng_state.copy_(r0)
+        aa = int(s._anti_air_at(torch.tensor([GUNNER]), torch.tensor([foe]))[0])
+        diff = aa - (int(s._type_ranged_strength[BOMBER]) + terms)
+        want = int(s._damage_roll(torch.ones(1, dtype=torch.bool), torch.tensor([diff]), k="pin")[0])
+        assert taken == want, f"the burst dealt {taken}, the law says {want} (diff {diff}); gun {g}"
+        return taken, terms
+
+    plain, t0 = burst(False)
+    ally_taken, t1 = burst(True)
+    assert t0 == 0 and t1 >= 5 and ally_taken < plain, (
+        f"the alliance's +5 rides the plane in the burst — {plain} -> {ally_taken} (terms {t1})")
+    print(f"  11 the seat-pair terms in the burst OK ({plain} -> {ally_taken})")
+
     print("AIR PATROL OK — deploy, return, the patrol's heal, interception, the order of a sortie, "
-          "the bomb's 50%, Priority Target")
+          "the bomb's 50%, Priority Target, the seat-pair terms")
 
 
 if __name__ == "__main__":

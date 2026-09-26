@@ -22,7 +22,7 @@ the proof.
      pull is highest; its slot compacts away
   5. anyone may attack it without a declaration — no war opens
   6. a Free City heals in its own phase and presses on its neighbours
-  7. the world era's melee pair on the flip turn, then a drawn unit every
+  7. the former owner's best melee pair on the flip turn, then a drawn unit every
      fifth of the city's turns
   8. its flat defence and a walled Free City's strike
   9. its units defend and bank no experience
@@ -331,21 +331,34 @@ def free_units(sim) -> list[tuple[int, int, int]]:
 def test_grants(rules, path) -> None:
     sim = fresh(rules, path)
     t0 = int(sim.turn)
-    # the wire: the pair and each class's chassis era by era (`eraUnitOfClass`)
+    # the wire: the pair's count and class, each grant class's chassis era by
+    # era (`eraUnitOfClass`)
     assert (sim._free_pair_n, sim._free_grant_period) == (2, 5), "the wire's grant rows"
-    assert [UNI[int(x)] for x in sim._free_pair] == [
-        "WARRIOR", "SWORDSMAN", "MAN_AT_ARMS", "MUSKETMAN", "LINE_INFANTRY",
-        "INFANTRY", "INFANTRY", "MECHANIZED_INFANTRY", "MECHANIZED_INFANTRY"], sim._free_pair
+    assert RULES["promotions"]["classes"][sim._free_pair_cls] == "MELEE"
     assert [UNI[int(x)] if int(x) >= 0 else None for x in sim._free_grant_units[0]] == [
         None, "HORSEMAN", "COURSER", "COURSER", "CAVALRY", "CAVALRY", "HELICOPTER", "HELICOPTER", "HELICOPTER"]
     era = int(sim._world_era()[B0].clamp(min=0))
-    pair = int(sim._free_pair[era])
+    # the pair is the FORMER OWNER's best melee by its own research, whatever
+    # the world era: Warriors with nothing, Swordsmen from Iron Working (no
+    # Iron asked), Line Infantry from Military Science
+    tech = {t["id"]: i for i, t in enumerate(RULES["techs"])}
+    held = sim.civ_techs[B0, :2].clone()
+    sim.civ_techs[B0, 0] = False
+    assert UNI[int(sim._free_pair_type(0)[B0])] == "WARRIOR"
+    sim.civ_techs[B0, 1, tech["IRON_WORKING"]] = True
+    assert UNI[int(sim._free_pair_type(0)[B0])] == "WARRIOR", "another seat's research moved the pair"
+    sim.civ_techs[B0, 0, tech["IRON_WORKING"]] = True
+    assert UNI[int(sim._free_pair_type(0)[B0])] == "SWORDSMAN"
+    sim.civ_techs[B0, 0, tech["MILITARY_SCIENCE"]] = True
+    assert UNI[int(sim._free_pair_type(0)[B0])] == "LINE_INFANTRY"
+    sim.civ_techs[B0, :2] = held
+    pair = int(sim._free_pair_type(0)[B0])
     centre = revolt(sim)
     col = free_slot(sim, centre)
     F = sim.FREE_ROW
     cid = int(sim.city_id[B0, F, col])
     assert int(sim.city_freed_turn[B0, F, col]) == t0
-    # the world era's melee pair exists on the flip turn itself, on the first
+    # the former owner's melee pair exists on the flip turn itself, on the first
     # free land tiles beside the centre in direction order, in the hostile
     # pool, each remembering the city that granted it
     units = free_units(sim)
@@ -385,7 +398,7 @@ def test_grants(rules, path) -> None:
     before = free_units(sim)
     sim._barbarian_phase()
     assert free_units(sim) == before, "a barbarian walk moved a Free Cities unit"
-    print("  7 the grants OK — the era's melee pair on the flip turn, a drawn unit every fifth turn, no barbarian walk")
+    print("  7 the grants OK — the former owner's melee pair on the flip turn, a drawn unit every fifth turn, no barbarian walk")
 
 
 def test_treasury_and_join(rules, path) -> None:

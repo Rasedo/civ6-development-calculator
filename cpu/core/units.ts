@@ -254,13 +254,15 @@ export function riverCharge(state: GameState, from: Tile, to: Tile, mover?: { ty
 }
 
 /**
- * How far out to sea a seat's Traders may go. CIV6: "The Celestial Navigation
- * technology is required to move on Coast tiles. The Cartography technology is
- * required to move on Ocean tiles." A seat with neither keeps to the land.
+ * Whether a seat's Traders may go to sea. CIV6 (the pedia): "The Celestial
+ * Navigation technology is required to move on Coast tiles." The pedia's
+ * Cartography gate on Ocean is not the game's: the lab's route path crossed
+ * five Ocean plots with Celestial Navigation and no Cartography
+ * (tools/civ6lab, lab 5), so water, Ocean included, opens at once. A seat
+ * without Celestial Navigation keeps to the land.
  */
 export const TRADE_WATER_NONE = 0;
-export const TRADE_WATER_COAST = 1;
-const TRADE_WATER_OCEAN = 2;
+export const TRADE_WATER_OPEN = 1;
 
 /** The naval MELEE line: a hull with no ranged strength that is neither a
  *  raider nor a carrier. */
@@ -303,8 +305,7 @@ export function ignoresShores(state: GameState, unit: { type: string; seat: numb
 
 export function tradeWaterLevel(state: GameState, seat: number): number {
   const techs = seatOf(state, seat)?.research.techs;
-  if (!techs?.includes('CELESTIAL_NAVIGATION')) return TRADE_WATER_NONE;
-  return techs.includes('CARTOGRAPHY') ? TRADE_WATER_OCEAN : TRADE_WATER_COAST;
+  return techs?.includes('CELESTIAL_NAVIGATION') ? TRADE_WATER_OPEN : TRADE_WATER_NONE;
 }
 
 /** May a Trader at this water level stand here? A portal's mountain is
@@ -312,9 +313,7 @@ export function tradeWaterLevel(state: GameState, seat: number): number {
 export function tradeWalkable(tile: Tile, water: number): boolean {
   if (portalAt(tile)) return true;
   if (isImpassable(tile)) return false;
-  if (!isWater(tile)) return true;
-  if (water < TRADE_WATER_COAST) return false;
-  return tile.terrain !== 'OCEAN' || water >= TRADE_WATER_OCEAN;
+  return !isWater(tile) || water >= TRADE_WATER_OPEN;
 }
 
 /**
@@ -360,18 +359,26 @@ export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: 
  * Trader parked at the origin.
  */
 export function tradeWalkReachable(state: GameState, fromIndex: number, toIndex: number, water: number): boolean {
+  return tradeWalkPath(state, fromIndex, toIndex, water) !== null;
+}
+
+/** The plots of that descent, both ends included — the Trader's path — or
+ *  null where no descent reaches `toIndex`. */
+export function tradeWalkPath(state: GameState, fromIndex: number, toIndex: number, water: number): number[] | null {
   const map = state.map;
   const dest = map.tiles[toIndex];
   const start = map.tiles[fromIndex];
-  if (!dest || !start) return false;
-  if (isImpassable(dest) || isImpassable(start)) return false;
+  if (!dest || !start) return null;
+  if (isImpassable(dest) || isImpassable(start)) return null;
+  const path = [fromIndex];
   let at = fromIndex;
   for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at !== toIndex; step++) {
     const next = tradeWalkStep(state, at, toIndex, water);
-    if (next === at) return false;
+    if (next === at) return null;
     at = next;
+    path.push(at);
   }
-  return at === toIndex;
+  return at === toIndex ? path : null;
 }
 
 /** the trade walk is bounded by the route range — a route

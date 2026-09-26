@@ -6,7 +6,7 @@ import { cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAt
 import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { ENCAMPMENT_HP, WALLS_HP } from '../../../cpu/data/units';
-import { PALACE_CITY_CS, GARRISON_CITY_CS, ENVOY_CITY_CS } from '../../../cpu/data/constants';
+import { PALACE_CITY_CS, GARRISON_DAMAGE_SCALE, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../../../cpu/data/constants';
 import { DISTRICTS } from '../../../cpu/data/districts';
 import { tilesWithin } from '../../../world/hex';
 import type { City, CityState, DistrictId, GameState, Tile } from '../../../cpu/core/types';
@@ -251,11 +251,16 @@ describe("a city centre's standing strength", () => {
     return t;
   }
 
-  it('stands on the best melee floored at 15; the capital adds the Palace', () => {
+  // runs/city_defense_preview_c38s2_era*: max(the start era's melee, the
+  // best melee fielded) - 10 — an Ancient major's base is 10
+  it("stands on max(the start era's melee, the best melee) - 10; the capital adds the Palace", () => {
     const { state, capital, city } = scene();
-    expect(centreStrength(state, city)).toBe(15);
-    expect(centreStrength(state, capital)).toBe(15 + PALACE_CITY_CS);
+    expect([CITY_START_MELEE_MAJOR, CITY_BASE_MELEE_CUT]).toEqual([20, 10]);
+    expect(centreStrength(state, city)).toBe(10);
+    expect(centreStrength(state, capital)).toBe(10 + PALACE_CITY_CS);
     expect(PALACE_CITY_CS).toBe(3);
+    state.seats.find((s) => s.seat === 1)!.bestMeleeCS = 65;
+    expect(centreStrength(state, city)).toBe(55);
   });
 
   it('a Campus beside an Aqueduct adds 2, not 4: the Aqueduct carries no modifier', () => {
@@ -264,31 +269,48 @@ describe("a city centre's standing strength", () => {
     district(state, city, 11, 12, 'AQUEDUCT');
     expect(DISTRICTS.CAMPUS.cityStrength).toBe(2);
     expect(DISTRICTS.AQUEDUCT.cityStrength).toBe(0);
-    expect(centreStrength(state, city)).toBe(15 + 2);
+    expect(centreStrength(state, city)).toBe(10 + 2);
   });
 
   it('a pillaged or unfinished district adds nothing', () => {
     const { state, city } = scene();
     const campus = district(state, city, 13, 12, 'CAMPUS');
     const hub = district(state, city, 11, 12, 'COMMERCIAL_HUB');
-    expect(centreStrength(state, city)).toBe(15 + 4);
+    expect(centreStrength(state, city)).toBe(10 + 4);
     campus.districtPillaged = true;
-    expect(centreStrength(state, city)).toBe(15 + 2);
+    expect(centreStrength(state, city)).toBe(10 + 2);
     hub.districtComplete = false;
-    expect(centreStrength(state, city)).toBe(15);
+    expect(centreStrength(state, city)).toBe(10);
   });
 
-  it('a military unit of the holder on the centre adds 10; the Encampment reads without it', () => {
+  // runs/garrison_scale_20260926T081246Z.jsonl: base 55 (a Line Infantry 65
+  // less 10), an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage 0,
+  // 10, 25, 50, 75, 90
+  it('the garrison adds what its Combat stands above the base, scaled by its wounds', () => {
+    const { state, city } = scene();
+    const inf = spawnUnit(state, 'INFANTRY', city.centerIndex, 1)!;
+    expect(GARRISON_DAMAGE_SCALE).toBe(200);
+    // the strongest melee on its own centre adds exactly the cut
+    expect(centreStrength(state, city)).toBe(65 + 10);
+    state.seats.find((s) => s.seat === 1)!.bestMeleeCS = 65;
+    const read = [100, 90, 75, 50, 25, 10].map((hp) => { inf.hp = hp; return centreStrength(state, city); });
+    expect(read).toEqual([75, 74, 72.5, 70, 67.5, 66]);
+    // the Encampment reads without it
+    expect(centreStrength(state, city, false)).toBe(55);
+  });
+
+  it('a garrison no stronger than the base and a foreign unit add nothing', () => {
     const { state, city } = scene();
     spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 18, 18).index, 1);
-    expect(centreStrength(state, city)).toBe(35);
-    spawnUnit(state, 'WARRIOR', city.centerIndex, 1);
-    expect(GARRISON_CITY_CS).toBe(10);
-    expect(centreStrength(state, city)).toBe(35 + 10);
-    expect(centreStrength(state, city, false)).toBe(35);
+    expect(centreStrength(state, city)).toBe(25);
+    const w = spawnUnit(state, 'WARRIOR', city.centerIndex, 1)!;
+    expect(centreStrength(state, city)).toBe(25);
+    w.seat = 0;
+    state.seats.find((s) => s.seat === 1)!.bestMeleeCS = 0;
+    expect(centreStrength(state, city)).toBe(10);
   });
 
-  it("a city-state's centre: its best melee, the Palace, +1 per envoy from every major", () => {
+  it("a city-state's centre: max(its start melee, its best melee) - 10, the Palace, +1 per envoy", () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     state.seats.push(emptySeat(1));
@@ -301,10 +323,14 @@ describe("a city centre's standing strength", () => {
     for (const t of tilesWithin(state.map, 9, 9, 1)) setTileOwner(t, cs.seat);
     state.cityStates.push(cs);
     state.cityStateMax = 1;
+    expect(CITY_START_MELEE_MINOR).toBe(25);
     expect(centreStrength(state, minorCity(cs))).toBe(15 + PALACE_CITY_CS + 3 * ENVOY_CITY_CS);
-    // the strongest melee it has fielded, not its population or its type
+    // a Warrior stays under the minor's own start value
     spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 9).index, cs.seat);
     expect(cs.bestMeleeCS).toBe(20);
-    expect(centreStrength(state, minorCity(cs))).toBe(20 + 3 + 3);
+    expect(centreStrength(state, minorCity(cs))).toBe(15 + 3 + 3);
+    // the strongest melee it has fielded, not its population or its type
+    spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 10, 10).index, cs.seat);
+    expect(centreStrength(state, minorCity(cs))).toBe(25 + 3 + 3);
   });
 });

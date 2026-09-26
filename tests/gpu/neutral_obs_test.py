@@ -220,7 +220,7 @@ def check_driver_units(sim, st, row: int, nobs: list, mask: torch.Tensor) -> int
 # the sim attribute each unit action column the driver names stood in
 ACT_ATTRS = {
     "SPREAD_HERE": "_A_SPREAD", "FOUND_CITY": "_A_FOUND", "EXCAVATE": "_A_EXCAVATE", "PARK": "_A_PARK",
-    "PROMOTE_0": "_A_PROMOTE", "CONDEMN_0": "_A_CONDEMN", "REMOVE_HERESY": "_A_HERESY",
+    "PROMOTE_0": "_A_PROMOTE", "CONDEMN": "_A_CONDEMN", "REMOVE_HERESY": "_A_HERESY",
     "LAUNCH_INQUISITION": "_A_INQUISITION", "CONVERT_HEATHEN": "_A_HEATHEN", "AIR_STRIKE_0": "_A_AIR_STRIKE",
     "REBASE_0": "_A_REBASE", "SPY_TRAVEL_0": "_A_SPY_TRAVEL", "SPY_MISSION_0": "_A_SPY_MISSION",
     "DEPLOY_0": "_A_DEPLOY", "RETURN_TO_BASE": "_A_RETURN", "PRIORITY_TARGET_0": "_A_PRIORITY",

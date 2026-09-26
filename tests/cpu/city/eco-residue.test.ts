@@ -23,7 +23,7 @@ import { builderJobAt, jobCtx } from '../../../cpu/core/targetSites';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { GREAT_PEOPLE, GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { GOVERNMENT_LIST, POLICY_LIST } from '../../../cpu/data/policies';
-import { CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_PER_TURN_DROP, GAME_SPEED } from '../../../cpu/data/constants';
+import { CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_PER_TURN_DROP, GAME_SPEED, POLICY_UNLOCK_K_BASE, POLICY_UNLOCK_K_PER_TECH, POLICY_UNLOCK_ROUND } from '../../../cpu/data/constants';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, GameState, SeatActionRecord } from '../../../cpu/core/types';
 
@@ -53,28 +53,30 @@ describe('the policy unlock', () => {
     return state;
   }
 
-  it('is free the turn after a civic, then the maximum, dropping a step a turn to the minimum', () => {
+  it('is free the turn after a civic, then the maximum, dropping a step a turn to the minimum, times k', () => {
     const state = scene();
     const s = seatOf(state, 0)!;
-    s.government.civicTurn = 10;
-    state.turn = 11;
-    expect(policyUnlockCost(state, 0)).toBe(0);
-    state.turn = 12;
-    expect(policyUnlockCost(state, 0)).toBe(CIVIC_UNLOCK_MAX_COST);
-    state.turn = 13;
-    expect(policyUnlockCost(state, 0)).toBe(CIVIC_UNLOCK_MAX_COST - CIVIC_UNLOCK_PER_TURN_DROP);
-    state.turn = 100;
-    expect(policyUnlockCost(state, 0)).toBe(CIVIC_UNLOCK_MIN_COST);
     expect([CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST]).toEqual([50, 5, 10]);
+    expect([POLICY_UNLOCK_K_BASE, POLICY_UNLOCK_K_PER_TECH, POLICY_UNLOCK_ROUND]).toEqual([15, 1, 5]);
+    s.government.civicTurn = 10;
+    // no techs: k = 1.5 — 75, 67.5 rounded half up to 70, the floor 15
+    s.research.techs = [];
+    const at = (turn: number) => { state.turn = turn; return policyUnlockCost(state, 0); };
+    expect([at(11), at(12), at(13), at(100)]).toEqual([0, 75, 70, 15]);
+    // 31 techs: k = 4.6 — the lab's jump to 230 at 31 techs, 207 to 205, the
+    // floor 46 to 45
+    s.research.techs = Array.from({ length: 31 }, (_, i) => `TECH_${i}`);
+    expect([at(11), at(12), at(13), at(100)]).toEqual([0, 230, 205, 45]);
   });
 
   it('charges a government change outside the window once, and refuses one the purse cannot meet', () => {
     const state = scene();
     const s = seatOf(state, 0)!;
     s.government.civicTurn = 1;
-    state.turn = 5; // three turns past the window
+    s.research.techs = [];
+    state.turn = 5; // three turns past the window: the row's 40 at k = 1.5
     const cost = policyUnlockCost(state, 0);
-    expect(cost).toBe(CIVIC_UNLOCK_MAX_COST - 2 * CIVIC_UNLOCK_PER_TURN_DROP);
+    expect(cost).toBe(60);
     s.treasury = cost - 1;
     applySeatActionRecord(state, s, REC(GOV('OLIGARCHY')));
     expect(seatGovernment(state, 0)).toBe('AUTOCRACY');

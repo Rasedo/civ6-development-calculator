@@ -1,5 +1,5 @@
 
-import { PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST } from '../data/constants';
+import { PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, POLICY_UNLOCK_K_BASE, POLICY_UNLOCK_K_PER_TECH, POLICY_UNLOCK_ROUND } from '../data/constants';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { TerrainId, Tile } from '../../world/types';
 import { hiddenResourcesFor } from './seats';
@@ -1519,15 +1519,20 @@ export function adoptGovernment(state: GameState, seat: number, index: number): 
 /** THE POLICY UNLOCK's Gold for seat `seat` this turn: 0 in the free window
  *  (the turn after the seat completed a civic, `GovernmentState.civicTurn`),
  *  else `CIVIC_UNLOCK_MAX_COST` the first turn past it, dropping by
- *  `CIVIC_UNLOCK_PER_TURN_DROP` each further turn to `CIVIC_UNLOCK_MIN_COST`.
- *  One payment opens the government and the cards for the turn
- *  (`UNLOCK_POLICIES`). `_policy_unlock_cost` is the twin. */
+ *  `CIVIC_UNLOCK_PER_TURN_DROP` each further turn to `CIVIC_UNLOCK_MIN_COST`,
+ *  times k = (POLICY_UNLOCK_K_BASE + POLICY_UNLOCK_K_PER_TECH × the seat's
+ *  researched techs) / 10, rounded to the nearest POLICY_UNLOCK_ROUND (halves
+ *  up) in integers. One payment opens the government and the cards for the
+ *  turn (`UNLOCK_POLICIES`). `_policy_unlock_cost` is the twin. */
 export function policyUnlockCost(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
   const past = state.turn - 1 - s.government.civicTurn;
   if (past <= 0) return 0;
-  return Math.max(CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_MAX_COST - CIVIC_UNLOCK_PER_TURN_DROP * (past - 1));
+  const row = Math.max(CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_MAX_COST - CIVIC_UNLOCK_PER_TURN_DROP * (past - 1));
+  const k10 = POLICY_UNLOCK_K_BASE + POLICY_UNLOCK_K_PER_TECH * s.research.techs.length;
+  const step = 10 * POLICY_UNLOCK_ROUND;
+  return POLICY_UNLOCK_ROUND * Math.floor((row * k10 + step / 2) / step);
 }
 
 /** Would `adoptGovernment(state, seat, index)` CHANGE the government the

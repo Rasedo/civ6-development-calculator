@@ -14,7 +14,7 @@ import { hexDistance, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isImpassable, isWater, isMountain } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnUnit } from './units';
+import { tradeWalkPath, tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnUnit } from './units';
 import { TRADE_ROAD_MAX_STEPS } from '../data/constants';
 import { civEraIndex } from './city';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
@@ -184,11 +184,10 @@ export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: 
   }
 }
 
-/** CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to the
- *  yields of every Trade Route which passes through this city" — the
- *  DESTINATION's post, which `routeChainGold` cannot double because the
- *  stored chain never holds the destination. Jakarta's suzerain pays
- *  the same city again. */
+/** The Trading Post this seat holds at a route's foreign DESTINATION: +1
+ *  Gold, the destination's share of the path term's T (`routePathGold`
+ *  counts the cities the path crosses). Jakarta's suzerain pays the same
+ *  city again. */
 export function routePostGold(state: GameState, seat: number, destCenter: number): number {
   if (!(seatOf(state, seat)?.tradingPosts ?? []).includes(destCenter)) return 0;
   return 1 + (suzerainEffect(state, seat, 'routePostGold') ? 1 : 0);
@@ -227,31 +226,74 @@ export function routeDestLuxuryGold(state: GameState, seat: number, dest: City):
   return AMSTERDAM_DEST_LUXURY_GOLD * seen.size;
 }
 
-/** CIV6 (Trading Post): "Every Trading Post for your civilization through
- *  which a route passes along its course adds +1 Gold to its total yield",
- *  and "Each foreign Trading Post also adds +1 Gold to the yields of every
- *  Trade Route which passes through this city" — the stored CHAIN is the
- *  course: each chain city pays 1 (the owner's own post, which the chain
- *  rides by construction) plus the OTHER civs' posts standing there. */
+/** The stored CHAIN's own Gold — the modifiers that name a route's Trading
+ *  Posts; the post's own +1 is the path's (`routePathGold`), which the lab
+ *  read on foreign cities alone and never for another civilization's post. */
 export function routeChainGold(state: GameState, seat: number, r: TradeRoute): number {
-  let g = 0;
   // CIV6 (Jakarta): "Your Trading Posts in FOREIGN cities provide +1
   // Gold to your Trade Routes PASSING THROUGH or going to the city" — the
   // passing-through half. The chain rides this seat's own posts by
   // construction, so the only test left is whether the city is foreign.
   const jakarta = suzerainEffect(state, seat, 'routePostGold');
+  // CIV6 (All Roads Lead to Rome): "+1 Gold for passing through Trading
+  // Posts in your own cities" — a chain hop IS one of the seat's posts.
+  const rome = civOf(state, seat) === 'ROME';
+  if (!jakarta && !rome) return 0;
+  let g = 0;
   for (const c of r.chain ?? []) {
     if (!centreHasCity(state, c)) continue;
-    g += 1;
-    if (jakarta && tileSeat(state.map.tiles[c]) !== seat) g += 1;
-    // CIV6 (All Roads Lead to Rome): "+1 Gold for passing through Trading
-    // Posts in your own cities" — a chain hop IS one of the seat's posts.
-    if (civOf(state, seat) === 'ROME' && tileSeat(state.map.tiles[c]) === seat) g += ROME_OWN_POST_GOLD;
-    for (const sx of state.seats) {
-      if (sx.seat !== seat && (sx.tradingPosts ?? []).includes(c)) g += 1;
-    }
+    const own = tileSeat(state.map.tiles[c]) === seat;
+    if (jakarta && !own) g += 1;
+    if (rome && own) g += ROME_OWN_POST_GOLD;
   }
   return g;
+}
+
+/**
+ * THE ROUTE'S PATH TERM (Gathering Storm's transportation efficiency): the
+ * Gold a route earns from its path, D × min(MAX_RATIO, floor(DENOM × S / n)
+ * / DENOM) + T. D is the Gold the destination's own rows pay the leg
+ * (`District_TradeRouteYields`, a city-state's flat Gold); n every plot of
+ * the Trader's path, both ends included; S the path's score — WATER per
+ * water plot and RAIL per railroad plot past the origin, PORTAL per portal
+ * the Trader takes; T one per foreign city the path crosses that holds this
+ * seat's Trading Post (the destination's own post is `routePostGold`). The
+ * path is the engine's own (`tradeWalkPath` at the seat's water level); a
+ * pair no descent reaches has none and earns nothing here.
+ */
+export const ROUTE_PATH_WATER = srcConst('trade.pathWater', 2,
+  xml('GlobalParameters', 'Name=TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_SCORE_WATER_TILE', 'Value'));
+export const ROUTE_PATH_RAIL = srcConst('trade.pathRail', 2, {
+  ...xml('GlobalParameters', 'Name=TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_SCORE_BEST_ROUTE_TILE', 'Value'),
+  note: 'the best route is the Railroad; the lab laid them one plot at a time',
+});
+export const ROUTE_PATH_PORTAL = srcConst('trade.pathPortal', 15,
+  xml('GlobalParameters', 'Name=TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_SCORE_PORTAL_USE', 'Value'));
+export const ROUTE_PATH_MAX_RATIO = srcConst('trade.pathMaxRatio', 1,
+  xml('GlobalParameters', 'Name=TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_MAX_RATIO', 'Value'));
+export const ROUTE_PATH_DENOM = srcConst('trade.pathDenom', 256, {
+  lab: 'runs/trade_path_20260926T_c20.jsonl (railroads one plot at a time: D x floor(512/n)/256 per plot)'
+    + ' and runs/trade_sweep_20260926T.jsonl (1,948 of 1,948 gold rows)',
+  note: 'the ratio is floored to 256ths; _SCORE_MULTIPLE_DOMAINS 15 enters nowhere',
+});
+
+export function routePathGold(state: GameState, seat: number, originCenter: number, destCenter: number, d: number): number {
+  const path = tradeWalkPath(state, originCenter, destCenter, tradeWaterLevel(state, seat));
+  if (!path) return 0;
+  const tiles = state.map.tiles;
+  const posts = seatOf(state, seat)?.tradingPosts ?? [];
+  let score = 0;
+  let t = 0;
+  for (let i = 1; i < path.length; i++) {
+    const at = tiles[path[i]];
+    const prev = tiles[path[i - 1]];
+    if (isWater(at)) score += ROUTE_PATH_WATER;
+    if (at.railroad) score += ROUTE_PATH_RAIL;
+    if (hexDistance(prev.col, prev.row, at.col, at.row) > 1) score += ROUTE_PATH_PORTAL;
+    if (i < path.length - 1 && tileSeat(at) !== seat && posts.includes(at.index) && centreHasCity(state, at.index)) t += 1;
+  }
+  const eff = Math.min(ROUTE_PATH_MAX_RATIO * ROUTE_PATH_DENOM, Math.floor((ROUTE_PATH_DENOM * score) / path.length));
+  return (d * eff) / ROUTE_PATH_DENOM + t;
 }
 
 /** CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2 Gold for
@@ -732,9 +774,12 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     // a city-state's one city: Democracy's destination half of a suzerain's
     // route in, then its own routes out
     addYields(out, incomingAllyRouteYields(state, city));
-    for (const r of seatOf(state, seat)?.tradeRoutes ?? []) {
+    const minor = seatOf(state, seat);
+    for (const r of minor?.tradeRoutes ?? []) {
       const y = minorRouteYields(state, r);
-      if (y) addYields(out, y);
+      if (!y) continue;
+      addYields(out, y);
+      out.gold += routePathGold(state, seat, city.centerIndex, routeDestCenter(state, minor!, r), y.gold);
     }
     return out;
   }
@@ -784,8 +829,10 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       if (cityState) {
         // SOVEREIGNTY outcome A doubles what a minor of the named TYPE pays
         // the route sent to it.
-        addYields(out, cityStateRouteYields(
-          cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type))));
+        const csPay = cityStateRouteYields(
+          cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type)));
+        addYields(out, csPay);
+        out.gold += routePathGold(state, seat, city.centerIndex, cityState.centerIndex, csPay.gold);
         // a SURVIVED City-State Emergency pays its target +2 gold on every
         // minor leg, forever
         out.gold += emergencyCsRouteGold(state, seat);
@@ -809,6 +856,8 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity) {
         addYields(out, routeYieldsInternational(state, city, civCity, seat));
+        out.gold += routePathGold(state, seat, city.centerIndex, civCity.centerIndex,
+          districtRouteYields(state, civCity, 'international').gold);
         // CIV6 (Religious Community): the ORIGIN's worship buildings, on this leg
         out.gold += religiousCommunityGold(state, seat, city);
         // CIV6 (Sahel Merchants): the ORIGIN's own flat Desert, on this leg
@@ -865,6 +914,8 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
     if (dest) {
       addYields(out, routeYields(state, dest));
+      out.gold += routePathGold(state, seat, city.centerIndex, dest.centerIndex,
+        districtRouteYields(state, dest, 'domestic').gold);
       out.gold += routeLengthGold(state, seat, city.centerIndex, dest.centerIndex, route);
       // CIV6 (Raja Todar Mal): "+0.5 Gold for each specialty district at the
       // destination" of a route to your own city

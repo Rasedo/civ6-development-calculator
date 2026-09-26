@@ -28,9 +28,11 @@ function scoreCounts(state: GameState, s: Seat): Record<ScoreCount, number> {
   const wonders = seatWonders(state, s.seat).length;
   let districts = wonders; // each completed wonder stands on its own district
   let population = 0;
+  let buildings = 0;
   for (const c of s.cities) {
     districts += completedDistrictCount(state, c, false);
     population += c.population;
+    buildings += c.buildings.length;
   }
   const r = s.religion;
   return {
@@ -43,6 +45,7 @@ function scoreCounts(state: GameState, s: Seat): Record<ScoreCount, number> {
     religion: [r.follower, r.founder, r.worship, r.enhancer].filter((b) => b != null).length,
     techs: s.research.techs.length,
     wonders,
+    buildings,
   };
 }
 

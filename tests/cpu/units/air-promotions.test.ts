@@ -441,14 +441,15 @@ describe('the bomber wrecks what a tile carries', () => {
     expect(seat.treasury).toBe(0);
   });
 
-  it('half health is not more than half, and SUPERFORTRESS says so', () => {
-    // CIV6 (Bomber): a bomber needs "more than 50% health to do so (or the
-    // Superfortress Promotion, which removes the minimum health requirement)".
-    expect(bomb('FARM', 51).t.pillaged).toBe(true);
-    const hurt = bomb('FARM', 50);
+  it('half health is enough, 49 is not, and SUPERFORTRESS lifts the bar', () => {
+    // CIV6 (Air Strikes): "at 50% health or higher" — runs/air_bomb50_20260926T.jsonl
+    // pillaged at 51 and 50 HP left, not at 49; (Superfortress) "No minimum
+    // health requirement to air pillage."
+    expect(bomb('FARM', 50).t.pillaged).toBe(true);
+    const hurt = bomb('FARM', 49);
     expect(hurt.offered).toBe(false);
     expect(hurt.t.pillaged).toBe(false);
-    expect(bomb('FARM', 50, bit('AIR_BOMBER', 'SUPERFORTRESS')).t.pillaged).toBe(true);
+    expect(bomb('FARM', 49, bit('AIR_BOMBER', 'SUPERFORTRESS')).t.pillaged).toBe(true);
   });
 
   it('a fighter is offered nothing to wreck', () => {

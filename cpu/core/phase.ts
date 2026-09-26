@@ -13,7 +13,7 @@ import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
-import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches } from './combat';
+import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, awardDefenseXp, encircled, stackDefender, unitAttackRange } from './combat';
@@ -27,7 +27,8 @@ import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBo
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_COST_PCT, LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS } from '../data/cityStates';
-import { freeCityBuild, freeCityResearch } from './minorBuild';
+import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
+import { FREE_CITY_PAIR_CLASS } from '../data/seats';
 import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -85,7 +86,7 @@ const A_FORM_UP = unitActionIndex(IMPROVEMENT_IDS).FORM_UP_0;
 const A_ESCORT = unitActionIndex(IMPROVEMENT_IDS).ESCORT;
 const A_BREAK_ESCORT = unitActionIndex(IMPROVEMENT_IDS).BREAK_ESCORT;
 const A_PROMOTE = unitActionIndex(IMPROVEMENT_IDS).PROMOTE_0;
-const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN_0;
+const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN;
 const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
 const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION;
 const A_EVANGELIZE = unitActionIndex(IMPROVEMENT_IDS).EVANGELIZE_BELIEF;
@@ -615,10 +616,19 @@ export function flipCity(state: GameState, city: City): void {
     return;
   }
   const free = freeSeatOf(state);
+  const pair = freeCityPairType(state, city.seat);
   transferCity(state, city.seat, free, city, 'revolted');
   const freed = free.cities[free.cities.length - 1];
-  const pair = eraUnitOfClass('MELEE', Math.max(0, worldEraIndex(state)));
   if (pair) for (let k = 0; k < FREE_CITY_PAIR_COUNT; k++) grantFreeCityUnit(state, freed, pair);
+}
+
+/** THE REVOLT'S PAIR: the strongest `FREE_CITY_PAIR_CLASS` chassis the
+ *  FORMER OWNER's techs and civics unlock (`trainableIn`; a grant asks no
+ *  strategic resource — the watched pairs were Swordsmen and Musketmen;
+ *  `minorBestOfClass`, ties by catalog order). */
+export function freeCityPairType(state: GameState, formerOwner: number): string | null {
+  const r = seatOf(state, formerOwner)?.research ?? { techs: [], civics: [] };
+  return minorBestOfClass(trainableIn(r, true), FREE_CITY_PAIR_CLASS);
 }
 
 /** THE ERA'S CHASSIS of a promotion class: the class's generic land chain (no
@@ -640,7 +650,8 @@ export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
 }
 
 /** A FREE CITY's granted unit. The Free Cities player's revolt hands it
- *  `FREE_CITY_PAIR_COUNT` of the world era's melee on the flip turn, and
+ *  `FREE_CITY_PAIR_COUNT` of the former owner's best melee on the flip turn
+ *  (`freeCityPairType`), and
  *  every `FREE_CITY_GRANT_PERIOD`th of its turns while it stays Free one more
  *  (`freeCityGrantType`). Each stands on the first free land tile beside the
  *  centre, in direction order; with none free it is not granted. The unit
@@ -1690,9 +1701,8 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         if (nb) formUp(state, unit, nb.index);
         return;
       }
-      if (a >= A_CONDEMN && a < A_CONDEMN + 6) {
-        const nb = neighborTile(state.map, here, a - A_CONDEMN);
-        if (nb) condemnHeretic(state, unit, nb.index);
+      if (a === A_CONDEMN) {
+        condemnHeretic(state, unit);
         return;
       }
       if (a === A_REMOVE_HERESY) {
@@ -2085,16 +2095,17 @@ export function cityStrikes(state: GameState, city: City, strikeCS: number): voi
     for (const t of state.map.tiles) {
       const d = hexDistance(origin.col, origin.row, t.col, t.row);
       if (d < 1 || d > 2) continue;
-      // ANY unit hostile to the city's seat: a city's strike picks its target
-      // by distance, never by which enemy the unit belongs to.
-      if (visibleHostilesAt(state, t.index, striker).length === 0) continue;
+      // ANY unit hostile to the city's seat that a shot may take (`shootable`:
+      // never a civilian): a city's strike picks its target by distance, never
+      // by which enemy the unit belongs to.
+      if (!visibleHostilesAt(state, t.index, striker).some(shootable)) continue;
       if (d < bestDist) {
         bestDist = d;
         bestTile = t.index;
       }
     }
     if (bestTile < 0) return;
-    const defender = stackDefender(state, visibleHostilesAt(state, bestTile, striker), true); // a city strike is a SHOT
+    const defender = stackDefender(state, visibleHostilesAt(state, bestTile, striker).filter(shootable), true); // a city strike is a SHOT
     const defCSa = cityStrikeDefenderCS(state, defender, state.map.tiles[bestTile], city.seat);
     // a survived Military Emergency pays its target +2 CS on every City
     // Strike against a member, forever. CIV6 (Expansion1_Emergencies.xml):

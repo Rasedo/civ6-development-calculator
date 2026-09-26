@@ -2728,10 +2728,16 @@ class SimEconomy:
         """[B] float64 — THE POLICY UNLOCK's Gold this turn: 0 in the free
         window (the turn after the seat completed a civic), else the maximum
         the first turn past it, dropping by the step each further turn to the
-        minimum. `policyUnlockCost`'s twin."""
+        minimum, times k = (base + per-tech x the seat's techs) / 10, rounded
+        to the nearest step (halves up) in integers. `policyUnlockCost`'s
+        twin."""
         mx, drop, mn = self.rules.civic_unlock
-        past = (self.turn - 1 - self.civ_civic_turn[:, row]).double()
-        cost = torch.clamp(mx - drop * (past - 1), min=mn)
+        kb, kt, rnd = self.rules.policy_unlock_k
+        past = (self.turn - 1 - self.civ_civic_turn[:, row]).long()
+        base = torch.clamp(mx - drop * (past - 1), min=mn)
+        k10 = kb + kt * self.civ_techs[:, row].long().sum(dim=1)
+        step = 10 * rnd
+        cost = (rnd * torch.div(base * k10 + step // 2, step, rounding_mode="floor")).double()
         return torch.where(past <= 0, torch.zeros_like(cost), cost)
 
     def _government_changes(self, row: int, gov: torch.Tensor, ok: torch.Tensor) -> torch.Tensor:
@@ -6645,6 +6651,10 @@ class SimEconomy:
                          + (self.civ_founder[:, row] >= 0).long() + (self.civ_enhancer[:, row] >= 0).long()),
             "techs": self.civ_techs[:, row].long().sum(dim=1),
             "wonders": wonders,
+            # every building the cities hold, pillaged ones too; the Palace
+            # is the capital's term here, a `buildings` entry on TS
+            "buildings": ((self.city_bldg[:, row, : self.RC].long().sum(dim=2)
+                           + self._palace_at(row, slice(0, self.RC)).long()) * alive.long()).sum(dim=1),
         }
         return torch.stack([counts[ln["count"]] * int(ln["value"]) for ln in self.rules.scoring], dim=1)
 

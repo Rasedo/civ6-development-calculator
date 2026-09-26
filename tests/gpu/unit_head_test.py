@@ -51,7 +51,7 @@ def main() -> None:
     imp_ids = rj["improvements"]["ids"]
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
     # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK, the PROMOTE
-    # head, +6 CONDEMN, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
+    # head, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
     # +1 CONVERT_HEATHEN, +1 UPGRADE, the five VARIABLE-width heads, the
     # engineer's +1 BUILD_ROAD, +1 FINISH_DISTRICT and +1 BUILD_RAILROAD, the
     # Great Person's
@@ -74,8 +74,8 @@ def main() -> None:
     # new verb has to come back here, which is the whole reason the lane exists.
     _dpw = sum(1 for n in acts if n.startswith("DEPLOY_"))
     assert _dpw > 0, "the DEPLOY head is empty"
-    want = (13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 30 + 1 + 1 + 1 + 1
-            + _dpw + 1 + dict(heads)["AIR_STRIKE_"] + 1)   # ...+ 1 EVANGELIZE_BELIEF
+    want = (13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 4 + sum(w for _p, w in heads) + 3 + 30 + 1 + 1 + 1 + 1
+            + _dpw + 1 + dict(heads)["AIR_STRIKE_"] + 1 + 1)   # ...+ 1 EVANGELIZE_BELIEF + 1 CONDEMN
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
@@ -103,8 +103,9 @@ def main() -> None:
              # last-appends
              + [f"DEPLOY_{k}" for k in range(_dpw)] + ["RETURN_TO_BASE"]
              + [f"PRIORITY_TARGET_{k}" for k in range(dict(heads)["AIR_STRIKE_"])]
-             # ...and the Apostle's EVANGELIZE BELIEF
-             + ["EVANGELIZE_BELIEF"])
+             # ...and the Apostle's EVANGELIZE BELIEF, then the own-tile
+             # CONDEMN HERETIC
+             + ["EVANGELIZE_BELIEF", "CONDEMN"])
     assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     # AIR_PILLAGE closes the enum rather than sitting in the mid-enum run, so
     # `_last` is what proves its contiguity and the walk below skips it.
@@ -121,11 +122,10 @@ def main() -> None:
         _at_h += _w
     assert _at_h == len(acts) - len(_last), "a head runs past the end of the enum"
     at = {n: i for i, n in enumerate(acts)}
-    assert [acts[at["CONDEMN_0"] + d] for d in range(6)] == [f"CONDEMN_{d}" for d in range(6)], \
-        "CONDEMN block is not one contiguous run"
+    assert not any(n.startswith("CONDEMN_") for n in acts), "a directional CONDEMN column survived"
     assert [acts[at["PROMOTE_0"] + k] for k in range(pcol)] == [f"PROMOTE_{k}" for k in range(pcol)], \
         "the PROMOTE head is not one contiguous run"
-    assert at["PROMOTE_0"] + pcol == at["CONDEMN_0"], "PROMOTE must run straight into CONDEMN"
+    assert at["PROMOTE_0"] + pcol == at["REMOVE_HERESY"], "PROMOTE must run straight into REMOVE_HERESY"
     assert acts[at["FOUND_CITY"]:at["FOUND_CITY"] + 3] == ["FOUND_CITY", "EXCAVATE", "PARK"], \
         "civilian verb tail misplaced"
     assert at["FOUND_CITY"] + 3 == at["PROMOTE_0"], "the civilian tail must run into PROMOTE"

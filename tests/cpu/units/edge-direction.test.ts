@@ -6,7 +6,7 @@ import { neighborTile } from '../../../world/hex';
 
 /**
  * A DIRECTION keeps its slot at the map's edge. The replay surface decodes
- * MOVE_d / ATTACK_d / FORM_UP_d / CONDEMN_d / SPREAD_d against the six hex
+ * MOVE_d / ATTACK_d / FORM_UP_d / SPREAD_d against the six hex
  * directions; the compacted neighbour list drops an off-map slot and would
  * shift every later direction by one — the GPU's `neigh` plane keeps the
  * -1, so the two engines walked apart along an ocean's east edge.

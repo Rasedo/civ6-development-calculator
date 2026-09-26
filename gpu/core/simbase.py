@@ -168,6 +168,7 @@ class Rules:
     faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
     purchase_divisor: int  # every gold / faith price is floored to a multiple of this (PURCHASE_DIVISOR 5, measured)
     civic_unlock: tuple  # (CivicUnlockMaxCost, CivicUnlockPerTurnDrop, CivicUnlockMinCost) — `policyUnlockCost`
+    policy_unlock_k: tuple  # (k's base, k's per-tech step, both in tenths; the rounding step) — `policyUnlockCost`
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
@@ -387,8 +388,10 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         gold_purchase_mult=r["scenario"]["goldPurchaseMult"],
         faith_purchase_mult=r["scenario"]["faithPurchaseMult"],
         purchase_divisor=int(r["scenario"]["purchaseDivisor"]),
-        civic_unlock=(float(r["scenario"]["civicUnlockMaxCost"]), float(r["scenario"]["civicUnlockPerTurnDrop"]),
-                      float(r["scenario"]["civicUnlockMinCost"])),
+        civic_unlock=(int(r["scenario"]["civicUnlockMaxCost"]), int(r["scenario"]["civicUnlockPerTurnDrop"]),
+                      int(r["scenario"]["civicUnlockMinCost"])),
+        policy_unlock_k=(int(r["scenario"]["policyUnlockKBase"]), int(r["scenario"]["policyUnlockKPerTech"]),
+                         int(r["scenario"]["policyUnlockRound"])),
         turn_limit=r["scenario"]["turnLimit"],
         space_ly_target=r["scenario"]["spaceLyTarget"],
         district_cost=r["districtCost"],

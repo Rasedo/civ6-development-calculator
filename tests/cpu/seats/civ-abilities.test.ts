@@ -66,13 +66,13 @@ describe('All Roads Lead to Rome', () => {
     expect(state.map.tiles[theirs.centerIndex].road).toBe(true);
   });
 
-  it('pays +1 Gold for a chain hop through an own city', () => {
+  it('pays +1 Gold for a chain hop through an own city, which pays nobody else', () => {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     const cap = settleAt(state, tileAtCoords(state.map, 6, 6).index, 0);
     const route = { chain: [cap.centerIndex] } as TradeRoute;
-    expect(routeChainGold(state, 0, route)).toBe(1);
+    expect(routeChainGold(state, 0, route)).toBe(0);
     state.seats[0].civ = civ('ROME');
-    expect(routeChainGold(state, 0, route)).toBe(2);
+    expect(routeChainGold(state, 0, route)).toBe(1);
   });
 });
 
