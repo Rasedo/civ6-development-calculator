@@ -774,10 +774,11 @@ class SimSeats:
             return self._ally_at_war_with(row, tgt)
         if cond == 8:
             # CIV6 (War of Retribution): "a player who has broken a promise to
-            # you within the past 30 turns" - the window the break opened
+            # you within the past 30 turns" - the window a break of any kind
+            # opened
             if row >= NM or tgt >= NM:
                 return zero
-            return self.seat_promise_broken[:, row, tgt] > 0
+            return (self.seat_promise_broken[:, row, tgt] > 0).any(dim=1)
         if cond == 9:
             # CIV6 (Ideological War): "a player who is in a different Tier 3
             # government" — both LATE, and not the same one
@@ -10634,7 +10635,7 @@ class SimSeats:
                 if _cpop:
                     _fw = _first & self._row_is(row, _cc, _cl)[rows]
                     self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
-        self._grievance_settled_near(row, found, tile)
+        self._settle_incursion(row, found, tile)
         self._eff_version += 1
         return found
 

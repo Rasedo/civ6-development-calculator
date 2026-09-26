@@ -1046,15 +1046,20 @@ def decide_geo(st, geos: list, seeds=None):
     return den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p
 
 
+# the city-to-city distance at which a seat asks a rival not to settle near
+# it: the promise's reach from the border plus a city's third ring
+SETTLE_ASK_PROXIMITY = 6
+
+
 def _promise_turn(st, geos: list, g: dict, ask_p, keep_p, alive_row, rstr) -> None:
     """THE PROMISES each seat asks and makes. One ask per seat per turn, to
     the lowest-numbered rival and the first kind that qualifies: a promise
     not to SPY of a rival whose spy this seat holds in its cell, not to
     CONVERT of a rival whose religion one of its cities follows, not to DIG of
-    a rival it holds grievances against - with the favor to pay for it and
-    nothing of the kind standing. Don't-settle-near is never asked: no row
-    gives it an incursion. The rival makes the promise when the asker is the
-    stronger, and refuses otherwise."""
+    a rival it holds grievances against, not to SETTLE NEAR of a rival with a
+    city within `SETTLE_ASK_PROXIMITY` of one of its own - with the favor to
+    pay for it and nothing of the kind standing. The rival makes the promise
+    when the asker is the stronger, and refuses otherwise."""
     B, dev, nrow = len(geos), st.device, st.n_majors
     cost = st.promise_cost
     promise = _geo_t(geos, "promise", dev)                           # [B, n, n, kinds]
@@ -1068,7 +1073,8 @@ def _promise_turn(st, geos: list, g: dict, ask_p, keep_p, alive_row, rstr) -> No
             if a == p:
                 continue
             quiet = alive_row[:, a] & alive_row[:, p] & ~war[:, a, p]
-            signal = (spies_held[:, p, a] > 0, converted[:, a, p] > 0, g["grievance"][:, a, p] > 0)
+            signal = (spies_held[:, p, a] > 0, converted[:, a, p] > 0, g["grievance"][:, a, p] > 0,
+                      g["proximity"][:, a, p] <= SETTLE_ASK_PROXIMITY)
             for k, why in enumerate(signal):
                 sel = (quiet & why & ~taken[:, a] & (favor[:, a] >= cost[k])
                        & (promise[:, a, p, k] == 0))

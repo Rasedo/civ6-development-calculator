@@ -899,4 +899,5 @@ _MUTABLE = [
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_gpp_turn",  # Great Person points EARNED this turn, per class (a competition reads it)
     "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",
+    "volcano_active", "tile_event_fired",  # the turn's random event: waking volcanoes, first occurrences
 ]

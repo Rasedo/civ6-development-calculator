@@ -1135,6 +1135,7 @@ class SimEconomy:
         # CIV6 (Aid Request trigger): the rows whose city loses population this phase
         self._aid_hit = torch.zeros(B, self.n_majors, dtype=torch.bool, device=dev)
 
+        self._wake_volcanoes()
         # CIV6 (RANDOM_EVENT_START_TURN): no event fires before its first turn,
         # and no draw is spent
         if int(self.turn) >= self._random_event_start_turn:
@@ -1179,6 +1180,51 @@ class SimEconomy:
         self._eff_version += 1
 
     # ---- THE TURN'S ONE RANDOM EVENT ---------------------------------------
+
+    def _wake_volcanoes(self) -> None:
+        """`wakeVolcanoes` — every volcano starts DORMANT, and each dormant one
+        WAKES at `_volcano_wake_p` a turn: ONE draw per dormant volcano, in
+        ascending tile order, every turn. An active volcano stays active."""
+        dormant = self.volcano_at & ~self.volcano_active
+        if not bool(dormant.any()):
+            return
+        order = dormant.long().cumsum(dim=1) * dormant.long()
+        for k in range(1, int(order.max()) + 1):
+            at = order == k
+            hit = at.any(dim=1)
+            t = at.long().argmax(dim=1)
+            r = self._next_random(hit)
+            woke = (hit & (r < self._volcano_wake_p)).nonzero(as_tuple=True)[0]
+            self.volcano_active[woke, t[woke]] = True
+
+    def _flood_open(self) -> torch.Tensor:
+        """[B, n_sites] `riverRevealed` over the flood sites: a river floods
+        once any major has revealed a plot of it — its component's plots
+        (`river_comp`), a lone Floodplains plot its own. With no fog every
+        river is revealed."""
+        idx, _n = self._flood_sites
+        ok = idx >= 0
+        if not self.fog_of_war:
+            return ok
+        seen = self.seat_explored.any(dim=1)  # [B, T]
+        start = idx.clamp(min=0)
+        comp = self.river_comp.gather(1, start)  # [B, n_sites]
+        on = (self.river_comp.unsqueeze(1) == comp.unsqueeze(2)) & (comp >= 0).unsqueeze(2)
+        return ok & ((on & seen.unsqueeze(1)).any(dim=2) | seen.gather(1, start))
+
+    def _site_pick(self, shares: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
+        """[B] the column of `shares` [B, X] (hundredths, 0 where no site) a
+        draw lands on: the first site whose running share passes `u` [B], the
+        last site when `u` passes them all — `randomEvent`'s walk over the
+        sites that stand."""
+        X = shares.shape[1]
+        run = shares.cumsum(dim=1)
+        live = shares > 0
+        col = torch.arange(X, device=self.device).unsqueeze(0).expand_as(shares)
+        past = live & (run.double() > u.unsqueeze(1))
+        first = torch.where(past, col, torch.full_like(col, X)).min(dim=1).values
+        last = torch.where(live, col, torch.full_like(col, -1)).max(dim=1).values
+        return torch.where(first < X, first, last).clamp(min=0)
 
     # the draw's families (`EventFamily`)
     _EV_ERUPTION, _EV_FLOOD, _EV_STORM, _EV_ACCIDENT, _EV_DROUGHT, _EV_METEOR, _EV_FIRE = range(7)
@@ -1436,12 +1482,20 @@ class SimEconomy:
         self._eff_version += 1
 
     def _drought_cands(self) -> torch.Tensor:
-        """[B, T] `droughtCandidate` — the plots a drought may centre on now:
-        its ground (`drought_cand`, static), above water, and CIV6 "devoid of
-        all Features" — no live feature stands there (a chopped or melted one
-        is gone, an arrived Volcanic Soil is one)."""
-        featureless = (self.feat_id < 0) | self.feat_stripped
-        return self.drought_cand & featureless & ~self.tile_submerged
+        """[B, T] `droughtCandidate` — the plots a drought may start on now:
+        the plot and all six of its neighbours are dry ground — the ground
+        (`drought_cand`, static) above water and CIV6 "devoid of all Features"
+        (no live feature: a chopped or melted one is gone, an arrived Volcanic
+        Soil is one), a district's plot or a city centre counting as
+        featureless. A plot on the map's edge lacks a neighbour and never
+        qualifies."""
+        featureless = (self.feat_id < 0) | self.feat_stripped | (self.district >= 0) | self._centre_plane()
+        dry = self.drought_cand & featureless & ~self.tile_submerged
+        out = dry.clone()
+        for d in range(6):
+            n = self.neigh[:, d]  # [T]
+            out &= (n >= 0).unsqueeze(0) & dry[:, n.clamp(min=0)]
+        return out
 
     def _drought_sites(self, cand: torch.Tensor) -> torch.Tensor:
         """[B, T] `droughtSites` — the city centres (a major's, a Free City's,
@@ -1517,35 +1571,39 @@ class SimEconomy:
         return out
 
     def _random_event(self, strip: torch.Tensor) -> None:
-        """`randomEvent` — THE TURN'S ONE RANDOM EVENT, MEASURED (C-74-S1): at
-        most one event a turn. Each eligible (row, site) pair fires with the
-        absolute chance p = weight / N — N the per-site normaliser for a
-        flood, an eruption or an accident, the per-map one for a storm, a
-        drought, the meteor or a fire (`eventNorm`) — the turn is EMPTY with
-        what is left, and chances summing past 1 are scaled to sum to 1. ONE
-        draw `at = r * max(1, total)` walks the rows in table order: the row
-        whose cumulative chance first exceeds `at` fires, at site
-        `floor((at - chance before it) / p)`; past the last, nothing fires. A
-        storm, the meteor and a fire is ONE site when its start plot exists
-        anywhere, and its plot is a second draw; a drought is one site while a
-        city holds a start plot in reach (`_drought_sites`), its plot three
-        more draws (`_drought_start`); a flood has one site per river, a
-        volcano's eruption one per ACTIVE volcano, a natural wonder's one
-        while the wonder stands (its plots together), an accident one per
-        city — a major's or a Free City's — whose reactor has reached the
-        row's `MinTurnAtRisk`. The draw is spent every turn, eligible or
-        not."""
-        B, dev = self.B, self.device
+        """`randomEvent` — THE TURN'S ONE RANDOM EVENT, MEASURED
+        (`runs/event_history_*`, `runs/c74s2_turn_c74s2_duel*`): at most one
+        event a turn. Each (row, site) pair fires with the absolute chance
+        p·b, p = weight / N — N the per-site normaliser for a flood, an
+        eruption or an accident, the per-map one for a storm, a drought, the
+        meteor or a fire (`eventNorm`) — and b the site's share in hundredths:
+        a per-site pair not yet fired this game carries 100 + the
+        first-occurrence boost, one that has 100 (`tile_event_fired` on its
+        key plot); a row counted once per map is one share of 100 whether or
+        not its start plot exists. The turn is EMPTY with what is left, and
+        chances summing past 1 are scaled to sum to 1. ONE draw
+        `at = r * max(1, total)` walks the rows in table order: the row whose
+        cumulative chance first exceeds `at` fires, at the first site whose
+        running share passes `(at - chance before it) / p * 100`
+        (`_site_pick`); past the last row, nothing fires. A drawn row that
+        finds no start plot is an empty turn: a storm's, the meteor's and a
+        fire's plot is a second draw, a drought's three more
+        (`_drought_start`). The sites: a flood one per river a major has
+        revealed (`_flood_open`), keyed on its start plot; a volcano's
+        eruption one per ACTIVE volcano; a natural wonder's one while it
+        stands, keyed on its lowest-index plot; an accident one per city — a
+        major's or a Free City's — whose reactor has reached the row's
+        `MinTurnAtRisk`, keyed on its centre. The draw is spent every turn,
+        eligible or not."""
+        B, T, dev = self.B, self.T, self.device
         every = torch.ones(B, dtype=torch.bool, device=dev)
         rows = self._event_rows()
         per_site = (self._EV_FLOOD, self._EV_ERUPTION, self._EV_ACCIDENT)
         per = [w / (self._event_norm_site if fam in per_site else self._event_norm_map) for fam, _s, w in rows]
         # `stormFamilyAt` is null on a SUBMERGED tile: while nothing has
         # drowned the static per-family lists are the live sets; after a
-        # sea-level rise the count and the pick read the live mask
+        # sea-level rise the pick reads the live mask
         drowned = bool(self.tile_submerged.any())
-        fam_n = [(((self.storm_fam == f) & ~self.tile_submerged).sum(dim=1) if drowned else self._storm_lists[f][1])
-                 for f in range(len(self._storm_lists))]
         reactor = self._reactor_plane()
         acc_sites = [reactor >= g for g in self._accident_min_turn]
         wonder = [self._wonder_plots(f) for f in self._er_wonder_fid]
@@ -1553,39 +1611,53 @@ class SimEconomy:
         dry_sites = self._drought_sites(dry_cand)
         met_cand = self._meteor_cands()
         fire_cand = [self._fire_cands(s) for s in range(len(self._fire_weight))]
-        counts: list[torch.Tensor] = []
+        every_plot = torch.arange(T, device=dev).unsqueeze(0).expand(B, T)
+        no_key = torch.full((B, 1), -1, dtype=torch.long, device=dev)
+        # per row: each site's key plot and whether it stands, [B, X]
+        keys: list[torch.Tensor] = []
+        stand: list[torch.Tensor] = []
         for fam, s, _w in rows:
             if fam == self._EV_FLOOD:
-                counts.append(self._flood_sites[1])
+                keys.append(self._flood_sites[0])
+                stand.append(self._flood_open())
+            elif fam == self._EV_ERUPTION and self._er_on_volcano[s]:
+                keys.append(every_plot)
+                stand.append(self.volcano_active)
             elif fam == self._EV_ERUPTION:
-                counts.append(self._volc_n if self._er_on_volcano[s] else wonder[s].any(dim=1).long())
-            elif fam == self._EV_STORM:
-                counts.append((fam_n[self._st_family[s]] > 0).long())
+                keys.append(wonder[s].long().argmax(dim=1, keepdim=True))
+                stand.append(wonder[s].any(dim=1, keepdim=True))
             elif fam == self._EV_ACCIDENT:
-                counts.append(acc_sites[s].sum(dim=1))
-            elif fam == self._EV_DROUGHT:
-                counts.append(dry_sites.any(dim=1).long())
-            elif fam == self._EV_METEOR:
-                counts.append(met_cand.any(dim=1).long())
+                keys.append(every_plot)
+                stand.append(acc_sites[s])
             else:
-                counts.append(fire_cand[s].any(dim=1).long())
+                keys.append(no_key)
+                stand.append(torch.ones(B, 1, dtype=torch.bool, device=dev))
+        shares: list[torch.Tensor] = []
+        for i, (fam, _s, _w) in enumerate(rows):
+            if fam in per_site:
+                fired = (self.tile_event_fired.gather(1, keys[i].clamp(min=0)) >> i) & 1
+                b = 100 + self._first_boost * (1 - fired)
+            else:
+                b = torch.full_like(keys[i], 100)
+            shares.append(torch.where(stand[i], b, torch.zeros_like(b)))
         cum: list[torch.Tensor] = []
         total = torch.zeros(B, dtype=torch.float64, device=dev)
-        for w, n in zip(per, counts):
-            total = total + w * n.double()
+        for w, sh in zip(per, shares):
+            total = total + w * sh.sum(dim=1).double() / 100.0
             cum.append(total)
         at = self._next_random(every) * total.clamp(min=1.0)
         ev = torch.full((B,), -1, dtype=torch.long, device=dev)
-        k = torch.zeros(B, dtype=torch.long, device=dev)
+        key = torch.full((B,), -1, dtype=torch.long, device=dev)
         done = torch.zeros(B, dtype=torch.bool, device=dev)
         before = torch.zeros(B, dtype=torch.float64, device=dev)
-        for i, (w, n) in enumerate(zip(per, counts)):
-            take = ~done & (n > 0) & (w > 0) & (at < cum[i])
-            w1 = torch.where(w > 0, w, torch.ones_like(w))
-            kk = torch.floor((at - before) / w1).to(torch.long)
-            kk = torch.minimum(kk, n - 1).clamp(min=0)
-            ev = torch.where(take, torch.full_like(ev, i), ev)
-            k = torch.where(take, kk, k)
+        for i, (w, sh) in enumerate(zip(per, shares)):
+            take = ~done & (sh.sum(dim=1) > 0) & (w > 0) & (at < cum[i])
+            if bool(take.any()):
+                w1 = torch.where(w > 0, w, torch.ones_like(w))
+                col = self._site_pick(sh, (at - before) / w1 * 100.0)
+                kt = keys[i].gather(1, col.unsqueeze(1)).squeeze(1)
+                ev = torch.where(take, torch.full_like(ev, i), ev)
+                key = torch.where(take, kt, key)
             done = done | take
             before = cum[i]
         if not bool(done.any()):
@@ -1595,14 +1667,16 @@ class SimEconomy:
         evc = ev.clamp(min=0)
         fam = torch.where(done, fam_of[evc], torch.full_like(ev, -1))
         sev = sev_of[evc]
+        # the fired (row, site) pair loses its first-occurrence boost
+        mark = (done & (key >= 0)).nonzero(as_tuple=True)[0]
+        if mark.numel():
+            self.tile_event_fired[mark, key[mark]] |= torch.bitwise_left_shift(torch.ones_like(evc[mark]), evc[mark])
 
         hit = fam == self._EV_FLOOD
         if bool(hit.any()):
-            idx = self._flood_sites[0]
-            tile = idx.gather(1, k.clamp(max=idx.shape[1] - 1).unsqueeze(1)).squeeze(1)
             # the flood tables are read for every game of the batch, so a game
             # whose row is another family's reads a clamped (unused) index
-            self._flood_river(hit, tile, sev.clamp(min=0, max=self._flood_dmg_lo.numel() - 1))
+            self._flood_river(hit, key.clamp(min=0), sev.clamp(min=0, max=self._flood_dmg_lo.numel() - 1))
 
         for r in range(len(self._eruption_weight)):
             hit = (fam == self._EV_ERUPTION) & (sev == r)
@@ -1611,9 +1685,7 @@ class SimEconomy:
             if not self._er_on_volcano[r]:
                 ring = self._eruption_ring(hit, wonder[r])
             else:
-                vt = self.volcano_tile
-                tile = vt.gather(1, k.clamp(max=vt.shape[1] - 1).unsqueeze(1)).squeeze(1)
-                ring = torch.where(hit.unsqueeze(1), self.neigh[tile.clamp(min=0)],
+                ring = torch.where(hit.unsqueeze(1), self.neigh[key.clamp(min=0)],
                                    torch.full((B, 6), -1, dtype=torch.long, device=dev))
             self._erupt(hit, ring, torch.full((B,), r, dtype=torch.long, device=dev))
 
@@ -1658,10 +1730,7 @@ class SimEconomy:
             hit = (fam == self._EV_ACCIDENT) & (sev == s)
             if not bool(hit.any()):
                 continue
-            plane = acc_sites[s]
-            rank = plane.long().cumsum(dim=1)
-            centre = ((rank == (k + 1).unsqueeze(1)) & plane).long().argmax(dim=1)
-            self._nuclear_accident(hit, centre, s)
+            self._nuclear_accident(hit, key.clamp(min=0), s)
 
     def _drought(self, hit: torch.Tensor, centre: torch.Tensor, sev: torch.Tensor,
                  strip: torch.Tensor) -> None:
@@ -1770,7 +1839,7 @@ class SimEconomy:
 
     def _erupt_tile(self, on: torch.Tensor, tile: torch.Tensor, row: torch.Tensor) -> None:
         """`eruptTile` — one eruption's damage on one ring plot per game where
-        `on` [B], at each game's row — MEASURED (C-41-S1): its
+        `on` [B], at each game's row — MEASURED (`runs/volcano_own_*`): its
         `RandomEvent_Damages` land on an OWNED plot only, applied as the
         flood's are; every BONUS resource on a land plot of the ring is lost
         whoever owns it (`_drop_resource`). SIX draws per plot, always,

@@ -14,7 +14,7 @@
 import type { GameState, Tile } from './types';
 import { warKindWith, citiesOf, civsAtWar, friendTurnsWith, grantKey, isCiv, seatOf, seatsAllied, tileSeat, warClockKey, alliedWarDiscount } from './seats';
 import { tilesWithin } from '../../world/hex';
-import { PROMISES, PROMISE_BROKEN_GRIEVANCE, PROMISE_TURNS, RETRIBUTION_TURNS } from '../data/promises';
+import { PROMISES, PROMISE_BROKEN_GRIEVANCE, PROMISE_BROKEN_MULT, PROMISE_SETTLE, PROMISE_TURNS, RETRIBUTION_TURNS, SETTLE_PROMISE_REACH } from '../data/promises';
 import { WAR_KINDS, WAR_KIND_SURPRISE } from '../data/warKinds';
 import { worldEraIndex } from './eras';
 import { congressGrievanceMult } from './congress';
@@ -35,8 +35,6 @@ import { GRIEVANCE_ALLY_SHARE,
   GRIEVANCE_LAST_CITY,
   GRIEVANCE_OCCUPIED_CAPITAL_DECAY,
   GRIEVANCE_OCCUPIED_DECAY,
-  GRIEVANCE_SETTLED_NEAR,
-  GRIEVANCE_SETTLED_NEAR_RANGE,
   GRIEVANCE_WAR_ON_CS_FRIEND,
   GRIEVANCE_WAR_ON_FRIEND,
   GRIEVANCE_WAR_ON_SUZERAIN,
@@ -206,22 +204,6 @@ export function grievanceCityStateTaken(state: GameState, taker: number, razed: 
   grievanceAgainstTheWorld(state, taker, razed ? GRIEVANCE_CS_RAZED : GRIEVANCE_CS_CONQUERED);
 }
 
-/**
- * SETTLED TOO NEAR: a major founding a city at `centre` owes every other
- * major that owns a plot within `GRIEVANCE_SETTLED_NEAR_RANGE` of it. The
- * live game drew it from the near rival alone, promise or none, so it is the
- * rival's own and no ally or friend shares it.
- */
-export function grievanceSettledNear(state: GameState, founder: number, centre: Tile): void {
-  if (!isCiv(founder)) return;
-  const near = new Set<number>();
-  for (const t of tilesWithin(state.map, centre.col, centre.row, GRIEVANCE_SETTLED_NEAR_RANGE)) {
-    const s = tileSeat(t);
-    if (s !== founder && isCiv(s)) near.add(s);
-  }
-  for (const s of near) addGrievance(state, s, founder, GRIEVANCE_SETTLED_NEAR);
-}
-
 /** "Denounced: 25". */
 export function grievanceDenounce(state: GameState, denouncer: number, target: number): void {
   spreadGrievance(state, target, denouncer, GRIEVANCE_DENOUNCE);
@@ -277,16 +259,19 @@ function setPromiseWith(state: GameState, asker: number, promiser: number, kind:
   else state.promises[key] = row;
 }
 
-/** Turns left on the War of Retribution window `promiser`'s last broken
- *  promise to `asker` opened; 0 where none runs. */
-export function promiseBrokenWith(state: GameState, asker: number, promiser: number): number {
+/** Turns left on the window `promiser`'s broken promise of `kind` to `asker`
+ *  opened; 0 where none runs. While it runs the promise stands BROKEN: it
+ *  cannot be asked again, each incursion costs the broken-promise multiple,
+ *  and the War of Retribution is open. */
+export function promiseBrokenWith(state: GameState, asker: number, promiser: number, kind: number): number {
   if (asker === promiser) return 0;
-  return state.promiseBroken?.[grantKey(asker, promiser)] ?? 0;
+  return state.promiseBroken?.[grantKey(asker, promiser)]?.[kind] ?? 0;
 }
 
 /** May `asker` ask `promiser` for promise `kind` now? Two living majors not
- *  at war, nothing of that kind standing between them, and the asker holding
- *  the row's `FavorCost`. */
+ *  at war, nothing of that kind standing between them — kept, refused or
+ *  broken (CIV6 `IsPromiseMade` reads true after a refusal and after a
+ *  break) — and the asker holding the row's `FavorCost`. */
 export function promiseAskable(state: GameState, asker: number, promiser: number, kind: number): boolean {
   if (kind < 0 || kind >= PROMISES.length || asker === promiser) return false;
   if (!isCiv(asker) || !isCiv(promiser)) return false;
@@ -295,6 +280,7 @@ export function promiseAskable(state: GameState, asker: number, promiser: number
   if (!a || !p || a.cities.length === 0 || p.cities.length === 0) return false;
   if (civsAtWar(state, asker, promiser)) return false;
   if (promiseWith(state, asker, promiser, kind) !== 0) return false;
+  if (promiseBrokenWith(state, asker, promiser, kind) > 0) return false;
   return (a.diplomaticFavor ?? 0) >= PROMISES[kind].favorCost;
 }
 
@@ -337,31 +323,57 @@ export function settlePromises(
 }
 
 /**
- * `actor` did `n` times what promise `kind` forbids, to `victim`. A KEPT
- * promise is BROKEN — CIV6 "Promise Broken" (100 Grievances), the promise
- * ends and the War of Retribution window opens; a REFUSED one earns
- * `GrievancesPerIncursion` for each incursion.
+ * `actor` did `n` times what promise `kind` forbids, to `victim` — MEASURED
+ * on the settle promise (`runs/promise_c2s1_*`, `runs/promise_break_*`, the
+ * grievance log read in the turn of the act). A KEPT promise is BROKEN —
+ * CIV6 "Promise Broken" (100 Grievances), the promise ends and its broken
+ * window opens (`promiseBrokenWith`); a REFUSED one earns
+ * `GrievancesPerIncursion` for each incursion, a BROKEN one that times
+ * GRIEVANCE_MULTIPLIER_FOR_BROKEN_PROMISE; with nothing standing the act
+ * costs nothing.
  */
 export function promiseIncursion(state: GameState, victim: number, actor: number, kind: number, n: number): void {
   if (n <= 0 || victim === actor || !isCiv(victim) || !isCiv(actor)) return;
   const v = promiseWith(state, victim, actor, kind);
   if (v > 0) {
     setPromiseWith(state, victim, actor, kind, 0);
-    (state.promiseBroken ??= {})[grantKey(victim, actor)] = RETRIBUTION_TURNS;
+    const key = grantKey(victim, actor);
+    const row = (state.promiseBroken ??= {})[key] ?? PROMISES.map(() => 0);
+    row[kind] = RETRIBUTION_TURNS;
+    state.promiseBroken[key] = row;
     addGrievance(state, victim, actor, PROMISE_BROKEN_GRIEVANCE);
   } else if (v < 0) {
     addGrievance(state, victim, actor, PROMISES[kind].incursion * n);
+  } else if (promiseBrokenWith(state, victim, actor, kind) > 0) {
+    addGrievance(state, victim, actor, Math.floor((PROMISES[kind].incursion * n * PROMISE_BROKEN_MULT) / 100));
   }
 }
 
-/** Every promise, refusal and retribution window runs one turn toward 0. */
+/**
+ * A major FOUNDS a city at `centre`: an incursion on the settle promise of
+ * every other major owning a plot within `SETTLE_PROMISE_REACH` of it (its
+ * border distance), in ascending seat order. With no promise standing the
+ * founding costs nothing — MEASURED, no standalone "settled too near"
+ * grievance exists.
+ */
+export function settleIncursion(state: GameState, founder: number, centre: Tile): void {
+  if (!isCiv(founder)) return;
+  const near = new Set<number>();
+  for (const t of tilesWithin(state.map, centre.col, centre.row, SETTLE_PROMISE_REACH)) {
+    const s = tileSeat(t);
+    if (s !== founder && isCiv(s)) near.add(s);
+  }
+  for (const s of [...near].sort((a, b) => a - b)) promiseIncursion(state, s, founder, PROMISE_SETTLE, 1);
+}
+
+/** Every promise, refusal and broken window runs one turn toward 0. */
 export function tickPromises(state: GameState): void {
   for (const [key, row] of Object.entries(state.promises ?? {})) {
     for (let k = 0; k < row.length; k++) row[k] -= Math.sign(row[k]);
     if (row.every((x) => x === 0)) delete state.promises![key];
   }
-  for (const [key, left] of Object.entries(state.promiseBroken ?? {})) {
-    if (left <= 1) delete state.promiseBroken![key];
-    else state.promiseBroken![key] = left - 1;
+  for (const [key, row] of Object.entries(state.promiseBroken ?? {})) {
+    for (let k = 0; k < row.length; k++) row[k] = Math.max(0, row[k] - 1);
+    if (row.every((x) => x === 0)) delete state.promiseBroken![key];
   }
 }

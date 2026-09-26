@@ -203,10 +203,16 @@ export interface Tile {
   road?: boolean;
   goodyHut: boolean;
   volcano: boolean;
-  /** CIV6 (`RealismSettings.PercentVolcanoesActive`): this volcano is ACTIVE
-   *  and may erupt. Drawn once per volcano when the game is made from the map
-   *  (`deriveVolcanoActivity`), never read off the world file. */
+  /** this volcano is ACTIVE and may erupt. Every volcano starts dormant and
+   *  wakes on the turn's draw (`wakeVolcanoes`); never read off the world
+   *  file. */
   volcanoActive?: boolean;
+  /** the rows of the turn's random-event draw (a bit per `eventRows` index)
+   *  that have fired on the site keyed on this plot — a flooding river's
+   *  start plot, a volcano, a wonder's lowest-index plot, a reactor city's
+   *  centre. A site whose row has not yet fired carries the first-occurrence
+   *  boost (`randomEvent`). */
+  eventFired?: number;
   /** a CITIZEN is PINNED to this plot. `assignWorkedTiles` takes every
    *  locked plot the city can work before it ranks anything by score, so a
    *  lock is how a player overrides the automatic allocation for tiles the

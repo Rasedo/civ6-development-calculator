@@ -244,7 +244,7 @@ def poke_river_reach() -> None:
             f"tile {t} is on ANOTHER river and the flood reached it"
     print(f"  f river reach OK — {n} floodplains flooded together, {len(off)} off-river spared")
 
-    # THE FLOOD SITES (`floodSites`, shipped by the exporter): the turn's draw
+    # THE FLOOD SITES (`floodRivers`, shipped by the exporter): the turn's draw
     # weighs each flood row once per RIVER carrying Floodplains and once per
     # Floodplains plot no river touches, in the order of each one's lowest
     # Floodplains plot; a river's site is the Floodplains plot its flood

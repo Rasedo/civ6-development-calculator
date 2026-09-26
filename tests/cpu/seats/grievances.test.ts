@@ -10,10 +10,10 @@ import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, AGREEMENT_TURNS,
   GRIEVANCE_WAR_BASE, GRIEVANCE_DECAY_BASE, GRIEVANCE_DENOUNCE,
   GRIEVANCE_FRIEND_SHARE, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_GANG,
   GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_OCCUPIED_CAPITAL_DECAY,
-  GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX,
-  GRIEVANCE_SETTLED_NEAR, GRIEVANCE_SETTLED_NEAR_RANGE } from '../../../cpu/data/seats';
-import { addGrievance, decayGrievances, grievanceCityTaken, grievanceDenounce, grievanceFavorPenalty, grievanceWith, grievancesAgainst } from '../../../cpu/core/grievance';
-import { DED_TO_ARMS } from '../../../cpu/data/seats';
+  GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX } from '../../../cpu/data/seats';
+import { addGrievance, grievanceCityTaken, grievanceDenounce, grievanceFavorPenalty, grievanceWith, grievancesAgainst,
+  promiseAskable, promiseBrokenWith, promiseWith, settlePromises } from '../../../cpu/core/grievance';
+import { PROMISES, PROMISE_SETTLE, PROMISE_BROKEN_GRIEVANCE, PROMISE_BROKEN_MULT, RETRIBUTION_TURNS, SETTLE_PROMISE_REACH } from '../../../cpu/data/promises';import { DED_TO_ARMS } from '../../../cpu/data/seats';
 
 const warG = (kind: 'surprise' | 'formal' | 'golden', col: 0 | 1 | 2, base: number) =>
   Math.round((base * WAR_GRIEVANCE_PCT[kind][col]) / 100);
@@ -225,35 +225,43 @@ describe('grievances', () => {
     expect(grievancesAgainst(state, 0)).toBeGreaterThanOrEqual(GRIEVANCE_GANG);
   });
 
-  it('SETTLED TOO NEAR: a founding within 3 of a rival plot draws 25, and 4 draws nothing', () => {
-    // the lab read 19 and 18 one turn later, after the Industrial (6) and
-    // Renaissance (7) GrievanceDecayRate
-    expect(GRIEVANCE_SETTLED_NEAR).toBe(25);
-    expect(GRIEVANCE_SETTLED_NEAR - 6).toBe(19);
-    expect(GRIEVANCE_SETTLED_NEAR - 7).toBe(18);
-    expect(GRIEVANCE_SETTLED_NEAR_RANGE).toBe(3);
-    const site = (reach: number) => {
+  it('THE SETTLE PROMISE: a founding near a rival\'s border costs nothing unasked, 25 refused, 100 to break and 50 after', () => {
+    expect([SETTLE_PROMISE_REACH, PROMISE_BROKEN_GRIEVANCE, PROMISE_BROKEN_MULT]).toEqual([3, 100, 200]);
+    expect(PROMISES[PROMISE_SETTLE].incursion).toBe(25);
+    /** seat 1 asked seat 0 not to settle near it (`answer` kept or refused,
+     *  none for no ask), then seat 0 founds at each border distance in turn;
+     *  the grievance seat 1 holds after each founding */
+    const run = (answer: 'keep' | 'refuse' | null, reaches: number[]) => {
       const state = newGame(1);
       state.grievances = {};
+      if (answer) {
+        seatOf(state, 1)!.diplomaticFavor = 100;
+        settlePromises(state, [[1, 0, PROMISE_SETTLE]], answer === 'keep' ? [[0, 1, PROMISE_SETTLE]] : []);
+      }
       const rival = state.map.tiles.filter((t) => tileSeat(t) === 1);
       const border = (t: Tile) => Math.min(...rival.map((r) => hexDistance(t.col, t.row, r.col, r.row)));
-      const t = state.map.tiles.find((x) => tileSeat(x) < 0 && border(x) === reach)!;
-      expect(t).toBeDefined();
-      foundCityAt(state, 0, t, seatOf(state, 0)!);
-      return grievanceWith(state, 1, 0);
+      return {
+        state,
+        seen: reaches.map((reach) => {
+          const t = state.map.tiles.find((x) => tileSeat(x) < 0 && border(x) === reach)!;
+          expect(t).toBeDefined();
+          foundCityAt(state, 0, t, seatOf(state, 0)!);
+          return grievanceWith(state, 1, 0);
+        }),
+      };
     };
-    expect(site(3)).toBe(GRIEVANCE_SETTLED_NEAR);
-    expect(site(4)).toBe(0);
-    // and it decays at the ordinary peace rate
-    const state = newGame(1);
-    state.grievances = {};
-    const rival = state.map.tiles.filter((t) => tileSeat(t) === 1);
-    const t =state.map.tiles.find((x) => tileSeat(x) < 0
-      && Math.min(...rival.map((r) => hexDistance(x.col, x.row, r.col, r.row))) === 2)!;
-    foundCityAt(state, 0, t, seatOf(state, 0)!);
-    expect(grievanceWith(state, 1, 0)).toBe(GRIEVANCE_SETTLED_NEAR);
-    decayGrievances(state, 0);
-    expect(grievanceWith(state, 1, 0)).toBe(GRIEVANCE_SETTLED_NEAR - GRIEVANCE_DECAY_BASE);
+    // no ask standing: nothing at any distance
+    expect(run(null, [3]).seen).toEqual([0]);
+    // refused: the refusal's 25, then 25 a founding within 3, none at 4
+    const refused = run('refuse', [4, 2]).seen;
+    expect(refused).toEqual([25, 50]);
+    // kept: a founding within 3 breaks it for 100, each further one 50; the
+    // promise stands broken and cannot be asked again
+    const kept = run('keep', [5, 3, 1]);
+    expect(kept.seen).toEqual([0, 100, 150]);
+    expect(promiseWith(kept.state, 1, 0, PROMISE_SETTLE)).toBe(0);
+    expect(promiseBrokenWith(kept.state, 1, 0, PROMISE_SETTLE)).toBe(RETRIBUTION_TURNS);
+    expect(promiseAskable(kept.state, 1, 0, PROMISE_SETTLE)).toBe(false);
   });
 });
 describe('golden age war', () => {

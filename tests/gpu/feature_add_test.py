@@ -159,7 +159,8 @@ def main() -> None:
     # 3 — the eruption: one draw per eligible ring plot, at its SEVERITY's
     # chance (GENTLE / CATASTROPHIC / MEGACOLOSSAL 35 / 50 / 75)
     sim3 = fresh(rules, path, slot=3)
-    volc = [int(v) for v in sim3.volcano_tile[B0].tolist() if int(v) >= 0]
+    # any volcano of the map, active or not: `_erupt` is handed its ring
+    volc = sim3.volcano_at[B0].nonzero().flatten().tolist()
     assert volc, "the fixture carries no volcano"
     # the eight rows: Eyjafjallajokull CATASTROPHIC / MEGACOLOSSAL, Kilimanjaro
     # GENTLE / CATASTROPHIC, Vesuvius MEGACOLOSSAL, then the volcano's three
@@ -211,7 +212,10 @@ def main() -> None:
 
     # 4 — the turn's draw names the severity: over the eruptions it fires,
     # GENTLE / CATASTROPHIC / MEGACOLOSSAL come in proportion to 4 / 2.5 / 1.5
+    # (every volcano awake, every pair already fired: no first-occurrence boost)
     sim4 = fresh(rules, path, slot=3)
+    sim4.volcano_active.copy_(sim4.volcano_at)
+    sim4.tile_event_fired.fill_((1 << len(sim4._event_rows())) - 1)
     ew, sim4._eruption_weight = sim4._eruption_weight, [0.0] * VOLC0 + sim4._eruption_weight[VOLC0:]
     seen = [0, 0, 0]
     sim4._erupt = lambda hit, ring, row: [seen.__setitem__(int(x) - VOLC0, seen[int(x) - VOLC0] + 1)

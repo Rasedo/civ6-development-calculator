@@ -22,6 +22,7 @@ class SimDeals:
     PROMISE_SPY = 0
     PROMISE_CONVERT = 1
     PROMISE_DIG = 2
+    PROMISE_SETTLE = 3
 
     # ------------------------------------------------------------- the cell
     def _spies_held_of(self, row: int) -> torch.Tensor:
@@ -337,20 +338,21 @@ class SimDeals:
                 if bool((stale > 0).any()):
                     self.deal_offer_left[:, a, b] = (stale - 1).clamp(min=0)
         # CIV6: "All Deals, Demands, and Promises last for 30 turns" -
-        # `tickPromises`: every promise, refusal and retribution window runs
-        # one turn toward 0.
+        # `tickPromises`: every promise, refusal and broken window runs one
+        # turn toward 0.
         self.seat_promise -= torch.sign(self.seat_promise)
         self.seat_promise_broken.sub_(1).clamp_(min=0)
 
     # ----------------------------------------------------------- the promise
     def _promise_askable(self, asker: int, promiser: int, kind: int) -> torch.Tensor:
         """[B] bool — `promiseAskable`: two living majors not at war, nothing
-        of the kind standing between them, and the asker holding the row's
-        `FavorCost`."""
+        of the kind standing between them — kept, refused or broken — and the
+        asker holding the row's `FavorCost`."""
         nrow = self.n_majors
         live = self.civ_alive[:, :nrow] & self.city_alive[:, :nrow].any(dim=2)
         return (live[:, asker] & live[:, promiser] & ~self.war[:, asker, promiser]
                 & (self.seat_promise[:, asker, promiser, kind] == 0)
+                & (self.seat_promise_broken[:, asker, promiser, kind] == 0)
                 & (self.civ_diplo_favor[:, asker] >= self._promises[kind][0]))
 
     def _settle_promises(self, asks: dict, keeps: dict) -> None:
@@ -398,8 +400,10 @@ class SimDeals:
     def _promise_incursion(self, victim: int, actor: int, kind: int, n: torch.Tensor) -> None:
         """`promiseIncursion`: `actor` did `n` [B] times what promise `kind`
         forbids, to `victim`. A KEPT promise is BROKEN - 100 Grievances, the
-        promise ends, the War of Retribution window opens; a REFUSED one earns
-        `GrievancesPerIncursion` for each incursion."""
+        promise ends and its broken window opens; a REFUSED one earns
+        `GrievancesPerIncursion` for each incursion, a BROKEN one that times
+        the broken-promise percent; with nothing standing the act costs
+        nothing."""
         nrow = self.n_majors
         if victim == actor or victim >= nrow or actor >= nrow:
             return
@@ -407,15 +411,35 @@ class SimDeals:
         if not bool(hit.any()):
             return
         v = self.seat_promise[:, victim, actor, kind]
+        was_broken = self.seat_promise_broken[:, victim, actor, kind] > 0
         broke = hit & (v > 0)
         cont = hit & (v < 0)
+        again = hit & (v == 0) & was_broken
         if bool(broke.any()):
             self.seat_promise[:, victim, actor, kind] = torch.where(broke, 0, v)
-            self.seat_promise_broken[:, victim, actor] = torch.where(
-                broke, self._retribution_turns, self.seat_promise_broken[:, victim, actor])
+            self.seat_promise_broken[:, victim, actor, kind] = torch.where(
+                broke, self._retribution_turns, self.seat_promise_broken[:, victim, actor, kind])
             self._add_grievance(victim, actor, self._promise_broken_griev, broke)
         if bool(cont.any()):
             self._add_grievance(victim, actor, n.long() * self._promises[kind][2], cont)
+        if bool(again.any()):
+            self._add_grievance(
+                victim, actor, torch.div(n.long() * self._promises[kind][2] * self._promise_broken_mult, 100,
+                                         rounding_mode="floor"), again)
+
+    def _settle_incursion(self, founder: int, m: torch.Tensor, centre: torch.Tensor) -> None:
+        """`settleIncursion`: a major founding a city at `centre` [B] where
+        `m` commits an incursion on the settle promise of every other major
+        owning a plot within `_settle_promise_reach` of it, in ascending seat
+        order; with no promise standing it costs nothing."""
+        if founder >= self.n_majors:
+            return
+        near = self.pair_dist[centre.clamp(min=0)] <= self._settle_promise_reach  # [B, T]
+        for s in range(self.n_majors):
+            if s == founder:
+                continue
+            hit = m & (near & (self.tile_seat == s)).any(dim=1)
+            self._promise_incursion(s, founder, self.PROMISE_SETTLE, hit.long())
 
     def _deal_end_term(self, giver: int, taker: int, items: torch.Tensor, done: torch.Tensor) -> None:
         """CIV6: "Resources and gold per turn ... are temporary, and once the

@@ -419,8 +419,9 @@ def _deal_line(clock: str, planes: tuple):
 
 def _promise_line(sim, b, rows):
     """THE PROMISE LEDGER from the asker's side: [promiser, the signed turns
-    per promise kind, the retribution window, ...] for every promiser with
-    anything standing, ascending. Majors-only, so the row IS the seat."""
+    per promise kind, the broken window per promise kind, ...] for every
+    promiser with anything standing, ascending. Majors-only, so the row IS
+    the seat."""
     pr = sim.seat_promise[b].tolist()
     br = sim.seat_promise_broken[b].tolist()
     out = []
@@ -429,8 +430,8 @@ def _promise_line(sim, b, rows):
         for j in range(sim.n_majors):
             if j == c:
                 continue
-            if br[c][j] > 0 or any(v != 0 for v in pr[c][j]):
-                line += [j, *[int(v) for v in pr[c][j]], int(br[c][j])]
+            if any(v > 0 for v in br[c][j]) or any(v != 0 for v in pr[c][j]):
+                line += [j, *[int(v) for v in pr[c][j]], *[int(v) for v in br[c][j]]]
         out.append(line)
     return out
 
@@ -983,6 +984,8 @@ TILE = {
     "falloutTurns": lambda sim, b, rows: sim.tile_fallout[b].long().numpy(),
     "water": lambda sim, b, rows: sim.water[b].long().numpy(),
     "floodCount": lambda sim, b, rows: sim.tile_flood_ct[b].numpy(),
+    "volcanoActive": lambda sim, b, rows: sim.volcano_active[b].long().numpy(),
+    "eventFired": lambda sim, b, rows: sim.tile_event_fired[b].numpy(),
     "airSlotBonus": lambda sim, b, rows: sim.tile_air_bonus[b].numpy(),
     "gpRegRange": lambda sim, b, rows: sim.tile_gp_perm[b, :, 0].numpy(),
     "gpRegProd": lambda sim, b, rows: sim.tile_gp_perm[b, :, min(1, sim.tile_gp_perm.shape[2] - 1)].numpy(),

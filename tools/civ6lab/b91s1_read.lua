@@ -43,17 +43,22 @@ for p = 0, 62 do
         local r = {b = b.BuildingType, has = bl:HasBuilding(b.Index)}
         r.canEx = P(function() return bq:CanProduce(b.Hash, true) end)
         local ok, can, res = pcall(function() return bq:CanProduce(b.Hash, false, true) end)
-        r.can = ok and can or ("err:" .. tostring(can))
-        r.canWhy = ok and reasons(res) or nil
+        if ok then r.can = can; r.canWhy = reasons(res) else r.can = "err:" .. tostring(can) end
         local params = {[CityCommandTypes.PARAM_BUILDING_TYPE] = b.Hash, [CityCommandTypes.PARAM_YIELD_TYPE] = faith}
         r.buyEx = P(function() return CityManager.CanStartCommand(c, CityCommandTypes.PURCHASE, true, params, false) end)
         local ok2, buy, res2 = pcall(function() return CityManager.CanStartCommand(c, CityCommandTypes.PURCHASE, false, params, true) end)
-        r.buy = ok2 and buy or ("err:" .. tostring(buy))
-        r.buyWhy = ok2 and reasons(res2) or nil
+        if ok2 then r.buy = buy; r.buyWhy = reasons(res2) else r.buy = "err:" .. tostring(buy) end
         r.faithCost = P(function() return c:GetGold():GetPurchaseCost(faith, b.Hash) end)
         rows[#rows + 1] = r
       end
+      local inCity = P(function()
+        local t = {}
+        for _, g in ipairs(c:GetReligion():GetReligionsInCity()) do t[#t + 1] = {g.Religion, g.Followers} end
+        return t
+      end)
       OUT({kind = "city", p = p, id = c:GetID(), name = c:GetName(), x = c:GetX(), y = c:GetY(), founded = founded,
+        ownerMajority = P(function() return pl:GetReligion():GetReligionInMajorityOfCities() end),
+        pop = c:GetPopulation(), religions = inCity,
         majority = P(function() return c:GetReligion():GetMajorityReligion() end),
         temple = bl:HasBuilding(GameInfo.Buildings["BUILDING_TEMPLE"].Index),
         holySite = c:GetDistricts():HasDistrict(GameInfo.Districts["DISTRICT_HOLY_SITE"].Index),

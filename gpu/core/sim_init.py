@@ -507,14 +507,17 @@ class SimInit:
         self.deal_term_item = torch.full((B, _pw, _pw, _di, 3), -1, dtype=torch.long, device=device)
         # THE PROMISE LEDGER, keyed asker -> promiser, per promise kind (the
         # `eras.promises` rows): the turns left on a KEPT promise (positive) or
-        # a REFUSED one (negative), 0 none; and the turns left on the War of
-        # Retribution window a broken promise opened.
+        # a REFUSED one (negative), 0 none; and per kind the turns left on the
+        # window a broken promise opened (the promise stands broken, and any
+        # kind's window opens the War of Retribution).
         self._promises = [tuple(int(x) for x in r) for r in rules.eras["promises"]]
         self._promise_turns = int(rules.eras["promiseTurns"])
         self._promise_broken_griev = int(rules.eras["promiseBrokenGrievance"])
+        self._promise_broken_mult = int(rules.eras["promiseBrokenMult"])
+        self._settle_promise_reach = int(rules.eras["settlePromiseReach"])
         self._retribution_turns = int(rules.eras["retributionTurns"])
         self.seat_promise = torch.zeros(B, _pw, _pw, len(self._promises), dtype=torch.long, device=device)
-        self.seat_promise_broken = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        self.seat_promise_broken = torch.zeros(B, _pw, _pw, len(self._promises), dtype=torch.long, device=device)
         # CIV6: a captured spy is "imprisoned, but not killed" — keyed
         # owner -> captor, and still counted against the owner's capacity.
         # ...as COUNTS BY LEVEL, so the spy that is traded back is the one that
@@ -636,8 +639,6 @@ class SimInit:
         self._griev_cs_conquered = int(_er2["grievanceCsConquered"])
         self._griev_cs_razed = int(_er2["grievanceCsRazed"])
         self._griev_denounce = int(_er2["grievanceDenounce"])
-        self._griev_settled_near = int(_er2["grievanceSettledNear"])
-        self._griev_settled_near_range = int(_er2["grievanceSettledNearRange"])
         self._griev_held_capital = int(_er2["grievanceHeldCapital"])
         self._griev_ally_share = int(_er2["grievanceAllyShare"])
         self._griev_friend_share = int(_er2["grievanceFriendShare"])
@@ -1748,14 +1749,7 @@ class SimInit:
         # the storm FAMILY that may start on each tile (`stormFamilyAt`), -1 none
         self.storm_fam = torch.tensor([[t.get("sf", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.fertilizable = torch.tensor([[t.get("fz", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # the ACTIVE volcanoes, the eruption rows' sites (`deriveVolcanoActivity`
-        # stamped them when the game was made from the map), packed from 0
-        n_volc = max(max((len(f["activeVolcanoes"]) for f in fixtures), default=0), 1)
-        self.volcano_tile = torch.full((B, n_volc), -1, dtype=torch.long, device=device)
-        for b, f in enumerate(fixtures):
-            for i, v in enumerate(f["activeVolcanoes"]):
-                self.volcano_tile[b, i] = v
-        # the flood sites (`floodSites`), each the plot its flood starts on, in
+        # the flood sites (`floodRivers`), each the plot its flood starts on, in
         # draw order — `_pick_static`'s (idx, n) shape, -1 pads
         n_fl = max(max((len(f["floodStarts"]) for f in fixtures), default=0), 1)
         _fl_idx = torch.full((B, n_fl), -1, dtype=torch.long, device=device)
@@ -1768,8 +1762,12 @@ class SimInit:
         # (`featureOk`)
         self.volcano_at = torch.zeros(B, T, dtype=torch.bool, device=device)
         for b, f in enumerate(fixtures):
-            for v in f.get("volcanoes", []):
+            for v in f["volcanoes"]:
                 self.volcano_at[b, v] = True
+        # an ACTIVE volcano, the eruption rows' sites (`Tile.volcanoActive`):
+        # every volcano starts dormant and wakes on its own draw
+        # (`_wake_volcanoes`)
+        self.volcano_active = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
         # the PRODUCTION half of flood silt — real Civ 6 rolls food and
         # production separately, so the two accumulate apart.
@@ -2664,6 +2662,11 @@ class SimInit:
         # over the row's normaliser, per map or per site (`eventNorm`)
         self._event_norm_map = float(_ds["eventNormPerMap"])
         self._event_norm_site = float(_ds["eventNormPerSite"])
+        # a per-site pair not yet fired this game carries 100 + this share in
+        # hundredths (`FIRST_TIME_OCCURRENCE_BOOST`)
+        self._first_boost = int(_ds["firstTimeOccurrenceBoost"])
+        # a dormant volcano's chance a turn to wake (`VOLCANO_WAKE_P`)
+        self._volcano_wake_p = float(_ds["volcanoWakeP"])
         # a drought's start plot: the weight of each distance from its city's
         # centre (`DROUGHT_DISTANCE_WEIGHTS`), the index the distance
         self._drought_dist_w = [int(x) for x in _ds["droughtDistanceWeights"]]
@@ -2922,8 +2925,6 @@ class SimInit:
             width = max(int(n.max()), 1)
             idx = torch.argsort((~cand).to(torch.int8), dim=1, stable=True)[:, :width]
             return idx, n
-        # the active volcanoes each game holds (`volcano_tile` is packed from 0)
-        self._volc_n = (self.volcano_tile >= 0).sum(dim=1)
         # one start-tile list per storm family (`stormFamilyAt`)
         self._storm_lists = [cand_list(self.storm_fam == f) for f in range(max(self._st_family) + 1)]
         # Yields sum the picked tiles sequentially to mirror the TS reduce. When
@@ -4123,6 +4124,9 @@ class SimInit:
         # every river-flood EPISODE a tile has taken — the Great Bath's faith
         # counts them (`Tile.floodCount`)
         self.tile_flood_ct = torch.zeros(B, T, dtype=torch.long, device=dev)
+        # the random-event rows (a bit per `_event_rows` index) that have
+        # fired on the site keyed on each plot (`Tile.eventFired`)
+        self.tile_event_fired = torch.zeros(B, T, dtype=torch.long, device=dev)
         # a STORM centred on the tile: its `STORM_EVENTS` row (-1 none) and the
         # turns it has left (`Tile.stormEvent` / `Tile.stormTurns`)
         self.storm_event = torch.full((B, T), -1, dtype=torch.long, device=dev)

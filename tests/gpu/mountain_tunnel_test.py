@@ -265,7 +265,7 @@ def test_a_volcano_refuses_it(rules, path) -> None:
     feature and the tunnel's Improvement_ValidFeatures rows list none, so the
     world's own volcano refuses it (`featureOk`), in mask and applier alike."""
     sim = build(path)
-    vol = [int(x) for x in sim.volcano_tile[B0].tolist() if x >= 0]
+    vol = sim.volcano_at[B0].nonzero().flatten().tolist()
     vol = [v for v in vol if any(x >= 0 and not bool(sim.water[B0, x]) and bool(sim.passable[B0, x])
                                  for x in sim.neigh[v].tolist())]
     assert vol, "this fixture holds no volcano with a land plot beside it"

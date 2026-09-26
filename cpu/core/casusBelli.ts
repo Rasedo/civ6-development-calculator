@@ -20,6 +20,7 @@ import { seatGovernment } from './effects';
 import { hexDistance } from '../../world/hex';
 import { GOVERNMENTS } from '../data/policies';
 import { DED_TO_ARMS } from '../data/seats';
+import { PROMISES } from '../data/promises';
 import { WAR_BUFF_ROWS, rowIsFor, type WarBuffRow } from '../data/civilizations';
 import {
   COLONIAL_WAR_ERA_LEAD, LATE_GOVERNMENT_TIER, TERRITORIAL_WAR_CITIES, TERRITORIAL_WAR_RANGE,
@@ -104,8 +105,8 @@ export function warConditionHolds(state: GameState, seat: number, target: number
       return goldenDedication(state, seat, DED_TO_ARMS);
     case 'brokenPromise':
       // CIV6 (War of Retribution): "a player who has broken a promise to you
-      // within the past 30 turns" — the window the break opened
-      return promiseBrokenWith(state, seat, target) > 0;
+      // within the past 30 turns" — the window a break of any kind opened
+      return PROMISES.some((_p, k) => promiseBrokenWith(state, seat, target, k) > 0);
     case 'differentLateGovernment': {
       // CIV6 (Ideological War): "a player who is in a different Tier 3
       // government" — both LATE, and not the same one

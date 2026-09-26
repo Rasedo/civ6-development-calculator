@@ -623,8 +623,8 @@ const SEAT: Record<string, Extractor> = {
     const out: number[] = [];
     for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
       const row = PROMISES.map((_p, k) => promiseWith(state, s.seat, other, k));
-      const broken = promiseBrokenWith(state, s.seat, other);
-      if (broken > 0 || row.some((v) => v !== 0)) out.push(other, ...row, broken);
+      const broken = PROMISES.map((_p, k) => promiseBrokenWith(state, s.seat, other, k));
+      if (broken.some((v) => v > 0) || row.some((v) => v !== 0)) out.push(other, ...row, ...broken);
     }
     return out;
   }),
@@ -861,6 +861,8 @@ const TILE: Record<string, Extractor> = {
   falloutTurns: overTiles((t) => t.falloutTurns ?? 0),
   water: overTiles((t) => (isWater(t) ? 1 : 0)),
   floodCount: overTiles((t) => t.floodCount ?? 0),
+  volcanoActive: overTiles((t) => (t.volcanoActive ? 1 : 0)),
+  eventFired: overTiles((t) => t.eventFired ?? 0),
   airSlotBonus: overTiles((t) => t.airSlotBonus ?? 0),
   gpRegRange: overTiles((t) => t.gpPerm?.[0] ?? 0),
   gpRegProd: overTiles((t) => t.gpPerm?.[1] ?? 0),

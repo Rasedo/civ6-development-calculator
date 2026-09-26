@@ -53,30 +53,45 @@ export function warmedWeight(weight: number, cipdPct: number, degrees: number): 
 }
 
 /**
- * THE EMPTY TURN — MEASURED (C-74-S1, 7 games, 1,757 turns; lab4 Standard):
- * a (row, site) pair fires with the ABSOLUTE per-turn chance weight / N, the
- * weight its `warmedWeight`, and the turn is empty with what is left. A row
- * counted once per map (the storms, the droughts, the fires, the meteor)
- * divides by 250 at Standard; a row counted per site (a flooding river, an
- * active volcano, a volcano wonder, a reactor) by 240. When the chances sum
- * past 1 they are scaled to sum to 1 (the warm read caps the sum). The
- * normalisers are the Standard readings; Duel's are the lab's open line.
+ * THE EMPTY TURN — MEASURED: a (row, site) pair fires with the ABSOLUTE
+ * per-turn chance weight / N, the weight its `warmedWeight`, and the turn is
+ * empty with what is left. A row counted once per map (the storms, the
+ * droughts, the fires, the meteor) divides by 250, the Standard reading; a
+ * row counted per site (a flooding river, an active volcano, a volcano
+ * wonder, a reactor) by 251, read at Duel and at Standard. When the chances
+ * sum past 1 they are scaled to sum to 1 (the warm read caps the sum).
  */
 export const EVENT_NORM_PER_MAP = srcConst('disasters.eventNormPerMap', 250, {
   lab: 'C-74 (C-74-S1, runs/event_turns_lab4_t250.jsonl and the six obs games): P(row) = '
     + 'Occ x (1 + CIPD/100 x T) / 250 for the once-per-map rows at Standard (95%: 250-285)',
 });
-export const EVENT_NORM_PER_SITE = srcConst('disasters.eventNormPerSite', 240, {
-  lab: 'C-74 (C-74-S1, runs/event_turns_lab4_t250.jsonl and the six obs games): P(row, site) = '
-    + 'Occ x (1 + CIPD/100 x T) / 240 for the per-site rows at both sizes',
+export const EVENT_NORM_PER_SITE = srcConst('disasters.eventNormPerSite', 251, {
+  lab: 'runs/c74s2_turn_c74s2_duel1_20260926T074416Z.jsonl to runs/c74s2_turn_c74s2_duel8_20260926T084042Z.jsonl '
+    + '(8 Duel games, 1,680 per-turn reads; fit tools/civ6lab/c74s2_boost.py): '
+    + 'percent = floor(100 x Occ x b x (1 + CIPD/100 x T) / N) fits 1,244 of 1,250 flood reads and 649 of 649 '
+    + 'eruption reads for N in (250.62, 251.25], b the first-occurrence boost; the lab4 Standard sweep fits 13 of 13 '
+    + 'eruptions at 251 (tools/civ6lab/c74s2_s1check.py)',
 });
 
-/** CIV6 (`RealismSettings.PercentVolcanoesActive`, REALISM_SETTING_MODERATE):
- *  the percent of the map's volcanoes that are ACTIVE — each volcano's state
- *  drawn once when the map loads (`deriveVolcanoActivity`); only an active
- *  one erupts (measured, C-74-S1). */
-export const PERCENT_VOLCANOES_ACTIVE = srcConst('disasters.percentVolcanoesActive', 70,
-  xml('RealismSettings', 'RealismSettingType=REALISM_SETTING_MODERATE', 'PercentVolcanoesActive'));
+/** CIV6 (RANDOM_EVENT_FIRST_TIME_OCCURRENCE_BOOST, Expansion2_GlobalParameters):
+ *  the percent a per-site (row, site) pair's chance is raised by while that
+ *  pair has not yet fired this game — MEASURED per (row, site), neither per
+ *  row nor per site, and on the per-site rows. */
+export const FIRST_TIME_OCCURRENCE_BOOST = srcConst('disasters.firstTimeOccurrenceBoost', 30, {
+  derived: 'the GlobalParameters row, applied per (row, site) as the Duel reads fit it '
+    + '(the eight Duel records c74s2_turn_c74s2_duel1..8, tools/civ6lab/c74s2_boost.py: no boost, a per-row and a '
+    + 'per-site boost all fail)',
+  inputs: [xml('GlobalParameters', 'Name=RANDOM_EVENT_FIRST_TIME_OCCURRENCE_BOOST', 'Value')],
+});
+
+/** Each DORMANT volcano's chance a turn to wake — MEASURED: every volcano
+ *  starts dormant (20 of 20 at turn 1), wakes at about 0.6% a turn and was
+ *  read going back to sleep once in 1,604 active volcano-turns; only an
+ *  active one erupts (61 of 61 eruptions fell on an active turn). */
+export const VOLCANO_WAKE_P = srcConst('disasters.volcanoWakeP', 0.006, {
+  lab: 'runs/c74s2_turn_c74s2_duel1_20260926T074416Z.jsonl to runs/c74s2_turn_c74s2_duel8_20260926T084042Z.jsonl '
+    + '(tools/civ6lab/c74s2_volc_fit.py): 13 wakes over 2,217 dormant volcano-turns',
+});
 
 /** CIV6 (`RANDOM_EVENT_START_TURN`, Expansion2_GlobalParameters): the first
  *  turn a random event may fire. */
@@ -120,13 +135,15 @@ export const DROUGHT_DISTANCE_WEIGHTS = srcConst('disasters.droughtDistanceWeigh
     + 'start within 3 of a city centre, at distance 0 / 1 / 2 / 3 in 11 / 41 / 46 / 26',
 });
 
-/** A plot a drought may centre on now: its terrain, above ground, and
- *  CIV6 (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP) "Drought targets areas
- *  that are devoid of all Features" — no feature of any kind stands there. */
-export function droughtCandidate(t: {
+/** Dry ground for a drought's patch: its terrain above the sea and CIV6
+ *  (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP) "Drought targets areas that
+ *  are devoid of all Features" — no feature stands there, and a district's
+ *  plot (`district`: it holds one, a city centre included) counts as
+ *  featureless whatever lies under it. */
+export function droughtGround(t: {
   terrain: string; elevation: string; feature: string | null; submerged?: boolean;
-}): boolean {
-  return droughtTerrain(t) && t.feature === null && !t.submerged;
+}, district: boolean): boolean {
+  return droughtTerrain(t) && (t.feature === null || district) && !t.submerged;
 }
 
 /**

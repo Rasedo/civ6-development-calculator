@@ -19,7 +19,7 @@ if u ~= nil then
     rec.moves2 = P(function() return u:GetMovesRemaining() end)
     rec.can = P(function() return UnitManager.CanStartCommand(u, cmd, true) end)
     local ok, can, res = pcall(function() return UnitManager.CanStartCommand(u, cmd, false, true) end)
-    rec.canFull = ok and can or ("err:" .. tostring(can))
+    if ok then rec.canFull = can else rec.canFull = "err:" .. tostring(can) end
     if ok and type(res) == "table" and res[UnitCommandResults.FAILURE_REASONS] then
       local t = {}
       for _, s in ipairs(res[UnitCommandResults.FAILURE_REASONS]) do t[#t + 1] = tostring(s) end

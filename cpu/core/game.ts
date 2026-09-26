@@ -16,13 +16,13 @@ import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
-import { disasterPhase, deriveVolcanoActivity } from './disasters';
+import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { cityStatePhase, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
 import { minorPhase } from './minorBuild';
 import { seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
-import { grievanceSettledNear, promiseIncursion } from './grievance';
+import { settleIncursion, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
 import { commitProduction } from './seatTurn';
 import { seatWonderFlag } from './wonders';
@@ -170,13 +170,12 @@ export function districtVariantCost(state: GameState, seat: number, type: Distri
 /** Fresh game state around a loaded world's map, before any seat is placed:
  *  `loadWorld` seats the roster the world file names. */
 export function createGameFromMap(map: GameState['map'], rngInit: number): GameState {
-  // The sea's reach, the two climate denominators and which volcanoes are
-  // active are properties of the map as it was loaded, so they are stamped
-  // once, here, and never re-derived from a map the game has already changed.
+  // The sea's reach and the two climate denominators are properties of the
+  // map as it was loaded, so they are stamped once, here, and never
+  // re-derived from a map the game has already changed.
   deriveLowlands(map);
   deriveContinents(map);
   deriveMountainRanges(map);
-  deriveVolcanoActivity(map, rngInit);
   return {
     map,
     climateIdx: -1,
@@ -335,7 +334,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     const id = g.unit ?? (g.promoClass ? bestTrainableOfClass(state, seat, g.promoClass) : null);
     if (id) spawnUnit(state, id, tile.index, seat);
   }
-  grievanceSettledNear(state, seat, tile);
+  settleIncursion(state, seat, tile);
   return city;
 }
 

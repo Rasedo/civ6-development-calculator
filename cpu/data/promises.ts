@@ -17,8 +17,8 @@
  *     religion;
  *   - DONT_DIG_ARTIFACTS: an Archaeologist of the promiser excavating a dig on
  *     the asker's ground;
- *   - DONT_SETTLE_TOO_NEAR: none — no row gives "near" a distance (ask 18),
- *     so the promise can be asked, kept and refused, and never broken.
+ *   - DONT_SETTLE_TOO_NEAR: the promiser founding a city within
+ *     `SETTLE_PROMISE_REACH` of the asker's border.
  */
 import { srcConst, xml, type SrcMap } from './provenance';
 
@@ -64,6 +64,27 @@ export const PROMISE_TURNS = srcConst('eras.promiseTurns', 30,
  *  made to you ... has been broken (100 Grievances generated)." */
 export const PROMISE_BROKEN_GRIEVANCE = srcConst('eras.promiseBrokenGrievance', 100,
   { pedia: 'Expansion2 Notifications text LOC_NOTIFICATION_DIPLO_PROMISE_FROM_BROKEN_SUMMARY: "has been broken (100 Grievances generated)"' });
+
+/** CIV6 (GRIEVANCE_MULTIPLIER_FOR_BROKEN_PROMISE, Expansion2_GlobalParameters):
+ *  the percent an incursion's `GrievancesPerIncursion` is charged at while
+ *  the promise stands broken — MEASURED on the settle promise: every founding
+ *  within reach after the break cost 50 = 25 x 200%. */
+export const PROMISE_BROKEN_MULT = srcConst('eras.promiseBrokenMult', 200, {
+  derived: 'the GlobalParameters row, read as the percent on each incursion after a break '
+    + '(runs/promise_break_20260926T073549Z.jsonl: 50 per founding after the break, four eras)',
+  inputs: [xml('GlobalParameters', 'Name=GRIEVANCE_MULTIPLIER_FOR_BROKEN_PROMISE', 'Value')],
+});
+
+/** The settle promise's reach: the promiser's founding breaks or costs when
+ *  the new centre lies within this many plots of the asker's BORDER (the
+ *  nearest plot it owns). Border 1, 2 and 3 broke a kept promise (border 3
+ *  at city distance 6 too); border 4 to 8 cost nothing. */
+export const SETTLE_PROMISE_REACH = srcConst('eras.settlePromiseReach', 3, {
+  lab: 'runs/promise_break_20260926T073549Z.jsonl (the promise_c2s1_prom_b1..b8 scenes, e.g. '
+    + 'runs/promise_c2s1_prom_b1_20260926T071452Z.log): a kept promise broke at border 1, 2, 3 '
+    + '(runs/promise_c2s1_prom_b3c6_20260926T072023Z.log: city distance 6); border 4-8 cost nothing '
+    + '(runs/promise_c2s1_prom_b4_20260926T071719Z.log, 5 of 5)',
+});
 
 /** CIV6 (DIPLOACTION_DECLARE_WAR_OF_RETRIBUTION): "a player who has broken a
  *  promise to you within the past 30 turns" — the window a break opens. */

@@ -1313,7 +1313,7 @@
             "seat_promise",
             "seat_promise_broken"
           ],
-          "note": "DIRECTED asker -> promiser: [promiser, per promise kind the signed turns left (kept +, refused -), the turns left on the War of Retribution window a break opened] for every promiser with anything standing, ascending."
+          "note": "DIRECTED asker -> promiser: [promiser, per promise kind the signed turns left (kept +, refused -), per promise kind the turns left on the broken window a break opened] for every promiser with anything standing, ascending."
         },
         {
           "name": "co2",
@@ -2972,6 +2972,28 @@
           ]
         },
         {
+          "name": "volcanoActive",
+          "compare": "exact",
+          "covers": [
+            "Tile.volcanoActive"
+          ],
+          "planes": [
+            "volcano_active"
+          ],
+          "note": "a volcano that may erupt: every volcano starts dormant and wakes on its own draw each turn."
+        },
+        {
+          "name": "eventFired",
+          "compare": "exact",
+          "covers": [
+            "Tile.eventFired"
+          ],
+          "planes": [
+            "tile_event_fired"
+          ],
+          "note": "a bit per random-event row that has fired on the site keyed on this plot; an unfired (row, site) pair carries the first-occurrence boost."
+        },
+        {
           "name": "airSlotBonus",
           "compare": "exact",
           "covers": [
@@ -3157,10 +3179,6 @@
       {
         "path": "Tile.volcano",
         "why": "world geometry, fixed at build."
-      },
-      {
-        "path": "Tile.volcanoActive",
-        "why": "a derived MAP fact, drawn once per volcano by `deriveVolcanoActivity` when the game is made from the map; the exporter ships the active volcanoes (`activeVolcanoes`) and nothing in play changes them."
       },
       {
         "path": "CityState.name",

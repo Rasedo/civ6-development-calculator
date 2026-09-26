@@ -16,10 +16,11 @@ import { dealPhase } from '../../../cpu/core/deals';
 import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { warConditionHolds, warKindAllowed } from '../../../cpu/core/casusBelli';
 import {
-  grievanceWith, promiseBrokenWith, promiseIncursion, promiseWith, settlePromises,
+  grievanceWith, promiseAskable, promiseBrokenWith, promiseIncursion, promiseWith, settlePromises,
 } from '../../../cpu/core/grievance';
 import {
-  PROMISES, PROMISE_BROKEN_GRIEVANCE, PROMISE_CONVERT, PROMISE_DIG, PROMISE_SPY, PROMISE_TURNS, RETRIBUTION_TURNS,
+  PROMISES, PROMISE_BROKEN_GRIEVANCE, PROMISE_BROKEN_MULT, PROMISE_CONVERT, PROMISE_DIG, PROMISE_SPY, PROMISE_TURNS,
+  RETRIBUTION_TURNS,
 } from '../../../cpu/data/promises';
 import { WAR_KINDS } from '../../../cpu/data/warKinds';
 import { tilesWithin } from '../../../world/hex';
@@ -127,7 +128,7 @@ describe('the incursion', () => {
     settlePromises(state, [[0, 1, PROMISE_CONVERT]], []);
     promiseIncursion(state, 0, 1, PROMISE_CONVERT, 2);
     expect(grievanceWith(state, 0, 1)).toBe(25 + 50);
-    expect(promiseBrokenWith(state, 0, 1)).toBe(0);
+    expect(promiseBrokenWith(state, 0, 1, PROMISE_CONVERT)).toBe(0);
   });
 
   it('breaks a kept promise: 100 Grievances, the promise ends, the War of Retribution opens', () => {
@@ -137,7 +138,8 @@ describe('the incursion', () => {
     promiseIncursion(state, 0, 1, PROMISE_SPY, 3);
     expect(promiseWith(state, 0, 1, PROMISE_SPY)).toBe(0);
     expect(grievanceWith(state, 0, 1)).toBe(PROMISE_BROKEN_GRIEVANCE);
-    expect(promiseBrokenWith(state, 0, 1)).toBe(RETRIBUTION_TURNS);
+    expect(promiseBrokenWith(state, 0, 1, PROMISE_SPY)).toBe(RETRIBUTION_TURNS);
+    expect(promiseBrokenWith(state, 0, 1, PROMISE_DIG)).toBe(0);
     expect(warConditionHolds(state, 0, 1, 'brokenPromise')).toBe(true);
     expect(warConditionHolds(state, 1, 0, 'brokenPromise')).toBe(false);
     // the kind still asks its civic and a five-turn denouncement
@@ -145,9 +147,16 @@ describe('the incursion', () => {
     expect(warKindAllowed(state, 0, 1, RETRIBUTION)).toBe(false);
     state.seats[0].denounced[1] = state.turn - 5;
     expect(warKindAllowed(state, 0, 1, RETRIBUTION)).toBe(true);
-    // a second incursion finds nothing standing
-    promiseIncursion(state, 0, 1, PROMISE_SPY, 1);
-    expect(grievanceWith(state, 0, 1)).toBe(PROMISE_BROKEN_GRIEVANCE);
+    // the promise stands BROKEN: it cannot be asked again, and each further
+    // incursion costs GrievancesPerIncursion x GRIEVANCE_MULTIPLIER_FOR_BROKEN_PROMISE
+    expect(PROMISE_BROKEN_MULT).toBe(200);
+    expect(promiseAskable(state, 0, 1, PROMISE_SPY)).toBe(false);
+    promiseIncursion(state, 0, 1, PROMISE_SPY, 2);
+    expect(grievanceWith(state, 0, 1)).toBe(PROMISE_BROKEN_GRIEVANCE + 2 * 50);
+    // another kind between the pair is untouched by the break
+    settlePromises(state, [[0, 1, PROMISE_DIG]], []);
+    promiseIncursion(state, 0, 1, PROMISE_DIG, 1);
+    expect(grievanceWith(state, 0, 1)).toBe(PROMISE_BROKEN_GRIEVANCE + 2 * 50 + 25 + 25);
   });
 
   it('nothing standing, nothing owed', () => {
@@ -166,7 +175,7 @@ describe('the clock', () => {
     dealPhase(state);
     expect(promiseWith(state, 0, 1, PROMISE_DIG)).toBe(PROMISE_TURNS - 1);
     expect(promiseWith(state, 0, 2, PROMISE_CONVERT)).toBe(-(PROMISE_TURNS - 1));
-    expect(promiseBrokenWith(state, 0, 1)).toBe(RETRIBUTION_TURNS - 1);
+    expect(promiseBrokenWith(state, 0, 1, PROMISE_SPY)).toBe(RETRIBUTION_TURNS - 1);
     for (let t = 1; t < PROMISE_TURNS; t++) dealPhase(state);
     expect(state.promises ?? {}).toEqual({});
     expect(state.promiseBroken ?? {}).toEqual({});

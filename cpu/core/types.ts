@@ -399,9 +399,10 @@ export interface GameState {
    *  (PROMISES order) the turns left on the promiser's promise (positive) or
    *  on its refusal (negative), 0 where neither stands. */
   promises?: Record<string, number[]>;
-  /** Turns left on the War of Retribution window a BROKEN promise opened,
-   *  keyed `${asker}>${promiser}` — the asker's casus belli. */
-  promiseBroken?: Record<string, number>;
+  /** Per promise kind, turns left on the window a BROKEN promise opened,
+   *  keyed `${asker}>${promiser}`: the promise stands broken while it runs,
+   *  and any kind's window is the asker's War of Retribution casus belli. */
+  promiseBroken?: Record<string, number[]>;
   /** CAPTURED SPIES, keyed owner -> captor: the LEVELS of the owner's spies
    *  that captor is holding, one entry per spy. They are "imprisoned, but not
    *  killed", still count against the owner's capacity, and come home at the
