@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, grantTechs, grantCivics } from '../helpers';
-import { seatOf } from '../../../cpu/core/seats';
+import { seatOf, setTileOwner } from '../../../cpu/core/seats';
+import { validImprovements } from '../../../cpu/core/rules';
+import { paintVolcanicSoil } from '../../../cpu/core/disasters';
 import { modifiersFromResearch } from '../../../cpu/core/effects';
 import { tileYields } from '../../../cpu/core/yields';
 import { IMPROVEMENTS } from '../../../cpu/data/improvements';
@@ -95,5 +97,50 @@ describe('the Lumber Mill on a river', () => {
     // CIV6 (Ziggurat): "+1 Culture if next to River" rides the same column,
     // and so does the Chateau's "+2 Gold if on a tile containing a River edge"
     expect(withRiver.map((d) => d.id).sort()).toEqual(['CHATEAU', 'LUMBER_MILL', 'ZIGGURAT']);
+  });
+});
+
+describe('the Lumber Mill\'s ground', () => {
+  // CIV6 (Improvement_ValidFeatures): FEATURE_FOREST (Improvements.xml) and
+  // FEATURE_JUNGLE with PrereqCivic CIVIC_MERCANTILISM (Expansion2_Improvements.xml)
+  it('reads the install: Woods, and Rainforest from Mercantilism', () => {
+    expect(IMPROVEMENTS.LUMBER_MILL.features).toEqual(['WOODS', 'RAINFOREST']);
+    expect(IMPROVEMENTS.LUMBER_MILL.featureCivics).toEqual({ RAINFOREST: 'MERCANTILISM' });
+  });
+
+  it('is offered on Woods after Construction, on Rainforest only once Mercantilism is in', () => {
+    const state = world();
+    const woods = tileAtCoords(state.map, 6, 6);
+    const rain = tileAtCoords(state.map, 8, 6);
+    const burnt = tileAtCoords(state.map, 10, 6);
+    const soil = tileAtCoords(state.map, 6, 8);
+    const bare = tileAtCoords(state.map, 8, 8);
+    const plots = [woods, rain, burnt, soil, bare];
+    woods.feature = 'WOODS';
+    rain.feature = 'RAINFOREST';
+    burnt.feature = 'BURNT_WOODS';
+    soil.feature = 'VOLCANIC_SOIL';
+    bare.feature = null;
+    for (const t of plots) {
+      t.terrain = 'PLAINS';
+      t.resource = null;
+      setTileOwner(t, 0);
+    }
+    const offered = () => plots.filter((t) => validImprovements(state, t, 0).includes('LUMBER_MILL'));
+    expect(offered()).toEqual([]);
+    grantTechs(state, 'CONSTRUCTION');
+    expect(offered()).toEqual([woods]);
+    grantCivics(state, 'MERCANTILISM');
+    expect(offered()).toEqual([woods, rain]);
+  });
+
+  it('goes with the Rainforest it stood on, as with Woods', () => {
+    const state = world();
+    const t = tileAtCoords(state.map, 6, 6);
+    t.feature = 'RAINFOREST';
+    t.improvement = 'LUMBER_MILL';
+    paintVolcanicSoil(t);
+    expect(t.feature).toBe('VOLCANIC_SOIL');
+    expect(t.improvement).toBeNull();
   });
 });

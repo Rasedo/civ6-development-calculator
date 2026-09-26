@@ -40,9 +40,9 @@ def build(path) -> BatchSim:
 
 def _ridge(sim, n: int = 3):
     """A connected run of `n` mountain tiles, with its own range id: the
-    longest range this world holds, its natural-wonder plots left out (no
-    tunnel stands on one)."""
-    mt = (sim.tile_mountain[B0] & ~sim.nwonder[B0]).nonzero().flatten().tolist()
+    longest range this world holds, its natural-wonder and volcano plots
+    left out (no tunnel stands on one)."""
+    mt = (sim.tile_mountain[B0] & ~sim.nwonder[B0] & ~sim.volcano_at[B0]).nonzero().flatten().tolist()
     assert mt, "this fixture carries no mountain"
     # take a whole range, so the tiles are genuinely connected
     ranges: dict[int, list[int]] = {}
@@ -260,6 +260,46 @@ def test_a_natural_wonder_refuses_it(rules, path) -> None:
     print("  9 the feature gate OK — a natural wonder's mountain refuses the tunnel")
 
 
+def test_a_volcano_refuses_it(rules, path) -> None:
+    """CIV6 (FEATURE_VOLCANO, Expansion2_Features.xml): a volcano is its plot's
+    feature and the tunnel's Improvement_ValidFeatures rows list none, so the
+    world's own volcano refuses it (`featureOk`), in mask and applier alike."""
+    sim = build(path)
+    vol = [int(x) for x in sim.volcano_tile[B0].tolist() if x >= 0]
+    vol = [v for v in vol if any(x >= 0 and not bool(sim.water[B0, x]) and bool(sim.passable[B0, x])
+                                 for x in sim.neigh[v].tolist())]
+    assert vol, "this fixture holds no volcano with a land plot beside it"
+    tgt = vol[0]
+    assert bool(sim.volcano_at[B0, tgt]) and bool(sim.tile_mountain[B0, tgt])
+    sim.tile_seat[B0, tgt] = -1
+    sim.improvement[B0, tgt] = -1
+    slot, rank = _stand_beside(sim, tgt)
+    here = int(sim.major_unit_tile[B0, slot])
+    for _t in (int(x) for x in sim.neigh[here].tolist() if x >= 0):
+        if _t != tgt and bool(sim.tile_mountain[B0, _t]):
+            sim.improvement[B0, _t] = sim.TUNNEL
+    col = int(sim._A_IMP[sim.TUNNEL])
+    sim._gen_ver += 1
+    sim._eff_version += 1
+    try:
+        # the same plot with the volcano lifted IS offered: the volcano is the gate
+        sim.volcano_at[B0, tgt] = False
+        sim._gen_ver += 1
+        assert bool(sim._seat_unit_mask(0)[0, rank, col]), "the bare mountain under the volcano was not offered"
+    finally:
+        sim.volcano_at[B0, tgt] = True
+    sim._gen_ver += 1
+    sim._eff_version += 1
+    assert not bool(sim._seat_unit_mask(0)[0, rank, col]), "a volcano was offered the tunnel"
+    acts = torch.full((1, sim._seat_slot_map(0)[0].shape[0]), -1, dtype=torch.long)
+    acts[0, rank] = col
+    sim.seat_ext[B0, 0] = True
+    sim._apply_seat_unit_actions(0, acts)
+    assert int(sim.improvement[B0, tgt]) != sim.TUNNEL, "the applier tunnelled a volcano"
+    assert int(sim.major_unit_charges[B0, slot]) == 3, "and it spent no charge"
+    print(" 10 the volcano gate OK — a volcano refuses the tunnel")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -272,6 +312,7 @@ def main() -> int:
     test_it_cannot_be_pillaged(rules, path)
     test_the_two_xp2_columns(rules, path)
     test_a_natural_wonder_refuses_it(rules, path)
+    test_a_volcano_refuses_it(rules, path)
     print("BATTERY OK mountain_tunnel")
     return 0
 

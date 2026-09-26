@@ -1465,7 +1465,7 @@ class SimMinors:
                 ok = self._plane_seen("mine_ok", row) & (
                     techs[:, self._mine_unlock_tech] if self._mine_unlock_tech >= 0 else zeros).unsqueeze(1)
             elif k == self.LUMBER:
-                ok = self._plane_seen("lumber_ok", row) & ~self.feat_stripped & (
+                ok = self._lumber_ground(row, civics) & (
                     techs[:, self._lumber_unlock_tech] if self._lumber_unlock_tech >= 0 else zeros).unsqueeze(1)
             elif self.SEASIDE >= 0 and k == self.SEASIDE:
                 ok = self._seaside_ok(row) & unl(k)

@@ -19,7 +19,8 @@ Proven here:
   * the raise is the ASKING SEAT's own research — a seat without the row is
     paid nothing on the identical tile;
   * a pillaged improvement is paid none of it;
-  * the river column pays only where a river runs, and stacks with Steel.
+  * the river column pays only where a river runs, and stacks with Steel;
+  * the Lumber Mill stands on Woods, and on Rainforest once Mercantilism is in.
 """
 
 from __future__ import annotations
@@ -182,12 +183,48 @@ def test_river_column(rules, path) -> None:
     print("  3 river column OK — only on a river, stacking with Steel, dark under pillage")
 
 
+def test_lumber_ground(rules, path) -> None:
+    """CIV6 (Improvement_ValidFeatures): the Lumber Mill takes FEATURE_FOREST
+    (Improvements.xml), and FEATURE_JUNGLE once the seat holds Mercantilism
+    (Expansion2_Improvements.xml, PrereqCivic CIVIC_MERCANTILISM) —
+    `_lumber_ground`, the one predicate the mask, the applier, the job walk
+    and the minors' builders ask; the TS twin is `featureOk`."""
+    sim = fresh(rules, path)
+    rf, wf = sim._rainforest_fid, sim._woods_feat
+    assert sim._lumber_feat_civic == [(rf, CIVICS.index("MERCANTILISM"))], \
+        f"the wire's civic-gated features read {sim._lumber_feat_civic}"
+    free = (~sim.water[B0] & sim.passable[B0] & (sim.district[B0] < 0)
+            & (sim.built_wonder[B0] < 0) & (sim.centre_slot_at[B0] < 0)
+            & (sim.res_imp[B0] == -1) & sim.lumber_ok[B0])
+    woods = (free & (sim.feat_id[B0] == wf)).nonzero().flatten().tolist()
+    rain = (free & (sim.feat_id[B0] == rf)).nonzero().flatten().tolist()
+    assert woods and rain, f"the baked plane holds {len(woods)} Woods and {len(rain)} Rainforest plots"
+    w, r = woods[0], rain[0]
+    g = sim._lumber_ground(ROW)
+    assert bool(g[B0, w]) and not bool(g[B0, r]), "Rainforest offered before Mercantilism"
+    # the job walk reads the same predicate, under Construction
+    research(sim, ROW, "tech", "CONSTRUCTION")
+    for t in (w, r):
+        sim.tile_seat[B0, t] = ROW
+        sim.improvement[B0, t] = -1
+    job = sim._seat_job_mask(ROW)
+    assert bool(job[B0, w]) and not bool(job[B0, r]), "a Rainforest mill job before Mercantilism"
+    research(sim, ROW, "civic", "MERCANTILISM")
+    g = sim._lumber_ground(ROW)
+    assert bool(g[B0, w]) and bool(g[B0, r]), "Mercantilism did not open the Rainforest"
+    assert bool(sim._seat_job_mask(ROW)[B0, r]), "no Rainforest mill job after Mercantilism"
+    # a SECOND seat without the civic still refuses it
+    assert not bool(sim._lumber_ground(1)[B0, r]), "the civic reached a seat that never adopted it"
+    print("  4 lumber ground OK — Woods from Construction, Rainforest from Mercantilism")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
     test_wire(rules, path)
     test_paid_per_seat(rules, path)
     test_river_column(rules, path)
+    test_lumber_ground(rules, path)
     print("BATTERY OK imp_research_yields")
     return 0
 

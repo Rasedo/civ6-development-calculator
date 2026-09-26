@@ -2051,7 +2051,8 @@ export function builderRemoveFeature(state: GameState, unitId: number, seat: num
   const grant = state.sandbox ? null : chopGrant(state, tile, seat);
   const feature = tile.feature;
   const featureName = feature ? FEATURES[feature]?.name ?? feature : '';
-  if (tile.improvement === 'LUMBER_MILL' && tile.feature === 'WOODS') tile.improvement = null;
+  // a Lumber Mill stands only on a feature it lists, and goes with it
+  if (tile.improvement === 'LUMBER_MILL') tile.improvement = null;
   tile.feature = null;
   if (grant) {
     applyLumpYield(state, tile.index, grant, seat);

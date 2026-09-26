@@ -44,7 +44,7 @@ re-adds them.
 | B-89 fire on a religious unit | 1 | what may target a Missionary / Apostle, and Condemn Heretic's geometry (LAB) |
 | B-91 a religion's beliefs | 1 | Religious Colonization's pressure, Holy Waters' reach, "cities following", whose religion a worship building follows (LAB) |
 | B-93 Great People as Gathering Storm layers them | 1 | whether Darwin counts the plot underfoot (LAB) |
-| B-94 an improvement's and a wonder's ground | 1 | the Lumber Mill on Rainforest, the Tunnel on a volcano, the water wonders' and multi-plot wonders' placement (BUILD); `Feature_AdjacentTerrains`' reading (LAB) |
+| B-94 an improvement's and a wonder's ground | 1 | the generator's ResetTerrain and natural cliffs on wonder plots (BUILD); the ice radius (ASK); `Feature_AdjacentTerrains`' reading, the unpublished multi-plot shapes, a water wonder on a lake (LAB) |
 | **B. Fidelity vs real Civ 6** | **9** | |
 | C-1 power | 1 | the accident's building and unit rows (LAB) |
 | C-2 diplomatic agreements | 1 | the promise's break and the broken-promise operand (LAB) |
@@ -115,7 +115,10 @@ commit.
   - LAB: whether Darwin's payout counts the natural-wonder plot he stands on (both engines count adjacent wonder plots only).
 - **B-94. AN IMPROVEMENT'S AND A WONDER'S GROUND.** Weight 1.
   Every improvement takes only the features its `Improvement_ValidFeatures` rows list (`ImprovementDef.features`, `featureOk` / `_imp_feats_ok`; none listed means none, Volcanic Soil included), the Mountain Tunnel and Qhapaq Ñan too, so a natural wonder's mountain refuses them. Every land wonder reads its own rows on every plot it covers (`world/wonders.ts`, `wonderTileValid`): `Feature_ValidTerrains` (Kilimanjaro and Everest on Mountains), NoRiver, NoCoast and Coast, `Feature_AdjacentTerrains` / `NotAdjacentTerrains`, `Feature_AdjacentFeatures` / NoAdjacentFeatures, `Tiles`, and `Features.MinDistanceNW` 8; no latitude band for land wonders.
-  - BUILD: the Lumber Mill takes Rainforest in GS (both engines allow Woods only); the volcano is a feature (`FEATURE_VOLCANO`) that refuses the Tunnel and Qhapaq Ñan by the same reading (both engines keep it a separate flag); the water wonders (Galápagos, the Great Barrier Reef) place by `MinDistanceLand` / `MaxDistanceLand` and `NotNearFeatures` ICE, not the engine's latitude band; the multi-plot wonders' `CustomPlacement` shapes are unread.
+  The Lumber Mill takes Rainforest from Mercantilism (`Improvement_ValidFeatures` FEATURE_JUNGLE `PrereqCivic`; `ImprovementDef.featureCivics`, `_lumber_ground`); a volcano refuses every improvement that lists no volcano row, the Tunnel and Qhapaq Ñan included (`volcano_at`); the water wonders place by `MinDistanceLand` / `MaxDistanceLand` on salt Coast, the generator's three coast-expansion passes (`TerrainGenerator.lua`) laying the Coast they need; Yosemite, Eyjafjallajokull, Torres del Paine and the Cliffs of Dover take their `CustomPlacement` shapes.
+  - BUILD: the generator runs `ResetTerrain` on every wonder plot (flattening hills and mountains) and `SetNaturalCliff` on custom-placed plots; neither engine does — this bears on Kilimanjaro's Mountain reading.
+  - ASK: the water wonders' `NotNearFeatures` ICE radius ("Far based on map size", DLL-only); only the plot itself refuses Ice.
+  - LAB: the shape of a multi-plot wonder with no `CustomPlacement` (Dead Sea, Pantanal, Everest, Eye of the Sahara, the water wonders — laid by the DLL's `SetFeatureType`); whether a water wonder may stand on a lake (a lake is TERRAIN_COAST in the install, a separate terrain here).
   - LAB: `Feature_AdjacentTerrains` read as "at least one neighbour" (the other reading: every neighbour) — `TerrainBuilder.CanHaveFeature` over the tuner settles it.
 
 ## C. Absent systems — the blockers, and the gaps waiting on them

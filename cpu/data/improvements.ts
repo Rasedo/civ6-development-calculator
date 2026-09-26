@@ -93,9 +93,12 @@ export interface ImprovementDef {
   /** CIV6 (Improvement_ValidFeatures): the ONLY features the row may stand
    *  on. Absent is the install writing no row, and the row refuses every
    *  feature plot. Every arm of `validImprovementsIn` that reads the catalog's
-   *  ground clause reads it; the Farm, Mine, Lumber Mill, Seaside Resort and
-   *  the resource rows spell their own ground. */
+   *  ground clause reads it, the Lumber Mill's too; the Farm, Mine, Seaside
+   *  Resort and the resource rows spell their own ground. */
   features?: FeatureId[];
+  /** CIV6 (`Improvement_ValidFeatures.PrereqCivic`): a listed feature the row
+   *  takes only once the seat holds this civic (`Unlocks.featureRows`). */
+  featureCivics?: Partial<Record<FeatureId, string>>;
   /** CIV6 (a SINGLE_PLOT modifier): extra yields while standing on one of
    *  these features (the Sphinx's Floodplains Culture). */
   featureYields?: { features: FeatureId[]; yields: Partial<Yields> };
@@ -355,8 +358,12 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     riverYields: { production: 1 },
     housing: 0,
     resourceOnly: false,
-    description: 'Woods. +2 production, +1 more on a river.',
+    features: ['WOODS', 'RAINFOREST'],
+    featureCivics: { RAINFOREST: 'MERCANTILISM' },
+    description: 'Woods, or Rainforest from Mercantilism. +2 production, +1 more on a river.',
     src: {
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_LUMBER_MILL (FEATURE_FOREST, FEATURE_JUNGLE), as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_LUMBER_MILL', 'FeatureType')] },
+      'featureCivics.RAINFOREST': xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&FeatureType=FEATURE_JUNGLE', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_LUMBER_MILL', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_LUMBER_MILL', 'PlunderAmount'),
       'yields.production': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION', 'YieldChange'),

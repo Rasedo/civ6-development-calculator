@@ -58,8 +58,8 @@ class SimOrders:
         _ab = torch.where(_cmd, actions[:, :_n], torch.full_like(actions[:, :_n], -1))
         _no = torch.zeros_like(_cmd)
         _fc = self._A_FOUND
-        _sn = self._A_SNIPE if self._snipe_on else -1
-        _sn3 = self._A_SNIPE3 if self._snipe3_on else -1
+        _sn = self._A_SNIPE
+        _sn3 = self._A_SNIPE3
         _sp = self._A_SPREAD
         _xc = self._A_EXCAVATE
         _pk = self._A_PARK
@@ -116,8 +116,8 @@ class SimOrders:
             ((_ab >= 0) & (_ab < 6)).any(dim=0),                                # move
             ((_ab >= 6) & (_ab < 12)).any(dim=0),                               # attack
             ((_ab == _fc) if _fc >= 0 else _no).any(dim=0),                     # found
-            ((((_ab >= _sn) & (_ab < _sn + 12)) if _sn >= 0 else _no)
-             | (((_ab >= _sn3) & (_ab < _sn3 + 18)) if _sn3 >= 0 else _no)).any(dim=0),  # snipe
+            (((_ab >= _sn) & (_ab < _sn + 12))
+             | ((_ab >= _sn3) & (_ab < _sn3 + 18))).any(dim=0),  # snipe
             ((_ab == self._A_CHOP) if self._A_CHOP >= 0 else _no).any(dim=0),
             (torch.isin(_ab, torch.tensor(_ic, dtype=_ab.dtype, device=dev)) if _ic else _no).any(dim=0),
             ((_ab == self._A_PILLAGE) if self._act_names and self._A_PILLAGE > 0 else _no).any(dim=0),
@@ -1058,8 +1058,7 @@ class SimOrders:
                     elif _k == self.MINE:
                         _valid = self._plane_seen("mine_ok", row).gather(1, hc.unsqueeze(1)).squeeze(1) & mining
                     elif _k == self.LUMBER:
-                        _valid = (self._plane_seen("lumber_ok", row).gather(1, hc.unsqueeze(1)).squeeze(1)
-                                  & ~self.feat_stripped.gather(1, hc.unsqueeze(1)).squeeze(1) & constr)
+                        _valid = self._lumber_ground(row, civics).gather(1, hc.unsqueeze(1)).squeeze(1) & constr
                     else:
                         _ut = int(self._imp_unlock[_k])
                         _unl = (techs[:, _ut] if _ut >= 0
@@ -1137,8 +1136,8 @@ class SimOrders:
                     if self._imp_outside[_k]:
                         _tterr = _tterr | (self.tile_seat.gather(1, _tnc) < 0)
                     # neither row lists a feature (`featureOk`), so a natural
-                    # wonder's mountain refuses it
-                    _tfeat = ((self.feat_id >= 0) & ~self.feat_stripped).gather(1, _tnc)
+                    # wonder's mountain and a volcano refuse it
+                    _tfeat = (((self.feat_id >= 0) & ~self.feat_stripped) | self.volcano_at).gather(1, _tnc)
                     _tok = ((_tnb >= 0) & self.tile_mountain.gather(1, _tnc)
                             & (self.improvement.gather(1, _tnc) < 0) & ~_tfeat & _tterr)
                     _tkey = torch.where(_tok, _tnb, torch.full_like(_tnb, 2 ** 30))
@@ -1687,8 +1686,9 @@ class SimOrders:
         self.feat_stripped[rows, tiles] = True
         self.tdef[rows, tiles] = self.hills[rows, tiles].long() * 3  # a stripped feature no longer defends (TS terrainDefense reads live)
         self.tmove[rows, tiles] = self.hills[rows, tiles].long() * self._mp_scale  # nor slows movement (hills-only cost)
-        # TS builderRemoveFeature: chopping WOODS removes a LUMBER_MILL (it
-        # requires woods), else a stale mill keeps +production on a bare tile.
+        # TS builderRemoveFeature: a LUMBER_MILL goes with the Woods or
+        # Rainforest it stood on, else a stale mill keeps +production on a
+        # bare tile.
         if self.LUMBER >= 0:
             lm = self.improvement[rows, tiles] == self.LUMBER
             if bool(lm.any()):
@@ -1711,8 +1711,8 @@ class SimOrders:
         """The farm / mine / lumber job flags of a plot whose removable
         feature is gone (chopped, paved or painted over by Volcanic Soil):
         TS's live gates read the bare ground (`bareGround`), so farm and mine
-        take their feature-free variants and the Lumber Mill, which needs
-        WOODS, is refused. A harvest on such a plot calls this after copying
+        take their feature-free variants and the Lumber Mill, which needs a
+        listed feature, is refused. A harvest on such a plot calls this after copying
         the resource-free values in, which carry the starting feature."""
         self.lumber_ok[rows, tiles] = False
         self.farm_flat[rows, tiles] = self._fa_f_c[rows, tiles]

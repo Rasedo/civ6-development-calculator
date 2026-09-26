@@ -3676,8 +3676,9 @@ class SimEconomy:
         (`_bare_ground_jobs`)."""
         live = getattr(self, name)
         if name == "lumber_ok":
-            # the Lumber Mill stands on Woods: a plot whose t0 Woods a fire
-            # has burnt (or the soil painted over) takes none
+            # the Lumber Mill stands on its listed Woods or Rainforest: a plot
+            # whose t0 feature a fire has burnt (or the soil painted over)
+            # takes none
             live = live & (self.feat_id == self.feat_id0)
         bare = self._nr_bare.get(name)
         if bare is None:

@@ -3943,7 +3943,7 @@ class SimSeats:
         if self.MINE >= 0 and self._mine_unlock_tech >= 0:
             ok = ok | (self._plane_seen("mine_ok", row) & tk[:, self._mine_unlock_tech].unsqueeze(1))
         if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0:
-            ok = ok | (self._plane_seen("lumber_ok", row) & tk[:, self._lumber_unlock_tech].unsqueeze(1))
+            ok = ok | (self._lumber_ground(row, cv) & tk[:, self._lumber_unlock_tech].unsqueeze(1))
         if self.SEASIDE >= 0 and self._seaside_unlock_tech >= 0:
             ok = ok | (self._seaside_ok(row) & tk[:, self._seaside_unlock_tech].unsqueeze(1))
         for _g in self._imp_ground_idx:
@@ -4038,12 +4038,13 @@ class SimSeats:
                 allow |= self.hills if e == 1 else ~self.hills
             ok &= allow
         # CIV6 (Improvement_ValidFeatures, `featureOk`): a live feature takes
-        # only the rows that list it; a row with no list takes bare ground.
+        # only the rows that list it; a row with no list takes bare ground. A
+        # volcano is its plot's feature and no row lists it.
         live = (self.feat_id >= 0) & ~self.feat_stripped
         allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
         for f in self._imp_feats_ok[k]:
             allow |= self.feat_id == f
-        ok &= ~live | allow
+        ok &= (~live | allow) & ~self.volcano_at
         if self._imp_no_adj_same[k]:
             nb = self.neigh
             nbc = nb.clamp(min=0)

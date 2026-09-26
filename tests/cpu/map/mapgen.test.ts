@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateMap, resourceValidOnTile } from '../../../world/mapgen';
-import { neighborOffset, oppositeDir, inBounds, tileAt, neighbors } from '../../../world/hex';
+import { neighborOffset, oppositeDir, inBounds, tileAt, neighbors, hexDistance } from '../../../world/hex';
 import { RESOURCES } from '../../../world/resources';
 import type { GameMap } from '../../../cpu/core/types';
 
@@ -57,14 +57,23 @@ describe('map generation', () => {
     }
   });
 
-  it('ocean tiles never touch land; coast tiles always do', () => {
+  it('ocean tiles never touch land; coast lies within four plots of it', () => {
+    // CIV6 (TerrainGenerator.lua): every water plot beside land is Coast,
+    // then three "Expanding coasts" passes each widen it by at most a ring
+    const land = map.tiles.filter((t) => t.terrain !== 'OCEAN' && t.terrain !== 'COAST' && t.terrain !== 'LAKE');
+    let expanded = 0;
     for (const t of map.tiles) {
       const touchesLand = neighbors(map, t).some(
         (n) => n.terrain !== 'OCEAN' && n.terrain !== 'COAST' && n.terrain !== 'LAKE',
       );
       if (t.terrain === 'OCEAN') expect(touchesLand).toBe(false);
-      if (t.terrain === 'COAST') expect(touchesLand).toBe(true);
+      if (t.terrain === 'COAST') {
+        const d = Math.min(...land.map((u) => hexDistance(t.col, t.row, u.col, u.row)));
+        expect(d).toBeLessThanOrEqual(4);
+        if (d > 1) expanded++;
+      }
     }
+    expect(expanded).toBeGreaterThan(0);
   });
 
   it('every placed resource is valid for its tile', () => {

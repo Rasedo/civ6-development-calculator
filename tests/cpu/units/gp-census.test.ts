@@ -252,7 +252,9 @@ describe('the grants', () => {
     const state = newGame();
     state.seats[0].civ = civRow('ROME');
     const techs = state.seats[0].research.techs;
-    const coast = state.map.tiles.find((t) => t.terrain === 'COAST' && !isImpassable(t) && free(state, t.index))!;
+    // a Coast plot with land beside it: the person stands on the shore
+    const coast = state.map.tiles.find((t) => t.terrain === 'COAST' && !isImpassable(t) && free(state, t.index)
+      && neighbors(state.map, t).some((n) => !isWater(n) && !isImpassable(n)))!;
     const none = stand(state, 'GP_HANNO_THE_NAVIGATOR', ownBare(state));
     expect(activateGreatPerson(state, none)).toBe(true); // nothing unlocked: the charge is spent for nothing
     expect(state.units.some((x) => x.seat === 0 && x.type === 'GALLEY')).toBe(false);

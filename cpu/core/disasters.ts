@@ -177,10 +177,10 @@ export function soilPaintable(t: Tile): boolean {
   return t.feature === null || SOIL_REPLACES.includes(t.feature);
 }
 
-/** The plot becomes Volcanic Soil; a Lumber Mill goes with the Woods it
- *  stood on, any other improvement stays. */
+/** The plot becomes Volcanic Soil; a Lumber Mill goes with the Woods or
+ *  Rainforest it stood on, any other improvement stays. */
 export function paintVolcanicSoil(t: Tile): void {
-  if (t.improvement === 'LUMBER_MILL' && t.feature === 'WOODS') t.improvement = null;
+  if (t.improvement === 'LUMBER_MILL') t.improvement = null;
   t.feature = 'VOLCANIC_SOIL';
 }
 

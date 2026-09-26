@@ -176,8 +176,9 @@ export function adjacentPlotTarget(
   let best = -1;
   for (const n of neighbors(map, tile)) {
     if (!isMountain(n) || n.improvement) continue;
-    // neither row lists a feature, so a natural wonder's mountain refuses it
-    if (!featureOk(def, n)) continue;
+    // neither row lists a feature, so a natural wonder's mountain and a
+    // volcano refuse it
+    if (!featureOk(def, n, null)) continue;
     // the TARGET answers the territory column, not the tile the builder
     // stands on — `CanBuildOutsideTerritory` reaches unowned mountains and
     // stops at another seat's border like every other row.
@@ -227,9 +228,16 @@ export function bareGround(tile: Tile): boolean {
 }
 
 /** CIV6 (Improvement_ValidFeatures): a plot carrying a feature takes only the
- *  rows that list that feature; a row with no list takes bare ground alone. */
-export function featureOk(def: ImprovementDef, tile: Tile): boolean {
-  return tile.feature === null || !!def.features?.includes(tile.feature);
+ *  rows that list that feature, and a listed feature whose row names a
+ *  `PrereqCivic` only once the seat holds it (`unlocks.featureRows`; null
+ *  unlocks gate no research); a row with no list takes bare ground alone. A
+ *  volcano is its plot's feature (`FEATURE_VOLCANO`, Expansion2_Features.xml)
+ *  and no row lists it. */
+export function featureOk(def: ImprovementDef, tile: Tile, unlocks: Unlocks | null): boolean {
+  if (tile.volcano) return false;
+  if (tile.feature === null) return true;
+  if (!def.features?.includes(tile.feature)) return false;
+  return !unlocks || !def.featureCivics?.[tile.feature] || unlocks.featureRows.has(`${def.id}:${tile.feature}`);
 }
 
 /**
@@ -336,7 +344,7 @@ export function validImprovementsIn(
       // CIV6 (Legion): the Roman Fort is the FORT row, laid without its tech.
       if (fortBuilder ? def.id !== 'FORT' : (!def.engineer || !unlocked(def.id))) continue;
       if (!territoryOk(def, tile, opts.ownsTile)) continue;
-      if (!featureOk(def, tile)) continue;
+      if (!featureOk(def, tile, unlocks)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.excludeTerrains?.includes(tile.terrain)) continue;
       if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
@@ -354,7 +362,7 @@ export function validImprovementsIn(
       if (def.uniqueTo && def.uniqueTo !== opts.civ) continue;
       if (!territoryOk(def, tile, opts.ownsTile)) continue;
       if (tile.improvement) continue;
-      if (!featureOk(def, tile)) continue;
+      if (!featureOk(def, tile, unlocks)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
       if (!uniqueGroundOk(def, tile, opts)) continue;
@@ -385,7 +393,7 @@ export function validImprovementsIn(
       if (def.noAdjacentSame && opts.map
           && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
-      if (!featureOk(def, tile)) continue;
+      if (!featureOk(def, tile, unlocks)) continue;
       if (!uniqueGroundOk(def, tile, opts)) continue;
       out.push(def.id);
     }
@@ -402,7 +410,7 @@ export function validImprovementsIn(
     if (def.uniqueTo && (def.uniqueTo !== opts.civ || !unlocked(def.id))) continue;
     // a row the BUILDER does not lay (the Pa's Toa) has its own arm above
     if (def.builtBy || def.waterOnly) continue;
-    if (!featureOk(def, tile)) continue;
+    if (!featureOk(def, tile, unlocks)) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
@@ -433,7 +441,11 @@ export function validImprovementsIn(
   // Civ 6 allows it on any passable land tile the owner holds; the district /
   // wonder / impassable paves are already refused above, and a resource tile
   // returns early with its own improvement, so nothing more is needed here.
-  if (unlocked('LUMBER_MILL') && tile.feature === 'WOODS') out.push('LUMBER_MILL');
+  // LUMBER MILL: a listed feature under it (Woods, or Rainforest once the
+  // seat holds Mercantilism) — it takes no bare ground
+  if (unlocked('LUMBER_MILL') && tile.feature !== null && featureOk(IMPROVEMENTS.LUMBER_MILL, tile, unlocks)) {
+    out.push('LUMBER_MILL');
+  }
   // SEASIDE RESORT — real Civ 6: a FLAT COASTAL Grassland/Plains/
   // Desert tile with BREATHTAKING appeal (>= 4). Needs the map (coast
   // adjacency + appeal), so callers that pass none simply never offer it —
@@ -456,7 +468,7 @@ export function validImprovementsIn(
     if (!def.groundOnly || !unlocked(def.id)) continue;
     if (!govOk(def)) continue;
     if (def.requiresFeature && tile.feature !== def.requiresFeature) continue;
-    if (!featureOk(def, tile)) continue;
+    if (!featureOk(def, tile, unlocks)) continue;
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;

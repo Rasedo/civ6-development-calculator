@@ -1176,6 +1176,18 @@ class SimMasks:
                              & ~self._feat_blocks_ground())
         return out
 
+    def _lumber_ground(self, row: int, civics: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, T] — where this row may build a LUMBER MILL (`featureOk` over
+        its `Improvement_ValidFeatures` rows): the baked plane of its listed
+        features still standing, and a feature whose row names a civic
+        (Rainforest, Mercantilism) only once the row holds it. ONE predicate
+        for the mask, the applier, the job walk and the minors' builders."""
+        cv = self.civ_civics[:, row] if civics is None else civics
+        out = self._plane_seen("lumber_ok", row) & ~self.feat_stripped
+        for _lf, _lc in self._lumber_feat_civic:
+            out = out & ~((self.feat_id == _lf) & ~cv[:, _lc].unsqueeze(1))
+        return out
+
     def _military_policies(self, seat: torch.Tensor) -> torch.Tensor:
         """`Modifiers.militaryPolicies`' twin, shaped like `seat`: how many
         MILITARY policies the seat each element names has slotted. A minor or a
@@ -3334,7 +3346,7 @@ class SimMasks:
                 farmable = farmable & ~dry_here
             build_f = (here_ok & farmable).unsqueeze(2)
             build_m = (here_ok & self._plane_seen("mine_ok", row).gather(1, tc) & mining).unsqueeze(2)
-            build_l = (here_ok & self._plane_seen("lumber_ok", row).gather(1, tc) & ~self.feat_stripped.gather(1, tc) & constr).unsqueeze(2)
+            build_l = (here_ok & self._lumber_ground(row, civics).gather(1, tc) & constr).unsqueeze(2)
         else:
             here_ok = torch.zeros(B, N, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = torch.zeros(B, N, 1, dtype=torch.bool, device=dev)
@@ -3480,8 +3492,9 @@ class SimMasks:
                         _tterr = _tterr | (
                             self.tile_seat.gather(1, _tflat).reshape(_tnb.shape) < 0)
                     # neither row lists a feature (`featureOk`), so a natural
-                    # wonder's mountain refuses it
-                    _tfeat = ((self.feat_id >= 0) & ~self.feat_stripped).gather(1, _tflat).reshape(_tnb.shape)
+                    # wonder's mountain and a volcano refuse it
+                    _tfeat = (((self.feat_id >= 0) & ~self.feat_stripped) | self.volcano_at).gather(
+                        1, _tflat).reshape(_tnb.shape)
                     _tmt = (self.tile_mountain.gather(1, _tflat).reshape(_tnb.shape)
                             & (self.improvement.gather(1, _tflat).reshape(_tnb.shape) < 0)
                             & ~_tfeat
@@ -3571,39 +3584,37 @@ class SimMasks:
             pillage = pillage | raid
         pillage = pillage.unsqueeze(2)
 
-        _sn: list[torch.Tensor] = []
-        if self._snipe_on:
-            rngd = (self._type_ranged_strength[ut] > 0) & (self._type_ranged_range[ut] >= 2)
-            ring = self.ring2[tc]
-            ringc = ring.clamp(min=0).reshape(B, -1)
-            _rm = self.military_at.gather(1, ringc)
-            _rc = self._civclass_at(ringc)
-            _rneg = torch.full_like(_rm, -1)
-            _rms = torch.where(_rm >= 0, self.unit_seat.gather(1, _rm.clamp(min=0)), _rneg)
-            _rcs = torch.where(_rc >= 0, self.unit_seat.gather(1, _rc.clamp(min=0)), _rneg)
-            # the strike's scope-out: a MAJOR's ranged fire engages barbarians
-            # only (cpu/core/combat.ts hostileRangedStrike, `!(isCiv(a) &&
-            # isCiv(b))`), so a major seat's ring targets are barbarian units.
-            _res_ = self.embarked_at.gather(1, ringc)
-            _res_s = torch.where(_res_ >= 0, self.unit_seat.gather(1, _res_.clamp(min=0)), _rneg)
-            _ring_u = ((_rms == BARB_SEAT) | (_rcs == BARB_SEAT)
-                       | (_res_s == BARB_SEAT)).reshape(B, N, 12)
-            _ring_ctr = self._centre_seat_plane().gather(1, ringc)
-            _ring_c = self._seats_hostile(
-                row, torch.where(_ring_ctr < 100, _ring_ctr, _rneg)).reshape(B, N, 12)
-            # CIV6: ranged fire bombards a minor's centre on
-            # `cityStateAttackable`'s own clauses — a declared war, or a war
-            # with its suzerain.
-            _ring_csp = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-            if self.S > 0:
-                _ring_csp.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
-            _ring_cs = (_ring_csp.gather(1, ringc) & (_ring_ctr >= 100)).reshape(B, N, 12)
-            # a district's defenses are a target at range too
-            _ring_e = self._encamp_block(ringc, row).reshape(B, N, 12)
-            _sn = [
-                present.unsqueeze(2) & rngd.unsqueeze(2) & ~u_emb.unsqueeze(2)
-                & has_atk & may_shoot & (ring >= 0) & (_ring_u | _ring_c | _ring_cs | _ring_e)
-            ]
+        rngd = (self._type_ranged_strength[ut] > 0) & (self._type_ranged_range[ut] >= 2)
+        ring = self.ring2[tc]
+        ringc = ring.clamp(min=0).reshape(B, -1)
+        _rm = self.military_at.gather(1, ringc)
+        _rc = self._civclass_at(ringc)
+        _rneg = torch.full_like(_rm, -1)
+        _rms = torch.where(_rm >= 0, self.unit_seat.gather(1, _rm.clamp(min=0)), _rneg)
+        _rcs = torch.where(_rc >= 0, self.unit_seat.gather(1, _rc.clamp(min=0)), _rneg)
+        # the strike's scope-out: a MAJOR's ranged fire engages barbarians
+        # only (cpu/core/combat.ts hostileRangedStrike, `!(isCiv(a) &&
+        # isCiv(b))`), so a major seat's ring targets are barbarian units.
+        _res_ = self.embarked_at.gather(1, ringc)
+        _res_s = torch.where(_res_ >= 0, self.unit_seat.gather(1, _res_.clamp(min=0)), _rneg)
+        _ring_u = ((_rms == BARB_SEAT) | (_rcs == BARB_SEAT)
+                   | (_res_s == BARB_SEAT)).reshape(B, N, 12)
+        _ring_ctr = self._centre_seat_plane().gather(1, ringc)
+        _ring_c = self._seats_hostile(
+            row, torch.where(_ring_ctr < 100, _ring_ctr, _rneg)).reshape(B, N, 12)
+        # CIV6: ranged fire bombards a minor's centre on
+        # `cityStateAttackable`'s own clauses — a declared war, or a war
+        # with its suzerain.
+        _ring_csp = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        if self.S > 0:
+            _ring_csp.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
+        _ring_cs = (_ring_csp.gather(1, ringc) & (_ring_ctr >= 100)).reshape(B, N, 12)
+        # a district's defenses are a target at range too
+        _ring_e = self._encamp_block(ringc, row).reshape(B, N, 12)
+        _sn = [
+            present.unsqueeze(2) & rngd.unsqueeze(2) & ~u_emb.unsqueeze(2)
+            & has_atk & may_shoot & (ring >= 0) & (_ring_u | _ring_c | _ring_cs | _ring_e)
+        ]
 
         _sp: list[torch.Tensor] = []
         if self._A_SPREAD >= 0:
@@ -3880,37 +3891,35 @@ class SimMasks:
         if self._A_GP >= 0:
             _gp = [(present & self._gp_site_ok(row, sc, tc)).unsqueeze(2)]
 
-        _sn3: list[torch.Tensor] = []
-        if self._snipe3_on:
-            # CIV6: distance 3 needs ATTACK RANGE 3 — chassis range plus the
-            # RANGE promotion, which is what `unitAttackRange` sums on TS.
-            _rt3 = self._promo_val(ut, self.unit_promos.gather(1, sc), "RANGE")
-            rngd3 = (self._type_ranged_strength[ut] > 0) & ((self._type_ranged_range[ut] + _rt3) >= 3)
-            ring3 = self.ring3[tc]
-            ring3c = ring3.clamp(min=0).reshape(B, -1)
-            _rm3 = self.military_at.gather(1, ring3c)
-            _rc3 = self._civclass_at(ring3c)
-            _rneg3 = torch.full_like(_rm3, -1)
-            _rms3 = torch.where(_rm3 >= 0, self.unit_seat.gather(1, _rm3.clamp(min=0)), _rneg3)
-            _rcs3 = torch.where(_rc3 >= 0, self.unit_seat.gather(1, _rc3.clamp(min=0)), _rneg3)
-            _res3 = self.embarked_at.gather(1, ring3c)
-            _res3s = torch.where(_res3 >= 0, self.unit_seat.gather(1, _res3.clamp(min=0)), _rneg3)
-            # same scope-out as the SNIPE head: a major's ranged fire engages
-            # barbarian units, hostile centres, and district defenses.
-            _ring3u = ((_rms3 == BARB_SEAT) | (_rcs3 == BARB_SEAT)
-                       | (_res3s == BARB_SEAT)).reshape(B, N, 18)
-            _ring3ctr = self._centre_seat_plane().gather(1, ring3c)
-            _ring3ct = self._seats_hostile(
-                row, torch.where(_ring3ctr < 100, _ring3ctr, _rneg3)).reshape(B, N, 18)
-            _ring3csp = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-            if self.S > 0:
-                _ring3csp.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
-            _ring3cs = (_ring3csp.gather(1, ring3c) & (_ring3ctr >= 100)).reshape(B, N, 18)
-            _ring3e = self._encamp_block(ring3c, row).reshape(B, N, 18)
-            _sn3 = [
-                present.unsqueeze(2) & rngd3.unsqueeze(2) & ~u_emb.unsqueeze(2)
-                & has_atk & may_shoot & (ring3 >= 0) & (_ring3u | _ring3ct | _ring3cs | _ring3e)
-            ]
+        # CIV6: distance 3 needs ATTACK RANGE 3 — chassis range plus the
+        # RANGE promotion, which is what `unitAttackRange` sums on TS.
+        _rt3 = self._promo_val(ut, self.unit_promos.gather(1, sc), "RANGE")
+        rngd3 = (self._type_ranged_strength[ut] > 0) & ((self._type_ranged_range[ut] + _rt3) >= 3)
+        ring3 = self.ring3[tc]
+        ring3c = ring3.clamp(min=0).reshape(B, -1)
+        _rm3 = self.military_at.gather(1, ring3c)
+        _rc3 = self._civclass_at(ring3c)
+        _rneg3 = torch.full_like(_rm3, -1)
+        _rms3 = torch.where(_rm3 >= 0, self.unit_seat.gather(1, _rm3.clamp(min=0)), _rneg3)
+        _rcs3 = torch.where(_rc3 >= 0, self.unit_seat.gather(1, _rc3.clamp(min=0)), _rneg3)
+        _res3 = self.embarked_at.gather(1, ring3c)
+        _res3s = torch.where(_res3 >= 0, self.unit_seat.gather(1, _res3.clamp(min=0)), _rneg3)
+        # same scope-out as the SNIPE head: a major's ranged fire engages
+        # barbarian units, hostile centres, and district defenses.
+        _ring3u = ((_rms3 == BARB_SEAT) | (_rcs3 == BARB_SEAT)
+                   | (_res3s == BARB_SEAT)).reshape(B, N, 18)
+        _ring3ctr = self._centre_seat_plane().gather(1, ring3c)
+        _ring3ct = self._seats_hostile(
+            row, torch.where(_ring3ctr < 100, _ring3ctr, _rneg3)).reshape(B, N, 18)
+        _ring3csp = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        if self.S > 0:
+            _ring3csp.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
+        _ring3cs = (_ring3csp.gather(1, ring3c) & (_ring3ctr >= 100)).reshape(B, N, 18)
+        _ring3e = self._encamp_block(ring3c, row).reshape(B, N, 18)
+        _sn3 = [
+            present.unsqueeze(2) & rngd3.unsqueeze(2) & ~u_emb.unsqueeze(2)
+            & has_atk & may_shoot & (ring3 >= 0) & (_ring3u | _ring3ct | _ring3cs | _ring3e)
+        ]
 
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]

@@ -263,8 +263,11 @@ export function buildFixture(state: GameState, world: WorldFile): object {
           : !isWater(t) && t.elevation === 'HILLS' && t.feature === null)
           ? 1
           : 0,
+      // the Lumber Mill's listed features (`Improvement_ValidFeatures`); a
+      // civic-gated one waits on the row's civic GPU-side (`_lumber_ground`)
       lu:
-        !t.resource && !t.district && !naturalWonderAt(t) && !isImpassable(t) && !isWater(t) && t.feature === 'WOODS'
+        !t.resource && !t.district && !naturalWonderAt(t) && !isImpassable(t) && !isWater(t)
+        && t.feature !== null && !!IMPROVEMENTS.LUMBER_MILL.features?.includes(t.feature)
           ? 1
           : 0,
       sr_c:

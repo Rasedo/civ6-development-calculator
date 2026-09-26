@@ -1750,6 +1750,13 @@ class SimInit:
         for b, f in enumerate(fixtures):
             for i, v in enumerate(f.get("volcanoes", [])):
                 self.volcano_tile[b, i] = v
+        # CIV6 (FEATURE_VOLCANO, Expansion2_Features.xml): a volcano is its
+        # plot's feature, and no Improvement_ValidFeatures row lists it
+        # (`featureOk`)
+        self.volcano_at = torch.zeros(B, T, dtype=torch.bool, device=device)
+        for b, f in enumerate(fixtures):
+            for v in f.get("volcanoes", []):
+                self.volcano_at[b, v] = True
         self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
         # the PRODUCTION half of flood silt — real Civ 6 rolls food and
         # production separately, so the two accumulate apart.
@@ -1775,8 +1782,6 @@ class SimInit:
         # hardcoded column number.
         self._act_names = list(rules.actions["unit"])
         self._act = {n: i for i, n in enumerate(self._act_names)}
-        self._snipe_on = "SNIPE_0" in self._act
-        self._snipe3_on = "SNIPE3_0" in self._act
         self._A_SPREAD = self._act["SPREAD_HERE"]  # religious spread head
         self._A_FOUND = self._act["FOUND_CITY"]  # the settler's verb
         self._A_EXCAVATE = self._act["EXCAVATE"]  # the archaeologist's
@@ -1839,8 +1844,8 @@ class SimInit:
         assert _stc == self._spy_travel_cols and _smc == self._n_spy_missions, (
             f"spy heads are {_stc}/{_smc} wide, the wire says "
             f"{self._spy_travel_cols}/{self._n_spy_missions}")
-        _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) \
-            + (18 if self._snipe3_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
+        _want = 13 + len(ids) + 3 + 12 \
+            + 18 + (7 if self._A_SPREAD >= 0 else 0) \
             + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
             + (1 if self._A_PARK >= 0 else 0) \
             + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
@@ -1893,6 +1898,9 @@ class SimInit:
         self._farmadj_tech = int(imp["farmAdjTech"])    # GS: Replaceable Parts +1 more
         self._mine_unlock_tech = int(imp["mineUnlockTech"])       # MINING
         self._lumber_unlock_tech = int(imp["lumberUnlockTech"])   # CONSTRUCTION
+        # the Lumber Mill's features that wait on a civic (Rainforest,
+        # Mercantilism), [(feature, civic)] — `_lumber_ground`
+        self._lumber_feat_civic = [(int(f), int(c)) for f, c in imp["lumberFeatCivic"]]
         self._seaside_unlock_tech = int(imp["seasideUnlockTech"])  # RADIO
         self._seaside_min_appeal = int(imp["seasideMinAppeal"])     # BREATHTAKING
         # What RESEARCH adds to an improvement's own yields — the TS

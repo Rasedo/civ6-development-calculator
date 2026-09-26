@@ -19,8 +19,8 @@ const MOUNTAINS = ground(LAND, ['MOUNTAIN']);
 export const MIN_DISTANCE_NW = 8;
 
 /** MAPGEN data only — a wonder's yields, appeal and passability live on its
- *  FEATURE row (`FEATURES`), the one roster every reader asks. Every land
- *  clause holds for every plot the wonder covers. */
+ *  FEATURE row (`FEATURES`), the one roster every reader asks. Every clause
+ *  holds for every plot the wonder covers. */
 export interface NaturalWonderDef {
   /** doubles as the wonder's FEATURE row id — the roster the readers ask. */
   id: FeatureId;
@@ -30,13 +30,22 @@ export interface NaturalWonderDef {
   size: number;
   becomesTerrain?: TerrainId;
   spawn: {
-    water?: boolean; // must be coast water
-    minLat?: number; // the water wonders' band
-    maxLat?: number;
-    /** CIV6 (Feature_ValidTerrains): the land terrains and elevations a plot
-     *  may stand on — every roster row's list is their product. */
-    terrains?: TerrainId[];
-    elevations?: Elevation[];
+    /** CIV6 (Feature_ValidTerrains): the terrains and elevations a plot may
+     *  stand on — every roster row's list is their product. */
+    terrains: TerrainId[];
+    elevations: Elevation[];
+    /** CIV6 (`Features.MinDistanceLand` / `MaxDistanceLand`): the plot's hex
+     *  distance to the nearest land plot lies in this band. */
+    minDistanceLand?: number;
+    maxDistanceLand?: number;
+    /** CIV6 (Feature_NotNearFeatures): the plot carries none of these. The
+     *  row's reach beyond its own plot ("Far based on map size") is the
+     *  DLL's and unpublished. */
+    notNearFeatures?: FeatureId[];
+    /** CIV6 (`Features.CustomPlacement`, NaturalWonderGenerator.lua
+     *  `CustomGetMultiTileFeaturePlotList`): the multi-plot shape the
+     *  generator lays from the first plot (`wonderPlots`). */
+    customPlacement?: 'PLACEMENT_YOSEMITE' | 'PLACEMENT_TORRES_DEL_PAINE' | 'PLACEMENT_CLIFFS_DOVER';
     /** CIV6 (`Features.NoCoast`): no adjacent salt water. */
     inland?: boolean;
     /** CIV6 (`Features.Coast`): adjacent salt water. */
@@ -58,10 +67,11 @@ export interface NaturalWonderDef {
   color: string;
 }
 
-// The land rows are the layered install's Features, Feature_ValidTerrains,
-// Feature_AdjacentTerrains, Feature_NotAdjacentTerrains and
-// Feature_AdjacentFeatures rows (Features.xml, Expansion1_Features_Major.xml,
-// Expansion2_Features.xml, Australia_Features.xml, VikingsLandmarks_Features.xml).
+// The rows are the layered install's Features, Feature_ValidTerrains,
+// Feature_AdjacentTerrains, Feature_NotAdjacentTerrains,
+// Feature_AdjacentFeatures and Feature_NotNearFeatures rows (Features.xml,
+// Expansion1_Features_Major.xml, Expansion2_Features.xml,
+// Australia_Features.xml, VikingsLandmarks_Features.xml).
 export const WONDERS: Record<string, NaturalWonderDef> = {
   CRATER_LAKE: {
     id: 'CRATER_LAKE',
@@ -89,7 +99,10 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Galápagos Islands',
     code: 'GA',
     size: 2,
-    spawn: { water: true, maxLat: 0.5 },
+    spawn: {
+      terrains: ['COAST'], elevations: ['FLAT'], noRiver: true,
+      minDistanceLand: 2, maxDistanceLand: 3, notNearFeatures: ['ICE'],
+    },
     color: '#6fd8a8',
   },
   GREAT_BARRIER_REEF: {
@@ -97,7 +110,10 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Great Barrier Reef',
     code: 'GB',
     size: 2,
-    spawn: { water: true, maxLat: 0.55 },
+    spawn: {
+      terrains: ['COAST'], elevations: ['FLAT'], noRiver: true,
+      minDistanceLand: 1, maxDistanceLand: 1, notNearFeatures: ['ICE'],
+    },
     color: '#ff9fb0',
   },
   PANTANAL: {
@@ -130,6 +146,7 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     spawn: {
       terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], elevations: ['FLAT', 'HILLS'], inland: true, noRiver: true,
       notAdjacentTerrains: [...ground(['DESERT', 'SNOW'], ['FLAT']), ...MOUNTAINS],
+      customPlacement: 'PLACEMENT_TORRES_DEL_PAINE',
     },
     color: '#b8c8e8',
   },
@@ -152,6 +169,7 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     spawn: {
       terrains: ['PLAINS', 'TUNDRA'], elevations: ['FLAT'], inland: true, noRiver: true,
       notAdjacentTerrains: MOUNTAINS, adjacentFeatures: ['WOODS'],
+      customPlacement: 'PLACEMENT_YOSEMITE',
     },
     color: '#a8c890',
   },
@@ -160,7 +178,10 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Cliffs of Dover',
     code: 'CD',
     size: 2,
-    spawn: { terrains: ['GRASSLAND', 'PLAINS'], elevations: ['HILLS'], coast: true, noRiver: true },
+    spawn: {
+      terrains: ['GRASSLAND', 'PLAINS'], elevations: ['HILLS'], coast: true, noRiver: true,
+      customPlacement: 'PLACEMENT_CLIFFS_DOVER',
+    },
     color: '#e8e8f0',
   },
   MOUNT_EVEREST: {
@@ -190,6 +211,7 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     spawn: {
       terrains: ['SNOW', 'TUNDRA'], elevations: ['FLAT', 'HILLS'], inland: true, noRiver: true,
       adjacentTerrains: ground(['SNOW', 'TUNDRA'], ['FLAT', 'HILLS']),
+      customPlacement: 'PLACEMENT_YOSEMITE',
     },
     color: '#c8ccd4',
   },

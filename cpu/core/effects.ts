@@ -26,6 +26,7 @@ import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { cityStateEnvoyBonuses, isSuzerain, suzerainEffect, suzerainOf, suzerainSciencePct } from './cityStates';
 import { NAN_MADOL_WATER_CULTURE } from '../data/cityStates';
+import { IMPROVEMENTS } from '../data/improvements';
 
 import { GP_PERM, GP_UNIT_PROD_CLASSES } from '../data/greatPeople';
 import { unitIsMilitary } from './units';
@@ -42,6 +43,9 @@ export interface Unlocks {
   governments: Set<string>;
   policies: Set<string>;
   hillFarms: boolean;
+  /** CIV6 (`Improvement_ValidFeatures.PrereqCivic`): the `IMPROVEMENT:FEATURE`
+   *  rows whose civic the seat holds (`featureOk`). */
+  featureRows: Set<string>;
 }
 
 const BASELINE = {
@@ -79,7 +83,13 @@ export function computeUnlocksIn(
     governments: new Set(),
     policies: new Set(),
     hillFarms: false,
+    featureRows: new Set(),
   };
+  for (const def of Object.values(IMPROVEMENTS)) {
+    for (const [f, civic] of Object.entries(def.featureCivics ?? {})) {
+      if (civic && research.civics.includes(civic)) u.featureRows.add(`${def.id}:${f}`);
+    }
+  }
   for (const fx of completedEffectsIn(research)) {
     switch (fx.kind) {
       case 'unlockImprovement':

@@ -106,6 +106,20 @@ describe('the mountain tunnel', () => {
     expect(adjacentPlotTarget(s.map, stand, IMPROVEMENTS.MOUNTAIN_ROAD, mine)).toBe(next);
   });
 
+  it('refuses a volcano: FEATURE_VOLCANO is the plot\'s feature and neither row lists it', () => {
+    const s = ridge([3, 4, 5]);
+    const stand = tileAtCoords(s.map, 4, 6);
+    const first = tunnelTarget(s.map, stand, mine);
+    s.map.tiles[first].volcano = true;
+    const next = tunnelTarget(s.map, stand, mine);
+    expect(next).not.toBe(first);
+    expect(adjacentPlotTarget(s.map, stand, IMPROVEMENTS.MOUNTAIN_ROAD, mine)).toBe(next);
+    // every mountain beside it a volcano: nothing to build on
+    for (const c of [3, 4, 5]) tileAtCoords(s.map, c, 5).volcano = true;
+    expect(tunnelTarget(s.map, stand, mine)).toBe(-1);
+    expect(adjacentPlotTarget(s.map, stand, IMPROVEMENTS.MOUNTAIN_ROAD, mine)).toBe(-1);
+  });
+
   it('refuses a mountain inside ANOTHER seat\'s borders', () => {
     // CIV6 (`CanBuildOutsideTerritory`): outside means UNOWNED. A tile inside
     // another seat's borders is nobody's to improve, so the widening the flag

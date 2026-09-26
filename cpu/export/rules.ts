@@ -2261,6 +2261,14 @@ export function buildRules() {
       lumberUnlockTech: techList.findIndex((t) =>
         t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'LUMBER_MILL'),
       ),
+      // CIV6 (`Improvement_ValidFeatures.PrereqCivic`): the Lumber Mill's
+      // features that wait on a civic, [feature, civic]
+      lumberFeatCivic: Object.entries(IMPROVEMENTS.LUMBER_MILL.featureCivics ?? {}).map(([f, c]) => {
+        const fi = FEAT_IDS.indexOf(f as never);
+        const ci = civicIdx.get(c as string);
+        if (fi < 0 || ci === undefined) throw new Error(`lumberFeatCivic: ${f} / ${c} is not in the catalog`);
+        return [fi, ci];
+      }),
       // What RESEARCH adds to an improvement's own yields, [row, improvement,
       // yield]. Techs and civics carry the same effect kind and TS sums both
       // into one `mods.improvementYields` map, so both tables ship.

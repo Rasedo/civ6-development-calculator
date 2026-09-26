@@ -20,6 +20,11 @@ import {
   vertexKey,
   vertexNeighbors,
   vertexTouchingTiles,
+  DIR_E,
+  DIR_NE,
+  DIR_SE,
+  DIR_SW,
+  DIR_W,
   type Vertex,
 } from './hex';
 import type { GameMap, MapGenOptions, TerrainId, Tile } from './types';
@@ -165,6 +170,20 @@ export function generateMap(opts: MapGenOptions): GameMap {
     if (t.terrain === 'LAKE') continue;
     t.terrain = neighbors(map, t).some((n) => isLandIdx(n.index)) ? 'COAST' : 'OCEAN';
   }
+  // CIV6 (TerrainGenerator.lua `GenerateTerrainTypes`, "Expanding coasts"):
+  // three passes, each turning an Ocean plot beside Coast into Coast at 1 in 4
+  // (`GetRandomNumber(4, "add shallows") == 0`), a pass's plots gathered
+  // before any of them turns. Its own stream, so the passes below draw as
+  // they did.
+  {
+    const rngC = mulberry32(deriveSeed(seed, 'coasts'));
+    for (let pass = 0; pass < 3; pass++) {
+      const shallows = map.tiles.filter(
+        (t) => t.terrain === 'OCEAN' && neighbors(map, t).some((n) => n.terrain === 'COAST') && rngC() < 0.25,
+      );
+      for (const t of shallows) t.terrain = 'COAST';
+    }
+  }
 
   generateRivers(map, elev, seaLevel, deriveSeed(seed, 'rivers'));
 
@@ -286,29 +305,39 @@ export function generateMap(opts: MapGenOptions): GameMap {
   return map;
 }
 
-function wonderTileValid(
-  map: GameMap,
-  t: Tile,
-  def: NaturalWonderDef,
-  latOf: (row: number) => number,
-  isAnchor: boolean,
-): boolean {
+/** Each plot's hex distance to the nearest land plot (0 on land), by a
+ *  breadth-first walk out from every land plot. */
+function landDistance(map: GameMap): Int32Array {
+  const dist = new Int32Array(map.tiles.length).fill(-1);
+  let frontier = map.tiles.filter((t) => !TERRAINS[t.terrain].water);
+  for (const t of frontier) dist[t.index] = 0;
+  for (let d = 1; frontier.length; d++) {
+    const next: Tile[] = [];
+    for (const t of frontier) {
+      for (const n of neighbors(map, t)) {
+        if (dist[n.index] >= 0) continue;
+        dist[n.index] = d;
+        next.push(n);
+      }
+    }
+    frontier = next;
+  }
+  return dist;
+}
+
+/** May this plot carry `def`? CIV6 (Feature_ValidTerrains,
+ *  MinDistanceLand / MaxDistanceLand, Feature_NotNearFeatures,
+ *  Feature_(Not)AdjacentTerrains, Feature_AdjacentFeatures, NoCoast, Coast,
+ *  NoRiver, NoAdjacentFeatures): the rules of every plot the wonder covers,
+ *  not only its first. */
+function wonderTileValid(map: GameMap, t: Tile, def: NaturalWonderDef, landDist: Int32Array): boolean {
   if (naturalWonderAt(t)) return false;
   if (t.col < 2 || t.row < 2 || t.col >= map.width - 2 || t.row >= map.height - 2) return false;
-  if (isAnchor) {
-    const lat = latOf(t.row);
-    if (def.spawn.minLat !== undefined && lat < def.spawn.minLat) return false;
-    if (def.spawn.maxLat !== undefined && lat > def.spawn.maxLat) return false;
-  }
-  if (def.spawn.water) {
-    return t.terrain === 'COAST' && t.feature !== 'ICE';
-  }
-  // CIV6 (Feature_ValidTerrains, Feature_(Not)AdjacentTerrains,
-  // Feature_AdjacentFeatures, NoCoast, Coast, NoRiver, NoAdjacentFeatures):
-  // rules of every plot the wonder covers, not only its anchor
   const sp = def.spawn;
-  if (TERRAINS[t.terrain].water) return false;
-  if (!sp.terrains?.includes(t.terrain) || !sp.elevations?.includes(t.elevation)) return false;
+  if (!sp.terrains.includes(t.terrain) || !sp.elevations.includes(t.elevation)) return false;
+  if (sp.minDistanceLand !== undefined && landDist[t.index] < sp.minDistanceLand) return false;
+  if (sp.maxDistanceLand !== undefined && landDist[t.index] > sp.maxDistanceLand) return false;
+  if (sp.notNearFeatures && t.feature !== null && sp.notNearFeatures.includes(t.feature)) return false;
   if (sp.noRiver && t.riverMask !== 0) return false;
   const nb = neighbors(map, t);
   const salt = nb.some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN');
@@ -323,27 +352,72 @@ function wonderTileValid(
   return true;
 }
 
+/** Salt water: a water plot that is not a lake (`IsWater() and not IsLake()`). */
+function saltWater(t: Tile | null): boolean {
+  return !!t && (t.terrain === 'COAST' || t.terrain === 'OCEAN');
+}
+
+/**
+ * The plots `def` covers when laid from `first`, or null. CIV6
+ * (NaturalWonderGenerator.lua `CustomGetMultiTileFeaturePlotList`): every
+ * plot answers `wonderTileValid`, and a `CustomPlacement` row fixes the shape —
+ *   PLACEMENT_YOSEMITE / PLACEMENT_TORRES_DEL_PAINE: `first` and its EAST
+ *     neighbour;
+ *   PLACEMENT_CLIFFS_DOVER: `first` and one neighbour picked by where the salt
+ *     water lies — West salt and Southwest water (the script asks West's lake
+ *     flag twice, never Southwest's) take the Southeast plot, else Southwest
+ *     and Southeast salt take East, else Southeast and East salt take
+ *     Northeast.
+ * A row with no `CustomPlacement` is laid by the DLL (`SetFeatureType` on the
+ * first plot), whose shape is unpublished: the neighbours that answer the rules,
+ * in direction order, until `Tiles`.
+ */
+function wonderPlots(map: GameMap, first: Tile, def: NaturalWonderDef, landDist: Int32Array): Tile[] | null {
+  const ok = (t: Tile | null): t is Tile => !!t && wonderTileValid(map, t, def, landDist);
+  const at = (d: number) => neighborTile(map, first, d);
+  switch (def.spawn.customPlacement) {
+    case 'PLACEMENT_YOSEMITE':
+    case 'PLACEMENT_TORRES_DEL_PAINE': {
+      const e = at(DIR_E);
+      return ok(e) ? [first, e] : null;
+    }
+    case 'PLACEMENT_CLIFFS_DOVER': {
+      const w = at(DIR_W), sw = at(DIR_SW), se = at(DIR_SE), e = at(DIR_E);
+      let second: Tile | null;
+      if (saltWater(w) && !!sw && TERRAINS[sw.terrain].water) second = se;
+      else if (saltWater(sw) && saltWater(se)) second = e;
+      else if (saltWater(se) && saltWater(e)) second = at(DIR_NE);
+      else return null;
+      return ok(second) ? [first, second] : null;
+    }
+    default: {
+      const tiles: Tile[] = [first];
+      for (const n of neighbors(map, first)) {
+        if (tiles.length >= def.size) break;
+        if (ok(n)) tiles.push(n);
+      }
+      return tiles.length < def.size ? null : tiles;
+    }
+  }
+}
+
 function placeWonders(map: GameMap, seed: number): void {
   const rng = mulberry32(seed);
   const quota = wonderQuota(map.width, map.height);
-  const half = (map.height - 1) / 2;
-  const latOf = (row: number) => Math.abs(row - half) / half;
   const placedTiles: Tile[] = [];
   let placedCount = 0;
 
   for (const def of shuffle(rng, Object.values(WONDERS))) {
     if (placedCount >= quota) break;
+    // read on the map as it stands: a placed lake wonder is water
+    const landDist = landDistance(map);
     const anchors = shuffle(
       rng,
-      map.tiles.filter((t) => wonderTileValid(map, t, def, latOf, true)),
+      map.tiles.filter((t) => wonderTileValid(map, t, def, landDist)),
     );
     for (const anchor of anchors) {
-      const tiles: Tile[] = [anchor];
-      for (const n of neighbors(map, anchor)) {
-        if (tiles.length >= def.size) break;
-        if (wonderTileValid(map, n, def, latOf, false)) tiles.push(n);
-      }
-      if (tiles.length < def.size) continue;
+      const tiles = wonderPlots(map, anchor, def, landDist);
+      if (!tiles) continue;
       if (
         placedTiles.some((p) =>
           tiles.some((t) => hexDistance(p.col, p.row, t.col, t.row) < MIN_DISTANCE_NW),

@@ -12,7 +12,7 @@ import { claimMeteorSite, classLine, meteorGrantUnit, spawnUnit, terrainMp } fro
 import { featureDefense } from '../../../cpu/core/combat';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { tileYields } from '../../../cpu/core/yields';
-import { neighbors } from '../../../world/hex';
+import { DIR_E, hexDistance, neighborTile, neighbors } from '../../../world/hex';
 import { FEATURES } from '../../../world/features';
 import { WONDERS } from '../../../world/wonders';
 import { generateMap } from '../../../world/mapgen';
@@ -402,24 +402,42 @@ describe('Eyjafjallajokull and Vesuvius on the map', () => {
     expect(isImpassable(w)).toBe(true);
   });
 
-  it('every generated land wonder keeps its plots\' rules (Feature_ValidTerrains, the adjacency rows, NoCoast, Coast, NoRiver)', () => {
+  it('every generated wonder keeps its plots\' rules (Feature_ValidTerrains, the land distance, the adjacency rows, NoCoast, Coast, NoRiver, CustomPlacement)', () => {
     const P = WORLD_PRESETS.baseline;
     const seen: Record<string, number> = {};
     const on = (kinds: readonly (readonly [string, string])[], n: Tile) =>
       kinds.some(([terrain, elevation]) => n.terrain === terrain && n.elevation === elevation);
+    const water = (t: Tile) => t.terrain === 'COAST' || t.terrain === 'OCEAN' || t.terrain === 'LAKE';
     for (let s = 0; s < 240; s++) {
       const map = generateMap({
         width: P.width, height: P.height, seed: 20000 + s, withResources: true, withWonders: true,
         withVillages: true, layout: P.layout, landFraction: P.landFraction, resourceMult: P.resourceMult,
       });
+      // hex distance to the nearest land plot
+      const landDist = (t: Tile) => {
+        let best = Infinity;
+        for (const u of map.tiles) {
+          if (!water(u)) best = Math.min(best, hexDistance(t.col, t.row, u.col, u.row));
+        }
+        return best;
+      };
       for (const def of Object.values(WONDERS)) {
-        if (def.spawn.water) continue;
         const plots = map.tiles.filter((t) => t.feature === def.id);
         if (plots.length === 0) continue;
         seen[def.id] = (seen[def.id] ?? 0) + 1;
         expect(plots.length).toBe(def.size);
         const sp = def.spawn;
+        // PLACEMENT_YOSEMITE / _TORRES_DEL_PAINE: the second plot is the first's
+        // EAST neighbour; PLACEMENT_CLIFFS_DOVER: the two plots touch
+        if (sp.customPlacement === 'PLACEMENT_YOSEMITE' || sp.customPlacement === 'PLACEMENT_TORRES_DEL_PAINE') {
+          expect(plots.some((a) => neighborTile(map, a, DIR_E) === plots.find((b) => b !== a))).toBe(true);
+        }
+        if (sp.customPlacement === 'PLACEMENT_CLIFFS_DOVER') {
+          expect(hexDistance(plots[0].col, plots[0].row, plots[1].col, plots[1].row)).toBe(1);
+        }
         for (const t of plots) {
+          if (sp.minDistanceLand !== undefined) expect(landDist(t)).toBeGreaterThanOrEqual(sp.minDistanceLand);
+          if (sp.maxDistanceLand !== undefined) expect(landDist(t)).toBeLessThanOrEqual(sp.maxDistanceLand);
           expect(t.riverMask).toBe(0);
           expect(t.volcano).toBe(false);
           if (!def.becomesTerrain) {
@@ -438,8 +456,10 @@ describe('Eyjafjallajokull and Vesuvius on the map', () => {
         }
       }
     }
-    // Kilimanjaro stands on a lone Mountain, Everest and Vesuvius on a range's edge
-    for (const id of ['EYJAFJALLAJOKULL', 'VESUVIUS', 'MOUNT_KILIMANJARO', 'MOUNT_EVEREST']) {
+    // Kilimanjaro stands on a lone Mountain, Everest and Vesuvius on a range's
+    // edge, Galápagos two to three plots out to sea
+    for (const id of ['EYJAFJALLAJOKULL', 'VESUVIUS', 'MOUNT_KILIMANJARO', 'MOUNT_EVEREST', 'GALAPAGOS',
+      'GREAT_BARRIER_REEF', 'YOSEMITE', 'TORRES_DEL_PAINE', 'CLIFFS_OF_DOVER']) {
       expect(seen[id], id).toBeGreaterThan(0);
     }
   });
