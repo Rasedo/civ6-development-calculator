@@ -12,12 +12,12 @@ local c = pl:GetCities():GetCapitalCity()
 local function score()
   local ok, v = pcall(function() return pl:GetCategoryScore(empire) end)
   if ok then return v end
-  return "err:" .. tostring(v)
+  return "\"err\""
 end
 local function total()
   local ok, v = pcall(function() return pl:GetScore() end)
   if ok then return v end
-  return "err:" .. tostring(v)
+  return "\"err\""
 end
 local list = "ZLIST"
 for name in string.gmatch(list, "[^,]+") do
@@ -28,9 +28,8 @@ for name in string.gmatch(list, "[^,]+") do
   if row ~= nil and row.PrereqDistrict ~= nil and row.PrereqDistrict ~= "DISTRICT_CITY_CENTER" then
     local drow = GameInfo.Districts[row.PrereqDistrict]
     where = nil
-    for _, d in c:GetDistricts():Members() do
-      if drow ~= nil and d:GetType() == drow.Index then where = Map.GetPlot(d:GetX(), d:GetY()):GetIndex() end
-    end
+    local d = drow and c:GetDistricts():GetDistrict(drow.Index)
+    if d ~= nil then where = Map.GetPlot(d:GetX(), d:GetY()):GetIndex() end
     have = where and "district" or "no district"
   end
   local before, tb = score(), total()
