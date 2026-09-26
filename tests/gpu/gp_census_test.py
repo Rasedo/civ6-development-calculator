@@ -38,7 +38,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from core import load_rules, fixture_paths, FIXTURES
+from core import load_rules, fixture_paths, FIXTURES, statecompare
 from core.neutral import gp_site_plane
 from warmup import clear_works, opened, warm_base
 
@@ -389,6 +389,14 @@ def test_routes(rules, path, R) -> None:
     d0 = gold(ROW)
     sim.civ_gp_perm[:, ROW, sim._gp_perm_names.index("domesticRouteGoldPerSpecialty")] = 0.5
     assert gold(ROW) == d0 + 0.5 * 2, "Todar Mal: two specialty districts at the destination"
+    # ...and the state compare reads the channel as the install writes it: the
+    # 0.5 itself, folded at milli like TS's `Seat.gpPerm`, never truncated to 0
+    _tk = sim._gp_perm_names.index("domesticRouteGoldPerSpecialty")
+    _seen = statecompare.EXTRACTORS["seat"]["gpPerm"](sim, B0, [ROW])[0][_tk]
+    assert _seen == 0.5, f"state compare: Todar Mal's channel reads {_seen}, the plane holds 0.5"
+    _f = next(f for g in statecompare.load_manifest()["groups"] if g["name"] == "seat"
+              for f in g["fields"] if f["name"] == "gpPerm")
+    assert _f["compare"] == "milli", "a 0.5 channel under an exact fold rounds apart on the two engines"
     print(f"  2 Rockefeller and Todar Mal OK — {kinds} strategic kinds, two specialty districts")
 
     # Ibn Fadlan: a route to a city-state

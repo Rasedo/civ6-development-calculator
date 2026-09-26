@@ -1372,14 +1372,14 @@
         },
         {
           "name": "gpPerm",
-          "compare": "exact",
+          "compare": "milli",
           "covers": [
             "Seat.gpPerm"
           ],
           "planes": [
             "civ_gp_perm"
           ],
-          "note": "the permanent per-seat channels a Great Person left behind, in GP_PERM order."
+          "note": "the permanent per-seat channels a Great Person left behind, in GP_PERM order. Milli, because a channel carries the install's Amount as written and Raja Todar Mal's is 0.5 Gold."
         },
         {
           "name": "gpLuxuries",
