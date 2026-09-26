@@ -14,6 +14,7 @@ import { availableProjects, projectCost, queueProject } from '../../../cpu/core/
 import { completeProject } from '../../../cpu/core/production';
 import { buySeatBuilding, seatPhase } from '../../../cpu/core/phase';
 import { UNITS, WALLS_TIER_CS, WALLS_TIER_HP, REPAIR_QUIET_TURNS } from '../../../cpu/data/units';
+import { GARRISON_CITY_CS } from '../../../cpu/data/constants';
 
 // The siege round, against the pages it came from: City combat (Civ6) for the
 // perimeter, the damage classes and the siege; Battering Ram / Siege Tower for
@@ -463,7 +464,7 @@ describe('the Encampment perimeter', () => {
     const cityBefore = cityDefenseStrength(gar.state, gar.city);
     spawnUnit(gar.state, 'SWORDSMAN', gar.city.centerIndex, 0);
     expect(encampmentDefense(gar.state, att3, gar.enc)!.defCS).toBe(encBefore);
-    expect(cityDefenseStrength(gar.state, gar.city)).toBe(cityBefore + 5);
+    expect(cityDefenseStrength(gar.state, gar.city)).toBe(cityBefore + GARRISON_CITY_CS);
   });
 
   it("with the DISTRICT's perimeter gone the whole roll reaches the garrison", () => {

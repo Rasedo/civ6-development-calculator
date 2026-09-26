@@ -140,6 +140,10 @@ export interface DistrictDef {
    * new district row carries its own appeal without touching either walk.
    */
   appealAdjacent: number;
+  /** CIV6 (`Districts.CityStrengthModifier`): what this district adds to its
+   *  city centre's Combat Strength while it stands complete and unpillaged
+   *  (`centreStrength` / `_centre_strength`). */
+  cityStrength: number;
   /** CIV6 (Pillaging, GS data): what wrecking it pays the pillager; absent =
    *  NO_PLUNDER (the City Center and the Encampment, which is conquered
    *  instead — and the Dam, whose row is a 0 HP heal). */
@@ -205,6 +209,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 0,
     appealAdjacent: 0,
+    cityStrength: 0,
     placement: {},
     description: 'Founded with the city.',
     src: {
@@ -213,6 +218,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_CITY_CENTER', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_CITY_CENTER', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_CITY_CENTER', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_CITY_CENTER', 'CityStrengthModifier'),
       code: { stylized: 'a display code, not a game constant' },
       color: { stylized: 'a display colour, not a game constant' },
     },
@@ -250,6 +256,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 1,
     appealAdjacent: 0,
+    cityStrength: 2,
     placement: {},
     description: 'Science district.',
     src: {
@@ -258,6 +265,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_CAMPUS', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_CAMPUS', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_CAMPUS', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_CAMPUS', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_CAMPUS', 'PlunderType', { expect: 'PLUNDER_SCIENCE' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_CAMPUS', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -316,6 +324,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 1,
     appealAdjacent: 1,
+    cityStrength: 2,
     placement: {},
     description: 'Faith district.',
     src: {
@@ -324,6 +333,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_HOLY_SITE', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_HOLY_SITE', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_HOLY_SITE', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_HOLY_SITE', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_HOLY_SITE', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_HOLY_SITE', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -388,6 +398,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 1,
     appealAdjacent: 1,
+    cityStrength: 2,
     placement: {},
     description: 'Culture district (+1 per adjacent world wonder).',
     src: {
@@ -396,6 +407,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_THEATER', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_THEATER', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_THEATER', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_THEATER', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_THEATER', 'PlunderType', { expect: 'PLUNDER_CULTURE' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_THEATER', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -450,6 +462,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 0,
     appealAdjacent: 0,
+    cityStrength: 2,
     placement: {},
     description: 'Gold district.',
     src: {
@@ -458,6 +471,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_COMMERCIAL_HUB', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_COMMERCIAL_HUB', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_COMMERCIAL_HUB', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_COMMERCIAL_HUB', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_COMMERCIAL_HUB', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_COMMERCIAL_HUB', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -528,6 +542,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 0,
     appealAdjacent: 0,
+    cityStrength: 2,
     placement: { onCoastalWater: true },
     description: 'Placed on coast/lake water adjacent to land.',
     src: {
@@ -536,6 +551,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_HARBOR', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_HARBOR', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_HARBOR', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_HARBOR', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_HARBOR', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_HARBOR', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -610,6 +626,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 1,
     appealAdjacent: -1,
+    cityStrength: 2,
     placement: {},
     description: 'Production district.',
     src: {
@@ -618,6 +635,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_INDUSTRIAL_ZONE', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_INDUSTRIAL_ZONE', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_INDUSTRIAL_ZONE', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_INDUSTRIAL_ZONE', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_INDUSTRIAL_ZONE', 'PlunderType', { expect: 'PLUNDER_SCIENCE' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_INDUSTRIAL_ZONE', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -671,6 +689,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 1,
     appealAdjacent: -1,
+    cityStrength: 2,
     placement: { notAdjacentToCityCenter: true },
     description: 'Military district (its buildings add production and housing).',
     src: {
@@ -679,6 +698,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_ENCAMPMENT', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_ENCAMPMENT', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_ENCAMPMENT', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_ENCAMPMENT', 'CityStrengthModifier'),
       code: { stylized: 'a display code, not a game constant' },
       color: { stylized: 'a display colour, not a game constant' },
       'placement.notAdjacentToCityCenter': xml('Districts', 'DistrictType=DISTRICT_ENCAMPMENT', 'NoAdjacentCity'),
@@ -703,6 +723,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0, // housing handled specially (depends on existing fresh water)
     maintenance: 0,
     appealAdjacent: 0,
+    cityStrength: 0,
     placement: { requiresAdjacentCityCenter: true, requiresWaterSourceOrMountain: true },
     // CIV6: an Aqueduct beside a Geothermal Fissure provides 1 Amenity.
     amenityAdjacent: { source: 'GEOTHERMAL_FISSURE', amount: 1 },
@@ -713,6 +734,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_AQUEDUCT', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_AQUEDUCT', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_AQUEDUCT', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_AQUEDUCT', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_AQUEDUCT', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_AQUEDUCT', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -744,6 +766,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     maintenance: 1,
     amenities: 1,
     appealAdjacent: 1,
+    cityStrength: 2,
     exclusiveDistricts: ['WATER_PARK'],
     placement: {},
     description: 'Amenities district. One or the other with the Water Park, never both.',
@@ -754,6 +777,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       maintenance: xml('Districts', 'DistrictType=DISTRICT_ENTERTAINMENT_COMPLEX', 'Maintenance'),
       amenities: xml('Districts', 'DistrictType=DISTRICT_ENTERTAINMENT_COMPLEX', 'Entertainment'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_ENTERTAINMENT_COMPLEX', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_ENTERTAINMENT_COMPLEX', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_ENTERTAINMENT_COMPLEX', 'PlunderType', { expect: 'PLUNDER_HEAL' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_ENTERTAINMENT_COMPLEX', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -791,6 +815,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 0,
     appealAdjacent: 0,
+    cityStrength: 2,
     placement: {},
     description: 'Housing based on tile appeal (2-6).',
     src: {
@@ -799,6 +824,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: { stylized: 'the appeal band pays it — cpu/core/city.ts:382 takes the NEIGHBORHOOD arm and never reads this column; its Average band pays 6-2 = 4, the install Districts.Housing' },
       maintenance: xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_NEIGHBORHOOD', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -828,6 +854,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 1,
     appealAdjacent: -1,
+    cityStrength: 2,
     // CIV6 (Aerodrome): "must be built on flat terrain".
     placement: { flatLand: true },
     description: 'Builds and bases aircraft. Flat land only.',
@@ -837,6 +864,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_AERODROME', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_AERODROME', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_AERODROME', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_AERODROME', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_AERODROME', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_AERODROME', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -856,6 +884,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 0,  // Districts.xml writes the Spaceport no Maintenance (schema default 0)
     appealAdjacent: -1,
+    cityStrength: 2,
     placement: { flatLand: true },
     description: 'Launch site for the Science Victory projects. Flat land only.',
     src: {
@@ -864,6 +893,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_SPACEPORT', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_SPACEPORT', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_SPACEPORT', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_SPACEPORT', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_SPACEPORT', 'PlunderType', { expect: 'PLUNDER_SCIENCE' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_SPACEPORT', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -888,6 +918,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 3,
     maintenance: 0,
     appealAdjacent: 1,
+    cityStrength: 0,
     floodShield: true,
     placement: { floodplainRiver: true },
     description: 'On a floodplain with the river on two sides. +3 housing, and its river no longer floods.',
@@ -897,6 +928,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_DAM', 'CityStrengthModifier'),
       code: { stylized: 'a display code, not a game constant' },
       color: { stylized: 'a display colour, not a game constant' },
       costProgressGame: xml('Districts', 'DistrictType=DISTRICT_DAM', 'CostProgressionParam1'),
@@ -920,6 +952,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 0,
     appealAdjacent: 1,
+    cityStrength: 0,
     placement: { canalPassage: true },
     description: 'Flat land between water and a City Center or a second body of water.',
     src: {
@@ -928,6 +961,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_CANAL', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_CANAL', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_CANAL', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_CANAL', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_CANAL', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_CANAL', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -952,6 +986,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     maintenance: 1,
     amenities: 1,
     appealAdjacent: 1,
+    cityStrength: 2,
     exclusiveDistricts: ['ENTERTAINMENT_COMPLEX'],
     placement: { onCoastalWater: true },
     // CIV6 (DISTRICT_WATER_STREET_CARNIVAL, "Copacabana"): Cost 27,
@@ -971,6 +1006,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       maintenance: xml('Districts', 'DistrictType=DISTRICT_WATER_ENTERTAINMENT_COMPLEX', 'Maintenance'),
       amenities: xml('Districts', 'DistrictType=DISTRICT_WATER_ENTERTAINMENT_COMPLEX', 'Entertainment'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_WATER_ENTERTAINMENT_COMPLEX', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_WATER_ENTERTAINMENT_COMPLEX', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_WATER_ENTERTAINMENT_COMPLEX', 'PlunderType', { expect: 'PLUNDER_HEAL' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_WATER_ENTERTAINMENT_COMPLEX', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -1000,6 +1036,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 0,
     appealAdjacent: 1,
+    cityStrength: 0,
     appealHousing: true,
     cultureBombUnowned: true,
     placement: { notAdjacentToCityCenter: true },
@@ -1010,6 +1047,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: { stylized: 'the appeal band pays it — cpu/core/city.ts:384 takes the appealHousing arm and never reads this column; PRESERVE_APPEAL_HOUSING[2] (Average) is 1, the install Districts.Housing' },
       maintenance: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -1035,6 +1073,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 1,
     appealAdjacent: 0,
+    cityStrength: 2,
     loyalty: 8,
     governorTitle: 1,
     oneCivWide: true,
@@ -1046,6 +1085,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_GOVERNMENT', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_GOVERNMENT', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_GOVERNMENT', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_GOVERNMENT', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_GOVERNMENT', 'PlunderType', { expect: 'PLUNDER_CULTURE' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_GOVERNMENT', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
@@ -1072,6 +1112,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     housing: 0,
     maintenance: 1,
     appealAdjacent: 0,
+    cityStrength: 2,
     envoysNextToCenter: 1,
     spyLevelPenalty: 2,
     oneCivWide: true,
@@ -1083,6 +1124,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       housing: xml('Districts', 'DistrictType=DISTRICT_DIPLOMATIC_QUARTER', 'Housing'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_DIPLOMATIC_QUARTER', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_DIPLOMATIC_QUARTER', 'Appeal'),
+      cityStrength: xml('Districts', 'DistrictType=DISTRICT_DIPLOMATIC_QUARTER', 'CityStrengthModifier'),
       'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_DIPLOMATIC_QUARTER', 'PlunderType', { expect: 'PLUNDER_CULTURE' }),
       'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_DIPLOMATIC_QUARTER', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },

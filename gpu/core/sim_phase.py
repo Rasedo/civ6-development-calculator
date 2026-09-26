@@ -61,8 +61,8 @@ class SimPhase:
         matrix — `unitsHostile` asked of the whole map at once — so
         barbarians, at-war majors and at-war city-states all answer through
         one lookup and no seat gets a hand-written hostility set of its own.
-        A city-state's row fires from its own centre strength
-        (`_minor_centre_cs`, `minorCityCS`)."""
+        Every row fires from its centre's standing strength
+        (`_centre_strength`, `centreStrength`)."""
         Bn, Tn, dev2 = self.B, self.T, self.device
         if not bool(fire.any()):
             return
@@ -112,20 +112,10 @@ class SimPhase:
         d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
         if bool(d_emb.any()):
             def_cs = torch.where(d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
-        if row == self.FREE_ROW:
-            # the Free Cities player's flat base, its garrison and its walls
-            gslot = self.military_at[bidx, ctr]
-            gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == seat)).long()
-            atk_cs = (self._free_def + gar * 5
-                      + self._walls_tier_cs[self._walls_tier_row(row, col)])
-        elif row >= self.n_majors:
-            atk_cs = self._minor_centre_cs(row - self._CITY_MINOR0)
-        else:
-            gslot = self.military_at[bidx, ctr]
-            gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)).long()
-            bm = self.civ_best_melee[:, row]
-            atk_cs = (torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
-                      + self._walls_tier_cs[self._walls_tier_row(row, col)])
+        # the centre's standing strength, whoever holds it (`centreStrength`);
+        # a major's government and governor terms ride on top
+        atk_cs = self._centre_strength(torch.full_like(col, row), col)
+        if row < self.n_majors:
             atk_cs = atk_cs + self._gov_mods(row)[12]["crng"].to(atk_cs.dtype)
             # CIV6 (Redoubt): "Increase city garrison Combat Strength by 5" —
             # this model fires a strike from the same base it defends with, so

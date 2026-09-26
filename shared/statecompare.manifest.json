@@ -1834,6 +1834,15 @@
           "note": "the Builders the minor has trained, which price its next (`builderCost`); the Seat field a minor's record carries."
         },
         {
+          "name": "minorBestMeleeCS",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "citystate_best_melee"
+          ],
+          "note": "the strongest melee Combat Strength the minor has fielded, the base its centre stands on (`holderStrength`); the Seat field a minor's record carries."
+        },
+        {
           "name": "warTurns",
           "compare": "exact",
           "covers": [

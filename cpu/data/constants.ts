@@ -204,6 +204,20 @@ export const EMBARKED_DEFENSE_CS_BY_ERA: readonly number[] =
     inputs: [xml('Eras', 'EraType=ERA_CLASSICAL', 'EmbarkedUnitStrength')],
   });
 
+/** A CITY CENTRE'S STANDING STRENGTH, the terms beside its base and walls
+ *  (`centreStrength` / `_centre_strength`). The combat preview's DEFENSES
+ *  lines, read term by term over 1,774 centres (tools/civ6lab/runs/
+ *  citydef_20260926T061603Z.jsonl). The Palace's +3 stands in the city that
+ *  holds the Palace — the capital, and a city-state's one city. */
+export const PALACE_CITY_CS = srcConst('combat.palaceCityCs', 3,
+  xml('ModifierArguments', 'ModifierId=PALACE_ADJUST_GARRISON_STRENGTH&Name=Amount', 'Value',
+    { note: 'MODIFIER_PLAYER_CITIES_ADJUST_INNER_DEFENSE on BUILDING_PALACE; the lab read it in the capital alone' }));
+/** a military unit of the holder standing on the centre, at full value (the
+ *  preview scales it down for a wounded garrison) */
+export const GARRISON_CITY_CS = srcConst('combat.garrisonCityCs', 10, gp('COMBAT_GARRISON_MILITIA_MODIFIER'));
+/** a city-state's centre, per envoy it holds from every major together */
+export const ENVOY_CITY_CS = srcConst('combat.envoyCityCs', 1, gp('COMBAT_STRENGTH_FROM_ENVOYS'));
+
 /** CIV6 (GlobalParameters.xml): COMBAT_BASE_CAPTURE_STRENGTH_DIFFERENCE 20 —
  *  the one number the install publishes beside the cavalry capture's
  *  permission. The curve through it is this model's (STYLIZED, owner

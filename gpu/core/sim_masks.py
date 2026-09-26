@@ -2644,20 +2644,24 @@ class SimMasks:
         if len(_hold) > 0:
             self._occ_set(_hold, spot[_hold], nxt[_hold] + off)
         nxt[rows] += 1
-        # a minor's centre stands on its own strength (`minorCityCS`), and no
-        # chassis it trains climbs in price, so neither tally below has a
-        # minor column
-        if minor:
-            return can
-        # track the seat's strongest MELEE ever fielded (city defense) — a
-        # civilian's combat 0 never raises it. Gated on `can` like TS: a
-        # no-spot spawn never lands the unit.
+        # track the seat's strongest MELEE ever fielded (the base its centres
+        # stand on), a city-state's too — a civilian's combat 0 never raises
+        # it. Gated on `can` like TS: a no-spot spawn never lands the unit.
         melee_cs = torch.where(
             can & (self._type_ranged_strength[ti_n] == 0),
             self._type_combat[ti_n],
-            torch.zeros_like(self.civ_best_melee[:, row]),
+            torch.zeros_like(self._type_combat[ti_n]),
         )
-        self.civ_best_melee[:, row] = torch.maximum(self.civ_best_melee[:, row], melee_cs)
+        if self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S:
+            s = row - self._CITY_MINOR0
+            self.citystate_best_melee[:, s] = torch.maximum(
+                self.citystate_best_melee[:, s], melee_cs.to(self.citystate_best_melee.dtype))
+        # no chassis a minor or the Free Cities trains climbs in price, and the
+        # Free Cities' base is its own flat one, so neither tally below has a
+        # column for them
+        if minor:
+            return can
+        self.civ_best_melee[:, row] = torch.maximum(self.civ_best_melee[:, row], melee_cs.to(self.civ_best_melee.dtype))
         # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose
         # price climbs is priced off every copy the seat has ever acquired, so
         # the tally is taken here — a purchase, a grant or a Great Person's free

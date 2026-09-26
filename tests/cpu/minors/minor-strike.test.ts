@@ -2,7 +2,7 @@
  * A CITY-STATE'S CITY STRIKES. CIV6: walls give a city its ranged strike, and
  * a city-state's city is an ordinary city — so a walled minor fires at the
  * nearest unit at war with it, in its own turn, through the majors' own body
- * (`cityStrikes`), from its own centre strength (`minorCityCS`).
+ * (`cityStrikes`), from its centre's standing strength (`centreStrength`).
  *
  * The GPU twin is tests/gpu/minor_builds_test.py's strike scene.
  */
@@ -10,11 +10,12 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
-import { minorCityCS } from '../../../cpu/core/combat';
+import { centreStrength } from '../../../cpu/core/combat';
 import { minorPhase } from '../../../cpu/core/minorBuild';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { cityStrikes } from '../../../cpu/core/phase';
 import { WALLS_TIER_CS } from '../../../cpu/data/units';
+import { PALACE_CITY_CS } from '../../../cpu/data/constants';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, GameState } from '../../../cpu/core/types';
 
@@ -41,10 +42,10 @@ describe("a city-state's ranged strike", () => {
     expect(near).toBeTruthy();
     setWar(state, 1, cs.seat, true);
     const hp0 = near.hp;
-    cityStrikes(state, minorCity(cs), minorCityCS(state, cs));
+    cityStrikes(state, minorCity(cs), centreStrength(state, minorCity(cs)));
     expect(near.hp).toBeLessThan(hp0);
-    // 15 + population + militaristic 6 + the Ancient Walls' tier
-    expect(minorCityCS(state, cs)).toBe(15 + 3 + 6 + (WALLS_TIER_CS[1] ?? 0));
+    // the 15 floor (no melee fielded) + the Ancient Walls' tier + the Palace
+    expect(centreStrength(state, minorCity(cs))).toBe(15 + (WALLS_TIER_CS[1] ?? 0) + PALACE_CITY_CS);
   });
 
   it('holds fire at peace, and without walls', () => {
@@ -53,7 +54,7 @@ describe("a city-state's ranged strike", () => {
       const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 7, 6).index, 1)!;
       if (war) setWar(state, 1, cs.seat, true);
       const hp0 = u.hp;
-      cityStrikes(state, minorCity(cs), minorCityCS(state, cs));
+      cityStrikes(state, minorCity(cs), centreStrength(state, minorCity(cs)));
       expect(u.hp, `walls ${walls} war ${war}`).toBe(hp0);
     }
   });

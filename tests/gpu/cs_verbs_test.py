@@ -59,7 +59,8 @@ def clear_queues(sim) -> None:
 def make_suzerain_mil(sim, s: int, envoys: int = 5) -> None:
     """Force CS slot `s` militaristic + alive, met by R, with R holding the
     strict suzerain envoy majority (seat 0 at 0 envoys, the other civ at 0)."""
-    mil = int(sim.rules.citystate["militaristicIdx"])
+    # the militaristic type is the one whose district is the Encampment
+    mil = [int(x) for x in sim.rules.citystate["typeDistrictIdx"]].index(sim._encamp_didx)
     sim.citystate_type[0, s] = mil
     sim.citystate_alive[0, s] = True
     sim.seat_citystate_met[0, R + 1, s] = True

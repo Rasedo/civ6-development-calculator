@@ -690,6 +690,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorArmySeen: overCityStates((cityState) => cityState.armySeen ?? -1),
   minorLossTurn: overCityStates((cityState) => cityState.lossTurn ?? -1),
   minorBuildersTrained: overCityStates((cityState) => cityState.buildersTrained),
+  minorBestMeleeCS: overCityStates((cityState) => cityState.bestMeleeCS),
   warTurns: overCityStates((cityState, state) => warClockLine(state, cityState.seat)),
   treatyTurns: overCityStates((cityState, state) => treatyClockLine(state, cityState.seat)),
 };

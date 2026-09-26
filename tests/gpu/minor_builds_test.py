@@ -306,8 +306,9 @@ def test_the_conquest_carries_the_build(rules, path) -> None:
 
 def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
     """CIV6: a defensible district fights "similar to the parent City
-    Center" - a militaristic minor's Encampment at the minor's OWN centre
-    strength, walls tier included, never at a clamped major row's floor."""
+    Center, excluding any bonus obtained for a Garrisoned unit" - a minor's
+    Encampment at its OWN centre's standing strength less the garrison,
+    walls tier included, never at a clamped major row's floor."""
     sim = build(rules, path)
     s = a_minor(sim)
     row = sim._CITY_MINOR0 + s
@@ -331,10 +332,12 @@ def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
     d, _hrow, hcol, wtier, held = sim._encamp_terms(tt)
     csx = torch.full((sim.B,), s, dtype=torch.long)
     tier = int(sim._minor_walls_tier_at(csx)[B0])
-    mil = int(sim.rules.citystate.get("militaristicIdx", -1))
-    want = (15 + int(sim.citystate_pop[B0, s])
-            + (6 if int(sim.citystate_type[B0, s]) == mil else 0)
-            + int(sim._walls_tier_cs[tier]))
+    # the centre's standing strength less its garrison: the best melee
+    # (floor 15), the walls, the Palace, the Encampment's own district
+    # term and the envoys the minor holds
+    want = (max(15, int(sim.citystate_best_melee[B0, s])) + int(sim._walls_tier_cs[tier])
+            + int(sim._palace_city_cs) + int(sim._d_city_str[dv])
+            + int(sim._minor_envoys_received()[B0, s]) * int(sim._envoy_city_cs))
     assert tier >= 1, "the walls did not reach the tier read"
     assert int(d[B0]) == want, f"the minor's Encampment defends at {int(d[B0])}, its centre says {want}"
     assert bool(held[B0]), "the minor's own walls did not size the perimeter"
@@ -377,8 +380,8 @@ def test_the_tier1_building_follows_the_district(rules, path) -> None:
 def test_the_walled_minor_strikes(rules, path) -> None:
     """CIV6: walls give a city its ranged strike, and a city-state's city is an
     ordinary city — so a walled minor fires at the nearest unit at war with it,
-    through the majors' own body (`_city_strikes`), from its own centre
-    strength (`_minor_centre_cs`). The TS twin is
+    through the majors' own body (`_city_strikes`), from its centre's
+    standing strength (`_centre_strength`). The TS twin is
     tests/cpu/minors/minor-strike.test.ts."""
     sim = build(rules, path)
     s = a_minor(sim)
@@ -411,11 +414,14 @@ def test_the_walled_minor_strikes(rules, path) -> None:
     sim._city_strikes(row, col0, alive)
     assert int(sim.unit_hp[B0, slot]) < hp0, "the walled minor held fire at a unit at war with it"
 
-    mil = int(sim.rules.citystate.get("militaristicIdx", -1))
     tier = int(sim._minor_walls_tier(s)[B0])
-    want = (15 + int(sim.citystate_pop[B0, s])
-            + (6 if int(sim.citystate_type[B0, s]) == mil else 0) + int(sim._walls_tier_cs[tier]))
-    assert int(sim._minor_centre_cs(s)[B0]) == want, "the strike leaves from another strength"
+    g = int(sim.military_at[B0, ctr])
+    gar = g >= 0 and int(sim.unit_seat[B0, g]) == 100 + s
+    want = (max(15, int(sim.citystate_best_melee[B0, s])) + int(sim._walls_tier_cs[tier])
+            + int(sim._palace_city_cs) + (int(sim._garrison_city_cs) if gar else 0)
+            + int(sim._minor_envoys_received()[B0, s]) * int(sim._envoy_city_cs))
+    got = int(sim._centre_strength(torch.full((sim.B,), row, dtype=torch.long), col0)[B0])
+    assert got == want, f"the strike leaves from {got}, the centre says {want}"
     print("  8 strike OK — the walled minor fires at war, holds at peace, from its centre")
 
 

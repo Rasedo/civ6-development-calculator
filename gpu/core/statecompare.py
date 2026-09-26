@@ -742,6 +742,7 @@ CITY_STATE = {
     "minorArmySeen": lambda sim, b, rows: [int(sim.citystate_army_seen[b, s]) for s in rows],
     "minorLossTurn": lambda sim, b, rows: [int(sim.citystate_loss_turn[b, s]) for s in rows],
     "minorBuildersTrained": lambda sim, b, rows: [int(sim.citystate_builders_trained[b, s]) for s in rows],
+    "minorBestMeleeCS": lambda sim, b, rows: [int(sim.citystate_best_melee[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
     "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],
 }

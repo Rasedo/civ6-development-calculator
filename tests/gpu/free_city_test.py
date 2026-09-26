@@ -443,9 +443,9 @@ def test_defence_and_strike(rules, path) -> None:
     F = sim.FREE_ROW
     hrow = torch.tensor([F])
     hcol = torch.tensor([col])
-    no = torch.zeros(1, dtype=torch.long)
-    assert int(sim._city_defense_cs(hrow, hcol, no)[0][B0]) == 72, "the Free City's flat base is 72"
-    assert int(sim._city_defense_cs(torch.tensor([0]), torch.tensor([0]), no)[0][B0]) != 72
+    assert int(sim._holder_strength(hrow)[B0]) == 72, "the Free City's flat base is 72"
+    assert int(sim._holder_strength(torch.tensor([0]))[B0]) != 72
+    assert int(sim._city_defense_cs(hrow, hcol)[0][B0]) == int(sim._centre_strength(hrow, hcol)[B0])
     # an unwalled Free City fires nothing; a walled one strikes a hostile
     # unit beside it
     for walled in (False, True):
@@ -453,12 +453,13 @@ def test_defence_and_strike(rules, path) -> None:
         c = revolt(s)
         j = free_slot(s, c)
         if walled:
+            before = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]))[0][B0])
             wi = RULES["buildings"].index(next(b for b in RULES["buildings"] if b["id"] == "ANCIENT_WALLS"))
             s.city_bldg[B0, F, j, wi] = True
             s._bldg_version += 1
             s.city_outer_hp[B0, F, j] = int(s._walls_max_at(torch.tensor([F]), torch.tensor([j]))[B0])
-            base = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]), no)[0][B0])
-            assert base == 72 + int(s._walls_tier_cs[1]), base
+            base = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]))[0][B0])
+            assert base == before + int(s._walls_tier_cs[1]), (before, base)
         u = put(s, 1, attack_plot(s, c), "WARRIOR")
         s._free_cities_phase()
         hp = int(s.major_unit_hp[B0, u])

@@ -38,7 +38,7 @@ import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, wallsMax } from './rules';
 import { seatGrowth } from './seatTurn';
 import { cityBorderGrowth, cityStrikes, paveGround } from './phase';
-import { applyTrainingGrants, minorCityCS } from './combat';
+import { applyTrainingGrants, centreStrength } from './combat';
 import { districtScaledBase, districtProgressAdd, goldAffordable, projectCost, repairAvailable } from './game';
 import { computeCityStats } from './city';
 import { minorCity, suzerainOf } from './cityStates';
@@ -95,7 +95,8 @@ export function minorPhase(state: GameState): void {
     minorBuilders(state, cityState);
     minorTrade(state, cityState);
     minorBuild(state, cityState, production);
-    cityStrikes(state, minorCity(cityState), minorCityCS(state, cityState));
+    const city = minorCity(cityState);
+    cityStrikes(state, city, centreStrength(state, city));
     minorWalk(state, cityState);
     cityState.armySeen = minorMilitary(state, cityState).length;
   }

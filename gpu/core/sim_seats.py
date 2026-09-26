@@ -11381,29 +11381,64 @@ class SimSeats:
         return torch.where(ctr_seat == FREE_SEAT, torch.full_like(ctr_seat, self.FREE_ROW),
                            ctr_seat.clamp(min=0, max=self.n_majors - 1))
 
-    def _holder_base(self, hrow: torch.Tensor, best: torch.Tensor) -> torch.Tensor:
-        """`holderStrength`: the strength a city and its Encampment stand at
-        before walls and garrison — the holder's best melee unit floored at 15,
-        and on the Free Cities row a flat base of its own (`_free_def`)."""
+    def _holder_strength(self, hrow: torch.Tensor) -> torch.Tensor:
+        """[B] long — `holderStrength`, for a city-plane ROW per game: the
+        strongest melee unit the holder has fielded (a major's
+        `civ_best_melee`, a city-state's `citystate_best_melee`) floored at
+        15, and on the Free Cities row a flat base of its own (`_free_def`)."""
+        bidx = self._bidx
+        major = hrow < self.n_majors
+        s0 = (hrow - self._CITY_MINOR0).clamp(min=0, max=max(self.S - 1, 0))
+        minor = (hrow >= self._CITY_MINOR0) & (hrow < self._CITY_MINOR0 + self.S)
+        best = torch.where(major, self.civ_best_melee[bidx, hrow.clamp(max=self.n_majors - 1)],
+                           torch.where(minor, self.citystate_best_melee[bidx, s0].to(self.civ_best_melee.dtype),
+                                       torch.zeros(self.B, dtype=self.civ_best_melee.dtype, device=self.device)))
         return torch.where(hrow == self.FREE_ROW, torch.full_like(best, self._free_def),
                            torch.maximum(best, torch.full_like(best, 15)))
 
-    def _city_defense_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
-                         gar: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _centre_strength(self, hrow: torch.Tensor, hcol: torch.Tensor,
+                         garrisoned: bool = True) -> torch.Tensor:
+        """[B] long — `centreStrength`, A CITY CENTRE'S STANDING STRENGTH, one
+        rule for whichever row holds the city (a major, the Free Cities, a
+        city-state's row with its one column 0): the holder's base
+        (`_holder_strength`), `Districts.CityStrengthModifier` over the city's
+        complete, unpillaged districts counted per instance off the tile plane
+        (`_dist_counts`' rule), the walls tier's adder, the Palace's +3 where
+        the city holds it (`_palace_at`: a capital, a minor's city), a
+        garrison's +10 — a military unit of the holder on the centre, left out
+        where `garrisoned` is False (the Encampment) — and a city-state's +1
+        per envoy it holds (`_minor_envoys_received`)."""
+        bidx = self._bidx
+        hc0 = hcol.clamp(min=0)
+        minor = (hrow >= self._CITY_MINOR0) & (hrow < self._CITY_MINOR0 + self.S)
+        seat = self._ROW_SEAT[hrow]
+        cs = self._holder_strength(hrow) + self._walls_tier_cs[self._walls_tier_at(hrow, hcol)]
+        live = ((self.tile_seat == seat.unsqueeze(1))
+                & (self.tile_city == self.city_id[bidx, hrow, hc0].unsqueeze(1))
+                & (self.district >= 0) & self.district_complete & ~self.district_pillaged)
+        cs = cs + (live.long() * self._d_city_str[self.district.clamp(min=0)]).sum(dim=1)
+        pal = self.city_is_cap[bidx, hrow, hc0] | minor
+        cs = cs + pal.long() * self._palace_city_cs
+        if garrisoned:
+            ctr = self.city_center[bidx, hrow, hc0].clamp(min=0)
+            gslot = self.military_at[bidx, ctr]
+            gar = (gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == seat)
+            cs = cs + gar.long() * self._garrison_city_cs
+        if self.S > 0:
+            s0 = (hrow - self._CITY_MINOR0).clamp(min=0, max=self.S - 1)
+            env = self._minor_envoys_received()[bidx, s0]
+            cs = cs + torch.where(minor, env * self._envoy_city_cs, torch.zeros_like(env))
+        return cs
+
+    def _city_defense_cs(self, hrow: torch.Tensor, hcol: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`cityDefenseStrength` for whichever row holds the city, [B] each:
-        the holder's best melee unit (floor 15), +5 for a garrison, the walls
-        tier (each pre-modern tier "+3 Combat Strength", stacking), and — for a
-        MAJOR — its government's city-defense effect and CIV6 (Redoubt):
-        "Increase city garrison Combat Strength by 5." The Free Cities seat
-        seats nobody: its city stands on its own flat base (`_free_def`, the
-        live game's 72), plus its garrison and its walls. Returns
-        `(def_cs, walls_tier)`."""
-        bidx = torch.arange(self.B, device=self.device)
+        the centre's standing strength (`_centre_strength`) and — for a MAJOR
+        — its government's city-defense effect and CIV6 (Redoubt): "Increase
+        city garrison Combat Strength by 5." Returns `(def_cs, walls_tier)`."""
         major = hrow < self.n_majors
         h0 = hrow.clamp(max=self.n_majors - 1)
-        best = torch.where(major, self.civ_best_melee[bidx, h0], torch.zeros_like(hrow))
         wtier = self._walls_tier_at(hrow, hcol)
-        def_cs = (self._holder_base(hrow, best) + gar * 5 + self._walls_tier_cs[wtier])
+        def_cs = self._centre_strength(hrow, hcol)
         def_cs = def_cs + torch.where(major, self._fx_at_seat("cdef", h0).to(def_cs.dtype),
                                       torch.zeros_like(def_cs))
         if self.n_governors:
@@ -11763,37 +11798,28 @@ class SimSeats:
         """(def_cs, hrow, hcol, wtier, held) for the Encampment on `tc`.
 
         CIV6 gives a defensible district Combat Strength "similar to the parent
-        City Center, EXCLUDING any bonus obtained for a Garrisoned unit" — so
-        the walls tier's own bonus is in and the garrison's +5 is not. `hcol`
-        is the city behind the district; without one (a district whose city has
-        fallen) the roll lands whole on its own pool."""
+        City Center, EXCLUDING any bonus obtained for a Garrisoned unit" — its
+        city's standing strength without the garrison (`_centre_strength`),
+        whoever holds it; a district no city holds stands on the holder's base
+        alone. `hcol` is the city behind the district; without one (a district
+        whose city has fallen) the roll lands whole on its own pool. A
+        city-state's district answers from the minor's row with `hcol` -1: its
+        city stamps no repair clock here."""
         hseat = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
         hrow = self._holder_row(hseat)
-        bidx = torch.arange(self.B, device=self.device)
         hcol = self._owner_city_col(hseat, tc)
-        wtier = self._walls_tier_at(hrow, hcol)
         held = hcol >= 0
-        # the Free Cities seat's district stands on its city's flat base
-        _major = hrow < self.n_majors
-        _best = torch.where(_major, self.civ_best_melee[bidx, hrow.clamp(max=self.n_majors - 1)],
-                            torch.zeros_like(hrow))
-        def_cs = (self._holder_base(hrow, _best)
-                  + torch.where(held, self._walls_tier_cs[wtier],
-                                torch.zeros_like(self._walls_tier_cs[wtier])))
-        # a CITY-STATE's Encampment fights at the minor's own centre
-        # strength (`attackCityState`'s formula), its walls tier included -
-        # never at a clamped major row's floor.
+        # the row and column the strength is read at: a minor's own row
+        srow, scol = hrow, hcol
         is_cs = (hseat >= 100) & (hseat < 100 + self.S)
         if bool(is_cs.any()):
             csx = (hseat - 100).clamp(min=0, max=max(self.S - 1, 0))
-            cs_tier = self._minor_walls_tier_at(csx)
-            mil_idx = int(self.rules.citystate["militaristicIdx"])
-            cs_def = (15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
-                      + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
-                      + self._walls_tier_cs[cs_tier])
-            def_cs = torch.where(is_cs, cs_def.to(def_cs.dtype), def_cs)
-            wtier = torch.where(is_cs, cs_tier, wtier)
+            srow = torch.where(is_cs, self._CITY_MINOR0 + csx, hrow)
+            scol = torch.where(is_cs, torch.zeros_like(hcol), hcol)
             held = held | is_cs
+        wtier = self._walls_tier_at(srow, scol)
+        def_cs = torch.where(held, self._centre_strength(srow, scol, garrisoned=False),
+                             self._holder_strength(srow))
         return def_cs, hrow, hcol, wtier, held
 
     def _encamp_take_roll(self, m: torch.Tensor, tc: torch.Tensor, utype: torch.Tensor,
@@ -12515,9 +12541,7 @@ class SimSeats:
         hseat = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1)
         hrow = self._holder_row(hseat)
         slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-        gslot = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == hseat)).long()
-        def_cs, _wtier = self._city_defense_cs(hrow, slot, gar)
+        def_cs, _wtier = self._city_defense_cs(hrow, slot)
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
                  + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
@@ -12545,7 +12569,7 @@ class SimSeats:
                       f"atk_e={float(atk_e[_b]):.1f} def_cs={float(def_cs[_b]):.1f} "
                       f"combat={float(self._type_combat[int(a_type[_b, u])]):.0f} "
                       f"wound={float(self._wound(a_hp[:, u], a_type[:, u])[_b]):.1f} "
-                      f"xp={int(a_xp[_b, u])} gar={int(gar[_b])}")
+                      f"xp={int(a_xp[_b, u])} best={int(self._holder_strength(hrow)[_b])}")
         # DRAW ORDER is the parity contract: the city's damage first, the
         # counter second, exactly as TS's cityAssault draws them.
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
@@ -12708,9 +12732,10 @@ class SimSeats:
         """ONE melee assault on a CITY-STATE centre, for any attacking seat —
         the `attackCityState` twin.
 
-        Defense is `15 + pop (+6 militaristic)`; the csty/cstyc draw pair and the
-        attacker-death cleanup are shared by every attacking seat, so the
-        war-weariness death term is scored in exactly one place.
+        Defense is the minor's centre strength (`_centre_strength`); the
+        csty/cstyc draw pair and the attacker-death cleanup are shared by every
+        attacking seat, so the war-weariness death term is scored in exactly
+        one place.
 
         The per-CLASS terms are TS's own `assaultAtkCS` clauses, not pool
         accidents — the same ones `_assault_city` documents.
@@ -12723,18 +12748,13 @@ class SimSeats:
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         at0 = a_type[:, u].clamp(min=0, max=self.NU - 1)
         here = a_tile[:, u].clamp(min=0)
-        mil_idx = int(self.rules.citystate["militaristicIdx"])
         # CIV6: walls raise the defense and take their share first — the
         # minor's city rides the majors' own split (`attackCityState`).
         cs_tier = self._minor_walls_tier_at(citystate_sc)
         _bax = torch.arange(self.B, device=self.device)
         cs_mrow = self._CITY_MINOR0 + citystate_sc.clamp(min=0, max=max(self.S - 1, 0))
         cs_outer = torch.minimum(self.city_outer_hp[_bax, cs_mrow, 0], self._walls_tier_hp[cs_tier])
-        def_cs = (
-            15 + self.citystate_pop.gather(1, citystate_sc.unsqueeze(1)).squeeze(1)
-            + (self.citystate_type.gather(1, citystate_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
-            + self._walls_tier_cs[cs_tier]
-        )
+        def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[at0] + self._form_cs_pool(atk_kind, u)
                  + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
@@ -12969,9 +12989,7 @@ class SimSeats:
         if bool(city_att.any()):
             hrow = self._holder_row(ctr)
             hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-            _gm = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-            gar = ((_gm >= 0) & (self.unit_seat[_bidx, _gm.clamp(min=0)] == ctr)).long()
-            def_cs, _wtier = self._city_defense_cs(hrow, hcol, gar)
+            def_cs, _wtier = self._city_defense_cs(hrow, hcol)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
             atk_e = (self._city_ranged_strength(ut0, a_seat, outer_all)
                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
@@ -13033,15 +13051,10 @@ class SimSeats:
             cs_att = _rest & _cst.gather(1, ttc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
         if bool(cs_att.any()):
             csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-            mil_idx = int(self.rules.citystate["militaristicIdx"])
             cs_tier = self._minor_walls_tier_at(csx)
             cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
             cs_outer = torch.minimum(self.city_outer_hp[_bidx, cs_mrow, 0], self._walls_tier_hp[cs_tier])
-            def_cs = (
-                15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
-                + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
-                + self._walls_tier_cs[cs_tier]
-            )
+            def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
             atk_cs = (self._city_ranged_strength(ut0, a_seat, cs_outer)
                       + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                       - self._wound(a_hp, ut0)
@@ -13270,8 +13283,7 @@ class SimSeats:
             hseat = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1)
             hrow = self._holder_row(hseat)
             slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-            gar = ((mslot >= 0) & (m_seat == hseat)).long()
-            def_cs, _wtier = self._city_defense_cs(hrow, slot, gar)
+            def_cs, _wtier = self._city_defense_cs(hrow, slot)
             outer_all = self.city_outer_hp[bidx, hrow, slot]
             _rs = self._city_ranged_strength(at0, aseat, outer_all)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
@@ -13298,18 +13310,13 @@ class SimSeats:
                                             torch.full_like(_chp, XP_CITY_ATTACK)))
         if bool(cs_att.any()):
             csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-            mil_idx = int(self.rules.citystate["militaristicIdx"])
             # CIV6: the minor's walls raise the defense and take their share
             # first, exactly as the major-city arm above.
             cs_tier = self._minor_walls_tier_at(csx)
             _bax = torch.arange(self.B, device=self.device)
             cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
             cs_outer = torch.minimum(self.city_outer_hp[_bax, cs_mrow, 0], self._walls_tier_hp[cs_tier])
-            def_cs = (
-                15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
-                + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
-                + self._walls_tier_cs[cs_tier]
-            )
+            def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
             _cs_rs = self._city_ranged_strength(at0, aseat, cs_outer)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             d_cs = self._damage_roll(cs_att,

@@ -237,6 +237,9 @@ class SimInit:
             B, s_pad, len(rules.citystate["buildRows"]), dtype=torch.long, device=device)
         self.citystate_army_cap = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_builders_trained = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # the strongest melee Combat Strength the minor has fielded — the base
+        # its centre stands on (`holderStrength`, the Seat's `bestMeleeCS`)
+        self.citystate_best_melee = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # the episode's Builder purchase rate (per mille, -1 undrawn), the
         # military count at the end of the minor's last turn (-1 before its
         # first) and the turn it was last seen to lose a unit (-1 none) — the
@@ -2707,6 +2710,11 @@ class SimInit:
         # TIER, plus the tech that grants the top tier outright.
         self._walls_tier_hp = torch.tensor([int(x) for x in rules.combat["wallsTierHp"]], dtype=torch.long, device=device)
         self._walls_tier_cs = torch.tensor([int(x) for x in rules.combat["wallsTierCs"]], dtype=torch.long, device=device)
+        # a city centre's standing terms beside its base and walls
+        # (`_centre_strength`): the Palace's, a garrison's, a minor's per envoy
+        self._palace_city_cs = int(rules.combat["palaceCityCs"])
+        self._garrison_city_cs = int(rules.combat["garrisonCityCs"])
+        self._envoy_city_cs = int(rules.combat["envoyCityCs"])
         self._walls_tier_urban = int(rules.combat["wallsTierUrban"])
         self._urban_def_tech = int(rules.combat["urbanDefensesTech"])
         self._repair_quiet = int(rules.combat["repairQuietTurns"])
@@ -2798,6 +2806,9 @@ class SimInit:
         self._d_flood_shield = torch.tensor([bool(d["floodShield"]) for d in self.districts_cat], dtype=torch.bool, device=device)
         self._d_bomb_unowned = torch.tensor([bool(d["cultureBombUnowned"]) for d in self.districts_cat], dtype=torch.bool, device=device)
         self._d_spy_pen = torch.tensor([int(d["spyLevelPenalty"]) for d in self.districts_cat], dtype=torch.long, device=device)
+        # `Districts.CityStrengthModifier`: what each complete, unpillaged
+        # district adds to its centre's strength (`_centre_strength`)
+        self._d_city_str = torch.tensor([int(d["cityStrength"]) for d in self.districts_cat], dtype=torch.long, device=device)
         # CIV6 (Pillaging): the district plunder rows, same enum as the
         # improvements'
         self._d_plun_kind = torch.tensor([int(d["plun"][0]) for d in self.districts_cat], dtype=torch.long, device=device)
@@ -4020,6 +4031,10 @@ class SimInit:
             self.civ_best_melee[:, _row0] = torch.where(
                 self.major_unit_seat == _row0, _mcs0, torch.zeros_like(_mcs0)
             ).max(dim=1).values
+        for _s0 in range(self.S):
+            self.citystate_best_melee[:, _s0] = torch.where(
+                self.major_unit_seat == 100 + _s0, _mcs0, torch.zeros_like(_mcs0)
+            ).max(dim=1).values.to(self.citystate_best_melee.dtype)
 
         self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
 

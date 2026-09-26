@@ -365,7 +365,7 @@ class SimMinors:
             return
         bidx = self._bidx
         col = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        env = self.seat_citystate_envoys[:, : self.n_majors, : self.S].sum(dim=1).long()
+        env = self._minor_envoys_received()
         for s in range(self.S):
             row = self._CITY_MINOR0 + s
             if not bool(self._row_annex_influence[row]):
@@ -479,14 +479,11 @@ class SimMinors:
             tier = torch.where(urban, torch.full_like(tier, self._walls_tier_urban), tier)
         return tier
 
-    def _minor_centre_cs(self, s: int) -> torch.Tensor:
-        """[B] long — `minorCityCS`: the minor's centre strength, 15 plus its
-        population, +6 for a militaristic minor, and its walls tier's adder.
-        Its city's ranged strike leaves from it."""
-        mil_idx = int(self.rules.citystate["militaristicIdx"])
-        return (15 + self.citystate_pop[:, s].long()
-                + (self.citystate_type[:, s] == mil_idx).long() * 6
-                + self._walls_tier_cs[self._minor_walls_tier(s)].long())
+    def _minor_envoys_received(self) -> torch.Tensor:
+        """[B, S] long — `envoysReceived`: every envoy each minor holds, the
+        raw store summed over the majors that sent them. A posted governor is
+        not an envoy received."""
+        return self.seat_citystate_envoys[:, : self.n_majors, : self.S].sum(dim=1).long()
 
     def _minor_district_site(self, s: int) -> torch.Tensor:
         """[B, T] `canPlaceDistrictIn`'s city half for the minor's one city —

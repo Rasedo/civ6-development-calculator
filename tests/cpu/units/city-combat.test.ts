@@ -2,9 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { spawnUnit } from '../../../cpu/core/units';
 import { outerPool } from '../../../cpu/core/rules';
-import { cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct } from '../../../cpu/core/combat';
-import { BARB_SEAT, emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
+import { cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct, centreStrength } from '../../../cpu/core/combat';
+import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
+import { minorCity } from '../../../cpu/core/cityStates';
 import { ENCAMPMENT_HP, WALLS_HP } from '../../../cpu/data/units';
+import { PALACE_CITY_CS, GARRISON_CITY_CS, ENVOY_CITY_CS } from '../../../cpu/data/constants';
+import { DISTRICTS } from '../../../cpu/data/districts';
+import { tilesWithin } from '../../../world/hex';
+import type { City, CityState, DistrictId, GameState, Tile } from '../../../cpu/core/types';
 
 // The city-combat formulas, against the pages they were sourced from:
 // Combat (Civ6) for the damage roll and the wound penalty, City combat (Civ6)
@@ -221,5 +226,85 @@ describe('an Encampment under attack', () => {
     );
     hostileUnitAct(ctl.state, spawnUnit(ctl.state, 'WARRIOR', ctl.enc.index, BARB_SEAT)!);
     expect(ctl.enc.districtPillaged).toBe(true);
+  });
+});
+
+// The combat preview's DEFENSES lines, one rule for every holder
+// (`centreStrength`). The GPU twin is tests/gpu/centre_strength_test.py, which
+// asserts the same numbers.
+describe("a city centre's standing strength", () => {
+  function scene() {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    state.seats.push(emptySeat(1));
+    const capital = settleAt(state, tileAtCoords(state.map, 4, 4).index, 1);
+    const city = settleAt(state, tileAtCoords(state.map, 12, 12).index, 1);
+    return { state, capital, city };
+  }
+  function district(state: GameState, city: City, col: number, row: number, type: DistrictId): Tile {
+    const t = tileAtCoords(state.map, col, row);
+    setTileOwner(t, city.seat, city.id);
+    t.district = type;
+    t.districtComplete = true;
+    t.districtPillaged = false;
+    city.districts.push({ type, tileIndex: t.index });
+    return t;
+  }
+
+  it('stands on the best melee floored at 15; the capital adds the Palace', () => {
+    const { state, capital, city } = scene();
+    expect(centreStrength(state, city)).toBe(15);
+    expect(centreStrength(state, capital)).toBe(15 + PALACE_CITY_CS);
+    expect(PALACE_CITY_CS).toBe(3);
+  });
+
+  it('a Campus beside an Aqueduct adds 2, not 4: the Aqueduct carries no modifier', () => {
+    const { state, city } = scene();
+    district(state, city, 13, 12, 'CAMPUS');
+    district(state, city, 11, 12, 'AQUEDUCT');
+    expect(DISTRICTS.CAMPUS.cityStrength).toBe(2);
+    expect(DISTRICTS.AQUEDUCT.cityStrength).toBe(0);
+    expect(centreStrength(state, city)).toBe(15 + 2);
+  });
+
+  it('a pillaged or unfinished district adds nothing', () => {
+    const { state, city } = scene();
+    const campus = district(state, city, 13, 12, 'CAMPUS');
+    const hub = district(state, city, 11, 12, 'COMMERCIAL_HUB');
+    expect(centreStrength(state, city)).toBe(15 + 4);
+    campus.districtPillaged = true;
+    expect(centreStrength(state, city)).toBe(15 + 2);
+    hub.districtComplete = false;
+    expect(centreStrength(state, city)).toBe(15);
+  });
+
+  it('a military unit of the holder on the centre adds 10; the Encampment reads without it', () => {
+    const { state, city } = scene();
+    spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 18, 18).index, 1);
+    expect(centreStrength(state, city)).toBe(35);
+    spawnUnit(state, 'WARRIOR', city.centerIndex, 1);
+    expect(GARRISON_CITY_CS).toBe(10);
+    expect(centreStrength(state, city)).toBe(35 + 10);
+    expect(centreStrength(state, city, false)).toBe(35);
+  });
+
+  it("a city-state's centre: its best melee, the Palace, +1 per envoy from every major", () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    state.seats.push(emptySeat(1));
+    const centre = tileAtCoords(state.map, 9, 9);
+    const cs: CityState = {
+      ...emptySeat(seatOfCityState(0)),
+      id: 0, name: 'Envoyland', type: 'militaristic', centerIndex: centre.index,
+      population: 5, envoys: { 0: 2, 1: 1 }, met: [0, 1], suzerain: 0,
+    };
+    for (const t of tilesWithin(state.map, 9, 9, 1)) setTileOwner(t, cs.seat);
+    state.cityStates.push(cs);
+    state.cityStateMax = 1;
+    expect(centreStrength(state, minorCity(cs))).toBe(15 + PALACE_CITY_CS + 3 * ENVOY_CITY_CS);
+    // the strongest melee it has fielded, not its population or its type
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 9).index, cs.seat);
+    expect(cs.bestMeleeCS).toBe(20);
+    expect(centreStrength(state, minorCity(cs))).toBe(20 + 3 + 3);
   });
 });

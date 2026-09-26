@@ -85,6 +85,13 @@ export function envoysOf(cityState: CityState, seat: number): number {
   return cityState.envoys[seat] ?? 0;
 }
 
+/** Every envoy this minor holds, the store summed over every seat that sent
+ *  one — a posted governor is not an envoy received. The GPU twin is
+ *  `_minor_envoys_received`. */
+export function envoysReceived(cityState: CityState): number {
+  return Object.values(cityState.envoys).reduce((n, e) => n + e, 0);
+}
+
 /**
  * The envoys `seat` effectively holds here — the store plus whatever governor
  * it has posted at this minor. CIV6 (Amani, Messenger): "Can be assigned to a
@@ -181,7 +188,7 @@ export function addEnvoys(state: GameState, cityState: CityState, seat: number, 
 export function envoyTiles(state: GameState, cityState: CityState): void {
   if (!CIV_LEVELS.CITY_STATE.canAnnexTilesWithReceivedInfluence) return;
   const city = minorCity(cityState);
-  let want = Object.values(cityState.envoys).reduce((n, e) => n + e, 0) - city.tilesAcquired;
+  let want = envoysReceived(cityState) - city.tilesAcquired;
   while (want > 0) {
     const next = pickBorderTile(state, city);
     if (next === null) break; // the border rule's own refusal: nothing free is in reach
