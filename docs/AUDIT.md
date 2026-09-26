@@ -47,7 +47,7 @@ re-adds them.
 | B-94 an improvement's and a wonder's ground | 1 | the generator's ResetTerrain and natural cliffs on wonder plots (BUILD); the ice radius (ASK); `Feature_AdjacentTerrains`' reading, the unpublished multi-plot shapes, a water wonder on a lake (LAB) |
 | B-95 a city centre's strength | 1 | the base's "ever built" and a garrison's health scaling (LAB) |
 | **B. Fidelity vs real Civ 6** | **10** | |
-| C-1 power | 1 | the accident's building and unit rows (LAB) |
+| C-1 power | 2 | the accident's unit rows on the reactor plot (BUILD); the building rows' shape, the CATASTROPHIC band, the unexplained MINOR and ring losses (LAB) |
 | C-2 diplomatic agreements | 1 | the promise's break and the broken-promise operand (LAB) |
 | C-16 the spy's second half | 1 | the counterspy's escape term (LAB) |
 | C-20 the route's transportation efficiency | 1 | how the score becomes the multiplier; the Trader's walk and range against the game's pathfinder (LAB) |
@@ -58,8 +58,8 @@ re-adds them.
 | C-49 named storms | 1 | the step drops against an ocean mask, the resultants' bimodality (LAB) |
 | C-60 the Free City's own play | 1 | bankruptcy's shape, its techs, the grant's type rule, a grant with no free tile, the grants' fate on a fall (LAB) |
 | C-74 the turn's one random event, the residue | 3 | the empty mass, active volcano sites, the flood's start plot, the city-anchored drought (BUILD); Duel's normalisers, the activity clock, `CanBeFlooded`'s gate, `Spacing`, the per-site drift, the fire clock, the meteor's grant, a blizzard on a wonder, a minor's pillaged buildings (LAB) |
-| **C. Absent systems** | **13** | |
-| **OPEN, TOTAL** | **23** | |
+| **C. Absent systems** | **14** | |
+| **OPEN, TOTAL** | **24** | |
 
 ## The question ledger — owner asks
 
@@ -130,11 +130,13 @@ commit.
 
 ## C. Absent systems — the blockers, and the gaps waiting on them
 
-- **C-1. POWER.** Weight 1.
+- **C-1. POWER.** Weight 2.
   The NUCLEAR ACCIDENT ships on both engines as measured (`nuclearAccident` / `_nuclear_accident`, `ACCIDENT_*` in `cpu/data/disasters.ts`): three rows of the turn's one event draw (C-74) at `OccurrencesPerGame` 1, one site per major city whose reactor age (`City.reactorAge` / `city_reactor_age`) has reached the row's `MinTurnAtRisk` 10 / 20 / 30; two draws, the Industrial Zone pillaged at DISTRICT_PILLAGED's 0 / 50 / 100, ONE citizen lost at POPULATION_LOSS's 0 / 0 / 80 (never the last), RADIATION_LEAKED's 2 / 10 / 20 turns of fallout on the Industrial Zone's plot alone; no ring improvement pillaged, the plant kept and ageing. REACHED by `tests/cpu/map/disasters.test.ts` and the `power` poke lane; the serve gate reaches it only past Nuclear Fission.
   - MEASURED, lab 4 (`tools/civ6lab/reactor_fleet.py`, `runs/reactor_20260923T192129Z.jsonl`): 75 forced accidents, 25 per severity: the Industrial Zone pillaged 0/25, 13/25, 25/25; one citizen lost in 22/25 cities at CATASTROPHIC, none at MINOR (the record's seven MINOR losses came after a turn: a socket-set population snapping back, and two turns passing); the fallout on the reactor's own plot, 2 / 10 / 20 turns; no building removed (0/80) and no farm within 3 pillaged (0/40).
   A Free City's reactor keeps ageing and is a site (`ageReactors` / `_age_reactors` from `freeCitiesPhase` / `_free_cities_phase`); a flip carries the reactor's age.
-  - LAB C-1-S1: BUILDING_PILLAGED (MINOR 20, MAJOR 100) — lab 3's InGame read, taken correctly, pillaged the Factory and Power Plant and spared the Workshop at MAJOR, so per building or the plant alone is open (the "`IsPillaged` throws" reading was the `ok and v or "err"` idiom printing a false); and the UNIT_DAMAGE / UNIT_KILLED_CIVILIAN / CITY_GARRISON rows (MAJOR 50, CATASTROPHIC 100, damage 20–50), which neither engine applies.
+  - MEASURED (C-1-S1, `reactor_fleet.py trials --rig reactor_units_rig.lua`, `runs/reactor_reactor_base_20260926T071934Z.jsonl`, 150 forced accidents, 50 per severity over 10 independent loads x 5 reactors; each load burns a different count of game-RNG draws first, since a load replays one random stream): the Power Plant itself is never pillaged (0/150), and `BUILDING_DESTROYED` at CATASTROPHIC destroys nothing — it pillages as the others do. Of the Industrial Zone's other buildings, Workshop / Factory pillaged: MINOR 5 / 3 (never both; 8 of 50 events hit one — the row's 20% as one building per event, or ~8% per building), MAJOR 36 / 18 (45 of 50 events hit one or both), CATASTROPHIC 30 / 12 (the Factory only with the Workshop). Units are struck on the REACTOR'S PLOT only (none at distance 1–3, no ship adjacent, the city's garrison pool untouched): land units damaged at MAJOR 25 / 52 (band 20–49) and CATASTROPHIC 47 / 50 (band 22–93), Builders killed 22 / 50 and 50 / 50 (`UNIT_KILLED_CIVILIAN` 50 / 100). The Industrial Zone pillaged 0 / 31 / 50 of 50; one citizen lost in 39 of 50 at CATASTROPHIC (`POPULATION_LOSS` 80). Fallout covers the reactor's plot alone. The engines ship the district, population and fallout rows and none of the building or unit rows.
+  - BUILD (C-1, both engines): the unit rows on the reactor's plot — `UNIT_DAMAGE_LAND` (MAJOR 50, CATASTROPHIC 100; `MinHP` 20 / `MaxHP` 50) and `UNIT_KILLED_CIVILIAN` (50 / 100), from `RandomEvent_Damages`; the Power Plant spared.
+  - LAB: the building rows' shape (one building per event, or per building; why MAJOR's 100 leaves 5 of 50 events untouched; the Factory only with the Workshop at CATASTROPHIC); the CATASTROPHIC land band reaching 93 (two rows landing, or the fallout); the MINOR record's hits on the reactor plot (5 land units killed, 5 damaged at 50, no unit row at MINOR) and units vanishing at distance 1–3 with no damage (9 / 1 / 5 by severity) — neither is explained.
   A city-state's grid is powered by renewables alone (`minorPower`, `_minor_power`): it holds no stockpile and builds no plant, so no reactor ages there.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 1.
   The promises ship on both engines: the four `DiplomaticActions_XP2` rows (`cpu/data/promises.ts`, `eras.promises`), a ledger per ordered pair (`promiseWith` / `seat_promise`, `promiseBrokenWith` / `seat_promise_broken`), the ask and the answer settled in one turn (`settlePromises` / `_settle_promises`), the incursion (`promiseIncursion` / `_promise_incursion`) called from the offensive spy mission, the city that comes to follow the promiser's religion and the dig worked on the asker's ground, and the War of Retribution's `brokenPromise` reading the window. The plain "settled too near" grievance ships (`grievanceSettledNear` / `_grievance_settled_near`, from `foundCityAt` / `_found_city_at`): every other major owning a plot within 3 of the new centre gains it against the founder. REACHED by `tests/cpu/seats/promises.test.ts`, `grievances.test.ts` and the `promises` poke lane; the serve gate through the driver's `_promise_turn`.

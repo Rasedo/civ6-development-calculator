@@ -3,7 +3,7 @@ severity DOES, measured over many reactors at once.
 
     python tools/civ6lab/reactor_fleet.py --host 127.0.0.3 setup --cities 8
     python tools/civ6lab/reactor_fleet.py --host 127.0.0.3 trials --loads 3
-    python tools/civ6lab/reactor_fleet.py --host 127.0.0.3 trials --save reactor_units --loads 5 --no-later
+    python tools/civ6lab/reactor_fleet.py --host 127.0.0.1 trials --loads 5 --no-later --rig reactor_units_rig.lua --set ZMIL=UNIT_INFANTRY --set ZNAV=UNIT_DESTROYER
 
 `setup` (a fresh human-seat game): found N cities for seat 0 on spaced land
 plots, give each population 12, an Industrial Zone with Workshop, Factory and
@@ -132,8 +132,25 @@ for k = 0, fm:GetReactorCount() - 1 do
         if dd > fallMax then fallMax = dd end
       end
     end
+    -- every unit within 3 of the reactor: id, type, distance, damage
+    local us = {}
+    for q = 0, 63 do
+      local o = Players[q]
+      if o ~= nil and o:IsAlive() then
+        for _, u in o:GetUnits():Members() do
+          local dd = Map.GetPlotDistance(u:GetX(), u:GetY(), rp:GetX(), rp:GetY())
+          if dd <= 3 then
+            us[#us + 1] = "[" .. u:GetID() .. ",\\"" .. GameInfo.Units[u:GetType()].UnitType .. "\\"," .. dd
+              .. "," .. J(pcall(function() return u:GetDamage() end)) .. "," .. q .. "]"
+          end
+        end
+      end
+    end
+    local centre = ds:GetDistrict(GameInfo.Districts["DISTRICT_CITY_CENTER"].Index)
+    local gar = centre and J(pcall(function() return centre:GetDamage(DefenseTypes.DISTRICT_GARRISON) end)) or "null"
     print("{\\"reactor\\":" .. k .. ",\\"city\\":" .. r.CityID .. ",\\"pop\\":" .. c:GetPopulation()
       .. ",\\"izPillaged\\":" .. izPil .. ",\\"buildings\\":{" .. table.concat(bs, ",") .. "}"
+      .. ",\\"units\\":[" .. table.concat(us, ",") .. "],\\"garrisonDamage\\":" .. gar
       .. ",\\"improvements\\":" .. imps .. ",\\"impPillaged\\":" .. pils
       .. ",\\"falloutPlots\\":" .. fall .. ",\\"falloutMaxDist\\":" .. fallMax
       .. ",\\"falloutAtReactor\\":" .. fm:GetFalloutTurnsRemaining(r.PlotIndex) .. "}")
@@ -238,7 +255,20 @@ def cmd_trials(a) -> int:
                 t = Tuner(a.host).connect()
                 lp = lab.local_player(t)
                 turn = lab.turn(t)
+                if a.rig:
+                    # the rig is placed on the loaded game itself: a saved
+                    # rig does not survive the load (the units move)
+                    lua = (HERE / a.rig).read_text(encoding="utf-8")
+                    for kv in a.set:
+                        k, v = kv.split("=", 1)
+                        lua = lua.replace(k, v)
+                    placed = [x for x in t.run(GC, lua, timeout=60) if '"ok":true' in x]
+                    print(f"    rig: {len(placed)} placed", flush=True)
                 before = snap(t)
+                # a load replays the same random stream, so every load of one
+                # save repeats one outcome: burn a load-dependent number of
+                # draws off the shared game RNG first
+                t.run(GC, f"for i = 1, {n * 97} do TerrainBuilder.GetRandomNumber(100, 'lab burn') end")
                 print(f"load {n} {sev.split('_')[-1]}:", t.run(GC, LUA_FIRE.replace("ZEVENT", sev))[-1], flush=True)
                 now = snap(t)
                 later = {}
@@ -264,6 +294,8 @@ def main(argv=None) -> int:
     s = sub.add_parser("trials")
     s.add_argument("--loads", type=int, default=3)
     s.add_argument("--save", default="reactor_base", help="the named save each trial loads")
+    s.add_argument("--rig", help="a GameCore Lua placed after each load, before the first snapshot")
+    s.add_argument("--set", action="append", default=[], metavar="TOKEN=VALUE", help="token for the rig")
     s.add_argument("--no-later", dest="later", action="store_false",
                    help="read only before and right after the accident; pass no turn")
     s.set_defaults(fn=cmd_trials)
