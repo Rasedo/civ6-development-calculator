@@ -2815,6 +2815,26 @@
           ]
         },
         {
+          "name": "fertilitySci",
+          "compare": "exact",
+          "covers": [
+            "Tile.fertilitySci"
+          ],
+          "planes": [
+            "fertility_sci"
+          ]
+        },
+        {
+          "name": "fertilityCul",
+          "compare": "exact",
+          "covers": [
+            "Tile.fertilityCul"
+          ],
+          "planes": [
+            "fertility_cul"
+          ]
+        },
+        {
           "name": "droughtTurns",
           "compare": "exact",
           "covers": [
@@ -3137,6 +3157,10 @@
       {
         "path": "Tile.volcano",
         "why": "world geometry, fixed at build."
+      },
+      {
+        "path": "Tile.volcanoActive",
+        "why": "a derived MAP fact, drawn once per volcano by `deriveVolcanoActivity` when the game is made from the map; the exporter ships the active volcanoes (`activeVolcanoes`) and nothing in play changes them."
       },
       {
         "path": "CityState.name",

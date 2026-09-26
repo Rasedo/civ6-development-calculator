@@ -3,8 +3,11 @@ import type { City, GameState, Tile } from './types';
 import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
-import { neighborTile, neighbors, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
+import { neighborTile, neighbors, offsetToAxial, axialToOffset, tileAt, tilesWithin, hexDistance } from '../../world/hex';
 import { isWater } from '../../world/query';
+import { TERRAINS } from '../../world/terrains';
+import { RESOURCES } from '../../world/resources';
+import { mulberry32, deriveSeed } from '../../world/rng';
 import { nextRandom } from './rand';
 import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders, campTiles } from './seats';
 import { raiseAidRequest } from './competition';
@@ -21,10 +24,11 @@ import { disbandUnit } from './units';
 import { unitDomain } from './units';
 import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn, FLOOD_BLDG_P, warmedWeight, RANDOM_EVENT_START_TURN } from '../data/disasters';
 import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_DURATION, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtCandidate, SOIL_REPLACES } from '../data/disasters';
-import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER } from '../data/disasters';
+import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
+import { EVENT_NORM_PER_MAP, EVENT_NORM_PER_SITE, PERCENT_VOLCANOES_ACTIVE, DROUGHT_DISTANCE_WEIGHTS } from '../data/disasters';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
-import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P } from '../data/disasters';
+import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
 import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
 import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
@@ -169,8 +173,9 @@ function strikeUnits(state: GameState, tile: Tile, owner: number, s: UnitStrike,
 /** May an eruption paint Volcanic Soil on this ring plot? Land that is not a
  *  Mountain and not drowned, carrying no district (a city centre is one) and
  *  no wonder, and either bare or under a feature the soil replaces (Woods,
- *  Rainforest). Floodplains, a Geothermal Fissure, a natural wonder and soil
- *  already there are not candidates. `_soil_paintable` is the twin. */
+ *  Rainforest, Marsh). Floodplains, a Geothermal Fissure, an Oasis, a natural
+ *  wonder and soil already there are not candidates. `_soil_paintable` is the
+ *  twin. */
 export function soilPaintable(t: Tile): boolean {
   if (isWater(t) || t.submerged || t.elevation === 'MOUNTAIN') return false;
   if (t.district || t.builtWonder) return false;
@@ -260,31 +265,69 @@ export function floodSeverity(state: GameState): number {
 }
 
 /**
- * The FLOOD SITES: one per river carrying Floodplains, named by its
- * lowest-index Floodplains tile, and one per Floodplains tile no river
- * touches — the plots a flood can start from, in ascending tile order. The
- * river walk is `riverReach`'s.
+ * The FLOOD SITES: one per river carrying Floodplains and one per Floodplains
+ * plot no river touches, in the order of each one's lowest-index Floodplains
+ * plot (the river walk is `riverReach`'s). A site is the plot its flood
+ * STARTS on (`floodStart`). Static: rivers, Floodplains and the map's water
+ * as made never move, so the exporter ships the list (`floodStarts`).
  */
 export function floodSites(map: GameMap): Tile[] {
   const seen = new Uint8Array(map.tiles.length);
   const out: Tile[] = [];
   for (const t of map.tiles) {
     if (t.feature !== 'FLOODPLAINS' || seen[t.index]) continue;
-    out.push(t);
     seen[t.index] = 1;
-    const stack = [t];
-    while (stack.length) {
-      const u = stack.pop()!;
+    const river = [t];
+    for (let i = 0; i < river.length; i++) {
+      const u = river[i];
       for (let d = 0; d < 6; d++) {
         if (!(u.riverMask & (1 << d))) continue;
         const n = neighborTile(map, u, d);
         if (!n || seen[n.index]) continue;
         seen[n.index] = 1;
-        stack.push(n);
+        river.push(n);
       }
     }
+    out.push(floodStart(map, river));
   }
   return out;
+}
+
+/**
+ * The plot a river's flood starts on — MEASURED (C-74-S1, 447 of 447 floods):
+ * the FIRST plot of the river's floodplain list. This map's river model keeps
+ * no flow direction, so the first plot is read as the river's UPSTREAM-MOST
+ * Floodplains plot: the one farthest, in steps across river edges, from the
+ * river's plots that touch the map's water as made (its mouth), ties to the
+ * lowest index. A river touching no water, and a lone Floodplains plot, start
+ * on their lowest-index Floodplains plot.
+ */
+function floodStart(map: GameMap, river: readonly Tile[]): Tile {
+  const dist = new Map<number, number>();
+  const queue = river.filter((u) => neighbors(map, u).some((n) => TERRAINS[n.terrain].water))
+    .sort((a, b) => a.index - b.index);
+  for (const u of queue) dist.set(u.index, 0);
+  for (let i = 0; i < queue.length; i++) {
+    const u = queue[i];
+    for (let d = 0; d < 6; d++) {
+      if (!(u.riverMask & (1 << d))) continue;
+      const n = neighborTile(map, u, d);
+      if (!n || dist.has(n.index)) continue;
+      dist.set(n.index, dist.get(u.index)! + 1);
+      queue.push(n);
+    }
+  }
+  let best: Tile | null = null;
+  let far = -1;
+  for (const u of [...river].sort((a, b) => a.index - b.index)) {
+    if (u.feature !== 'FLOODPLAINS') continue;
+    const du = dist.get(u.index) ?? 0;
+    if (du > far) {
+      best = u;
+      far = du;
+    }
+  }
+  return best!;
 }
 
 export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
@@ -429,18 +472,83 @@ function fireCandidate(t: Tile, row: number): boolean {
   return t.feature === FIRE_START_FEATURE[row] && !t.submerged;
 }
 
+/** A city a drought may anchor on: its centre and, by distance from it (the
+ *  `DROUGHT_DISTANCE_WEIGHTS` index), the plots within reach a drought may
+ *  start on, each list in ascending tile order. */
+interface DroughtSite {
+  centre: Tile;
+  byDist: Tile[][];
+}
+
+/** Every city — a major's, a Free City's, a city-state's — holding a plot a
+ *  drought may start on within reach of its centre, in ascending centre
+ *  order. `_drought_sites` is the twin. */
+function droughtSites(state: GameState): DroughtSite[] {
+  const map = state.map;
+  const reach = DROUGHT_DISTANCE_WEIGHTS.length - 1;
+  const centres: number[] = [];
+  for (const s of cityHolders(state)) for (const c of s.cities) centres.push(c.centerIndex);
+  for (const cs of state.cityStates) centres.push(cs.centerIndex);
+  centres.sort((a, b) => a - b);
+  const out: DroughtSite[] = [];
+  for (const i of centres) {
+    const c = map.tiles[i];
+    const byDist: Tile[][] = DROUGHT_DISTANCE_WEIGHTS.map(() => []);
+    for (const t of tilesWithin(map, c.col, c.row, reach).sort((a, b) => a.index - b.index)) {
+      if (droughtCandidate(t)) byDist[hexDistance(c.col, c.row, t.col, t.row)].push(t);
+    }
+    if (byDist.some((l) => l.length > 0)) out.push({ centre: c, byDist });
+  }
+  return out;
+}
+
+/**
+ * A drought's start plot — MEASURED (C-74-S1): within reach of a city centre.
+ * THREE draws: the city, uniformly over `sites`; the distance, by
+ * `DROUGHT_DISTANCE_WEIGHTS` over the distances where that city holds a
+ * start plot; the plot, uniformly over its plots at that distance.
+ */
+function droughtStart(state: GameState, sites: DroughtSite[]): Tile | undefined {
+  const site = pick(state, sites);
+  if (!site) return undefined;
+  let total = 0;
+  for (let d = 0; d < site.byDist.length; d++) if (site.byDist[d].length) total += DROUGHT_DISTANCE_WEIGHTS[d];
+  const at = nextRandom(state) * total;
+  let cum = 0;
+  let dist = 0;
+  for (let d = 0; d < site.byDist.length; d++) {
+    if (!site.byDist[d].length) continue;
+    dist = d;
+    cum += DROUGHT_DISTANCE_WEIGHTS[d];
+    if (at < cum) break;
+  }
+  return pick(state, site.byDist[dist]);
+}
+
+/** CIV6 (`RealismSettings.PercentVolcanoesActive`): each volcano of the map
+ *  is ACTIVE at the setting's percent, drawn once when the game is made from
+ *  the map, one draw per volcano in ascending tile order on the game's own
+ *  derived stream (not the turn stream). */
+export function deriveVolcanoActivity(map: GameMap, rngInit: number): void {
+  const rng = mulberry32(deriveSeed(rngInit, 'volcanoActive'));
+  for (const t of map.tiles) {
+    if (t.volcano) t.volcanoActive = rng() * 100 < PERCENT_VOLCANOES_ACTIVE;
+  }
+}
+
 /** The sites every row can strike this turn. A storm, a drought, the meteor
  *  and a fire is ONE site when its start plot exists anywhere (the plot is
- *  drawn after); a flood has one per river (`floodSites`), a volcano's
- *  eruption one per volcano, a natural wonder's one while the wonder stands
- *  (its plots together), an accident one per city whose reactor has reached
- *  the row's `MinTurnAtRisk` — whoever holds it, the Free Cities seat
- *  included — in ascending centre order. */
+ *  drawn after; a drought's needs a city, `droughtSites`); a flood has one
+ *  per river (`floodSites`), a volcano's eruption one per ACTIVE volcano, a
+ *  natural wonder's one while the wonder stands (its plots together), an
+ *  accident one per city whose reactor has reached the row's
+ *  `MinTurnAtRisk` — whoever holds it, the Free Cities seat included — in
+ *  ascending centre order. */
 interface EventSites {
   flood: Tile[];
   eruption: Tile[][][];  // per ERUPTION_ROWS row, its sites, each a site's plots
   storm: Tile[][];      // per family, the live start plots
-  drought: Tile[];
+  drought: DroughtSite[];
   accident: ReactorSite[][];  // per severity
   meteor: Tile[];
   fire: Tile[][];       // per fire row, its live start plots
@@ -455,7 +563,7 @@ function eventSites(state: GameState): EventSites {
     }
   }
   reactors.sort((a, b) => a.city.centerIndex - b.city.centerIndex);
-  const volcanoes = map.tiles.filter((t) => t.volcano).map((t) => [t]);
+  const volcanoes = map.tiles.filter((t) => t.volcano && t.volcanoActive).map((t) => [t]);
   const camps = campTiles(state);
   return {
     flood: floodSites(map),
@@ -465,7 +573,7 @@ function eventSites(state: GameState): EventSites {
       return plots.length ? [plots] : [];
     }),
     storm: STORM_FAMILIES.map((f) => map.tiles.filter((t) => stormFamilyAt(t) === f)),
-    drought: map.tiles.filter((t) => droughtCandidate(t)),
+    drought: droughtSites(state),
     accident: ACCIDENT_MIN_TURN.map((gate) => reactors.filter((r) => (r.city.reactorAge ?? 0) >= gate)),
     meteor: map.tiles.filter((t) => meteorCandidate(t, camps)),
     fire: FIRE_START_FEATURE.map((_f, row) => map.tiles.filter((t) => fireCandidate(t, row))),
@@ -484,31 +592,49 @@ function siteCount(sites: EventSites, row: EventRow): number {
   }
 }
 
+/** A row's normaliser (`EVENT_NORM_*`): a row counted per site divides by
+ *  the per-site reading, a row counted once per map by the per-map one. */
+function eventNorm(family: EventFamily): number {
+  switch (family) {
+    case 'flood':
+    case 'eruption':
+    case 'accident':
+      return EVENT_NORM_PER_SITE;
+    case 'storm':
+    case 'drought':
+    case 'meteor':
+    case 'fire':
+      return EVENT_NORM_PER_MAP;
+  }
+}
+
 /**
- * THE TURN'S ONE RANDOM EVENT — MEASURED (lab 4, a natural 251-turn game):
- * the game fires at most one event a turn, drawn over the eligible (row,
- * site) pairs with each row's `OccurrencesPerGame` as the pair's weight.
- * ONE draw `x = r * total` walks the rows in table order: the row whose
- * cumulative weight first exceeds `x` fires, at site
- * `floor((x - weight before it) / row weight)`. Nothing eligible, nothing
- * fires; the draw is spent every turn either way. The storm's, the drought's,
- * the meteor's and the fire's plot is a second draw over their start plots.
+ * THE TURN'S ONE RANDOM EVENT — MEASURED (C-74-S1): the game fires at most
+ * one event a turn. Each eligible (row, site) pair fires with the absolute
+ * chance p = weight / N (`eventNorm`), the turn is EMPTY with what is left,
+ * and when the chances sum past 1 they are scaled to sum to 1. ONE draw
+ * `x = r * max(1, total)` walks the rows in table order: the row whose
+ * cumulative chance first exceeds `x` fires, at site `floor((x - chance
+ * before it) / p)`; past the last, nothing fires. The draw is spent every
+ * turn. The storm's, the meteor's and the fire's plot is a second draw over
+ * their start plots, the drought's three more (`droughtStart`).
  */
 function randomEvent(state: GameState, strip: boolean): void {
   const rows = eventRows(warmingDegrees(state));
   const sites = eventSites(state);
   const count = rows.map((row) => siteCount(sites, row));
+  const per = rows.map((row) => row.weight / eventNorm(row.family));
   const cum: number[] = [];
   let total = 0;
   for (let i = 0; i < rows.length; i++) {
-    total += rows[i].weight * count[i];
+    total += per[i] * count[i];
     cum.push(total);
   }
-  const at = nextRandom(state) * total;
+  const at = nextRandom(state) * Math.max(1, total);
   for (let i = 0; i < rows.length; i++) {
-    if (count[i] <= 0 || rows[i].weight <= 0 || at >= cum[i]) continue;
+    if (count[i] <= 0 || per[i] <= 0 || at >= cum[i]) continue;
     const before = i > 0 ? cum[i - 1] : 0;
-    const k = Math.max(0, Math.min(count[i] - 1, Math.floor((at - before) / rows[i].weight)));
+    const k = Math.max(0, Math.min(count[i] - 1, Math.floor((at - before) / per[i])));
     fireEvent(state, rows[i], sites, k, strip);
     return;
   }
@@ -537,7 +663,7 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
       return;
     }
     case 'drought': {
-      const center = pick(state, sites.drought);
+      const center = droughtStart(state, sites.drought);
       if (!center) return;
       drought(state, center, row.sev, strip);
       return;
@@ -683,18 +809,36 @@ export function eruptionRing(map: GameMap, plots: readonly Tile[]): Tile[] {
   return out;
 }
 
+/** +1 of a silt channel on a land, non-mountain plot, capped — while the
+ *  climate still lays fertility down. */
+function silt(state: GameState, tile: Tile, key: 'fertilityProd' | 'fertilitySci' | 'fertilityCul'): void {
+  if (!fertilityLive(state) || isWater(tile) || tile.elevation === 'MOUNTAIN') return;
+  tile[key] = Math.min(FERTILITY_CAP, (tile[key] ?? 0) + 1);
+}
+
 /**
  * AN ERUPTION of a volcano or of a natural wonder (`plots`, its plots), at
  * `ERUPTION_ROWS` row `row`. CIV6 (`RandomEvent_Yields` FEATURE_VOLCANIC_SOIL,
- * `ReplaceFeature`): one draw per eligible ring plot, in ring order, at the
- * row's paint chance; then each ring plot, in ring order, takes the row's
+ * `ReplaceFeature`): FOUR draws per eligible ring plot, in ring order — the
+ * paint at the row's YIELD_FOOD chance, then its YIELD_PRODUCTION,
+ * YIELD_SCIENCE and YIELD_CULTURE chances, each +1 of that yield on a plot
+ * the draw painted; then each ring plot, in ring order, takes the row's
  * damage (`eruptTile`) and is fertilized.
  */
 export function erupt(state: GameState, plots: readonly Tile[], row: number): void {
   const ring = eruptionRing(state.map, plots);
   const volcano = plots[0];
   for (const n of ring) {
-    if (soilPaintable(n) && nextRandom(state) < ERUPTION_PAINT_P[row]) paintVolcanicSoil(n);
+    if (!soilPaintable(n)) continue;
+    const rPaint = nextRandom(state);
+    const rProd = nextRandom(state);
+    const rSci = nextRandom(state);
+    const rCul = nextRandom(state);
+    if (rPaint >= ERUPTION_PAINT_P[row]) continue;
+    paintVolcanicSoil(n);
+    if (rProd < ERUPTION_PROD_P[row]) silt(state, n, 'fertilityProd');
+    if (rSci < ERUPTION_SCI_P[row]) silt(state, n, 'fertilitySci');
+    if (rCul < ERUPTION_CUL_P[row]) silt(state, n, 'fertilityCul');
   }
   for (const n of ring) {
     eruptTile(state, n, row);
@@ -704,14 +848,16 @@ export function erupt(state: GameState, plots: readonly Tile[], row: number): vo
 }
 
 /**
- * ONE eruption's damage on one ring plot — the row's `RandomEvent_Damages`
- * applied as the flood's are, on every plot of the ring whoever owns it.
- * SIX draws per plot, always, whatever stands there: improvement destroyed,
- * district pillaged, buildings pillaged, the HP band, civilian killed,
- * population. The improvement is pillaged outright (IMPROVEMENT_PILLAGED 100
- * on every row); the land units and a city centre take the band
- * (UNIT_DAMAGE_LAND, CITY_GARRISON, CITY_WALLS, Percentage 100); no row names
- * UNIT_DAMAGE_NAVAL, so a hull on a water plot is untouched.
+ * ONE eruption's damage on one ring plot — MEASURED (C-41-S1): the row's
+ * `RandomEvent_Damages` land on an OWNED plot only, applied as the flood's
+ * are; every BONUS resource on a land plot of the ring is lost whoever owns
+ * it (strategic and luxury stay). SIX draws per plot, always, whatever
+ * stands there or whoever owns it: improvement destroyed, district pillaged,
+ * buildings pillaged, the HP band, civilian killed, population. The
+ * improvement is pillaged outright (IMPROVEMENT_PILLAGED 100 on every row);
+ * the land units and a city centre take the band (UNIT_DAMAGE_LAND,
+ * CITY_GARRISON, CITY_WALLS, Percentage 100); no row names UNIT_DAMAGE_NAVAL,
+ * so a hull on a water plot is untouched.
  */
 function eruptTile(state: GameState, tile: Tile, row: number): void {
   const rDestroy = nextRandom(state);
@@ -720,6 +866,8 @@ function eruptTile(state: GameState, tile: Tile, row: number): void {
   const rDamage = nextRandom(state);
   const rCivilian = nextRandom(state);
   const rPop = nextRandom(state);
+  if (tile.resource && !isWater(tile) && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+  if (tileSeat(tile) < 0) return;
   scorch(state, tile);
   if (rDestroy < ERUPTION_DESTROY_P[row]) destroyImprovement(state, tile);
   if (rDistrict < ERUPTION_DISTRICT_P[row]) pillageDistrict(state, tile);
@@ -748,21 +896,34 @@ export function ageReactors(cities: readonly City[]): void {
 }
 
 /**
- * A NUCLEAR ACCIDENT at one severity, in one city — MEASURED over 75 forced
- * accidents. TWO draws, always: the Industrial Zone is pillaged at the row's
- * district chance, and ONE citizen is lost at its population chance (never
- * the last). Fallout lies on the reactor's own plot, the Industrial Zone, for
- * the row's turns. No building is destroyed, no ring improvement pillaged,
- * and the plant stays, ageing on.
+ * A NUCLEAR ACCIDENT at one severity, in one city — MEASURED over 225 forced
+ * accidents. FIVE draws, always: the Industrial Zone is pillaged at the
+ * row's district chance, ONE citizen is lost at its population chance (never
+ * the last), and the units on the reactor's own plot take the row's
+ * UNIT_DAMAGE_LAND share and band and its UNIT_KILLED_CIVILIAN chance
+ * (`strikeUnits`, one roll per plot as every event reads them). Fallout lies
+ * on that plot, the Industrial Zone, for the row's turns. No building is
+ * destroyed, no ring improvement pillaged, no unit off the plot struck, and
+ * the plant is never pillaged: it stays, ageing on.
  */
 export function nuclearAccident(state: GameState, seat: number, city: City, sev: number): void {
   const rDistrict = nextRandom(state);
   const rPop = nextRandom(state);
+  const rLand = nextRandom(state);
+  const rCivilian = nextRandom(state);
+  const rHp = nextRandom(state);
   const iz = city.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
   if (iz) {
     const t = state.map.tiles[iz.tileIndex];
     t.falloutTurns = Math.max(t.falloutTurns ?? 0, ACCIDENT_FALLOUT[sev]);
     if (rDistrict < ACCIDENT_DISTRICT_P[sev]) pillageDistrict(state, t);
+    strikeUnits(state, t, tileSeat(t), {
+      land: rLand < ACCIDENT_LAND_P[sev],
+      naval: false,
+      civ: rCivilian < ACCIDENT_CIV_KILL_P[sev],
+      landDmg: ACCIDENT_DMG_LO[sev] + Math.floor(rHp * (ACCIDENT_DMG_HI[sev] - ACCIDENT_DMG_LO[sev] + 1)),
+      navalDmg: 0,
+    }, null);
   }
   if (rPop < ACCIDENT_POP_P[sev] && city.population > 1) {
     city.population -= 1;

@@ -119,6 +119,7 @@ describe('Reinforced Materials', () => {
     const volcano = tileAtCoords(state.map, 8, 8);
     volcano.elevation = 'MOUNTAIN';
     volcano.volcano = true;
+    volcano.volcanoActive = true;
     const slope = tileAtCoords(state.map, 9, 8);
     slope.improvement = 'FARM';
     setTileOwner(slope, 0, city.id);
@@ -130,16 +131,21 @@ describe('Reinforced Materials', () => {
     const { state, slope } = volcanoWorld(false);
     let guard = 0;
     // pillaged on every row; a CATASTROPHIC or MEGACOLOSSAL one may take it away
-    while (!slope.pillaged && slope.improvement !== null && guard++ < 600) disasterPhase(state);
+    while (!slope.pillaged && slope.improvement !== null && guard++ < 3000) disasterPhase(state);
     expect(slope.pillaged || slope.improvement === null).toBe(true);
   });
 
   it('...and leaves the governed city\'s improvement alone', () => {
     const { state, slope } = volcanoWorld(true);
-    for (let i = 0; i < 600; i++) disasterPhase(state);
+    let eruptions = 0;
+    for (let i = 0; i < 3000; i++) {
+      state.eventLog = [];
+      disasterPhase(state);
+      if (state.eventLog.some((e) => e.includes('eruption'))) eruptions += 1;
+    }
     expect(slope.improvement).toBe('FARM');
     expect(slope.pillaged).toBe(false);
-    expect(state.eventLog.some((e) => e.includes('eruption'))).toBe(true);
+    expect(eruptions).toBeGreaterThan(0);
   });
 
   it('a flood pillages no district the promotion covers', () => {

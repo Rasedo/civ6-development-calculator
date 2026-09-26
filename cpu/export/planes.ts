@@ -23,6 +23,7 @@ import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, i
 import { neighbors } from '../../world/hex';
 import { UNITS } from '../data/units';
 import { stormFamilyAt, STORM_FAMILIES, droughtTerrain } from '../data/disasters';
+import { floodSites } from '../core/disasters';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -317,6 +318,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     return { ...rec, nr };
   });
   const volcanoes = map.tiles.filter((t) => t.volcano).map((t) => t.index);
+  // the volcanoes that may erupt, stamped when the game was made from the
+  // map (`deriveVolcanoActivity`)
+  const activeVolcanoes = map.tiles.filter((t) => t.volcano && t.volcanoActive).map((t) => t.index);
   const landTiles = map.tiles.filter((t) => !isWater(t)).length;
   const maxCamps = Math.max(1, Math.floor(landTiles / 120));
 
@@ -334,6 +338,10 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     fogOfWar: 1, // fog is LIVE in units mode — both engines derive t0 explored from the start units
     disasters: 1,
     volcanoes,
+    activeVolcanoes,
+    // the flood sites, each the plot its flood starts on, in draw order —
+    // static, so the TS rule's own answer ships (`floodSites`)
+    floodStarts: floodSites(map).map((t) => t.index),
     maxCamps,
     rngInit: world.rngInit >>> 0,
     // `cityStateMax` is a genuine MAX — placement drops a city-state it

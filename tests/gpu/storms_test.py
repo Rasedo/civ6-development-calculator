@@ -312,15 +312,17 @@ def main() -> int:
     end3 = int(sim9._storm_walk(torch.tensor([False]), torch.tensor([sea]), torch.tensor([CAT4_]))[0])
     assert end3 == sea and int(sim9.rng_state[0]) == s0
     print("  9 walk OK — eight draws per walk, the record travels, the ocean and other storms bound it")
-    # -- 10: THE TURN'S ONE RANDOM EVENT — MEASURED (lab 4): at most one event
-    # a turn, drawn over the eligible (row, site) pairs with each row's
-    # OccurrencesPerGame as the pair's weight. A flood weighs once per river,
-    # an eruption once per volcano (Kilimanjaro once per its plot), a storm
-    # or a drought once when its terrain exists. Each family's firing is
-    # counted here with its effect taken out, so the shares read the draw
-    # alone.
+    # -- 10: THE TURN'S ONE RANDOM EVENT — MEASURED (C-74-S1): at most one
+    # event a turn; each eligible (row, site) pair fires with the absolute
+    # chance OccurrencesPerGame / N (240 for a per-site row, 250 for a
+    # once-per-map one), the rest of the turn is empty. A flood counts once
+    # per river, an eruption once per ACTIVE volcano (a wonder once while it
+    # stands), a storm once when its terrain exists, a drought once while a
+    # city holds a start plot. Each family's firing is counted here with its
+    # effect taken out, so the shares read the draw alone.
     sim10 = fresh(rules)
-    fired = {"flood": 0, "volcano": 0, "storm": 0, "drought": 0, "accident": 0, "meteor": 0, "fire": 0}
+    fired = {"flood": 0, "volcano": 0, "storm": 0, "drought": 0, "accident": 0, "meteor": 0, "fire": 0,
+             "empty": 0}
     turn = {}
     sim10._flood_river = lambda hit, tile, sev: turn.__setitem__("flood", bool(hit[0]))
     sim10._erupt = lambda hit, ring, sev: turn.__setitem__("volcano", bool(hit[0]))
@@ -340,32 +342,40 @@ def main() -> int:
         turn["drought"] = bool((sim10.drought[0] > 0).any())
         turn["meteor"] = bool(sim10.tile_meteor[0].any())
         n_fired = sum(1 for v in turn.values() if v)
-        assert n_fired == 1, f"the turn fired {n_fired} events: {turn}"
-        # the event draw, then the storm's, the drought's, the meteor's or the
-        # fire's plot pick, and one draw per land plot of the drought's
-        # footprint
+        assert n_fired <= 1, f"the turn fired {n_fired} events: {turn}"
+        # the event draw, then the storm's, the meteor's or the fire's plot
+        # pick, or the drought's city, distance and plot and one draw per land
+        # plot of its footprint
         spent = draws(s0, int(sim10.rng_state[0]))
         dry = int((sim10.drought[0] > 0).sum())
         picks = turn.get("storm") or turn.get("meteor") or turn.get("fire")
-        assert spent == (2 if picks else 2 + dry if turn["drought"] else 1), (spent, turn)
+        assert spent == (2 if picks else 4 + dry if turn["drought"] else 1), (spent, turn)
         for k, v in turn.items():
             fired[k] += int(v)
+        fired["empty"] += int(n_fired == 0)
     del sim10._flood_river, sim10._erupt, sim10._nuclear_accident, sim10._ignite
     fams = {int(f) for f in range(len(sim10._storm_lists)) if int(sim10._storm_lists[f][1][0]) > 0}
+    site, per_map = sim10._event_norm_site, sim10._event_norm_map
+    assert (site, per_map) == (240.0, 250.0)
+    volcano = 0.0
+    for r, w_r in enumerate(sim10._eruption_weight):
+        n = int(sim10._volc_n[0]) if sim10._er_on_volcano[r] else int(sim10._wonder_plots(sim10._er_wonder_fid[r])[0].any())
+        volcano += w_r * n / site
     w = {
-        "flood": 4.5 * int(sim10._flood_sites[1][0]),
-        "volcano": 8.0 * int(sim10._volc_n[0]) + 6.5 * int(((sim10.feat_id[0] == sim10._er_wonder_fid[2])
-                                                          & ~sim10.feat_stripped[0]).any()),
-        "storm": sum(sim10._st_weight[e] for e in range(8) if sim10._st_family[e] in fams),
-        "drought": 28.0 if bool(sim10._drought_cands()[0].any()) else 0.0,
+        "flood": 4.5 * int(sim10._flood_sites[1][0]) / site,
+        "volcano": volcano,
+        "storm": sum(sim10._st_weight[e] for e in range(8) if sim10._st_family[e] in fams) / per_map,
+        "drought": 28.0 / per_map if bool(sim10._drought_sites(sim10._drought_cands())[0].any()) else 0.0,
         "accident": 0.0,
-        "meteor": 6.0 if bool(sim10._meteor_cands()[0].any()) else 0.0,
-        "fire": sum(6.0 for s in range(2) if bool(sim10._fire_cands(s)[0].any())),
+        "meteor": 6.0 / per_map if bool(sim10._meteor_cands()[0].any()) else 0.0,
+        "fire": sum(6.0 / per_map for s in range(2) if bool(sim10._fire_cands(s)[0].any())),
     }
     total = sum(w.values())
+    w["empty"] = max(0.0, 1.0 - total)
+    scale = max(1.0, total)
     for k in fired:
-        assert abs(fired[k] / N - w[k] / total) < 0.03, f"{k}: {fired[k]}/{N} against {w[k]}/{total}"
-    print(f"  10 one event a turn OK — {fired} over {N} turns against weights {w}")
+        assert abs(fired[k] / N - w[k] / scale) < 0.02, f"{k}: {fired[k]}/{N} against {w[k]}/{scale}"
+    print(f"  10 one event a turn OK — {fired} over {N} turns against chances {w}")
 
     # 11 — RANDOM_EVENT_START_TURN: on turn 1 the phase fires nothing and
     # spends no draw; on the start turn it draws
@@ -467,6 +477,36 @@ def main() -> int:
     s._eff_version += 1
     assert float(s._eff_food()[0, t]) == wet, "a Stepwell's city keeps its food"
     print(f"  12 drought OK — featureless start, pillage and destroy, the bar, the shield")
+
+    # 13 — THE DROUGHT'S ANCHOR (`droughtStart`, MEASURED C-74-S1): a city
+    # centre holding a start plot within 3 is a site; the start is three
+    # draws — the city, the distance by the measured mix, the plot — and
+    # lands within 3 of a site's centre
+    s13 = fresh(rules)
+    assert s13._drought_dist_w == [11, 41, 46, 26]
+    cand = s13._drought_cands()
+    sites = s13._drought_sites(cand)
+    centres = sites[0].nonzero().flatten().tolist()
+    assert centres, "the fixture's cities hold no drought start in reach"
+    for c in s13._centre_plane()[0].nonzero().flatten().tolist():
+        near = bool((cand[0] & (s13.pair_dist[c] <= 3)).any())
+        assert (c in centres) == near, f"centre {c}: a site iff a start plot lies within 3"
+    one = torch.tensor([True])
+    by_d = [0, 0, 0, 0]
+    N13 = 2000
+    for _ in range(N13):
+        s0 = int(s13.rng_state[0])
+        got, tile = s13._drought_start(one, sites, cand)
+        assert bool(got[0]) and draws(s0, int(s13.rng_state[0])) == 3, "three draws: city, distance, plot"
+        t = int(tile[0])
+        assert bool(cand[0, t]), "the start is a drought candidate"
+        d = min(int(s13.pair_dist[c, t]) for c in centres)
+        assert d <= 3, f"start {t} lies {d} from every site's centre"
+        by_d[d] += 1
+    assert all(n > 0 for n in by_d), f"a distance never drawn: {by_d}"
+    none = s13._drought_start(torch.tensor([False]), sites, cand)
+    assert not bool(none[0][0])
+    print(f"  13 drought anchor OK — {len(centres)} city sites, starts by distance {by_d} over {N13}")
     print("BATTERY OK storms")
     return 0
 

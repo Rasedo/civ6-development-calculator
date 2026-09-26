@@ -865,7 +865,8 @@ _MUTABLE = [
     # for good, so the t0 feature bakes it zeroes are state (`_paint_soil`).
     "appeal_base", "appeal_feat", "feat_removable", "tile_ftu", "_feat_adj", "_nfeat_adj",
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
-    "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
+    "fertility", "fertility_prod", "fertility_sci", "fertility_cul",
+    "tile_locked", "drought", "improvement", "pillaged", "district",
     "storm_event", "storm_left",  # the STORM centred on a tile and the turns it has left
     "fire_start",  # the turn a plot's FIRE began, -1 none
     "tile_meteor",  # METEOR SITES: laid by the draw, taken by the first unit in

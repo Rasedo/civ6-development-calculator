@@ -91,11 +91,10 @@ describe('the Meteor Shower', () => {
     expect(meteorCandidate(state.map.tiles[0], none)).toBe(false);
   });
 
-  it('is ONE site at weight 6 however many plots it may strike, and leaves one Meteor Site', () => {
-    // the island's seven plots are its only sites; a tornado and a drought
-    // pair start there too: 6 against 6 + 18 + 28 = 52
+  it('is ONE site at 6 / 250 a turn however many plots it may strike, and leaves one Meteor Site', () => {
+    // the island's seven plots are its only sites, counted once
     const { state, plots } = island();
-    const N = 4000;
+    const N = 8000;
     let meteors = 0;
     for (let i = 0; i < N; i++) {
       for (const t of plots) t.meteor = false;
@@ -106,8 +105,8 @@ describe('the Meteor Shower', () => {
       meteors++;
       expect(plots.filter((t) => t.meteor).length).toBe(1);
     }
-    expect(Math.abs(meteors / N - 6 / 52)).toBeLessThan(0.015);
-  });
+    expect(Math.abs(meteors / N - 6 / 250)).toBeLessThan(0.006);
+  }, 60000);
 
   it('grants the Heavy Cavalry one past the seat\'s research in its nearest city, burning no fuel', () => {
     const state = makeState(makeMap(16, 16));
@@ -281,15 +280,14 @@ describe('the fires', () => {
     expect(canPlaceDistrictIn(state, city, 'CAMPUS', plot.index, { unlocks: null, ownsTile: () => true }).ok).toBe(true);
   });
 
-  it('starts on a live Woods or Rainforest plot, each row ONE site at 6', () => {
-    // one Woods plot and one Rainforest plot on a sea: 6 + 6 against the
-    // tornadoes 18, the droughts 28 (the bare island) and the meteor 6
+  it('starts on a live Woods or Rainforest plot, each row ONE site at 6 / 250 a turn', () => {
+    // one Woods plot and one Rainforest plot on a sea island
     const state = makeState(makeMap(14, 14, 'COAST'));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
     const island = [tileAtCoords(state.map, 7, 7), ...neighbors(state.map, tileAtCoords(state.map, 7, 7))];
     for (const t of island) t.terrain = 'PLAINS';
-    const N = 4000;
+    const N = 8000;
     let jungle = 0;
     let forest = 0;
     for (let i = 0; i < N; i++) {
@@ -303,10 +301,9 @@ describe('the fires', () => {
       if (burning(island[1]) === 'BURNING_WOODS') forest++;
       if (burning(island[2]) === 'BURNING_RAINFOREST') jungle++;
     }
-    const total = 6 + 6 + 18 + 28 + 6;
-    expect(Math.abs(forest / N - 6 / total)).toBeLessThan(0.015);
-    expect(Math.abs(jungle / N - 6 / total)).toBeLessThan(0.015);
-  });
+    expect(Math.abs(forest / N - 6 / 250)).toBeLessThan(0.006);
+    expect(Math.abs(jungle / N - 6 / 250)).toBeLessThan(0.006);
+  }, 60000);
 });
 
 describe('the natural wonders\' eruptions', () => {
@@ -336,8 +333,8 @@ describe('the natural wonders\' eruptions', () => {
     v.terrain = 'GRASSLAND';
     v.elevation = 'MOUNTAIN';
     v.feature = 'VESUVIUS';
-    // the draw names only them: 6.5 + 7
-    const N = 3000;
+    // the draw names only them, at (4 + 2.5) / 240 and 7 / 240 a turn
+    const N = 8000;
     let eyj = 0;
     let ves = 0;
     for (let i = 0; i < N; i++) {
@@ -345,10 +342,11 @@ describe('the natural wonders\' eruptions', () => {
       disasterPhase(state);
       if (state.eventLog.some((e) => e.includes(`(${e1.col}, ${e1.row})`))) eyj++;
       if (state.eventLog.some((e) => e.includes(`(${v.col}, ${v.row})`))) ves++;
+      expect(state.eventLog.length).toBeLessThanOrEqual(1);
     }
-    expect(eyj + ves).toBe(N);
-    expect(Math.abs(eyj / N - 6.5 / 13.5)).toBeLessThan(0.03);
-  });
+    expect(Math.abs(eyj / N - 6.5 / 240)).toBeLessThan(0.006);
+    expect(Math.abs(ves / N - 7 / 240)).toBeLessThan(0.006);
+  }, 60000);
 
   it('Vesuvius\'s MEGACOLOSSAL costs every ring city a citizen and bands its land units 70-90', () => {
     const state = makeState(makeMap(18, 18));
@@ -462,7 +460,7 @@ describe('Eyjafjallajokull and Vesuvius on the map', () => {
       'GREAT_BARRIER_REEF', 'YOSEMITE', 'TORRES_DEL_PAINE', 'CLIFFS_OF_DOVER']) {
       expect(seen[id], id).toBeGreaterThan(0);
     }
-  });
+  }, 60000);
 
   it('a locked world holding Vesuvius offers its row a real site', () => {
     const files = readdirSync('seeder/worlds').filter((f) => /^seed\d+\.world\.json$/.test(f)).sort();

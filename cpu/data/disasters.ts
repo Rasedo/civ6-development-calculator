@@ -17,7 +17,8 @@ import { srcConst, xml, type SrcMap } from './provenance';
  * site) pairs with that column as the pair's WEIGHT: floods and eruptions ran
  * about ten times their column (one weight per river, per volcano), storms
  * and droughts near theirs (one weight per event). `disasterPhase` makes the
- * draw; every weight below is the column itself.
+ * draw; every weight below is the column itself, and the draw turns it into
+ * an absolute chance over its normaliser (`EVENT_NORM_*`).
  */
 const freq = (ev: string) => xml('RandomEvent_Frequencies',
   `RandomEventType=RANDOM_EVENT_${ev}&RealismSettingType=REALISM_SETTING_MODERATE`,
@@ -51,6 +52,32 @@ export function warmedWeight(weight: number, cipdPct: number, degrees: number): 
   return weight * (1 + (cipdPct / 100) * degrees);
 }
 
+/**
+ * THE EMPTY TURN — MEASURED (C-74-S1, 7 games, 1,757 turns; lab4 Standard):
+ * a (row, site) pair fires with the ABSOLUTE per-turn chance weight / N, the
+ * weight its `warmedWeight`, and the turn is empty with what is left. A row
+ * counted once per map (the storms, the droughts, the fires, the meteor)
+ * divides by 250 at Standard; a row counted per site (a flooding river, an
+ * active volcano, a volcano wonder, a reactor) by 240. When the chances sum
+ * past 1 they are scaled to sum to 1 (the warm read caps the sum). The
+ * normalisers are the Standard readings; Duel's are the lab's open line.
+ */
+export const EVENT_NORM_PER_MAP = srcConst('disasters.eventNormPerMap', 250, {
+  lab: 'C-74 (C-74-S1, runs/event_turns_lab4_t250.jsonl and the six obs games): P(row) = '
+    + 'Occ x (1 + CIPD/100 x T) / 250 for the once-per-map rows at Standard (95%: 250-285)',
+});
+export const EVENT_NORM_PER_SITE = srcConst('disasters.eventNormPerSite', 240, {
+  lab: 'C-74 (C-74-S1, runs/event_turns_lab4_t250.jsonl and the six obs games): P(row, site) = '
+    + 'Occ x (1 + CIPD/100 x T) / 240 for the per-site rows at both sizes',
+});
+
+/** CIV6 (`RealismSettings.PercentVolcanoesActive`, REALISM_SETTING_MODERATE):
+ *  the percent of the map's volcanoes that are ACTIVE — each volcano's state
+ *  drawn once when the map loads (`deriveVolcanoActivity`); only an active
+ *  one erupts (measured, C-74-S1). */
+export const PERCENT_VOLCANOES_ACTIVE = srcConst('disasters.percentVolcanoesActive', 70,
+  xml('RealismSettings', 'RealismSettingType=REALISM_SETTING_MODERATE', 'PercentVolcanoesActive'));
+
 /** CIV6 (`RANDOM_EVENT_START_TURN`, Expansion2_GlobalParameters): the first
  *  turn a random event may fire. */
 export const RANDOM_EVENT_START_TURN = srcConst('disasters.randomEventStartTurn', 2,
@@ -80,6 +107,18 @@ export const DROUGHT_CIPD = srcConst('disasters.droughtCipd', [0, 50] as const, 
 export function droughtTerrain(t: { terrain: string; elevation: string }): boolean {
   return (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation !== 'MOUNTAIN';
 }
+
+/**
+ * THE DROUGHT'S ANCHOR — MEASURED (C-74-S1, 127 droughts): a drought starts
+ * within 3 of a city centre (124 of 127), named after the nearest city. Its
+ * start plot's distance from the centre ran 0: 11, 1: 41, 2: 46, 3: 26 — the
+ * weights of the distance draw, the index the distance; the list's length
+ * less one is the reach.
+ */
+export const DROUGHT_DISTANCE_WEIGHTS = srcConst('disasters.droughtDistanceWeights', [11, 41, 46, 26] as const, {
+  lab: 'C-74 (C-74-S1, runs/event_turns_lab4_t250.jsonl and the six obs games): 124 of 127 droughts '
+    + 'start within 3 of a city centre, at distance 0 / 1 / 2 / 3 in 11 / 41 / 46 / 26',
+});
 
 /** A plot a drought may centre on now: its terrain, above ground, and
  *  CIV6 (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP) "Drought targets areas
@@ -501,8 +540,8 @@ export function volcanoRow(sev: number): number {
 }
 
 /** Each row's weight in the turn's one draw, its OccurrencesPerGame at
- *  MODERATE, counted once per SITE: a volcano's rows once per volcano, a
- *  natural wonder's rows once while the wonder stands. */
+ *  MODERATE, counted once per SITE: a volcano's rows once per ACTIVE volcano,
+ *  a natural wonder's rows once while the wonder stands. */
 export const ERUPTION_WEIGHT = srcConst('disasters.eruptionWeight', [4, 2.5, 4, 2.5, 7, 4, 2.5, 1.5] as const, {
   derived: 'each ERUPTION_ROWS row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE, in row order',
   inputs: ERUPTION_ROWS.map((r) => freq(r)),
@@ -539,10 +578,32 @@ export const ERUPTION_PAINT_P = srcConst('disasters.eruptionPaintP', [0.5, 0.75,
 });
 
 /**
+ * CIV6 (`RandomEvent_Yields`, FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): the
+ * row's other yield rows beside its paint row — YIELD_PRODUCTION on every
+ * row, YIELD_SCIENCE on the CATASTROPHIC and MEGACOLOSSAL rows and
+ * Vesuvius's, YIELD_CULTURE on Vesuvius's alone. Each is the chance a plot
+ * the eruption PAINTS gains +1 of that yield (measured: painted plots gain
+ * +1 Food, some +1 Production, and +1 Science at CATASTROPHIC and
+ * MEGACOLOSSAL only, runs/volcano_own_20260926T074139Z.jsonl). A row the
+ * install does not carry reads 0.
+ */
+const eruptYield = (name: string, y: string, v: readonly number[]) => srcConst(`disasters.${name}`, v, {
+  derived: `Percentage/100 of each eruption row's FEATURE_VOLCANIC_SOIL ${y} row, the chance a painted `
+    + 'plot gains +1 of it; a row carrying none reads 0',
+  inputs: ERUPTION_ROWS.map((r, i) => xml('RandomEvent_Yields',
+    `RandomEventType=RANDOM_EVENT_${r}&YieldType=${y}`, 'Percentage', v[i] === 0 ? { absent: true } : undefined)),
+});
+export const ERUPTION_PROD_P = eruptYield('eruptionProdP', 'YIELD_PRODUCTION', [0.25, 0.35, 0.25, 0.35, 0.25, 0.15, 0.25, 0.35]);
+export const ERUPTION_SCI_P = eruptYield('eruptionSciP', 'YIELD_SCIENCE', [0.1, 0.15, 0, 0.15, 0.25, 0, 0.1, 0.15]);
+export const ERUPTION_CUL_P = eruptYield('eruptionCulP', 'YIELD_CULTURE', [0, 0, 0, 0, 0.5, 0, 0, 0]);
+
+/**
  * THE ERUPTION'S DAMAGE ROWS (`RandomEvent_Damages`), per `ERUPTION_ROWS`
- * index, applied to every plot of the ring (`RealismSettings.ExtraRange` is
- * false at MODERATE, so `ExtraRangePercentage` never reads) the way the
- * flood's rows are applied: IMPROVEMENT_PILLAGED 100 on every row, then
+ * index, applied to every OWNED plot of the ring (measured: unowned
+ * improvements stood 81 of 81, runs/volcano_own_20260926T074139Z.jsonl;
+ * `RealismSettings.ExtraRange` is false at MODERATE, so
+ * `ExtraRangePercentage` never reads) the way the flood's rows are
+ * applied: IMPROVEMENT_PILLAGED 100 on every row, then
  * IMPROVEMENT_DESTROYED, DISTRICT_PILLAGED and BUILDING_PILLAGED,
  * UNIT_DAMAGE_LAND's band on the land units (and CITY_GARRISON / CITY_WALLS,
  * the same band on every row, on a city centre), UNIT_KILLED_CIVILIAN and
@@ -569,10 +630,12 @@ const eruptBand = (name: string, col: 'MinHP' | 'MaxHP', v: readonly number[]) =
 export const ERUPTION_DMG_LO = eruptBand('eruptionDmgLo', 'MinHP', [40, 60, 0, 40, 70, 0, 40, 60]);
 export const ERUPTION_DMG_HI = eruptBand('eruptionDmgHi', 'MaxHP', [60, 80, 0, 60, 90, 0, 60, 80]);
 /** The features an eruption's soil REPLACES — Woods and Rainforest (the
- *  install's FOREST and JUNGLE), measured replaced at 6/28, 11/28, 18/28;
- *  Floodplains and Geothermal Fissure are never painted (0/18). */
-export const SOIL_REPLACES: readonly string[] = srcConst('disasters.soilReplaces', ['WOODS', 'RAINFOREST'], {
-  lab: 'runs/volcano_20260923T191337Z.jsonl',
+ *  install's FOREST and JUNGLE), measured replaced at 6/28, 11/28, 18/28, and
+ *  Marsh (22 of 36); Floodplains and Geothermal Fissure (0/18) and Oasis
+ *  (0/36) are never painted. */
+export const SOIL_REPLACES: readonly string[] = srcConst('disasters.soilReplaces', ['WOODS', 'RAINFOREST', 'MARSH'], {
+  lab: 'runs/volcano_20260923T191337Z.jsonl (Woods, Rainforest, Floodplains, Fissure) and '
+    + 'runs/volcano_own_20260926T081948Z.jsonl (Marsh 22/36 painted, Oasis 0/36)',
 });
 
 /**
@@ -833,6 +896,39 @@ export const ACCIDENT_DISTRICT_P = srcConst('disasters.accidentDistrictP', [0, 0
   inputs: [
     xml('RandomEvent_Damages', `${accident('MINOR')}&DamageType=DISTRICT_PILLAGED`, 'Percentage', { absent: true }),
     ...accidentDmg('DISTRICT_PILLAGED').slice(1),
+  ],
+});
+/**
+ * The accident's UNIT rows, struck on the REACTOR'S PLOT alone (measured,
+ * C-1-S1, runs/reactor_reactor_base_20260926T071934Z.jsonl: no unit at
+ * distance 1-3 touched, the garrison untouched): UNIT_DAMAGE_LAND's share
+ * and inclusive band, and UNIT_KILLED_CIVILIAN, by severity — MINOR carries
+ * neither row. The plot is land, so the rows' UNIT_DAMAGE_NAVAL finds no
+ * hull, and it is no city centre, so CITY_GARRISON finds none.
+ */
+export const ACCIDENT_LAND_P = srcConst('disasters.accidentLandP', [0, 0.5, 1] as const, {
+  derived: 'Percentage/100 of each accident row\'s UNIT_DAMAGE_LAND row (MINOR carries none), the '
+    + 'chance the land units on the reactor\'s plot are struck (measured 25/52, 47/50)',
+  inputs: [
+    xml('RandomEvent_Damages', `${accident('MINOR')}&DamageType=UNIT_DAMAGE_LAND`, 'Percentage', { absent: true }),
+    ...accidentDmg('UNIT_DAMAGE_LAND').slice(1),
+  ],
+});
+const accidentBand = (name: string, col: 'MinHP' | 'MaxHP', v: readonly number[]) => srcConst(`disasters.${name}`, v, {
+  derived: `each accident row's UNIT_DAMAGE_LAND ${col}, inclusive; MINOR carries none and reads 0`,
+  inputs: [
+    xml('RandomEvent_Damages', `${accident('MINOR')}&DamageType=UNIT_DAMAGE_LAND`, col, { absent: true }),
+    ...accidentDmg('UNIT_DAMAGE_LAND', col).slice(1),
+  ],
+});
+export const ACCIDENT_DMG_LO = accidentBand('accidentDmgLo', 'MinHP', [0, 20, 20]);
+export const ACCIDENT_DMG_HI = accidentBand('accidentDmgHi', 'MaxHP', [0, 50, 50]);
+export const ACCIDENT_CIV_KILL_P = srcConst('disasters.accidentCivKillP', [0, 0.5, 1] as const, {
+  derived: 'Percentage/100 of each accident row\'s UNIT_KILLED_CIVILIAN row (MINOR carries none), the '
+    + 'chance the civilians on the reactor\'s plot die (measured 22/50, 50/50)',
+  inputs: [
+    xml('RandomEvent_Damages', `${accident('MINOR')}&DamageType=UNIT_KILLED_CIVILIAN`, 'Percentage', { absent: true }),
+    ...accidentDmg('UNIT_KILLED_CIVILIAN').slice(1),
   ],
 });
 export const ACCIDENT_POP_P = srcConst('disasters.accidentPopP', [0, 0, 0.8] as const, {

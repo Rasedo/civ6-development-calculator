@@ -214,6 +214,8 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
 
   if (tile.fertility > 0) out.food += tile.fertility;
   if (tile.fertilityProd > 0) out.production += tile.fertilityProd;
+  if ((tile.fertilitySci ?? 0) > 0) out.science += tile.fertilitySci!;
+  if ((tile.fertilityCul ?? 0) > 0) out.culture += tile.fertilityCul!;
   // CIV6 (PreventsDrought): a city with an Aqueduct, Bath, Dam or Stepwell
   // "will not suffer the -1 Food yield during a Drought"
   if (tile.droughtTurns > 0 && !droughtShielded(ctx.map.tiles, tile)) out.food = Math.max(0, out.food - 1);

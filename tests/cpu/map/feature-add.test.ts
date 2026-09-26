@@ -20,19 +20,19 @@ import type { GameState, Tile } from '../../../cpu/core/types';
 import type { FeatureId, ImprovementId } from '../../../world/types';
 
 describe('Volcanic Soil', () => {
-  it('paints bare land and Woods or Rainforest, and nothing else', () => {
+  it('paints bare land and Woods, Rainforest or Marsh, and nothing else', () => {
     const state = makeState(makeMap(16, 16));
     const at = (c: number, r: number) => tileAtCoords(state.map, c, r);
     expect(soilPaintable(at(2, 2))).toBe(true);
     const improved = at(3, 2);
     improved.improvement = 'FARM';
     expect(soilPaintable(improved)).toBe(true);
-    for (const f of ['WOODS', 'RAINFOREST'] as const) {
+    for (const f of ['WOODS', 'RAINFOREST', 'MARSH'] as const) {
       const t = at(4, 2);
       t.feature = f;
       expect(soilPaintable(t)).toBe(true);
     }
-    for (const f of ['FLOODPLAINS', 'GEOTHERMAL_FISSURE', 'MARSH', 'OASIS', 'VOLCANIC_SOIL', 'ULURU'] as const) {
+    for (const f of ['FLOODPLAINS', 'GEOTHERMAL_FISSURE', 'OASIS', 'VOLCANIC_SOIL', 'ULURU'] as const) {
       const t = at(5, 2);
       t.feature = f;
       expect(soilPaintable(t)).toBe(false);
@@ -186,11 +186,11 @@ describe('Volcanic Soil', () => {
   });
 
   it('the turn\'s draw picks the eruption\'s severity by the rows\' weights', () => {
-    // a sea with one volcano ringed by desert: an eruption or a dust storm is
-    // all the turn's draw can name. Over the phases that erupted, the
-    // severity is GENTLE / CATASTROPHIC / MEGACOLOSSAL in proportion to
-    // 4 / 2.5 / 1.5 — read off how often a bare ring plot is painted, the
-    // weighted mean of the three paint chances.
+    // a sea with one active volcano ringed by desert: an eruption, a dust
+    // storm or the meteor is all the turn's draw can name. Over the phases
+    // that erupted, the severity is GENTLE / CATASTROPHIC / MEGACOLOSSAL in
+    // proportion to 4 / 2.5 / 1.5 — read off how often a bare ring plot is
+    // painted, the weighted mean of the three paint chances.
     const state: GameState = makeState(makeMap(16, 16, 'COAST'));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
@@ -198,11 +198,12 @@ describe('Volcanic Soil', () => {
     v.terrain = 'DESERT';
     v.elevation = 'MOUNTAIN';
     v.volcano = true;
+    v.volcanoActive = true;
     const ring = neighbors(state.map, v);
     let plots = 0;
     let painted = 0;
     let eruptions = 0;
-    for (let i = 0; i < 3000; i++) {
+    for (let i = 0; i < 8000; i++) {
       for (const t of ring) { t.terrain = 'DESERT'; t.elevation = 'FLAT'; t.feature = null; t.meteor = false; }
       state.eventLog = [];
       disasterPhase(state);
@@ -211,13 +212,12 @@ describe('Volcanic Soil', () => {
       plots += ring.length;
       painted += ring.filter((t) => t.feature === 'VOLCANIC_SOIL').length;
     }
-    // the volcano's 8 against the dust storms' 8 + 2 and the meteor's 6 (the
-    // bare desert ring is nobody's)
-    expect(Math.abs(eruptions / 3000 - 8 / 24)).toBeLessThan(0.03);
+    // the volcano's 8 over the per-site 240, whatever else the turn may draw
+    expect(Math.abs(eruptions / 8000 - 8 / 240)).toBeLessThan(0.006);
     const w = [4, 2.5, 1.5];
     const mean = w.reduce((a, x, s) => a + x * VOLCANO_PAINT_P[s], 0) / 8;
-    expect(Math.abs(painted / plots - mean)).toBeLessThan(0.03);
-  });
+    expect(Math.abs(painted / plots - mean)).toBeLessThan(0.04);
+  }, 60000);
 
   it('the eight eruption rows are the install\'s paint chances, in the live table\'s order', () => {
     // Eyjafjallajokull CATASTROPHIC / MEGACOLOSSAL, Kilimanjaro GENTLE /

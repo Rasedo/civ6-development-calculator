@@ -969,6 +969,8 @@ TILE = {
     "locked": _tile("tile_locked"),
     "fertility": _tile("fertility"),
     "fertilityProd": _tile("fertility_prod"),
+    "fertilitySci": _tile("fertility_sci"),
+    "fertilityCul": _tile("fertility_cul"),
     "droughtTurns": _tile("drought"),
     "stormEvent": _tile("storm_event"),
     "stormTurns": _tile("storm_left"),

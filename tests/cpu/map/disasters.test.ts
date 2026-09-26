@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { setTileOwner, freeSeatOf, FREE_SEAT } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodSites, erupt, drought, ageReactors } from '../../../cpu/core/disasters';
+import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodSites, erupt, drought, ageReactors, deriveVolcanoActivity } from '../../../cpu/core/disasters';
 import { ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtCandidate, DROUGHT_DURATION } from '../../../cpu/data/disasters';
+import { EVENT_NORM_PER_MAP, EVENT_NORM_PER_SITE, PERCENT_VOLCANOES_ACTIVE, DROUGHT_DISTANCE_WEIGHTS, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_CIV_KILL_P } from '../../../cpu/data/disasters';
+import { NO_SEAT } from '../../../cpu/core/types';
+import { hexDistance } from '../../../world/hex';
 import { validImprovementsIn } from '../../../cpu/core/rules';
 import { transferCity, freeCitiesPhase } from '../../../cpu/core/phase';
 // The turn draws ONE random event over every eligible (row, site) pair, so a
@@ -53,6 +56,7 @@ describe('disasters', () => {
     const volcano = tileAtCoords(state.map, 8, 8);
     volcano.elevation = 'MOUNTAIN';
     volcano.volcano = true;
+    volcano.volcanoActive = true;
     const slope = tileAtCoords(state.map, 9, 8);
     slope.improvement = 'FARM';
     setTileOwner(slope, 0);
@@ -342,6 +346,32 @@ describe('the flood reaches the whole river', () => {
     expect(riverReach(state.map, off).map((t) => t.index)).toEqual([off.index]);
   });
 
+  it('a flood starts on its river\'s upstream-most floodplain: the one farthest from the mouth', () => {
+    const board = (mouthEast: boolean | null) => {
+      const state = makeState(makeMap(16, 16));
+      const a = tileAtCoords(state.map, 3, 4);
+      const b = link(state.map, a, 0);
+      const c = link(state.map, b, 0);
+      const d = link(state.map, c, 0);
+      const e = link(state.map, d, 0);
+      for (const t of [b, c, d]) t.feature = 'FLOODPLAINS';
+      if (mouthEast !== null) (mouthEast ? neighborTile(state.map, e, 0)! : neighborTile(state.map, a, 3)!).terrain = 'COAST';
+      return { state, b, d };
+    };
+    // the sea beside the east end: the west floodplain is upstream-most
+    const east = board(true);
+    expect(floodSites(east.state.map).map((t) => t.index)).toEqual([east.b.index]);
+    // the sea beside the west end: the east one
+    const west = board(false);
+    expect(floodSites(west.state.map).map((t) => t.index)).toEqual([west.d.index]);
+    // no water anywhere: the lowest-index floodplain
+    const inland = board(null);
+    expect(floodSites(inland.state.map).map((t) => t.index)).toEqual([inland.b.index]);
+    // the whole river floods from any start
+    expect(riverReach(west.state.map, west.d).map((t) => t.index))
+      .toEqual(riverReach(west.state.map, west.b).map((t) => t.index));
+  });
+
   it('one flood takes every floodplain along its river together', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
@@ -375,19 +405,23 @@ describe('the flood reaches the whole river', () => {
 });
 
 describe('the turn\'s one random event', () => {
-  /** a sea holding two volcanoes (their rings water, so no storm starts
-   *  there), one river of two Grassland floodplains plus a lone one, and one
-   *  bare Grassland plot — the only featureless one, the drought's start */
+  /** a sea holding two active volcanoes (their rings water, so no storm
+   *  starts there), one river of two Grassland floodplains plus a lone one,
+   *  and one bare Grassland plot with a city on it — the only featureless
+   *  plot, the drought's start (and owned, so no meteor falls) */
   const eventBoard = () => {
     const state = makeState(makeMap(18, 18, 'COAST'));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
-    tileAtCoords(state.map, 14, 14).terrain = 'GRASSLAND';
+    const home = tileAtCoords(state.map, 14, 14);
+    home.terrain = 'GRASSLAND';
+    const city = settleAt(state, home.index);
     for (const [c, r] of [[4, 4], [12, 12]]) {
       const v = tileAtCoords(state.map, c, r);
       v.terrain = 'GRASSLAND';
       v.elevation = 'MOUNTAIN';
       v.volcano = true;
+      v.volcanoActive = true;
     }
     const a = tileAtCoords(state.map, 8, 4);
     const b = neighborTile(state.map, a, 0)!;
@@ -398,7 +432,15 @@ describe('the turn\'s one random event', () => {
       t.terrain = 'GRASSLAND';
       t.feature = 'FLOODPLAINS';
     }
-    return { state, a, b, lone };
+    return { state, a, b, lone, city };
+  };
+
+  /** one phase with no storm left standing, so a drawn storm always lands
+   *  and logs */
+  const phase = (state: GameState) => {
+    for (const t of state.map.tiles) t.stormTurns = 0;
+    state.eventLog = [];
+    disasterPhase(state);
   };
 
   it('a river is one flood site, a riverless floodplain another', () => {
@@ -406,36 +448,56 @@ describe('the turn\'s one random event', () => {
     expect(floodSites(state.map).map((t) => t.index)).toEqual([a.index, lone.index].sort((x, y) => x - y));
   });
 
-  it('fires at most one event a turn, each row weighted once per site', () => {
-    // sites: 2 flood sites x 4.5, 2 volcanoes x 8, and the Grassland's one
-    // tornado pair (15 + 3), the bare plot's drought pair (23 + 5) and its
-    // Meteor Shower (6 — nobody owns it): 9 + 16 + 18 + 28 + 6 = 77
+  it('each (row, site) pair fires at its weight over its normaliser; the rest of the turn is empty', () => {
+    // per-site rows over 240: 2 flood sites x 4.5, 2 volcanoes x 8; per-map
+    // rows over 250: the Grassland's tornado pair (15 + 3) and the city's
+    // drought pair (23 + 5); no meteor (every Grassland plot is owned or a
+    // floodplain)
+    expect([EVENT_NORM_PER_SITE, EVENT_NORM_PER_MAP]).toEqual([240, 250]);
     const { state } = eventBoard();
-    const bare = tileAtCoords(state.map, 14, 14);
-    const N = 6000;
-    let floods = 0;
-    let eruptions = 0;
-    let droughts = 0;
-    let meteors = 0;
+    const N = 8000;
+    const seen = { flood: 0, eruption: 0, storm: 0, drought: 0, empty: 0 };
     for (let i = 0; i < N; i++) {
-      bare.meteor = false;
-      state.eventLog = [];
-      disasterPhase(state);
+      phase(state);
       expect(state.eventLog.length).toBeLessThanOrEqual(1);
-      if (state.eventLog.some((e) => e.startsWith('Flood'))) floods++;
-      if (state.eventLog.some((e) => e.includes('eruption'))) eruptions++;
-      if (state.eventLog.some((e) => e.startsWith('Drought'))) droughts++;
-      if (state.eventLog.some((e) => e.startsWith('Meteor'))) meteors++;
+      const e = state.eventLog[0] ?? '';
+      if (e.startsWith('Flood')) seen.flood++;
+      else if (e.includes('eruption')) seen.eruption++;
+      else if (e.startsWith('Storm')) seen.storm++;
+      else if (e.startsWith('Drought')) seen.drought++;
+      else if (e === '') seen.empty++;
     }
-    expect(Math.abs(floods / N - 9 / 77)).toBeLessThan(0.02);
-    expect(Math.abs(eruptions / N - 16 / 77)).toBeLessThan(0.02);
-    expect(Math.abs(droughts / N - 28 / 77)).toBeLessThan(0.02);
-    expect(Math.abs(meteors / N - 6 / 77)).toBeLessThan(0.015);
+    const want = { flood: 9 / 240, eruption: 16 / 240, storm: 18 / 250, drought: 28 / 250 };
+    for (const [k, p] of Object.entries(want)) {
+      expect(Math.abs(seen[k as keyof typeof seen] / N - p)).toBeLessThan(0.012);
+    }
+    const busy = Object.values(want).reduce((x, y) => x + y, 0);
+    expect(Math.abs(seen.empty / N - (1 - busy))).toBeLessThan(0.02);
   });
 
-  it('Kilimanjaro erupts on its own two rows, 4 + 2.5, painting its ring at 50%', () => {
-    // the board above plus one Mount Kilimanjaro ringed by bare Grassland (the
-    // tornado, drought and meteor sites already stand): 77 + 6.5 = 83.5
+  it('chances summing past 1 are scaled to sum to 1: no turn is empty', () => {
+    // sixty lone Desert floodplains: 60 x 4.5 / 240 = 1.125, and the
+    // Desert's dust storm pair (8 + 2) / 250 = 0.04
+    const state = makeState(makeMap(18, 18, 'COAST'));
+    state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
+    for (const t of state.map.tiles.filter((u) => u.row % 2 === 0 && u.col % 2 === 0).slice(0, 60)) {
+      t.terrain = 'DESERT';
+      t.feature = 'FLOODPLAINS';
+    }
+    expect(floodSites(state.map)).toHaveLength(60);
+    const N = 3000;
+    let floods = 0;
+    for (let i = 0; i < N; i++) {
+      phase(state);
+      expect(state.eventLog).toHaveLength(1);
+      if (state.eventLog[0].startsWith('Flood')) floods++;
+    }
+    expect(Math.abs(floods / N - 1.125 / 1.165)).toBeLessThan(0.015);
+  });
+
+  it('Kilimanjaro erupts on its own two rows, (4 + 2.5) / 240 a turn, painting its ring at 50%', () => {
+    // the board above plus one Mount Kilimanjaro ringed by bare Grassland
     const { state } = eventBoard();
     const k = tileAtCoords(state.map, 14, 4);
     k.terrain = 'GRASSLAND';
@@ -463,16 +525,57 @@ describe('the turn\'s one random event', () => {
       plots += ring.length;
       painted += ring.filter((t) => t.feature === 'VOLCANIC_SOIL').length;
     }
-    expect(Math.abs(kili / N - 6.5 / 83.5)).toBeLessThan(0.015);
-    expect(Math.abs((eruptions - kili) / N - 16 / 83.5)).toBeLessThan(0.02);
-    expect(Math.abs(painted / plots - 0.5)).toBeLessThan(0.04);
+    expect(Math.abs(kili / N - 6.5 / 240)).toBeLessThan(0.008);
+    expect(Math.abs((eruptions - kili) / N - 16 / 240)).toBeLessThan(0.012);
+    expect(Math.abs(painted / plots - 0.5)).toBeLessThan(0.06);
     expect(k.feature).toBe('MOUNT_KILIMANJARO');
+  });
+
+  it('only an ACTIVE volcano erupts, and about 70% of them are active', () => {
+    const { state } = eventBoard();
+    const [v] = state.map.tiles.filter((t) => t.volcano);
+    v.volcanoActive = false;
+    let at = 0;
+    let other = 0;
+    for (let i = 0; i < 3000; i++) {
+      phase(state);
+      if (state.eventLog.some((e) => e.includes(`eruption at (${v.col}, ${v.row})`))) at++;
+      else if (state.eventLog.some((e) => e.includes('eruption'))) other++;
+    }
+    expect(at).toBe(0);
+    expect(other).toBeGreaterThan(0);
+    // the load-time draw: one per volcano, the same for the same game seed
+    const volcanoMap = () => {
+      const map = makeMap(40, 40);
+      for (const t of map.tiles) t.volcano = t.index % 3 !== 0;
+      return map;
+    };
+    const map = volcanoMap();
+    const again = volcanoMap();
+    deriveVolcanoActivity(map, 9001);
+    deriveVolcanoActivity(again, 9001);
+    let active = 0;
+    let volcanoes = 0;
+    for (let i = 0; i < map.tiles.length; i++) {
+      expect(map.tiles[i].volcanoActive).toBe(again.tiles[i].volcanoActive);
+      if (!map.tiles[i].volcano) {
+        expect(map.tiles[i].volcanoActive).toBeUndefined();
+        continue;
+      }
+      volcanoes += 1;
+      if (map.tiles[i].volcanoActive) active += 1;
+    }
+    expect(PERCENT_VOLCANOES_ACTIVE).toBe(70);
+    expect(Math.abs(active / volcanoes - 0.7)).toBeLessThan(0.04);
+    const reseeded = volcanoMap();
+    deriveVolcanoActivity(reseeded, 9002);
+    expect(reseeded.tiles.map((t) => t.volcanoActive)).not.toEqual(map.tiles.map((t) => t.volcanoActive));
   });
 
   it('a drought is seven plots for 5 or 10 turns', () => {
     const { state } = eventBoard();
     const lengths = new Set<number>();
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 1500; i++) {
       for (const t of state.map.tiles) t.droughtTurns = 0;
       state.eventLog = [];
       disasterPhase(state);
@@ -484,6 +587,43 @@ describe('the turn\'s one random event', () => {
       for (const t of dry) lengths.add(t.droughtTurns);
     }
     expect([...lengths].sort((x, y) => x - y)).toEqual([5, 10]);
+  });
+
+  it('a drought anchors on a city: a start plot within 3 of its centre, the city uniform, the distance by the measured mix', () => {
+    const state = makeState(makeMap(20, 20));
+    state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
+    const cities = [settleAt(state, tileAtCoords(state.map, 4, 4).index),
+      settleAt(state, tileAtCoords(state.map, 15, 15).index)];
+    const centres = cities.map((c) => state.map.tiles[c.centerIndex]);
+    const byDist = [0, 0, 0, 0];
+    const byCity = [0, 0];
+    for (let i = 0; i < 6000; i++) {
+      phase(state);
+      const e = state.eventLog.find((x) => x.startsWith('Drought'));
+      if (!e) continue;
+      const [col, row] = e.match(/\((\d+), (\d+)\)/)!.slice(1).map(Number);
+      const d = centres.map((c) => hexDistance(c.col, c.row, col, row));
+      const k = d.findIndex((x) => x <= 3);
+      expect(k).toBeGreaterThanOrEqual(0);
+      byCity[k] += 1;
+      byDist[d[k]] += 1;
+    }
+    const n = byCity[0] + byCity[1];
+    expect(n).toBeGreaterThan(500);
+    expect(Math.abs(byCity[0] / n - 0.5)).toBeLessThan(0.06);
+    const w = DROUGHT_DISTANCE_WEIGHTS.reduce((x, y) => x + y, 0);
+    DROUGHT_DISTANCE_WEIGHTS.forEach((x, d) => expect(Math.abs(byDist[d] / n - x / w)).toBeLessThan(0.05));
+  }, 60000);
+
+  it('no city, no drought', () => {
+    const state = makeState(makeMap(16, 16));
+    state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
+    for (let i = 0; i < 2000; i++) {
+      phase(state);
+      expect(state.eventLog.some((e) => e.startsWith('Drought'))).toBe(false);
+    }
   });
 });
 
@@ -531,13 +671,47 @@ describe('the nuclear accident', () => {
     }
   });
 
+  it('strikes the units on the reactor\'s plot alone: land 0 / 50 / 100 in the 20-50 band, civilians 0 / 50 / 100', () => {
+    const N = 1500;
+    for (let sev = 0; sev < 3; sev++) {
+      const { state, city, izTile } = reactorBoard(40);
+      state.unitsMode = true;
+      let struck = 0;
+      let killed = 0;
+      const band = new Set<number>();
+      for (let i = 0; i < N; i++) {
+        const w = spawnUnit(state, 'WARRIOR', izTile.index, 0)!;
+        const b = spawnUnit(state, 'BUILDER', izTile.index, 0)!;
+        const g = spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!;
+        expect([w.tileIndex, b.tileIndex, g.tileIndex]).toEqual([izTile.index, izTile.index, city.centerIndex]);
+        nuclearAccident(state, 0, city, sev);
+        const hp = state.units.find((x) => x.id === w.id)!.hp;
+        if (hp < 100) {
+          struck += 1;
+          band.add(100 - hp);
+        }
+        if (!state.units.some((x) => x.id === b.id)) killed += 1;
+        // the garrison off the reactor's plot is never touched
+        expect(state.units.find((x) => x.id === g.id)!.hp).toBe(100);
+        state.units = state.units.filter((x) => x.id !== w.id && x.id !== b.id && x.id !== g.id);
+      }
+      expect(Math.abs(struck / N - ACCIDENT_LAND_P[sev])).toBeLessThan(0.04);
+      expect(Math.abs(killed / N - ACCIDENT_CIV_KILL_P[sev])).toBeLessThan(0.04);
+      for (const d of band) expect(d >= 20 && d <= 50).toBe(true);
+      if (sev > 0) expect(band.size).toBeGreaterThan(20);
+      expect(city.buildings).toContain('NUCLEAR_POWER_PLANT');
+      expect(city.pillagedBuildings ?? []).not.toContain('NUCLEAR_POWER_PLANT');
+    }
+    expect([...ACCIDENT_LAND_P, ...ACCIDENT_CIV_KILL_P]).toEqual([0, 0.5, 1, 0, 0.5, 1]);
+  });
+
   it('a reactor is a site only past each severity\'s MinTurnAtRisk', () => {
     const sevOf = (state: GameState) =>
       state.eventLog.filter((e) => e.startsWith('Nuclear accident')).map((e) => Number(e.slice(-2, -1)));
     for (const [age, want] of [[9, []], [10, [0]], [25, [0, 1]], [30, [0, 1, 2]]] as const) {
       const { state } = reactorBoard(age);
       const seen = new Set<number>();
-      for (let i = 0; i < 1500; i++) {
+      for (let i = 0; i < 4000; i++) {
         state.eventLog = [];
         disasterPhase(state);
         for (const s of sevOf(state)) seen.add(s);
@@ -670,6 +844,97 @@ describe('the eruption\'s damage rows', () => {
       state.units = state.units.filter((x) => x.id !== g.id);
     }
     expect(Math.abs(destroyed / farms - 0.8)).toBeLessThan(0.04);
+  });
+});
+
+describe('the eruption on owned and unowned ground', () => {
+  /** an active volcano on a Grassland board, no city near */
+  const openBoard = () => {
+    const state = makeState(makeMap(18, 18));
+    state.unitsMode = true;
+    const v = tileAtCoords(state.map, 8, 8);
+    v.elevation = 'MOUNTAIN';
+    v.volcano = true;
+    v.volcanoActive = true;
+    return { state, v, ring: neighbors(state.map, v) };
+  };
+
+  it('damages OWNED plots only, and takes every bonus resource on the ring whoever owns it', () => {
+    const { state, v, ring } = openBoard();
+    const [ownedFarm, openFarm, ownedWheat, openWheat, iron, openUnit] = ring;
+    for (let i = 0; i < 300; i++) {
+      for (const t of ring) {
+        t.feature = null;
+        t.improvement = null;
+        t.pillaged = false;
+        t.resource = null;
+        setTileOwner(t, NO_SEAT);
+      }
+      for (const t of [ownedFarm, ownedWheat, iron]) setTileOwner(t, 0);
+      for (const t of [ownedFarm, openFarm]) t.improvement = 'FARM';
+      ownedWheat.resource = 'WHEAT';
+      openWheat.resource = 'STONE';
+      iron.resource = 'IRON';
+      const w = spawnUnit(state, 'WARRIOR', openUnit.index, 0)!;
+      const b = spawnUnit(state, 'BUILDER', openUnit.index, 0)!;
+      erupt(state, [v], volcanoRow(2));
+      expect(openFarm.improvement).toBe('FARM');
+      expect(openFarm.pillaged).toBe(false);
+      expect(ownedFarm.improvement === null || ownedFarm.pillaged).toBe(true);
+      expect(ownedWheat.resource).toBeNull();
+      expect(openWheat.resource).toBeNull();
+      expect(iron.resource).toBe('IRON');
+      expect(state.units.find((x) => x.id === w.id)?.hp).toBe(100);
+      expect(state.units.some((x) => x.id === b.id)).toBe(true);
+      state.units = state.units.filter((x) => x.id !== w.id && x.id !== b.id);
+    }
+  });
+
+  it('a painted plot gains Production, Science and Culture at the row\'s chances; an unpainted one gains none', () => {
+    const { state, v, ring } = openBoard();
+    const row = ERUPTION_ROWS.indexOf('VESUVIUS_MEGACOLOSSAL');
+    expect([ERUPTION_PROD_P[row], ERUPTION_SCI_P[row], ERUPTION_CUL_P[row]]).toEqual([0.25, 0.25, 0.5]);
+    let painted = 0;
+    const got = { fertilityProd: 0, fertilitySci: 0, fertilityCul: 0 };
+    for (let i = 0; i < 1000; i++) {
+      for (const t of ring) {
+        t.feature = null;
+        t.fertilityProd = 0;
+        t.fertilitySci = 0;
+        t.fertilityCul = 0;
+      }
+      erupt(state, [v], row);
+      for (const t of ring) {
+        if (t.feature !== 'VOLCANIC_SOIL') {
+          expect([t.fertilityProd, t.fertilitySci, t.fertilityCul]).toEqual([0, 0, 0]);
+          continue;
+        }
+        painted += 1;
+        for (const k of Object.keys(got) as (keyof typeof got)[]) got[k] += t[k] ?? 0;
+      }
+    }
+    expect(Math.abs(got.fertilityProd / painted - 0.25)).toBeLessThan(0.04);
+    expect(Math.abs(got.fertilitySci / painted - 0.25)).toBeLessThan(0.04);
+    expect(Math.abs(got.fertilityCul / painted - 0.5)).toBeLessThan(0.05);
+    // the silt pays through the plot's yields
+    const t = ring[0];
+    t.fertilitySci = 2;
+    t.fertilityCul = 1;
+    const y = tileYields(bareCtx(state.map), t);
+    t.fertilitySci = 0;
+    t.fertilityCul = 0;
+    const y0 = tileYields(bareCtx(state.map), t);
+    expect([y.science - y0.science, y.culture - y0.culture]).toEqual([2, 1]);
+  });
+
+  it('a GENTLE eruption paints no Science', () => {
+    const { state, v, ring } = openBoard();
+    for (let i = 0; i < 300; i++) {
+      for (const t of ring) t.feature = null;
+      erupt(state, [v], volcanoRow(0));
+    }
+    expect(ring.some((t) => (t.fertilityProd ?? 0) > 0)).toBe(true);
+    expect(ring.every((t) => (t.fertilitySci ?? 0) === 0 && (t.fertilityCul ?? 0) === 0)).toBe(true);
   });
 });
 
@@ -826,7 +1091,7 @@ describe('a Free City\'s reactor', () => {
     expect(free.reactorAge).toBe(27);
     // past MAJOR's 20, before CATASTROPHIC's 30: rows MINOR and MAJOR fire
     const seen = new Set<number>();
-    for (let i = 0; i < 1500; i++) {
+    for (let i = 0; i < 4000; i++) {
       state.eventLog = [];
       disasterPhase(state);
       for (const e of state.eventLog.filter((x) => x.startsWith('Nuclear accident'))) {

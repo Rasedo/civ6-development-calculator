@@ -7528,6 +7528,9 @@ class SimSeats:
         f_base = self._eff_food()
         p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs + _addy[:, :, 1]
         ty_oth = self.tile_yields - self.feat_yields * fs.unsqueeze(-1) + _addy  # live-adjusted static (cols 2-5)
+        _silt = self._silt_y()
+        if _silt is not None:
+            ty_oth = ty_oth + _silt
         # CAMP/PLANTATION catalog gold joins the static columns
         # (TS tileYields adds improvement yields in every context; pillage
         # suspends them). Cols 0/1 stay untouched — food/production ride
@@ -10266,6 +10269,9 @@ class SimSeats:
         p_plane = g["p_plane"]
         y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * g["fs"].unsqueeze(-1)
                  + self._feat_add_y()[:, :, 2:]).sum(dim=2)
+        _silt = self._silt_y()
+        if _silt is not None:
+            y_oth = y_oth + _silt[:, :, 2:].sum(dim=2)
         live_imp = ((self.improvement >= 0) & ~self.pillaged).to(self.dtype)
         y_oth = y_oth + self._imp_yields[self.improvement.clamp(min=0), 2:].sum(dim=2) * live_imp
         if self.SEASIDE >= 0:

@@ -1748,11 +1748,21 @@ class SimInit:
         # the storm FAMILY that may start on each tile (`stormFamilyAt`), -1 none
         self.storm_fam = torch.tensor([[t.get("sf", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.fertilizable = torch.tensor([[t.get("fz", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        n_volc = max(max((len(f.get("volcanoes", [])) for f in fixtures), default=0), 1)
+        # the ACTIVE volcanoes, the eruption rows' sites (`deriveVolcanoActivity`
+        # stamped them when the game was made from the map), packed from 0
+        n_volc = max(max((len(f["activeVolcanoes"]) for f in fixtures), default=0), 1)
         self.volcano_tile = torch.full((B, n_volc), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
-            for i, v in enumerate(f.get("volcanoes", [])):
+            for i, v in enumerate(f["activeVolcanoes"]):
                 self.volcano_tile[b, i] = v
+        # the flood sites (`floodSites`), each the plot its flood starts on, in
+        # draw order — `_pick_static`'s (idx, n) shape, -1 pads
+        n_fl = max(max((len(f["floodStarts"]) for f in fixtures), default=0), 1)
+        _fl_idx = torch.full((B, n_fl), -1, dtype=torch.long, device=device)
+        for b, f in enumerate(fixtures):
+            for i, v in enumerate(f["floodStarts"]):
+                _fl_idx[b, i] = v
+        self._flood_sites = (_fl_idx, (_fl_idx >= 0).sum(dim=1))
         # CIV6 (FEATURE_VOLCANO, Expansion2_Features.xml): a volcano is its
         # plot's feature, and no Improvement_ValidFeatures row lists it
         # (`featureOk`)
@@ -1764,6 +1774,9 @@ class SimInit:
         # the PRODUCTION half of flood silt — real Civ 6 rolls food and
         # production separately, so the two accumulate apart.
         self.fertility_prod = torch.zeros(B, T, dtype=torch.long, device=device)
+        # the SCIENCE and CULTURE silt an eruption leaves on a plot it paints
+        self.fertility_sci = torch.zeros(B, T, dtype=torch.long, device=device)
+        self.fertility_cul = torch.zeros(B, T, dtype=torch.long, device=device)
         # a CITIZEN is PINNED to this plot (Tile.locked): the work ranking takes
         # every locked plot a city can reach before it ranks anything by score.
         self.tile_locked = torch.zeros(B, T, dtype=torch.bool, device=device)
@@ -2631,6 +2644,21 @@ class SimInit:
         self._accident_fallout = torch.tensor([int(x) for x in _ds["accidentFallout"]], dtype=torch.long, device=device)
         self._accident_district_p = torch.tensor([float(x) for x in _ds["accidentDistrictP"]], dtype=torch.float64, device=device)
         self._accident_pop_p = torch.tensor([float(x) for x in _ds["accidentPopP"]], dtype=torch.float64, device=device)
+        # ...and its unit rows on the reactor's plot: the land share, the
+        # inclusive band, the civilians' kill chance
+        self._accident_land_p = [float(x) for x in _ds["accidentLandP"]]
+        self._accident_dmg_lo = [int(x) for x in _ds["accidentDmgLo"]]
+        self._accident_dmg_hi = [int(x) for x in _ds["accidentDmgHi"]]
+        self._accident_civ_kill_p = [float(x) for x in _ds["accidentCivKillP"]]
+        # THE EMPTY TURN: a (row, site) pair's absolute chance is its weight
+        # over the row's normaliser, per map or per site (`eventNorm`)
+        self._event_norm_map = float(_ds["eventNormPerMap"])
+        self._event_norm_site = float(_ds["eventNormPerSite"])
+        # a drought's start plot: the weight of each distance from its city's
+        # centre (`DROUGHT_DISTANCE_WEIGHTS`), the index the distance
+        self._drought_dist_w = [int(x) for x in _ds["droughtDistanceWeights"]]
+        # [T, T] 1 where two plots lie within that reach (`_drought_sites`)
+        self._drought_within = (self.pair_dist <= len(self._drought_dist_w) - 1).to(torch.float32)
         # THE EIGHT ERUPTION ROWS (`ERUPTION_ROWS`: Eyjafjallajokull's two,
         # Kilimanjaro's two, Vesuvius's, then the volcano's three), one entry
         # per row: the per-plot Volcanic Soil chance and the
@@ -2638,6 +2666,9 @@ class SimInit:
         def _erf(k: str) -> torch.Tensor:
             return torch.tensor([float(x) for x in _ds[k]], dtype=torch.float64, device=device)
         self._er_paint_p = _erf("eruptionPaintP")
+        # a painted plot's +1 Production, Science and Culture chances
+        self._er_prod_p, self._er_sci_p = _erf("eruptionProdP"), _erf("eruptionSciP")
+        self._er_cul_p = _erf("eruptionCulP")
         self._er_destroy_p, self._er_district_p = _erf("eruptionDestroyP"), _erf("eruptionDistrictP")
         self._er_bldg_p, self._er_pop_p = _erf("eruptionBldgP"), _erf("eruptionPopP")
         self._er_civ_kill_p = _erf("eruptionCivKillP")
@@ -2875,10 +2906,7 @@ class SimInit:
             width = max(int(n.max()), 1)
             idx = torch.argsort((~cand).to(torch.int8), dim=1, stable=True)[:, :width]
             return idx, n
-        # the flood sites (`floodSites`): one plot per river carrying
-        # Floodplains, and each riverless Floodplains plot
-        self._build_flood_sites()
-        # the volcanoes each game holds (`volcano_tile` is packed from 0)
+        # the active volcanoes each game holds (`volcano_tile` is packed from 0)
         self._volc_n = (self.volcano_tile >= 0).sum(dim=1)
         # one start-tile list per storm family (`stormFamilyAt`)
         self._storm_lists = [cand_list(self.storm_fam == f) for f in range(max(self._st_family) + 1)]

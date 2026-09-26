@@ -96,7 +96,7 @@ def main() -> None:
     rules = load_rules()
     path = fixture_paths()[0]
     sim = fresh(rules, path)
-    assert sim._soil_fid == SOIL and sim._soil_replaces == [WOODS, RAINFOREST], "the catalog order moved"
+    assert sim._soil_fid == SOIL and sim._soil_replaces == [WOODS, RAINFOREST, MARSH], "the catalog order moved"
 
     # 1 — the envelope
     t = bare_land(sim)
@@ -104,13 +104,13 @@ def main() -> None:
     sim.improvement[B0, t] = 0
     assert paintable(sim, t), "an improvement does not refuse the soil"
     sim.improvement[B0, t] = -1
-    for f in (WOODS, RAINFOREST):
+    for f in (WOODS, RAINFOREST, MARSH):
         sim.feat_id[B0, t] = f
         assert paintable(sim, t), f"feature {f} is replaced"
     sim.feat_stripped[B0, t] = True
     assert paintable(sim, t), "a chopped plot is bare"
     sim.feat_stripped[B0, t] = False
-    for f in (MARSH, FLOODPLAINS, GEO, SOIL):
+    for f in (FLOODPLAINS, GEO, SOIL):
         sim.feat_id[B0, t] = f
         assert not paintable(sim, t), f"feature {f} is never painted"
     sim.feat_id[B0, t] = -1
@@ -123,7 +123,7 @@ def main() -> None:
         assert not paintable(sim, t), "water, a Mountain or a drowned plot refuses"
         plane[B0, t] = False
     assert not paintable(sim, -1)
-    print("  1 envelope OK — bare, improved, Woods, Rainforest in; the rest out")
+    print("  1 envelope OK — bare, improved, Woods, Rainforest, Marsh in; the rest out")
 
     # 2 — a painted Woods reads as a chopped one, plus the soil's name
     chop = fresh(rules, path, slot=1)
@@ -167,6 +167,11 @@ def main() -> None:
     assert sim3._eruption_weight == [4, 2.5, 4, 2.5, 7, 4, 2.5, 1.5]
     hit = torch.zeros(sim3.B, dtype=torch.bool)
     hit[B0] = True
+    # a painted plot's +1 Production / Science / Culture chances, per row
+    assert sim3._er_prod_p.tolist()[VOLC0:] == [0.15, 0.25, 0.35]
+    assert sim3._er_sci_p.tolist()[VOLC0:] == [0.0, 0.1, 0.15]
+    assert sim3._er_cul_p.tolist() == [0, 0, 0, 0, 0.5, 0, 0, 0]
+    silted = [[0, 0, 0] for _ in range(3)]
     for sev in range(3):
         plots = painted = 0
         for it in range(400):
@@ -178,12 +183,17 @@ def main() -> None:
             before = sim3.feat_id[B0].clone()
             s0 = int(sim3.rng_state[B0])
             sim3._erupt(hit, ring_of(sim3, v), torch.full((sim3.B,), VOLC0 + sev, dtype=torch.long))
-            assert (s0 + (len(elig) + 6 * len(ring)) * STEP) & 0xFFFFFFFF == int(sim3.rng_state[B0]), \
-                "an eruption draws once per eligible ring plot, then six per ring plot"
+            assert (s0 + (4 * len(elig) + 6 * len(ring)) * STEP) & 0xFFFFFFFF == int(sim3.rng_state[B0]), \
+                "an eruption draws four times per eligible ring plot, then six per ring plot"
             for n in ring:
+                silt = (int(sim3.fertility_prod[B0, n]), int(sim3.fertility_sci[B0, n]),
+                        int(sim3.fertility_cul[B0, n]))
                 if n in elig:
                     plots += 1
                     painted += int(int(sim3.feat_id[B0, n]) == SOIL)
+                    if int(sim3.feat_id[B0, n]) != SOIL:
+                        assert silt == (0, 0, 0), f"unpainted plot {n} silted {silt}"
+                    silted[sev] = [a + int(b > 0) for a, b in zip(silted[sev], silt)]
                 else:
                     assert int(sim3.feat_id[B0, n]) == int(before[n]), f"ineligible plot {n} was painted"
             if plots >= 1200:
@@ -192,7 +202,12 @@ def main() -> None:
         assert plots >= 300, f"only {plots} eligible ring plots over the runs"
         rate = painted / plots
         assert abs(rate - p) < 0.05, f"severity {sev}: painted {painted}/{plots} = {rate:.3f} against {p}"
-        print(f"  3 eruption paint OK — severity {sev}: {painted}/{plots} = {rate:.3f} against {p}")
+        for k, py in enumerate((sim3._er_prod_p, sim3._er_sci_p, sim3._er_cul_p)):
+            want = float(py[VOLC0 + sev])
+            got = silted[sev][k] / painted
+            assert abs(got - want) < 0.06, f"severity {sev} silt {k}: {silted[sev][k]}/{painted} against {want}"
+        print(f"  3 eruption paint OK — severity {sev}: {painted}/{plots} = {rate:.3f} against {p}, "
+              f"silt {silted[sev]} of {painted}")
 
     # 4 — the turn's draw names the severity: over the eruptions it fires,
     # GENTLE / CATASTROPHIC / MEGACOLOSSAL come in proportion to 4 / 2.5 / 1.5
@@ -203,13 +218,13 @@ def main() -> None:
                                           for x in row[hit].tolist()]
     sim4._flood_river = lambda hit, tile, sev: None
     strip = sim4._desertification_live()
-    for _ in range(3000):
+    for _ in range(8000):
         sim4.storm_left.zero_()
         sim4._random_event(strip)
     del sim4._erupt, sim4._flood_river
     sim4._eruption_weight = ew
     n = sum(seen)
-    assert n > 300, f"only {n} eruptions in 3000 draws"
+    assert n > 300, f"only {n} eruptions in 8000 draws"
     for s, w in enumerate((4, 2.5, 1.5)):
         assert abs(seen[s] / n - w / 8) < 0.05, f"severity {s}: {seen[s]}/{n} against {w}/8"
     print(f"  4 eruption severity OK — {seen} over {n} eruptions against 4 / 2.5 / 1.5")
@@ -228,7 +243,9 @@ def main() -> None:
     kt = bare_land(sim5)
     sim5.feat_id[B0, kt] = kf
     sim5._flood_weight = [0.0] * len(sim5._flood_weight)
-    sim5._eruption_weight = [0.0, 0.0, 4.0, 2.5, 0.0, 0.0, 0.0, 0.0]
+    # scaled past the normaliser, so the capped chances sum to 1: every turn
+    # fires, in the rows' 4 : 2.5
+    sim5._eruption_weight = [0.0, 0.0, 400.0, 250.0, 0.0, 0.0, 0.0, 0.0]
     sim5._meteor_weight = 0.0
     sim5._fire_weight = [0.0] * len(sim5._fire_weight)
     sim5._st_weight = [0.0] * len(sim5._st_weight)
@@ -254,17 +271,26 @@ def main() -> None:
     assert abs(rows_seen[0] / n - 4 / 6.5) < 0.03, f"GENTLE {rows_seen[0]}/{n} against 4/6.5"
     print(f"  5 Kilimanjaro OK — {rows_seen} over {n} draws against 4 / 2.5, over its ring")
 
-    # 6 — THE DAMAGE ROWS, plot by plot (`eruptTile`): every open ring plot
-    # a Farm; a Warrior and a Builder on two of them, a Galley on a water one
-    v6 = volc[0]
+    # 6 — THE DAMAGE ROWS, plot by plot (`eruptTile`), on OWNED plots only:
+    # every open ring plot a Farm, all but one owned; a Warrior and a Builder
+    # on an owned one, a Warrior and a bonus resource on the unowned one, a
+    # Galley on a water one
     probe = fresh(rules, path, slot=5)
+
+    def open_land(v: int) -> list[int]:
+        ring = [int(n) for n in probe.neigh[v].tolist() if int(n) >= 0]
+        return [n for n in ring if not bool(probe.water[B0, n]) and not bool(probe.tile_mountain[B0, n])
+                and bool(probe.passable[B0, n]) and int(probe.centre_slot_at[B0, n]) < 0
+                and int(probe.district[B0, n]) < 0 and int(probe.built_wonder[B0, n]) < 0
+                and int(probe.military_at[B0, n]) < 0 and int(probe.civilian_at[B0, n]) < 0
+                and int(probe.res_priority[B0, n]) == 0]
+    # any volcano of the map, active or not: `_erupt` is handed its ring
+    v6 = max((int(v) for v in probe.volcano_at[B0].nonzero().flatten().tolist()), key=lambda v: len(open_land(v)))
     ring6 = [int(n) for n in probe.neigh[v6].tolist() if int(n) >= 0]
-    land6 = [n for n in ring6 if not bool(probe.water[B0, n]) and not bool(probe.tile_mountain[B0, n])
-             and bool(probe.passable[B0, n]) and int(probe.centre_slot_at[B0, n]) < 0
-             and int(probe.district[B0, n]) < 0 and int(probe.built_wonder[B0, n]) < 0
-             and int(probe.military_at[B0, n]) < 0 and int(probe.civilian_at[B0, n]) < 0]
+    land6 = open_land(v6)
     sea6 = [n for n in ring6 if bool(probe.water[B0, n]) and int(probe.military_at[B0, n]) < 0]
     assert len(land6) >= 2, f"volcano {v6} has too little open land on its ring"
+    owned6, open6 = land6[:-1], land6[-1]
     one = torch.zeros(probe.B, dtype=torch.bool)
     one[B0] = True
     for row, want_destroy, want_kill in ((VOLC0, 0.0, 0.0), (VOLC0 + 1, 0.75, 0.2)):
@@ -277,11 +303,19 @@ def main() -> None:
             for n in land6:
                 s.improvement[B0, n] = s.FARM
                 s.pillaged[B0, n] = False
-            w = put(s, land6[0], "WARRIOR")
-            b = put(s, land6[1], "BUILDER")
+                s.tile_seat[B0, n] = 0 if n != open6 else -1
+            s.res_priority[B0, open6] = 1
+            w = put(s, owned6[0], "WARRIOR")
+            b = put(s, owned6[0], "BUILDER")
+            u = put(s, open6, "WARRIOR")
             g = put(s, sea6[0], "GALLEY") if sea6 else -1
             s._erupt(one, ring_of(s, v6), torch.full((s.B,), row, dtype=torch.long))
-            for n in land6:
+            assert int(s.improvement[B0, open6]) == s.FARM and not bool(s.pillaged[B0, open6]), \
+                "an unowned plot takes no damage row"
+            assert int(s.major_unit_hp[B0, u]) == 100, "a unit on an unowned plot is untouched"
+            assert bool(s.res_stripped[B0, open6]) and int(s.res_priority[B0, open6]) == 0, \
+                "a bonus resource on the ring goes whoever owns the plot"
+            for n in owned6:
                 farms += 1
                 if int(s.improvement[B0, n]) < 0:
                     gone += 1

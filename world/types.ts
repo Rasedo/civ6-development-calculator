@@ -203,6 +203,10 @@ export interface Tile {
   road?: boolean;
   goodyHut: boolean;
   volcano: boolean;
+  /** CIV6 (`RealismSettings.PercentVolcanoesActive`): this volcano is ACTIVE
+   *  and may erupt. Drawn once per volcano when the game is made from the map
+   *  (`deriveVolcanoActivity`), never read off the world file. */
+  volcanoActive?: boolean;
   /** a CITIZEN is PINNED to this plot. `assignWorkedTiles` takes every
    *  locked plot the city can work before it ranks anything by score, so a
    *  lock is how a player overrides the automatic allocation for tiles the
@@ -253,6 +257,10 @@ export interface Tile {
   /** the PRODUCTION half of flood silt — real Civ 6 fertilizes food and
    *  production on separate rolls, so the two accumulate apart. */
   fertilityProd: number;
+  /** the SCIENCE and CULTURE silt an eruption leaves on a plot it paints
+   *  (`RandomEvent_Yields` YIELD_SCIENCE, YIELD_CULTURE); absent = none. */
+  fertilitySci?: number;
+  fertilityCul?: number;
   droughtTurns: number;
   /** CIV6 (`RandomEvents`, Duration 3): a STORM centred here — the
    *  `STORM_EVENTS` row it is, and the turns it has left to apply its

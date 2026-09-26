@@ -494,23 +494,7 @@ class SimOrders:
                     else:
                         _psc = _psc[_r]
                     _amt = js_round(_hamt[_r].double() * _psc * _hm)
-                    # TS harvests with `tile.resource = null`, so the tile
-                    # becomes the same tile with NO resource: every baked
-                    # flag takes its resource-free value (`_nr_planes`), not
-                    # just the stripped bit. A paved tile never needed this —
-                    # a zero-yield district hides the loss.
-                    self.res_stripped[_r, _t] = True
-                    for _p, _bare in self._nr_planes:
-                        getattr(self, _p)[_r, _t] = _bare[_r, _t]
-                    # the resource-free values carry the STARTING feature; a
-                    # plot whose feature is already gone takes its job flags
-                    # from the ground as it stands
-                    _gone = self.feat_stripped[_r, _t]
-                    if bool(_gone.any()):
-                        self._bare_ground_jobs(_r[_gone], _t[_gone])
-                    # a sea resource also lends SEA_RESOURCE adjacency, and
-                    # that read is live on TS
-                    self._withdraw_sea_adj(_r, _t)
+                    self._drop_resource(_r, _t)
                     _col_h = self._city_col_at(row, _r, _t)
                     _drip_h = self.city_progress[:, row, :, 0].clone()
                     for _i in range(len(_r)):
@@ -1718,6 +1702,29 @@ class SimOrders:
         self.farm_flat[rows, tiles] = self._fa_f_c[rows, tiles]
         self.farm_hill[rows, tiles] = self._fa_h_c[rows, tiles]
         self.mine_ok[rows, tiles] = self._mi_c[rows, tiles]
+
+    def _drop_resource(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """`tile.resource = null` on (row, tile) pairs holding a live
+        resource — a harvest, an eruption's lost bonus resource: the plot
+        becomes the same plot with NO resource, so every baked flag takes its
+        resource-free value (`_nr_planes`), not just the stripped bit. Those
+        values carry the STARTING feature: a plot whose feature is gone takes
+        its job flags from the ground as it stands, and one an eruption
+        painted keeps the soil's zeroed chop key (`_paint_soil`). A sea resource
+        also takes back the SEA_RESOURCE adjacency it lent, which TS reads
+        live."""
+        self.res_stripped[rows, tiles] = True
+        for _p, _bare in self._nr_planes:
+            getattr(self, _p)[rows, tiles] = _bare[rows, tiles]
+        _soil = ((self.feat_id[rows, tiles] == self._soil_fid) & ~self.feat_stripped[rows, tiles]
+                 & (self.feat_id0[rows, tiles] != self._soil_fid))
+        _gone = self.feat_stripped[rows, tiles] | _soil
+        if bool(_gone.any()):
+            self._bare_ground_jobs(rows[_gone], tiles[_gone])
+        if bool(_soil.any()):
+            self.tile_ftr[rows[_soil], tiles[_soil]] = 0
+        self._withdraw_sea_adj(rows, tiles)
+        self._eff_version += 1
 
     def _withdraw_sea_adj(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """Withdraw the SEA_RESOURCE adjacency a paved-over water tile lent.

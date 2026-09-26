@@ -119,11 +119,12 @@ describe('Volcanic Soil', () => {
     const volcano = tileAtCoords(state.map, 8, 8);
     volcano.elevation = 'MOUNTAIN';
     volcano.volcano = true;
+    volcano.volcanoActive = true;
     const slope = tileAtCoords(state.map, 9, 8);
     setTileOwner(slope, 0);
 
     let guard = 0;
-    while (slope.fertility === 0 && guard++ < 600) disasterPhase(state);
+    while (slope.fertility === 0 && guard++ < 3000) disasterPhase(state);
     expect(slope.fertility).toBeGreaterThanOrEqual(1);
   });
 });

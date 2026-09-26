@@ -244,16 +244,26 @@ def poke_river_reach() -> None:
             f"tile {t} is on ANOTHER river and the flood reached it"
     print(f"  f river reach OK — {n} floodplains flooded together, {len(off)} off-river spared")
 
-    # THE FLOOD SITES (`floodSites`): the turn's draw weighs each flood row
-    # once per RIVER carrying Floodplains, named by its lowest Floodplains
-    # plot, and once per Floodplains plot no river touches — ascending.
+    # THE FLOOD SITES (`floodSites`, shipped by the exporter): the turn's draw
+    # weighs each flood row once per RIVER carrying Floodplains and once per
+    # Floodplains plot no river touches, in the order of each one's lowest
+    # Floodplains plot; a river's site is the Floodplains plot its flood
+    # starts on (its upstream-most), one of its own.
     rivers = {int(c) for c in rc[fp].tolist() if int(c) >= 0}
     alone = [t for t in (fp & (rc < 0)).nonzero(as_tuple=True)[0].tolist()]
     lead = [int(((rc == c) & fp).nonzero(as_tuple=True)[0].min()) for c in rivers]
     idx, cnt = sim._flood_sites
     got = idx[0, : int(cnt[0])].tolist()
-    assert got == sorted(lead + alone), f"flood sites {got} against {sorted(lead + alone)}"
-    print(f"  g flood sites OK — {len(rivers)} rivers and {len(alone)} lone floodplains, one site each")
+    assert all(bool(fp[s]) for s in got), f"a flood site off the Floodplains: {got}"
+
+    def lead_of(s: int) -> int:
+        c = int(rc[s])
+        return s if c < 0 else int(((rc == c) & fp).nonzero(as_tuple=True)[0].min())
+    assert [lead_of(s) for s in got] == sorted(lead + alone), \
+        f"flood sites {got} name {[lead_of(s) for s in got]}, not {sorted(lead + alone)}"
+    moved = sum(1 for s in got if lead_of(s) != s)
+    print(f"  g flood sites OK — {len(rivers)} rivers and {len(alone)} lone floodplains, one site each, "
+          f"{moved} rivers starting upstream of their lowest plot")
 
 
 if __name__ == "__main__":

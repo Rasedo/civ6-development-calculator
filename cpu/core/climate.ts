@@ -228,6 +228,8 @@ export function submergeTile(state: GameState, tile: Tile): void {
   tile.gpPerm = undefined;
   tile.fertility = 0;
   tile.fertilityProd = 0;
+  tile.fertilitySci = undefined;
+  tile.fertilityCul = undefined;
   tile.droughtTurns = 0;
 }
 

@@ -599,10 +599,12 @@ STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
 
 
 def test_reactor_accident(sim) -> None:
-    """10. THE ACCIDENT — MEASURED over 75 forced accidents: the damage rows'
-    Percentages are per-accident CHANCES. Two draws, always; the Industrial
+    """10. THE ACCIDENT — MEASURED over 225 forced accidents: the damage rows'
+    Percentages are per-accident CHANCES. Five draws, always; the Industrial
     Zone pillaged at 0 / 50 / 100, one citizen lost at 0 / 0 / 80, fallout
-    on the reactor's own plot alone for 2 / 10 / 20 turns, the plant kept.
+    on the reactor's own plot alone for 2 / 10 / 20 turns, the plant kept
+    and never pillaged; the land units on that plot struck at 0 / 50 / 100
+    for 20-50, its civilians killed at 0 / 50 / 100, a unit off it untouched.
     And the site: a reactor is one only past each row's MinTurnAtRisk."""
     row, j = a_city(sim)
     izt = put_district(sim, row, j, sim._iz_idx)
@@ -615,25 +617,54 @@ def test_reactor_accident(sim) -> None:
     assert sim._accident_min_turn == [10, 20, 30]
     assert sim._accident_fallout.tolist() == [2, 10, 20]
     assert sim._accident_weight == [1, 1, 1]
+    assert sim._accident_land_p == [0, 0.5, 1] and sim._accident_civ_kill_p == [0, 0.5, 1]
+    assert sim._accident_dmg_lo == [0, 20, 20] and sim._accident_dmg_hi == [0, 50, 50]
+    uids = [u["id"] for u in json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))["units"]]
+    lo = sim.POOL_LO["major"]
+    # a Warrior and a Builder on the reactor's plot, a Warrior in the centre
+    units = [(izt, uids.index("WARRIOR"), sim.military_at), (izt, sim._builder_idx, sim.civilian_at),
+             (centre, uids.index("WARRIOR"), sim.military_at)]
+    slots = [place(sim, t, ty, row, hp=100) for t, ty, _p in units]
+
+    def arm() -> None:
+        for s, (t, _ty, plane) in zip(slots, units):
+            sim.major_unit_alive[0, s] = True
+            sim.major_unit_hp[0, s] = 100
+            plane[0, t] = s + lo
     N = 1500
     for sev, (dp, pp) in enumerate(((0.0, 0.0), (0.5, 0.0), (1.0, 0.8))):
-        pillaged = lost = 0
+        pillaged = lost = struck = killed = 0
+        band: set[int] = set()
         for _ in range(N):
             sim.district_pillaged[0, izt] = False
             sim.tile_fallout[0] = 0
             sim.city_pop[0, row, j] = 12
+            arm()
             s0 = int(sim.rng_state[0])
             sim._nuclear_accident(hit, at, sev)
-            assert (s0 + 2 * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), "an accident draws twice"
+            assert (s0 + 5 * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), "an accident draws five times"
             assert int(sim.tile_fallout[0, izt]) == int(sim._accident_fallout[sev])
             assert int((sim.tile_fallout[0] > 0).sum()) == 1, "fallout on the reactor's plot alone"
             pop = int(sim.city_pop[0, row, j])
             assert pop in (11, 12), "an accident takes one citizen at most"
             pillaged += int(bool(sim.district_pillaged[0, izt]))
             lost += int(pop == 11)
+            d = 100 - int(sim.major_unit_hp[0, slots[0]])
+            if d:
+                struck += 1
+                band.add(d)
+            killed += int(not bool(sim.major_unit_alive[0, slots[1]]))
+            assert int(sim.major_unit_hp[0, slots[2]]) == 100, "a unit off the reactor's plot is untouched"
         assert bool(sim.city_bldg[0, row, j, nuc]), "the plant stays"
+        assert not bool(sim.city_bldg_pillaged[0, row, j, nuc]), "the plant is never pillaged"
         assert abs(pillaged / N - dp) < 0.04, f"severity {sev}: zone pillaged {pillaged}/{N}"
         assert abs(lost / N - pp) < 0.04, f"severity {sev}: citizen lost {lost}/{N}"
+        assert abs(struck / N - sim._accident_land_p[sev]) < 0.04, f"severity {sev}: land struck {struck}/{N}"
+        assert abs(killed / N - sim._accident_civ_kill_p[sev]) < 0.04, f"severity {sev}: civilians {killed}/{N}"
+        assert all(20 <= x <= 50 for x in band), f"severity {sev}: band {sorted(band)}"
+    for s, (t, _ty, plane) in zip(slots, units):
+        sim.major_unit_alive[0, s] = False
+        plane[0, t] = -1
     sim.tile_fallout[0] = 0
     sim.district_pillaged[0, izt] = False
     # the site: ages 9 / 10 / 25 / 30 open no row / MINOR / MINOR+MAJOR / all
@@ -655,8 +686,8 @@ def test_reactor_accident(sim) -> None:
     sim._accident_weight = w0
     sim.city_reactor_age[0, row, j] = -1
     sim.city_bldg[0, row, j, nuc] = False
-    print("  accident OK: two draws, the zone and one citizen at the rows' chances, fallout on the "
-          "reactor's plot alone, the plant kept, a site only past each MinTurnAtRisk")
+    print("  accident OK: five draws, the zone, one citizen and the plot's units at the rows' chances, "
+          "fallout on the reactor's plot alone, the plant kept, a site only past each MinTurnAtRisk")
 
 
 def test_free_city_reactor(sim) -> None:

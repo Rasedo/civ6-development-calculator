@@ -72,18 +72,17 @@ def put(sim, row: int, kind: str, tile: int) -> int:
 
 
 def only(sim, keep: str) -> None:
-    """zero every row of the draw but `keep`'s family"""
-    if keep != "flood":
-        sim._flood_weight = [0.0] * len(sim._flood_weight)
-    if keep != "eruption":
-        sim._eruption_weight = [0.0] * len(sim._eruption_weight)
+    """zero every row of the draw but `keep`'s family, and scale that
+    family's weights far past the normalisers, so the capped chances sum to 1
+    and every draw fires one of its rows in their own proportions"""
+    k = 1000.0
+    sim._flood_weight = [w * k if keep == "flood" else 0.0 for w in sim._flood_weight]
+    sim._eruption_weight = [w * k if keep == "eruption" else 0.0 for w in sim._eruption_weight]
     sim._st_weight = [0.0] * len(sim._st_weight)
     sim._accident_weight = [0.0] * len(sim._accident_weight)
     sim._drought_weight = [0.0] * len(sim._drought_weight)
-    if keep != "meteor":
-        sim._meteor_weight = 0.0
-    if keep != "fire":
-        sim._fire_weight = [0.0] * len(sim._fire_weight)
+    sim._meteor_weight = sim._meteor_weight * k if keep == "meteor" else 0.0
+    sim._fire_weight = [w * k if keep == "fire" else 0.0 for w in sim._fire_weight]
 
 
 def main() -> None:

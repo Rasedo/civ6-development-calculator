@@ -543,7 +543,8 @@ class SimEconomy:
         `tile` [B] (-1 = none)? Land that is not a Mountain and not drowned,
         with no district (a city centre included, kept apart in
         `centre_slot_at`) and no wonder, either bare (a chopped feature is
-        bare) or under a LIVE feature the soil replaces (Woods, Rainforest)."""
+        bare) or under a LIVE feature the soil replaces (Woods, Rainforest,
+        Marsh)."""
         t1 = tile.clamp(min=0).unsqueeze(1)
 
         def at(p: torch.Tensor) -> torch.Tensor:
@@ -701,12 +702,35 @@ class SimEconomy:
         self._nprod_cache = (self._eff_version, out)
         return out
 
+    def _silt_y(self) -> torch.Tensor | None:
+        """[B, T, 6] the SCIENCE and CULTURE silt (`fertilitySci`,
+        `fertilityCul`) in their yield columns — tileYields' fertility lines,
+        which a natural-wonder plot never reaches — or None while no plot
+        holds any."""
+        if not bool(self.fertility_sci.any()) and not bool(self.fertility_cul.any()):
+            return None
+        out = torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device)
+        live = (~self.nwonder).to(self.dtype)
+        out[:, :, 3] = self.fertility_sci.to(self.dtype) * live
+        out[:, :, 4] = self.fertility_cul.to(self.dtype) * live
+        return out
+
     def _fertilize(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """+1 fertility (capped) on land, non-mountain tiles. (row, tile)
         pairs must be unique — duplicates would collapse to a single +1."""
         ok = self.fertilizable[rows, tiles]
         r2, t2 = rows[ok], tiles[ok]
         self.fertility[r2, t2] = (self.fertility[r2, t2] + 1).clamp(max=3)
+
+    def _silt(self, plane: torch.Tensor, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """`silt` — +1 of one silt channel (`plane`, capped) on the land,
+        non-mountain (row, tile) pairs, while each game's climate still lays
+        fertility down. Pairs must be unique."""
+        ok = self.fertilizable[rows, tiles] & self._fertility_live()[rows]
+        r2, t2 = rows[ok], tiles[ok]
+        if r2.numel():
+            plane[r2, t2] = (plane[r2, t2] + 1).clamp(max=3)
+            self._eff_version += 1
 
     def _fertilize_counted(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """Like _fertilize but duplicate (row, tile) pairs stack: min(3,
@@ -1012,7 +1036,8 @@ class SimEconomy:
                        ("lux_id", -1), ("lux_req", -9), ("res_imp", -1),
                        ("tile_lowland", 0), ("encamp_hp", 0), ("encamp_outer_hp", 0),
                        ("park", -1), ("tile_air_bonus", 0), ("tile_gp_perm", 0), ("fertility", 0),
-                       ("fertility_prod", 0), ("drought", 0), ("wok", 0)):
+                       ("fertility_prod", 0), ("fertility_sci", 0), ("fertility_cul", 0),
+                       ("drought", 0), ("wok", 0)):
             getattr(self, _p)[take] = _v
         self.tile_yields[take] = 0
         # water housing is fresh-water first, then coastal — and the ground the
@@ -1418,6 +1443,36 @@ class SimEconomy:
         featureless = (self.feat_id < 0) | self.feat_stripped
         return self.drought_cand & featureless & ~self.tile_submerged
 
+    def _drought_sites(self, cand: torch.Tensor) -> torch.Tensor:
+        """[B, T] `droughtSites` — the city centres (a major's, a Free City's,
+        a city-state's) holding a drought start plot (`cand`) within the
+        reach of `DROUGHT_DISTANCE_WEIGHTS`, the cities a drought may anchor
+        on, read in ascending centre order."""
+        near = (cand.to(torch.float32) @ self._drought_within) > 0
+        return self._centre_plane() & near
+
+    def _drought_start(self, hit: torch.Tensor, sites: torch.Tensor,
+                       cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """`droughtStart` — a drought's start plot where `hit` [B]: THREE
+        draws — the city, uniformly over `sites`; the distance, by the
+        distance weights over the distances where that city holds a start
+        plot; the plot, uniformly over its start plots at that distance in
+        ascending order. Returns (got, tile) in `_pick_live`'s shape."""
+        got, centre = self._pick_live(hit, sites)
+        dist = self.pair_dist[centre].long()  # [B, T]
+        avail = [got & (cand & (dist == d)).any(dim=1) for d in range(len(self._drought_dist_w))]
+        total = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for d, w in enumerate(self._drought_dist_w):
+            total = total + w * avail[d].double()
+        at = self._next_random(got) * total
+        chosen = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        cum = torch.zeros_like(total)
+        for d, w in enumerate(self._drought_dist_w):
+            cum = cum + w * avail[d].double()
+            take = avail[d] & (chosen < 0) & (at < cum)
+            chosen = torch.where(take, torch.full_like(chosen, d), chosen)
+        return self._pick_live(got, cand & (dist == chosen.unsqueeze(1)))
+
     def _drought_barred(self) -> torch.Tensor:
         """[B, T] `droughtBars` for the improvement standing on each plot: a
         drought's own improvement (`_drought_imps`) under a live drought is
@@ -1443,27 +1498,6 @@ class SimEconomy:
         self.city_reactor_age[:, row, :cols] = torch.where(
             has, age.clamp(min=0) + 1, torch.full_like(age, -1))
 
-    def _build_flood_sites(self) -> None:
-        """`floodSites` — the plots a flood can start from, in ascending tile
-        order: one per river carrying Floodplains, named by its lowest-index
-        Floodplains plot, and each Floodplains plot no river touches. Static:
-        neither rivers nor Floodplains move. `(idx, n)` in `_pick_static`'s
-        list shape."""
-        B, T, dev = self.B, self.T, self.device
-        tiles = torch.arange(T, device=dev).unsqueeze(0).expand(B, T)
-        comp = self.river_comp
-        on_river = self.floodplain & (comp >= 0)
-        n_comp = max(int(comp.max()) + 1, 1)
-        first = torch.full((B, n_comp), T, dtype=torch.long, device=dev)
-        first.scatter_reduce_(1, comp.clamp(min=0), torch.where(on_river, tiles, torch.full_like(tiles, T)),
-                              reduce="amin")
-        lead = first.gather(1, comp.clamp(min=0)) == tiles
-        site = self.floodplain & ((comp < 0) | lead)
-        n = site.sum(dim=1)
-        width = max(int(n.max()), 1)
-        idx = torch.argsort((~site).to(torch.int8), dim=1, stable=True)[:, :width]
-        self._flood_sites = (idx, n)
-
     def _reactor_plane(self) -> torch.Tensor:
         """[B, T] — the reactor age of the major city centred on each tile, -1
         elsewhere: the accident's sites, read in ascending centre order
@@ -1483,15 +1517,20 @@ class SimEconomy:
         return out
 
     def _random_event(self, strip: torch.Tensor) -> None:
-        """`randomEvent` — THE TURN'S ONE RANDOM EVENT, MEASURED (lab 4, a
-        natural 251-turn game): at most one event a turn, drawn over the
-        eligible (row, site) pairs with each row's `OccurrencesPerGame` as the
-        pair's weight. ONE draw `at = r * total` walks the rows in table
-        order: the row whose cumulative weight first exceeds `at` fires, at
-        site `floor((at - weight before it) / row weight)`. A storm, a
-        drought, the meteor and a fire is ONE site when its start plot exists
-        anywhere, and its plot is a second draw; a flood has one site per
-        river, a volcano's eruption one per volcano, a natural wonder's one
+        """`randomEvent` — THE TURN'S ONE RANDOM EVENT, MEASURED (C-74-S1): at
+        most one event a turn. Each eligible (row, site) pair fires with the
+        absolute chance p = weight / N — N the per-site normaliser for a
+        flood, an eruption or an accident, the per-map one for a storm, a
+        drought, the meteor or a fire (`eventNorm`) — the turn is EMPTY with
+        what is left, and chances summing past 1 are scaled to sum to 1. ONE
+        draw `at = r * max(1, total)` walks the rows in table order: the row
+        whose cumulative chance first exceeds `at` fires, at site
+        `floor((at - chance before it) / p)`; past the last, nothing fires. A
+        storm, the meteor and a fire is ONE site when its start plot exists
+        anywhere, and its plot is a second draw; a drought is one site while a
+        city holds a start plot in reach (`_drought_sites`), its plot three
+        more draws (`_drought_start`); a flood has one site per river, a
+        volcano's eruption one per ACTIVE volcano, a natural wonder's one
         while the wonder stands (its plots together), an accident one per
         city — a major's or a Free City's — whose reactor has reached the
         row's `MinTurnAtRisk`. The draw is spent every turn, eligible or
@@ -1499,6 +1538,8 @@ class SimEconomy:
         B, dev = self.B, self.device
         every = torch.ones(B, dtype=torch.bool, device=dev)
         rows = self._event_rows()
+        per_site = (self._EV_FLOOD, self._EV_ERUPTION, self._EV_ACCIDENT)
+        per = [w / (self._event_norm_site if fam in per_site else self._event_norm_map) for fam, _s, w in rows]
         # `stormFamilyAt` is null on a SUBMERGED tile: while nothing has
         # drowned the static per-family lists are the live sets; after a
         # sea-level rise the count and the pick read the live mask
@@ -1509,6 +1550,7 @@ class SimEconomy:
         acc_sites = [reactor >= g for g in self._accident_min_turn]
         wonder = [self._wonder_plots(f) for f in self._er_wonder_fid]
         dry_cand = self._drought_cands()
+        dry_sites = self._drought_sites(dry_cand)
         met_cand = self._meteor_cands()
         fire_cand = [self._fire_cands(s) for s in range(len(self._fire_weight))]
         counts: list[torch.Tensor] = []
@@ -1522,22 +1564,22 @@ class SimEconomy:
             elif fam == self._EV_ACCIDENT:
                 counts.append(acc_sites[s].sum(dim=1))
             elif fam == self._EV_DROUGHT:
-                counts.append(dry_cand.any(dim=1).long())
+                counts.append(dry_sites.any(dim=1).long())
             elif fam == self._EV_METEOR:
                 counts.append(met_cand.any(dim=1).long())
             else:
                 counts.append(fire_cand[s].any(dim=1).long())
         cum: list[torch.Tensor] = []
         total = torch.zeros(B, dtype=torch.float64, device=dev)
-        for (_f, _s, w), n in zip(rows, counts):
+        for w, n in zip(per, counts):
             total = total + w * n.double()
             cum.append(total)
-        at = self._next_random(every) * total
+        at = self._next_random(every) * total.clamp(min=1.0)
         ev = torch.full((B,), -1, dtype=torch.long, device=dev)
         k = torch.zeros(B, dtype=torch.long, device=dev)
         done = torch.zeros(B, dtype=torch.bool, device=dev)
         before = torch.zeros(B, dtype=torch.float64, device=dev)
-        for i, ((_f, _s, w), n) in enumerate(zip(rows, counts)):
+        for i, (w, n) in enumerate(zip(per, counts)):
             take = ~done & (n > 0) & (w > 0) & (at < cum[i])
             w1 = torch.where(w > 0, w, torch.ones_like(w))
             kk = torch.floor((at - before) / w1).to(torch.long)
@@ -1608,7 +1650,7 @@ class SimEconomy:
 
         hit = fam == self._EV_DROUGHT
         if bool(hit.any()):
-            got, tile = self._pick_live(hit, dry_cand)
+            got, tile = self._drought_start(hit, dry_sites, dry_cand)
             if bool(got.any()):
                 self._drought(got, tile, sev.clamp(min=0, max=len(self._drought_weight) - 1), strip)
 
@@ -1693,20 +1735,29 @@ class SimEconomy:
         """`erupt` — an eruption of a volcano or of a natural wonder at each
         game's `ERUPTION_ROWS` row `row` [B], over its ring [B, K]
         (`_eruption_ring`, -1 pads). CIV6 (`RandomEvent_Yields`
-        FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): one draw per eligible ring
-        plot, in ring order, at the row's paint chance; then each ring plot,
-        in ring order, takes the row's damage (`_erupt_tile`), and the ring is
-        fertilized."""
+        FEATURE_VOLCANIC_SOIL, `ReplaceFeature`): FOUR draws per eligible ring
+        plot, in ring order — the paint at the row's chance, then its
+        Production, Science and Culture chances, each +1 of that yield on a
+        plot the draw painted (`_silt`); then each ring plot, in ring order,
+        takes the row's damage (`_erupt_tile`), and the ring is fertilized."""
         p = self._er_paint_p[row]
         none = torch.full_like(row, -1)
         for d in range(ring.shape[1]):
             nd = torch.where(hit, ring[:, d], none)
             elig = self._soil_paintable(nd)
             rs = self._next_random(elig)
+            r_prod = self._next_random(elig)
+            r_sci = self._next_random(elig)
+            r_cul = self._next_random(elig)
             paint = elig & (rs < p)
             if bool(paint.any()):
                 pr = paint.nonzero(as_tuple=True)[0]
                 self._paint_soil(pr, nd[pr])
+                for plane, r, py in ((self.fertility_prod, r_prod, self._er_prod_p),
+                                     (self.fertility_sci, r_sci, self._er_sci_p),
+                                     (self.fertility_cul, r_cul, self._er_cul_p)):
+                    sel = pr[r[pr] < py[row[pr]]]
+                    self._silt(plane, sel, nd[sel])
         for d in range(ring.shape[1]):
             nd = torch.where(hit, ring[:, d], none)
             self._erupt_tile(nd >= 0, nd.clamp(min=0), row)
@@ -1719,10 +1770,12 @@ class SimEconomy:
 
     def _erupt_tile(self, on: torch.Tensor, tile: torch.Tensor, row: torch.Tensor) -> None:
         """`eruptTile` — one eruption's damage on one ring plot per game where
-        `on` [B], at each game's row: its `RandomEvent_Damages` applied as the
-        flood's are, on every ring plot whoever owns it. SIX draws per plot,
-        always, whatever stands there: improvement destroyed, district
-        pillaged, buildings pillaged, the HP band, civilian killed,
+        `on` [B], at each game's row — MEASURED (C-41-S1): its
+        `RandomEvent_Damages` land on an OWNED plot only, applied as the
+        flood's are; every BONUS resource on a land plot of the ring is lost
+        whoever owns it (`_drop_resource`). SIX draws per plot, always,
+        whatever stands there or whoever owns it: improvement destroyed,
+        district pillaged, buildings pillaged, the HP band, civilian killed,
         population. The improvement is pillaged outright (IMPROVEMENT_PILLAGED
         100 on every row); the land units and a city centre take the band
         (UNIT_DAMAGE_LAND, CITY_GARRISON, CITY_WALLS, Percentage 100); no row
@@ -1733,6 +1786,15 @@ class SimEconomy:
         r_damage = self._next_random(on)
         r_civilian = self._next_random(on)
         r_pop = self._next_random(on)
+        if not bool(on.any()):
+            return
+        t1 = tile.unsqueeze(1)
+        bonus = (on & (self.res_priority.gather(1, t1).squeeze(1) == 1)
+                 & ~self.res_stripped.gather(1, t1).squeeze(1) & ~self.water.gather(1, t1).squeeze(1))
+        if bool(bonus.any()):
+            br = bonus.nonzero(as_tuple=True)[0]
+            self._drop_resource(br, tile[br])
+        on = on & (self.tile_seat.gather(1, t1).squeeze(1) >= 0)
         if not bool(on.any()):
             return
         rows = on.nonzero(as_tuple=True)[0]
@@ -1804,15 +1866,20 @@ class SimEconomy:
 
     def _nuclear_accident(self, hit: torch.Tensor, centre: torch.Tensor, sev: int) -> None:
         """`nuclearAccident` — a nuclear accident at severity `sev` in the
-        city centred on `centre`, a major's or a Free City's, MEASURED over 75
-        forced accidents. TWO draws, always: the Industrial Zone is pillaged
-        at the row's district chance, and ONE citizen is lost at its
-        population chance (never the last). Fallout lies on the reactor's own
-        plot, the Industrial Zone, for the row's turns. No building is
-        destroyed, no ring improvement pillaged, and the plant stays, ageing
-        on."""
+        city centred on `centre`, a major's or a Free City's, MEASURED over 225
+        forced accidents. FIVE draws, always: the Industrial Zone is pillaged
+        at the row's district chance, ONE citizen is lost at its population
+        chance (never the last), and the units on the reactor's own plot take
+        the row's UNIT_DAMAGE_LAND share and band and its UNIT_KILLED_CIVILIAN
+        chance (`_strike_units`). Fallout lies on that plot, the Industrial
+        Zone, for the row's turns. No building is destroyed, no ring
+        improvement pillaged, no unit off the plot struck, and the plant is
+        never pillaged: it stays, ageing on."""
         r_district = self._next_random(hit)
         r_pop = self._next_random(hit)
+        r_land = self._next_random(hit)
+        r_civilian = self._next_random(hit)
+        r_hp = self._next_random(hit)
         rows = hit.nonzero(as_tuple=True)[0]
         c = centre[rows]
         row_of = self._seat_row[self.tile_seat[rows, c].clamp(min=0)]
@@ -1826,6 +1893,16 @@ class SimEconomy:
                     self.tile_fallout[rr, tt], self._accident_fallout[sev].expand_as(tt))
                 pil = r_district[rr] < self._accident_district_p[sev]
                 self._pillage_district(rr[pil], tt[pil])
+                on = torch.zeros_like(hit)
+                on[rr] = True
+                plot = torch.zeros_like(centre)
+                plot[rr] = tt
+                lo, hi = self._accident_dmg_lo[sev], self._accident_dmg_hi[sev]
+                dmg = lo + torch.floor(r_hp * float(hi - lo + 1)).to(torch.long)
+                owner = self.tile_seat.gather(1, plot.unsqueeze(1)).squeeze(1)
+                self._strike_units(on, plot, owner, on & (r_land < self._accident_land_p[sev]),
+                                   torch.zeros_like(on), on & (r_civilian < self._accident_civ_kill_p[sev]),
+                                   dmg, torch.zeros_like(dmg), torch.full_like(centre, -1))
         lose = r_pop[rows] < self._accident_pop_p[sev]
         for R in (*range(self.n_majors), self.FREE_ROW):
             sel = lose & (row_of == R)
@@ -5808,6 +5885,9 @@ class SimEconomy:
         ctr6 = (self.tile_yields.gather(1, _c6).double()
                 - self.feat_yields.gather(1, _c6).double() * strip
                 + self._feat_add_y().gather(1, _c6).double())
+        _silt = self._silt_y()
+        if _silt is not None:
+            ctr6 = ctr6 + _silt.gather(1, _c6).double()
         if has_bel:
             ctr6 = ctr6 + featP.gather(1, _c6).double()
         if hidY is not None:

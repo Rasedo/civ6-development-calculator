@@ -6,6 +6,7 @@ import { foundCity } from '../../cpu/core/game';
 import { slotGreedily } from '../../cpu/core/effects';
 import { deriveContinents, deriveMountainRanges } from '../../world/query';
 import { deriveLowlands, standingRemovable } from '../../cpu/core/climate';
+import { deriveVolcanoActivity } from '../../cpu/core/disasters';
 import { canFoundCity } from '../../cpu/core/rules';
 import { GP_CLASSES } from '../../cpu/data/greatPeople';
 import { spawnUnit, stepUnit, unitFullMoves } from '../../cpu/core/units';
@@ -69,6 +70,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
   deriveLowlands(map);
   deriveContinents(map);
   deriveMountainRanges(map);
+  deriveVolcanoActivity(map, 42);
   return {
     map,
     climateIdx: -1,
