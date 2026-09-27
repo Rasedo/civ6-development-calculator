@@ -394,10 +394,9 @@ class SimMasks:
         fortifications around the City Centers of all current and future
         cities and their Encampment districts", with no production and no
         building row at all, so the perimeter simply arrives at the new tier's
-        full pool. Cities founded afterwards read the same tier through
-        `_walls_max_all` and need no write; only the standing ones do, because
-        a breach they are already carrying is what the fortifications
-        replace."""
+        full pool. A city founded afterwards starts full at that tier
+        (`_found_city_at`); the standing ones are written here, because a
+        breach they are already carrying is what the fortifications replace."""
         if self._urban_def_tech < 0 or not bool(hit.any()):
             return
         full = int(self._walls_tier_hp[self._walls_tier_urban])

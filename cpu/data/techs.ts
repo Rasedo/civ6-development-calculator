@@ -377,6 +377,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Technologies', 'TechnologyType=TECH_FLIGHT', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the TechnologyPrereqs rows of TECH_FLIGHT, read as an AND-list', inputs: [xml('TechnologyPrereqs', 'Technology=TECH_FLIGHT&PrereqTech=TECH_INDUSTRIALIZATION', 'PrereqTech', { expect: 'TECH_INDUSTRIALIZATION' }), xml('TechnologyPrereqs', 'Technology=TECH_FLIGHT&PrereqTech=TECH_SCIENTIFIC_THEORY', 'PrereqTech', { expect: 'TECH_SCIENTIFIC_THEORY' })] },
     'effects.0.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_AIRSTRIP', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
+    'effects.1.district': xml('Districts', 'DistrictType=DISTRICT_AERODROME', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
   },
   COMBUSTION: {
     era: xml('Technologies', 'TechnologyType=TECH_COMBUSTION', 'EraType', { expect: 'ERA_MODERN' }),
@@ -716,6 +717,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
 
     T('FLIGHT', 'Flight', 'Modern', 1250, ['INDUSTRIALIZATION', 'SCIENTIFIC_THEORY'], [
       { kind: 'unlockImprovement', improvement: 'AIRSTRIP' },
+      { kind: 'unlockDistrict', district: 'AERODROME' },
     ]),
     T('COMBUSTION', 'Combustion', 'Modern', 1370, ['STEEL', 'REFINING']),
     T('REFINING', 'Refining', 'Modern', 1250, ['RIFLING'], [

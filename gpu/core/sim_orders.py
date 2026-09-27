@@ -1651,7 +1651,12 @@ class SimOrders:
             self.city_growth[b, row, col] = 0
             self.city_cbox[b, row, col] = 0
             self.city_acquired[b, row, col] = 0
-            self.city_outer_hp[b, row, col] = self.city_outer_hp[b, self._CITY_MINOR0 + s, 0]
+            # the minor's perimeter carries over as it stands; one at its FULL
+            # pool (TS: `outerHp` unset) stands full at the new owner's tier,
+            # set once the buildings below are in
+            _m_outer = self.city_outer_hp[b, self._CITY_MINOR0 + s, 0].clone()
+            _m_full = bool(_m_outer >= self._walls_tier_hp[self._minor_walls_tier(s)][b])
+            self.city_outer_hp[b, row, col] = _m_outer
             self._q_clear(b, row, col)
             self.city_prod_bank[b, row, col] = 0
             for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
@@ -1663,6 +1668,10 @@ class SimOrders:
             self.city_bldg_pillaged[b, row, col, :] = self.city_bldg_pillaged[b, self._CITY_MINOR0 + s, 0, :]
             self.city_bldg_era[b, row, col, :] = -1   # a minor stamps none
             self._bldg_version += 1
+            if _m_full:
+                self.city_outer_hp[b, row, col] = self._walls_max_at(
+                    torch.full((self.B,), row, dtype=torch.long, device=dev),
+                    torch.full((self.B,), col, dtype=torch.long, device=dev))[b].to(self.city_outer_hp.dtype)
             self.city_followed[b, row, col] = -1
             self.city_pressure[b, row, col, :] = 0
         self._eff_version += 1

@@ -69,7 +69,7 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { UNITS, UNIT_INDEX } from '../data/units';
 import { SPY_IDLE } from '../data/espionage';
-import { buildingCostIn } from './rules';
+import { buildingCostIn, outerPool } from './rules';
 import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
@@ -706,7 +706,9 @@ const CITY: Record<string, Extractor> = {
   gpPerm: overCities((r) => GP_CITY_PERM.map((_k: string, i: number) => r.city.gpPerm?.[i] ?? 0)),
   population: overCities((r) => r.city.population),
   hp: overCities((r) => r.city.hp),
-  outerHp: overCities((r) => r.city.outerHp ?? 0),
+  // the pool as it stands (`outerPool`): an unset `outerHp` is a FULL
+  // perimeter at the holder's tier, which is what the GPU stores
+  outerHp: overCities((r, state) => outerPool(state, r.city)),
   lastHitTurn: overCities((r) => r.city.lastHitTurn ?? 0),
   reactorAge: overCities((r) => r.city.reactorAge ?? -1),
   projectBoostTurn: overCities((r) => r.city.projectBoostTurn ?? 0),

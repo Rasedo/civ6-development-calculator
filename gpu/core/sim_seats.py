@@ -10152,6 +10152,12 @@ class SimSeats:
         old_pres = self.city_pressure[b, src_row, src_col, :].clone()
         old_hp = int(self.city_hp[b, src_row, src_col])
         old_outer = int(self.city_outer_hp[b, src_row, src_col])
+        # a perimeter at its FULL pool is TS's unset `outerHp`: it stands full
+        # at whatever tier the new holder reads, while a breached one carries
+        # its number
+        old_full = old_outer >= int(self._walls_max_at(
+            torch.full((self.B,), src_row, dtype=torch.long, device=self.device),
+            torch.full((self.B,), src_col, dtype=torch.long, device=self.device))[b])
         self._clear_city_slot(b, src_row, src_col)
         self.centre_slot_at[b, c_t] = -1
         # ...and the loser re-crowns immediately, BEFORE the route prune and
@@ -10251,12 +10257,7 @@ class SimSeats:
         self.city_acquired[b, dst_row, col] = old_acq
         self.city_loyalty[b, dst_row, col] = 100.0 if conquest else self._loyalty_after_cultural
         self.city_hp[b, dst_row, col] = half_hp if conquest else old_hp
-        # the Walls are GONE on a conquest, so `_walls_max_at` is 0 and the
-        # pool reads 0/0; the stored 0 goes in anyway, because a captor
-        # already holding Urban Defenses (a tier no building supplies) would
-        # otherwise take delivery of a city refortified the instant it changed
-        # hands. A loyalty flip breaches nothing and carries the pool it had.
-        self.city_outer_hp[b, dst_row, col] = 0 if conquest else old_outer
+        self.city_outer_hp[b, dst_row, col] = old_outer   # refitted below once the buildings are in
         self.city_last_hit[b, dst_row, col] = 0
         # the race a FREE CITY runs starts at nothing "since the Free City
         # became independent"; any other arrival carries none
@@ -10274,6 +10275,10 @@ class SimSeats:
         self.city_bldg_pillaged[b, dst_row, col, :] = old_bpil
         self.city_bldg_era[b, dst_row, col, :] = old_bera
         self._bldg_version += 1
+        if old_full:
+            self.city_outer_hp[b, dst_row, col] = self._walls_max_at(
+                torch.full((self.B,), dst_row, dtype=torch.long, device=self.device),
+                torch.full((self.B,), col, dtype=torch.long, device=self.device))[b].to(self.city_outer_hp.dtype)
         # the CONQUEROR manages nothing yet: TS's flipped literal carries no
         # `specialistPref`, so every slot goes back to the automatic rule.
         self.city_spec_pin[b, dst_row, col, :] = -1
@@ -10675,6 +10680,12 @@ class SimSeats:
         self.city_bldg_pillaged[rows, row, slot, :] = False
         self.city_bldg_era[rows, row, slot, :] = -1
         self._bldg_version += 1
+        # a new city's perimeter stands FULL at its tier (TS: `outerHp`
+        # unset): 0 with no walls, the urban pool once Urban Defenses is held
+        _colb = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        _colb[rows] = slot
+        _wm = self._walls_max_at(torch.full((self.B,), row, dtype=torch.long, device=self.device), _colb)
+        self.city_outer_hp[rows, row, slot] = _wm[rows].to(self.city_outer_hp.dtype)
         # Persistent id — foundCityAt's `nextCityId++`; tile_city stores it
         # (TS ownerCity), the slot stays a storage address only.
         _new_cid = self.civ_next_city_id[rows, row].clone()
