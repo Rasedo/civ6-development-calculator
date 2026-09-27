@@ -1,0 +1,17 @@
+{"kind":"rig","destroyedAA":"UNIT_ANTIAIR_GUN@36:44,UNIT_ANTIAIR_GUN@37:43,UNIT_ANTIAIR_GUN@37:44","fighter":11206670}
+{"kind":"setlocal","p":6,"ok":true,"err":"nil"}
+{"kind": "local_ig", "local": "6"}
+{"kind":"op","go":0,"unit":11206670,"op":"REBASE","x":39,"y":43,"targets":0,"targetHasXY":false,"can":"false","why":"","request":"no","at":"36:42","moves":8,"activity":"ACTIVITY_AWAKE"}
+{"kind":"op","go":0,"unit":11206670,"op":"REBASE","x":39,"y":43,"targets":0,"targetHasXY":false,"can":"false","why":"","request":"no","at":"36:42","moves":8,"activity":"ACTIVITY_AWAKE"}
+{"kind":"op","go":0,"unit":11206670,"op":"REBASE","x":39,"y":43,"targets":0,"targetHasXY":false,"can":"false","why":"","request":"no","at":"36:42","moves":8,"activity":"ACTIVITY_AWAKE"}
+{"kind":"op","go":0,"unit":11206670,"op":"REBASE","x":39,"y":43,"targets":0,"targetHasXY":false,"can":"false","why":"","request":"no","at":"36:42","moves":8,"activity":"ACTIVITY_AWAKE"}
+{"kind":"op","go":0,"unit":11206670,"op":"REBASE","x":39,"y":43,"targets":4,"targetHasXY":true,"can":"true","why":"","request":"no","at":"36:42","moves":8,"activity":"ACTIVITY_AWAKE"}
+{"kind":"op","go":1,"unit":11206670,"op":"REBASE","x":39,"y":43,"targets":4,"targetHasXY":true,"can":"true","why":"","request":"true:nil","at":"36:42","moves":8,"activity":"ACTIVITY_AWAKE"}
+{"kind":"op","go":0,"unit":11206670,"op":"REBASE","x":39,"y":43,"targets":0,"targetHasXY":false,"can":"false","why":"","request":"no","at":"39:43","moves":0,"activity":"ACTIVITY_HEAL"}
+{"kind":"restore","moves":8,"at":"39:43"}
+{"kind":"op","go":0,"unit":11206670,"op":"DEPLOY","x":36,"y":44,"targets":100,"targetHasXY":true,"can":"true","why":"","request":"no","at":"39:43","moves":8,"activity":"ACTIVITY_HEAL"}
+{"kind":"op","go":1,"unit":11206670,"op":"DEPLOY","x":36,"y":44,"targets":100,"targetHasXY":true,"can":"true","why":"","request":"true:nil","at":"39:43","moves":8,"activity":"ACTIVITY_HEAL"}
+{"kind":"op","go":0,"unit":11206670,"op":"DEPLOY","x":36,"y":44,"targets":80,"targetHasXY":true,"can":"true","why":"","request":"no","at":"36:44","moves":0,"activity":"ACTIVITY_INTERCEPT"}
+{"kind":"setlocal","p":0,"ok":true,"err":"nil"}
+{"kind": "local_ig", "local": "0"}
+{"kind": "turn", "turn": "227"}

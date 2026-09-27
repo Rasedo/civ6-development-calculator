@@ -1,0 +1,6 @@
+{"raw": "turn 155 p0 active false human true | p1 active true human false"}
+{"raw": "grabbed 155"}
+{"raw": "turn 155 p0 active false human false | p1 active true human true"}
+{"raw": "run: def: spy 7471106 at 54:10 level 3 xp 45 promos PROMOTION_SPY_TECHNOLOGIST,PROMOTION_SPY_DEMOLITIONS op UNITOPERATION_SPY_COUNTERSPY targets "}
+{"raw": "grabbed seat ends its turn"}
+{"raw": "turn 155 p0 active false human true | p1 active true human false"}

@@ -1,0 +1,11 @@
+{"raw": "turn 154 p0 active true human true | p1 active false human false"}
+{"raw": "endturn requested"}
+{"raw": "grabbed 154"}
+{"raw": "turn 154 p0 active false human false | p1 active true human true"}
+{"raw": "run: def: spy 7471106 at 54:11 level 1 xp 15 promos  op -1 targets 54:11,53:13,53:9,54:10,54:12,56:11,55:11,54:8"}
+{"raw": "run: def: promote can true offered PROMOTION_SPY_DEMOLITIONS,PROMOTION_SPY_ROCKET_SCIENTIST,PROMOTION_SPY_ACE_DRIVER took PROMOTION_SPY_DEMOLITIONS"}
+{"raw": "run: def: promote can false offered  took none"}
+{"raw": "run: def: spy 7471106 at 54:11 level 2 xp 15 promos PROMOTION_SPY_DEMOLITIONS op -1 targets 54:11,53:13,53:9,54:10,54:12,56:11,55:11,54:8"}
+{"raw": "run: def: post at 54:10 plotcan false requested empty"}
+{"raw": "run: def: spy 7471106 at 54:11 level 2 xp 15 promos PROMOTION_SPY_DEMOLITIONS op -1 targets 54:11,53:13,53:9,54:10,54:12,56:11,55:11,54:8"}
+{"raw": "turn 154 p0 active false human true | p1 active true human false"}

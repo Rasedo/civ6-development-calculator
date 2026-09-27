@@ -1,0 +1,12 @@
+{"raw": "turn 153 p0 active true human true | p1 active false human false"}
+{"raw": "endturn requested"}
+{"raw": "grabbed 153"}
+{"raw": "turn 153 p0 active false human false | p1 active true human true"}
+{"raw": "run: spy p1 id 7340039 at 54:10 moves 1 level 1 op -1 | empty: true false  | plot: true false  | targets 0"}
+{"raw": "run: spy p1 id 7143433 at 77:14 moves 0 level 1 op 41 | empty: true false  | plot: true false  | targets 0"}
+{"raw": "run: spy p1 id 7274519 at 54:10 moves 1 level 1 op -1 | empty: true false  | plot: true false  | targets 0"}
+{"raw": "run: post: counterspy at 54:10 can false requested false"}
+{"raw": "run: spy p1 id 7340039 at 54:10 moves 1 level 1 op -1 | empty: true false  | plot: true false  | targets 0"}
+{"raw": "run: spy p1 id 7143433 at 77:14 moves 1 level 1 op 41 | empty: true false  | plot: true false  | targets 0"}
+{"raw": "run: spy p1 id 7274519 at 54:10 moves 1 level 1 op -1 | empty: true false  | plot: true false  | targets 0"}
+{"raw": "turn 153 p0 active false human true | p1 active true human false"}

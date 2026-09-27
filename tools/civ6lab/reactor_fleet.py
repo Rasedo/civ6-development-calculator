@@ -29,11 +29,12 @@ import datetime as dt
 import json
 import pathlib
 import sys
+import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from tuner import Tuner  # noqa: E402
 import lab  # noqa: E402
-import game  # noqa: E402
+import h4  # noqa: E402
 
 HERE = pathlib.Path(__file__).parent
 GC, IG = lab.GC, lab.IG
@@ -97,7 +98,8 @@ local function J(ok, v)
 end
 """
 
-# GameCore: one JSON line per reactor city — what an accident can touch
+# GameCore: one JSON line per reactor city — what an accident can touch; a
+# building's pillage is `IsPillaged(row.Index)` (the Hash form reads false)
 LUA_SNAP = LUA_J + """
 local fm = Game.GetFalloutManager()
 local iz = GameInfo.Districts["DISTRICT_INDUSTRIAL_ZONE"].Index
@@ -111,7 +113,7 @@ for k = 0, fm:GetReactorCount() - 1 do
     local bs = {}
     for row in GameInfo.Buildings() do
       if bl:HasBuilding(row.Index) then
-        bs[#bs + 1] = "\\"" .. row.BuildingType .. "\\":" .. J(pcall(function() return bl:IsPillaged(row.Hash) end))
+        bs[#bs + 1] = "\\"" .. row.BuildingType .. "\\":" .. J(pcall(function() return bl:IsPillaged(row.Index) end))
       end
     end
     local imps, pils = 0, 0
@@ -159,9 +161,10 @@ end
 """
 
 # InGame: the same reactors through the UI's readers — the building pillage
-# reader lab 2 proved (`city:GetBuildings():IsPillaged(row.Hash)`, where the
-# GameCore object answers false for a building the InGame one calls
-# pillaged), `CanProduce(row.Hash, true)` as a second reader (UNVERIFIED as a
+# reader (`city:GetBuildings():IsPillaged(row.Hash)`; it holds its last value
+# for a city until an event touches that city, so a GameCore
+# `SetPillaged(false)` leaves it reading true — the GameCore read above takes
+# the building's INDEX and follows every change), `CanProduce(row.Hash, true)` as a second reader (UNVERIFIED as a
 # pillage test: ProductionPanel.lua asks it before listing a repair), the
 # Industrial Zone's `IsPillaged`, and the plant's age and accident threshold
 # (`GetReactorAge` / `GetReactorAccidentThreshold` take the CITY).
@@ -218,11 +221,37 @@ def snap(t: Tuner) -> dict[int, dict]:
     return out
 
 
+# GameCore: every reactor city's Workshop, Factory and Power Plant and its
+# Industrial Zone set unpillaged (`Buildings:SetPillaged`, `District:SetPillaged`,
+# the Debug City panel's calls), so an event starts from three unpillaged
+# buildings
+LUA_REPAIR = """
+local fm = Game.GetFalloutManager()
+local iz = GameInfo.Districts["DISTRICT_INDUSTRIAL_ZONE"].Index
+local n = 0
+for k = 0, fm:GetReactorCount() - 1 do
+  local r = fm:GetReactorByIndex(k)
+  local c = CityManager.GetCity(r.Owner, r.CityID)
+  if c then
+    for _, b in ipairs({"BUILDING_WORKSHOP", "BUILDING_FACTORY", "BUILDING_POWER_PLANT"}) do
+      if pcall(function() c:GetBuildings():SetPillaged(GameInfo.Buildings[b].Index, false) end) then n = n + 1 end
+    end
+    local d = c:GetDistricts():GetDistrict(iz)
+    if d then pcall(function() d:SetPillaged(false) end) end
+  end
+end
+print("repaired " .. n)
+"""
+
+
 def load(host: str, save: str) -> None:
-    """load `save` through `game.py load`; a failed load stops the run"""
-    rc = game.cmd_load(argparse.Namespace(host=host, port=4318, name=save, wait=600.0))
-    if rc != 0:
-        raise SystemExit(f"load of {save!r} on {host} failed (game.py load returned {rc})")
+    """load `save` (`h4` verbs, a 170 s deadline); a failed load stops the run"""
+    ns = argparse.Namespace(host=host, name=save, deadline=170.0, t0=time.monotonic())
+    if h4.load_start(ns) != 0:
+        raise SystemExit(f"load of {save!r} on {host} failed")
+    time.sleep(4.0)
+    if h4.load_wait(ns) != 0:
+        raise SystemExit(f"load of {save!r} on {host} did not reach the game")
 
 
 def cmd_setup(a) -> int:
@@ -248,13 +277,17 @@ def cmd_setup(a) -> int:
 def cmd_trials(a) -> int:
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = lab.RUNS / f"reactor_{a.save}_{stamp}.jsonl"
-    with open(out, "w", encoding="utf-8") as fh:
-        for n in range(a.loads):
+    with open(out, "w", encoding="utf-8", newline="\n") as fh:
+        for n in range(a.first_load, a.first_load + a.loads):
             for sev in SEVERITIES:
+                # every trial (load, rig, fire, reads) under its own deadline
+                watchdog = h4.guard(175.0, f"reactor trial {n} {sev}")
                 load(a.host, a.save)
-                t = Tuner(a.host).connect()
+                t = h4.connect(a.host)
                 lp = lab.local_player(t)
                 turn = lab.turn(t)
+                if a.repair:
+                    print("   ", t.run(GC, LUA_REPAIR)[-1], flush=True)
                 if a.rig:
                     # the rig is placed on the loaded game itself: a saved
                     # rig does not survive the load (the units move)
@@ -267,19 +300,23 @@ def cmd_trials(a) -> int:
                 before = snap(t)
                 # a load replays the same random stream, so every load of one
                 # save repeats one outcome: burn a load-dependent number of
-                # draws off the shared game RNG first
-                t.run(GC, f"for i = 1, {n * 97} do TerrainBuilder.GetRandomNumber(100, 'lab burn') end")
+                # draws off the game's own stream first (TerrainBuilder's
+                # generator is another stream and leaves the repeats alike)
+                seed = t.run(GC, f"for i = 1, {n * 97} do Game.GetRandNum(100, 'lab burn') end "
+                                 "print(Game.GetRandomSeed())")[-1]
                 print(f"load {n} {sev.split('_')[-1]}:", t.run(GC, LUA_FIRE.replace("ZEVENT", sev))[-1], flush=True)
                 now = snap(t)
                 later = {}
                 if a.later:
-                    lab.advance(t, "autoplay", lp, 300.0)
+                    lab.advance(t, "autoplay", lp, 150.0)
                     later = snap(t)
                 for k, b in before.items():
-                    fh.write(json.dumps({"save": a.save, "load": n, "turn": turn, "sev": sev, "before": b,
+                    fh.write(json.dumps({"save": a.save, "load": n, "burn": n * 97, "seed": seed, "turn": turn,
+                                         "sev": sev, "repaired": a.repair, "before": b,
                                          "now": now.get(k), "later": later.get(k)}) + "\n")
                 fh.flush()
                 t.close()
+                watchdog.cancel()
     print("->", out.name)
     return 0
 
@@ -293,6 +330,9 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_setup)
     s = sub.add_parser("trials")
     s.add_argument("--loads", type=int, default=3)
+    s.add_argument("--first-load", type=int, default=0, help="the first load's number (sets its burn)")
+    s.add_argument("--repair", action="store_true",
+                   help="set the Workshop, Factory, Power Plant and Industrial Zone unpillaged before the first read")
     s.add_argument("--save", default="reactor_base", help="the named save each trial loads")
     s.add_argument("--rig", help="a GameCore Lua placed after each load, before the first snapshot")
     s.add_argument("--set", action="append", default=[], metavar="TOKEN=VALUE", help="token for the rig")

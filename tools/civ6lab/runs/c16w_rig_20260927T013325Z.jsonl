@@ -1,0 +1,7 @@
+{"kind":"create","made":"created","id":7340039,"promos":""}
+{"kind": "turn", "turn": "150"}
+{"kind":"setlocal","p":1,"ok":true}
+{"kind":"post","go":1,"local":1,"can":"false","request":"no","op":"-1","level":"1","at":"54:10"}
+{"kind": "post", "go": 0, "local": 1, "can": "false", "request": "no", "op": "-1", "level": "1", "at": "54:10"}
+{"kind":"setlocal","p":0,"ok":true}
+{"kind": "after", "local": "0", "turn": "150"}

@@ -1015,3 +1015,76 @@ returning to seat 1: seat 1 human, seat 0 AI), save `b82s6_t6_h1`,
 `b82s6_spec.json` (endturn); `runs/b82s6_tie_h1_*.jsonl`. Control 11–10 → 0.
 Seat 1 +2 population, seat 0 +1 era score: 12–12 → seat 0, twice (the second
 with 3 draws burned); seat 1 +2 population +1 era: 13–11 → seat 1.
+
+## 9. Host 127.0.0.4 scenes (lab 5b)
+
+Every call is deadline-bound (`h4.py`: `spawn`, `menu`, `load-start`,
+`load-wait`, `load`, `lua`, `close`, and `h4.guard(seconds)` for a scene
+script). An AI seat is played by `PlayerManager.SetLocalPlayerAndObserver(p)`:
+air operations (REBASE, DEPLOY) land a few seconds after the switch; SPY
+operations need the seat's turn ACTIVE, which an AI seat's is only while the
+turn processes — `c16w_grab.py` requests seat 0's end of turn, polls
+`IsTurnActive(p)` every 20 ms and switches then; the grabbed seat must end
+its own turn before seat 0 is made local again, or the turn stands.
+
+### C-34 (lab tail). Interception XP, war weariness, draw order
+`c34w_rig.py` (Georgia's Fighter created, REBASEd and DEPLOYed over 36:44 as
+the local seat, the anti-air guns within 2 removed; save `c34s2_rig_t228`),
+`c34w_targets.lua`, `c34w_strike.py` (seed set, preview, AIR_ATTACK, draws
+counted), `c34w_fit.py`; `runs/c34w_strike_*.jsonl`. With a patrol the strike
+takes THREE draws (one without): draw 1 the interceptor's hit on the bomber,
+draw 2 the bomber's hit on the interceptor, draw 3 the strike on the ground
+unit, 12 of 12 at Δ = 26.86..26.93 (the preview says 97 − 70 = 27). The
+strike runs at the bomber's post-interception health (wound term damage/10,
+Δ0 6.0, 10 of 10) and lands even when the interception KILLED the bomber
+(2 of 2: 22 and 28 to the infantry). XP: interceptor +4 (also when it kills:
+no kill bonus, 2 rows), struck unit +4, bomber +3 = the strike's own (nothing
+for the interception); a sortie at a plot holding only the patrol gave the
+bomber +5. War weariness has no reader (no method matching "wear" on the
+player or its sub-objects in either state); the per-city amenity loss moved
+nothing within the turn.
+
+### C-16-S1. The counterspy as the pursuer
+`c16w_rig.py`, `c16w_def.lua`, `c16w_grab.py`, `c16w_turn.lua`,
+`c16w_cycle.py`, `c16w_fit.py`, `c16w_mission_fit.py`; save
+`c16w_guard3_t156` (p1 Canada's created Spy, promoted twice by real PROMOTE
+commands to level 3, on COUNTERSPY over Ottawa's Commercial Hub 54:10; a
+created spy posts only from the city CENTRE, and `SetPromotion` adds a
+promotion without a level); `runs/escape_cs_c16w_guard3b.log`,
+`..._guard3c.log` (the second after 53 draws burnt). The AI re-posts or moves
+its spy unless grabbed each turn. 50 Siphon Funds missions by fresh seat-0
+spies: with the post standing (41) the six bands fit a threshold 3 lower
+(logL −65.6 against −88.0 for no term); 16 escape prompts, the counterspy
+named in 5 (2 escaped; −3 predicts 0.14, no term 0.39), the police in 11.
+
+### C-60 (lab tails)
+Grant order (`c60t_grant_run.py`, now `--prelua` / `--tburn` / a deadline;
+`c60w_occ.py`, `c60w_bfs_fit.py`; `runs/c60t_grant_w_*.jsonl`): a walk
+round each hex ring from its W corner, turning +1 (odd-r), picks every
+placement, 9 of 9; every breadth-first order fails (best 5 of 9), as does
+every other ring start. TerrainBuilder burns change nothing; neither
+improvement nor yield decides (a Farm set on 67:19 / 67:20 left the pick).
+A city-state's first turn (`c60m_run.py`, `c60m_removed.lua`;
+`runs/bankrupt_minor2_*.jsonl`, `lab4_t100`): the mass shedding is the RIG —
+Bologna (p9) whose bank the socket wrote at 0–70 disbanded every upkeep unit
+on the next turn with income positive and no unit created (natural bank 110,
+written 85/100/150: nothing); Armagh (p17) written 6.4 → 0 lost two of its
+units. Singapore (p12), natural bank 0.14, lost exactly its created unit at
+S 4 and two, then one a turn, at S 32.
+
+### C-1 (lab tail). The accident's building rows, read right
+`reactor_fleet.py trials --repair` (Workshop, Factory, Power Plant and the
+Industrial Zone set unpillaged by GameCore `SetPillaged` first; burns on
+`Game.GetRandNum`; deadlines) with `reactor_units_rig.lua`; `c1w_tally.py`;
+`runs/reactor_reactor_base_20260927T053410Z/053613Z/054059Z.jsonl`. The
+GameCore reader is `IsPillaged(row.Index)`; the Hash form reads false, and
+the InGame reader keeps a city's last value until an event touches it — the
+earlier records read a pillaged Power Plant (and three Factories) BEFORE
+every event. 35 events a severity: the Power Plant is pillaged by EVERY
+accident (105 of 105); MINOR adds the Factory 4 of 35, never the Workshop;
+MAJOR pillages the zone 22 of 35 and then every building, else the Factory
+(13 of 13); CATASTROPHIC the zone and all three, 35 of 35, −1 population 30
+of 35. Units: only the reactor's plot is struck — MINOR none, MAJOR 19 of 38
+land units (both units of a plot alike, 6 of 6 plots) and Builders killed
+17 of 30, CATASTROPHIC every land unit and every Builder; damage
+20–49; nothing within 1–3 touched or gone.

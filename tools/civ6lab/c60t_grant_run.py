@@ -18,11 +18,11 @@ import datetime as dt
 import json
 import pathlib
 import sys
+import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from tuner import Tuner  # noqa: E402
 import lab  # noqa: E402
-import game  # noqa: E402
+import h4  # noqa: E402
 
 LUA_BLOCK = """
 local LAND = {"UNIT_MODERN_ARMOR", "UNIT_TANK", "UNIT_INFANTRY", "UNIT_MUSKETMAN", "UNIT_SWORDSMAN"}
@@ -80,10 +80,13 @@ def main(argv=None) -> int:
     p.add_argument("--save", default="lab4_t250")
     p.add_argument("--city", default="69:21")
     p.add_argument("--block", default="")
-    p.add_argument("--burn", type=int, default=0)
+    p.add_argument("--burn", type=int, default=0, help="Game.GetRandNum draws burnt after the rig")
+    p.add_argument("--tburn", type=int, default=0, help="TerrainBuilder.GetRandomNumber draws burnt after the rig")
+    p.add_argument("--prelua", default="", help="GameCore Lua run once after the rig (e.g. an improvement set)")
+    p.add_argument("--deadline", type=float, default=178.0)
     p.add_argument("--until", type=int, default=252)
     p.add_argument("--tag", default="arm")
-    p.add_argument("--wait", type=float, default=300.0)
+    p.add_argument("--wait", type=float, default=120.0)
     a = p.parse_args(argv)
     cx, cy = a.city.split(":")
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -100,9 +103,14 @@ def main(argv=None) -> int:
         fh.flush()
         return r
 
-    if game.cmd_load(argparse.Namespace(host=a.host, port=4318, name=a.save, wait=600.0)) != 0:
+    h4.guard(a.deadline, "c60t_grant_run")
+    ns = argparse.Namespace(host=a.host, name=a.save, deadline=a.deadline, t0=time.monotonic())
+    if h4.load_start(ns) != 0:
         raise SystemExit(f"load of {a.save!r} on {a.host} failed")
-    t = Tuner(a.host).connect()
+    time.sleep(4.0)
+    if h4.load_wait(ns) != 0:
+        raise SystemExit(f"load of {a.save!r} on {a.host} did not reach the game")
+    t = h4.connect(a.host)
     lp = lab.local_player(t)
     if a.block:
         for ln in t.run(lab.GC, LUA_BLOCK.replace("ZBLOCK", a.block), timeout=60):
@@ -111,6 +119,13 @@ def main(argv=None) -> int:
     if a.burn:
         for ln in t.run(lab.GC, f"for i = 1, {a.burn} do Game.GetRandNum(100, 'lab') end "
                                 f"print('{{\"kind\":\"burn\",\"n\":{a.burn},\"seed\":' .. Game.GetRandomSeed() .. '}}')"):
+            rec(ln)
+    if a.prelua:
+        for ln in t.run(lab.GC, a.prelua + '\nprint("prelua done")'):
+            rec(json.dumps({"kind": "prelua", "code": a.prelua, "text": ln}))
+    if a.tburn:
+        for ln in t.run(lab.GC, f"for i = 1, {a.tburn} do TerrainBuilder.GetRandomNumber(100, 'lab') end "
+                                f"print('{{\"kind\":\"tburn\",\"n\":{a.tburn}}}')"):
             rec(ln)
     # where the game PLACES each Free Cities unit, before that seat's turn moves it
     ev = (pathlib.Path(__file__).parent / "unit_events.lua").read_text(encoding="utf-8")
