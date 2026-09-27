@@ -1,0 +1,38 @@
+{"state": "GC", "seq": 1819, "turn": 151, "seed": 3333384860, "ev": "EV.PlayerAgeChanged", "args": ["0"]}
+{"state": "GC", "seq": 1820, "turn": 151, "seed": 3333384860, "ev": "EV.EmergenciesUpdated", "args": []}
+{"state": "GC", "seq": 1821, "turn": 151, "seed": 3333384860, "ev": "GE.PlayerTurnStarted", "args": ["0"]}
+{"state": "GC", "seq": 1822, "turn": 151, "seed": 3333384860, "ev": "GE.OnCivicCulturevated", "args": ["0", "3"]}
+{"state": "GC", "seq": 1823, "turn": 151, "seed": 3333384860, "ev": "GE.OnFaithEarned", "args": ["0", "532"]}
+{"state": "GC", "seq": 1824, "turn": 151, "seed": 2259200122, "ev": "GE.PlayerTurnStartComplete", "args": ["0"]}
+{"state": "GC", "seq": 1825, "turn": 151, "seed": 2259200122, "ev": "EV.ResearchChanged", "args": ["0", "20"]}
+{"state": "GC", "seq": 1826, "turn": 151, "seed": 2259200122, "ev": "EV.TreasuryChanged", "args": ["0", "9", "-13"]}
+{"state": "GC", "seq": 1827, "turn": 151, "seed": 2259200122, "ev": "EV.UnitRemovedFromMap", "args": ["0", "2883587"]}
+{"state": "GC", "seq": 1828, "turn": 151, "seed": 2259200122, "ev": "EV.NotificationAdded", "args": ["0", "469"]}
+{"state": "GC", "seq": 1829, "turn": 151, "seed": 2259200122, "ev": "EV.NotificationAdded", "args": ["0", "470"]}
+{"state": "GC", "seq": 1830, "turn": 151, "seed": 2259200122, "ev": "EV.TreasuryChanged", "args": ["0", "7.80078125", "0"]}
+{"state": "GC", "seq": 1831, "turn": 151, "seed": 2259200122, "ev": "EV.CivicCompleted", "args": ["0", "3", "false"]}
+{"state": "GC", "seq": 1832, "turn": 151, "seed": 2259200122, "ev": "EV.NotificationAdded", "args": ["0", "471"]}
+{"state": "GC", "seq": 1833, "turn": 151, "seed": 2259200122, "ev": "EV.NotificationAdded", "args": ["0", "472"]}
+{"state": "GC", "seq": 1834, "turn": 151, "seed": 2259200122, "ev": "EV.FaithChanged", "args": ["0", "0.65234375", "532.21484375"]}
+{"state": "GC", "seq": 1835, "turn": 151, "seed": 2259200122, "ev": "EV.InfluenceChanged", "args": ["0"]}
+{"state": "GC", "seq": 1836, "turn": 151, "seed": 2259200122, "ev": "EV.InfluenceChanged", "args": ["0"]}
+{"state": "GC", "seq": 1837, "turn": 151, "seed": 2259200122, "ev": "EV.NotificationAdded", "args": ["0", "473"]}
+{"state": "GC", "seq": 1838, "turn": 151, "seed": 2259200122, "ev": "EV.NotificationAdded", "args": ["0", "474"]}
+{"state": "GC", "seq": 1839, "turn": 151, "seed": 2259200122, "ev": "EV.InfluenceChanged", "args": ["0"]}
+{"state": "GC", "seq": 1840, "turn": 151, "seed": 2259200122, "ev": "EV.LevyCounterChanged", "args": ["0"]}
+{"state": "GC", "seq": 1841, "turn": 151, "seed": 2259200122, "ev": "EV.GovernorChanged", "args": ["0", "1"]}
+{"state": "GC", "seq": 1842, "turn": 151, "seed": 2259200122, "ev": "EV.GovernorChanged", "args": ["0", "5"]}
+{"state": "GC", "seq": 1843, "turn": 151, "seed": 2259200122, "ev": "EV.CityProductionUpdated", "args": ["0", "65536", "47", "0", "65535"]}
+{"state": "GC", "seq": 1844, "turn": 151, "seed": 2259200122, "ev": "EV.NotificationAdded", "args": ["0", "475"]}
+{"state": "GC", "seq": 1845, "turn": 151, "seed": 2259200122, "ev": "EV.CityLoyaltyChanged", "args": ["0", "65536"]}
+{"state": "GC", "seq": 1846, "turn": 151, "seed": 2259200122, "ev": "EV.CulturalIdentityConversionOutcomeChanged", "args": ["0", "65536", "2"]}
+{"state": "GC", "seq": 1847, "turn": 151, "seed": 2259200122, "ev": "EV.NotificationAdded", "args": ["0", "476"]}
+{"state": "GC", "seq": 1848, "turn": 151, "seed": 2259200122, "ev": "EV.CityLoyaltyChanged", "args": ["0", "196609"]}
+{"state": "GC", "seq": 1849, "turn": 151, "seed": 2259200122, "ev": "EV.CulturalIdentityConversionOutcomeChanged", "args": ["0", "196609", "2"]}
+{"state": "GC", "seq": 1850, "turn": 151, "seed": 2259200122, "ev": "EV.UnitMovementPointsRestored", "args": ["0", "2883587", "3"]}
+{"state": "GC", "seq": 1851, "turn": 151, "seed": 2259200122, "ev": "EV.ResearchChanged", "args": ["0", "-1"]}
+{"state": "GC", "seq": 1852, "turn": 151, "seed": 2259200122, "ev": "EV.PlayerTurnActivated", "args": ["0", "true"]}
+{"state": "C9", "seq": 125, "turn": 151, "seed": 3333384860, "ev": "PlayerTurnStarted", "args": ["0", "P0 g=0 gy=9 mt=22 rt=20 rp=0 sy=6.3046875 f=531.5625 sc=125", "W co2=0 temp=8.5 tch=0 lvl=0 sea=-1 win=nil score=125,794,298,630,377,532,583,526 favor=2,5,58,108,144,116,123,17 gp=0:64,1:9,2:46,3:85,4:-1,5:142,6:161,7:25,8:203,9:-1", "C 20,32:13:65536:13:gar=7:out=40:adjwar=2:adjown=0;36,42:0:65536:6:gar=40:out=0:adjwar=0:adjown=2;37,38:0:196609:3:gar=0:out=0:adjwar=0:adjown=0;69,21:62:196608:10:gar=0:out=0:adjwar=1:adjown=1;18,16:4:524294:4:gar=0:out=0:adjwar=0:adjown=0"]}
+{"state": "C9", "seq": 126, "turn": 151, "seed": 3333384860, "ev": "OnCivicCulturevated", "args": ["0,3", "P0 g=0 gy=7.80078125 mt=20 rt=20 rp=6.3046875 sy=5.55078125 f=531.5625 sc=125"]}
+{"state": "C9", "seq": 127, "turn": 151, "seed": 3333384860, "ev": "OnFaithEarned", "args": ["0,532", "P0 g=0 gy=7.80078125 mt=20 rt=20 rp=6.3046875 sy=5.55078125 f=532.21484375 sc=125"]}
+{"state": "C9", "seq": 128, "turn": 151, "seed": 2259200122, "ev": "PlayerTurnStartComplete", "args": ["0", "P0 g=0 gy=10.80078125 mt=20 rt=20 rp=6.3046875 sy=7.421875 f=532.21484375 sc=125", "W co2=0 temp=8.5 tch=0 lvl=0 sea=-1 win=nil score=125,794,298,630,377,532,583,526 favor=2,5,58,108,144,116,123,17 gp=0:64,1:9,2:46,3:85,4:-1,5:142,6:161,7:25,8:203,9:-1", "C 20,32:13:65536:13:gar=7:out=40:adjwar=2:adjown=0;36,42:0:65536:6:gar=40:out=0:adjwar=0:adjown=2;37,38:0:196609:3:gar=0:out=0:adjwar=0:adjown=0;69,21:62:196608:10:gar=0:out=0:adjwar=1:adjown=1;18,16:4:524294:4:gar=0:out=0:adjwar=0:adjown=0"]}

@@ -1,0 +1,10 @@
+GC ['already armed ok=321 bad=35']
+IG ['already armed ok=143 bad=35']
+C9 ['already armed']
+    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DRAMA_POETRY
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> CALAKMUL builds UNIT_WARRIOR
+advanced to 155
+GC: 1570 events
+IG: 1467 events
+C9: 104 events
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\c93_t154_turnlimit_20260927T070152Z.jsonl

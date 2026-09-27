@@ -1,0 +1,11 @@
+GC ['already armed ok=321 bad=35']
+IG ['already armed ok=143 bad=35']
+C9 ['already armed']
+    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> CALAKMUL builds UNIT_WARRIOR
+    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM
+    cause popup TechCivicCompletedPopup -> closed
+advanced to 152
+GC: 2019 events
+IG: 1878 events
+C9: 143 events
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\c93_t151_20260927T065712Z.jsonl

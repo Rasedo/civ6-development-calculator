@@ -1,0 +1,4 @@
+cause ('blocker', 'ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE') -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":151}
+cause ('session', '4:4') -> closed sessions [4:4]
+cause ('popup', 'DiplomacyActionView') -> hidden
+cause ('popup', 'LeaderScene') -> hidden

@@ -1,0 +1,3 @@
+player 2 turn=150 gold=61.8984375 goldYield=34.40234375 maint=30 faith=120.78515625 tech=29 techProg=65.51171875 techCost=240 sci=19.921875 civic=29 civicProg=30.81640625 civicCost=505 cul=19.2578125
+city 65536 LOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE pop=14 food=66 thr=82 surplus=9 housing=16 amen=0/7 item=E prog=24 cost=44 prod=8 loy=100 lpt=23 culture=34.4453125/193 plots=E rel=-1:6:950.0,8:0:16.2,11:1:81.8,2:7:1000.0
+city 131073 LOC_CITY_NAME_NGARUAWAHIA pop=10 food=3.75390625 thr=57 surplus=6 housing=11 amen=1/5 item=E prog=41 cost=100 prod=0 loy=5 lpt=-17 culture=4.61328125/107 plots=E rel=-1:1:300.0,7:6:1773.2,8:3:849.7,2:0:133.9,11:0:20.5

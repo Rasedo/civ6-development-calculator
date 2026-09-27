@@ -10,6 +10,11 @@ across tuner calls), armed once per game load:
   SN  `turnorder_snapgc.lua` in GameCore_Tuner (--gcsnap): at each GE event, the
       event player's state read synchronously (--watch: the player read at the
       game-turn events)
+  C9  `turnorder_c93snap.lua` in GameCore_Tuner (--c93): at each GE event the
+      event player's gold / yields / research / faith / score, and at the turn
+      boundaries the world (CO2, temperature, climate level, sea-level
+      countdown, scores, favor, the great-people timeline, the winner) and the
+      plots `turnorder_c93rig.lua ZRIG=watch` names
 It clears them, optionally runs a probe (--snap) before and after, advances
 `--turns` turns (lab.advance), and after each turn swaps each log out in one
 call and reads it back. One JSON line per event to
@@ -33,8 +38,10 @@ from tuner import Tuner  # noqa: E402
 
 ARM = (HERE / "turnorder_arm.lua").read_text(encoding="utf-8")
 SNAP = (HERE / "turnorder_snapgc.lua").read_text(encoding="utf-8")
+C93 = (HERE / "turnorder_c93snap.lua").read_text(encoding="utf-8")
 # recorder -> (Lua state, source, the ZSTATE token)
-RECORDERS = {"GC": (lab.GC, ARM, "GC"), "IG": (lab.IG, ARM, "IG"), "SN": (lab.GC, SNAP, "GC")}
+RECORDERS = {"GC": (lab.GC, ARM, "GC"), "IG": (lab.IG, ARM, "IG"), "SN": (lab.GC, SNAP, "GC"),
+             "C9": (lab.GC, C93, "GC")}
 
 
 def lua(rec: str, mode: str, watch: int = 0, **kw) -> str:
@@ -77,6 +84,7 @@ def main() -> int:
     ap.add_argument("--tag", required=True)
     ap.add_argument("--how", choices=("autoplay", "endturn"), default="autoplay")
     ap.add_argument("--gcsnap", action="store_true")
+    ap.add_argument("--c93", action="store_true", help="the C-93 witness (turnorder_c93snap.lua)")
     ap.add_argument("--watch", type=int, default=0)
     ap.add_argument("--snap", action="append", default=[], help="a Lua probe run before and after")
     ap.add_argument("--snap-state", action="append", default=[])
@@ -84,7 +92,7 @@ def main() -> int:
     ap.add_argument("--no-advance", action="store_true")
     ap.add_argument("--wait", type=float, default=150.0)
     a = ap.parse_args()
-    recs = ["GC", "IG"] + (["SN"] if a.gcsnap else [])
+    recs = ["GC", "IG"] + (["SN"] if a.gcsnap else []) + (["C9"] if a.c93 else [])
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     outp = HERE / "runs" / "turnorder" / f"{a.tag}_{stamp}.jsonl"
     outp.parent.mkdir(parents=True, exist_ok=True)

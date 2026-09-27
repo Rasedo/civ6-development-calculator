@@ -1,0 +1,11 @@
+## watch
+watch 6
+## pop Thebes +30
+city owner=4 pop=17
+change=47
+## pop Nekhen +30
+city owner=4 pop=10
+change=40
+## loyalty Apu -70
+change=nil
+65536:100/26 131073:100/31 196610:100/31 458755:100/23 327684:3.375/-5.515625 393221:100/23 524294:100/31 

@@ -1,0 +1,3 @@
+player 0 turn=150 gold=0 goldYield=9 maint=22 faith=531.5625 tech=20 techProg=0 techCost=120 sci=6.3046875 civic=-1 civicProg=-1 civicCost=-1 cul=6.0625
+city 65536 LOC_CITY_NAME_NARANJO pop=6 food=3.98046875 thr=33 surplus=6 housing=6 amen=4/3 item=E prog=62 cost=90 prod=7.5 loy=60 lpt=29 culture=122.609375/134 plots=E rel=-1:2:750.0,12:0:9.5,7:4:1522.0,8:0:145.8
+city 196609 LOC_CITY_NAME_CALAKMUL pop=3 food=4.046875 thr=16 surplus=5 housing=4 amen=2/2 item=E prog=E cost=E prod=2.40234375 loy=50 lpt=21 culture=3.96484375/10 plots=E rel=-1:0:50.0,12:1:118.2,7:2:589.0

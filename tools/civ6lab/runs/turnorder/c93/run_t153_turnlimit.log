@@ -1,0 +1,14 @@
+GC ['armed ok=321 bad=35']
+IG ['armed ok=143 bad=35']
+C9 ['c93 armed 21']
+    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_POLITICAL_PHILOSOPHY
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+    cause session 4:4 -> closed sessions [4:4]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup TechCivicCompletedPopup -> closed
+advanced to 154
+GC: 1862 events
+IG: 1728 events
+C9: 136 events
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\c93_t153_turnlimit_20260927T070128Z.jsonl

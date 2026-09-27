@@ -1,0 +1,14 @@
+GC ['already armed ok=321 bad=35']
+IG ['already armed ok=143 bad=35']
+C9 ['already armed']
+    autoplay false
+advanced to 228
+GC: 3280 events
+IG: 3159 events
+C9: 123 events
+    autoplay false
+advanced to 229
+GC: 2989 events
+IG: 2833 events
+C9: 158 events
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\c93_t227_20260927T070345Z.jsonl

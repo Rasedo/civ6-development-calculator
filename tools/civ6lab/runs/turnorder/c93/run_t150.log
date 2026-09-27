@@ -1,0 +1,16 @@
+GC ['armed ok=321 bad=35']
+IG ['armed ok=143 bad=35']
+C9 ['c93 armed 21']
+snap before tools/civ6lab/turnorder_city_ig.lua: 3 lines
+    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> CALAKMUL builds UNIT_WARRIOR
+    cause popup BoostUnlockedPopup -> closed
+    cause blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION: no handler
+    cause popup WorldCongressIntro -> closed
+    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+advanced to 151
+GC: 1818 events
+IG: 1693 events
+C9: 126 events
+snap after tools/civ6lab/turnorder_city_ig.lua: 3 lines
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\c93_t150_20260927T065142Z.jsonl

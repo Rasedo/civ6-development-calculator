@@ -1,0 +1,34 @@
+## watch
+watch 5
+## research P0 tech20 prog0
+before rt=20 cost=120 prog=115.0546875 sy=8.546875
+set=20
+prog2=0
+after rt=20 prog=0
+## bankrupt P0
+before gold=315.171875 gy=12 maint=10
+made 4 3080210@34,40 3145745@35,40 3211279@36,40 3276811@37,40
+after gold=0 gy=12 maint=22
+## loyalty Calakmul -50
+change=nil
+## build Calakmul +21
+cur=BUILDING_MONUMENT
+add=true
+## research P4 cartography 239
+before rt=36 cost=240 prog=0 sy=60.5
+set=26
+prog2=239
+after rt=26 prog=239
+## damage Naranjo garrison 60
+before gar=0
+set=60
+## pop Winnipeg +20
+city owner=1 pop=2
+change=22
+## pop Halifax +20
+city owner=1 pop=6
+change=26
+## loyalty Ngaruawahia -95
+change=nil
+## loyalty Naranjo -40
+change=nil

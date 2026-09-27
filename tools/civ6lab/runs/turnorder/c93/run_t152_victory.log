@@ -1,0 +1,10 @@
+GC ['already armed ok=321 bad=35']
+IG ['already armed ok=143 bad=35']
+C9 ['already armed']
+    unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+advanced to 153
+GC: 1757 events
+IG: 1639 events
+C9: 120 events
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\c93_t152_victory_20260927T065949Z.jsonl

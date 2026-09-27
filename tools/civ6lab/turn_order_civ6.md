@@ -58,24 +58,26 @@ Each player's turn is its START-OF-TURN PROCESSING, then its actions:
 | # | step | evidence |
 |---|---|---|
 | A1 | `GE.PlayerTurnStarted(p)` | 332 blocks |
-| A2 | **gold** banked, net of maintenance; if the balance falls below 0: the first unit with upkeep disbanded, the balance clamped to 0, the shortfall's amenity penalty applied — all before any city | armB: balance 0, net −10 → `TreasuryChanged 0\|12\|-10`, `UnitRemovedFromMap`, `TreasuryChanged …\|0`; both cities' amenities −2 and production yields lower (11 → 9.90, 4.40 → 4) at the first GE after the start, before any city event |
-| A3 | **science** banked; the tech COMPLETES and its effects apply now | armT: `rt` 20 → −1 and Naranjo's production yield 10 → 11 (Apprenticeship's +1 on its worked mine) at the first GE after the start, before any city event. Over every synchronous record (`turnorder_startcheck.py`, 268 blocks, 196 with an event): at the block's FIRST event research had already moved in 196 / 196 and gold in 184 / 196, and a city had produced or grown in 1 |
+| A2 | **science** banked on the yields as they stand at the start; the tech COMPLETES and its effects apply now | armT: `rt` 20 → −1 and Naranjo's production yield 10 → 11 (Apprenticeship's +1 on its worked mine) at the first GE after the start, before any city event. Over every synchronous record (`turnorder_startcheck.py`, 268 blocks, 196 with an event): at the block's FIRST event research had already moved in 196 / 196 and gold in 184 / 196, and a city had produced or grown in 1. Science BEFORE gold: see "The C-93 LAB lines" below (3 of 3 rigged blocks) |
+| A3 | **gold** banked on the yields after the tech, net of maintenance; if the balance falls below 0: the first unit with upkeep disbanded, the balance clamped to 0, the shortfall's amenity penalty applied — all before any city | armB: balance 0, net −10 → `TreasuryChanged 0\|12\|-10`, `UnitRemovedFromMap`, `TreasuryChanged …\|0`; both cities' amenities −2 and production yields lower (11 → 9.90, 4.40 → 4) at the first GE after the start, before any city event |
 | A4 | pending policy changes (`GE.PolicyChanged`) | the first event of 17 blocks, always after gold and science, before the civic |
 | A5 | **culture** banked; the civic COMPLETES (`GE.OnCivicCulturevated`) | 60 events: gold already moved at 54, faith at 2 — both a civic completing INSIDE the city walk after a building finished (t225 p7, t230 p6), the regular step being before faith |
 | A6 | **faith** banked (`GE.OnFaithEarned`) | faith moved at the block's first `OnFaithEarned` in 178 / 178, and no city had produced or grown before it in any (0 / 178) |
 | A7 | great-person points, influence / envoys, the levy counter, the governors | published order of `GreatPeoplePointsChanged`, `InfluenceChanged`, `LevyCounterChanged`, `GovernorChanged` (every block), all before the first city's events; not separable synchronously |
-| A8 | **each city, in the player's city-list order** (`Members()`, the acquisition order; 42 of 42 multi-city blocks): **production** (the completion, a Settler's −1 pop) → **growth / starvation, on the yields as they stand after the completion** → border growth → loyalty. Each city also draws once for its next plot (`GetNextBuyablePlot picker`; the block's draws ≈ its city count) | production before growth in the same city 11 / 11 (+3 of 3 shrinks); armS: Settler completes, pop 6 → 5, then the food box gains +2.129 = the pop-5 surplus (5 × ½ housing × 0.85 amenity) where the pre-completion city predicts +1.275; `CityTileOwnershipChanged` and `CityLoyaltyChanged` published after `CityPopulationChanged` per city; loyalty is applied to every city on its OWNER's turn only (1069 player-phase + 28 local-seat, 0 elsewhere) |
+| A8 | **each city, in the player's city-list order** (`Members()`, the acquisition order; 42 of 42 multi-city blocks): **production** (the completion, a Settler's −1 pop) → **growth / starvation, on the yields as they stand after the completion** → border growth → loyalty (production on the loyalty level the city had BEFORE this turn's loyalty change, 2 of 2 rigs); after the LAST city, a city whose loyalty reached 0 this turn becomes a Free City (2 of 2). Each city also draws once for its next plot (`GetNextBuyablePlot picker`; the block's draws ≈ its city count) | production before growth in the same city 11 / 11 (+3 of 3 shrinks); armS: Settler completes, pop 6 → 5, then the food box gains +2.129 = the pop-5 surplus (5 × ½ housing × 0.85 amenity) where the pre-completion city predicts +1.275; `CityTileOwnershipChanged` and `CityLoyaltyChanged` published after `CityPopulationChanged` per city; loyalty is applied to every city on its OWNER's turn only (1069 player-phase + 28 local-seat, 0 elsewhere) |
 | A9 | **religious pressure goes OUT from this player's cities**: a city converts during the start block of the player whose cities press it | whole-world snapshots, t231d: 13 of 15 follower changes landed inside ANOTHER player's start block (e.g. player 0's city gained religion 7 in player 6's block and religion 11 in player 7's); follower changes inside the owner's block came with a growth event in 26 of 26 (t225–228) |
 | A10 | the player's units get their movement back (after the cities) | units' moves jump at `PlayerTurnStartComplete` in 77 blocks; `UnitMovementPointsRestored` published after the city events |
 | A11 | `GE.PlayerTurnStartComplete(p)`, then the player's ACTIONS: moves, combat, purchases, picks, diplomacy; `PlayerTurnDeactivated(p)` | the AI's `OnCombatOccurred`, `UnitCreated` with a gold drop (purchases), `DiplomacyDeclareWar` all fall here |
 
-**B. After the barbarians' turn**, before the counter moves:
+**B. After the barbarians' actions**, before the counter moves (the order
+the C-93 witness reads synchronously; `GE.OnGameTurnEnded` is published
+before the heals' events but fires AFTER them):
 
 | # | step | evidence |
 |---|---|---|
-| B1 | `GE.OnGameTurnEnded(T)` | 16 of 16, after player 63's start |
-| B2 | the **World Congress** session resolves | RandCalls: `World Congress Resolutions` closes its turn label in 12 of 17 turns (only `Random congress resolution target` after it in the rest); t150: the votes' `FavorChanged` in the end phase, `WorldCongressFinished` published at T+1's `TurnBegin` |
-| B3 | **every unit and every city heals** | all 45 unit heals and 22 city/district heals of the records are in this phase (the 9 other decreases are promotion heals, `UnitPromoted` beside each); a unit ATTACKED this turn that did not move or attack itself heals (9 defenders; 14 others did not — killed, full or starved, not separated); none of the 49 defenders that moved or attacked healed |
+| B1 | the **World Congress** session resolves: the votes' favor spent (`FavorChanged` reason 2), then its outcome (reason 9) | RandCalls: `World Congress Resolutions` closes its turn label in 12 of 17 turns (only `Random congress resolution target` after it in the rest); C9 t150: player 3's favor 351 at the barbarians' `PlayerTurnStartComplete`, 87 at `GE.OnGameTurnEnded` (−264 in votes) |
+| B2 | **every unit and every city heals** | all 45 unit heals and 22 city/district heals of the records are in this phase (the 9 other decreases are promotion heals, `UnitPromoted` beside each); a unit ATTACKED this turn that did not move or attack itself heals (9 defenders; 14 others did not — killed, full or starved, not separated); none of the 49 defenders that moved or attacked healed. Synchronously before `GE.OnGameTurnEnded`: C9 t150 Naranjo's garrison 60 at the barbarians' start, 40 at `OnGameTurnEnded`; t231d / t232 all units' damage 828 → 795 and 1190 → 979 between the barbarians' start and `OnGameTurnEnded`, unchanged from there to `OnGameTurnStarted`. The Congress's favor changes are published before the first heal in 3 of 3 replays of the t150 session |
+| B3 | `GE.OnGameTurnEnded(T)` | 16 of 16 (+13 C-93 turns), after player 63's actions |
 | B4 | `EV.TurnEnd(T)` | |
 
 **C. The counter moves to T+1**, then, before `GE.OnGameTurnStarted(T+1)`:
@@ -87,16 +89,20 @@ Each player's turn is its START-OF-TURN PROCESSING, then its actions:
 | C3 | the turn's **random event** roll and its effects (pillage, unit damage, population loss, fertility), a new storm's start plot | `Random Event Roll` after the volcano roll 190 / 190; t154: a flood's two `GE.OnCityPopulationChanged(-1)` fire here, before `OnGameTurnStarted` |
 | C4 | the draws between `OnGameTurnEnded` and `OnGameTurnStarted` | 170 / 40 / 50 / 162 / 226 / 32 on the seeded records |
 
-**D. `GE.OnGameTurnStarted(T+1)`**, then:
+**D. The turn change, published after `GE.OnGameTurnStarted(T+1)`** — but
+the C-93 witness reads the per-turn favor (D4) and the scores (D5) already
+applied AT `GE.OnGameTurnStarted` in 13 of 13 turns, so everything published
+before the per-turn favor happens before that GE fires, in the gap with C:
 
 | # | step | evidence |
 |---|---|---|
-| D1 | `PreTurnBegin` | |
+| D1 | `PreTurnBegin`; the **climate** step: ice melt, sea-level rise (terrain → coast, improvements removed) — its order against the storms, the volcano and the random event (C) is unread: no turn carried both | t227→228: 27 `TerrainTypeChanged`, 257 `FeatureRemovedFromMap`, 4 `ImprovementRemovedFromMap` published after `PreTurnBegin`, before the per-turn favor, after the climate level crossed 7 → 8 inside player 6's start of t227; the sea-level countdown (`GameClimate.GetNextSeaLevelRiseTurns`) moves only in the gap (4 of 4 changes) |
 | D2 | the **era** change and every major's **Age** | `GameEraChanged` 3 / 3 and `PlayerAgeChanged` 36 in this gap |
 | D3 | city-state **quests** checked (new quests are DRAWN later, on the city-states' own turns) | `QuestChanged` 86 in the gap; `Selecting a random new quest` follows a `GetNextBuyablePlot` draw in 50 / 54 turns |
-| D4 | **diplomatic favor** per turn for every major at once | `FavorChanged(…, -1)` 120 in the gap, 2 elsewhere |
-| D5 | `TurnBegin`, then the **emergencies** update | `EmergenciesUpdated` 13 / 14 right after `TurnBegin` |
-| D6 | player 0's turn (A) | |
+| D4 | **diplomatic favor** per turn for every major at once | `FavorChanged(…, -1)` 120 in the gap, 2 elsewhere; C9: every per-turn favor change in the gap, 13 of 13 turns |
+| D5 | the **score** of every major recomputed | C9: the scores move between `OnGameTurnEnded(T)` and `OnGameTurnStarted(T+1)` in 13 of 13 turns; a city lost in its owner's block (Ngaruawahia t150, Apu t151) moves the owner's score only at that turn change (342 → 298, 532 → 516); one live change inside a block (player 7 −2 during player 1's start, t233) |
+| D6 | `GE.OnGameTurnStarted(T+1)`, `TurnBegin`, then the **emergencies** update | `EmergenciesUpdated` 13 / 14 right after `TurnBegin` |
+| D7 | player 0's turn (A) | |
 
 The turn label that ends a game (score, turn limit) was not reached.
 
@@ -128,8 +134,10 @@ amenity penalty and disband hit the SAME turn's cities — armB: Naranjo made
 alliance route yields through `carryPolicies` (science → tech loop → culture →
 gold → faith → `seatAccumulators` → unit and WMD upkeep → `bankruptcy` →
 grants → civic loop) and `advanceGreatPeople` to BEFORE the city walk, in
-Civ 6's order gold with upkeep → `bankruptcy` → science → techs → culture →
-civics → faith → great people (gold vs science is unpinned); the sums it banks
+Civ 6's order science → techs → gold with upkeep → `bankruptcy` → culture →
+civics → faith → great people (science before gold: 3 of 3 rigged blocks,
+"The C-93 LAB lines" item 1) — the gold banked reads the yields AFTER this
+turn's techs, the science banked the yields BEFORE this turn's shortfall; the sums it banks
 are the cities' yields at the start (the `computeCityStats` taken before the
 walk today), and the walk takes `computeCityStats` again AFTER it, so the walk
 reads the new techs, civics and shortfall. GPU: `_seat_research_tail` (and `_advance_great_people`)
@@ -157,7 +165,9 @@ and `completeQueueItem` first, then recompute this city's stats, then
 city (+20) and its Encampment inside the owner's city walk
 (`seatPhase`; GPU `_seat_city_fire_and_heal`), a city-state's centre in
 `cityStatePhase` (+10), a Free City in `freeCitiesPhase`. Civ 6 heals every
-city after every player, barbarians included (B3). *Effect:* a city attacked
+city after every player, barbarians included (B2) — +20 to a city-state's
+centre too, and a city attacked that turn heals unless it is besieged (item 5
+below). *Effect:* a city attacked
 by a seat that moves AFTER its owner meets a healed city in ours and an
 unhealed one in Civ 6 — a capture can take a turn longer in ours. *Change:*
 take the city, Encampment, minor and Free City heals out of the per-seat
@@ -189,7 +199,7 @@ before `wakeVolcanoes` / `randomEvent`.
 
 **Δ7. The World Congress sits BEFORE the turn counter moves.** Ours:
 `state.turn += 1` → `eraBoundary` → `eraInspirations` → `worldCongress`
-(which reads the NEW turn). Civ 6: the session resolves at the end of T (B2),
+(which reads the NEW turn). Civ 6: the session resolves at the end of T (B1),
 the era changes after the counter moves (D2). *Effect:* the session schedule
 reads a turn number one higher than Civ 6's, so every regular session lands a
 turn-label apart from Civ 6's for the same schedule. *Change:* call
@@ -223,67 +233,241 @@ the governors before the cities; a unit trained this turn pays no upkeep this
 turn; the unit movement refresh (per player in Civ 6, all at once in ours —
 no effect, a seat's moves are only spent in its own actions).
 
+## The C-93 LAB lines
+
+Measured 2026-09-27 at `--host 127.0.0.2`: `lab4_t150` played on by hand
+(end turn on the human seat) through turns 150–154 with rigs, and
+`lab4_t225` autoplayed through turns 225–232 plus a rigged turn 233.
+
+The instruments:
+
+* `turnorder_c93snap.lua` — the C-93 witness (recorder `C9`,
+  `turnorder_run.py --c93`): at every GE event the event player's gold, gold
+  yield, maintenance, research and its progress, science yield, faith and
+  score; at every `PlayerTurnStarted` / `PlayerTurnStartComplete` /
+  `OnGameTurnEnded` / `OnGameTurnStarted` the world — total CO2, average
+  temperature, climate level, the sea-level countdown, every major's score and
+  favor, the great-people timeline, the winner — and the watched plots
+  (the city there, its garrison and wall damage, the war / own units beside
+  it).
+* `turnorder_c93rig.lua` (`ZRIG=research|bankrupt|build|loyalty|pop|damage|watch|victory`),
+  `turnorder_c93gp.lua` (the timeline; `RecruitPerson`), `turnorder_c93survey.lua`
+  (every major's gold, research and cities' loyalty, worked Quarries and
+  Fishing Boats), `turnorder_c93probe.lua` (a city's loyalty breakdown and
+  queue; a city-state's pools and neighbours), `turnorder_c93dump.lua`
+  (the readers: `GameClimate`, `GreatPeople`, `DefenseTypes`, …).
+* `turnorder_c93read.py` reads the recorders without advancing (after
+  `turnorder_unstick.py` releases a held human start); `turnorder_c93where.py`
+  names the interval each world quantity moved in; `turnorder_cityheal.py`
+  (the heal of a city hit this turn, with its siege state);
+  `turnorder_congressheal.py` (the session's favor against the heals, in
+  published order).
+* Records: `runs/turnorder/c93_t150_*`, `c93_t151p0_*`, `c93_t151_*`,
+  `c93_t152_victory_*`, `c93_t153_turnlimit_*`, `c93_t154_turnlimit_*`,
+  `c93_t225_*`, `c93_t227_*`, `c93_t229_*`, `c93_t231_*`,
+  `c93_t233_tikal_*` (GC and C9 rows; the InGame rows mirror GC's Events and
+  were dropped), and the rigs' reads in `runs/turnorder/c93/`. 14 witnessed
+  turns.
+
+### 1. Science before gold
+
+| rig | read | science first predicts | gold first predicts |
+|---|---|---|---|
+| Egypt (4), t150: Cartography at 239 / 240, one worked Fishing Boats (+2 gold with Cartography, `Improvement_BonusYieldChanges` Id 3) | at `PlayerTurnStarted` gold 106.574, gold yield 54.848, maintenance 18; at the first GE Cartography done, gold yield 57.047, gold 145.621: **+39.047** | 57.047 − 18 = **39.047** | 54.848 − 18 = 36.848 |
+| Maya (0), t151: gold 0, four Crossbowmen past the income (maintenance 22 against 9), research progress 0 | at `PlayerTurnStarted` progress 0, science yield 6.3047; at the first GE progress **6.3047**, science yield already 5.5508, maintenance 20 (one unit disbanded) | 6.3047 | 5.5508 |
+| armB (t152) re-read: Apprenticeship's cost for player 0 reads 120 | the overflow 115.0547 + 8.5469 − 120 = 3.6016, the t152 bank 12.1484 − 3.6016 = **8.5469** | 8.5469 | 7.7969 |
+
+3 of 3. The published order agrees (`ResearchCompleted` → `TreasuryChanged`
+carrying the post-tech yield 57.046875). Faith is banked after the shortfall
+(armB +0.9023 = 90% of 1.0). It matters: a tech that changes gold (the
+tech-gated improvement gold: Fishing Boats +2 at Cartography, Quarry +2 at
+Banking, Camp +1 at Synthetic Materials) pays the same turn, and a
+shortfall's penalty never cuts the same turn's science.
+
+*Ours:* the old order (`turn_order_ours.md` step 11) banks science, completes
+techs, then culture, gold, faith, then upkeep and `bankruptcy`, then civics —
+science already before gold, but culture before gold and the shortfall after
+faith. **The Δ2 BUILD order changes**: science → techs → gold → upkeep →
+`bankruptcy` → culture → civics → faith → great people, all before the walk.
+
+### 2. Loyalty's place and the flip
+
+**Production reads the loyalty level the city had before this turn's
+change** — loyalty comes after production (2 of 2):
+
+| rig | before | loyal yield predicts | wavering yield predicts | read |
+|---|---|---|---|---|
+| Naranjo (0), t150→151: loyalty 60 (Wavering: production 10 → 7.5), +26 / turn, the shortfall's −10% on top | progress 62 | 62 + 9 = 71 | 62 + 6.5…6.75 = 68.5…68.75 | **68**; loyalty 86 (Loyal), production yield 9 after |
+| Tikal (0), t233→234: loyalty 72 (Wavering: production 7.80; Loyal 10.80), +4.05 | progress 49 | 59.8 | 56.8 | **57**; loyalty 76.05 (Loyal), production yield 12.60 after |
+
+Both beside the published per-city order `CityProductionUpdated` →
+`CityLoyaltyChanged` (11 of 11 blocks). The loyalty change applied is the
+start's value after the shortfall (Naranjo +26 = 29 − 3 Happiness, Calakmul
++18 = 21 − 3).
+
+**A city whose stock reaches 0 becomes a Free City inside its owner's start
+block, the same turn, after the WHOLE city walk** (2 of 2):
+
+* Ngaruawahia (Maori, the 2nd and last of 2 cities; stock 5, Winnipeg and
+  Halifax +20 population → −17 / turn), t150: owner 2 at `PlayerTurnStarted(2)`,
+  a Free City (62, new id 196608) at `PlayerTurnStartComplete(2)`.
+* Apu (Persia, the 5th of 7 cities; stock 3.375, Thebes and Nekhen +30 →
+  −5.5 / turn), t151: between the 3rd city's `BuildingConstructed` and the
+  flip's first GE the sync stream takes exactly 5 draws — the
+  `GetNextBuyablePlot` picker of cities 3 to 7 (the flip itself takes none:
+  Ngaruawahia's block has 2 draws for 2 cities) — and the 6th and 7th cities'
+  `CityLoyaltyChanged` are published before the flip's events.
+
+The flip: two granted units, the city rebuilt for player 62 with its
+districts, buildings and population, the governor ejected; player 62 then
+takes its own block the same turn. *Ours:* `applyLoyalty` marks a city at 0
+and `flipCity` runs after the walk — **the flip's place stands**; loyalty
+moves from the head of the city to its tail (the Δ3 BUILD line, unchanged).
+
+### 3. Climate, tourism, the score, the victory checks
+
+| quantity | where it moves | count |
+|---|---|---|
+| total CO2 (`GetTotalCO2Footprint`) | inside each emitting major's start block, some in action phases, never in the gap | 58 start, 16 action, 0 gap |
+| average temperature, temperature change | with the CO2, at once | 65 of the 72 lab4_t225 CO2 steps moved it; none moved without one |
+| climate level (`GetClimateChangeLevel`) | crossed 7 → 8 inside player 6's start, t227 | 1 |
+| the realised climate step: ice melt, sea-level rise | at the turn change after `PreTurnBegin`, before the per-turn favor (D1): t227→228 257 features removed, 27 terrain changes, 4 improvements removed | 1 |
+| the sea-level countdown (`GetNextSeaLevelRiseTurns`) | the turn change only | 4 of 4 |
+| every major's score | the turn change (D5) | 14 of 14 turns; 2 live changes of ANOTHER player's score inside a block (player 6 −4 in player 5's actions t151; player 7 −2 in player 1's start t233); a city lost in its owner's block moves that score only at the turn change |
+| diplomatic favor per turn | the turn change (D4) | 14 of 14 turns |
+
+* **Tourism**: no reader in GameCore (its player stats and culture objects
+  carry none); InGame's `GetTourism` / `GetTouristsFrom` read only between
+  turns. Unpinned.
+* **The victory checks**: two rigs failed. `ChangeScienceVictoryPoints(25)`
+  put player 3 at 25 / 25 but `GetVictoryProgressForTeam` read 0.5 (the
+  projects count too) and nobody won. The turn limit (`CUSTOM`, 153) set in
+  InGame's `GameConfiguration` reaches GameCore only through a save and load
+  (`c93_turnlimit153`: GameCore then reads 153), and the game did not end at
+  153, 154 or 155 (`Game.GetMaxGameTurns` reads 0). Unpinned.
+
+*Ours:* `climateTurn` once after every seat, before `state.turn += 1`; the
+realised step sits at the turn change in both, Civ 6's after the counter.
+Our CO2 is summed at the climate step, Civ 6's accrues per player and the
+level can cross mid-turn — nothing reads the level between the two in ours
+(the disasters roll at the turn change in both), so no BUILD follows beyond
+placing `climateTurn` after the increment beside `disasterPhase` (its order
+against the storms is unread). Our score is computed where it is read (the
+turn-limit check) — no change.
+
+### 4. The Congress against the heal
+
+Both run after the barbarians' actions and before `GE.OnGameTurnEnded`
+(synchronously: player 3's −264 favor in votes and Naranjo's +20 are both
+applied between the barbarians' `PlayerTurnStartComplete` and
+`OnGameTurnEnded`); in the published order every session favor change
+(5 votes, reason 2; 4 outcomes, reason 9) precedes the first heal, 3 of 3
+replays of the t150 session: **the Congress, then the heal** (B1, B2). It does
+not matter: the session moves favor, grievances and resolutions, the heal
+moves hit points; no state crosses. *Ours:* the BUILD line puts
+`worldCongress` before the increment and the heal after the barbarians; order
+them Congress → heal.
+
+### 5. A city attacked this turn
+
+The garrison (the city's own hit points, `DefenseTypes.DISTRICT_GARRISON`
+= 1587009065 in both states) heals **+20 at the turn's end, or the whole
+damage when less, whether or not it was attacked that turn, unless the city
+is under siege** (`EV.CitySiegeStatusChanged`):
+
+| hit this turn | siege at the end | healed | count |
+|---|---|---|---|
+| yes | free | yes | 42 of 42 (lab4_t150: 5 + 4 in two histories; lab4_t225: 15 + 18 in two histories; majors 0, 3, city-states 13, 19, the Free Cities) |
+| yes | besieged | no | 0 of 4 (city-state 13, t150 and t151, two histories) |
+| no | free | yes | 5 of 5 (the Naranjo rig 60 → 40) |
+
+The walls (`DISTRICT_OUTER` = 1839557181) never heal: 0 of 47 hit pools. A
+city-state's centre heals **+20** like the rest (city-state 13: 65 → 45,
+75 → 55, 71 → 51). *Ours:* `healCities` +20 with the encircled gate and no
+wall heal — matches for civs and Free Cities; **a city-state's centre takes
++10 with no siege gate** (`healCities`, `sim_phase.py`): Civ 6 +20, and no
+heal while besieged.
+
+### 6. The Great Person draw
+
+Every change of the great-people timeline in the 14 witnessed turns happened
+inside the recruiting player's block — 5 in a start (the rigged General
+64 → 67 by player 3 and Admiral 9 → 12 by player 6 at t151; Writer 161 → 166
+by player 3 t152; Musician 110 → 111 by player 7 t228, 111 → −1 by player 1
+t230), 4 in an action phase (Merchant 95 → 94 by player 1 t226, Admiral
+17 → −1 by player 2 t226, General 73 → −1 by player 1 t227, Merchant 94 → −1
+by player 6 t233) — and none at the turn change: **the replacement is drawn
+at the recruitment** (the rigs: `GetGreatPeoplePoints():SetPointsTotal(class,
+209)`, a turn's points short of the 210 cost; `GreatPeople:RecruitPerson(0, 64)`
+for a player without the points returned and changed nothing). A class with nobody left reads −1 and stayed empty
+across the era change 7 → 8 (t232; the Information era has no individual of
+those classes). So the `Generating a random new Great Person` draws before
+the storms in 9 of 76 host-4 turns are not a recruitment's replacement; what
+they are is unread (this instance writes no RandCalls — the Logs belong to
+the first instance). *Ours:* `ensureGpOffer` draws the replacement at once —
+matches.
+
 ## What could not be pinned
 
-* The **order of gold vs science** inside A2–A3 (both move before the first
-  synchronous event; the published order lists research first).
-* **Loyalty's** exact place inside the city (GameCore has no loyalty reader;
-  the placement is the published event order) and **when a city at 0 loyalty
-  flips** (no flip in the records).
-* **Climate**: sea-level rise and the CO2 phase change (no climate event
-  fired in the records).
-* **Tourism** banking, the **score** and the **turn limit / victory** checks
-  (no event; the end of the game was not reached).
-* The GP market's refill draw that opens some turns
-  (`Generating a random new Great Person` before the storms in 9 of 76 storm
-  turns) — whether a turn-start recruitment exists or it is a late draw of
-  the previous turn.
-* The relative order of the end-of-turn congress and the heal (published
-  order: favor first, then the heals).
-* The healing rule for a city attacked this turn (only the heal's position was
-  read).
+* **Tourism** banking (no synchronous reader).
+* The **victory checks** and the **turn limit** (no rig brought an ending).
+* The turn-opening `Generating a random new Great Person` draw.
+* The climate step against the storms, the volcano and the random event
+  (no turn carried both).
 * A human seat's start of turn waits for its open diplomacy session and
   popups (`turnorder_unstick.py` answers them): the READINGS are unaffected,
   but a run that reads the local seat straight after the counter moves reads
-  it BEFORE its processing.
+  it BEFORE its processing (`turnorder_c93read.py` reads it after).
 
 ## Proposed AUDIT entry
 
 - **C-93. THE TURN'S ORDER.** Weight 5.
   Civ 6 runs a game turn as: each player in ascending id (majors, city-states,
-  the Free Cities, the barbarians) takes its start of turn — gold with upkeep
-  and bankruptcy, science and techs, policies, culture and civics, faith,
+  the Free Cities, the barbarians) takes its start of turn — science and
+  techs, gold with upkeep and bankruptcy, policies, culture and civics, faith,
   great people / envoys / governors, then each city in acquisition order:
-  production, growth on the live city, borders, loyalty, its religious
-  pressure out — then its actions; then the World Congress; then every unit
-  and city heals; the counter moves; the storms, the volcano roll and the
-  random event; the era and Ages, the quests' check, the favor; the
-  emergencies (`tools/civ6lab/turn_order_civ6.md`, measured 2026-09-27,
-  `runs/turnorder/`).
+  production, growth on the live city, borders, loyalty; after the last city
+  a city at 0 loyalty becomes a Free City; its religious pressure out — then
+  its actions; then the World Congress; then every unit and city heals; the
+  counter moves; the storms, the volcano roll, the random event and the
+  climate step; the era and Ages, the quests' check, the favor and the
+  scores; the emergencies (`tools/civ6lab/turn_order_civ6.md`, measured
+  2026-09-27, `runs/turnorder/`).
   - BUILD: the player order — `endTurn` / `SimStep.step`: majors, then
     `cityStatePhase` + `minorPhase`, then `freeCitiesPhase`, then
     `barbarianPhase` (16 of 16 turns, 332 blocks).
-  - BUILD: the economy before the cities — `seatPhase`'s research / civic /
-    gold / upkeep / `bankruptcy` / faith / `advanceGreatPeople` block and GPU
-    `_seat_research_tail` before the city walk, the walk's stats taken after
-    it (armT: +11 not +10; armB: +9.90 not +11).
+  - BUILD: the economy before the cities, in the order science → techs →
+    gold → upkeep → `bankruptcy` → culture → civics → faith →
+    `advanceGreatPeople` (`seatPhase`; GPU `_seat_research_tail` before the
+    column loop), the walk's stats taken after it (armT: +11 not +10; armB:
+    +9.90 not +11; science before gold 3 of 3: Egypt's Cartography +39.047
+    not +36.848, Maya's shortfall 6.3047 not 5.5508, armB 8.5469).
   - BUILD: inside a city, production → growth on recomputed stats → borders →
     loyalty (`seatPhase` walk, `minorAccrue` / `minorBuild`,
     `freeCitiesPhase`; GPU `_seat_city_produce` → `_seat_city_growth` →
     `_seat_border_growth` → `_seat_city_loyalty`) (11 / 11; armS +2.129 vs
-    +1.275).
+    +1.275; production on the pre-change loyalty level 2 of 2: Naranjo 68 not
+    71, Tikal 57 not 59.8); the flip after the whole walk, the turn the stock
+    reaches 0 (`flipCity` / `_seat_loyalty_flips`, 2 of 2).
   - BUILD: the city heals leave the seat, minor and Free City bodies for one
-    end-of-turn heal beside the unit heal (22 of 22 city heals at the turn's
-    end).
+    end-of-turn heal after the Congress, beside the unit heal (22 of 22 city
+    heals at the turn's end); +20 or the whole damage, attacked or not, none
+    while besieged, for a city-state's centre too (ours +10, no siege gate):
+    42 of 42 attacked-and-free healed, 0 of 4 besieged, city-state 13 +20
+    three times; walls never (0 of 47).
   - BUILD: `spreadReligiousPressure` / `_spread_religious_pressure` per source
     seat, on that seat's turn (13 of 15 conversions in the presser's block).
   - BUILD: `disasterPhase` / `_disaster_phase`: the storm walk before the
-    volcano and the random event (67 / 76, 76 / 76, 190 / 190).
-  - BUILD: `worldCongress` / `_world_congress` before the turn increment
-    (12 / 17 turns closed by the session's draws).
+    volcano and the random event (67 / 76, 76 / 76, 190 / 190);
+    `climateTurn` / `_climate_turn` after the turn increment beside it.
+  - BUILD: `worldCongress` / `_world_congress` before the turn increment and
+    before the heal (12 / 17 turns closed by the session's draws; its favor
+    published before the heals 3 of 3).
   - BUILD: the record's world-facing verbs (purchases, levy, silo, routes,
     the diplomacy arms) at the actor's block tail beside
     `applySeatUnitOrders`.
-  - LAB: gold vs science inside the start; loyalty's place in the city and
-    the flip's moment; the climate step; tourism; the score and victory
-    checks; the congress vs the heal; a city's heal when attacked that turn.
+  - LAB: tourism's banking (no GameCore reader); the victory and turn-limit
+    checks (a science-points rig and a socket turn limit brought no ending);
+    the `Generating a random new Great Person` draw that opens 9 of 76
+    host-4 turns (not a recruitment's replacement: 9 of 9 replacements drawn
+    in the recruiter's block); the climate step against the storms.

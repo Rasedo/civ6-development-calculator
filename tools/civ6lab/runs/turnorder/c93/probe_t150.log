@@ -1,0 +1,13 @@
+loy=100 lpt=20 fromRatio=20
+breakdown.1.PopulationPressure = 20
+breakdown.2.Governors = 0
+breakdown.3.Happiness = 0
+breakdown.4.Other = 0
+item=BUILDING_MONUMENT prog=8 cost=30 prod=4.3984375
+cs city 65536 @20,32 garrison=0/200 outer=35/200
+  dir0 20,33 owner=13 water=false mtn=false units=13:UNIT_PIKE_AND_SHOT:war=false
+  dir1 21,32 owner=13 water=false mtn=false units=5:UNIT_GREAT_GENERAL:war=true
+  dir2 20,31 owner=13 water=false mtn=false units=
+  dir3 19,31 owner=13 water=false mtn=false units=5:UNIT_CUIRASSIER:war=true
+  dir4 19,32 owner=13 water=false mtn=false units=
+  dir5 19,33 owner=13 water=false mtn=false units=5:UNIT_CUIRASSIER:war=true
