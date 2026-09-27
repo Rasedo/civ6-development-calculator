@@ -2833,11 +2833,14 @@ class SimSeats:
                 base_b = base_b & self.civ_civics[:, row, civ_b]
             buy_b = base_b & self._afford(self.civ_faith[:, row], b_price)
             if bool(buy_b.any()):
+                # the band takes the slot the pool hands out next; it may land
+                # beside the centre, so it is never looked up by the centre's plot
+                _next_b = self.unit_next.clone()
                 landed_b = self._spawn_unit(row, buy_b, at_b, self._band_idx)
                 self.civ_faith[:, row] = torch.where(landed_b, self.civ_faith[:, row] - b_price, self.civ_faith[:, row])
                 lb = landed_b.nonzero(as_tuple=True)[0]
                 if lb.numel():
-                    _sb = self.civilian_at[lb, at_b[lb]] - self.POOL_LO["major"]
+                    _sb = _next_b[lb]
                     _ok = (_sb >= 0) & (_sb < self.UNIT_MAX)
                     if bool(_ok.any()):
                         self.unit_band_level[lb[_ok], _sb[_ok]] = 1
