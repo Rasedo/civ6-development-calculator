@@ -247,6 +247,7 @@ class Api:
     def __init__(self, world: World, lua: lua51.LuaRuntime, log_print: bool):
         self.w = world
         self.lua = lua
+        world.lua = lua
         self.W, self.H = world.W, world.H
         self.wrap_x = world.wrap_x
         self.log_print = log_print
@@ -641,44 +642,35 @@ end
 """
 
 HKS_SORT = r"""
--- table.sort as Lua 5.1's auxsort, except that the first two swaps of the
--- median of three test "not lt(b, a)" where Lua 5.1 tests lt(a, b); the
--- third swap and the partition scans keep lt. Fitted on the two ties the
--- game's draw logs decide (Duel seed 1000's natural wonder sites tied at
--- 1001087 take the later plot; Small seed 1000's wonder rolls tied at 82 take
--- the earlier wonder); how Havok Script breaks the resource placements'
--- ties is not settled (h3 report).
+-- table.sort as Havok Script 2013.2.0 sorts (measured: every permutation and
+-- every comparator call sequence of 1178 probed sorts, tools/civ6lab/h3_hksort.py):
+-- the median of three (t[u] before t[l] swaps them; then t[l] not before
+-- t[m] swaps m and l, else t[m] not before t[u] swaps m and u), the pivot
+-- left in place, a Wirth partition (i from l + 1, j from u - 1, swapping
+-- while i <= j), then [l, j] and [i, u], the left part first
 local function sort(t, lt)
   lt = lt or function(a, b) return a < b end
-  local function le(a, b) return not lt(b, a) end
   local function aux(l, u)
-    while l < u do
-      if le(t[u], t[l]) then t[l], t[u] = t[u], t[l] end
-      if u - l == 1 then return end
-      local i = math.floor((l + u) / 2)
-      if le(t[i], t[l]) then t[i], t[l] = t[l], t[i]
-      elseif lt(t[u], t[i]) then t[i], t[u] = t[u], t[i] end
-      if u - l == 2 then return end
-      local P = t[i]
-      t[i], t[u - 1] = t[u - 1], t[i]
-      i = l
-      local j = u - 1
-      while true do
-        i = i + 1
-        while lt(t[i], P) do i = i + 1 end
-        j = j - 1
-        while lt(P, t[j]) do j = j - 1 end
-        if j < i then break end
+    if l >= u then return end
+    if lt(t[u], t[l]) then t[l], t[u] = t[u], t[l] end
+    if u - l == 1 then return end
+    local m = math.floor((l + u) / 2)
+    if not lt(t[l], t[m]) then t[m], t[l] = t[l], t[m]
+    elseif not lt(t[m], t[u]) then t[m], t[u] = t[u], t[m] end
+    if u - l == 2 then return end
+    local P = t[m]
+    local i, j = l + 1, u - 1
+    while i <= j do
+      while lt(t[i], P) do i = i + 1 end
+      while lt(P, t[j]) do j = j - 1 end
+      if i <= j then
         t[i], t[j] = t[j], t[i]
+        i = i + 1
+        j = j - 1
       end
-      t[u - 1], t[i] = t[i], t[u - 1]
-      if i - l < u - i then
-        j = l; i = i - 1; l = i + 2
-      else
-        j = i + 1; i = u; u = j - 2
-      end
-      aux(j, i)
     end
+    aux(l, j)
+    aux(i, u)
   end
   aux(1, #t)
 end

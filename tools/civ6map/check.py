@@ -85,8 +85,8 @@ def compare_maps(a: dict, b: dict) -> dict:
 
 
 def oracle_continents(gdump: dict) -> None:
-    """StampContinents' partition past one continent is not specified: take
-    the game's continents from its dump (StampContinents' own output; no later
+    """StampContinents' seeds after the first are not specified: take the
+    game's continents from its dump (StampContinents' own output; no later
     stage changes a plot's continent) and keep the native's 43 draws"""
     from tools.civ6map import world as W
 
@@ -131,7 +131,7 @@ def main() -> int:
     world, _ = generate(a.script, size, int(rec["map_seed"]), majors=a.majors.split(","),
                         n_minors=n_minors, minors=[], options=options)
     if world.unspecified:
-        print("unspecified natives stood in:", world.unspecified)
+        print("unspecified natives stood in:", sorted(set(world.unspecified)))
     ours = world.rng.ledger
     game = list(probe_entries(rec))
     gl = [e for e in game if e[0] == "lua"]
