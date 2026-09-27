@@ -1,0 +1,13 @@
+{
+  "save": "lab4_t150", "tag": "c74s3_minor_pillage", "turns": 8, "controls": 1,
+  "set": {"ZALL": "0", "ZTAG": "read"},
+  "pre":  [{"state": "InGame", "file": "c74s3_minors.lua"}],
+  "each": [{"state": "InGame", "file": "c74s3_minors.lua"}],
+  "post": [],
+  "arms": [
+    {"name": "tornado_bologna_campus", "gc": "c74s3_apply.lua",
+     "set": {"ZEV": "RANDOM_EVENT_TORNADO_OUTBREAK", "ZX": "57", "ZY": "20"}},
+    {"name": "tornado_chinguetti_hs", "gc": "c74s3_apply.lua",
+     "set": {"ZEV": "RANDOM_EVENT_TORNADO_OUTBREAK", "ZX": "25", "ZY": "28"}}
+  ]
+}

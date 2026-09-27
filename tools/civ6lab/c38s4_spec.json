@@ -1,0 +1,15 @@
+{
+  "save": "lab4_t150", "tag": "c38s4_levy", "turns": 0, "controls": 1,
+  "set": {"ZP": "0"},
+  "pre":  [{"state": "InGame", "file": "c38s4_levy.lua"}],
+  "each": [],
+  "post": [],
+  "arms": [
+    {"name": "trait", "gc": "c38s4_attach.lua", "set": {"ZMOD": "TRAIT_LEVY_DISCOUNT"}},
+    {"name": "gov", "gc": "c38s4_attach.lua", "set": {"ZMOD": "BUILDING_GOV_LEVY_DISCOUNT"}},
+    {"name": "both", "gc": "c38s4_attach.lua", "set": {"ZMOD": "TRAIT_LEVY_DISCOUNT"},
+     "steps": [{"state": "GameCore", "file": "c38s4_attach.lua", "set": {"ZMOD": "BUILDING_GOV_LEVY_DISCOUNT"}}]},
+    {"name": "trait_twice", "gc": "c38s4_attach.lua", "set": {"ZMOD": "TRAIT_LEVY_DISCOUNT"},
+     "steps": [{"state": "GameCore", "file": "c38s4_attach.lua", "set": {"ZMOD": "TRAIT_LEVY_DISCOUNT"}}]}
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "save": "lab4_t150", "tag": "b93s1_darwin", "turns": 0, "controls": 0,
+  "set": {"ZP": "0", "ZFREE": "1", "ZDEAR": "1"},
+  "pre":  [{"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "0", "ZTAG": "after1"}},
+           {"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "0", "ZTAG": "after2"}},
+           {"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "0", "ZTAG": "after3"}}],
+  "each": [],
+  "post": [],
+  "arms": [
+    {"name": "on1_adj3", "gc": "b93s1_place.lua", "set": {"ZX": "19", "ZY": "16"},
+     "steps": [{"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "0", "ZTAG": "before"}},
+               {"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "1", "ZTAG": "go"}}]},
+    {"name": "on1_adj2", "gc": "b93s1_place.lua", "set": {"ZX": "19", "ZY": "15"},
+     "steps": [{"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "0", "ZTAG": "before"}},
+               {"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "1", "ZTAG": "go"}}]},
+    {"name": "on0_adj2", "gc": "b93s1_place.lua", "set": {"ZX": "18", "ZY": "17"},
+     "steps": [{"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "0", "ZTAG": "before"}},
+               {"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "1", "ZTAG": "go"}}]},
+    {"name": "idle_on1_adj3", "gc": "b93s1_place.lua", "set": {"ZX": "19", "ZY": "16"},
+     "steps": [{"state": "InGame", "file": "b93s1_activate.lua", "set": {"ZGO": "0", "ZTAG": "before"}}]}
+  ]
+}

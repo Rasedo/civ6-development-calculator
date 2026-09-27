@@ -1,0 +1,40 @@
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "made", "type": "UNIT_MUSKETMAN", "id": 917507, "x": 56, "y": 19}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "made", "type": "UNIT_MUSKETMAN", "id": 983041, "x": 57, "y": 18}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "bank", "balance": 0.0}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "seat", "turn": 100, "balance": 0, "goldYield": 12.6, "maintenance": 16, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 5, "units": [[524288, "UNIT_TRADER"], [983041, "UNIT_MUSKETMAN"], [655362, "UNIT_MAN_AT_ARMS"], [917507, "UNIT_MUSKETMAN"], [851972, "UNIT_TREBUCHET"]]}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "city", "turn": 100, "id": 65536, "name": "LOC_CITY_NAME_BOLOGNA", "pop": 10, "amenities": 4, "need": 5, "lostBankruptcy": 0, "happiness": 3}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":3,\"picked\":\"COMMEMORATION_INFRASTRUCTURE,COMMEMORATION_RELIGIOUS,COMMEMORATION_EXPLORATION\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":100}"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause session 1:1 -> closed sessions [1:1]"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause session 3:3 -> closed sessions [3:3]"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "seat", "turn": 101, "balance": 0, "goldYield": 12.6, "maintenance": 2, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 1, "units": [[524288, "UNIT_TRADER"]]}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "city", "turn": 101, "id": 65536, "name": "LOC_CITY_NAME_BOLOGNA", "pop": 10, "amenities": 3, "need": 5, "lostBankruptcy": 1, "happiness": 3}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NARANJO builds UNIT_WARRIOR"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause popup WorldCongressIntro -> closed"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "seat", "turn": 102, "balance": 10.6, "goldYield": 12.6, "maintenance": 2, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 2, "units": [[524288, "UNIT_TRADER"], [1048578, "UNIT_BUILDER"]]}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "city", "turn": 102, "id": 65536, "name": "LOC_CITY_NAME_BOLOGNA", "pop": 10, "amenities": 4, "need": 5, "lostBankruptcy": 0, "happiness": 3}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NARANJO builds UNIT_WARRIOR"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_EARLY_EMPIRE"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_EARLY_EMPIRE"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "seat", "turn": 103, "balance": 21.2, "goldYield": 12.6, "maintenance": 2, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 2, "units": [[524288, "UNIT_TRADER"], [1048578, "UNIT_BUILDER"]]}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "city", "turn": 103, "id": 65536, "name": "LOC_CITY_NAME_BOLOGNA", "pop": 10, "amenities": 4, "need": 5, "lostBankruptcy": 0, "happiness": 3}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NARANJO builds UNIT_WARRIOR"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "seat", "turn": 104, "balance": 31.8, "goldYield": 12.6, "maintenance": 2, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 2, "units": [[524288, "UNIT_TRADER"], [1048578, "UNIT_BUILDER"]]}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "city", "turn": 104, "id": 65536, "name": "LOC_CITY_NAME_BOLOGNA", "pop": 10, "amenities": 4, "need": 5, "lostBankruptcy": 0, "happiness": 3}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CELESTIAL_NAVIGATION"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "seat", "turn": 105, "balance": 42.41, "goldYield": 12.6, "maintenance": 2, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 2, "units": [[524288, "UNIT_TRADER"], [1048578, "UNIT_BUILDER"]]}
+{"tag": "p9_mus2", "seat": 9, "units_spec": "UNIT_MUSKETMAN:2", "kind": "city", "turn": 105, "id": 65536, "name": "LOC_CITY_NAME_BOLOGNA", "pop": 10, "amenities": 4, "need": 5, "lostBankruptcy": 0, "happiness": 3}

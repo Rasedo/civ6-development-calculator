@@ -1,0 +1,13 @@
+{
+  "save": "lab4_t150", "tag": "c74s3_fire2", "turns": 8, "controls": 0,
+  "set": {"ZX": "34", "ZY": "33", "ZR": "2", "ZEV": "RANDOM_EVENT_FOREST_FIRE",
+          "ZFEAT": "34,34,FEATURE_FOREST;35,32,FEATURE_FOREST"},
+  "pre":  [{"state": "GameCore", "file": "c74s3_plots.lua"}],
+  "each": [{"state": "GameCore", "file": "c74s3_plots.lua"}],
+  "post": [],
+  "arms": [
+    {"name": "fire_rig_b1", "burn": 1, "gc": "c74s3_fire_rig.lua"},
+    {"name": "fire_rig_b2", "burn": 2, "gc": "c74s3_fire_rig.lua"},
+    {"name": "fire_rig_b3", "burn": 3, "gc": "c74s3_fire_rig.lua"}
+  ]
+}

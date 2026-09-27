@@ -7,7 +7,7 @@ ONE change placed after the load play the same turn otherwise. The spec (JSON):
 
     {"save": "lab4_t150", "tag": "b82s3", "turns": 1, "controls": 2,
      "set": {"ZP": "1"},                       # tokens for every snippet
-     "pre":  [{"state": "InGame", "file": "x.lua"}],   # read after the arm, before the turn
+     "pre":  [{"state": "InGame", "file": "x.lua", "set": {}}],   # read after the arm, before the turn (a reader's own tokens win)
      "each": [{"state": "InGame", "file": "z.lua"}],   # read after every turn
      "post": [{"state": "InGame", "file": "y.lua"}],   # read after the turns
      "arms": [{"name": "palace", "gc": "arm.lua", "ig": null, "set": {"ZWHAT": "BUILDING_PALACE"},
@@ -15,7 +15,9 @@ ONE change placed after the load play the same turn otherwise. The spec (JSON):
 
 Per arm: load, `burn` draws of `Game.GetRandNum(100, "lab")` (independent
 repeats), the arm's GameCore snippet then its InGame snippet, the `pre`
-readers, `turns` Autoplay turns, the `post` readers. The control arms (no
+readers, `turns` turns (`"advance": "autoplay"` by default, or `"endturn"`, which
+leaves the seat's own units where they stand; per spec or per arm), the
+`post` readers. The control arms (no
 snippet) run first. A snippet is a file under tools/civ6lab or inline Lua
 (`gc_lua` / `ig_lua`); `lab_json.lua` (J, P, OUT) is prepended to each and
 the Z-tokens substituted. Every printed line that parses as JSON is kept.
@@ -85,20 +87,22 @@ def arm(host: str, spec: dict, a: dict | None) -> dict:
         # further changes, in order: [{"state", "file" | "lua", "set"}]
         rec["steps"] = [run_lua(t, s.get("state", lab.GC), snippet(s.get("file"), s.get("lua"), {**tokens, **s.get("set", {})}))
                         for s in a.get("steps", [])]
-    rec["pre"] = [run_lua(t, r["state"], snippet(r.get("file"), r.get("lua"), tokens)) for r in spec.get("pre", [])]
+    rec["pre"] = [run_lua(t, r["state"], snippet(r.get("file"), r.get("lua"), {**tokens, **r.get("set", {})}))
+                  for r in spec.get("pre", [])]
     turns = int((a or {}).get("turns", spec.get("turns", 1)))
     rec["each"] = []
     for _ in range(turns):
         try:
-            lab.advance(t, "autoplay", lp, 900.0)
+            lab.advance(t, (a or {}).get("advance", spec.get("advance", "autoplay")), lp, 900.0)
         except lab.GameOver as e:
             rec["game_over"] = e.info
             break
         if spec.get("each"):
             rec["each"].append({"turn": lab.turn(t), "reads": [
-                run_lua(t, r["state"], snippet(r.get("file"), r.get("lua"), tokens)) for r in spec["each"]]})
+                run_lua(t, r["state"], snippet(r.get("file"), r.get("lua"), {**tokens, **r.get("set", {})})) for r in spec["each"]]})
     rec["turn1"] = lab.turn(t)
-    rec["post"] = [run_lua(t, r["state"], snippet(r.get("file"), r.get("lua"), tokens)) for r in spec.get("post", [])]
+    rec["post"] = [run_lua(t, r["state"], snippet(r.get("file"), r.get("lua"), {**tokens, **r.get("set", {})}))
+                   for r in spec.get("post", [])]
     t.close()
     return rec
 

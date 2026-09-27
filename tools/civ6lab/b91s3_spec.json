@@ -1,0 +1,13 @@
+{
+  "save": "lab4_t150", "tag": "b91s3_colonization", "turns": 2, "controls": 0,
+  "set": {"ZR": "7", "ZF": "6", "ZBELIEF": "BELIEF_RELIGIOUS_COLONIZATION", "ZP": "0", "ZX": "34", "ZY": "34", "ZSET": "1", "ZTAG": "read"},
+  "pre":  [{"state": "InGame", "file": "b91s3_city.lua"}, {"state": "InGame", "file": "b91s3_city.lua"}],
+  "each": [{"state": "InGame", "file": "b91s3_city.lua"}],
+  "post": [],
+  "arms": [
+    {"name": "rc_off", "gc": "b91s3_rig.lua", "set": {"ZADD": "0"},
+     "steps": [{"state": "InGame", "file": "pop_foundcity.lua"}]},
+    {"name": "rc_on", "gc": "b91s3_rig.lua", "set": {"ZADD": "1"},
+     "steps": [{"state": "InGame", "file": "pop_foundcity.lua"}]}
+  ]
+}

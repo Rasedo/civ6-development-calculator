@@ -1,0 +1,12 @@
+{
+  "save": "lab4_t150", "tag": "b91s4_holywaters", "turns": 3, "controls": 0, "advance": "endturn",
+  "set": {"ZF": "6", "ZP": "0", "ZDMG": "60",
+          "ZUNITS": "65,34,7;65,35,8;64,34,7;66,34,8;67,34,7;64,36,8;37,38,7;36,42,8"},
+  "pre":  [{"state": "GameCore", "file": "b91s4_read.lua"}],
+  "each": [{"state": "GameCore", "file": "b91s4_read.lua"}],
+  "post": [],
+  "arms": [
+    {"name": "hw_off", "gc": "b91s4_rig.lua", "set": {"ZADD": "0"}},
+    {"name": "hw_on", "gc": "b91s4_rig.lua", "set": {"ZADD": "1"}}
+  ]
+}

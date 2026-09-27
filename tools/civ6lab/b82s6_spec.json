@@ -1,0 +1,13 @@
+{
+  "save": "b82s6_t6_h1", "tag": "b82s6_tie_h1", "turns": 1, "controls": 0, "advance": "endturn",
+  "pre":  [{"state": "InGame", "file": "lab5_survey.lua"}],
+  "post": [{"state": "InGame", "file": "lab5_survey.lua"}, {"state": "GameCore", "file": "lab5_endgame_probe.lua"}],
+  "arms": [
+    {"name": "tie_p1pop2_p0era1", "gc": "b82s3_arm.lua", "set": {"ZKIND": "pop", "ZX": "37", "ZY": "11", "ZWHAT": "2"},
+     "steps": [{"file": "b82s3_arm.lua", "set": {"ZKIND": "era", "ZX": "8", "ZY": "9", "ZWHAT": "1"}}]},
+    {"name": "tie_rep_burn3", "burn": 3, "gc": "b82s3_arm.lua", "set": {"ZKIND": "pop", "ZX": "37", "ZY": "11", "ZWHAT": "2"},
+     "steps": [{"file": "b82s3_arm.lua", "set": {"ZKIND": "era", "ZX": "8", "ZY": "9", "ZWHAT": "1"}}]},
+    {"name": "win_p1pop2era1", "gc": "b82s3_arm.lua", "set": {"ZKIND": "pop", "ZX": "37", "ZY": "11", "ZWHAT": "2"},
+     "steps": [{"file": "b82s3_arm.lua", "set": {"ZKIND": "era", "ZX": "37", "ZY": "11", "ZWHAT": "1"}}]}
+  ]
+}

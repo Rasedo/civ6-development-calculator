@@ -1,0 +1,11 @@
+{
+  "save": "lab4_t150", "tag": "c74s3_fire", "turns": 11, "controls": 0,
+  "set": {"ZX": "34", "ZY": "33", "ZR": "3", "ZEV": "RANDOM_EVENT_FOREST_FIRE"},
+  "pre":  [{"state": "GameCore", "file": "c74s3_plots.lua"}],
+  "each": [{"state": "GameCore", "file": "c74s3_plots.lua"}],
+  "post": [],
+  "arms": [
+    {"name": "fire_b0", "burn": 0, "gc": "c74s3_apply.lua"},
+    {"name": "fire_b5", "burn": 5, "gc": "c74s3_apply.lua"}
+  ]
+}

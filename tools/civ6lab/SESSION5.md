@@ -911,3 +911,107 @@ absolute-rate fit), the accident's building rows (C-1-S1), the Nuclear
 Emergency reader (B-86-S0), the city-state spending watch (C-38, under the
 2026-09-23 ruling). The envoy tile and the tile swap's reach were measured in
 lab 4.
+
+## 8. Host 127.0.0.2 scenes (lab 5, `lab4_t150` unless named)
+
+Every arm is a `pair_run.py` spec (a fresh load per arm; `"advance":
+"endturn"` leaves the seat's own units standing, and a reader entry may carry
+its own `set` tokens).
+
+### C-38-S4. The levy discounts
+`c38s4_spec.json` (`c38s4_attach.lua` + `c38s4_levy.lua`), `c38s4_fit.py`;
+`runs/c38s4_levy_20260926T125629Z.jsonl`. `GetLevyMilitaryCost(minor)` is the
+same for every major: the sum over the minor's military units of their
+speed-scaled production cost in its capital (`GetUnitCost`: 11 of 11 minors;
+a Galley adds 32, not 25% of its 125 purchase price). Attached to seat 0:
+`TRAIT_LEVY_DISCOUNT` alone 50%, `BUILDING_GOV_LEVY_DISCOUNT` alone 50%, both
+25% (floor(floor(L/2)/2): 255 → 127 → 63), and the same modifier attached
+twice 25%: the rows multiply, each truncating.
+
+### B-91-S1..S4. Worship buildings, cities following, Colonization, Holy Waters
+- Worship (`b91s1_read.lua`, `b91s1_fit.py`, `b91s1_why.py`;
+  `runs/b91s1_lab4_t150_*.jsonl`): a worship building is offered (the
+  exclusion test, or a refusal WITH a reason such as the missing Holy Site)
+  iff its belief is in the CITY's majority religion — 405 of 405 rows; the
+  owner's founded religion misses 18, the owner's majority-of-cities 10.
+  `SetAllCityToReligion` (GameCore) on Toronto (Canada founded religion 2)
+  moved its offer from the Gurdwara to religion 7's Synagogue. A city holding
+  a worship building is offered no other (Thebes, converted, keeps its Wat).
+- Cities following (`b91s2_snap.lua`, `b91s2_convert.lua`;
+  `runs/b91s2_follow_lab4_t150_20260926T1320Z.jsonl`): Pilgrimage's founder
+  (p6) gains +2 Faith in the same tuner call for each city converted to its
+  religion — Toronto (Canada), Bologna (a city-state), Thebes (Egypt).
+- Religious Colonization (`b91s3_rig.lua`, `b91s3_city.lua`,
+  `b91s3_spec.json`; `runs/b91s3_colonization_*`): `Game.GetReligion():
+  AddBelief(founder, belief index)` adds a belief (`b91s3_addprobe.lua`). Seat
+  0 (majority religion 7) founds a city: with the belief it starts with its one
+  citizen following 7 and 202 pressure of 7 (the neighbours then add as in the
+  control); without it 0 followers, and 7 arrives only as pressure (10, 16).
+- Holy Waters (`b91s4_rig.lua`, `b91s4_read.lua`, `b91s4_spec.json`,
+  endturn; `runs/b91s4_holywaters_*`): no religious unit heals without it (0
+  in 3 turns, in foreign and own territory); with it, +10 a turn from the
+  second turn to seat 0's Missionaries of religion 7 AND of religion 8 on
+  Tbilisi's Holy Site (p6, religion 7) and on the three adjacent plots tried,
+  nothing at distance 2.
+
+### B-93-S1. Darwin's plot
+`b93s1_place.lua` (`GrantPerson` then `UnitManager.PlaceUnit`; `CreatePerson`
+places nothing, `b93s1_probe.lua`; the plot is freed with `plot:SetOwner(-1)`,
+a Great Person cannot stand in a closed foreign territory), research set to
+Future Tech so nothing completes, `b93s1_activate.lua`;
+`runs/b93s1_darwin_20260926T132306Z.jsonl`. On a Chocolate Hills plot with 3
+wonder plots adjacent: +1000; on one with 2 adjacent: +750; off the wonder
+with 2 adjacent: +500; idle: 0. 250 a wonder plot, the one underfoot counted.
+
+### C-74-S3. Blizzard, building pillage, the minor's repair, the fire clock
+- Blizzard (`c74s3_apply.lua`, `c74s3_storms.lua`;
+  `runs/c74s3_blizzard_lab4_t150_20260926T1340Z.jsonl`): `ApplyEvent` checks
+  the start: a Blizzard aimed at a Grassland plot starts elsewhere (Tundra
+  Hills 55,9); aimed at Torres del Paine (76,10 and 77,10, Tundra) and
+  Eyjafjallajokull (34,45, Tundra) it starts ON the wonder plot, 3 of 3.
+- One storm hit on a district (`c74s3_bp_spec.json`, `c74s3_minors.lua`,
+  `c74s3_bp_fit.py`; `runs/c74s3_bldg_pillage_20260926T133346Z.jsonl`, 4
+  loads x 6 districts, Tornado Outbreak and Family): when the district is
+  pillaged every building in it is (13 of 13); when it is not, at most ONE
+  building is — the top of the district's chain (University over Library,
+  the Meeting House over Temple and Shrine: 6 of 6), 3 of 3 at Outbreak's 100,
+  3 of 5 at Family's 60. City-states' districts exactly as a major's.
+- The minor's repair (`c74s3_minor_spec.json`, `c74s3_minor_fit.py`;
+  `runs/c74s3_minor_pillage_20260926T132658Z.jsonl`, 8 turns): the minor
+  finishes its current item, then queues the pillaged building itself, which
+  resumes at 75% of its cost (University 93 of 125, Meeting House 71 of 95)
+  and is built with production; nothing bought (Chinguetti at 0 gold).
+- The fire (`c74s3_fire_spec.json`, `c74s3_fire2_spec.json`,
+  `c74s3_fire_rig.lua` (Woods planted by `WorldBuilder.MapManager():
+  SetFeatureType`), `c74s3_plots.lua`, `c74s3_fire_fit.py`;
+  `runs/c74s3_fire_20260926T133940Z.jsonl`, `runs/c74s3_fire2_20260926T134425Z.jsonl`):
+  a plot burns on its ignition turn and the next, is Burnt Forest four turns,
+  and is Woods again on ignition + 6. Spread reached the Woods neighbours in 2
+  of 5 fires, all of them at once, one turn after the origin (t151) or two
+  (t152), each spread plot then on its OWN clock (regrown 6 turns after its
+  own ignition). No Rainforest neighbour ever burned (3 in each of 5 fires).
+
+### B-D-S3/S4. The policy price
+`bds3_ladder.py` + `bds3_step.lua`, `bds3_fit.py`, `bds4_probe.py` +
+`bds4_step.lua`, `bds4_fit.py`, `bds4_kt.py`, `bds4_fall.py`, `bds2_law.py`,
+`bds2_intervals.py`, `bds2_models.py`; `runs/bds3_ladder_cheap_20260926T135028Z.jsonl`,
+`runs/bds3_ladder_dear_20260926T135428Z.jsonl`, `runs/bds4_probe_20260926T135815Z.jsonl`.
+InGame `HasTech` lags GameCore `SetTech` by many calls while the price moves
+at once: count techs in GameCore. The price is a function of (T, C, s) alone,
+identical across seats: 5 x round(base(s) x max(kT(T), kC(C)) / 5),
+base(s) ~ 50 - 5 s. Removing techs lowers it only to a floor that removing
+civics then lowers, and back. kT moves by COUNT — an Ancient tech removed
+(cost 25) and a Future tech granted (2600) move it alike. At s = 0 (price =
+50k): T 33..65 → 235 245 250 255 265 270 275 275 285 290 295 305 310 315 320
+325 330 335 345 350 355 365 365 370 380 385 390 395 405 410 410 420 425; C
+19..32 → 185 190 200 210 215 225 230 235 245 250 260 270 275 280. No
+linear k fits (steps of 0 at T 40, 55, 63); the fall misses base(s) x k on 5
+of 186 (T, s) cells at d = 4.95, 18 at d = 5 (most at s = 7). A civic
+re-granted by the tuner restarts the fall.
+
+### B-82-S6. A tie with the human in the higher seat
+`b82s6_prep.py` (the `b82s4_tie.json` Duel, Autoplay to turn 5, one turn
+returning to seat 1: seat 1 human, seat 0 AI), save `b82s6_t6_h1`,
+`b82s6_spec.json` (endturn); `runs/b82s6_tie_h1_*.jsonl`. Control 11–10 → 0.
+Seat 1 +2 population, seat 0 +1 era score: 12–12 → seat 0, twice (the second
+with 3 draws burned); seat 1 +2 population +1 era: 13–11 → seat 1.
