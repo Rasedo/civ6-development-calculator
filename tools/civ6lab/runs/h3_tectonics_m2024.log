@@ -1,0 +1,8 @@
+map seed 2024 grid 44x26 world age 2 plates 13.5 tectonics block at draw 28784 (229788 draws)
+model draws 229788 ledger 229788 -> EXACT
+same plot: 222/349 land plots agree; (model, game) {('F', 'F'): 193, ('F', 'H'): 38, ('F', 'M'): 13, ('H', 'F'): 44, ('H', 'H'): 23, ('H', 'M'): 7, ('M', 'F'): 5, ('M', 'H'): 20, ('M', 'M'): 6}
+index - 1: 326/349 land plots agree; (model, game) {('F', 'F'): 242, ('F', 'M'): 6, ('H', 'H'): 65, ('H', 'M'): 1, ('M', 'H'): 16, ('M', 'M'): 19}
+lake plots [(39, 13), (40, 13), (40, 14), (33, 17), (34, 17), (34, 18), (35, 18)]
+lake plots that were ocean in the plot types (fits): [()]
+coastal mountain draws 17, shuffle draws 337, lonely mountains 7 (ledger: Shuffling table entry - Lua x337, Coastal Mountain Removal x17)
+after coastal removal and lonely mountains: 349/349 land plots agree; (model, game) {('F', 'F'): 242, ('H', 'H'): 81, ('M', 'M'): 26}

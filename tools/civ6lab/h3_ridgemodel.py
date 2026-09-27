@@ -6,18 +6,18 @@ scored against the pinned dumps (h3_ridges.py / h3_fractal.py records).
 Seeds: max(trunc(numPlates), 3), placed in order. A seed draws
     y = get(fy), x = get(fx), b0 = get(7); if b0 >= 3: one more draw;
     b1 = one draw; b2 = get(2); if b2 == 1: one more draw
-(b0..c2 never touch the field). While its hex distance to an earlier seed is
-< 7 it is moved: hx = get(fx), y = get(fy), x = hx + (y >> 1), not wrapped
-(a moved seed may sit past the array's east edge and still counts).
-Field over the array x < fx, y < fy: d1, d2 the two smallest hex distances
-(odd rows shifted right) to the seeds, h = 255 * d1 // d2, blended into the
-fractal a' = (h * br + a * bf) // max(br + bf, 1).
+(weakness, bias direction and strength; without ridge flags they never touch
+the field). While its hex distance to an earlier seed is < 7 it is moved:
+hx = get(fx), y = get(fy), x = hx + (y >> 1), not wrapped (a moved seed may
+sit past the array's east edge and still counts).
+Field over the array x < fx, y < fy: d1, d2 the two smallest (modified, with
+ridge flags) hex distances (odd rows shifted right) to the seeds,
+h = 255 * d1 // d2, blended into the fractal a' = (h * br + a * bf) // max(br + bf, 1).
 """
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import pathlib
 import sys
 
@@ -72,31 +72,43 @@ def weakness(s: dict) -> int:
     return ((s["c0"] * 7) >> 16) - 3 if s["b0"] >= 3 else 0
 
 
+def direction(q: int, r: int) -> int:
+    """the point's direction from the seed, from its offset q = dhx (odd rows
+    shifted right), r = dy read as cartesian axes: the largest dot product with
+    NE (1/2, √3/2), E (1, 0), SW (-1/2, -√3/2), W (-1, 0), NW (-1/2, √3/2);
+    SE is never returned (its sector splits between E and SW at -60°); a tie
+    (q = 0) goes to NW above the seed and SW below; the seed itself has none.
+    Exact integer form of that partition."""
+    if q == 0 and r == 0:
+        return -1
+    if r > 0:
+        if q > 0:
+            return 0 if q * q < 3 * r * r else 1
+        return 5 if q * q < 3 * r * r else 4
+    if r == 0:
+        return 1 if q > 0 else 4
+    if q > 0:
+        return 1 if 3 * q * q > r * r else 3
+    return 4 if q * q > 3 * r * r else 3
+
+
 def bias(s: dict, x: int, y: int) -> int:
-    """PARTIAL (about 86% of the measured cells): a seed with b2 == 1 has
-    strength get(8) - 4 of its second draw c2 and direction get(6) of b1
-    (NE, E, SE, SW, W, NW); the point's direction is the 60-degree sector of
-    its axial offset (dhx, dy) read as cartesian, sectors centred on 60, 0,
-    -60, -120, 180, 120 degrees; + strength in the bias sector, - strength in
-    the opposite one"""
-    if s["b2"] != 1 or (x, y) == (s["x"], s["y"]):
+    """a seed with b2 == 1 (the first draw of max(0, get(8) - 4) >= 0) has
+    strength get(8) - 4 of its second draw c2 (-4..3) and direction get(6)
+    of b1 (NE, E, SE, SW, W, NW); + strength where the point's direction()
+    is b1, - strength where it is b1 + 3 (mod 6)"""
+    if s["b2"] != 1:
         return 0
     st = ((s["c2"] * 8) >> 16) - 4
     dr = (s["b1"] * 6) >> 16
-    X = (x - (y >> 1)) - (s["x"] - (s["y"] >> 1))
-    Y = y - s["y"]
-    best, e = None, -1
-    for i, ang in enumerate((60, 0, -60, -120, 180, 120)):
-        dp = X * math.cos(math.radians(ang)) + Y * math.sin(math.radians(ang))
-        if best is None or dp > best:
-            best, e = dp, i
-    return st if e == dr else -st if e == (dr + 3) % 6 else 0
+    e = direction((x - (y >> 1)) - (s["x"] - (s["y"] >> 1)), y - s["y"])
+    return st if e == dr else -st if e >= 0 and e == (dr + 3) % 6 else 0
 
 
 def ridge_height_flagged(seeds, x, y, rng: Rng) -> int:
-    """PARTIAL: any ridge flag draws get(3) per (point, seed), seeds in order;
-    D = max(1, d + get(3) + weakness), d the plain hex distance (FRAC_WRAP_X
-    wraps nothing), plus the directional bias (bias())."""
+    """any ridge flag draws get(3) per (point, seed), seeds in order;
+    D = max(1, d + get(3) + weakness + bias), d the plain hex distance
+    (FRAC_WRAP_X wraps nothing), bias() the directional bias."""
     ds = []
     for s in seeds:
         n = rng.get(3)

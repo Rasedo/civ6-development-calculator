@@ -1,0 +1,10 @@
+map seed 1000 grid 44x26 world age 5 plates 27.0 tectonics block at draw 116638 (459344 draws)
+model draws 459344 ledger 459344 -> EXACT
+same plot: 207/392 land plots agree; (model, game) {('F', 'F'): 146, ('F', 'H'): 67, ('F', 'M'): 8, ('H', 'F'): 73, ('H', 'H'): 59, ('H', 'M'): 11, ('M', 'F'): 7, ('M', 'H'): 19, ('M', 'M'): 2}
+index - 1: 381/392 land plots agree; (model, game) {('F', 'F'): 224, ('F', 'M'): 1, ('H', 'F'): 2, ('H', 'H'): 137, ('M', 'H'): 8, ('M', 'M'): 20}
+lake plots [(12, 13), (36, 13), (36, 14), (37, 14), (39, 14), (36, 15), (37, 15), (13, 16), (36, 20)]
+lake plots that were ocean in the plot types (fits): [((12, 13), (39, 14)), ((12, 13), (13, 16)), ((12, 13), (36, 20)), ((39, 14), (13, 16)), ((39, 14), (36, 20)), ((13, 16), (36, 20))]
+coastal mountain draws 9, shuffle draws 376, lonely mountains 1 (ledger: Shuffling table entry - Lua x376, Coastal Mountain Removal x9)
+after coastal removal and lonely mountains: 390/392 land plots agree; (model, game) {('F', 'F'): 224, ('H', 'F'): 2, ('H', 'H'): 145, ('M', 'M'): 21}
+    ((37, 19), 'H', 'F', '3.38.-1.0.-1.9.0')
+    ((37, 20), 'H', 'F', '3.38.-1.0.-1.9.0')
