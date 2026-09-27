@@ -142,7 +142,9 @@ def clauses(db: DB, P: Plots, f: int, i: int):
         ("NoCoast", lambda: db.fb(f, "NoCoast") and not P.water[i] and P.salt_adj[i]),
         ("NoRiver", lambda: db.fb(f, "NoRiver") and (P.river[i] or P.radj[i])),
         ("RequiresRiver", lambda: db.fb(f, "RequiresRiver") and not P.river[i]),
-        ("Lake: water next to it", lambda: db.fb(f, "Lake") and any(q is not None and P.water[q] for q in ring)),
+        # water under Ice does not count (Huge 1001: Crater Lake beside two iced plots)
+        ("Lake: water next to it", lambda: db.fb(f, "Lake") and any(q is not None and P.water[q] and s.feature[q] != 1
+                                                                   for q in ring)),
         ("a lake", lambda: P.lake[i] and not db.fb(f, "Lake")),
         ("Coast", lambda: db.fb(f, "Coast") and not P.salt_adj[i]),
         ("MinDistanceLand", lambda: bool(mn) and P.dland[i] < mn),
@@ -151,7 +153,10 @@ def clauses(db: DB, P: Plots, f: int, i: int):
         ("AdjacentTerrains", lambda: bool(at) and not any(q is not None and s.terrain[q] in at for q in ring)),
         ("NotAdjacentTerrains", lambda: bool(nat) and any(q is not None and s.terrain[q] in nat for q in ring)),
         ("AdjacentFeatures", lambda: bool(af) and not any(q is not None and s.feature[q] in af for q in ring)),
-        ("NotNearFeatures", lambda: bool(nn) and any(g.dist(i, q) <= g.n // 256 for q in range(g.n) if s.feature[q] in nn)),
+        # radius min(W*H * AVOID_FEATURE_MAX_MULTIPLIER as 8.8 fixed point (0.004 -> 1/256),
+        # AVOID_FEATURE_MAX_THRESHOLD 24) (the DLL's 0x894870)
+        ("NotNearFeatures", lambda: bool(nn) and any(g.dist(i, q) <= min(g.n // 256, 24)
+                                                     for q in range(g.n) if s.feature[q] in nn)),
         ("MinDistanceNW", lambda: mnw > 0 and any(g.dist(i, q) <= mnw for q in P.nwplots)),
     ]
 

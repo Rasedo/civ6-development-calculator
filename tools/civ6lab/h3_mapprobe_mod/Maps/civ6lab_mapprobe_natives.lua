@@ -322,6 +322,37 @@ local function infostr(info)
 	return table.concat(ks, ",")
 end
 
+-- the map as a Divide call reads it: dfert|<major/minor>|<check>|<rle of
+-- GetPlotFertility(i, -1, check)>, dstarts|<phase>|<player:plot,...> (every
+-- player's GetStartingPlot), dlm|<phase>|<rle of plot:GetLandmassID? / area>
+local fertBusy = false
+local function divState(phase)
+	fertBusy = true
+	for _, chk in ipairs({ false, true }) do
+		local vals = {}
+		for i = 0, N() - 1 do
+			local ok, v = pcall(StartPositioner.GetPlotFertility, i, -1, chk)
+			vals[#vals + 1] = ok and tostring(v) or "e"
+		end
+		X[#X + 1] = "dfert|" .. phase .. "|" .. tostring(chk) .. "|" .. rle(vals)
+	end
+	fertBusy = false
+	local st = {}
+	for _, pid in ipairs(PlayerManager.GetAliveIDs and PlayerManager.GetAliveIDs() or {}) do
+		local ok, p = pcall(function() return Players[pid]:GetStartingPlot() end)
+		st[#st + 1] = tostring(pid) .. ":" .. tostring(ok and p and p:GetIndex())
+	end
+	X[#X + 1] = "dstarts|" .. phase .. "|" .. table.concat(st, ",")
+	local lm = perplot(function(p)
+		local ok, v = pcall(function() return p:GetLandmassID() end)
+		if ok then return v end
+		return "a" .. tostring(p:GetArea():GetID())
+	end)
+	X[#X + 1] = "dlm|" .. phase .. "|" .. rle(lm)
+end
+PRE["StartPositioner.DivideMapIntoMajorRegions"] = function() divState("major") end
+PRE["StartPositioner.DivideMapIntoMinorRegions"] = function() divState("minor") end
+
 POST["StartPositioner.DivideMapIntoMajorRegions"] = function(_st, _res, ...)
 	local ok, n = pcall(function() return StartPositioner.GetNumMajorCivStarts() end)
 	X[#X + 1] = "sdiv|" .. argstr(...) .. "|" .. tostring(ok and n)
@@ -352,7 +383,7 @@ local function gpfFlush()
 end
 local gpfBusy = false
 POST["StartPositioner.GetPlotFertility"] = function(_st, res, i, major, check)
-	if gpfBusy or major == nil or major < 0 then return end
+	if fertBusy or gpfBusy or major == nil or major < 0 then return end
 	local key = tostring(major) .. "|" .. tostring(check)
 	if key ~= GPF.key then gpfFlush(); GPF.key = key end
 	-- beside it, the same plot's fertility with no major and with the check off

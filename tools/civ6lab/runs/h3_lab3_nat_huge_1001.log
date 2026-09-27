@@ -1,0 +1,21 @@
+    mod handle 50
+    enabled in this configuration: 41 gathering_storm=true probe=true
+    map options world_age=2(config) sea_level=2(config) temperature=2(config) rainfall=2(config) resources=2(default) start=2(default)
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    map_options=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 2:1 3:1 4:1 5:1 6:1 7:1 8:1 9:1 10:1 11:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=civ6lab_mapprobe_natives.lua size=370405108 cs=12 realism=2 majors=12 map_seed=1001 game_seed=2000 world_age=2 sea_level=2 temperature=2 rainfall=2 resources=2 start=2 autostart=true
+    hosting
+in game {"turn": 1, "map_seed": 1001, "map_options": {"world_age": 2, "sea_level": 2, "temperature": 2, "rainfall": 2, "resources": 2, "start": 2}, "game_seed": 2000, "humans": 1, "minors": 13, "majors": {"0": "LEADER_ROBERT_THE_BRUCE", "1": "LEADER_HOJO", "2": "LEADER_PHILIP_II", "3": "LEADER_JADWIGA", "4": "LEADER_JAYAVARMAN", "5": "LEADER_GORGO", "6": "LEADER_HAMMURABI", "7": "LEADER_CLEOPATRA", "8": "LEADER_SIMON_BOLIVAR", "9": "LEADER_LADY_SIX_SKY", "10": "LEADER_MENELIK", "11": "LEADER_KRISTINA"}}
+{"tag": "lab3nat_h3_huge_natives_m1001_g2000", "config": "C:/civ6-development-calculator/tools/civ6lab/h3_huge_natives.json", "map_seed": 1001, "game_seed": 2000, "first_draws": [13095, 30964, 1185, 5520], "state_after_first": [1716452159], "draws_before_probe": 399057, "sync_seed_now": 1756160620, "map_options": {"world_age": "2", "sea_level": "2", "temperature": "2", "rainfall": "2", "resources": "2", "start": "2", "MAP_SIZE": "370405108"}, "map_dump": "C:\\civ6-development-calculator\\tools\\civ6lab\\runs\\h3_map_lab3nat_h3_huge_natives_m1001_g2000.json", "probe_entries": 32501, "x_entries": 3599, "extra_lines": {}}
+-> C:\civ6-development-calculator\tools\civ6lab\runs\h3_session_20260927T193055Z.jsonl

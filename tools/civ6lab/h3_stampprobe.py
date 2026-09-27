@@ -109,7 +109,58 @@ def shapes_multi(w: int, h: int) -> list[tuple[str, object]]:
     return out
 
 
-SETS = {"basic": shapes_basic, "multi": shapes_multi}
+L_ = 15  # coast terrain: a lake inside land
+
+
+def shapes_dll(w: int, h: int) -> list[tuple[str, object]]:
+    """the DLL rule's corners: mountains inside a land area (a plot with 5+
+    of its neighbours in the area joins the split's mask), lakes, a mountain
+    block as its own area, a C-shaped island whose centroid is water, a
+    mountain bridge"""
+    out = []
+    cx, cy = w // 2, h // 2
+    body = rect(cx - 12, cx + 12, cy - 8, cy + 8)
+
+    def with_cells(base, cells, t):
+        def f(x, y):
+            if (x, y) in cells:
+                return t
+            return base(x, y)
+        return f
+
+    out.append(("mtn1", with_cells(body, {(cx, cy)}, M)))
+    out.append(("mtn2", with_cells(body, {(cx, cy), (cx + 1, cy)}, M)))
+    out.append(("mtn4", with_cells(body, {(cx, cy), (cx + 1, cy), (cx, cy + 1), (cx + 1, cy + 1)}, M)))
+    out.append(("mtnline", with_cells(body, {(cx - 3 + k, cy + 2) for k in range(7)}, M)))
+    out.append(("mtnedge", with_cells(body, {(cx - 12 + k, cy - 8) for k in range(24)}, M)))
+    out.append(("mtnoff", with_cells(body, {(cx - 6, cy - 3), (cx + 5, cy + 4), (cx - 9, cy + 5)}, M)))
+    out.append(("lake1", with_cells(body, {(cx, cy)}, L_)))
+    out.append(("lake3", with_cells(body, {(cx, cy), (cx + 1, cy), (cx, cy + 1)}, L_)))
+    out.append(("mtnblock", union(rect(4, 24, cy - 6, cy + 6), rect(w - 20, w - 8, cy - 6, cy + 6, M))))
+    out.append(("mtnblock_big", union(rect(4, 18, cy - 5, cy + 5), rect(w - 26, w - 6, cy - 9, cy + 9, M))))
+
+    def cshape(x0, y0, s):
+        def f(x, y):
+            if not (x0 <= x < x0 + s and y0 <= y < y0 + s):
+                return None
+            inner = x0 + 2 <= x < x0 + s and y0 + 2 <= y < y0 + s - 2
+            return None if inner else G
+        return f
+    out.append(("cisland", union(rect(4, 22, cy - 8, cy + 8), rect(w - 24, w - 6, cy - 8, cy + 8),
+                                 cshape(cx - 5, 2, 10))))
+    out.append(("cisland_n", union(rect(4, 22, cy - 8, cy + 8), rect(w - 24, w - 6, cy - 8, cy + 8),
+                                   cshape(cx - 4, h - 12, 9), rect(cx - 1, cx + 1, 3, 5))))
+    out.append(("mtnbridge", union(rect(4, cx - 3, cy - 6, cy + 6), rect(cx + 3, w - 4, cy - 6, cy + 6),
+                                   rect(cx - 3, cx + 3, cy - 1, cy + 1, M))))
+    out.append(("rect_odd", rect(cx - 10, cx + 11, cy - 7, cy + 6)))
+    out.append(("ring", union(rect(cx - 12, cx + 12, cy - 9, cy - 5), rect(cx - 12, cx + 12, cy + 5, cy + 9),
+                              rect(cx - 12, cx - 8, cy - 9, cy + 9), rect(cx + 8, cx + 12, cy - 9, cy + 9))))
+    out.append(("lshape", union(rect(cx - 14, cx + 14, cy - 9, cy - 3), rect(cx - 14, cx - 8, cy - 9, cy + 10))))
+    out.append(("tshape", union(rect(cx - 15, cx + 15, cy + 3, cy + 9), rect(cx - 3, cx + 3, cy - 10, cy + 9))))
+    return out
+
+
+SETS = {"basic": shapes_basic, "multi": shapes_multi, "dll": shapes_dll}
 
 
 def lua_rle(vals: list[int]) -> str:
@@ -199,7 +250,8 @@ def cmd_read(path: str, set_name: str) -> int:
         name, cont = parts[1], parts[2]
         f = shapes[name]
         land = [0 if f(i % w, i // w) is not None else 1 for i in range(w * h)]
-        out["stamps"].append({"name": name, "land": lua_rle(land), "cont": cont,
+        ter = [16 if f(i % w, i // w) is None else f(i % w, i // w) for i in range(w * h)]
+        out["stamps"].append({"name": name, "land": lua_rle(land), "terrain": lua_rle(ter), "cont": cont,
                               "err": parts[3] if len(parts) > 3 else None})
     dst = HERE / "runs" / ("h3_stampx_" + pathlib.Path(path).stem.split("_", 2)[-1] + ".json")
     dst.write_text(json.dumps(out), encoding="utf-8")

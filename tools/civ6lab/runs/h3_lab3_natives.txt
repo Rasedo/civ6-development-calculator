@@ -1,0 +1,7 @@
+tools/civ6lab/runs/h3_session_20260927T191757Z.jsonl
+tools/civ6lab/runs/h3_session_20260927T192136Z.jsonl
+tools/civ6lab/runs/h3_session_20260927T192249Z.jsonl
+tools/civ6lab/runs/h3_session_20260927T192420Z.jsonl
+tools/civ6lab/runs/h3_session_20260927T192756Z.jsonl
+tools/civ6lab/runs/h3_session_20260927T192917Z.jsonl
+tools/civ6lab/runs/h3_session_20260927T193055Z.jsonl
