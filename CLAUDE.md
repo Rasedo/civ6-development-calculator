@@ -32,7 +32,7 @@ by one scripted decision server (`policy/`), verified against each other by
 
 - The owner's mode (`.claude/mode`, shown in the status line, printed at
   session start) is the owner's switch: `build` = no battery and no hunt,
-  `normal` = the five-commit cadence decides, `measure` = the box is free.
+  `normal` = the ten-commit cadence decides, `measure` = the box is free.
   Only the owner changes it (`! python tools/mode.py <mode>`).
 - Per commit: the compile bar plus a single-seed smoke serve. A red serve
   lane is hunted with `python gpu/battery.py --seeds <s> --ckpt-every 20`,

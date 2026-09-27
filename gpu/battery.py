@@ -57,9 +57,11 @@ def _argval(flag: str) -> str | None:
 # — vitest and the whole poke pool — sits it out.
 #
 # It records NOTHING. A hunt neither claims a green nor spends the
-# four-commit clock, and the cadence rule does not gate it: refusing a probe
+# commit clock, and the cadence rule does not gate it: refusing a probe
 # because the clock has not run is what makes a hunt re-run the whole fleet.
 HUNT_SEEDS = _argval("--seeds")
+# the commits since the last green that unlock a full run (owner rule)
+CADENCE = 10
 HUNT = HUNT_SEEDS is not None
 HUNT_RESUME = _argval("--resume")
 HUNT_CKPT_EVERY = _argval("--ckpt-every")
@@ -516,7 +518,7 @@ def main() -> int:
 
 
 def _main() -> int:
-    # OWNER RULE: the battery runs every FIVE commits, not every
+    # OWNER RULE: the battery runs every TEN commits (`CADENCE`), not every
     # round — batched hunts run at ~15 min/bug where isolated ones paid ~80
     # (stats/battery.jsonl audit). The per-commit bar is the compile bar plus
     # a single-seed smoke serve. A RED run never resets the clock (only a
@@ -529,11 +531,11 @@ def _main() -> int:
             n = int(_stats._git("rev-list", "--count", f"{since}..HEAD"))
         except ValueError:
             n = -1  # unknown sha (rebase?) — the clock is unprovable, run
-        if 0 <= n < 5:
+        if 0 <= n < CADENCE:
             print(
                 f"BATTERY REFUSED — cadence rule: {n} commit(s) in git history "
                 f"since the last green run ({since[:12]}); the battery unlocks "
-                f"at 5."
+                f"at {CADENCE}."
             )
             print("Per-commit bar: compile bar + single-seed smoke serve "
                   "(python gpu/battery.py --seeds <s> --ckpt-every 20 — hunt mode, "

@@ -51,7 +51,7 @@ mirrors it turn-exactly. Never widen tolerances.
 6. **Validate.** Per commit: the compile bar plus a single-seed smoke
    serve — `python gpu/battery.py --seeds <seed> --ckpt-every 20` (hunt
    mode: stage 0, one serve shard, no poke pool; it records nothing and
-   claims no green). Every five commits, the full bar: `python
+   claims no green). Every ten commits, the full bar: `python
    gpu/battery.py`. The battery is the ONLY entry to the gate;
    `gpu/serve_gate.py` is never launched by hand. Green is the `pass` row
    with the full step count at your head sha in `stats/battery.jsonl`,
