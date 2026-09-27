@@ -11932,7 +11932,9 @@ class SimSeats:
                 _tr = moved & transition & (gslot >= _lo) & (gslot < self.POOL_HI[_pre])
                 if not bool(_tr.any()):
                     continue
-                _f = self._full_mp(_pre)
+                # `unitFullMoves` of the new mode carries no aura: the aura is
+                # granted at the reset, never at a transition
+                _f = self._full_mp(_pre) - getattr(self, f"{_pre}_unit_aura_mp")
                 _r = _tr.nonzero(as_tuple=True)[0]
                 _s = gslot[_r] - _lo
                 self.unit_mp_full[_r, gslot[_r]] = _f[_r, _s]
