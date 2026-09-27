@@ -170,6 +170,10 @@ def main() -> int:
     s = rec["map_seed"] & M32
     pos = 0
     model = Model(a.plate_value)
+    # a set world age (MapConfiguration world_age 1 new / 2 standard / 3 old)
+    # is Continents.lua's world_age_new 5 / normal 3 / old 2; unset, it is rolled
+    wa = str(rec.get("map_options", {}).get("world_age"))
+    model.world_age = {"1": 5, "2": 3, "3": 2}.get(wa)
     rows = []  # (kind, label, count, detail)
     pending = []
     lua_run = collections.Counter()

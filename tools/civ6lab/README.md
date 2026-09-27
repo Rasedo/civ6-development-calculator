@@ -24,6 +24,7 @@ work, the calls that do not, the traps, and an index of what is here.
 
     python tools/civ6lab/game.py launch                         # the DX11 binary -> main menu
     python tools/civ6lab/game.py new --config tools/civ6lab/lab4.json
+    python tools/civ6lab/game.py new --config tools/civ6lab/h3_duel.json --dry   # write the setup, read it back, do not host
     python tools/civ6lab/game.py load <save name>              # Begin/Continue pressed by the game
     python tools/civ6lab/game.py save <save name>
 
@@ -35,7 +36,25 @@ Continue itself (`FrontEnd/LoadScreen.lua`); a new game is `GameConfiguration` /
 `Network.HostGame(ServerType.SERVER_TYPE_NONE)`; a load matches the save
 list's `Path` (its `Name` is not the file name) and calls `Network.LoadGame`.
 Hash="1" setup parameters take `DB.MakeHash(name)` (speed, difficulty, map
-size — verified by readback). The socket RESETS across a load or a host;
+size — verified by readback).
+
+**The map options** (`world_age`, `sea_level`, `temperature`, `rainfall`,
+`resources`, `start`) are written as the setup screen writes them: every
+Map-group `Parameters` row that applies to the chosen script — its own rows
+(Key1 `Map`, Key2 the script, e.g. Base `Configuration/Data/MapSettings.xml`
+for `Continents.lua`: WorldAge, Temperature, Rainfall, SeaLevel) and the
+global single-player rows (`SetupParameters.xml`: Resources, StartPosition),
+their `ParameterCriteria` met — takes its `DefaultValue` (2 for all six),
+read from the FrontEnd's Configuration database at host time; a config key
+of the same name overrides it (1..4, 4 = random; `start` 1 balanced / 2
+standard / 3 legendary). A script with no row for an option (a mod map)
+gets it only from the config. The readback line and `game_info`'s
+`map_options` show the values `MapConfiguration.GetValue` answers in the
+hosted game. Before this, the options were left unset and Continents rolled
+World Age and Sea Level itself (its first two draws); with the defaults its
+first two draws are the Continental and Rift Grain rolls (Duel seed 1000:
+365,913 draws, the map identical to the probe with the options set,
+`runs/h3_session_20260927T015413Z.jsonl`, `..015420Z.jsonl`). The socket RESETS across a load or a host;
 `game.py` reconnects and waits for `GameCore_Tuner`. Verified 2026-09-23:
 new game, save, load, all with the input context reading `World` after.
 

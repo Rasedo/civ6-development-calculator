@@ -10,6 +10,8 @@
 		<ImportFiles id="civ6lab_mapprobe_files">
 			<File>Maps/civ6lab_mapprobe.lua</File>
 			<File>Maps/civ6lab_mapprobe_quiet.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives.lua</File>
+			<File>Maps/civ6lab_mapprobe_exp.lua</File>
 			<File>Maps/civ6lab_xp2_assignstartingplots.lua</File>
 			<File>Maps/civ6lab_xp2_coastallowlands.lua</File>
 			<File>Maps/civ6lab_xp2_continents.lua</File>
@@ -26,6 +28,8 @@
 	<Files>
 		<File>Maps/civ6lab_mapprobe.lua</File>
 		<File>Maps/civ6lab_mapprobe_quiet.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives.lua</File>
+		<File>Maps/civ6lab_mapprobe_exp.lua</File>
 		<File>Maps/civ6lab_xp2_assignstartingplots.lua</File>
 		<File>Maps/civ6lab_xp2_coastallowlands.lua</File>
 		<File>Maps/civ6lab_xp2_continents.lua</File>

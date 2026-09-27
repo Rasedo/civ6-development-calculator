@@ -1,0 +1,21 @@
+    mod handle 47
+    enabled in this configuration: 41 gathering_storm=true probe=true
+    map options world_age=2(config) sea_level=2(config) temperature=2(config) rainfall=2(config) resources=2(default) start=2(default)
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    map_options=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 2:1 3:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=civ6lab_mapprobe_exp.lua size=-601637951 cs=6 realism=2 majors=4 map_seed=1000 game_seed=2000 world_age=2 sea_level=2 temperature=2 rainfall=2 resources=2 start=2 autostart=true
+    hosting
+in game {"turn": 1, "map_seed": 1000, "map_options": {"world_age": 2, "sea_level": 2, "temperature": 2, "rainfall": 2, "resources": 2, "start": 2}, "game_seed": 2000, "humans": 1, "minors": 7, "majors": {"0": "LEADER_ROBERT_THE_BRUCE", "1": "LEADER_HOJO", "2": "LEADER_PHILIP_II", "3": "LEADER_JADWIGA"}}
+{"tag": "exp3_h3_tiny_exp_m1000_g2000", "config": "tools/civ6lab/h3_tiny_exp.json", "map_seed": 1000, "game_seed": 2000, "first_draws": [25838, 11463, 12943, 26624], "state_after_first": [3386676581], "draws_before_probe": 485916, "sync_seed_now": 2067997923, "map_options": {"world_age": "2", "sea_level": "2", "temperature": "2", "rainfall": "2", "resources": "2", "start": "2", "MAP_SIZE": "-601637951"}, "map_dump": "C:\\civ6-development-calculator\\tools\\civ6lab\\runs\\h3_map_exp3_h3_tiny_exp_m1000_g2000.json", "probe_entries": 0, "x_entries": 154, "extra_lines": {}}
+-> C:\civ6-development-calculator\tools\civ6lab\runs\h3_session_20260927T023549Z.jsonl

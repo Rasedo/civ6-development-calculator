@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\h3_lua.py"[0m, line [35m32[0m, in [35m<module>[0m
+    sys.exit([31mmain[0m[1;31m()[0m)
+             [31m~~~~[0m[1;31m^^[0m
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\h3_lua.py"[0m, line [35m25[0m, in [35mmain[0m
+    for ln in [31mt.run[0m[1;31m(a.state, pathlib.Path(a.file).read_text(encoding="utf-8"), timeout=a.timeout)[0m:
+              [31m~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\tuner.py"[0m, line [35m169[0m, in [35mrun[0m
+    raise TunerError(
+        f"no Lua state {state!r}; the game lists {sorted(self.states)} "
+        "(GameCore_Tuner and InGame appear only once a game is loaded)")
+[1;35mtuner.TunerError[0m: [35mno Lua state 'GameCore_Tuner'; the game lists ['CityStatePicker', 'CivRoyaleIntro', 'ConfirmKick', 'CreditsScreen', 'CrossPlayLogin', 'DebugHotloadCache', 'EditHotseatPlayer', 'FrontEnd', 'FrontEndPopup', 'HostGame', 'InvitePopup', 'JoiningRoom', 'LeaderPicker', 'LoadGameMenu', 'Lobby', 'Main State', 'MainMenu', 'Mods', 'MultiSelectWindow', 'My2K', 'Options', 'PBCNotifyRemind', 'PiratesIntro', 'SaveGameMenu', 'StagingRoom', 'StateTransition', 'SwitchLayoutPopup', 'Test', 'UserSetupWarning'] (GameCore_Tuner and InGame appear only once a game is loaded)[0m

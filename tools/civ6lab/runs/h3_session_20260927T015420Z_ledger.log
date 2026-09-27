@@ -1,0 +1,1203 @@
+﻿       2 lua          2  Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1  
+                   Fractal.Create(44,26,1,{FRAC_POLAR=true},6,5)                                                        2145
+                   [not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)                                              26
+    2173 block     2171  1 logged native call(s)  model 2171 EXACT
+    2226 lua         53  FractalWorld Center Rift Segment Length - Lua x23, FractalWorld Center Rift Direction - Lua x23, Random Region Edges x6,  
+                   AreaBuilder.Recalculate()                                                                            0
+    2226 block        0  1 logged native call(s)  model 0 EXACT
+    2228 lua          2  Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1  
+                   Fractal.Create(44,26,1,{},6,5)                                                                       2145
+                   Fractal.CreateRifts(44,26,1,{FRAC_POLAR=true},ud,6,5)                                                2145
+                   [not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)                                              24
+    6542 block     4314  2 logged native call(s)  model 4314 EXACT
+    6610 lua         68  Random Region Edges x27, FractalWorld Center Rift Segment Length - Lua x21, FractalWorld Center Rift Direction - Lua x19  
+                   AreaBuilder.Recalculate()                                                                            0
+    6610 block        0  1 logged native call(s)  model 0 EXACT
+    6612 lua          2  Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1  
+                   Fractal.Create(44,26,2,{FRAC_POLAR=true},6,5)                                                        2145
+                   [not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)                                              26
+    8783 block     2171  1 logged native call(s)  model 2171 EXACT
+    8845 lua         62  FractalWorld Center Rift Segment Length - Lua x24, FractalWorld Center Rift Direction - Lua x24, Random Region Edges x13  
+                   AreaBuilder.Recalculate()                                                                            0
+    8845 block        0  1 logged native call(s)  model 0 EXACT
+    8847 lua          2  Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1  
+                   Fractal.Create(44,26,2,{},6,5)                                                                       2145
+                   Fractal.CreateRifts(44,26,1,{FRAC_POLAR=true},ud,6,5)                                                2145
+                   [not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)                                              27
+   13164 block     4317  2 logged native call(s)  model 4317 EXACT
+   13225 lua         61  Random Region Edges x29, FractalWorld Center Rift Segment Length - Lua x19, FractalWorld Center Rift Direction - Lua x12  
+                   AreaBuilder.Recalculate()                                                                            0
+   13225 block        0  1 logged native call(s)  model 0 EXACT
+   13227 lua          2  Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1  
+                   Fractal.Create(44,26,1,{},6,5)                                                                       2145
+                   Fractal.CreateRifts(44,26,2,{FRAC_POLAR=true},ud,6,5)                                                2145
+                   [not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)                                              24
+   17541 block     4314  2 logged native call(s)  model 4314 EXACT
+   17622 lua         81  FractalWorld Center Rift Segment Length - Lua x30, Random Region Edges x25, FractalWorld Center Rift Direction - Lua x25  
+                   AreaBuilder.Recalculate()                                                                            0
+   17622 block        0  1 logged native call(s)  model 0 EXACT
+   17624 lua          2  Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1  
+                   Fractal.Create(44,26,2,{FRAC_POLAR=true},6,5)                                                        2145
+                   [not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)                                              22
+   19791 block     2167  1 logged native call(s)  model 2167 EXACT
+   19868 lua         77  FractalWorld Center Rift Segment Length - Lua x28, FractalWorld Center Rift Direction - Lua x25, Random Region Edges x23  
+                   AreaBuilder.Recalculate()                                                                            0
+   19868 block        0  1 logged native call(s)  model 0 EXACT
+   19870 lua          2  Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1  
+                   Fractal.Create(44,26,2,{},6,5)                                                                       2145
+                   Fractal.CreateRifts(44,26,2,{FRAC_POLAR=true},ud,6,5)                                                2145
+                   [not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)                                              26
+   24186 block     4316  2 logged native call(s)  model 4316 EXACT
+   24276 lua         90  FractalWorld Center Rift Segment Length - Lua x31, FractalWorld Center Rift Direction - Lua x31, Random Region Edges x27  
+                   AreaBuilder.Recalculate()                                                                            0
+                   Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)                                                     8320
+                   Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)                                                     8320
+                   [not wrapped] hills Fractal:BuildRidges(18.0,{FRAC_WRAP_X},10,5) on (128, 64)                        147579
+                   [not wrapped] mountains Fractal:BuildRidges(18.0,{FRAC_WRAP_X},10,5) on (128, 64)                    147564
+  336059 block   311783  3 logged native call(s)  model 311783 EXACT
+  336405 lua        346  Shuffling table entry - Lua x331, Coastal Mountain Removal x15  
+                   Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)                                                     8320
+                   Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)                                                     8320
+                   Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)                                                     8320
+  361365 block    24960  3 logged native call(s)  model 24960 EXACT
+  361914 lua        549  add shallows x549  
+                   AreaBuilder.Recalculate()                                                                            0
+                   TerrainBuilder.AnalyzeChokepoints()                                                                  0
+                   TerrainBuilder.StampContinents()                                                                     43
+                   Map.GetContinentsInUse()                                                                             0
+  361957 block       43  4 logged native call(s)  model 43 EXACT
+  361972 lua         15  Shuffling table entry - Lua x15  
+                   AreaBuilder.Recalculate()                                                                            0
+                   TerrainBuilder.GetInlandCorner(@31,5)                                                                4
+  361976 block        4  2 logged native call(s)  model 4 EXACT
+  361982 lua          6  River Rand x6  
+                   TerrainBuilder.SetNWOfRiver(@31,5,true,1,0)                                                          0
+  361982 block        0  1 logged native call(s)  model 0 EXACT
+  361984 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@32,5,true,2,0)                                                          0
+  361984 block        0  1 logged native call(s)  model 0 EXACT
+  361986 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@32,5,true,1,0)                                                          0
+  361986 block        0  1 logged native call(s)  model 0 EXACT
+  361988 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@33,5,true,2,0)                                                          0
+  361988 block        0  1 logged native call(s)  model 0 EXACT
+  361990 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@33,5,true,1,0)                                                          0
+  361990 block        0  1 logged native call(s)  model 0 EXACT
+  361992 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@33,5,true,0,0)                                                           0
+  361992 block        0  1 logged native call(s)  model 0 EXACT
+  361994 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@34,6,true,1,0)                                                          0
+  361994 block        0  1 logged native call(s)  model 0 EXACT
+  361996 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@35,6,true,2,0)                                                          0
+  361996 block        0  1 logged native call(s)  model 0 EXACT
+  361998 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@35,6,true,1,0)                                                          0
+  361998 block        0  1 logged native call(s)  model 0 EXACT
+  362000 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@35,6,true,0,0)                                                           0
+  362000 block        0  1 logged native call(s)  model 0 EXACT
+  362002 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@35,7,true,1,0)                                                          0
+  362002 block        0  1 logged native call(s)  model 0 EXACT
+  362004 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@36,7,true,2,0)                                                          0
+  362004 block        0  1 logged native call(s)  model 0 EXACT
+  362006 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@36,6,true,3,0)                                                           0
+  362006 block        0  1 logged native call(s)  model 0 EXACT
+  362007 lua          1  River Rand x1  
+                   TerrainBuilder.SetNEOfRiver(@37,6,true,2,0)                                                          0
+  362007 block        0  1 logged native call(s)  model 0 EXACT
+  362009 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@36,5,true,3,0)                                                           0
+  362009 block        0  1 logged native call(s)  model 0 EXACT
+  362010 lua          1  River Rand x1  
+                   TerrainBuilder.SetNEOfRiver(@37,5,true,2,0)                                                          0
+  362010 block        0  1 logged native call(s)  model 0 EXACT
+  362012 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@37,5,true,1,0)                                                          0
+  362012 block        0  1 logged native call(s)  model 0 EXACT
+  362014 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@37,5,true,0,0)                                                           0
+  362014 block        0  1 logged native call(s)  model 0 EXACT
+  362016 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@38,6,true,1,0)                                                          0
+  362016 block        0  1 logged native call(s)  model 0 EXACT
+  362018 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@39,6,true,2,0)                                                          0
+  362018 block        0  1 logged native call(s)  model 0 EXACT
+  362020 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@39,6,true,1,0)                                                          0
+  362020 block        0  1 logged native call(s)  model 0 EXACT
+  362022 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@39,6,true,0,0)                                                           0
+  362022 block        0  1 logged native call(s)  model 0 EXACT
+  362024 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@39,7,true,1,0)                                                          0
+  362024 block        0  1 logged native call(s)  model 0 EXACT
+  362026 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@40,7,true,2,0)                                                          0
+  362026 block        0  1 logged native call(s)  model 0 EXACT
+  362028 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@40,7,true,1,0)                                                          0
+  362028 block        0  1 logged native call(s)  model 0 EXACT
+  362156 lua        128  MapGenerator AddRivers x128  
+                   TerrainBuilder.GetInlandCorner(@11,17)                                                               4
+  362160 block        4  1 logged native call(s)  model 4 EXACT
+  362166 lua          6  River Rand x6  
+                   TerrainBuilder.SetNEOfRiver(@11,17,true,2,1)                                                         0
+  362166 block        0  1 logged native call(s)  model 0 EXACT
+  362168 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@11,17,true,1,1)                                                         0
+  362168 block        0  1 logged native call(s)  model 0 EXACT
+  362170 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@12,17,true,2,1)                                                         0
+  362170 block        0  1 logged native call(s)  model 0 EXACT
+  362172 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@12,17,true,1,1)                                                         0
+  362172 block        0  1 logged native call(s)  model 0 EXACT
+  362174 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@13,17,true,2,1)                                                         0
+  362174 block        0  1 logged native call(s)  model 0 EXACT
+  362176 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@13,17,true,1,1)                                                         0
+  362176 block        0  1 logged native call(s)  model 0 EXACT
+  362178 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@13,17,true,0,1)                                                          0
+  362178 block        0  1 logged native call(s)  model 0 EXACT
+  362179 lua          1  River Rand x1  
+                   TerrainBuilder.SetNWOfRiver(@14,18,true,1,1)                                                         0
+  362179 block        0  1 logged native call(s)  model 0 EXACT
+  362216 lua         37  MapGenerator AddRivers x37  
+                   TerrainBuilder.GetInlandCorner(@12,9)                                                                4
+  362220 block        4  1 logged native call(s)  model 4 EXACT
+  362226 lua          6  River Rand x6  
+                   TerrainBuilder.SetWOfRiver(@11,9,true,3,2)                                                           0
+  362226 block        0  1 logged native call(s)  model 0 EXACT
+  362228 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@11,9,true,4,2)                                                          0
+                   TerrainBuilder.GetInlandCorner(@15,11)                                                               4
+  362232 block        4  2 logged native call(s)  model 4 EXACT
+  362238 lua          6  River Rand x6  
+                   TerrainBuilder.SetNEOfRiver(@16,11,true,2,3)                                                         0
+                   TerrainBuilder.GetInlandCorner(@12,12)                                                               4
+  362242 block        4  2 logged native call(s)  model 4 EXACT
+  362248 lua          6  River Rand x6  
+                   TerrainBuilder.SetNWOfRiver(@12,12,true,4,4)                                                         0
+  362248 block        0  1 logged native call(s)  model 0 EXACT
+  362250 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@12,12,true,5,4)                                                         0
+  362250 block        0  1 logged native call(s)  model 0 EXACT
+  362252 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@11,12,true,4,4)                                                         0
+  362252 block        0  1 logged native call(s)  model 0 EXACT
+  362254 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@11,12,true,5,4)                                                         0
+  362254 block        0  1 logged native call(s)  model 0 EXACT
+  362256 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@10,12,true,4,4)                                                         0
+                   TerrainBuilder.GetInlandCorner(@24,12)                                                               4
+  362260 block        4  2 logged native call(s)  model 4 EXACT
+  362266 lua          6  River Rand x6  
+                   TerrainBuilder.SetNWOfRiver(@23,13,true,4,5)                                                         0
+  362266 block        0  1 logged native call(s)  model 0 EXACT
+  362268 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@23,12,true,3,5)                                                          0
+  362268 block        0  1 logged native call(s)  model 0 EXACT
+  362270 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@23,12,true,4,5)                                                         0
+                   TerrainBuilder.GetInlandCorner(@14,13)                                                               4
+  362274 block        4  2 logged native call(s)  model 4 EXACT
+  362280 lua          6  River Rand x6  
+                   TerrainBuilder.SetNEOfRiver(@15,14,true,2,6)                                                         0
+  362280 block        0  1 logged native call(s)  model 0 EXACT
+  362282 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@15,14,true,1,6)                                                         0
+                   TerrainBuilder.GetInlandCorner(@41,14)                                                               4
+  362286 block        4  2 logged native call(s)  model 4 EXACT
+  362292 lua          6  River Rand x6  
+                   TerrainBuilder.SetNEOfRiver(@41,14,true,5,7)                                                         0
+  362292 block        0  1 logged native call(s)  model 0 EXACT
+  362294 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@40,14,true,4,7)                                                         0
+  362294 block        0  1 logged native call(s)  model 0 EXACT
+  362296 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@40,14,true,5,7)                                                         0
+                   TerrainBuilder.GetInlandCorner(@25,15)                                                               4
+  362300 block        4  2 logged native call(s)  model 4 EXACT
+  362306 lua          6  River Rand x6  
+                   TerrainBuilder.SetNEOfRiver(@25,16,true,5,8)                                                         0
+  362306 block        0  1 logged native call(s)  model 0 EXACT
+  362308 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@24,16,true,0,8)                                                          0
+                   TerrainBuilder.GetInlandCorner(@12,20)                                                               4
+  362312 block        4  2 logged native call(s)  model 4 EXACT
+  362318 lua          6  River Rand x6  
+                   TerrainBuilder.SetNWOfRiver(@11,20,true,1,9)                                                         0
+  362318 block        0  1 logged native call(s)  model 0 EXACT
+  362320 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@11,20,true,0,9)                                                          0
+  362320 block        0  1 logged native call(s)  model 0 EXACT
+  362322 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@11,21,true,1,9)                                                         0
+  362322 block        0  1 logged native call(s)  model 0 EXACT
+  362324 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@11,21,true,0,9)                                                          0
+  362324 block        0  1 logged native call(s)  model 0 EXACT
+  362326 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@12,22,true,1,9)                                                         0
+  362326 block        0  1 logged native call(s)  model 0 EXACT
+  362328 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@12,22,true,0,9)                                                          0
+                   TerrainBuilder.GetInlandCorner(@6,22)                                                                4
+  362332 block        4  2 logged native call(s)  model 4 EXACT
+  362338 lua          6  River Rand x6  
+                   TerrainBuilder.SetWOfRiver(@4,21,true,3,10)                                                          0
+                   TerrainBuilder.GetInlandCorner(@8,22)                                                                4
+  362342 block        4  2 logged native call(s)  model 4 EXACT
+  362348 lua          6  River Rand x6  
+                   TerrainBuilder.SetNEOfRiver(@8,23,true,5,11)                                                         0
+  362348 block        0  1 logged native call(s)  model 0 EXACT
+  362350 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@7,23,true,0,11)                                                          0
+  362350 block        0  1 logged native call(s)  model 0 EXACT
+  362352 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@8,24,true,5,11)                                                         0
+                   TerrainBuilder.GetInlandCorner(@31,14)                                                               4
+  362356 block        4  2 logged native call(s)  model 4 EXACT
+  362362 lua          6  River Rand x6  
+                   TerrainBuilder.SetNEOfRiver(@32,15,true,2,12)                                                        0
+  362362 block        0  1 logged native call(s)  model 0 EXACT
+  362364 lua          2  River Rand x2  
+                   TerrainBuilder.SetWOfRiver(@32,14,true,3,12)                                                         0
+  362364 block        0  1 logged native call(s)  model 0 EXACT
+  362366 lua          2  River Rand x2  
+                   TerrainBuilder.SetNEOfRiver(@33,14,true,2,12)                                                        0
+  362366 block        0  1 logged native call(s)  model 0 EXACT
+  362368 lua          2  River Rand x2  
+                   TerrainBuilder.SetNWOfRiver(@33,14,true,1,12)                                                        0
+  362368 block        0  1 logged native call(s)  model 0 EXACT
+  362420 lua         52  MapGenerator AddLakes x52  
+                   AreaBuilder.Recalculate()                                                                            0
+                   TerrainBuilder.GenerateFloodplains(true,4,10)                                                        0
+  362420 block        0  2 logged native call(s)  model 0 EXACT
+  362421 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(0,-1)                                                                          0
+  362421 block        0  1 logged native call(s)  model 0 EXACT
+  362423 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(2,-1)                                                                          0
+  362423 block        0  1 logged native call(s)  model 0 EXACT
+  362427 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(6,-1)                                                                          0
+  362427 block        0  1 logged native call(s)  model 0 EXACT
+  362428 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(7,-1)                                                                          0
+  362428 block        0  1 logged native call(s)  model 0 EXACT
+  362429 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(8,-1)                                                                          0
+  362429 block        0  1 logged native call(s)  model 0 EXACT
+  362432 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(11,-1)                                                                         0
+  362432 block        0  1 logged native call(s)  model 0 EXACT
+  362433 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(12,-1)                                                                         0
+  362433 block        0  1 logged native call(s)  model 0 EXACT
+  362434 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(13,-1)                                                                         0
+  362434 block        0  1 logged native call(s)  model 0 EXACT
+  362435 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(14,-1)                                                                         0
+  362435 block        0  1 logged native call(s)  model 0 EXACT
+  362436 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(15,-1)                                                                         0
+  362436 block        0  1 logged native call(s)  model 0 EXACT
+  362437 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(16,-1)                                                                         0
+  362437 block        0  1 logged native call(s)  model 0 EXACT
+  362439 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(18,-1)                                                                         0
+  362439 block        0  1 logged native call(s)  model 0 EXACT
+  362440 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(19,-1)                                                                         0
+  362440 block        0  1 logged native call(s)  model 0 EXACT
+  362441 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(20,-1)                                                                         0
+  362441 block        0  1 logged native call(s)  model 0 EXACT
+  362442 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(21,-1)                                                                         0
+  362442 block        0  1 logged native call(s)  model 0 EXACT
+  362444 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(23,-1)                                                                         0
+  362444 block        0  1 logged native call(s)  model 0 EXACT
+  362445 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(24,-1)                                                                         0
+  362445 block        0  1 logged native call(s)  model 0 EXACT
+  362449 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(31,-1)                                                                         0
+  362449 block        0  1 logged native call(s)  model 0 EXACT
+  362450 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(32,-1)                                                                         0
+  362450 block        0  1 logged native call(s)  model 0 EXACT
+  362453 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(35,-1)                                                                         0
+  362453 block        0  1 logged native call(s)  model 0 EXACT
+  362455 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(37,-1)                                                                         0
+  362455 block        0  1 logged native call(s)  model 0 EXACT
+  362456 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(40,-1)                                                                         0
+  362456 block        0  1 logged native call(s)  model 0 EXACT
+  362457 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(41,-1)                                                                         0
+  362457 block        0  1 logged native call(s)  model 0 EXACT
+  362461 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1101,-1)                                                                       0
+  362461 block        0  1 logged native call(s)  model 0 EXACT
+  362468 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(1117,-1)                                                                       0
+  362468 block        0  1 logged native call(s)  model 0 EXACT
+  362478 lua         10  Permanent Ice x10  
+                   TerrainBuilder.AddIce(1127,-1)                                                                       0
+  362478 block        0  1 logged native call(s)  model 0 EXACT
+  362479 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1128,-1)                                                                       0
+  362479 block        0  1 logged native call(s)  model 0 EXACT
+  362481 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1130,-1)                                                                       0
+  362481 block        0  1 logged native call(s)  model 0 EXACT
+  362485 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1134,-1)                                                                       0
+  362485 block        0  1 logged native call(s)  model 0 EXACT
+  362490 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(1139,-1)                                                                       0
+  362490 block        0  1 logged native call(s)  model 0 EXACT
+  362494 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1143,-1)                                                                       0
+  362494 block        0  1 logged native call(s)  model 0 EXACT
+  362496 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(3,30)                                                                          0
+  362496 block        0  1 logged native call(s)  model 0 EXACT
+  362497 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(5,30)                                                                          0
+  362497 block        0  1 logged native call(s)  model 0 EXACT
+  362501 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(22,30)                                                                         0
+  362501 block        0  1 logged native call(s)  model 0 EXACT
+  362502 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(25,30)                                                                         0
+  362502 block        0  1 logged native call(s)  model 0 EXACT
+  362503 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(30,30)                                                                         0
+  362503 block        0  1 logged native call(s)  model 0 EXACT
+  362506 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(36,30)                                                                         0
+  362506 block        0  1 logged native call(s)  model 0 EXACT
+  362511 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(44,30)                                                                         0
+  362511 block        0  1 logged native call(s)  model 0 EXACT
+  362516 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(51,30)                                                                         0
+  362516 block        0  1 logged native call(s)  model 0 EXACT
+  362517 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(52,30)                                                                         0
+  362517 block        0  1 logged native call(s)  model 0 EXACT
+  362518 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(54,30)                                                                         0
+  362518 block        0  1 logged native call(s)  model 0 EXACT
+  362520 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(56,30)                                                                         0
+  362520 block        0  1 logged native call(s)  model 0 EXACT
+  362523 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(59,30)                                                                         0
+  362523 block        0  1 logged native call(s)  model 0 EXACT
+  362524 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(60,30)                                                                         0
+  362524 block        0  1 logged native call(s)  model 0 EXACT
+  362526 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(62,30)                                                                         0
+  362526 block        0  1 logged native call(s)  model 0 EXACT
+  362531 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(67,30)                                                                         0
+  362531 block        0  1 logged native call(s)  model 0 EXACT
+  362537 lua          6  Permanent Ice x6  
+                   TerrainBuilder.AddIce(79,30)                                                                         0
+  362537 block        0  1 logged native call(s)  model 0 EXACT
+  362542 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(85,30)                                                                         0
+  362542 block        0  1 logged native call(s)  model 0 EXACT
+  362543 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(87,30)                                                                         0
+  362543 block        0  1 logged native call(s)  model 0 EXACT
+  362545 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1057,30)                                                                       0
+  362545 block        0  1 logged native call(s)  model 0 EXACT
+  362547 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1073,30)                                                                       0
+  362547 block        0  1 logged native call(s)  model 0 EXACT
+  362548 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1074,30)                                                                       0
+  362548 block        0  1 logged native call(s)  model 0 EXACT
+  362550 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1084,30)                                                                       0
+  362550 block        0  1 logged native call(s)  model 0 EXACT
+  362551 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1085,30)                                                                       0
+  362551 block        0  1 logged native call(s)  model 0 EXACT
+  362552 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1086,30)                                                                       0
+  362552 block        0  1 logged native call(s)  model 0 EXACT
+  362553 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1087,30)                                                                       0
+  362553 block        0  1 logged native call(s)  model 0 EXACT
+  362554 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1090,30)                                                                       0
+  362554 block        0  1 logged native call(s)  model 0 EXACT
+  362556 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1095,30)                                                                       0
+  362556 block        0  1 logged native call(s)  model 0 EXACT
+  362558 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1099,30)                                                                       0
+  362558 block        0  1 logged native call(s)  model 0 EXACT
+  362559 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1100,30)                                                                       0
+  362559 block        0  1 logged native call(s)  model 0 EXACT
+  362561 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1116,30)                                                                       0
+  362561 block        0  1 logged native call(s)  model 0 EXACT
+  362562 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1118,30)                                                                       0
+  362562 block        0  1 logged native call(s)  model 0 EXACT
+  362564 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1129,30)                                                                       0
+  362564 block        0  1 logged native call(s)  model 0 EXACT
+  362565 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1131,30)                                                                       0
+  362565 block        0  1 logged native call(s)  model 0 EXACT
+  362569 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1140,30)                                                                       0
+  362569 block        0  1 logged native call(s)  model 0 EXACT
+  362571 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1,29)                                                                          0
+  362571 block        0  1 logged native call(s)  model 0 EXACT
+  362572 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(4,29)                                                                          0
+  362572 block        0  1 logged native call(s)  model 0 EXACT
+  362576 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(26,29)                                                                         0
+  362576 block        0  1 logged native call(s)  model 0 EXACT
+  362583 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(43,29)                                                                         0
+  362583 block        0  1 logged native call(s)  model 0 EXACT
+  362584 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(45,29)                                                                         0
+  362584 block        0  1 logged native call(s)  model 0 EXACT
+  362586 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(47,29)                                                                         0
+  362586 block        0  1 logged native call(s)  model 0 EXACT
+  362587 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(48,29)                                                                         0
+  362587 block        0  1 logged native call(s)  model 0 EXACT
+  362588 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(49,29)                                                                         0
+  362588 block        0  1 logged native call(s)  model 0 EXACT
+  362591 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(55,29)                                                                         0
+  362591 block        0  1 logged native call(s)  model 0 EXACT
+  362592 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(57,29)                                                                         0
+  362592 block        0  1 logged native call(s)  model 0 EXACT
+  362593 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(58,29)                                                                         0
+  362593 block        0  1 logged native call(s)  model 0 EXACT
+  362594 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(61,29)                                                                         0
+  362594 block        0  1 logged native call(s)  model 0 EXACT
+  362595 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(63,29)                                                                         0
+  362595 block        0  1 logged native call(s)  model 0 EXACT
+  362597 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(65,29)                                                                         0
+  362597 block        0  1 logged native call(s)  model 0 EXACT
+  362599 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(68,29)                                                                         0
+  362599 block        0  1 logged native call(s)  model 0 EXACT
+  362609 lua         10  Permanent Ice x10  
+                   TerrainBuilder.AddIce(86,29)                                                                         0
+  362609 block        0  1 logged native call(s)  model 0 EXACT
+  362611 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(89,29)                                                                         0
+  362611 block        0  1 logged native call(s)  model 0 EXACT
+  362618 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(101,29)                                                                        0
+  362618 block        0  1 logged native call(s)  model 0 EXACT
+  362619 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(103,29)                                                                        0
+  362619 block        0  1 logged native call(s)  model 0 EXACT
+  362620 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(104,29)                                                                        0
+  362620 block        0  1 logged native call(s)  model 0 EXACT
+  362627 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(130,29)                                                                        0
+  362627 block        0  1 logged native call(s)  model 0 EXACT
+  362628 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(131,29)                                                                        0
+  362628 block        0  1 logged native call(s)  model 0 EXACT
+  362629 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1012,29)                                                                       0
+  362629 block        0  1 logged native call(s)  model 0 EXACT
+  362631 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1028,29)                                                                       0
+  362631 block        0  1 logged native call(s)  model 0 EXACT
+  362632 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1029,29)                                                                       0
+  362632 block        0  1 logged native call(s)  model 0 EXACT
+  362635 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1040,29)                                                                       0
+  362635 block        0  1 logged native call(s)  model 0 EXACT
+  362637 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1042,29)                                                                       0
+  362637 block        0  1 logged native call(s)  model 0 EXACT
+  362639 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1045,29)                                                                       0
+  362639 block        0  1 logged native call(s)  model 0 EXACT
+  362642 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1051,29)                                                                       0
+  362642 block        0  1 logged native call(s)  model 0 EXACT
+  362646 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1058,29)                                                                       0
+  362646 block        0  1 logged native call(s)  model 0 EXACT
+  362649 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1083,29)                                                                       0
+  362649 block        0  1 logged native call(s)  model 0 EXACT
+  362652 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1091,29)                                                                       0
+  362652 block        0  1 logged native call(s)  model 0 EXACT
+  362653 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1094,29)                                                                       0
+  362653 block        0  1 logged native call(s)  model 0 EXACT
+  362654 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1096,29)                                                                       0
+  362654 block        0  1 logged native call(s)  model 0 EXACT
+  362659 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(1119,29)                                                                       0
+  362659 block        0  1 logged native call(s)  model 0 EXACT
+  362661 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1132,29)                                                                       0
+  362661 block        0  1 logged native call(s)  model 0 EXACT
+  362668 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(10,28)                                                                         0
+  362668 block        0  1 logged native call(s)  model 0 EXACT
+  362670 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(27,28)                                                                         0
+  362670 block        0  1 logged native call(s)  model 0 EXACT
+  362673 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(34,28)                                                                         0
+  362673 block        0  1 logged native call(s)  model 0 EXACT
+  362676 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(42,28)                                                                         0
+  362676 block        0  1 logged native call(s)  model 0 EXACT
+  362677 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(46,28)                                                                         0
+  362677 block        0  1 logged native call(s)  model 0 EXACT
+  362678 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(50,28)                                                                         0
+  362678 block        0  1 logged native call(s)  model 0 EXACT
+  362682 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(69,28)                                                                         0
+  362682 block        0  1 logged native call(s)  model 0 EXACT
+  362689 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(81,28)                                                                         0
+  362689 block        0  1 logged native call(s)  model 0 EXACT
+  362692 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(88,28)                                                                         0
+  362692 block        0  1 logged native call(s)  model 0 EXACT
+  362693 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(90,28)                                                                         0
+  362693 block        0  1 logged native call(s)  model 0 EXACT
+  362695 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(92,28)                                                                         0
+  362695 block        0  1 logged native call(s)  model 0 EXACT
+  362696 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(93,28)                                                                         0
+  362696 block        0  1 logged native call(s)  model 0 EXACT
+  362700 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(97,28)                                                                         0
+  362700 block        0  1 logged native call(s)  model 0 EXACT
+  362703 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(100,28)                                                                        0
+  362703 block        0  1 logged native call(s)  model 0 EXACT
+  362705 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(105,28)                                                                        0
+  362705 block        0  1 logged native call(s)  model 0 EXACT
+  362707 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(107,28)                                                                        0
+  362707 block        0  1 logged native call(s)  model 0 EXACT
+  362709 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(109,28)                                                                        0
+  362709 block        0  1 logged native call(s)  model 0 EXACT
+  362710 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(110,28)                                                                        0
+  362710 block        0  1 logged native call(s)  model 0 EXACT
+  362713 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(113,28)                                                                        0
+  362713 block        0  1 logged native call(s)  model 0 EXACT
+  362715 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(132,28)                                                                        0
+  362715 block        0  1 logged native call(s)  model 0 EXACT
+  362716 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(133,28)                                                                        0
+  362716 block        0  1 logged native call(s)  model 0 EXACT
+  362724 lua          8  Permanent Ice x8  
+                   TerrainBuilder.AddIce(175,28)                                                                        0
+  362724 block        0  1 logged native call(s)  model 0 EXACT
+  362732 lua          8  Permanent Ice x8  
+                   TerrainBuilder.AddIce(998,28)                                                                        0
+  362732 block        0  1 logged native call(s)  model 0 EXACT
+  362733 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(999,28)                                                                        0
+  362733 block        0  1 logged native call(s)  model 0 EXACT
+  362734 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1001,28)                                                                       0
+  362734 block        0  1 logged native call(s)  model 0 EXACT
+  362738 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1013,28)                                                                       0
+  362738 block        0  1 logged native call(s)  model 0 EXACT
+  362741 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1030,28)                                                                       0
+  362741 block        0  1 logged native call(s)  model 0 EXACT
+  362742 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1038,28)                                                                       0
+  362742 block        0  1 logged native call(s)  model 0 EXACT
+  362744 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1041,28)                                                                       0
+  362744 block        0  1 logged native call(s)  model 0 EXACT
+  362749 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(1049,28)                                                                       0
+  362749 block        0  1 logged native call(s)  model 0 EXACT
+  362751 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1052,28)                                                                       0
+  362751 block        0  1 logged native call(s)  model 0 EXACT
+  362753 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1055,28)                                                                       0
+  362753 block        0  1 logged native call(s)  model 0 EXACT
+  362755 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1059,28)                                                                       0
+  362755 block        0  1 logged native call(s)  model 0 EXACT
+  362756 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1072,28)                                                                       0
+  362756 block        0  1 logged native call(s)  model 0 EXACT
+  362757 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1075,28)                                                                       0
+  362757 block        0  1 logged native call(s)  model 0 EXACT
+  362762 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(1092,28)                                                                       0
+  362762 block        0  1 logged native call(s)  model 0 EXACT
+  362765 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1098,28)                                                                       0
+  362765 block        0  1 logged native call(s)  model 0 EXACT
+  362766 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1102,28)                                                                       0
+  362766 block        0  1 logged native call(s)  model 0 EXACT
+  362771 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(1135,28)                                                                       0
+  362771 block        0  1 logged native call(s)  model 0 EXACT
+  362772 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1137,28)                                                                       0
+  362772 block        0  1 logged native call(s)  model 0 EXACT
+  362773 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1138,28)                                                                       0
+  362773 block        0  1 logged native call(s)  model 0 EXACT
+  362775 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1142,28)                                                                       0
+  362775 block        0  1 logged native call(s)  model 0 EXACT
+  362776 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(9,27)                                                                          0
+  362776 block        0  1 logged native call(s)  model 0 EXACT
+  362777 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(17,27)                                                                         0
+  362777 block        0  1 logged native call(s)  model 0 EXACT
+  362780 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(33,27)                                                                         0
+  362780 block        0  1 logged native call(s)  model 0 EXACT
+  362784 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(64,27)                                                                         0
+  362784 block        0  1 logged native call(s)  model 0 EXACT
+  362785 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(66,27)                                                                         0
+  362785 block        0  1 logged native call(s)  model 0 EXACT
+  362786 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(70,27)                                                                         0
+  362786 block        0  1 logged native call(s)  model 0 EXACT
+  362796 lua         10  Permanent Ice x10  
+                   TerrainBuilder.AddIce(91,27)                                                                         0
+  362796 block        0  1 logged native call(s)  model 0 EXACT
+  362797 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(94,27)                                                                         0
+  362797 block        0  1 logged native call(s)  model 0 EXACT
+  362798 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(95,27)                                                                         0
+  362798 block        0  1 logged native call(s)  model 0 EXACT
+  362799 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(96,27)                                                                         0
+  362799 block        0  1 logged native call(s)  model 0 EXACT
+  362800 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(98,27)                                                                         0
+  362800 block        0  1 logged native call(s)  model 0 EXACT
+  362803 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(106,27)                                                                        0
+  362803 block        0  1 logged native call(s)  model 0 EXACT
+  362806 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(112,27)                                                                        0
+  362806 block        0  1 logged native call(s)  model 0 EXACT
+  362809 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(134,27)                                                                        0
+  362809 block        0  1 logged native call(s)  model 0 EXACT
+  362811 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(136,27)                                                                        0
+  362811 block        0  1 logged native call(s)  model 0 EXACT
+  362819 lua          8  Permanent Ice x8  
+                   TerrainBuilder.AddIce(147,27)                                                                        0
+  362819 block        0  1 logged native call(s)  model 0 EXACT
+  362820 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(148,27)                                                                        0
+  362820 block        0  1 logged native call(s)  model 0 EXACT
+  362828 lua          8  Permanent Ice x8  
+                   TerrainBuilder.AddIce(157,27)                                                                        0
+  362828 block        0  1 logged native call(s)  model 0 EXACT
+  362830 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(174,27)                                                                        0
+  362830 block        0  1 logged native call(s)  model 0 EXACT
+  362831 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(176,27)                                                                        0
+  362831 block        0  1 logged native call(s)  model 0 EXACT
+  362833 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(178,27)                                                                        0
+  362833 block        0  1 logged native call(s)  model 0 EXACT
+  362839 lua          6  Permanent Ice x6  
+                   TerrainBuilder.AddIce(957,27)                                                                        0
+  362839 block        0  1 logged native call(s)  model 0 EXACT
+  362840 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(968,27)                                                                        0
+  362840 block        0  1 logged native call(s)  model 0 EXACT
+  362842 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(970,27)                                                                        0
+  362842 block        0  1 logged native call(s)  model 0 EXACT
+  362845 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(986,27)                                                                        0
+  362845 block        0  1 logged native call(s)  model 0 EXACT
+  362850 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(997,27)                                                                        0
+  362850 block        0  1 logged native call(s)  model 0 EXACT
+  362852 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1002,27)                                                                       0
+  362852 block        0  1 logged native call(s)  model 0 EXACT
+  362853 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1005,27)                                                                       0
+  362853 block        0  1 logged native call(s)  model 0 EXACT
+  362863 lua         10  Permanent Ice x10  
+                   TerrainBuilder.AddIce(1037,27)                                                                       0
+  362863 block        0  1 logged native call(s)  model 0 EXACT
+  362865 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1043,27)                                                                       0
+  362865 block        0  1 logged native call(s)  model 0 EXACT
+  362867 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1046,27)                                                                       0
+  362867 block        0  1 logged native call(s)  model 0 EXACT
+  362868 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1047,27)                                                                       0
+  362868 block        0  1 logged native call(s)  model 0 EXACT
+  362869 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1048,27)                                                                       0
+  362869 block        0  1 logged native call(s)  model 0 EXACT
+  362870 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1050,27)                                                                       0
+  362870 block        0  1 logged native call(s)  model 0 EXACT
+  362872 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1054,27)                                                                       0
+  362872 block        0  1 logged native call(s)  model 0 EXACT
+  362879 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(1093,27)                                                                       0
+  362879 block        0  1 logged native call(s)  model 0 EXACT
+  362880 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1097,27)                                                                       0
+  362880 block        0  1 logged native call(s)  model 0 EXACT
+  362883 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1120,27)                                                                       0
+  362883 block        0  1 logged native call(s)  model 0 EXACT
+  362886 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1136,27)                                                                       0
+  362886 block        0  1 logged native call(s)  model 0 EXACT
+  362887 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1141,27)                                                                       0
+  362887 block        0  1 logged native call(s)  model 0 EXACT
+  362890 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(38,26)                                                                         0
+  362890 block        0  1 logged native call(s)  model 0 EXACT
+  362892 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(53,26)                                                                         0
+  362892 block        0  1 logged native call(s)  model 0 EXACT
+  362902 lua         10  Permanent Ice x10  
+                   TerrainBuilder.AddIce(99,26)                                                                         0
+  362902 block        0  1 logged native call(s)  model 0 EXACT
+  362904 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(108,26)                                                                        0
+  362904 block        0  1 logged native call(s)  model 0 EXACT
+  362905 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(111,26)                                                                        0
+  362905 block        0  1 logged native call(s)  model 0 EXACT
+  362906 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(114,26)                                                                        0
+  362906 block        0  1 logged native call(s)  model 0 EXACT
+  362907 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(115,26)                                                                        0
+  362907 block        0  1 logged native call(s)  model 0 EXACT
+  362909 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(135,26)                                                                        0
+  362909 block        0  1 logged native call(s)  model 0 EXACT
+  362911 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(138,26)                                                                        0
+  362911 block        0  1 logged native call(s)  model 0 EXACT
+  362912 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(139,26)                                                                        0
+  362912 block        0  1 logged native call(s)  model 0 EXACT
+  362913 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(140,26)                                                                        0
+  362913 block        0  1 logged native call(s)  model 0 EXACT
+  362915 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(142,26)                                                                        0
+  362915 block        0  1 logged native call(s)  model 0 EXACT
+  362919 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(146,26)                                                                        0
+  362919 block        0  1 logged native call(s)  model 0 EXACT
+  362921 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(150,26)                                                                        0
+  362921 block        0  1 logged native call(s)  model 0 EXACT
+  362927 lua          6  Permanent Ice x6  
+                   TerrainBuilder.AddIce(156,26)                                                                        0
+  362927 block        0  1 logged native call(s)  model 0 EXACT
+  362930 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(177,26)                                                                        0
+  362930 block        0  1 logged native call(s)  model 0 EXACT
+  362933 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(181,26)                                                                        0
+  362933 block        0  1 logged native call(s)  model 0 EXACT
+  362940 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(219,26)                                                                        0
+  362940 block        0  1 logged native call(s)  model 0 EXACT
+  362945 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(913,26)                                                                        0
+  362945 block        0  1 logged native call(s)  model 0 EXACT
+  362947 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(924,26)                                                                        0
+  362947 block        0  1 logged native call(s)  model 0 EXACT
+  362949 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(926,26)                                                                        0
+  362949 block        0  1 logged native call(s)  model 0 EXACT
+  362954 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(954,26)                                                                        0
+  362954 block        0  1 logged native call(s)  model 0 EXACT
+  362956 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(956,26)                                                                        0
+  362956 block        0  1 logged native call(s)  model 0 EXACT
+  362958 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(960,26)                                                                        0
+  362958 block        0  1 logged native call(s)  model 0 EXACT
+  362962 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(971,26)                                                                        0
+  362962 block        0  1 logged native call(s)  model 0 EXACT
+  362964 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(985,26)                                                                        0
+  362964 block        0  1 logged native call(s)  model 0 EXACT
+  362966 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(993,26)                                                                        0
+  362966 block        0  1 logged native call(s)  model 0 EXACT
+  362968 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(995,26)                                                                        0
+  362968 block        0  1 logged native call(s)  model 0 EXACT
+  362972 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1004,26)                                                                       0
+  362972 block        0  1 logged native call(s)  model 0 EXACT
+  362974 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1007,26)                                                                       0
+  362974 block        0  1 logged native call(s)  model 0 EXACT
+  362986 lua         12  Permanent Ice x12  
+                   TerrainBuilder.AddIce(1053,26)                                                                       0
+  362986 block        0  1 logged native call(s)  model 0 EXACT
+  362987 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1056,26)                                                                       0
+  362987 block        0  1 logged native call(s)  model 0 EXACT
+  362989 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1076,26)                                                                       0
+  362989 block        0  1 logged native call(s)  model 0 EXACT
+  362990 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1077,26)                                                                       0
+  362990 block        0  1 logged native call(s)  model 0 EXACT
+  362994 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1089,26)                                                                       0
+  362994 block        0  1 logged native call(s)  model 0 EXACT
+  362999 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(1133,26)                                                                       0
+  362999 block        0  1 logged native call(s)  model 0 EXACT
+  363012 lua         13  Permanent Ice x13  
+                   TerrainBuilder.AddIce(102,25)                                                                        0
+  363012 block        0  1 logged native call(s)  model 0 EXACT
+  363021 lua          9  Permanent Ice x9  
+                   TerrainBuilder.AddIce(151,25)                                                                        0
+  363021 block        0  1 logged native call(s)  model 0 EXACT
+  363029 lua          8  Permanent Ice x8  
+                   TerrainBuilder.AddIce(179,25)                                                                        0
+  363029 block        0  1 logged native call(s)  model 0 EXACT
+  363030 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(180,25)                                                                        0
+  363030 block        0  1 logged native call(s)  model 0 EXACT
+  363031 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(182,25)                                                                        0
+  363031 block        0  1 logged native call(s)  model 0 EXACT
+  363036 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(187,25)                                                                        0
+  363036 block        0  1 logged native call(s)  model 0 EXACT
+  363038 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(191,25)                                                                        0
+  363038 block        0  1 logged native call(s)  model 0 EXACT
+  363040 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(193,25)                                                                        0
+  363040 block        0  1 logged native call(s)  model 0 EXACT
+  363041 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(194,25)                                                                        0
+  363041 block        0  1 logged native call(s)  model 0 EXACT
+  363049 lua          8  Permanent Ice x8  
+                   TerrainBuilder.AddIce(222,25)                                                                        0
+  363049 block        0  1 logged native call(s)  model 0 EXACT
+  363053 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(263,25)                                                                        0
+  363053 block        0  1 logged native call(s)  model 0 EXACT
+  363067 lua         14  Permanent Ice x14  
+                   TerrainBuilder.AddIce(941,25)                                                                        0
+  363067 block        0  1 logged native call(s)  model 0 EXACT
+  363069 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(948,25)                                                                        0
+  363069 block        0  1 logged native call(s)  model 0 EXACT
+  363071 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(950,25)                                                                        0
+  363071 block        0  1 logged native call(s)  model 0 EXACT
+  363080 lua          9  Permanent Ice x9  
+                   TerrainBuilder.AddIce(963,25)                                                                        0
+  363080 block        0  1 logged native call(s)  model 0 EXACT
+  363081 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(967,25)                                                                        0
+  363081 block        0  1 logged native call(s)  model 0 EXACT
+  363082 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(969,25)                                                                        0
+  363082 block        0  1 logged native call(s)  model 0 EXACT
+  363083 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(972,25)                                                                        0
+  363083 block        0  1 logged native call(s)  model 0 EXACT
+  363087 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(994,25)                                                                        0
+  363087 block        0  1 logged native call(s)  model 0 EXACT
+  363091 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1006,25)                                                                       0
+  363091 block        0  1 logged native call(s)  model 0 EXACT
+  363094 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1010,25)                                                                       0
+  363094 block        0  1 logged native call(s)  model 0 EXACT
+  363095 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1011,25)                                                                       0
+  363095 block        0  1 logged native call(s)  model 0 EXACT
+  363100 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(1032,25)                                                                       0
+  363100 block        0  1 logged native call(s)  model 0 EXACT
+  363103 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(1039,25)                                                                       0
+  363103 block        0  1 logged native call(s)  model 0 EXACT
+  363107 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(1081,25)                                                                       0
+  363107 block        0  1 logged native call(s)  model 0 EXACT
+  363108 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1082,25)                                                                       0
+  363108 block        0  1 logged native call(s)  model 0 EXACT
+  363127 lua         19  Permanent Ice x19  
+                   TerrainBuilder.AddIce(129,24)                                                                        0
+  363127 block        0  1 logged native call(s)  model 0 EXACT
+  363134 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(152,24)                                                                        0
+  363134 block        0  1 logged native call(s)  model 0 EXACT
+  363135 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(153,24)                                                                        0
+  363135 block        0  1 logged native call(s)  model 0 EXACT
+  363137 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(155,24)                                                                        0
+  363137 block        0  1 logged native call(s)  model 0 EXACT
+  363138 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(158,24)                                                                        0
+  363138 block        0  1 logged native call(s)  model 0 EXACT
+  363141 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(183,24)                                                                        0
+  363141 block        0  1 logged native call(s)  model 0 EXACT
+  363142 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(184,24)                                                                        0
+  363142 block        0  1 logged native call(s)  model 0 EXACT
+  363143 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(185,24)                                                                        0
+  363143 block        0  1 logged native call(s)  model 0 EXACT
+  363145 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(188,24)                                                                        0
+  363145 block        0  1 logged native call(s)  model 0 EXACT
+  363147 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(192,24)                                                                        0
+  363147 block        0  1 logged native call(s)  model 0 EXACT
+  363148 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(195,24)                                                                        0
+  363148 block        0  1 logged native call(s)  model 0 EXACT
+  363149 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(196,24)                                                                        0
+  363149 block        0  1 logged native call(s)  model 0 EXACT
+  363151 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(201,24)                                                                        0
+  363151 block        0  1 logged native call(s)  model 0 EXACT
+  363156 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(223,24)                                                                        0
+  363156 block        0  1 logged native call(s)  model 0 EXACT
+  363159 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(226,24)                                                                        0
+  363159 block        0  1 logged native call(s)  model 0 EXACT
+  363166 lua          7  Permanent Ice x7  
+                   TerrainBuilder.AddIce(238,24)                                                                        0
+  363166 block        0  1 logged native call(s)  model 0 EXACT
+  363171 lua          5  Permanent Ice x5  
+                   TerrainBuilder.AddIce(307,24)                                                                        0
+  363171 block        0  1 logged native call(s)  model 0 EXACT
+  363173 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(880,24)                                                                        0
+  363173 block        0  1 logged native call(s)  model 0 EXACT
+  363187 lua         14  Permanent Ice x14  
+                   TerrainBuilder.AddIce(917,24)                                                                        0
+  363187 block        0  1 logged native call(s)  model 0 EXACT
+  363190 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(923,24)                                                                        0
+  363190 block        0  1 logged native call(s)  model 0 EXACT
+  363191 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(925,24)                                                                        0
+  363191 block        0  1 logged native call(s)  model 0 EXACT
+  363193 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(928,24)                                                                        0
+  363193 block        0  1 logged native call(s)  model 0 EXACT
+  363199 lua          6  Permanent Ice x6  
+                   TerrainBuilder.AddIce(952,24)                                                                        0
+  363199 block        0  1 logged native call(s)  model 0 EXACT
+  363202 lua          3  Permanent Ice x3  
+                   TerrainBuilder.AddIce(958,24)                                                                        0
+  363202 block        0  1 logged native call(s)  model 0 EXACT
+  363204 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(961,24)                                                                        0
+  363204 block        0  1 logged native call(s)  model 0 EXACT
+  363205 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(962,24)                                                                        0
+  363205 block        0  1 logged native call(s)  model 0 EXACT
+  363209 lua          4  Permanent Ice x4  
+                   TerrainBuilder.AddIce(984,24)                                                                        0
+  363209 block        0  1 logged native call(s)  model 0 EXACT
+  363211 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(988,24)                                                                        0
+  363211 block        0  1 logged native call(s)  model 0 EXACT
+  363213 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(992,24)                                                                        0
+  363213 block        0  1 logged native call(s)  model 0 EXACT
+  363214 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(996,24)                                                                        0
+  363214 block        0  1 logged native call(s)  model 0 EXACT
+  363216 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1003,24)                                                                       0
+  363216 block        0  1 logged native call(s)  model 0 EXACT
+  363217 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1008,24)                                                                       0
+  363217 block        0  1 logged native call(s)  model 0 EXACT
+  363218 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1009,24)                                                                       0
+  363218 block        0  1 logged native call(s)  model 0 EXACT
+  363219 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1014,24)                                                                       0
+  363219 block        0  1 logged native call(s)  model 0 EXACT
+  363221 lua          2  Permanent Ice x2  
+                   TerrainBuilder.AddIce(1027,24)                                                                       0
+  363221 block        0  1 logged native call(s)  model 0 EXACT
+  363222 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1031,24)                                                                       0
+  363222 block        0  1 logged native call(s)  model 0 EXACT
+  363223 lua          1  Permanent Ice x1  
+                   TerrainBuilder.AddIce(1033,24)                                                                       0
+  363223 block        0  1 logged native call(s)  model 0 EXACT
+  363229 lua          6  Permanent Ice x6  
+                   TerrainBuilder.AddIce(1088,24)                                                                       0
+  363229 block        0  1 logged native call(s)  model 0 EXACT
+  363235 lua          6  Permanent Ice x6  
+                   TerrainBuilder.AddIce(1126,24)                                                                       0
+  363235 block        0  1 logged native call(s)  model 0 EXACT
+  363410 lua        175  Resource Placement Score Adjust x175  
+                   TerrainBuilder.AnalyzeChokepoints()                                                                  0
+  363410 block        0  1 logged native call(s)  model 0 EXACT
+  363684 lua        274  Shuffling table entry - Lua x202, Natural Wonder Placement Score Adjust x51, Natural Wonder Selection Roll x17, Oasis Ra  
+                   TerrainBuilder.AddCoastalLowland(567,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(728,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(524,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(538,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(729,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(500,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(859,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(333,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(449,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(525,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(771,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(456,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(980,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(851,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(774,0)                                                              0
+                   TerrainBuilder.AddCoastalLowland(233,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(611,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(422,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(694,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(494,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(824,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(790,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(377,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(743,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(734,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(656,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(588,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(631,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(602,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(645,1)                                                              0
+                   TerrainBuilder.AddCoastalLowland(600,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(693,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(587,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(407,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(703,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(411,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(850,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(427,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(72,2)                                                               0
+                   TerrainBuilder.AddCoastalLowland(727,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(712,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(755,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(1022,2)                                                             0
+                   TerrainBuilder.AddCoastalLowland(869,2)                                                              0
+                   TerrainBuilder.AddCoastalLowland(646,2)                                                              0
+                   Map.GetContinentsInUse()                                                                             0
+  363684 block        0  46 logged native call(s)  model 0 EXACT
+  364092 lua        408  Resource Placement Score Adjust x379, Shuffling table entry - Lua x29  
+                   Map.GetContinentsInUse()                                                                             0
+  364092 block        0  1 logged native call(s)  model 0 EXACT
+  365882 lua       1790  Resource Placement Score Adjust x1764, Shuffling table entry - Lua x26  
+                   StartPositioner.DivideMapIntoMajorRegions(2,150,50,false)                                            0
+  365882 block        0  1 logged native call(s)  model 0 EXACT
+  365894 lua         12  Shuffling table entry - Lua x10, Random Direction x2  
+                   StartPositioner.DivideMapIntoMinorRegions(3)                                                         0
+  365894 block        0  1 logged native call(s)  model 0 EXACT
+  365913 lua         19  Goody Hut - LUA Goody Hut x19  
+world age 3; Lua draws not matching at their position: 0
+ledger total 365913; measured 365913
+-> C:\civ6-development-calculator\tools\civ6lab\runs\h3_session_20260927T015420Z_ledger.json

@@ -27,7 +27,21 @@ missing one:
      "difficulty": "DIFFICULTY_PRINCE", "map": "Continents.lua",
      "size": "MAPSIZE_STANDARD", "city_states": 12, "realism": 2,
      "map_seed": 1234, "game_seed": 5678, "start_era": "ERA_ANCIENT",
-     "turn_limit": "none", "all_ai": false, "majors": 6}
+     "turn_limit": "none", "all_ai": false, "majors": 6,
+     "world_age": 2, "sea_level": 2, "temperature": 2, "rainfall": 2,
+     "resources": 2, "start": 2}
+The six map options are written as the setup screen writes them: each one
+the map script has a Map-group `Parameters` row for (the script's own rows,
+Key1 "Map" / Key2 the script, e.g. Base `Configuration/Data/MapSettings.xml`
+for Continents.lua: WorldAge, Temperature, Rainfall, SeaLevel, DefaultValue 2
+each; and the global single-player rows of `SetupParameters.xml`: Resources 2,
+StartPosition 2) takes its row's DefaultValue, read from the FrontEnd's
+Configuration database at host time; a config key overrides it (the domains:
+world age 1 new / 2 standard / 3 old / 4 random, sea level 1 low / 2 standard
+/ 3 high / 4 random, temperature 1 hot / 2 standard / 3 cold / 4 random,
+rainfall 1 arid / 2 standard / 3 wet / 4 random, resources 1 sparse / 2
+standard / 3 abundant / 4 random, start 1 balanced / 2 standard / 3
+legendary). Unset, Continents rolls World Age and Sea Level itself.
 `max_turns` sets a CUSTOM turn limit (the score victory's turn; a running
 game ignores a later change);
 `realism` is Gathering Storm's disaster intensity (GAME_REALISM, 0-4, default 2);
@@ -35,8 +49,8 @@ game ignores a later change);
 makes every major an AI and the host an OBSERVER in slot 0 (the majors take
 slots 1..n), a game that plays itself with no local player. `--map-seed` /
 `--game-seed` override the config's seeds. `new` prints the game's own
-readback once it is up: turn, seeds, humans, minors and the major seats
-(`game_info`). The keys map onto the install's
+readback once it is up: turn, seeds, the map options, humans, minors and
+the major seats (`game_info`). The keys map onto the install's
 Configuration Parameters rows; those with Hash="1" take DB.MakeHash of the
 value name.
 """
@@ -198,6 +212,52 @@ if cfg.majors then
     GameConfiguration.SetParticipatingPlayerCount(cfg.majors + GameConfiguration.GetHiddenPlayerCount())
   end)
 end
+-- the map options, as the setup screen writes them: every Map-group
+-- Parameters row among MAP_OPTIONS that applies to this script (global, Key1
+-- IS NULL, or Key1 'Map' with Key2 the script; a single-player row; its
+-- ParameterCriteria met) at its DefaultValue, a config key of the same name
+-- over it. A config key for an option the script has no row for is written
+-- too; an option with neither stays unset.
+local MAP_OPTIONS = { "world_age", "sea_level", "temperature", "rainfall", "resources", "start" }
+local mapopts = {}
+try("map_options", function()
+  local script = MapConfiguration.GetScript()
+  local crit = {}
+  for _, c in ipairs(DB.ConfigurationQuery("SELECT * FROM ParameterCriteria") or {}) do
+    crit[c.ParameterId] = crit[c.ParameterId] or {}
+    table.insert(crit[c.ParameterId], c)
+  end
+  local function meets(pid)
+    for _, c in ipairs(crit[pid] or {}) do
+      local actual
+      if c.ConfigurationGroup == "Map" then actual = MapConfiguration.GetValue(c.ConfigurationId)
+      else actual = GameConfiguration.GetValue(c.ConfigurationId) end
+      local eq = tostring(actual) == tostring(c.ConfigurationValue)
+      if (c.Operator == "Equals" and not eq) or (c.Operator == "NotEquals" and eq) then return false end
+    end
+    return true
+  end
+  local rows = DB.ConfigurationQuery("SELECT * FROM Parameters WHERE ConfigurationGroup = 'Map' AND "
+    .. "((Key1 IS NULL AND Key2 IS NULL) OR (Key1 = 'Map' AND Key2 = ?))", script) or {}
+  local default = {}
+  for _, r in ipairs(rows) do
+    local sp = r.SupportsSinglePlayer
+    if sp ~= false and sp ~= 0 and sp ~= "0" and meets(r.ParameterId) then
+      default[r.ConfigurationId] = tonumber(r.DefaultValue)
+    end
+  end
+  for _, k in ipairs(MAP_OPTIONS) do
+    local v, how = cfg[k], "config"
+    if v == nil then v, how = default[k], "default" end
+    if v ~= nil then
+      MapConfiguration.SetValue(k, v)
+      mapopts[#mapopts + 1] = k .. "=" .. tostring(v) .. "(" .. how .. ")"
+    else
+      mapopts[#mapopts + 1] = k .. "=unset"
+    end
+  end
+end)
+print("map options " .. table.concat(mapopts, " "))
 if cfg.city_states then try("city_states", function() GameConfiguration.SetValue("CITY_STATE_COUNT", cfg.city_states) end) end
 if cfg.realism then try("realism", function() GameConfiguration.SetValue("GAME_REALISM", cfg.realism) end) end
 if cfg.map_seed then try("map_seed", function() MapConfiguration.SetValue("RANDOM_SEED", cfg.map_seed) end) end
@@ -245,6 +305,12 @@ print("readback ruleset=" .. tostring(GameConfiguration.GetRuleSet())
   .. " majors=" .. tostring(MapConfiguration.GetMaxMajorPlayers())
   .. " map_seed=" .. tostring(MapConfiguration.GetValue("RANDOM_SEED"))
   .. " game_seed=" .. tostring(GameConfiguration.GetValue("GAME_SYNC_RANDOM_SEED"))
+  .. " world_age=" .. tostring(MapConfiguration.GetValue("world_age"))
+  .. " sea_level=" .. tostring(MapConfiguration.GetValue("sea_level"))
+  .. " temperature=" .. tostring(MapConfiguration.GetValue("temperature"))
+  .. " rainfall=" .. tostring(MapConfiguration.GetValue("rainfall"))
+  .. " resources=" .. tostring(MapConfiguration.GetValue("resources"))
+  .. " start=" .. tostring(MapConfiguration.GetValue("start"))
   .. " autostart=" .. tostring(Automation.IsAutoStartEnabled()))
 if not NOHOST then
   Network.HostGame(ServerType.SERVER_TYPE_NONE)
@@ -294,8 +360,13 @@ for p = 0, 62 do
     end
   end
 end
+local opts = {}
+for _, k in ipairs({ "world_age", "sea_level", "temperature", "rainfall", "resources", "start" }) do
+  opts[#opts + 1] = "\\"" .. k .. "\\":" .. tostring(MapConfiguration.GetValue(k) or "null")
+end
 print("{\\"turn\\":" .. Game.GetCurrentGameTurn()
   .. ",\\"map_seed\\":" .. tostring(MapConfiguration.GetValue("RANDOM_SEED"))
+  .. ",\\"map_options\\":{" .. table.concat(opts, ",") .. "}"
   .. ",\\"game_seed\\":" .. tostring(GameConfiguration.GetValue("GAME_SYNC_RANDOM_SEED"))
   .. ",\\"humans\\":" .. humans .. ",\\"minors\\":" .. minors
   .. ",\\"majors\\":{" .. table.concat(majors, ",") .. "}}")

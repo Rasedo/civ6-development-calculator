@@ -1,0 +1,13 @@
+    map options world_age=2(default) sea_level=2(default) temperature=2(default) rainfall=2(default) resources=2(default) start=2(default)
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    map_options=ok
+    city_states=ok
+    realism=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=2 map_seed=-513047656 game_seed=-513047657 world_age=2 sea_level=2 temperature=2 rainfall=2 resources=2 start=2 autostart=true
