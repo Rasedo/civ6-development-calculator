@@ -1,0 +1,36 @@
+020045Z natural N 3
+    k0: area lo 498 size 409 part 409 seed (62, 21) e1 8.25
+    k1: area lo 163 size 539* part 190 seed None e1 None
+    k2: area lo 163 size 539* part 349 seed None e1 None
+021047Z natural N 4
+    k0: area lo 264 size 818* part 201 seed None e1 None
+    k1: area lo 264 size 818* part 617 seed None e1 None
+    k2: area lo 2242 size 410 part 410 seed (62, 39) e1 9.22
+    k3: area lo 832 size 162 part 162 seed (77, 16) e1 6.26
+104802Z natural N 2
+    k0: area lo 367 size 370 part 370 seed (17, 19) e1 7.21
+    k1: area lo 403 size 313 part 313 seed (45, 24) e1 5.41
+104902Z natural N 2
+    k0: area lo 339 size 349 part 349 seed (45, 13) e1 8.06
+    k1: area lo 132 size 322 part 322 seed (20, 14) e1 6.26
+104951Z natural N 2
+    k0: area lo 68 size 427 part 427 seed (16, 11) e1 9.55
+    k1: area lo 341 size 309 part 309 seed (48, 25) e1 5.59
+105039Z natural N 3
+    k0: area lo 461 size 421 part 421 seed (16, 27) e1 7.16
+    k1: area lo 413 size 470* part 172 seed None e1 None
+    k2: area lo 413 size 470* part 298 seed None e1 None
+105144Z natural N 3
+    k0: area lo 248 size 494 part 494 seed (29, 18) e1 7.16
+    k1: area lo 498 size 426 part 426 seed (58, 19) e1 8.49
+    k2: area lo 1893 size 166 part 166 seed (44, 35) e1 6.26
+105236Z natural N 4
+    k0: area lo 645 size 515 part 515 seed (67, 24) e1 7.02
+    k1: area lo 2197 size 362 part 362 seed (18, 38) e1 6.1
+    k2: area lo 354 size 252 part 252 seed (14, 15) e1 6.32
+    k3: area lo 885 size 210 part 210 seed (39, 26) e1 6.08
+105337Z natural N 4
+    k0: area lo 617 size 843* part 403 seed (29, 41) e1 8.0
+    k1: area lo 617 size 843* part 440 seed (23, 27) e1 9.0
+    k2: area lo 307 size 625* part 401 seed (69, 8) e1 4.47
+    k3: area lo 307 size 625* part 224 seed (65, 44) e1 1.0

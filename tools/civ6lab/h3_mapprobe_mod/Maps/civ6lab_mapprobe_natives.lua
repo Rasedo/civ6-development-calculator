@@ -212,6 +212,7 @@ end
 
 PRE["TerrainBuilder.StampContinents"] = function()
 	X[#X + 1] = "stamp|before|" .. rle(perplot(water3))
+	X[#X + 1] = "stamp|terrain|" .. rle(perplot(function(p) return p:GetTerrainType() end))
 end
 POST["TerrainBuilder.StampContinents"] = function()
 	X[#X + 1] = "stamp|after|" .. rle(perplot(function(p) return p:GetContinentType() end))
@@ -342,6 +343,31 @@ POST["StartPositioner.GetMinorCivStartInfo"] = function(_st, res, i)
 	X[#X + 1] = "minfo|" .. tostring(i) .. "|" .. infostr(res[1])
 end
 
+-- GetPlotFertility calls with a major index (the start picker's weighted
+-- fertility), in call order: gpf|<major>|<check>|<index>:<value>,...
+local GPF = { key = nil, items = {} }
+local function gpfFlush()
+	if GPF.key then X[#X + 1] = "gpf|" .. GPF.key .. "|" .. table.concat(GPF.items, ",") end
+	GPF.key, GPF.items = nil, {}
+end
+local gpfBusy = false
+POST["StartPositioner.GetPlotFertility"] = function(_st, res, i, major, check)
+	if gpfBusy or major == nil or major < 0 then return end
+	local key = tostring(major) .. "|" .. tostring(check)
+	if key ~= GPF.key then gpfFlush(); GPF.key = key end
+	-- beside it, the same plot's fertility with no major and with the check off
+	gpfBusy = true
+	local okb, base = pcall(StartPositioner.GetPlotFertility, i, -1)
+	local okf, nochk = pcall(StartPositioner.GetPlotFertility, i, major, false)
+	gpfBusy = false
+	GPF.items[#GPF.items + 1] = tostring(i) .. ":" .. tostring(res[1]) .. ":" .. tostring(okb and base) .. ":" ..
+		tostring(okf and nochk)
+end
+POST["StartPositioner.MarkMajorRegionUsed"] = function(_st, _res, i)
+	gpfFlush()
+	X[#X + 1] = "mark|" .. tostring(i)
+end
+
 local ORIG = { { TerrainBuilder, "GetRandomNumber", raw } }
 
 pcall(function()
@@ -402,6 +428,26 @@ wrap(StartPositioner, "StartPositioner", "GetMajorCivStartPlots", true)
 wrap(StartPositioner, "StartPositioner", "GetMajorCivStartInfo", true)
 wrap(StartPositioner, "StartPositioner", "GetMinorCivStartPlots", true)
 wrap(StartPositioner, "StartPositioner", "GetMinorCivStartInfo", true)
+wrap(StartPositioner, "StartPositioner", "GetPlotFertility", true)
+-- the start picker's choices: pick|major|<region>|<plot index>, pick|minor|<plot>
+if AssignStartingPlots then
+	local sm, sn = AssignStartingPlots.__SetStartMajor, AssignStartingPlots.__SetStartMinor
+	ORIG[#ORIG + 1] = { AssignStartingPlots, "__SetStartMajor", sm }
+	ORIG[#ORIG + 1] = { AssignStartingPlots, "__SetStartMinor", sn }
+	AssignStartingPlots.__SetStartMajor = function(self, plots, i)
+		local p = sm(self, plots, i)
+		gpfFlush()
+		X[#X + 1] = "pick|major|" .. tostring(i) .. "|" .. tostring(p and p:GetIndex())
+		return p
+	end
+	AssignStartingPlots.__SetStartMinor = function(self, plots)
+		local p = sn(self, plots)
+		gpfFlush()
+		X[#X + 1] = "pick|minor||" .. tostring(p and p:GetIndex())
+		return p
+	end
+end
+wrap(StartPositioner, "StartPositioner", "MarkMajorRegionUsed", true)
 wrap(Map, "Map", "GetContinentsInUse")
 wrap(Map, "Map", "FindWater", true)
 
@@ -480,6 +526,7 @@ function GenerateMap()
 	local ok, err = pcall(RealGenerateMap)
 	LOG[#LOG + 1] = ">GenerateMap ok=" .. tostring(ok) .. " " .. tostring(err)
 	for _, o in ipairs(ORIG) do pcall(function() o[1][o[2]] = o[3] end) end
+	gpfFlush()
 	local okt, errt = pcall(finalTables)
 	X[#X + 1] = "final|" .. tostring(okt) .. "|" .. tostring(errt):gsub("[;|]", " ")
 	local oks, errs = pcall(store)

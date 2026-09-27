@@ -22,6 +22,9 @@ anything else is stated as a count.
 | `runs/h3_sort_20260927T062516Z.json` | Duel (live game) | - | table.sort probe: 589 sorts x 2 Lua states, permutations and comparator traces (`h3_sortprobe.py`) |
 | `runs/h3_stampx_20260927T064803Z.json`, `..064858Z`, `..064955Z` | Tiny, Small, Standard | defaults | stamp probe: 46 controlled shapes each (`h3_stampprobe.py`) |
 | `runs/h3_fertkern*.log` | Duel (live game) | - | GetPlotFertility kernel: one plot changed at a time (`h3_fertkern*.lua`) |
+| `runs/h3_stampx_20260927T104508Z.json`, `..104555Z`, `..104647Z` | Tiny, Small, Standard | defaults | stamp probe, `--set multi`: rectangles, separate squares, big square + small island (34-37 shapes each) |
+| `runs/h3_session_20260927T104802Z` .. `..113750Z` (15, list in `runs/h3_natives_all.txt`) | Tiny, Small, Standard seeds 1001..1005, Large 1001 | defaults | natives probe with the stamp's terrain (`stamp|terrain`); regions (`sdiv`, `sinfo`, `minfo`) |
+| `runs/h3_session_20260927T114117Z`, `..114551Z`, `..114633Z` | Duel 1000, Tiny 1001, 1002 | defaults | natives probe + the start picker's fertility calls (`gpf`, `pick`, `mark`) |
 
 The probe `h3_mapprobe_mod/Maps/civ6lab_mapprobe_natives.lua` draws nothing
 (its map is the unprobed map: Continents.lua with the setup defaults and the
@@ -50,7 +53,7 @@ Analysis scripts (all offline, `python tools/civ6lab/<script> <records>`):
 `h3_depthmap.py`, `h3_hksort.py` (table.sort and its scorer),
 `h3_checksort.py` (the generator check with that sort), `h3_stampfit.py`,
 `h3_eastl.py`, `h3_dllstrings.py`, `h3_fertfit.py`, `h3_regions.py`,
-`h3_tieshow.py`; shared readers `h3_x.py`.
+`h3_tieshow.py`, `h3_medial.py`, `h3_regalloc.py`, `h3_regfit.py`, `h3_gpf.py`, `h3_gpf2.py`; shared readers `h3_x.py`.
 
 ---
 
@@ -214,29 +217,74 @@ either end, dumbbells, two separate squares
   7 on Small and Standard), whose first seed is one plot further east than
   that maximum (true geometry, rows sqrt(3)/2 apart, gets those 6 and
   misses the even heights).
-- **The later seeds: OPEN.** A greedy in that order with a spacing rule
-  "hex distance >= depth - k" (candidate, seed, min or max depth; hex or
-  Euclidean depth and distance) reproduces at best 35 of 55 determined
-  seed tuples (`rulescan`, `rulediag`); ratio rules (distance > a * depth)
-  26. The strips fit (spacing = hex depth - 1); the squares do not: sq26
-  (depth 13 at the centre) takes its three other seeds at hex distance 7
-  (depth 9) on three of the four diagonals, sq22 at distance 6, which no
-  single spacing rule with the strips' allows; a strip's head and its short
-  end also take a corner-branch seed (tall_w12_short's fourth seed (40,7)
-  sits 3 from the third). The seed lists of one shape nest across map
-  sizes (sq26: Small's 3 seeds are Standard's first 3; sq22 and sq6 the
-  same on Tiny), so the order is a fixed sequence cut at N; but the spacing
-  is not a fixed distance: the half-length 12-wide strip takes its second
-  seed 4 rows below the first on Tiny (15 rows long: the plateau's two
-  ends, rows 12 and 8) where every longer 12-wide strip takes 5. The seeds
-  look like points of the medial axis ("singular points": its junctions
-  and a walk along its edges); the next step is a probe that isolates the
-  walk (strips of one width and lengths 12..40 on N = 2..4, and shapes with
-  one and two junctions).
-- **Areas**: several land areas share the seeds (two equal squares with
-  N = 4 take two each; a square beside a larger one: the larger takes 3);
-  an island with no seed joins a part across the water (the earlier `exp`
-  records); how seeds are shared among areas is OPEN with the seed rule.
+- **The later seeds within one area: OPEN, 44 of 84 determined tuples.**
+  The best rule found: after the first seed, the land plots in order of
+  (row-unit Euclidean depth desc, plot index desc), a plot kept when its
+  hex distance to every earlier seed is at least its own depth - 1.75
+  (`rulediag --variant e1:c:1.75`; with the first seed forced to the truth
+  and 3+ seeds, 44 of 74, whatever the depth key: `later`). What that
+  greedy reproduces: every chain along a strip (spacing hex depth - 1) and
+  the first two seeds of most rectangles. What it does not: the seeds after
+  a chain reaches the far end of its plateau. There the game takes the far
+  junction itself when it is nearer than the spacing (tall_w12_short on
+  Tiny: rows 12 and 8, 4 apart; rect18x24 on Standard: (42,30) then (41,23),
+  7 apart at depth 9), then corner-branch points (rect18x24: (38,33) and
+  (45,33), NW and NE of the first seed; rect36x18: (30,24) SW of the west
+  junction; rect24x12: (34,28) NW of it; tall_w12_short on Standard: (40,7)
+  SW of the bottom junction, 3 from the third seed), and a square's three
+  later seeds sit on three of its four diagonals. These branch seeds are
+  often NOT the deepest remaining plot (rect24x12's (34,28) has depth 4.61
+  where (34,25) has 5.00), so no depth-ordered greedy fits them. The seeds
+  are "singular points" of the medial axis (the DLL's word) taken in some
+  order along its graph. Tried and rejected: candidates restricted to a
+  discrete skeleton (plots not dominated by a neighbour's disc: 47 at
+  best); one seed at a time into the largest current cell (44); the
+  Voronoi vertices of the coastal ocean plots (Delaunay circumcentres,
+  `h3_medial.py`) sorted by radius (their maxima are plateaus, not the
+  seeds); EASTL-sorted candidate lists (`h3_eastl.py`: 4); linear spacing
+  rules a*dep(c) + b*dep(s) + k over hex, land-path and Euclidean
+  distances (`linscan`: 45 at best).
+- **The first seed's misses** (odd-height wide strips) stay open: row-unit
+  Euclidean depth puts their first seed one plot west of the game's, and
+  sqrt(3)/2 rows fixes them and breaks the even heights.
+- **How the N continents are shared among land areas: exact on every
+  splittable stamp** (`alloc`, 334 of 348 stamps; the 14 misses are depth-1
+  shapes (a one-plot line, a single plot, 2-wide strips) that hold one
+  seed whatever their allowance). The areas are the passable-land areas
+  (`AreaBuilder`; mountains split them). Let L = the passable land plots,
+  T = L / (2.75 N):
+  1. the areas of at least T plots, by size descending (a tie: the lower
+     first plot), the first N of them taking one continent each;
+  2. each further continent goes to the qualifying area of largest
+     size / continents so far (a tie: the earlier in that order), until N.
+  The divisor 2.75 is fitted: every stamp holds for 2.64 <= k < 2.875
+  (Tiny sq_10_20 keeps a 100-plot square out of 500 at N = 2: k >= 2.5;
+  Small 113306Z gives a 136-plot island its own continent: k >= 2.64;
+  Large 113750Z denies a 133-plot one: k < 2.875). No area below T takes a
+  continent while one above does; five 49-plot blobs all qualify.
+- **Numbering across areas: exact but one** (`alloc`, 347 of 348): the
+  continents are grouped by area; the groups in order of the area's size
+  / its continent count, descending (a tie: area order); inside a group
+  the area's own seed order. So two equal areas with N = 3: the unsplit
+  one is k0 (810 / 1 > 810 / 2); a 400 square with 3 continents beside a
+  196 one at N = 4: the 196 is k0 (196 > 133). The one miss is Standard
+  021047Z, 818 / 2 = 409 against 410, from the old record whose areas are
+  read off the final map's mountains (the new records carry the stamp's
+  own terrain, `stamp|terrain`).
+- **Seedless areas (islands, and areas beyond the first N): 121 of 125**
+  (`islands --pairrule`): an area without a continent joins the part of
+  the nearest plot of the areas that hold continents, hex distance over
+  water with x wrapping; a tie goes to the pair with the lower island plot
+  index, then the lower target index (exact on all 41 controlled cases;
+  the 4 misses are small islands on natural maps). Joining one island at a
+  time with the joined islands as targets is worse (115).
+- New evidence: the multi-shape stamps (`h3_stampprobe.py --set multi`:
+  rectangles 12..36 x 12..24, two and three separate squares of chosen
+  sides, a 20-square beside a small square of side 4..14;
+  `runs/h3_stampx_20260927T104508Z` Tiny, `..104555Z` Small, `..104647Z`
+  Standard) and 15 new natural maps with
+  the stamp's terrain (`runs/h3_session_20260927T1048..1137*`, Tiny, Small,
+  Standard and Large seeds 1001..1005).
 
 ## TerrainBuilder.GetInlandCorner(plot)
 
@@ -454,7 +502,7 @@ excluded); IsImpassable = mountain or an Impassable feature.
   a one-plot lake after `AreaBuilder.Recalculate`; `runs/h3_fertkern*.log`)
   and the rule then scores **11,364 of 11,364** plots of the four natives
   maps (Duel defaults, Tiny, Small, Standard; `fert` records).
-- GetPlotFertility(i, major, true) (`fertw`) is OPEN.
+- GetPlotFertility(i, major, bCheckOthers): see the region notes below.
 - GetMajorCivStartInfo(i) answers {ContinentType, LandmassID, Fertility,
   TotalPlots, WestEdge, EastEdge, NorthEdge, SouthEdge} for region i
   (`sinfo` / `minfo` records; LandmassID uses the id form
@@ -471,10 +519,46 @@ excluded); IsImpassable = mountain or an Impassable feature.
   pairs: Tiny 16 and 18, Standard 15 and 27). Minor regions (`minfo`)
   share the rectangles but carry another fertility (778 against 1105 for
   the same rectangle).
-- **OPEN**: how many regions each landmass takes, three- and more-way cuts
-  (Small's 196610 into x 0..60, 61..65, 66..73), the minor fertility,
-  `GetNumMajorCivStarts` (6 for 4 majors on Tiny, 3 for 2 on Duel), and the
-  order of the plot lists.
+- **Region numbering: exact.** The major regions are numbered by their
+  `Fertility`, descending, across landmasses (all 19 natives sessions:
+  e.g. Standard 021047Z 1561, 1269, 1171, 1145, 1061, 1031, 963, 879).
+- **`GetNumMajorCivStarts` = n + the landmasses of fertility >= 150 (the
+  second argument) that take no major region** (17 of 19: Duel 2 + the
+  425 island = 3, Tiny 4 + 396 and 328 = 6, Small 6 + 493 = 7, 6 + 642,
+  6 + 791, Standard 8 + 774 = 9; landmasses of 131, 127, 82, 75 add
+  nothing). The two misses (Standard 113357Z and Large 113750Z, one more
+  than counted) are maps whose landmasses the final map joins but the last
+  `AreaBuilder` pass did not (113357Z: the DLL's landmass 458758 holds 3620
+  fertility in its regions where the final map's component holds 4276), so
+  the count is exact on the DLL's own landmasses.
+- **Regions per landmass: 18 of 19** (`h3_regfit.py`): Sainte-Laguë
+  (the next region to the landmass of largest F / (2c + 1), c its regions
+  so far), over the landmasses whose fertility is at least 0.75 of the
+  average F_total / n, F = the DLL's landmass fertility (the sum of its
+  regions' `Fertility`; the final map's plot sum misplaces 113357Z). The
+  miss: Standard 113556Z, 3222 / 3191 / 1494 with 8 regions: the game gives
+  4 / 3 / 1, Sainte-Laguë 3 / 3 / 2. Every divisor d(c) = c + δ fails one
+  of 113556Z (needs δ > 0.62) and 021047Z (needs δ < 0.74) while holding
+  the other 17; D'Hondt 16, largest remainder 17; recursive halving of the
+  most fertile region fits 113556Z and not Small's 3 + 3. The data,
+  landmass fertility and the region counts per session, are printed by
+  `h3_regfit.py` over `runs/h3_natives_all.txt`.
+- **OPEN**: the eligibility threshold's exact form (0.75 of the average
+  lies between 791 of 1156 excluded and 1145 of 1134 included),
+  three-way and larger cuts (the build finds them not rectangle cuts),
+  the minor regions' fertility, and the order of the plot lists.
+- **GetPlotFertility(i, region, bCheckOthers) during the start picker**
+  (the natives probe now logs every such call with the same plot's
+  GetPlotFertility(i, -1) and (i, region, false) beside it, `gpf` records,
+  and each pick, `pick` records; `h3_gpf2.py`): 1,700 calls on Duel and
+  two Tiny maps: the checked value is never above the base, 0 on 837 calls
+  (every plot of the first region the Tiny 1001 picker scores, all plots
+  within 8 of an earlier pick, and many others), base - 1 on 777, base - 2
+  or - 3 on the rest; the unchecked (i, region, false) equals the base on
+  only 1,210 of the 1,700. The rule is OPEN; measured outside the picker
+  (after `DivideMapIntoMajorRegions` again, `civ6lab_mapprobe_fert.lua`)
+  both the checked and the unchecked value read 0 everywhere, so the
+  function reads picker state beyond the regions.
 
 ## ResetTerrain, SetNaturalCliff (B-94)
 

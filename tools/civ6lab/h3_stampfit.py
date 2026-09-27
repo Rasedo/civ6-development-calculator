@@ -27,6 +27,46 @@ EXP = ["h3_session_20260927T021509Z.jsonl", "h3_session_20260927T023441Z.jsonl",
        "h3_session_20260927T023549Z.jsonl", "h3_session_20260927T024959Z.jsonl"]
 
 
+def stamp_state(s: Session, limit: int = 1_500_000) -> int:
+    """the stream state at StampContinents without a ledger: the run of Lua
+    draws logged just before it (no drawing native in between) located by
+    its values among the first `limit` draws from the map seed"""
+    import numpy as np
+    k = next(i for i, e in enumerate(s.log) if e.startswith("<TerrainBuilder.StampContinents"))
+    run = []
+    j = k - 1
+    while j >= 0:
+        e = s.log[j]
+        if e[0] in "<>P":
+            if e.startswith((">AreaBuilder", "<AreaBuilder", ">TerrainBuilder.AnalyzeChokepoints",
+                             "<TerrainBuilder.AnalyzeChokepoints")) and not run:
+                j -= 1
+                continue
+            break
+        r, v, _ = e.split(":")
+        run.append((int(float(r)), int(float(v))))
+        j -= 1
+        if len(run) >= 12:
+            break
+    run.reverse()
+    st = np.empty(limit + 1, dtype=np.uint64)
+    x = s.rec["map_seed"] & M32
+    A_, C_ = 1103515245, 12345
+    st[0] = x
+    for n in range(1, limit + 1):
+        x = (A_ * x + C_) & M32
+        st[n] = x
+    hi = (st >> np.uint64(16)).astype(np.int64)
+    ok = np.ones(limit + 1 - len(run), dtype=bool)
+    for m, (r, v) in enumerate(run):
+        vals = (hi[1 + m: limit + 1 - len(run) + 1 + m] * (r & 0xFFFF)) >> 16
+        ok &= vals == v
+    hits = np.nonzero(ok)[0]
+    if len(hits) != 1:
+        raise ValueError(f"stamp state: {len(hits)} matches for the run {run}")
+    return int(st[int(hits[0]) + len(run)])
+
+
 def load_cases(paths: list[str]) -> list[dict]:
     """every stamp: grid, land mask at the stamp (0 land / 1 water), the
     continent per plot, and part[i] = k (shuffled[k]) or -1"""
@@ -97,12 +137,15 @@ def load_cases(paths: list[str]) -> list[dict]:
             g = s.g
             n = NCONT[g.w]
             cont = unrle(after[2])
-            st = s.state_before("TerrainBuilder.StampContinents")
+            st = s.state_before("TerrainBuilder.StampContinents") if s.ledger else stamp_state(s)
             a = shuffles(st)["fy_forward"]
             bv = unrle(before[2])
-            # mountains as the final map has them (later stages move a few)
+            # mountains as the stamp saw them (the probe's stamp|terrain), or
+            # as the final map has them
+            st_ter = s.x1("stamp", "terrain")
+            ter = unrle(st_ter[2]) if st_ter else s.terrain
             cls = [None if v == 1 else "K" if v == 2 else
-                   ("M" if s.terrain[i] < 15 and s.terrain[i] % 3 == 2 else "L") for i, v in enumerate(bv)]
+                   ("M" if ter[i] < 15 and ter[i] % 3 == 2 else "L") for i, v in enumerate(bv)]
             out.append({"src": pathlib.Path(p).stem[-7:], "name": "natural", "g": g, "n": n,
                         "land": [v != 1 for v in bv], "cont": cont, "cls": cls,
                         "part": [a.index(c) if c != -1 else -1 for c in cont], "off": "ledger"})
@@ -427,7 +470,7 @@ def main() -> int:
         print(__doc__)
         return 1
     cmd = sys.argv[1]
-    valued = ("--map", "--variant", "--parts", "--metric")
+    valued = ("--map", "--variant", "--parts", "--metric", "--rowh", "--divs", "--okey", "--skel", "--pts")
     args, skip = [], False
     for a in sys.argv[2:]:
         if skip:
@@ -822,6 +865,417 @@ def main() -> int:
         res.sort(key=lambda r: -r[0])
         for s, n, b in res[:15]:
             print(s, n, b[:12])
+    elif cmd == "medial":
+        # the seeds against the Voronoi vertices of the coastal ocean plots
+        # (h3_medial): each true seed's best vertex radius, and greedy runs
+        # over the vertices sorted by radius
+        import math
+        from h3_medial import voronoi_vertices, S3
+        rowh = float(sys.argv[sys.argv.index("--rowh") + 1]) if "--rowh" in sys.argv else S3
+        data = []
+        for c in cases:
+            if want and c["name"] != want:
+                continue
+            sets = seed_sets_cached(c)
+            if not (sets and len(sets) <= 3 and len({t[0] for t in sets}) == 1):
+                continue
+            V = voronoi_vertices(c, rowh)
+            data.append((c, sets, V))
+            if "--show" in sys.argv:
+                g = c["g"]
+                vr = collections.defaultdict(list)
+                for ux, uy, r, p, _t in V:
+                    vr[p].append(r)
+                top = sorted(V, key=lambda v: -v[2])[:8]
+                print(c["src"], c["name"], "top vertices", [(round(v[0], 2), round(v[1] / rowh, 2), round(v[2], 3), (v[3] % g.w, v[3] // g.w)) for v in top])
+                for s in sets[0]:
+                    print("    seed", (s % g.w, s // g.w), "vertex radii", sorted({round(r, 3) for r in vr.get(s, [])}, reverse=True)[:4])
+        res = []
+        for rule in ("own", "seed", "min", "ratio_own", "ratio_seed"):
+            grid = [x / 20 for x in range(0, 61)] if not rule.startswith("ratio") else [0.5 + x / 100 for x in range(0, 51)]
+            for k in grid:
+                score = 0
+                bad = []
+                for c, sets, V in data:
+                    Vs = sorted(V, key=lambda v: (-round(v[2], 6), -v[3]))
+                    seeds, cen = [], []
+                    for ux, uy, r, p, _t in Vs:
+                        good = True
+                        for (sx, sy, sr) in cen:
+                            d = math.hypot(ux - sx, uy - sy)
+                            lim = {"own": r - k, "seed": sr - k, "min": min(r, sr) - k,
+                                   "ratio_own": k * r, "ratio_seed": k * sr}[rule]
+                            if d < lim - 1e-9 or p in seeds:
+                                good = False
+                                break
+                        if good:
+                            seeds.append(p)
+                            cen.append((ux, uy, r))
+                            if len(seeds) == c["n"]:
+                                break
+                    if tuple(seeds) in sets:
+                        score += 1
+                    else:
+                        bad.append(c["name"])
+                res.append((score, f"{rule} {k:.2f}", sorted(set(bad))))
+        res.sort(key=lambda r: -r[0])
+        print(len(data), "cases")
+        for s, n, b in res[:12]:
+            print(s, n, b[:14])
+    elif cmd == "areaseeds":
+        # per land area: size, deepest plot (row-unit Euclidean depth, index
+        # desc), the parts it holds; for an area holding several parts, the
+        # seed tuples of those parts inside the area alone
+        for c in cases:
+            if want and c["name"] != want:
+                continue
+            g = c["g"]
+            e1 = edepth1(c)
+            print(c["src"], c["name"], "N", c["n"])
+            for a in areas(c):
+                if a["kind"] != "L" or len(a["plots"]) < 12:
+                    continue
+                best = max(a["plots"], key=lambda i: (round(e1[i], 5), i))
+                ks = collections.Counter(c["part"][i] for i in a["plots"])
+                print(f"   area lo {a['plots'][0]} size {len(a['plots'])} deepest ({best % g.w},{best // g.w}) "
+                      f"e1 {e1[best]:.2f} parts {dict(ks)}")
+                if len(ks) > 1:
+                    sub = dict(c)
+                    keep = set(a["plots"])
+                    if "--landmass" in sys.argv:
+                        fr, keep = list(keep), set(keep)
+                        while fr:
+                            u = fr.pop()
+                            for v in g.ring1(u):
+                                if v is not None and c["land"][v] and v not in keep:
+                                    keep.add(v)
+                                    fr.append(v)
+                        keep = {i for i in keep if c["part"][i] in ks}
+                    sub["land"] = [i in keep for i in range(g.n)]
+                    sub["part"] = [c["part"][i] if i in keep else -1 for i in range(g.n)]
+                    sub["name"] = c["name"] + f"@{a['plots'][0]}" + ("L" if "--landmass" in sys.argv else "")
+                    sets = seed_sets(sub, metric="hex") if "--hex" in sys.argv else seed_sets_cached(sub)
+                    for t in (sets or [])[:4]:
+                        print("      seeds", [((s % g.w, s // g.w), round(e1[s], 2)) for s in t])
+                    print("      tuples", None if sets is None else len(sets))
+    elif cmd == "bestpair":
+        # the seed pair (a in part ka, b in part kb) with the fewest plots of
+        # the two parts on the wrong side (land-path distance, tie to ka)
+        import numpy as np
+        ka, kb = (int(x) for x in sys.argv[sys.argv.index("--parts") + 1].split(","))
+        for c in cases:
+            if c["name"] != want:
+                continue
+            g = c["g"]
+            D = geodist(c) if "--hex" not in sys.argv else hexdist(g).astype(np.int32)
+            A = [i for i in range(g.n) if c["part"][i] == ka]
+            B = [i for i in range(g.n) if c["part"][i] == kb]
+            U = np.array(A + B)
+            lab = np.array([0] * len(A) + [1] * len(B))
+            best = []
+            for a in A:
+                da = D[a, U][None, :]
+                db = D[np.ix_(B, U)]
+                wrong = np.where(lab == 0, da > db, db >= da).sum(axis=1)
+                j = int(wrong.argmin())
+                best.append((int(wrong[j]), a, B[j]))
+            best.sort()
+            for w_, a, b in best[:6]:
+                da = D[a, U]
+                db = D[b, U]
+                bad = [int(U[q]) for q in range(len(U)) if (lab[q] == 0 and da[q] > db[q]) or (lab[q] == 1 and db[q] >= da[q])]
+                print(f"  wrong {w_}: a ({a % g.w},{a // g.w}) b ({b % g.w},{b // g.w}) bad {[(q % g.w, q // g.w, c['part'][q]) for q in bad[:12]]}")
+    elif cmd == "islands2":
+        # islands joined one at a time: the unassigned area nearest (hex) to
+        # any assigned plot joins that plot's part (ties: lower island plot,
+        # then lower target plot); assigned = the main areas, then growing
+        import numpy as np
+        tot = ok = 0
+        for c in cases:
+            g = c["g"]
+            D = hexdist(g)
+            ars = [a for a in areas(c) if a["kind"] in ("L", "M", "K")]
+            main = {}
+            for n_, a in enumerate(ars):
+                for k in {c["part"][i] for i in a["plots"]}:
+                    if k not in main or len(a["plots"]) > len(ars[main[k]]["plots"]):
+                        main[k] = n_
+            mains = set(main.values())
+            assigned = [i for n_ in mains for i in ars[n_]["plots"]]
+            part_of = {i: c["part"][i] for i in assigned}
+            rest = [n_ for n_ in range(len(ars)) if n_ not in mains and ars[n_]["kind"] == "L"]
+            while rest:
+                A_ = np.array(assigned)
+                best = None
+                for n_ in rest:
+                    P_ = np.array(ars[n_]["plots"])
+                    d = D[np.ix_(P_, A_)]
+                    m = int(d.min())
+                    cand = min((int(P_[a_]), int(A_[b_])) for a_, b_ in zip(*np.nonzero(d == m)))
+                    key = (m, cand)
+                    if best is None or key < best[0]:
+                        best = (key, n_)
+                (m, (pi, ti)), n_ = best
+                k_true = collections.Counter(c["part"][i] for i in ars[n_]["plots"]).most_common(1)[0][0]
+                got = part_of[ti]
+                tot += 1
+                ok += got == k_true
+                if got != k_true:
+                    print(f"{c['src']} {c['name']:22s} island lo {ars[n_]['plots'][0]} size {len(ars[n_]['plots'])} "
+                          f"true {k_true} got {got} at {m}")
+                for i in ars[n_]["plots"]:
+                    part_of[i] = k_true
+                assigned += ars[n_]["plots"]
+                rest.remove(n_)
+        print("islands", ok, "/", tot)
+    elif cmd == "islands":
+        # areas that share their part with a larger area (joined across
+        # water): does the nearest plot of another (joined-to) area, by hex
+        # distance, carry the island's part?
+        import numpy as np
+        tot = ok = 0
+        for c in cases:
+            g = c["g"]
+            D = hexdist(g)
+            ars = [a for a in areas(c) if a["kind"] in ("L", "M", "K")]
+            owner = {}
+            for n, a in enumerate(ars):
+                for i in a["plots"]:
+                    owner[i] = n
+            # the main area of each part: the largest area holding it
+            main = {}
+            for n, a in enumerate(ars):
+                for k in {c["part"][i] for i in a["plots"]}:
+                    if k not in main or len(a["plots"]) > len(ars[main[k]]["plots"]):
+                        main[k] = n
+            mains = set(main.values())
+            for n, a in enumerate(ars):
+                if n in mains or a["kind"] != "L":
+                    continue
+                ks = {c["part"][i] for i in a["plots"]}
+                if len(ks) != 1:
+                    continue
+                k = ks.pop()
+                others = [i for i in range(g.n) if c["land"][i] and owner.get(i) in mains]
+                P_ = np.array(a["plots"])
+                O = np.array(others)
+                d = D[np.ix_(P_, O)]
+                m = d.min()
+                near = sorted({c["part"][int(O[j])] for j in np.nonzero((d == m).any(axis=0))[0]})
+                if len(near) > 1:
+                    # Euclidean tie-breaks between the tied pairs
+                    pairs = [(int(P_[a_]), int(O[b_])) for a_, b_ in zip(*np.nonzero(d == m))]
+                    import math
+
+                    def eu(p, q, rowh):
+                        px, py = p % g.w + 0.5 * ((p // g.w) & 1), (p // g.w) * rowh
+                        qx, qy = q % g.w + 0.5 * ((q // g.w) & 1), (q // g.w) * rowh
+                        dx = abs(px - qx)
+                        dx = min(dx, g.w - dx)
+                        return math.hypot(dx, py - qy)
+                    for rowh in (1.0, 3 ** 0.5 / 2):
+                        e = min(eu(p, q, rowh) for p, q in pairs)
+                        print("      tie", rowh, sorted({c["part"][q] for p, q in pairs if abs(eu(p, q, rowh) - e) < 1e-9}),
+                              [((p % g.w, p // g.w), (q % g.w, q // g.w), c["part"][q]) for p, q in pairs][:6])
+                if "--pairrule" in sys.argv:
+                    cand = [(int(P_[a_]), int(O[b_])) for a_, b_ in zip(*np.nonzero(d == m))]
+                    near = [c["part"][min(cand)[1]]]
+                if "--first" in sys.argv:
+                    d0 = D[P_[0], O]
+                    j = min(range(len(O)), key=lambda j_: (int(d0[j_]), int(O[j_])))
+                    near = [c["part"][int(O[j])]]
+                tot += 1
+                good = near == [k]
+                ok += good
+                if not good or "--all" in sys.argv:
+                    print(f"{c['src']} {c['name']:24s} island lo {a['plots'][0]} size {len(a['plots'])} part {k} "
+                          f"nearest main-area parts {near} at {int(m)}")
+        print("islands", ok, "/", tot)
+    elif cmd == "order":
+        # multi-area stamps: per part k (in number order) its main area, the
+        # area's size, and its seed (the determined seed of a split area's
+        # part, else the area's deepest plot by row-unit Euclidean depth)
+        for c in cases:
+            g = c["g"]
+            ars = [a for a in areas(c) if a["kind"] == "L"]
+            holders = [a for a in ars if len(a["plots"]) >= 12]
+            if len(holders) < 2:
+                continue
+            e1 = edepth1(c)
+            rows = []
+            for k in range(c["n"]):
+                owners = [a for a in ars if any(c["part"][i] == k for i in a["plots"])]
+                if not owners:
+                    continue
+                main = max(owners, key=lambda a: sum(1 for i in a["plots"] if c["part"][i] == k))
+                pl = [i for i in main["plots"] if c["part"][i] == k]
+                split = len({c["part"][i] for i in main["plots"]}) > 1
+                if split:
+                    sub = dict(c)
+                    keep = set(main["plots"])
+                    sub["land"] = [i in keep for i in range(g.n)]
+                    sub["part"] = [c["part"][i] if i in keep else -1 for i in range(g.n)]
+                    sub["name"] = c["name"] + f"@{main['plots'][0]}"
+                    sets = seed_sets_cached(sub)
+                    ks_ = sorted({c["part"][i] for i in main["plots"]})
+                    seed = sets[0][ks_.index(k)] if sets else None
+                else:
+                    seed = max(pl, key=lambda i: (round(e1[i], 5), i))
+                rows.append(f"k{k}: area lo {main['plots'][0]} size {len(main['plots'])}{'*' if split else ''} "
+                            f"part {len(pl)} seed {None if seed is None else (seed % g.w, seed // g.w)} "
+                            f"e1 {None if seed is None else round(e1[seed], 2)}")
+            print(c["src"], c["name"], "N", c["n"])
+            for r_ in rows:
+                print("    " + r_)
+    elif cmd == "alloc":
+        # continents per land area (the truth) against the allocation model:
+        # areas of size >= T (T = plots // div; none -> every area) sorted by
+        # size, the first N take one each, then the area of largest
+        # size / count takes the next; and the numbering: groups (an
+        # area's parts) sorted by their largest part, desc
+        divs = [float(x) for x in (sys.argv[sys.argv.index("--divs") + 1].split(",") if "--divs" in sys.argv else ["28"])]
+        for div in divs:
+            ok_alloc = ok_order = n = 0
+            for c in cases:
+                g = c["g"]
+                ars = [a for a in areas(c) if a["kind"] == "L"]
+                truth = {}
+                for a in ars:
+                    ks = collections.Counter(c["part"][i] for i in a["plots"])
+                    truth[a["plots"][0]] = ks
+                T = sum(len(a["plots"]) for a in ars) / (div * c["n"])
+                order = sorted(ars, key=lambda a: -len(a["plots"]))
+                q = [a for a in order if len(a["plots"]) >= T] or order
+                q = q[:c["n"]]
+                cnt = {a["plots"][0]: 1 for a in q}
+                while sum(cnt.values()) < c["n"]:
+                    best = max(q, key=lambda a: len(a["plots"]) / cnt[a["plots"][0]])
+                    cnt[best["plots"][0]] += 1
+                # true counts: parts whose plots are mostly in the area and that area is their largest holder
+                tcnt = collections.Counter()
+                for k in set(c["part"]) - {-1}:
+                    holder = max(ars, key=lambda a: truth[a["plots"][0]].get(k, 0))
+                    tcnt[holder["plots"][0]] += 1
+                good_a = dict(tcnt) == cnt
+                ok_alloc += good_a
+                # order: groups by the largest true part
+                groups = collections.defaultdict(list)
+                for k in sorted(set(c["part"]) - {-1}):
+                    holder = max(ars, key=lambda a: truth[a["plots"][0]].get(k, 0))
+                    groups[holder["plots"][0]].append(k)
+                area_rank = {a["plots"][0]: r for r, a in enumerate(order)}
+                psize = collections.Counter(p for p in c["part"] if p >= 0)
+                gl = sorted(groups.items(), key=lambda kv: (-sum(truth[kv[0]].values()) / len(kv[1]), area_rank[kv[0]]))
+                seq = [k for _, ks in gl for k in ks]
+                good_o = seq == sorted(seq) and all(ks == sorted(ks) for _, ks in gl)
+                ok_order += good_o
+                n += 1
+                if (not good_a or not good_o) and "--quiet" not in sys.argv:
+                    print(f"{c['src']} {c['name']:24s} N{c['n']} T{T:.0f} alloc {'ok' if good_a else 'BAD'} "
+                          f"order {'ok' if good_o else 'BAD'} true {dict(tcnt)} model {cnt} "
+                          f"sizes {[len(a['plots']) for a in order[:6]]} groups {[(a_, ks) for a_, ks in gl]}")
+            print(f"div {div}: alloc {ok_alloc}/{n} order {ok_order}/{n}")
+    elif cmd == "linscan":
+        # greedy in (e1 desc, index desc) order; a candidate c is kept when
+        # dist(c, s) >= a*dep(c) + b*dep(s) + k for every earlier seed s
+        import itertools
+        import numpy as np
+        data = []
+        for c in cases:
+            sets = seed_sets_cached(c)
+            if not (sets and len(sets) <= 3 and len({t[0] for t in sets}) == 1):
+                continue
+            g = c["g"]
+            e1 = edepth1(c)
+            land = sorted((i for i in range(g.n) if c["land"][i]), key=lambda i: (-round(e1[i], 5), -i))
+            idx = np.arange(g.n)
+            cx = idx % g.w + 0.5 * ((idx // g.w) & 1)
+            cy = (idx // g.w).astype(float)
+            data.append((c, sets, land, {"e1": e1, "hd": depth(c), "eT": edepth(c)},
+                         {"hex": hexdist(g), "geo": geodist(c)}, cx, cy))
+        print(len(data), "cases")
+        res = []
+        for dk in ("e1", "hd"):
+            for dist in ("hex", "geo", "e1"):
+                for a, b in ((1, 0), (0, 1), (0.5, 0.5), (1, -0.25), (0.75, 0), (0.75, 0.25), (1, 0.25), (0.5, 0)):
+                    for k in np.arange(-3.0, 1.01, 0.25):
+                        score = 0
+                        for c, sets, land, deps, dists, cx, cy in data:
+                            g = c["g"]
+                            dp = deps[dk]
+                            seeds = []
+                            for i in land:
+                                good = True
+                                for s in seeds:
+                                    if dist == "e1":
+                                        dx = abs(cx[i] - cx[s])
+                                        dx = min(dx, g.w - dx)
+                                        d = float(np.hypot(dx, cy[i] - cy[s]))
+                                    else:
+                                        d = float(dists[dist][i, s])
+                                    if d < a * dp[i] + b * dp[s] + k - 1e-9:
+                                        good = False
+                                        break
+                                if good:
+                                    seeds.append(i)
+                                    if len(seeds) == c["n"]:
+                                        break
+                            score += tuple(seeds) in sets
+                        res.append((score, f"{dk} {dist} a {a} b {b} k {k:.2f}"))
+        res.sort(reverse=True)
+        for s_, n_ in res[:15]:
+            print(s_, n_)
+    elif cmd == "pts":
+        # depths of named plots of one case: --pts x,y;x,y
+        pts = [tuple(int(v) for v in p.split(",")) for p in sys.argv[sys.argv.index("--pts") + 1].split(";")]
+        for c in cases:
+            if c["name"] != want:
+                continue
+            g = c["g"]
+            e1, eT, hd = edepth1(c), edepth(c), depth(c)
+            for x, y in pts:
+                i = y * g.w + x
+                print(f"  {c['src']} ({x},{y}) idx {i} hd {hd[i]} e1 {e1[i]:.6f} eT {eT[i]:.6f}")
+    elif cmd == "later":
+        # the seeds after the first: the first taken from the truth, then
+        # greedy over an ordering key with the spacing hex >= dep(c) - k;
+        # counts cases whose whole tuple matches, per key and k
+        import numpy as np
+        data = []
+        for c in cases:
+            sets = seed_sets_cached(c)
+            if not (sets and len(sets) <= 3 and len({t[0] for t in sets}) == 1) or c["n"] < 3:
+                continue
+            g = c["g"]
+            land = [i for i in range(g.n) if c["land"][i]]
+            data.append((c, sets, land, depth(c), edepth1(c), edepth(c), hexdist(g)))
+        print(len(data), "cases with 3+ seeds")
+        keys = {
+            "e1,-i": lambda hd, e1, eT, i: (-round(e1[i], 5), -i),
+            "eT,-i": lambda hd, e1, eT, i: (-round(eT[i], 5), -i),
+            "hd,eT,-i": lambda hd, e1, eT, i: (-hd[i], -round(eT[i], 5), -i),
+            "hd,e1,-i": lambda hd, e1, eT, i: (-hd[i], -round(e1[i], 5), -i),
+            "hd,-i": lambda hd, e1, eT, i: (-hd[i], -i),
+            "hd,i": lambda hd, e1, eT, i: (-hd[i], i),
+            "eT,i": lambda hd, e1, eT, i: (-round(eT[i], 5), i),
+        }
+        for kn, kf in keys.items():
+            for dk in ("hd", "e1", "eT"):
+                for k in (0, 0.5, 1, 1.25, 1.5, 1.75, 2):
+                    ok = 0
+                    for c, sets, land, hd, e1, eT, D in data:
+                        dp = {"hd": hd, "e1": e1, "eT": eT}[dk]
+                        order = sorted(land, key=lambda i: kf(hd, e1, eT, i))
+                        seeds = [sets[0][0]]
+                        for i in order:
+                            if i in seeds:
+                                continue
+                            if all(D[i, s] >= dp[i] - k - 1e-9 for s in seeds):
+                                seeds.append(i)
+                                if len(seeds) == c["n"]:
+                                    break
+                        ok += tuple(seeds) in sets
+                    print(f"{ok:3d}/{len(data)} key {kn:9s} spacing dep {dk} k {k}")
     elif cmd == "rulediag":
         # one greedy rule on every determined case: predicted seeds vs the
         # determined tuple(s)
@@ -836,19 +1290,82 @@ def main() -> int:
             e1 = edepth1(c)
             dp = {"e1": e1, "hd": depth(c), "eT": edepth(c)}[dk]
             D = hexdist(g)
-            land = sorted((i for i in range(g.n) if c["land"][i]), key=lambda i: (-round(e1[i], 5), -i))
+            ok_ = sys.argv[sys.argv.index("--okey") + 1] if "--okey" in sys.argv else "e1"
+            ov = {"e1": e1, "eT": edepth(c), "hd": depth(c)}[ok_]
+            if "--eastl" in sys.argv:
+                from h3_eastl import eastl_sort
+                land = [i for i in range(g.n) if c["land"][i]]
+                if "--rev" in sys.argv:
+                    land.reverse()
+                eastl_sort(land, lambda a, b: ov[a] > ov[b])
+            else:
+                land = sorted((i for i in range(g.n) if c["land"][i]),
+                              key=lambda i: (-round(ov[i], 5), i if "--asc" in sys.argv else -i))
+            if "--skel" in sys.argv:
+                tol = float(sys.argv[sys.argv.index("--skel") + 1])
+                cx_ = lambda i: (i % g.w + 0.5 * ((i // g.w) & 1), float(i // g.w))
+                sk = set()
+                for i in land:
+                    xi, yi = cx_(i)
+                    dom = False
+                    for q in g.ring1(i):
+                        if q is None or not c["land"][q]:
+                            continue
+                        xq, yq = cx_(q)
+                        dx = abs(xi - xq)
+                        dx = min(dx, g.w - dx)
+                        if e1[q] >= e1[i] + ((dx * dx + (yi - yq) ** 2) ** 0.5) - tol:
+                            dom = True
+                            break
+                    if not dom:
+                        sk.add(i)
+                land = [i for i in land if i in sk]
             seeds = []
-            for i in land:
-                if all(D[i, s] >= {"s": dp[s], "c": dp[i], "min": min(dp[s], dp[i])}[gname] - k - 1e-9 for s in seeds):
-                    seeds.append(i)
-                    if len(seeds) == c["n"]:
+            passes = lambda i: all(D[i, s] >= {"s": dp[s], "c": dp[i], "min": min(dp[s], dp[i])}[gname] - k - 1e-9
+                                   for s in seeds)
+            if "--cells" in sys.argv:
+                # one seed at a time into the largest current cell
+                import numpy as np
+                G = geodist(c)
+                rank = {i: r for r, i in enumerate(land)}
+                seeds.append(land[0])
+                while len(seeds) < c["n"]:
+                    sub_ = G[seeds]
+                    lab_ = np.argmin(sub_, axis=0)
+                    cells = collections.defaultdict(list)
+                    for i in land:
+                        cells[int(lab_[i])].append(i)
+                    order_ = sorted(cells, key=lambda s_: (-len(cells[s_]), s_))
+                    added = False
+                    for s_ in order_:
+                        cand = sorted(cells[s_], key=lambda i: rank[i])
+                        for i in cand:
+                            if i not in seeds and passes(i):
+                                seeds.append(i)
+                                added = True
+                                break
+                        if added or "--anycell" not in sys.argv:
+                            break
+                    if not added:
                         break
+            else:
+                for i in land:
+                    if passes(i):
+                        seeds.append(i)
+                        if len(seeds) == c["n"]:
+                            break
             ok = tuple(seeds) in sets
+            setok = any(sorted(seeds) == sorted(t) for t in sets)
             n_ok += ok
+            n_set = locals().get("n_set", 0) + setok
+            eT = edepth(c)
             f = lambda t: " ".join(f"({s % g.w},{s // g.w})" for s in t)
             if not ok:
-                print(f"{c['src']} {c['name']:22s} pred {f(seeds)}  true {' | '.join(f(t) for t in sets)}")
-        print("ok", n_ok)
+                print(f"{c['src']} {c['name']:22s} {'SET ' if setok else ''}pred {f(seeds)}  true {' | '.join(f(t) for t in sets)}")
+                if "--detail" in sys.argv:
+                    for s in sets[0]:
+                        print(f"      ({s % g.w},{s // g.w}) idx {s} e1 {e1[s]:.4f} eT {eT[s]:.4f} hd {depth(c)[s]}")
+        print("ok", n_ok, "sets", n_set)
     elif cmd == "top":
         # the deepest plots of one case under hex depth and both Euclidean depths
         for c in cases:

@@ -81,7 +81,35 @@ def shapes_basic(w: int, h: int) -> list[tuple[str, object]]:
     return out
 
 
-SETS = {"basic": shapes_basic}
+def shapes_multi(w: int, h: int) -> list[tuple[str, object]]:
+    """rectangles of several aspects; two and three separate squares of
+    chosen sides (west to east); a 20-square beside a small square of side
+    s: which land takes how many continents, and in which order"""
+    out = []
+    cx, cy = w // 2, h // 2
+    for rw in (12, 18, 24, 30, 36):
+        for rh in (12, 18, 24):
+            if rh < h - 8 and rw < w - 8:
+                out.append((f"rect{rw}x{rh}", rect(cx - rw // 2, cx - rw // 2 + rw, cy - rh // 2, cy - rh // 2 + rh)))
+
+    def row(sides, gap=6):
+        xs, x = [], 4
+        for s in sides:
+            xs.append(x)
+            x += s + gap
+        return union(*[rect(x0, x0 + s, cy - s // 2, cy - s // 2 + s) for x0, s in zip(xs, sides)])
+
+    for sides in ((10, 14), (14, 10), (12, 12), (10, 20), (20, 10), (14, 18), (18, 14), (12, 12, 12), (16, 12, 8),
+                  (8, 12, 16)):
+        if sum(sides) + 6 * len(sides) + 4 < w - 4 and max(sides) < h - 6:
+            out.append(("sq_" + "_".join(map(str, sides)), row(sides)))
+    for s in (4, 6, 8, 10, 12, 14):
+        out.append((f"big20_small{s}", row((20, s), gap=8)))
+        out.append((f"small{s}_big20", row((s, 20), gap=8)))
+    return out
+
+
+SETS = {"basic": shapes_basic, "multi": shapes_multi}
 
 
 def lua_rle(vals: list[int]) -> str:
@@ -155,12 +183,12 @@ def cmd_where() -> int:
     return 0
 
 
-def cmd_read(path: str) -> int:
+def cmd_read(path: str, set_name: str) -> int:
     rec = [json.loads(ln) for ln in pathlib.Path(path).read_text(encoding="utf-8").splitlines() if ln][0]
     xs = rec["probe"].get("x", [])
     grid = next(e for e in xs if e.startswith("grid|")).split("|")[1]
     w, h = map(int, grid.split(","))
-    shapes = dict(SETS[rec.get("stamp_set", "basic")](w, h))
+    shapes = dict(SETS[set_name](w, h))
     out = {"session": path, "grid": [w, h], "map_seed": rec["map_seed"], "stamps": []}
     for e in xs:
         parts = e.split("|")
@@ -191,7 +219,7 @@ def main() -> int:
     if cmd == "where":
         return cmd_where()
     if cmd == "read":
-        return cmd_read(sys.argv[2])
+        return cmd_read(sys.argv[2], set_name)
     print(__doc__)
     return 1
 

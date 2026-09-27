@@ -1,0 +1,16 @@
+84 cases
+45 e1 hex a 0.75 b 0.25 k -1.75
+45 e1 geo a 0.75 b 0.25 k -1.75
+45 e1 e1 a 1 b 0 k -1.50
+45 e1 e1 a 1 b 0 k -1.25
+44 hd hex a 1 b 0 k -1.75
+44 hd hex a 1 b 0 k -1.50
+44 hd hex a 1 b 0 k -1.25
+44 hd hex a 1 b 0 k -1.00
+44 hd hex a 0.75 b 0.25 k -1.75
+44 hd geo a 1 b 0 k -1.75
+44 hd geo a 1 b 0 k -1.50
+44 hd geo a 1 b 0 k -1.25
+44 hd geo a 1 b 0 k -1.00
+44 hd geo a 0.75 b 0.25 k -1.75
+44 e1 hex a 1 b 0 k -1.75
