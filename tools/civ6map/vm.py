@@ -19,7 +19,7 @@ import lupa.lua51 as lua51
 
 from .fractal import Fractal
 from .gameinfo import INSTALL
-from .hks import strip_annotations
+from .hks import strip_annotations, table_order
 from .world import World
 
 LAYERS = [INSTALL / "Base/Assets/Maps", INSTALL / "Base/Assets/Maps/Utility",
@@ -266,6 +266,9 @@ class Api:
         if self.log_print:
             self.prints.append("\t".join(str(a) for a in args))
 
+    def hks_order(self, keys):
+        return self._list(table_order([int(keys[k]) for k in keys]))
+
     def _list(self, xs):
         return self.lua.table_from(list(xs))
 
@@ -350,7 +353,7 @@ class Api:
         self.w.set_feature(i, int(f))
 
     def TB_CanHaveFeature(self, i, f, single=None):
-        return self.w.can_have_feature_placed(i, int(f), bool(single))
+        return self.w.can_have_feature_call(i, int(f), single)
 
     def TB_GetAdjacentFeatureCount(self, i, f):
         return self.w.adjacent_feature_count(i, int(f))
@@ -383,6 +386,7 @@ class Api:
 
     def TB_GenerateFloodplains(self, inland, lo, hi):
         self._native("TerrainBuilder.GenerateFloodplains")
+        self.w.generate_floodplains(_int(lo), _int(hi))
         self._facts("TerrainBuilder.GenerateFloodplains")
 
     def TB_AddIce(self, i, e):
@@ -501,6 +505,7 @@ class Api:
         return self.w.can_have_resource(i, self._res_index(r))
 
     def RB_SetResourceType(self, i, r, n):
+        self.w.resource_log.append((i, self._res_index(r)))
         self.w.resource[i] = self._res_index(r)
         self.w.res_count[i] = int(n) if n is not None else 1
 
@@ -618,89 +623,64 @@ class Api:
 
 
 HKS_PAIRS = r"""
--- pairs over a table whose keys are all numbers visits them in ascending
--- order (Havok Script's order where the game's logs show it: DoRiver's
--- flow-direction table, keys 0..5); any other table keeps next's order
-local next_, sort = next, table.sort
+-- pairs over a table whose keys are all numbers visits them in Havok
+-- Script's node order (hks.table_order); any other table keeps next's order
+local N = ...
+local next_ = next
 function pairs(t)
   local keys, allnum = {}, true
   for k in next_, t do
     if type(k) ~= "number" then allnum = false; break end
     keys[#keys + 1] = k
   end
-  if not allnum then return next_, t, nil end
-  sort(keys)
+  if not allnum or #keys < 2 then return next_, t, nil end
+  local order = N.hks_order(keys)
   local i = 0
-  return function() i = i + 1; local k = keys[i]; if k ~= nil then return k, t[k] end end, t, nil
+  return function() i = i + 1; local k = order[i]; if k ~= nil then return k, t[k] end end, t, nil
 end
 """
 
 HKS_SORT = r"""
--- table.sort as the C runtime's qsort (Microsoft's: median of three, a
--- selection sort below 9 elements) over a three-way comparison built from
--- the Lua order: lt(a, b) -> -1, lt(b, a) -> 1, else 0. Equal elements
--- land where that algorithm leaves them (the game's natural wonder
--- placement takes the later of two tied plots, as this does).
+-- table.sort as Lua 5.1's auxsort, except that the first two swaps of the
+-- median of three test "not lt(b, a)" where Lua 5.1 tests lt(a, b); the
+-- third swap and the partition scans keep lt. Fitted on the two ties the
+-- game's draw logs decide (Duel seed 1000's natural wonder sites tied at
+-- 1001087 take the later plot; Small seed 1000's wonder rolls tied at 82 take
+-- the earlier wonder); how Havok Script breaks the resource placements'
+-- ties is not settled (h3 report).
 local function sort(t, lt)
   lt = lt or function(a, b) return a < b end
-  local function comp(a, b)
-    if lt(a, b) then return -1 elseif lt(b, a) then return 1 end
-    return 0
-  end
-  local function shortsort(lo, hi)
-    while hi > lo do
-      local mx = lo
-      for p = lo + 1, hi do
-        if comp(t[p], t[mx]) > 0 then mx = p end
-      end
-      t[mx], t[hi] = t[hi], t[mx]
-      hi = hi - 1
-    end
-  end
-  local function rec(lo, hi)
-    while true do
-      local size = hi - lo + 1
-      if size <= 8 then shortsort(lo, hi); return end
-      local mid = lo + math.floor(size / 2)
-      if comp(t[lo], t[mid]) > 0 then t[lo], t[mid] = t[mid], t[lo] end
-      if comp(t[lo], t[hi]) > 0 then t[lo], t[hi] = t[hi], t[lo] end
-      if comp(t[mid], t[hi]) > 0 then t[mid], t[hi] = t[hi], t[mid] end
-      local loguy, higuy = lo, hi
+  local function le(a, b) return not lt(b, a) end
+  local function aux(l, u)
+    while l < u do
+      if le(t[u], t[l]) then t[l], t[u] = t[u], t[l] end
+      if u - l == 1 then return end
+      local i = math.floor((l + u) / 2)
+      if le(t[i], t[l]) then t[i], t[l] = t[l], t[i]
+      elseif lt(t[u], t[i]) then t[i], t[u] = t[u], t[i] end
+      if u - l == 2 then return end
+      local P = t[i]
+      t[i], t[u - 1] = t[u - 1], t[i]
+      i = l
+      local j = u - 1
       while true do
-        if mid > loguy then
-          loguy = loguy + 1
-          while loguy < mid and comp(t[loguy], t[mid]) <= 0 do loguy = loguy + 1 end
-        end
-        if mid <= loguy then
-          loguy = loguy + 1
-          while loguy <= hi and comp(t[loguy], t[mid]) <= 0 do loguy = loguy + 1 end
-        end
-        higuy = higuy - 1
-        while higuy > mid and comp(t[higuy], t[mid]) > 0 do higuy = higuy - 1 end
-        if higuy < loguy then break end
-        t[loguy], t[higuy] = t[higuy], t[loguy]
-        if mid == higuy then mid = loguy end
+        i = i + 1
+        while lt(t[i], P) do i = i + 1 end
+        j = j - 1
+        while lt(P, t[j]) do j = j - 1 end
+        if j < i then break end
+        t[i], t[j] = t[j], t[i]
       end
-      higuy = higuy + 1
-      if mid < higuy then
-        higuy = higuy - 1
-        while higuy > mid and comp(t[higuy], t[mid]) == 0 do higuy = higuy - 1 end
-      end
-      if mid >= higuy then
-        higuy = higuy - 1
-        while higuy > lo and comp(t[higuy], t[mid]) == 0 do higuy = higuy - 1 end
-      end
-      if higuy - lo >= hi - loguy then
-        if loguy < hi then rec(loguy, hi) end
-        if lo < higuy then hi = higuy else return end
+      t[u - 1], t[i] = t[i], t[u - 1]
+      if i - l < u - i then
+        j = l; i = i - 1; l = i + 2
       else
-        if lo < higuy then rec(lo, higuy) end
-        if loguy < hi then lo = loguy else return end
+        j = i + 1; i = u; u = j - 2
       end
+      aux(j, i)
     end
   end
-  local n = #t
-  if n > 1 then rec(1, n) end
+  aux(1, #t)
 end
 table.sort = sort
 """
@@ -715,7 +695,7 @@ def run(world: World, script: str, *, log_print: bool = False, hks: bool = True)
     lua.compile(PRELUDE)(api)
     if hks:
         lua.execute(HKS_SORT)
-        lua.execute(HKS_PAIRS)
+        lua.compile(HKS_PAIRS)(api)
     api.include(script)
     lua.globals().GenerateMap()
     return api

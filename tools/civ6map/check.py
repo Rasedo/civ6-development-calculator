@@ -1,9 +1,13 @@
 """A generated map against the game's own: the draw stream and the map.
 
     python tools/civ6map/check.py --session tools/civ6lab/runs/h3_session_<stamp>.jsonl \
-        [--majors LEADER_A,LEADER_B --minors 3]
+        [--majors LEADER_A,LEADER_B,...] [--oracle continents]
 
-The session record (tools/civ6lab/h3_session.py --probe over the quiet probe)
+The size, the city-state count and the map options are the recorded game's
+(its config file and the options it read back); the majors are the session
+log's. `--oracle continents` takes StampContinents' unspecified partition
+from the game's dump (the 43 draws stay) to test the stages after it. The
+session record (tools/civ6lab/h3_session.py --probe, quiet or natives probe)
 carries the game's every Lua draw (range, value, reason) in order, the native
 calls between them with the map facts logged after some, the map's total
 draw count and its dump. The generator runs the same script, size and seed;
@@ -25,7 +29,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.civ6map.generate import dump, generate  # noqa: E402
+from tools.civ6map.generate import dump, generate  
 
 PROBE_SCRIPT = "Continents"
 
@@ -80,25 +84,31 @@ def compare_maps(a: dict, b: dict) -> dict:
             "starts ours": a["starts"], "starts game": b["starts"]}
 
 
-def oracle_floodplains(gdump: dict) -> None:
-    """GenerateFloodplains replaced by the game's own floodplains (every
-    floodplain in the finished map was placed there: no later stage adds or
-    removes one)"""
-    from tools.civ6map import vm
+def oracle_continents(gdump: dict) -> None:
+    """StampContinents' partition past one continent is not specified: take
+    the game's continents from its dump (StampContinents' own output; no later
+    stage changes a plot's continent) and keep the native's 43 draws"""
+    from tools.civ6map import world as W
 
-    orig = vm.Api.TB_GenerateFloodplains
-
-    def placed(self, inland, lo, hi):
-        fp = {self.w.fix[k] for k in ("FEATURE_FLOODPLAINS", "FEATURE_FLOODPLAINS_GRASSLAND",
-                                      "FEATURE_FLOODPLAINS_PLAINS")}
+    def partition(self, n):
+        order = self.continent_order
+        rank = {c: k for k, c in enumerate(order)}
+        out = []
         for y, row in enumerate(gdump["rows"]):
             for x, cell in enumerate(row):
-                f = int(cell.split(".")[1])
-                if f in fp:
-                    self.w.feature[y * self.w.W + x] = f
-        return orig(self, inland, lo, hi)
+                c = int(cell.split(".")[5])
+                out.append(-1 if c < 0 else rank[c])
+        return out
 
-    vm.Api.TB_GenerateFloodplains = placed
+    W.World.partition_continents = partition
+
+
+def session_setup(rec: dict) -> tuple[str, int, dict]:
+    """the size, the city-state count and the map options the recorded game
+    ran with (its config file and the options it read back)"""
+    cfg = json.loads((ROOT / rec["config"]).read_text(encoding="utf-8"))
+    opts = {k: int(v) for k, v in (rec.get("map_options") or {}).items() if k != "MAP_SIZE"}
+    return cfg["size"], int(cfg.get("city_states", 0)), opts
 
 
 def main() -> int:
@@ -106,20 +116,22 @@ def main() -> int:
     p.add_argument("--session", required=True)
     p.add_argument("--line", type=int, default=0)
     p.add_argument("--script", default=PROBE_SCRIPT)
-    p.add_argument("--size", default="MAPSIZE_DUEL")
-    p.add_argument("--majors", default="LEADER_ROBERT_THE_BRUCE,LEADER_HOJO")
-    p.add_argument("--minors", type=int, default=3)
+    p.add_argument("--majors", default="LEADER_ROBERT_THE_BRUCE,LEADER_HOJO",
+                   help="the game's majors in player order (the session log's 'in game' line)")
     p.add_argument("--show", type=int, default=6, help="Lua draws of context around the first difference")
     p.add_argument("--save-dump")
-    p.add_argument("--oracle", action="append", default=[], choices=["floodplains"],
-                   help="take this open native's result from the game's dump, to test the stages after it")
+    p.add_argument("--oracle", action="append", default=[], choices=["continents"],
+                   help="take this unspecified native's result from the game's dump, to test the stages after it")
     a = p.parse_args()
     sess = pathlib.Path(a.session)
     rec = [json.loads(ln) for ln in sess.read_text(encoding="utf-8").splitlines() if ln][a.line]
-    if "floodplains" in a.oracle:
-        oracle_floodplains(json.loads(pathlib.Path(rec["map_dump"]).read_text(encoding="utf-8")))
-    world, api = generate(a.script, a.size, int(rec["map_seed"]), majors=a.majors.split(","),
-                          n_minors=a.minors, minors=[], options={})
+    if "continents" in a.oracle:
+        oracle_continents(json.loads(pathlib.Path(rec["map_dump"]).read_text(encoding="utf-8")))
+    size, n_minors, options = session_setup(rec)
+    world, _ = generate(a.script, size, int(rec["map_seed"]), majors=a.majors.split(","),
+                        n_minors=n_minors, minors=[], options=options)
+    if world.unspecified:
+        print("unspecified natives stood in:", world.unspecified)
     ours = world.rng.ledger
     game = list(probe_entries(rec))
     gl = [e for e in game if e[0] == "lua"]

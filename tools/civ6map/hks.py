@@ -96,3 +96,55 @@ def strip_annotations(src: str) -> str:
         last = e
     out.append(src[last:])
     return "".join(out)
+
+
+def table_order(keys: list[int]) -> list[int]:
+    """the order Havok Script's pairs visits a table whose keys are the
+    integers `keys`, inserted in ascending order into an empty table: Lua
+    5.1's node table (main position, the free slot searched down from the
+    end, a colliding key moved off a slot it does not own, a full table
+    resized to the next power of two with its nodes reinserted last to
+    first) with a key's main position key mod size and no array part; a
+    table of exactly 1..n is its array, in order. Evidence: DoRiver's flow
+    table (keys 0..5 in ascending order, every river of the logs) and
+    AddTerrainFromContinents' lonely-mountain lists by continent (Standard
+    seed 1000: continents 6, 10, 11, 15 visited 15, 6, 10, 11)."""
+    ks = sorted(keys)
+    if ks == list(range(1, len(ks) + 1)):
+        return ks
+    st = {"nodes": [], "last": 0}
+
+    def insert(k) -> bool:
+        nodes = st["nodes"]
+        size = len(nodes)
+        if not size:
+            return False
+        mp = k % size
+        if nodes[mp] is None:
+            nodes[mp] = k
+            return True
+        while st["last"] > 0:
+            st["last"] -= 1
+            f = st["last"]
+            if nodes[f] is None:
+                if nodes[mp] % size != mp:
+                    nodes[f], nodes[mp] = nodes[mp], k
+                else:
+                    nodes[f] = k
+                return True
+        return False
+
+    for k in ks:
+        if insert(k):
+            continue
+        old = st["nodes"]
+        count = sum(1 for n in old if n is not None) + 1
+        size = 1
+        while size < count:
+            size *= 2
+        st["nodes"], st["last"] = [None] * size, size
+        for o in reversed(old):
+            if o is not None:
+                insert(o)
+        insert(k)
+    return [n for n in st["nodes"] if n is not None]

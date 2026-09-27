@@ -2,12 +2,11 @@
 the map scripts call (TerrainBuilder, Map, AreaBuilder, Areas,
 ResourceBuilder, ImprovementBuilder, StartPositioner, Fractal).
 
-Where each native's behaviour comes from is said at the native: the lab's
-pinned models (the stream, the fractals, the ledger's draw counts), the
-install's rows, or a fit against the game's own logs of Duel Continents map
-seeds 1000 and 2024 (the draw-by-draw probe records and the finished maps).
-OPEN_NATIVES names what is not yet specified; each keeps the draw count
-the ledger measured.
+The natives are the lab's measured laws (tools/civ6lab/h3_natives_spec.md
+and the fractal, ridge and stream models); where a native says it was fitted,
+the fit is against the game's own draw-by-draw logs and finished maps.
+OPEN_NATIVES names what is not yet specified; each keeps the draw count the
+ledger measured.
 
 Grid: Civ 6's hex grid, y = 0 the bottom row, odd rows shifted right, x
 wraps on a wrap-X map, y never wraps. Directions NE, E, SE, SW, W, NW = 0..5.
@@ -19,14 +18,10 @@ from .fractal import Fractal
 from .gameinfo import GameInfo
 
 OPEN_NATIVES = {
-    "TerrainBuilder.GenerateFloodplains": "0 draws; places no floodplain",
-    "TerrainBuilder.StampContinents": "43 draws; the split of the land among more than one continent "
-                                      "(Maps.Continents > 1) raises",
-    "TerrainBuilder.AnalyzeChokepoints": "0 draws; keeps no state",
-    "TerrainBuilder.AddIce": "0 draws; records the sea-level phase only",
-    "TerrainBuilder.AddCoastalLowland": "0 draws; records the lowland level only",
-    "ResourceBuilder.CanHaveResource": "the lab's row model; the game refuses a few plots it admits "
-                                       "(luxuries on Duel seed 1000, strategics on 2024)",
+    "TerrainBuilder.StampContinents": "the split of the land among Maps.Continents > 1 continents, and which "
+                                      "part takes the shuffle's first entry (every plot joins continent 0 and "
+                                      "the run records it in World.unspecified)",
+    "Map.GetContinentPlots": "the order of the plots it answers (plot order here)",
     "StartPositioner": "regions, fertility and ocean starts: no region is offered, no start is placed",
     "ImprovementBuilder.CanHaveImprovement": "the install's Improvement_ValidTerrains / ValidFeatures",
     "Plot.GetYield": "terrain + feature + resource yield rows",
@@ -77,6 +72,9 @@ class World:
         self.areas: dict[int, Area] = {}
         self.fractals: list[Fractal] = []
         self.player_start: dict[int, int] = {}
+        self.unspecified: list[str] = []
+        self.resource_log: list[tuple[int, int]] = []
+        self.continent_order: list[int] = []
         # the install's rows the natives read
         self.t_rows = gi.rows("Terrains")
         self.f_rows = gi.rows("Features")
@@ -180,32 +178,28 @@ class World:
         return [n for n in (self.adj(i, d) for d in range(6)) if n is not None]
 
     def distance(self, x1, y1, x2, y2) -> int:
-        """Civ 5's plotDistance: the offset dx wrapped into [-W/2, W/2], then
-        hex-space distance"""
-        dx = x2 - x1
-        if self.wrap_x:
-            if dx > self.W // 2:
-                dx -= self.W
-            elif dx < -(self.W // 2):
-                dx += self.W
-        dy = y2 - y1
-        h1 = x1 - (y1 >> 1)
-        h2 = (x1 + dx) - ((y1 + dy) >> 1)
-        hdx = h2 - h1
-        if (hdx >= 0) == (dy >= 0):
-            return abs(hdx) + abs(dy)
-        return max(abs(hdx), abs(dy))
+        """hex distance: the cube distance of q = x - (y - (y & 1)) / 2, r = y,
+        the shorter way round when x wraps"""
+        r1, r2 = y1, y2
+        q1 = x1 - (y1 >> 1)
+        best = None
+        for sh in ((-self.W, 0, self.W) if self.wrap_x else (0,)):
+            dq = q1 - ((x2 + sh) - (y2 >> 1))
+            dr = r1 - r2
+            d = (abs(dq) + abs(dr) + abs(dq + dr)) // 2
+            best = d if best is None else min(best, d)
+        return best
 
     def within(self, i: int, rng: int) -> list[int]:
-        """plots in Civ 5's plotXYWithRangeCheck order: dx outer, dy inner"""
+        """the plots within hex distance rng of plot i, itself included"""
         x, y = self.xy(i)
-        out = []
-        for dx in range(-rng, rng + 1):
-            for dy in range(-rng, rng + 1):
+        out: dict[int, None] = {}
+        for dy in range(-rng, rng + 1):
+            for dx in range(-rng, rng + 1):
                 p = self.plot(x + dx, y + dy)
-                if p is not None and self.distance(x, y, *self.xy(p)) <= rng:
-                    out.append(p)
-        return out
+                if p is not None and p not in out and self.distance(x, y, *self.xy(p)) <= rng:
+                    out[p] = None
+        return list(out)
 
     # ----------------------------------------------------------- plot facts
     def is_water(self, i):
@@ -231,13 +225,14 @@ class World:
     def is_lake(self, i):
         return self.is_water(i) and self.area_size(i) <= self.gpi("LAKE_MAX_AREA_SIZE", 9)
 
+    def is_ice(self, i):
+        return self.feature[i] == self.fix.get("FEATURE_ICE", -2)
+
     def is_coastal_land(self, i):
-        """land beside any water, lakes included (the game's AddRivers pass 2
-        draws once per land plot that is not coastal: 231 on Duel Continents
-        seed 1000, as this counts; an ocean-size threshold would give 237)"""
+        """land with a water neighbour not covered by Ice (lakes count)"""
         if self.is_water(i):
             return False
-        return any(self.is_water(n) for n in self.neighbours(i))
+        return any(self.is_water(n) and not self.is_ice(n) for n in self.neighbours(i))
 
     def river_edges(self, i) -> list[bool]:
         """the six edges NE, E, SE, SW, W, NW of plot i carrying a river"""
@@ -253,16 +248,28 @@ class World:
         return out
 
     def is_river(self, i):
-        return any(self.river_edges(i))
+        """a land plot with a river on one of its edges to another land plot
+        (a river flag on an edge to water does not count: the game answers
+        IsRiver false on both sides of such an edge)"""
+        if self.is_water(i):
+            return False
+        return any(on and (n := self.adj(i, d)) is not None and not self.is_water(n)
+                   for d, on in enumerate(self.river_edges(i)))
 
     def is_natural_wonder(self, i):
         f = self.feature[i]
         return f >= 0 and bool(self.f_rows[f]["NaturalWonder"])
 
     def is_fresh_water(self, i):
-        if self.is_water(i):
+        """passable land (not water, not impassable) that is a river plot,
+        carries a feature that AddsFreshWater and is no natural wonder (an
+        Oasis), or is next to a lake or to a feature that AddsFreshWater"""
+        if self.is_water(i) or self.is_impassable(i):
             return False
         if self.is_river(i):
+            return True
+        f = self.feature[i]
+        if f >= 0 and self.f_rows[f]["AddsFreshWater"] and not self.f_rows[f]["NaturalWonder"]:
             return True
         for n in self.neighbours(i):
             if self.is_lake(n):
@@ -274,32 +281,32 @@ class World:
 
     # ---------------------------------------------------------------- areas
     def recalculate_areas(self) -> None:
-        """AreaBuilder.Recalculate: connected components of water, of
-        passable land and of mountains, numbered in plot order. Mountains
-        stand apart: AddRivers' pass 3 and 4 test the plot's area's river
-        edges against its size, and the game's rivers from Duel seed 1000's
-        mountains (10,6) and (8,7) are drawn although their landmass is
-        already past its share"""
+        """AreaBuilder.Recalculate: the connected components (x wrapping) of
+        three classes, water (lakes included), passable land and mountains,
+        numbered k = 1, 2, ... in the order of their lowest plot; area id =
+        (k << 16) | (k - 1). Later terrain changes leave the areas as they
+        are until the next call."""
         self.area_of = [-1] * self.N
         self.areas = {}
-        nid = 0
+        k = 0
         for s in range(self.N):
             if self.area_of[s] >= 0:
                 continue
+            k += 1
+            aid = (k << 16) | (k - 1)
             wat = self.is_water(s)
             kind = self._area_kind(s)
-            a = Area(nid, wat)
-            self.areas[nid] = a
+            a = Area(aid, wat)
+            self.areas[aid] = a
             stack = [s]
-            self.area_of[s] = nid
+            self.area_of[s] = aid
             while stack:
                 p = stack.pop()
                 a.plots.append(p)
                 for n in self.neighbours(p):
                     if self.area_of[n] < 0 and self._area_kind(n) == kind:
-                        self.area_of[n] = nid
+                        self.area_of[n] = aid
                         stack.append(n)
-            nid += 1
 
     def _area_kind(self, i: int) -> int:
         return 0 if self.is_water(i) else 2 if self.is_mountain(i) else 1
@@ -311,72 +318,69 @@ class World:
 
     # ----------------------------------------------------------- features
     def salt_adjacent(self, i: int) -> bool:
-        """beside water that is neither a lake nor under ice"""
-        ice = self.fix.get("FEATURE_ICE", -2)
-        return any(self.is_water(n) and not self.is_lake(n) and self.feature[n] != ice for n in self.neighbours(i))
+        """a neighbour that is salt water (water, not a lake) not covered by Ice"""
+        return any(self.is_water(n) and not self.is_lake(n) and not self.is_ice(n) for n in self.neighbours(i))
 
     def river_adjacent(self, i: int) -> bool:
         return any(self.is_river(n) for n in self.neighbours(i))
 
     def can_have_feature(self, i: int, f: int) -> bool:
-        """the single-plot test: the install's Feature columns and child
-        tables, in the clause order the lab measures (tools/civ6lab/h3_chf.py)"""
+        """CanHaveFeature's single-plot test: 15 clauses in order, each from
+        the install's rows (h3_natives_spec.md)"""
         if f < 0:
             return True
-        if self.feature[i] >= 0:
-            return False
         fr = self.f_rows[f]
-        lake = self.is_lake(i)
-        if self.terrain[i] not in self.f_valid.get(f, ()) and not (lake and fr["Lake"]):
-            return False
-        if fr["NoCoast"] and not self.is_water(i) and self.salt_adjacent(i):
-            return False
-        if fr["NoRiver"] and (self.is_river(i) or self.river_adjacent(i)):
-            return False
-        if fr["RequiresRiver"] and not self.is_river(i):
-            return False
         nb = self.neighbours(i)
-        if fr["Lake"] and any(self.is_water(n) for n in nb):
+        lake = self.is_lake(i)
+        if self.feature[i] >= 0:                                               # 1
             return False
-        if lake and not fr["Lake"]:
+        valid = self.f_valid.get(f)
+        if valid and self.terrain[i] not in valid and not (fr["Lake"] and lake):  # 2
             return False
-        if fr["Coast"] and not self.salt_adjacent(i):
+        if fr["NoCoast"] and not self.is_water(i) and self.salt_adjacent(i):   # 3
             return False
-        lo, hi = fr["MinDistanceLand"], fr["MaxDistanceLand"]
-        if lo or hi:
+        if fr["NoRiver"] and (self.is_river(i) or self.river_adjacent(i)):     # 4
+            return False
+        if fr["RequiresRiver"] and not self.is_river(i):                       # 5
+            return False
+        if fr["Lake"] and any(self.is_water(n) for n in nb):                   # 6
+            return False
+        if lake and not fr["Lake"]:                                            # 7
+            return False
+        if fr["Coast"] and not self.salt_adjacent(i):                          # 8
+            return False
+        lo, hi = fr["MinDistanceLand"] or 0, fr["MaxDistanceLand"] or 0
+        if lo or hi:                                                           # 9
             d = self._land_distance(i, max(lo, hi) + 1)
             if (lo and d < lo) or (hi and d > hi):
                 return False
-        if fr["NoAdjacentFeatures"] and any(self.feature[n] >= 0 for n in nb):
+        if fr["NoAdjacentFeatures"] and any(self.feature[n] >= 0 for n in nb):  # 10
             return False
-        if f in self.f_adj_terrain and not any(self.terrain[n] in self.f_adj_terrain[f] for n in nb):
+        if f in self.f_adj_terrain and not any(self.terrain[n] in self.f_adj_terrain[f] for n in nb):  # 11
             return False
-        if f in self.f_not_adj_terrain and any(self.terrain[n] in self.f_not_adj_terrain[f] for n in nb):
+        if f in self.f_not_adj_terrain and any(self.terrain[n] in self.f_not_adj_terrain[f] for n in nb):  # 12
             return False
-        if f in self.f_adj_feature and not any(self.feature[n] in self.f_adj_feature[f] for n in nb):
+        if f in self.f_adj_feature and not any(self.feature[n] in self.f_adj_feature[f] for n in nb):  # 13
             return False
-        if f in self.f_not_near:
+        if f in self.f_not_near:                                               # 14
             r = self.N // 256
-            x, y = self.xy(i)
-            if any(self.feature[q] in self.f_not_near[f] and self.distance(x, y, *self.xy(q)) <= r
-                   for q in range(self.N)):
+            if any(self.feature[q] in self.f_not_near[f] for q in self.within(i, r)):
                 return False
         mnw = fr["MinDistanceNW"]
-        if mnw is not None and mnw > 0:
-            x, y = self.xy(i)
-            if any(self.is_natural_wonder(q) and self.distance(x, y, *self.xy(q)) <= mnw for q in range(self.N)):
+        if mnw is not None and mnw > 0:                                        # 15
+            if any(self.is_natural_wonder(q) for q in self.within(i, mnw)):
                 return False
         return True
 
-    def footprint(self, i: int, f: int) -> list[int] | None:
-        """the plots a natural wonder of Tiles > 1 with no CustomPlacement
-        takes from anchor i: the first orientation d in direction order whose
-        extra plots all pass the single-plot test — 2 plots: the neighbour d;
-        3: the neighbours d and d + 1; 4: those and the plot two steps out
-        between them (the lab's shape model, tools/civ6lab/h3_nwfit.py)"""
+    def footprint(self, i: int, f: int, custom: bool = False) -> list[int] | None:
+        """the plots a natural wonder with Tiles > 1 and no CustomPlacement
+        covers from anchor i: the first orientation d in DirectionTypes order
+        whose extra plots all pass the single-plot test — 2 plots: the
+        neighbour d; 3: the neighbours d and d + 1; 4: those and the neighbour
+        d + 1 of neighbour d. None when no orientation fits."""
         fr = self.f_rows[f]
         tiles = fr["Tiles"] or 1
-        if tiles < 2 or fr["CustomPlacement"] is not None:
+        if tiles < 2 or (fr["CustomPlacement"] is not None and not custom):
             return [i]
         for d in range(6):
             a = self.adj(i, d)
@@ -389,23 +393,29 @@ class World:
                 return [i] + extra
         return None
 
-    def can_have_feature_placed(self, i: int, f: int, single: bool) -> bool:
-        """TerrainBuilder.CanHaveFeature(plot, f, single): with single set the
-        plot alone, else a multi-plot wonder's whole footprint too"""
+    def can_have_feature_call(self, i: int, f: int, single) -> bool:
+        """TerrainBuilder.CanHaveFeature(plot, f, single): the single-plot test
+        when the third argument is true or omitted; with false a natural
+        wonder of Tiles > 1 also needs a footprint (custom placements too)"""
         if not self.can_have_feature(i, f):
             return False
-        if single or f < 0 or not self.f_rows[f]["NaturalWonder"]:
+        if single is None or single or f < 0 or not self.f_rows[f]["NaturalWonder"]:
             return True
-        return self.footprint(i, f) is not None
+        return self.footprint(i, f, custom=True) is not None
 
     def set_feature(self, i: int, f: int) -> None:
-        """SetFeatureType: a multi-plot wonder with no CustomPlacement lays
-        its whole footprint"""
+        """SetFeatureType: a natural wonder with Tiles > 1 and no
+        CustomPlacement lays its footprint (nothing at all when none fits); a
+        lake wonder turns every plot it covers into Coast"""
         plots = [i]
         if f >= 0 and self.f_rows[f]["NaturalWonder"]:
-            plots = self.footprint(i, f) or [i]
+            plots = self.footprint(i, f)
+            if plots is None:
+                return
         for p in plots:
             self.feature[p] = f
+            if f >= 0 and self.f_rows[f]["Lake"]:
+                self.terrain[p] = self.tix["TERRAIN_COAST"]
 
     def _land_distance(self, i, cap):
         """hex distance to the nearest land plot (0 on land), cap + 1 when none is within cap"""
@@ -423,10 +433,11 @@ class World:
 
     # ---------------------------------------------------------- resources
     def can_have_resource(self, i: int, r: int) -> bool:
-        """the install's rows, in the clause order the lab measures
-        (tools/civ6lab/h3_chr.py): no resource yet, not a start plot, the
-        feature in ValidFeatures (or no feature and the terrain in
-        ValidTerrains), LakeEligible, AdjacentToLand"""
+        """CanHaveResource: refused when the plot has a resource; is a start
+        plot; has a feature not in the resource's ValidFeatures, or no feature
+        and a terrain not in its ValidTerrains; NoRiver on a river plot or
+        RequiresRiver off one; LakeEligible false on a lake; AdjacentToLand
+        with no land neighbour"""
         if r < 0:
             return True
         if self.resource[i] >= 0 or self.starting[i]:
@@ -438,6 +449,10 @@ class World:
         elif self.terrain[i] not in self.r_valid_t.get(r, ()):
             return False
         row = self.r_rows[r]
+        if row.get("NoRiver") and self.is_river(i):
+            return False
+        if row.get("RequiresRiver") and not self.is_river(i):
+            return False
         if row.get("LakeEligible") is False and self.is_lake(i):
             return False
         if row.get("AdjacentToLand") and not any(not self.is_water(n) for n in self.neighbours(i)):
@@ -447,45 +462,88 @@ class World:
     def adjacent_resource_count(self, i: int) -> int:
         return sum(1 for n in self.neighbours(i) if self.resource[n] >= 0)
 
+    # ---------------------------------------------------------- floodplains
+    def river_plots(self) -> dict[int, list[int]]:
+        """each river's plots: its setter calls in the order DoRiver made
+        them, each adding the plot passed and then its partner across the edge
+        (W of river: the E neighbour; NW: the SE neighbour; NE: the SW
+        neighbour), each plot once"""
+        partner = (E, SE, SW)
+        out: dict[int, list[int]] = {}
+        for rid, p, edge in self.river_order:
+            lst = out.setdefault(rid, [])
+            for q in (p, self.adj(p, partner[edge])):
+                if q is not None and q not in lst:
+                    lst.append(q)
+        return out
+
+    def generate_floodplains(self, lo: int, hi: int) -> None:
+        """GenerateFloodplains: per river, from the mouth (the list's end)
+        towards the source, the first maximal run of at least `lo`
+        consecutive flat, featureless grassland, plains or desert plots; its
+        `hi` plots nearest the mouth take the floodplain of their terrain.
+        Every river is judged on the map as it stands before any floodplain
+        (the union of the runs)."""
+        fp = {self.tix["TERRAIN_DESERT"]: self.fix["FEATURE_FLOODPLAINS"],
+              self.tix["TERRAIN_GRASS"]: self.fix["FEATURE_FLOODPLAINS_GRASSLAND"],
+              self.tix["TERRAIN_PLAINS"]: self.fix["FEATURE_FLOODPLAINS_PLAINS"]}
+        take: dict[int, int] = {}
+        for plots in self.river_plots().values():
+            run: list[int] = []
+            for p in [*reversed(plots), None]:
+                if p is not None and self.terrain[p] in fp and self.feature[p] < 0:
+                    run.append(p)
+                    continue
+                if len(run) >= lo:
+                    for q in run[:hi]:
+                        take[q] = fp[self.terrain[q]]
+                    break
+                run = []
+        for q, f in take.items():
+            self.feature[q] = f
+
     # ---------------------------------------------------------- continents
     def stamp_continents(self) -> None:
-        """one draw per Continents row: Civ 5's shuffleArray of the rows
-        (for k < n, swap k with k + get(n - k)); the map's first continent is
-        the shuffle's first entry (Duel Continents, seeds 1000 and 2024: 9
-        and 15, as the game stamps them). With the size's Maps.Continents = 1
-        every land plot and every lake takes it (the game's facts after
-        the native: 399 land + 2 lake plots on continent 9). How the land is
-        split among more continents is not specified: that raises."""
+        """StampContinents: 43 draws, Civ 5's shuffleArray of the Continents
+        rows (for k < 43: swap k with k + get(43 - k)); continent k of the
+        partition takes shuffled[k]; every land, mountain and lake plot
+        carries one, ocean -1. With Maps.Continents = 1 the partition is the
+        whole: the rest of it is `partition_continents`."""
         rows = self.gi.rows("Continents")
         n = len(rows)
         order = list(range(n))
         for k in range(n):
             j = self.rng.get(n - k) + k
             order[k], order[j] = order[j], order[k]
-        want = self.size_row["Continents"]
-        if want != 1:
-            raise NotImplementedError(f"StampContinents with {want} continents is not specified")
-        self.continent = [order[0] if (not self.is_water(i) or self.is_lake(i)) else -1 for i in range(self.N)]
+        self.continent_order = order
+        parts = self.partition_continents(self.size_row["Continents"])
+        self.continent = [-1 if parts[i] < 0 else order[parts[i]] for i in range(self.N)]
+
+    def partition_continents(self, n: int) -> list[int]:
+        """which of the n continents each non-ocean plot joins (-1 ocean).
+        Measured for n = 1 only; for more the game's split is not specified
+        (h3_natives_spec.md) and every plot joins continent 0, recorded in
+        `self.unspecified`"""
+        if n != 1:
+            self.unspecified.append(f"StampContinents: the land split among {n} continents")
+        return [0 if (not self.is_water(i) or self.is_lake(i)) else -1 for i in range(self.N)]
 
     def continents_in_use(self) -> list[int]:
         return sorted({c for c in self.continent if c >= 0})
 
-    def find_second_continent(self, i: int, rng: int) -> bool:
+    def find_second_continent(self, i: int, rng) -> bool:
+        """a continent on the plot and another one within hex distance rng"""
         c = self.continent[i]
-        for p in self.within(i, int(rng)):
-            o = self.continent[p]
-            if o >= 0 and o != c and not self.is_water(p):
-                return True
-        return False
+        if c < 0:
+            return False
+        return any(self.continent[p] not in (-1, c) for p in self.within(i, int(rng)))
 
     def find_water(self, i: int, rng, fresh: bool) -> bool:
-        """Map.FindWater: fresh = a lake or a plot with fresh water (a river
-        on it or beside a lake, river or oasis) in range, else any water in
-        range; a fractional range truncates. Fitted on the game's AddRivers
-        logs (Duel Continents seeds 1000 and 2024: every GetInlandCorner call
-        of the four passes lands where the game's does)"""
+        """Map.FindWater: a plot within hex distance trunc(rng), the plot
+        itself included, that is fresh water (IsFreshWater) with `fresh`,
+        else water"""
         for p in self.within(i, int(rng)):
-            if (self.is_lake(p) or self.is_fresh_water(p)) if fresh else self.is_water(p):
+            if self.is_fresh_water(p) if fresh else self.is_water(p):
                 return True
         return False
 
@@ -499,10 +557,9 @@ class World:
         return False
 
     def inland_corner(self, i: int) -> int | None:
-        """Civ 5's getInlandCorner, 4 draws: shuffleArray(4) of the corner
-        cases (the plot itself, NE, NW, W), then the first case whose SE
-        corner has no water. Cases 1..3 fitted on the game's river logs;
-        case 0 (the plot itself) never decided a river there."""
+        """GetInlandCorner, 4 draws: Civ 5's shuffleArray of the cases (P,
+        P's NE, NW and W neighbours), then the first that exists with no
+        water at its SE corner (itself, its E and SE neighbours land)"""
         sh = list(range(4))
         for k in range(4):
             j = self.rng.get(4 - k) + k

@@ -88,6 +88,8 @@ def main() -> int:
     if a.print:
         print("\n".join(api.prints))
     print(f"{a.script} {a.size} map seed {a.map_seed}: {world.rng.n} draws, {time.time() - t0:.1f}s")
+    for u in sorted(set(world.unspecified)):
+        print("  not specified, stood in:", u)
     if a.dump:
         pathlib.Path(a.dump).write_text(json.dumps(dump(world, a.map_seed)), encoding="utf-8")
     if a.ledger:
