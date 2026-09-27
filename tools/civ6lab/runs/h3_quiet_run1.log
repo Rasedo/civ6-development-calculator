@@ -1,0 +1,33 @@
+﻿    mod handle 44
+    enabled in this configuration: 1 e6d8f6ba-a2bf-4f6b-ba4b-f5446f403033
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=civ6lab_mapprobe_quiet.lua size=388991850 cs=3 realism=2 majors=2 map_seed=1000 game_seed=2000 autostart=true
+    hosting
+python : Traceback (most recent call last):
+At line:1 char:333
++ ... NG='utf-8'; python -u tools/civ6lab/h3_session.py --host 127.0.0.3 -- ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\h3_session.py"[0m, line [35m154[0m, in [35m<module>[0m
+    sys.exit([31mmain[0m[1;31m()[0m)
+             [31m~~~~[0m[1;31m^^[0m
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\h3_session.py"[0m, line [35m132[0m, in [35mmain[0m
+    rc = game.cmd_new(ns)
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\game.py"[0m, line [35m490[0m, in [35mcmd_new[0m
+    t = wait_for_state(a.host, a.port, GC, a.wait, "print(Game.GetCurrentGameTurn())")
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\game.py"[0m, line [35m346[0m, in [35mwait_for_state[0m
+    raise TunerError(f"state {state} not ready within {wait}s")
+[1;35mtuner.TunerError[0m: [35mstate GameCore_Tuner not ready within 600.0s[0m

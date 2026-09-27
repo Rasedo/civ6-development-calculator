@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\h3_lua.py"[0m, line [35m32[0m, in [35m<module>[0m
+    sys.exit([31mmain[0m[1;31m()[0m)
+             [31m~~~~[0m[1;31m^^[0m
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\h3_lua.py"[0m, line [35m25[0m, in [35mmain[0m
+    for ln in [31mt.run[0m[1;31m(a.state, pathlib.Path(a.file).read_text(encoding="utf-8"), timeout=a.timeout)[0m:
+              [31m~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"C:\civ6-development-calculator\tools\civ6lab\tuner.py"[0m, line [35m195[0m, in [35mrun[0m
+    raise TunerError(f"{state}: {payload}{got}")
+[1;35mtuner.TunerError[0m: [35mGameCore_Tuner: ERR:Runtime Error: [string "(function()..."]:8: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:8: in function '(anonymous)'
+	[string "(function()..."]:11: in function '(main chunk)'
+Lua callstack:
+
+  printed before the error:
+    FEATURE_VOLCANO 34
+    MEGADISASTERS false
+    features 50[0m

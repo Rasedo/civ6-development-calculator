@@ -1,0 +1,36 @@
+biased seeds 11
+cart      hex6 sign +1: 11903/14769  rwx_p3_1:817/967 rwx_p3_2:1447/1700 rwx_p3_3:1540/1698 rwx_p3_6:1585/1782 rwx_p3_13:1639/1871 rwx_p3_14:793/1105 rwx_p3_15:318/721 rwx_p3_18:831/1162 rwx_p3_20:759/1124 rwxy_p3:840/1305 rpolar_p3:1334/1334
+cart      hex6 sign -1: 9031/14769  rwx_p3_1:607/967 rwx_p3_2:1171/1700 rwx_p3_3:1540/1698 rwx_p3_6:1379/1782 rwx_p3_13:468/1871 rwx_p3_14:290/1105 rwx_p3_15:328/721 rwx_p3_18:674/1162 rwx_p3_20:690/1124 rwxy_p3:550/1305 rpolar_p3:1334/1334
+cart      axint sign +1: 9901/14769  rwx_p3_1:788/967 rwx_p3_2:1286/1700 rwx_p3_3:1540/1698 rwx_p3_6:1489/1782 rwx_p3_13:926/1871 rwx_p3_14:406/1105 rwx_p3_15:180/721 rwx_p3_18:733/1162 rwx_p3_20:719/1124 rwxy_p3:500/1305 rpolar_p3:1334/1334
+cart      axint sign -1: 8397/14769  rwx_p3_1:606/967 rwx_p3_2:1165/1700 rwx_p3_3:1540/1698 rwx_p3_6:1377/1782 rwx_p3_13:385/1871 rwx_p3_14:214/1105 rwx_p3_15:191/721 rwx_p3_18:583/1162 rwx_p3_20:682/1124 rwxy_p3:320/1305 rpolar_p3:1334/1334
+cart      axnorm sign +1: 10627/14769  rwx_p3_1:713/967 rwx_p3_2:1225/1700 rwx_p3_3:1540/1698 rwx_p3_6:1420/1782 rwx_p3_13:1452/1871 rwx_p3_14:609/1105 rwx_p3_15:433/721 rwx_p3_18:700/1162 rwx_p3_20:559/1124 rwxy_p3:642/1305 rpolar_p3:1334/1334
+cart      axnorm sign -1: 8394/14769  rwx_p3_1:492/967 rwx_p3_2:1098/1700 rwx_p3_3:1540/1698 rwx_p3_6:1298/1782 rwx_p3_13:385/1871 rwx_p3_14:211/1105 rwx_p3_15:443/721 rwx_p3_18:667/1162 rwx_p3_20:522/1124 rwxy_p3:404/1305 rpolar_p3:1334/1334
+array     hex6 sign +1: 11979/14769  rwx_p3_1:828/967 rwx_p3_2:1493/1700 rwx_p3_3:1540/1698 rwx_p3_6:1624/1782 rwx_p3_13:1625/1871 rwx_p3_14:759/1105 rwx_p3_15:311/721 rwx_p3_18:840/1162 rwx_p3_20:786/1124 rwxy_p3:839/1305 rpolar_p3:1334/1334
+array     hex6 sign -1: 9125/14769  rwx_p3_1:607/967 rwx_p3_2:1171/1700 rwx_p3_3:1540/1698 rwx_p3_6:1385/1782 rwx_p3_13:499/1871 rwx_p3_14:312/1105 rwx_p3_15:321/721 rwx_p3_18:670/1162 rwx_p3_20:707/1124 rwxy_p3:579/1305 rpolar_p3:1334/1334
+array     axint sign +1: 10088/14769  rwx_p3_1:786/967 rwx_p3_2:1320/1700 rwx_p3_3:1540/1698 rwx_p3_6:1522/1782 rwx_p3_13:957/1871 rwx_p3_14:436/1105 rwx_p3_15:180/721 rwx_p3_18:733/1162 rwx_p3_20:733/1124 rwxy_p3:547/1305 rpolar_p3:1334/1334
+array     axint sign -1: 8494/14769  rwx_p3_1:606/967 rwx_p3_2:1156/1700 rwx_p3_3:1540/1698 rwx_p3_6:1376/1782 rwx_p3_13:416/1871 rwx_p3_14:244/1105 rwx_p3_15:191/721 rwx_p3_18:583/1162 rwx_p3_20:681/1124 rwxy_p3:367/1305 rpolar_p3:1334/1334
+array     axnorm sign +1: 10695/14769  rwx_p3_1:712/967 rwx_p3_2:1259/1700 rwx_p3_3:1540/1698 rwx_p3_6:1441/1782 rwx_p3_13:1435/1871 rwx_p3_14:608/1105 rwx_p3_15:450/721 rwx_p3_18:695/1162 rwx_p3_20:556/1124 rwxy_p3:665/1305 rpolar_p3:1334/1334
+array     axnorm sign -1: 8455/14769  rwx_p3_1:480/967 rwx_p3_2:1084/1700 rwx_p3_3:1540/1698 rwx_p3_6:1285/1782 rwx_p3_13:416/1871 rwx_p3_14:242/1105 rwx_p3_15:461/721 rwx_p3_18:666/1162 rwx_p3_20:504/1124 rwxy_p3:443/1305 rpolar_p3:1334/1334
+axial     hex6 sign +1: 11903/14769  rwx_p3_1:817/967 rwx_p3_2:1447/1700 rwx_p3_3:1540/1698 rwx_p3_6:1585/1782 rwx_p3_13:1639/1871 rwx_p3_14:793/1105 rwx_p3_15:318/721 rwx_p3_18:831/1162 rwx_p3_20:759/1124 rwxy_p3:840/1305 rpolar_p3:1334/1334
+axial     hex6 sign -1: 9031/14769  rwx_p3_1:607/967 rwx_p3_2:1171/1700 rwx_p3_3:1540/1698 rwx_p3_6:1379/1782 rwx_p3_13:468/1871 rwx_p3_14:290/1105 rwx_p3_15:328/721 rwx_p3_18:674/1162 rwx_p3_20:690/1124 rwxy_p3:550/1305 rpolar_p3:1334/1334
+axial     axint sign +1: 9901/14769  rwx_p3_1:788/967 rwx_p3_2:1286/1700 rwx_p3_3:1540/1698 rwx_p3_6:1489/1782 rwx_p3_13:926/1871 rwx_p3_14:406/1105 rwx_p3_15:180/721 rwx_p3_18:733/1162 rwx_p3_20:719/1124 rwxy_p3:500/1305 rpolar_p3:1334/1334
+axial     axint sign -1: 8397/14769  rwx_p3_1:606/967 rwx_p3_2:1165/1700 rwx_p3_3:1540/1698 rwx_p3_6:1377/1782 rwx_p3_13:385/1871 rwx_p3_14:214/1105 rwx_p3_15:191/721 rwx_p3_18:583/1162 rwx_p3_20:682/1124 rwxy_p3:320/1305 rpolar_p3:1334/1334
+axial     axnorm sign +1: 10627/14769  rwx_p3_1:713/967 rwx_p3_2:1225/1700 rwx_p3_3:1540/1698 rwx_p3_6:1420/1782 rwx_p3_13:1452/1871 rwx_p3_14:609/1105 rwx_p3_15:433/721 rwx_p3_18:700/1162 rwx_p3_20:559/1124 rwxy_p3:642/1305 rpolar_p3:1334/1334
+axial     axnorm sign -1: 8394/14769  rwx_p3_1:492/967 rwx_p3_2:1098/1700 rwx_p3_3:1540/1698 rwx_p3_6:1298/1782 rwx_p3_13:385/1871 rwx_p3_14:211/1105 rwx_p3_15:443/721 rwx_p3_18:667/1162 rwx_p3_20:522/1124 rwxy_p3:404/1305 rpolar_p3:1334/1334
+axial_raw hex6 sign +1: 12731/14769  rwx_p3_1:684/967 rwx_p3_2:1656/1700 rwx_p3_3:1540/1698 rwx_p3_6:1706/1782 rwx_p3_13:1763/1871 rwx_p3_14:904/1105 rwx_p3_15:230/721 rwx_p3_18:1041/1162 rwx_p3_20:927/1124 rwxy_p3:946/1305 rpolar_p3:1334/1334
+axial_raw hex6 sign -1: 9473/14769  rwx_p3_1:605/967 rwx_p3_2:1261/1700 rwx_p3_3:1540/1698 rwx_p3_6:1455/1782 rwx_p3_13:553/1871 rwx_p3_14:347/1105 rwx_p3_15:239/721 rwx_p3_18:672/1162 rwx_p3_20:836/1124 rwxy_p3:631/1305 rpolar_p3:1334/1334
+axial_raw axint sign +1: 10691/14769  rwx_p3_1:654/967 rwx_p3_2:1489/1700 rwx_p3_3:1540/1698 rwx_p3_6:1613/1782 rwx_p3_13:1022/1871 rwx_p3_14:495/1105 rwx_p3_15:81/721 rwx_p3_18:930/1162 rwx_p3_20:886/1124 rwxy_p3:647/1305 rpolar_p3:1334/1334
+axial_raw axint sign -1: 8913/14769  rwx_p3_1:602/967 rwx_p3_2:1246/1700 rwx_p3_3:1540/1698 rwx_p3_6:1443/1782 rwx_p3_13:481/1871 rwx_p3_14:303/1105 rwx_p3_15:92/721 rwx_p3_18:581/1162 rwx_p3_20:824/1124 rwxy_p3:467/1305 rpolar_p3:1334/1334
+axial_raw axnorm sign +1: 11728/14769  rwx_p3_1:788/967 rwx_p3_2:1463/1700 rwx_p3_3:1540/1698 rwx_p3_6:1599/1782 rwx_p3_13:1574/1871 rwx_p3_14:720/1105 rwx_p3_15:255/721 rwx_p3_18:858/1162 rwx_p3_20:795/1124 rwxy_p3:802/1305 rpolar_p3:1334/1334
+axial_raw axnorm sign -1: 9049/14769  rwx_p3_1:607/967 rwx_p3_2:1184/1700 rwx_p3_3:1540/1698 rwx_p3_6:1390/1782 rwx_p3_13:481/1871 rwx_p3_14:300/1105 rwx_p3_15:265/721 rwx_p3_18:668/1162 rwx_p3_20:727/1124 rwxy_p3:553/1305 rpolar_p3:1334/1334
+rwx_p3_1 (47, 29) strength 2 direction 3 residual values [-4, -3, -2, -1, 0, 1, 2]
+rwx_p3_2 (21, 13) strength 3 direction 0 residual values [-3, -2, -1, 0, 3]
+rwx_p3_3 (56, 18) strength 0 direction 1 residual values [-4, -3, -2, -1, 0]
+rwx_p3_6 (33, 14) strength -4 direction 3 residual values [-4, -3, -2, -1, 0, 1, 4]
+rwx_p3_13 (52, 14) strength -3 direction 4 residual values [-3, -1, 0, 3]
+rwx_p3_14 (17, 20) strength -1 direction 4 residual values [-4, -3, -2, -1, 0, 1]
+rwx_p3_15 (4, 30) strength 3 direction 2 residual values [-4, -3, -2, -1, 0]
+rwx_p3_18 (7, 2) strength 1 direction 2 residual values [-4, -3, -2, -1, 0]
+rwx_p3_20 (12, 0) strength -2 direction 0 residual values [-4, -3, -2, -1, 0]
+rwxy_p3 (41, 18) strength -4 direction 1 residual values [-4, -3, -2, -1, 0, 4]
+rpolar_p3 (27, 16) strength 0 direction 5 residual values [0]

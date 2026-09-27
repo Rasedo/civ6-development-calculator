@@ -41,10 +41,15 @@ if n then for i = 0, n - 1 do print("C " .. i .. " " .. tostring(Map.GetPlotByIn
 LUA_ADD_MOD = """
 local h = Modding.GetModHandle("ZMOD")
 print("mod handle " .. tostring(h))
-if h ~= nil then GameConfiguration.AddEnabledMods(h, true) end
-local ids = {}
-for _, m in ipairs(GameConfiguration.GetEnabledMods() or {}) do ids[#ids + 1] = tostring(m.Id or m.Handle or m) end
-print("enabled in this configuration: " .. #ids .. " " .. table.concat(ids, " "))
+if h ~= nil then GameConfiguration.AddEnabledMods(h) end
+local n, gs, mine = 0, false, false
+for _, m in ipairs(GameConfiguration.GetEnabledMods() or {}) do
+  n = n + 1
+  local id = tostring(m.Id):lower()
+  if id == "4873eb62-8ccc-4574-b784-dda455e74e68" then gs = true end
+  if id == "ZMOD" then mine = true end
+end
+print("enabled in this configuration: " .. n .. " gathering_storm=" .. tostring(gs) .. " probe=" .. tostring(mine))
 """
 
 
@@ -121,8 +126,9 @@ def main() -> int:
     for pair in a.pairs.split(","):
         ms, gs = (int(x) for x in pair.split(":"))
         if a.mod:
-            # this game's configuration only (TutorialSetup.lua's call): the
-            # mod's global enabled state in Mods.sqlite is not touched
+            # this game's configuration only; AddEnabledMods(h) adds to the
+            # enabled list (a second argument true replaces it, dropping
+            # Gathering Storm and hosting a Base-content game)
             t = Tuner(a.host, a.port).connect()
             for ln in t.run(FE, LUA_ADD_MOD.replace("ZMOD", a.mod)):
                 print("   ", ln)

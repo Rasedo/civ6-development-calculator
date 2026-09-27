@@ -1,0 +1,15 @@
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=2 map_seed=1000 game_seed=2000 autostart=true
+    hosting
+in game {"turn": 1, "map_seed": 1000, "game_seed": 2000, "humans": 1, "minors": 4, "majors": {"0": "LEADER_ROBERT_THE_BRUCE", "1": "LEADER_HOJO"}}

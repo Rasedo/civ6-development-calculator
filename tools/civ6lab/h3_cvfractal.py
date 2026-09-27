@@ -31,6 +31,12 @@ class Rng:
         return (((self.s >> 16) & 0xFFFF) * (r & 0xFFFF)) >> 16
 
 
+def cdiv(a: int, b: int) -> int:
+    """C integer division (truncates toward zero)"""
+    q = abs(a) // abs(b)
+    return q if (a >= 0) == (b > 0) else -q
+
+
 def clamp(v: int, lo: int, hi: int) -> int:
     return lo if v < lo else hi if v > hi else v
 
@@ -88,11 +94,34 @@ class Fractal:
                     s += rng.get(1 << (8 - smooth + p))
                     s -= 1 << (7 - smooth + p)
                     a[X][Y] = clamp(s, 0, 255)
+        self.a = a
+        if rifts is not None:
+            self.tectonic_action(rifts)
         if "FRAC_INVERT_HEIGHTS" in flags:
             for x in range(fx):
                 for y in range(fy):
                     a[x][y] = 255 - a[x][y]
-        self.a = a
+
+    def tectonic_action(self, rifts: "Fractal") -> None:
+        """Civ 4/5's tectonicAction: a rift 16 columns wide either side of a
+        centre that wanders with the rift fractal's column fx/4*3"""
+        fx, fy, a = self.fx, self.fy, self.a
+        rift2x = (fx // 4) * 3
+        width = 16
+        deep = 0
+
+        def yield_x(x):
+            return x + fx if x < 0 else x - fx if x >= fx else x
+
+        for y in range(fy + 1):
+            c = cdiv(cdiv((rifts.a[rift2x][y] - 128) * fx, 128), 8)
+            for x in range(width):
+                rx = yield_x(c + x)
+                lx = yield_x(c - x)
+                a[rx][y] = (a[rx][y] * x + deep * (width - x)) // width
+                a[lx][y] = (a[lx][y] * x + deep * (width - x)) // width
+        for y in range(fy + 1):
+            a[fx][y] = a[0][y]
 
     def height(self, x: int, y: int) -> int:
         lx = (self.xinc * x) // FP
@@ -131,10 +160,17 @@ def height_from_percent(f: Fractal, pct: int) -> int:
 
 
 def score(rec: dict) -> dict:
-    if rec.get("rift"):
-        return {"name": rec["name"], "skipped": "rifts not modelled"}
     rng = Rng(rec["state_before"])
-    f = Fractal(rec["w"], rec["h"], rec["grain"], rng, set(rec["flags"]), rec["xe"], rec["ye"])
+    rifts = None
+    draws_game = rec["draws"].get("P0->P2")
+    if rec.get("rift"):
+        from h3_fractal import state_after
+        rifts = Fractal(rec["w"], rec["h"], rec["rift"], rng, set(), rec["xe"], rec["ye"])
+        n_rifts = rng.n
+        rng = Rng(state_after(rec["pins"]["P1"]))
+        draws_game = [rec["draws"]["P0->P1"], rec["draws"]["P1->P2"]]
+    f = Fractal(rec["w"], rec["h"], rec["grain"], rng, set(rec["flags"]), rec["xe"], rec["ye"], rifts=rifts)
+    draws_model = rng.n if rifts is None else [n_rifts, rng.n]
     got = rec["grid"]
     hit = tot = 0
     first = None
@@ -148,7 +184,7 @@ def score(rec: dict) -> dict:
                 first = (x, y, v, got[y][x])
     mod = [height_from_percent(f, q) for q in range(101)]
     pct = sum(m == g for m, g in zip(mod, rec["pct"]))
-    return {"name": rec["name"], "draws_model": rng.n, "draws_game": rec["draws"].get("P0->P2"),
+    return {"name": rec["name"], "draws_model": draws_model, "draws_game": draws_game,
             "plots": tot, "hits": hit, "first_miss": first, "pct_hits_of_101": pct}
 
 

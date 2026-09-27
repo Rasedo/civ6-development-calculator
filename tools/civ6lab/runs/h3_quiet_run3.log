@@ -1,0 +1,18 @@
+    mod handle 45
+    enabled in this configuration: 1 e6d8f6ba-a2bf-4f6b-ba4b-f5446f403033
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=civ6lab_mapprobe_quiet.lua size=388991850 cs=3 realism=2 majors=2 map_seed=1000 game_seed=2000 autostart=true
+    hosting
+
+[h3_bounded] killed after 175.0s

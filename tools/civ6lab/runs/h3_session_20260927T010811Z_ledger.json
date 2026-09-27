@@ -1,0 +1,7478 @@
+[
+[
+"lua",
+"Random World Age - Lua x1, Random Sea Level - Lua x1, Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+4,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,2,{},6,5)",
+2145,
+""
+],
+[
+"native",
+"FractalWrap(mt=table|idx=table)",
+0,
+""
+],
+[
+"native",
+"Fractal.CreateRifts(44,26,2,{FRAC_POLAR=true},ud,6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+25,
+""
+],
+[
+"block",
+"3 logged native call(s)",
+4315,
+"model 4315 EXACT"
+],
+[
+"lua",
+"FractalWorld Center Rift Segment Length - Lua x25, FractalWorld Center Rift Direction - Lua x25, Random Region Edges x19, FractalWorld Center Rift Lean - Lua x1",
+70,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+2,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,1,{},6,5)",
+2145,
+""
+],
+[
+"native",
+"Fractal.CreateRifts(44,26,2,{FRAC_POLAR=true},ud,6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+25,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4315,
+"model 4315 EXACT"
+],
+[
+"lua",
+"FractalWorld Center Rift Segment Length - Lua x23, FractalWorld Center Rift Direction - Lua x21, Random Region Edges x12, FractalWorld Center Rift Lean - Lua x1",
+57,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+2,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,2,{FRAC_POLAR=true},6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+26,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+2171,
+"model 2171 EXACT"
+],
+[
+"lua",
+"FractalWorld Center Rift Segment Length - Lua x33, FractalWorld Center Rift Direction - Lua x33, Random Region Edges x23, FractalWorld Center Rift Lean - Lua x1",
+90,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+2,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,2,{},6,5)",
+2145,
+""
+],
+[
+"native",
+"Fractal.CreateRifts(44,26,2,{FRAC_POLAR=true},ud,6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+23,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4313,
+"model 4313 EXACT"
+],
+[
+"lua",
+"FractalWorld Center Rift Segment Length - Lua x23, FractalWorld Center Rift Direction - Lua x23, Random Region Edges x16, FractalWorld Center Rift Lean - Lua x1",
+63,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+2,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,2,{FRAC_POLAR=true},6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+26,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+2171,
+"model 2171 EXACT"
+],
+[
+"lua",
+"FractalWorld Center Rift Segment Length - Lua x31, FractalWorld Center Rift Direction - Lua x29, Random Region Edges x16, FractalWorld Center Rift Lean - Lua x1",
+77,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+2,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,2,{FRAC_POLAR=true},6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+24,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+2169,
+"model 2169 EXACT"
+],
+[
+"lua",
+"FractalWorld Center Rift Segment Length - Lua x21, FractalWorld Center Rift Direction - Lua x18, Random Region Edges x14, FractalWorld Center Rift Lean - Lua x1",
+54,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+2,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,1,{},6,5)",
+2145,
+""
+],
+[
+"native",
+"Fractal.CreateRifts(44,26,2,{FRAC_POLAR=true},ud,6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+25,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4315,
+"model 4315 EXACT"
+],
+[
+"lua",
+"FractalWorld Center Rift Segment Length - Lua x33, FractalWorld Center Rift Direction - Lua x33, Random Region Edges x25, FractalWorld Center Rift Lean - Lua x1",
+92,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+2,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,2,{FRAC_POLAR=true},6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+24,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+2169,
+"model 2169 EXACT"
+],
+[
+"lua",
+"Random Region Edges x27, FractalWorld Center Rift Segment Length - Lua x22, FractalWorld Center Rift Direction - Lua x22, FractalWorld Center Rift Lean - Lua x1",
+72,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Continental Grain roll - LUA Continents x1, Rift Grain roll - LUA Continents x1",
+2,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,1,{FRAC_POLAR=true},6,5)",
+2145,
+""
+],
+[
+"native",
+"[not wrapped] Fractal:BuildRidges(4,{},1,2) on (64, 32)",
+27,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+2172,
+"model 2172 EXACT"
+],
+[
+"lua",
+"FractalWorld Center Rift Segment Length - Lua x29, FractalWorld Center Rift Direction - Lua x25, Random Region Edges x24, FractalWorld Center Rift Lean - Lua x1",
+79,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+8320,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+8320,
+""
+],
+[
+"native",
+"[not wrapped] hills Fractal:BuildRidges(13.5,{FRAC_WRAP_X},10,5) on (128, 64)",
+106578,
+""
+],
+[
+"native",
+"[not wrapped] mountains Fractal:BuildRidges(13.5,{FRAC_WRAP_X},10,5) on (128, 64)",
+106570,
+""
+],
+[
+"block",
+"3 logged native call(s)",
+229788,
+"model 229788 EXACT"
+],
+[
+"lua",
+"Shuffling table entry - Lua x337, Coastal Mountain Removal x17",
+354,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+8320,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+8320,
+""
+],
+[
+"native",
+"Fractal.Create(44,26,3,{FRAC_WRAP_X=true},-1,-1)",
+8320,
+""
+],
+[
+"block",
+"3 logged native call(s)",
+24960,
+"model 24960 EXACT"
+],
+[
+"lua",
+"add shallows x479",
+479,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AnalyzeChokepoints()",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.StampContinents()",
+43,
+""
+],
+[
+"native",
+"Map.GetContinentsInUse()",
+0,
+""
+],
+[
+"block",
+"4 logged native call(s)",
+43,
+"model 43 EXACT"
+],
+[
+"lua",
+"Shuffling table entry - Lua x23",
+23,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF1CF0})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF2B00},true,5,0)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF2AB0},true,4,0)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF2AB0},true,5,0)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF2A60},true,4,0)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF2A60},true,5,0)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF2A10},true,4,0)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF1C00},true,3,0)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF1C00},true,4,0)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF1C00},true,5,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF4040})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF4E50},true,0,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF5C10},true,1,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF5C10},true,0,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF6A20},true,5,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF69D0},true,0,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF7790},true,1,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF7790},true,0,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF85A0},true,1,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF85A0},true,0,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF9360},true,1,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF93B0},true,2,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF93B0},true,1,1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF93B0},true,0,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF6FC0})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF6F70},true,3,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF6F70},true,4,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF61B0},true,3,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF6200},true,2,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF53F0},true,3,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF5440},true,2,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF4680},true,3,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF4680},true,4,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF3870},true,3,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF3870},true,4,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF2AB0},true,3,2)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"MapGenerator AddRivers x208",
+208,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EEC3E0})",
+4,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EED150},true,5,3)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EED100},true,4,3)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EED100},true,5,3)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EEF450})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF0210},true,1,4)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF0260},true,2,4)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF0260},true,1,4)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF0260},true,0,4)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF1070},true,5,4)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF1020},true,0,4)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF1DE0},true,1,4)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF1DE0},true,0,4)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF2BF0},true,1,4)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF0940})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF1750},true,1,5)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF1750},true,0,5)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF2510},true,1,5)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF2560},true,2,5)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF17A0},true,3,5)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF17F0},true,2,5)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF3230})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF2420},true,3,6)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF2420},true,4,6)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF3410})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF2600},true,3,7)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF5530})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF54E0},true,1,8)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF54E0},true,0,8)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF62F0},true,5,8)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF62A0},true,0,8)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF7060},true,1,8)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF70B0},true,2,8)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF62F0},true,3,8)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF6340},true,2,8)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF6340},true,1,8)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF5AD0})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF5AD0},true,4,9)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF4D10},true,3,9)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF4D10},true,4,9)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EF6E80})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF60C0},true,3,10)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF60C0},true,4,10)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF52B0},true,3,10)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF52B0},true,4,10)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF44F0},true,3,10)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF44F0},true,4,10)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EFB340})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EFC0B0},true,5,11)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EFC060},true,4,11)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EFC060},true,5,11)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GetInlandCorner({__instance=userdata: 0000000194EFB480})",
+4,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+4,
+"model 4 EXACT"
+],
+[
+"lua",
+"River Rand x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EFA620},true,3,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EFA670},true,2,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF98B0},true,3,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF9900},true,2,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNWOfRiver({__instance=userdata: 0000000194EF9900},true,1,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF9950},true,2,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF8B40},true,3,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF8B90},true,2,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF7DD0},true,3,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF7E20},true,2,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetWOfRiver({__instance=userdata: 0000000194EF7010},true,3,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"River Rand x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.SetNEOfRiver({__instance=userdata: 0000000194EF7060},true,2,12)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"MapGenerator AddLakes x71",
+71,
+""
+],
+[
+"native",
+"AreaBuilder.Recalculate()",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.GenerateFloodplains(true,4,10)",
+0,
+""
+],
+[
+"block",
+"2 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(5,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(6,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(7,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(8,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(9,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(12,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(13,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(15,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(16,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(17,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(19,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(20,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(21,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(24,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(25,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(28,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(30,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(38,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(41,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(42,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1116,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1117,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1118,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1119,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1120,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1126,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1127,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1133,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1134,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1138,-1)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x9",
+9,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(14,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(18,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(23,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(31,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(37,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(43,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(48,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(51,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(52,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(56,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(58,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(62,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(63,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(64,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(69,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(71,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(72,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(74,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(82,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x7",
+7,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1075,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1077,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1084,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1091,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1094,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1095,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1128,30)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x9",
+9,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(22,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(26,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(32,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(39,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(40,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(47,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(49,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(53,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(55,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(60,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(61,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(67,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(75,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(81,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(84,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(85,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(86,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(95,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(97,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(100,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(101,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(106,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(108,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x8",
+8,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(119,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(127,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1031,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1040,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1050,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1076,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1083,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1089,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1090,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1092,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1096,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1121,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1125,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1135,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1139,29)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(4,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(27,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(29,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(36,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(46,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(50,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(54,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(57,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(59,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(65,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(70,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(73,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(83,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(93,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(94,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(98,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(99,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(107,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(109,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(114,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(116,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(126,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(129,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(141,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(150,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(151,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(152,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(171,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(988,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1007,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1039,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1041,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1044,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1045,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1048,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1051,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1073,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1082,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1085,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1093,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1122,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1132,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1136,28)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(3,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(10,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(66,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(68,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x7",
+7,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(96,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(102,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(105,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(113,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(115,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(117,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(128,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(130,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(138,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(142,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(144,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x11",
+11,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(170,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(172,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(194,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(216,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(944,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(987,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(989,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(997,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1002,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1008,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1032,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1033,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1038,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1049,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1078,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1086,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x8",
+8,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1137,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1140,27)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(0,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x9",
+9,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(90,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(103,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(118,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(120,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(136,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(143,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(145,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(148,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(149,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(157,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(162,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(182,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(187,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(196,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(214,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(215,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(217,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(237,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(238,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x11",
+11,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(958,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(994,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(995,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(998,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1000,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1003,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1004,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1005,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1009,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1034,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1052,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1088,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1123,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1129,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1130,26)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x8",
+8,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(44,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(87,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(89,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(92,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(104,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(112,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(134,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(139,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(146,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(156,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x9",
+9,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(180,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(183,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(186,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(188,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(189,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(195,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(197,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x16",
+16,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(261,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x8",
+8,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(942,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(945,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x9",
+9,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(957,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(959,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x10",
+10,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(993,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(996,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1001,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1037,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1043,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1047,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1081,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1131,25)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(11,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(45,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(91,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(111,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(133,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(135,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(137,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(147,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x9",
+9,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(173,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(179,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(184,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(185,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(193,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(200,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(218,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x4",
+4,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(226,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(227,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x6",
+6,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(236,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(239,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(240,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(258,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(259,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(260,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(262,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(282,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(283,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x11",
+11,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(943,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(951,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(952,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(953,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x9",
+9,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(965,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(991,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1006,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1042,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x5",
+5,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1079,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x2",
+2,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1087,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x3",
+3,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1124,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Permanent Ice x1",
+1,
+""
+],
+[
+"native",
+"TerrainBuilder.AddIce(1141,24)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Resource Placement Score Adjust x163",
+163,
+""
+],
+[
+"native",
+"TerrainBuilder.AnalyzeChokepoints()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Shuffling table entry - Lua x195, Natural Wonder Selection Roll x26, Natural Wonder Placement Score Adjust x19, Oasis Random x2",
+242,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(367,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(249,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(764,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(207,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(251,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(252,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(973,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(710,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(917,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(534,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(527,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(1017,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(911,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(458,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(414,0)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(323,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(676,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(325,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(523,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(542,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(535,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(1071,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(359,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(822,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(208,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(1059,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(206,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(972,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(203,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(1029,1)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(168,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(79,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(1061,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(872,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(941,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(524,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(913,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(1058,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(1014,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(835,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(852,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(790,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(587,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(78,2)",
+0,
+""
+],
+[
+"native",
+"TerrainBuilder.AddCoastalLowland(878,2)",
+0,
+""
+],
+[
+"native",
+"Map.GetContinentsInUse()",
+0,
+""
+],
+[
+"block",
+"46 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Resource Placement Score Adjust x419, Shuffling table entry - Lua x29",
+448,
+""
+],
+[
+"native",
+"Map.GetContinentsInUse()",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Resource Placement Score Adjust x1696, Shuffling table entry - Lua x26",
+1722,
+""
+],
+[
+"native",
+"StartPositioner.DivideMapIntoMajorRegions(2,150,50,false)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Shuffling table entry - Lua x4, Random Direction x3",
+7,
+""
+],
+[
+"native",
+"StartPositioner.DivideMapIntoMinorRegions(3)",
+0,
+""
+],
+[
+"block",
+"1 logged native call(s)",
+0,
+"model 0 EXACT"
+],
+[
+"lua",
+"Goody Hut - LUA Goody Hut x15",
+15,
+""
+]
+]
