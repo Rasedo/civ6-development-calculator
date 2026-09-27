@@ -10152,9 +10152,8 @@ class SimSeats:
         old_pres = self.city_pressure[b, src_row, src_col, :].clone()
         old_hp = int(self.city_hp[b, src_row, src_col])
         old_outer = int(self.city_outer_hp[b, src_row, src_col])
-        # a perimeter at its FULL pool is TS's unset `outerHp`: it stands full
-        # at whatever tier the new holder reads, while a breached one carries
-        # its number
+        # a perimeter at its FULL pool is TS's unset `outerHp`, which a flip
+        # carries as unset — full again at whatever tier the new holder reads
         old_full = old_outer >= int(self._walls_max_at(
             torch.full((self.B,), src_row, dtype=torch.long, device=self.device),
             torch.full((self.B,), src_col, dtype=torch.long, device=self.device))[b])
@@ -10257,7 +10256,6 @@ class SimSeats:
         self.city_acquired[b, dst_row, col] = old_acq
         self.city_loyalty[b, dst_row, col] = 100.0 if conquest else self._loyalty_after_cultural
         self.city_hp[b, dst_row, col] = half_hp if conquest else old_hp
-        self.city_outer_hp[b, dst_row, col] = old_outer   # refitted below once the buildings are in
         self.city_last_hit[b, dst_row, col] = 0
         # the race a FREE CITY runs starts at nothing "since the Free City
         # became independent"; any other arrival carries none
@@ -10275,10 +10273,18 @@ class SimSeats:
         self.city_bldg_pillaged[b, dst_row, col, :] = old_bpil
         self.city_bldg_era[b, dst_row, col, :] = old_bera
         self._bldg_version += 1
-        if old_full:
+        # the Walls are GONE on a conquest and the pool reads 0 (TS writes
+        # `outerHp = 0`, so a captor already holding Urban Defenses takes
+        # delivery of a breached city); a flip carries the pool it had — a
+        # breached one as its number, a full one full at the new tier
+        if conquest:
+            self.city_outer_hp[b, dst_row, col] = 0
+        elif old_full:
             self.city_outer_hp[b, dst_row, col] = self._walls_max_at(
                 torch.full((self.B,), dst_row, dtype=torch.long, device=self.device),
                 torch.full((self.B,), col, dtype=torch.long, device=self.device))[b].to(self.city_outer_hp.dtype)
+        else:
+            self.city_outer_hp[b, dst_row, col] = old_outer
         # the CONQUEROR manages nothing yet: TS's flipped literal carries no
         # `specialistPref`, so every slot goes back to the automatic rule.
         self.city_spec_pin[b, dst_row, col, :] = -1
