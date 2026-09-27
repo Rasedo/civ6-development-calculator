@@ -8545,13 +8545,15 @@ class SimSeats:
             # route sent to a minor of the named TYPE.
             pc = pays_c.double() * self._congress_cs_route_mult().gather(1, css)
             _p_dest = torch.where(pays_c, self.citystate_center[:, :S].gather(1, css), _p_dest)
-            _p_d = torch.where(pays_c, citystate_gold * pc, _p_d)
+            ycol = self._citystate_yidx[:, :S].gather(1, css)
+            # D is every Gold the destination pays the route: the flat Gold,
+            # and the specialty where the minor's type pays Gold
+            _p_d = torch.where(pays_c, (citystate_gold + citystate_spec * (ycol == 2).double()) * pc, _p_d)
             _p_want = _p_want | pays_c
             # a SURVIVED City-State Emergency pays its target +2 gold on every
             # minor leg — added AFTER the yield, so Sovereignty does not double it
             inc.scatter_add_(1, from_j * 6 + 2, citystate_gold * pc
                              + pays_c.double() * self._emergency_cs_route_gold(row).unsqueeze(1))
-            ycol = self._citystate_yidx[:, :S].gather(1, css)
             inc.scatter_add_(1, from_j * 6 + ycol, citystate_spec * pc)
             # CIV6 (Democracy): a route to a minor this seat is SUZERAIN of pays
             # the government's own +4 Food and +4 Production, the same clause the

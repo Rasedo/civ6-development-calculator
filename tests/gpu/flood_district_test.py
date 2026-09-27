@@ -40,14 +40,6 @@ def floodplain(sim) -> int:
     return tiles[0]
 
 
-def flood_until(sim, done, cap: int = 600) -> int:
-    n = 0
-    while not done() and n < cap:
-        sim._disaster_phase()
-        n += 1
-    return n
-
-
 def main() -> None:
     sim = build()
     t = floodplain(sim)
@@ -55,9 +47,18 @@ def main() -> None:
     sim.district[0, t] = 0            # a COMPLETE district on the floodplain
     sim.district_complete[0, t] = True
     sim.district_pillaged[0, t] = False
-    n = flood_until(sim, lambda: bool(sim.district_pillaged[0, t]))
-    assert bool(sim.district_pillaged[0, t]),         f"{n} disaster phases and the flooded district is still whole"
-    print(f"  a complete district on a floodplain is pillaged (after {n} phases)")
+    # A moderate flood never pillages a district (its DISTRICT_PILLAGED row
+    # is 0), so the floods are driven onto the tile at the top severity.
+    hit = torch.zeros(sim.B, dtype=torch.bool)
+    hit[0] = True
+    at = torch.full((sim.B,), t, dtype=torch.long)
+    top = torch.full((sim.B,), len(sim._flood_district_p) - 1, dtype=torch.long)
+    n = 0
+    while not bool(sim.district_pillaged[0, t]) and n < 200:
+        sim._flood_river(hit, at, top)
+        n += 1
+    assert bool(sim.district_pillaged[0, t]), f"{n} top-severity floods and the district is still whole"
+    print(f"  a complete district on a floodplain is pillaged (after {n} floods)")
 
     # ...and the same tile, with the district still BUILDING, survives every
     # flood. The flood is DRIVEN onto the tile and its count proves each one

@@ -1675,12 +1675,12 @@ class SimEconomy:
                 keys.append(no_key)
                 stand.append(torch.ones(B, 1, dtype=torch.bool, device=dev))
         shares: list[torch.Tensor] = []
-        for i, (fam, _s, _w) in enumerate(rows):
+        for i, ((fam, _s, _w), key) in enumerate(zip(rows, keys)):
             if fam in per_site:
-                fired = (self.tile_event_fired.gather(1, keys[i].clamp(min=0)) >> i) & 1
+                fired = (self.tile_event_fired.gather(1, key.clamp(min=0)) >> i) & 1
                 b = 100 + self._first_boost * (1 - fired)
             else:
-                b = torch.full_like(keys[i], 100)
+                b = torch.full_like(key, 100)
             shares.append(torch.where(stand[i], b, torch.zeros_like(b)))
         cum: list[torch.Tensor] = []
         total = torch.zeros(B, dtype=torch.float64, device=dev)

@@ -227,7 +227,9 @@ class SimMinors:
             ycol = self._citystate_yidx[:, :S].gather(1, css)
             inc.scatter_add_(1, ycol, self._minor_cs_route_spec * m)
             _p_dest = torch.where(ok_c, self.citystate_center[:, :S].gather(1, css), _p_dest)
-            _p_d = torch.where(ok_c, self._minor_cs_route_gold * m, _p_d)
+            # D is every Gold the destination pays the route: the flat Gold,
+            # and the specialty where the minor's type pays Gold
+            _p_d = torch.where(ok_c, (self._minor_cs_route_gold + self._minor_cs_route_spec * (ycol == 2).double()) * m, _p_d)
             _p_want = _p_want | ok_c
         rd_c = self.seat_route_dcity[:, row]
         intl = act & (rd_c >= 0)
