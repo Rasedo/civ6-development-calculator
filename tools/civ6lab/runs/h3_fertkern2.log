@@ -1,0 +1,22 @@
+MTN P t0 F with 0..6 adjacent mountains: 4 5 6 7 8 9 10
+MTN P t3 F with 0..6 adjacent mountains: 4 5 6 7 8 9 10
+MTN P t1 F with 0..6 adjacent mountains: 6 7 8 9 10 11 12
+MTN P t6 F with 0..6 adjacent mountains: 0 1 2 3 4 5 6
+MTN P t9 F with 0..6 adjacent mountains: 0 0 0 0 1 2 3
+MTN dir 0..5: 5 5 5 5 5 5
+ADJ3 t5 F(P) 7
+ADJ3 t8 F(P) 7
+ADJ3 t11 F(P) 7
+ADJ3 t14 F(P) 7
+ADJ3 t1 F(P) 4
+ADJ3 t4 F(P) 4
+ADJ3 f3 F(P) 4
+ADJ3 f2 F(P) 4
+ADJ3 f5 F(P) 4
+ADJ3 f4 F(P) 6
+ADJ3 r11 F(P) 4
+ADJ3 r0 F(P) 4
+RIVER W of P: F 7 IsRiver true
+RIVER W of E-neighbour (P's E edge): F 4 IsRiver false
+RIVER one plot away: F 4 IsRiver false adj false
+RESET F 4

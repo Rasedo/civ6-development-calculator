@@ -12,6 +12,8 @@
 			<File>Maps/civ6lab_mapprobe_quiet.lua</File>
 			<File>Maps/civ6lab_mapprobe_natives.lua</File>
 			<File>Maps/civ6lab_mapprobe_exp.lua</File>
+			<File>Maps/civ6lab_mapprobe_stamp.lua</File>
+			<File>Maps/civ6lab_stampshapes.lua</File>
 			<File>Maps/civ6lab_xp2_assignstartingplots.lua</File>
 			<File>Maps/civ6lab_xp2_coastallowlands.lua</File>
 			<File>Maps/civ6lab_xp2_continents.lua</File>
@@ -30,6 +32,8 @@
 		<File>Maps/civ6lab_mapprobe_quiet.lua</File>
 		<File>Maps/civ6lab_mapprobe_natives.lua</File>
 		<File>Maps/civ6lab_mapprobe_exp.lua</File>
+		<File>Maps/civ6lab_mapprobe_stamp.lua</File>
+		<File>Maps/civ6lab_stampshapes.lua</File>
 		<File>Maps/civ6lab_xp2_assignstartingplots.lua</File>
 		<File>Maps/civ6lab_xp2_coastallowlands.lua</File>
 		<File>Maps/civ6lab_xp2_continents.lua</File>

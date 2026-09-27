@@ -1,0 +1,26 @@
+55 cases
+35 order e1 depth eT dist hex g min k 1.00
+35 order e1 depth eT dist hex g c k 1.00
+35 order e1 depth e1 dist hex g min k 1.75
+35 order e1 depth e1 dist hex g c k 1.75
+35 order e1 depth e1 dist eT g min k 1.75
+35 order e1 depth e1 dist eT g c k 1.75
+34 order e1 depth e1 dist e1 g min k 1.75
+34 order e1 depth e1 dist e1 g min k 1.50
+34 order e1 depth e1 dist e1 g c k 1.75
+34 order e1 depth e1 dist e1 g c k 1.50
+33 order e1 depth hd dist hex g min k 1.75
+33 order e1 depth hd dist hex g min k 1.50
+33 order e1 depth hd dist hex g min k 1.25
+33 order e1 depth hd dist hex g min k 1.00
+33 order e1 depth hd dist hex g c k 1.75
+33 order e1 depth hd dist hex g c k 1.50
+33 order e1 depth hd dist hex g c k 1.25
+33 order e1 depth hd dist hex g c k 1.00
+33 order e1 depth hd dist eT g min k 1.75
+33 order e1 depth hd dist eT g min k 1.50
+33 order e1 depth hd dist eT g c k 1.75
+33 order e1 depth hd dist eT g c k 1.50
+33 order e1 depth hd dist e1 g s k 1.75
+33 order e1 depth hd dist e1 g min k 1.75
+33 order e1 depth hd dist e1 g min k 1.50

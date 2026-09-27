@@ -1,0 +1,66 @@
+064955Z tall_w3                s0 (42,48): 
+064955Z tall_w7                s0 (42,46): 
+064955Z tall_w8                s0 (42,46): 
+064955Z tall_w8_x1             s0 (43,46): 
+064955Z tall_w8_y1             s0 (42,46): 
+064955Z tall_w8_short          s0 (42,22): 
+064955Z tall_w12_short         s0 (42,20): e1-desc-desc_first
+064955Z wide_h3                s0 (77,27): 
+064955Z wide_h4                s0 (76,27): 
+064955Z wide_h5                s0 (76,27): 
+064955Z wide_h6                s0 (75,27): e1-asc-asc_last e1-desc-desc_first
+064955Z wide_h7                s0 (75,27): 
+064955Z wide_h8                s0 (74,27): 
+064955Z wide_h10               s0 (73,27): 
+064955Z wide_h12               s0 (72,27): 
+064955Z wide_h14               s0 (71,27): 
+064955Z wide_h6_y1             s0 (75,28): 
+064955Z wide_h6_short          s0 (38,27): 
+064955Z wide_h10_y1            s0 (73,28): 
+064955Z wide_h10_short         s0 (36,27): 
+064955Z sq14                   s0 (41,27): hd-asc-desc_first hd-desc-asc_last e1-asc-desc_first e1-desc-asc_last
+064955Z sq18                   s0 (41,27): hd-asc-desc_first hd-desc-asc_last e1-asc-desc_first e1-asc-asc_last
+064955Z sq22                   s0 (41,27): hd-asc-asc_last e1-asc-asc_last e1-desc-desc_first eT-asc-asc_last eT-desc-desc_first
+064955Z sq26                   s0 (41,27): hd-desc-desc_first e1-asc-asc_last e1-desc-desc_first
+064955Z tall8_headN            s0 (42,42): e1-asc-desc_first e1-desc-asc_last
+064955Z tall8_headS            s0 (42,12): hd-asc-desc_first e1-asc-desc_first e1-asc-asc_last e1-desc-asc_last
+064858Z tall_w7                s0 (37,38): 
+064858Z tall_w8                s0 (37,38): e1-asc-desc_first
+064858Z tall_w8_x1             s0 (38,38): e1-asc-desc_first
+064858Z tall_w8_y1             s0 (37,38): 
+064858Z tall_w8_short          s0 (37,18): 
+064858Z tall_w12_short         s0 (37,16): 
+064858Z wide_h3                s0 (67,23): 
+064858Z wide_h4                s0 (66,23): 
+064858Z wide_h5                s0 (66,23): 
+064858Z wide_h6                s0 (65,23): 
+064858Z wide_h7                s0 (65,23): 
+064858Z wide_h8                s0 (64,23): 
+064858Z wide_h10               s0 (63,23): 
+064858Z wide_h12               s0 (62,23): 
+064858Z wide_h14               s0 (61,23): e1-desc-asc_last
+064858Z wide_h6_y1             s0 (65,24): 
+064858Z wide_h6_short          s0 (33,23): 
+064858Z wide_h10_y1            s0 (63,24): 
+064858Z wide_h10_short         s0 (31,23): 
+064858Z sq6                    s0 (36,23): e1-asc-asc_last e1-desc-desc_first
+064858Z sq22                   s0 (36,23): hd-asc-asc_last e1-asc-asc_last e1-desc-desc_first eT-asc-asc_last eT-desc-desc_first
+064858Z sq26                   s0 (36,23): hd-desc-desc_first e1-asc-asc_last e1-desc-desc_first
+064858Z tall8_headN            s0 (37,34): hd-desc-desc_first e1-asc-desc_first e1-desc-asc_last
+064858Z tall8_headS            s0 (37,12): hd-asc-asc_last hd-desc-desc_first
+064858Z two_sq_bigE            s0 (57,23): hd-asc-desc_first e1-asc-desc_first e1-desc-asc_last
+064803Z tall_w4                s0 (30,32): 
+064803Z tall_w12_short         s0 (30,12): 
+064803Z sq6                    s0 (29,19): e1-asc-asc_last e1-desc-desc_first
+064803Z sq22                   s0 (29,19): hd-asc-asc_last e1-asc-asc_last e1-desc-desc_first eT-asc-asc_last eT-desc-desc_first
+064803Z tall8_headS            s0 (30,12): hd-asc-asc_last e1-desc-desc_first
+e1-desc-desc_first     10/56
+e1-asc-asc_last        10/56
+e1-asc-desc_first      8/56
+e1-desc-asc_last       6/56
+hd-asc-asc_last        5/56
+hd-asc-desc_first      4/56
+hd-desc-desc_first     4/56
+eT-asc-asc_last        3/56
+eT-desc-desc_first     3/56
+hd-desc-asc_last       2/56
