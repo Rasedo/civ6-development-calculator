@@ -3,7 +3,9 @@ of `tests/cpu/units/religious-target.test.ts`, from the lab's records
 (`tools/civ6lab/runs/religious_target_20260926T_{read,pairs,fire}.jsonl`): a
 ranged attack or a city's strike never targets a Missionary, an Apostle or a
 Builder; a melee order onto a religious unit is a MOVE onto its tile, onto a
-Builder a capture; Condemn Heretic is legal on the heretic's own tile only.
+Builder a capture; Condemn Heretic is legal on the heretic's own tile only; a
+shot from the ground never takes a lone Support chassis
+(`tools/civ6lab/runs/b89t_fire_20260926.jsonl`).
 
     python tests/gpu/religious_target_test.py
 """
@@ -160,7 +162,44 @@ def main() -> None:
     got = int(sim.civilian_at[0, b])
     assert got >= 0 and int(sim.unit_seat[0, got]) == ROW, "the Builder was not captured"
     print("  4 a melee order onto a Builder captures it OK")
-    print("RELIGIOUS TARGET OK — no shot at a civilian, the melee move, Condemn on its own tile")
+
+    # -- 5: a shot from the ground never takes a lone Support chassis ----------
+    # runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl: a lone
+    # Anti-Air Gun refused to a Field Cannon, a Trebuchet and a city, no draw;
+    # an Infantry beside it made the tile a target and took the shot
+    sim = fresh(rules, path)
+    at_war(sim, ROW, FOE)
+    a, b, c = trio(sim)
+    arch = spawn(sim, ROW, type_id(sim, "ARCHER"), a)
+    ram = spawn(sim, FOE, type_id(sim, "BATTERING_RAM"), b)
+    db = sim.neigh[a].tolist().index(b)
+    assert not bool(mask_of(sim, ROW, arch)[6 + db]), "a ranged unit is offered a lone Support chassis"
+    r0 = sim.rng_state.clone()
+    order(sim, ROW, arch, 6 + db)
+    assert int(sim.unit_hp[0, ram]) == 100 and torch.equal(r0, sim.rng_state), "the shot took a lone ram"
+    assert not bool(sim._nonbarb_unit_plane()[0][b]), "a barbarian's shot reaches a lone Support chassis"
+    guard = spawn(sim, FOE, sim._warrior_idx, b)
+    assert bool(mask_of(sim, ROW, arch)[6 + db]), "beside a combat unit the tile is a target"
+    order(sim, ROW, arch, 6 + db)
+    assert int(sim.unit_hp[0, guard]) < 100 and int(sim.unit_hp[0, ram]) == 100, (
+        "the combat unit beside the ram takes the shot")
+    # a walled city's strike passes over a lone Medic for the warrior behind it
+    sim = fresh(rules, path)
+    at_war(sim, ROW, FOE)
+    j = int(sim.city_alive[0, FOE].nonzero().flatten()[0])
+    ctr = int(sim.city_center[0, FOE, j])
+    d1 = [t for t in range(sim.T) if int(sim.pair_dist[ctr, t]) == 1 and bare(sim, t)]
+    d2 = [t for t in range(sim.T) if int(sim.pair_dist[ctr, t]) == 2 and bare(sim, t)]
+    med = spawn(sim, ROW, type_id(sim, "MEDIC"), d1[0])
+    war = spawn(sim, ROW, sim._warrior_idx, d2[0])
+    col = torch.full((sim.B,), j, dtype=torch.long)
+    sim._seat_city_strike(FOE, col, torch.ones(sim.B, dtype=torch.bool), "cstk")
+    assert int(sim.unit_hp[0, med]) == 100, "the city's strike took a lone Medic"
+    assert int(sim.unit_hp[0, war]) < 100, "the city's strike held fire at the warrior"
+    print("  5 a shot from the ground never takes a lone Support chassis OK (the mask, the order, "
+          "the raider's reach, the city's strike)")
+    print("RELIGIOUS TARGET OK — no shot at a civilian or a lone Support chassis, the melee move, "
+          "Condemn on its own tile")
 
 
 if __name__ == "__main__":

@@ -547,6 +547,51 @@ def main() -> int:
     none = s13._drought_start(torch.tensor([False]), sites, cand)
     assert not bool(none[0][0])
     print(f"  13 drought anchor OK — {len(centres)} city sites, starts by distance {by_d} over {N13}")
+
+    # 14 — BUILDING_PILLAGED on a district not itself pillaged takes ONE
+    # building, the dearest standing; DISTRICT_PILLAGED takes every one; a
+    # city-state's district alike, its repair then waiting
+    # (runs/c74s3_bldg_pillage_20260926T133346Z.jsonl)
+    s = fresh(rules)
+    bids = [b["id"] for b in rules.buildings]
+    lib, uni = bids.index("LIBRARY"), bids.index("UNIVERSITY")
+    campus = next(int(d["idx"]) for d in s.districts_cat if d["id"] == "CAMPUS")
+    j = int(s.city_alive[0, 0].long().argmax())
+    sl = s.city_slot_at(0)[0]
+    t = next(x for x in range(s.T) if int(sl[x]) == j and int(s.district[0, x]) < 0
+             and int(s.centre_slot_at[0, x]) < 0 and not bool(s.water[0, x]))
+    s.district[0, t] = campus
+    s.district_complete[0, t] = True
+    s.district_pillaged[0, t] = False
+    s.city_dist_tile[0, 0, j, campus] = t
+    s.city_bldg[0, 0, j, lib] = True
+    s.city_bldg[0, 0, j, uni] = True
+    one, tt = torch.tensor([0]), torch.tensor([t])
+
+    def fell(row: int, col: int) -> list:
+        return [bids[i] for i in s.city_bldg_pillaged[0, row, col].nonzero(as_tuple=True)[0].tolist()]
+
+    s._pillage_tile_buildings(one, tt)
+    assert fell(0, j) == ["UNIVERSITY"], fell(0, j)
+    s._pillage_tile_buildings(one, tt)
+    assert sorted(fell(0, j)) == ["LIBRARY", "UNIVERSITY"], fell(0, j)
+    s.city_bldg_pillaged[0, 0, j] = False
+    s._pillage_district(one, tt)
+    assert bool(s.district_pillaged[0, t]) and sorted(fell(0, j)) == ["LIBRARY", "UNIVERSITY"], fell(0, j)
+    m = int(s.citystate_alive[0].long().argmax())
+    mrow = s._CITY_MINOR0 + m
+    ctr = int(s.citystate_center[0, m])
+    ct = next(n for n in s.neigh[ctr].tolist() if n >= 0 and int(s.tile_seat[0, n]) == 100 + m
+              and int(s.district[0, n]) < 0 and not bool(s.water[0, n]))
+    s.district[0, ct] = campus
+    s.district_complete[0, ct] = True
+    s.city_dist_tile[0, mrow, 0, campus] = ct
+    s.city_bldg[0, mrow, 0, lib] = True
+    s.city_bldg[0, mrow, 0, uni] = True
+    s._pillage_tile_buildings(one, torch.tensor([ct]))
+    assert fell(mrow, 0) == ["UNIVERSITY"], fell(mrow, 0)
+    assert bool(s.citystate_repair_wait[0, m]), "the minor's repair did not wait"
+    print("  14 building pillage OK — the top of the chain alone, all with the district, a city-state's alike")
     print("BATTERY OK storms")
     return 0
 

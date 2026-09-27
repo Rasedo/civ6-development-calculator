@@ -391,22 +391,30 @@ export function airStrikeTargets(state: GameState, unit: Unit, width: number): n
  * What `tileIndex` offers THIS aircraft. Which enemies STAND there, never
  * which one is first in the list: a list-order rule would let the two engines
  * point the same column at different tiles. A civilian is never an air
- * strike's target (`shootable`).
+ * strike's target, a lone Support chassis is (`airTarget`). A BOMBER is also
+ * offered a land tile whose hostiles are Support chassis with no Anti-Air,
+ * which take the flat blow: the live game fired a Bomber at a lone Battering
+ * Ram and a lone Observation Balloon for 65 each
+ * (runs/b89t_fire_20260926.jsonl).
  */
 export function airStrikeOffers(state: GameState, unit: Unit, tileIndex: number): boolean {
   const t = state.map.tiles[tileIndex];
   if (!t) return false;
   let land = false;
   let sea = false;
+  let hard = false;
   for (const u of unitsAt(state, tileIndex)) {
     if (isAirUnit(u.type) || unitDomain(u.type) === 'civilian' || !unitsHostile(state, unit, u)) continue;
     if (!unitVisibleTo(state, u, unit.seat)) continue;
     if (UNITS[u.type]?.naval) sea = true;
-    else land = true;
+    else {
+      land = true;
+      if (unitDomain(u.type) === 'military' || antiAirAt(state, u) > 0) hard = true;
+    }
   }
   const holder = cityAtIndex(state, tileIndex);
   const centre = holder !== undefined && unitsHostile(state, unit, { seat: holder.holder.seat });
-  return UNITS[unit.type]!.air! === 'BOMBER' ? (centre || sea) : (land && !centre);
+  return UNITS[unit.type]!.air! === 'BOMBER' ? (centre || sea || (land && !hard)) : (land && !centre);
 }
 
 /** this seat's own bases with room, ordered by tile index and cut to width. */

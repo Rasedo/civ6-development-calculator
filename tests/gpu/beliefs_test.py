@@ -220,6 +220,10 @@ def test_worship_building(rules, path) -> None:
     assert not bool(sim._seat_buildable(ROW)[B0, j, wat]), "a worship building with no religion"
     adopt(sim, ROW, [[FOL, 2], [WOR, wat_k]])
     assert int(sim._worship_bidx_of(ROW)[B0]) == wat
+    # the city's majority religion offers it
+    assert not bool(sim._seat_buildable(ROW)[B0, j, wat]), "a worship building in a city following nothing"
+    sim.city_followed[B0, ROW, j] = ROW
+    sim._eff_version += 1
     buildable = sim._seat_buildable(ROW)[B0, j]
     assert bool(buildable[wat]), "the Worship belief's building is not on the production list"
     assert not any(bool(buildable[b]) for b in others), "another worship building is on the list"
@@ -267,12 +271,14 @@ def test_mosque_and_dar_e_mehr(rules, path) -> None:
     sim._eff_version += 1
     assert buy_missionary() == base + 1, "the Mosque's +1 spread did not reach the Missionary"
 
-    # the Dar-e Mehr stands through a disaster that darkens the Temple
+    # the Dar-e Mehr stands through a disaster's building hit, which takes
+    # the dearest other building of the Holy Site (the Mosque), one alone
     dem = BIDS.index("DAR_E_MEHR")
     sim.city_bldg[B0, ROW, j, dem] = True
     t = int(sim.city_dist_tile[B0, ROW, j, sim._hs_idx])
     sim._pillage_tile_buildings(torch.tensor([B0]), torch.tensor([t]))
-    assert bool(sim.city_bldg_pillaged[B0, ROW, j, sim._temple_bidx]), "the disaster missed the Temple"
+    assert bool(sim.city_bldg_pillaged[B0, ROW, j, mosque]), "the disaster missed the Mosque"
+    assert not bool(sim.city_bldg_pillaged[B0, ROW, j, sim._temple_bidx]), "a building hit took a second building"
     assert not bool(sim.city_bldg_pillaged[B0, ROW, j, dem]), "a disaster pillaged the Dar-e Mehr"
     print("  4 Mosque +1 spread, Dar-e Mehr disaster-proof OK")
 

@@ -27,10 +27,10 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT, FREE_CITY_DEFENSE } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
-import { drawAndPayGoody, unitReligious } from './units';
+import { drawAndPayGoody, raiseBestMelee, unitReligious } from './units';
 import { nextRandom } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
-import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
+import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
 import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_DAMAGE_SCALE, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
@@ -284,8 +284,10 @@ export function trainMovement(
   return mp;
 }
 
-/** Everything the CITY that trained a unit hands it for life, in one place. */
+/** Everything the CITY that trained or bought a unit hands it for life, in one
+ *  place, and the seat's strongest melee trained or bought (`raiseBestMelee`). */
 export function applyTrainingGrants(state: GameState, city: City, unit: Unit): void {
+  raiseBestMelee(state, city.seat, unit.type);
   const cls = promoClassOf(unit.type);
   unit.xpPct = trainXpPct(state, city, cls);
   const mp = trainMovement(state, city, cls);
@@ -749,14 +751,26 @@ export function stackDefenceCS(state: GameState, u: Unit): number {
     + formationCS(u) + convoyCS(state, u) - fuelShortCS(state, u);
 }
 /**
- * May a SHOT take this unit — a ranged attack, a city's or an Encampment's
- * strike, an air strike? Never a civilian, a religious unit included, ashore
- * or embarked: `CombatManager.CanAttackTarget` refused a Missionary, an
- * Apostle and a Builder to every ranged attacker and to a walled city's
- * strike, from every owner (runs/religious_target_20260926T_*.jsonl),
- * and accepted every combat unit. A support chassis stays a target.
+ * May a SHOT FROM THE GROUND take this unit — a ranged or bombard attack, a
+ * city's or an Encampment's strike? Only a military unit: never a civilian, a
+ * religious unit included, ashore or embarked — `CombatManager.CanAttackTarget`
+ * refused a Missionary, an Apostle and a Builder to every ranged attacker and
+ * to a walled city's strike, from every owner
+ * (runs/religious_target_20260926T_*.jsonl) — and never a Support chassis
+ * standing without a combat unit: a lone Anti-Air Gun was refused to a Field
+ * Cannon, a Trebuchet and a city, with no draw
+ * (runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl). Beside a
+ * combat unit the tile is a target and the combat unit takes the shot
+ * (`stackDefender`). An air strike asks `airTarget`.
  */
 export function shootable(u: Unit): boolean {
+  return unitDomain(u.type) === 'military';
+}
+
+/** May an AIR STRIKE take this unit? Anything but a civilian: a bomber and a
+ *  jet fighter were refused a Builder and a Missionary and took every lone
+ *  Support chassis (runs/b89t_fire_20260926.jsonl). */
+export function airTarget(u: Unit): boolean {
   return unitDomain(u.type) !== 'civilian';
 }
 
@@ -1026,7 +1040,7 @@ export function rangedCityPenalty(unitType: string, outerHp: number): number {
 
 /** The base a holder's centres and Encampments stand on: max(the start era's
  *  melee strength — a major's and a minor's each its own row — the strongest
- *  melee unit the seat has fielded, `Seat.bestMeleeCS`) - 10
+ *  melee unit the seat has ever trained or bought, `Seat.bestMeleeCS`) - 10
  *  (`CITY_BASE_MELEE_CUT`); for the Free Cities player a flat base of its
  *  own, measured at 72 with no walls standing. */
 function holderStrength(state: GameState, seat: number): number {
@@ -1977,8 +1991,16 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
  *
  * `priority` is PRIORITY TARGET: the tile's Support-class unit takes the blow
  * (`priorityDefender`), whoever else stands there, at the flat
- * `PRIORITY_TARGET_DAMAGE` and with no answers. A civilian is never struck
- * (`shootable`).
+ * `PRIORITY_TARGET_DAMAGE`, with no draw and no answers — a patrol on the
+ * struck tile or beside it never intercepts it
+ * (runs/c34t_patrol_priority_20260926.jsonl). A plain strike on a LONE
+ * Support chassis with no Anti-Air of its own deals the same flat blow with
+ * no draw, after the sortie's answers: a Battering Ram, a Medic, a Siege
+ * Tower and an Observation Balloon each took 65, a second strike killed, and
+ * only the sorties flown beside an Anti-Air Gun drew (its answer)
+ * (runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl). A lone
+ * Anti-Air Gun fights at its Anti-Air. A civilian is never struck
+ * (`airTarget`).
  */
 export function airStrike(
   state: GameState, attackerId: number, targetIndex: number, seat: number, priority = false,
@@ -2004,24 +2026,22 @@ export function airStrike(
     return r;
   }
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type) && shootable(u)
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type) && airTarget(u)
       && unitVisibleTo(state, u, attacker.seat),
   );
   if (enemies.length === 0) return { ok: false, reason: 'Nothing to strike.' };
   attacker.patrol = undefined;
   logUnitOrder(state, seat, attackerId, 'ranged', targetIndex);
-  if (support) {
-    // PRIORITY TARGET, as fired: a flat share of the support unit's hit
-    // points, no draw, no answer from the ground or the air, nothing back
-    // (`PRIORITY_TARGET_DAMAGE`).
-    support.hp -= PRIORITY_TARGET_DAMAGE;
-  } else {
-    if (!airAnswers(state, attacker, targetIndex)) return { ok: true };
-  }
+  // PRIORITY TARGET takes no answer from the ground or the air
+  if (!support && !airAnswers(state, attacker, targetIndex)) return { ok: true };
   // CIV6 (Air combat): "all air attacks are ranged", so the naval hex's
   // higher-chassis rule answers this blow too.
   const defender = support ?? stackDefender(state, enemies, true);
-  if (!support) {
+  if (support || (unitDomain(defender.type) === 'support' && antiAirAt(state, defender) <= 0)) {
+    // a flat share of the Support unit's hit points, no draw, nothing back
+    // (`PRIORITY_TARGET_DAMAGE`)
+    defender.hp -= PRIORITY_TARGET_DAMAGE;
+  } else {
     const atk = UNITS[attacker.type]?.ranged?.strength ?? 0;
     const def = airDefenseOf(state, defender);
     // CIV6 (Air combat): "all air attacks are ranged", so the sortie is a

@@ -21,7 +21,8 @@ and the exact twin is driven:
              Mimar Sinan's Industrial Zone culture bomb, and the route
              clauses (foreign-route Gold both ways, Todar Mal, Rockefeller,
              Ibn Fadlan)
-  own sites  Galileo beside a Mountain, Darwin and Janaki on or beside a
+  own sites  Galileo beside a Mountain, Darwin (paid for the wonder plot
+             underfoot too) and Janaki on or beside a
              wonder or a Rainforest, the wonder engineers on the wonder's own
              plot, James of St. George's missing Castle, Mary Leakey's
              Artifact city and its triple Tourism, James Young's Oil, Sun
@@ -473,6 +474,12 @@ def test_action_sites(rules, path, R) -> None:
     assert not p.site_ok(*dar, wild)
     sim.nwonder[B0, nb0] = True
     assert p.site_ok(*dar, wild)
+    # the wonder plot he stands on counts with the one beside him: 2 x 250
+    sim.nwonder[B0, wild] = True
+    sci0 = float(sim.civ_tech_prog[B0, ROW])
+    p.spend(*dar, wild)
+    assert float(sim.civ_tech_prog[B0, ROW]) == sci0 + 2 * sp(500), float(sim.civ_tech_prog[B0, ROW]) - sci0
+    sim.nwonder[B0, wild] = False
     sim.nwonder[B0, nb0] = False
     jan = p.person({p.fx("perAdjSource"): 2.0})
     assert int(sim._gp_site[jan]) == SITES["nearRainforest"]

@@ -714,10 +714,12 @@ export const METEOR_GRANT_CLASS = srcConst('disasters.meteorGrantClass', 'HEAVY_
  * row (FEATURE_JUNGLE = RAINFOREST, FEATURE_FOREST = WOODS), ONE site while
  * such a plot exists (lab 4: 6 and 6 in 251 turns at their column 6), the
  * plot a second draw. The plot BURNS (`RandomEvent_Yields` Turn 0), is BURNT
- * at Turn 2 and REGROWS at Turn 6, every turn counted from the event's own
- * start — the plots a fire spreads to share its clock, which is how its
- * "Fire Ended" notification (MinTurn 2) reports every one of them at once.
- * A plot the fire spreads to burns as the burning form of its own feature.
+ * at Turn 2 and REGROWS at Turn 6, every turn counted from the plot's OWN
+ * ignition: a plot the fire spreads to burns on its ignition turn and the
+ * next, is burnt four turns and regrows on its ignition + 6
+ * (runs/c74s3_fire_20260926T133940Z.jsonl,
+ * runs/c74s3_fire2_20260926T134425Z.jsonl). A plot the fire spreads to burns
+ * as the burning form of its own feature.
  */
 const FIRE_IDS = ['JUNGLE_FIRE', 'FOREST_FIRE'] as const;
 const fire = (col: string) => FIRE_IDS.map((id) => xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${id}`, col));
@@ -777,6 +779,14 @@ export const FIRE_SPREAD_P = srcConst('disasters.fireSpreadP', 0.5, {
 });
 export const FIRE_SPREAD_TURNS = srcConst('disasters.fireSpreadTurns', [1, 2] as const, {
   derived: 'the SPREAD row\'s MinTurn and MaxTurn', inputs: [...fireDmg('SPREAD', 'MinTurn'), ...fireDmg('SPREAD', 'MaxTurn')],
+});
+/** per fire row, JUNGLE then FOREST: 1 where the fire spreads into the
+ *  other row's feature too, 0 where it spreads into its own alone — a Forest
+ *  Fire never spreads into Rainforest; a Jungle Fire takes both, as the
+ *  Climate screen's "Spreads to adjacent Woods or Rainforest" reads. */
+export const FIRE_SPREAD_CROSS = srcConst('disasters.fireSpreadCross', [1, 0] as const, {
+  lab: 'runs/c74s3_fire_20260926T133940Z.jsonl and runs/c74s3_fire2_20260926T134425Z.jsonl',
+  note: 'five Forest Fires with three Rainforest neighbours each: no Rainforest plot ever burned, while the Woods neighbours caught in 2 of 5',
 });
 /** The burning plot's damage rows, every one at Percentage 101 — no roll: an
  *  improvement and a district pillaged, a civilian killed and the land units

@@ -30,7 +30,10 @@ Proven here:
     into the minor's own pot, the worship row raises the building the minor's
     religion names, the Flood Barrier waits on lowland and costs by it, the
     Trader row trains one under capacity with a route open, and a coastal
-    minor with no ship buys one.
+    minor with no ship buys one;
+  * a pillaged building waits for the item in hand, then comes first and
+    resumes at 75% of its cost (runs/c74s3_minor_pillage_20260926T132658Z.jsonl);
+    one in a pillaged district waits for the district.
 """
 
 from __future__ import annotations
@@ -689,6 +692,52 @@ def test_the_worship_row(rules, path) -> None:
     print("  13 worship OK — the building its religion names")
 
 
+def test_the_pillaged_repair(rules, path) -> None:
+    sim = build(rules, path)
+    s = a_minor(sim)
+    row = sim._CITY_MINOR0 + s
+    idle_builder(sim, s)
+    anc = walls_rows(sim)[0]
+    plan(sim, s, [walls_row(sim, rules)])
+    grant_walls_tech(sim, s, anc)
+    lib = BLD.index("LIBRARY")
+    campus = next(int(d["idx"]) for d in sim.districts_cat if d["id"] == "CAMPUS")
+    t = [t for t in range(sim.T) if int(sim.tile_seat[B0, t]) == 100 + s and int(sim.district[B0, t]) < 0
+         and bool(sim.passable[B0, t]) and t != int(sim.citystate_center[B0, s])][0]
+    sim.district[B0, t] = campus
+    sim.district_complete[B0, t] = True
+    sim.city_dist_tile[B0, row, 0, campus] = t
+    sim.city_bldg[B0, row, 0, lib] = True
+    sim.city_bldg_pillaged[B0, row, 0, lib] = True
+    sim.citystate_repair_wait[B0, s] = True
+    sim._bldg_version += 1
+    sim._eff_version += 1
+    # the walls are the item in hand: they land, the Library waits
+    sim.citystate_prod[B0, s] = float(sim.rules_dev.b_cost[anc])
+    sim._minor_build(s)
+    assert bool(sim.city_bldg[B0, row, 0, anc]), "the walls in hand did not land"
+    assert not bool(sim.citystate_repair_wait[B0, s]), "the wait outlived the item in hand"
+    assert bool(sim.city_bldg_pillaged[B0, row, 0, lib]), "the repair jumped the item in hand"
+    # the repair is the item now: 75% of the cost stands, the rest from the pot
+    assert sim._mb_repair_resume_pct == 75.0
+    full = float(sim.rules_dev.b_cost[lib])
+    left = full - (full * 75 // 100)
+    sim.citystate_prod[B0, s] = left - 1
+    sim._minor_build(s)
+    assert bool(sim.city_bldg_pillaged[B0, row, 0, lib]), "repaired short of its price"
+    sim.citystate_prod[B0, s] = left
+    sim._minor_build(s)
+    assert not bool(sim.city_bldg_pillaged[B0, row, 0, lib]), "the Library was not repaired"
+    assert float(sim.citystate_prod[B0, s]) == 0.0, float(sim.citystate_prod[B0, s])
+    # a pillaged district holds its buildings' repair back
+    sim.city_bldg_pillaged[B0, row, 0, lib] = True
+    sim.district_pillaged[B0, t] = True
+    sim.citystate_prod[B0, s] = 1000.0
+    sim._minor_build(s)
+    assert bool(sim.city_bldg_pillaged[B0, row, 0, lib]), "repaired inside a pillaged district"
+    print(f"  17 repair OK — after the item in hand, {left:.0f} of {full:.0f} left to build")
+
+
 def test_the_flood_barrier_row(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
@@ -800,6 +849,7 @@ def main() -> int:
     test_the_flood_barrier_row(rules, path)
     test_the_trader_row(rules, path)
     test_the_ship_purchase(rules, path)
+    test_the_pillaged_repair(rules, path)
     print("BATTERY OK minor_builds")
     return 0
 

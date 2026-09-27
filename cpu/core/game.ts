@@ -7,11 +7,11 @@ import { GWO_RELIC } from '../data/greatWorks';
 import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
-import { canFoundCity, availableBuildings, buildingCompletable, type RuleResult } from './rules';
+import { canFoundCity, availableBuildings, buildingCompletable, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked } from './units';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestMelee } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
@@ -44,13 +44,13 @@ import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { nextRandom } from './rand';
-import { ENHANCER_BELIEFS, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, worshipBuildingOf, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { ENHANCER_BELIEFS, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed } from '../data/constants';
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, cityHolders, grantFoundingPressure, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
+import { BARB_SEAT, allCities, cityHolders, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeDestCenter } from './trade';
@@ -303,7 +303,18 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
       extra -= 1;
     }
   }
+  // CIV6 (Religious Colonization): the founder's majority religion, read
+  // before the new city joins its count, carries the belief — the city starts
+  // with its citizen following it on the belief's pressure
+  const colonRel = majorityReligionOf(state, seat);
+  const colonRow = colonRel >= 0 ? seatOf(state, colonRel)?.religion : undefined;
+  const colon = colonRow?.founded && colonRow.enhancer ? ENHANCER_BELIEFS[colonRow.enhancer]?.effects.colonizePressure ?? 0 : 0;
   list.push(city);
+  if (colon > 0) {
+    city.religionPressure = new Array(state.seats.length).fill(0);
+    city.religionPressure[colonRel] = colon;
+    city.followedReligion = colonRel;
+  }
   logPopWrite(state, city, 'fd');
   addEraScore(state, seat, ERA_SCORE_FOUND);
   if (city.isCapital) {
@@ -643,17 +654,15 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
 export function buyWorshipBuilding(state: GameState, cityId: number, seat: number): RuleResult {
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
-  // the building the religion's Worship belief names
-  const wid = buyer.religion.founded ? worshipBuildingOf(buyer.religion.worship) : undefined;
-  if (!wid) return { ok: false, reason: 'The religion holds no Worship belief.' };
   // CIV6 (Urban Development Treaty, outcome B): a faith purchase still
   // CREATES a building in the district, so the ban covers it.
   if (congressUdtBlockedDistrict(state) === 'HOLY_SITE') return { ok: false, reason: 'The World Congress bans new Holy Site buildings.' };
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
-  if (city.buildings.includes(wid) || !city.buildings.includes('TEMPLE')) {
-    return { ok: false, reason: 'Needs a Temple, and no worship building yet.' };
-  }
+  // the building the city's majority religion's Worship belief names
+  const wid = worshipOffered(state, city);
+  if (!wid) return { ok: false, reason: 'The city is offered no worship building.' };
+  if (!city.buildings.includes('TEMPLE')) return { ok: false, reason: 'Needs a Temple.' };
   const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
   const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
   if (!ht?.districtComplete || ht.districtPillaged) {
@@ -1037,6 +1046,7 @@ function purchaseWarriorMonk(state: GameState, city: City, buyer: Seat, seat: nu
   const u = spawnUnit(state, 'WARRIOR_MONK', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
+  raiseBestMelee(state, seat, 'WARRIOR_MONK');
   patronSaint(state, city, u);
   return { ok: true };
 }

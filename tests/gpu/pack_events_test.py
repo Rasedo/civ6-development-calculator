@@ -16,7 +16,8 @@ Proven here:
     past the seat's research, in its nearest city, burning no fuel;
   * THE FIRE: a plot burns, is burnt at its fire's Turn 2 (+1 Food) and
     regrows at Turn 6 (+1 Production) with its chop planes and the adjacency
-    it lends restored exactly; it spreads on turns 1-2 on the same clock; it
+    it lends restored exactly; it spreads on its turns 1-2, each caught plot
+    on its own clock, and a Forest Fire never into Rainforest; it
     pillages, kills civilians and strikes land units 50-101 on turns 0-2 and
     costs one citizen on turn 0; while it lasts the plot takes no Lumber Mill,
     city, district or wonder, and lends the fire's Appeal;
@@ -274,10 +275,12 @@ def main() -> None:
     assert not bool(sim.major_unit_alive[B0, bld]), "a civilian is killed"
     print("  6 fire damage OK — the band on turns 0-2, the civilian, the Lumber Mill, one citizen")
 
-    # 7 — the spread: each adjacent live Woods catches at 50% on turns 1 and 2,
-    # on the fire's clock; one draw per candidate neighbour
+    # 7 — the spread: each adjacent live Woods catches at 50% on the burning
+    # plot's turns 1 and 2, one draw per candidate neighbour; a caught plot
+    # burns on its ignition turn and the next, is burnt four turns and is
+    # Woods again at ignition + 6, on its own clock
     caught = ring = 0
-    for it in range(150):
+    for it in range(100):
         sim = fresh(rules, path, slot=4)
         sim.rng_state[B0] = 7919 * (it + 1)
         nb = [n for n in sim.neigh[w].tolist() if n >= 0 and not bool(sim.water[B0, n])
@@ -298,17 +301,45 @@ def main() -> None:
         burning_now = [n for n in nb if int(sim.feat_id[B0, n]) == burning]
         # one spread draw per neighbour, then one band draw per burning plot
         assert draws(s0, int(sim.rng_state[B0])) == len(nb) + 1 + len(burning_now)
-        sim.turn = start + 2
-        sim._fire_turn()
+        seen = set()
+        prev = {n: int(sim.fire_start[B0, n]) for n in nb}
         for n in nb:
-            ring += 1
-            if int(sim.feat_id[B0, n]) == burnt:
-                caught += 1
-                assert int(sim.fire_start[B0, n]) == start, "a caught plot shares the fire's clock"
-            else:
-                assert int(sim.feat_id[B0, n]) == woods
+            if prev[n] >= 0:
+                assert prev[n] == start + 1, "a plot caught on turn 1 starts its own clock"
+                seen.add(n)
+        for turn in range(start + 2, start + 15):
+            sim.turn = turn
+            sim._fire_turn()
+            for n in nb:
+                fs = int(sim.fire_start[B0, n])
+                if fs < 0:
+                    assert int(sim.feat_id[B0, n]) == woods, (turn, n)
+                    prev[n] = fs
+                    continue
+                if fs != prev[n]:
+                    assert fs == turn, "a caught plot starts its own clock"
+                seen.add(n)
+                prev[n] = fs
+                age = turn - fs
+                assert age < 6, (turn, n, age)
+                assert int(sim.feat_id[B0, n]) == (burning if age < 2 else burnt), (turn, n, age)
+        ring += len(nb)
+        caught += len(seen)
     assert caught / ring > 0.72, f"{caught}/{ring} caught"
-    print(f"  7 fire spread OK — {caught}/{ring} neighbours caught on turns 1-2, on the fire's clock")
+    # a Forest Fire never spreads into Rainforest: no candidate, no draw
+    sim = fresh(rules, path, slot=4)
+    for n in nb:
+        sim.feat_id[B0, n] = sim._fire_start_fid[0]
+        sim.feat_stripped[B0, n] = False
+    sim._eff_version += 1
+    sim._ignite(rows, tiles, torch.tensor([start]))
+    for age in range(0, 4):
+        sim.turn = start + age
+        s0 = int(sim.rng_state[B0])
+        sim._fire_turn()
+        assert draws(s0, int(sim.rng_state[B0])) == (1 if age <= 2 else 0), age
+    assert all(int(sim.feat_id[B0, n]) == sim._fire_start_fid[0] and int(sim.fire_start[B0, n]) < 0 for n in nb)
+    print(f"  7 fire spread OK — {caught}/{ring} neighbours caught, each on its own clock; no Rainforest from a Forest Fire")
 
     # 8 — a two-plot wonder's ring: every plot touching either, each once
     sim = fresh(rules, path, slot=5)

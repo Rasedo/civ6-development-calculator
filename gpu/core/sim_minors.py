@@ -283,7 +283,8 @@ class SimMinors:
 
     def _minor_worship(self, s: int) -> torch.Tensor:
         """[B] long — `minorWorship`: the worship building minor `s`'s majority
-        religion's Worship belief names, -1 where none."""
+        religion's Worship belief names, -1 where none or while its city holds
+        a worship building."""
         fol = self._minor_followed()[:, s]
         n = self.civ_worship.shape[1]
         wi = torch.where((fol >= 0) & (fol < n),
@@ -292,7 +293,8 @@ class SimMinors:
         if self._worship_bidx.numel() == 0:
             return torch.full_like(wi, -1)
         wb = self._worship_bidx[wi.clamp(min=0, max=self._worship_bidx.numel() - 1)]
-        return torch.where(wi >= 0, wb, torch.full_like(wi, -1))
+        holds = (self.city_bldg[:, self._CITY_MINOR0 + s, 0] & self._b_worship.unsqueeze(0)).any(dim=1)
+        return torch.where((wi >= 0) & ~holds, wb, torch.full_like(wi, -1))
 
     def _pave_plot(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """`paveGround` — the ground a district or a wonder takes, for every
@@ -550,6 +552,8 @@ class SimMinors:
         self._mb_builder_pct = float(cs["builderProdPct"])
         self._mb_military_pct = float(cs["militaryProdPct"])
         self._mb_small_military = int(cs["smallMilitary"])
+        # a pillaged building resumes at this percent of its cost
+        self._mb_repair_resume_pct = float(cs["repairResumePct"])
         # THE MINOR'S PURSE (`minorPurchases`, `minorUpgrades`)
         self._mb_buy_slots = torch.tensor([int(x) for x in cs["builderBuySlots"]], dtype=torch.long, device=dev)
         self._mb_buy_floor = float(cs["militaryBuyFloor"])
@@ -559,9 +563,8 @@ class SimMinors:
         self._mb_upgrade_gold = float(cs["upgradeGold"])
         self._mb_naval_bp = int(cs["navalBuyBp"])
         self._mb_naval_cls = int(cs["navalClass"])
-        # THE LEVY: the army's turns away, and its price's share
+        # THE LEVY: the army's turns away
         self._levy_turns = int(cs["levyTurns"])
-        self._levy_cost_pct = float(cs["levyCostPct"])
         # what a city-state destination pays a city-state's route
         self._minor_cs_route_gold = float(rules.trade["cityStateRouteGold"])
         self._minor_cs_route_spec = float(rules.trade["cityStateRouteSpec"])
@@ -705,11 +708,48 @@ class SimMinors:
             ok = ok & (self.city_outer_hp[:, row, 0] >= self._walls_tier_hp[self._minor_walls_tier(s)])
         return ok
 
-    def _minor_train(self, s: int, pay: torch.Tensor, ui: torch.Tensor, cost: torch.Tensor) -> None:
+    def _minor_train(self, s: int, pay: torch.Tensor, ui: torch.Tensor, cost: torch.Tensor) -> torch.Tensor:
         """A unit the pot covers lands (`_minor_spawn`); only a unit that lands
-        is paid for."""
+        is paid for. Returns where one landed."""
         landed = self._minor_spawn(s, pay, ui)
         self.citystate_prod[:, s] -= torch.where(landed, cost, torch.zeros_like(cost))
+        return landed
+
+    def _minor_repair_target(self, s: int) -> torch.Tensor:
+        """[B] long — `minorRepairTarget`: the pillaged building minor `s`
+        repairs next, the first in the layout whose district stands complete
+        and unpillaged (a City Center row always); -1 for none."""
+        row = self._CITY_MINOR0 + s
+        NB = int(self._b_req_district.shape[0])
+        pil = self.city_bldg_pillaged[:, row, 0] & self.city_bldg[:, row, 0]            # [B, NB]
+        rq = self._b_req_district
+        dt = self.city_dist_tile[:, row, 0][:, rq.clamp(min=0)]                          # [B, NB]
+        d0 = dt.clamp(min=0)
+        clean = (dt >= 0) & self.district_complete.gather(1, d0) & ~self.district_pillaged.gather(1, d0)
+        ok = pil & ((rq < 0).unsqueeze(0) | clean)
+        first = torch.where(ok, torch.arange(NB, device=self.device).unsqueeze(0), torch.full_like(dt, NB)).min(dim=1).values
+        return torch.where(first < NB, first, torch.full_like(first, -1))
+
+    def _minor_repair_now(self, s: int, mask: torch.Tensor, target: torch.Tensor, toward) -> None:
+        """The repair where `mask`: the pot takes the turn's Production and the
+        building (`target`) completes when the pot covers what is left past
+        `MINOR_REPAIR_RESUME_PCT` of its cost (`minorBuild`'s `repairNow`)."""
+        if not bool(mask.any()):
+            return
+        toward(mask, 0.0)
+        row = self._CITY_MINOR0 + s
+        tc = target.clamp(min=0)
+        full = self.rules_dev.b_cost.to(torch.float64)[tc]
+        if self._barrier_bidx >= 0:
+            full = torch.where(tc == self._barrier_bidx, self._flood_barrier_cost(row)[:, 0].double(), full)
+        cost = full - torch.floor(full * self._mb_repair_resume_pct / 100)
+        pay = mask & (self.citystate_prod[:, s] >= cost)
+        if bool(pay.any()):
+            rr = pay.nonzero(as_tuple=True)[0]
+            self.citystate_prod[rr, s] -= cost[rr]
+            self.city_bldg_pillaged[rr, row, 0, tc[rr]] = False
+            self._bldg_version += 1
+            self._eff_version += 1
 
     def _minor_spawn(self, s: int, mask: torch.Tensor, ui: torch.Tensor,
                      grants: bool = True) -> torch.Tensor:
@@ -717,7 +757,8 @@ class SimMinors:
         (`spawnUnit`, the ordinary rule) under its seat, carrying what the
         city's buildings hand a unit trained there (`applyTrainingGrants`)
         unless `grants` is off; a Builder counts toward the next one's price.
-        The games where it landed."""
+        Every such unit is trained or bought, so it raises the minor's best
+        melee (`_raise_best_melee`). The games where it landed."""
         if not bool(mask.any()):
             return torch.zeros_like(mask)
         row = self._CITY_MINOR0 + s
@@ -729,6 +770,7 @@ class SimMinors:
                 self.city_dist_tile[:, row, 0], self.city_bldg_pillaged[:, row, 0])
             xp = self._train_xp_pct(bl, u0, row, col0)
         landed = self._spawn_unit(row, mask, self.citystate_center[:, s].clamp(min=0), u0, init_xp=xp)
+        self._raise_best_melee(row, landed, u0)
         if self._builder_idx >= 0:
             self.citystate_builders_trained[:, s] += (landed & (u0 == self._builder_idx)).long()
         self._gen_ver += 1
@@ -749,7 +791,10 @@ class SimMinors:
         Trader waits on a route open to it and room under its capacity; the
         repair restores the walls at the HP it puts back; a district project
         pays its yield conversion into the minor's own pot; a district paves
-        its plot (`_pave_plot`)."""
+        its plot (`_pave_plot`). A pillaged building is queued behind the item
+        in hand when it fell (`citystate_repair_wait`, cleared as an item
+        completes or when no row wants one) and then comes first
+        (`_minor_repair_target`, `_minor_repair_now`)."""
         if self.S == 0:
             return
         alive = self.citystate_alive[:, s]
@@ -798,7 +843,12 @@ class SimMinors:
         d_per = dcp["perDistrict"]
         _d_pg = dcp["progressGame"]
 
-        halt = ~alive
+        # a pillaged building queued behind the item in hand comes first once
+        # that item is done (`citystate_repair_wait`)
+        rep = self._minor_repair_target(s)
+        rep_now = alive & (rep >= 0) & ~self.citystate_repair_wait[:, s]
+        self._minor_repair_now(s, rep_now, rep, toward)
+        halt = ~alive | rep_now
         for r, kind in enumerate(self._mb_kind):
             if bool(halt.all()):
                 break
@@ -816,8 +866,9 @@ class SimMinors:
                     continue
                 toward(avail, self._mb_builder_pct)
                 cost = self._builder_cost(self.citystate_builders_trained[:, s]).double()
-                self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost),
-                                  torch.full((B,), self._builder_idx, dtype=torch.long, device=dev), cost)
+                done = self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost),
+                                         torch.full((B,), self._builder_idx, dtype=torch.long, device=dev), cost)
+                self.citystate_repair_wait[:, s] &= ~done
                 halt = halt | avail
                 continue
             if kind in ("unit", "army"):
@@ -835,7 +886,8 @@ class SimMinors:
                     continue
                 toward(avail, mil_pct)
                 cost = self._type_cost[ui.clamp(min=0)].double()
-                self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost), ui, cost)
+                done = self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost), ui, cost)
+                self.citystate_repair_wait[:, s] &= ~done
                 halt = halt | avail
                 continue
             if kind == "trader":
@@ -855,8 +907,9 @@ class SimMinors:
                     continue
                 toward(avail, 0.0)
                 cost = self._trader_cost(row).double()
-                self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost),
-                                  torch.full((B,), self._trader_idx, dtype=torch.long, device=dev), cost)
+                done = self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost),
+                                         torch.full((B,), self._trader_idx, dtype=torch.long, device=dev), cost)
+                self.citystate_repair_wait[:, s] &= ~done
                 halt = halt | avail
                 continue
             if kind == "repair":
@@ -866,6 +919,7 @@ class SimMinors:
                     continue
                 toward(avail, 0.0)
                 pay = avail & (self.citystate_prod[:, s] >= cost_r)
+                self.citystate_repair_wait[:, s] &= ~pay
                 if bool(pay.any()):
                     rr = pay.nonzero(as_tuple=True)[0]
                     self.citystate_prod[rr, s] -= cost_r[rr]
@@ -894,6 +948,7 @@ class SimMinors:
                     if pi in self._proj_fp:
                         # a project still running lights the next turn's grid
                         self.citystate_full_power[:, s] |= avail & ~pay
+                    self.citystate_repair_wait[:, s] &= ~pay
                     if bool(pay.any()):
                         self.citystate_prod[:, s] -= torch.where(pay, cost_p, zero_b)
                         yi = int(prow["y"])
@@ -922,6 +977,7 @@ class SimMinors:
                     cost_b = (self._flood_barrier_cost(row)[:, 0].double() if bi == self._barrier_bidx
                               else torch.full_like(zero_b, float(rd.b_cost[bi])))
                     pay = avail & (self.citystate_prod[:, s] >= cost_b)
+                    self.citystate_repair_wait[:, s] &= ~pay
                     if bool(pay.any()):
                         rr = pay.nonzero(as_tuple=True)[0]
                         self.city_bldg[rr, row, 0, bi] = True
@@ -982,6 +1038,7 @@ class SimMinors:
                             f" b{int(_t - _g)} g{int(_g)} t{int(_t)}"
                             f" pot{int(float(self.citystate_prod[_b, s]))}")
                 pay = avail & (self.citystate_prod[:, s] >= d_cost)
+                self.citystate_repair_wait[:, s] &= ~pay
                 if bool(pay.any()):
                     rr = pay.nonzero(as_tuple=True)[0]
                     tt = splane.long().argmax(dim=1)[rr]
@@ -995,7 +1052,12 @@ class SimMinors:
                     self.citystate_prod[rr, s] -= d_cost[rr]
                     self._eff_version += 1
                 halt = halt | avail
-        toward(~halt, 0.0)
+        # no item in hand: a pillaged building is the item now
+        idle = ~halt
+        self.citystate_repair_wait[:, s] &= ~idle
+        rep_idle = idle & (rep >= 0)
+        self._minor_repair_now(s, rep_idle, rep, toward)
+        toward(idle & ~rep_idle, 0.0)
 
     def _minor_upgrades(self, s: int, gained: torch.Tensor) -> None:
         """`minorUpgrades` — CIV6 (Leaders.xml, MinorCivTriggeredTrees): a

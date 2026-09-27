@@ -1013,7 +1013,10 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_EMILIE_DU_CHATELET: { eurekaRandom: 3, eurekaHi: 1 },
   GP_GALILEO_GALILEI: { site: 'nearMountain', perAdjacent: { source: 'MOUNTAIN', yield: 'science', amount: gpScaled('GP_GALILEO_SCIENCE', 'GREATPERSON_ADJACENT_GRASSMOUNTAIN_SCIENCE', 250) } },
   GP_ISAAC_NEWTON: { buildings: ['LIBRARY', 'UNIVERSITY'], perm: { universityScience: gpArg('GP_NEWTON_UNIVERSITY_SCIENCE', 'GREATPERSON_UNIVERSITIES_SMALL_SCIENCE', 2) } },
-  GP_CHARLES_DARWIN: { site: 'nearNaturalWonder', perAdjacent: { source: 'NATURAL_WONDER', yield: 'science', amount: gpScaled('GP_DARWIN_SCIENCE', 'GREATPERSON_ADJACENT_NATURALWONDER_SCIENCE', 500) } },
+  // the natural-wonder plot he stands on counts too: 250 a wonder plot
+  // online, the plot underfoot included (on a wonder with 3 adjacent 1000,
+  // with 2 750, beside 2 500; runs/b93s1_darwin_20260926T132306Z.jsonl)
+  GP_CHARLES_DARWIN: { site: 'nearNaturalWonder', perAdjacent: { source: 'NATURAL_WONDER', yield: 'science', amount: gpScaled('GP_DARWIN_SCIENCE', 'GREATPERSON_ADJACENT_NATURALWONDER_SCIENCE', 500), here: true } },
   GP_DMITRI_MENDELEEV: { eurekaTechs: ['CHEMISTRY'], eurekaRandom: 1 },
   GP_JAMES_YOUNG: {
     eurekaRandom: 2, eurekaHi: 1,

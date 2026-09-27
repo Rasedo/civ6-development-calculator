@@ -73,17 +73,15 @@ class SimPhase:
         # measures from the district's tile, the centre's otherwise.
         org = ctr if origin is None else origin.clamp(min=0)
         dist = self.pair_dist[org].to(torch.long)  # [B, T]
-        # a strike is a SHOT: a support chassis is a target, a civilian never
-        # (`shootable`), ashore or afloat
-        _mil, _civ = self._visible_military_at(seat), self.support_at
+        # a strike is a SHOT: it takes a military unit alone, ashore or afloat
+        # — never a civilian, never a lone Support chassis (`shootable`)
+        _mil = self._visible_military_at(seat)
         _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
-        _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
-        _emb = self._shot_embarked_plane()
+        _emb = self._shot_embarked_plane(False)
         _eseat = torch.where(_emb >= 0, self.unit_seat.gather(1, _emb.clamp(min=0)), torch.full_like(_emb, -1))
         hm = self._seats_hostile(seat, _mseat)
-        hc = self._seats_hostile(seat, _cseat)
         he = self._seats_hostile(seat, _eseat)
-        valid = fire.unsqueeze(1) & (hm | hc | he) & (dist >= 1) & (dist <= 2)
+        valid = fire.unsqueeze(1) & (hm | he) & (dist >= 1) & (dist <= 2)
         arangeT = torch.arange(Tn, device=dev2)
         k = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
         best_key = k.min(dim=1).values
@@ -91,14 +89,11 @@ class SimPhase:
         strike = fire & (best_key < 10**9)
         if not bool(strike.any()):
             return
-        _okm, _okc = hm[bidx, tt], hc[bidx, tt]
         # a city strike is a SHOT, so `stackDefender`'s higher-chassis arm picks
-        _ms_t, _mq_t, _okm, _cs_t, _cq_t, _okc = self._stack_fold(
-            tt, seat, _mil[bidx, tt], _mseat[bidx, tt], _okm,
-            _civ[bidx, tt], _cseat[bidx, tt], _okc, ranged=True)
-        _okc = self._shot_ok(_cs_t, _okc)
-        d_slot = torch.where(_okm, _ms_t, torch.where(_okc, _cs_t, torch.full_like(tt, -1)))
-        d_seat = torch.where(_okm, _mq_t, torch.where(_okc, _cq_t, torch.full_like(tt, -1)))
+        _ms_t, _mq_t, _okm = self._shot_fold(
+            tt, seat, _mil[bidx, tt], _mseat[bidx, tt], hm[bidx, tt])
+        d_slot = torch.where(_okm, _ms_t, torch.full_like(tt, -1))
+        d_seat = torch.where(_okm, _mq_t, torch.full_like(tt, -1))
         ds0 = d_slot.clamp(min=0)
         # A MILITARY target whose seat class earns xp — never a barbarian and
         # never the Free Cities' own.
@@ -149,7 +144,7 @@ class SimPhase:
         def_e = def_e + self._roster_cs(_def_seat, d_type, tt, torch.full_like(tt, seat), None, True,
                                         self.unit_formation[bidx, ds0],
                                         self.unit_levied[bidx, ds0]).to(def_e.dtype)
-        self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
+        self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)
 
     def _seat_turn(self, row: int) -> torch.Tensor:
@@ -645,8 +640,9 @@ class SimPhase:
         """`grantFreeCityUnit` for the Free City in column `col` [B] of the
         free row, in the games of `mask` [B], of chassis `unit_type` [B] (-1
         grants nothing). Each stands on the NEAREST free land plot outward from
-        the centre, never the centre itself, the lowest tile index among the
-        plots at one distance; with none free anywhere it is not granted. The
+        the centre, never the centre itself nor a plot holding a district, the
+        lowest tile index among the plots at one distance; with none free
+        anywhere it is not granted. The
         unit lands in the hostile pool under FREE_SEAT, where the Free Cities'
         walker moves it (`_free_walk`); it remembers the city that granted it
         (`unit_free_city`), whose join takes it."""
@@ -659,7 +655,8 @@ class SimPhase:
         ground = self.passable
         if self._imp_portal_any:
             ground = ground | self._portal_plane()
-        ok = ground & ~self._blocked_for(tiles, FREE_SEAT) & (tiles != ctr.unsqueeze(1))
+        ok = (ground & ~self._blocked_for(tiles, FREE_SEAT) & (tiles != ctr.unsqueeze(1))
+              & (self.district < 0))
         key = torch.where(ok, self.pair_dist[ctr].long() * T + tiles, torch.full_like(tiles, T * T))
         best = key.min(dim=1).values
         spot = torch.remainder(best, T)
@@ -1241,9 +1238,10 @@ class SimPhase:
             fp = fp | self._allied_type(row, 3, 3).any(dim=1)
             _bl_u = self.city_bldg[bidx, row, col, :] & ~self._bldg_dark(
                 self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])
-            self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp,
-                             free_promo=fp, formation=form_t,
-                             init_mp=self._train_mp_bonus(_bl_u, ui, row))
+            _tr = self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp,
+                                   free_promo=fp, formation=form_t,
+                                   init_mp=self._train_mp_bonus(_bl_u, ui, row))
+            self._raise_best_melee(row, _tr, ui)
             # CIV6 (People of the Steppe): "Receive a second light cavalry
             # unit ... each time you train a light cavalry unit" — a TRAINED
             # one, the Arsenal's own door (`EXTRA_UNIT_COPY_ROWS`)
@@ -1261,7 +1259,8 @@ class SimPhase:
                 if not bool(_ew.any()):
                     continue
                 for _ in range(_en):
-                    self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t)
+                    self._raise_best_melee(
+                        row, self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui)
             # CIV6 (Suleiman's Janissary): the chassis costs the TRAINING city
             # a citizen, in a city this seat founded.
             for _pc, _pl, _pu, _pa, _pf in self._live_rows(row, self._unit_pop_cost_rows):
@@ -1284,7 +1283,8 @@ class SimPhase:
                 twin = made_u & self.unit_naval[ui] & self._seat_wonder_any(row, self._wond_dupnaval)
                 if bool(twin.any()):
                     # what was trained arrives twice, tier and all
-                    self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t)
+                    self._raise_best_melee(
+                        row, self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui)
             if self._builder_idx >= 0:
                 made_b = made_u & (ui == self._builder_idx)
                 self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + made_b.long()

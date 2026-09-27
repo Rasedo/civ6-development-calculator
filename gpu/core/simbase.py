@@ -168,7 +168,7 @@ class Rules:
     faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
     purchase_divisor: int  # every gold / faith price is floored to a multiple of this (PURCHASE_DIVISOR 5, measured)
     civic_unlock: tuple  # (CivicUnlockMaxCost, CivicUnlockPerTurnDrop, CivicUnlockMinCost) — `policyUnlockCost`
-    policy_unlock_k: tuple  # (k's base, k's per-tech step, both in tenths; the rounding step) — `policyUnlockCost`
+    policy_unlock_terms: tuple  # ((tech first, tech prices), (civic first, civic prices), the rounding step) — `policyUnlockCost`
     anarchy_turns: int  # the turns a return to a held government leaves the seat in none (ANARCHY_TURNS)
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
@@ -391,8 +391,9 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         purchase_divisor=int(r["scenario"]["purchaseDivisor"]),
         civic_unlock=(int(r["scenario"]["civicUnlockMaxCost"]), int(r["scenario"]["civicUnlockPerTurnDrop"]),
                       int(r["scenario"]["civicUnlockMinCost"])),
-        policy_unlock_k=(int(r["scenario"]["policyUnlockKBase"]), int(r["scenario"]["policyUnlockKPerTech"]),
-                         int(r["scenario"]["policyUnlockRound"])),
+        policy_unlock_terms=((int(r["scenario"]["policyUnlockTechFirst"]), tuple(int(x) for x in r["scenario"]["policyUnlockTechPrice"])),
+                             (int(r["scenario"]["policyUnlockCivicFirst"]), tuple(int(x) for x in r["scenario"]["policyUnlockCivicPrice"])),
+                             int(r["scenario"]["policyUnlockRound"])),
         anarchy_turns=int(r["scenario"]["anarchyTurns"]),
         turn_limit=r["scenario"]["turnLimit"],
         space_ly_target=r["scenario"]["spaceLyTarget"],
@@ -893,6 +894,7 @@ _MUTABLE = [
     "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee",
     "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
+    "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
     "city_free_pot",  # a Free City's build pot
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",

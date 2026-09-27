@@ -416,22 +416,25 @@ def test_epic_quest_levy(rules, path) -> None:
         sim._minor_spawn(0, torch.ones(sim.B, dtype=torch.bool),
                          torch.full((sim.B,), sim._warrior_idx, dtype=torch.long), grants=False)
     base = float(sim._levy_cost(rome, s0)[0])
-    assert base > 0
+    army = sim._minor_army(s0)[B0].nonzero(as_tuple=True)[0]
+    assert base == float(sim._type_cost[sim.major_unit_type[B0, army]].sum()) and base > 0
+    half = float(int(base) // 2)
     play(sim, rome, "SUMERIA")
-    assert float(sim._levy_cost(rome, s0)[0]) == base / 2
-    # the Foreign Ministry's row of the same modifier sums with it: free
-    # together, half alone, nothing from a pillaged one
+    assert float(sim._levy_cost(rome, s0)[0]) == half
+    # the Foreign Ministry's row of the same modifier takes its half in turn:
+    # a quarter together (each truncating), half alone, nothing from a
+    # pillaged one
     fm = [b["id"] for b in rules.buildings].index("FOREIGN_MINISTRY")
     j = int(sim.city_alive[B0, rome].nonzero(as_tuple=True)[0][0])
     sim.city_bldg[B0, rome, j, fm] = True
-    assert float(sim._levy_cost(rome, s0)[0]) == 0
+    assert float(sim._levy_cost(rome, s0)[0]) == float(int(half) // 2)
     play(sim, rome, "ROME")
-    assert float(sim._levy_cost(rome, s0)[0]) == base / 2
+    assert float(sim._levy_cost(rome, s0)[0]) == half
     sim.city_bldg_pillaged[B0, rome, j, fm] = True
     assert float(sim._levy_cost(rome, s0)[0]) == base
     sim.city_bldg_pillaged[B0, rome, j, fm] = False
     sim.city_bldg[B0, rome, j, fm] = False
-    print("  9 Epic Quest OK — half-price levies, the Foreign Ministry's half summed")
+    print("  9 Epic Quest OK — half-price levies, the Foreign Ministry's half in turn")
 
 
 def main() -> int:

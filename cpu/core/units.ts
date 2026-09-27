@@ -1658,6 +1658,23 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
   return best;
 }
 
+/** A seat TRAINED or BOUGHT `unitType`: the strongest melee it has ever done
+ *  so rises to it and never falls (`Seat.bestMeleeCS`, the base its centres
+ *  stand on). The live game raised the base at the purchase in every city at
+ *  once and kept it after the unit died; a unit merely created, granted,
+ *  captured or only buildable moved nothing
+ *  (runs/b95t_p1_mech_bought_20260927.jsonl,
+ *  runs/b95t_p0_mech_buy_del_20260927T003125Z.jsonl,
+ *  runs/b95t_p1_mech_create_del_20260927T002833Z.jsonl,
+ *  runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl,
+ *  runs/b95t_p0_tech_only_20260927T003037Z.jsonl). */
+export function raiseBestMelee(state: GameState, seat: number, unitType: string): void {
+  const def = UNITS[unitType];
+  if (!def || !(def.combat > 0) || def.ranged) return;
+  const owner = seatOf(state, seat);
+  if (owner) owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat);
+}
+
 /** `far`: a GRANT, which the game places on the nearest plot that takes the
  *  unit however far that is — past the anchor and its ring, the whole map by
  *  distance, the lower tile index on a tie. */
@@ -1748,13 +1765,6 @@ export function spawnUnit(
   }
   state.units.push(unit);
   revealAround(state, seat, unit.tileIndex, unitSight(unit, state), { seeThrough: unitSeesThrough(unit) });
-  // Track the strongest MELEE unit each civ has ever fielded —
-  // real Civ 6 bases city defense on it (spawnUnit is the chokepoint for
-  // training, purchase, levies and seat production alike).
-  if (def.combat > 0 && !def.ranged) {
-    const owner = seatOf(state, seat);
-    if (owner) owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat);
-  }
   // CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose price
   // climbs is priced off every copy the seat has ever acquired, so the tally is
   // taken at the one place a unit is born — a purchase, a grant or a Great

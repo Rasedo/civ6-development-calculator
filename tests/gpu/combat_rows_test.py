@@ -223,7 +223,7 @@ def _strike_def_e(sim, utype: str) -> float:
     finally:
         del sim._city_strike_resolve
     assert got, "the city found no target"
-    strike, t_hit, d_slot, def_e = got[0][0], got[0][1], got[0][2], got[0][8]
+    strike, t_hit, d_slot, def_e = got[0][0], got[0][1], got[0][2], got[0][7]
     assert bool(strike[B0]) and int(t_hit[B0]) == tt and int(d_slot[B0]) == slot + sim.POOL_LO["major"]
     return float(def_e[B0])
 

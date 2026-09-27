@@ -326,6 +326,13 @@ export const MINOR_STARTING_UNITS = srcConst('cityState.startingUnits', 2, {
  *  TRAIT_LEADER_MAJOR_CIV alone. */
 export const MINOR_PRODUCTION_PCT = srcConst('cityState.productionPct', -50,
   xml('ModifierArguments', 'ModifierId=MINOR_CIV_PRODUCTION_PENALTY&Name=Amount', 'Value'));
+/** A minor's repair of a pillaged building: it resumes the building at
+ *  this percent of its cost, the rest built with Production — 100 less the
+ *  install's PILLAGE_BUILDING_REPAIR_PERCENT 25. */
+export const MINOR_REPAIR_RESUME_PCT = srcConst('cityState.repairResumePct', 75, {
+  lab: 'runs/c74s3_minor_pillage_20260926T132658Z.jsonl',
+  note: 'the minor finishes its current item, then queues the pillaged building, which resumes at University 93 of 125 and Meeting House 71 of 95 and is built with Production; nothing bought',
+});
 export const MINOR_WALLS_PROD_PCT = srcConst('cityState.wallsProdPct', 200,
   xml('ModifierArguments', 'ModifierId=MINOR_CIV_PRODUCTION_WALLS&Name=Amount', 'Value'));
 export const MINOR_HARBOR_PROD_PCT = srcConst('cityState.harborProdPct', 500,
@@ -708,14 +715,10 @@ export const FREE_CITY_BUILD_ROWS: readonly FreeCityBuildRow[] = [
  *  current military units. The units will not be able to move on the turn
  *  they are levied, but will take orders from the Suzerain on the following
  *  turn. They will return to the city-state after {2_TurnLimit} Turns, or if
- *  the Suzerain changes." The turn limit is `LEVY_MILITARY_TURN_DURATION`; the
- *  price is `LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST` of the units' own
- *  Gold purchase prices, summed. The turn limit runs online through
- *  `speedTurns`. */
+ *  the Suzerain changes." The turn limit is `LEVY_MILITARY_TURN_DURATION`,
+ *  run online through `speedTurns`; the price is `levyGoldCost`'s. */
 export const LEVY_TURNS = srcConst('cityState.levyTurns', speedTurns(30),
   speedTurnsSrc(xml('GlobalParameters', 'Name=LEVY_MILITARY_TURN_DURATION', 'Value'), 30));
-export const LEVY_COST_PCT = srcConst('cityState.levyCostPct', 25,
-  xml('GlobalParameters', 'Name=LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST', 'Value'));
 
 export const GOV_INFLUENCE_TIER: Record<string, number> = {
   CHIEFDOM: 0,

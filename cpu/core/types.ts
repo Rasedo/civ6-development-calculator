@@ -854,6 +854,9 @@ export interface CityState extends Seat {
   buildings?: string[];
   /** `City.pillagedBuildings` for the minor's city — the same ONE reader. */
   pillagedBuildings?: string[];
+  /** a building was pillaged while the minor worked on an item: its repair
+   *  waits until that item completes (`minorBuild`). */
+  repairWait?: boolean;
   outerHp?: number;
   /** the build pot: the city's own Production, banked until the build
    *  table's next item is covered (`minorPhase`). */

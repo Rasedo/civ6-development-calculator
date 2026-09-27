@@ -194,34 +194,52 @@ describe('the fires', () => {
     expect(tileYields(ctx, c).production).toBe(woodsProd + 1);
   });
 
-  it('spreads to each adjacent Woods at 50% on the fire\'s turns 1 and 2, on the fire\'s clock', () => {
-    const N = 400;
+  it('spreads to each adjacent Woods at 50% on its turns 1 and 2, each caught plot on its own clock', () => {
+    const N = 200;
     let caught = 0;
     let ring = 0;
     for (let i = 0; i < N; i++) {
       const { state, c, stand } = woodsBoard();
       state.rngState = 1000 + i;
       light(c, T0);
-      phaseAt(state, T0);
-      // turn 0: nothing spreads
-      expect(stand.slice(1).every((t) => t.feature === 'WOODS')).toBe(true);
-      phaseAt(state, T0 + 1);
-      phaseAt(state, T0 + 2);
-      for (const t of stand.slice(1)) {
-        ring++;
-        if (t.feature === 'WOODS') continue;
-        caught++;
-        // caught on turn 1 or 2, it is burnt with the rest at the fire's Turn 2
-        expect(t.feature).toBe('BURNT_WOODS');
-        expect(t.fireStart).toBe(T0);
+      const seen = new Set<Tile>();
+      for (let turn = T0; turn <= T0 + 14; turn++) {
+        const before = new Map(stand.map((t) => [t, t.fireStart]));
+        phaseAt(state, turn);
+        // turn 0: nothing spreads
+        if (turn === T0) expect(stand.slice(1).every((t) => t.feature === 'WOODS')).toBe(true);
+        for (const t of stand) {
+          if (t.fireStart === undefined) {
+            expect(t.feature).toBe('WOODS');
+            continue;
+          }
+          // a plot caught this turn starts its own clock now
+          if (t.fireStart !== before.get(t)) expect(t.fireStart).toBe(turn);
+          if (t !== c) seen.add(t);
+          const age = turn - t.fireStart;
+          // it burns on its ignition turn and the next, is burnt four turns
+          // and is Woods again at ignition + 6
+          expect(t.feature).toBe(age < FIRE_BURNT_TURN ? 'BURNING_WOODS' : 'BURNT_WOODS');
+          expect(age).toBeLessThan(FIRE_REGROW_TURN);
+        }
       }
-      // and it regrows with the rest
-      for (let turn = T0 + 3; turn <= T0 + FIRE_REGROW_TURN; turn++) phaseAt(state, turn);
-      expect(stand.every((t) => t.feature === 'WOODS' || t.feature === null)).toBe(true);
+      ring += stand.length - 1;
+      caught += seen.size;
     }
     // a ring plot misses both turns' draws from the centre at 1/4 before the
     // other ring plots' own spreads — at least 3/4 catch
     expect(caught / ring).toBeGreaterThan(0.72);
+  });
+
+  it('a Forest Fire never spreads into Rainforest', () => {
+    for (let i = 0; i < 40; i++) {
+      const { state, c, stand } = woodsBoard();
+      state.rngState = 2000 + i;
+      for (const t of stand.slice(1)) t.feature = 'RAINFOREST';
+      light(c, T0);
+      for (let turn = T0; turn <= T0 + 3; turn++) phaseAt(state, turn);
+      expect(stand.slice(1).every((t) => t.feature === 'RAINFOREST' && t.fireStart === undefined)).toBe(true);
+    }
   });
 
   it('pillages, kills civilians and burns land units 50-101 on turns 0-2, and costs one citizen on turn 0', () => {

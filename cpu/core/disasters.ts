@@ -1,5 +1,5 @@
 
-import type { City, GameState, Tile } from './types';
+import type { City, CityState, GameState, Tile } from './types';
 import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -18,7 +18,8 @@ import { UNITS } from '../data/units';
 import { rowIsFor } from '../data/civilizations';
 import { cityAtIndex, unitIsNoncombat } from './units';
 import { outerPool } from './rules';
-import { pillageBuilding } from './yields';
+import { buildingPillaged, pillageBuilding } from './yields';
+import { centerBuildingIds } from './prodLayout';
 import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
@@ -27,7 +28,7 @@ import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_DURATION, DROUGH
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
 import { EVENT_NORM_PER_MAP, EVENT_NORM_PER_SITE, FIRST_TIME_OCCURRENCE_BOOST, VOLCANO_WAKE_P, DROUGHT_DISTANCE_WEIGHTS } from '../data/disasters';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
-import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
+import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_SPREAD_CROSS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
 import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
 import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
 import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
@@ -59,38 +60,70 @@ function scorch(state: GameState, tile: Tile): void {
 }
 
 /** CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile, not
- *  just the improvement — the buildings inside it go dark with it, which is
- *  what a Dam is built to prevent. A city CENTER is never pillaged. */
-function pillageDistrict(state: GameState, tile: Tile): void {
+ *  just the improvement, which is what a Dam is built to prevent. A city
+ *  CENTER is never pillaged. With `buildings`, DISTRICT_PILLAGED takes every
+ *  building standing in the district too, a city-state's alike
+ *  (runs/c74s3_bldg_pillage_20260926T133346Z.jsonl: 13 of 13); the nuclear
+ *  accident takes the district alone (its Power Plant was never pillaged,
+ *  runs/reactor_reactor_base_20260926T071712Z.jsonl). */
+function pillageDistrict(state: GameState, tile: Tile, buildings: boolean): void {
   if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete
       && !tile.districtPillaged && !envImmune(state, tile)) {
     tile.districtPillaged = true;
+    if (!buildings) return;
+    const h = districtHolder(state, tile);
+    if (!h) return;
+    for (const id of centerBuildingIds()) {
+      // CIV6 (Dar-e Mehr): "Cannot be pillaged by natural disasters"
+      if (BUILDINGS[id].district === tile.district && !BUILDINGS[id].disasterProof) pillageHeld(h, id);
+    }
   }
 }
 
 /**
  * CIV6 (RandomEvent_Damages): BUILDING_PILLAGED is a column of its OWN, with
- * its own Percentage — a flood pillages the district at 50 and its buildings
- * at 100, so the two are independent and a building goes dark whether or not
- * the district around it does.
- *
- * READING: the table carries one Percentage per event per damage type and no
- * per-building granularity, so the roll is ONE PER TILE — the same shape this
- * engine already reads the unit and population columns at — and a hit darkens
- * every building of the district standing there.
+ * its own Percentage, rolled ONE PER TILE. A hit on a district not itself
+ * pillaged takes ONE building, the top of the district's chain (University
+ * over Library, Meeting House over Temple:
+ * runs/c74s3_bldg_pillage_20260926T133346Z.jsonl, 6 of 6), a city-state's
+ * alike. READING: the top is the dearest building standing unpillaged there
+ * (`BuildingDef.cost`, ties to the first in the production layout); a
+ * Dar-e Mehr, which "Cannot be pillaged by natural disasters", is passed
+ * over. A pillaged district's buildings went with it.
  */
 function pillageTileBuildings(state: GameState, tile: Tile): void {
   // A city CENTRE is never pillaged (`pillageDistrict`'s own rule, and no
   // storm row names CITY_GARRISON or CITY_WALLS), so its buildings stand.
-  if (!tile.district || tile.district === 'CITY_CENTER'
-      || !tile.districtComplete || envImmune(state, tile)) return;
-  const held = cityAtIndex(state, tile.index);
-  const city = held?.city ?? cityHoldingDistrict(state, tile);
-  if (!city) return;
-  for (const id of [...(city.buildings ?? [])]) {
-    // CIV6 (Dar-e Mehr): "Cannot be pillaged by natural disasters"
-    if (BUILDINGS[id]?.district === tile.district && !BUILDINGS[id]?.disasterProof) pillageBuilding(city, id);
+  if (!tile.district || tile.district === 'CITY_CENTER' || !tile.districtComplete
+      || tile.districtPillaged || envImmune(state, tile)) return;
+  const h = districtHolder(state, tile);
+  if (!h) return;
+  let top: string | undefined;
+  for (const id of centerBuildingIds()) {
+    const def = BUILDINGS[id];
+    if (def.district !== tile.district || def.disasterProof || !h.city.buildings?.includes(id)
+      || buildingPillaged(h.city, id)) continue;
+    if (top === undefined || def.cost > BUILDINGS[top].cost) top = id;
   }
+  if (top) pillageHeld(h, top);
+}
+
+/** The city — a major's, the Free Cities', a city-state's — whose registry
+ *  holds the district standing on this tile; `minor` names a city-state's. */
+function districtHolder(state: GameState, tile: Tile):
+  { city: { buildings?: string[]; pillagedBuildings?: string[] }; minor?: CityState } | undefined {
+  const city = cityHoldingDistrict(state, tile);
+  if (city) return { city };
+  const cs = (state.cityStates ?? []).find((m) => (m.districts ?? []).some((d) => d.tileIndex === tile.index));
+  return cs ? { city: cs, minor: cs } : undefined;
+}
+
+/** A standing building of the holder goes pillaged; a city-state's repair
+ *  of it waits for the item it is working on (`CityState.repairWait`). */
+function pillageHeld(h: NonNullable<ReturnType<typeof districtHolder>>, id: string): void {
+  if (!h.city.buildings?.includes(id) || buildingPillaged(h.city, id)) return;
+  pillageBuilding(h.city, id);
+  if (h.minor) h.minor.repairWait = true;
 }
 
 /** the city whose registry holds the district standing on this tile. */
@@ -393,7 +426,7 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
   if (!mitigated && !immune) {
     scorch(state, tile);
     if (rDestroy < FLOOD_DESTROY_P[sev]) destroyImprovement(state, tile);
-    if (rDistrict < FLOOD_DISTRICT_P[sev]) pillageDistrict(state, tile);
+    if (rDistrict < FLOOD_DISTRICT_P[sev]) pillageDistrict(state, tile, true);
     if (rBldg < FLOOD_BLDG_P[sev]) pillageTileBuildings(state, tile);
     const dmg = FLOOD_DAMAGE_LO[sev]
       + Math.floor(rDamage * (FLOOD_DAMAGE_HI[sev] - FLOOD_DAMAGE_LO[sev] + 1));
@@ -753,9 +786,9 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
   }
 }
 
-/** A plot catches fire on the clock of the fire that began on `start`: its
- *  Woods or Rainforest becomes the burning form (`RandomEvent_Yields` Turn 0,
- *  Amount 0 — burning pays nothing). */
+/** A plot catches fire on turn `start`, its own clock: its Woods or
+ *  Rainforest becomes the burning form (`RandomEvent_Yields` Turn 0, Amount
+ *  0 — burning pays nothing). */
 function ignite(t: Tile, start: number): void {
   const row = FIRE_START_FEATURE.indexOf(t.feature ?? '');
   t.feature = FIRE_BURNING_FEATURE[row] as Tile['feature'];
@@ -763,12 +796,13 @@ function ignite(t: Tile, start: number): void {
 }
 
 /**
- * THE FIRES' TURN, after the draw: every plot on fire, on its fire's clock
- * (`age` = turns since the fire began). SPREAD first: each plot burning at an
- * age in `FIRE_SPREAD_TURNS` — the list taken before any spreads, so a plot
- * caught this turn does not spread this turn — draws once per adjacent live
- * Woods or Rainforest, in direction order, and at `FIRE_SPREAD_P` sets it
- * burning on the same clock. Then each plot on fire, in ascending order: a
+ * THE FIRES' TURN, after the draw: every plot on fire, on its own clock
+ * (`age` = turns since the plot caught). SPREAD first: each plot burning at
+ * an age in `FIRE_SPREAD_TURNS` — the list taken before any spreads, so a
+ * plot caught this turn does not spread this turn — draws once per adjacent
+ * live plot of its own fire's feature (and of the other fire's where
+ * `FIRE_SPREAD_CROSS` says so), in direction order, and at `FIRE_SPREAD_P`
+ * sets it burning from this turn. Then each plot on fire, in ascending order: a
  * BURNING plot draws once for the UNIT_DAMAGE_LAND band and takes the rows
  * whose turns hold its age — its improvement and district pillaged, its
  * civilians killed and land units struck, and at `FIRE_POP_TURN` one citizen
@@ -784,10 +818,11 @@ function fireTurn(state: GameState): void {
     return age >= FIRE_SPREAD_TURNS[0] && age <= FIRE_SPREAD_TURNS[1];
   });
   for (const t of spreading) {
+    const own = FIRE_BURNING_FEATURE.indexOf(t.feature ?? '');
     for (const n of neighbors(map, t)) {
       const row = FIRE_START_FEATURE.indexOf(n.feature ?? '');
-      if (row < 0 || !fireCandidate(n, row)) continue;
-      if (nextRandom(state) < FIRE_SPREAD_P) ignite(n, t.fireStart!);
+      if (row < 0 || !fireCandidate(n, row) || (row !== own && !FIRE_SPREAD_CROSS[own])) continue;
+      if (nextRandom(state) < FIRE_SPREAD_P) ignite(n, state.turn);
     }
   }
   for (const t of map.tiles) {
@@ -799,7 +834,7 @@ function fireTurn(state: GameState): void {
       const rDamage = nextRandom(state);
       if (age >= FIRE_DAMAGE_TURNS[0] && age <= FIRE_DAMAGE_TURNS[1]) {
         scorch(state, t);
-        pillageDistrict(state, t);
+        pillageDistrict(state, t, true);
         const dmg = FIRE_DMG[0] + Math.floor(rDamage * (FIRE_DMG[1] - FIRE_DMG[0] + 1));
         strikeUnits(state, t, tileSeat(t), { land: true, naval: false, civ: true, landDmg: dmg, navalDmg: 0 }, null);
       }
@@ -933,7 +968,7 @@ function eruptTile(state: GameState, tile: Tile, row: number): void {
   if (tileSeat(tile) < 0) return;
   scorch(state, tile);
   if (rDestroy < ERUPTION_DESTROY_P[row]) destroyImprovement(state, tile);
-  if (rDistrict < ERUPTION_DISTRICT_P[row]) pillageDistrict(state, tile);
+  if (rDistrict < ERUPTION_DISTRICT_P[row]) pillageDistrict(state, tile, true);
   if (rBldg < ERUPTION_BLDG_P[row]) pillageTileBuildings(state, tile);
   const dmg = ERUPTION_DMG_LO[row]
     + Math.floor(rDamage * (ERUPTION_DMG_HI[row] - ERUPTION_DMG_LO[row] + 1));
@@ -979,7 +1014,7 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
   if (iz) {
     const t = state.map.tiles[iz.tileIndex];
     t.falloutTurns = Math.max(t.falloutTurns ?? 0, ACCIDENT_FALLOUT[sev]);
-    if (rDistrict < ACCIDENT_DISTRICT_P[sev]) pillageDistrict(state, t);
+    if (rDistrict < ACCIDENT_DISTRICT_P[sev]) pillageDistrict(state, t, false);
     strikeUnits(state, t, tileSeat(t), {
       land: rLand < ACCIDENT_LAND_P[sev],
       naval: false,
@@ -1147,7 +1182,7 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
   const distP = lowland && ev.lowlandDist > 0 ? ev.lowlandDist : ev.distPill;
   if (rPill < pillP) scorch(state, tile);
   if (rDestroy < ev.impDest) destroyImprovement(state, tile);
-  if (rDistrict < distP) pillageDistrict(state, tile);
+  if (rDistrict < distP) pillageDistrict(state, tile, true);
   if (rBldgS < ev.bldgPill) pillageTileBuildings(state, tile);
   if (rPop < ev.pop) losePopulation(state, tile);
   strikeUnits(state, tile, owner, {

@@ -1794,6 +1794,17 @@
           "note": "its last turn's Production went toward a still-running fullyPowered project"
         },
         {
+          "name": "minorRepairWait",
+          "compare": "exact",
+          "covers": [
+            "CityState.repairWait"
+          ],
+          "planes": [
+            "citystate_repair_wait"
+          ],
+          "note": "a building was pillaged while the minor worked on an item: its repair waits for that item"
+        },
+        {
           "name": "minorRoutes",
           "compare": "exact",
           "covers": [

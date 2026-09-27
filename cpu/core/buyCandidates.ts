@@ -21,8 +21,8 @@ import { goldenDedication, monumentalityBuyMult } from './eras';
 import { builderCost, goldBuyableUnits, purchaseSpotBlocked, trainableUnits } from './units';
 import { hasMet, isSuzerain } from './cityStates';
 import { pickBorderTile } from './city';
-import { worshipBuildingOf, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
-import { availableBuildings, buildingCompletable, goldPurchasableBuildings } from './rules';
+import { MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
+import { availableBuildings, buildingCompletable, goldPurchasableBuildings, worshipOffered } from './rules';
 import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from './effects';
 import { congressUdtBlockedDistrict } from './congress';
 import { districtSiteCost, districtSiteLegal, levyGoldCost, minorArmy } from './phase';
@@ -340,19 +340,20 @@ export function buyContext(state: GameState, seat: number): BuyContext {
     out.monu_settler_ok = spawn.population >= 2
       && goldAffordable(faith, faithPrice(state, seat, settlerCost(state, seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, seat)));
   }
-  // kinds 4, 5, 6, 11 — the founded religion's worship building (the one its
-  // Worship belief names, once it holds one) and units.
-  // A Shrine sells the Missionary; the Apostle and the Inquisitor need a
-  // Temple on top; every unit tier sells only in a city with a majority
-  // religion.
+  // kind 4 — the worship building a city's majority religion names
+  // (`worshipOffered`), whoever founded it, in the first city offered one
+  // with a Temple and a working Holy Site.
+  const wCity = cities.find((c) => worshipOffered(state, c) !== undefined && c.buildings.includes('TEMPLE') && holySiteOk(state, c));
+  const wid = wCity ? worshipOffered(state, wCity) : undefined;
+  if (wCity && wid && congressUdtBlockedDistrict(state) !== 'HOLY_SITE'
+    && goldAffordable(faith, faithPrice(state, seat, buildingFaithCost(state, seat, wid)))) {
+    out.worship_ok = true;
+    out.worship_city = wCity.centerIndex;
+  }
+  // kinds 5, 6, 11 — the founded religion's units. A Shrine sells the
+  // Missionary; the Apostle and the Inquisitor need a Temple on top; every
+  // unit tier sells only in a city with a majority religion.
   if (actor.religion.founded) {
-    const wid = worshipBuildingOf(actor.religion.worship);
-    const wCity = wid ? cities.find((c) => !c.buildings.includes(wid) && c.buildings.includes('TEMPLE') && holySiteOk(state, c)) : undefined;
-    if (wid && wCity && congressUdtBlockedDistrict(state) !== 'HOLY_SITE'
-      && goldAffordable(faith, faithPrice(state, seat, buildingFaithCost(state, seat, wid)))) {
-      out.worship_ok = true;
-      out.worship_city = wCity.centerIndex;
-    }
     const follows = (c: City) => (c.followedReligion ?? -1) >= 0;
     const shrineCity = cities.find((c) => c.buildings.includes('SHRINE') && holySiteOk(state, c) && follows(c));
     const templeCity = cities.find((c) => c.buildings.includes('SHRINE') && c.buildings.includes('TEMPLE')

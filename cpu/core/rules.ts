@@ -865,6 +865,18 @@ export function goldPurchasableBuildings(state: GameState, city: City): Building
   return buildableBuildings(state, city, true);
 }
 
+/** The worship building city `city` is offered: the one its MAJORITY
+ *  religion's Worship belief names, whoever founded it and whoever holds the
+ *  city (runs/b91s1_lab4_t150_20260926T1305Z.jsonl and
+ *  runs/b91s1_lab4_t150_converted_20260926T1322Z.jsonl: 405 of 405 offers),
+ *  and none while the city holds a worship building. `_worship_offered` is
+ *  the twin. */
+export function worshipOffered(state: GameState, city: City): string | undefined {
+  if (city.buildings.some((b) => BUILDINGS[b]?.worship)) return undefined;
+  const rel = city.followedReligion ?? -1;
+  return rel < 0 ? undefined : worshipBuildingOf(seatOf(state, rel)?.religion.worship);
+}
+
 function buildableBuildings(state: GameState, city: City, gold: boolean): BuildingDef[] {
   const map = state.map;
   const unlocks = gates(state, city.seat);
@@ -894,10 +906,11 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
       // arm never sells one (CIV6 repairs from the queue alone)
       if ((have.has(def.id) && (gold || !buildingPillaged(city, def.id))) || queued.has(def.id)) continue;
       if (def.worship) {
-        // CIV6: a worship building is built (or faith-bought, never
-        // gold-bought) by the religion whose Worship belief names it
+        // built (or faith-bought, never gold-bought) where the city's
+        // majority religion names it (`worshipOffered`); a held one standing
+        // pillaged is its repair
         if (gold) continue;
-        if (worshipBuildingOf(seatOf(state, city.seat)?.religion.worship) !== def.id) continue;
+        if (!have.has(def.id) && worshipOffered(state, city) !== def.id) continue;
       } else if (unlocks && RESEARCH_GATED_BUILDINGS.has(def.id) && !unlocks.buildings.has(def.id)) {
         // the research gate holds only rows some tech or civic GRANTS: a
         // Government Plaza tier building (or Hangar/Airport) is unlocked by

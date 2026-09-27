@@ -3,7 +3,7 @@
     python tests/gpu/centre_strength_test.py
 
 One rule for every holder, the combat preview's DEFENSES lines: the holder's
-base (max(the start era's melee, its strongest melee fielded) - 10: an Ancient
+base (max(the start era's melee, its strongest melee trained or bought) - 10: an Ancient
 major's 20, a minor's 25), `Districts.CityStrengthModifier`
 over the complete, unpillaged districts, the walls tier, the Palace's +3, the
 garrison term, and a city-state's +1 per envoy. Each scene asserts the number
@@ -159,8 +159,9 @@ def test_minor(sim) -> None:
     sim.seat_citystate_envoys[B0, 0, s] = 2
     sim.seat_citystate_envoys[B0, 1, s] = 1
     assert strength(sim, row, 0) == 15 + 3 + 3, strength(sim, row, 0)
-    # a Warrior stays under the minor's own start value 25; the strongest
-    # melee it fields, not its population or its type, raises the base
+    # a Warrior merely created moves nothing; one trained stays under the
+    # minor's own start value 25; the strongest melee it trains, not its
+    # population or its type, raises the base
     ring2 = ((sim.pair_dist[ctr] == 2) & ~sim.water[B0] & (sim.military_at[B0] < 0)
              & (sim.civilian_at[B0] < 0) & sim.passable[B0])
     at = int(ring2.long().argmax())
@@ -168,21 +169,39 @@ def test_minor(sim) -> None:
     one = torch.ones(sim.B, dtype=torch.bool)
     sim._spawn_unit(row, one, torch.full((sim.B,), at, dtype=torch.long),
                     torch.full((sim.B,), sim._warrior_idx, dtype=torch.long))
-    assert int(sim.citystate_best_melee[B0, s]) == 20, "the minor's tracker missed its Warrior"
+    assert int(sim.citystate_best_melee[B0, s]) == 0, "a created Warrior raised the minor's base"
+    sim._minor_spawn(s, one, torch.full((sim.B,), sim._warrior_idx, dtype=torch.long))
+    assert int(sim.citystate_best_melee[B0, s]) == 20, "the minor's tracker missed its trained Warrior"
+    clear(sim, ctr)   # the trained Warrior lands on the centre: no garrison here
     assert strength(sim, row, 0) == 15 + 3 + 3, strength(sim, row, 0)
     sim.citystate_best_melee[B0, s] = 35
     assert strength(sim, row, 0) == 25 + 3 + 3, strength(sim, row, 0)
     print("  4 the city-state OK — max(25, its best melee) - 10, the Palace, +1 per envoy")
 
 
-def test_seeded_tracker() -> None:
-    """The minors' starting Warriors seed the tracker as TS's `loadWorld`
-    spawns count them."""
+def test_trained_or_bought() -> None:
+    """runs/b95t_p1_mech_bought_20260927.jsonl: the base is the strongest melee
+    ever TRAINED or BOUGHT — raised at once, kept after the unit dies; a
+    starting, granted or captured unit moves nothing
+    (runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl)."""
     sim = build()
-    for s in range(sim.S):
-        if bool(sim.citystate_alive[B0, s]):
-            assert int(sim.citystate_best_melee[B0, s]) == 20, int(sim.citystate_best_melee[B0, s])
-    print("  5 the seeded tracker OK — every minor starts at its Warriors' 20")
+    assert int(sim.civ_best_melee[B0].abs().sum()) == 0, "a starting unit raised a major's base"
+    assert int(sim.citystate_best_melee[B0].abs().sum()) == 0, "a starting unit raised a minor's base"
+    r = 0
+    one = torch.ones(sim.B, dtype=torch.bool)
+    sword = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "SWORDSMAN")
+    cannon = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "FIELD_CANNON")
+    ctr = int(sim.city_center[B0, r, int(sim.city_alive[B0, r].nonzero().flatten()[0])])
+    sim._spawn_unit(r, one, torch.full((sim.B,), ctr, dtype=torch.long),
+                    torch.full((sim.B,), sword, dtype=torch.long))
+    assert int(sim.civ_best_melee[B0, r]) == 0, "a granted Swordsman raised the base"
+    sim._raise_best_melee(r, one, torch.full((sim.B,), sword, dtype=torch.long))
+    assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[sword])
+    sim._raise_best_melee(r, one, sim._warrior_idx)
+    sim._raise_best_melee(r, one, torch.full((sim.B,), cannon, dtype=torch.long))
+    assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[sword]), (
+        "the base fell, or a ranged chassis raised it")
+    print("  5 trained or bought OK — a starting or granted unit moves nothing, the base never falls")
 
 
 def main() -> None:
@@ -191,7 +210,7 @@ def main() -> None:
     test_districts(sim)
     test_garrison(sim)
     test_minor(sim)
-    test_seeded_tracker()
+    test_trained_or_bought()
     print("centre_strength_test OK")
 
 

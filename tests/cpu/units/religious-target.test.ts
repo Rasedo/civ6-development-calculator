@@ -4,7 +4,9 @@
  * a ranged attack or a city's strike never targets a Missionary, an Apostle or
  * a Builder; a melee order onto a religious unit is a MOVE onto its tile, onto
  * a Builder a capture; Condemn Heretic is legal on the heretic's own tile
- * only. The GPU twin is tests/gpu/religious_target_test.py.
+ * only; a shot from the ground never takes a lone Support chassis
+ * (tools/civ6lab/runs/b89t_fire_20260926.jsonl). The GPU twin is
+ * tests/gpu/religious_target_test.py.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
@@ -65,6 +67,45 @@ describe('a shot never takes a civilian', () => {
     cityStrikes(state, city, 30);
     expect(builder.hp).toBe(100);
     expect(miss.hp).toBe(100);
+    expect(w.hp).toBeLessThan(100);
+  });
+});
+
+// runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl: a lone
+// Anti-Air Gun refused to a Field Cannon, a Trebuchet and a city, no draw; an
+// Infantry beside it made the tile a target and took the shot
+describe('a shot from the ground never takes a lone Support chassis', () => {
+  it('a ranged and a bombard attack refuse it; beside a combat unit the combat unit is shot', () => {
+    const state = scene();
+    const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 5, 5).index, 0)!;
+    const treb = spawnUnit(state, 'TREBUCHET', tileAtCoords(state.map, 5, 7).index, 0)!;
+    const ram = spawnUnit(state, 'BATTERING_RAM', tileAtCoords(state.map, 6, 5).index, 1)!;
+    const medic = spawnUnit(state, 'MEDIC', tileAtCoords(state.map, 5, 6).index, 1)!;
+    const r0 = state.rngState;
+    expect(rangedAttack(state, archer.id, ram.tileIndex).ok).toBe(false);
+    expect(rangedAttack(state, treb.id, medic.tileIndex).ok).toBe(false);
+    expect([ram.hp, medic.hp]).toEqual([100, 100]);
+    expect(state.rngState).toBe(r0);
+    expect(attackTargets(state, archer)).not.toContain(ram.tileIndex);
+    expect(unitMask(maskCtx(state, 0), archer).filter((c) => c >= 6 && c < 12)).toEqual([]);
+    const guard = spawnUnit(state, 'WARRIOR', ram.tileIndex, 1)!;
+    expect(rangedAttack(state, archer.id, ram.tileIndex).ok).toBe(true);
+    expect(guard.hp).toBeLessThan(100);
+    expect(ram.hp).toBe(100);
+  });
+
+  it("a barbarian archer's targets and a walled city's strike pass over it", () => {
+    const state = scene();
+    const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 5, 5).index, BARB_SEAT)!;
+    const ram = spawnUnit(state, 'BATTERING_RAM', tileAtCoords(state.map, 6, 5).index, 0)!;
+    expect(attackTargets(state, archer)).not.toContain(ram.tileIndex);
+    const city = settleAt(state, tileAtCoords(state.map, 12, 12).index, 0);
+    city.buildings.push('ANCIENT_WALLS');
+    city.outerHp = WALLS_TIER_HP[1];
+    const medic = spawnUnit(state, 'MEDIC', tileAtCoords(state.map, 13, 12).index, 1)!;
+    const w = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 14, 12).index, 1)!;
+    cityStrikes(state, city, 30);
+    expect(medic.hp).toBe(100);
     expect(w.hp).toBeLessThan(100);
   });
 });

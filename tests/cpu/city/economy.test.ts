@@ -82,6 +82,9 @@ describe('gold & faith purchases', () => {
     city.buildings.push('SHRINE', 'TEMPLE');
     seatOf(state, 0)!.religion.founded = true;
     seatOf(state, 0)!.religion.worship = 'CATHEDRAL';
+    // the city's majority religion names the building
+    expect(buyWorshipBuilding(state, city.id, 0).ok).toBe(false);
+    city.followedReligion = 0;
     const cost = buildingFaithCost(state, 0, 'CATHEDRAL');
     seatOf(state, 0)!.faith = purchaseStep(cost) + 3;
     seatOf(state, 0)!.treasury = 0;

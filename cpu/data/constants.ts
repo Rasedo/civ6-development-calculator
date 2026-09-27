@@ -113,29 +113,43 @@ export const PURCHASE_DIVISOR = srcConst('scenario.purchaseDivisor', 5, gp('PURC
  *  Gold (`GOVERNMENT_UNLOCK_WITH_FAITH` false) through one `UNLOCK_POLICIES`
  *  operation that opens both the cards and the government for the turn. The
  *  online speed's row names the cost's three figures; `policyUnlockCost`
- *  reads them as the cost starting at the maximum the first turn past the
+ *  reads them as the base starting at the maximum the first turn past the
  *  window and dropping by the step each further turn, never below the
- *  minimum, the whole scaled by k = (POLICY_UNLOCK_K_BASE +
- *  POLICY_UNLOCK_K_PER_TECH × the seat's techs) / 10 and rounded to the
- *  nearest POLICY_UNLOCK_ROUND. */
+ *  minimum, the whole scaled by k = max(kT(techs), kC(civics)) and rounded
+ *  to the nearest POLICY_UNLOCK_ROUND. kT and kC are the measured tables
+ *  below, each entry the price at the maximum base (k × the maximum). */
 export const CIVIC_UNLOCK_MAX_COST = srcConst('scenario.civicUnlockMaxCost', 50,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockMaxCost'));
 export const CIVIC_UNLOCK_PER_TURN_DROP = srcConst('scenario.civicUnlockPerTurnDrop', 5,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockPerTurnDrop'));
 export const CIVIC_UNLOCK_MIN_COST = srcConst('scenario.civicUnlockMinCost', 10,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockMinCost'));
-/** k's intercept and per-tech slope, in tenths (k = 1.5 + techs/10). */
-export const POLICY_UNLOCK_K_BASE = srcConst('scenario.policyUnlockKBase', 15, {
-  lab: 'runs/policy_cost_bdprice_20260926T082243Z.jsonl and runs/policy_cost_bdprice2_20260926T082716Z.jsonl',
-  note: 'GetCostToUnlockPolicies over 30 turns, 8 majors: the jump 50k = 75 + 5 x techs, the floor 10k, k following the tech count alone',
+/** kT: the price at the maximum base (50 x kT) for a seat of
+ *  POLICY_UNLOCK_TECH_FIRST techs, then one entry per further tech. Outside
+ *  the table the nearest measured step carries on (`policyUnlockTerm`). */
+export const POLICY_UNLOCK_TECH_FIRST = srcConst('scenario.policyUnlockTechFirst', 33, {
+  lab: 'runs/bds4_probe_20260926T135815Z.jsonl, runs/bds3_ladder_cheap_20260926T135028Z.jsonl and runs/bds3_ladder_dear_20260926T135428Z.jsonl',
+  note: 'the grant ladders read the tech term at 33 to 65 techs',
 });
-export const POLICY_UNLOCK_K_PER_TECH = srcConst('scenario.policyUnlockKPerTech', 1, {
-  lab: 'runs/policy_cost_bdprice2_20260926T082716Z.jsonl',
-  note: 'k rises by 1/10 per researched tech (techs 26-28: k 4.1-4.3 ... 40: 5.5)',
+export const POLICY_UNLOCK_TECH_PRICE = srcConst('scenario.policyUnlockTechPrice',
+  [235, 245, 250, 255, 265, 270, 275, 275, 285, 290, 295, 305, 310, 315, 320, 325, 330, 335, 345, 350, 355, 365, 365, 370, 380, 385, 390, 395, 405, 410, 410, 420, 425] as const, {
+    lab: 'runs/bds4_probe_20260926T135815Z.jsonl, runs/bds3_ladder_cheap_20260926T135028Z.jsonl and runs/bds3_ladder_dear_20260926T135428Z.jsonl',
+    note: 'GetCostToUnlockPolicies (read in GameCore) at s = 0 against the tech COUNT, techs granted and removed one at a time: T 33..65; no linear law fits (steps of 0 at 40, 55, 63)',
+  });
+/** kC: the price at the maximum base (50 x kC) for a seat of
+ *  POLICY_UNLOCK_CIVIC_FIRST civics, then one entry per further civic. */
+export const POLICY_UNLOCK_CIVIC_FIRST = srcConst('scenario.policyUnlockCivicFirst', 19, {
+  lab: 'runs/bds4_probe_20260926T135815Z.jsonl',
+  note: 'the probe reads the civic term at 19 to 32 civics, where it rises above the tech term',
 });
+export const POLICY_UNLOCK_CIVIC_PRICE = srcConst('scenario.policyUnlockCivicPrice',
+  [185, 190, 200, 210, 215, 225, 230, 235, 245, 250, 260, 270, 275, 280] as const, {
+    lab: 'runs/bds4_probe_20260926T135815Z.jsonl',
+    note: 'GetCostToUnlockPolicies at s = 0 with techs removed below the civic floor: C 19..32; the price is the larger of the two terms',
+  });
 export const POLICY_UNLOCK_ROUND = srcConst('scenario.policyUnlockRound', 5, {
-  lab: 'runs/policy_cost_bdprice_20260926T082243Z.jsonl',
-  note: 'every read price is a multiple of 5; nearest, halves up, is this engine\'s reading of the rounding',
+  lab: 'runs/bds4_probe_20260926T135815Z.jsonl, runs/bds3_ladder_cheap_20260926T135028Z.jsonl and runs/bds3_ladder_dear_20260926T135428Z.jsonl',
+  note: 'every read price is a multiple of 5, the nearest; of the 41 distinct in-table cells landing on an exact half, 36 read the half up (3 down, all at 39 techs, whose table entry is the edge of its interval; 2 on the fall)',
 });
 
 /** ANARCHY. CIV6 (the Governments pedia): "If you switch to a previously
@@ -271,7 +285,7 @@ export const PALACE_CITY_CS = srcConst('combat.palaceCityCs', 3,
   xml('ModifierArguments', 'ModifierId=PALACE_ADJUST_GARRISON_STRENGTH&Name=Amount', 'Value',
     { note: 'MODIFIER_PLAYER_CITIES_ADJUST_INNER_DEFENSE on BUILDING_PALACE; the lab read it in the capital alone' }));
 /** THE HOLDER'S BASE a centre stands on: max(the start era's melee strength,
- *  the strongest melee the holder has fielded) - 10 (`holderStrength`). The
+ *  the strongest melee the holder has trained or bought) - 10 (`holderStrength`). The
  *  engines start at Ancient, so the start value is the ERA_ANCIENT row's —
  *  the major's and the minor's each their own column. The Civilopedia: "the
  *  strongest melee unit built by your civilization, minus 10". */

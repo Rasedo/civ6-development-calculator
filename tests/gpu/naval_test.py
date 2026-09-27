@@ -1021,7 +1021,8 @@ def poke_passenger_death(rules, path, WARRIOR, BUILDER):
     _lone_war(sim)
     ctr = int(sim.city_center[0, 0, 0])
 
-    # -- the CITY STRIKE kills a lone embarked civilian.
+    # -- the CITY STRIKE kills a lone embarked military passenger (a shot takes
+    # a military unit alone, `shootable`).
     tt = -1
     for d in range(6):
         t = int(sim.neigh[ctr, d])
@@ -1031,7 +1032,7 @@ def poke_passenger_death(rules, path, WARRIOR, BUILDER):
     assert tt >= 0
     force_water(sim, tt)
     clear_tile(sim, tt)
-    slot = place_civilian(sim, 1, tt, BUILDER, hp=1, emb=True)
+    slot = place_mil(sim, 1, tt, WARRIOR, hp=1, emb=True)
     assert int(sim.embarked_at[0, tt]) == slot + sim.POOL_LO["major"], "the fixture put it on the wrong plane"
     sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
     sim.city_outer_hp[0, 0, 0] = sim._walls_hp

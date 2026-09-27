@@ -1440,8 +1440,8 @@ class SimMasks:
         offers a melee order and what holds an Encampment silent. `unitsAt` on
         TS returns every unit of the hex; when a civilian AND a support unit
         share the hex the LOWER slot answers, which is TS's array order under
-        the append rule. A shot reads `_shot_class_at`, a melee resolution
-        `_melee_class_at`. `tiles` is [B] or [B, K], already clamped."""
+        the append rule. A shot from the ground takes none of them
+        (`_shot_fold`), a melee resolution reads `_melee_class_at`. `tiles` is [B] or [B, K], already clamped."""
         flat = tiles.dim() == 1
         t = tiles.unsqueeze(1) if flat else tiles
         c = self.civilian_at.gather(1, t)
@@ -1449,29 +1449,38 @@ class SimMasks:
         out = torch.where((c >= 0) & (s >= 0), torch.minimum(c, s), torch.where(c >= 0, c, s))
         return out.squeeze(1) if flat else out
 
-    def _shot_class_at(self, tiles: torch.Tensor) -> torch.Tensor:
-        """The non-military occupant a SHOT may take on each tile — a ranged
-        attack, a city's strike, an air strike: the support chassis, never a
-        civilian (`shootable`; the lab refused a Missionary, an Apostle and a
-        Builder to every ranged attacker and to a walled city). `tiles` is
-        [B] or [B, K], already clamped."""
-        flat = tiles.dim() == 1
-        t = tiles.unsqueeze(1) if flat else tiles
-        s = self.support_at.gather(1, t)
-        return s.squeeze(1) if flat else s
-
-    def _shot_embarked_plane(self) -> torch.Tensor:
-        """[B, T] — `embarked_at` with its CIVILIAN passengers left out: a
-        shot never takes a civilian afloat either (`shootable`)."""
+    def _shot_embarked_plane(self, air: bool) -> torch.Tensor:
+        """[B, T] — `embarked_at` with the passengers a shot never takes left
+        out. A shot from the ground or a city takes a military passenger alone
+        (`shootable`); an AIR strike any but a civilian (`airTarget`)."""
         e = self.embarked_at
         et = self.unit_type.gather(1, e.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-        return torch.where((e >= 0) & self._type_civilian[et], torch.full_like(e, -1), e)
+        drop = self._dom_civilian(et) if air else ~self._type_dom_mil[et]
+        return torch.where((e >= 0) & drop, torch.full_like(e, -1), e)
+
+    def _dom_civilian(self, ut: torch.Tensor) -> torch.Tensor:
+        """`unitDomain(type) === 'civilian'` for clamped types `ut`: the
+        NONCOMBAT set less the Support chassis (a Military Engineer carries
+        charges and no Combat, and is a Support unit all the same)."""
+        return self._type_civilian[ut] & ~self._type_support[ut]
+
+    def _shot_fold(self, tc: torch.Tensor, seat, mslot: torch.Tensor,
+                   m_seat: torch.Tensor, ok_m: torch.Tensor):
+        """`_stack_fold` for a SHOT from the ground or a city, which takes a
+        military unit alone (`shootable`): never a civilian, never a Support
+        chassis standing without a combat unit (a lone Anti-Air Gun refused to
+        a Field Cannon, a Trebuchet and a city, runs/b89t_fire_20260926.jsonl).
+        Only the military pair is folded; returns (mslot, m_seat, ok_m)."""
+        neg = torch.full_like(mslot, -1)
+        mslot, m_seat, ok_m, _c, _cs, _okc = self._stack_fold(
+            tc, seat, mslot, m_seat, ok_m, neg, neg, torch.zeros_like(ok_m), ranged=True)
+        return mslot, m_seat, ok_m
 
     def _shot_ok(self, cslot: torch.Tensor, ok_c: torch.Tensor) -> torch.Tensor:
         """`ok_c` with a CIVILIAN candidate dropped — the passenger
-        `_stack_fold` hands over at sea is one a shot never takes."""
+        `_stack_fold` hands an air strike at sea is one it never takes."""
         ct = self.unit_type.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-        return ok_c & ~((cslot >= 0) & self._type_civilian[ct])
+        return ok_c & ~((cslot >= 0) & self._dom_civilian(ct))
 
     def _melee_class_at(self, tiles: torch.Tensor) -> torch.Tensor:
         """`_civclass_at` with a RELIGIOUS unit left out: a melee order never
@@ -2513,6 +2522,27 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
+    def _raise_best_melee(self, row: int, landed: torch.Tensor, type_idx) -> None:
+        """`raiseBestMelee` — the row TRAINED or BOUGHT `type_idx` in the games
+        of `landed`: its strongest melee so made rises to it and never falls
+        (`civ_best_melee`, a minor's `citystate_best_melee`), read at once by
+        every centre's base. A unit created, granted or captured moves nothing
+        (runs/b95t_p1_mech_bought_20260927.jsonl,
+        runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl). The Free
+        Cities' base is its own flat one, so it keeps no column."""
+        if isinstance(type_idx, int):
+            type_idx = torch.full((self.B,), type_idx, dtype=torch.long, device=self.device)
+        ti = type_idx.clamp(min=0, max=self.NU - 1)
+        cs = torch.where(landed & (type_idx >= 0) & (self._type_ranged_strength[ti] == 0),
+                         self._type_combat[ti], torch.zeros_like(self._type_combat[ti]))
+        if row < self.n_majors:
+            self.civ_best_melee[:, row] = torch.maximum(
+                self.civ_best_melee[:, row], cs.to(self.civ_best_melee.dtype))
+        elif self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S:
+            s = row - self._CITY_MINOR0
+            self.citystate_best_melee[:, s] = torch.maximum(
+                self.citystate_best_melee[:, s], cs.to(self.citystate_best_melee.dtype))
+
     def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None, far: bool = False) -> torch.Tensor:
         """`spawnUnit`. `far`: a GRANT, placed on the nearest plot that takes
         the unit however far that is — past the anchor and its ring, the whole
@@ -2679,24 +2709,10 @@ class SimMasks:
         if len(_hold) > 0:
             self._occ_set(_hold, spot[_hold], nxt[_hold] + off)
         nxt[rows] += 1
-        # track the seat's strongest MELEE ever fielded (the base its centres
-        # stand on), a city-state's too — a civilian's combat 0 never raises
-        # it. Gated on `can` like TS: a no-spot spawn never lands the unit.
-        melee_cs = torch.where(
-            can & (self._type_ranged_strength[ti_n] == 0),
-            self._type_combat[ti_n],
-            torch.zeros_like(self._type_combat[ti_n]),
-        )
-        if self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S:
-            s = row - self._CITY_MINOR0
-            self.citystate_best_melee[:, s] = torch.maximum(
-                self.citystate_best_melee[:, s], melee_cs.to(self.citystate_best_melee.dtype))
-        # no chassis a minor or the Free Cities trains climbs in price, and the
-        # Free Cities' base is its own flat one, so neither tally below has a
-        # column for them
+        # no chassis a minor or the Free Cities trains climbs in price, so the
+        # tally below has no column for them
         if minor:
             return can
-        self.civ_best_melee[:, row] = torch.maximum(self.civ_best_melee[:, row], melee_cs.to(self.civ_best_melee.dtype))
         # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose
         # price climbs is priced off every copy the seat has ever acquired, so
         # the tally is taken here — a purchase, a grant or a Great Person's free
@@ -3334,16 +3350,13 @@ class SimMasks:
             self._seats_hostile(row, m_seat) | self._seats_hostile(row, c_seat)
             | self._seats_hostile(row, e_seat)
         ).reshape(B, N, 6)
-        # a RANGED unit's shot never takes a civilian, ashore or afloat
-        # (`shootable`): its unit targets are the military, support and
-        # non-civilian passenger occupants
-        _ss = self._shot_class_at(nbc)
-        _se = self._shot_embarked_plane().gather(1, nbc)
-        s_seat = torch.where(_ss >= 0, self.unit_seat.gather(1, _ss.clamp(min=0)), neg)
+        # a RANGED unit's shot takes a military unit alone, ashore or afloat
+        # (`shootable`): its unit targets are the military occupant and a
+        # military passenger
+        _se = self._shot_embarked_plane(False).gather(1, nbc)
         se_seat = torch.where(_se >= 0, self.unit_seat.gather(1, _se.clamp(min=0)), neg)
         hostile_shot = (
-            self._seats_hostile(row, m_seat) | self._seats_hostile(row, s_seat)
-            | self._seats_hostile(row, se_seat)
+            self._seats_hostile(row, m_seat) | self._seats_hostile(row, se_seat)
         ).reshape(B, N, 6)
         ctr_seat = self._centre_seat_plane()
         ctr_nb = ctr_seat.gather(1, nbc)
@@ -3638,17 +3651,15 @@ class SimMasks:
         ring = self.ring2[tc]
         ringc = ring.clamp(min=0).reshape(B, -1)
         _rm = self.military_at.gather(1, ringc)
-        _rc = self._shot_class_at(ringc)   # never a civilian (`shootable`)
         _rneg = torch.full_like(_rm, -1)
         _rms = torch.where(_rm >= 0, self.unit_seat.gather(1, _rm.clamp(min=0)), _rneg)
-        _rcs = torch.where(_rc >= 0, self.unit_seat.gather(1, _rc.clamp(min=0)), _rneg)
         # the strike's scope-out: a MAJOR's ranged fire engages barbarians
         # only (cpu/core/combat.ts hostileRangedStrike, `!(isCiv(a) &&
-        # isCiv(b))`), so a major seat's ring targets are barbarian units.
-        _res_ = self._shot_embarked_plane().gather(1, ringc)
+        # isCiv(b))`), so a major seat's ring targets are barbarian units —
+        # military ones alone (`shootable`).
+        _res_ = self._shot_embarked_plane(False).gather(1, ringc)
         _res_s = torch.where(_res_ >= 0, self.unit_seat.gather(1, _res_.clamp(min=0)), _rneg)
-        _ring_u = ((_rms == BARB_SEAT) | (_rcs == BARB_SEAT)
-                   | (_res_s == BARB_SEAT)).reshape(B, N, 12)
+        _ring_u = ((_rms == BARB_SEAT) | (_res_s == BARB_SEAT)).reshape(B, N, 12)
         _ring_ctr = self._centre_seat_plane().gather(1, ringc)
         _ring_c = self._seats_hostile(
             row, torch.where(_ring_ctr < 100, _ring_ctr, _rneg)).reshape(B, N, 12)
@@ -3948,15 +3959,13 @@ class SimMasks:
         ring3 = self.ring3[tc]
         ring3c = ring3.clamp(min=0).reshape(B, -1)
         _rm3 = self.military_at.gather(1, ring3c)
-        _rc3 = self._shot_class_at(ring3c)   # never a civilian (`shootable`)
         _rneg3 = torch.full_like(_rm3, -1)
         _rms3 = torch.where(_rm3 >= 0, self.unit_seat.gather(1, _rm3.clamp(min=0)), _rneg3)
-        _rcs3 = torch.where(_rc3 >= 0, self.unit_seat.gather(1, _rc3.clamp(min=0)), _rneg3)
-        _res3 = self._shot_embarked_plane().gather(1, ring3c)
+        _res3 = self._shot_embarked_plane(False).gather(1, ring3c)
         _res3s = torch.where(_res3 >= 0, self.unit_seat.gather(1, _res3.clamp(min=0)), _rneg3)
         # same scope-out as the SNIPE head: a major's ranged fire engages
-        # barbarian units, hostile centres, and district defenses.
-        _ring3u = ((_rms3 == BARB_SEAT) | (_rcs3 == BARB_SEAT)
+        # barbarian military units, hostile centres, and district defenses.
+        _ring3u = ((_rms3 == BARB_SEAT)
                    | (_res3s == BARB_SEAT)).reshape(B, N, 18)
         _ring3ctr = self._centre_seat_plane().gather(1, ring3c)
         _ring3ct = self._seats_hostile(
@@ -4006,27 +4015,32 @@ class SimMasks:
         pad.scatter_(2, col, idx)
         return pad[:, :, :width]
 
-    def _air_tile_offer(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """[B, T] x3 — hostile LAND units, hostile SHIPS, and a hostile major
-        CENTRE, per tile. An aircraft holds neither occupancy plane, so what
-        stands on a tile is exactly what those two carry (`airStrikeOffers`);
-        a civilian is never a strike's target (`shootable`)."""
+    def _air_tile_offer(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """[B, T] x4 — hostile LAND units, hostile SHIPS, a hostile major
+        CENTRE, and a hostile land unit that is no flat target (a military
+        one, or one with Anti-Air), per tile. An aircraft holds neither
+        occupancy plane, so what stands on a tile is exactly what those two
+        carry (`airStrikeOffers`); a civilian is never a strike's target, a
+        lone Support chassis is (`airTarget`)."""
         B, T, dev = self.B, self.T, self.device
         neg = torch.full((B, T), -1, dtype=torch.long, device=dev)
         land = torch.zeros(B, T, dtype=torch.bool, device=dev)
         sea = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for plane in (self._visible_military_at(row), self.support_at, self._shot_embarked_plane()):
+        hard = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        for plane in (self._visible_military_at(row), self.support_at, self._shot_embarked_plane(True)):
             pc = plane.clamp(min=0)
             here = plane >= 0
             s = torch.where(here, self.unit_seat.gather(1, pc), neg)
             t = torch.where(here, self.unit_type.gather(1, pc), neg)
+            tc = t.clamp(min=0, max=self.NU - 1)
             h = self._seats_hostile(row, s)
-            nav = self.unit_naval[t.clamp(min=0, max=self.NU - 1)]
+            nav = self.unit_naval[tc]
             sea = sea | (h & nav)
             land = land | (h & ~nav)
+            hard = hard | (h & ~nav & (self._type_dom_mil[tc] | (self._anti_air_at(tc, s) > 0)))
         cs = self._centre_seat_plane()
         ctr = self._seats_hostile(row, self._centre_target_seat(cs))
-        return land, sea, ctr
+        return land, sea, ctr, hard
 
     def _air_wreckable(self, row: int) -> torch.Tensor:
         """[B, T] — a tile an air pillage may wreck: at war with its owner,
@@ -4191,7 +4205,9 @@ class SimMasks:
         CIV6 (Air combat): a strike reaches anything inside the aircraft's
         OPERATIONAL RANGE, a FIGHTER's damage is "effective against land units,
         but not against cities and naval units" and a BOMBER's "against cities
-        and naval units but not against land units"."""
+        and naval units but not against land units" — save a land tile whose
+        hostiles are Support chassis with no Anti-Air, which a Bomber struck
+        for the flat 65 (runs/b89t_fire_20260926.jsonl)."""
         B, N = tc.shape
         W, dev = self._air_strike_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
@@ -4205,9 +4221,9 @@ class SimMasks:
         rngv = (self._type_ranged_range[ti[:, cols]]
                 + self._promo_val(ti[:, cols], self.unit_promos.gather(1, sc[:, cols]),
                                   "RANGE")).unsqueeze(2)
-        land, sea, ctr = self._air_tile_offer(row)
+        land, sea, ctr, hard = self._air_tile_offer(row)
         bomb = (k == 2).unsqueeze(2)
-        offer = torch.where(bomb, (ctr | sea).unsqueeze(1), (land & ~ctr).unsqueeze(1))
+        offer = torch.where(bomb, (ctr | sea | (land & ~hard)).unsqueeze(1), (land & ~ctr).unsqueeze(1))
         cand = (
             (dist > 0) & (dist <= rngv) & offer
             & (k > 0).unsqueeze(2)

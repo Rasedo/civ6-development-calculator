@@ -238,6 +238,23 @@ describe('the Free City step', () => {
     expect(got).not.toContain(centre.index);
   });
 
+  // runs/c60t_grant_A_b6920_20260927T000521Z.jsonl: with the one plain plot of
+  // ring 1 held, the grant passed the district plot beside the centre for ring 2
+  it('a grant never lands on a plot holding a district', () => {
+    const { state, border } = scene(30);
+    const centre = state.map.tiles[border.centerIndex];
+    const ring1 = neighbors(state.map, centre).filter((t) => !isWater(t)).sort((a, b) => a.index - b.index);
+    const theater = ring1[0];
+    theater.district = 'THEATER_SQUARE';
+    theater.districtComplete = true;
+    border.districts.push({ type: 'THEATER_SQUARE', tileIndex: theater.index });
+    border.loyalty = 0;
+    flipCity(state, border);
+    const got = state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.tileIndex);
+    expect(got).toEqual(ring1.slice(1, 1 + FREE_CITY_PAIR_COUNT).map((t) => t.index));
+    expect(got).not.toContain(theater.index);
+  });
+
   it("the pair follows the former owner's techs, not the world era", () => {
     // the rival's Iron Working (Classical) lifts the world era; seat 0 still
     // gives Warriors

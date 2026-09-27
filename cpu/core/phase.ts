@@ -23,10 +23,10 @@ import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, t
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
-import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, purchaseStep, unitUpkeep } from './effects';
+import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
-import { LEVY_COST_PCT, LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS } from '../data/cityStates';
+import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS } from '../data/seats';
 import { landWalker, walkUnit } from './walker';
@@ -308,20 +308,28 @@ export function minorArmy(state: GameState, cityState: CityState): Unit[] {
   return state.units.filter((u) => u.seat === cityState.seat && unitIsMilitary(u.type));
 }
 
-/** THE LEVY'S PRICE (`LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST`): that
- *  share of the Gold purchase prices of the units it takes — each the
- *  chassis' own price at the purchase rate, floored to five as the minor's own
- *  purchases pay (`purchaseStep`) — summed and floored. Then the seat's levy
- *  discount (MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT), its rows summed
- *  and capped at the whole price: CIV6 (Epic Quest) "Levying units from a
- *  city-state costs 50% less Gold", and (Foreign Ministry) "Leveraging City
- *  States costs half Gold". */
+/** THE LEVY'S PRICE: the speed-scaled production cost of every military
+ *  unit it takes, summed — the same for every major (`GetLevyMilitaryCost`,
+ *  runs/c38s4_levy_20260926T125629Z.jsonl: 11 of 11 minors; the install's
+ *  LEVY_MILITARY_PERCENT_OF_UNIT_PURCHASE_COST 25 of the unfloored purchase
+ *  price, `GOLD_PURCHASE_MULT` 4 x the cost, is that number). Then each
+ *  MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT row the seat holds takes its
+ *  percent off in turn, each truncating — CIV6 (Epic Quest) "Levying units
+ *  from a city-state costs 50% less Gold", then (Foreign Ministry)
+ *  "Leveraging City States costs half Gold" per standing Foreign Ministry,
+ *  buildings in catalog order: both rows pay 25%, never nothing. */
 export function levyGoldCost(state: GameState, seat: number, cityState: CityState): number {
-  let sum = 0;
-  for (const u of minorArmy(state, cityState)) sum += purchaseStep(UNITS[u.type].cost * GOLD_PURCHASE_MULT);
-  const off = (civOf(state, seat) === 'SUMERIA' ? EPIC_QUEST_LEVY_DISCOUNT_PCT : 0)
-    + seatBuildingSum(state, seat, 'levyDiscountPct');
-  return (Math.floor((sum * LEVY_COST_PCT) / 100) * (100 - Math.min(100, off))) / 100;
+  let cost = 0;
+  for (const u of minorArmy(state, cityState)) cost += UNITS[u.type].cost;
+  const off = (pct: number) => { cost = Math.floor((cost * (100 - pct)) / 100); };
+  if (civOf(state, seat) === 'SUMERIA') off(EPIC_QUEST_LEVY_DISCOUNT_PCT);
+  for (const def of Object.values(BUILDINGS)) {
+    if (!def.levyDiscountPct) continue;
+    for (const city of citiesOf(state, seat)) {
+      if (city.buildings.includes(def.id) && !darkBuildings(state.map, city).has(def.id)) off(def.levyDiscountPct);
+    }
+  }
+  return cost;
 }
 
 /**
@@ -657,8 +665,11 @@ export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
  *  from the centre, never the centre itself: with every plot of ring 1 held
  *  the grant landed 2 away, with rings 1 and 2 held 3 away
  *  (runs/c60s3_r1_20260926T081910Z.jsonl, runs/c60s3_r1_20260926T082156Z.jsonl,
- *  runs/c60s3_r2_20260926T082415Z.jsonl). Among the plots at one distance the
- *  lowest tile index takes it. The unit remembers the city that granted it
+ *  runs/c60s3_r2_20260926T082415Z.jsonl). A plot holding a district is never
+ *  one: with the one free plain plot of ring 1 held, the grant passed the
+ *  district plot beside the centre for ring 2
+ *  (runs/c60t_grant_A_b6920_20260927T000521Z.jsonl). Among the plots at one
+ *  distance the lowest tile index takes it. The unit remembers the city that granted it
  *  (`Unit.freeCity`): when that city joins a civilization, the grant goes
  *  (`joinFromFreeCity`). The units walk with the Free Cities' walker
  *  (`freeCitiesPhase`). */
@@ -669,6 +680,7 @@ function grantFreeCityUnit(state: GameState, city: City, unitType: string): void
   let bd = Infinity;
   for (const t of state.map.tiles) {
     if (t.index === centre.index) continue;
+    if (t.district) continue;
     const d = hexDistance(centre.col, centre.row, t.col, t.row);
     if (d < bd && tileFreeForUnit(state, t.index, FREE_SEAT, probe)) {
       spot = t;
@@ -2102,7 +2114,7 @@ export function cityStrikes(state: GameState, city: City, strikeCS: number): voi
       const d = hexDistance(origin.col, origin.row, t.col, t.row);
       if (d < 1 || d > 2) continue;
       // ANY unit hostile to the city's seat that a shot may take (`shootable`:
-      // never a civilian): a city's strike picks its target by distance, never
+      // a military one): a city's strike picks its target by distance, never
       // by which enemy the unit belongs to.
       if (!visibleHostilesAt(state, t.index, striker).some(shootable)) continue;
       if (d < bestDist) {

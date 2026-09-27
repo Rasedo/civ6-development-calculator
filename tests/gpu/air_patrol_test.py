@@ -513,8 +513,79 @@ def main() -> None:
         f"the alliance's +5 rides the plane in the burst — {plain} -> {ally_taken} (terms {t1})")
     print(f"  11 the seat-pair terms in the burst OK ({plain} -> {ally_taken})")
 
+    # -- 12: PRIORITY TARGET is never intercepted -----------------------------
+    # runs/c34t_patrol_priority_20260926.jsonl: under an enemy patrol on the
+    # struck tile or one away, the flat 65, no draw, no damage either way
+    sim = fresh(rules, path)
+    at_war(sim, row, foe)
+    ae = aerodrome(sim, row, a_city(sim, row))
+    fctr = int(sim.city_center[0, foe, a_city(sim, foe)])
+    f = spawn(sim, row, FIGHTER, ae)
+    t = bare_land(sim, ae, 1, int(sim._type_ranged_range[FIGHTER]))[0]
+    spawn(sim, foe, SOFT, t)
+    med = spawn(sim, foe, MEDIC, t)
+    on = spawn(sim, foe, FIGHTER, fctr)
+    sim.unit_patrol[0, on] = t
+    assert bool(sim._interceptor_scan(torch.tensor([row]), torch.tensor([t]))[1][0])
+    pt = sim._priority_targets(row, torch.tensor([[f]]), torch.tensor([[ae]]),
+                               torch.tensor([[FIGHTER]]))[0, 0].tolist()
+    r0 = sim.rng_state.clone()
+    order(sim, row, f, sim._A_PRIORITY + pt.index(t))
+    got = (int(sim.unit_hp[0, med]), int(sim.unit_hp[0, f]), int(sim.unit_hp[0, on]))
+    assert got == (35, 100, 100) and torch.equal(r0, sim.rng_state), (
+        f"a Priority Target under a patrol is never intercepted — medic, plane, patrol {got}")
+    print("  12 PRIORITY TARGET under a patrol OK (no interception, no draw)")
+
+    # -- 13: a plain strike on a LONE Support chassis --------------------------
+    # runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl: a lone
+    # Support chassis took a flat 65 with no draw away from any gun, and a
+    # second strike killed; a lone Anti-Air Gun defended at its Anti-Air
+    def lone(ty):
+        s = fresh(rules, path)
+        at_war(s, row, foe)
+        ae2 = aerodrome(s, row, a_city(s, row))
+        f2 = spawn(s, row, FIGHTER, ae2)
+        t2 = bare_land(s, ae2, 1, int(s._type_ranged_range[FIGHTER]))[0]
+        v = spawn(s, foe, ty, t2)
+        ac = s._air_strike_targets(row, torch.tensor([[f2]]), torch.tensor([[ae2]]),
+                                   torch.tensor([[FIGHTER]]))[0, 0].tolist()
+        assert t2 in ac, f"a lone Support chassis is an air strike's target — {ac}"
+        r1 = s.rng_state.clone()
+        order(s, row, f2, s._A_AIR_STRIKE + ac.index(t2))
+        return s, v, t2, ae2, torch.equal(r1, s.rng_state)
+
+    s, v, t2, ae2, quiet = lone(MEDIC)
+    assert int(s.unit_hp[0, v]) == 35 and quiet, (
+        f"a lone Medic takes the flat 65 with no draw — hp {int(s.unit_hp[0, v])}, quiet {quiet}")
+    f3 = spawn(s, row, FIGHTER, ae2)
+    ac = s._air_strike_targets(row, torch.tensor([[f3]]), torch.tensor([[ae2]]),
+                               torch.tensor([[FIGHTER]]))[0, 0].tolist()
+    order(s, row, f3, s._A_AIR_STRIKE + ac.index(t2))
+    assert not bool(s.unit_alive[0, v]), "a second strike kills it"
+    s, v, _, _, quiet = lone(GUNNER)
+    assert not quiet and int(s.unit_hp[0, v]) != 35, "a lone Anti-Air Gun fights at its Anti-Air"
+    # a BOMBER is offered a lone Support chassis with no Anti-Air, and deals the
+    # same flat blow; never a land combat unit or a lone gun
+    s = fresh(rules, path)
+    at_war(s, row, foe)
+    ae2 = aerodrome(s, row, a_city(s, row))
+    b2 = spawn(s, row, BOMBER, ae2)
+    spots = bare_land(s, ae2, 2, int(s._type_ranged_range[BOMBER]))
+    tm, tsoft, tgun = spots[0], spots[-1], spots[len(spots) // 2]
+    vm = spawn(s, foe, MEDIC, tm)
+    spawn(s, foe, SOFT, tsoft)
+    spawn(s, foe, GUNNER, tgun)
+    bc = s._air_strike_targets(row, torch.tensor([[b2]]), torch.tensor([[ae2]]),
+                               torch.tensor([[BOMBER]]))[0, 0].tolist()
+    assert tm in bc and tsoft not in bc and tgun not in bc, (bc, tm, tsoft, tgun)
+    r1 = s.rng_state.clone()
+    order(s, row, b2, s._A_AIR_STRIKE + bc.index(tm))
+    assert int(s.unit_hp[0, vm]) == 35, f"the bomber's blow on a lone Support chassis — {int(s.unit_hp[0, vm])}"
+    assert torch.equal(r1, s.rng_state) or int(s.pair_dist[tm, tgun]) <= 1, "the flat blow drew"
+    print("  13 a lone Support chassis under a plain strike OK (flat 65, no draw; the gun fights)")
+
     print("AIR PATROL OK — deploy, return, the patrol's heal, interception, the order of a sortie, "
-          "the bomb's 50%, Priority Target, the seat-pair terms")
+          "the bomb's 50%, Priority Target, the seat-pair terms, the lone Support chassis")
 
 
 if __name__ == "__main__":

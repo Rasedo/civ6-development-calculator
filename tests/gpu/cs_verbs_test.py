@@ -8,7 +8,7 @@ Both mechanics run from the civ phase (the `_seat_phase` levy block +
 `questSatisfied`):
 
   * CIV LEVY — a civ suzerain of a CS takes its whole standing army
-    (`levyUnits`), paying `levyCostPct` of the units' Gold prices, once while
+    (`levyUnits`), paying the units' summed production cost, once while
     the army is out; it comes home after `levyTurns` or when the suzerain
     changes (`_minor_levy_return`).
   * CIV QUESTS (zero-draw) — one deterministic quest per (civ, CS):

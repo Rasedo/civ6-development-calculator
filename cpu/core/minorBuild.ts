@@ -28,6 +28,7 @@ import {
   MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
   MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_WEIGHTS_PEACE,
   MINOR_WALK_WEIGHTS_WAR, MINOR_WALLS_PROD_PCT, type MinorBuildRow, FREE_CITY_BUILD_ROWS,
+  MINOR_REPAIR_RESUME_PCT,
 } from '../data/cityStates';
 import { ENCAMPMENT_HP, UNIT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
@@ -44,11 +45,12 @@ import { computeCityStats } from './city';
 import { minorCity, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, type Unlocks } from './effects';
 import { applyLumpYield } from './economy';
-import { cityPower } from './yields';
+import { buildingPillaged, cityPower, repairBuilding } from './yields';
+import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorRouteCandidate, minorTrade, tradeCapacity } from './trade';
 import { FREE_SEAT, civsAtWar, majorityReligionOf, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
+import { builderCost, cityNavalCapable, disbandUnit, raiseBestMelee, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
 import { nextRandom } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
@@ -292,7 +294,10 @@ function minorBuyMilitary(state: GameState, cityState: CityState, units: Unit[])
   if (Math.floor(nextRandom(state) * 10000) >= (recent ? bp * MINOR_LOSS_BUY_MULT : bp)) return;
   if (monk) {
     const u = spawnUnit(state, 'WARRIOR_MONK', cityState.centerIndex, cityState.seat);
-    if (u) cityState.faith -= monkPrice;
+    if (u) {
+      cityState.faith -= monkPrice;
+      raiseBestMelee(state, cityState.seat, 'WARRIOR_MONK');
+    }
     return;
   }
   const id = minorArmyUnit(trainableIn(cityState.research, minorAnyResource()), units);
@@ -512,9 +517,11 @@ function minorBuildingCost(state: GameState, cityState: CityState, id: string): 
   return def.floodBarrier ? floodBarrierCost(state, minorCity(cityState)) : def.cost;
 }
 
-/** CIV6: a worship building is built by the religion whose Worship belief
- *  names it — for a city-state, its city's majority religion. */
+/** The worship building the minor's city is offered (`worshipOffered`): the
+ *  one its majority religion's Worship belief names, none while it holds a
+ *  worship building. */
 function minorWorship(state: GameState, cityState: CityState): string | undefined {
+  if ((cityState.buildings ?? []).some((b) => BUILDINGS[b]?.worship)) return undefined;
   const rel = majorityReligionOf(state, cityState.seat);
   return rel < 0 ? undefined : worshipBuildingOf(seatOf(state, rel)?.religion.worship);
 }
@@ -589,6 +596,22 @@ function minorWant(
   }
 }
 
+/** The pillaged building the minor repairs next: the first in the
+ *  production layout whose district stands complete and unpillaged (a City
+ *  Center row always). */
+function minorRepairTarget(state: GameState, cityState: CityState): string | undefined {
+  if (!cityState.pillagedBuildings?.length) return undefined;
+  return centerBuildingIds().find((id) => {
+    if (!buildingPillaged(cityState, id)) return false;
+    const def = BUILDINGS[id];
+    if (def.district === 'CITY_CENTER') return true;
+    return (cityState.districts ?? []).some((d) => {
+      const t = state.map.tiles[d.tileIndex];
+      return t.district === def.district && t.districtComplete && !t.districtPillaged;
+    });
+  });
+}
+
 /** The first row that wants an item it can make now is the one the turn's
  *  Production goes toward — the pot takes it under that item's rows
  *  (`minorProduction`) — and the item completes when the pot covers it, at
@@ -598,7 +621,12 @@ function minorWant(
  *  walls, the city's and its Encampment's, at the HP it puts back
  *  (`projectCost`); a district project pays its yield conversion, its cost at
  *  the row's `yieldPct` (`projectYieldLump`), into the minor's own pot for that yield (a
- *  city-state earns no Great People, so its points go nowhere). */
+ *  city-state earns no Great People, so its points go nowhere).
+ *  A PILLAGED building is queued after the item the minor was working on
+ *  when it fell (`CityState.repairWait`, cleared as an item completes or when
+ *  no row wants one) and then comes first: it resumes at
+ *  `MINOR_REPAIR_RESUME_PCT` of its cost and the rest is built with the pot
+ *  (`minorRepairTarget`). */
 function minorBuild(state: GameState, cityState: CityState, production: number): void {
   cityState.fullyPowered = false;
   let pot = cityState.prodProgress ?? 0;
@@ -606,6 +634,19 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
     pot += minorProduction(production, pct);
     cityState.prodProgress = pot;
   };
+  const repair = minorRepairTarget(state, cityState);
+  const repairNow = (id: string): void => {
+    toward(0);
+    const full = minorBuildingCost(state, cityState, id);
+    const cost = full - Math.floor((full * MINOR_REPAIR_RESUME_PCT) / 100);
+    if (pot < cost) return;
+    cityState.prodProgress = pot - cost;
+    repairBuilding(cityState, id);
+  };
+  if (repair && !cityState.repairWait) {
+    repairNow(repair);
+    return;
+  }
   const unlocks = computeUnlocksIn(cityState.research, []); // a MINOR carries no roster row
   const units = state.units.filter((u) => u.seat === cityState.seat);
   const military = units.filter((u) => unitIsMilitary(u.type)).length;
@@ -628,6 +669,7 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
       if (!unit) return;
       applyTrainingGrants(state, minorCity(cityState), unit);
       cityState.prodProgress = pot - cost;
+      cityState.repairWait = false;
       if (builder) cityState.buildersTrained += 1;
       return;
     }
@@ -637,6 +679,7 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
       const cost = minorBuildingCost(state, cityState, want.building);
       if (pot < cost) return;
       cityState.prodProgress = pot - cost;
+      cityState.repairWait = false;
       cityState.buildings = [...(cityState.buildings ?? []), want.building];
       if (def.floodBarrier) repairBehindBarrier(state, minorCity(cityState));
       if (def.walls) {
@@ -659,6 +702,7 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
         return;
       }
       cityState.prodProgress = pot - cost;
+      cityState.repairWait = false;
       if (def.repair) {
         cityState.outerHp = wallsMax(state, city);
         fitEncampOuter(state, city);
@@ -684,6 +728,7 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
       + ` t${cost} pot${Math.floor(pot)}`);
     if (pot < cost) return;
     cityState.prodProgress = pot - cost;
+    cityState.repairWait = false;
     const t = state.map.tiles[want.site];
     t.district = district;
     t.districtComplete = true;
@@ -693,6 +738,12 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
       t.encampHp = ENCAMPMENT_HP;
       t.encampOuterHp = wallsMax(state, { buildings: cityState.buildings ?? [], seat: cityState.seat });
     }
+    return;
+  }
+  // no item in hand: a pillaged building is the item now
+  cityState.repairWait = false;
+  if (repair) {
+    repairNow(repair);
     return;
   }
   toward(0);

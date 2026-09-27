@@ -237,7 +237,7 @@ class SimInit:
             B, s_pad, len(rules.citystate["buildRows"]), dtype=torch.long, device=device)
         self.citystate_army_cap = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_builders_trained = torch.zeros(B, s_pad, dtype=torch.long, device=device)
-        # the strongest melee Combat Strength the minor has fielded — the base
+        # the strongest melee Combat Strength the minor has trained or bought — the base
         # its centre stands on (`holderStrength`, the Seat's `bestMeleeCS`)
         self.citystate_best_melee = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # the episode's Builder purchase rate (per mille, -1 undrawn), the
@@ -250,6 +250,9 @@ class SimInit:
         # its last turn's Production went toward a `fullyPowered` project
         # still running — the queue head `_minor_power` reads (`fullyPowered`)
         self.citystate_full_power = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # a building was pillaged while the minor worked on an item: its
+        # repair waits for that item (`CityState.repairWait`)
+        self.citystate_repair_wait = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         self._init_minor_build(rules)
         # the minor city's GOLD and FAITH: what its yield walk pays, less its
         # units' upkeep, spent on its purchases and upgrades (the TS
@@ -1320,6 +1323,8 @@ class SimInit:
             "zeal": torch.tensor([0] + [int(x["zeal"]) for x in _erows], dtype=torch.long, device=device),
             "theoKeep": torch.tensor([0] + [int(x["theoKeep"]) for x in _erows], dtype=torch.long, device=device),
             "hwHeal": torch.tensor([0] + [int(x["hwHeal"]) for x in _erows], dtype=torch.long, device=device),
+            # Religious Colonization: the pressure a founded city starts with
+            "colon": torch.tensor([0] + [int(x["colon"]) for x in _erows], dtype=torch.long, device=device),
         }
         # whether the catalog carries each channel at all
         self._enh_zeal_any = bool((self._enh["zeal"] != 0).any())
@@ -2640,6 +2645,8 @@ class SimInit:
         self._fire_regrow_turn = int(_ds["fireRegrowTurn"])
         self._fire_spread_p = float(_ds["fireSpreadP"])
         self._fire_spread_turns = [int(x) for x in _ds["fireSpreadTurns"]]
+        # per row: 1 where the fire spreads into the other row's feature too
+        self._fire_spread_cross = [int(x) for x in _ds["fireSpreadCross"]]
         self._fire_damage_turns = [int(x) for x in _ds["fireDamageTurns"]]
         self._fire_pop_turn = int(_ds["firePopTurn"])
         self._fire_dmg = [int(x) for x in _ds["fireDmg"]]
@@ -3016,7 +3023,9 @@ class SimInit:
         self._b_spy_pen_enc = rules.b_spy_pen_enc.to(device)
         self._b_influence = rules.b_influence.to(device)
         self._b_favor = rules.b_favor.to(device)
-        self._b_levy_discount = rules.b_levy_discount.to(device)
+        # (building, percent) per MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT
+        # building row, catalog order — `_levy_cost` takes each in turn
+        self._levy_discount_rows = [(b, int(p)) for b, p in enumerate(rules.b_levy_discount.tolist()) if int(p) > 0]
         self._b_tourism = rules.b_tourism.to(device)
         self._b_tour_any = bool((self._b_tourism != 0).any())
         self._b_loy_no_gov = rules.b_loy_no_gov.to(device)
@@ -4070,22 +4079,6 @@ class SimInit:
                             torch.tensor([_s0], dtype=torch.long, device=device),
                             torch.zeros(1, dtype=torch.bool, device=device))[0]
                     self.unit_next[b] += 1
-
-        # The FIXTURE-LOADED starting units must seed the best-melee trackers:
-        # TS counts them through spawnUnit at loadWorld, so a seat starting
-        # with a WARRIOR has city defense 20, not the floor. ONE scan over the
-        # merged pool, one row per seat.
-        _ut0 = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        _melee0 = self.major_unit_alive & (self._type_ranged_strength[_ut0] == 0)
-        _mcs0 = torch.where(_melee0, self._type_combat[_ut0], torch.zeros_like(self.major_unit_type))
-        for _row0 in range(self.n_majors):
-            self.civ_best_melee[:, _row0] = torch.where(
-                self.major_unit_seat == _row0, _mcs0, torch.zeros_like(_mcs0)
-            ).max(dim=1).values
-        for _s0 in range(self.S):
-            self.citystate_best_melee[:, _s0] = torch.where(
-                self.major_unit_seat == 100 + _s0, _mcs0, torch.zeros_like(_mcs0)
-            ).max(dim=1).values.to(self.citystate_best_melee.dtype)
 
         self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
 

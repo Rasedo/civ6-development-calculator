@@ -246,6 +246,7 @@ describe('founding a religion', () => {
     state.sandbox = true;
     adoptBeliefs(state, 0, [pick('WAT'), pick('HOLY_ORDER')]);
     state.sandbox = false;
+    city.followedReligion = 0;
     city.queue.push({ kind: 'building', building: 'WAT', progress: 30 });
     seatOf(state, 0)!.faith = 1000;
     const bank0 = city.productionBank ?? 0;

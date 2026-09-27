@@ -429,6 +429,27 @@ def test_grant_outward(rules, path) -> None:
     print("  7b the outward grant OK — ring 1 held, the pair lands 2 away, lowest index first, never the centre")
 
 
+def test_grant_off_districts(rules, path) -> None:
+    """A grant never lands on a plot holding a district: with the one plain
+    plot of ring 1 held, the live game passed the district plot beside the
+    centre for ring 2 (runs/c60t_grant_A_b6920_20260927T000521Z.jsonl)."""
+    sim = fresh(rules, path)
+    plant_city(sim, 0)
+    col = int(sim.city_alive[B0, 0].nonzero()[-1])
+    centre = int(sim.city_center[B0, 0, col])
+    sim.city_pop[B0, 0, col] = 3
+    ring1 = sorted(int(n) for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n]))
+    theater = ring1[0]
+    sim.district[B0, theater] = next(i for i, d in enumerate(sim.districts_cat) if d["id"] == "THEATER_SQUARE")
+    sim.district_complete[B0, theater] = True
+    flip = torch.zeros(sim.B, sim.RC, dtype=torch.bool)
+    flip[B0, col] = True
+    sim._seat_loyalty_flips(0, flip)
+    units = free_units(sim)
+    assert [u[2] for u in units] == ring1[1:3], (units, ring1)
+    print("  7c the grant passes a district plot OK")
+
+
 def test_treasury_and_join(rules, path) -> None:
     sim = fresh(rules, path)
     centre = revolt(sim)
@@ -564,6 +585,7 @@ def main() -> int:
     test_heal_and_pressure(rules, path)
     test_grants(rules, path)
     test_grant_outward(rules, path)
+    test_grant_off_districts(rules, path)
     test_defence_and_strike(rules, path)
     test_free_unit_defends(rules, path)
     test_treasury_and_join(rules, path)

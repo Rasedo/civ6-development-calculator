@@ -14,7 +14,7 @@ import { ALLIANCE_M1_CS, ALLIANCE_MILITARY } from '../../../cpu/data/seats';
 import { RESOURCES } from '../../../world/resources';
 import {
   INTERCEPT_RANGE, INTERCEPT_SUPPORT_CS, PRIORITY_TARGET_DAMAGE, canDeployTo, deployAir, deployRange, deployTargets,
-  interceptorAgainst, priorityDefender, priorityTargets, rebaseAir, returnToBase,
+  airStrikeTargets, interceptorAgainst, priorityDefender, priorityTargets, rebaseAir, returnToBase,
 } from '../../../cpu/core/air';
 import { airPillage, airStrike, damageRoll } from '../../../cpu/core/combat';
 import { promoRows } from '../../../cpu/data/promotions';
@@ -408,6 +408,25 @@ describe('priority target', () => {
     expect(m2.hp).toBe(100);
   });
 
+  // runs/c34t_patrol_priority_20260926.jsonl: under an enemy patrol on the
+  // struck tile or one away, 5 of 5 Priority Targets took the flat 65 with no
+  // draw and no damage either way
+  it('is never intercepted', () => {
+    const { state, pad } = airState();
+    const plane = spawnUnit(state, FIGHTER, pad.index, 0)!;
+    const t = tileAtCoords(state.map, 8, 11);
+    spawnUnit(state, 'WARRIOR', t.index, 1);
+    const medic = spawnUnit(state, 'MEDIC', t.index, 1)!;
+    const on = patrolOf(state, FIGHTER, t.index);
+    const beside = patrolOf(state, JET, tileAtCoords(state.map, 8, 12).index);
+    expect(interceptorAgainst(state, plane, t.index)).toBeDefined();
+    const r0 = state.rngState;
+    expect(airStrike(state, plane.id, t.index, 0, true).ok).toBe(true);
+    expect(medic.hp).toBe(100 - PRIORITY_TARGET_DAMAGE);
+    expect([plane.hp, on.hp, beside.hp]).toEqual([100, 100, 100]);
+    expect(state.rngState).toBe(r0);
+  });
+
   it('a tile with no Support unit, or a hostile centre, is no priority target', () => {
     const { state, pad } = airState();
     const plane = spawnUnit(state, FIGHTER, pad.index, 0)!;
@@ -418,5 +437,65 @@ describe('priority target', () => {
     spawnUnit(state, 'MEDIC', foeCity.centerIndex, 1);
     expect(priorityDefender(state, plane, foeCity.centerIndex)).toBeUndefined();
     expect(airStrike(state, plane.id, t.index, 0, true).ok).toBe(false);
+  });
+});
+
+// runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl: a Battering
+// Ram, a Medic, a Siege Tower and an Observation Balloon standing alone each
+// took a flat 65 from a plain air strike and a second strike killed; only the
+// sorties flown beside an Anti-Air Gun drew, the gun's answer; a lone
+// Anti-Air Gun defended at its Anti-Air
+describe('a plain air strike on a lone Support chassis', () => {
+  it('deals the flat 65 with no draw, and a second strike kills', () => {
+    const { state, pad } = airState();
+    const plane = spawnUnit(state, FIGHTER, pad.index, 0)!;
+    const medic = spawnUnit(state, 'MEDIC', tileAtCoords(state.map, 8, 11).index, 1)!;
+    const r0 = state.rngState;
+    expect(airStrike(state, plane.id, medic.tileIndex, 0).ok).toBe(true);
+    expect(medic.hp).toBe(100 - PRIORITY_TARGET_DAMAGE);
+    expect(plane.hp).toBe(100);
+    expect(state.rngState).toBe(r0);
+    const second = spawnUnit(state, FIGHTER, pad.index, 0)!;
+    expect(airStrike(state, second.id, medic.tileIndex, 0).ok).toBe(true);
+    expect(state.units).not.toContain(medic);
+  });
+
+  it('meets the anti-air cover first, then the flat blow', () => {
+    const { state, pad } = airState();
+    const plane = spawnUnit(state, FIGHTER, pad.index, 0)!;
+    const ram = spawnUnit(state, 'BATTERING_RAM', tileAtCoords(state.map, 8, 11).index, 1)!;
+    spawnUnit(state, GUNNER, tileAtCoords(state.map, 8, 12).index, 1);
+    const r0 = state.rngState;
+    expect(airStrike(state, plane.id, ram.tileIndex, 0).ok).toBe(true);
+    const want = damageRoll({ ...state, rngState: r0 } as GameState,
+      UNITS[GUNNER].antiAir! - UNITS[FIGHTER].ranged!.strength);
+    expect(100 - plane.hp).toBe(want);
+    expect(ram.hp).toBe(100 - PRIORITY_TARGET_DAMAGE);
+  });
+
+  it('a bomber is offered it and deals the same blow; never a land combat unit or a lone gun', () => {
+    const { state, pad } = airState();
+    const bomber = spawnUnit(state, BOMBER, pad.index, 0)!;
+    const ram = spawnUnit(state, 'BATTERING_RAM', tileAtCoords(state.map, 8, 11).index, 1)!;
+    const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 11).index, 1)!;
+    const gun = spawnUnit(state, GUNNER, tileAtCoords(state.map, 6, 13).index, 1)!;
+    const offered = airStrikeTargets(state, bomber, AIR_STRIKE_COLS);
+    expect(offered).toContain(ram.tileIndex);
+    expect(offered).not.toContain(foe.tileIndex);
+    expect(offered).not.toContain(gun.tileIndex);
+    const r0 = state.rngState;
+    expect(airStrike(state, bomber.id, ram.tileIndex, 0).ok).toBe(true);
+    expect(ram.hp).toBe(100 - PRIORITY_TARGET_DAMAGE);
+    expect(state.rngState).toBe(r0);
+  });
+
+  it('a lone Anti-Air Gun fights at its Anti-Air', () => {
+    const { state, pad } = airState();
+    const plane = spawnUnit(state, FIGHTER, pad.index, 0)!;
+    const gun = spawnUnit(state, GUNNER, tileAtCoords(state.map, 8, 11).index, 1)!;
+    const r0 = state.rngState;
+    expect(airStrike(state, plane.id, gun.tileIndex, 0).ok).toBe(true);
+    expect(state.rngState).not.toBe(r0);
+    expect(100 - gun.hp).not.toBe(PRIORITY_TARGET_DAMAGE);
   });
 });

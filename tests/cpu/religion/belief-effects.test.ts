@@ -6,9 +6,11 @@
  * CIV6 (Beliefs.xml, Expansion2_Beliefs.xml): LAY_MINISTRY
  * (BELIEF_YIELD_PER_DISTRICT), SACRED_PLACES (BELIEF_YIELD_PER_CITY_WITH_WONDER),
  * MISSIONARY_ZEAL (ABILITY_RELIGIOUS_IGNORE_TERRAIN_COST), MONASTIC_ISOLATION
- * (EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS 100), RELIGIOUS_COLONIZATION (its row,
- * no amount), HOLY_WATERS (MODIFIER_ALL_UNITS_ADJUST_HEAL_RELIGION_PER_TURN
- * 10); the Dar-e Mehr's Building_YieldsPerEra.
+ * (EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS 100), RELIGIOUS_COLONIZATION (the
+ * measured 200 a new city starts with), HOLY_WATERS
+ * (MODIFIER_ALL_UNITS_ADJUST_HEAL_RELIGION_PER_TURN 10); the Dar-e Mehr's
+ * Building_YieldsPerEra; the cities following a founder belief pays per; the
+ * worship building a city's majority religion offers.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, expandBorders, standBuilding } from '../helpers';
@@ -16,6 +18,8 @@ import { foundCity, condemnHeretic } from '../../../cpu/core/game';
 import { seatOf, emptySeat, setWar } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { makeYieldCtx } from '../../../cpu/core/effects';
+import { availableBuildings } from '../../../cpu/core/rules';
+import { placeCityStateAt } from '../../../cpu/core/cityStates';
 import { moveCostInto, riverCharge, religiousHeal, spawnUnit } from '../../../cpu/core/units';
 import { transferCity } from '../../../cpu/core/phase';
 import { completeQueueItem } from '../../../cpu/core/production';
@@ -51,14 +55,14 @@ function religion(state: GameState, founder: string | null, enhancer: string | n
 }
 
 describe('the catalogs hold the install\'s nine Founders and nine Enhancers', () => {
-  it('every row, RELIGIOUS_COLONIZATION inert', () => {
+  it('every row, RELIGIOUS_COLONIZATION the 200 a new city starts with', () => {
     expect(Object.keys(FOUNDER_BELIEFS)).toHaveLength(9);
     expect(Object.keys(ENHANCER_BELIEFS)).toHaveLength(9);
     for (const id of ['LAY_MINISTRY', 'SACRED_PLACES']) expect(FOUNDER_BELIEFS[id]).toBeDefined();
     for (const id of ['MISSIONARY_ZEAL', 'MONASTIC_ISOLATION', 'RELIGIOUS_COLONIZATION', 'HOLY_WATERS']) {
       expect(ENHANCER_BELIEFS[id]).toBeDefined();
     }
-    expect(ENHANCER_BELIEFS.RELIGIOUS_COLONIZATION.effects).toEqual({});
+    expect(ENHANCER_BELIEFS.RELIGIOUS_COLONIZATION.effects).toEqual({ colonizePressure: 200 });
   });
 });
 
@@ -90,6 +94,25 @@ describe('Founder beliefs', () => {
     t.builtWonderComplete = false;
     const none = computeCityStats(state, city).breakdown.bonuses;
     expect(none.faith - before.faith).toBe(0);
+  });
+
+  it('Pilgrimage pays +2 Faith per city following the religion anywhere: a foreign major\'s, a city-state\'s', () => {
+    const { state, city } = sandboxCity();
+    religion(state, 'PILGRIMAGE', null);
+    state.seats.push(emptySeat(1));
+    const other = foundCity(state, tileAtCoords(state.map, 16, 16).index, 1).city!;
+    const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', tileAtCoords(state.map, 3, 16).index);
+    const faith = () => computeCityStats(state, city).breakdown.bonuses.faith;
+    const f0 = faith();
+    city.followedReligion = 0;
+    expect(faith() - f0).toBe(2);
+    other.followedReligion = 0;
+    expect(faith() - f0).toBe(4);
+    cs.religionPressure = [500, 0];
+    expect(faith() - f0).toBe(6);
+    // a city following another religion counts nothing
+    other.followedReligion = 1;
+    expect(faith() - f0).toBe(4);
   });
 });
 
@@ -131,6 +154,17 @@ describe('Enhancer beliefs', () => {
     }
   });
 
+  it('Religious Colonization: a city founded by a seat whose majority religion holds it starts following it at 200', () => {
+    for (const [enhancer, want] of [[null, -1], ['RELIGIOUS_COLONIZATION', 0]] as const) {
+      const { state, city } = sandboxCity();
+      religion(state, null, enhancer);
+      city.followedReligion = 0;
+      const next = foundCity(state, tileAtCoords(state.map, 16, 16).index, 0).city!;
+      expect(next.followedReligion ?? -1).toBe(want);
+      expect(next.religionPressure?.[0] ?? 0).toBe(want >= 0 ? 200 : 0);
+    }
+  });
+
   it('Holy Waters: +10 healing on or next to a Holy Site of a city following the religion, for any religious unit', () => {
     const { state, city } = sandboxCity();
     district(state, city, 'HOLY_SITE', 10, 9);
@@ -150,6 +184,30 @@ describe('Enhancer beliefs', () => {
   });
 });
 
+describe('a worship building is offered by the city\'s majority religion', () => {
+  it('another seat\'s building where the city follows its religion, none once one stands', () => {
+    const { state, city } = sandboxCity();
+    district(state, city, 'HOLY_SITE', 10, 9);
+    city.buildings.push('SHRINE', 'TEMPLE');
+    religion(state, null, null);
+    seatOf(state, 0)!.religion.worship = 'WAT';
+    state.seats.push(emptySeat(1));
+    const r1 = seatOf(state, 1)!.religion;
+    r1.founded = true;
+    r1.worship = 'MOSQUE';
+    const offered = () => availableBuildings(state, city).filter((b) => b.worship).map((b) => b.id);
+    expect(offered()).toEqual([]);
+    city.followedReligion = 1;
+    expect(offered()).toEqual(['MOSQUE']);
+    city.followedReligion = 0;
+    expect(offered()).toEqual(['WAT']);
+    // a city holding one is offered no other
+    city.buildings.push('WAT');
+    city.followedReligion = 1;
+    expect(offered()).toEqual([]);
+  });
+});
+
 describe('the Dar-e Mehr pays +1 Faith per game era since constructed or last repaired', () => {
   function withDarEMehr() {
     const { state, city } = sandboxCity();
@@ -158,6 +216,7 @@ describe('the Dar-e Mehr pays +1 Faith per game era since constructed or last re
     const rel = seatOf(state, 0)!.religion;
     rel.founded = true;
     rel.worship = 'DAR_E_MEHR';
+    city.followedReligion = 0;
     return { state, city };
   }
 

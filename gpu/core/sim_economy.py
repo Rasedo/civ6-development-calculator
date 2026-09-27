@@ -749,7 +749,7 @@ class SimEconomy:
               & ~self._env_immune()[rows, tiles])
         self.pillaged[rows[ok], tiles[ok]] = True
 
-    def _pillage_district(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+    def _pillage_district(self, rows: torch.Tensor, tiles: torch.Tensor, buildings: bool = True) -> None:
         """CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile,
         not just the improvement — the buildings inside go dark with it, which
         is what a Dam is built to prevent. The `district` plane never encodes a
@@ -757,44 +757,70 @@ class SimEconomy:
         ok = ((self.district[rows, tiles] >= 0) & self.district_complete[rows, tiles]
               & ~self.district_pillaged[rows, tiles] & ~self._env_immune()[rows, tiles])
         self.district_pillaged[rows[ok], tiles[ok]] = True
+        if buildings:
+            # DISTRICT_PILLAGED takes every building standing in it
+            self._pillage_held(rows[ok], tiles[ok], top_only=False)
 
     def _pillage_tile_buildings(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """`pillageTileBuildings` — CIV6 (RandomEvent_Damages):
-        BUILDING_PILLAGED is a column of its OWN, with its own Percentage (a
-        flood pillages the district at 50 and its buildings at 100, and its
-        MODERATE row carries no district column at all), so a building goes
-        dark whether or not the district around it does. The table carries no
-        per-building granularity, so the roll is ONE PER TILE and a hit
-        darkens every building of the district standing there."""
+        BUILDING_PILLAGED is a column of its OWN, with its own Percentage,
+        rolled ONE PER TILE. A hit on a district not itself pillaged takes ONE
+        building, the top of the district's chain — the dearest standing
+        unpillaged, ties to the first in the layout, a Dar-e Mehr passed over
+        — a city-state's alike."""
         if not rows.numel():
             return
-        di = self.district[rows, tiles]
-        ok = ((di >= 0) & self.district_complete[rows, tiles]
-              & ~self._env_immune()[rows, tiles])
-        if not bool(ok.any()):
+        ok = ((self.district[rows, tiles] >= 0) & self.district_complete[rows, tiles]
+              & ~self.district_pillaged[rows, tiles] & ~self._env_immune()[rows, tiles])
+        self._pillage_held(rows[ok], tiles[ok], top_only=True)
+
+    def _pillage_held(self, rows: torch.Tensor, tiles: torch.Tensor, top_only: bool) -> None:
+        """Pillage the buildings of the district standing on each (rows,
+        tiles) plot in the city that holds it — a major's or the Free Cities'
+        city owning the plot, a city-state's whose registry holds it: every
+        standing one, or (`top_only`) the dearest standing unpillaged one,
+        ties to the first in the layout. CIV6 (Dar-e Mehr): "Cannot be
+        pillaged by natural disasters". A city-state's repair of what falls
+        waits for the item in hand (`citystate_repair_wait`).
+        `districtHolder` / `pillageHeld`'s twin."""
+        if not rows.numel():
             return
-        rr, tt, dd = rows[ok], tiles[ok], di[ok]
-        seat_at = self.tile_seat[rr, tt]
-        hit = False
+        dd = self.district[rows, tiles]
+        NB = int(self._b_req_district.shape[0])
+        key = (self.rules_dev.b_cost.to(torch.float64) * float(NB + 1)
+               + (NB - torch.arange(NB, device=self.device)).to(torch.float64))
+
+        def take(br: torch.Tensor, r: int, col: torch.Tensor, bd: torch.Tensor) -> torch.Tensor:
+            cand = (self.city_bldg[br, r, col] & ~self.city_bldg_pillaged[br, r, col]
+                    & (self._b_req_district.unsqueeze(0) == bd.unsqueeze(1))
+                    & ~self._b_disaster_proof.unsqueeze(0))
+            if top_only:
+                top = torch.where(cand, key.unsqueeze(0), torch.full_like(cand, -1.0, dtype=torch.float64)).argmax(dim=1)
+                cand = (torch.nn.functional.one_hot(top, NB).bool() & cand.any(dim=1, keepdim=True))
+            if bool(cand.any()):
+                self.city_bldg_pillaged[br, r, col] |= cand
+                self._eff_version += 1
+            return cand.any(dim=1)
+
+        seat_at = self.tile_seat[rows, tiles]
         for r in (*range(self.n_majors), self.FREE_ROW):
             sel = seat_at == int(self._ROW_SEAT[r])
             if not bool(sel.any()):
                 continue
-            br, bt, bd = rr[sel], tt[sel], dd[sel]
+            br, bt, bd = rows[sel], tiles[sel], dd[sel]
             col = self._city_col_at(r, br, bt)
             good = col >= 0
-            if not bool(good.any()):
+            if bool(good.any()):
+                take(br[good], r, col[good], bd[good])
+        for s in range(self.S):
+            r = self._CITY_MINOR0 + s
+            reg = self.city_dist_tile[rows, r, 0].gather(1, dd.clamp(min=0).unsqueeze(1)).squeeze(1)
+            sel = (dd >= 0) & (reg == tiles) & self.citystate_alive[rows, s]
+            if not bool(sel.any()):
                 continue
-            br, bd, col = br[good], bd[good], col[good]
-            # CIV6 (Dar-e Mehr): "Cannot be pillaged by natural disasters"
-            mine = (self.city_bldg[br, r, col]
-                    & (self._b_req_district.unsqueeze(0) == bd.unsqueeze(1))
-                    & ~self._b_disaster_proof.unsqueeze(0))
-            if bool(mine.any()):
-                self.city_bldg_pillaged[br, r, col] |= mine
-                hit = True
-        if hit:
-            self._eff_version += 1
+            br, bd = rows[sel], dd[sel]
+            fell = take(br, r, torch.zeros_like(br), bd)
+            self.citystate_repair_wait[br[fell], s] = True
 
     def _pick_static(self, mask_hit: torch.Tensor, cand_list: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         idx, cnt = cand_list
@@ -1348,9 +1374,9 @@ class SimEconomy:
                 self.d_static_adj[rows[om], n_d[om], :] += contrib[om]
 
     def _ignite(self, rows: torch.Tensor, tiles: torch.Tensor, start: torch.Tensor) -> None:
-        """`ignite` — the plots (`rows`, `tiles`) catch fire on the clock of the
-        fire begun on turn `start`: each Woods or Rainforest becomes its
-        burning form (`RandomEvent_Yields` Turn 0). A burning plot is neither
+        """`ignite` — the plots (`rows`, `tiles`) catch fire on turn `start`,
+        their own clock: each Woods or Rainforest becomes its burning form
+        (`RandomEvent_Yields` Turn 0). A burning plot is neither
         choppable nor Removable, so the t0 chop planes are suspended, and the
         adjacency its Woods or Rainforest lent is withdrawn — `_regrow` puts
         both back."""
@@ -1395,11 +1421,12 @@ class SimEconomy:
 
     def _fire_turn(self) -> None:
         """`fireTurn` — THE FIRES' TURN, after the draw: every plot on fire, on
-        its fire's clock (`age` = turns since the fire began). SPREAD first:
+        its own clock (`age` = turns since the plot caught). SPREAD first:
         each plot burning at an age in the spread turns — the list taken
         before any spreads, walked in ascending order — draws once per
-        adjacent live Woods or Rainforest above the sea, in direction order,
-        and at the spread chance sets it burning on the same clock. Then each
+        adjacent live plot of its own fire's feature above the sea (and of the
+        other fire's where `_fire_spread_cross` says so), in direction order,
+        and at the spread chance sets it burning from this turn. Then each
         plot on fire, in ascending order: a BURNING plot draws once for the
         UNIT_DAMAGE_LAND band and, at an age in the damage turns, is pillaged
         (improvement and district), its civilians killed and its land units
@@ -1422,7 +1449,8 @@ class SimEconomy:
                 at = order == k
                 hit = at.any(dim=1)
                 t = at.long().argmax(dim=1)
-                start = self.fire_start.gather(1, t.unsqueeze(1)).squeeze(1)
+                start = torch.full_like(t, turn)
+                own_fid = self.feat_id.gather(1, t.unsqueeze(1)).squeeze(1)
                 nb = self.neigh[t]
                 for d in range(6):
                     n = torch.where(hit, nb[:, d], none)
@@ -1431,8 +1459,12 @@ class SimEconomy:
                     ok = ((n >= 0) & ~self.feat_stripped.gather(1, n1).squeeze(1)
                           & ~self.tile_submerged.gather(1, n1).squeeze(1))
                     cand = torch.zeros_like(ok)
-                    for f in self._fire_start_fid:
-                        cand |= ok & (fid == f)
+                    for s, f in enumerate(self._fire_start_fid):
+                        into = own_fid == self._fire_burning_fid[s]
+                        for o in range(len(self._fire_start_fid)):
+                            if o != s and self._fire_spread_cross[o]:
+                                into = into | (own_fid == self._fire_burning_fid[o])
+                        cand |= ok & (fid == f) & into
                     r = self._next_random(cand)
                     cr = (cand & (r < self._fire_spread_p)).nonzero(as_tuple=True)[0]
                     self._ignite(cr, n[cr], start[cr])
@@ -1961,7 +1993,7 @@ class SimEconomy:
                 self.tile_fallout[rr, tt] = torch.maximum(
                     self.tile_fallout[rr, tt], self._accident_fallout[sev].expand_as(tt))
                 pil = r_district[rr] < self._accident_district_p[sev]
-                self._pillage_district(rr[pil], tt[pil])
+                self._pillage_district(rr[pil], tt[pil], buildings=False)
                 on = torch.zeros_like(hit)
                 on[rr] = True
                 plot = torch.zeros_like(centre)
@@ -2383,9 +2415,9 @@ class SimEconomy:
         still building, and only `buildingCompletable` — the PURCHASE gate,
         `complete=True` — demands the district be finished.
 
-        A WORSHIP building is offered only where it IS the building this
-        seat's religion's Worship belief names (`_worship_bidx_of`), and never
-        on the gold reading.
+        A WORSHIP building is offered only in a city whose majority religion's
+        Worship belief names it (`_worship_offered`) or that holds it
+        pillaged, and never on the gold reading.
 
         `queued` is TS's queued SET: a building anywhere in the city's queue is
         already on order, and TS offers neither it nor a prerequisite it would
@@ -2434,14 +2466,17 @@ class SimEconomy:
         # REPAIR, on its own column at `_building_cost_in`'s repair price;
         # the gold arm never sells one (CIV6 repairs from the queue alone)
         held = have if gold else (have & ~self.city_bldg_pillaged[:, row])
-        own_w = torch.zeros(B, NB, dtype=torch.bool, device=dev)
-        if not gold and row < self.n_majors:
-            _wb = self._worship_bidx_of(row)
-            own_w = (torch.arange(NB, device=dev).unsqueeze(0) == _wb.unsqueeze(1)) & (_wb >= 0).unsqueeze(1)
+        # a worship building where the city's majority religion names it, or
+        # the repair of one it holds pillaged; never on the gold reading
+        own_w = torch.zeros(B, C, NB, dtype=torch.bool, device=dev)
+        if not gold:
+            _wb = self._worship_offered(row)
+            own_w = (((torch.arange(NB, device=dev).reshape(1, 1, -1) == _wb.unsqueeze(2)) & (_wb >= 0).unsqueeze(2))
+                     | have)
         base = (
             unlocked.unsqueeze(1) & ~held & ~queued
             & (~rd.b_river.reshape(1, 1, -1) | river_c.unsqueeze(2))
-            & (~self._b_worship.unsqueeze(0) | own_w).unsqueeze(1)
+            & (~self._b_worship.reshape(1, 1, -1) | own_w)
         )
         # CIV6 (Urban Development Treaty, outcome B): "No buildings can be
         # created in this district." New picks only — in-flight items finish.
@@ -2646,21 +2681,34 @@ class SimEconomy:
         wb = self._worship_bidx[wi.clamp(min=0, max=self._worship_bidx.numel() - 1)]
         return torch.where(wi >= 0, wb, torch.full_like(wi, -1))
 
+    def _worship_offered(self, row: int) -> torch.Tensor:
+        """[B, RC] long — the worship building each city of row `row` is
+        offered: the one its MAJORITY religion's Worship belief names, whoever
+        founded it, -1 where none or while the city holds a worship building.
+        `worshipOffered`'s twin."""
+        fol = self.city_followed[:, row, :self.RC]
+        n = self.civ_worship.shape[1]
+        wi = torch.where((fol >= 0) & (fol < n),
+                         self.civ_worship.gather(1, fol.clamp(min=0, max=n - 1)),
+                         torch.full_like(fol, -1))
+        if self._worship_bidx.numel() == 0:
+            return torch.full_like(wi, -1)
+        wb = self._worship_bidx[wi.clamp(min=0, max=self._worship_bidx.numel() - 1)]
+        holds = (self.city_bldg[:, row] & self._b_worship.reshape(1, 1, -1)).any(dim=2)
+        return torch.where((wi >= 0) & ~holds, wb, torch.full_like(wi, -1))
+
     def _worship_city_ok(self, row: int) -> torch.Tensor:
-        """[B, RC] cities of seat row `row` that could take its worship
-        building NOW — `buyWorshipBuilding`'s city gates: the building its
-        religion's Worship belief names, not yet held, a TEMPLE and a COMPLETE
-        unpillaged Holy Site. The seat-level gates (a founded religion, the
-        faith) sit at the call site."""
+        """[B, RC] cities of seat row `row` that could take a worship building
+        NOW — `buyWorshipBuilding`'s city gates: a building offered
+        (`_worship_offered`), a TEMPLE and a COMPLETE unpillaged Holy Site.
+        The seat-level gates (the faith, the Congress ban) sit at the call
+        site."""
         if row >= self.n_majors or self._temple_bidx < 0 or self._hs_idx < 0:
             return torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
-        wb = self._worship_bidx_of(row)
+        wb = self._worship_offered(row)
         hs = self.city_dist_tile[:, row, :, self._hs_idx]
         hs_ok = (hs >= 0) & self.district_complete.gather(1, hs.clamp(min=0)) & ~self.district_pillaged.gather(1, hs.clamp(min=0))
-        held_w = self.city_bldg[:, row].gather(
-            2, wb.clamp(min=0).reshape(-1, 1, 1).expand(-1, self.RC, 1)).squeeze(2)
-        return ((wb >= 0).unsqueeze(1) & self.city_alive[:, row] & self.city_bldg[:, row, :, self._temple_bidx]
-                & ~held_w & hs_ok)
+        return ((wb >= 0) & self.city_alive[:, row] & self.city_bldg[:, row, :, self._temple_bidx] & hs_ok)
 
     def _adj_district_count(self) -> torch.Tensor:
         """[B, T] number of adjacent COMPLETED districts — the DISTRICT
@@ -2798,20 +2846,37 @@ class SimEconomy:
             pal = torch.ones_like(pal)
         return pal
 
+    @staticmethod
+    def _policy_unlock_term(term: tuple, n: torch.Tensor) -> torch.Tensor:
+        """[B] long — one measured multiplier table (`term` = (the count of
+        its first entry, the prices at the maximum base)) read at counts `n`;
+        below the table the first step carries on down, above it the last
+        step carries on up. `policyUnlockTerm`'s twin."""
+        first, prices = term
+        tab = torch.tensor(prices, dtype=torch.long, device=n.device)
+        last = len(prices) - 1
+        i = n - first
+        inside = tab[i.clamp(min=0, max=last)]
+        below = prices[0] + (prices[1] - prices[0]) * i
+        above = prices[last] + (prices[last] - prices[last - 1]) * (i - last)
+        return torch.where(i < 0, below, torch.where(i > last, above, inside))
+
     def _policy_unlock_cost(self, row: int) -> torch.Tensor:
         """[B] float64 — THE POLICY UNLOCK's Gold this turn: 0 in the free
-        window (the turn after the seat completed a civic), else the maximum
-        the first turn past it, dropping by the step each further turn to the
-        minimum, times k = (base + per-tech x the seat's techs) / 10, rounded
-        to the nearest step (halves up) in integers. `policyUnlockCost`'s
-        twin."""
+        window (the turn after the seat completed a civic), else base x k
+        rounded to the nearest step (halves up) in integers: the base the
+        maximum the first turn past the window, dropping by the step each
+        further turn to the minimum; k the larger of the tech term at the
+        seat's techs and the civic term at its civics, each the price at the
+        maximum base. `policyUnlockCost`'s twin."""
         mx, drop, mn = self.rules.civic_unlock
-        kb, kt, rnd = self.rules.policy_unlock_k
+        tech, civic, rnd = self.rules.policy_unlock_terms
         past = (self.turn - 1 - self.civ_civic_turn[:, row]).long()
         base = torch.clamp(mx - drop * (past - 1), min=mn)
-        k10 = kb + kt * self.civ_techs[:, row].long().sum(dim=1)
-        step = 10 * rnd
-        cost = (rnd * torch.div(base * k10 + step // 2, step, rounding_mode="floor")).double()
+        term = torch.maximum(self._policy_unlock_term(tech, self.civ_techs[:, row].long().sum(dim=1)),
+                             self._policy_unlock_term(civic, self.civ_civics[:, row].long().sum(dim=1)))
+        step = mx * rnd
+        cost = (rnd * torch.div(base * term + step // 2, step, rounding_mode="floor")).double()
         return torch.where(past <= 0, torch.zeros_like(cost), cost)
 
     def _government_changes(self, row: int, gov: torch.Tensor, ok: torch.Tensor) -> torch.Tensor:
@@ -4632,6 +4697,10 @@ class SimEconomy:
         was = _rw(self.city_followed).clone()
         self._relig_row_write(self.city_followed, torch.where(liv, best, torch.full_like(best, -1)))
         _fol1 = _rw(self.city_followed)
+        if bool((_fol1 != was).any()):
+            # a city's majority religion decides the worship building it is
+            # offered (`_worship_offered`)
+            self._eff_version += 1
         for _g in range(self.n_majors):
             _conv = (_fol1 == _g) & (was != _g) & liv
             if bool(_conv.any()):
@@ -6426,14 +6495,16 @@ class SimEconomy:
                 ((_env >= 1) & _acs).double() * float(self.rules.citystate["capitalBonus"]))
         if has_bel:
             # Founder capital incomes — perF (per-N followers, empire-wide) +
-            # perC (per live city). Followers = this row's own live pop sum
-            # (a city's religion follows its owner while uncoupled).
+            # perC (per city following the founder religion, worldwide:
+            # `citiesFollowing`). Followers = this row's own live pop sum.
             perF = self._bel_add("perF", row)  # [B, 7] = N, then the 6 yields
             perC = self._bel_add("perC", row)  # [B, 6]
             _liv = self.city_alive[:, row, :cols]
             _fol = (self.city_pop[:, row, :cols] * _liv.long()).sum(dim=1).double()
             _times = torch.where(perF[:, 0] > 0, torch.floor(_fol / perF[:, 0].clamp(min=1)), torch.zeros_like(_fol))
-            b_cap = b_cap + perF[:, 1:] * _times.unsqueeze(1) + perC * _liv.sum(dim=1).double().unsqueeze(1)
+            _nfol = (self._cities_following(self._founder_religion(row)).double()
+                     if bool((perC != 0).any()) else torch.zeros_like(_fol))
+            b_cap = b_cap + perF[:, 1:] * _times.unsqueeze(1) + perC * _nfol.unsqueeze(1)
             # CIV6 (Lay Ministry, Sacred Places): per completed district of a
             # type and per city holding a completed World Wonder, over the
             # row's own cities — `beliefCapitalYields`

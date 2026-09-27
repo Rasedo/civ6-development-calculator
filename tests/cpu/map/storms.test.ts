@@ -9,6 +9,8 @@ import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyA
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { tileYields } from '../../../cpu/core/yields';
 import type { GameState, Tile } from '../../../cpu/core/types';
+import type { StormEvent } from '../../../cpu/data/disasters';
+import { placeCityStateAt } from '../../../cpu/core/cityStates';
 
 /**
  * THE EIGHT NAMED STORMS — the TS half; the GPU twin is
@@ -303,6 +305,42 @@ describe('the eight storms are the install\'s table', () => {
     const before = [...(city.pillagedBuildings ?? [])];
     stormTile(state, centre, ev, false);
     expect(city.pillagedBuildings ?? []).toEqual(before);
+  });
+
+  it('BUILDING_PILLAGED takes the top of an unpillaged district\'s chain; DISTRICT_PILLAGED takes them all; a city-state\'s alike', () => {
+    const base = STORM_EVENTS.find((e) => e.bldgPill >= 1)!;
+    const bldgOnly: StormEvent = { ...base, distPill: 0, lowlandDist: 0 };
+    const both: StormEvent = { ...base, distPill: 1, lowlandDist: 1 };
+    const state = board(null);
+    const city = settleAt(state, tileAtCoords(state.map, 5, 5).index, 0);
+    const dt = tileAtCoords(state.map, 6, 5);
+    setTileOwner(dt, 0, city.id);
+    dt.district = 'CAMPUS';
+    dt.districtComplete = true;
+    city.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
+    city.buildings.push('LIBRARY', 'UNIVERSITY');
+    stormTile(state, dt, bldgOnly, false);
+    expect(city.pillagedBuildings).toEqual(['UNIVERSITY']);
+    // the next hit takes the next standing one
+    stormTile(state, dt, bldgOnly, false);
+    expect(city.pillagedBuildings).toEqual(['UNIVERSITY', 'LIBRARY']);
+    // a pillaged district takes every building with it, and a building hit on
+    // it takes nothing more
+    city.pillagedBuildings = [];
+    stormTile(state, dt, both, false);
+    expect(dt.districtPillaged).toBe(true);
+    expect([...(city.pillagedBuildings ?? [])].sort()).toEqual(['LIBRARY', 'UNIVERSITY']);
+    // a city-state's district: the top alone, and its repair waits
+    const cs = placeCityStateAt(state, 0, 'Testopolis', 'scientific', tileAtCoords(state.map, 12, 12).index);
+    const ct = tileAtCoords(state.map, 13, 12);
+    setTileOwner(ct, cs.seat);
+    ct.district = 'CAMPUS';
+    ct.districtComplete = true;
+    cs.districts = [{ type: 'CAMPUS', tileIndex: ct.index }];
+    cs.buildings = [...(cs.buildings ?? []), 'LIBRARY', 'UNIVERSITY'];
+    stormTile(state, ct, bldgOnly, false);
+    expect(cs.pillagedBuildings).toEqual(['UNIVERSITY']);
+    expect(cs.repairWait).toBe(true);
   });
 
   it('a warmed world grows each row by its own ChanceIncreasePerDegree', () => {

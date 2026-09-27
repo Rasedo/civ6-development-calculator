@@ -174,8 +174,8 @@ export interface BuildingDef {
   favorPerTurn?: number;
   /** CIV6 (Foreign Ministry, BUILDING_GOV_LEVY_DISCOUNT,
    *  MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT): "Leveraging City States
-   *  costs half Gold" — a percent off the owner's levies, summed with every
-   *  other row of the modifier (`levyGoldCost`). */
+   *  costs half Gold" — a percent off the owner's levies, taken in turn with
+   *  every other row of the modifier, each truncating (`levyGoldCost`). */
   levyDiscountPct?: number;
   /** CIV6 (Hydroelectric Dam): "Provides 6 Power to the city from renewable
    *  water sources" — a supply with no fuel behind it. */

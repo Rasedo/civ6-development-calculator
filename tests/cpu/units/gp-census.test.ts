@@ -526,6 +526,12 @@ describe('the Action columns\' own sites', () => {
     expect(gpActivateOk(state, d)).toBe(false);
     nb.feature = 'MOUNT_EVEREST';
     expect(gpActivateOk(state, d)).toBe(true);
+    // the wonder plot he stands on counts with the ones beside him: 2 x 250
+    wild.feature = 'MOUNT_EVEREST';
+    const sciD = state.seats[0].research.techProgress;
+    expect(activateGreatPerson(state, d)).toBe(true);
+    expect(state.seats[0].research.techProgress).toBe(sciD + 2 * scaleByGameSpeed(500));
+    wild.feature = null;
     nb.feature = null;
 
     const j = stand(state, 'GP_JANAKI_AMMAL', wild.index);

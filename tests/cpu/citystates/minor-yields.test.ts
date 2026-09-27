@@ -14,13 +14,12 @@ import { minorCity } from '../../../cpu/core/cityStates';
 import { minorLevyReturn, minorPhase, minorPower } from '../../../cpu/core/minorBuild';
 import { computeCityStats } from '../../../cpu/core/city';
 import { levyGoldCost, levyUnits } from '../../../cpu/core/phase';
-import { purchaseStep } from '../../../cpu/core/effects';
 import { buildingPillaged, pillageBuilding } from '../../../cpu/core/yields';
 import { spawnUnit } from '../../../cpu/core/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
-import { CITIZEN_SCIENCE, GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
+import { CITIZEN_SCIENCE } from '../../../cpu/data/constants';
 import { UNITS } from '../../../cpu/data/units';
-import { LEVY_COST_PCT, LEVY_TURNS, MINOR_BUILD_ROWS, MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
+import { LEVY_TURNS, MINOR_BUILD_ROWS, MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
 
@@ -112,7 +111,7 @@ describe("the minor's city rides the yield walk", () => {
 });
 
 describe("the levy takes the minor's own army", () => {
-  it('pays its share of the units\' prices, takes every military unit still, and holds them until the term or the suzerain ends', () => {
+  it('pays the units\' production cost, takes every military unit still, and holds them until the term or the suzerain ends', () => {
     const state = makeState(makeMap(24, 24));
     state.unitsMode = true;
     const cs = addCs(state, 12, 12, 'militaristic', 4);
@@ -124,8 +123,8 @@ describe("the levy takes the minor's own army", () => {
     const w1 = spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat)!;
     const w2 = spawnUnit(state, 'SLINGER', cs.centerIndex, cs.seat)!;
     const builder = spawnUnit(state, 'BUILDER', cs.centerIndex, cs.seat)!;
-    const price = (id: string) => purchaseStep(UNITS[id].cost * GOLD_PURCHASE_MULT);
-    const cost = Math.floor(((price('WARRIOR') + price('SLINGER')) * LEVY_COST_PCT) / 100);
+    // the summed speed-scaled production cost, the Builder no part of it
+    const cost = UNITS.WARRIOR.cost + UNITS.SLINGER.cost;
     expect(levyGoldCost(state, 0, cs)).toBe(cost);
 
     expect(levyUnits(state, cs.id, 0).ok).toBe(true);

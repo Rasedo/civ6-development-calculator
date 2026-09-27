@@ -1,5 +1,5 @@
 
-import { ANARCHY_TURNS, PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, POLICY_UNLOCK_K_BASE, POLICY_UNLOCK_K_PER_TECH, POLICY_UNLOCK_ROUND } from '../data/constants';
+import { ANARCHY_TURNS, PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, POLICY_UNLOCK_TECH_FIRST, POLICY_UNLOCK_TECH_PRICE, POLICY_UNLOCK_CIVIC_FIRST, POLICY_UNLOCK_CIVIC_PRICE, POLICY_UNLOCK_ROUND } from '../data/constants';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { TerrainId, Tile } from '../../world/types';
 import { hiddenResourcesFor } from './seats';
@@ -841,6 +841,28 @@ export function foreignFollowerCount(state: GameState, seat: number): number {
   return n;
 }
 
+/** The CITIES FOLLOWING religion `g` a founder belief pays per: every city in
+ *  the world whose majority follows it — a major's, the Free Cities', a
+ *  city-state's (runs/b91s2_follow_lab4_t150_20260926T1320Z.jsonl:
+ *  Pilgrimage paid +2 Faith for a converted foreign major's city and for a
+ *  city-state). `_cities_following` is the twin. */
+export function citiesFollowing(state: GameState, g: number): number {
+  if (g < 0) return 0;
+  let n = 0;
+  for (const o of state.seats) for (const c of o.cities) if (c.followedReligion === g) n += 1;
+  for (const c of state.freeSeat?.cities ?? []) if (c.followedReligion === g) n += 1;
+  for (const cs of state.cityStates ?? []) if (majorityReligionOf(state, cs.seat) === g) n += 1;
+  return n;
+}
+
+/** The religion whose founder belief seat `seat` is paid (`founderBeliefOf`):
+ *  its own founding, or (Mvemba) its majority religion; -1 for none. */
+export function founderReligionOf(state: GameState, seat: number): number {
+  const s = seatOf(state, seat);
+  if (!s || !founderBeliefOf(state, seat)) return -1;
+  return s.religion.founded ? seat : majorityReligionOf(state, seat);
+}
+
 export function peacefulFounderFaith(state: GameState, seat: number): number {
   const per = getModifiers(state, seat).peacefulFounderFaith;
   if (!per) return 0;
@@ -982,7 +1004,10 @@ function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): 
   const rel = s.religion;
   fpPush(m, rel?.pantheon ?? null);
   fpPush(m, rel?.founded ?? false);
-  fpPush(m, founderBeliefOf(state, seat));   // the founder belief PAID — Mvemba's borrowed one moves with the majority
+  const founderBelief = founderBeliefOf(state, seat);
+  fpPush(m, founderBelief);   // the founder belief PAID — Mvemba's borrowed one moves with the majority
+  // a per-city founder belief pays over the world's cities following
+  if (founderBelief && FOUNDER_BELIEFS[founderBelief]?.effects.perCity) fpPush(m, citiesFollowing(state, founderReligionOf(state, seat)));
   fpPush(m, rel?.enhancer ?? null);
 
   const gov = s.government;
@@ -1199,9 +1224,13 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
 
   const beliefSeat = { followers: pop, cities: cities.length };
   applyBeliefEffects(mods, rel?.pantheon ? PANTHEONS[rel.pantheon] : undefined, beliefSeat);
-  // the founder belief PAID: the seat's own, or (Mvemba) the majority religion's
+  // the founder belief PAID: the seat's own, or (Mvemba) the majority
+  // religion's — per city, over the religion's cities following worldwide
   const founderBelief = founderBeliefOf(state, seat);
-  if (founderBelief) applyBeliefEffects(mods, FOUNDER_BELIEFS[founderBelief], beliefSeat);
+  if (founderBelief) {
+    applyBeliefEffects(mods, FOUNDER_BELIEFS[founderBelief],
+      { followers: pop, cities: citiesFollowing(state, founderReligionOf(state, seat)) });
+  }
   if (rel?.founded) {
     applyBeliefEffects(mods, rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer] : undefined, beliefSeat);
   }
@@ -1524,23 +1553,40 @@ export function adoptGovernment(state: GameState, seat: number, index: number): 
   if (back) s.government.anarchyEnd = state.turn + ANARCHY_TURNS;
 }
 
+/** One measured multiplier table read at count `n` (`first` the count of its
+ *  first entry), in the table's units (the price at the maximum base).
+ *  Below the table the first step carries on down, above it the last step
+ *  carries on up. */
+export function policyUnlockTerm(table: readonly number[], first: number, n: number): number {
+  const i = n - first;
+  const last = table.length - 1;
+  if (i < 0) return table[0] + (table[1] - table[0]) * i;
+  if (i > last) return table[last] + (table[last] - table[last - 1]) * (i - last);
+  return table[i];
+}
+
 /** THE POLICY UNLOCK's Gold for seat `seat` this turn: 0 in the free window
  *  (the turn after the seat completed a civic, `GovernmentState.civicTurn`),
- *  else `CIVIC_UNLOCK_MAX_COST` the first turn past it, dropping by
- *  `CIVIC_UNLOCK_PER_TURN_DROP` each further turn to `CIVIC_UNLOCK_MIN_COST`,
- *  times k = (POLICY_UNLOCK_K_BASE + POLICY_UNLOCK_K_PER_TECH × the seat's
- *  researched techs) / 10, rounded to the nearest POLICY_UNLOCK_ROUND (halves
- *  up) in integers. One payment opens the government and the cards for the
- *  turn (`UNLOCK_POLICIES`). `_policy_unlock_cost` is the twin. */
+ *  else base × k rounded to the nearest POLICY_UNLOCK_ROUND (halves up) in
+ *  integers. The base is `CIVIC_UNLOCK_MAX_COST` the first turn past the
+ *  window, dropping by `CIVIC_UNLOCK_PER_TURN_DROP` each further turn to
+ *  `CIVIC_UNLOCK_MIN_COST`; k is the larger of the tech term at the seat's
+ *  researched techs and the civic term at its civics
+ *  (`POLICY_UNLOCK_TECH_PRICE`, `POLICY_UNLOCK_CIVIC_PRICE`, each the price
+ *  at the maximum base, so k = term / `CIVIC_UNLOCK_MAX_COST`). One payment
+ *  opens the government and the cards for the turn (`UNLOCK_POLICIES`).
+ *  `_policy_unlock_cost` is the twin. */
 export function policyUnlockCost(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
   const past = state.turn - 1 - s.government.civicTurn;
   if (past <= 0) return 0;
   const row = Math.max(CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_MAX_COST - CIVIC_UNLOCK_PER_TURN_DROP * (past - 1));
-  const k10 = POLICY_UNLOCK_K_BASE + POLICY_UNLOCK_K_PER_TECH * s.research.techs.length;
-  const step = 10 * POLICY_UNLOCK_ROUND;
-  return POLICY_UNLOCK_ROUND * Math.floor((row * k10 + step / 2) / step);
+  const term = Math.max(
+    policyUnlockTerm(POLICY_UNLOCK_TECH_PRICE, POLICY_UNLOCK_TECH_FIRST, s.research.techs.length),
+    policyUnlockTerm(POLICY_UNLOCK_CIVIC_PRICE, POLICY_UNLOCK_CIVIC_FIRST, s.research.civics.length));
+  const step = CIVIC_UNLOCK_MAX_COST * POLICY_UNLOCK_ROUND;
+  return POLICY_UNLOCK_ROUND * Math.floor((row * term + step / 2) / step);
 }
 
 /** Would `adoptGovernment(state, seat, index)` CHANGE the government the

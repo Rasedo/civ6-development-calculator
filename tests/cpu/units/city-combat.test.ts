@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
-import { spawnUnit } from '../../../cpu/core/units';
+import { disbandUnit, raiseBestMelee, reseatUnit, spawnUnit } from '../../../cpu/core/units';
 import { outerPool } from '../../../cpu/core/rules';
-import { cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct, centreStrength } from '../../../cpu/core/combat';
+import { applyTrainingGrants, cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct, centreStrength } from '../../../cpu/core/combat';
+import { endTurn } from '../../../cpu/core/game';
+import { commitProduction } from '../../../cpu/core/seatTurn';
 import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
-import { ENCAMPMENT_HP, WALLS_HP } from '../../../cpu/data/units';
+import { ENCAMPMENT_HP, UNITS, WALLS_HP } from '../../../cpu/data/units';
 import { PALACE_CITY_CS, GARRISON_DAMAGE_SCALE, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../../../cpu/data/constants';
 import { DISTRICTS } from '../../../cpu/data/districts';
 import { tilesWithin } from '../../../world/hex';
@@ -301,7 +303,7 @@ describe("a city centre's standing strength", () => {
 
   it('a garrison no stronger than the base and a foreign unit add nothing', () => {
     const { state, city } = scene();
-    spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 18, 18).index, 1);
+    raiseBestMelee(state, 1, 'SWORDSMAN');
     expect(centreStrength(state, city)).toBe(25);
     const w = spawnUnit(state, 'WARRIOR', city.centerIndex, 1)!;
     expect(centreStrength(state, city)).toBe(25);
@@ -325,12 +327,58 @@ describe("a city centre's standing strength", () => {
     state.cityStateMax = 1;
     expect(CITY_START_MELEE_MINOR).toBe(25);
     expect(centreStrength(state, minorCity(cs))).toBe(15 + PALACE_CITY_CS + 3 * ENVOY_CITY_CS);
-    // a Warrior stays under the minor's own start value
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 9).index, cs.seat);
+    // a trained Warrior stays under the minor's own start value
+    raiseBestMelee(state, cs.seat, 'WARRIOR');
     expect(cs.bestMeleeCS).toBe(20);
     expect(centreStrength(state, minorCity(cs))).toBe(15 + 3 + 3);
-    // the strongest melee it has fielded, not its population or its type
-    spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 10, 10).index, cs.seat);
+    // the strongest melee it has trained, not its population or its type
+    raiseBestMelee(state, cs.seat, 'SWORDSMAN');
     expect(centreStrength(state, minorCity(cs))).toBe(25 + 3 + 3);
+  });
+});
+
+// runs/b95t_p1_mech_bought_20260927.jsonl: a Mechanized Infantry (85) bought
+// raised every centre's base to 75 at once and kept it after the unit died;
+// runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl,
+// runs/b95t_p1_mech_create_del_20260927T002833Z.jsonl: one merely created
+// moved nothing
+describe('the base: the strongest melee ever trained or bought', () => {
+  function scene() {
+    const state = makeState(makeMap(24, 24));
+    state.unitsMode = true;
+    const capital = settleAt(state, tileAtCoords(state.map, 4, 4).index, 0);
+    const city = settleAt(state, tileAtCoords(state.map, 12, 12).index, 0);
+    const seat = seatOf(state, 0)!;
+    seat.treasury = 100_000;
+    return { state, capital, city, seat };
+  }
+
+  it('a unit granted or captured moves nothing; a trained one raises every centre at once', () => {
+    const { state, capital, city, seat } = scene();
+    spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 8, 8).index, 0);
+    expect(seat.bestMeleeCS).toBe(0);
+    expect(centreStrength(state, city)).toBe(10);
+    state.seats.push(emptySeat(1));
+    const taken = spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 20, 20).index, 1)!;
+    reseatUnit(state, taken, 0);
+    expect(seat.bestMeleeCS).toBe(0);
+    commitProduction(state, 0, capital, { kind: 'unit', unit: 'WARRIOR', progress: 0 });
+    capital.queue[0].progress = 10_000;
+    endTurn(state);
+    expect(seat.bestMeleeCS).toBe(UNITS.WARRIOR.combat);
+  });
+
+  it('a bought unit raises it; the base never falls when the unit dies', () => {
+    const { state, city, seat } = scene();
+    applyTrainingGrants(state, city, spawnUnit(state, 'SWORDSMAN', city.centerIndex, 0)!);
+    expect(seat.bestMeleeCS).toBe(UNITS.SWORDSMAN.combat);
+    expect(centreStrength(state, city, false)).toBe(UNITS.SWORDSMAN.combat - CITY_BASE_MELEE_CUT);
+    for (const u of state.units.filter((x) => x.seat === 0)) disbandUnit(state, u.id);
+    expect(centreStrength(state, city)).toBe(UNITS.SWORDSMAN.combat - CITY_BASE_MELEE_CUT);
+    raiseBestMelee(state, 0, 'WARRIOR');
+    expect(seat.bestMeleeCS).toBe(UNITS.SWORDSMAN.combat);
+    // a ranged chassis is no melee
+    raiseBestMelee(state, 0, 'FIELD_CANNON');
+    expect(seat.bestMeleeCS).toBe(UNITS.SWORDSMAN.combat);
   });
 });

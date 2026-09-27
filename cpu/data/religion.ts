@@ -90,6 +90,11 @@ export interface BeliefEffects {
    *  the extra healing a religious unit takes on or next to a Holy Site
    *  district of a city following the religion. */
   holySiteReligiousHeal?: number;
+  /** CIV6 (Religious Colonization, EFFECT_ENABLE_RELIGION_AUTO_SPREAD):
+   *  "Cities start with this Religion in place if founded by a player who
+   *  has this as their majority Religion" — the pressure of the religion a
+   *  new city starts with, its citizen following it. */
+  colonizePressure?: number;
 }
 
 export interface BeliefDef {
@@ -384,6 +389,12 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.holySiteReligiousHeal':
       xml('ModifierArguments', 'ModifierId=HOLY_WATERS_HEALING_MODIFIER&Name=Amount', 'Value'),
   },
+  RELIGIOUS_COLONIZATION: {
+    'effects.colonizePressure': {
+      lab: 'runs/b91s3_colonization_20260926T130735Z.jsonl',
+      note: 'a population-1 city founded by a seat whose majority religion holds the belief starts with its citizen following it and 202 pressure of it, the neighbours\' 2 added as in the control arm (no row in the install names the amount)',
+    },
+  },
 };
 
 const B = (id: string, name: string, description: string, effects: BeliefEffects): BeliefDef =>
@@ -536,11 +547,7 @@ export const WORSHIP_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
 );
 
 /**
- * Enhancer beliefs, the install's nine. RELIGIOUS_COLONIZATION
- * (EFFECT_ENABLE_RELIGION_AUTO_SPREAD: "Cities start with this Religion in
- * place if founded by a player who has this as their majority Religion")
- * holds its place in the pool and applies nothing: the install names no
- * amount of pressure a new city starts with.
+ * Enhancer beliefs, the install's nine.
  */
 export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   [
@@ -568,7 +575,9 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('MONASTIC_ISOLATION', 'Monastic Isolation', "Your Religion's pressure never drops due to losses in Theological Combat.", {
       theoLossReductionPct: 100,
     }),
-    B('RELIGIOUS_COLONIZATION', 'Religious Colonization', 'Cities start with this Religion in place if founded by a player who has this as their majority Religion.', {}),
+    B('RELIGIOUS_COLONIZATION', 'Religious Colonization', 'Cities start with this Religion in place if founded by a player who has this as their majority Religion.', {
+      colonizePressure: 200,
+    }),
     B('HOLY_WATERS', 'Holy Waters', '+10 healing for religious units in or next to Holy Site districts of cities following this Religion.', {
       holySiteReligiousHeal: 10,
     }),

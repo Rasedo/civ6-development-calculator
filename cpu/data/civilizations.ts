@@ -632,7 +632,7 @@ export const KNARR_NAVAL_MELEE_NEUTRAL_HEAL = srcConst('knarrNeutralHeal', 10,
 
 /** CIV6 (Epic Quest, TRAIT_LEVY_DISCOUNT, MODIFIER_PLAYER_ADJUST_LEVY_DISCOUNT_PERCENT):
  *  "Levying units from a city-state costs 50% less Gold" — the percent off,
- *  summed with the Foreign Ministry's row of the same modifier
+ *  taken before the Foreign Ministry's row of the same modifier, each truncating
  *  (`levyGoldCost`). */
 export const EPIC_QUEST_LEVY_DISCOUNT_PCT = srcConst('epicQuestLevyDiscountPct', 50,
   ma('TRAIT_LEVY_DISCOUNT', 'Percent'));

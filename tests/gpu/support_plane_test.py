@@ -7,8 +7,8 @@ The support stacking class has its own occupancy plane, so a hand-written
 plane list three wide misses it. This lane stands a lone
 support unit where each folded reader looks and asks the question its twin
 asks: the walls' siege assist from a Ram, a nuke's hostile tile, the
-barbarians' march target, the war-weariness occupancy, a storm's damage
-branch and a flood's kill branch.
+war-weariness occupancy, a storm's damage branch and a flood's kill branch —
+and the barbarian's shot, which never takes it.
 """
 
 from __future__ import annotations
@@ -81,14 +81,15 @@ def main() -> None:
     assert int(bits[0]) & ASSIST_RAM, f"the Ram on the support plane lent no assist (bits {int(bits[0])})"
     print("  1 siege assist OK — a Ram on the support plane helps the melee attacker")
 
-    # -- 2: a lone enemy support unit makes a tile hostile for a nuke, a target for
-    #       the barbarians, and an occupant for the weariness count
+    # -- 2: a lone enemy support unit makes a tile hostile for a nuke and an
+    #       occupant for the weariness count; a barbarian's shot never takes it
+    #       (runs/b89t_fire_20260926.jsonl)
     lone = free_land(sim, avoid=(tgt, beside))
     g2 = place(sim, lone, 1, sup[0])
     assert bool(sim._nuke_hostile(0)[0, lone]), "a nuke's hostile scan misses a lone support unit"
-    assert bool(sim._nonbarb_unit_plane()[0, lone]), "the barbarians' march scan misses a lone support unit"
+    assert not bool(sim._nonbarb_unit_plane()[0, lone]), "a barbarian's shot reaches a lone support unit"
     assert int(sim._ww_occ(torch.tensor([lone]))[0]) & 8, "the weariness occupancy misses the support plane"
-    print("  2 scans OK — nuke, barbarian march, weariness occupancy all see the lone support unit")
+    print("  2 scans OK — nuke and weariness occupancy see the lone support unit, a barbarian's shot does not")
 
     # -- 3: a storm DAMAGES a support unit (the fighters' branch), a flood ROLLS
     #       to kill it (the noncombat branch)

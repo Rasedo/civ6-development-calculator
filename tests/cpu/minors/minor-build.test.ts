@@ -20,7 +20,7 @@ import {
   CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPES, MINOR_ARMY_CAP_SLOTS, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS,
   MINOR_BUILDER_PROD_PCT, MINOR_BUILDER_RADIUS, MINOR_DISFAVORED_DISTRICTS, MINOR_EXCLUDED_UNIT_CLASSES,
   MINOR_HARBOR_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_NAVAL_BUY_BP, MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY,
-  MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT, type MinorBuildRow,
+  MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT, type MinorBuildRow, MINOR_REPAIR_RESUME_PCT,
 } from '../../../cpu/data/cityStates';
 import { PROJECTS, projectYieldLump } from '../../../cpu/data/projects';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -137,6 +137,59 @@ describe('the build table', () => {
     minorPhase(state);
     expect(cs.buildFrom).toEqual(drawn);
     expect(cs.armyCap).toBe(cap);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe("the minor's repair of a pillaged building", () => {
+  it('waits for the item in hand, then comes first and resumes at 75% of its cost', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12);
+    idleBuilder(state, cs);
+    hold(cs, 'CAMPUS', tileAtCoords(state.map, 13, 12));
+    cs.buildings = [...(cs.buildings ?? []), 'LIBRARY'];
+    cs.pillagedBuildings = ['LIBRARY'];
+    cs.repairWait = true;
+    // the walls are the item in hand
+    plan(cs, [buildingRow('ANCIENT_WALLS')]);
+    cs.research.techs = ['MINING', 'MASONRY'];
+    const p = turnOf(state, cs);
+    expect(cs.prodProgress).toBe(p * half * ((100 + MINOR_WALLS_PROD_PCT) / 100));
+    expect(cs.pillagedBuildings).toEqual(['LIBRARY']);
+    // the walls complete: the wait ends
+    cs.prodProgress = BUILDINGS.ANCIENT_WALLS.cost;
+    minorPhase(state);
+    expect(cs.buildings).toContain('ANCIENT_WALLS');
+    expect(cs.repairWait).toBe(false);
+    // the repair is the item now, ahead of every row, under no toward-row
+    const p2 = computeCityStats(state, minorCity(cs)).total.production;
+    cs.prodProgress = 0;
+    minorPhase(state);
+    expect(cs.prodProgress).toBe(p2 * half);
+    expect(cs.pillagedBuildings).toEqual(['LIBRARY']);
+    expect(MINOR_REPAIR_RESUME_PCT).toBe(75);
+    const full = BUILDINGS.LIBRARY.cost;
+    const left = full - Math.floor((full * MINOR_REPAIR_RESUME_PCT) / 100);
+    cs.prodProgress = left - p2 * half;
+    minorPhase(state);
+    expect(cs.pillagedBuildings ?? []).toEqual([]);
+    expect(cs.prodProgress).toBe(0);
+  });
+
+  it('a building in a pillaged district waits for the district', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12);
+    idleBuilder(state, cs);
+    const t = tileAtCoords(state.map, 13, 12);
+    hold(cs, 'CAMPUS', t);
+    t.districtPillaged = true;
+    cs.buildings = [...(cs.buildings ?? []), 'LIBRARY'];
+    cs.pillagedBuildings = ['LIBRARY'];
+    plan(cs, []);
+    cs.prodProgress = 1000;
+    state.turn = 1;
+    minorPhase(state);
+    expect(cs.pillagedBuildings).toEqual(['LIBRARY']);
   });
 });
 

@@ -202,8 +202,8 @@ function inEscortHere(ctx: MaskCtx, u: Unit): boolean {
 // ---- ATTACK 6-11 ------------------------------------------------------------
 
 /** May `u` attack `to`? A hostile unit there (the military one as this seat
- *  sees it, the civilian or support one, the passenger — a RANGED unit never
- *  a civilian, `shootable`), a hostile major or Free City centre, an
+ *  sees it, the civilian or support one, the passenger — a RANGED unit only a
+ *  military one, `shootable`), a hostile major or Free City centre, an
  *  attackable city-state centre, or a live enemy Encampment; a fighter with
  *  movement and an attack left that may shoot; an embarked unit only as a
  *  melee blow ashore over no cliff. The ranged unit's reach is the neighbour
@@ -237,8 +237,8 @@ function attackOk(ctx: MaskCtx, u: Unit, here: Tile, to: Tile): boolean {
 // ---- the SNIPE rings --------------------------------------------------------
 
 /** A ranged strike's target at ring distance 2 or 3. A major's ranged fire
- *  engages BARBARIAN units only (`hostileRangedStrike`'s scope-out) and never
- *  a civilian (`shootable`), a hostile MAJOR centre, an attackable city-state
+ *  engages BARBARIAN units only (`hostileRangedStrike`'s scope-out) and only
+ *  a military one (`shootable`), a hostile MAJOR centre, an attackable city-state
  *  centre, or a live enemy Encampment. The GPU reads the military occupant
  *  unfiltered by stealth here, and names a Free City's centre no target. */
 function ringTarget(ctx: MaskCtx, t: Tile): boolean {

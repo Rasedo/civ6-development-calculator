@@ -402,8 +402,8 @@ def case_tile(sim, base, row: int) -> None:
 
 def endow_worship(sim, row: int, j: int) -> None:
     """Plant buyWorshipBuilding's gates: a COMPLETE Holy Site in THIS city's
-    registry, its Temple prerequisite, and a founded religion holding Worship
-    belief 0."""
+    registry, its Temple prerequisite, a founded religion holding Worship
+    belief 0, and the city following it."""
     owned = ((sim.tile_seat[0] == row) & (sim.district[0] < 0) & (sim.centre_slot_at[0] < 0)
              & (sim.built_wonder[0] < 0)).nonzero(as_tuple=True)[0]
     assert len(owned), f"row {row}: city owns no free tile for a HOLY_SITE"
@@ -414,6 +414,7 @@ def endow_worship(sim, row: int, j: int) -> None:
     sim.city_bldg[0, row, j, sim._temple_bidx] = True
     sim.civ_religion_done[0, row] = True
     sim.civ_worship[0, row] = 0
+    sim.city_followed[0, row, j] = row
     sim.civ_faith[0, row] = RICH
     sim._eff_version += 1
 
@@ -448,15 +449,16 @@ def case_worship(sim, base, row: int) -> None:
     )
     assert abs(float(sim.civ_treasury[0, row]) - g0) < 1e-6, f"row {row}: a worship buy touched the treasury"
 
-    # without a religion the same intent is refused
+    # a city following no religion is offered none: the same intent is refused
     sim.restore(base)
     prep(sim, row)
     endow_worship(sim, row, j)
-    sim.civ_religion_done[0, row] = False
+    sim.city_followed[0, row, j] = -1
+    sim._eff_version += 1
     sim._stash_buy(row, worship=t1(j))
     sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
-    assert not bool(sim.city_bldg[0, row, j, wj]), f"row {row}: worship bought with no religion founded"
-    print(f"  row {row}: worship buy OK (-{sim._worship_cost:.0f} faith, gold untouched, religion gate holds)")
+    assert not bool(sim.city_bldg[0, row, j, wj]), f"row {row}: worship bought in a city following no religion"
+    print(f"  row {row}: worship buy OK (-{sim._worship_cost:.0f} faith, gold untouched, majority-religion gate holds)")
 
 
 # ---------------------------------------------------------------------------

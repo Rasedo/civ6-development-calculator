@@ -7,6 +7,7 @@ import { levyGoldCost, transferCity, seatPhase } from '../../../cpu/core/phase';
 import { floodTile } from '../../../cpu/core/disasters';
 import { ITERU_RIVER_PROD_MULT } from '../../../cpu/data/civilizations';
 import { CIV_IDS } from '../../../cpu/data/seats';
+import { UNITS } from '../../../cpu/data/units';
 import { unitPromoRows } from '../../../cpu/core/promotions';
 import { GP_PERM } from '../../../cpu/data/greatPeople';
 import type { CityState, GameState, TradeRoute, Unit } from '../../../cpu/core/types';
@@ -202,12 +203,12 @@ describe('Epic Quest', () => {
     spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat);
     spawnUnit(state, 'SLINGER', cs.centerIndex, cs.seat);
     const full = levyGoldCost(state, 0, cs);
-    expect(full).toBeGreaterThan(0);
+    expect(full).toBe(UNITS.WARRIOR.cost + UNITS.SLINGER.cost);
     state.seats[0].civ = civ('SUMERIA');
-    expect(levyGoldCost(state, 0, cs)).toBe(full / 2);
+    expect(levyGoldCost(state, 0, cs)).toBe(Math.floor(full / 2));
   });
 
-  it('sums with the Foreign Ministry: half each, free together, nothing from a dark one', () => {
+  it('multiplies with the Foreign Ministry: half each, a quarter together, nothing from a dark one', () => {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     const cs: CityState = {
       ...emptySeat(seatOfCityState(0)), id: 0, name: 'CS0', type: 'militaristic',
@@ -219,10 +220,13 @@ describe('Epic Quest', () => {
     const full = levyGoldCost(state, 0, cs);
     const city = settleAt(state, tileAtCoords(state.map, 3, 3).index, 0);
     city.buildings.push('FOREIGN_MINISTRY');
-    expect(levyGoldCost(state, 0, cs)).toBe(full / 2);
+    const half = Math.floor(full / 2);
+    expect(levyGoldCost(state, 0, cs)).toBe(half);
+    // each row truncates in turn: 37 -> 18 -> 9, never free
     state.seats[0].civ = civ('SUMERIA');
-    expect(levyGoldCost(state, 0, cs)).toBe(0);
+    expect(levyGoldCost(state, 0, cs)).toBe(Math.floor(half / 2));
+    expect(Math.floor(half / 2)).toBeGreaterThan(0);
     city.pillagedBuildings = ['FOREIGN_MINISTRY'];
-    expect(levyGoldCost(state, 0, cs)).toBe(full / 2);
+    expect(levyGoldCost(state, 0, cs)).toBe(half);
   });
 });
