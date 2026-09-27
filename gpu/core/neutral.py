@@ -609,7 +609,11 @@ def gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
         colc = col.clamp(min=0)
         hq = sim._q_head(seat).gather(1, colc)
         isw = (hq >= sim.WONDER_BASE) & (hq < sim.WONDER_BASE + max(sim._wond_n, 1))
-        at = sim.city_qtile[:, seat, :, 0].gather(1, colc)
+        # a WONDER's site lives in the city's wonder registry, not in
+        # `city_qtile` (which names a district's plot)
+        nW = sim.city_wonder.shape[3]
+        wreg = sim.city_wonder[:, seat].gather(1, colc.unsqueeze(2).expand(-1, -1, nW))   # [B, T, nW]
+        at = wreg.gather(2, (hq - sim.WONDER_BASE).clamp(min=0, max=max(nW - 1, 0)).unsqueeze(2)).squeeze(2)
         tiles = torch.arange(sim.T, device=own.device).unsqueeze(0)
         return own & (col >= 0) & (sim.built_wonder >= 0) & ~sim.built_wonder_complete & isw & (at == tiles)
     if site == 14:  # this seat's City Center whose city lacks building `arg`

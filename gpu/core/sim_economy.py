@@ -4966,7 +4966,9 @@ class SimEconomy:
         if planes is None:
             return torch.zeros_like(tile, dtype=torch.bool)
         land, sea = planes
-        valid = (seat >= 0) & (tile >= 0)
+        # a city-state's or the Free Cities' unit shares the majors' pool, so
+        # its seat is screened here, never clamped onto a major's plane
+        valid = (seat >= 0) & (seat < self.n_majors) & (tile >= 0)
         g = seat.clamp(min=0, max=self.n_majors - 1)
         idx = (g * self.T + tile.clamp(min=0)).reshape(self.B, -1)
         land_hit = land.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
