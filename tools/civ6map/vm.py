@@ -95,10 +95,10 @@ Map = {}
 function Map.GetGridSize() return W, H end
 function Map.GetPlot(x, y) return P(N.Map_GetPlot(x, y)) end
 function Map.GetPlotByIndex(i) return P(N.Map_GetPlotByIndex(i)) end
-function Map.GetPlotXY(x, y, dx, dy) return P(N.Map_GetPlotXY(x, y, dx, dy)) end
+function Map.GetPlotXY(x, y, dx, dy, r) return P(N.Map_GetPlotXY(x, y, dx, dy, r)) end
 function Map.GetPlotXYWithRangeCheck(x, y, dx, dy, r) return P(N.Map_GetPlotXYWithRangeCheck(x, y, dx, dy, r)) end
 function Map.GetAdjacentPlot(x, y, d) return P(N.Map_GetAdjacentPlot(x, y, d)) end
-function Map.GetPlotDistance(x1, y1, x2, y2) return N.Map_GetPlotDistance(x1, y1, x2, y2) end
+function Map.GetPlotDistance(...) return N.Map_GetPlotDistance(...) end
 function Map.GetMapSize() return N.Map_GetMapSize() end
 function Map.GetPlotCount() return W * H end
 function Map.IsWrapX() return N.wrap_x end
@@ -302,26 +302,42 @@ class Api:
     def Map_GetPlotByIndex(self, i):
         return int(i) if i is not None and 0 <= i < self.w.N else None
 
-    def Map_GetPlotXY(self, x, y, dx, dy, *_):
-        return self.w.plot(_int(x) + _int(dx), _int(y) + _int(dy))
+    def Map_GetPlotXY(self, x, y, dx, dy, r=None):
+        """the plot (x + dx, y + dy); with a fifth argument (dx, dy) is a
+        hex-space offset (q = x - floor(y / 2), q + dx, y + dy), not range
+        checked: the start pickers' luxury and natural-wonder buffers and
+        the start biases read it so (tools/civ6lab/h3_rangecheck.py and the
+        check.py cases)"""
+        x, y, dx, dy = _int(x), _int(y), _int(dx), _int(dy)
+        if r is None:
+            return self.w.plot(x + dx, y + dy)
+        return self._hexspace(x, y, dx, dy)
+
+    def _hexspace(self, x, y, dx, dy):
+        q, yy = x - (y >> 1) + dx, y + dy
+        return self.w.plot(q + (yy >> 1), yy)
 
     def Map_GetPlotXYWithRangeCheck(self, x, y, dx, dy, r):
-        """Civ 5's plotXYWithRangeCheck: the offset plot, refused beyond hex
-        distance r"""
+        """Civ 5's plotXYWithRangeCheck: (dx, dy) a hex-space offset, refused
+        when |dx| or |dy| exceeds r or its hex length (|dx| + |dy| when the
+        signs agree, else the larger) does"""
         x, y, dx, dy, r = _int(x), _int(y), _int(dx), _int(dy), _int(r)
         if abs(dx) > r or abs(dy) > r:
             return None
-        p = self.w.plot(x + dx, y + dy)
-        if p is not None and self.w.distance(x, y, *self.w.xy(p)) > r:
+        if (abs(dx) + abs(dy) if (dx >= 0) == (dy >= 0) else max(abs(dx), abs(dy))) > r:
             return None
-        return p
+        return self._hexspace(x, y, dx, dy)
 
     def Map_GetAdjacentPlot(self, x, y, d):
         i = self.w.plot(x, y)
         d = _int(d)
         return None if i is None or not 0 <= d < 6 else self.w.adj(i, d)
 
-    def Map_GetPlotDistance(self, x1, y1, x2, y2):
+    def Map_GetPlotDistance(self, x1, y1, x2=None, y2=None):
+        """hex distance between (x1, y1) and (x2, y2), or with two arguments
+        between two plot indices (the start pickers' form)"""
+        if x2 is None and y2 is None:
+            return self.w.distance(*self.w.xy(_int(x1)), *self.w.xy(_int(y1)))
         return self.w.distance(_int(x1), _int(y1), _int(x2), _int(y2))
 
     def Map_GetMapSize(self):
@@ -508,7 +524,7 @@ class Api:
     def RB_SetResourceType(self, i, r, n):
         self.w.resource_log.append((i, self._res_index(r)))
         self.w.resource[i] = self._res_index(r)
-        self.w.res_count[i] = int(n) if n is not None else 1
+        self.w.res_count[i] = 0 if self.w.resource[i] < 0 else int(n) if n is not None else 1
 
     def RB_GetAdjacentResourceCount(self, i):
         return self.w.adjacent_resource_count(i)

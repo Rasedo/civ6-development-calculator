@@ -5,8 +5,8 @@
 
 The size, the city-state count and the map options are the recorded game's
 (its config file and the options it read back); the majors are the session
-log's. `--oracle continents` takes StampContinents' unspecified partition
-from the game's dump (the 43 draws stay) to test the stages after it. The
+log's. `--oracle continents` takes StampContinents' partition from the game's
+dump (the 43 draws stay) to test the stages after it on their own. The
 session record (tools/civ6lab/h3_session.py --probe, quiet or natives probe)
 carries the game's every Lua draw (range, value, reason) in order, the native
 calls between them with the map facts logged after some, the map's total
@@ -85,9 +85,9 @@ def compare_maps(a: dict, b: dict) -> dict:
 
 
 def oracle_continents(gdump: dict) -> None:
-    """StampContinents' seeds after the first are not specified: take the
-    game's continents from its dump (StampContinents' own output; no later
-    stage changes a plot's continent) and keep the native's 43 draws"""
+    """take the game's continents from its dump (StampContinents' own
+    output; no later stage changes a plot's continent) and keep the
+    native's 43 draws"""
     from tools.civ6map import world as W
 
     def partition(self, n):
@@ -121,7 +121,7 @@ def main() -> int:
     p.add_argument("--show", type=int, default=6, help="Lua draws of context around the first difference")
     p.add_argument("--save-dump")
     p.add_argument("--oracle", action="append", default=[], choices=["continents"],
-                   help="take this unspecified native's result from the game's dump, to test the stages after it")
+                   help="take this native's result from the game's dump, to test the stages after it")
     a = p.parse_args()
     sess = pathlib.Path(a.session)
     rec = [json.loads(ln) for ln in sess.read_text(encoding="utf-8").splitlines() if ln][a.line]

@@ -13,18 +13,15 @@ wraps on a wrap-X map, y never wraps. Directions NE, E, SE, SW, W, NW = 0..5.
 """
 from __future__ import annotations
 
+from . import continents, eastl
 from .cvrandom import Rng
 from .fractal import Fractal
 from .gameinfo import GameInfo
 
 OPEN_NATIVES = {
-    "TerrainBuilder.StampContinents": "the split of the land among Maps.Continents > 1 continents, and which "
-                                      "part takes the shuffle's first entry (every plot joins continent 0 and "
-                                      "the run records it in World.unspecified)",
     "Map.GetContinentPlots": "the order of the plots it answers (plot order here)",
-    "StartPositioner": "regions, fertility and ocean starts: no region is offered, no start is placed",
-    "ImprovementBuilder.CanHaveImprovement": "the install's Improvement_ValidTerrains / ValidFeatures",
-    "Plot.GetYield": "terrain + feature + resource yield rows",
+    "StartPositioner": "the minor regions (the DLL reading scores 17 of 168 region records), the largest-landmass "
+                       "filter, and ocean starts",
 }
 
 NE, E, SE, SW, W, NW = range(6)
@@ -142,7 +139,8 @@ class World:
         Ice plot or a plot next to Ice; else 2 food + 2 production + gold +
         2 science + 2 culture + 2 faith of the plot's yields, +5 for a luxury
         resource or Horses or Iron, +3 on a land river plot or else +2 on
-        fresh land, +1 per adjacent mountain, +1 per distinct natural wonder
+        fresh land or a passable plot under a feature that AddsFreshWater (a
+        natural wonder's too), +1 per adjacent mountain, +1 per distinct natural wonder
         among the neighbours, -5 on tundra; at least 0"""
         t = self.t_rows[self.terrain[i]]["TerrainType"]
         if self.is_mountain(i) or self.is_ice(i) or t.startswith("TERRAIN_SNOW"):
@@ -157,9 +155,10 @@ class World:
                        or self.r_rows[r]["ResourceType"] in ("RESOURCE_HORSES", "RESOURCE_IRON")):
             v += 5
         if not self.is_water(i):
+            f = self.feature[i]
             if self.is_river(i):
                 v += 3
-            elif self.is_fresh_water(i):
+            elif self.is_fresh_water(i) or (f >= 0 and self.f_rows[f]["AddsFreshWater"] and not self.is_impassable(i)):
                 v += 2
         v += sum(1 for n in nb if self.is_mountain(n))
         v += len({self.feature[n] for n in nb if self.is_natural_wonder(n)})
@@ -366,15 +365,16 @@ class World:
     def river_adjacent(self, i: int) -> bool:
         return any(self.is_river(n) for n in self.neighbours(i))
 
-    def can_have_feature(self, i: int, f: int) -> bool:
+    def can_have_feature(self, i: int, f: int, replace: bool = False) -> bool:
         """CanHaveFeature's single-plot test: 15 clauses in order, each from
-        the install's rows (h3_natives_spec.md)"""
+        the install's rows (h3_natives_spec.md); with `replace` the plot's
+        own feature does not refuse it"""
         if f < 0:
             return True
         fr = self.f_rows[f]
         nb = self.neighbours(i)
         lake = self.is_lake(i)
-        if self.feature[i] >= 0:                                               # 1
+        if self.feature[i] >= 0 and not replace:                               # 1
             return False
         valid = self.f_valid.get(f)
         if valid and self.terrain[i] not in valid and not (fr["Lake"] and lake):  # 2
@@ -414,10 +414,11 @@ class World:
                 return False
         return True
 
-    def footprint(self, i: int, f: int, custom: bool = False) -> list[int] | None:
+    def footprint(self, i: int, f: int, custom: bool = False, replace: bool = False) -> list[int] | None:
         """the plots a natural wonder with Tiles > 1 and no CustomPlacement
         covers from anchor i: the first orientation d in DirectionTypes order
-        whose extra plots all pass the single-plot test — 2 plots: the
+        whose extra plots all pass the single-plot test (with `replace`, a
+        feature already on an extra plot does not refuse it) — 2 plots: the
         neighbour d; 3: the neighbours d and d + 1; 4: those and the neighbour
         d + 1 of neighbour d. None when no orientation fits."""
         fr = self.f_rows[f]
@@ -431,7 +432,7 @@ class World:
                 extra.append(self.adj(i, (d + 1) % 6))
             if tiles >= 4:
                 extra.append(None if a is None else self.adj(a, (d + 1) % 6))
-            if all(q is not None and self.can_have_feature(q, f) for q in extra):
+            if all(q is not None and self.can_have_feature(q, f, replace) for q in extra):
                 return [i] + extra
         return None
 
@@ -447,11 +448,12 @@ class World:
 
     def set_feature(self, i: int, f: int) -> None:
         """SetFeatureType: a natural wonder with Tiles > 1 and no
-        CustomPlacement lays its footprint (nothing at all when none fits); a
-        lake wonder turns every plot it covers into Coast"""
+        CustomPlacement lays its footprint, over a feature already on an
+        extra plot (nothing at all when none fits); a lake wonder turns every
+        plot it covers into Coast"""
         plots = [i]
         if f >= 0 and self.f_rows[f]["NaturalWonder"]:
-            plots = self.footprint(i, f)
+            plots = self.footprint(i, f, replace=True)
             if plots is None:
                 return
         for p in plots:
@@ -561,111 +563,12 @@ class World:
         self.continent = [-1 if parts[i] < 0 else order[parts[i]] for i in range(self.N)]
 
     def partition_continents(self, n: int) -> list[int]:
-        """which of the n continents each non-ocean plot joins (-1 ocean).
-        Measured: the first seed is the non-ocean plot of greatest Euclidean
-        distance to the nearest ocean plot (centres at (x + 0.5 on odd rows,
-        y), rows one unit apart, x wrapping; a tie to the higher plot), and
-        every plot joins the nearest seed by land path (6 neighbours through
-        non-ocean plots, x wrapping), a tie to the lower seed; seed k's part
-        is continent k. Not measured, stood in and recorded in
-        `self.unspecified`: the later seeds (the next deepest plot whose land
-        path to every seed s is at least s's hex depth - 1) and a plot no
-        seed reaches by land (the nearest seed by hex distance)."""
-        ocean = [self.is_water(i) and not self.is_lake(i) for i in range(self.N)]
-        land = [i for i in range(self.N) if not ocean[i]]
-        if not land:
-            return [-1] * self.N
-        depth = self.euclid_depth(ocean)
-        order = sorted(land, key=lambda i: (depth[i], i), reverse=True)
-        seeds = [order[0]]
-        paths = [self.land_path(order[0], ocean)]
-        if n > 1:
-            self.unspecified.append("StampContinents: the seeds after the first")
-            hexd = self.hex_depth(ocean)
-            for i in order[1:]:
-                if len(seeds) == n:
-                    break
-                if all(paths[k][i] < 0 or paths[k][i] >= hexd[s] - 1 for k, s in enumerate(seeds)):
-                    seeds.append(i)
-                    paths.append(self.land_path(i, ocean))
-        self.continent_seeds = seeds
-        part = [-1] * self.N
-        stray = False
-        for i in land:
-            reach = [(d[i], k) for k, d in enumerate(paths) if d[i] >= 0]
-            if reach:
-                part[i] = min(reach)[1]
-            else:
-                stray = True
-                x, y = self.xy(i)
-                part[i] = min((self.distance(x, y, *self.xy(s)), k) for k, s in enumerate(seeds))[1]
-        if stray and len(seeds) > 1:
-            self.unspecified.append("StampContinents: land no seed reaches")
-        return part
-
-    def euclid_depth(self, ocean: list[bool]) -> list[int]:
-        """per plot, the squared Euclidean distance to the nearest ocean plot
-        in quarter units (centres at (2x + (y odd), 2y), x wrapping), as an
-        exact integer; (1 << 60) with no ocean"""
-        rows: dict[int, list[int]] = {}
-        for i in range(self.N):
-            if ocean[i]:
-                x, y = self.xy(i)
-                rows.setdefault(y, []).append(2 * x + (y & 1))
-        span = 2 * self.W
-        out = [0] * self.N
-        for i in range(self.N):
-            if ocean[i]:
-                continue
-            x, y = self.xy(i)
-            cx = 2 * x + (y & 1)
-            best = 1 << 60
-            for dy in range(self.H):
-                if 4 * dy * dy >= best:
-                    break
-                for yy in {y - dy, y + dy}:
-                    for ox in rows.get(yy, ()):
-                        dx = abs(cx - ox)
-                        if self.wrap_x:
-                            dx = min(dx, span - dx)
-                        d = dx * dx + 4 * dy * dy
-                        if d < best:
-                            best = d
-            out[i] = best
-        return out
-
-    def hex_depth(self, ocean: list[bool]) -> list[int]:
-        """hex distance to the nearest ocean plot (0 on ocean)"""
-        d = [0 if o else -1 for o in ocean]
-        front = [i for i in range(self.N) if ocean[i]]
-        k = 0
-        while front:
-            k += 1
-            nxt = []
-            for u in front:
-                for v in self.neighbours(u):
-                    if d[v] < 0:
-                        d[v] = k
-                        nxt.append(v)
-            front = nxt
-        return d
-
-    def land_path(self, s: int, ocean: list[bool]) -> list[int]:
-        """steps from s through non-ocean plots (-1 where no path runs)"""
-        d = [-1] * self.N
-        d[s] = 0
-        front = [s]
-        k = 0
-        while front:
-            k += 1
-            nxt = []
-            for u in front:
-                for v in self.neighbours(u):
-                    if d[v] < 0 and not ocean[v]:
-                        d[v] = k
-                        nxt.append(v)
-            front = nxt
-        return d
+        """which of the n continents each non-ocean plot joins (-1 ocean):
+        `continents.partition` over AreaBuilder's plot classes"""
+        kind = [continents.OCEAN if self.is_water(i) and not self.is_lake(i) else continents.LAKE
+                if self.is_water(i) else continents.MOUNTAIN if self.is_mountain(i) else continents.LAND
+                for i in range(self.N)]
+        return continents.partition(self.W, self.H, self.wrap_x, kind, n)
 
     def continents_in_use(self) -> list[int]:
         return sorted({c for c in self.continent if c >= 0})
@@ -712,153 +615,226 @@ class World:
 
 
 class Region:
-    __slots__ = ("landmass", "west", "east", "south", "north", "plots", "fertility", "continent", "used")
+    """a start region: a box (inclusive edges, x not wrapping) over the plots
+    of one continent on one landmass"""
+    __slots__ = ("continent", "landmass", "north", "south", "east", "west", "fertility", "civs", "flags",
+                 "plots", "used")
 
-    def __init__(self, landmass, west, east, south, north):
-        self.landmass, self.west, self.east, self.south, self.north = landmass, west, east, south, north
+    def __init__(self, continent: int, landmass: int, x: int, y: int, fertility: int):
+        self.continent, self.landmass = continent, landmass
+        self.north = self.south = y
+        self.east = self.west = x
+        self.fertility = fertility
+        self.civs = 0
+        self.flags: set[str] = set()
         self.plots: list[int] = []
-        self.fertility = 0
-        self.continent = -1
         self.used = False
+
+    def copy(self) -> "Region":
+        r = Region(self.continent, self.landmass, self.west, self.south, self.fertility)
+        r.north, r.east = self.north, self.east
+        r.flags = set(self.flags)
+        return r
+
+
+# the parts a region of c civs is split into: (civs each, parts)
+SPLIT = {2: (1, 2), 3: (1, 3), 4: (2, 2), 5: (2, 3), 6: (2, 3), 7: (4, 2), 8: (4, 2), 9: (3, 3),
+         10: (4, 3), 11: (4, 3), 12: (4, 3), 13: (8, 2), 14: (8, 2), 15: (8, 2), 16: (8, 2), 17: (6, 3),
+         18: (6, 3), 19: (10, 2), 20: (10, 2), 21: (8, 3), 22: (8, 3), 23: (8, 3), 24: (8, 3)}
 
 
 class Starts:
-    """StartPositioner. Measured (h3_natives_spec.md and the natives probe's
-    region records): GetPlotFertility(i, -1); a landmass (as the last area
-    recalculation saw it) spans the inclusive rectangle of its plots, x not
-    wrapping; a region is a rectangle, its plots the landmass's plots
-    inside it in plot order, its fertility their GetPlotFertility sum, its
-    TotalPlots every plot of the rectangle; a landmass holding two regions
-    is cut by rows from the south after the first row where twice the
-    running fertility reaches the total, both parts keeping its columns;
-    the regions come in fertility order, largest first.
-    Not measured, stood in and recorded in World.unspecified: how many
-    regions each landmass takes (fertility per region, largest first), a
-    cut into three or more (one region's share at a time), a cut by columns
-    (when the rectangle is wider than tall), the count GetNumMajorCivStarts
-    answers, the minor regions (the same machinery over the minor count and
-    the same fertility; the game's minor Fertility is another measure),
-    GetPlotFertility with a major, and the ocean starts (none: a roster
-    without an ocean-start leader never reads them)."""
+    """StartPositioner as the install's DLL codes it (tools/civ6lab/h3_divdll.py,
+    h3_gpfdll.py, scored on the natives probe's region and start-picker
+    records; tools/civ6lab/h3_regcheck.py runs this code against them).
+
+    Entries: one per (continent, landmass) over the plots with a continent,
+    in plot order (a landmass: a component of land and mountains as the last
+    area recalculation saw it, id (k << 16) | (k - 1) by its lowest plot;
+    water plots carry landmass -1), each with its plots' GetPlotFertility(i,
+    -1) sum and a box grown by one bound per plot (x below W: W = x; else x
+    above E: E = x; else y below S: S = y; else y above N: N = y), sorted by
+    fertility descending (EASTL sort). A region's plots are its entry's
+    plots inside its box, in plot order; TotalPlots every plot of the box.
+
+    Stood in and recorded in World.unspecified: the minor regions (the
+    DLL reading below; the game's minor regions and Fertility differ on
+    most records), the fourth argument of
+    DivideMapIntoMajorRegions (the largest landmass only; Continents passes
+    false) and the ocean starts (none: a roster without an ocean-start
+    leader never reads them)."""
 
     def __init__(self, world: "World"):
         self.w = world
         self.major: list[Region] = []
         self.minor: list[Region] = []
+        self.min_major = self.min_minor = 0
 
-    # ------------------------------------------------------------ landmasses
-    def landmasses(self) -> dict[int, list[int]]:
-        """the components of land (mountains included) and of water as the
-        last area recalculation saw them (a lake wonder's plots stay land),
-        numbered k = 1, 2, ... by their lowest plot, id (k << 16) | (k - 1);
-        the land ones, with their plots in plot order"""
+    # ------------------------------------------------------------ entries
+    def landmass_ids(self) -> list[int]:
+        """per plot its landmass id, -1 on water (as the last area
+        recalculation saw it: a lake wonder's plots stay land)"""
         w = self.w
         wet = [w.areas[w.area_of[p]].water for p in range(w.N)]
-        seen = [0] * w.N
-        out: dict[int, list[int]] = {}
+        lid = [0] * w.N
         k = 0
         for s in range(w.N):
-            if seen[s]:
+            if lid[s]:
                 continue
             k += 1
-            lid = (k << 16) | (k - 1)
-            water = wet[s]
-            comp, stack = [], [s]
-            seen[s] = lid
+            v = (k << 16) | (k - 1)
+            lid[s] = v
+            stack = [s]
             while stack:
                 p = stack.pop()
-                comp.append(p)
                 for n in w.neighbours(p):
-                    if not seen[n] and wet[n] == water:
-                        seen[n] = lid
+                    if not lid[n] and wet[n] == wet[s]:
+                        lid[n] = v
                         stack.append(n)
-            if not water:
-                out[lid] = sorted(comp)
-        return out
+        return [-1 if wet[p] else lid[p] for p in range(w.N)]
 
-    def bounds(self, plots: list[int]) -> tuple[int, int, int, int]:
-        """the smallest inclusive rectangle (west, east, south, north) holding
-        the plots, x not wrapping: a landmass across the seam spans x 0..W-1"""
-        xs = [p % self.w.W for p in plots]
-        ys = [p // self.w.W for p in plots]
-        return min(xs), max(xs), min(ys), max(ys)
+    def entries(self, fert: list[int], lmid: list[int]) -> list[Region]:
+        ent: dict[tuple[int, int], Region] = {}
+        order = []
+        for i in range(self.w.N):
+            c = self.w.continent[i]
+            if c == -1:
+                continue
+            x, y = self.w.xy(i)
+            e = ent.get((c, lmid[i]))
+            if e is None:
+                e = ent[(c, lmid[i])] = Region(c, lmid[i], x, y, fert[i])
+                order.append(e)
+                continue
+            e.fertility += fert[i]
+            if x < e.west:
+                e.west = x
+            elif x > e.east:
+                e.east = x
+            elif y < e.south:
+                e.south = y
+            elif y > e.north:
+                e.north = y
+        eastl.sort(order, lambda a, b: a.fertility > b.fertility)
+        return order
 
-    def in_rect(self, p: int, r: Region) -> bool:
-        x, y = self.w.xy(p)
-        return r.west <= x <= r.east and r.south <= y <= r.north
+    def owns(self, r: Region, i: int, lmid: list[int]) -> bool:
+        return self.w.continent[i] == r.continent and lmid[i] == r.landmass
 
-    def region(self, lid: int, plots: list[int], rect: tuple) -> Region:
-        """the region over a rectangle: the landmass's plots inside it"""
-        r = Region(lid, *rect)
-        r.plots = [p for p in plots if self.in_rect(p, r)]
-        r.fertility = sum(self.w.plot_fertility(p) for p in r.plots)
-        conts = [self.w.continent[p] for p in r.plots if self.w.continent[p] >= 0]
-        r.continent = max(set(conts), key=conts.count) if conts else -1
-        return r
+    def box(self, r: Region):
+        for y in range(r.south, r.north + 1):
+            for x in range(r.west, r.east + 1):
+                yield y * self.w.W + x
 
-    def divide(self, lid: int, plots: list[int], rect: tuple, k: int) -> list[Region]:
-        """k regions over the rectangle: two by rows from the south, after
-        the first row where twice the running fertility reaches the total,
-        each part keeping the rectangle's columns (measured); by columns from
-        the west when the rectangle is wider than tall, and one region's
-        share at a time for three or more (not measured)"""
-        whole = self.region(lid, plots, rect)
-        west, east, south, north = rect
-        if k <= 1 or len(whole.plots) < 2 or (west == east and south == north):
-            return [whole]
-        if k > 2:
-            self.w.unspecified.append(f"StartPositioner: a landmass cut into {k} regions")
-        fert = {p: self.w.plot_fertility(p) for p in whole.plots}
-        by_col = east - west > north - south
-        if by_col:
-            self.w.unspecified.append("StartPositioner: a region cut by columns")
-            line, span = [p % self.w.W for p in whole.plots], range(west, east)
-        else:
-            line, span = [p // self.w.W for p in whole.plots], range(south, north)
+    # ------------------------------------------------------------ division
+    def cut(self, src: Region, rows: bool, pct: int, fert: list[int], lmid: list[int]) -> Region:
+        """the lines from the south (west) are summed, the entry's own plots
+        in each, while the sum is below fertility * pct // 100 and the line
+        is below N (E); src ends at the last line summed and keeps that sum,
+        the new part starts after it with the rest; the cut side is flagged
+        on both (the new part carries no other flag)"""
+        dst = src.copy()
+        dst.flags = set()
+        target = src.fertility * pct // 100
         run = 0
-        cut = span[-1]
-        for c in span:
-            run += sum(fert[p] for p, q in zip(whole.plots, line) if q == c)
-            if k * run >= whole.fertility:
-                cut = c
-                break
-        if by_col:
-            first, rest = (west, cut, south, north), (cut + 1, east, south, north)
+        W = self.w.W
+        if rows:
+            k = src.south
+            while run < target and k < src.north:
+                run += sum(fert[k * W + x] for x in range(src.west, src.east + 1) if self.owns(src, k * W + x, lmid))
+                k += 1
+            src.north, dst.south = k - 1, k
+            src.flags.add("N")
+            dst.flags.add("S")
         else:
-            first, rest = (west, east, south, cut), (west, east, cut + 1, north)
-        return self.divide(lid, plots, first, 1) + self.divide(lid, plots, rest, k - 1)
+            k = src.west
+            while run < target and k < src.east:
+                run += sum(fert[y * W + k] for y in range(src.south, src.north + 1) if self.owns(src, y * W + k, lmid))
+                k += 1
+            src.east, dst.west = k - 1, k
+            src.flags.add("E")
+            dst.flags.add("W")
+        dst.fertility = src.fertility - run
+        src.fertility = run
+        return dst
 
-    def allocate(self, n: int, lms: dict[int, list[int]]) -> list[Region]:
-        """n regions over the landmasses (how many each takes: fertility per
-        region, largest first, not measured), in fertility order, largest
-        first"""
-        fert = {lid: sum(self.w.plot_fertility(p) for p in pl) for lid, pl in lms.items()}
-        count = {lid: 0 for lid in lms}
-        for _ in range(n):
-            lid = max(lms, key=lambda m: (fert[m] / (1 + count[m]), -m))
-            count[lid] += 1
+    def split(self, e: Region, out: list[Region], fert: list[int], lmid: list[int]) -> None:
+        """a region of c civs: 0 or 1 stays whole; else SPLIT[c] parts of
+        equal civs, by rows when N - S >= E - W, else by columns: two parts
+        cut at 50 %, three cut at 33 % and the rest at 50 %"""
+        c = e.civs
+        if c <= 1:
+            out.append(e)
+            return
+        if c not in SPLIT:
+            self.w.unspecified.append(f"StartPositioner: a region of {c} civs")
+            return
+        each, ways = SPLIT[c]
+        rows = (e.north - e.south) >= (e.east - e.west)
+        if ways == 2:
+            parts = [e, self.cut(e, rows, 50, fert, lmid)]
+        else:
+            a = self.cut(e, rows, 33, fert, lmid)
+            parts = [e, a, self.cut(a, rows, 50, fert, lmid)]
+        for part in parts:
+            part.civs = each
+            self.split(part, out, fert, lmid)
+
+    def allocate(self, units: list[Region], n: int, fert: list[int], lmid: list[int]) -> list[Region]:
+        """n civs one at a time: the units re-sorted by fertility // (civs +
+        1) descending (EASTL sort) and the first takes one more; then every
+        unit split, the regions sorted by fertility descending (EASTL
+        sort), each with its plots"""
+        for _ in range(n if units else 0):
+            eastl.sort(units, lambda a, b: a.fertility // (a.civs + 1) > b.fertility // (b.civs + 1))
+            units[0].civs += 1
         regions: list[Region] = []
-        for lid in lms:
-            if count[lid]:
-                regions += self.divide(lid, lms[lid], self.bounds(lms[lid]), count[lid])
-        return sorted(regions, key=lambda r: -r.fertility)
+        for u in units:
+            self.split(u, regions, fert, lmid)
+        eastl.sort(regions, lambda a, b: a.fertility > b.fertility)
+        for r in regions:
+            r.plots = [i for i in range(self.w.N) if self.owns(r, i, lmid) and self.in_rect(i, r)]
+        return regions
+
+    def is_major(self, e: Region) -> bool:
+        return e.fertility >= self.min_minor and e.fertility >= self.min_major
 
     # ------------------------------------------------------------ natives
-    def DivideMapIntoMajorRegions(self, n, fert, minor_fert, flag):
+    def DivideMapIntoMajorRegions(self, n, min_major, min_minor, largest_only):
+        """the entries of fertility at least both minimums take the n civs"""
         self.w.rng.ledger.append(("native", "StartPositioner.DivideMapIntoMajorRegions", 0))
-        self.w.unspecified.append("StartPositioner: the regions per landmass")
-        self.major = self.allocate(int(n), self.landmasses())
+        if largest_only:
+            self.w.unspecified.append("StartPositioner: DivideMapIntoMajorRegions' largest-landmass filter")
+        self.min_major, self.min_minor = int(min_major), int(min_minor)
+        fert = [self.w.plot_fertility(i) for i in range(self.w.N)]
+        lmid = self.landmass_ids()
+        units = [e for e in self.entries(fert, lmid) if self.is_major(e)]
+        self.major = self.allocate(units, int(n), fert, lmid)
 
     def DivideMapIntoMinorRegions(self, n):
+        """the entries of at least the minor minimum that are not majors, then
+        a copy of every major region with no civs, each re-summed over its
+        box (its own plots) with GetPlotFertility(i, -1, true); the n civs and
+        the split as for the majors, the cuts on GetPlotFertility(i, -1)"""
         self.w.rng.ledger.append(("native", "StartPositioner.DivideMapIntoMinorRegions", 0))
-        self.w.unspecified.append("StartPositioner: the minor regions")
-        self.minor = self.allocate(int(n), self.landmasses())
+        self.w.unspecified.append("StartPositioner: the minor regions (the DLL reading misses most records)")
+        fert =[self.w.plot_fertility(i) for i in range(self.w.N)]
+        lmid = self.landmass_ids()
+        units = [e for e in self.entries(fert, lmid) if e.fertility >= self.min_minor and not self.is_major(e)]
+        units += [r.copy() for r in self.major]
+        for u in units:
+            u.fertility = sum(self.GetPlotFertility(i, -1, True) for i in self.box(u) if self.owns(u, i, lmid))
+        self.minor = self.allocate(units, int(n), fert, lmid)
 
     def GetNumMajorCivStarts(self):
         return len(self.major)
 
     def GetNumMinorCivStarts(self):
         return len(self.minor)
+
+    def in_rect(self, p: int, r: Region) -> bool:
+        x, y = self.w.xy(p)
+        return r.west <= x <= r.east and r.south <= y <= r.north
 
     def _plots(self, regions, i):
         i = int(i)
@@ -875,7 +851,7 @@ class Starts:
         if not 0 <= i < len(regions):
             return None
         r = regions[i]
-        total = sum(1 for p in range(self.w.N) if self.in_rect(p, r))
+        total = (r.east - r.west + 1) * (r.north - r.south + 1)
         return self.w.lua.table_from({"ContinentType": r.continent, "LandmassID": r.landmass,
                                       "Fertility": r.fertility, "TotalPlots": total, "WestEdge": r.west,
                                       "EastEdge": r.east, "NorthEdge": r.north, "SouthEdge": r.south})
@@ -891,10 +867,53 @@ class Starts:
         if 0 <= i < len(self.major):
             self.major[i].used = True
 
-    def GetPlotFertility(self, i, major=-1, check=False):
-        if major is not None and major >= 0 and check:
-            self.w.unspecified.append("StartPositioner.GetPlotFertility(i, major, true)")
-        return self.w.plot_fertility(int(i))
+    def GetPlotFertility(self, i, region=-1, check=False):
+        """GetPlotFertility(i, -1) as `World.plot_fertility`, B; for a major
+        region r: 0 when r shares a cut edge and the plot's row y is within
+        D = START_DISTANCE_MAJOR_CIVILIZATION // 3 of it (north N: y + D > N;
+        south S: y - D < S; and, the row against the column edges, east E:
+        y + D > E; west W: y - D < W); else B unchecked, or checked
+        max(0, trunc((100 - pct) B / 100)) with pct the centre term (cx, cy
+        the truncated box centre; 100 when cx == E or cy == N; else
+        |trunc(10 (x - cx) / (E - cx))| + |trunc(10 (y - cy) / (N - cy))|)
+        plus the distance term. Outside the major regions, checked: the
+        distance term alone with R halved. The distance term: over the start
+        plots set so far, the largest of 100, 75, 50, 25 at hex distance
+        < R, R, R + 1, R + 2, R = START_DISTANCE_FERTILITY_EXCLUSION_ZONE"""
+        i = int(i)
+        region = -1 if region is None else int(region)
+        base = self.w.plot_fertility(i)
+        zone = self.w.gpi("START_DISTANCE_FERTILITY_EXCLUSION_ZONE", 6)
+        x, y = self.w.xy(i)
+        if 0 <= region < len(self.major):
+            r = self.major[region]
+            d = self.w.gpi("START_DISTANCE_MAJOR_CIVILIZATION", 12) // 3
+            f = r.flags
+            if ("N" in f and y + d > r.north) or ("S" in f and y - d < r.south) or \
+                    ("E" in f and y + d > r.east) or ("W" in f and y - d < r.west):
+                return 0
+            if not check:
+                return base
+            cx, cy = _tdiv(r.east + r.west, 2), _tdiv(r.north + r.south, 2)
+            if cy == r.north or cx == r.east:
+                pct = 100
+            else:
+                pct = abs(_tdiv(10 * (x - cx), r.east - cx)) + abs(_tdiv(10 * (y - cy), r.north - cy))
+        elif not check:
+            return base
+        else:
+            pct, zone = 0, zone // 2
+        near = 0
+        for p in self.w.player_start.values():
+            if p is None:
+                continue
+            dist = self.w.distance(x, y, *self.w.xy(p))
+            near = max(near, 100 if dist < zone else 75 if dist == zone else 50 if dist == zone + 1
+                       else 25 if dist == zone + 2 else 0)
+        pct += near
+        if pct <= 0:
+            return base
+        return max(0, _tdiv((100 - pct) * base, 100))
 
     def GetTotalOceanStartCandidates(self, water_map=None):
         return 0
@@ -904,3 +923,9 @@ class Starts:
 
     def GetOceanStartTile(self, i):
         return -1
+
+
+def _tdiv(a: int, b: int) -> int:
+    """C integer division, truncating toward zero"""
+    q = abs(a) // abs(b)
+    return q if (a >= 0) == (b > 0) else -q
