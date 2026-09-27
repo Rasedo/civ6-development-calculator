@@ -27,7 +27,7 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT, FREE_CITY_DEFENSE } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
-import { drawAndPayGoody, raiseBestMelee, unitReligious } from './units';
+import { drawAndPayGoody, raiseBestMelee, unitReligious, unitStackSlot } from './units';
 import { nextRandom } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE, XP_INTERCEPT } from './air';
@@ -1729,9 +1729,13 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // city/Encampment stands" — the same district-first rule the centre gets
   // below, and the conquest is what destroys the shelterers.
   const encamp = encampmentDefense(state, attacker, target);
+  // CIV6: one military unit to a tile — the move onto a religious unit's
+  // tile is refused where the mover's own military already stands.
   if (enemies.length === 0 && !seatTarget && !cityStateTarget && !encamp && !isWater(target) && !def.naval
       && unitsAt(state, targetIndex).some((u) => unitReligious(u.type) && unitsHostile(state, attacker, u)
-        && unitVisibleTo(state, u, attacker.seat))) {
+        && unitVisibleTo(state, u, attacker.seat))
+      && !unitsAt(state, targetIndex).some((u) => u.id !== attacker.id && u.seat === attacker.seat
+        && unitStackSlot(u) === 'military')) {
     const r = stepUnit(state, attacker, target);
     return r === 'moved' || r === 'halted' ? MOVED_ONTO : no('Cannot move there.');
   }

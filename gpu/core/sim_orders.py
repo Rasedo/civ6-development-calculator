@@ -862,7 +862,10 @@ class SimOrders:
                     city_hit = city_t
                     cs_hit = cs_t & ~city_t
                     unit_hit = (host_m | host_c) & ~city_hit & ~cs_hit & ~enc_t
-                    coloc = host_r & ~host_m & ~host_c & ~city_hit & ~cs_hit & ~enc_t
+                    # CIV6: one military unit to a tile — the move is refused
+                    # where the mover's own military already stands
+                    own_mil = (_ms >= 0) & (m_seat == row)
+                    coloc = host_r & ~host_m & ~host_c & ~own_mil & ~city_hit & ~cs_hit & ~enc_t
                     _css = self.citystate_at.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)
                     for b_ in valid.nonzero(as_tuple=True)[0].tolist():
                         v = int(sc[b_])
@@ -2173,7 +2176,10 @@ class SimOrders:
             cs_att = attack & ~rngd & cs_here & ~ctr_here
             # the district shelters whoever stands on it, so it answers first
             unit_att = attack & ~rngd & has_u & fight_u & ~ctr_here & ~cs_here & ~_enc_here
-            coloc_att = attack & ~rngd & has_u & ~fight_u & rel_u & ~ctr_here & ~cs_here & ~_enc_here
+            # CIV6: one military unit to a tile — the move is refused where a
+            # barbarian military unit already stands
+            own_mil = (_mb >= 0) & (_mb_seat == BARB_SEAT)
+            coloc_att = attack & ~rngd & has_u & ~fight_u & rel_u & ~own_mil & ~ctr_here & ~cs_here & ~_enc_here
             enc_att = attack & ~rngd & ~ctr_here & ~cs_here & _enc_here
 
             if bool(city_att.any()):
