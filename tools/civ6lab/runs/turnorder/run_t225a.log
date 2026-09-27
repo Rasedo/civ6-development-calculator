@@ -1,0 +1,15 @@
+GC ['armed ok=321 bad=35']
+IG ['armed ok=143 bad=35']
+SN ['snap armed 16']
+    autoplay false
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_TOURISM","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":226}
+advanced to 226
+GC: 3020 events
+IG: 2895 events
+SN: 115 events
+    autoplay false
+advanced to 227
+GC: 2972 events
+IG: 2840 events
+SN: 110 events
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\t225a_20260927T054307Z.jsonl

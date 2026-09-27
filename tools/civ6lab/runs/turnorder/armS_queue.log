@@ -1,0 +1,8 @@
+TUNER: InGame: ERR:Runtime Error: [string "(function()..."]:16: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:16: in function '(anonymous)'
+	[string "(function()..."]:19: in function '(main chunk)'
+Lua callstack:
+
+  printed before the error:
+    can=true

@@ -1,0 +1,2 @@
+cause ('blocker', 'ENDTURN_BLOCKING_FILL_CIVIC_SLOT') -> None
+cause ('popup', 'NaturalDisasterPopup') -> closed

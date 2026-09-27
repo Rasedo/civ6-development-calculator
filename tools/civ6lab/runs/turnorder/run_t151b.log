@@ -1,0 +1,20 @@
+GC ['already armed ok=321 bad=35']
+GC ['cleared']
+GC ['on n=0']
+IG ['already armed ok=143 bad=35']
+IG ['cleared']
+IG ['on n=0']
+    autoplay false
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":151}
+    cause session 4:4 -> closed sessions [4:4]
+    cause popup DiplomacyActionView -> closed
+    cause popup LeaderScene -> hidden
+    cause popup WorldCongressPopup -> closed
+advanced to 152
+GC: 3111 events
+IG: 2982 events
+    autoplay false
+advanced to 153
+GC: 2783 events
+IG: 2665 events
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\t151b_20260927T053148Z.jsonl

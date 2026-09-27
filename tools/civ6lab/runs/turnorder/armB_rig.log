@@ -1,0 +1,4 @@
+before gold=317.171875 yield=12 maint=10 unitMaint=10
+made 4 3080210@34,40 3145745@35,40 3211279@36,40 3276811@37,40
+after gold=0 yield=12 maint=22 unitMaint=22
+units 12

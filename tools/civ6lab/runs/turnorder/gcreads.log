@@ -1,0 +1,149 @@
+gold = 208.7265625
+goldYield = 395.8203125
+maint = 97
+faith = 135.48828125
+faithYield = 71.53515625
+researching = 52
+researchProg = 0
+scienceYield = 194.765625
+civic = 37
+civicProg = err:[string "(function()..."]:20: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:20: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:20: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+cultureYield = 117.19921875
+favor = err:[string "(function()..."]:22: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:22: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:22: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+era = 5
+eraScore = err:[string "(function()..."]:24: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:24: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:24: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+gpp = 124.65625
+envoys = 0
+influencePts = 1
+city.id = 65536
+pop = 15
+growth = table: 00000001E2845DF0
+food = err:[string "(function()..."]:32: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:32: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:32: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+foodSurplus = 9
+growthThreshold = err:[string "(function()..."]:34: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:34: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:34: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+housing = 16
+amen = 7
+yieldFood = 39
+yieldProd = 33
+yieldGold = 79.19921875
+bq = table: 00000001E28466B0
+bq.cur = PROJECT_ENHANCE_DISTRICT_CAMPUS
+bq.curHash = err:[string "(function()..."]:42: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:42: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:42: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+bq.progress = err:[string "(function()..."]:43: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:43: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:43: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+bq.prodYield = err:[string "(function()..."]:44: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:44: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:44: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+bq.turnsLeft = err:Not Implemented.
+stack traceback:
+	[C]: in function 'lGetTurnsLeft'
+	[string "(function()..."]:45: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:45: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+bq.overflow = err:[string "(function()..."]:46: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:46: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:46: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+culture = err:[string "(function()..."]:47: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:47: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:47: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+culture.cur = err:[string "(function()..."]:48: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:48: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:48: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+culture.next = err:[string "(function()..."]:49: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:49: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:49: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+culture.turns = err:[string "(function()..."]:50: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:50: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:50: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+loyaltyGC = err:[string "(function()..."]:51: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:51: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:51: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+damage = err:[string "(function()..."]:52: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:52: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:52: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+religion.major = 2
+religion.list = err:[string "(function()..."]:54: function expected instead of nil
+stack traceback:
+	[string "(function()..."]:54: in function '(anonymous)'
+	[C]: in function 'pcall'
+	[string "(function()..."]:6: in function 'tri'
+	[string "(function()..."]:54: in function '(anonymous)'
+	[string "(function()..."]:63: in function '(main chunk)'
+buildings = table: 00000001E2847D80
+unit.damage = 0
+unit.moves = 0

@@ -1,0 +1,16 @@
+GC ['already armed ok=321 bad=35']
+IG ['already armed ok=143 bad=35']
+SN ['already armed']
+snap before tools/civ6lab/turnorder_city_ig.lua: 3 lines
+snap before tools/civ6lab/turnorder_worked.lua: 2 lines
+    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+    cause blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION: no handler
+    cause popup WorldCongressIntro -> closed
+advanced to 151
+GC: 1728 events
+IG: 1613 events
+SN: 104 events
+snap after tools/civ6lab/turnorder_city_ig.lua: 3 lines
+snap after tools/civ6lab/turnorder_worked.lua: 2 lines
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\armT_apprenticeship_20260927T054837Z.jsonl

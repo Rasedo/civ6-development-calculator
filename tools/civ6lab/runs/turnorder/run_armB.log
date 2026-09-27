@@ -1,0 +1,18 @@
+GC ['already armed ok=321 bad=35']
+IG ['already armed ok=143 bad=35']
+SN ['already armed']
+snap before tools/civ6lab/turnorder_city_ig.lua: 3 lines
+    unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM
+    cause session 4:4 -> closed sessions [4:4]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup TechCivicCompletedPopup -> closed
+    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM
+    cause popup BoostUnlockedPopup -> closed
+advanced to 152
+GC: 1953 events
+IG: 1830 events
+SN: 115 events
+snap after tools/civ6lab/turnorder_city_ig.lua: 3 lines
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\armB_bankrupt_20260927T055023Z.jsonl

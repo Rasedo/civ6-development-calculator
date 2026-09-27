@@ -1,0 +1,673 @@
+     1 t150 d   -       MARK                                         before_advance_0
+   567 t150 d   -       EV.RemotePlayerTurnEnd                       0
+   568 t150 d   -       EV.PlayerTurnDeactivated                     0
+   569 t150 d   -       EV.RemotePlayerTurnBegin                     1
+   570 t150 d   -       GE.PlayerTurnStarted                         1
+   571 t150 d   -       GE.OnFaithEarned                             1|335
+   572 t150 d   -       GE.BuildingConstructed                       1|131073|24|1312|true
+   573 t150 d   0       GE.OnCityPopulationChanged                   1|131073|1
+   574 t150 d   -       GE.UnitCreated                               1|7274519|1|196610
+   575 t150 d   -       GE.UnitInitialized                           1|7274519|1|196610
+   576 t150 d   -       GE.OnCityPopulationChanged                   1|196610|0 x3 (..578 1|393221|1)
+   579 t150 d   -       GE.PlayerTurnStartComplete                   1
+   580 t150 d   -       GE.BuildingConstructed                       1|262147|21|1403|true
+   581 t150 d   -       GE.OnCombatOccurred                          -1|-1|63|18088011
+   582 t150 d   -       EV.ResearchChanged                           1|44
+   583 t150 d   -       EV.TreasuryChanged                           1|346.5234375|838.6796875
+   584 t150 d   -       EV.CivicChanged                              1|37
+   585 t150 d   -       EV.FaithChanged                              1|83.1484375|335.08984375
+   586 t150 d   -       EV.GreatPeoplePointsChanged                  1 x9 (..594 1)
+   595 t150 d   -       EV.InfluenceChanged                          1
+   596 t150 d   -       EV.LevyCounterChanged                        1
+   603 t150 d   -       EV.GovernorChanged                           1|1 x4 (..606 1|6)
+   608 t150 d   -       EV.BuildingChanged                           54|10|27|1|65536|88
+   609 t150 d   -       EV.CityLoyaltyChanged                        1|65536
+   611 t150 d   -       EV.BuildingChanged                           52|15|24|1|131073|100
+   612 t150 d   -       EV.CityProductionCompleted                   1|131073|1|24|false|65535
+   613 t150 d   -       EV.CityReligionChanged                       1|131073|2
+   614 t150 d   -       EV.CityReligionFollowersChanged              1|131073
+   615 t150 d   -       EV.CityPopulationChanged                     1|131073|20
+   616 t150 d   -       EV.CityLoyaltyChanged                        1|131073
+   619 t150 d   -       EV.UnitAddedToMap                            1|7274519|54|21
+   621 t150 d   -       EV.CityPopulationChanged                     1|196610|14
+   622 t150 d   -       EV.CityProductionCompleted                   1|196610|0|2|false|0
+   623 t150 d   -       EV.CityLoyaltyChanged                        1|196610
+   625 t150 d   -       EV.DistrictBuildProgressChanged              1|3342384|262147|59|18|7 x2 (..626 1|3342384|262147|59)
+   627 t150 d   -       EV.CityLoyaltyChanged                        1|262147
+   629 t150 d   -       EV.BuildingChanged                           65|15|69|1|327684|23
+   630 t150 d   -       EV.CityReligionChanged                       1|327684|7
+   631 t150 d   -       EV.CityReligionFollowersChanged              1|327684
+   632 t150 d   -       EV.CityPopulationChanged                     1|327684|7
+   633 t150 d   -       EV.CityLoyaltyChanged                        1|327684
+   634 t150 d   -       EV.ImprovementChanged                        65|14|1|1|9|0
+   636 t150 d   -       EV.DistrictBuildProgressChanged              1|3276847|393221|60|24|2 x2 (..637 1|3276847|393221|60)
+   638 t150 d   -       EV.ImprovementChanged                        60|22|1|1|-1|0
+   639 t150 d   -       EV.CityReligionChanged                       1|393221|7
+   640 t150 d   -       EV.CityReligionFollowersChanged              1|393221
+   641 t150 d   -       EV.CityPopulationChanged                     1|393221|8
+   642 t150 d   -       EV.CityLoyaltyChanged                        1|393221 x2 (..644 1|458758)
+   646 t150 d   -       EV.DistrictBuildProgressChanged              1|3145773|524295|62|20|23 x2 (..647 1|3145773|524295|62)
+   648 t150 d   -       EV.CityLoyaltyChanged                        1|524295
+   675 t150 d   -       EV.WorldCongressSpecialSessionBeingCalled    1
+   676 t150 d   -       EV.ResearchChanged                           1|-1
+   677 t150 d   -       EV.TreasuryChanged                           1|344.22265625|258.6796875
+   678 t150 d   -       EV.BuildingAddedToMap                        59|16|21|1|262147|0
+   679 t150 d   -       EV.BuildingChanged                           59|16|21|1|262147|100
+   680 t150 d   -       EV.CityProductionCompleted                   1|262147|1|21|false|65535
+   681 t150 d   -       EV.CityMadePurchase                          1|262147|60|16|-660405657|21
+   682 t150 d   -       EV.TreasuryChanged                           1|383.72265625|258.6796875
+   683 t150 d   -       EV.TradeRouteAddedToMap                      1|54|21
+   684 t150 d   -       EV.TradeRouteActivityChanged                 1|1|196610|3|65536
+   693 t150 d   -       EV.ImprovementChanged                        55|9|2|1|-1|1
+   694 t150 d   -       EV.CityFocusChanged                          1|65536
+   695 t150 d   -       EV.ImprovementRemovedFromMap                 55|15|1
+   696 t150 d   -       EV.DistrictAddedToMap                        1|3407921|131073|55|15|6
+   697 t150 d   -       EV.CityProductionChanged                     1|131073|2|6|-1
+   698 t150 d   -       EV.DistrictAddedToMap                        1|3473458|196610|55|23|24
+   699 t150 d   -       EV.CityProductionChanged                     1|196610|2|24|-1
+   700 t150 d   -       EV.FavorChanged                              1|-30|2
+   701 t150 d   -       EV.PlayerTurnActivated                       1|true
+   719 t150 d   -       EV.ImprovementAddedToMap                     62|19|2|1|44|0
+   720 t150 d   -       EV.CityFocusChanged                          1|524295
+   724 t150 d   -       EV.UnitChargesChanged                        1|6881305|2|3
+   726 t150 d   -       EV.UnitDamageChanged                         63|18088011|22|0|100
+   753 t150 d   -       EV.UnitChargesChanged                        1|3735554|1|2
+   760 t150 d   -       EV.RemotePlayerTurnEnd                       1
+   809 t150 d   -       EV.PlayerTurnDeactivated                     1
+   810 t150 d   -       EV.RemotePlayerTurnBegin                     2
+   811 t150 d   -       GE.PlayerTurnStarted                         2
+   812 t150 d   -       GE.OnFaithEarned                             2|134
+   813 t150 d   -       GE.PlayerTurnStartComplete                   2
+   814 t150 d   -       GE.OnPlayerGaveInfluenceToken                2|16|1|-1|false x2 (..815 2|16|1|-1)
+   816 t150 d  12       GE.OnCombatOccurred                          -1|-1|3|3276811
+   817 t150 d   0       EV.ResearchChanged                           2|29
+   818 t150 d   0       EV.TreasuryChanged                           2|74.40234375|106.30078125
+   819 t150 d   0       EV.CivicChanged                              2|29
+   820 t150 d   0       EV.FaithChanged                              2|13.953125|134.73828125
+   821 t150 d   0       EV.GreatPeoplePointsChanged                  2 x5 (..825 2)
+   826 t150 d   0       EV.InfluenceChanged                          2 x3 (..828 2)
+   829 t150 d   0       EV.LevyCounterChanged                        2
+   830 t150 d   0       EV.GovernorChanged                           2|1 x4 (..833 2|5)
+   835 t150 d   0       EV.CityLoyaltyChanged                        2|65536 x2 (..837 2|131073)
+   849 t150 d   0       EV.FavorChanged                              2|0|1
+   850 t150 d   0       EV.InfluenceGiven                            16|0
+   851 t150 d   0       EV.FavorChanged                              2|0|1
+   852 t150 d   0       EV.InfluenceGiven                            16|0
+   853 t150 d   0       EV.InfluenceChanged                          2
+   854 t150 d   0       EV.ResearchChanged                           2|-1
+   855 t150 d   0       EV.PlayerTurnActivated                       2|true
+   878 t150 d   0       EV.UnitDamageChanged                         3|3276811|94|64|100
+   886 t150 d   0       EV.RemotePlayerTurnEnd                       2
+   896 t150 d   0       EV.PlayerTurnDeactivated                     2
+   897 t150 d   0       EV.RemotePlayerTurnBegin                     3
+   898 t150 d   0       GE.PlayerTurnStarted                         3
+   899 t150 d   0       GE.OnFaithEarned                             3|228
+   900 t150 d   0       GE.BuildingConstructed                       3|65536|2|1256|true
+   901 t150 d   -       GE.UnitCreated                               3|5898255|3|131073
+   902 t150 d   -       GE.UnitInitialized                           3|5898255|3|131073
+   903 t150 d   -       GE.OnCityPopulationChanged                   3|131073|0
+   904 t150 d   2       GE.BuildingConstructed                       3|196610|4|1077|true
+   905 t150 d   4       GE.OnCityPopulationChanged                   3|458758|1
+   906 t150 d   -       GE.UnitCreated                               63|19005513
+   907 t150 d   -       GE.UnitInitialized                           63|19005513
+   908 t150 d   -       GE.UnitCreated                               63|19071063
+   909 t150 d   -       GE.UnitInitialized                           63|19071063
+   910 t150 d   -       GE.PlayerTurnStartComplete                   3
+   911 t150 d   -       GE.OnPlayerGaveInfluenceToken                3|8|1|4|false x2 (..912 3|8|1|-1)
+   913 t150 d   -       GE.OnCombatOccurred                          3|3997698|2|4718597
+   914 t150 d   -       GE.OnGreatPersonActivated                    3|5832727|24|7
+   915 t150 d   -       EV.ResearchChanged                           3|45
+   916 t150 d   -       EV.TreasuryChanged                           3|96.0859375|187.1640625
+   917 t150 d   -       EV.CivicChanged                              3|37
+   918 t150 d   -       EV.FaithChanged                              3|79.83203125|228.703125
+   919 t150 d   -       EV.GreatPeoplePointsChanged                  3 x9 (..927 3)
+   928 t150 d   -       EV.InfluenceChanged                          3 x3 (..930 3)
+   931 t150 d   -       EV.LevyCounterChanged                        3
+   934 t150 d   -       EV.GovernorChanged                           3|2 x5 (..938 3|0)
+   940 t150 d   -       EV.BuildingChanged                           80|14|2|3|65536|100
+   941 t150 d   -       EV.CityProductionCompleted                   3|65536|1|2|false|65535
+   943 t150 d   -       EV.CityLoyaltyChanged                        3|65536
+   946 t150 d   -       EV.UnitAddedToMap                            3|5898255|73|12
+   948 t150 d   -       EV.CityPopulationChanged                     3|131073|14
+   949 t150 d   -       EV.CityProductionCompleted                   3|131073|0|1|false|0
+   950 t150 d   -       EV.CityTileOwnershipChanged                  3|131073|69|15
+   951 t150 d   -       EV.CityLoyaltyChanged                        3|131073
+   953 t150 d   -       EV.BuildingChanged                           69|12|4|3|196610|100
+   954 t150 d   -       EV.CityProductionCompleted                   3|196610|1|4|false|65535
+   955 t150 d   -       EV.CityLoyaltyChanged                        3|196610
+   957 t150 d   -       EV.BuildingChanged                           72|9|94|3|262147|42
+   958 t150 d   -       EV.CityLoyaltyChanged                        3|262147 x2 (..960 3|327684)
+   962 t150 d   -       EV.BuildingChanged                           66|9|10|3|393221|92
+   963 t150 d   -       EV.CityLoyaltyChanged                        3|393221
+   965 t150 d   -       EV.DistrictBuildProgressChanged              3|2228256|458758|81|14|4 x2 (..966 3|2228256|458758|81)
+   967 t150 d   -       EV.CityReligionChanged                       3|458758|8
+   968 t150 d   -       EV.CityReligionFollowersChanged              3|458758
+   969 t150 d   -       EV.CityPopulationChanged                     3|458758|4
+   970 t150 d   -       EV.CityLoyaltyChanged                        3|458758
+   982 t150 d   -       EV.UnitAddedToMap                            63|19005513|54|8 x2 (..986 63|19071063|54|8)
+   990 t150 d   -       EV.DistrictBuildProgressChanged              1|2621477|65536|54|8|10
+   991 t150 d   -       EV.DistrictPillaged                          1|2621477|65536|54|8|10
+   993 t150 d   -       EV.SpyMissionCompleted                       3|1
+   996 t150 d   -       EV.WorldCongressSpecialSessionBeingCalled    3
+   997 t150 d   -       EV.DiplomacyRelationshipChanged              5|8|-2041297249|true
+   998 t150 d   -       EV.DiplomacyRelationshipChanged              8|5|-2041297249|true
+   999 t150 d   -       EV.DiplomacyMakePeace                        8|5
+  1000 t150 d   -       EV.DiplomacyRelationshipChanged              8|10|-2041297249|true
+  1001 t150 d   -       EV.DiplomacyRelationshipChanged              10|8|-2041297249|true
+  1002 t150 d   -       EV.DiplomacyMakePeace                        8|10
+  1003 t150 d   -       EV.DiplomacyRelationshipChanged              8|14|-2041297249|true
+  1004 t150 d   -       EV.DiplomacyRelationshipChanged              14|8|-2041297249|true
+  1005 t150 d   -       EV.DiplomacyMakePeace                        8|14
+  1007 t150 d   -       EV.FavorChanged                              3|0|1
+  1008 t150 d   -       EV.InfluenceGiven                            8|0
+  1009 t150 d   -       EV.InfluenceChanged                          3
+  1010 t150 d   -       EV.DiplomacyRelationshipChanged              2|8|-2041297249|true
+  1011 t150 d   -       EV.DiplomacyRelationshipChanged              8|2|-2041297249|true x2 (..1012 8|12|-2041297249|true)
+  1013 t150 d   -       EV.DiplomacyRelationshipChanged              12|8|-2041297249|true
+  1014 t150 d   -       EV.DiplomacyDeclareWar                       12|8
+  1015 t150 d   -       EV.DiplomacyDeclareWar                       8|2 x2 (..1016 8|12)
+  1018 t150 d   -       EV.FavorChanged                              3|0|1
+  1019 t150 d   -       EV.CityTileOwnershipChanged                  8|65536|20|25
+  1020 t150 d   -       EV.InfluenceGiven                            8|0
+  1021 t150 d   -       EV.InfluenceChanged                          3
+  1022 t150 d   -       EV.ResearchChanged                           3|-1
+  1023 t150 d   -       EV.TreasuryChanged                           3|99.68359375|72.1640625
+  1024 t150 d   -       EV.CityTileOwnershipChanged                  3|327684|80|9
+  1025 t150 d   -       EV.CityMadePurchase                          3|327684|80|9|2010226114|0
+  1026 t150 d   -       EV.BuildingAddedToMap                        80|14|19|3|65536|0
+  1027 t150 d   -       EV.CityProductionChanged                     3|65536|1|19|-1
+  1028 t150 d   -       EV.BuildingChanged                           74|13|39|3|131073|0
+  1029 t150 d   -       EV.CityProductionChanged                     3|131073|1|39|-1
+  1030 t150 d   -       EV.DistrictAddedToMap                        3|2293793|196610|69|14|10
+  1031 t150 d   -       EV.CityProductionChanged                     3|196610|2|10|-1
+  1032 t150 d   -       EV.FavorChanged                              3|-30|2
+  1033 t150 d   -       EV.PlayerTurnActivated                       3|true
+  1043 t150 d   -       EV.UnitDamageChanged                         2|4718597|76|12|100
+  1044 t150 d   -       EV.UnitDamageChanged                         3|3997698|74|59|100
+  1047 t150 d   -       EV.ImprovementAddedToMap                     74|7|7|3|4|0
+  1049 t150 d   -       EV.CityFocusChanged                          3|262147
+  1050 t150 d   -       EV.UnitChargesChanged                        3|5636109|2|3
+  1057 t150 d   -       EV.UnitGreatPersonActivated                  3|5832727|7|24
+  1058 t150 d   -       EV.GreatWorkCreated                          3|5832727|73|12|23|27
+  1059 t150 d   -       EV.UnitRemovedFromMap                        3|5832727
+  1072 t150 d   -       EV.RemotePlayerTurnEnd                       3
+  1082 t150 d   -       EV.PlayerTurnDeactivated                     3
+  1083 t150 d   -       EV.RemotePlayerTurnBegin                     4
+  1084 t150 d   -       GE.PlayerTurnStarted                         4
+  1085 t150 d   -       GE.OnFaithEarned                             4|1028
+  1086 t150 d  25       GE.OnCityPopulationChanged                   4|327681|1 x2 (..1087 4|458757|1)
+  1088 t150 d   6       GE.PlayerTurnStartComplete                   4
+  1089 t150 d   0       EV.ResearchChanged                           4|36
+  1090 t150 d   0       EV.TreasuryChanged                           4|54.84765625|143.421875
+  1091 t150 d   0       EV.CivicChanged                              4|29
+  1092 t150 d   0       EV.FaithChanged                              4|24.90234375|1028.69921875
+  1093 t150 d   0       EV.GreatPeoplePointsChanged                  4 x8 (..1100 4)
+  1101 t150 d   0       EV.InfluenceChanged                          4
+  1102 t150 d   0       EV.LevyCounterChanged                        4
+  1108 t150 d   0       EV.GovernorChanged                           4|1 x4 (..1111 4|6)
+  1113 t150 d   0       EV.BuildingChanged                           26|19|23|4|65536|97
+  1114 t150 d   0       EV.CityLoyaltyChanged                        4|65536
+  1116 t150 d   0       EV.DistrictBuildProgressChanged              4|1835031|327681|27|17|2 x2 (..1117 4|1835031|327681|27)
+  1118 t150 d   0       EV.CityPopulationChanged                     4|327681|6
+  1119 t150 d   0       EV.CityLoyaltyChanged                        4|327681
+  1121 t150 d   0       EV.DistrictBuildProgressChanged              4|1900568|196610|24|13|8 x2 (..1122 4|1900568|196610|24)
+  1123 t150 d   0       EV.CityLoyaltyChanged                        4|196610
+  1125 t150 d   0       EV.BuildingChanged                           19|18|19|4|262147|83
+  1126 t150 d   0       EV.CityLoyaltyChanged                        4|262147 x2 (..1128 4|393220)
+  1130 t150 d   0       EV.CityReligionChanged                       4|458757|11
+  1131 t150 d   0       EV.CityReligionFollowersChanged              4|458757
+  1132 t150 d   0       EV.CityPopulationChanged                     4|458757|4
+  1133 t150 d   0       EV.CityLoyaltyChanged                        4|458757
+  1135 t150 d   0       EV.BuildingChanged                           18|16|15|4|524294|75
+  1136 t150 d   0       EV.CityLoyaltyChanged                        4|524294
+  1137 t150 d   0       EV.DiplomacyRelationshipChanged              4|7|-2041297249|true
+  1138 t150 d   0       EV.DiplomacyRelationshipChanged              7|4|-2041297249|true
+  1139 t150 d   0       EV.DiplomacyRelationshipChanged              4|7|-2041297249|true
+  1140 t150 d   0       EV.AllianceAvailable                         4|7|-1
+  1141 t150 d   0       EV.DiplomacyRelationshipChanged              7|4|-2041297249|true
+  1142 t150 d   0       EV.AllianceAvailable                         7|4|-1
+  1143 t150 d   0       EV.DiplomacyRelationshipChanged              4|8|-2041297249|true
+  1144 t150 d   0       EV.ResearchChanged                           4|-1
+  1145 t150 d   0       EV.PlayerTurnActivated                       4|true
+  1146 t150 d   0       EV.RemotePlayerTurnEnd                       4
+  1149 t150 d   0       EV.PlayerTurnDeactivated                     4
+  1150 t150 d   0       EV.RemotePlayerTurnBegin                     5
+  1151 t150 d   0       GE.PlayerTurnStarted                         5
+  1152 t150 d   0       GE.OnFaithEarned                             5|46
+  1153 t150 d   0       GE.OnDistrictConstructed                     5|6|32|31|true
+  1154 t150 d   -       GE.UnitCreated                               5|5898244|5|458755
+  1155 t150 d   -       GE.UnitInitialized                           5|5898244|5|458755
+  1156 t150 d   -       GE.OnCityPopulationChanged                   5|458755|-1 x3 (..1158 5|458755|1)
+  1159 t150 d   -       GE.PlayerTurnStartComplete                   5
+  1160 t150 d   -       GE.OnCombatOccurred                          5|5373967|13|1966086
+  1161 t150 d  11       GE.OnCombatOccurred                          5|5636118|13|1966086 x2 (..1162 5|5505031|-1|-1)
+  1163 t150 d   -       GE.OnGreatPersonActivated                    5|5832727|22|7
+  1164 t150 d   -       EV.ResearchChanged                           5|49
+  1165 t150 d   -       EV.TreasuryChanged                           5|101.79296875|174.0546875
+  1166 t150 d   -       EV.CivicChanged                              5|31
+  1167 t150 d   -       EV.FaithChanged                              5|45.16796875|46.4609375
+  1168 t150 d   -       EV.GreatPeoplePointsChanged                  5 x8 (..1175 5)
+  1176 t150 d   -       EV.InfluenceChanged                          5
+  1177 t150 d   -       EV.LevyCounterChanged                        5
+  1181 t150 d   -       EV.GovernorChanged                           5|1 x5 (..1185 5|0)
+  1191 t150 d   -       EV.DistrictBuildProgressChanged              5|2424865|65536|32|31|6 x2 (..1192 5|2424865|65536|32)
+  1193 t150 d   -       EV.CityProductionCompleted                   5|65536|2|6|false|65535 x2 (..1194 5|65536|2|6)
+  1195 t150 d   -       EV.CityTileOwnershipChanged                  5|65536|34|31
+  1196 t150 d   -       EV.CityLoyaltyChanged                        5|65536
+  1198 t150 d   -       EV.BuildingChanged                           30|24|16|5|131073|86
+  1199 t150 d   -       EV.CityLoyaltyChanged                        5|131073
+  1201 t150 d   -       EV.BuildingChanged                           27|31|22|5|196610|83
+  1202 t150 d   -       EV.CityLoyaltyChanged                        5|196610
+  1205 t150 d   -       EV.UnitAddedToMap                            5|5898244|34|25
+  1207 t150 d   -       EV.CityReligionChanged                       5|458755|12
+  1208 t150 d   -       EV.CityReligionFollowersChanged              5|458755
+  1209 t150 d   -       EV.CityPopulationChanged                     5|458755|4 x2 (..1210 5|458755|4)
+  1211 t150 d   -       EV.CityProductionCompleted                   5|458755|0|0|false|0
+  1212 t150 d   -       EV.CityReligionChanged                       5|458755|12
+  1213 t150 d   -       EV.CityReligionFollowersChanged              5|458755
+  1214 t150 d   -       EV.CityPopulationChanged                     5|458755|5
+  1215 t150 d   -       EV.CityLoyaltyChanged                        5|458755
+  1217 t150 d   -       EV.BuildingChanged                           24|22|10|5|327684|80
+  1218 t150 d   -       EV.CityLoyaltyChanged                        5|327684
+  1219 t150 d   -       EV.CulturalIdentityConversionOutcomeChanged  5|327684|2
+  1221 t150 d   -       EV.BuildingChanged                           31|22|16|5|393221|58
+  1222 t150 d   -       EV.CityLoyaltyChanged                        5|393221
+  1224 t150 d   -       EV.DistrictBuildProgressChanged              5|2490402|524294|23|33|10 x2 (..1225 5|2490402|524294|23)
+  1226 t150 d   -       EV.CityLoyaltyChanged                        5|524294
+  1245 t150 d   -       EV.WorldCongressSpecialSessionBeingCalled    5
+  1246 t150 d   -       EV.DiplomacyRelationshipChanged              5|8|-2041297249|true
+  1247 t150 d   -       EV.ResearchChanged                           5|-1
+  1248 t150 d   -       EV.BuildingAddedToMap                        33|28|16|5|65536|0
+  1249 t150 d   -       EV.CityProductionChanged                     5|65536|1|16|-1
+  1250 t150 d   -       EV.FeatureRemovedFromMap                     36|26
+  1251 t150 d   -       EV.DistrictAddedToMap                        5|2555939|458755|36|26|7
+  1252 t150 d   -       EV.CityProductionChanged                     5|458755|2|7|-1
+  1253 t150 d   -       EV.FavorChanged                              5|-30|2
+  1254 t150 d   -       EV.PlayerTurnActivated                       5|true
+  1264 t150 d   -       EV.CitySiegeStatusChanged                    13|65536|true
+  1266 t150 d   -       EV.UnitDamageChanged                         13|1966086|42|0|100
+  1267 t150 d   -       EV.UnitDamageChanged                         5|5373967|57|31|100
+  1269 t150 d   -       EV.UnitDamageChanged                         13|1966086|97|42|100
+  1270 t150 d   -       EV.UnitDamageChanged                         5|5636118|13|0|100 x2 (..1272 5|5505031|24|0)
+  1273 t150 d   -       EV.DistrictDamageChanged                     13|65536|1839557181|41|35 x2 (..1274 13|65536|1587009065|7)
+  1284 t150 d   -       EV.UnitGreatPersonActivated                  5|5832727|7|22
+  1285 t150 d   -       EV.GreatWorkCreated                          5|5832727|32|28|1|28
+  1320 t150 d   -       EV.UnitChargesChanged                        5|5570561|2|3
+  1324 t150 d   -       EV.RemotePlayerTurnEnd                       5
+  1343 t150 d   -       EV.PlayerTurnDeactivated                     5
+  1344 t150 d   -       EV.RemotePlayerTurnBegin                     6
+  1345 t150 d   -       GE.PlayerTurnStarted                         6
+  1346 t150 d   -       GE.PolicyChanged                             6|30|false|false x2 (..1347 6|67|true|false)
+  1348 t150 d   -       GE.OnCivicCulturevated                       6|33
+  1349 t150 d   -       GE.OnFaithEarned                             6|310
+  1350 t150 d   -       GE.OnCityPopulationChanged                   6|65536|1
+  1351 t150 d  10       GE.PlayerTurnStartComplete                   6
+  1352 t150 d   -       GE.OnCombatOccurred                          6|2949135|5|5439500
+  1353 t150 d   -       EV.ResearchChanged                           6|42
+  1354 t150 d   -       EV.TreasuryChanged                           6|174.59765625|377.14453125
+  1355 t150 d   -       EV.GovernmentPolicyChanged                   6|67
+  1356 t150 d   -       EV.CivicChanged                              8|33
+  1357 t150 d   -       EV.CivicChanged                              9|33
+  1358 t150 d   -       EV.CivicChanged                              10|33
+  1359 t150 d   -       EV.CivicChanged                              11|33
+  1360 t150 d   -       EV.CivicChanged                              12|33
+  1361 t150 d   -       EV.CivicChanged                              13|33
+  1362 t150 d   -       EV.CivicChanged                              15|33
+  1363 t150 d   -       EV.CivicChanged                              16|33
+  1364 t150 d   -       EV.CivicChanged                              18|33
+  1365 t150 d   -       EV.CivicChanged                              19|33
+  1366 t150 d   -       EV.CivicChanged                              62|33
+  1367 t150 d   -       EV.CivicCompleted                            6|33|false
+  1368 t150 d   -       EV.FaithChanged                              6|139.55859375|310.64453125
+  1369 t150 d   -       EV.CityReligionChanged                       6|131073|7
+  1370 t150 d   -       EV.CityReligionFollowersChanged              6|131073
+  1371 t150 d   -       EV.GreatPeoplePointsChanged                  6 x9 (..1379 6)
+  1380 t150 d   -       EV.InfluenceChanged                          6
+  1381 t150 d   -       EV.LevyCounterChanged                        6
+  1386 t150 d   -       EV.GovernorChanged                           6|1 x4 (..1389 6|6)
+  1391 t150 d   -       EV.BuildingChanged                           65|33|23|6|65536|66
+  1392 t150 d   -       EV.CityReligionChanged                       6|65536|7
+  1393 t150 d   -       EV.CityReligionFollowersChanged              6|65536
+  1394 t150 d   -       EV.CityPopulationChanged                     6|65536|24
+  1395 t150 d   -       EV.CityTileOwnershipChanged                  6|65536|65|28
+  1396 t150 d   -       EV.CityLoyaltyChanged                        6|65536
+  1398 t150 d   -       EV.DistrictBuildProgressChanged              6|2752550|131073|62|32|11 x2 (..1399 6|2752550|131073|62)
+  1400 t150 d   -       EV.CityLoyaltyChanged                        6|131073
+  1402 t150 d   -       EV.BuildingChanged                           69|32|94|6|196610|66
+  1403 t150 d   -       EV.CityLoyaltyChanged                        6|196610
+  1405 t150 d   -       EV.BuildingChanged                           62|40|28|6|262147|97
+  1406 t150 d   -       EV.CityLoyaltyChanged                        6|262147
+  1408 t150 d   -       EV.BuildingChanged                           62|28|9|6|327684|41
+  1409 t150 d   -       EV.CityLoyaltyChanged                        6|327684 x3 (..1413 6|458758)
+  1432 t150 d   -       EV.ResearchChanged                           6|-1
+  1434 t150 d   -       EV.ImprovementChanged                        60|35|1|6|-1|1
+  1435 t150 d   -       EV.CityFocusChanged                          6|131073
+  1436 t150 d   -       EV.PlayerTurnActivated                       6|true
+  1460 t150 d   -       EV.UnitDamageChanged                         5|5439500|46|0|100
+  1461 t150 d   -       EV.UnitDamageChanged                         6|2949135|23|0|100
+  1503 t150 d   -       EV.RemotePlayerTurnEnd                       6
+  1504 t150 d   -       EV.PlayerTurnDeactivated                     6
+  1505 t150 d   -       EV.RemotePlayerTurnBegin                     7
+  1506 t150 d   -       GE.PlayerTurnStarted                         7
+  1507 t150 d   -       GE.OnFaithEarned                             7|185
+  1508 t150 d   -       GE.BuildingConstructed                       7|65536|69|2535|true x2 (..1509 7|327684|22|2190)
+  1510 t150 d  13       GE.PlayerTurnStartComplete                   7
+  1511 t150 d   -       GE.OnCombatOccurred                          7|3801103|5|4063253
+  1512 t150 d   -       EV.ResearchChanged                           7|68
+  1513 t150 d   -       EV.TreasuryChanged                           7|79.79296875|103.109375
+  1514 t150 d   -       EV.CivicChanged                              7|38
+  1515 t150 d   -       EV.FaithChanged                              7|72.54296875|185.5625
+  1516 t150 d   -       EV.CityReligionChanged                       5|524294|12
+  1517 t150 d   -       EV.CityReligionFollowersChanged              5|524294
+  1518 t150 d   -       EV.GreatPeoplePointsChanged                  7 x6 (..1523 7)
+  1524 t150 d   -       EV.InfluenceChanged                          7
+  1525 t150 d   -       EV.LevyCounterChanged                        7
+  1531 t150 d   -       EV.GovernorChanged                           7|5 x5 (..1535 7|0)
+  1537 t150 d   -       EV.CityTileOwnershipChanged                  7|65536|13|26 x2 (..1538 7|65536|10|26)
+  1539 t150 d   -       EV.DistrictRemovedFromMap                    1|3211310|327684|65|15|13
+  1540 t150 d   -       EV.CityProductionChanged                     1|327684|1|-1|65535
+  1541 t150 d   -       EV.BuildingChanged                           15|30|69|7|65536|100
+  1542 t150 d   -       EV.WonderCompleted                           15|30|69|7|65536|100
+  1543 t150 d   -       EV.CityProductionCompleted                   7|65536|1|69|false|65535
+  1544 t150 d   -       EV.ResearchChanged                           7|45
+  1545 t150 d   -       EV.ResearchCompleted                         7|40|false
+  1546 t150 d   -       EV.ResearchChanged                           8|68
+  1547 t150 d   -       EV.ResearchChanged                           9|68
+  1548 t150 d   -       EV.ResearchChanged                           10|68
+  1549 t150 d   -       EV.ResearchChanged                           11|68
+  1550 t150 d   -       EV.ResearchChanged                           12|68
+  1551 t150 d   -       EV.ResearchChanged                           13|68
+  1552 t150 d   -       EV.ResearchChanged                           14|68
+  1553 t150 d   -       EV.ResearchChanged                           15|68
+  1554 t150 d   -       EV.ResearchChanged                           16|68
+  1555 t150 d   -       EV.ResearchChanged                           17|68
+  1556 t150 d   -       EV.ResearchChanged                           18|68
+  1557 t150 d   -       EV.ResearchChanged                           19|68
+  1558 t150 d   -       EV.ResearchChanged                           62|68
+  1559 t150 d   -       EV.ResearchCompleted                         7|68|false
+  1560 t150 d   -       EV.CityLoyaltyChanged                        7|65536
+  1562 t150 d   -       EV.DistrictBuildProgressChanged              7|2228254|131073|9|27|10 x2 (..1563 7|2228254|131073|9)
+  1564 t150 d   -       EV.CityLoyaltyChanged                        7|131073
+  1566 t150 d   -       EV.BuildingChanged                           15|28|25|7|196610|31
+  1567 t150 d   -       EV.CityLoyaltyChanged                        7|196610
+  1569 t150 d   -       EV.BuildingChanged                           19|27|14|7|262147|95
+  1570 t150 d   -       EV.CityLoyaltyChanged                        7|262147
+  1572 t150 d   -       EV.BuildingChanged                           6|26|22|7|327684|100
+  1573 t150 d   -       EV.CityProductionCompleted                   7|327684|1|22|false|65535
+  1574 t150 d   -       EV.CityLoyaltyChanged                        7|327684
+  1576 t150 d   -       EV.BuildingChanged                           18|34|65|7|393221|22
+  1577 t150 d   -       EV.CityLoyaltyChanged                        7|393221
+  1592 t150 d   -       EV.ResearchChanged                           7|-1
+  1593 t150 d   -       EV.ImprovementChanged                        10|29|1|7|-1|0 x2 (..1594 10|31|1|7)
+  1595 t150 d   -       EV.CityFocusChanged                          7|65536
+  1596 t150 d   -       EV.BuildingAddedToMap                        11|30|18|7|65536|0
+  1597 t150 d   -       EV.CityProductionChanged                     7|65536|1|18|-1
+  1598 t150 d   -       EV.FeatureRemovedFromMap                     6|25
+  1599 t150 d   -       EV.DistrictAddedToMap                        7|2293791|327684|6|25|5
+  1600 t150 d   -       EV.CityProductionChanged                     7|327684|2|5|-1
+  1601 t150 d   -       EV.PlayerTurnActivated                       7|true
+  1623 t150 d   -       EV.UnitDamageChanged                         5|4063253|41|0|100
+  1624 t150 d   -       EV.UnitDamageChanged                         7|3801103|20|0|100
+  1642 t150 d   -       EV.RemotePlayerTurnEnd                       7
+  1652 t150 d   -       EV.PlayerTurnDeactivated                     7
+  1653 t150 d   -       EV.RemotePlayerTurnBegin                     8
+  1654 t150 d   -       GE.PlayerTurnStarted                         8
+  1655 t150 d   -       GE.OnFaithEarned                             8|5529
+  1656 t150 d   3       GE.PlayerTurnStartComplete                   8
+  1657 t150 d   0       EV.ResearchChanged                           8|35
+  1658 t150 d   0       EV.TreasuryChanged                           8|8.1015625|21.203125
+  1659 t150 d   0       EV.CivicChanged                              8|27
+  1660 t150 d   0       EV.FaithChanged                              8|84.90234375|5529.97265625
+  1662 t150 d   0       EV.CityLoyaltyChanged                        8|65536
+  1664 t150 d   0       EV.DiplomacyRelationshipChanged              8|5|-2041297249|true
+  1665 t150 d   0       EV.ResearchChanged                           8|68 x2 (..1666 8|-1)
+  1667 t150 d   0       EV.PlayerTurnActivated                       8|true
+  1668 t150 d   0       EV.RemotePlayerTurnEnd                       8
+  1675 t150 d   0       EV.PlayerTurnDeactivated                     8
+  1676 t150 d   0       EV.RemotePlayerTurnBegin                     9
+  1677 t150 d   0       GE.PlayerTurnStarted                         9
+  1678 t150 d   0       GE.OnFaithEarned                             9|13883
+  1679 t150 d   1       GE.PlayerTurnStartComplete                   9
+  1680 t150 d   -       EV.ResearchChanged                           9|40
+  1681 t150 d   -       EV.TreasuryChanged                           9|12|129.0859375
+  1682 t150 d   -       EV.CivicChanged                              9|14
+  1683 t150 d   -       EV.FaithChanged                              9|291.80078125|13883.7265625
+  1685 t150 d   -       EV.CityLoyaltyChanged                        9|65536
+  1689 t150 d   -       EV.ResearchChanged                           9|-1
+  1690 t150 d   -       EV.PlayerTurnActivated                       9|true
+  1698 t150 d   -       EV.RemotePlayerTurnEnd                       9
+  1704 t150 d   -       EV.PlayerTurnDeactivated                     9
+  1705 t150 d   -       EV.RemotePlayerTurnBegin                     10
+  1706 t150 d   -       GE.PlayerTurnStarted                         10
+  1707 t150 d   -       GE.OnFaithEarned                             10|10412
+  1708 t150 d   -       GE.PlayerTurnStartComplete                   10
+  1709 t150 d   -       EV.ResearchChanged                           10|40
+  1710 t150 d   -       EV.TreasuryChanged                           10|14.40234375|-6.59765625 x2 (..1711 10|14.40234375|0)
+  1712 t150 d   -       EV.CivicChanged                              10|24
+  1713 t150 d   -       EV.FaithChanged                              10|121|10412.25
+  1715 t150 d   -       EV.CityLoyaltyChanged                        10|65536
+  1717 t150 d   -       EV.ResearchChanged                           10|68 x2 (..1718 10|-1)
+  1719 t150 d   -       EV.PlayerTurnActivated                       10|true
+  1722 t150 d   -       EV.RemotePlayerTurnEnd                       10
+  1730 t150 d   -       EV.PlayerTurnDeactivated                     10
+  1731 t150 d   -       EV.RemotePlayerTurnBegin                     11
+  1732 t150 d   -       GE.PlayerTurnStarted                         11
+  1733 t150 d   -       GE.OnFaithEarned                             11|4500
+  1734 t150 d   4       GE.PlayerTurnStartComplete                   11
+  1735 t150 d   -       EV.ResearchChanged                           11|40
+  1736 t150 d   -       EV.TreasuryChanged                           11|12.80078125|411.88671875
+  1737 t150 d   -       EV.CivicChanged                              11|24
+  1738 t150 d   -       EV.FaithChanged                              11|89|4500
+  1740 t150 d   -       EV.CityLoyaltyChanged                        11|65536
+  1745 t150 d   -       EV.ResearchChanged                           11|-1
+  1746 t150 d   -       EV.PlayerTurnActivated                       11|true
+  1752 t150 d   -       EV.RemotePlayerTurnEnd                       11
+  1759 t150 d   -       EV.PlayerTurnDeactivated                     11
+  1760 t150 d   -       EV.RemotePlayerTurnBegin                     12
+  1761 t150 d   -       GE.PlayerTurnStarted                         12
+  1762 t150 d   -       GE.PlayerTurnStartComplete                   12
+  1763 t150 d   6       EV.ResearchChanged                           12|41
+  1764 t150 d   0       EV.ResearchCompleted                         12|68|false
+  1765 t150 d   0       EV.TreasuryChanged                           12|10.80078125|21.984375
+  1766 t150 d   0       EV.CivicChanged                              12|24
+  1782 t150 d   0       EV.PlayerEraChanged                          12|5
+  1784 t150 d   0       EV.CityLoyaltyChanged                        12|65536
+  1789 t150 d   0       EV.ResearchChanged                           12|-1
+  1790 t150 d   0       EV.PlayerTurnActivated                       12|true
+  1798 t150 d   0       EV.RemotePlayerTurnEnd                       12
+  1807 t150 d   0       EV.PlayerTurnDeactivated                     12
+  1808 t150 d   0       EV.RemotePlayerTurnBegin                     13
+  1809 t150 d   0       GE.PlayerTurnStarted                         13
+  1810 t150 d   0       GE.OnFaithEarned                             13|73
+  1811 t150 d   -       GE.PlayerTurnStartComplete                   13
+  1812 t150 d   -       GE.OnCombatOccurred                          -1|-1|5|5373967
+  1813 t150 d   -       EV.ResearchChanged                           13|45
+  1814 t150 d   -       EV.TreasuryChanged                           13|8.40234375|-1.59765625 x2 (..1815 13|8.40234375|0)
+  1816 t150 d   -       EV.CivicChanged                              13|27
+  1817 t150 d   -       EV.FaithChanged                              13|0.80078125|73.82421875
+  1823 t150 d   -       EV.CityLoyaltyChanged                        13|65536
+  1825 t150 d   -       EV.ResearchChanged                           13|68 x2 (..1826 13|-1)
+  1827 t150 d   -       EV.PlayerTurnActivated                       13|true
+  1830 t150 d   -       EV.UnitDamageChanged                         5|5373967|82|57|100
+  1832 t150 d   -       EV.RemotePlayerTurnEnd                       13
+  1833 t150 d   -       EV.PlayerTurnDeactivated                     13
+  1834 t150 d   -       EV.RemotePlayerTurnBegin                     14
+  1835 t150 d   -       GE.PlayerTurnStarted                         14
+  1836 t150 d   4       GE.PlayerTurnStartComplete                   14
+  1837 t150 d   -       EV.ResearchChanged                           14|41
+  1838 t150 d   -       EV.ResearchCompleted                         14|68|false
+  1839 t150 d   -       EV.TreasuryChanged                           14|13.5|17.3125
+  1840 t150 d   -       EV.CivicChanged                              14|27
+  1853 t150 d   -       EV.PlayerEraChanged                          14|5
+  1855 t150 d   -       EV.CityLoyaltyChanged                        14|65536
+  1858 t150 d   -       EV.ResearchChanged                           14|-1
+  1859 t150 d   -       EV.PlayerTurnActivated                       14|true
+  1865 t150 d   -       EV.RemotePlayerTurnEnd                       14
+  1866 t150 d   -       EV.PlayerTurnDeactivated                     14
+  1867 t150 d   -       EV.RemotePlayerTurnBegin                     15
+  1868 t150 d   -       GE.PlayerTurnStarted                         15
+  1869 t150 d   3       GE.PlayerTurnStartComplete                   15
+  1870 t150 d   -       EV.ResearchChanged                           15|41
+  1871 t150 d   -       EV.ResearchCompleted                         15|68|false
+  1872 t150 d   -       EV.TreasuryChanged                           15|15.75|19.12890625
+  1873 t150 d   -       EV.CivicChanged                              15|27
+  1884 t150 d   -       EV.PlayerEraChanged                          15|5
+  1886 t150 d   -       EV.CityLoyaltyChanged                        15|65536
+  1893 t150 d   -       EV.ResearchChanged                           15|-1
+  1894 t150 d   -       EV.UnitRemovedFromMap                        15|2359303 x2 (..1895 15|2293770)
+  1896 t150 d   -       EV.PlayerTurnActivated                       15|true
+  1907 t150 d   -       EV.RemotePlayerTurnEnd                       15
+  1917 t150 d   -       EV.PlayerTurnDeactivated                     15
+  1918 t150 d   -       EV.RemotePlayerTurnBegin                     16
+  1919 t150 d   -       GE.PlayerTurnStarted                         16
+  1920 t150 d   -       GE.OnFaithEarned                             16|1833
+  1921 t150 d   3       GE.PlayerTurnStartComplete                   16
+  1922 t150 d   0       GE.OnCityPopulationChanged                   16|65536|0
+  1923 t150 d   0       GE.UnitCreated                               16|1835014|16|65536
+  1924 t150 d   0       GE.UnitInitialized                           16|1835014|16|65536
+  1925 t150 d   0       EV.ResearchChanged                           16|45
+  1926 t150 d   0       EV.ResearchCompleted                         16|68|false
+  1927 t150 d   0       EV.TreasuryChanged                           16|30|209.84765625
+  1928 t150 d   0       EV.CivicChanged                              16|27
+  1929 t150 d   0       EV.FaithChanged                              16|28.6015625|1833.82421875
+  1947 t150 d   0       EV.PlayerEraChanged                          16|5
+  1949 t150 d   0       EV.BuildingChanged                           57|29|20|16|65536|51
+  1950 t150 d   0       EV.CityLoyaltyChanged                        16|65536
+  1954 t150 d   0       EV.DiplomacyRelationshipChanged              16|2|-2041297249|true
+  1955 t150 d   0       EV.ResearchChanged                           16|-1
+  1956 t150 d   0       EV.CityPopulationChanged                     16|65536|14
+  1957 t150 d   0       EV.TreasuryChanged                           16|30|64.84765625
+  1959 t150 d   0       EV.UnitAddedToMap                            16|1835014|58|30
+  1961 t150 d   0       EV.CityMadePurchase                          16|65536|58|30|366026264|1
+  1962 t150 d   0       EV.PlayerTurnActivated                       16|true
+  1963 t150 d   0       EV.RemotePlayerTurnEnd                       16
+  1978 t150 d   0       EV.PlayerTurnDeactivated                     16
+  1979 t150 d   0       EV.RemotePlayerTurnBegin                     17
+  1980 t150 d   0       GE.PlayerTurnStarted                         17
+  1981 t150 d   0       GE.OnFaithEarned                             17|744
+  1982 t150 d   -       GE.PlayerTurnStartComplete                   17
+  1983 t150 d   -       EV.ResearchChanged                           17|45
+  1984 t150 d   -       EV.TreasuryChanged                           17|14.8515625|12.65234375
+  1985 t150 d   -       EV.CivicChanged                              17|24
+  1986 t150 d   -       EV.FaithChanged                              17|7.203125|744.11328125
+  1990 t150 d   -       EV.CityLoyaltyChanged                        17|65536
+  1995 t150 d   -       EV.ResearchChanged                           17|68 x2 (..1996 17|-1)
+  1997 t150 d   -       EV.PlayerTurnActivated                       17|true
+  2006 t150 d   -       EV.QuestChanged                              17|1
+  2008 t150 d   -       EV.DiplomacyMeet                             17|1
+  2012 t150 d   -       EV.RemotePlayerTurnEnd                       17
+  2018 t150 d   -       EV.PlayerTurnDeactivated                     17
+  2019 t150 d   -       EV.RemotePlayerTurnBegin                     18
+  2020 t150 d   -       GE.PlayerTurnStarted                         18
+  2021 t150 d   -       GE.PlayerTurnStartComplete                   18
+  2022 t150 d   -       EV.ResearchChanged                           18|45
+  2023 t150 d   -       EV.TreasuryChanged                           18|11.703125|18.125
+  2024 t150 d   -       EV.CivicChanged                              18|21
+  2026 t150 d   -       EV.CityLoyaltyChanged                        18|65536
+  2030 t150 d   -       EV.ResearchChanged                           18|68 x2 (..2031 18|-1)
+  2032 t150 d   -       EV.PlayerTurnActivated                       18|true
+  2040 t150 d   -       EV.RemotePlayerTurnEnd                       18
+  2046 t150 d   -       EV.PlayerTurnDeactivated                     18
+  2047 t150 d   -       EV.RemotePlayerTurnBegin                     19
+  2048 t150 d   -       GE.PlayerTurnStarted                         19
+  2049 t150 d   -       GE.PlayerTurnStartComplete                   19
+  2050 t150 d   -       EV.ResearchChanged                           19|45
+  2051 t150 d   -       EV.TreasuryChanged                           19|12|334.3203125
+  2052 t150 d   -       EV.CivicChanged                              19|21
+  2058 t150 d   -       EV.BuildingChanged                           70|17|22|19|65536|20
+  2059 t150 d   -       EV.CityLoyaltyChanged                        19|65536
+  2061 t150 d   -       EV.ResearchChanged                           19|68 x2 (..2062 19|-1)
+  2063 t150 d   -       EV.PlayerTurnActivated                       19|true
+  2069 t150 d   -       EV.RemotePlayerTurnEnd                       19
+  2070 t150 d   -       EV.PlayerTurnDeactivated                     19
+  2071 t150 d   -       EV.RemotePlayerTurnBegin                     62
+  2072 t150 d   -       GE.PlayerTurnStarted                         62
+  2073 t150 d   -       GE.PlayerTurnStartComplete                   62
+  2074 t150 d   -       EV.ResearchChanged                           62|34
+  2075 t150 d   -       EV.ResearchCompleted                         62|22|false
+  2076 t150 d   -       EV.CivicChanged                              62|17
+  2077 t150 d   -       EV.ResearchChanged                           62|-1
+  2078 t150 d   -       EV.PlayerTurnActivated                       62|true
+  2080 t150 d   -       EV.RemotePlayerTurnEnd                       62
+  2081 t150 d   -       EV.PlayerTurnDeactivated                     62
+  2082 t150 d   -       EV.RemotePlayerTurnBegin                     63
+  2083 t150 d   -       GE.PlayerTurnStarted                         63
+  2084 t150 d   -       GE.PlayerTurnStartComplete                   63
+  2085 t150 d  17       GE.UnitCreated                               63|19136593
+  2086 t150 d   0       GE.UnitInitialized                           63|19136593
+  2087 t150 d   0       GE.UnitCreated                               63|19202059
+  2088 t150 d   0       GE.UnitInitialized                           63|19202059
+  2089 t150 d   0       GE.UnitCreated                               63|19267653
+  2090 t150 d   0       GE.UnitInitialized                           63|19267653
+  2091 t150 d   0       GE.OnPillage                                 63|18088011|-1|-1|35|804
+  2092 t150 d  10       GE.OnGameTurnEnded                           150
+  2113 t150 d   0       EV.ResearchChanged                           63|41
+  2115 t150 d   0       EV.UnitAddedToMap                            63|19136593|53|32
+  2117 t150 d   0       EV.ResearchChanged                           63|-1
+  2118 t150 d   0       EV.PlayerTurnActivated                       63|true
+  2119 t150 d   0       EV.UnitChargesChanged                        1|5373972|0|1
+  2120 t150 d   0       EV.UnitRemovedFromMap                        1|5373972
+  2122 t150 d   0       EV.UnitAddedToMap                            63|19202059|51|10
+  2124 t150 d   0       EV.UnitChargesChanged                        63|19202059|1|3
+  2125 t150 d   0       EV.UnitCaptured                              1|5373972|1|63
+  2131 t150 d   0       EV.UnitChargesChanged                        1|6029329|0|1
+  2132 t150 d   0       EV.UnitRemovedFromMap                        1|6029329
+  2134 t150 d   0       EV.UnitAddedToMap                            63|19267653|53|8
+  2136 t150 d   0       EV.UnitChargesChanged                        63|19267653|1|3
+  2137 t150 d   0       EV.UnitCaptured                              1|6029329|1|63
+  2141 t150 d   0       EV.DistrictBuildProgressChanged              1|2949162|458758|48|9|35
+  2142 t150 d   0       EV.DistrictPillaged                          1|2949162|458758|48|9|35
+  2192 t150 d   0       EV.RemotePlayerTurnEnd                       63
+  2193 t150 d   0       EV.PlayerTurnDeactivated                     63
+  2194 t150 d   0       EV.PhaseBegin                                2
+  2195 t150 d   0       EV.FavorChanged                              1|-4|2
+  2196 t150 d   0       EV.FavorChanged                              3|-264|2
+  2197 t150 d   0       EV.FavorChanged                              5|-4|2
+  2198 t150 d   0       EV.FavorChanged                              6|-84|2
+  2199 t150 d   0       EV.FavorChanged                              7|-24|2
+  2200 t150 d   0       EV.FavorChanged                              0|0|9
+  2201 t150 d   0       EV.FavorChanged                              2|0|9
+  2202 t150 d   0       EV.FavorChanged                              4|0|9
+  2203 t150 d   0       EV.FavorChanged                              6|84|9
+  2204 t150 d   0       EV.UnitDamageChanged                         5|5046291|56|71|100
+  2205 t150 d   0       EV.UnitDamageChanged                         17|2621448|35|45|100
+  2206 t150 d   0       EV.TurnEnd                                   150
+  2759 t151 d   -       GE.OnGameTurnStarted                         151
+  2760 t151 d   -       EV.PreTurnBegin                              151
+  2761 t151 d   -       EV.RandomEventOccurred                       3|1|56|18|1|-1
+  2764 t151 d   -       EV.PlayerDarkAgeChanged                      0
+  2765 t151 d   -       EV.PlayerAgeChanged                          0 x2 (..2766 0)
+  2767 t151 d   -       EV.PlayerAgeChanged                          1 x2 (..2768 1)
+  2769 t151 d   -       EV.PlayerAgeChanged                          2
+  2770 t151 d   -       EV.PlayerAgeChanged                          3
+  2771 t151 d   -       EV.PlayerDarkAgeChanged                      4
+  2772 t151 d   -       EV.PlayerAgeChanged                          4 x2 (..2773 4)
+  2774 t151 d   -       EV.PlayerAgeChanged                          5
+  2775 t151 d   -       EV.PlayerAgeChanged                          6
+  2776 t151 d   -       EV.PlayerDarkAgeChanged                      7
+  2777 t151 d   -       EV.PlayerAgeChanged                          7 x2 (..2778 7)
+  2779 t151 d   -       EV.QuestChanged                              8|0 x5 (..2784 8|7)
+  2785 t151 d   -       EV.QuestChanged                              9|4 x3 (..2787 9|7)
+  2788 t151 d   -       EV.QuestChanged                              10|0 x3 (..2791 10|7)
+  2792 t151 d   -       EV.QuestChanged                              11|7
+  2793 t151 d   -       EV.QuestChanged                              12|7
+  2794 t151 d   -       EV.QuestChanged                              13|7
+  2795 t151 d   -       EV.QuestChanged                              14|0 x2 (..2797 14|5)
+  2798 t151 d   -       EV.QuestChanged                              16|1 x3 (..2800 16|6)
+  2801 t151 d   -       EV.QuestChanged                              17|0 x5 (..2806 17|7)
+  2807 t151 d   -       EV.QuestChanged                              18|4 x3 (..2809 18|7)
+  2810 t151 d   -       EV.QuestChanged                              19|0 x3 (..2813 19|2)
+  2814 t151 d   -       EV.GameEraChanged                            4|5
+  2816 t151 d   -       EV.FavorChanged                              0|0|-1
+  2817 t151 d   -       EV.FavorChanged                              1|2|-1
+  2818 t151 d   -       EV.FavorChanged                              2|3|-1
+  2819 t151 d   -       EV.FavorChanged                              3|21|-1
+  2820 t151 d   -       EV.FavorChanged                              4|8|-1
+  2821 t151 d   -       EV.FavorChanged                              5|4|-1
+  2822 t151 d   -       EV.FavorChanged                              6|12|-1
+  2823 t151 d   -       EV.FavorChanged                              7|7|-1
+  2824 t151 d   -       EV.TurnBegin                                 151
+  2825 t151 d   -       EV.PhaseBegin                                0
+  2826 t151 d   -       EV.WorldCongressFinished                     
+  2828 t151 d   -       EV.LocalPlayerTurnBegin                      
+  2829 t151 d   -       MARK                                         after_advance_0

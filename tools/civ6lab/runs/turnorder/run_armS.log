@@ -1,0 +1,14 @@
+GC ['already armed ok=321 bad=35']
+IG ['already armed ok=143 bad=35']
+SN ['already armed']
+snap before tools/civ6lab/turnorder_city_ig.lua: 3 lines
+snap before tools/civ6lab/turnorder_worked.lua: 2 lines
+    unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+advanced to 153
+GC: 1638 events
+IG: 1528 events
+SN: 96 events
+snap after tools/civ6lab/turnorder_city_ig.lua: 3 lines
+snap after tools/civ6lab/turnorder_worked.lua: 2 lines
+wrote C:\civ6-development-calculator\tools\civ6lab\runs\turnorder\armS_settler_growth_20260927T055302Z.jsonl

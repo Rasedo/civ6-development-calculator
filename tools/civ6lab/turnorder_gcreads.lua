@@ -1,0 +1,60 @@
+-- GameCore_Tuner: which per-city / per-player reads answer in GameCore, on
+-- player ZP's first city. Every read prints its value or err:<msg>.
+local P = Players[ZP]
+local function tri(label, f)
+  local ok, v = pcall(f)
+  print(label .. " = " .. (ok and tostring(v) or ("err:" .. tostring(v))))
+end
+local city = nil
+for _, c in P:GetCities():Members() do city = c break end
+tri("gold", function() return P:GetTreasury():GetGoldBalance() end)
+tri("goldYield", function() return P:GetTreasury():GetGoldYield() end)
+tri("maint", function() return P:GetTreasury():GetTotalMaintenance() end)
+tri("faith", function() return P:GetReligion():GetFaithBalance() end)
+tri("faithYield", function() return P:GetReligion():GetFaithYield() end)
+tri("researching", function() return P:GetTechs():GetResearchingTech() end)
+tri("researchProg", function() local t = P:GetTechs(); return t:GetResearchProgress(t:GetResearchingTech()) end)
+tri("scienceYield", function() return P:GetTechs():GetScienceYield() end)
+tri("civic", function() return P:GetCulture():GetProgressingCivic() end)
+tri("civicProg", function() local c = P:GetCulture(); return c:GetCulturalProgress(c:GetProgressingCivic()) end)
+tri("cultureYield", function() return P:GetCulture():GetCultureYield() end)
+tri("favor", function() return P:GetFavor() end)
+tri("era", function() return P:GetEra() end)
+tri("eraScore", function() return Game.GetEras():GetPlayerCurrentScore(ZP) end)
+tri("gpp", function() return P:GetGreatPeoplePoints():GetPointsTotal(0) end)
+tri("envoys", function() return P:GetInfluence():GetTokensToGive() end)
+tri("influencePts", function() return P:GetInfluence():GetPointsEarned() end)
+if city == nil then print("nocity") return end
+tri("city.id", function() return city:GetID() end)
+tri("pop", function() return city:GetPopulation() end)
+tri("growth", function() return city:GetGrowth() end)
+tri("food", function() return city:GetGrowth():GetFood() end)
+tri("foodSurplus", function() return city:GetGrowth():GetFoodSurplus() end)
+tri("growthThreshold", function() return city:GetGrowth():GetGrowthThreshold() end)
+tri("housing", function() return city:GetGrowth():GetHousing() end)
+tri("amen", function() return city:GetGrowth():GetAmenities() end)
+tri("yieldFood", function() return city:GetYield(0) end)
+tri("yieldProd", function() return city:GetYield(1) end)
+tri("yieldGold", function() return city:GetYield(2) end)
+tri("bq", function() return city:GetBuildQueue() end)
+tri("bq.cur", function() return city:GetBuildQueue():CurrentlyBuilding() end)
+tri("bq.curHash", function() return city:GetBuildQueue():GetCurrentProductionTypeHash() end)
+tri("bq.progress", function() return city:GetBuildQueue():GetProgress() end)
+tri("bq.prodYield", function() return city:GetBuildQueue():GetProductionYield() end)
+tri("bq.turnsLeft", function() return city:GetBuildQueue():GetTurnsLeft() end)
+tri("bq.overflow", function() return city:GetBuildQueue():GetOverflow() end)
+tri("culture", function() return city:GetCulture() end)
+tri("culture.cur", function() return city:GetCulture():GetCurrentCulture() end)
+tri("culture.next", function() return city:GetCulture():GetNextPlotCultureCost() end)
+tri("culture.turns", function() return city:GetCulture():GetTurnsUntilExpansion() end)
+tri("loyaltyGC", function() return city:GetCulturalIdentity():GetLoyalty() end)
+tri("damage", function() return city:GetDamage(0) end)
+tri("religion.major", function() return city:GetReligion():GetMajorityReligion() end)
+tri("religion.list", function() local r = city:GetReligion():GetReligionsInCity(); return #r end)
+tri("buildings", function() return city:GetBuildings() end)
+local u = nil
+for _, x in P:GetUnits():Members() do u = x break end
+if u ~= nil then
+  tri("unit.damage", function() return u:GetDamage() end)
+  tri("unit.moves", function() return u:GetMovesRemaining() end)
+end
