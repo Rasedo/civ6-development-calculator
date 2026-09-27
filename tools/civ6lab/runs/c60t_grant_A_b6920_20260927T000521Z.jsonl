@@ -1,0 +1,14 @@
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "block", "x": 69, "y": 20, "made": "UNIT_MODERN_ARMOR:4718607", "units": 1}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "city", "turn": 250, "owner": 62}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "city", "turn": 251, "owner": 62}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "city", "turn": 252, "owner": 62}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "p62", "turn": 252, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 19, "idx": 1664, "dist": 2}
+{"tag": "A_b6920", "kind": "p62", "block": "69:20", "burn": 0, "turn": 252, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 19, "idx": 1664, "dist": 2}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "p62", "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 20, "idx": 1748, "dist": 2}
+{"tag": "A_b6920", "kind": "p62", "block": "69:20", "burn": 0, "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 20, "idx": 1748, "dist": 2}

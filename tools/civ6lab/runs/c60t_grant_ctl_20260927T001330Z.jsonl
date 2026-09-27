@@ -1,0 +1,35 @@
+{"tag": "ctl", "block": "", "burn": 0, "kind": "events", "text": "armed add=true move=true"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "city", "turn": 250, "owner": 62}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 250, "x": 68, "y": 20, "idx": 1748, "units": "2:UNIT_INFANTRY"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 250, "x": 69, "y": 22, "idx": 1917, "units": "6:UNIT_NUCLEAR_SUBMARINE"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 250, "x": 70, "y": 18, "idx": 1582, "units": "2:UNIT_INFANTRY"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 250, "x": 71, "y": 18, "idx": 1583, "units": "2:UNIT_GREAT_ADMIRAL"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "city", "turn": 251, "owner": 62}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 251, "x": 69, "y": 22, "idx": 1917, "units": "6:UNIT_NUCLEAR_SUBMARINE"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 251, "x": 69, "y": 24, "idx": 2085, "units": "2:UNIT_LINE_INFANTRY"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 251, "x": 70, "y": 24, "idx": 2086, "units": "1:UNIT_MISSILE_CRUISER"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 251, "x": 71, "y": 18, "idx": 1583, "units": "2:UNIT_FRIGATE"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 251, "x": 71, "y": 22, "idx": 1919, "units": "2:UNIT_INFANTRY"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 251, "x": 71, "y": 24, "idx": 2087, "units": "1:UNIT_MISSILE_CRUISER"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "event", "turn": 251, "event": "add", "id": 2752517, "x": 69, "y": 21}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "event", "turn": 251, "event": "add", "id": 2818052, "x": 69, "y": 20}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "event", "turn": 251, "event": "move", "id": 2752517, "x": 68, "y": 21}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "event", "turn": 251, "event": "move", "id": 2752517, "x": 68, "y": 20}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "city", "turn": 252, "owner": 62}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "p62", "turn": 252, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 69, "y": 20, "idx": 1749, "dist": 1}
+{"tag": "ctl", "kind": "p62", "block": "", "burn": 0, "turn": 252, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 69, "y": 20, "idx": 1749, "dist": 1}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "p62", "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 20, "idx": 1748, "dist": 2}
+{"tag": "ctl", "kind": "p62", "block": "", "burn": 0, "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 20, "idx": 1748, "dist": 2}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 252, "x": 67, "y": 20, "idx": 1747, "units": "2:UNIT_LINE_INFANTRY"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 252, "x": 68, "y": 20, "idx": 1748, "units": "62:UNIT_AT_CREW"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 252, "x": 69, "y": 20, "idx": 1749, "units": "62:UNIT_LINE_INFANTRY"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 252, "x": 69, "y": 22, "idx": 1917, "units": "6:UNIT_NUCLEAR_SUBMARINE"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 252, "x": 70, "y": 24, "idx": 2086, "units": "1:UNIT_MISSILE_CRUISER"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 252, "x": 71, "y": 18, "idx": 1583, "units": "2:UNIT_FRIGATE"}
+{"tag": "ctl", "block": "", "burn": 0, "kind": "occ", "turn": 252, "x": 71, "y": 24, "idx": 2087, "units": "1:UNIT_MISSILE_CRUISER"}

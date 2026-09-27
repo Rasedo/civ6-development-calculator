@@ -1,0 +1,21 @@
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "block", "x": 69, "y": 20, "made": "UNIT_MODERN_ARMOR:4718607", "units": 1}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "block", "x": 68, "y": 19, "made": "UNIT_MODERN_ARMOR:4784142", "units": 1}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "block", "x": 69, "y": 19, "made": "UNIT_MODERN_ARMOR:4849682", "units": 1}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "block", "x": 68, "y": 20, "made": "UNIT_MODERN_ARMOR:4915209", "units": 2}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "block", "x": 67, "y": 19, "made": "UNIT_MODERN_ARMOR:4980747", "units": 1}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "block", "x": 67, "y": 20, "made": "UNIT_MODERN_ARMOR:5046277", "units": 1}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "city", "turn": 250, "owner": 62}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "city", "turn": 251, "owner": 62}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "blockgone", "x": 67, "y": 20}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "city", "turn": 252, "owner": 62}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "p62", "turn": 252, "id": 2818052, "type": "UNIT_CAVALRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 67, "y": 20, "idx": 1747, "dist": 3}
+{"tag": "B_r2_6719_6720", "kind": "p62", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "turn": 252, "id": 2818052, "type": "UNIT_CAVALRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 67, "y": 20, "idx": 1747, "dist": 3}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "p62", "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 69, "y": 21, "idx": 1833, "dist": 0}
+{"tag": "B_r2_6719_6720", "kind": "p62", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 69, "y": 21, "idx": 1833, "dist": 0}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "blockgone", "x": 68, "y": 20}
+{"tag": "B_r2_6719_6720", "block": "69:20;68:19;69:19;68:20;67:19;67:20", "burn": 0, "kind": "blockgone", "x": 67, "y": 20}

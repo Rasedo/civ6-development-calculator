@@ -1,0 +1,4 @@
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "block", "x": 69, "y": 20, "made": "UNIT_MODERN_ARMOR:4718607", "units": 1}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "city", "turn": 250, "owner": 62}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"tag": "A_b6920", "block": "69:20", "burn": 0, "kind": "log", "text": "    cause endgame {\"why\": \"victory\", \"winner\": 1, \"alive\": true, \"menu\": false, \"more\": false}: the game is over"}

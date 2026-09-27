@@ -1,0 +1,48 @@
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "block", "x": 69, "y": 20, "made": "UNIT_MODERN_ARMOR:4718607", "units": 1}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "block", "x": 68, "y": 19, "made": "UNIT_MODERN_ARMOR:4784142", "units": 1}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "block", "x": 69, "y": 19, "made": "UNIT_MODERN_ARMOR:4849682", "units": 1}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "block", "x": 68, "y": 20, "made": "UNIT_MODERN_ARMOR:4915209", "units": 2}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "city", "turn": 250, "owner": 62}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 250, "x": 68, "y": 19, "idx": 1664, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 250, "x": 68, "y": 20, "idx": 1748, "units": "2:UNIT_INFANTRY,0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 250, "x": 69, "y": 19, "idx": 1665, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 250, "x": 69, "y": 20, "idx": 1749, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 250, "x": 69, "y": 22, "idx": 1917, "units": "6:UNIT_NUCLEAR_SUBMARINE"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 250, "x": 70, "y": 18, "idx": 1582, "units": "2:UNIT_INFANTRY"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 250, "x": 71, "y": 18, "idx": 1583, "units": "2:UNIT_GREAT_ADMIRAL"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "city", "turn": 251, "owner": 62}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 68, "y": 19, "idx": 1664, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 68, "y": 20, "idx": 1748, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 69, "y": 19, "idx": 1665, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 69, "y": 20, "idx": 1749, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 69, "y": 24, "idx": 2085, "units": "2:UNIT_LINE_INFANTRY"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 70, "y": 24, "idx": 2086, "units": "1:UNIT_MISSILE_CRUISER"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 71, "y": 18, "idx": 1583, "units": "2:UNIT_FRIGATE"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 71, "y": 22, "idx": 1919, "units": "2:UNIT_INFANTRY"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 251, "x": 71, "y": 24, "idx": 2087, "units": "1:UNIT_MISSILE_CRUISER"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "block", "x": 69, "y": 20, "made": "held", "units": 1}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "block", "x": 68, "y": 19, "made": "held", "units": 1}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "block", "x": 69, "y": 19, "made": "held", "units": 1}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "block", "x": 68, "y": 20, "made": "held", "units": 1}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "city", "turn": 252, "owner": 62}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "p62", "turn": 252, "id": 2818052, "type": "UNIT_CAVALRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 67, "y": 19, "idx": 1663, "dist": 3}
+{"tag": "C_r2", "kind": "p62", "block": "69:20;68:19;69:19;68:20", "burn": 0, "turn": 252, "id": 2818052, "type": "UNIT_CAVALRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 67, "y": 19, "idx": 1663, "dist": 3}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "p62", "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 21, "idx": 1832, "dist": 1}
+{"tag": "C_r2", "kind": "p62", "block": "69:20;68:19;69:19;68:20", "burn": 0, "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 21, "idx": 1832, "dist": 1}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 67, "y": 19, "idx": 1663, "units": "62:UNIT_CAVALRY"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 67, "y": 20, "idx": 1747, "units": "2:UNIT_INFANTRY"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 67, "y": 21, "idx": 1831, "units": "2:UNIT_LINE_INFANTRY"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 68, "y": 19, "idx": 1664, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 68, "y": 21, "idx": 1832, "units": "62:UNIT_AT_CREW"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 68, "y": 24, "idx": 2084, "units": "6:UNIT_NUCLEAR_SUBMARINE"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 69, "y": 19, "idx": 1665, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 69, "y": 20, "idx": 1749, "units": "0:UNIT_MODERN_ARMOR"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 70, "y": 24, "idx": 2086, "units": "1:UNIT_MISSILE_CRUISER"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 71, "y": 18, "idx": 1583, "units": "2:UNIT_FRIGATE"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "occ", "turn": 252, "x": 71, "y": 24, "idx": 2087, "units": "1:UNIT_MISSILE_CRUISER"}
+{"tag": "C_r2", "block": "69:20;68:19;69:19;68:20", "burn": 0, "kind": "blockgone", "x": 68, "y": 20}

@@ -1,0 +1,11 @@
+LOC_CITY_NAME_OTTAWA DISTRICT_CITY_CENTER base=75 def=91 | +3 от стен ; +10 от районов ; +3 от охраны дворца
+LOC_CITY_NAME_OTTAWA DISTRICT_ENCAMPMENT base=75 def=91 | +3 от стен ; +10 от районов ; +3 от охраны дворца
+LOC_CITY_NAME_MONTREAL DISTRICT_CITY_CENTER base=75 def=94 | +9 от стен ; +10 от районов
+LOC_CITY_NAME_TORONTO DISTRICT_CITY_CENTER base=75 def=90 | +9 от стен ; +6 от районов
+LOC_CITY_NAME_QUEBEC_CITY DISTRICT_CITY_CENTER base=75 def=92 | +9 от стен ; +8 от районов
+LOC_CITY_NAME_QUEBEC_CITY DISTRICT_ENCAMPMENT base=75 def=92 | +9 от стен ; +8 от районов
+LOC_CITY_NAME_HALIFAX DISTRICT_CITY_CENTER base=75 def=88 | +9 от стен ; +4 от районов
+LOC_CITY_NAME_HALIFAX DISTRICT_ENCAMPMENT base=75 def=88 | +9 от стен ; +4 от районов
+LOC_CITY_NAME_SAINT_JOHN DISTRICT_CITY_CENTER base=75 def=77 | +2 от районов
+LOC_CITY_NAME_VICTORIA DISTRICT_CITY_CENTER base=75 def=78 | +3 от стен
+LOC_CITY_NAME_WINNIPEG DISTRICT_CITY_CENTER base=75 def=75 | 
