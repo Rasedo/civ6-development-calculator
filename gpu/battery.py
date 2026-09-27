@@ -707,6 +707,8 @@ def _main() -> int:
                 ("civ_pair_strike", [py, "tests/gpu/civ_pair_strike_test.py"], 2),  # a civ city fires on an enemy civ
                 ("spawn_reclaim", [py, "tests/gpu/spawn_reclaim_test.py"], 2),  # a reclaimed slot hands on no drowned unit's MP
                 ("centre_defence", [py, "tests/gpu/centre_defence_test.py"], 2),  # a centre is attacked as the CITY
+                ("centre_strength", [py, "tests/gpu/centre_strength_test.py"], 2),  # a centre's base, garrison and holder terms
+                ("religious_target", [py, "tests/gpu/religious_target_test.py"], 2),  # no shot at a civilian or a lone Support unit
                 ("stack_rules", [py, "tests/gpu/stack_rules_test.py"], 2),  # cross-domain stacking + Encampment spawn wall
                 ("golden_move", [py, "tests/gpu/golden_move_test.py"], 2),  # MONUMENTALITY / EXODUS +2 MP, per seat
                 ("bankruptcy", [py, "tests/gpu/bankruptcy_test.py"], 4),
