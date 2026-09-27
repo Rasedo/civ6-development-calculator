@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { seatOf } from '../../../cpu/core/seats';
-import { applySeatActionRecord } from '../../../cpu/core/phase';
+import { applySeatPolicies } from '../../../cpu/core/phase';
 import { computeAdoption, unlockedPolicyIds, fitPolicies, fitPoliciesLoose, governmentSlots, inDarkAge, wonderExtraSlots, slottedPolicyIndices } from '../../../cpu/core/effects';
 import { congressPolicyBlocked } from '../../../cpu/core/congress';
 import { POLICY_LIST, POLICIES } from '../../../cpu/data/policies';
@@ -13,7 +13,7 @@ import type { GameState, SeatActionRecord } from '../../../cpu/core/types';
  * Which cards a seat slots is a DRIVER decision on the wire: `unlockedPolicyIds`
  * is the one gate the greedy reference, the record's validator and the effects
  * share, `fitPolicies` lays a set into the slots or refuses it whole,
- * `applySeatActionRecord` stores an accepted set in `government.policies`, the
+ * `applySeatPolicies` stores an accepted set in `government.policies`, the
  * effects (`applyGovernment`), the congress voter, the Policy Treaty and the
  * boost detector read the STORE through `slottedPolicyIndices`, and a changed
  * government keeps what still fits (`fitPoliciesLoose`).
@@ -64,15 +64,15 @@ describe('the slotted-card store', () => {
     const { state, open, greedy } = scene();
     const s = seatOf(state, 0)!;
     s.government.policies = [];
-    applySeatActionRecord(state, s, REC(greedy.map((id) => IDX.get(id)!)));
+    applySeatPolicies(state, s, REC(greedy.map((id) => IDX.get(id)!)));
     expect(s.government.policies.filter((p) => p !== null).sort()).toEqual([...greedy].sort());
     const locked = POLICY_LIST.findIndex((p) => !open.has(p.id));
     expect(locked).toBeGreaterThanOrEqual(0);
     const before = [...s.government.policies];
-    applySeatActionRecord(state, s, REC([...greedy.map((id) => IDX.get(id)!), locked]));
+    applySeatPolicies(state, s, REC([...greedy.map((id) => IDX.get(id)!), locked]));
     expect(s.government.policies).toEqual(before);
     // and no decision at all touches nothing
-    applySeatActionRecord(state, s, REC());
+    applySeatPolicies(state, s, REC());
     expect(s.government.policies).toEqual(before);
   });
 

@@ -213,18 +213,17 @@ describe('the war kinds', () => {
       return state;
     };
     // seat 1's two cities (6 and ~7 tiles from seat 2's capital) press it at
-    // 4 (the Holy City) + 1 per turn; seat 0's stand 12 tiles away and press nothing
+    // 4 (the Holy City) + 1 on seat 1's turn
     const plain = build();
-    spreadReligiousPressure(plain);
+    spreadReligiousPressure(plain, 1);
     const p0 = plain.seats[2].cities[0].religionPressure!;
     expect(p0[1]).toBe(5);
-    expect(p0[0]).toBe(0);
 
     const allied = build();
     setAllianceTypeWith(allied, 0, 1, ALLIANCE_RELIGIOUS);
     setAllyTurnsWith(allied, 0, 1, AGREEMENT_TURNS);
     setAlliancePtsWith(allied, 0, 1, ALLIANCE_L3_QP);
-    spreadReligiousPressure(allied);
+    spreadReligiousPressure(allied, 1);
     const p1 = allied.seats[2].cities[0].religionPressure!;
     expect(p1[1]).toBe(Math.floor((5 * (100 + ALLIANCE_REL3_PRESSURE_PCT)) / 100));
 
@@ -234,7 +233,7 @@ describe('the war kinds', () => {
     setAllyTurnsWith(seeded, 0, 1, AGREEMENT_TURNS);
     setAlliancePtsWith(seeded, 0, 1, ALLIANCE_L3_QP);
     seeded.seats[2].cities[0].religionPressure = [1, 0, 0];
-    spreadReligiousPressure(seeded);
+    spreadReligiousPressure(seeded, 1);
     expect(seeded.seats[2].cities[0].religionPressure![1]).toBe(5);
   });
 });

@@ -251,10 +251,10 @@ describe('the things a deal can name', () => {
     const state = table();
     holdSpy(state, 1, 2, 0);
     expect(spiesOf(state, 1)).toHaveLength(0);
-    play(state, {
-      2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] },
-      1: { accept: [2] },
-    });
+    // seat 2 puts the offer down in its own actions, after seat 1's have run:
+    // seat 1 answers the standing offer on the next turn
+    play(state, { 2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] } });
+    play(state, { 1: { accept: [2] } });
     expect(spyHeldWith(state, 1, 2)).toBe(0);
     const freed = spiesOf(state, 1);
     expect(freed).toHaveLength(1);
@@ -273,17 +273,14 @@ describe('the things a deal can name', () => {
     holdSpy(state, 1, 2, 1);
     holdSpy(state, 1, 2, 3);
     expect(spyHeldWith(state, 1, 2)).toBe(2);
-    play(state, {
-      2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] },
-      1: { accept: [2] },
-    });
+    // seat 2 offers in its own actions; seat 1 answers the next turn
+    play(state, { 2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] } });
+    play(state, { 1: { accept: [2] } });
     expect(spiesOf(state, 1).map((u) => u.spyLevel)).toEqual([3]);
     expect([...spyLevelsHeld(state, 1, 2)]).toEqual([1]);
     for (const s of state.seats) s.treasury = 1000;
-    play(state, {
-      2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] },
-      1: { accept: [2] },
-    });
+    play(state, { 2: { offer: [1, [[DEAL_SPY, 0, 0]], [[DEAL_GOLD, 100, 0]]] } });
+    play(state, { 1: { accept: [2] } });
     expect(spiesOf(state, 1).map((u) => u.spyLevel).sort()).toEqual([1, 3]);
     expect(spyHeldWith(state, 1, 2)).toBe(0);
   });
@@ -366,7 +363,10 @@ describe('the table that ends a war', () => {
   it('...but not before the war has run its minimum', () => {
     const state = table();
     setWar(state, 1, 2, true);
-    setWarTurnsWith(state, 1, 2, WAR_MIN_TURNS - 1);
+    // the pair's war clock ticks at its lower seat's tail, before seat 2
+    // answers in its own actions: two short of the minimum is one short at
+    // the answer
+    setWarTurnsWith(state, 1, 2, WAR_MIN_TURNS - 2);
     play(state, {
       1: { offer: [2, [[DEAL_GOLD, 200, 0]], []] },
       2: { accept: [1] },

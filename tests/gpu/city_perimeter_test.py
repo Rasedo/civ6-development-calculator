@@ -392,7 +392,7 @@ def test_encirclement(rules, path) -> None:
         s.unit_next[0] = nxt + len(hostiles)
         s.war[0, 0, 1] = s.war[0, 1, 0] = True
         s.sync_war()
-        s._seat_city_fire_and_heal(0, L(s, 0), torch.tensor([True], device=s.device))
+        s._heal_cities()
         return int(s.city_hp[0, 0, 0]), int(s.city_outer_hp[0, 0, 0])
 
     hp_free, outer_free = one_turn([])

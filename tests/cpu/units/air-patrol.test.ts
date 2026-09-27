@@ -13,7 +13,7 @@ import { emptySeat, seatOf, setAllianceTypeWith, setAllyTurnsWith, setTileOwner,
 import { ALLIANCE_M1_CS, ALLIANCE_MILITARY } from '../../../cpu/data/seats';
 import { RESOURCES } from '../../../world/resources';
 import {
-  INTERCEPT_RANGE, INTERCEPT_SUPPORT_CS, PRIORITY_TARGET_DAMAGE, canDeployTo, deployAir, deployRange, deployTargets,
+  INTERCEPT_RANGE, INTERCEPT_SUPPORT_CS, PRIORITY_TARGET_DAMAGE, XP_INTERCEPT, canDeployTo, deployAir, deployRange, deployTargets,
   airStrikeTargets, interceptorAgainst, priorityDefender, priorityTargets, rebaseAir, returnToBase,
 } from '../../../cpu/core/air';
 import { airPillage, airStrike, damageRoll } from '../../../cpu/core/combat';
@@ -210,25 +210,33 @@ describe('the interception', () => {
     expect(interceptorAgainst(state, striker, target.index)!.support).toBe(7.5);
   });
 
-  it('the interception is a two-sided fight at Combat: the interceptor draws first', () => {
-    /** a bomber strikes a ship under `n` patrols; the damage both sides take */
+  /** a bomber at `hp` strikes a ship under `n` patrols */
+  function shipStrike(n: number, hp = 100) {
+    const s = airState();
+    const b = spawnUnit(s.state, BOMBER, s.pad.index, 0)!;
+    b.hp = hp;
+    const water = tileAtCoords(s.state.map, 8, 12);
+    water.terrain = 'COAST';
+    const ship = spawnUnit(s.state, 'IRONCLAD', water.index, 1)!;
+    ship.tileIndex = water.index;
+    const pats = Array.from({ length: n }, () => patrolOf(s.state, FIGHTER, ship.tileIndex));
+    const r0 = s.state.rngState;
+    expect(airStrike(s.state, b.id, ship.tileIndex, 0).ok).toBe(true);
+    return { ...s, b, ship, pats, r0 };
+  }
+
+  it('the interception is a two-sided fight at Combat: the plane draws first', () => {
+    // runs/c34w_strike_*: the bomber's damage on the first draw, the
+    // interceptor's on the second (12 of 12)
     function fight(n: number): { toBomber: number; toFighter: number } {
-      const s = airState();
-      const b = spawnUnit(s.state, BOMBER, s.pad.index, 0)!;
-      const water = tileAtCoords(s.state.map, 8, 12);
-      water.terrain = 'COAST';
-      const ship = spawnUnit(s.state, 'IRONCLAD', water.index, 1)!;
-      ship.tileIndex = water.index;
-      const pats = Array.from({ length: n }, () => patrolOf(s.state, FIGHTER, ship.tileIndex));
-      const r0 = s.state.rngState;
-      expect(airStrike(s.state, b.id, ship.tileIndex, 0).ok).toBe(true);
+      const { state, b, pats, r0 } = shipStrike(n);
       // the interceptor at its Combat (a Biplane 80, not its Ranged 75) plus
       // +5 per full-health backer, the bomber at its Combat (85)
       const iE = UNITS[FIGHTER].combat + INTERCEPT_SUPPORT_CS * (n - 1);
       const aE = UNITS[BOMBER].combat;
-      const replay = { ...s.state, rngState: r0 } as GameState;
-      const toFighter = damageRoll(replay, aE - iE);
+      const replay = { ...state, rngState: r0 } as GameState;
       const toBomber = damageRoll(replay, iE - aE);
+      const toFighter = damageRoll(replay, aE - iE);
       expect(100 - pats[0].hp).toBe(toFighter);
       expect(100 - b.hp).toBe(toBomber);
       return { toBomber, toFighter };
@@ -237,6 +245,35 @@ describe('the interception', () => {
     const three = fight(3);
     expect(one.toFighter).toBeGreaterThan(0);
     expect(three.toBomber).toBeGreaterThan(one.toBomber);   // +10 behind the interceptor
+  });
+
+  it('the interceptor banks a flat 4, the plane nothing from the fight', () => {
+    expect(XP_INTERCEPT).toBe(4);
+    const hit = shipStrike(1);
+    expect(hit.pats[0].xp).toBe(XP_INTERCEPT);
+    // the bomber's XP is its strike's alone, as an unintercepted strike's
+    expect(hit.b.xp).toBeGreaterThan(0);
+    expect(hit.b.xp).toBe(shipStrike(0).b.xp);
+    // a patrol at its level's threshold banks nothing more
+    const capped = airState();
+    const b = spawnUnit(capped.state, BOMBER, capped.pad.index, 0)!;
+    capped.sea.terrain = 'COAST';
+    spawnUnit(capped.state, 'IRONCLAD', capped.sea.index, 1);
+    const p = patrolOf(capped.state, FIGHTER, capped.sea.index);
+    p.xp = 15;
+    expect(airStrike(capped.state, b.id, capped.sea.index, 0).ok).toBe(true);
+    expect(p.xp).toBe(15);
+  });
+
+  it('a bomber the interception downs still strikes, at its health after the fight, and is gone', () => {
+    // runs/c34w_strike_d1kill_20260927T013012Z.jsonl and
+    // runs/c34w_strike_d1edge_20260927T012915Z.jsonl: the bomber at 100
+    // damage, the ground unit struck on the third draw, the interceptor +4
+    const { state, b, ship, pats } = shipStrike(1, 1);
+    expect(state.units).not.toContain(b);
+    expect(ship.hp).toBeLessThan(100);
+    expect(pats[0].xp).toBe(XP_INTERCEPT);
+    expect(b.xp ?? 0).toBe(0);
   });
 
   it('an interceptor brought to 0 HP is gone', () => {

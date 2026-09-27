@@ -12,7 +12,7 @@ import {
 } from '../../../cpu/core/combat';
 import { availableProjects, projectCost, queueProject } from '../../../cpu/core/game';
 import { completeProject } from '../../../cpu/core/production';
-import { buySeatBuilding, seatPhase } from '../../../cpu/core/phase';
+import { buySeatBuilding, healCities, seatPhase } from '../../../cpu/core/phase';
 import { UNITS, WALLS_TIER_CS, WALLS_TIER_HP, REPAIR_QUIET_TURNS } from '../../../cpu/data/units';
 
 // The siege round, against the pages it came from: City combat (Civ6) for the
@@ -252,7 +252,7 @@ describe('the siege gate', () => {
     city.buildings.push('ANCIENT_WALLS');
     city.outerHp = 40;
     city.hp = 100;
-    seatPhase(state);
+    healCities(state);
     expect(city.hp).toBe(120);      // the city's own 20 HP still arrives
     expect(city.outerHp).toBe(40);  // the perimeter does not
   });
@@ -483,14 +483,14 @@ describe('the Encampment perimeter', () => {
     // tile will become Impassable again".
     const free = withEncampment();
     free.enc.encampHp = 0;
-    seatPhase(free.state);
+    healCities(free.state);
     expect(free.enc.encampHp).toBe(20);
 
     const held = withEncampment();
     held.enc.encampHp = 0;
     const sitter = spawnUnit(held.state, 'WARRIOR', held.enc.index, BARB_SEAT)!;
     expect(sitter.tileIndex).toBe(held.enc.index);
-    seatPhase(held.state);
+    healCities(held.state);
     expect(held.enc.encampHp).toBe(0);
   });
 

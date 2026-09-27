@@ -902,6 +902,7 @@ class SimInit:
         self._spy_roll_dice = int(_sp["rollDice"])
         self._spy_roll_faces = int(_sp["rollFaces"])
         self._spy_roll_level_base = int(_sp["rollLevelBase"])
+        self._spy_counterspy_roll = int(_sp["counterspyRoll"])
         self._spy_capture_pct = int(_sp["capturePct"])
         self._spy_escape_base = int(_sp["escapeBase"])
         self._spy_escape_level = int(_sp["escapeLevel"])
@@ -1730,7 +1731,7 @@ class SimInit:
         self.city_worked = torch.full(
             (B, self.CITY_ROWS, self.RC, int(self._off3.shape[0])), -1,
             dtype=torch.long, device=device)
-        # THE AMENITY TIER the loop-top walk ran on, one per city slot, -1
+        # THE AMENITY TIER the walk's recorded read ran on, one per city slot, -1
         # before the first walk. Derived like the pick above, and kept for the
         # same reason: it MULTIPLIES every yield the city pays, so a
         # disagreement about it reaches the census only as a fraction of a
@@ -1862,6 +1863,8 @@ class SimInit:
         self._intercept_support_cs = int(rules.combat["interceptSupportCs"])
         # PRIORITY TARGET's flat blow (`PRIORITY_TARGET_DAMAGE`)
         self._priority_target_damage = int(rules.combat["priorityTargetDamage"])
+        # the interceptor's flat XP (`XP_INTERCEPT`)
+        self._xp_intercept = int(rules.combat["xpIntercept"])
         self._nuke_cols = int(rules.nuclear["nukeCols"])
         _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
         assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
@@ -2660,10 +2663,11 @@ class SimInit:
         # RANDOM_EVENT_START_TURN: no event fires, and no draw is spent, before it
         self._random_event_start_turn = int(_ds["randomEventStartTurn"])
         # the nuclear accident by severity: the reactor age that opens the
-        # row, the fallout turns, the district and population chances
+        # row, the fallout turns, the district, building and population chances
         self._accident_min_turn = [int(x) for x in _ds["accidentMinTurn"]]
         self._accident_fallout = torch.tensor([int(x) for x in _ds["accidentFallout"]], dtype=torch.long, device=device)
         self._accident_district_p = torch.tensor([float(x) for x in _ds["accidentDistrictP"]], dtype=torch.float64, device=device)
+        self._accident_bldg_p = torch.tensor([float(x) for x in _ds["accidentBldgP"]], dtype=torch.float64, device=device)
         self._accident_pop_p = torch.tensor([float(x) for x in _ds["accidentPopP"]], dtype=torch.float64, device=device)
         # ...and its unit rows on the reactor's plot: the land share, the
         # inclusive band, the civilians' kill chance

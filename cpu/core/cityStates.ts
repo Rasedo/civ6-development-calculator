@@ -523,14 +523,6 @@ export function sueForPeaceWithCityState(state: GameState, cityStateId: number, 
   return { ok: true };
 }
 
-export function cityStatePhase(state: GameState): void {
-  if (state.cityStates.length === 0) return;
-
-  for (const cityState of state.cityStates) {
-    if (cityState.hp !== undefined && cityState.hp < CITY_STATE_MAX_HP) cityState.hp = Math.min(CITY_STATE_MAX_HP, cityState.hp + 10);
-  }
-}
-
 /**
  * THE MINOR'S ONE CITY, as the city rules see it. CIV6 (City-state): a
  * city-state's city is an ordinary city — it works its tiles, its districts
@@ -557,7 +549,7 @@ export function minorCity(cityState: CityState): City {
     centerIndex: cityState.centerIndex,
     population: cityState.population,
     // the minor's OWN boxes, not zeroes: its city grows and claims like any
-    // other. `minorAccrue` writes them back after the shared rules run.
+    // other. `minorGrowth` writes them back after the shared rules run.
     foodBox: cityState.foodBox ?? 0,
     cultureBox: cityState.cultureBox ?? 0,
     tilesAcquired: cityState.tilesAcquired ?? 0,

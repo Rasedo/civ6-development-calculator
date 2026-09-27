@@ -45,12 +45,13 @@ function envoyGroup(state: GameState, seat: number): { avail: number; held: numb
   return { avail: seatOf(state, seat)?.envoysAvailable ?? 0, held };
 }
 
-/** The `congress` group: the Regular Session the coming step (turn + 1)
- *  would hold — its ANNOUNCED slate and the seat's `preference` per slot —
- *  whether it also holds the Diplomatic Victory resolution and who leads it,
- *  whether a Special Session sits, the seat's favor floored, the vote step. */
+/** The `congress` group: the Regular Session the coming step would hold — it
+ *  sits at the close of the current turn, before the counter moves — its
+ *  ANNOUNCED slate and the seat's `preference` per slot, whether it also holds
+ *  the Diplomatic Victory resolution and who leads it, whether a Special
+ *  Session sits, the seat's favor floored, the vote step. */
 function congressGroup(state: GameState, seat: number): Record<string, unknown> {
-  const turn = state.turn + 1;
+  const turn = state.turn;
   const worldEra = worldEraIndex(state);
   const fires = congressSessionDue(turn, worldEra);
   const slate = fires ? [...(state.congressSlate ?? [-1, -1])] : [-1, -1];

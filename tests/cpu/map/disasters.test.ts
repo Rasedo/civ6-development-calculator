@@ -714,25 +714,36 @@ describe('the nuclear accident', () => {
     return { state, city, izTile };
   };
 
-  it('its payloads are per-accident chances: the zone, one citizen, fallout on the zone alone', () => {
+  it('its payloads are per-accident chances: the plant always, the chain\'s top, the zone, one citizen, fallout on the zone alone', () => {
     const N = 2000;
     for (let sev = 0; sev < 3; sev++) {
       const { state, city, izTile } = reactorBoard(40);
+      city.buildings.push('WORKSHOP', 'FACTORY');
       let pillaged = 0;
+      let factory = 0;
+      let workshop = 0;
       let lost = 0;
       for (let i = 0; i < N; i++) {
         izTile.districtPillaged = false;
         izTile.falloutTurns = 0;
+        city.pillagedBuildings = [];
         city.population = 12;
         nuclearAccident(state, 0, city, sev);
         expect(izTile.falloutTurns).toBe(ACCIDENT_FALLOUT[sev]);
         expect(city.population === 12 || city.population === 11).toBe(true);
+        expect(city.pillagedBuildings).toContain('NUCLEAR_POWER_PLANT');
         if (izTile.districtPillaged) pillaged++;
+        if (city.pillagedBuildings.includes('FACTORY')) factory++;
+        if (city.pillagedBuildings.includes('WORKSHOP')) workshop++;
         if (city.population === 11) lost++;
       }
       expect(state.map.tiles.filter((t) => (t.falloutTurns ?? 0) > 0)).toEqual([izTile]);
       expect(city.buildings).toContain('NUCLEAR_POWER_PLANT');
       expect(Math.abs(pillaged / N - [0, 0.5, 1][sev])).toBeLessThan(0.04);
+      // BUILDING_PILLAGED 20 / 100 / none takes the Factory, the district row
+      // the Workshop with the rest
+      expect(Math.abs(factory / N - [0.2, 1, 1][sev])).toBeLessThan(0.04);
+      expect(Math.abs(workshop / N - [0, 0.5, 1][sev])).toBeLessThan(0.04);
       expect(Math.abs(lost / N - [0, 0, 0.8][sev])).toBeLessThan(0.04);
     }
   });
@@ -766,7 +777,7 @@ describe('the nuclear accident', () => {
       for (const d of band) expect(d >= 20 && d <= 50).toBe(true);
       if (sev > 0) expect(band.size).toBeGreaterThan(20);
       expect(city.buildings).toContain('NUCLEAR_POWER_PLANT');
-      expect(city.pillagedBuildings ?? []).not.toContain('NUCLEAR_POWER_PLANT');
+      expect(city.pillagedBuildings).toContain('NUCLEAR_POWER_PLANT');
     }
     expect([...ACCIDENT_LAND_P, ...ACCIDENT_CIV_KILL_P]).toEqual([0, 0.5, 1, 0, 0.5, 1]);
   });

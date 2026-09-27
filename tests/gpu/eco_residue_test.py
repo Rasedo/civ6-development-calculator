@@ -72,7 +72,7 @@ def test_policy_unlock(sim, rj) -> None:
 
     def record(g: int) -> None:
         sim.apply_seat_actions(ROW, government=torch.full((sim.B,), g, dtype=torch.long))
-        sim._seat_record_apply(ROW, active)
+        sim._seat_policy_apply(ROW, active)
 
     def now() -> int:
         g, has = sim._adopted_gov(ROW)

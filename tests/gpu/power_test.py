@@ -30,7 +30,7 @@ because a gate lane reaches an Industrial-era grid only by accident:
   9. THE STOCKPILE the plants burn — `_seat_accrue_stockpile` per improved
      source and its ceiling, `_charge_unit_resource` at the train, and the
      heal `_res_starved` denies a unit whose source the seat has lost.
- 10. THE ACCIDENT — `_nuclear_accident`'s two draws and its measured
+ 10. THE ACCIDENT — `_nuclear_accident`'s six draws and its measured
      payloads, and `_random_event` opening a reactor's rows only past each
      MinTurnAtRisk (the TS twin is tests/cpu/map/disasters.test.ts).
 """
@@ -600,21 +600,27 @@ STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
 
 def test_reactor_accident(sim) -> None:
     """10. THE ACCIDENT — MEASURED over 225 forced accidents: the damage rows'
-    Percentages are per-accident CHANCES. Five draws, always; the Industrial
-    Zone pillaged at 0 / 50 / 100, one citizen lost at 0 / 0 / 80, fallout
-    on the reactor's own plot alone for 2 / 10 / 20 turns, the plant kept
-    and never pillaged; the land units on that plot struck at 0 / 50 / 100
+    Percentages are per-accident CHANCES. Six draws, always; the plant
+    pillaged every time and kept, the top of the chain still standing (the
+    Factory) at BUILDING_PILLAGED's 20 / 100 / none, the Industrial Zone and
+    every building in it at 0 / 50 / 100, one citizen lost at 0 / 0 / 80,
+    fallout on the reactor's own plot alone for 2 / 10 / 20 turns; the land
+    units on that plot struck at 0 / 50 / 100
     for 20-50, its civilians killed at 0 / 50 / 100, a unit off it untouched.
     And the site: a reactor is one only past each row's MinTurnAtRisk."""
     row, j = a_city(sim)
     izt = put_district(sim, row, j, sim._iz_idx)
     nuc = sim._nuclear_bidx
+    wsh, fac = bidx(sim, "WORKSHOP"), bidx(sim, "FACTORY")
     sim.city_bldg[0, row, j, nuc] = True
+    sim.city_bldg[0, row, j, wsh] = True
+    sim.city_bldg[0, row, j, fac] = True
     centre = int(sim.city_center[0, row, j])
     hit = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
     hit[0] = True
     at = torch.full((sim.B,), centre, dtype=torch.long, device=sim.device)
     assert sim._accident_min_turn == [10, 20, 30]
+    assert sim._accident_bldg_p.tolist() == [0.2, 1.0, 0.0]
     assert sim._accident_fallout.tolist() == [2, 10, 20]
     assert sim._accident_weight == [1, 1, 1]
     assert sim._accident_land_p == [0, 0.5, 1] and sim._accident_civ_kill_p == [0, 0.5, 1]
@@ -632,22 +638,26 @@ def test_reactor_accident(sim) -> None:
             sim.major_unit_hp[0, s] = 100
             plane[0, t] = s + lo
     N = 1500
-    for sev, (dp, pp) in enumerate(((0.0, 0.0), (0.5, 0.0), (1.0, 0.8))):
-        pillaged = lost = struck = killed = 0
+    for sev, (dp, fp, pp) in enumerate(((0.0, 0.2, 0.0), (0.5, 1.0, 0.0), (1.0, 1.0, 0.8))):
+        pillaged = factory = workshop = lost = struck = killed = 0
         band: set[int] = set()
         for _ in range(N):
             sim.district_pillaged[0, izt] = False
+            sim.city_bldg_pillaged[0, row, j] = False
             sim.tile_fallout[0] = 0
             sim.city_pop[0, row, j] = 12
             arm()
             s0 = int(sim.rng_state[0])
             sim._nuclear_accident(hit, at, sev)
-            assert (s0 + 5 * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), "an accident draws five times"
+            assert (s0 + 6 * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), "an accident draws six times"
             assert int(sim.tile_fallout[0, izt]) == int(sim._accident_fallout[sev])
             assert int((sim.tile_fallout[0] > 0).sum()) == 1, "fallout on the reactor's plot alone"
+            assert bool(sim.city_bldg_pillaged[0, row, j, nuc]), "every accident pillages the plant"
             pop = int(sim.city_pop[0, row, j])
             assert pop in (11, 12), "an accident takes one citizen at most"
             pillaged += int(bool(sim.district_pillaged[0, izt]))
+            factory += int(bool(sim.city_bldg_pillaged[0, row, j, fac]))
+            workshop += int(bool(sim.city_bldg_pillaged[0, row, j, wsh]))
             lost += int(pop == 11)
             d = 100 - int(sim.major_unit_hp[0, slots[0]])
             if d:
@@ -656,8 +666,9 @@ def test_reactor_accident(sim) -> None:
             killed += int(not bool(sim.major_unit_alive[0, slots[1]]))
             assert int(sim.major_unit_hp[0, slots[2]]) == 100, "a unit off the reactor's plot is untouched"
         assert bool(sim.city_bldg[0, row, j, nuc]), "the plant stays"
-        assert not bool(sim.city_bldg_pillaged[0, row, j, nuc]), "the plant is never pillaged"
         assert abs(pillaged / N - dp) < 0.04, f"severity {sev}: zone pillaged {pillaged}/{N}"
+        assert abs(factory / N - fp) < 0.04, f"severity {sev}: the Factory pillaged {factory}/{N}"
+        assert abs(workshop / N - dp) < 0.04, f"severity {sev}: the Workshop pillaged {workshop}/{N}"
         assert abs(lost / N - pp) < 0.04, f"severity {sev}: citizen lost {lost}/{N}"
         assert abs(struck / N - sim._accident_land_p[sev]) < 0.04, f"severity {sev}: land struck {struck}/{N}"
         assert abs(killed / N - sim._accident_civ_kill_p[sev]) < 0.04, f"severity {sev}: civilians {killed}/{N}"
@@ -667,6 +678,9 @@ def test_reactor_accident(sim) -> None:
         plane[0, t] = -1
     sim.tile_fallout[0] = 0
     sim.district_pillaged[0, izt] = False
+    sim.city_bldg_pillaged[0, row, j] = False
+    sim.city_bldg[0, row, j, wsh] = False
+    sim.city_bldg[0, row, j, fac] = False
     # the site: ages 9 / 10 / 25 / 30 open no row / MINOR / MINOR+MAJOR / all
     seen: set[int] = set()
     sim._nuclear_accident = lambda h, c, s: seen.add(s) if bool(h[0]) and int(c[0]) == centre else None
@@ -686,8 +700,8 @@ def test_reactor_accident(sim) -> None:
     sim._accident_weight = w0
     sim.city_reactor_age[0, row, j] = -1
     sim.city_bldg[0, row, j, nuc] = False
-    print("  accident OK: five draws, the zone, one citizen and the plot's units at the rows' chances, "
-          "fallout on the reactor's plot alone, the plant kept, a site only past each MinTurnAtRisk")
+    print("  accident OK: six draws, the plant pillaged, the chain's top, the zone, one citizen and the "
+          "plot's units at the rows' chances, fallout on the reactor's plot alone, a site only past each MinTurnAtRisk")
 
 
 def test_free_city_reactor(sim) -> None:

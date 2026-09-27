@@ -13,12 +13,15 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
 import {
   spyDestinations, beginTravel, beginMission, missionOffered, tickSpies, spyCity, cityCounterLevels,
+  missionThreshold,
 } from '../../../cpu/core/espionage';
+import { nextRandom } from '../../../cpu/core/rand';
 import { spyHeldWith } from '../../../cpu/core/deals';
 import { promoRows } from '../../../cpu/data/promotions';
 import {
   SPY_UNIT, SPY_MISSIONS, SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_FOMENT_UNREST,
   SPY_M_COUNTERSPY, SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_ESCAPE_ROUTES, SPY_SURVEILLANCE_REACH,
+  SPY_COUNTERSPY_ROLL,
 } from '../../../cpu/data/espionage';
 import { buildingPillaged, cityBuildingYields, darkBuildings } from '../../../cpu/core/yields';
 import { availableBuildings, goldPurchasableBuildings, buildingCostIn } from '../../../cpu/core/rules';
@@ -162,6 +165,42 @@ describe('the counterspy defends the district it stands on and the adjacent ones
       expect(run(2, true)).toBe(true);
     } finally {
       SPY_ESCAPE_ROUTES.forEach((r, i) => { (r as { district: string | null }).district = gates[i]; });
+    }
+  });
+
+  it('a guarding post lowers the mission roll by 3, flat, whatever its level', () => {
+    expect(SPY_COUNTERSPY_ROLL).toBe(3);
+    // a seed whose 3d6 lands exactly 2 over Siphon Funds' fresh threshold:
+    // success undetected unguarded, fail undetected (2 - 3 = -1) guarded
+    const t = missionThreshold(SPY_MISSIONS[SPY_M_SIPHON_FUNDS], 0);
+    let seed = 1;
+    for (;; seed++) {
+      const probe = { rngState: seed } as GameState;
+      let r = 0;
+      for (let i = 0; i < 3; i++) r += Math.floor(nextRandom(probe) * 6) + 1;
+      if (r === t + 2) break;
+    }
+    const run = (guardLevel: number | null) => {
+      const { state, theirs } = spyState();
+      const hub = districtAt(state, theirs, 'COMMERCIAL_HUB', 1);
+      if (guardLevel !== null) {
+        const guard = spyAt(state, 1, theirs.centerIndex);
+        guard.spyLevel = guardLevel;
+        expect(beginMission(state, guard, SPY_M_COUNTERSPY)).toBe(true);
+      }
+      const spy = spyAt(state, 0, hub);
+      expect(beginMission(state, spy, SPY_M_SIPHON_FUNDS)).toBe(true);
+      for (let i = 0; i < turnsOf(SPY_M_SIPHON_FUNDS) - 1; i++) tickSpies(state, 0);
+      state.rngState = seed;
+      tickSpies(state, 0);
+      return { state, spy };
+    };
+    const open = run(null);
+    expect(open.spy.spyLevel).toBe(1);
+    for (const lvl of [0, 2]) {
+      const guarded = run(lvl);
+      expect(guarded.spy.spyLevel ?? 0).toBe(0);
+      expect(guarded.state.units).toContain(guarded.spy);
     }
   });
 

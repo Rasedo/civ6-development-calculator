@@ -18,9 +18,9 @@ import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlan
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
-import { cityStatePhase, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
+import { suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
 import { minorPhase } from './minorBuild';
-import { seatPhase, freeCitiesPhase, worldCongress, nextCityName } from './phase';
+import { seatPhase, freeCitiesPhase, healCities, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { settleIncursion, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
@@ -1368,27 +1368,30 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   return { ok: true };
 }
 
+/**
+ * ONE GAME TURN, as Civ 6 runs it (tools/civ6lab/turn_order_civ6.md,
+ * runs/turnorder/): the players one at a time in ascending player id — the
+ * majors, the city-states, the Free Cities, the barbarians (16 of 16 turns);
+ * then the World Congress session and the heal of every unit and every city,
+ * both before the counter moves; then, on the new turn, the storms, the
+ * volcano roll and the random event (`disasterPhase`), the climate step, the
+ * era and Ages, and the victory checks.
+ */
 export function endTurn(state: GameState): void {
-  if (state.unitsMode) {
-    refreshUnits(state);
-    barbarianPhase(state);
-  }
-  if (state.disasters) disasterPhase(state);
-  cityStatePhase(state);
-  minorPhase(state);
   seatPhase(state);
-  // CIV6's Free Cities player takes its turn after every major's; the GPU
-  // twin runs `_free_cities_phase` at the same position.
+  minorPhase(state);
   freeCitiesPhase(state);
-
+  if (state.unitsMode) barbarianPhase(state);
   theologicalCombatPhase(state);
-  spreadReligiousPressure(state);
-  climateTurn(state);
+  worldCongress(state);
+  if (state.unitsMode) refreshUnits(state);
+  healCities(state);
 
   state.turn += 1;
-  eraBoundary(state);
+  if (state.disasters) disasterPhase(state);
+  climateTurn(state);
+  eraBoundary(state); // era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
   eraInspirations(state);
-  worldCongress(state); // era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
   // THE EXOPLANET FLIGHT — CIV6: the craft covers 1 light-year/turn plus one
   // per completed laser station, and the win fires on ARRIVAL, not launch.
   // Ascending seat order + the victoryType guard: a same-turn tie goes to the
@@ -1615,9 +1618,8 @@ function eraInspirations(state: GameState): void {
  * standing next to an enemy apostle fights, before it can spread. Inside a
  * scripted walk it would run only for undriven seats and go inert the moment
  * the wire took that seat's decisions. It is an eager RULE at ONE schedule
- * position — after every seat's turn, before the pressure spread reads the
- * swing — so it
- * belongs to no seat and inherits no replay-position fork.
+ * position — after every player's turn, the next turn's spreads reading the
+ * swing — so it belongs to no seat and inherits no replay-position fork.
  */
 function theologicalCombatPhase(state: GameState): void {
   const nRel = state.seats.length;
@@ -1709,15 +1711,21 @@ function theologicalCombatPhase(state: GameState): void {
 }
 
 /**
- * Religious pressure spread (deterministic, zero-RNG). Religions are indexed
- * by seat: religion g is seat g's. Every city following a founded religion
- * presses the cities within range once per turn, and a city then FOLLOWS
- * what `followedReligionOf` picks from its accumulated pressure. The GPU
- * mirror is BatchSim._spread_religious_pressure. Fresh City objects
- * (founded/flipped cities) carry no pressure — the reset-on-birth KILL
- * hygiene, mirrored on the GPU by zeroing dead/absent slots each turn.
+ * Religious pressure spread from seat `src`'s cities, on `src`'s own turn
+ * (deterministic, zero-RNG). CIV6: a player's cities press their neighbours
+ * during that player's start of turn, and the neighbours convert then
+ * (tools/civ6lab/turn_order_civ6.md: 13 of 15 follower changes inside the
+ * presser's block), so a city converted by an earlier player presses with its
+ * new religion when its own owner's turn comes. Religions are indexed by
+ * seat: religion g is seat g's. Every city of `src` following a founded
+ * religion presses the cities within range, `src`'s trade routes carry their
+ * religions both ways, and every city then FOLLOWS what `followedReligionOf`
+ * picks from its accumulated pressure. The GPU mirror is
+ * BatchSim._spread_religious_pressure. Fresh City objects (founded/flipped
+ * cities) carry no pressure — the reset-on-birth KILL hygiene, mirrored on
+ * the GPU by zeroing dead/absent slots at every spread.
  */
-export function spreadReligiousPressure(state: GameState): void {
+export function spreadReligiousPressure(state: GameState, src: number): void {
   const nRel = state.seats.length;
   const founded = state.seats.map((sx) => sx.religion.founded && sx.religion.holyTile != null && sx.religion.holyTile >= 0);
   if (!founded.some(Boolean)) return; // no religion exists yet — nothing to spread
@@ -1748,6 +1756,7 @@ export function spreadReligiousPressure(state: GameState): void {
   // 10 tiles)" — the founder's Holy-Site cities take the Holy City's step.
   const sources: { g: number; tile: Tile; w: number }[] = [];
   for (const city of cities) {
+    if (city.seat !== src) continue;
     const g = city.followedReligion ?? -1;
     if (g < 0 || !founded[g]) continue;
     const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
@@ -1769,7 +1778,7 @@ export function spreadReligiousPressure(state: GameState): void {
   const routeTerms = new Map<number, { g: number; w: number }[]>();
   const byCentre = new Map(cities.map((c) => [c.centerIndex, c]));
   for (const sx of state.seats) {
-    if (!sx.tradeRoutes?.length) continue;
+    if (sx.seat !== src || !sx.tradeRoutes?.length) continue;
     const rows = getModifiers(state, sx.seat).routePressure;
     const pctO = rows.filter((r) => r.origin).reduce((s, r) => s + r.pct, 0);
     const pctD = rows.filter((r) => r.destination).reduce((s, r) => s + r.pct, 0);

@@ -29,7 +29,7 @@ import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLD
 import { EVENT_NORM_PER_MAP, EVENT_NORM_PER_SITE, FIRST_TIME_OCCURRENCE_BOOST, VOLCANO_WAKE_P, DROUGHT_DISTANCE_WEIGHTS } from '../data/disasters';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_SPREAD_CROSS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
-import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
+import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
 import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
 import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
@@ -61,16 +61,13 @@ function scorch(state: GameState, tile: Tile): void {
 
 /** CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile, not
  *  just the improvement, which is what a Dam is built to prevent. A city
- *  CENTER is never pillaged. With `buildings`, DISTRICT_PILLAGED takes every
- *  building standing in the district too, a city-state's alike
- *  (runs/c74s3_bldg_pillage_20260926T133346Z.jsonl: 13 of 13); the nuclear
- *  accident takes the district alone (its Power Plant was never pillaged,
- *  runs/reactor_reactor_base_20260926T071712Z.jsonl). */
-function pillageDistrict(state: GameState, tile: Tile, buildings: boolean): void {
+ *  CENTER is never pillaged. DISTRICT_PILLAGED takes every building standing
+ *  in the district too, a city-state's alike
+ *  (runs/c74s3_bldg_pillage_20260926T133346Z.jsonl: 13 of 13). */
+function pillageDistrict(state: GameState, tile: Tile): void {
   if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete
       && !tile.districtPillaged && !envImmune(state, tile)) {
     tile.districtPillaged = true;
-    if (!buildings) return;
     const h = districtHolder(state, tile);
     if (!h) return;
     for (const id of centerBuildingIds()) {
@@ -426,7 +423,7 @@ export function floodTile(state: GameState, tile: Tile, sev: number, mitigated: 
   if (!mitigated && !immune) {
     scorch(state, tile);
     if (rDestroy < FLOOD_DESTROY_P[sev]) destroyImprovement(state, tile);
-    if (rDistrict < FLOOD_DISTRICT_P[sev]) pillageDistrict(state, tile, true);
+    if (rDistrict < FLOOD_DISTRICT_P[sev]) pillageDistrict(state, tile);
     if (rBldg < FLOOD_BLDG_P[sev]) pillageTileBuildings(state, tile);
     const dmg = FLOOD_DAMAGE_LO[sev]
       + Math.floor(rDamage * (FLOOD_DAMAGE_HI[sev] - FLOOD_DAMAGE_LO[sev] + 1));
@@ -834,7 +831,7 @@ function fireTurn(state: GameState): void {
       const rDamage = nextRandom(state);
       if (age >= FIRE_DAMAGE_TURNS[0] && age <= FIRE_DAMAGE_TURNS[1]) {
         scorch(state, t);
-        pillageDistrict(state, t, true);
+        pillageDistrict(state, t);
         const dmg = FIRE_DMG[0] + Math.floor(rDamage * (FIRE_DMG[1] - FIRE_DMG[0] + 1));
         strikeUnits(state, t, tileSeat(t), { land: true, naval: false, civ: true, landDmg: dmg, navalDmg: 0 }, null);
       }
@@ -968,7 +965,7 @@ function eruptTile(state: GameState, tile: Tile, row: number): void {
   if (tileSeat(tile) < 0) return;
   scorch(state, tile);
   if (rDestroy < ERUPTION_DESTROY_P[row]) destroyImprovement(state, tile);
-  if (rDistrict < ERUPTION_DISTRICT_P[row]) pillageDistrict(state, tile, true);
+  if (rDistrict < ERUPTION_DISTRICT_P[row]) pillageDistrict(state, tile);
   if (rBldg < ERUPTION_BLDG_P[row]) pillageTileBuildings(state, tile);
   const dmg = ERUPTION_DMG_LO[row]
     + Math.floor(rDamage * (ERUPTION_DMG_HI[row] - ERUPTION_DMG_LO[row] + 1));
@@ -995,17 +992,23 @@ export function ageReactors(cities: readonly City[]): void {
 
 /**
  * A NUCLEAR ACCIDENT at one severity, in one city — MEASURED over 225 forced
- * accidents. FIVE draws, always: the Industrial Zone is pillaged at the
- * row's district chance, ONE citizen is lost at its population chance (never
- * the last), and the units on the reactor's own plot take the row's
- * UNIT_DAMAGE_LAND share and band and its UNIT_KILLED_CIVILIAN chance
- * (`strikeUnits`, one roll per plot as every event reads them). Fallout lies
- * on that plot, the Industrial Zone, for the row's turns. No building is
- * destroyed, no ring improvement pillaged, no unit off the plot struck, and
- * the plant is never pillaged: it stays, ageing on.
+ * accidents. SIX draws, always. Every accident pillages the Power Plant
+ * (105 of 105, runs/reactor_reactor_base_20260927T053410Z.jsonl,
+ * runs/reactor_reactor_base_20260927T053613Z.jsonl,
+ * runs/reactor_reactor_base_20260927T054059Z.jsonl); then the row's
+ * BUILDING_PILLAGED chance takes the top of the Industrial Zone's chain still
+ * standing (`pillageTileBuildings`) and its DISTRICT_PILLAGED chance the zone
+ * and every building in it (`pillageDistrict`), as every event's rows do.
+ * ONE citizen is lost at its population chance (never the last), and the
+ * units on the reactor's own plot take the row's UNIT_DAMAGE_LAND share and
+ * band and its UNIT_KILLED_CIVILIAN chance (`strikeUnits`, one roll per plot
+ * as every event reads them). Fallout lies on that plot, the Industrial Zone,
+ * for the row's turns. No building is destroyed, no ring improvement
+ * pillaged, no unit off the plot struck; the plant stays, ageing on.
  */
 export function nuclearAccident(state: GameState, seat: number, city: City, sev: number): void {
   const rDistrict = nextRandom(state);
+  const rBldg = nextRandom(state);
   const rPop = nextRandom(state);
   const rLand = nextRandom(state);
   const rCivilian = nextRandom(state);
@@ -1014,7 +1017,9 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
   if (iz) {
     const t = state.map.tiles[iz.tileIndex];
     t.falloutTurns = Math.max(t.falloutTurns ?? 0, ACCIDENT_FALLOUT[sev]);
-    if (rDistrict < ACCIDENT_DISTRICT_P[sev]) pillageDistrict(state, t, false);
+    if (!envImmune(state, t)) pillageHeld({ city }, 'NUCLEAR_POWER_PLANT');
+    if (rBldg < ACCIDENT_BLDG_P[sev]) pillageTileBuildings(state, t);
+    if (rDistrict < ACCIDENT_DISTRICT_P[sev]) pillageDistrict(state, t);
     strikeUnits(state, t, tileSeat(t), {
       land: rLand < ACCIDENT_LAND_P[sev],
       naval: false,
@@ -1042,18 +1047,41 @@ export function disasterPhase(state: GameState): void {
     if ((t.falloutTurns ?? 0) > 0) t.falloutTurns = (t.falloutTurns ?? 0) - 1;
   }
 
+  // CIV6: the live storms walk and strike first, then the volcano roll, then
+  // the turn's random event and its effects — a new storm's footprint at its
+  // strike plot among them (tools/civ6lab/turn_order_civ6.md: `Storm
+  // Direction` opens 67 of 76 turns, `Active Volcano Roll` after it 76 of 76,
+  // `Random Event Roll` after that 190 of 190).
+  stormsTurn(state, map.tiles.filter((t) => (t.stormTurns ?? 0) > 0), strip);
   wakeVolcanoes(state);
   // CIV6 (RANDOM_EVENT_START_TURN): no event fires before its first turn, and
   // no draw is spent
-  if (state.turn >= RANDOM_EVENT_START_TURN) randomEvent(state, strip);
+  if (state.turn >= RANDOM_EVENT_START_TURN) {
+    randomEvent(state, strip);
+    stormsTurn(state, map.tiles.filter((t) => (t.stormTurns ?? 0) > 0
+      && STORM_EVENTS[t.stormEvent!].duration === t.stormTurns), strip);
+  }
   fireTurn(state);
-  // CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
-  // storm lives three turns. ENTRY: the footprint at the strike plot.
-  // MOVEMENT: the centre walks `STORM_MOVEMENT` unit steps, then the
-  // footprint lands where it stopped. DISSIPATION: the centre walks once
-  // more and does no damage. Live storms go in ascending centre index, the
-  // list taken BEFORE any of them moves, so none walks twice in one turn.
-  const live = map.tiles.filter((t) => (t.stormTurns ?? 0) > 0);
+  // CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): the
+  // phase's LOWEST victim civilization asks for aid — resolved once at the
+  // end, so the order the two engines walk the turn's events cannot pick a
+  // different victim; a city-state's or Free City's loss raises nothing
+  const hits = (state.aidHit ?? []).filter((s) => isCiv(s));
+  if (hits.length) raiseAidRequest(state, Math.min(...hits));
+  state.aidHit = undefined;
+}
+
+/**
+ * The turn of each storm in `live` (centres in ascending index, the list
+ * taken BEFORE any of them moves, so none walks twice in one turn). CIV6
+ * (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a storm lives
+ * three turns. ENTRY: the footprint at the strike plot. MOVEMENT: the centre
+ * walks `STORM_MOVEMENT` unit steps, then the footprint lands where it
+ * stopped. DISSIPATION: the centre walks once more and does no damage. Each
+ * storm's clock ticks before the next one walks, so a storm dissipating this
+ * turn frees its final tile for a later storm's walk.
+ */
+function stormsTurn(state: GameState, live: Tile[], strip: boolean): void {
   for (let center of live) {
     const ev = STORM_EVENTS[center.stormEvent!];
     const age = ev.duration - (center.stormTurns ?? 0); // 0 entry, 1 movement, 2 dissipation
@@ -1062,13 +1090,6 @@ export function disasterPhase(state: GameState): void {
     center.stormTurns = (center.stormTurns ?? 0) - 1;
     if (center.stormTurns <= 0) center.stormEvent = -1;
   }
-  // CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): the
-  // phase's LOWEST victim civilization asks for aid — resolved once at the
-  // end, so the order the two engines walk the turn's events cannot pick a
-  // different victim; a city-state's or Free City's loss raises nothing
-  const hits = (state.aidHit ?? []).filter((s) => isCiv(s));
-  if (hits.length) raiseAidRequest(state, Math.min(...hits));
-  state.aidHit = undefined;
 }
 
 /**
@@ -1182,7 +1203,7 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
   const distP = lowland && ev.lowlandDist > 0 ? ev.lowlandDist : ev.distPill;
   if (rPill < pillP) scorch(state, tile);
   if (rDestroy < ev.impDest) destroyImprovement(state, tile);
-  if (rDistrict < distP) pillageDistrict(state, tile, true);
+  if (rDistrict < distP) pillageDistrict(state, tile);
   if (rBldgS < ev.bldgPill) pillageTileBuildings(state, tile);
   if (rPop < ev.pop) losePopulation(state, tile);
   strikeUnits(state, tile, owner, {

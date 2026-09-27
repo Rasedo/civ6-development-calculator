@@ -38,6 +38,16 @@ export const INTERCEPT_SUPPORT_CS = srcConst('combat.interceptSupportCs', 5, {
   pedia: 'Civilopedia_Concepts_Text.xml LOC_PEDIA_CONCEPTS_PAGE_AIRCOMBAT_5_CHAPTER_CONTENT_PARA_1: '
     + '"adding +5 to the strength of the main interceptor"',
 });
+/** THE INTERCEPTION'S EXPERIENCE: the interceptor banks a flat 4 through the
+ *  percentage modifiers — no strength ratio and no kill bonus, whether the
+ *  plane lives or dies — and the plane banks nothing from it. */
+export const XP_INTERCEPT = srcConst('combat.xpIntercept', 4, {
+  lab: 'runs/c34w_strike_d0_20260927T012444Z.jsonl, runs/c34w_strike_d0empty_20260927T012802Z.jsonl, '
+    + 'runs/c34w_strike_d0inf_20260927T012543Z.jsonl, runs/c34w_strike_d1edge_20260927T012915Z.jsonl, '
+    + 'runs/c34w_strike_d1inf_20260927T012850Z.jsonl, runs/c34w_strike_d1kill_20260927T013012Z.jsonl '
+    + '(save c34s2_rig_t228): the Fighter +4 on every interception below its level cap, the Bomber downed '
+    + 'included; the Bomber +3 from its strike alone, as the unintercepted runs/c34w_strike_d2ctl_20260927T012707Z.jsonl',
+});
 /** PRIORITY TARGET's blow: a flat share of the struck unit's hit points, no
  *  draw, nothing back — the preview shows an ordinary combat, the fired order
  *  does not (runs/air_strike_20260926T.jsonl: 4 of 4 fired strikes took an

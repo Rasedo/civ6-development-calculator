@@ -7,17 +7,16 @@ class SimMinors:
     def _city_state_phase(self) -> None:
         if self.S == 0:
             return
-        citystate_max = int(self.rules.citystate["maxHp"])
-        self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
         # each minor in turn — the `minorPhase` order, one minor at a time
         # because a district one minor lands may lend a neighbour's district
         # adjacency across the border: its levied army home when due, the loss
-        # its army shows, its grid, its city's yields and its units' upkeep,
-        # the research they buy, the episode's draws, the upgrades a
-        # completion triggers, its purchases, its Builders' work, its trade
-        # routes, the item the Production goes to, its city's ranged strikes
-        # (the majors' own body, `cityStrikes`), its army's walk, and the army
-        # it ends the turn with
+        # its army shows, its grid; its economy and the research it completes;
+        # its city — the plan, the item its Production goes to now, then growth
+        # and borders on the city as it stands after that; then its actions —
+        # the upgrades a completion triggers, its purchases, its Builders'
+        # work, its trade routes, its city's ranged strikes (the majors' own
+        # body, `cityStrikes`), its army's walk; and the army it ends the turn
+        # with
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
             alive = self.citystate_alive[:, s]
@@ -30,14 +29,14 @@ class SimMinors:
             self.citystate_loss_turn[:, s] = torch.where(
                 lost, torch.full_like(seen, int(self.turn)), self.citystate_loss_turn[:, s])
             self._minor_power(s)
-            prod = self._minor_accrue(s)
-            gained = self._minor_research(s)
+            gained = self._minor_economy(s)
             self._minor_plan(s)
+            self._minor_build(s, self._minor_production(s))
+            self._minor_growth(s)
             self._minor_upgrades(s, gained)
             self._minor_purchases(s)
             self._minor_builders(s)
             self._minor_trade(s)
-            self._minor_build(s, prod)
             self._city_strikes(self._CITY_MINOR0 + s, col0, alive)
             self._minor_walk(s)
             self.citystate_army_seen[:, s] = torch.where(alive, self._minor_military_count(s), seen)
@@ -314,28 +313,28 @@ class SimMinors:
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         return (mine & self._type_military[mt]).sum(dim=1)
 
-    def _minor_accrue(self, s: int) -> torch.Tensor:
-        """THE MINOR'S CITY PAYS ITS YIELDS, AND THEN GROWS AND CLAIMS ON THEM.
-
-        CIV6 (City-state): a city-state's city is an ordinary city — its Campus
-        yields Science, its Commercial Hub Gold — and the install has ONE city
-        rule, so it grows on its FOOD BOX and takes ground on its CULTURE BOX
-        exactly as a major's does. Its row is a row of the CITY BLOCK,
-        so `_seat_city_growth` and `_seat_border_growth` are the majors' own
-        bodies called on it, and `citystate_pop` is a VIEW of `city_pop` — the
-        growth write moves it with no mirror of its own.
-
-        Science and Culture also feed the two research pots; Gold banks into
-        `citystate_treasury` and pays the minor's units' upkeep — each unit's
-        own Maintenance, a minor carrying no card that cuts it — and meets the
-        `_bankruptcy` every seat meets; Faith banks into `citystate_faith`.
-        The [B] Production is returned for `_minor_build`, which pays it into
-        the pot under the rows of the item it goes toward."""
+    def _minor_economy(self, s: int) -> torch.Tensor:
+        """`minorEconomy` — THE MINOR'S ECONOMY, in the order every player's
+        start of turn runs (tools/civ6lab/turn_order_civ6.md). CIV6
+        (City-state): a city-state's city is an ordinary city — its Campus
+        yields Science, its Commercial Hub Gold. Its Science and Culture as
+        the turn opens feed the two research pots and the research completes
+        on them (`_minor_research`); then, off the city as that research left
+        it, Gold banks into `citystate_treasury` and pays the minor's units'
+        upkeep — each unit's own Maintenance, a minor carrying no card that
+        cuts it — and meets the `_bankruptcy` every seat meets, and Faith
+        banks into `citystate_faith`. Returns [B] long, the upgrade trigger's
+        count."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         keep = alive.double()
-        total, eff, need, _tier = self._seat_city_stats(row)
-        tot = total[:, 0]  # [B, 6], zero where the city is dead
+        tot = self._seat_city_stats(row, record=False)[0][:, 0]  # [B, 6], zero where the city is dead
+        self.citystate_tech_prog[:, s] += tot[:, 3] * keep
+        self.citystate_civic_prog[:, s] += tot[:, 4] * keep
+        gained = self._minor_research(s)
+        if bool((gained > 0).any()):
+            fresh = self._seat_city_stats(row, record=False)[0][:, 0]
+            tot = torch.where((gained > 0).unsqueeze(1), fresh, tot)
         mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
         upkeep = (self._type_maintenance[self.major_unit_type.clamp(min=0, max=self.NU - 1)].double()
                   * mine.double()).sum(dim=1)
@@ -343,14 +342,31 @@ class SimMinors:
         paid = torch.where(alive, tre - upkeep, tre)
         maint = self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)].double()
         self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
-        self.citystate_tech_prog[:, s] += tot[:, 3] * keep
-        self.citystate_civic_prog[:, s] += tot[:, 4] * keep
         self.citystate_faith[:, s] += tot[:, 5] * keep
-        col = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        return gained
+
+    def _minor_production(self, s: int) -> torch.Tensor:
+        """[B] — the Production minor `s`'s city makes as it stands now, for
+        `_minor_build`, which pays it into the pot under the rows of the item
+        it goes toward; 0 where the city is dead."""
+        row = self._CITY_MINOR0 + s
+        tot = self._seat_city_stats(row, record=False)[0][:, 0]
+        return tot[:, 1] * self.citystate_alive[:, s].double()
+
+    def _minor_growth(self, s: int) -> None:
+        """`minorGrowth` — THE MINOR'S CITY GROWS AND CLAIMS, on the city as it
+        stands after its production. CIV6 (City-state): the install has ONE
+        city rule, so it grows on its FOOD BOX and takes ground on its CULTURE
+        BOX exactly as a major's does. Its row is a row of the CITY BLOCK, so
+        `_seat_city_growth` and `_seat_border_growth` are the majors' own
+        bodies called on it, and `citystate_pop` is a VIEW of `city_pop` — the
+        growth write moves it with no mirror of its own."""
+        row = self._CITY_MINOR0 + s
         act = self.citystate_alive[:, s]
+        total, eff, need, _tier = self._seat_city_stats(row)
+        col = torch.zeros(self.B, dtype=torch.long, device=self.device)
         self._seat_city_growth(row, col, act, eff[:, 0], need[:, 0])
-        self._seat_border_growth(row, col, act, tot[:, 4] * keep)
-        return tot[:, 1] * keep
+        self._seat_border_growth(row, col, act, total[:, 0, 4] * act.double())
 
     def _minor_envoy_tiles(self) -> None:
         """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`.
@@ -779,7 +795,7 @@ class SimMinors:
     def _minor_build(self, s: int, prod: torch.Tensor | None = None) -> None:
         """`minorBuild` — the first row of the build table (`MINOR_BUILD_ROWS`,
         fitted to C-38's census) that wants an item the minor can make now is
-        the one the turn's Production (`prod`, [B], `_minor_accrue`'s; none is
+        the one the turn's Production (`prod`, [B], `_minor_production`'s; none is
         zero) goes toward: the pot takes it under the minor's percent on its
         city's Production and that item's toward-row (walls +200%, the Harbor
         and the type's district +500%, a Builder +200%, a military unit +200%

@@ -991,8 +991,10 @@ class SimSeats:
 
     def _seat_record_apply(self, row: int, active: torch.Tensor) -> None:
         """applySeatActionRecord for seat row `row` — ONE body every seat runs,
-        at the TS record position (after the CS/quest block, before the gold
-        ladder), in the TS arm order: tech, civic, envoys, war, production.
+        at the TS record position (after the CS/quest block, before the
+        economy), in the TS arm order: tech, civic, envoys, war, production;
+        the government and the cards wait for the economy
+        (`_seat_policy_apply`).
 
         `active` is the eliminated-actor `continue`: TS's `continue` precedes
         the record apply, so a cityless seat applies NOTHING — but the stash is
@@ -1001,14 +1003,13 @@ class SimSeats:
 
         The WAR arm drains here and not at decide time: the walkers drain later
         in the phase, so a same-turn declaration still legalizes this turn's
-        own unit orders — and the phase-top geo denounce has already landed, so
-        the declare's alliance gate reads the post-denounce axis, as TS's does.
+        own unit orders — and every earlier seat's diplomacy has already landed
+        at its own tail, so the declare's alliance gate reads that axis, as
+        TS's does.
 
         Every arm re-validates against the LIVE state here; nothing chooses."""
         tech = self._driven_tech.pop(row, None)
         civic = self._driven_civic.pop(row, None)
-        policies = self._driven_policies.pop(row, None)
-        government = self._driven_government.pop(row, None)
         envoys = self._driven_envoys.pop(row, None)
         war = self._driven_war.pop(row, None)
         war_kind = self._driven_war_kind.pop(row, None)
@@ -1030,43 +1031,6 @@ class SimSeats:
             ok = active & ext & (c_act >= 0) \
                 & self._available_mask(self.civ_civics[:, row], self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
             self._select_research(row, c_act, ok, is_civic=True)
-        # THE POLICY UNLOCK: outside the free window a change of government or
-        # of the slotted cards pays `_policy_unlock_cost` once for the turn,
-        # and a seat that cannot afford it keeps what it has
-        unlocked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-
-        def _unlock(want: torch.Tensor) -> torch.Tensor:
-            """[B] — where `want`, the change may land: already unlocked this
-            turn, free, or paid now (the treasury charged here)."""
-            nonlocal unlocked
-            cost = self._policy_unlock_cost(row)
-            need = want & ~unlocked & (cost > 0)
-            pay = need & self._afford(self.civ_treasury[:, row], cost)
-            self.civ_treasury[:, row] = torch.where(pay, self.civ_treasury[:, row] - cost.to(self.civ_treasury.dtype),
-                                                    self.civ_treasury[:, row])
-            go = want & (~need | pay)
-            unlocked = unlocked | go
-            return go
-
-        if government is not None and self._ngov:
-            # the GOVERNMENT — validated (`_gov_open`) and stored; it lands
-            # before the cards so the set below is laid into the government
-            # the seat is now in, as `applySeatActionRecord` orders it
-            g_ok = active & ext & (government >= 0)
-            chg = self._government_changes(row, government, g_ok)
-            self._adopt_government(row, government, g_ok & (~chg | _unlock(chg)))
-        if policies is not None:
-            # the SLOTTED CARDS — validated whole (every card unlocked,
-            # the set fits the slots) and STORED; a set that does not fit is
-            # refused entire, as `applySeatActionRecord` refuses it
-            chosen = policies.to(torch.bool)
-            ok = active & ext & self._policy_set_ok(row, chosen)
-            chg = ok & self._policy_set_changes(row, chosen)
-            ok = ok & (~chg | _unlock(chg))
-            if bool(ok.any()):
-                self.civ_policies[:, row] = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
-                # the government memo's fast path trusts this version alone
-                self._eff_version += 1
         if envoys is not None and self.S > 0:
             e_seq = envoys.to(torch.long)
             if e_seq.dim() == 1:
@@ -1158,6 +1122,61 @@ class SimSeats:
             self._apply_seat_pref(row, pref, dtile)
         elif production is not None:
             self._apply_seat_production(row, production, dtile)
+
+    def _seat_policy_apply(self, row: int, active: torch.Tensor) -> torch.Tensor:
+        """`applySeatPolicies` — THE PENDING POLICIES: the record's government
+        and slotted cards for seat row `row`, applied in the seat's start of
+        turn after its gold, upkeep and bankruptcy and before its culture
+        (tools/civ6lab/turn_order_civ6.md: `GE.PolicyChanged` after gold and
+        science, before the civic). The stash drains either way. Returns [B]
+        the games whose record carried either arm, where the cities' yields
+        are read again."""
+        policies = self._driven_policies.pop(row, None)
+        government = self._driven_government.pop(row, None)
+        carried = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        if not bool(active.any()):
+            return carried
+        ext = self.seat_ext[:, row]
+        if government is not None or policies is not None:
+            carried = active & ext
+        # THE POLICY UNLOCK: outside the free window a change of government or
+        # of the slotted cards pays `_policy_unlock_cost` once for the turn,
+        # and a seat that cannot afford it keeps what it has
+        unlocked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+
+        def _unlock(want: torch.Tensor) -> torch.Tensor:
+            """[B] — where `want`, the change may land: already unlocked this
+            turn, free, or paid now (the treasury charged here)."""
+            nonlocal unlocked
+            cost = self._policy_unlock_cost(row)
+            need = want & ~unlocked & (cost > 0)
+            pay = need & self._afford(self.civ_treasury[:, row], cost)
+            self.civ_treasury[:, row] = torch.where(pay, self.civ_treasury[:, row] - cost.to(self.civ_treasury.dtype),
+                                                    self.civ_treasury[:, row])
+            go = want & (~need | pay)
+            unlocked = unlocked | go
+            return go
+
+        if government is not None and self._ngov:
+            # the GOVERNMENT — validated (`_gov_open`) and stored; it lands
+            # before the cards so the set below is laid into the government
+            # the seat is now in, as `applySeatPolicies` orders it
+            g_ok = active & ext & (government >= 0)
+            chg = self._government_changes(row, government, g_ok)
+            self._adopt_government(row, government, g_ok & (~chg | _unlock(chg)))
+        if policies is not None:
+            # the SLOTTED CARDS — validated whole (every card unlocked,
+            # the set fits the slots) and STORED; a set that does not fit is
+            # refused entire, as `applySeatPolicies` refuses it
+            chosen = policies.to(torch.bool)
+            ok = active & ext & self._policy_set_ok(row, chosen)
+            chg = ok & self._policy_set_changes(row, chosen)
+            ok = ok & (~chg | _unlock(chg))
+            if bool(ok.any()):
+                self.civ_policies[:, row] = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
+                # the government memo's fast path trusts this version alone
+                self._eff_version += 1
+        return carried
 
     def _apply_citizens(self, row: int, active: torch.Tensor, spec, lock, swap=None) -> None:
         """The CITIZEN-ASSIGNMENT arm of the record. `spec` pins a count into
@@ -3611,8 +3630,11 @@ class SimSeats:
         """THE INTERCEPTION — `interceptFight`: a TWO-SIDED combat at the
         ordinary damage law, the interceptor at its Combat plus the other
         patrols' support against the plane at its Combat, each with its
-        seat-pair terms; the interceptor's damage is drawn first, then the
-        plane's. An interceptor at 0 HP or less is gone."""
+        seat-pair terms; the plane's damage is drawn first, then the
+        interceptor's (runs/c34w_strike_d0_20260927T012444Z.jsonl and the
+        other c34w_strike records `interceptFight` names). An interceptor at 0
+        HP or less is gone; one that stands banks `_xp_intercept` through the
+        percentage modifiers, and the plane banks nothing from the fight."""
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         _t = torch.ones_like(fire)
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
@@ -3632,14 +3654,26 @@ class SimSeats:
         a_e = a_e + self._promo_cs(
             at0, a_promos, attacking=~_t, foe_type=i_type, tile=_tile_p[:, u]).to(a_e.dtype)
         a_e = a_e + self._air_plane_terms(_seat_p[:, u], i_seat).to(a_e.dtype)
-        i_dmg = self._damage_roll(fire, a_e - i_e, k="airid", tile=tgt)
         a_dmg = self._damage_roll(fire, i_e - a_e, k="airi", tile=tgt)
+        i_dmg = self._damage_roll(fire, a_e - i_e, k="airid", tile=tgt)
         rows = fire.nonzero(as_tuple=True)[0]
         self.unit_hp[rows, is0[rows]] -= i_dmg[rows]
         _hp_p[:, u] = torch.where(fire, _hp_p[:, u] - a_dmg, _hp_p[:, u])
         gone = rows[self.unit_hp[rows, is0[rows]] <= 0]
         if gone.numel() > 0:
             self.unit_alive[gone, is0[gone]] = False
+        stood = self.unit_hp[rows, is0[rows]] > 0
+        rs, ss = rows[stood], is0[rows[stood]]
+        seat, types = self.unit_seat[rs, ss], self.unit_type[rs, ss]
+        earn = self._xp_eligible(types) & (seat != BARB_SEAT) & (seat != FREE_SEAT)
+        rs, ss, seat, types = rs[earn], ss[earn], seat[earn], types[earn]
+        if rs.numel() > 0:
+            gain = self._city_xp(
+                torch.full_like(ss, self._xp_intercept),
+                self.unit_xp_pct[rs, ss] + self._seat_xp_pct(types, seat, rs),
+                self._xp_mult(seat, types, False, rs))
+            self.unit_xp[rs, ss] = self._bank_xp(self.unit_xp[rs, ss], self.unit_level[rs, ss], gain)
+            self._log_xp(rs, ss, "ix")
 
     def _air_answers(self, fire: torch.Tensor, atk_kind: str, u: int, row: int,
                      tgt: torch.Tensor) -> torch.Tensor:
@@ -3652,8 +3686,10 @@ class SimSeats:
         target, it is forced to only engage the enemy fighter and will not
         attack the ground target." The patrol answers first
         (`_intercept_fight`), then the anti-air cover `_air_cover_scan` finds.
-        A plane shot down leaves; a fighter turned back has spent its
-        sortie."""
+        A fighter turned back has spent its sortie. A bomber the INTERCEPTION
+        downs flies on and strikes at its health after the fight, and is gone
+        after its blow (`_air_downed`); a plane the anti-air burst shoots down
+        leaves."""
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
         through = fire.clone()
@@ -3661,13 +3697,14 @@ class SimSeats:
         ifire = fire & i_has
         if bool(ifire.any()):
             self._intercept_fight(ifire, atk_kind, u, tgt, i_slot, i_sup)
-            through = through & ~(ifire & ((_hp_p[:, u] <= 0) | (self._type_air[at0] == 1)))
+            through = through & ~(ifire & (self._type_air[at0] == 1))
         c_slot, c_has = self._air_cover_scan(row, tgt.clamp(min=0))
         cfire = through & c_has
         if bool(cfire.any()):
+            flying = _hp_p[:, u] > 0
             self._air_cover_answer(cfire, atk_kind, u, tgt, c_slot)
-            through = through & ~(cfire & (_hp_p[:, u] <= 0))
-        dead = fire & (_hp_p[:, u] <= 0)
+            through = through & ~(cfire & flying & (_hp_p[:, u] <= 0))
+        dead = fire & ~through & (_hp_p[:, u] <= 0)
         if bool(dead.any()):
             _alive_p[:, u] = _alive_p[:, u] & ~dead
         spent = fire & ~through & ~dead
@@ -3703,17 +3740,25 @@ class SimSeats:
         fit = through & (
             (_hp_p[:, u] * 2 >= int(self.rules.combat["unitHp"]))
             | self._promo_flag(_ty, self._promo_pool(atk_kind)[0][:, u], "AIR_PILLAGE_ANY_HP"))
-        if not bool(fit.any()):
-            return
-        ttc = tgt.clamp(min=0)
-        _r = fit.nonzero(as_tuple=True)[0]
-        _tt = ttc[_r]
-        _pi = (self.improvement[_r, _tt] >= 0) & ~self.pillaged[_r, _tt]
-        _pd = ~_pi
-        self.pillaged[_r[_pi], _tt[_pi]] = True
-        self.district_pillaged[_r[_pd], _tt[_pd]] = True
-        self._air_scatter_from(_r[_pd], _tt[_pd])
-        self._eff_version += 1
+        if bool(fit.any()):
+            ttc = tgt.clamp(min=0)
+            _r = fit.nonzero(as_tuple=True)[0]
+            _tt = ttc[_r]
+            _pi = (self.improvement[_r, _tt] >= 0) & ~self.pillaged[_r, _tt]
+            _pd = ~_pi
+            self.pillaged[_r[_pi], _tt[_pi]] = True
+            self.district_pillaged[_r[_pd], _tt[_pd]] = True
+            self._air_scatter_from(_r[_pd], _tt[_pd])
+            self._eff_version += 1
+        self._air_downed(through, atk_kind, u)
+
+    def _air_downed(self, fired: torch.Tensor, atk_kind: str, u: int) -> None:
+        """`airDowned` — a bomber the interception downed is gone once its
+        blow has landed."""
+        _hp_p, _alive_p = self._pool_of(atk_kind)[0], self._pool_of(atk_kind)[5]
+        dead = fired & (_hp_p[:, u] <= 0)
+        if bool(dead.any()):
+            _alive_p[:, u] = _alive_p[:, u] & ~dead
 
     def _air_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
                     u: int, row: int, priority: bool = False) -> None:
@@ -3781,6 +3826,7 @@ class SimSeats:
             fired = self._ranged_attack(city_t, tgt, atk_kind, u, row)
             _mp0 = getattr(self, f"{atk_kind}_unit_mp")
             _mp0[:, u] = torch.where(fired, torch.zeros_like(_mp0[:, u]), _mp0[:, u])
+            self._air_downed(city_t, atk_kind, u)
         unit_att = go_unit & through
         if not bool(unit_att.any()):
             return
@@ -3822,7 +3868,9 @@ class SimSeats:
         _mp = getattr(self, f"{atk_kind}_unit_mp")
         _mp[:, u] = torch.where(unit_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
         self._spend_one_attack(atk_kind, u, unit_att)
-        a_died = torch.zeros_like(unit_att)  # it flew through its answers
+        # the strike kills no plane: a bomber the interception downed banks
+        # nothing (its hp) and gives the defender no kill bonus
+        a_died = torch.zeros_like(unit_att)
         d_died = unit_att & ((d_hp0 - d_dmg) <= 0)
         self._award_pair_xp(
             unit_att, a_kind=atk_kind, u=u, a_type=_type_p[:, u], a_seat=a_seat,
@@ -3840,7 +3888,8 @@ class SimSeats:
                                   vict_form=self._form_tier(ds0), killer_promos=a_promos,
                                   killer_tile=a_tile)
             self._gen_ver += 1
-        _hp_p[:, u] = self._heal_on_kill(self._row_of(a_seat), d_died, _hp_p[:, u])
+        _hp_p[:, u] = self._heal_on_kill(self._row_of(a_seat), d_died & (_hp_p[:, u] > 0), _hp_p[:, u])
+        self._air_downed(unit_att, atk_kind, u)
 
     def _air_spawn_at(self, row: int, ty: torch.Tensor, col: torch.Tensor,
                       ctr: torch.Tensor) -> torch.Tensor:
@@ -5695,7 +5744,9 @@ class SimSeats:
         (CONGRESS_RESOLUTIONS): the free vote + the 10k favor curve, outcome
         before target, +1 DVP to every winning-combo voter, refund tiers. The
         BALLOT rides the wire; a seat that submits none votes the AI line.
-        Zero-draw — a pure function of state."""
+        It sits after every player's turn and before the counter moves, so
+        the schedule reads the turn the session closes (`endTurn`'s
+        position)."""
         votes = self.civ_congress_vote.clone()
         self.civ_congress_vote[:] = -1  # an intent is for THIS turn
         # A Special Session may sit on ANY turn once the Congress is open; a
@@ -12583,7 +12634,9 @@ class SimSeats:
                                      a_pct[:, u] + self._seat_xp_pct(a_type, a_seat),
                                      ranged=ranged, initiated=True, foe_died=d_died,
                                      foe_is_barb=d_is_barb)
-            ok = live & ~a_died & self._xp_eligible(a_type)
+            # a side at 0 HP banks nothing (`awardBattleXp` reads its hp): a
+            # bomber the interception downed strikes and earns no XP
+            ok = live & ~a_died & (self._pool_of(a_kind)[0][:, u] > 0) & self._xp_eligible(a_type)
             a_xp_p = self._pool_of(a_kind)[3]
             a_xp_p[:, u] = torch.where(
                 ok, self._bank_xp(a_xp_p[:, u], a_lvl[:, u], gain), a_xp_p[:, u])
@@ -12627,7 +12680,8 @@ class SimSeats:
         mult = self._xp_mult(a_seat, a_type, True)
         gain = self._city_xp(
             base, a_pct[:, u] + self._seat_xp_pct(a_type, a_seat), mult)
-        ok = live & self._xp_eligible(a_type)
+        # a unit at 0 HP banks nothing (`awardCityXp` reads its hp)
+        ok = live & (self._pool_of(a_kind)[0][:, u] > 0) & self._xp_eligible(a_type)
         a_xp_p = self._pool_of(a_kind)[3]
         a_xp_p[:, u] = torch.where(
             ok, self._bank_xp(a_xp_p[:, u], a_lvl[:, u], gain), a_xp_p[:, u])
@@ -14811,11 +14865,15 @@ class SimSeats:
             if want is not None:
                 self._driven_geo[name][row] = want
 
-    def _geo_agreements(self) -> None:
-        """THE DIPLOMATIC AGREEMENTS, verb-major in the TS arm order: denounce,
-        friendship, the alliance friendship unlocks, the border grant, the
-        gift. Every want-mask is re-validated here — the record only names the
-        target."""
+    def _geo_agreements(self, row: int) -> None:
+        """ONE SEAT'S DIPLOMACY, at the tail of row `row`'s own turn — the
+        `seatDiplomacy` twin, in the TS arm order: denounce, friendship, the
+        alliance friendship unlocks, the delegation, the border grant, the
+        gift, then its offer on the table and its answers to the offers
+        standing, then its promise asks, each answered at once by the
+        promiser's own record. Every want-mask is re-validated here — the
+        record only names the target. The keeps stay stashed for the phase:
+        every asker's settlement reads them."""
         stashes = self._driven_geo
         if not any(stashes.values()):
             return
@@ -14828,12 +14886,13 @@ class SimSeats:
             stash = stashes[verb]
             if not stash:
                 return
-            for a in sorted(stash.keys()):
-                want = stash.pop(a)
-                for b in range(nrow):
-                    if b == a or not bool(want[:, b].any()):
-                        continue
-                    yield a, b, want[:, b] & alive_row[:, a] & alive_row[:, b]
+            want = stash.pop(row, None)
+            if want is None:
+                return
+            for b in range(nrow):
+                if b == row or not bool(want[:, b].any()):
+                    continue
+                yield row, b, want[:, b] & alive_row[:, row] & alive_row[:, b]
 
         for a, b, ok in pairs("denounce"):
             # CIV6 (Denouncing): "You cannot denounce Declared Friends or
@@ -14884,7 +14943,7 @@ class SimSeats:
                     self.seat_alliance_type[:, _x, _y] = torch.where(
                         form, ty, self.seat_alliance_type[:, _x, _y])
 
-        stashes["ally_type"].clear()
+        stashes["ally_type"].pop(row, None)
 
         for a, b, ok in pairs("delegation"):
             # CIV6 (Delegations and Embassies): the Resident Embassy "replaces"
@@ -14924,33 +14983,32 @@ class SimSeats:
                     grant, torch.full_like(self.seat_borders_turns[:, a, b], term),
                     self.seat_borders_turns[:, a, b])
 
-        gstash = stashes["gift"]
-        if gstash:
-            for a in sorted(gstash.keys()):
-                want = gstash.pop(a)
-                for kind in range(want.shape[1]):
-                    for b in range(nrow):
-                        if b == a or not bool(want[:, kind, b].any()):
-                            continue
-                        self._gift_work(a, b, kind,
-                                        want[:, kind, b] & alive_row[:, a] & alive_row[:, b]
-                                        & ~self.war[:, a, b])
-
-        # THE TABLE. Every offer goes down first and every answer comes second,
-        # so a pair that agrees within one turn settles within it.
-        ostash = stashes["offer"]
-        if ostash:
-            _di = self._deal_items
-            for a in sorted(ostash.keys()):
-                blob = ostash.pop(a)
-                tgt = blob[:, 0]
-                give = blob[:, 1:1 + _di * 3].reshape(-1, _di, 3)
-                ask = blob[:, 1 + _di * 3:].reshape(-1, _di, 3)
+        want = stashes["gift"].pop(row, None)
+        if want is not None:
+            a = row
+            for kind in range(want.shape[1]):
                 for b in range(nrow):
-                    if b == a or not bool((tgt == b).any()):
+                    if b == a or not bool(want[:, kind, b].any()):
                         continue
-                    self._deal_offer(a, b, tgt == b, give, ask,
-                                     alive_row[:, a] & alive_row[:, b])
+                    self._gift_work(a, b, kind,
+                                    want[:, kind, b] & alive_row[:, a] & alive_row[:, b]
+                                    & ~self.war[:, a, b])
+
+        # THE TABLE: this seat's offer goes down, then its answers to the
+        # offers standing — an offer nobody takes stands until `_deal_phase`
+        # sweeps it.
+        blob = stashes["offer"].pop(row, None)
+        if blob is not None:
+            _di = self._deal_items
+            a = row
+            tgt = blob[:, 0]
+            give = blob[:, 1:1 + _di * 3].reshape(-1, _di, 3)
+            ask = blob[:, 1 + _di * 3:].reshape(-1, _di, 3)
+            for b in range(nrow):
+                if b == a or not bool((tgt == b).any()):
+                    continue
+                self._deal_offer(a, b, tgt == b, give, ask,
+                                 alive_row[:, a] & alive_row[:, b])
 
         for a, b, ok in pairs("accept"):
             # `a` pressed the button; the offer on the table is `b`'s.
@@ -14964,11 +15022,10 @@ class SimSeats:
                 if bool(peace.any()):
                     self._make_peace(b, a, peace)
 
-        # THE PROMISES: every ask, then every answer, then the refusal of what
-        # nobody answered - one turn settles each ask (`_settle_promises`).
-        asks, keeps = dict(stashes["ask_promise"]), dict(stashes["keep_promise"])
-        stashes["ask_promise"].clear()
-        stashes["keep_promise"].clear()
-        if asks:
-            self._settle_promises(asks, keeps)
+        # THE PROMISES this seat asks: each settles at once against the
+        # promiser's own record — kept where that record keeps it, refused
+        # otherwise (`_settle_promises`).
+        ask = stashes["ask_promise"].pop(row, None)
+        if ask is not None:
+            self._settle_promises({row: ask}, dict(stashes["keep_promise"]))
 

@@ -162,7 +162,7 @@ def test_walls_first_and_only_once(rules, path) -> None:
 
     # no tech: the pot takes the city's Production under the minor's own
     # percent alone, and nothing lands
-    sim._minor_build(s, sim._minor_accrue(s))
+    sim._minor_build(s, sim._minor_production(s))
     pen = (100 + float(rules.citystate["productionPct"])) / 100
     assert float(sim.citystate_prod[B0, s]) == prod * pen * 1.0, "the pot did not take the city's Production"
     assert not bool(sim.city_bldg[B0, row, 0, anc]), "walls landed without their tech"

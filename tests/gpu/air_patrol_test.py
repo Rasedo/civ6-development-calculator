@@ -243,17 +243,19 @@ def main() -> None:
     assert int(sim.unit_mp[0, fs]) == 0 and int(sim.unit_attacks[0, fs]) == 0, (
         "and its sortie is spent")
 
-    def bomber_run(n_patrols):
-        """a bomber striking a ship under `n_patrols` foe patrols: (the
-        bomber's damage, the ship's damage). The interception is TWO-SIDED
-        at Combat: the interceptor's damage is drawn first, then the
-        bomber's."""
+    def bomber_run(n_patrols, hp=100, check=True):
+        """a bomber at `hp` striking a ship under `n_patrols` foe patrols:
+        (the bomber's damage, the ship's damage, the engine, the bomber's
+        slot, the patrols' slots). The interception is TWO-SIDED at Combat:
+        the bomber's damage is drawn first, then the interceptor's
+        (runs/c34w_strike_*, 12 of 12)."""
         s = fresh(rules, path)
         at_war(s, row, foe)
         jj = a_city(s, row)
         ae = aerodrome(s, row, jj)
         fc = int(s.city_center[0, foe, a_city(s, foe)])
         b = spawn(s, row, BOMBER, ae)
+        s.unit_hp[0, b] = hp
         sea = [t for t in range(s.T)
                if 0 < int(s.pair_dist[ae, t]) <= int(s._type_ranged_range[BOMBER])
                and bool(s.wpass[0, t]) and int(s.military_at[0, t]) < 0]
@@ -269,26 +271,42 @@ def main() -> None:
         assert sea[0] in bc, f"CIV6: a bomber answers naval units — {bc}"
         r0 = s.rng_state.clone()
         order(s, row, b, s._A_AIR_STRIKE + bc.index(sea[0]))
-        taken = 100 - int(s.unit_hp[0, b])
-        dealt = 100 - int(s.unit_hp[0, pats[0]])
-        # the interceptor at its Combat plus +5 per full-health backer, the
-        # bomber at its Combat (the TS lane pins the same numbers)
-        s.rng_state.copy_(r0)
-        i_e = int(s._type_combat[FIGHTER]) + s._intercept_support_cs * (n_patrols - 1)
-        a_e = int(s._type_combat[BOMBER])
-        one = torch.ones(1, dtype=torch.bool)
-        want_i = int(s._damage_roll(one, torch.tensor([a_e - i_e]), k="pin")[0])
-        want_b = int(s._damage_roll(one, torch.tensor([i_e - a_e]), k="pin")[0])
-        assert (dealt, taken) == (want_i, want_b), (
-            f"the interception dealt {dealt} / {taken}, the law says {want_i} / {want_b}")
-        return taken, 100 - int(s.unit_hp[0, sh])
+        taken = hp - int(s.unit_hp[0, b])
+        if check:
+            dealt = 100 - int(s.unit_hp[0, pats[0]])
+            # the interceptor at its Combat plus +5 per full-health backer, the
+            # bomber at its Combat (the TS lane pins the same numbers)
+            s.rng_state.copy_(r0)
+            i_e = int(s._type_combat[FIGHTER]) + s._intercept_support_cs * (n_patrols - 1)
+            a_e = int(s._type_combat[BOMBER])
+            one = torch.ones(1, dtype=torch.bool)
+            want_b = int(s._damage_roll(one, torch.tensor([i_e - a_e]), k="pin")[0])
+            want_i = int(s._damage_roll(one, torch.tensor([a_e - i_e]), k="pin")[0])
+            assert (dealt, taken) == (want_i, want_b), (
+                f"the interception dealt {dealt} / {taken}, the law says {want_i} / {want_b}")
+        return (taken, 100 - int(s.unit_hp[0, sh]), int(s.unit_xp[0, b]),
+                int(s.unit_xp[0, pats[0]]) if pats else -1,
+                int(s.unit_hp[0, b]), bool(s.unit_alive[0, b]))
 
-    one_b, one_s = bomber_run(1)
+    one_b, one_s, bxp1, ixp1, _, _ = bomber_run(1)
     assert one_b > 0 and one_s > 0, "CIV6: 'Bombers do not have this restriction'"
-    three_b, _ = bomber_run(3)
+    three_b = bomber_run(3)[0]
     assert three_b > one_b, (
         f"CIV6: each other patrol adds +5 — one patrol dealt {one_b}, three {three_b}")
-    print(f"  4 fighter turned back, bomber flies on OK (+5 backing: {one_b} -> {three_b})")
+    # the interceptor banks a flat 4, the bomber nothing from the fight: its
+    # XP is its strike's alone, as an unintercepted strike's
+    assert sim._xp_intercept == 4
+    assert ixp1 == 4, f"the interceptor banked {ixp1}"
+    bxp0 = bomber_run(0, check=False)[2]
+    assert bxp1 == bxp0 > 0, f"the bomber banked {bxp1} intercepted, {bxp0} not"
+    # a bomber the interception downs still strikes, and is gone after its blow
+    # (runs/c34w_strike_d1kill_20260927T013012Z.jsonl)
+    _, struck, bxpd, ixpd, hpd, alived = bomber_run(1, hp=1, check=False)
+    assert hpd <= 0 and not alived, "the downed bomber stays"
+    assert struck > 0, "a bomber the interception downed did not strike"
+    assert bxpd == 0 and ixpd == 4, f"a downed bomber banked {bxpd}, its interceptor {ixpd}"
+    print(f"  4 fighter turned back, bomber flies on OK (+5 backing: {one_b} -> {three_b}; "
+          f"the interceptor +4, a downed bomber strikes for {struck})")
 
     # -- 5: the answers come first ------------------------------------------
     sim = fresh(rules, path)

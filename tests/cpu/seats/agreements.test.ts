@@ -77,10 +77,10 @@ function table(width = 20): GameState {
   return state;
 }
 
-/** An agreement signed THIS turn has already paid its first tick by the time
- *  the phase ends: the verbs run at the head of `seatPhase` and the pair
- *  countdown at its tail, exactly as the peace treaty does. */
-const SIGNED = AGREEMENT_TURNS - 1;
+/** An agreement signed THIS turn pays its first tick on the next one: the
+ *  verbs run in the signer's actions, after the pair countdown has run in
+ *  both seats' blocks (the lower seat's tail ticks it). */
+const SIGNED = AGREEMENT_TURNS;
 
 const REC = (over: Partial<SeatActionRecord>): SeatActionRecord =>
   ({ production: [], tech: null, civic: null, units: [], ...over });

@@ -78,25 +78,28 @@ function minorDistrictSite(state: GameState, cityState: CityState, district: Dis
 /** One minor at a time — a district one minor lands may lend a neighbour's
  *  district adjacency across the border, so the next minor's yields read it.
  *  A levied army due home comes home first; the city's grid is resolved
- *  before its yields read it; a research completion triggers its upgrades,
- *  then its purse buys; its Builders work, then its routes walk and a free
- *  Trader takes a route, before its production lands, so a unit trained this
- *  turn waits for the next; then its city's ranged strikes (the majors' own
- *  body fired from the minor's centre strength), and last its army walks. */
+ *  before its yields read it. Then, as every player's turn runs
+ *  (tools/civ6lab/turn_order_civ6.md): its economy (`minorEconomy`) and the
+ *  research that completes on it, then its city — the plan, the Production
+ *  its city makes now, then growth and borders on the city as it stands
+ *  after that (`minorGrowth`) — then its actions: a research completion's
+ *  upgrades, its purchases, its Builders' work, its routes' walk and a free
+ *  Trader's route, its city's ranged strikes (the majors' own body fired
+ *  from the minor's centre strength), and last its army's walk. */
 export function minorPhase(state: GameState): void {
   for (const cityState of state.cityStates) {
     minorLevyReturn(state, cityState);
     const military = minorMilitary(state, cityState).length;
     if (cityState.armySeen !== undefined && military < cityState.armySeen) cityState.lossTurn = state.turn;
     minorPower(state, cityState);
-    const production = minorAccrue(state, cityState);
-    const gained = minorResearch(state, cityState);
+    const gained = minorEconomy(state, cityState);
     minorPlan(state, cityState);
+    minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
+    minorGrowth(state, cityState);
     minorUpgrades(state, cityState, gained);
     minorPurchases(state, cityState);
     minorBuilders(state, cityState);
     minorTrade(state, cityState);
-    minorBuild(state, cityState, production);
     const city = minorCity(cityState);
     cityStrikes(state, city, centreStrength(state, city));
     minorWalk(state, cityState);
@@ -140,40 +143,47 @@ function minorMilitary(state: GameState, cityState: CityState): Unit[] {
 }
 
 /**
- * The city's yields, once a turn, through the walk every major's city rides —
- * and then the two rules that walk feeds.
- *
- * CIV6 (City-state): the install has ONE city rule, so the minor's city GROWS
- * on its food box and CLAIMS ground on its culture box exactly as a major's
- * does. Both rules are the majors' own composers, and the boxes live
- * on the `CityState` record because `minorCity` builds a fresh `City` view
- * every call — so the results are written back.
- *
- * Its Gold banks and pays its units' upkeep — each unit's own Maintenance, a
- * minor carrying no government or policy that cuts it — and meets the
- * `bankruptcy` every seat meets. Its Faith banks. Its Production is returned
- * for `minorBuild`, which pays it into the pot under the rows of the item it
- * goes toward.
+ * THE MINOR'S ECONOMY, in the order every player's start of turn runs
+ * (tools/civ6lab/turn_order_civ6.md): its city's Science and Culture as the
+ * turn opens feed the two research pots, and the research completes on them
+ * (`minorResearch`); then, off the city as that research left it, its Gold
+ * banks and pays its units' upkeep — each unit's own Maintenance, a minor
+ * carrying no government or policy that cuts it — and meets the
+ * `bankruptcy` every seat meets, and its Faith banks. Returns how many trees
+ * completed a row, the upgrade trigger's count.
  */
-export function minorAccrue(state: GameState, cityState: CityState): number {
-  const city = minorCity(cityState);
-  const stats = computeCityStats(state, city);
-  const y = stats.total;
+export function minorEconomy(state: GameState, cityState: CityState): number {
+  let y = computeCityStats(state, minorCity(cityState)).total;
+  cityState.research.techProgress += y.science;
+  cityState.research.civicProgress += y.culture;
+  const gained = minorResearch(state, cityState);
+  if (gained > 0) y = computeCityStats(state, minorCity(cityState)).total;
   let upkeep = 0;
   for (const u of state.units) if (u.seat === cityState.seat) upkeep += UNITS[u.type]?.maintenance ?? 0;
   cityState.treasury += y.gold;
   cityState.treasury -= upkeep;
   bankruptcy(state, cityState, (t) => UNITS[t]?.maintenance ?? 0);
-  cityState.research.techProgress += y.science;
-  cityState.research.civicProgress += y.culture;
   cityState.faith += y.faith;
+  return gained;
+}
+
+/**
+ * THE MINOR'S CITY GROWS AND CLAIMS, on the city as it stands after its
+ * production. CIV6 (City-state): the install has ONE city rule, so the
+ * minor's city GROWS on its food box and CLAIMS ground on its culture box
+ * exactly as a major's does. Both rules are the majors' own composers, and
+ * the boxes live on the `CityState` record because `minorCity` builds a fresh
+ * `City` view every call — so the results are written back.
+ */
+export function minorGrowth(state: GameState, cityState: CityState): void {
+  const city = minorCity(cityState);
+  const stats = computeCityStats(state, city);
   seatGrowth(city, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
-  cityBorderGrowth(state, city, cityState.seat, y.culture);
+  cityBorderGrowth(state, city, cityState.seat, stats.total.culture);
   cityState.population = city.population;
   cityState.foodBox = city.foodBox;
   cityState.cultureBox = city.cultureBox;
   cityState.tilesAcquired = city.tilesAcquired;
-  return y.production;
 }
 
 /** What the turn's Production puts toward an item: the city's yield under the

@@ -394,9 +394,10 @@ def _beliefs(sim, row: int) -> dict:
 
 
 def _congress(sim, row: int) -> dict:
-    """The `congress` group: the session the coming step would hold, and
-    what this seat prefers on each resolution of its slate."""
-    turn = int(sim.turn) + 1
+    """The `congress` group: the session the coming step would hold — it sits
+    at the close of the current turn, before the counter moves — and what
+    this seat prefers on each resolution of its slate."""
+    turn = int(sim.turn)
     _fires, res0, res1, dv = sim._congress_upcoming(turn)
     slate = torch.stack([res0, res1], dim=1)                          # -1 off a session turn
     pref_o, pref_t = torch.full_like(slate, -1), torch.full_like(slate, -1)

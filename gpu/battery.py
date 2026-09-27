@@ -710,6 +710,7 @@ def _main() -> int:
                 ("stack_rules", [py, "tests/gpu/stack_rules_test.py"], 2),  # cross-domain stacking + Encampment spawn wall
                 ("golden_move", [py, "tests/gpu/golden_move_test.py"], 2),  # MONUMENTALITY / EXODUS +2 MP, per seat
                 ("bankruptcy", [py, "tests/gpu/bankruptcy_test.py"], 4),
+                ("turn_order", [py, "tests/gpu/turn_order_test.py"], 2),  # the economy before the walk, the end-of-turn heal
                 ("seat", [py, "tests/gpu/seat_test.py"], 4),
                 ("government", [py, "tests/gpu/government_test.py"], 4),
                 ("plaza", [py, "tests/gpu/plaza_test.py"], 2),  # the four Government Plaza effect bodies, none of them in the gate's reach

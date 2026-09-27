@@ -96,7 +96,8 @@ def spread_delta(sim, turn: int):
     sim.turn = turn
     before_a = sim.city_pressure[0, ROW, SA].clone()
     before_b = sim.city_pressure[0, ROW, SB].clone()
-    sim._spread_religious_pressure()
+    # the route owner's spread, on its own turn: both cities are its
+    sim._spread_religious_pressure(ROW, torch.ones(sim.B, dtype=torch.bool))
     da = (sim.city_pressure[0, ROW, SA] - before_a).tolist()
     db = (sim.city_pressure[0, ROW, SB] - before_b).tolist()
     return da, db

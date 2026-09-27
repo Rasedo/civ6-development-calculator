@@ -30,7 +30,7 @@ import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, raiseBestMelee, unitReligious } from './units';
 import { nextRandom } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
-import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
+import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE, XP_INTERCEPT } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
 import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_DAMAGE_SCALE, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
@@ -1888,8 +1888,15 @@ function airCoverAnswer(state: GameState, attacker: Unit, answerer: Unit, target
  *  its Combat (a Biplane 80, not its Ranged 75) plus the other patrols'
  *  support, against the plane at its Combat (a Bomber 85, not its Bombard),
  *  each with its seat-pair terms; both take damage (Δ3: 34 to the bomber, 27
- *  to the fighter). The interceptor's damage is drawn first, as a struck
- *  defender's is, then the plane's. A side at 0 HP or less is gone. */
+ *  to the fighter). The plane's damage is drawn first, then the
+ *  interceptor's (12 of 12, runs/c34w_strike_d0_20260927T012444Z.jsonl,
+ *  runs/c34w_strike_d0empty_20260927T012802Z.jsonl,
+ *  runs/c34w_strike_d0inf_20260927T012543Z.jsonl,
+ *  runs/c34w_strike_d1edge_20260927T012915Z.jsonl,
+ *  runs/c34w_strike_d1inf_20260927T012850Z.jsonl,
+ *  runs/c34w_strike_d1kill_20260927T013012Z.jsonl). An interceptor at 0 HP or
+ *  less is gone; one that stands banks `XP_INTERCEPT`, and the plane banks
+ *  nothing from the fight. The plane's own fate is `airAnswers`'. */
 function interceptFight(
   state: GameState, attacker: Unit, icp: { unit: Unit; support: number }, targetIndex: number,
 ): void {
@@ -1905,9 +1912,14 @@ function interceptFight(
       attacking: false, foeType: it.type, tile: state.map.tiles[attacker.tileIndex],
     })
     + airPlaneTerms(state, attacker, it);
-  it.hp -= damageRoll(state, aE - iE, 'airid', targetIndex);
   attacker.hp -= damageRoll(state, iE - aE, 'airi', targetIndex);
-  if (it.hp <= 0) disbandUnit(state, it.id);
+  it.hp -= damageRoll(state, aE - iE, 'airid', targetIndex);
+  if (it.hp <= 0) {
+    disbandUnit(state, it.id);
+  } else if (xpEligible(it)) {
+    bankXp(it, cityXp(XP_INTERCEPT, seatXpPct(state, it), xpMult(state, it, false)));
+    logXpWrite(state, it, 'ix');
+  }
 }
 
 /**
@@ -1920,22 +1932,32 @@ function interceptFight(
  * have this restriction." The patrol answers first (`interceptorAgainst`,
  * `interceptFight`), then the anti-air cover (`airCoverAgainst`: a parked
  * weapon "provides cover from air attacks up to 1 hex away", and "SHIPS with
- * the Anti-Air Strength stat" answer for their own hex). A plane shot down
- * leaves; a fighter turned back has spent its sortie. True when the plane
- * flies on to its target.
+ * the Anti-Air Strength stat" answer for their own hex). A fighter turned
+ * back has spent its sortie. A bomber the INTERCEPTION downs flies on and
+ * strikes at its health after the fight, and is gone after its blow (2 of 2,
+ * runs/c34w_strike_d1edge_20260927T012915Z.jsonl,
+ * runs/c34w_strike_d1kill_20260927T013012Z.jsonl; `airDowned`); a plane the
+ * anti-air burst shoots down leaves. True when the plane flies on to its
+ * target.
  */
 function airAnswers(state: GameState, attacker: Unit, targetIndex: number): boolean {
   const icp = interceptorAgainst(state, attacker, targetIndex);
   if (icp) {
     interceptFight(state, attacker, icp, targetIndex);
-    if (attacker.hp <= 0 || UNITS[attacker.type]?.air === 'FIGHTER') return sortieEnded(state, attacker);
+    if (UNITS[attacker.type]?.air === 'FIGHTER') return sortieEnded(state, attacker);
   }
   const cover = airCoverAgainst(state, attacker, targetIndex);
   if (cover) {
+    const flying = attacker.hp > 0;
     airCoverAnswer(state, attacker, cover, targetIndex);
-    if (attacker.hp <= 0) return sortieEnded(state, attacker);
+    if (flying && attacker.hp <= 0) return sortieEnded(state, attacker);
   }
   return true;
+}
+
+/** a bomber the interception downed, gone once its blow has landed */
+function airDowned(state: GameState, attacker: Unit): void {
+  if (attacker.hp <= 0) disbandUnit(state, attacker.id);
 }
 
 function sortieEnded(state: GameState, attacker: Unit): false {
@@ -1966,13 +1988,15 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
   logUnitOrder(state, seat, attackerId, 'pillage', targetIndex);
   if (!airAnswers(state, attacker, targetIndex)) return { ok: true };
   spendAttack(attacker, true);
-  if (!airPillageFit(attacker)) return { ok: true };
-  const t = state.map.tiles[targetIndex]!;
-  if (t.improvement && !t.pillaged) t.pillaged = true;
-  else {
-    t.districtPillaged = true;
-    displaceAirFrom(state, targetIndex);
+  if (airPillageFit(attacker)) {
+    const t = state.map.tiles[targetIndex]!;
+    if (t.improvement && !t.pillaged) t.pillaged = true;
+    else {
+      t.districtPillaged = true;
+      displaceAirFrom(state, targetIndex);
+    }
   }
+  airDowned(state, attacker);
   return { ok: true };
 }
 
@@ -2023,6 +2047,7 @@ export function airStrike(
     if (!airAnswers(state, attacker, targetIndex)) return { ok: true };
     const r = rangedAttack(state, attackerId, targetIndex);
     if (r.ok) attacker.movesLeft = 0;
+    airDowned(state, attacker);
     return r;
   }
   const enemies = unitsAt(state, targetIndex).filter(
@@ -2068,8 +2093,9 @@ export function airStrike(
   });
   if (defender.hp <= 0) {
     killUnit(state, defender);
-    healOnEliminate(state, attacker);
+    if (attacker.hp > 0) healOnEliminate(state, attacker);
   }
+  airDowned(state, attacker);
   return { ok: true };
 }
 
@@ -2508,7 +2534,7 @@ export function detonate(state: GameState, seat: number, k: number, targetIndex:
       tile.encampOuterHp = 0;
     }
   }
-  // the population loss — the pick is the loop-top SNAPSHOT both engines
+  // the population loss — the pick is the walk's recorded read both engines
   // record (`workedTiles` / `city_worked`), walked per city over the blast;
   // city-states record no pick and lose nobody on either engine
   for (const city of allCities(state)) {

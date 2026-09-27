@@ -474,7 +474,7 @@ def poke_walls_seat0(rules, path, GALLEY, WARRIOR):
     gslot = place_mil(sim, r + 1, tt, GALLEY)  # a civ-seat galley in range
     sim.civ_best_melee[0, 0] = 40
     base = sim.snapshot()
-    sim._seat_city_fire_and_heal(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
+    sim._city_strikes(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
     assert int(sim.major_unit_hp[0, gslot]) < 100, "seat-0 city walls did not strike the ship"
 
     # -- embarked override: a civ-seat WARRIOR at the same tile, embarked vs grounded.
@@ -483,11 +483,11 @@ def poke_walls_seat0(rules, path, GALLEY, WARRIOR):
     wslot = place_mil(sim, r + 1, tt, WARRIOR, emb=True)
     sim.civ_best_melee[0, 0] = 20  # keep the hit sub-lethal so we can read the damage
     snap = sim.snapshot()
-    sim._seat_city_fire_and_heal(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
+    sim._city_strikes(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
     emb_dmg = 100 - int(sim.major_unit_hp[0, wslot])
     sim.restore(snap)
     sim.major_unit_emb[0, wslot] = False  # same warrior, grounded (combat 20 + terrain)
-    sim._seat_city_fire_and_heal(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
+    sim._city_strikes(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
     gnd_dmg = 100 - int(sim.major_unit_hp[0, wslot])
     assert emb_dmg > gnd_dmg, f"embarked flat-CS override not applied at cstk (emb {emb_dmg} <= gnd {gnd_dmg})"
     print(f"  7a seat-0 cstk OK (ship struck; embarked override: dmg {emb_dmg} > grounded {gnd_dmg})")
@@ -882,15 +882,12 @@ def poke_submarine_siege(rules, path, FRIGATE, SUBMARINE):
         ring.append(place_mil(sim, 1, t, FRIGATE))
     assert len(ring) >= 3, "no passable ring on this seed"
 
-    col = torch.zeros(sim.B, dtype=torch.long)
-    act = sim.city_alive[:, 0, 0]
-
     def heal_of(kind: int) -> int:
         for slot in ring:
             sim.major_unit_type[0, slot] = kind
         sim.city_hp[0, 0, 0] = 100
         snap = sim.snapshot()
-        sim._seat_city_fire_and_heal(0, col, act)
+        sim._heal_cities()
         got = int(sim.city_hp[0, 0, 0]) - 100
         sim.restore(snap)
         return got
@@ -1036,7 +1033,7 @@ def poke_passenger_death(rules, path, WARRIOR, BUILDER):
     assert int(sim.embarked_at[0, tt]) == slot + sim.POOL_LO["major"], "the fixture put it on the wrong plane"
     sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
     sim.city_outer_hp[0, 0, 0] = sim._walls_hp
-    sim._seat_city_fire_and_heal(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
+    sim._city_strikes(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
     assert not bool(sim.major_unit_alive[0, slot]), "the city strike did not kill the passenger"
     assert int(sim.embarked_at[0, tt]) < 0, "a dead passenger still holds its tile"
 

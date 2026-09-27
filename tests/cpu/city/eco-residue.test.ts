@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, grantTechs, standDistrict } from '../helpers';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { buildingPurchaseCost, buildingFaithCost, unitPurchaseCost } from '../../../cpu/core/game';
-import { applySeatActionRecord } from '../../../cpu/core/phase';
+import { applySeatPolicies } from '../../../cpu/core/phase';
 import { faithPrice, goldPrice, makeYieldCtx, policyUnlockCost, policyUnlockTerm, seatGovernment } from '../../../cpu/core/effects';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { computeCityStats } from '../../../cpu/core/city';
@@ -92,18 +92,18 @@ describe('the policy unlock', () => {
     const cost = policyUnlockCost(state, 0);
     expect(cost).toBe(80);
     s.treasury = cost - 1;
-    applySeatActionRecord(state, s, REC(GOV('OLIGARCHY')));
+    applySeatPolicies(state, s, REC(GOV('OLIGARCHY')));
     expect(seatGovernment(state, 0)).toBe('AUTOCRACY');
     expect(s.treasury).toBe(cost - 1);
     s.treasury = cost + 7;
     // the government and a new card set in one record pay once
     const card = POLICY_LIST.findIndex((p) => p.id === 'DISCIPLINE');
-    applySeatActionRecord(state, s, REC(GOV('OLIGARCHY'), [card]));
+    applySeatPolicies(state, s, REC(GOV('OLIGARCHY'), [card]));
     expect(seatGovernment(state, 0)).toBe('OLIGARCHY');
     expect(s.government.policies).toContain('DISCIPLINE');
     expect(s.treasury).toBe(7);
     // naming what the seat already holds changes nothing and costs nothing
-    applySeatActionRecord(state, s, REC(GOV('OLIGARCHY'), [card]));
+    applySeatPolicies(state, s, REC(GOV('OLIGARCHY'), [card]));
     expect(s.treasury).toBe(7);
   });
 
@@ -113,7 +113,7 @@ describe('the policy unlock', () => {
     s.government.civicTurn = 4;
     state.turn = 5;
     s.treasury = 0;
-    applySeatActionRecord(state, s, REC(GOV('CLASSICAL_REPUBLIC')));
+    applySeatPolicies(state, s, REC(GOV('CLASSICAL_REPUBLIC')));
     expect(seatGovernment(state, 0)).toBe('CLASSICAL_REPUBLIC');
     expect(s.treasury).toBe(0);
   });

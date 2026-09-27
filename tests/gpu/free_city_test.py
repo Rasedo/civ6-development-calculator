@@ -307,7 +307,10 @@ def test_heal_and_pressure(rules, path) -> None:
     F = sim.FREE_ROW
     sim.city_hp[B0, F, col] = 100
     sim.city_pop[B0, F, col] = 20
+    # a Free City heals at the game turn's end, with every other city
     sim._free_cities_phase()
+    assert int(sim.city_hp[B0, F, col]) == 100, "a Free City healed in its own turn"
+    sim._heal_cities()
     assert int(sim.city_hp[B0, F, col]) == 120, "a Free City did not heal"
     # its citizens press on the majors' loyalty walk as a foreign term
     spot = spot_at(sim, centre, 4)
@@ -326,6 +329,22 @@ def free_units(sim) -> list[tuple[int, int, int]]:
     al = sim.unit_alive[B0] & (sim.unit_seat[B0] == FREE_SEAT)
     return [(int(s), int(sim.unit_type[B0, s]), int(sim.unit_tile[B0, s]))
             for s in al.nonzero(as_tuple=True)[0].tolist()]
+
+
+def ring_walk(sim, centre: int, k: int) -> list[int]:
+    """`hexRingWalk`: the on-map plots of the ring of radius k round `centre`,
+    from its W corner along the NE, E, SE, SW, W and NW legs (odd-r axial)"""
+    W, H = sim.W, sim.H
+    col, row = centre % W, centre // W
+    q, r = col - (row - (row & 1)) // 2 - k, row
+    out = []
+    for dq, dr in ((1, -1), (1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1)):
+        for _ in range(k):
+            c = q + (r - (r & 1)) // 2
+            if 0 <= c < W and 0 <= r < H:
+                out.append(r * W + c)
+            q, r = q + dq, r + dr
+    return out
 
 
 def test_grants(rules, path) -> None:
@@ -359,11 +378,11 @@ def test_grants(rules, path) -> None:
     cid = int(sim.city_id[B0, F, col])
     assert int(sim.city_freed_turn[B0, F, col]) == t0
     # the former owner's melee pair exists on the flip turn itself, on the
-    # nearest free land plots, the lowest tile index first, in the hostile
-    # pool, each remembering the city that granted it
+    # nearest free land plots, the first on the ring's walk first, in the
+    # hostile pool, each remembering the city that granted it
     units = free_units(sim)
     assert [u[1] for u in units] == [pair, pair], units
-    nbs = sorted(int(n) for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n]))
+    nbs = [n for n in ring_walk(sim, centre, 1) if bool(sim.passable[B0, n])]
     assert [u[2] for u in units] == nbs[:2], (units, nbs)
     lo = sim.POOL_LO["barb"]
     assert all(s >= lo for s, _t, _p in units), "a Free Cities unit left the hostile pool"
@@ -403,8 +422,8 @@ def test_grants(rules, path) -> None:
 
 def test_grant_outward(rules, path) -> None:
     """With every land plot beside the centre held, the pair lands on the
-    NEAREST free land plots outward — 2 away, the lowest tile index first —
-    never on the centre (runs/c60s3_r*.jsonl)."""
+    NEAREST free land plots outward — 2 away, the first on the ring's walk
+    first — never on the centre (runs/c60s3_r*.jsonl)."""
     sim = fresh(rules, path)
     plant_city(sim, 0)
     col = int(sim.city_alive[B0, 0].nonzero()[-1])
@@ -420,13 +439,12 @@ def test_grant_outward(rules, path) -> None:
     sim._seat_loyalty_flips(0, flip)
     units = free_units(sim)
     assert len(units) == 2, units
-    d = sim.pair_dist[centre].to(torch.long)
     held = sim.military_at[B0] >= 0
     held[[u[2] for u in units]] = False
-    free2 = ((d == 2) & sim.passable[B0] & ~held).nonzero(as_tuple=True)[0].tolist()
+    free2 = [t for t in ring_walk(sim, centre, 2) if bool(sim.passable[B0, t]) and not bool(held[t])]
     assert [u[2] for u in units] == free2[:2], (units, free2[:2])
     assert all(u[2] != centre for u in units)
-    print("  7b the outward grant OK — ring 1 held, the pair lands 2 away, lowest index first, never the centre")
+    print("  7b the outward grant OK — ring 1 held, the pair lands 2 away, first on the ring's walk, never the centre")
 
 
 def test_grant_off_districts(rules, path) -> None:
@@ -438,7 +456,7 @@ def test_grant_off_districts(rules, path) -> None:
     col = int(sim.city_alive[B0, 0].nonzero()[-1])
     centre = int(sim.city_center[B0, 0, col])
     sim.city_pop[B0, 0, col] = 3
-    ring1 = sorted(int(n) for n in sim.neigh[centre].tolist() if n >= 0 and bool(sim.passable[B0, n]))
+    ring1 = [n for n in ring_walk(sim, centre, 1) if bool(sim.passable[B0, n])]
     theater = ring1[0]
     sim.district[B0, theater] = next(i for i, d in enumerate(sim.districts_cat) if d["id"] == "THEATER_SQUARE")
     sim.district_complete[B0, theater] = True

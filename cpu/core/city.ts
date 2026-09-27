@@ -1037,11 +1037,11 @@ export function computeCityStats(
   mods?: Modifiers,
   /**
    * Store this walk's worked-tile pick on the city. FALSE for every
-   * caller but `seatPhase`'s loop-top snapshot: `computeCityStats` is a pure
-   * read that four other rules call at four other points in the turn, and a
-   * pick recorded from the SCORE walk would be the post-growth one — the turn
-   * itself ran on the snapshot. One writer, so the stored pick is the pick
-   * the turn actually used.
+   * caller but `seatPhase`'s read after the productions, the one each city
+   * grows, claims and takes its loyalty on: `computeCityStats` is a pure read
+   * that other rules call at other points in the turn, and a pick recorded
+   * from the SCORE walk would be the post-growth one. One writer, so the
+   * stored pick is the pick the turn actually used.
    */
   record = false,
 ): CityStats {
@@ -1071,9 +1071,9 @@ export function computeCityStats(
 
   const worked = workedTilesOf(state, city, ctx, specialistTotal);
   // the pick this walk MADE, kept where the census can read it. Never a
-  // recomputation, and never from a second caller: the walk is a loop-top
-  // SNAPSHOT, so a growth landing later in the same turn would change what a
-  // fresh call answers while the turn itself ran on this one.
+  // recomputation, and never from a second caller: the city's growth lands
+  // after its last read of the turn, so a fresh call would answer for a city
+  // the turn did not run on.
   if (record) city.workedTiles = worked;
 
   const tiles = emptyYields();
@@ -1357,9 +1357,9 @@ export function computeCityStats(
       + ` spec${completedDistrictCount(state, city, true)}`);
   }
   // the tier this walk RAN ON, kept where the census can read it — never a
-  // recomputation, for the same reason `workedTiles` is not one: the walk is
-  // a loop-top snapshot and the turn's own growth moves what a fresh call
-  // would answer.
+  // recomputation, for the same reason `workedTiles` is not one: the city's
+  // growth lands after its last read and moves what a fresh call would
+  // answer.
   if (record) city.amenityTier = amenityTierIndex(tier.name);
 
   const total = emptyYields();

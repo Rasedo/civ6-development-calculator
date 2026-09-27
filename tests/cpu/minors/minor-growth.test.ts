@@ -3,14 +3,12 @@
  *
  * CIV6 (City-state): the install has ONE city rule, so the minor's city fills
  * a FOOD BOX and takes ground on a CULTURE BOX exactly as a major's does.
- * Before this it moved +1 population every twelve turns and never claimed a
- * tile at all.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { minorPhase } from '../../../cpu/core/minorBuild';
-import { cityStatePhase, minorCity, resolveSuzerain } from '../../../cpu/core/cityStates';
+import { minorCity, resolveSuzerain } from '../../../cpu/core/cityStates';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
 
@@ -46,18 +44,6 @@ describe("a minor's city keeps a real food box", () => {
     expect(view.foodBox).toBe(7);
     expect(view.cultureBox).toBe(3);
     expect(view.tilesAcquired).toBe(2);
-  });
-
-  it('grows on the box and never on a twelve-turn clock', () => {
-    const { state, cs } = scene();
-    const pop0 = cs.population;
-    // the clock's old trigger: turns 12, 24 and 36 moved the population by
-    // themselves. `cityStatePhase` must no longer touch it at all.
-    for (const t of [12, 24, 36]) {
-      state.turn = t;
-      cityStatePhase(state);
-    }
-    expect(cs.population).toBe(pop0);
   });
 
   it('fills the box from its own surplus', () => {

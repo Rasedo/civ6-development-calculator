@@ -177,10 +177,14 @@ def make_holy_site(sim, r: int, j: int) -> int:
 
 def follow_all(sim, g: int) -> None:
     """Force every alive city (seat 0 + the civ seats) to follow religion g, so
-    a fresh missionary finds NO target and keeps its full charges."""
-    sim.city_followed[0, 0, :sim.RC] = torch.where(sim.city_alive[0, 0], torch.full_like(sim.city_followed[0, 0, :sim.RC], g), sim.city_followed[0, 0, :sim.RC])
-    if sim.n_majors > 1:
-        sim.city_followed[0, 1:sim.n_majors, :sim.RC] = torch.where(sim.city_alive[0, 1:sim.n_majors], torch.full_like(sim.city_followed[0, 1:sim.n_majors, :sim.RC], g), sim.city_followed[0, 1:sim.n_majors, :sim.RC])
+    a fresh missionary finds NO target and keeps its full charges. The
+    majority pressure goes with it, so a spread earlier in the phase re-picks
+    the same religion."""
+    live = sim.city_alive[0, :sim.n_majors, :sim.RC]
+    sim.city_followed[0, :sim.n_majors, :sim.RC] = torch.where(
+        live, torch.full_like(sim.city_followed[0, :sim.n_majors, :sim.RC], g), sim.city_followed[0, :sim.n_majors, :sim.RC])
+    sim.city_pressure[0, :sim.n_majors, :sim.RC, g] = torch.where(
+        live, torch.full_like(sim.city_pressure[0, :sim.n_majors, :sim.RC, g], 9000), sim.city_pressure[0, :sim.n_majors, :sim.RC, g])
 
 
 def live_missionaries(sim, r: int) -> list[int]:
@@ -482,7 +486,7 @@ def poke_presr(rules, rj, path):
         for s in (S2, S3):
             sim.city_pressure[0, r + 1, s] = 0
             sim.city_followed[0, r + 1, s] = -1
-        sim._spread_religious_pressure()
+        sim._spread_religious_pressure(r + 1, torch.ones(sim.B, dtype=torch.bool))
         return int(sim.city_pressure[0, r + 1, S2, g]), int(sim.city_pressure[0, r + 1, S3, g])
 
     # WITH ITINERANT: range base+3 -> receiver at base+3 gets the Holy City's step, base+4 nothing.
@@ -500,12 +504,12 @@ def poke_presr(rules, rj, path):
 def poke_free_city_pressure(rules, rj, path):
     """6b. THE FREE ROW IS IN THE WALK. `CivilizationLevels` names no
     religion column and the spread operation carries no owner filter, so a
-    Free City takes pressure like any other city and presses back once it
-    follows. The walk covered the majors alone on both engines.
+    Free City takes pressure like any other city and presses back, on the
+    Free Cities' own turn, once it follows.
 
-    This poke also guards the axis the widening put at risk: `O` counts
-    RELIGIONS and `NSC` counts CITY ROWS, and they stopped being the same
-    number. A Free City must NOT be treated as founding religion FREE_ROW."""
+    This poke also guards the axis: `O` counts RELIGIONS and `NSC` counts
+    CITY ROWS, and they are not the same number. A Free City must NOT be
+    treated as founding religion FREE_ROW."""
     sim = build(rules, path)
     g = 1
     F = sim.FREE_ROW
@@ -534,13 +538,14 @@ def poke_free_city_pressure(rules, rj, path):
     sim.city_followed[0, F, 0] = -1
 
     step = int(sim._holy_city_mult) * int(sim._pressure_per_turn)
-    sim._spread_religious_pressure()
+    every = torch.ones(sim.B, dtype=torch.bool)
+    sim._spread_religious_pressure(g, every)
     got = int(sim.city_pressure[0, F, 0, g])
     assert got == step, f"the free row took {got} pressure, expected the Holy City's {step}"
 
     # it FOLLOWS once the majority is its...
     sim.city_pressure[0, F, 0, g] = 9000
-    sim._spread_religious_pressure()
+    sim._spread_religious_pressure(g, every)
     assert int(sim.city_followed[0, F, 0]) == g, "the free row never followed"
 
     # ...and then it is a SOURCE: a second major city beside it takes the free
@@ -551,7 +556,7 @@ def poke_free_city_pressure(rules, rj, path):
     sim.city_pressure[0, g, S2] = 0
     sim.city_followed[0, g, S2] = -1
     sim.city_alive[0, g, 0] = False          # silence the Holy City
-    sim._spread_religious_pressure()
+    sim._spread_religious_pressure(F, every)
     lone = int(sim.city_pressure[0, g, S2, g])
     assert lone > 0, "a following Free City pressed nobody — the free row is not a SOURCE"
 

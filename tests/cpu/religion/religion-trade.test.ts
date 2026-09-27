@@ -380,18 +380,18 @@ describe('religious pressure spread', () => {
     };
     // an EVEN turn: 1 down the route, the half-point back
     state.turn = 10;
-    expect(delta(b, 0, () => spreadReligiousPressure(state))).toBe(1);
-    expect(delta(a, 1, () => spreadReligiousPressure(state))).toBe(1);
+    expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(1);
+    expect(delta(a, 1, () => spreadReligiousPressure(state, 0))).toBe(1);
     // an ODD turn: 1 down the route, nothing back
     state.turn = 11;
-    expect(delta(b, 0, () => spreadReligiousPressure(state))).toBe(1);
-    expect(delta(a, 1, () => spreadReligiousPressure(state))).toBe(0);
+    expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(1);
+    expect(delta(a, 1, () => spreadReligiousPressure(state, 0))).toBe(0);
     // each Holy City's own step rides beside it
-    expect(delta(a, 0, () => spreadReligiousPressure(state))).toBe(step);
+    expect(delta(a, 0, () => spreadReligiousPressure(state, 0))).toBe(step);
     // India: +100% on the OWNER's routes — 2 down, 1 back, on an odd turn too
     state.seats[0].civ = CIV_LEADERS.findIndex((l) => l.civ === 'INDIA');
-    expect(delta(b, 0, () => spreadReligiousPressure(state))).toBe(2);
-    expect(delta(a, 1, () => spreadReligiousPressure(state))).toBe(1);
+    expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(2);
+    expect(delta(a, 1, () => spreadReligiousPressure(state, 0))).toBe(1);
   });
 
   it("a holy city converts cities within range each turn; distant cities stay unconverted", () => {

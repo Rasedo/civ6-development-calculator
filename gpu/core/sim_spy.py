@@ -456,8 +456,11 @@ class SimSpy:
             self.unit_spy_turns[b, v] = int(self._spy_mission_turns(row, m, _sc)[b])
             return
         lvl = self._spy_effective_level(row, b, v, m, hr, hc)
+        # a counterspy guarding the district lowers the realised roll, flat
+        guard = (self._spy_counterspy_roll
+                 if self._counterspies_guarding(b, hr, hc, int(self.unit_tile[b, v])).numel() else 0)
         out = (self.M_SUCCESS_UNDETECTED if bool(mdef["certain"])
-               else self._mission_outcome(self._mission_roll(b), self._mission_threshold(m, lvl)))
+               else self._mission_outcome(self._mission_roll(b) - guard, self._mission_threshold(m, lvl)))
         if mdef["offensive"]:
             # CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_SPY): an offensive operation
             # run in the city is the spying the promise forbids, whatever its

@@ -749,17 +749,16 @@ class SimEconomy:
               & ~self._env_immune()[rows, tiles])
         self.pillaged[rows[ok], tiles[ok]] = True
 
-    def _pillage_district(self, rows: torch.Tensor, tiles: torch.Tensor, buildings: bool = True) -> None:
+    def _pillage_district(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile,
         not just the improvement — the buildings inside go dark with it, which
         is what a Dam is built to prevent. The `district` plane never encodes a
-        city CENTRE, so centres are outside this by construction."""
+        city CENTRE, so centres are outside this by construction.
+        DISTRICT_PILLAGED takes every building standing in it."""
         ok = ((self.district[rows, tiles] >= 0) & self.district_complete[rows, tiles]
               & ~self.district_pillaged[rows, tiles] & ~self._env_immune()[rows, tiles])
         self.district_pillaged[rows[ok], tiles[ok]] = True
-        if buildings:
-            # DISTRICT_PILLAGED takes every building standing in it
-            self._pillage_held(rows[ok], tiles[ok], top_only=False)
+        self._pillage_held(rows[ok], tiles[ok], top_only=False)
 
     def _pillage_tile_buildings(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """`pillageTileBuildings` — CIV6 (RandomEvent_Damages):
@@ -1161,20 +1160,35 @@ class SimEconomy:
         # CIV6 (Aid Request trigger): the rows whose city loses population this phase
         self._aid_hit = torch.zeros(B, self.n_majors, dtype=torch.bool, device=dev)
 
+        # CIV6: the live storms walk and strike first, then the volcano roll,
+        # then the turn's random event and its effects — a new storm's
+        # footprint at its strike plot among them
+        # (tools/civ6lab/turn_order_civ6.md: `Storm Direction` opens 67 of 76
+        # turns, `Active Volcano Roll` after it 76 of 76, `Random Event Roll`
+        # after that 190 of 190).
+        self._storms_turn(self.storm_left > 0, strip)
         self._wake_volcanoes()
         # CIV6 (RANDOM_EVENT_START_TURN): no event fires before its first turn,
         # and no draw is spent
         if int(self.turn) >= self._random_event_start_turn:
             self._random_event(strip)
+            born = (self.storm_left > 0) & (
+                self._st_duration[self.storm_event.clamp(min=0)] == self.storm_left)
+            self._storms_turn(born, strip)
         self._fire_turn()
-        # CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
-        # storm lives three turns — ENTRY (the footprint at the strike plot),
-        # MOVEMENT (the centre walks `_st_movement` unit steps, then the
-        # footprint lands where it stopped), DISSIPATION (it walks once more
-        # and does no damage). Live storms go in ascending centre index, the
-        # order taken BEFORE any of them moves, so none walks twice in one
-        # turn (`disasterPhase`'s `live` list).
-        live = self.storm_left > 0
+        # CIV6 (EMERGENCY_SEND_AID): the phase's lowest victim asks for aid, once
+        self._raise_aid_request(self._aid_hit)
+        self._aid_hit = None
+        self._eff_version += 1
+
+    def _storms_turn(self, live: torch.Tensor, strip: torch.Tensor) -> None:
+        """`stormsTurn` — the turn of each storm centred on `live` [B, T].
+        CIV6 (`RandomEvents`, Duration 3 / Movement 8 — MEASURED, ask 16): a
+        storm lives three turns — ENTRY (the footprint at the strike plot),
+        MOVEMENT (the centre walks `_st_movement` unit steps, then the
+        footprint lands where it stopped), DISSIPATION (it walks once more and
+        does no damage). The storms go in ascending centre index, the order
+        taken BEFORE any of them moves, so none walks twice in one turn."""
         order = live.long().cumsum(dim=1) * live.long()
         for k in range(1, int(order.max()) + 1):
             at = order == k
@@ -1200,10 +1214,6 @@ class SimEconomy:
             self.storm_left[rows, c] = left_now
             self.storm_event[rows, c] = torch.where(
                 left_now > 0, self.storm_event[rows, c], torch.full_like(left_now, -1))
-        # CIV6 (EMERGENCY_SEND_AID): the phase's lowest victim asks for aid, once
-        self._raise_aid_request(self._aid_hit)
-        self._aid_hit = None
-        self._eff_version += 1
 
     # ---- THE TURN'S ONE RANDOM EVENT ---------------------------------------
 
@@ -1968,15 +1978,20 @@ class SimEconomy:
     def _nuclear_accident(self, hit: torch.Tensor, centre: torch.Tensor, sev: int) -> None:
         """`nuclearAccident` — a nuclear accident at severity `sev` in the
         city centred on `centre`, a major's or a Free City's, MEASURED over 225
-        forced accidents. FIVE draws, always: the Industrial Zone is pillaged
-        at the row's district chance, ONE citizen is lost at its population
-        chance (never the last), and the units on the reactor's own plot take
-        the row's UNIT_DAMAGE_LAND share and band and its UNIT_KILLED_CIVILIAN
-        chance (`_strike_units`). Fallout lies on that plot, the Industrial
-        Zone, for the row's turns. No building is destroyed, no ring
-        improvement pillaged, no unit off the plot struck, and the plant is
-        never pillaged: it stays, ageing on."""
+        forced accidents. SIX draws, always. Every accident pillages the Power
+        Plant (runs/reactor_reactor_base_20260927T053410Z.jsonl,
+        runs/reactor_reactor_base_20260927T053613Z.jsonl,
+        runs/reactor_reactor_base_20260927T054059Z.jsonl); then the row's
+        BUILDING_PILLAGED chance takes the top of the Industrial Zone's chain
+        still standing and its DISTRICT_PILLAGED chance the zone and every
+        building in it. ONE citizen is lost at its population chance (never
+        the last), and the units on the reactor's own plot take the row's
+        UNIT_DAMAGE_LAND share and band and its UNIT_KILLED_CIVILIAN chance
+        (`_strike_units`). Fallout lies on that plot, the Industrial Zone, for
+        the row's turns. No building is destroyed, no ring improvement
+        pillaged, no unit off the plot struck; the plant stays, ageing on."""
         r_district = self._next_random(hit)
+        r_bldg = self._next_random(hit)
         r_pop = self._next_random(hit)
         r_land = self._next_random(hit)
         r_civilian = self._next_random(hit)
@@ -1992,8 +2007,17 @@ class SimEconomy:
             if rr.numel():
                 self.tile_fallout[rr, tt] = torch.maximum(
                     self.tile_fallout[rr, tt], self._accident_fallout[sev].expand_as(tt))
+                if self._nuclear_bidx >= 0:
+                    rw, sw, nb = row_of[has], slot[has].clamp(min=0), self._nuclear_bidx
+                    plant = (self.city_bldg[rr, rw, sw, nb] & ~self.city_bldg_pillaged[rr, rw, sw, nb]
+                             & ~self._env_immune()[rr, tt])
+                    if bool(plant.any()):
+                        self.city_bldg_pillaged[rr[plant], rw[plant], sw[plant], nb] = True
+                        self._eff_version += 1
+                bl = r_bldg[rr] < self._accident_bldg_p[sev]
+                self._pillage_tile_buildings(rr[bl], tt[bl])
                 pil = r_district[rr] < self._accident_district_p[sev]
-                self._pillage_district(rr[pil], tt[pil], buildings=False)
+                self._pillage_district(rr[pil], tt[pil])
                 on = torch.zeros_like(hit)
                 on[rr] = True
                 plot = torch.zeros_like(centre)
@@ -2813,7 +2837,7 @@ class SimEconomy:
         """[B] the adopted government's tier (0 if none) — the
         GOV_INFLUENCE_TIER lookup, which equals the government tier by
         definition (data/cityStates.ts) — added to the city-state influence
-        rate exactly like cityStatePhase."""
+        rate exactly as `seatPhase` adds it."""
         if not self._ngov:
             return torch.zeros(self.B, dtype=torch.long, device=self.device)
         adopted, has_gov = self._adopted_gov(row)
@@ -4576,20 +4600,26 @@ class SimEconomy:
         plane[:, :M].copy_(val[:, :M])
         plane[:, self.FREE_ROW:self.FREE_ROW + 1].copy_(val[:, M:M + 1])
 
-    def _spread_religious_pressure(self) -> None:
-        """The spreadReligiousPressure twin. CIV6 (GlobalParameters): every
-        city FOLLOWING a religion presses every live city within range each
-        turn — the Holy City at x4, a city with a Holy Site at x2, any other
-        at x1, times the Bishop's doubling at the source — and each city then
-        follows the religion holding more than half of its total pressure with
-        the atheism baseline (`_followed_religion`). Religions are the seat
-        rows: g IS seat g. Deterministic, zero-RNG.
+    def _spread_religious_pressure(self, src: int, act: torch.Tensor) -> None:
+        """The spreadReligiousPressure twin, from the cities of row `src` (a
+        major's row or the Free Cities row) on that row's own turn, in the
+        games of `act` [B]. CIV6: a player's cities press their neighbours
+        during its start of turn and the neighbours convert then
+        (tools/civ6lab/turn_order_civ6.md: 13 of 15 follower changes inside
+        the presser's block). CIV6 (GlobalParameters): every city of `src`
+        FOLLOWING a religion presses every live city within range — the Holy
+        City at x4, a city with a Holy Site at x2, any other at x1, times the
+        Bishop's doubling at the source — `src`'s trade routes carry their
+        religions both ways, and every city then follows the religion holding
+        more than half of its total pressure with the atheism baseline
+        (`_followed_religion`). Religions are the seat rows: g IS seat g.
+        Deterministic, zero-RNG.
 
-        KILL hygiene: dead/absent slots are zeroed each turn (torch.where on the
-        alive mask), so a razed-then-reused slot starts fresh — the TS mirror is
-        the fresh City object a founded/flipped city gets. city_pressure/city_followed
-        permute with their city in _reclaim_cities, so pressure tracks the CITY, not
-        the slot, through compaction."""
+        KILL hygiene: dead/absent slots are zeroed at every spread (torch.where
+        on the alive mask), so a razed-then-reused slot starts fresh — the TS
+        mirror is the fresh City object a founded/flipped city gets.
+        city_pressure/city_followed permute with their city in _reclaim_cities,
+        so pressure tracks the CITY, not the slot, through compaction."""
         B, O = self.B, self.n_majors
         # Itinerant Preachers: per-religion range — base + the religion's
         # claimed enhancer's presR. A religion is keyed by its FOUNDER's row
@@ -4608,50 +4638,46 @@ class SimEconomy:
         _rw = self._relig_rows
         RC = self.city_center.shape[2]
         K = NSC * RC
+        s = src if src < M else M  # the source row's place on the walked axis
         liv = _rw(self.city_alive)                                       # [B, NSC, RC]
         cen_f = _rw(self.city_center).clamp(min=0).reshape(B, K)
-        fol = _rw(self.city_followed).reshape(B, K)                      # [B, K] the SOURCE's religion
-        # which RELIGION each walked row founds, -1 for a row that founds none
-        # (the Free Cities player) — what the two "is this the owner's own
-        # religion" tests key on, in place of an arange over rows.
-        row_rel = torch.cat([torch.arange(M, device=self.device),
-                             torch.full((1,), -1, dtype=torch.long, device=self.device)])
-        emits = (fol >= 0) & liv.reshape(B, K) & founded.gather(1, fol.clamp(min=0))
+        # THE SOURCE: row `src`'s cells alone, each with the religion it follows
+        s_cen = cen_f.reshape(B, NSC, RC)[:, s]                          # [B, RC]
+        s_fol = self.city_followed[:, src, :RC]
+        emits = ((s_fol >= 0) & liv[:, s] & founded.gather(1, s_fol.clamp(min=0))
+                 & act.unsqueeze(1))
         # the source's step: the Holy City x4 — CIV6 (Jerusalem's suzerain):
         # "Your cities with Holy Sites exert pressure as if they were Holy
         # Cities", so the founder's own Holy-Site cities take that step too —
         # a Holy Site city x2, any other x1. The two do not stack.
-        holy = emits & (cen_f == self.holy_tile.gather(1, fol.clamp(min=0)))
-        site = torch.zeros(B, NSC, RC, dtype=torch.bool, device=self.device)
+        holy = emits & (s_cen == self.holy_tile.gather(1, s_fol.clamp(min=0)))
+        site = torch.zeros(B, RC, dtype=torch.bool, device=self.device)
         if self._hs_idx >= 0:
-            hs = _rw(self.city_dist_tile)[..., self._hs_idx]
-            hsc = hs.clamp(min=0).reshape(B, K)
-            site = ((hs >= 0).reshape(B, K) & self.district_complete.gather(1, hsc)
-                    & ~self.district_pillaged.gather(1, hsc)).reshape(B, NSC, RC)
-            if self._suz_c_holy >= 0:
-                own_rel = fol.reshape(B, NSC, RC) == row_rel.reshape(1, NSC, 1)
-                # a suzerain effect is a MAJOR's; the free row claims none
-                jm = torch.cat([torch.stack([self._suz_effect(g, self._suz_c_holy) for g in range(M)], dim=1),
-                                torch.zeros(B, 1, dtype=torch.bool, device=self.device)], dim=1)  # [B, NSC]
-                holy = holy | (site & own_rel & jm.unsqueeze(2)).reshape(B, K)
-        site_f = site.reshape(B, K)
-        step = torch.where(holy, self._holy_city_mult, torch.where(site_f, self._holy_site_mult, 1)) * self._pressure_per_turn
+            hs = self.city_dist_tile[:, src, :RC, self._hs_idx]
+            hsc = hs.clamp(min=0)
+            site = (hs >= 0) & self.district_complete.gather(1, hsc) & ~self.district_pillaged.gather(1, hsc)
+            # a suzerain effect is a MAJOR's; the free row claims none
+            if self._suz_c_holy >= 0 and src < M:
+                holy = holy | (site & (s_fol == src) & self._suz_effect(src, self._suz_c_holy).unsqueeze(1))
+        step = torch.where(holy, self._holy_city_mult, torch.where(site, self._holy_site_mult, 1)) * self._pressure_per_turn
         # CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
-        # stronger from this city" — the SOURCE city's own governor.
-        if self.n_governors:
-            # a governor is a MAJOR's; the free row's multiplier is the identity
-            bishop = torch.cat([torch.stack([self._governor_mult(g, "pressureMult") for g in range(M)], dim=1),
-                                torch.ones(B, 1, RC, dtype=torch.float64, device=self.device)],
-                               dim=1).reshape(B, K)
-            step = (step.double() * bishop.double()).long()
-        w = torch.where(emits, step, torch.zeros_like(step))            # [B, K]
+        # stronger from this city" — the SOURCE city's own governor, a major's.
+        if self.n_governors and src < M:
+            step = (step.double() * self._governor_mult(src, "pressureMult").double()).long()
+        w = torch.where(emits, step, torch.zeros_like(step))            # [B, RC]
         # every receiver against every source: within the SOURCE religion's range
-        d = self.pair_dist[cen_f.unsqueeze(2), cen_f.unsqueeze(1)].to(torch.long)   # [B, K recv, K src]
-        reach = RANGE.gather(1, fol.clamp(min=0))                        # [B, K src]
-        contrib = torch.where(d <= reach.unsqueeze(1), w.unsqueeze(1), torch.zeros_like(d))  # [B, K, K]
-        onehot = ((fol.unsqueeze(2) == torch.arange(O, device=self.device).reshape(1, 1, O)) & emits.unsqueeze(2)).double()
+        d = self.pair_dist[cen_f.unsqueeze(2), s_cen.unsqueeze(1)].to(torch.long)   # [B, K recv, RC src]
+        reach = RANGE.gather(1, s_fol.clamp(min=0))                      # [B, RC src]
+        contrib = torch.where(d <= reach.unsqueeze(1), w.unsqueeze(1), torch.zeros_like(d))  # [B, K, RC]
+        onehot = ((s_fol.unsqueeze(2) == torch.arange(O, device=self.device).reshape(1, 1, O)) & emits.unsqueeze(2)).double()
         add = (contrib.double() @ onehot).long().reshape(B, NSC, RC, O) * liv.unsqueeze(3).long()
-        self._route_pressure_terms(add, founded, liv)
+        # which RELIGION each walked row founds, -1 for a row that founds none
+        # (the Free Cities player) — what the "is this the owner's own
+        # religion" test keys on, in place of an arange over rows.
+        row_rel = torch.cat([torch.arange(M, device=self.device),
+                             torch.full((1,), -1, dtype=torch.long, device=self.device)])
+        if src < M:
+            self._route_pressure_terms(add, founded, liv, src, act)
         # CIV6 (Citadel of God): "City ignores pressure ... from Religions not
         # founded by the Governor's player."
         if self.n_governors:
@@ -4695,7 +4721,8 @@ class SimEconomy:
         # EXODUS pays era score each time a city CONVERTS; compare against the
         # PRE-flip follow set, exactly like `wasFollowed`.
         was = _rw(self.city_followed).clone()
-        self._relig_row_write(self.city_followed, torch.where(liv, best, torch.full_like(best, -1)))
+        self._relig_row_write(self.city_followed, torch.where(
+            liv, torch.where(act.view(B, 1, 1), best, was), torch.full_like(best, -1)))
         _fol1 = _rw(self.city_followed)
         if bool((_fol1 != was).any()):
             # a city's majority religion decides the worship building it is
@@ -4721,7 +4748,8 @@ class SimEconomy:
         half = ((amt > whole) & (self.turn % 2 == 0)).double()
         return (whole + half).long()
 
-    def _route_pressure_terms(self, add: torch.Tensor, founded: torch.Tensor, liv: torch.Tensor) -> None:
+    def _route_pressure_terms(self, add: torch.Tensor, founded: torch.Tensor, liv: torch.Tensor,
+                              row: int, act: torch.Tensor) -> None:
         """CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 /
         _FOR_ORIGIN 0.5): every live route carries its ORIGIN's religion to
         the destination and the destination's back at half strength, Dharma's
@@ -4730,9 +4758,9 @@ class SimEconomy:
         pressure straight into its row and follows nothing.
 
         The RECEIVER axis is the caller's row set — the majors and the Free
-        Cities row — so a route ending at a Free City lands in `add`
-        like any other. The route OWNER loop stays over the majors: the Free
-        Cities player runs no trade route."""
+        Cities row — so a route ending at a Free City lands in `add` like any
+        other. The route OWNER is major row `row`, on its own turn, in the
+        games of `act`: the Free Cities player runs no trade route."""
         B, O, S = self.B, self.n_majors, self.S
         cen_f = self._relig_rows(self.city_center).reshape(B, -1)
         fol_f = self._relig_rows(self.city_followed).reshape(B, -1)
@@ -4744,11 +4772,9 @@ class SimEconomy:
             cell = hit.long().argmax(dim=2)
             return hit.any(dim=2), cell, fol_f.gather(1, cell)
 
-        for row in range(self.n_majors):
-            oc, dc = self._route_centres(row)
-            live = (oc >= 0) & (dc >= 0)
-            if not bool(live.any()):
-                continue
+        oc, dc = self._route_centres(row)
+        live = (oc >= 0) & (dc >= 0) & act.unsqueeze(1)
+        if bool(live.any()):
             pct_o = torch.zeros(B, dtype=torch.long, device=self.device)
             pct_d = torch.zeros(B, dtype=torch.long, device=self.device)
             for civ, lead, o_f, d_f, pct in self._live_rows(row, self._route_pressure_rows):
@@ -4793,8 +4819,8 @@ class SimEconomy:
         `seatOf(FREE_SEAT)`; a city-state's tile answers nobody on either
         engine); `near3` over the majors alone (TS's `allCities` is
         `state.seats`). `tile_city` holds PERSISTENT ids for every seat, so
-        one id match answers for every row. Keyed (turn, _eff_version):
-        followedReligion moves once per turn (_spread_religious_pressure) and
+        one id match answers for every row. Keyed (turn, _eff_version): a
+        spread that moves a followedReligion (_spread_religious_pressure) and
         every city-set/ownership change (founding, capture, transfer, claim,
         compaction) bumps _eff_version — so the keyed cache IS the TS live
         read within a turn."""
@@ -5928,10 +5954,11 @@ class SimEconomy:
 
         The walk runs in f64 on every row; row 0's f32 lane casts on return.
 
-        j: one column, for the per-city callers outside the seat block.
+        j: one column.
         amen_yf: [B, n] the tier's yieldFactor. The caller ranks amenities,
-           because seatPhase ranks luxuryAmenities ONCE per seat turn and feeds
-           that same map to every one of that seat's cities."""
+           because seatPhase ranks luxuryAmenities once per read and feeds that
+           same map to every city the read covers.
+        record: keep the worked-tile pick of the columns walked."""
         rd = self.rules_dev
         B, dev, F64 = self.B, self.device, torch.float64
         cols = self.RC
@@ -6021,8 +6048,8 @@ class SimEconomy:
         # "citizens 'working' the affected tiles are eliminated" reads it.
         # Stashed rather than recomputed, so this stays the ONE place the pick
         # is made.
-        if j is None and record:
-            self.city_worked[:, row, :n].copy_(
+        if record:
+            self.city_worked[:, row, sl].copy_(
                 torch.where(take, tiles.gather(2, top_idx), torch.full_like(top_idx, -1)))
         sel = [
             c.gather(2, top_idx) * takef
@@ -6674,48 +6701,35 @@ class SimEconomy:
         # Dead columns contribute nothing (their static centre yields preload).
         return torch.where(alive.unsqueeze(2), total, torch.zeros_like(total))
 
-    def _seat_city_stats(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """THE loop-top city-stats SNAPSHOT for seat row `row`: the twin of
-        seatPhase's `for (const c of actor.cities) cityStats.set(c.id,
-        computeCityStats(state, c, luxMap, seatMods))`, one call for the whole
-        block. Returns the CityStats fields the walk consumes —
-        (total [B, RC, 6], eff_surplus [B, RC], need [B, RC], tier_idx [B, RC]),
-        all f64.
+    def _seat_city_stats(self, row: int, record: bool = True) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """The city-stats read for seat row `row` as the state stands now: the
+        twin of `computeCityStats(state, c, luxuryAmenities(...),
+        getModifiers(...))` over every city of the row at once, one luxury
+        ranking for the whole read. Returns the CityStats fields the seat
+        block consumes — (total [B, RC, 6], eff_surplus [B, RC], need [B, RC],
+        tier_idx [B, RC]), all f64.
 
-        THE SNAPSHOT IS THE RULE, and it is the same rule for every row. A
-        completion, a border claim or a growth landing at column j does NOT
-        reach column j+1's yields, housing, amenity tier or growth factor this
-        turn: seatPhase computes the whole map before it mutates anything, and
-        real Civ 6 banks a turn's yields off the state the turn opened with — a
-        building finished this turn pays from the next one.
+        The seat block takes it three times: before the economy (the yields it
+        banks), after the economy (the Production each city puts in), and
+        after the productions (each city's growth, border claim and loyalty) —
+        only that last one with `record`.
 
-        Recomputing mid-walk behind an (_eff_version, _claim_version) key
-        would model a `game.ts` endTurn city loop that does not exist — every
-        seat takes its turn through `seatPhase` — and it would let two rows
-        read two different economies.
-
-        THIS is the walk that records the worked-tile pick, and the
-        only one: `seat_score` rides the same body at another point in the
-        turn, and a pick stashed from the SCORE walk would be
-        the post-growth one while the turn itself ran on the snapshot — a
-        difference in the INSTRUMENT, not in the engines. `seatPhase` records
-        from its loop-top snapshot for exactly the same reason."""
+        A `record` read keeps the worked-tile pick and the amenity tier where
+        the census reads them; `seat_score` rides the same body without
+        recording, so the stored pick is always the one the turn's growth
+        used."""
         tier_idx, growth_f, yield_f, _lux = self._seat_amenity(row)
-        # the tier this walk RAN ON, kept where the census reads it — the same
-        # contract the worked-tile stash below keeps, and for the same reason.
-        #
-        # ONLY where a city was ALIVE at the walk. TS records from
-        # `computeCityStats(record)`, which runs over the loop-top snapshot of
-        # the seat's cities, so a slot with no city — or one a founding later
-        # this turn is about to fill — carries the -1 the plane was born with.
-        # Writing the whole row instead handed a newborn the tier of the walk
-        # that never saw it, and the census read that as a divergence.
-        _alive_t = self.city_alive[:, row, : self.RC]
-        self.city_amen_tier[:, row, : self.RC] = torch.where(
-            _alive_t, tier_idx.to(self.city_amen_tier.dtype),
-            torch.full_like(self.city_amen_tier[:, row, : self.RC], -1))
+        if record:
+            # ONLY where a city is ALIVE. A slot with no city — or one a
+            # founding later this turn is about to fill — carries the -1 the
+            # plane was born with; TS records from `computeCityStats(record)`
+            # over the seat's own cities alone.
+            _alive_t = self.city_alive[:, row, : self.RC]
+            self.city_amen_tier[:, row, : self.RC] = torch.where(
+                _alive_t, tier_idx.to(self.city_amen_tier.dtype),
+                torch.full_like(self.city_amen_tier[:, row, : self.RC], -1))
         maint, housing = self._seat_housing(row)  # once: maintenance for the walk, housing below
-        total = self._seat_city_walk(row, amen_yf=yield_f, record=True, maint=maint)
+        total = self._seat_city_walk(row, amen_yf=yield_f, record=record, maint=maint)
         pop = self.city_pop[:, row, : self.RC].double()
         surplus = total[:, :, 0] - pop * self.rules.food_per_citizen
         head = housing - pop

@@ -329,7 +329,10 @@ def check_geo(sim, geos: list) -> Counter:
                       and int(sim.seat_friend_turns[b, a, x]) == 0 and int(sim.treaty_turns[b, a, x]) == 0)
                 assert g["joint_open"][a][x] == int(jo), f"{cell} joint_open"
                 assert g["spies_held"][a][x] == int(sim.seat_spy_held[b, a, x].sum()), f"{cell} spies_held"
-                assert g["offer_ask"][a][x] == sim.deal_offer_ask[b, a, x].flatten().tolist(), f"{cell} offer_ask"
+                # an offer that no longer stands asks for nothing
+                ask = (sim.deal_offer_ask[b, a, x].flatten().tolist() if int(sim.deal_offer_left[b, a, x]) > 0
+                       else [-1] * sim.deal_offer_ask[b, a, x].numel())
+                assert g["offer_ask"][a][x] == ask, f"{cell} offer_ask"
                 assert g["promise"][a][x] == sim.seat_promise[b, a, x].tolist(), f"{cell} promise"
                 cv = sum(1 for j in range(sim.RC) if bool(sim.city_alive[b, a, j])
                          and int(sim.city_followed[b, a, j]) == x) if other else 0

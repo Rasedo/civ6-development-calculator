@@ -7,6 +7,24 @@ from . import simbase  # `_ALIAS_CHECK` is patched by tests/gpu/state_discipline
 class SimStep:
     def step(self) -> None:
         dev = self.device
+        # ONE GAME TURN, as Civ 6 runs it (`endTurn`; tools/civ6lab/
+        # turn_order_civ6.md, runs/turnorder/): the players one at a time in
+        # ascending player id — the majors, the city-states, the Free Cities,
+        # the barbarians (16 of 16 turns); then the World Congress session and
+        # the heal of every unit and every city, both before the counter
+        # moves; then, on the new turn, the storms, the volcano roll and the
+        # random event, the climate step, the era and Ages, and the victory
+        # checks.
+        self._seat_phase()
+        self._city_state_phase()
+        self._free_cities_phase()
+        if self.units_mode:
+            self._barbarian_phase()
+
+        self._theological_combat_phase()
+        self._world_congress()
+        # every unit's heal, fortification and movement (`refreshUnits`), then
+        # every city's (`healCities`)
         if self.units_mode:
             cap = self.rules.combat["unitHp"]
             for _pre in ("barb", "major"):
@@ -53,16 +71,17 @@ class SimStep:
             for _pre in ("major", "barb"):
                 self._reset_mp(_pre)
             self._fallout_toll()
+        self._heal_cities()
 
-        if self.units_mode:
-            self._barbarian_phase()
+        self._ww_audit()
+        self.turn += 1
+        # a return's Anarchy ends as the turn reaches `civ_gov_anarchy_end`:
+        # the government channels change with no record behind them
+        if self._ngov and bool((self.civ_gov_anarchy_end == self.turn).any()):
+            self._eff_version += 1
         if self.disasters:
             self._disaster_phase()
-        self._city_state_phase()
-        self._seat_phase()
-        # CIV6's Free Cities player takes its turn after every major's
-        # (`freeCitiesPhase`)
-        self._free_cities_phase()
+        self._climate_turn()
 
         # --- Dead-slot reclamation, at the step END and never the top:
         # callers sample slot-keyed unit actions from the PRE-step masks, so
@@ -90,16 +109,6 @@ class SimStep:
         if self.n_majors > 1 and self._civ_city_reg_check:
             self._check_rc_registry_invariant()
 
-        self._theological_combat_phase()
-        self._spread_religious_pressure()
-        self._climate_turn()
-
-        self._ww_audit()
-        self.turn += 1
-        # a return's Anarchy ends as the turn reaches `civ_gov_anarchy_end`:
-        # the government channels change with no record behind them
-        if self._ngov and bool((self.civ_gov_anarchy_end == self.turn).any()):
-            self._eff_version += 1
         if self._era_len > 0 and self.turn % self._era_len == 0:
             # CIV6: "all roads in your territory will upgrade to the next
             # level automatically" on reaching the era that brings the tier,
@@ -158,7 +167,6 @@ class SimStep:
             self.era_score_past += self.era_score
             self.era_score[:] = 0
             self._era_inspirations()
-        self._world_congress()
         # THE EXOPLANET FLIGHT — CIV6: 1 light-year/turn plus one per laser
         # station standing behind it, and the win fires on ARRIVAL, not launch.
         # Ties in one turn go to the lowest row (argmax takes the FIRST True),

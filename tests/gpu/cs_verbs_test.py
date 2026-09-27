@@ -213,10 +213,19 @@ def main() -> None:
     print("  L3 not-suzerain gate OK (2 envoys < suzerain minimum)")
 
     # -- L4: AFFORDABILITY gate (one milli-unit short) ----------------------
+    # the levy is an action at the seat's block tail, after its economy has
+    # banked the turn's gold: the purse is measured there, so the start is
+    # set one milli-unit short of the price less that turn's net income
+    sim.restore(base)
+    prep_levy(sim, S0)
+    start = float(sim._levy_cost(R + 1, s0_t)[0])
+    sim.civ_treasury[0, R + 1] = start
+    sim._seat_phase()
+    net = float(sim.civ_treasury[0, R + 1]) - start
     sim.restore(base)
     prep_levy(sim, S0)
     stash_levy(sim, S0)
-    sim.civ_treasury[0, R + 1] = float(sim._levy_cost(R + 1, s0_t)[0]) - 0.001
+    sim.civ_treasury[0, R + 1] = float(sim._levy_cost(R + 1, s0_t)[0]) - 0.001 - net
     sim._seat_phase()
     assert int(sim.citystate_levy_seat[0, S0]) == -1, "L4: levied below the gold cost"
     print("  L4 affordability gate OK (no levy one milli-unit below cost)")

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
-import { hexDistance, neighbors, tilesWithin } from '../../../world/hex';
+import { hexRingWalk, neighbors, tilesWithin } from '../../../world/hex';
 import { eraUnitOfClass, flipCity, freeCityPairType, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
@@ -183,12 +183,12 @@ describe('the Free City step', () => {
     const centre = state.map.tiles[city.centerIndex];
     const free = () => state.units.filter((u) => u.seat === FREE_SEAT);
     // CIV6 (the live watches): the former owner's best melee, twice, on the
-    // flip turn itself, on the nearest free land plots, the lowest tile index
-    // first — seat 0 has researched nothing, so the Warrior
+    // flip turn itself, on the nearest free land plots, the first on the
+    // ring's walk first — seat 0 has researched nothing, so the Warrior
     const era = Math.max(0, worldEraIndex(state));
     expect(pair).toBe('WARRIOR');
-    const want = neighbors(state.map, centre).filter((t) => !isWater(t))
-      .sort((a, b) => a.index - b.index).slice(0, FREE_CITY_PAIR_COUNT);
+    const want = hexRingWalk(state.map, centre.col, centre.row, 1).filter((t) => !isWater(t))
+      .slice(0, FREE_CITY_PAIR_COUNT);
     expect(free().map((u) => u.type)).toEqual(Array(FREE_CITY_PAIR_COUNT).fill(pair));
     expect(free().map((u) => u.tileIndex)).toEqual(want.map((t) => t.index));
     expect(free().every((u) => u.freeCity === city.id)).toBe(true);
@@ -229,13 +229,38 @@ describe('the Free City step', () => {
     expect(ring1.every((t) => held.has(t.index))).toBe(true);
     border.loyalty = 0;
     flipCity(state, border);
-    // the pair lands 2 away, on the two lowest-index free land plots there
-    const want = tilesWithin(state.map, centre.col, centre.row, 2)
-      .filter((t) => hexDistance(centre.col, centre.row, t.col, t.row) === 2 && !isWater(t) && !held.has(t.index))
-      .sort((a, b) => a.index - b.index).slice(0, FREE_CITY_PAIR_COUNT);
+    // the pair lands 2 away, on the first two free land plots of that ring's walk
+    const want = hexRingWalk(state.map, centre.col, centre.row, 2)
+      .filter((t) => !isWater(t) && !held.has(t.index)).slice(0, FREE_CITY_PAIR_COUNT);
     const got = state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.tileIndex);
     expect(got).toEqual(want.map((t) => t.index));
     expect(got).not.toContain(centre.index);
+  });
+
+  // tools/civ6lab/c60w_bfs_fit.py: around Ngaruawahia (69,21), the first
+  // free usable plot on the ring walk is the plot each of the nine recorded
+  // grants took (runs/c60t_grant_w_*)
+  it('the ring walk starts at the W corner and turns NE, E, SE, SW, W, NW, plot for plot', () => {
+    const map = makeMap(80, 30);
+    const walk = [1, 2, 3].flatMap((k) => hexRingWalk(map, 69, 21, k)).map((t) => `${t.col},${t.row}`);
+    expect(walk.slice(0, 6)).toEqual(['68,21', '69,20', '70,20', '70,21', '70,22', '69,22']);
+    expect(walk.slice(6, 18)).toEqual(['67,21', '68,20', '68,19', '69,19', '70,19', '71,20',
+      '71,21', '71,22', '70,23', '69,23', '68,23', '68,22']);
+    expect(walk.slice(18, 20)).toEqual(['66,21', '67,20']);
+    const R2 = ['69,20', '68,19', '69,19', '68,20'];
+    const D3 = ['67,19', '67,20', '67,22', '67,23', '68,18', '69,18'];
+    const obs: [string[], string][] = [
+      [[...R2, ...D3], '69,20'],
+      [['68,19', '69,19', ...D3], '68,19'],
+      [['67,19', '67,22', '67,23', '68,18', '69,18'], '67,19'],
+      [['67,20', '67,22', '67,23', '68,18', '69,18'], '67,20'],
+      [['67,22', '67,23'], '67,23'],
+      [['67,19', '67,22', '67,23'], '67,19'],
+      [['67,19', '67,20', '68,18', '69,18'], '67,20'],
+      [['67,19', '67,22', '67,23', '68,18'], '67,19'],
+      [['67,19', '67,20', '67,22', '67,23', '69,18'], '67,20'],
+    ];
+    for (const [free, placed] of obs) expect(walk.find((p) => free.includes(p))).toBe(placed);
   });
 
   // runs/c60t_grant_A_b6920_20260927T000521Z.jsonl: with the one plain plot of
@@ -243,7 +268,7 @@ describe('the Free City step', () => {
   it('a grant never lands on a plot holding a district', () => {
     const { state, border } = scene(30);
     const centre = state.map.tiles[border.centerIndex];
-    const ring1 = neighbors(state.map, centre).filter((t) => !isWater(t)).sort((a, b) => a.index - b.index);
+    const ring1 = hexRingWalk(state.map, centre.col, centre.row, 1).filter((t) => !isWater(t));
     const theater = ring1[0];
     theater.district = 'THEATER_SQUARE';
     theater.districtComplete = true;

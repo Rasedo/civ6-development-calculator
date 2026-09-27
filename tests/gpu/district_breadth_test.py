@@ -330,8 +330,8 @@ def poke_worship_buy(rules, rj, path):
     """e. WORSHIP faith-buy: a religion-founder holding a Worship belief, with a
     Temple + a COMPLETE unpillaged Holy Site + the faith, buys the building
     the belief names for the flat worship price. The exact debit is isolated
-    by a two-run BUY-vs-OWN diff (both runs carry the worship building's
-    income; only BUY pays). A seat without the Temple does not buy."""
+    by a two-run BUY-vs-NO-BUY diff (the buy lands after the turn's faith is
+    banked; only BUY pays). A seat without the Temple does not buy."""
     sim = build(rules, path)
     r, j = 0, 0
     assert bool(sim.city_alive[0, r + 1, j]), "civ capital must be alive"
@@ -345,10 +345,14 @@ def poke_worship_buy(rules, rj, path):
     assert TEMPLE >= 0 and HS >= 0 and wb >= 0, "worship anchors missing from export"
 
     # make city j the SOLE eligible city; found the religion; strip beliefs so
-    # civ_only_religion_done is the only lever gating the buy (income identical across
-    # the two runs).
+    # civ_religion_done is the only lever gating the buy.
     sim.civ_religion_done[:, r + 1] = True
     sim.civ_worship[:, r + 1] = wk
+    # the worship building a city is offered is its MAJORITY religion's: city
+    # j follows the seat's own, with the pressure that keeps it following
+    # through the seat's spread earlier in the block
+    sim.city_followed[0, r + 1, j] = r + 1
+    sim.city_pressure[0, r + 1, j, r + 1] = 9000
     sim.civ_pantheon_done[:, r + 1] = True   # skip the pantheon-buy faith drain
     sim.civ_prophets[:, r + 1] = 0
     sim.civ_pantheon[:, r + 1] = -1
@@ -379,16 +383,15 @@ def poke_worship_buy(rules, rj, path):
     bought = bool(sim.city_bldg[0, r + 1, j, wb])
     assert bought, "founder with Temple + complete Holy Site + faith did not buy its worship building"
 
-    # control OWN: same state, but the city already owns the worship building ->
-    # no purchase, yet identical worship-building income. faith_own - faith_buy
-    # isolates the flat 114 debit.
+    # control NO-BUY: same state, no order. The purchase is an action at the
+    # seat's block tail, after its faith is banked, so the bought building
+    # pays nothing this turn and both runs bank the same income:
+    # faith_none - faith_buy isolates the flat debit.
     sim.restore(base)
-    sim.city_bldg[0, r + 1, j, wb] = True
-    order_worship(sim)
     sim._seat_phase()
-    faith_own = float(sim.civ_faith[0, r + 1])
-    assert abs((faith_own - faith_buy) - cost) < 1e-6, (
-        f"worship debit not exactly {cost} faith (own {faith_own} - buy {faith_buy} = {faith_own - faith_buy})"
+    faith_none = float(sim.civ_faith[0, r + 1])
+    assert abs((faith_none - faith_buy) - cost) < 1e-6, (
+        f"worship debit not exactly {cost} faith (none {faith_none} - buy {faith_buy} = {faith_none - faith_buy})"
     )
 
     # no Temple -> no buy at all

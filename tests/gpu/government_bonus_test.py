@@ -121,7 +121,7 @@ def test_the_flat_bonus_is_the_governments_alone(rules, path) -> None:
     chosen[:, p_idx] = True
     sim.seat_ext[:, ROW] = True
     sim.apply_seat_actions(ROW, policies=chosen)
-    sim._seat_record_apply(ROW, torch.ones(sim.B, dtype=torch.bool))
+    sim._seat_policy_apply(ROW, torch.ones(sim.B, dtype=torch.bool))
     assert bool(sim._seat_slotted(ROW)[0, p_idx]), "the store did not take the legacy card"
     fx = sim._gov_mods(ROW)[12]
     assert float(fx["govbldy"][0] - before[0]) == float(sim._gov_govbldy[auto]), "the legacy card did not pay Autocracy's inherent bonus"

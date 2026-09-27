@@ -4,7 +4,7 @@ import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner
 import type { CityState } from '../../../cpu/core/types';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, orderUnit } from '../helpers';
 import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
-import { seatPhase } from '../../../cpu/core/phase';
+import { healCities, seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
 import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, awardDefenseXp, trainXpPct, flankCount, supportCount, flankSupportLive, FLANK_SUPPORT_CIVIC, classMatchupCS, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV } from '../../../cpu/core/combat';
 import {
@@ -206,7 +206,7 @@ describe('barbarians', () => {
     expect(city.hp).toBe(CITY_MAX_HP / 2);
 
     state.units = []; // barbarians gone
-    seatPhase(state); // unbesieged cities heal in the SEAT phase
+    healCities(state); // unbesieged cities heal at the game turn's end
     expect(city.hp).toBe(CITY_MAX_HP / 2 + 20);
   });
 

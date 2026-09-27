@@ -97,6 +97,30 @@ export function tilesWithin(map: GameMap, col: number, row: number, radius: numb
   return out;
 }
 
+/** the legs of a ring walk, from the ring's W corner: NE, E, SE, SW, W, NW */
+const RING_WALK_LEGS = [DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW] as const;
+
+/** the on-map plots of the hex ring of radius `k` >= 1 around (col, row), in
+ *  walk order: from the ring's W corner (k plots due W), k steps along each
+ *  leg of `RING_WALK_LEGS` in turn. */
+export function hexRingWalk(map: GameMap, col: number, row: number, k: number): Tile[] {
+  const [cq, cr] = offsetToAxial(col, row);
+  let q = cq - k;
+  let r = cr;
+  const out: Tile[] = [];
+  for (const d of RING_WALK_LEGS) {
+    const [dq, dr] = AXIAL_DIRS[d];
+    for (let i = 0; i < k; i++) {
+      const [c, rr] = axialToOffset(q, r);
+      const t = tileAt(map, c, rr);
+      if (t) out.push(t);
+      q += dq;
+      r += dr;
+    }
+  }
+  return out;
+}
+
 export interface Vertex {
   col: number;
   row: number;

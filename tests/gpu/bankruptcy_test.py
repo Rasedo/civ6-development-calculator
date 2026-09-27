@@ -136,13 +136,13 @@ def main() -> int:
     sim.seat_shortfall[0, sim.FREE_ROW] = 15
     assert int(sim._bankrupt_amenities(sim.FREE_ROW)[0]) == 2
 
-    # 5. a city-state meets the same bankruptcy in its accrual
+    # 5. a city-state meets the same bankruptcy in its economy
     msg = "no minor on this fixture"
     if sim.S and bool(sim.citystate_alive[0, 0]):
         sim = build(rules, path)
         setup(sim, [S] + [H] * 12, list(range(100, 113)), 100)
         sim.citystate_treasury[0, 0] = 0.0
-        sim._minor_accrue(0)
+        sim._minor_economy(0)
         assert float(sim.citystate_treasury[0, 0]) == 0.0, "the minor's treasury clamps at 0"
         assert int(sim.seat_shortfall[0, sim._CITY_MINOR0]) >= 10
         assert not bool(sim.major_unit_alive[0, 0]), "the minor's first unit with upkeep should have gone"

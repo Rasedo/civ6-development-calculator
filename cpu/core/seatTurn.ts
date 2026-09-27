@@ -62,8 +62,8 @@ function policyTreatyFavor(state: GameState, seat: number): number {
 
 /** CIV6 (City-State Emergency, success): "+1 Gold/turn for each Envoy they
  *  have" — every envoy this seat has placed, not just the ones at the minor
- *  the emergency was about. */
-function emergencyEnvoyIncome(state: GameState, seat: number): number {
+ *  the emergency was about. Banked with the seat's gold. */
+export function emergencyEnvoyIncome(state: GameState, seat: number): number {
   const placed = state.cityStates.reduce((n, cs) => n + (cs.envoys[seat] ?? 0), 0);
   return emergencyEnvoyGold(state, seat, placed);
 }
@@ -71,7 +71,6 @@ function emergencyEnvoyIncome(state: GameState, seat: number): number {
 export function seatAccumulators(state: GameState, seat: number, govCityIds?: ReadonlySet<number>): void {
   const s = seatOf(state, seat);
   if (!s) return;
-  s.treasury = (s.treasury ?? 0) + emergencyEnvoyIncome(state, seat);
   let natGeneral = seatTourism(state, seat, govCityIds);
   const natReligious = seatTourismReligious(state, seat);
   // CIV6 (Film Studio): the per-rival extra, read with the same snapshot

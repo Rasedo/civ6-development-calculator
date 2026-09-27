@@ -206,6 +206,15 @@ const spyRoll = {
 export const SPY_ROLL_DICE = srcConst('eras.espionage.rollDice', 3, spyRoll);
 export const SPY_ROLL_FACES = srcConst('eras.espionage.rollFaces', 6, spyRoll);
 export const SPY_ROLL_LEVEL_BASE = srcConst('eras.espionage.rollLevelBase', 2, spyRoll);
+/** A counterspy guarding the district a mission is run in lowers that
+ *  mission's roll by 3, flat, whatever the post's level (the install's
+ *  UnitOperations EnemyProbChange 3). The mission preview
+ *  (`GetResultProbability`) shows no such term; the realised roll carries it. */
+export const SPY_COUNTERSPY_ROLL = srcConst('eras.espionage.counterspyRoll', 3, {
+  lab: 'runs/escape_cs_c16w_guard3b.log and runs/escape_cs_c16w_guard3c.log (save c16w_guard3_t156, '
+    + 'fit tools/civ6lab/c16w_mission_fit.py): 41 missions against a level-3 post on the target district, '
+    + 'logL -65.6 at a shift of 3 against -88.0 with no term',
+});
 export const SPY_TRAVEL_TURNS_MIN = 1;
 export const SPY_TRAVEL_TILES_PER_TURN = 8;
 export const SPY_TRAVEL_TURNS_MAX = 5;

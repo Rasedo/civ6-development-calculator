@@ -256,6 +256,42 @@ def main() -> None:
     assert not bool(sim._seat_buildable(foe)[B0, theirs, wk]), "a repaired building is still offered"
     print(f"  4 sabotage OK — the Workshop pillaged and dark, repaired at {want:.0f} of {full:.0f}")
 
+    # -- 5: a guarding post lowers the mission roll by 3, flat ----------------
+    assert sim._spy_counterspy_roll == 3
+    lvl5 = sim._spy_effective_level(row, B0, v, sim._spy_m_sabotage, foe, theirs)
+    t5 = sim._mission_threshold(sim._spy_m_sabotage, lvl5)
+    seed5 = None
+    for _seed in range(1, 20000):
+        sim.rng_state[B0] = _seed
+        _r = sum(int(sim._next_random(_one)[B0] * sim._spy_roll_faces) + 1 for _ in range(sim._spy_roll_dice))
+        if _r == t5 + 2:          # success unseen unguarded, fail unseen (2 - 3 = -1) guarded
+            seed5 = _seed
+            break
+    assert seed5 is not None, f"no seed in 20000 rolls T+2 against T={t5}"
+
+    def sabotage() -> bool:
+        sim.city_bldg_pillaged[B0, foe, theirs, wk] = False
+        sim.unit_spy_mission[B0, v] = sim._spy_idle
+        sim._gen_ver += 1
+        order(sim, row, v, sim._A_SPY_MISSION + sim._spy_m_sabotage)
+        for _ in range(int(sim.unit_spy_turns[B0, v]) - 1):
+            sim._tick_spies(row)
+        sim.rng_state[B0] = seed5
+        sim._tick_spies(row)
+        return bool(sim.city_bldg_pillaged[B0, foe, theirs, wk])
+
+    for glvl in (0, 2):
+        post = spawn_spy(sim, foe, ctr_t)       # on the centre, beside the Zone
+        sim.unit_spy_mission[B0, post] = sim._spy_m_counterspy
+        sim.unit_spy_level[B0, post] = glvl
+        before = int(sim.unit_spy_level[B0, v])
+        assert not sabotage(), f"a level-{glvl} post did not turn T+2 into a failure"
+        assert bool(sim.unit_alive[B0, v]) and int(sim.unit_spy_level[B0, v]) == before
+        sim.unit_alive[B0, post] = False
+        sim._gen_ver += 1
+    assert sabotage(), "the same roll unguarded did not succeed"
+    print("  5 guard OK — a post guarding the district lowers the roll by 3, whatever its level")
+
     print("BATTERY OK spy_district")
 
 

@@ -27,6 +27,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all
 
+
+def every_seat_diplomacy(sim) -> None:
+    """Every major's diplomacy in turn order, each at its own block's tail
+    (`_seat_turn`), then the phase's end: the keeps are for this turn alone."""
+    for r in range(sim.n_majors):
+        sim._geo_agreements(r)
+    sim._driven_geo["keep_promise"].clear()
+
 SPY, CONVERT, DIG, SETTLE = 0, 1, 2, 3
 RETRIBUTION = 9  # WAR_KINDS code
 
@@ -71,7 +79,7 @@ def settle(sim, asks: dict, keeps: dict) -> None:
         sim.apply_geo(row, ask_promise=mask(sim, cells))
     for row, cells in keeps.items():
         sim.apply_geo(row, keep_promise=mask(sim, cells))
-    sim._geo_agreements()
+    every_seat_diplomacy(sim)
 
 
 def n1(sim, v: int = 1) -> torch.Tensor:

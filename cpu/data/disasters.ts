@@ -898,7 +898,7 @@ export function floodTerrainColumn(terrain: string): number {
  * Industrial Zone is pillaged at DISTRICT_PILLAGED's 0 / 50 / 100, one citizen
  * is lost at POPULATION_LOSS's 0 / 0 / 80 — and RADIATION_LEAKED's
  * `FalloutDuration` 2 / 10 / 20 lies on the reactor's own plot alone. The
- * plant stays and goes on ageing.
+ * plant is pillaged by every accident, stays and goes on ageing.
  */
 const accident = (sev: string) => `RandomEventType=RANDOM_EVENT_NUCLEAR_ACCIDENT_${sev}`;
 const ACCIDENT_SEVS = ['MINOR', 'MAJOR', 'CATASTROPHIC'] as const;
@@ -923,6 +923,23 @@ export const ACCIDENT_DISTRICT_P = srcConst('disasters.accidentDistrictP', [0, 0
   inputs: [
     xml('RandomEvent_Damages', `${accident('MINOR')}&DamageType=DISTRICT_PILLAGED`, 'Percentage', { absent: true }),
     ...accidentDmg('DISTRICT_PILLAGED').slice(1),
+  ],
+});
+/**
+ * The accident's BUILDING_PILLAGED row: ONE building of the Industrial Zone,
+ * the top of its chain still standing once the Power Plant has gone (the
+ * Factory, never the Workshop: MINOR 4 of 35, MAJOR 13 of 13 zones the
+ * district row left standing; runs/reactor_reactor_base_20260927T053410Z.jsonl,
+ * runs/reactor_reactor_base_20260927T053613Z.jsonl,
+ * runs/reactor_reactor_base_20260927T054059Z.jsonl). CATASTROPHIC carries no
+ * such row; its DISTRICT_PILLAGED 100 takes the zone and every building in it.
+ */
+export const ACCIDENT_BLDG_P = srcConst('disasters.accidentBldgP', [0.2, 1, 0] as const, {
+  derived: 'Percentage/100 of each accident row\'s BUILDING_PILLAGED row (CATASTROPHIC carries none), the '
+    + 'chance one more Industrial Zone building is pillaged (measured 4/35, 13/13)',
+  inputs: [
+    ...accidentDmg('BUILDING_PILLAGED').slice(0, 2),
+    xml('RandomEvent_Damages', `${accident('CATASTROPHIC')}&DamageType=BUILDING_PILLAGED`, 'Percentage', { absent: true }),
   ],
 });
 /**

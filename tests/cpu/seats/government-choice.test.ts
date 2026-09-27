@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { seatOf } from '../../../cpu/core/seats';
-import { applySeatActionRecord } from '../../../cpu/core/phase';
+import { applySeatPolicies } from '../../../cpu/core/phase';
 import { endTurn } from '../../../cpu/core/game';
 import { getModifiers, governmentBit, governmentSlots, governmentsOpen, inAnarchy, seatGovernment } from '../../../cpu/core/effects';
 import { GOVERNMENT_LIST, POLICY_LIST } from '../../../cpu/data/policies';
@@ -36,7 +36,7 @@ function scene(...civics: string[]): GameState {
 }
 
 function adopt(state: GameState, rec: SeatActionRecord): void {
-  applySeatActionRecord(state, seatOf(state, 0)!, rec);
+  applySeatPolicies(state, seatOf(state, 0)!, rec);
 }
 
 describe('the government choice', () => {

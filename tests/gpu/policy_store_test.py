@@ -91,10 +91,10 @@ def main() -> int:
     active = torch.ones(sim.B, dtype=torch.bool)
     sim.seat_ext[:, ROW] = True
     sim.apply_seat_actions(ROW, policies=greedy)
-    sim._seat_record_apply(ROW, active)
+    sim._seat_policy_apply(ROW, active)
     assert torch.equal(sim.civ_policies[0, ROW], greedy[0]), "an accepted set was not stored"
     sim.apply_seat_actions(ROW, policies=bad)
-    sim._seat_record_apply(ROW, active)
+    sim._seat_policy_apply(ROW, active)
     assert torch.equal(sim.civ_policies[0, ROW], greedy[0]), "a refused set overwrote the store"
     got = _civ_mask("civ_policies")(sim, 0, [ROW])[0]
     assert got == greedy[0].nonzero().flatten().tolist(), got

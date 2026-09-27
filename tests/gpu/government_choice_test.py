@@ -71,7 +71,7 @@ def main() -> int:
     def record(g: int | None = None, policies=None) -> None:
         t = None if g is None else torch.full((sim.B,), g, dtype=torch.long)
         sim.apply_seat_actions(ROW, government=t, policies=policies)
-        sim._seat_record_apply(ROW, active)
+        sim._seat_policy_apply(ROW, active)
 
     def now() -> str | None:
         g, has = sim._adopted_gov(ROW)
@@ -151,7 +151,7 @@ def main() -> int:
     scene("CODE_OF_LAWS", "POLITICAL_PHILOSOPHY")
     records.replay_seat(sim, ROW, {"production": [], "tech": None, "civic": None, "units": [],
                                    "government": gov["OLIGARCHY"]})
-    sim._seat_record_apply(ROW, active)
+    sim._seat_policy_apply(ROW, active)
     assert now() == "OLIGARCHY", "the replayed record did not adopt"
     obs = neutral.seat_obs(sim, ROW)[0]["policy"]
     assert obs["government"] == gov["OLIGARCHY"], obs

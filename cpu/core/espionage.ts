@@ -18,7 +18,7 @@ import {
   SPY_UNIT, SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX,
   SPY_MAX_LEVEL, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS, SPY_TRAVEL_COLS,
   SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN,
-  SPY_TRAVEL_TURNS_MAX, SPY_ROLL_DICE, SPY_ROLL_FACES, SPY_ROLL_LEVEL_BASE,
+  SPY_TRAVEL_TURNS_MAX, SPY_ROLL_DICE, SPY_ROLL_FACES, SPY_ROLL_LEVEL_BASE, SPY_COUNTERSPY_ROLL,
   SPY_CAPTURE_PCT, SPY_ESCAPE_BASE, SPY_ESCAPE_LEVEL, SPY_ESCAPE_POLICE, SPY_ESCAPE_COUNTERSPY_LEVEL,
   BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
@@ -512,8 +512,11 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     return;
   }
   const lvl = effectiveLevel(state, unit, here.city, m);
+  // a counterspy guarding the district lowers the realised roll, flat
+  const guard = counterspiesGuarding(state, here.seat.seat, here.city, unit.tileIndex).length > 0
+    ? SPY_COUNTERSPY_ROLL : 0;
   const out = def.certain ? MISSION_SUCCESS_UNDETECTED
-    : missionOutcome(missionRoll(state), missionThreshold(def, lvl));
+    : missionOutcome(missionRoll(state) - guard, missionThreshold(def, lvl));
   // CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_SPY): an offensive operation run in
   // the city is the spying the promise forbids, whatever its outcome
   if (def.offensive) promiseIncursion(state, here.seat.seat, unit.seat, PROMISE_SPY, 1);

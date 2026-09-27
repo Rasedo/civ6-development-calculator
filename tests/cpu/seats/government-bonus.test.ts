@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { seatOf } from '../../../cpu/core/seats';
-import { applySeatActionRecord } from '../../../cpu/core/phase';
+import { applySeatPolicies } from '../../../cpu/core/phase';
 import { computeAdoption, goldPrice, faithPrice, governmentBit, getModifiers, slottedPolicyIndices } from '../../../cpu/core/effects';
 import { unitPurchaseCost } from '../../../cpu/core/game';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICY_LIST } from '../../../cpu/data/policies';
@@ -89,7 +89,7 @@ describe('what a legacy card pays', () => {
     expect(computeAdoption(s.research).government).not.toBe('AUTOCRACY');
     const before = getModifiers(state, 0);
     const legIdx = POLICY_LIST.findIndex((p) => p.id === 'LEGACY_AUTOCRACY');
-    applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [], policies: [legIdx] });
+    applySeatPolicies(state, s, { production: [], tech: null, civic: null, units: [], policies: [legIdx] });
     expect(slottedPolicyIndices(state, 0), 'the store did not take the legacy card').toContain(legIdx);
     const after = getModifiers(state, 0);
     expect(after.yieldsPerGovBuilding - before.yieldsPerGovBuilding).toBe(GOVERNMENTS.AUTOCRACY.effects.yieldsPerGovBuilding);

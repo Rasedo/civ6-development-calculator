@@ -7,11 +7,11 @@ import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production';
 import { isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
-import { tilesWithin, hexDistance, neighbors, neighborTile } from '../../world/hex';
+import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { nextRandom } from './rand';
-import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
+import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
@@ -26,7 +26,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
-import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS } from '../data/cityStates';
+import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS } from '../data/seats';
 import { landWalker, walkUnit } from './walker';
@@ -61,7 +61,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost } from './game';
+import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -669,7 +669,19 @@ export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
  *  one: with the one free plain plot of ring 1 held, the grant passed the
  *  district plot beside the centre for ring 2
  *  (runs/c60t_grant_A_b6920_20260927T000521Z.jsonl). Among the plots at one
- *  distance the lowest tile index takes it. The unit remembers the city that granted it
+ *  distance the first on a walk round the ring takes it: from the ring's W
+ *  corner, along its NE, E, SE, SW, W and NW legs in turn (`hexRingWalk`; 9
+ *  of 9 placements, tools/civ6lab/c60w_bfs_fit.py over
+ *  runs/c60t_grant_w_e2_20260927T023727Z.jsonl,
+ *  runs/c60t_grant_w_e3_20260927T023833Z.jsonl,
+ *  runs/c60t_grant_w_e4_20260927T023939Z.jsonl,
+ *  runs/c60t_grant_w_r2_t257_20260927T023501Z.jsonl,
+ *  runs/c60t_grant_w_r2_tb0_20260927T023234Z.jsonl,
+ *  runs/c60t_grant_w_r2_tb7_20260927T023321Z.jsonl,
+ *  runs/c60t_grant_w_x1_20260927T024145Z.jsonl,
+ *  runs/c60t_grant_w_x2_20260927T024232Z.jsonl,
+ *  runs/c60t_grant_w_x3_20260927T024338Z.jsonl,
+ *  runs/c60t_grant_w_x4_20260927T024445Z.jsonl). The unit remembers the city that granted it
  *  (`Unit.freeCity`): when that city joins a civilization, the grant goes
  *  (`joinFromFreeCity`). The units walk with the Free Cities' walker
  *  (`freeCitiesPhase`). */
@@ -677,15 +689,9 @@ function grantFreeCityUnit(state: GameState, city: City, unitType: string): void
   const probe = { type: unitType, seat: FREE_SEAT };
   const centre = state.map.tiles[city.centerIndex];
   let spot: Tile | undefined;
-  let bd = Infinity;
-  for (const t of state.map.tiles) {
-    if (t.index === centre.index) continue;
-    if (t.district) continue;
-    const d = hexDistance(centre.col, centre.row, t.col, t.row);
-    if (d < bd && tileFreeForUnit(state, t.index, FREE_SEAT, probe)) {
-      spot = t;
-      bd = d;
-    }
+  for (let k = 1; !spot && k <= state.map.width + state.map.height; k++) {
+    spot = hexRingWalk(state.map, centre.col, centre.row, k)
+      .find((t) => !t.district && tileFreeForUnit(state, t.index, FREE_SEAT, probe));
   }
   if (!spot) return;
   const u = spawnUnit(state, unitType, spot.index, FREE_SEAT);
@@ -765,13 +771,15 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  amenities are the ordinary composer's over the Free Cities seat — the full
  *  need of its population, the supply of what that seat holds (its own
  *  luxuries, buildings and districts; no government, policy or governor) —
- *  and the tier is recorded off a loop-top snapshot of every Free City. Its
+ *  and the tier is recorded off one read of every Free City. Its
  *  treasury banks the Gold those same stats make, in array order, then pays
  *  its units' upkeep and meets the `bankruptcy` that may force. Then each
  *  city takes its grant when one falls due,
  *  puts the same stats' Production into its build table (`freeCityBuild`),
- *  fires the ranged strikes any walled city fires, heals as any unbesieged
- *  city does and runs `freeCityLoyaltyDelta`. Then the Free Cities' land
+ *  fires the ranged strikes any walled city fires and runs
+ *  `freeCityLoyaltyDelta` (its heal is the turn's end's, `healCities`). Then
+ *  its cities' religious pressure goes out (`spreadReligiousPressure`), then
+ *  the Free Cities' land
  *  units walk (`walkUnit`, C-60's tables, around the nearest Free City, in
  *  unit order off a list taken before anyone moves); the cities that reached
  *  0 join their race's winner, in array order, after the walk. */
@@ -794,7 +802,15 @@ export function freeCitiesPhase(state: GameState): void {
     + ` n${state.units.filter((u) => u.seat === FREE_SEAT).length}`
     + ` cost${upkeep.toFixed(3)} purse${free.treasury.toFixed(3)}`);
   free.treasury -= upkeep;
+  const short0 = free.goldShortfall ?? 0;
   bankruptcy(state, free, (t) => unitUpkeep(mods, t));
+  // the cities' Production is read again where the shortfall moved what they
+  // make
+  if ((free.goldShortfall ?? 0) !== short0) {
+    const lux2 = luxuryAmenities(state, FREE_SEAT);
+    const mods2 = getModifiers(state, FREE_SEAT);
+    free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, lux2, mods2); });
+  }
   const joiners: City[] = [];
   const research = freeCityResearch(state);
   [...free.cities].forEach((city, i) => {
@@ -806,14 +822,11 @@ export function freeCitiesPhase(state: GameState): void {
     }
     freeCityBuild(state, city, stats[i].total.production, research);
     cityStrikes(state, city, cityStrikeStrength(state, city));
-    const centre = state.map.tiles[city.centerIndex];
-    if (!encircled(state, centre, FREE_SEAT) && !irradiated(centre)) {
-      city.hp = Math.min(CITY_MAX_HP, city.hp + CITY_HEAL_PER_TURN);
-    }
     const next = (city.loyalty ?? LOYALTY_MAX) + freeCityLoyaltyDelta(state, city);
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
     if (city.loyalty <= 0) joiners.push(city);
   });
+  spreadReligiousPressure(state, FREE_SEAT);
   const homes = free.cities.map((c) => c.centerIndex);
   for (const u of state.units.filter((x) => x.seat === FREE_SEAT && landWalker(x))) {
     walkUnit(state, u, homes, FREE_WALK_STEPS, FREE_WALK_WEIGHTS);
@@ -1187,9 +1200,9 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
  * has reached CONGRESS_MIN_ERA (Medieval), one Regular Session runs — the
  * mechanics and their sources live at `congressSession` and the catalog
  * (CONGRESS_RESOLUTIONS). The slate keys on the MAX era across civs, the
- * wiki's "topics relevant for the current world". Zero-draw: a pure function
- * of state. Called from endTurn right after eraBoundary, the same position
- * the GPU mirrors.
+ * wiki's "topics relevant for the current world". Called from endTurn after
+ * every player's turn and before the turn counter moves, so the schedule
+ * reads the turn the session closes — the position the GPU mirrors.
  */
 export function worldCongress(state: GameState): void {
   const recorded = state.seats.map((sx) => sx.congressVote ?? null);
@@ -1411,36 +1424,13 @@ export function assertCityRegistryCoherent(state: GameState): void {
   }
 }
 
-/** apply ONE recorded turn for a driven seat. Touches no policy — if this
- * ever needed to consult the ladder, the file would not be a complete record of
- * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
- * `apply_seat_actions`: the idle gate, then the same cost/progress semantics. */
-export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatActionRecord): void {
-  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo, formLo } = prodLayout();
-  // the recorder ran at B=1 and `tolist()` keeps the batch dim: production
-  // arrives as [[c0..]], tech/civic as [v]. Unwrap defensively — the same fix
-  // apply_turn needed on the GPU side, and the second driven-parity red: every
-  // comparison against a LIST is false, so nothing ever queued and the TS
-  // queues flatlined while the economies agreed.
-  // v2: production is [[centreTile, col], ...] — the city
-  // axis keyed by CENTRE TILE, because slot order and founding order diverge
-  // under compaction/capture. Each engine resolves the centre to ITS city.
-  const prodPairs = rec.production;
-  const techCol = Array.isArray(rec.tech) ? (rec.tech as unknown as number[])[0] : rec.tech;
-  const civicCol = Array.isArray(rec.civic) ? (rec.civic as unknown as number[])[0] : rec.civic;
-  // The RESEARCH picks re-validate against AVAILABILITY: real Civ 6 offers no
-  // locked tech, the mask never names one, and an unchecked arm here would let
-  // a stale record start a tech on ONE engine. A pick may SWITCH the seat off
-  // an item mid-research — selectResearch parks the pool — and a re-stated
-  // pick is its no-op.
-  if (techCol !== null && techCol !== undefined && techCol >= 0) {
-    const t = Object.keys(TECHS)[techCol];
-    if (t && availableTechsIn(actor.research).some((d) => d.id === t)) selectResearch(actor.research, t);
-  }
-  if (civicCol !== null && civicCol !== undefined && civicCol >= 0) {
-    const c = Object.keys(CIVICS)[civicCol];
-    if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) selectResearch(actor.research, c, true);
-  }
+/**
+ * THE PENDING POLICIES: the record's government and slotted cards, applied
+ * in the seat's start of turn after its gold, upkeep and bankruptcy and
+ * before its culture (tools/civ6lab/turn_order_civ6.md: `GE.PolicyChanged`
+ * after gold and science, before the civic, 17 blocks).
+ */
+export function applySeatPolicies(state: GameState, actor: Seat, rec: SeatActionRecord): void {
   // THE POLICY UNLOCK: outside the free window a change of government or of
   // the slotted cards pays `policyUnlockCost` once for the turn, and a seat
   // that cannot afford it keeps what it has.
@@ -1474,6 +1464,38 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       const fit = ids.length === rec.policies.length ? fitPolicies(governmentSlots(state, actor.seat), ids) : null;
       if (fit && (!policySetChanges(state, actor.seat, fit) || unlock())) actor.government.policies = fit;
     }
+  }
+}
+
+/** apply ONE recorded turn for a driven seat. Touches no policy — if this
+ * ever needed to consult the ladder, the file would not be a complete record of
+ * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
+ * `apply_seat_actions`: the idle gate, then the same cost/progress semantics. */
+export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatActionRecord): void {
+  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo, formLo } = prodLayout();
+  // the recorder ran at B=1 and `tolist()` keeps the batch dim: production
+  // arrives as [[c0..]], tech/civic as [v]. Unwrap defensively — the same fix
+  // apply_turn needed on the GPU side, and the second driven-parity red: every
+  // comparison against a LIST is false, so nothing ever queued and the TS
+  // queues flatlined while the economies agreed.
+  // v2: production is [[centreTile, col], ...] — the city
+  // axis keyed by CENTRE TILE, because slot order and founding order diverge
+  // under compaction/capture. Each engine resolves the centre to ITS city.
+  const prodPairs = rec.production;
+  const techCol = Array.isArray(rec.tech) ? (rec.tech as unknown as number[])[0] : rec.tech;
+  const civicCol = Array.isArray(rec.civic) ? (rec.civic as unknown as number[])[0] : rec.civic;
+  // The RESEARCH picks re-validate against AVAILABILITY: real Civ 6 offers no
+  // locked tech, the mask never names one, and an unchecked arm here would let
+  // a stale record start a tech on ONE engine. A pick may SWITCH the seat off
+  // an item mid-research — selectResearch parks the pool — and a re-stated
+  // pick is its no-op.
+  if (techCol !== null && techCol !== undefined && techCol >= 0) {
+    const t = Object.keys(TECHS)[techCol];
+    if (t && availableTechsIn(actor.research).some((d) => d.id === t)) selectResearch(actor.research, t);
+  }
+  if (civicCol !== null && civicCol !== undefined && civicCol >= 0) {
+    const c = Object.keys(CIVICS)[civicCol];
+    if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) selectResearch(actor.research, c, true);
   }
   // the WAR verb: the recorded declare/peace applies HERE — before the
   // walkers, the exact position the GPU's pre-step war head uses, so a
@@ -2155,6 +2177,197 @@ export function cityStrikes(state: GameState, city: City, strikeCS: number): voi
   }
 }
 
+/**
+ * THE CITIES' HEAL, once a game turn, beside the units' (`refreshUnits`):
+ * CIV6 heals every unit and every city after the last player's turn and the
+ * World Congress, before the counter moves (tools/civ6lab/turn_order_civ6.md:
+ * 22 of 22 city and district heals in that phase). A city — a civ's, a Free
+ * City, a city-state's centre alike — "will automatically regain 20 HP per
+ * turn", or the whole damage when less, attacked that turn or not (42 of 42
+ * attacked and free healed; city-state 13 +20 three times) — until it is
+ * ENCIRCLED, at which point "it will no longer be able to repair the damage
+ * it suffers" (0 of 4 besieged healed); CIV6 (Defense Logistics): "City cannot
+ * be put under siege" — the ring may close and the heal still runs. The outer
+ * defenses are NOT on this gate: "once damaged, the outer defenses of a City
+ * Center or defensible district will not regenerate on their own" (0 of 47
+ * walls pools healed), and come back only through the Repair Outer Defenses
+ * project. A civ's unbesieged Encampment repairs beside its city. A City
+ * Center or Encampment caught in a blast has its HP reduced to 0, and
+ * "Healing is impossible ... while the fallout lasts".
+ */
+export function healCities(state: GameState): void {
+  for (const actor of state.seats) {
+    for (const civCity of actor.cities) {
+      const centre = state.map.tiles[civCity.centerIndex];
+      if (!governorFlag(state, civCity, (e) => e.noSiege) && encircled(state, centre, actor.seat)) continue;
+      if (!irradiated(centre)) civCity.hp = Math.min(CITY_MAX_HP, civCity.hp + CITY_HEAL_PER_TURN);
+      for (const d of civCity.districts) {
+        if (d.type !== 'ENCAMPMENT') continue;
+        const dt = state.map.tiles[d.tileIndex];
+        if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
+        // "This is an automatic action, which happens if its tile is not
+        // occupied" — an enemy standing on the district holds it silent.
+        if (unitsAt(state, dt.index).some((u) => unitsHostile(state, u, { seat: actor.seat }))) continue;
+        if (!irradiated(dt)) dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? ENCAMPMENT_HP) + CITY_HEAL_PER_TURN);
+      }
+    }
+  }
+  for (const cityState of state.cityStates) {
+    if (cityState.hp === undefined || cityState.hp >= CITY_STATE_MAX_HP) continue;
+    const centre = state.map.tiles[cityState.centerIndex];
+    if (encircled(state, centre, cityState.seat) || irradiated(centre)) continue;
+    cityState.hp = Math.min(CITY_STATE_MAX_HP, cityState.hp + CITY_HEAL_PER_TURN);
+  }
+  for (const city of state.freeSeat?.cities ?? []) {
+    const centre = state.map.tiles[city.centerIndex];
+    if (!encircled(state, centre, FREE_SEAT) && !irradiated(centre)) city.hp = Math.min(CITY_MAX_HP, city.hp + CITY_HEAL_PER_TURN);
+  }
+}
+
+/**
+ * ONE SEAT'S DIPLOMACY, at the tail of its own turn: the record's
+ * agreements in the GPU's arm order — denounce, friendship, the alliance
+ * friendship unlocks, the delegation, the border grant, the gifts — then its
+ * offer on the table and its answers to the offers standing there, then its
+ * promise asks, each answered at once by the promiser's own record (a keep
+ * made, else a refusal). Every arm is re-validated here — the record only
+ * names the target. A seat with no city takes no diplomacy.
+ */
+function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | undefined): void {
+  if (!isCiv(actor.seat) || actor.cities.length === 0) return;
+  for (const tj of recG?.denounce ?? []) {
+    const target = seatOf(state, tj);
+    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    if (denounceActive(state, actor.seat, target.seat)) continue; // already standing
+    if (civsAtWar(state, actor.seat, target.seat)) continue;
+    // CIV6 (Denouncing): "You cannot denounce Declared Friends or Allies -
+    // you have to wait until these states expire."
+    if (seatsFriends(state, actor.seat, target.seat)) continue;
+    if (seatsAllied(state, actor.seat, target.seat)) continue;
+    actor.denounced[target.seat] = state.turn;
+    grievanceDenounce(state, actor.seat, target.seat);
+    state.eventLog.push(`${actor.name} denounces ${target.name}.`);
+  }
+  for (const tj of recG?.friend ?? []) {
+    const target = seatOf(state, tj);
+    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    if (civsAtWar(state, actor.seat, target.seat)) continue;
+    if (seatsFriends(state, actor.seat, target.seat)) continue;
+    if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
+    // CIV6 (Alliance): "A leader you've offended (or who has many Grievances
+    // against you in Gathering Storm) will not want to become Declared
+    // Friends with you." Either side's outstanding balance refuses.
+    if (grievanceWith(state, actor.seat, target.seat) !== 0) continue;
+    setFriendTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
+    state.eventLog.push(`${actor.name} and ${target.name} declare friendship.`);
+  }
+  const allyList = recG?.ally ?? [];
+  for (let tk = 0; tk < allyList.length; tk++) {
+    const tj = allyList[tk];
+    const target = seatOf(state, tj);
+    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    // CIV6 (Alliance): "Alliances become possible after developing the Civil
+    // Service civic. You can only enter into an Alliance with a
+    // civilization if you and its leader are Declared Friends."
+    if (!actor.research.civics.includes(ALLIANCE_CIVIC)) continue;
+    if (!seatsFriends(state, actor.seat, target.seat)) continue;
+    if (civsAtWar(state, actor.seat, target.seat) || seatsAllied(state, actor.seat, target.seat)) continue;
+    if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
+    setAllyTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
+    // The record names the TYPE beside the target; an absent column reads
+    // RESEARCH, the wire's one default (the GPU replay parser matches).
+    setAllianceTypeWith(state, actor.seat, target.seat, recG?.allyType?.[tk] ?? 0);
+    state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
+  }
+  for (const tj of recG?.delegation ?? []) {
+    const target = seatOf(state, tj);
+    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    if (delegationWith(state, actor.seat, target.seat) > 0) continue;
+    // CIV6 (Delegations and Embassies): the Resident Embassy "replaces"
+    // the Delegation once Diplomatic Service is in, so the mission is one
+    // fact and the sender's own civics say what it costs.
+    const cost = actor.research.civics.includes(EMBASSY_CIVIC) ? EMBASSY_COST : DELEGATION_COST;
+    if ((actor.treasury ?? 0) < cost) continue;
+    // A rival worse than Neutral turns the mission away, and this model
+    // reads that as the two states it can name: a war, or a denouncement
+    // either way.
+    if (civsAtWar(state, actor.seat, target.seat)) continue;
+    if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
+    // "...which is paid to the other leader."
+    actor.treasury = (actor.treasury ?? 0) - cost;
+    target.treasury = (target.treasury ?? 0) + cost;
+    setDelegationWith(state, actor.seat, target.seat, 1);
+    state.eventLog.push(`${actor.name} sends a mission to ${target.name}.`);
+  }
+  for (const tj of recG?.borders ?? []) {
+    const target = seatOf(state, tj);
+    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    // CIV6 (Open Borders): the agreement "becomes available" once the
+    // GRANTOR has Early Empire — the civic that closed the border in the
+    // first place. "Open Borders cannot be offered to or requested from a
+    // leader who has Denounced you, or whom you have Denounced."
+    if (!actor.research.civics.includes(OPEN_BORDERS_CIVIC)) continue;
+    if (civsAtWar(state, actor.seat, target.seat)) continue;
+    if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
+    setBorderTurnsFrom(state, actor.seat, target.seat, AGREEMENT_TURNS);
+    state.eventLog.push(`${actor.name} opens its borders to ${target.name}.`);
+  }
+  for (const [kind, tj] of recG?.gift ?? []) {
+    // CIV6 (Trading): "You may trade almost anything in the game, including
+    // ... Great Works", and the one-sided half of that screen is the gift —
+    // "Click it and you gift your items to your rival." A NEGOTIATED deal
+    // needs a valuation no source publishes, so only the gift ships.
+    // "You can trade with all the leaders except the ones you're at war
+    // with."
+    if (kind < 0 || kind >= GW_KINDS) continue;
+    const target = seatOf(state, tj);
+    if (!target || !isCiv(tj) || target.cities.length === 0) continue;
+    if (civsAtWar(state, actor.seat, tj)) continue;
+    // WHICH work goes is not a decision: the giver's FIRST city holding one
+    // of the kind gives its LAST-placed such work, and the receiver's first
+    // city with an open slot that takes it receives — the same walk the
+    // deal item and the heist make.
+    const from = actor.cities.find((c) => gwCountKind(c, kind) > 0);
+    const work = from ? gwLastOfKind(from, kind) : undefined;
+    const home = work ? target.cities.find((c) => gwHasRoom(state, c, work.obj)) : undefined;
+    if (!from || !work || !home) continue;
+    moveGreatWork(state, from, work.slot, home);
+    state.eventLog.push(`${actor.name} gifts a Great Work to ${target.name}.`);
+  }
+  // THE TABLE: this seat's offer goes down, then its answers to the offers
+  // standing — an offer nobody takes stands until `dealPhase` sweeps it.
+  if (recG?.offer) {
+    const [tj, give, ask] = recG.offer;
+    const target = seatOf(state, tj);
+    if (target && isCiv(tj) && tj !== actor.seat && target.cities.length > 0
+        && give.length <= DEAL_ITEMS && ask.length <= DEAL_ITEMS) {
+      setDealOffer(state, actor.seat, tj, { left: DEAL_OFFER_TURNS + 1, give, ask });
+    }
+  }
+  for (const fj of recG?.accept ?? []) {
+    // CIV6 (Ending a War): "the peaceful resolution of a war involves
+    // diplomatic negotiations" — a table between two seats at war IS the
+    // peace deal, so confirming it is what ends the war.
+    const wasWar = civsAtWar(state, fj, actor.seat);
+    const from = seatOf(state, fj);
+    if (!from || !acceptDeal(state, fj, actor.seat)) continue;
+    if (wasWar) makePeace(state, from, actor.seat);
+    state.eventLog.push(`${actor.name} accepts a deal from ${from.name}.`);
+  }
+  // THE PROMISES this seat asks: each settles at once against the promiser's
+  // own record — kept where that record keeps it, refused otherwise
+  // (`settlePromises`).
+  const promiseAsks: [number, number, number][] = [];
+  for (const [tj, k] of recG?.askPromise ?? []) promiseAsks.push([actor.seat, tj, k]);
+  if (promiseAsks.length === 0) return;
+  const promiseKeeps: [number, number, number][] = [];
+  for (const other of state.seats) {
+    const recP = state.seatActions?.[state.turn - 1]?.[other.seat];
+    for (const [fj, k] of recP?.keepPromise ?? []) if (fj === actor.seat) promiseKeeps.push([other.seat, fj, k]);
+  }
+  settlePromises(state, promiseAsks, promiseKeeps);
+}
+
 export function seatPhase(state: GameState): void {
 
   // Seat units get their movement in this phase (like barbarians).
@@ -2183,170 +2396,6 @@ export function seatPhase(state: GameState): void {
   // per-turn payments, the 30-turn clock, and the offer nobody answered.
   dealPhase(state);
 
-  // THE DIPLOMATIC AGREEMENTS, in the GPU's arm order: denounce, then
-  // friendship, then the alliance friendship unlocks, then the border grant.
-  // Every one is re-validated here — the record only names the target.
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const tj of recG?.denounce ?? []) {
-      const target = seatOf(state, tj);
-      if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-      if (denounceActive(state, actor.seat, target.seat)) continue; // already standing
-      if (civsAtWar(state, actor.seat, target.seat)) continue;
-      // CIV6 (Denouncing): "You cannot denounce Declared Friends or Allies -
-      // you have to wait until these states expire."
-      if (seatsFriends(state, actor.seat, target.seat)) continue;
-      if (seatsAllied(state, actor.seat, target.seat)) continue;
-      actor.denounced[target.seat] = state.turn;
-      grievanceDenounce(state, actor.seat, target.seat);
-      state.eventLog.push(`${actor.name} denounces ${target.name}.`);
-    }
-  }
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const tj of recG?.friend ?? []) {
-      const target = seatOf(state, tj);
-      if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-      if (civsAtWar(state, actor.seat, target.seat)) continue;
-      if (seatsFriends(state, actor.seat, target.seat)) continue;
-      if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
-      // CIV6 (Alliance): "A leader you've offended (or who has many Grievances
-      // against you in Gathering Storm) will not want to become Declared
-      // Friends with you." Either side's outstanding balance refuses.
-      if (grievanceWith(state, actor.seat, target.seat) !== 0) continue;
-      setFriendTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
-      state.eventLog.push(`${actor.name} and ${target.name} declare friendship.`);
-    }
-  }
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    const allyList = recG?.ally ?? [];
-    for (let tk = 0; tk < allyList.length; tk++) {
-      const tj = allyList[tk];
-      const target = seatOf(state, tj);
-      if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-      // CIV6 (Alliance): "Alliances become possible after developing the Civil
-      // Service civic. You can only enter into an Alliance with a
-      // civilization if you and its leader are Declared Friends."
-      if (!actor.research.civics.includes(ALLIANCE_CIVIC)) continue;
-      if (!seatsFriends(state, actor.seat, target.seat)) continue;
-      if (civsAtWar(state, actor.seat, target.seat) || seatsAllied(state, actor.seat, target.seat)) continue;
-      if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
-      setAllyTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
-      // The record names the TYPE beside the target; an absent column reads
-      // RESEARCH, the wire's one default (the GPU replay parser matches).
-      setAllianceTypeWith(state, actor.seat, target.seat, recG?.allyType?.[tk] ?? 0);
-      state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
-    }
-  }
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const tj of recG?.delegation ?? []) {
-      const target = seatOf(state, tj);
-      if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-      if (delegationWith(state, actor.seat, target.seat) > 0) continue;
-      // CIV6 (Delegations and Embassies): the Resident Embassy "replaces"
-      // the Delegation once Diplomatic Service is in, so the mission is one
-      // fact and the sender's own civics say what it costs.
-      const cost = actor.research.civics.includes(EMBASSY_CIVIC) ? EMBASSY_COST : DELEGATION_COST;
-      if ((actor.treasury ?? 0) < cost) continue;
-      // A rival worse than Neutral turns the mission away, and this model
-      // reads that as the two states it can name: a war, or a denouncement
-      // either way.
-      if (civsAtWar(state, actor.seat, target.seat)) continue;
-      if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
-      // "...which is paid to the other leader."
-      actor.treasury = (actor.treasury ?? 0) - cost;
-      target.treasury = (target.treasury ?? 0) + cost;
-      setDelegationWith(state, actor.seat, target.seat, 1);
-      state.eventLog.push(`${actor.name} sends a mission to ${target.name}.`);
-    }
-  }
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const tj of recG?.borders ?? []) {
-      const target = seatOf(state, tj);
-      if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-      // CIV6 (Open Borders): the agreement "becomes available" once the
-      // GRANTOR has Early Empire — the civic that closed the border in the
-      // first place. "Open Borders cannot be offered to or requested from a
-      // leader who has Denounced you, or whom you have Denounced."
-      if (!actor.research.civics.includes(OPEN_BORDERS_CIVIC)) continue;
-      if (civsAtWar(state, actor.seat, target.seat)) continue;
-      if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
-      setBorderTurnsFrom(state, actor.seat, target.seat, AGREEMENT_TURNS);
-      state.eventLog.push(`${actor.name} opens its borders to ${target.name}.`);
-    }
-  }
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const [kind, tj] of recG?.gift ?? []) {
-      // CIV6 (Trading): "You may trade almost anything in the game, including
-      // ... Great Works", and the one-sided half of that screen is the gift —
-      // "Click it and you gift your items to your rival." A NEGOTIATED deal
-      // needs a valuation no source publishes, so only the gift ships.
-      // "You can trade with all the leaders except the ones you're at war
-      // with."
-      if (kind < 0 || kind >= GW_KINDS) continue;
-      const target = seatOf(state, tj);
-      if (!target || !isCiv(tj) || target.cities.length === 0) continue;
-      if (civsAtWar(state, actor.seat, tj)) continue;
-      // WHICH work goes is not a decision: the giver's FIRST city holding one
-      // of the kind gives its LAST-placed such work, and the receiver's first
-      // city with an open slot that takes it receives — the same walk the
-      // deal item and the heist make.
-      const from = actor.cities.find((c) => gwCountKind(c, kind) > 0);
-      const work = from ? gwLastOfKind(from, kind) : undefined;
-      const home = work ? target.cities.find((c) => gwHasRoom(state, c, work.obj)) : undefined;
-      if (!from || !work || !home) continue;
-      moveGreatWork(state, from, work.slot, home);
-      state.eventLog.push(`${actor.name} gifts a Great Work to ${target.name}.`);
-    }
-  }
-  // THE TABLE. Every offer goes down first and every answer comes second, so a
-  // pair that agrees within one turn settles within it — and an offer nobody
-  // takes stands one more turn before `dealPhase` sweeps it.
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recD = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    if (!recD?.offer) continue;
-    const [tj, give, ask] = recD.offer;
-    const target = seatOf(state, tj);
-    if (!target || !isCiv(tj) || tj === actor.seat || target.cities.length === 0) continue;
-    if (give.length > DEAL_ITEMS || ask.length > DEAL_ITEMS) continue;
-    setDealOffer(state, actor.seat, tj, { left: DEAL_OFFER_TURNS + 1, give, ask });
-  }
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recD = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const fj of recD?.accept ?? []) {
-      // CIV6 (Ending a War): "the peaceful resolution of a war involves
-      // diplomatic negotiations" — a table between two seats at war IS the
-      // peace deal, so confirming it is what ends the war.
-      const wasWar = civsAtWar(state, fj, actor.seat);
-      const from = seatOf(state, fj);
-      if (!from || !acceptDeal(state, fj, actor.seat)) continue;
-      if (wasWar) makePeace(state, from, actor.seat);
-      state.eventLog.push(`${actor.name} accepts a deal from ${from.name}.`);
-    }
-  }
-  // THE PROMISES: every ask, then every answer, then the refusal of what
-  // nobody answered — one turn settles each ask (`settlePromises`).
-  const promiseAsks: [number, number, number][] = [];
-  const promiseKeeps: [number, number, number][] = [];
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recP = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const [tj, k] of recP?.askPromise ?? []) promiseAsks.push([actor.seat, tj, k]);
-    for (const [fj, k] of recP?.keepPromise ?? []) promiseKeeps.push([actor.seat, fj, k]);
-  }
-  settlePromises(state, promiseAsks, promiseKeeps);
   for (const actor of state.seats) {
     const recU = state.seatActions?.[state.turn - 1]?.[actor.seat];
     if (actor.cities.length === 0) {
@@ -2495,6 +2544,513 @@ export function seatPhase(state: GameState): void {
     // The record replaces the PICKS and nothing else. Bookkeeping — yields,
     // growth, research accrual, treasury — is RULES and runs for every seat,
     // record or no record.
+
+    // THE SEAT'S ECONOMY, before its cities. CIV6: each player's start of
+    // turn banks its science (a technology completing takes effect at once),
+    // then its gold, upkeep and bankruptcy, then its pending policies, its
+    // culture and civics, its faith and its Great Person points, and only then
+    // walks its cities, which read the result — a technology's +1 Production
+    // lands the turn it completes, a shortfall's amenity penalty the same turn
+    // (tools/civ6lab/turn_order_civ6.md; runs/turnorder/armT_*, armB_*,
+    // c93_*). Each yield is banked off the cities as they stand at its own
+    // step, in city order: the science as the turn opened (Maya 6.3047, not
+    // the shortfall's 5.5508), the gold after the techs (Egypt +39.047 with
+    // Cartography's Fishing Boats, not +36.848), the culture after the
+    // shortfall and the policies, the faith after the civics. A read is taken
+    // again only where a step between has moved what the cities yield: a
+    // technology, the shortfall or the policies, a civic.
+    const grantedNow: string[] = []; // the roster's technology grants, spawned after the upkeep
+    const econMods = getModifiers(state, actor.seat);
+    // this seat's governor seats for THIS turn — persistent assignments the
+    // roster already carries, read once before the walk moves any loyalty.
+    const rGovIds = new Set(governorsOf(actor)
+      .filter((g) => g.appointed && g.cityId >= 0 && g.outTurns <= 0)
+      .map((g) => g.cityId));
+    const readYields = (): CityStats['total'][] => {
+      const lux = luxuryAmenities(state, actor.seat);
+      const mods = getModifiers(state, actor.seat);
+      return actor.cities.map((c) => computeCityStats(state, c, lux, mods).total);
+    };
+    // `total.gold` is already NET of district+building upkeep —
+    // computeCityStats subtracts it — so it is not charged a second time.
+    const citySum = (ys: CityStats['total'][], key: 'science' | 'gold' | 'culture' | 'faith'): number => {
+      let sum = 0;
+      for (const y of ys) sum += y[key];
+      return sum;
+    };
+    // CIV6 (Alliance, level 1): the ally's routes INTO this seat pay the
+    // receiver half of the typed route bonus - empire-level, per route.
+    const allianceRoute = (key: string, sum: number): number => {
+      for (const o of state.seats) {
+        if (o.seat === actor.seat) continue;
+        const aty = allianceTypeWith(state, actor.seat, o.seat);
+        if (aty >= 0 && ALLIANCE_ROUTE_FROM[aty] > 0 && ALLIANCE_ROUTE_YKEY[aty] === key) {
+          const n = (o.tradeRoutes ?? []).filter((r) => r.toSeat === actor.seat).length;
+          sum += ALLIANCE_ROUTE_FROM[aty] * n;
+        }
+        // CIV6 (Religious alliance 3): "+1 Faith for each of your Citizens
+        // following your ally's religion."
+        if (key === 'faith' && alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_RELIGIOUS, 3)) {
+          for (const c of actor.cities) {
+            if (c.followedReligion === o.seat) sum += ALLIANCE_REL3_FAITH_PER_POP * c.population;
+          }
+        }
+      }
+      return sum;
+    };
+    // CIV6 (The Last Prophet): "+1 Science for each foreign city following
+    // Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
+    const foreignFollowers = (key: string, sum: number): number => {
+      const foreignRows = getModifiers(state, actor.seat).foreignFollowerYields;
+      if (!foreignRows.length) return sum;
+      const foreign = foreignFollowerCount(state, actor.seat);
+      for (const r of foreignRows) {
+        if (r.yield === key) sum += r.amount * Math.floor(foreign / Math.max(1, r.per));
+      }
+      return sum;
+    };
+    let yields = readYields();
+    const rsr = actor.research;
+
+    // SCIENCE, and the technologies it completes.
+    let sciSum = citySum(yields, 'science');
+    // The seat's science/turn off the cities' own sums, folded in city order —
+    // the Moon Landing lump reads it, and the GPU folds the identical columns
+    // in slot order, so the f64 association agrees.
+    const sciPerTurnSeat = sciSum;
+    sciSum = foreignFollowers('science', allianceRoute('science', sciSum));
+    // the seat's OUTPUT this turn, stored for allies' percentage reads -
+    // written before those reads, so the terms never compound
+    actor.sciRate = sciSum;
+    for (const o of state.seats) {
+      if (o.seat === actor.seat) continue;
+      // CIV6 (Research alliance 3): "+10% of your ally's Science" while
+      // researching a tech the ally completed, or the tech the ally is on.
+      if (alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_RESEARCH, 3) && rsr.tech
+        && (o.research.techs.includes(rsr.tech) || o.research.tech === rsr.tech)) {
+        sciSum += ALLIANCE_R3_SCI_PCT * (o.sciRate ?? 0);
+      }
+    }
+    const gTech = goldenBoostBonus(state, actor.seat, false);
+    const gCivic = goldenBoostBonus(state, actor.seat, true);
+    // The RESEARCH PICK arrives on the wire (applySeatActionRecord). A seat
+    // with no pick banks progress with no current tech — the same wait the
+    // GPU's `cur_tech == -1` already models.
+    rsr.techProgress += sciSum;
+    // LIFETIME science — the cultureTotal pattern, beside the stream add.
+    // Every seat accrues (the GPU twin is seat_science_total rows 0..R);
+    // lump grants (applyLumpGrant, goody maps) add to the same field.
+    actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
+    const bTech = rosterBoostPoints(state, actor.seat, false);
+    let techDone = false;
+    while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech)) {
+      rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech);
+      if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
+      for (const fx of TECHS[rsr.tech].effects) {
+        // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
+        // Diplomatic Victory point" — once, at completion.
+        if (fx.kind === 'award') {
+          if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
+          if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
+        }
+      }
+      rsr.techs.push(rsr.tech);
+      // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
+      // technology. The SPAWN waits for the upkeep charge below — a unit
+      // granted this turn starts paying next turn, and the GPU's grant sits on
+      // the same side of `_seat_upkeep_and_bankruptcy`.
+      for (const g of econMods.grantUnits) {
+        if (g.tech !== rsr.tech || !g.unit) continue;   // a CLASS row is a founding grant
+        grantedNow.push(g.unit);
+      }
+      delete rsr.techRetained[rsr.tech];
+      rsr.tech = null;
+      techDone = true;
+    }
+    if (!rsr.tech && availableTechsIn(rsr).length === 0) rsr.techProgress = Math.min(rsr.techProgress, 0);
+
+    // GOLD, off the cities as the technologies left them; then the upkeep and
+    // the bankruptcy that upkeep may force.
+    if (techDone) yields = readYields();
+    const goldSum = foreignFollowers('gold', allianceRoute('gold', citySum(yields, 'gold')));
+    actor.treasury = (actor.treasury ?? 0) + goldSum;
+    // a WON City-State Emergency pays +1 gold/turn per envoy, banked before
+    // the upkeep
+    actor.treasury += emergencyEnvoyIncome(state, actor.seat);
+    const upkMods = getModifiers(state, actor.seat);
+    const _upk = state.units.reduce(
+      (s, u) => s + (u.seat === actor.seat ? unitUpkeep(upkMods, u.type) : 0),
+      0,
+    );
+    // WHAT the seat is charged and for HOW MANY units, before the charge
+    // lands: a rate difference and a roster difference look identical in the
+    // purse and are two different bugs.
+    const _dlu = (globalThis as { __diffLog?: string[] }).__diffLog;
+    if (_dlu) _dlu.push(`up:${actor.seat}:${state.turn}`
+      + ` n${state.units.filter((u) => u.seat === actor.seat).length}`
+      + ` cost${_upk.toFixed(3)} purse${(actor.treasury ?? 0).toFixed(3)}`);
+    actor.treasury -= _upk;
+    actor.treasury -= wmdUpkeep(state, actor.seat);
+    const shortfallBefore = actor.goldShortfall ?? 0;
+    bankruptcy(state, actor, (t) => unitUpkeep(upkMods, t));
+    // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's technology grants, after
+    // the upkeep they do not yet owe AND after the bankruptcy that upkeep may
+    // force.
+    for (const id of grantedNow) {
+      const cap = actor.cities.find((c) => c.centerIndex === actor.capitalTile) ?? actor.cities[0];
+      if (cap) spawnUnit(state, id, cap.centerIndex, actor.seat);
+    }
+
+    // THE PENDING POLICIES: the record's government and slotted cards.
+    const policiesMoved = !!rec && ((rec.government !== null && rec.government !== undefined) || !!rec.policies);
+    if (rec) applySeatPolicies(state, actor, rec);
+
+    // CULTURE, off the cities as the shortfall and the policies left them;
+    // the tourism, favor and grievance tallies; then the civics it completes.
+    if ((actor.goldShortfall ?? 0) !== shortfallBefore || policiesMoved) yields = readYields();
+    let culSum = foreignFollowers('culture', allianceRoute('culture', citySum(yields, 'culture')));
+    actor.culRate = culSum;
+    for (const o of state.seats) {
+      if (o.seat === actor.seat) continue;
+      // CIV6 (Cultural alliance 3): "+10% of your ally's Culture".
+      if (alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_CULTURAL, 3)) {
+        culSum += ALLIANCE_C3_CUL_PCT * (o.culRate ?? 0);
+      }
+    }
+    // the tourism term reads the seat's ERA off its completed research: after
+    // this turn's techs, before any civic completes
+    seatAccumulators(state, actor.seat, rGovIds);
+    rsr.civicProgress += culSum;
+    // LIFETIME culture — the same per-turn sum, banked separately
+    // because civicProgress is SPENT by every completed civic. Real Civ 6
+    // scores DOMESTIC TOURISTS off lifetime culture, so this is the substrate
+    // the Culture victory reads. Zero-draw; the GPU mirrors at this position.
+    actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
+    const bCivic = rosterBoostPoints(state, actor.seat, true);
+    const _govBefore = seatGovernment(state, actor.seat);
+    let civicDone = false;
+    while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic)) {
+      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic);
+      for (const fx of CIVICS[rsr.civic].effects) {
+        // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
+        // Diplomatic Victory point" — once, at completion.
+        if (fx.kind === 'award') {
+          if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
+          if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
+        }
+      }
+      rsr.civics.push(rsr.civic);
+      delete rsr.civicRetained[rsr.civic];
+      actor.government.civicTurn = state.turn;
+      rsr.civic = null;
+      civicDone = true;
+    }
+    if (!rsr.civic && availableCivicsIn(rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
+    // CIV6 (Legacy policy card): the card is unlocked by having BEEN in its
+    // government, so the seat remembers the one it is in now. A seat whose
+    // record never chose follows the newest government its civics unlock, and
+    // only a completed civic moves that, which is why this sits at the loop's
+    // exit; a CHANGE carries the slotted cards over.
+    const _govNow = seatGovernment(state, actor.seat);
+    actor.government.held |= governmentBit(_govNow);
+    if (_govNow && _govNow !== _govBefore) carryPolicies(state, actor.seat);
+
+    // FAITH, off the cities as the civics left them.
+    if (civicDone) yields = readYields();
+    const _fBase = citySum(yields, 'faith');
+    let faithSum = allianceRoute('faith', _fBase);
+    const _fAll = faithSum;
+    faithSum = foreignFollowers('faith', faithSum);
+    const _fFor = faithSum;
+    faithSum += peacefulFounderFaith(state, actor.seat);
+    // THE TURN'S FAITH INCOME, before it lands. One number per seat per
+    // turn: it splits an income disagreement from a SPEND disagreement,
+    // which is two halves of the search space in one line.
+    const _dlfi = (globalThis as { __diffLog?: string[] }).__diffLog;
+    if (_dlfi) _dlfi.push(`fi:${actor.seat}:${state.turn}`
+      + ` sum${faithSum.toFixed(6)} was${(actor.faith ?? 0).toFixed(6)}`
+      + ` base${_fBase.toFixed(6)} all${_fAll.toFixed(6)} for${_fFor.toFixed(6)}`
+      + ` gold${goldSum.toFixed(6)} purse${(actor.treasury ?? 0).toFixed(6)}`);
+    actor.faith = (actor.faith ?? 0) + faithSum;
+
+    advanceGreatPeople(state, actor.seat);
+
+    // The PANTHEON RACE — an eager rule for EVERY seat row, drawn from the
+    // open pool; the gate and the draw mirror the GPU's row-generic
+    // `_seat_pantheon_race`, so the streams stay aligned. A religion's own
+    // beliefs are the record's `beliefs` arm (`adoptBeliefs`).
+    // Pantheon: costs PANTHEON_FAITH_COST from this seat's own faith.
+    if (actor.religion.pantheon === null && (actor.faith ?? 0) >= PANTHEON_FAITH_COST) {
+      const open = Object.keys(PANTHEONS).filter((id) => !state.claimedPantheons.includes(id));
+      if (open.length > 0) {
+        actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
+        const pick = open[Math.floor(nextRandom(state) * open.length)];
+        state.claimedPantheons.push(pick);
+        addEraScore(state, actor.seat, ERA_SCORE_PANTHEON);
+        actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
+        state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
+      }
+    }
+
+    // THE CITIES, after the economy. CIV6: each city runs its production (the
+    // completion, a Settler's citizen), then grows or starves on the city as
+    // it stands after that completion, then claims its border tile, then
+    // takes its loyalty (tools/civ6lab/turn_order_civ6.md: 11 of 11 cities;
+    // runs/turnorder/armS_* — a Settler's -1 and then the pop-5 surplus,
+    // +2.129 Food). The walk puts every city's Production in, in city order,
+    // off the stats taken again after the economy; then reads every city
+    // again, as the productions left them; then grows, claims and takes the
+    // loyalty of each, in city order, off that second read — the read the
+    // census keeps. Iterate a SNAPSHOT: a city founded this turn does not act
+    // (the GPU gates on the pre-turn alive mask the same way).
+    const walkCities = [...actor.cities];
+    const seatMods = getModifiers(state, actor.seat);
+    const madeOf = new Map<number, number>();
+    {
+      const luxMap = luxuryAmenities(state, actor.seat);
+      for (const civCity of walkCities) madeOf.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods).total.production);
+    }
+    // CIV6 (Military alliance 2): "+15% Production toward military units
+    // when you or your ally are at war."
+    const warBuffPct = warBuffProdPct(state, actor.seat) / 100;
+    const milAllyWarPct = state.seats.some((x) => x.seat !== actor.seat
+      && alliedAtLevel(state, actor.seat, x.seat, ALLIANCE_MILITARY, 2)
+      && (atWarWithAny(state, actor.seat) || atWarWithAny(state, x.seat))) ? ALLIANCE_M2_MIL_PROD_PCT / 100 : 0;
+    for (const civCity of walkCities) {
+      const production = madeOf.get(civCity.id)!;
+      const q = civCity.queue[0];
+      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
+        // The seat's GOVERNMENT/POLICY encampHarborProdMult: a seat that
+        // adopts the government owns its effects; the multiplier keys on
+        // the ITEM, not on the seat.
+        let _em = isEncampHarborItem(q) ? seatMods.encampHarborProdMult : 1;
+        // CIV6 (To Arms!, Golden face): "+15% Production towards military
+        // units." (Heartbeat of Steam, Golden face): "+10% Production toward
+        // Industrial era and later wonders." The three item classes are
+        // disjoint, so the multiplier order is association-free.
+        if (q.kind === 'unit' && unitIsMilitary(q.unit) && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
+        if (q.kind === 'wonder' && (WONDER_ERA_INDEX[q.wonder] ?? 0) >= INDUSTRIAL_ERA_INDEX && goldenDedication(state, civCity.seat, DED_STEAM)) _em *= STEAM_WONDER_PROD_MULT;
+        // CIV6 (Urban Development Treaty, outcome A): "+100% Production
+        // towards buildings in this district."
+        const _udtD = congressUdtProdDistrict(state);
+        if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
+        // CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows
+        // CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
+        // the seat's home continent — its original capital's landmass
+        const _offHome = !onHomeContinent(state, civCity.seat, civCity.centerIndex);
+        if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { kind: 'building', building: q.building, district: BUILDINGS[q.building]?.district }, _offHome);
+        // CIV6 (Public Works Program): "+100% / -50% Production towards this
+        // Project."
+        if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
+        // CIV6 (Zoning Commissioner): "+20% Production towards constructing
+        // Districts in the city".
+        // CIV6 (Letters of Marque): "Naval Raiders: +100% Production";
+        // (Flower Power): land units other than Rock Bands cost double, which
+        // this model pays as a slower fill rather than a moved queue cost.
+        if (q.kind === 'unit' && UNITS[q.unit]?.raider) _em *= seatMods.navalRaiderProdMult;
+        if (q.kind === 'unit') _em /= landUnitPriceMult(state, civCity.seat, q.unit);
+        // CIV6 (Thunderbolt of the North): "+50% Production toward all naval
+        // melee units."
+        if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
+        // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
+        if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit }, _offHome);
+        if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
+        // CIV6 (Merchant Republic, GOVERNMENTBONUS_DISTRICT_PRODUCTION):
+        // "+15% Production toward Districts."
+        if (q.kind === 'district') _em *= seatMods.districtProdMult;
+        // CIV6 (Founder of Carthage): "+50% Production toward districts in the
+        // city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
+        if (q.kind === 'district' && seatMods.plazaDistrictProd
+          && civCity.districts.some((d) => d.type === 'GOVERNMENT_PLAZA'
+            && state.map.tiles[d.tileIndex].districtComplete)) {
+          _em *= 1 + seatMods.plazaDistrictProd / 100;
+        }
+        // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
+        if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district }, _offHome);
+        // CIV6 (Space Initiative, Arms Race Proponent): +30% toward the named
+        // projects in the governor's city; (Hong Kong): "+20% Production
+        // towards city projects"
+        if (q.kind === 'project') _em *= (1 + governorSum(state, civCity, (e) => e.projectProdPct?.[q.project]) / 100) * seatMods.projectProdMult * suzerainProjectMult(state, civCity.seat);
+        // CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
+        // toward Medieval, Renaissance, and Industrial era wonders" — an ERA
+        // BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)
+        if (q.kind === 'wonder' && seatMods.wonderEraProd.length) {
+          const we = WONDER_ERA_INDEX[q.wonder] ?? 0;
+          for (const r of seatMods.wonderEraProd) {
+            if (we >= ERAS.indexOf(r.startEra) && we <= ERAS.indexOf(r.endEra)) _em *= 1 + r.pct / 100;
+          }
+        }
+        // CIV6 (Pearl of the Danube): "+50% Production to Districts and
+        // Buildings constructed ACROSS A RIVER from a City Center." A building
+        // is built in its district, so its tile is that district's; a City
+        // Center building never crosses a river from the centre it stands on.
+        if (seatMods.riverCrossProd.length && (q.kind === 'district' || q.kind === 'building')) {
+          const at = q.kind === 'district'
+            ? q.tileIndex
+            : civCity.districts.find((d) => d.type === BUILDINGS[q.building]?.district)?.tileIndex;
+          if (at !== undefined && crossesRiver(state.map.tiles[civCity.centerIndex], state.map.tiles[at])) {
+            for (const r of seatMods.riverCrossProd) if (r.kind === q.kind) _em *= 1 + r.pct / 100;
+          }
+        }
+        // CIV6 (Iteru): "+15% Production towards Districts and Wonders built
+        // next to a River."
+        if ((q.kind === 'district' || q.kind === 'wonder') && seatMods.civ === 'EGYPT' && hasRiver(state.map.tiles[q.tileIndex])) {
+          _em *= ITERU_RIVER_PROD_MULT;
+        }
+        // CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
+        // this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
+        // bonus Production in all Cities for 5 turns". Both are percentages, so
+        // they join the cards' additive stack rather than compounding on it.
+        let _bpct = q.kind === 'settler' ? cityBuildingSum(state, civCity, 'settlerProdPct') / 100 : 0;
+        if ((actor.conquestProdTurns ?? 0) > 0) {
+          _bpct += seatBuildingSum(state, actor.seat, 'conquestProdPct') / 100;
+        }
+        if (q.kind === 'unit' && unitIsMilitary(q.unit)) _bpct += milAllyWarPct;
+        // CIV6 (TRAIT_LIBERATION_WAR_PRODUCTION, YIELD_PRODUCTION Amount 100):
+        // a percent on every item for the turns after the declaration
+        _bpct += warBuffPct;
+        _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
+        const progressBefore = q.progress;
+        q.progress += production * _em;
+        // Pay in the bank right after the production add, so the field
+        // written below is read back.
+        if (civCity.productionBank) {
+          q.progress += civCity.productionBank;
+          civCity.productionBank = 0;
+        }
+        repairDrip(state, civCity, progressBefore);
+        const cost =
+          q.kind === 'unit'
+            ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // builders lock at queue
+            : q.kind === 'building'
+              ? buildingCostIn(state, civCity, q.building)
+              : q.kind === 'wonder'
+                ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // catalog cost (already speed-scaled)
+                : q.cost ?? 54; // settler / district / project carry their own cost
+        if (q.progress >= cost) {
+          civCity.queue.shift();
+          completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);
+          // CIV6: a completion's OVERFLOW carries into the next item. The
+          // shift has already happened, so `queue[0]` is that item; only a
+          // queue that ran EMPTY has nowhere to put the hammers, and that is
+          // the one case they bank and pay a turn late.
+          //
+          // The carry does NOT cascade: one completion per city per turn, so
+          // an overflow big enough to finish the item behind it finishes it
+          // NEXT turn. The GPU completes once per city per turn too, and a
+          // second completion here would move the DRAW COUNT — a completion
+          // can spawn a unit — against an engine that had not made it.
+          const over = q.progress - cost;
+          const next = civCity.queue[0];
+          if (next) next.progress += over;
+          else civCity.productionBank = (civCity.productionBank ?? 0) + over;
+        }
+      }
+    }
+    const grown = new Map<number, CityStats>();
+    {
+      const luxMap = luxuryAmenities(state, actor.seat);
+      const mods = getModifiers(state, actor.seat);
+      for (const civCity of walkCities) grown.set(civCity.id, computeCityStats(state, civCity, luxMap, mods, true));
+    }
+    const civCityDefectors: City[] = [];
+    for (const civCity of walkCities) {
+      const stats = grown.get(civCity.id)!;
+      seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
+      cityBorderGrowth(state, civCity, actor.seat, stats.total.culture);
+      if (applyLoyalty(state, civCity, stats.amenities.tier.name, rGovIds.has(civCity.id))) {
+        civCityDefectors.push(civCity);
+      }
+      cityStrikes(state, civCity, cityStrikeStrength(state, civCity));
+    }
+
+    for (const civCity of civCityDefectors) flipCity(state, civCity);
+    spreadReligiousPressure(state, actor.seat);
+
+    const anyWar = atWarWithAny(state, actor.seat);
+    for (const foe of warsOf(state, actor.seat)) {
+      // ONE tick per pair per turn, at the pair's LOWER seat's tail — a major
+      // always outranks its city-state foes (their seat ids sit at 100+).
+      if (actor.seat < foe) setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
+    }
+    // ONE treaty countdown per pair per turn, at the pair's LOWER seat's tail —
+    // the war clock's discipline, over the pairs that are NOT at war. Every
+    // diplomatic AGREEMENT runs the same countdown here, and expires by
+    // reaching zero; the border grant is directed, so it ticks twice.
+    for (const other of [...state.seats.map((x) => x.seat), ...(state.cityStates ?? []).map((c) => c.seat)]) {
+      if (actor.seat >= other) continue;
+      const bound = treatyTurnsWith(state, actor.seat, other);
+      if (bound > 0) setTreatyTurnsWith(state, actor.seat, other, bound - 1);
+      if (!isCiv(other)) continue;
+      const fr = friendTurnsWith(state, actor.seat, other);
+      if (fr > 0) setFriendTurnsWith(state, actor.seat, other, fr - 1);
+      const al = allyTurnsWith(state, actor.seat, other);
+      if (al > 0) {
+        // CIV6 (Alliance): points accrue "every turn", faster when the pair
+        // trades - either direction pays its own quarter-point.
+        // CIV6 (Mediterranean's Bride): "Trading with Allies earns twice as
+        // many bonus Alliance Points"; (Adventures of Enkidu): "Their
+        // Alliances gain Alliance Points for being at war with a common foe."
+        const tradeQp = ALLIANCE_QP_ROUTE
+          * (leaderOf(state, actor.seat) === 'CLEOPATRA' || leaderOf(state, other) === 'CLEOPATRA' ? CLEOPATRA_TRADE_QP_MULT : 1);
+        const enkidu = leaderOf(state, actor.seat) === 'GILGAMESH' || leaderOf(state, other) === 'GILGAMESH';
+        const commonFoe = enkidu && [...state.seats.map((x) => x.seat), ...(state.cityStates ?? []).map((c) => c.seat)]
+          .some((f) => f !== actor.seat && f !== other && civsAtWar(state, actor.seat, f) && civsAtWar(state, other, f));
+        setAlliancePtsWith(state, actor.seat, other, alliancePtsWith(state, actor.seat, other)
+          + ALLIANCE_QP_TURN
+          // CIV6 (Democracy): "Alliance Points with all allies increase by an
+          // additional .25 per turn" — each side's own government pays it.
+          + getModifiers(state, actor.seat).alliancePointsPerTurn
+          + getModifiers(state, other).alliancePointsPerTurn
+          + (hasRouteToSeat(state, actor.seat, other) ? tradeQp : 0)
+          + (hasRouteToSeat(state, other, actor.seat) ? tradeQp : 0)
+          + (commonFoe ? ENKIDU_COMMON_FOE_QP : 0));
+        // CIV6 (Military alliance 2): "Allies share visibility" - each
+        // side's explored map folds into the other's, the fog this model keeps.
+        if (alliedAtLevel(state, actor.seat, other, ALLIANCE_MILITARY, 2)) {
+          const oa = seatOf(state, actor.seat);
+          const ob = seatOf(state, other);
+          if (oa?.explored && ob?.explored) {
+            for (let ei = 0; ei < oa.explored.length; ei++) {
+              const u = oa.explored[ei] | ob.explored[ei];
+              oa.explored[ei] = u;
+              ob.explored[ei] = u;
+            }
+          }
+        }
+        // CIV6 (Research alliance 2): "Every 30 turns (on Standard), you
+        // unlock a Eureka for a tech that your ally has researched or
+        // boosted, but you have not" - each side takes the first such tech
+        // in catalog order. A side's pick is a tech the other already
+        // holds, so the two picks never feed each other.
+        if (state.turn % ALLIANCE_R2_BOOST_TURNS === 0
+          && alliedAtLevel(state, actor.seat, other, ALLIANCE_RESEARCH, 2)) {
+          const ra = actor.research;
+          const rb = seatOf(state, other)!.research;
+          for (const [me, al] of [[ra, rb], [rb, ra]] as const) {
+            const pick = Object.keys(TECHS).find((tid) => (al.techs.includes(tid) || al.boosted.includes(tid))
+              && !me.techs.includes(tid) && !me.boosted.includes(tid));
+            if (pick) me.boosted.push(pick);
+          }
+        }
+        setAllyTurnsWith(state, actor.seat, other, al - 1);
+        // the TYPE is the live alliance's; the points are the pair's and stay
+        if (al === 1) delete state.allianceType?.[warClockKey(actor.seat, other)];
+      }
+      for (const [g, h] of [[actor.seat, other], [other, actor.seat]] as const) {
+        const ob = borderTurnsFrom(state, g, h);
+        if (ob > 0) setBorderTurnsFrom(state, g, h, ob - 1);
+      }
+    }
+    if (!anyWar) actor.peaceTurns += 1;
+    // CIV6 (Warlord's Throne): the conquest window runs 5 turns and expires by
+    // reaching zero, beside every other per-seat clock.
+    if ((actor.conquestProdTurns ?? 0) > 0) actor.conquestProdTurns = (actor.conquestProdTurns ?? 0) - 1;
+
+    // THE SEAT'S ACTIONS, after its processing and before the next
+    // player's turn (tools/civ6lab/turn_order_civ6.md, A11): its diplomacy,
+    // its purchases, its silo, its levy, its routes, then its units.
+    seatDiplomacy(state, actor, rec);
     // GOLD PURCHASE — ONE per seat per turn, and the WIRE names it. The
     // record's `buy` column carries [kind, centreTile, index]: kind 0 a
     // building, 1 a settler, 2 a military unit. Nothing here picks; each arm
@@ -2696,478 +3252,6 @@ export function seatPhase(state: GameState): void {
       }
       tradeRouteExpiry(state, actor);
     }
-
-    // Cities: real tile yields drive growth and the production queues.
-    // Iterate a SNAPSHOT — a settler completing mid-loop founds a city,
-    // and the newborn must not act this turn (the GPU gates on the
-    // pre-turn alive mask the same way).
-    const grantedNow: string[] = []; // the roster's technology grants, spawned after the upkeep
-    let sciSum = 0;
-    let culSum = 0;
-    let goldSum = 0;
-    let faithSum = 0;
-    const luxMap = luxuryAmenities(state, actor.seat);
-    const seatMods = getModifiers(state, actor.seat);
-    const cityStats = new Map<number, CityStats>();
-    for (const civCity of actor.cities) {
-      cityStats.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods, true));
-    }
-    // CIV6 (Military alliance 2): "+15% Production toward military units
-    // when you or your ally are at war."
-    const warBuffPct = warBuffProdPct(state, actor.seat) / 100;
-    const milAllyWarPct = state.seats.some((x) => x.seat !== actor.seat
-      && alliedAtLevel(state, actor.seat, x.seat, ALLIANCE_MILITARY, 2)
-      && (atWarWithAny(state, actor.seat) || atWarWithAny(state, x.seat))) ? ALLIANCE_M2_MIL_PROD_PCT / 100 : 0;
-    // The seat's science/turn off the SAME loop-top snapshot, folded in city
-    // order — the Moon Landing lump reads it, and the GPU folds the identical
-    // walk columns in slot order, so the f64 association agrees.
-    let sciPerTurnSeat = 0;
-    for (const civCity of actor.cities) sciPerTurnSeat += cityStats.get(civCity.id)!.total.science;
-    // this seat's governor seats for THIS turn — persistent assignments the
-    // roster already carries, read once before the walk moves any loyalty.
-    const rGovIds = new Set(governorsOf(actor)
-      .filter((g) => g.appointed && g.cityId >= 0 && g.outTurns <= 0)
-      .map((g) => g.cityId));
-    const civCityDefectors: City[] = [];
-    for (const civCity of [...actor.cities]) {
-      const stats = cityStats.get(civCity.id) ?? computeCityStats(state, civCity, luxMap, seatMods);
-      const tier = stats.amenities.tier;
-      if (applyLoyalty(state, civCity, tier.name, rGovIds.has(civCity.id))) {
-        civCityDefectors.push(civCity);
-      }
-      const y = stats.total;
-      // `total.gold` is already NET of district+building upkeep — computeCityStats
-      // subtracts it — so this must not charge it a second time.
-      goldSum += y.gold;
-      faithSum += y.faith; // the faith yield gains its consumer
-      const production = y.production;
-      sciSum += y.science;
-      const culC = y.culture;
-      culSum += culC;
-
-      seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
-      const q = civCity.queue[0];
-      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
-        // The seat's GOVERNMENT/POLICY encampHarborProdMult: a seat that
-        // adopts the government owns its effects; the multiplier keys on
-        // the ITEM, not on the seat.
-        let _em = isEncampHarborItem(q) ? seatMods.encampHarborProdMult : 1;
-        // CIV6 (To Arms!, Golden face): "+15% Production towards military
-        // units." (Heartbeat of Steam, Golden face): "+10% Production toward
-        // Industrial era and later wonders." The three item classes are
-        // disjoint, so the multiplier order is association-free.
-        if (q.kind === 'unit' && unitIsMilitary(q.unit) && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
-        if (q.kind === 'wonder' && (WONDER_ERA_INDEX[q.wonder] ?? 0) >= INDUSTRIAL_ERA_INDEX && goldenDedication(state, civCity.seat, DED_STEAM)) _em *= STEAM_WONDER_PROD_MULT;
-        // CIV6 (Urban Development Treaty, outcome A): "+100% Production
-        // towards buildings in this district."
-        const _udtD = congressUdtProdDistrict(state);
-        if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
-        // CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows
-        // CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
-        // the seat's home continent — its original capital's landmass
-        const _offHome = !onHomeContinent(state, civCity.seat, civCity.centerIndex);
-        if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { kind: 'building', building: q.building, district: BUILDINGS[q.building]?.district }, _offHome);
-        // CIV6 (Public Works Program): "+100% / -50% Production towards this
-        // Project."
-        if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
-        // CIV6 (Zoning Commissioner): "+20% Production towards constructing
-        // Districts in the city".
-        // CIV6 (Letters of Marque): "Naval Raiders: +100% Production";
-        // (Flower Power): land units other than Rock Bands cost double, which
-        // this model pays as a slower fill rather than a moved queue cost.
-        if (q.kind === 'unit' && UNITS[q.unit]?.raider) _em *= seatMods.navalRaiderProdMult;
-        if (q.kind === 'unit') _em /= landUnitPriceMult(state, civCity.seat, q.unit);
-        // CIV6 (Thunderbolt of the North): "+50% Production toward all naval
-        // melee units."
-        if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
-        // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
-        if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit }, _offHome);
-        if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
-        // CIV6 (Merchant Republic, GOVERNMENTBONUS_DISTRICT_PRODUCTION):
-        // "+15% Production toward Districts."
-        if (q.kind === 'district') _em *= seatMods.districtProdMult;
-        // CIV6 (Founder of Carthage): "+50% Production toward districts in the
-        // city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
-        if (q.kind === 'district' && seatMods.plazaDistrictProd
-          && civCity.districts.some((d) => d.type === 'GOVERNMENT_PLAZA'
-            && state.map.tiles[d.tileIndex].districtComplete)) {
-          _em *= 1 + seatMods.plazaDistrictProd / 100;
-        }
-        // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
-        if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district }, _offHome);
-        // CIV6 (Space Initiative, Arms Race Proponent): +30% toward the named
-        // projects in the governor's city; (Hong Kong): "+20% Production
-        // towards city projects"
-        if (q.kind === 'project') _em *= (1 + governorSum(state, civCity, (e) => e.projectProdPct?.[q.project]) / 100) * seatMods.projectProdMult * suzerainProjectMult(state, civCity.seat);
-        // CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
-        // toward Medieval, Renaissance, and Industrial era wonders" — an ERA
-        // BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)
-        if (q.kind === 'wonder' && seatMods.wonderEraProd.length) {
-          const we = WONDER_ERA_INDEX[q.wonder] ?? 0;
-          for (const r of seatMods.wonderEraProd) {
-            if (we >= ERAS.indexOf(r.startEra) && we <= ERAS.indexOf(r.endEra)) _em *= 1 + r.pct / 100;
-          }
-        }
-        // CIV6 (Pearl of the Danube): "+50% Production to Districts and
-        // Buildings constructed ACROSS A RIVER from a City Center." A building
-        // is built in its district, so its tile is that district's; a City
-        // Center building never crosses a river from the centre it stands on.
-        if (seatMods.riverCrossProd.length && (q.kind === 'district' || q.kind === 'building')) {
-          const at = q.kind === 'district'
-            ? q.tileIndex
-            : civCity.districts.find((d) => d.type === BUILDINGS[q.building]?.district)?.tileIndex;
-          if (at !== undefined && crossesRiver(state.map.tiles[civCity.centerIndex], state.map.tiles[at])) {
-            for (const r of seatMods.riverCrossProd) if (r.kind === q.kind) _em *= 1 + r.pct / 100;
-          }
-        }
-        // CIV6 (Iteru): "+15% Production towards Districts and Wonders built
-        // next to a River."
-        if ((q.kind === 'district' || q.kind === 'wonder') && seatMods.civ === 'EGYPT' && hasRiver(state.map.tiles[q.tileIndex])) {
-          _em *= ITERU_RIVER_PROD_MULT;
-        }
-        // CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
-        // this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
-        // bonus Production in all Cities for 5 turns". Both are percentages, so
-        // they join the cards' additive stack rather than compounding on it.
-        let _bpct = q.kind === 'settler' ? cityBuildingSum(state, civCity, 'settlerProdPct') / 100 : 0;
-        if ((actor.conquestProdTurns ?? 0) > 0) {
-          _bpct += seatBuildingSum(state, actor.seat, 'conquestProdPct') / 100;
-        }
-        if (q.kind === 'unit' && unitIsMilitary(q.unit)) _bpct += milAllyWarPct;
-        // CIV6 (TRAIT_LIBERATION_WAR_PRODUCTION, YIELD_PRODUCTION Amount 100):
-        // a percent on every item for the turns after the declaration
-        _bpct += warBuffPct;
-        _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
-        const progressBefore = q.progress;
-        q.progress += production * _em;
-        // Pay in the bank right after the production add, so the field
-        // written below is read back.
-        if (civCity.productionBank) {
-          q.progress += civCity.productionBank;
-          civCity.productionBank = 0;
-        }
-        repairDrip(state, civCity, progressBefore);
-        const cost =
-          q.kind === 'unit'
-            ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // builders lock at queue
-            : q.kind === 'building'
-              ? buildingCostIn(state, civCity, q.building)
-              : q.kind === 'wonder'
-                ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // catalog cost (already speed-scaled)
-                : q.cost ?? 54; // settler / district / project carry their own cost
-        if (q.progress >= cost) {
-          civCity.queue.shift();
-          completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);
-          // CIV6: a completion's OVERFLOW carries into the next item. The
-          // shift has already happened, so `queue[0]` is that item; only a
-          // queue that ran EMPTY has nowhere to put the hammers, and that is
-          // the one case they bank and pay a turn late.
-          //
-          // The carry does NOT cascade: one completion per city per turn, so
-          // an overflow big enough to finish the item behind it finishes it
-          // NEXT turn. The GPU completes once per city per turn too, and a
-          // second completion here would move the DRAW COUNT — a completion
-          // can spawn a unit — against an engine that had not made it.
-          const over = q.progress - cost;
-          const next = civCity.queue[0];
-          if (next) next.progress += over;
-          else civCity.productionBank = (civCity.productionBank ?? 0) + over;
-        }
-      }
-      cityBorderGrowth(state, civCity, actor.seat, culC);
-      const civCityCenter = state.map.tiles[civCity.centerIndex];
-      cityStrikes(state, civCity, cityStrikeStrength(state, civCity));
-      // CIV6: "the city will automatically regain 20 HP per turn", war or
-      // not — until it is ENCIRCLED, at which point "it will no longer be
-      // able to repair the damage it suffers". The outer defenses are NOT on
-      // this gate: "once damaged, the outer defenses of a City Center or
-      // defensible district will not regenerate on their own", and come back
-      // only through the Repair Outer Defenses project.
-      // CIV6 (Defense Logistics): "City cannot be put under siege" — the ring
-      // may close and the heal still runs.
-      if (governorFlag(state, civCity, (e) => e.noSiege)
-          || !encircled(state, civCityCenter, actor.seat)) {
-        // CIV6: a City Center or Encampment caught in a blast has its HP and
-        // Defense Strength reduced to 0, and "Healing is impossible ... while
-        // the fallout lasts".
-        if (!irradiated(state.map.tiles[civCity.centerIndex])) {
-          civCity.hp = Math.min(CITY_MAX_HP, civCity.hp + CITY_HEAL_PER_TURN);
-        }
-        for (const d of civCity.districts) {
-          if (d.type !== 'ENCAMPMENT') continue;
-          const dt = state.map.tiles[d.tileIndex];
-          if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
-          // "This is an automatic action, which happens if its tile is not
-          // occupied" — an enemy standing on the district holds it silent.
-          if (unitsAt(state, dt.index).some((u) => unitsHostile(state, u, { seat: actor.seat }))) continue;
-          if (!irradiated(dt)) {
-            dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? ENCAMPMENT_HP) + CITY_HEAL_PER_TURN);
-          }
-        }
-      }
-    }
-
-    for (const civCity of civCityDefectors) flipCity(state, civCity);
-
-    const rsr = actor.research;
-    const _fBase = faithSum;
-    // CIV6 (Alliance, level 1): the ally's routes INTO this seat pay the
-    // receiver half of the typed route bonus - empire-level, per route.
-    for (const o of state.seats) {
-      if (o.seat === actor.seat) continue;
-      const aty = allianceTypeWith(state, actor.seat, o.seat);
-      if (aty >= 0 && ALLIANCE_ROUTE_FROM[aty] > 0 && ALLIANCE_ROUTE_YKEY[aty]) {
-        const n = (o.tradeRoutes ?? []).filter((r) => r.toSeat === actor.seat).length;
-        const amt = ALLIANCE_ROUTE_FROM[aty] * n;
-        if (ALLIANCE_ROUTE_YKEY[aty] === 'science') sciSum += amt;
-        else if (ALLIANCE_ROUTE_YKEY[aty] === 'culture') culSum += amt;
-        else if (ALLIANCE_ROUTE_YKEY[aty] === 'gold') goldSum += amt;
-        else if (ALLIANCE_ROUTE_YKEY[aty] === 'faith') faithSum += amt;
-      }
-      // CIV6 (Religious alliance 3): "+1 Faith for each of your Citizens
-      // following your ally's religion."
-      if (alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_RELIGIOUS, 3)) {
-        for (const c of actor.cities) {
-          if (c.followedReligion === o.seat) faithSum += ALLIANCE_REL3_FAITH_PER_POP * c.population;
-        }
-      }
-    }
-    const _fAll = faithSum;
-    // CIV6 (The Last Prophet): "+1 Science for each foreign city following
-    // Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
-    const foreignRows = getModifiers(state, actor.seat).foreignFollowerYields;
-    if (foreignRows.length) {
-      const foreign = foreignFollowerCount(state, actor.seat);
-      for (const r of foreignRows) {
-        const amt = r.amount * Math.floor(foreign / Math.max(1, r.per));
-        if (r.yield === 'science') sciSum += amt;
-        else if (r.yield === 'culture') culSum += amt;
-        else if (r.yield === 'gold') goldSum += amt;
-        else if (r.yield === 'faith') faithSum += amt;
-      }
-    }
-    const _fFor = faithSum;
-    // the seat's OUTPUT this turn, stored for allies' percentage reads -
-    // written before those reads, so the terms never compound
-    actor.sciRate = sciSum;
-    actor.culRate = culSum;
-    for (const o of state.seats) {
-      if (o.seat === actor.seat) continue;
-      // CIV6 (Research alliance 3): "+10% of your ally's Science" while
-      // researching a tech the ally completed, or the tech the ally is on.
-      if (alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_RESEARCH, 3) && rsr.tech
-        && (o.research.techs.includes(rsr.tech) || o.research.tech === rsr.tech)) {
-        sciSum += ALLIANCE_R3_SCI_PCT * (o.sciRate ?? 0);
-      }
-      // CIV6 (Cultural alliance 3): "+10% of your ally's Culture".
-      if (alliedAtLevel(state, actor.seat, o.seat, ALLIANCE_CULTURAL, 3)) {
-        culSum += ALLIANCE_C3_CUL_PCT * (o.culRate ?? 0);
-      }
-    }
-    const gTech = goldenBoostBonus(state, actor.seat, false);
-    const gCivic = goldenBoostBonus(state, actor.seat, true);
-    const pickNext = () => {
-      // The RESEARCH PICK arrives on the wire (applySeatActionRecord). A seat
-      // with no pick banks progress with no current tech — the same wait the
-      // GPU's `cur_tech == -1` already models.
-    };
-    pickNext();
-    rsr.techProgress += sciSum;
-    // LIFETIME science — the cultureTotal pattern, beside the stream add.
-    // Every seat accrues (the GPU twin is seat_science_total rows 0..R);
-    // lump grants (applyLumpGrant, goody maps) add to the same field.
-    actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
-    const bTech = rosterBoostPoints(state, actor.seat, false);
-    while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech)) {
-      rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech);
-      if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
-      for (const fx of TECHS[rsr.tech].effects) {
-        // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
-        // Diplomatic Victory point" — once, at completion.
-        if (fx.kind === 'award') {
-          if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
-          if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
-        }
-      }
-      rsr.techs.push(rsr.tech);
-      // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
-      // technology. The SPAWN waits for the upkeep charge below — a unit
-      // granted this turn starts paying next turn, and the GPU's tech loop
-      // sits on the same side of `_seat_upkeep_and_bankruptcy`.
-      for (const g of seatMods.grantUnits) {
-        if (g.tech !== rsr.tech || !g.unit) continue;   // a CLASS row is a founding grant
-        grantedNow.push(g.unit);
-      }
-      delete rsr.techRetained[rsr.tech];
-      rsr.tech = null;
-      pickNext();
-    }
-    if (!rsr.tech && availableTechsIn(rsr).length === 0) rsr.techProgress = Math.min(rsr.techProgress, 0);
-    rsr.civicProgress += culSum;
-    // LIFETIME culture — the same per-turn sum, banked separately
-    // because civicProgress is SPENT by every completed civic. Real Civ 6
-    // scores DOMESTIC TOURISTS off lifetime culture, so this is the substrate
-    // the Culture victory reads. Zero-draw; the GPU mirrors at this position.
-    actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
-    actor.treasury = (actor.treasury ?? 0) + goldSum;
-    faithSum += peacefulFounderFaith(state, actor.seat);
-    // THE TURN'S FAITH INCOME, before it lands. One number per seat per
-    // turn: it splits an income disagreement from a SPEND disagreement,
-    // which is two halves of the search space in one line.
-    const _dlfi = (globalThis as { __diffLog?: string[] }).__diffLog;
-    if (_dlfi) _dlfi.push(`fi:${actor.seat}:${state.turn}`
-      + ` sum${faithSum.toFixed(6)} was${(actor.faith ?? 0).toFixed(6)}`
-      + ` base${_fBase.toFixed(6)} all${_fAll.toFixed(6)} for${_fFor.toFixed(6)}`
-      + ` gold${goldSum.toFixed(6)} purse${(actor.treasury ?? 0).toFixed(6)}`);
-    actor.faith = (actor.faith ?? 0) + faithSum;
-    seatAccumulators(state, actor.seat, rGovIds);
-    const _upk = state.units.reduce(
-      (s, u) => s + (u.seat === actor.seat ? unitUpkeep(seatMods, u.type) : 0),
-      0,
-    );
-    // WHAT the seat is charged and for HOW MANY units, before the charge
-    // lands: a rate difference and a roster difference look identical in the
-    // purse and are two different bugs.
-    const _dlu = (globalThis as { __diffLog?: string[] }).__diffLog;
-    if (_dlu) _dlu.push(`up:${actor.seat}:${state.turn}`
-      + ` n${state.units.filter((u) => u.seat === actor.seat).length}`
-      + ` cost${_upk.toFixed(3)} purse${(actor.treasury ?? 0).toFixed(3)}`);
-    actor.treasury -= _upk;
-    actor.treasury -= wmdUpkeep(state, actor.seat);
-    bankruptcy(state, actor, (t) => unitUpkeep(seatMods, t));
-    // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's technology grants, after
-    // the upkeep they do not yet owe AND after the bankruptcy that upkeep may
-    // force — the GPU's tech loop sits on the same side of both.
-    for (const id of grantedNow) {
-      const cap = actor.cities.find((c) => c.centerIndex === actor.capitalTile) ?? actor.cities[0];
-      if (cap) spawnUnit(state, id, cap.centerIndex, actor.seat);
-    }
-    const bCivic = rosterBoostPoints(state, actor.seat, true);
-    const _govBefore = seatGovernment(state, actor.seat);
-    while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic)) {
-      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic);
-      for (const fx of CIVICS[rsr.civic].effects) {
-        // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
-        // Diplomatic Victory point" — once, at completion.
-        if (fx.kind === 'award') {
-          if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
-          if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
-        }
-      }
-      rsr.civics.push(rsr.civic);
-      delete rsr.civicRetained[rsr.civic];
-      actor.government.civicTurn = state.turn;
-      rsr.civic = null;
-      pickNext();
-    }
-    if (!rsr.civic && availableCivicsIn(rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
-    // CIV6 (Legacy policy card): the card is unlocked by having BEEN in its
-    // government, so the seat remembers the one it is in now. A seat whose
-    // record never chose follows the newest government its civics unlock, and
-    // only a completed civic moves that, which is why this sits at the loop's
-    // exit; a CHANGE carries the slotted cards over.
-    const _govNow = seatGovernment(state, actor.seat);
-    actor.government.held |= governmentBit(_govNow);
-    if (_govNow && _govNow !== _govBefore) carryPolicies(state, actor.seat);
-
-    advanceGreatPeople(state, actor.seat);
-
-    // The PANTHEON RACE — an eager rule for EVERY seat row, drawn from the
-    // open pool; the gate and the draw mirror the GPU's row-generic
-    // `_seat_pantheon_race`, so the streams stay aligned. A religion's own
-    // beliefs are the record's `beliefs` arm (`adoptBeliefs`).
-    // Pantheon: costs PANTHEON_FAITH_COST from this seat's own faith.
-    if (actor.religion.pantheon === null && (actor.faith ?? 0) >= PANTHEON_FAITH_COST) {
-      const open = Object.keys(PANTHEONS).filter((id) => !state.claimedPantheons.includes(id));
-      if (open.length > 0) {
-        actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
-        const pick = open[Math.floor(nextRandom(state) * open.length)];
-        state.claimedPantheons.push(pick);
-        addEraScore(state, actor.seat, ERA_SCORE_PANTHEON);
-        actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
-        state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
-      }
-    }
-
-    const anyWar = atWarWithAny(state, actor.seat);
-    for (const foe of warsOf(state, actor.seat)) {
-      // ONE tick per pair per turn, at the pair's LOWER seat's tail — a major
-      // always outranks its city-state foes (their seat ids sit at 100+).
-      if (actor.seat < foe) setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
-    }
-    // ONE treaty countdown per pair per turn, at the pair's LOWER seat's tail —
-    // the war clock's discipline, over the pairs that are NOT at war. Every
-    // diplomatic AGREEMENT runs the same countdown here, and expires by
-    // reaching zero; the border grant is directed, so it ticks twice.
-    for (const other of [...state.seats.map((x) => x.seat), ...(state.cityStates ?? []).map((c) => c.seat)]) {
-      if (actor.seat >= other) continue;
-      const bound = treatyTurnsWith(state, actor.seat, other);
-      if (bound > 0) setTreatyTurnsWith(state, actor.seat, other, bound - 1);
-      if (!isCiv(other)) continue;
-      const fr = friendTurnsWith(state, actor.seat, other);
-      if (fr > 0) setFriendTurnsWith(state, actor.seat, other, fr - 1);
-      const al = allyTurnsWith(state, actor.seat, other);
-      if (al > 0) {
-        // CIV6 (Alliance): points accrue "every turn", faster when the pair
-        // trades - either direction pays its own quarter-point.
-        // CIV6 (Mediterranean's Bride): "Trading with Allies earns twice as
-        // many bonus Alliance Points"; (Adventures of Enkidu): "Their
-        // Alliances gain Alliance Points for being at war with a common foe."
-        const tradeQp = ALLIANCE_QP_ROUTE
-          * (leaderOf(state, actor.seat) === 'CLEOPATRA' || leaderOf(state, other) === 'CLEOPATRA' ? CLEOPATRA_TRADE_QP_MULT : 1);
-        const enkidu = leaderOf(state, actor.seat) === 'GILGAMESH' || leaderOf(state, other) === 'GILGAMESH';
-        const commonFoe = enkidu && [...state.seats.map((x) => x.seat), ...(state.cityStates ?? []).map((c) => c.seat)]
-          .some((f) => f !== actor.seat && f !== other && civsAtWar(state, actor.seat, f) && civsAtWar(state, other, f));
-        setAlliancePtsWith(state, actor.seat, other, alliancePtsWith(state, actor.seat, other)
-          + ALLIANCE_QP_TURN
-          // CIV6 (Democracy): "Alliance Points with all allies increase by an
-          // additional .25 per turn" — each side's own government pays it.
-          + getModifiers(state, actor.seat).alliancePointsPerTurn
-          + getModifiers(state, other).alliancePointsPerTurn
-          + (hasRouteToSeat(state, actor.seat, other) ? tradeQp : 0)
-          + (hasRouteToSeat(state, other, actor.seat) ? tradeQp : 0)
-          + (commonFoe ? ENKIDU_COMMON_FOE_QP : 0));
-        // CIV6 (Military alliance 2): "Allies share visibility" - each
-        // side's explored map folds into the other's, the fog this model keeps.
-        if (alliedAtLevel(state, actor.seat, other, ALLIANCE_MILITARY, 2)) {
-          const oa = seatOf(state, actor.seat);
-          const ob = seatOf(state, other);
-          if (oa?.explored && ob?.explored) {
-            for (let ei = 0; ei < oa.explored.length; ei++) {
-              const u = oa.explored[ei] | ob.explored[ei];
-              oa.explored[ei] = u;
-              ob.explored[ei] = u;
-            }
-          }
-        }
-        // CIV6 (Research alliance 2): "Every 30 turns (on Standard), you
-        // unlock a Eureka for a tech that your ally has researched or
-        // boosted, but you have not" - each side takes the first such tech
-        // in catalog order. A side's pick is a tech the other already
-        // holds, so the two picks never feed each other.
-        if (state.turn % ALLIANCE_R2_BOOST_TURNS === 0
-          && alliedAtLevel(state, actor.seat, other, ALLIANCE_RESEARCH, 2)) {
-          const ra = actor.research;
-          const rb = seatOf(state, other)!.research;
-          for (const [me, al] of [[ra, rb], [rb, ra]] as const) {
-            const pick = Object.keys(TECHS).find((tid) => (al.techs.includes(tid) || al.boosted.includes(tid))
-              && !me.techs.includes(tid) && !me.boosted.includes(tid));
-            if (pick) me.boosted.push(pick);
-          }
-        }
-        setAllyTurnsWith(state, actor.seat, other, al - 1);
-        // the TYPE is the live alliance's; the points are the pair's and stay
-        if (al === 1) delete state.allianceType?.[warClockKey(actor.seat, other)];
-      }
-      for (const [g, h] of [[actor.seat, other], [other, actor.seat]] as const) {
-        const ob = borderTurnsFrom(state, g, h);
-        if (ob > 0) setBorderTurnsFrom(state, g, h, ob - 1);
-      }
-    }
-    if (!anyWar) actor.peaceTurns += 1;
-    // CIV6 (Warlord's Throne): the conquest window runs 5 turns and expires by
-    // reaching zero, beside every other per-seat clock.
-    if ((actor.conquestProdTurns ?? 0) > 0) actor.conquestProdTurns = (actor.conquestProdTurns ?? 0) - 1;
     if (recU) applySeatUnitOrders(state, actor, recU.units);
   }
 

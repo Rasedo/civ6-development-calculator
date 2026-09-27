@@ -31,6 +31,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import load_rules, fixture_paths
 from warmup import warm_base, opened
 
+
+def every_seat_diplomacy(sim) -> None:
+    """Every major's diplomacy in turn order, each at its own block's tail
+    (`_seat_turn`), then the phase's end: the keeps are for this turn alone."""
+    for r in range(sim.n_majors):
+        sim._geo_agreements(r)
+    sim._driven_geo["keep_promise"].clear()
+
 SURPRISE, FORMAL, LIBERATION, RECONQUEST, TERRITORIAL, GOLDEN = 0, 1, 3, 4, 7, 8  # WAR_KINDS codes
 
 
@@ -236,7 +244,7 @@ def poke_alliance_pressure(rules, path):
     sim.city_pressure.zero_()
     sim._pressure_per_turn = 5  # one scene knob for both arms, so the floor shows
     snap = sim.snapshot()
-    sim._spread_religious_pressure()
+    sim._spread_religious_pressure(2, torch.ones(sim.B, dtype=torch.bool))
     plain = int(sim.city_pressure[0, 2, 0, 0])
     assert plain > 0, "the Holy City presses itself"
 
@@ -245,7 +253,7 @@ def poke_alliance_pressure(rules, path):
     sim.seat_ally_turns[0, 0, 1] = sim.seat_ally_turns[0, 1, 0] = 10
     sim.seat_alliance_pts[0, 0, 1] = sim.seat_alliance_pts[0, 1, 0] = sim._al_l3_qp
     assert int(sim._allied_type(0, 4, 3)[0, 1]) == 1
-    sim._spread_religious_pressure()
+    sim._spread_religious_pressure(2, torch.ones(sim.B, dtype=torch.bool))
     boosted = int(sim.city_pressure[0, 2, 0, 0])
     want = plain * (100 + sim._al_rel3_pressure_pct) // 100
     assert boosted == want and boosted > plain, f"+20% floored: want {want}, got {boosted} (plain {plain})"
@@ -256,7 +264,7 @@ def poke_alliance_pressure(rules, path):
     sim.seat_ally_turns[0, 0, 1] = sim.seat_ally_turns[0, 1, 0] = 10
     sim.seat_alliance_pts[0, 0, 1] = sim.seat_alliance_pts[0, 1, 0] = sim._al_l3_qp
     sim.city_pressure[0, 2, 0, 1] = 1
-    sim._spread_religious_pressure()
+    sim._spread_religious_pressure(2, torch.ones(sim.B, dtype=torch.bool))
     assert int(sim.city_pressure[0, 2, 0, 0]) == plain, "a follower of the ally's religion ends the bonus"
     print(f"  d alliance pressure OK ({plain} -> {boosted} with the level-3 Religious ally)")
 
@@ -312,7 +320,7 @@ def deal(sim, a: int, b: int, give, ask) -> None:
     m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
     m[:, a] = True
     sim.apply_geo(b, accept=m)
-    sim._geo_agreements()
+    every_seat_diplomacy(sim)
 
 
 def poke_joint_war(rules, path):

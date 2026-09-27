@@ -113,22 +113,22 @@ def main() -> None:
             sim.city_pressure[:, 0, s] = 0
             sim.city_pressure[:, 0, s, g] = 9000
             sim.city_followed[:, 0, s] = g
-        sim._spread_religious_pressure()
+        sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
         assert bool((sim.city_pressure[:, 0, 0, 1] == 1).all()), "religion-1 +1 pressure"
         assert bool((sim.city_pressure[:, 0, 0, 2] == 1).all()), "religion-2 +1 pressure"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "a tie is no majority"
         for _ in range(3):
-            sim._spread_religious_pressure()
+            sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
         assert bool((sim.city_pressure[:, 0, 0, 1] == 4).all()), "integer accumulation over turns"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "still tied -> nobody"
         # Break the tie: religion 2 pulls past half of the total (the other
         # religion's 4 plus the atheism baseline) -> majority flip to 2.
         sim.city_pressure[:, 0, 0, 2] += 5 + int(sim._atheism_per_pop) * sim.city_pop[:, 0, 0].long()
-        sim._spread_religious_pressure()
+        sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
         assert bool((sim.city_followed[:, 0, 0] == 2).all()), "majority pressure must flip to religion 2"
         # KILL hygiene: a razed city's pressure row is zeroed, follows nothing.
         sim.city_alive[:, 0, 0] = False
-        sim._spread_religious_pressure()
+        sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
         assert bool((sim.city_pressure[:, 0, 0, :] == 0).all()), "dead-slot pressure must reset (KILL hygiene)"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "dead city follows nothing"
         sim.city_alive[:, 0, 0] = True
@@ -136,7 +136,7 @@ def main() -> None:
         sim.city_pressure[:, 1:sim.n_majors].zero_()
         sim.city_followed[:, 1:sim.n_majors].fill_(-1)
         sim.city_pressure[:, 0 + 1, 0, 1] = 7  # stale pressure on a (possibly dead) slot
-        sim._spread_religious_pressure()
+        sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
         dead_rc = ~sim.city_alive[:, 1, 0]
         if bool(dead_rc.any()):
             assert bool((sim.city_pressure[dead_rc, 0 + 1, 0, :] == 0).all()), "dead rc-slot pressure must reset"

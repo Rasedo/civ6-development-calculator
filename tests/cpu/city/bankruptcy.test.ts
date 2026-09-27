@@ -6,7 +6,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { bankruptcy, flipCity, freeCitiesPhase } from '../../../cpu/core/phase';
 import { computeCityStats } from '../../../cpu/core/city';
 import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
-import { minorAccrue } from '../../../cpu/core/minorBuild';
+import { minorEconomy } from '../../../cpu/core/minorBuild';
 import { placeCityStateAt } from '../../../cpu/core/cityStates';
 import { bankruptAmenities, bankruptDisbands, goldShortfall } from '../../../cpu/data/seats';
 import { UNITS } from '../../../cpu/data/units';
@@ -103,7 +103,7 @@ describe('bankruptcy', () => {
     for (let k = 0; k < 12; k++) spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 3 + k, 12).index, cs.seat);
     const upkeep = state.units.filter((u) => u.seat === cs.seat).reduce((a, u) => a + (UNITS[u.type]?.maintenance ?? 0), 0);
     cs.treasury = 0;
-    minorAccrue(state, cs);
+    minorEconomy(state, cs);
     expect(cs.treasury).toBe(0);
     expect(cs.goldShortfall).toBeGreaterThanOrEqual(10);
     expect(cs.goldShortfall).toBeLessThanOrEqual(upkeep);

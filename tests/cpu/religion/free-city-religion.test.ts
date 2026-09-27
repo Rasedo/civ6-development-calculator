@@ -7,10 +7,8 @@
  * receive influence, build wonders) and it has no religion column at all. The
  * spread-religion operation row carries no owner filter, and the
  * `RELIGION_SPREAD_*` parameters are written per CITY. So the pressure walk
- * covers the free row, exactly as the loyalty walk already did.
- *
- * The walk had covered the majors alone on both engines: no pressure in, no
- * pressure out, and a Free City that could never follow anything.
+ * covers the free row, exactly as the loyalty walk does, and the Free Cities
+ * press on their own turn.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
@@ -48,7 +46,7 @@ describe('the pressure walk reaches the free row', () => {
     expect(free.followedReligion ?? null).toBeNull();
     // ATHEISM_PRESSURE_PER_POP is 50, so a pop-4 city holds 200 of its own
     // and the Holy City's x4 step needs past that to take the majority.
-    for (let i = 0; i < 120; i++) spreadReligiousPressure(state);
+    for (let i = 0; i < 120; i++) spreadReligiousPressure(state, 0);
     expect((free.religionPressure ?? [])[0] ?? 0).toBeGreaterThan(0);
     expect(free.followedReligion).toBe(0);
   });
@@ -57,13 +55,13 @@ describe('the pressure walk reaches the free row', () => {
     const { state, free } = scene();
     // ATHEISM_PRESSURE_PER_POP is 50, so a pop-4 city holds 200 of its own
     // and the Holy City's x4 step needs past that to take the majority.
-    for (let i = 0; i < 120; i++) spreadReligiousPressure(state);
+    for (let i = 0; i < 120; i++) spreadReligiousPressure(state, 0);
     expect(free.followedReligion).toBe(0);
-    // the walk reads `city.followedReligion` for every walked row, so the
-    // free row now appears among the sources; nothing about the source step
-    // asks who owns the city.
+    // the Free Cities' own spread reads `city.followedReligion` for their
+    // cities, so the Free City is a source on its own turn; nothing about the
+    // source step asks who owns the city.
     const before = (free.religionPressure ?? [])[0] ?? 0;
-    spreadReligiousPressure(state);
+    spreadReligiousPressure(state, FREE_SEAT);
     expect((free.religionPressure ?? [])[0] ?? 0).toBeGreaterThan(before);
   });
 });

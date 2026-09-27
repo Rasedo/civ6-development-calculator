@@ -108,7 +108,9 @@ describe('seat scalar groups', () => {
 
   it('congress: nothing sits off a session turn or before the era', () => {
     const state = scene();
-    state.turn = CONGRESS_INTERVAL - 1;      // the coming step is a session turn...
+    // the coming step is a session turn: the session closes the turn it sits
+    // in, before the counter moves...
+    state.turn = CONGRESS_INTERVAL;
     state.seats[0].diplomaticFavor = 7.9;
     state.congressSlate = [CONGRESS_MIGRATION, CONGRESS_BORDER_CONTROL];
     // ...but the world is Ancient: the Congress is closed
@@ -124,7 +126,7 @@ describe('seat scalar groups', () => {
   it('congress: the announced slate, the preference per slot, the DV leader', () => {
     const state = scene();
     state.seats[1].research.techs.push(LAST_TECH);
-    state.turn = CONGRESS_INTERVAL - 1;
+    state.turn = CONGRESS_INTERVAL;          // the session closes this turn
     state.congressSlate = [CONGRESS_MIGRATION, CONGRESS_MERCENARY];
     state.seats[1].faith = 50;
     state.seats[1].treasury = 10;
@@ -145,10 +147,12 @@ describe('seat scalar groups', () => {
   it('congress: a Special Session sits once a called emergency is due', () => {
     const state = scene();
     state.seats[0].research.techs.push(LAST_TECH);
-    state.turn = 10;
+    // the session sits at the close of the turn it is due in, before the
+    // counter moves: due at 12, the coming step from turn 12 holds it
+    state.turn = 11;
     state.emergencies = [{ kind: 0, target: 1, city: 0, phase: EMG_CALLED, act: 12, affected: [0], members: [] }];
     expect((SEAT_GROUPS.congress(state, 0) as Record<string, unknown>).special).toBe(false);
-    state.turn = 11;
+    state.turn = 12;
     expect((SEAT_GROUPS.congress(state, 0) as Record<string, unknown>).special).toBe(true);
     // the Congress closed: no session of either kind
     expect(specialSessionDue(state, 12, CONGRESS_MIN_ERA - 1)).toBe(false);

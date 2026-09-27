@@ -39,6 +39,14 @@ import json
 from core import BatchSim, load_rules, fixture_paths, FIXTURES
 from warmup import opened
 
+
+def every_seat_diplomacy(sim) -> None:
+    """Every major's diplomacy in turn order, each at its own block's tail
+    (`_seat_turn`), then the phase's end: the keeps are for this turn alone."""
+    for r in range(sim.n_majors):
+        sim._geo_agreements(r)
+    sim._driven_geo["keep_promise"].clear()
+
 B0 = 0
 RESEARCH, CULTURAL, ECONOMIC, MILITARY, RELIGIOUS = 0, 1, 2, 3, 4
 
@@ -80,7 +88,7 @@ def test_formation_and_expiry(rules, path) -> None:
     ty = torch.full((sim.B, sim.n_majors), -1, dtype=torch.long)
     ty[B0, 1] = MILITARY
     sim.apply_geo(0, ally=want, ally_type=ty)
-    sim._geo_agreements()
+    every_seat_diplomacy(sim)
     assert int(sim.seat_ally_turns[B0, 0, 1]) == int(sim._agreement_turns), "the clock did not start"
     assert int(sim.seat_alliance_type[B0, 0, 1]) == MILITARY, "the type was not stamped"
     assert int(sim.seat_alliance_type[B0, 1, 0]) == MILITARY, "the type is not symmetric"
@@ -312,11 +320,18 @@ def test_religious_pressure_and_faith(rules, path) -> None:
     for g in (0, 1):
         sim.civ_religion_done[B0, g] = True
     base = sim.city_pressure.clone()
-    sim._spread_religious_pressure()
+    every = torch.ones(sim.B, dtype=torch.bool)
+
+    def spread() -> None:
+        """every major's spread, in turn order"""
+        for r in range(sim.n_majors):
+            sim._spread_religious_pressure(r, every)
+
+    spread()
     without = int(sim.city_pressure[B0, 0, 0, 1])
     sim.city_pressure.copy_(base)
     ally_pair(sim, 0, 1, RELIGIOUS)
-    sim._spread_religious_pressure()
+    spread()
     with_a = int(sim.city_pressure[B0, 0, 0, 1])
     if without == 0:
         print("  6 pressure SKIPPED — the capitals sit out of pressure range on this fixture")

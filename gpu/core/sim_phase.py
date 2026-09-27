@@ -13,7 +13,6 @@ class SimPhase:
             # What the standing deals owe each other, before any new one is
             # struck: the per-turn payments, the clock, and the stale offer.
             self._deal_phase()
-            self._geo_agreements()
         for row in range(self.n_majors):
             self._seat_turn(row)
 
@@ -44,6 +43,9 @@ class SimPhase:
                     self.apply_seat_unit_sequence(row, torch.where(
                         _rows.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1)))
 
+        # a promise's keep answers every asker's settlement this phase, and is
+        # for THIS turn alone
+        self._driven_geo["keep_promise"].clear()
         self._seat_route_cache = None
 
 
@@ -166,10 +168,13 @@ class SimPhase:
                 self.civ_culture[:, row] += _ncf * _cy[4]
         if not bool(active.any()):
             # TS's eliminated-actor `continue` — but the stashed intents are for
-            # THIS turn and must not survive into the next one. Both drains pop
-            # unconditionally and apply nothing under an all-False mask.
+            # THIS turn and must not survive into the next one. Every drain pops
+            # unconditionally and applies nothing under an all-False mask.
             army0 = self._seat_army_count(row)
             self._seat_record_apply(row, active)
+            self._seat_policy_apply(row, active)
+            if self.n_majors > 1:
+                self._geo_agreements(row)
             self._seat_buy_ladder(row, active, army0)
             return active
         # THE TURN'S RESOURCES, before anything reads them: every improved
@@ -198,64 +203,60 @@ class SimPhase:
         # buy ladder's quota must read the pre-apply count, not the live one.
         army0 = self._seat_army_count(row)
         self._seat_record_apply(row, active)
-        self._seat_buy_ladder(row, active, army0)
-        self._seat_trade_phase(row, active)
         alive_c = self.city_alive[:, row].clone()
-
-        sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-        cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-        gold_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-        faith_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-        total, eff, need, tier_idx = self._seat_city_stats(row)
-        gov = self._seat_governor_seats(row)
-        flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
-        # One guard sync for the whole economy loop: alive_c is a pre-loop
-        # CLONE (a queue-completion newborn founded inside the loop does not
-        # act this turn — the [...actor.cities] discipline above) and `active`
-        # is a loop-invariant local.
+        # One guard sync for the whole block: alive_c is a pre-walk CLONE (a
+        # queue-completion newborn founded inside the walk does not act this
+        # turn — the [...actor.cities] discipline) and `active` is a
+        # loop-invariant local.
         cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
         cact_any_l = cact_all.any(dim=0).tolist()
-        # The seat's science/turn off the SAME loop-top snapshot, folded in
-        # slot order — the Moon Landing lump reads it. TS folds the identical
-        # city-stats values in array order, so the f64 association agrees.
-        sci_turn = torch.zeros(B, dtype=torch.float64, device=dev)
+
+        gov = self._seat_governor_seats(row)
+        sci_turn = self._seat_economy(row, active, cact_all, cact_any_l, gov)
+
+        # THE CITIES, after the economy (`seatPhase`'s walk). CIV6: each city
+        # runs its production, then grows or starves on the city as it stands
+        # after that completion, then claims its border tile, then takes its
+        # loyalty (tools/civ6lab/turn_order_civ6.md; runs/turnorder/armS_*).
+        # Every column puts its Production in, in slot order, off the stats
+        # taken again after the economy; then every column is read again, as
+        # the productions left it (the read the census keeps); then each
+        # grows, claims and takes its loyalty, in slot order, off that read.
+        # The SEAT halves of the per-city bodies are derived once above their
+        # loop and handed to every column: nothing in either reads a plane a
+        # column writes (see `_produce_pre` / `_loyalty_pre`).
+        made = self._seat_city_stats(row, record=False)[0][:, :, 1]
+        prod_pre = self._produce_pre(row)
         for j in range(self.RC):
             if cact_any_l[j]:
-                sci_turn = torch.where(cact_all[:, j], sci_turn + total[:, j, 3], sci_turn)
-        # The SEAT halves of the per-city bodies, derived once above the walk
-        # and handed to every column: nothing in either reads a plane a column
-        # writes (see `_produce_pre` / `_loyalty_pre`).
-        prod_pre = self._produce_pre(row)
+                jc = torch.full((B,), j, dtype=torch.long, device=dev)
+                self._seat_city_produce(row, jc, cact_all[:, j], made[:, j], sci_turn, prod_pre)
+        total, eff, need, tier_idx = self._seat_city_stats(row)
+        flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
         loy_pre = self._loyalty_pre(row)
         for j in range(self.RC):
             if not cact_any_l[j]:
                 continue
             cact = cact_all[:, j]
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
-            flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j], loy_pre)
-            # The empire streams, in seatPhase's own order. ASSOCIATION
-            # MATTERS: TS `sciSum += y.science + 0.7*pop` desugars to
-            # sciSum + (y.science + 0.7*pop) — the city term sums FIRST.
-            # (cul_sum + cul) + 0.3*pop is one ulp off and flips completions
-            # when a cost lands inside it. The citizens' term is already
-            # inside the snapshot's science/culture, and inside the amenity
-            # tier with it.
-            # `total.gold` is ALREADY net of the city's upkeep — the walk
-            # subtracts cityMaintenance where computeCityStats does, so
-            # phase.ts adds stats.total.gold straight in.
-            gold_sum = torch.where(cact, gold_sum + total[:, j, 2], gold_sum)
-            faith_sum = torch.where(cact, faith_sum + total[:, j, 5], faith_sum)
-            sci_sum = torch.where(cact, sci_sum + total[:, j, 3], sci_sum)
-            cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
-            cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
             self._seat_city_growth(row, jc, cact, eff[:, j], need[:, j])
-            self._seat_city_produce(row, jc, cact, total[:, j, 1], sci_turn, prod_pre)
+            cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
             self._seat_border_growth(row, jc, cact, cul_c)
-            self._seat_city_fire_and_heal(row, jc, cact)
+            flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j], loy_pre)
+            self._city_strikes(row, jc, cact)
 
         self._seat_loyalty_flips(row, flip)
-        self._seat_research_tail(row, active, sci_sum, cul_sum, gold_sum, faith_sum, gov)
+        # its cities' religious pressure goes out, on its own turn
+        self._spread_religious_pressure(row, active)
         self._seat_war_peace_tail(row, active)
+        # THE SEAT'S ACTIONS, after its processing and before the next
+        # player's turn (tools/civ6lab/turn_order_civ6.md, A11): its diplomacy,
+        # its purchases, its silo, its levy, its routes; its units walk next
+        # (`_seat_phase`).
+        if self.n_majors > 1:
+            self._geo_agreements(row)
+        self._seat_buy_ladder(row, active, army0)
+        self._seat_trade_phase(row, active)
         return active
 
     def _seat_war_peace_tail(self, row: int, active: torch.Tensor) -> None:
@@ -456,8 +457,8 @@ class SimPhase:
         constants, the alliance matrix (`_seat_war_peace_tail` ticks it after
         the walk), the ages, the city CENTRES (a centre is written at
         founding, and the walk founds nothing), the congress, the emergencies
-        and the Great Person per-city permanents (claimed in the research
-        tail). What the walk DOES move — every city's population, its
+        and the Great Person per-city permanents (claimed in the economy,
+        before the walk). What the walk DOES move — every city's population, its
         buildings, its own loyalty — is read live in the per-city body, one
         column at a time, exactly as before."""
         B, dev, F = self.B, self.device, torch.float64
@@ -640,8 +641,11 @@ class SimPhase:
         """`grantFreeCityUnit` for the Free City in column `col` [B] of the
         free row, in the games of `mask` [B], of chassis `unit_type` [B] (-1
         grants nothing). Each stands on the NEAREST free land plot outward from
-        the centre, never the centre itself nor a plot holding a district, the
-        lowest tile index among the plots at one distance; with none free
+        the centre, never the centre itself nor a plot holding a district;
+        among the plots at one distance the first on a walk round the ring
+        from its W corner along the NE, E, SE, SW, W and NW legs
+        (`hexRingWalk`, tools/civ6lab/c60w_bfs_fit.py over the
+        runs/c60t_grant_w_* records `grantFreeCityUnit` names); with none free
         anywhere it is not granted. The
         unit lands in the hostile pool under FREE_SEAT, where the Free Cities'
         walker moves it (`_free_walk`); it remembers the city that granted it
@@ -657,11 +661,28 @@ class SimPhase:
             ground = ground | self._portal_plane()
         ok = (ground & ~self._blocked_for(tiles, FREE_SEAT) & (tiles != ctr.unsqueeze(1))
               & (self.district < 0))
-        key = torch.where(ok, self.pair_dist[ctr].long() * T + tiles, torch.full_like(tiles, T * T))
+        # each plot's place on its ring's walk: axial offsets from the centre,
+        # the ring k, then the leg the plot lies on and its step along it
+        ar = torch.arange(T, device=self.device)
+        row_t = ar // self.W
+        q_t = ar % self.W - (row_t - (row_t & 1)) // 2
+        dq = q_t.unsqueeze(0) - q_t[ctr].unsqueeze(1)
+        dr = row_t.unsqueeze(0) - row_t[ctr].unsqueeze(1)
+        s = dq + dr
+        k = self.pair_dist[ctr].long()
+        pos = torch.where(
+            (s == -k) & (dr > -k), -dr,                                   # NE leg
+            torch.where((dr == -k) & (dq < k), k + dq,                    # E leg
+            torch.where((dq == k) & (dr < 0), 3 * k + dr,                 # SE leg
+            torch.where((s == k) & (dr < k), 3 * k + dr,                  # SW leg
+            torch.where((dr == k) & (dq > -k), 4 * k - dq,                # W leg
+                        6 * k - dr)))))                                   # NW leg
+        span = 6 * T
+        key = torch.where(ok, k * span + pos, torch.full_like(tiles, T * span))
         best = key.min(dim=1).values
-        spot = torch.remainder(best, T)
+        spot = key.min(dim=1).indices
         home = self.city_id[self._bidx, self.FREE_ROW, col.clamp(min=0)]
-        self._spawn_barb(mask & (best < T * T), spot, unit_type.clamp(min=0), ladder=False, seat=FREE_SEAT, home=home)
+        self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), ladder=False, seat=FREE_SEAT, home=home)
 
     def _free_grant_type(self, due: torch.Tensor) -> torch.Tensor:
         """[B] long — `freeCityGrantType` in the games of `due`: ONE draw over
@@ -694,8 +715,8 @@ class SimPhase:
         `_free_grant_period`th of its turns, the flip turn its first
         (`city_freed_turn`), the chassis `_free_grant_type`'s — puts the same
         walk's Production into its build table (`_free_city_build`), fires the
-        ranged strikes any walled city fires (`_city_strikes`), heals as any
-        unbesieged city does and runs its loyalty: CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
+        ranged strikes any walled city fires (`_city_strikes`) and runs its
+        loyalty (its heal is the turn's end's, `_heal_cities`): CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
         the flat base, the pressure term with every Free City's citizens on
         its own side and every major's (its age in each citizen's term) against,
         and the flat loyalty of what stands in it — no amenity, governor,
@@ -731,7 +752,15 @@ class SimPhase:
             income = income + gold[:, j]
         self.free_treasury.copy_(torch.where(
             acting, self.free_treasury + income.to(self.free_treasury.dtype), self.free_treasury))
+        short0 = self.seat_shortfall[:, row].clone()
         self._seat_upkeep_and_bankruptcy(row, acting)
+        # the cities' Production is read again where the shortfall moved what
+        # they make (`freeCitiesPhase`)
+        moved = self.seat_shortfall[:, row] != short0
+        if bool(moved.any()):
+            _yf2 = self._seat_amenity(row)[2]
+            prod2 = self._seat_city_walk(row, amen_yf=_yf2, maint=self._seat_housing(row)[0])[:, :, 1]
+            prod = torch.where(moved.unsqueeze(1), prod2, prod)
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
         scale = float(self.rules.seats["loyaltyScale"])
@@ -752,7 +781,6 @@ class SimPhase:
                 self._grant_free_unit(due, jc, self._free_grant_type(due))
             self._free_city_build(j, act, prod[:, j].double(), f_techs, f_civics, f_train)
             self._city_strikes(row, jc, act)
-            self._city_heal(row, jc, act)
             here = self.city_center[bidx, row, jc].clamp(min=0)
             own = self._citizen_pressure_from(here, row)
             foreign = torch.zeros(B, dtype=F, device=dev)
@@ -769,6 +797,8 @@ class SimPhase:
             nxt = torch.where(act, (loy + delta).clamp(min=0, max=lmax), loy)
             self.city_loyalty[bidx, row, jc] = nxt.to(self.city_loyalty.dtype)
             joins[:, j] = act & (self.city_loyalty[bidx, row, jc] <= 0)
+        # its cities' religious pressure goes out, on its own turn
+        self._spread_religious_pressure(row, acting)
         self._free_walk(acting)
         for j in range(self.RC):
             jl = joins[:, j] & self.city_alive[:, row, j]
@@ -885,7 +915,8 @@ class SimPhase:
                            pre: dict | None = None) -> None:
         """The queue head's turn — the production add, the banked chop, the
         completion and every completion's payout. ONE body, every seat row, at
-        the per-city seatPhase position (after growth, before border growth).
+        the per-city seatPhase position (the city's first step, before its
+        growth).
 
         Only the HEAD accrues — a deeper entry keeps whatever hammers it
         already holds and waits — and a completion SHIFTS the queue, so CIV6's
@@ -1304,8 +1335,7 @@ class SimPhase:
             self._bldg_version += 1
             self._building_dedications(row, bi, made_b2)
             # A completed REGIONAL building reaches OTHER cities' yields, so
-            # the caches must see the write even though this turn's own walk
-            # reads the loop-top snapshot.
+            # the caches must see the write: the walk's next read is live.
             self._eff_version += 1
             if self._walls_rows:
                 wm = br[(self._b_walls[bi[br]] > 0)]
@@ -1517,7 +1547,6 @@ class SimPhase:
                             # the craft; the win fires on ARRIVAL, in step().
                             self.space_ly[hit, row] = 0
 
-
     def _construction_faith(self, row: int, col: torch.Tensor,
                             cost: torch.Tensor, mask: torch.Tensor) -> None:
         """CIV6 (Citadel of God): "Gain Faith equal to 25% of the construction
@@ -1642,10 +1671,9 @@ class SimPhase:
         self._eff_version += 1
 
     def _city_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> torch.Tensor:
-        """A city's unbesieged HEAL for whichever row holds it — the majors'
-        in their own turn, the Free Cities row's in `_free_cities_phase`.
-        Returns the [B] mask of cities that healed, which the Encampment's
-        repair shares.
+        """A city's unbesieged HEAL for whichever row holds it, a major's, the
+        Free Cities' or a city-state's (`_heal_cities`). Returns the [B] mask
+        of cities not besieged, which the Encampment's repair shares.
 
         CIV6's siege: "if the invading army manages to establish zone of
         control on all passable tiles surrounding the City Center, it will no
@@ -1681,44 +1709,57 @@ class SimPhase:
         # CIV6: a City Center caught in a blast has its HP reduced to 0 and
         # "Healing is impossible ... while the fallout lasts". `_fallout()` is
         # the whole map; this asks about ONE tile per game.
-        ok = act & ~besieged & ~(self.tile_fallout[bidx, ctr] > 0)
+        free = act & ~besieged
+        ok = free & ~(self.tile_fallout[bidx, ctr] > 0)
+        # a city-state's centre stands at its own pool (`CITY_STATE_MAX_HP`)
+        minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
+        cmax = int(self.rules.citystate["maxHp"] if minor else self.rules.combat["cityMaxHp"])
         hp = self.city_hp[bidx, row, col]
-        self.city_hp[bidx, row, col] = torch.where(
-            ok, (hp + heal).clamp(max=int(self.rules.combat["cityMaxHp"])), hp)
-        return ok
+        self.city_hp[bidx, row, col] = torch.where(ok, (hp + heal).clamp(max=cmax), hp)
+        return free
 
-    def _seat_city_fire_and_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> None:
-        """A city's WALLS strike, its ADDITIONAL Encampment strike and the
-        unbesieged heal — ONE body, every seat row, at the per-city position
-        game.ts's seatPhase uses (right after border growth, before the next
-        city's block).
-
-        DRAW ORDER: walls first, then Encampment, then the heal, per city. A
-        city holding both rolls twice, and a walls kill removes a target the
-        Encampment roll would have taken.
-
-        Real Civ 6 fires and heals a city in its OWNER's turn, once — and
-        CIV6 (Embrasure) buys the city one more shot from each district that
-        has one."""
+    def _heal_cities(self) -> None:
+        """`healCities` — THE CITIES' HEAL, once a game turn, beside the
+        units': CIV6 heals every unit and every city after the last player's
+        turn and the World Congress, before the counter moves
+        (tools/civ6lab/turn_order_civ6.md: 22 of 22 city and district heals in
+        that phase). Every major's city, every Free City and every
+        city-state's centre heals +20, or the whole damage when less, attacked
+        that turn or not, unless besieged (`_city_heal`; 42 of 42 attacked and
+        free healed, 0 of 4 besieged); the walls never do; a major's
+        unbesieged Encampment repairs beside its city unless an enemy stands
+        on it or fallout lies on its own tile. Nothing here draws or reads
+        another city's heal, so the walk's order is free."""
         bidx = self._bidx
         heal = int(self.rules.combat["cityHealPerTurn"])
-        enc_reg, e0 = self._city_strikes(row, col, act)
-        ok = self._city_heal(row, col, act)
-        if e0 is not None:
-            # "This is an automatic action, which happens if its tile is not
-            # occupied" — an enemy standing on the district holds it silent.
-            # `unitsAt(...).some(hostile)` on TS: every plane, the support one too
-            _em = self.military_at.gather(1, e0.unsqueeze(1)).squeeze(1)
-            _ec = self._civclass_at(e0)
-            _es = torch.where(_em >= 0, self.unit_seat.gather(1, _em.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_em, -1))
-            _ecs = torch.where(_ec >= 0, self.unit_seat.gather(1, _ec.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ec, -1))
-            occupied = (self._seats_hostile(row, _es.unsqueeze(1)) | self._seats_hostile(row, _ecs.unsqueeze(1))).squeeze(1)
-            # the fallout question is about the district's OWN tile, so it is
-            # asked there rather than over the whole map (`_fallout()`)
-            rep = (ok & ~occupied & (enc_reg >= 0) & self.district_complete[bidx, e0]
-                   & ~self.district_pillaged[bidx, e0] & ~(self.tile_fallout[bidx, e0] > 0))
-            cur = self.encamp_hp[bidx, e0]
-            self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
+        for row in list(range(self.n_majors)) + [self.FREE_ROW]:
+            live = self.city_alive[:, row, : self.RC]
+            for j in live.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                col = torch.full((self.B,), j, dtype=torch.long, device=self.device)
+                free = self._city_heal(row, col, live[:, j])
+                if row >= self.n_majors or self._encamp_didx < 0:
+                    continue
+                enc_reg = self.city_dist_tile[bidx, row, col, self._encamp_didx]  # [B]
+                e0 = enc_reg.clamp(min=0)
+                # "This is an automatic action, which happens if its tile is
+                # not occupied" — an enemy standing on the district holds it
+                # silent. `unitsAt(...).some(hostile)` on TS: every plane, the
+                # support one too
+                _em = self.military_at.gather(1, e0.unsqueeze(1)).squeeze(1)
+                _ec = self._civclass_at(e0)
+                _es = torch.where(_em >= 0, self.unit_seat.gather(1, _em.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_em, -1))
+                _ecs = torch.where(_ec >= 0, self.unit_seat.gather(1, _ec.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ec, -1))
+                occupied = (self._seats_hostile(row, _es.unsqueeze(1)) | self._seats_hostile(row, _ecs.unsqueeze(1))).squeeze(1)
+                # the fallout question is about the district's OWN tile, so it
+                # is asked there rather than over the whole map (`_fallout()`)
+                rep = (free & ~occupied & (enc_reg >= 0) & self.district_complete[bidx, e0]
+                       & ~self.district_pillaged[bidx, e0] & ~(self.tile_fallout[bidx, e0] > 0))
+                cur = self.encamp_hp[bidx, e0]
+                self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
+        col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for s in range(self.S):
+            if bool(self.citystate_alive[:, s].any()):
+                self._city_heal(self._CITY_MINOR0 + s, col0, self.citystate_alive[:, s])
 
     def _city_strikes(self, row: int, col: torch.Tensor, act: torch.Tensor):
         """ONE city's ranged strikes for the turn — the centre's, then the
@@ -1800,77 +1841,100 @@ class SimPhase:
             self.civ_tourism_to[:, row, o] += torch.where(active, add_g, zero)
             self.civ_tourism_rel_to[:, row, o] += torch.where(active, add_r, zero)
 
-    def _seat_research_tail(self, row: int, active: torch.Tensor, sci_sum: torch.Tensor,
-                            cul_sum: torch.Tensor, gold_sum: torch.Tensor,
-                            faith_sum: torch.Tensor, gov: torch.Tensor) -> None:
-        _f_base = faith_sum.clone()
-        """The seat block's TAIL, for seat row `row` — ONE body every seat runs.
+    def _seat_economy(self, row: int, active: torch.Tensor, cact_all: torch.Tensor,
+                      cact_any_l: list, gov: torch.Tensor) -> torch.Tensor:
+        """The seat's ECONOMY, for seat row `row` — ONE body every seat runs,
+        ahead of its city walk; the `seatPhase` twin.
 
-        In seatPhase order: bank this turn's city sums (science, gold, faith),
-        pay unit upkeep, complete techs, drain a dead tech bank, accrue TOURISM,
-        DIPLOMATIC FAVOR and the grievance decay, bank culture, complete civics,
-        drain a dead civic bank, then the great-people and pantheon races.
+        CIV6's order (tools/civ6lab/turn_order_civ6.md; runs/turnorder/armT_*,
+        armB_*, c93_*): science, and the techs it completes; gold, the unit
+        upkeep and the bankruptcy it may force (the techs' granted units
+        after both); the pending policies (`_seat_policy_apply`); culture,
+        tourism, diplomatic favor and the grievance decay, and the civics the
+        culture completes; faith; then the great-people and pantheon races.
+        Each yield is banked off the cities as they stand at its own step,
+        folded in slot order as TS folds them in array order: the science as
+        the turn opened, the gold after the techs, the culture after the
+        shortfall and the policies, the faith after the civics. A read is
+        taken again only in the games where a step between moved what the
+        cities yield — a tech, the shortfall or the policies, a civic.
 
         POSITION IS LOAD-BEARING between tourism and the civics: the wonder
         term reads the seat's ERA off completed research, so tourism must sit
         AFTER this turn's tech completions and BEFORE any civic completes.
 
-        The sums arrive from the caller's city walk because that walk is where
-        game.ts computes them, per city, in slot order — the float association
-        is part of the contract."""
+        Returns [B] the cities' own science as the turn opened, which the
+        Moon Landing lump reads."""
         rdv = self.rules_dev
+        B, dev = self.B, self.device
+        NMa = self.n_majors
+        zero = torch.zeros(B, dtype=torch.float64, device=dev)
 
         def bank(plane: torch.Tensor, add: torch.Tensor) -> None:
             plane[:, row] = plane[:, row] + torch.where(active, add, torch.zeros_like(add))
 
-        # CIV6 (Alliance, level 1): the ally's routes INTO this seat pay the
-        # receiver half of the typed route bonus - empire-level, per route.
-        # CIV6 (Religious alliance 3): "+1 Faith for each of your Citizens
-        # following your ally's religion."
-        NMa = self.n_majors
-        for _o in range(NMa):
-            if _o == row:
-                continue
-            _aty = self.seat_alliance_type[:, row, _o]
-            _live = self.seat_ally_turns[:, row, _o] > 0
-            if bool((_live & (_aty >= 0)).any()):
-                _a0 = _aty.clamp(min=0)
-                _n = (self.seat_route_dseat[:, _o] == row).sum(dim=1).double()
-                _amt = torch.where(_live & (_aty >= 0),
-                                   self._al_route_from[_a0].double() * _n,
-                                   torch.zeros_like(_n))
-                _yc = self._al_route_ycol[_a0]
-                sci_sum = sci_sum + torch.where(_yc == 3, _amt, torch.zeros_like(_amt))
-                cul_sum = cul_sum + torch.where(_yc == 4, _amt, torch.zeros_like(_amt))
-                gold_sum = gold_sum + torch.where(_yc == 2, _amt, torch.zeros_like(_amt))
-                faith_sum = faith_sum + torch.where(_yc == 5, _amt, torch.zeros_like(_amt))
-            _r3 = self._allied_type(row, 4, 3)[:, _o]
-            if bool(_r3.any()):
-                _fol = ((self.city_followed[:, row] == _o) & self.city_alive[:, row]).double()
-                faith_sum = faith_sum + (_r3.double() * self._al_rel3_faith_pop
-                                         * (_fol * self.city_pop[:, row].double()).sum(dim=1))
-        _f_all = faith_sum.clone()
-        # CIV6 (The Last Prophet): "+1 Science for each foreign city following
-        # Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
-        for _fc, _fl, _fy, _fa, _fp in self._live_rows(row, self._foreign_follower_yield_rows):
-            _fw = self._row_is(row, _fc, _fl)
-            if not bool(_fw.any()):
-                continue
-            _n = torch.div(self._foreign_follower_count(row), max(1, _fp), rounding_mode="floor")
-            _amt = _fw.double() * _n.double() * _fa
-            if _fy == 3:
-                sci_sum = sci_sum + _amt
-            elif _fy == 4:
-                cul_sum = cul_sum + _amt
-            elif _fy == 2:
-                gold_sum = gold_sum + _amt
-            elif _fy == 5:
-                faith_sum = faith_sum + _amt
-        _f_for = faith_sum.clone()
+        def read(where: torch.Tensor, total: torch.Tensor) -> torch.Tensor:
+            """the cities' yields read again in the games of `where`"""
+            if not bool(where.any()):
+                return total
+            fresh = self._seat_city_stats(row, record=False)[0]
+            return torch.where(where.view(-1, 1, 1), fresh, total)
+
+        def city_sum(total: torch.Tensor, k: int) -> torch.Tensor:
+            # `total.gold` is ALREADY net of the city's upkeep
+            out = zero
+            for j in range(self.RC):
+                if cact_any_l[j]:
+                    out = torch.where(cact_all[:, j], out + total[:, j, k], out)
+            return out
+
+        def alliance_route(k: int, s: torch.Tensor) -> torch.Tensor:
+            # CIV6 (Alliance, level 1): the ally's routes INTO this seat pay the
+            # receiver half of the typed route bonus - empire-level, per route.
+            # CIV6 (Religious alliance 3): "+1 Faith for each of your Citizens
+            # following your ally's religion."
+            for _o in range(NMa):
+                if _o == row:
+                    continue
+                _aty = self.seat_alliance_type[:, row, _o]
+                _live = self.seat_ally_turns[:, row, _o] > 0
+                if bool((_live & (_aty >= 0)).any()):
+                    _a0 = _aty.clamp(min=0)
+                    _n = (self.seat_route_dseat[:, _o] == row).sum(dim=1).double()
+                    _amt = torch.where(_live & (_aty >= 0),
+                                       self._al_route_from[_a0].double() * _n,
+                                       torch.zeros_like(_n))
+                    s = s + torch.where(self._al_route_ycol[_a0] == k, _amt, torch.zeros_like(_amt))
+                if k == 5:
+                    _r3 = self._allied_type(row, 4, 3)[:, _o]
+                    if bool(_r3.any()):
+                        _fol = ((self.city_followed[:, row] == _o) & self.city_alive[:, row]).double()
+                        s = s + (_r3.double() * self._al_rel3_faith_pop
+                                 * (_fol * self.city_pop[:, row].double()).sum(dim=1))
+            return s
+
+        def foreign_followers(k: int, s: torch.Tensor) -> torch.Tensor:
+            # CIV6 (The Last Prophet): "+1 Science for each foreign city
+            # following Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
+            for _fc, _fl, _fy, _fa, _fp in self._live_rows(row, self._foreign_follower_yield_rows):
+                if _fy != k:
+                    continue
+                _fw = self._row_is(row, _fc, _fl)
+                if not bool(_fw.any()):
+                    continue
+                _n = torch.div(self._foreign_follower_count(row), max(1, _fp), rounding_mode="floor")
+                s = s + _fw.double() * _n.double() * _fa
+            return s
+
+        total = self._seat_city_stats(row, record=False)[0]
+
+        # SCIENCE, and the technologies it completes.
+        sci_sum = city_sum(total, 3)
+        sci_turn = sci_sum.clone()
+        sci_sum = foreign_followers(3, alliance_route(3, sci_sum))
         # the seat's OUTPUT this turn, stored for allies' percentage reads -
         # written before those reads, so the terms never compound
         self.civ_sci_rate[:, row] = torch.where(active, sci_sum, self.civ_sci_rate[:, row])
-        self.civ_cul_rate[:, row] = torch.where(active, cul_sum, self.civ_cul_rate[:, row])
         for _o in range(NMa):
             if _o == row:
                 continue
@@ -1883,44 +1947,13 @@ class SimPhase:
                 co = (curt >= 0) & (done_o | (self.civ_cur_tech[:, _o] == curt))
                 sci_sum = sci_sum + torch.where(
                     _r3a & co, self._al_r3_sci_pct * self.civ_sci_rate[:, _o], torch.zeros_like(sci_sum))
-            # CIV6 (Cultural alliance 3): "+10% of your ally's Culture".
-            _c3a = self._allied_type(row, 1, 3)[:, _o]
-            if bool(_c3a.any()):
-                cul_sum = cul_sum + torch.where(
-                    _c3a, self._al_c3_cul_pct * self.civ_cul_rate[:, _o], torch.zeros_like(cul_sum))
         bank(self.civ_tech_prog, sci_sum)
         bank(self.seat_science_total, sci_sum)
-        bank(self.civ_treasury, gold_sum)
-        # a WON City-State Emergency pays +1 gold/turn per envoy, banked before
-        # upkeep exactly as seatAccumulators is
-        bank(self.civ_treasury, self._emergency_envoy_gold(row).to(self.civ_treasury.dtype))
-        # CIV6 (Satyagraha): "+5 Faith for each civilization (including India)
-        # they have met that has founded a Religion and is not currently at
-        # war". Acquaintance between MAJORS is not modelled on either engine —
-        # every one is known — so "met" is every live major.
-        for _pc, _pl, _pa in self._live_rows(row, self._peaceful_founder_rows):
-            _pw = self._row_is(row, _pc, _pl)
-            if not bool(_pw.any()):
-                continue
-            _n = torch.zeros(self.B, dtype=torch.float64, device=self.device)
-            for _o in range(self.n_majors):
-                _ok = self.civ_religion_done[:, _o]
-                if _o != row:
-                    _ok = _ok & ~self.war[:, row, _o]
-                _n = _n + _ok.double()
-            faith_sum = faith_sum + _pw.double() * _n * _pa
-        if self._log_diff:
-            for _b in range(self.B):
-                self._diff_events.setdefault(_b, []).append(
-                    f"fi:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
-                    f" sum{float(faith_sum[_b]):.6f}"
-                    f" was{float(self.civ_faith[_b, row]):.6f}"
-                    f" base{float(_f_base[_b]):.6f} all{float(_f_all[_b]):.6f}"
-                    f" for{float(_f_for[_b]):.6f}"
-                    f" gold{float(gold_sum[_b]):.6f}"
-                    f" purse{float(self.civ_treasury[_b, row]):.6f}")
-        bank(self.civ_faith, faith_sum)
-        self._seat_upkeep_and_bankruptcy(row, active)
+        tech_done = torch.zeros(B, dtype=torch.bool, device=dev)
+        # CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at a
+        # technology, in the capital (`GRANT_UNIT_ROWS`) — spawned after the
+        # upkeep it does not yet owe and the bankruptcy that upkeep may force
+        grants: list[tuple[torch.Tensor, int]] = []
         for _ in range(RESEARCH_LOOPS):
             curt = self.civ_cur_tech[:, row]
             cost_t = self._eff_cost(
@@ -1931,18 +1964,16 @@ class SimPhase:
             fin = active & (curt >= 0) & (self.civ_tech_prog[:, row] >= cost_t)
             if not bool(fin.any()):
                 break
+            tech_done = tech_done | fin
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_techs[rows, row, curt[rows]] = True
             self._eff_version += 1
-            # CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
-            # technology, in the capital (`GRANT_UNIT_ROWS`)
             for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._live_rows(row, self._grant_unit_rows):
                 if _gt < 0 or _gu < 0:
                     continue
-                _gm = fin & (curt == _gt) & self._row_is(row, _gc, _gl) & (self.civ_cap_tile[:, row] >= 0)
+                _gm = fin & (curt == _gt) & self._row_is(row, _gc, _gl)
                 if bool(_gm.any()):
-                    self._spawn_unit(row, _gm, self.civ_cap_tile[:, row].clamp(min=0),
-                                     torch.full((self.B,), _gu, dtype=torch.long, device=self.device))
+                    grants.append((_gm, _gu))
             self._urban_defenses_fit(row, fin & (curt == self._urban_def_tech))
             # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
             # Diplomatic Victory point" — once, at completion.
@@ -1958,6 +1989,40 @@ class SimPhase:
             self.civ_cur_tech[:, row] = torch.where(fin, torch.full_like(curt, -1), self.civ_cur_tech[:, row])
         no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t).any(dim=1)
         self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
+
+        # GOLD, off the cities as the technologies left them; then the upkeep
+        # and the bankruptcy that upkeep may force.
+        total = read(tech_done, total)
+        gold_sum = foreign_followers(2, alliance_route(2, city_sum(total, 2)))
+        bank(self.civ_treasury, gold_sum)
+        # a WON City-State Emergency pays +1 gold/turn per envoy, banked before
+        # the upkeep
+        bank(self.civ_treasury, self._emergency_envoy_gold(row).to(self.civ_treasury.dtype))
+        short0 = self.seat_shortfall[:, row].clone()
+        self._seat_upkeep_and_bankruptcy(row, active)
+        for _gm, _gu in grants:
+            _gm = _gm & (self.civ_cap_tile[:, row] >= 0)
+            if bool(_gm.any()):
+                self._spawn_unit(row, _gm, self.civ_cap_tile[:, row].clamp(min=0),
+                                 torch.full((B,), _gu, dtype=torch.long, device=dev))
+
+        # THE PENDING POLICIES: the record's government and slotted cards.
+        carried = self._seat_policy_apply(row, active)
+
+        # CULTURE, off the cities as the shortfall and the policies left them;
+        # the tourism, favor and grievance tallies; then the civics it
+        # completes.
+        total = read((self.seat_shortfall[:, row] != short0) | carried, total)
+        cul_sum = foreign_followers(4, alliance_route(4, city_sum(total, 4)))
+        self.civ_cul_rate[:, row] = torch.where(active, cul_sum, self.civ_cul_rate[:, row])
+        for _o in range(NMa):
+            if _o == row:
+                continue
+            # CIV6 (Cultural alliance 3): "+10% of your ally's Culture".
+            _c3a = self._allied_type(row, 1, 3)[:, _o]
+            if bool(_c3a.any()):
+                cul_sum = cul_sum + torch.where(
+                    _c3a, self._al_c3_cul_pct * self.civ_cul_rate[:, _o], torch.zeros_like(cul_sum))
         _tin = self._tourism_inputs(row, gov)
         _nat_gen = self._tourism_of(
             _tin["gw_tour"],
@@ -2023,6 +2088,7 @@ class SimPhase:
         bank(self.civ_civic_prog, cul_sum)
         bank(self.civ_culture, cul_sum)
         _gov_before = self._adopted_gov(row)[0] if self._ngov else None
+        civic_done = torch.zeros(B, dtype=torch.bool, device=dev)
         for _ in range(RESEARCH_LOOPS):
             curc = self.civ_cur_civic[:, row]
             cost_c = self._eff_cost(
@@ -2033,6 +2099,7 @@ class SimPhase:
             fin = active & (curc >= 0) & (self.civ_civic_prog[:, row] >= cost_c)
             if not bool(fin.any()):
                 break
+            civic_done = civic_done | fin
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_civics[rows, row, curc[rows]] = True
             self.civ_civic_turn[rows, row] = self.turn
@@ -2062,8 +2129,43 @@ class SimPhase:
             self._carry_policies(row, _gov_on & (_adopted != _gov_before))
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
+
+        # FAITH, off the cities as the civics left them.
+        total = read(civic_done, total)
+        _f_base = city_sum(total, 5)
+        faith_sum = alliance_route(5, _f_base)
+        _f_all = faith_sum.clone()
+        faith_sum = foreign_followers(5, faith_sum)
+        _f_for = faith_sum.clone()
+        # CIV6 (Satyagraha): "+5 Faith for each civilization (including India)
+        # they have met that has founded a Religion and is not currently at
+        # war". Acquaintance between MAJORS is not modelled on either engine —
+        # every one is known — so "met" is every live major.
+        for _pc, _pl, _pa in self._live_rows(row, self._peaceful_founder_rows):
+            _pw = self._row_is(row, _pc, _pl)
+            if not bool(_pw.any()):
+                continue
+            _n = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+            for _o in range(self.n_majors):
+                _ok = self.civ_religion_done[:, _o]
+                if _o != row:
+                    _ok = _ok & ~self.war[:, row, _o]
+                _n = _n + _ok.double()
+            faith_sum = faith_sum + _pw.double() * _n * _pa
+        if self._log_diff:
+            for _b in range(self.B):
+                self._diff_events.setdefault(_b, []).append(
+                    f"fi:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
+                    f" sum{float(faith_sum[_b]):.6f}"
+                    f" was{float(self.civ_faith[_b, row]):.6f}"
+                    f" base{float(_f_base[_b]):.6f} all{float(_f_all[_b]):.6f}"
+                    f" for{float(_f_for[_b]):.6f}"
+                    f" gold{float(gold_sum[_b]):.6f}"
+                    f" purse{float(self.civ_treasury[_b, row]):.6f}")
+        bank(self.civ_faith, faith_sum)
         self._advance_great_people(row, active)
         self._seat_pantheon_race(row, active)
+        return sci_turn
 
     def _gp_cost(self, cls: int, at: torch.Tensor, world_era: torch.Tensor) -> torch.Tensor:
         """[B] float64 — what the person at queue position `at` costs. CIV6:

@@ -73,11 +73,19 @@ from warmup import settle_all, works_of, warm_base
 from core import neutral, records
 
 
+def every_seat_diplomacy(sim) -> None:
+    """Every major's diplomacy in turn order, each at its own block's tail
+    (`_seat_turn`), then the phase's end: the keeps are for this turn alone."""
+    for r in range(sim.n_majors):
+        sim._geo_agreements(r)
+    sim._driven_geo["keep_promise"].clear()
+
+
 # The agreement pass: the ported scans decide off the diplomatic table, the
 # engine arm re-validates.
 def geo_denounce(sim) -> None:
     records.geo_decide_and_apply(sim, neutral.static_for(sim), neutral.geo_obs(sim))
-    sim._geo_agreements()
+    every_seat_diplomacy(sim)
 
 
 # Declaring and suing ride the seat's OWN war head — `war_targets(row)` order,
@@ -183,7 +191,7 @@ def want(sim, row: int, verb: str, target: int, kind: int | None = None):
         m = torch.zeros(sim.B, 3, sim.n_majors, dtype=torch.bool, device=sim.device)
         m[:, kind, target] = True
     sim.apply_geo(row, **{verb: m})
-    sim._geo_agreements()
+    every_seat_diplomacy(sim)
 
 
 def poke_agreements(rules, path):
@@ -754,11 +762,16 @@ def deal(sim, a: int, b: int, give, ask, accept: bool = True):
             for c in range(3):
                 blob[:, base + s * 3 + c] = int(it[c])
     sim.apply_geo(a, offer=blob)
+    m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
+    m[:, a] = True
     if accept:
-        m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
-        m[:, a] = True
         sim.apply_geo(b, accept=m)
-    sim._geo_agreements()
+    every_seat_diplomacy(sim)
+    # each seat's diplomacy runs at its own block's tail: an answerer that
+    # moves BEFORE the offerer meets the offer on the next turn's answer
+    if accept and b < a:
+        sim.apply_geo(b, accept=m)
+        every_seat_diplomacy(sim)
 
 
 def poke_deal(rules, path):
@@ -779,7 +792,7 @@ def poke_deal(rules, path):
     m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
     m[:, a] = True
     sim.apply_geo(b, accept=m)
-    sim._geo_agreements()
+    every_seat_diplomacy(sim)
     assert float(sim.civ_treasury[0, a]) == 900.0
     assert float(sim.civ_treasury[0, b]) == 1100.0
     assert int(sim.deal_offer_left[0, a, b]) == 0
