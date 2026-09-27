@@ -56,6 +56,8 @@ def main(argv=None) -> int:
     p.add_argument("--gold", type=int, default=50000)
     p.add_argument("--wait", type=float, default=120.0)
     p.add_argument("--deadline", type=float, default=178.0)
+    p.add_argument("--lazy", action="store_true",
+                   help="grab the defender only on a turn its post read off (the seat-0 defender line)")
     a = p.parse_args(argv)
     h4.guard(a.deadline, "c16w_cycle")
     fh = open(a.log, "a", encoding="utf-8", newline="\n")
@@ -83,8 +85,11 @@ def main(argv=None) -> int:
     for _ in range(a.turns):
         t0 = lab.turn(t)
         t.run(GC, f"Players[0]:GetTreasury():SetGoldBalance({a.gold})")
+        posted = False
         for ln in t.run(IG, turn_lua, timeout=40):
             log(ln)
+            if ln.startswith("defender ") and "UNITOPERATION_SPY_COUNTERSPY" in ln:
+                posted = True
         seen: set[str] = set()
         for _ in range(12):
             name = t.run(IG, blocker)[-1].split()[-1]
@@ -97,7 +102,7 @@ def main(argv=None) -> int:
                 log(f"    popup {cause[1]} -> {lab.handle(t, 0, cause)}")
         t.run(IG, lab.LUA_ENDTURN)
         got = False
-        end = time.monotonic() + 60
+        end = time.monotonic() + (0 if a.lazy and posted else 60)
         while time.monotonic() < end:
             if t.run(GC, grab)[-1] == "grabbed":
                 got = True
@@ -123,6 +128,8 @@ def main(argv=None) -> int:
                 time.sleep(0.5)
             finally:
                 t.run(GC, "PlayerManager.SetLocalPlayerAndObserver(0)")
+        elif a.lazy and posted:
+            log(f"    post standing; p{dp} not grabbed")
         else:
             log(f"    no grab of p{dp} this turn")
         tn = lab.wait_turn(t, t0, 0, a.wait, log, first=3.0)

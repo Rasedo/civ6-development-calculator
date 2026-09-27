@@ -1,0 +1,13 @@
+{"tag": "appoint", "file": "c1g_gov.lua", "set": {"ZSTEP": "appoint", "ZK": "1", "ZPROMO": "x"}, "appointed": false, "call": true, "can": false, "kind": "gov", "points": 4, "spent": 4, "step": "appoint"}
+{"tag": "p1", "file": "c1g_gov.lua", "set": {"ZSTEP": "promote", "ZK": "1", "ZPROMO": "GOVERNOR_PROMOTION_ZONING_COMMISSIONER"}, "appointed": false, "call": true, "canHash": false, "canIdx": false, "kind": "gov", "points": 4, "spent": 4, "step": "promote"}
+{"tag": "read", "file": "c1g_gov.lua", "set": {"ZSTEP": "read", "ZK": "1", "ZPROMO": "x"}, "appointed": false, "kind": "gov", "points": 4, "spent": 4, "step": "read"}
+{"tag": "appoint2", "file": "c1g_gov.lua", "set": {"ZSTEP": "appoint", "ZK": "1", "ZPROMO": "x"}, "appointed": false, "call": true, "can": false, "kind": "gov", "points": 4, "spent": 4, "step": "appoint"}
+{"tag": "read2", "file": "c1g_gov.lua", "set": {"ZSTEP": "read", "ZK": "1", "ZPROMO": "x"}, "appointed": false, "kind": "gov", "points": 4, "spent": 4, "step": "read"}
+{"tag": "appoint3", "file": "c1g_gov.lua", "set": {"ZSTEP": "appoint", "ZK": "1", "ZPROMO": "x"}, "appointed": false, "call": true, "can": true, "kind": "gov", "points": 9, "spent": 6, "step": "appoint"}
+{"tag": "p1", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "promote", "ZPROMO": "GOVERNOR_PROMOTION_ZONING_COMMISSIONER"}, "appointed": false, "call": true, "canHash": false, "canIdx": false, "kind": "gov", "points": 10, "spent": 7, "step": "promote"}
+{"tag": "p2", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "promote", "ZPROMO": "GOVERNOR_PROMOTION_REINFORCED_INFRASTRUCTURE"}, "appointed": false, "call": true, "canHash": false, "canIdx": false, "kind": "gov", "points": 10, "spent": 7, "step": "promote"}
+{"tag": "assign", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "assign", "ZPROMO": "x"}, "appointed": false, "call": true, "city": 196610, "kind": "gov", "points": 10, "spent": 7, "step": "assign"}
+{"tag": "read3", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "read", "ZPROMO": "x"}, "appointed": false, "kind": "gov", "points": 10, "spent": 7, "step": "read"}
+{"tag": "read4", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "read", "ZPROMO": "x"}, "appointed": false, "kind": "gov", "points": 10, "spent": 7, "step": "read"}
+{"tag": "appoint_hash", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "appoint", "ZPROMO": "x", "ZGT": "row.Hash"}, "appointed": false, "call": true, "can": true, "kind": "gov", "points": 10, "spent": 7, "step": "appoint"}
+{"tag": "appoint_idx4", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "appoint", "ZPROMO": "x", "ZGT": "4"}, "appointed": false, "call": true, "can": true, "kind": "gov", "points": 14, "spent": 12, "step": "appoint"}

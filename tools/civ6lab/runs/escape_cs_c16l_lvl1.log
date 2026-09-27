@@ -1,0 +1,175 @@
+################ c16w cycle seat 0 op UNITOPERATION_SPY_SIPHON_FUNDS cap 12 extra 8 city 54:11 district 54:10 defender 1:7602178
+setup: four spy civics granted, 8 extra grants
+defender 7602178 at 54:11 level 1 op -1
+turn 156 spies 0 started 0 travelled 0 promoted 0 bought 2 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> CALAKMUL builds UNIT_WARRIOR
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup HistoricMoments -> closed
+    grabbed p1: def: spy 7602178 at 54:11 level 1 xp 0 promos  op -1 targets 54:11,53:13,53:9,54:10,54:12,56:11,55:11,54:8
+    repost: def: post at 54:10 plotcan true requested plot
+    after: def: spy 7602178 at 54:10 level 1 xp 0 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    cause popup HistoricMoments -> closed
+turn 157 spies active 0 idle 2 missions 0 captured-enemy 0
+spy 3342341 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 36:42 travel
+spy 3407887 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 37:38 travel
+defender 7602178 at 54:10 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 157 spies 2 started 0 travelled 2 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> CALAKMUL builds UNIT_WARRIOR
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup TechCivicCompletedPopup -> closed
+    grabbed p1: def: spy 7602178 at 54:10 level 1 xp 0 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    cause popup HistoricMoments -> closed
+turn 158 spies active 0 idle 0 missions 0 captured-enemy 0
+defender 7602178 at 54:10 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 158 spies 0 started 0 travelled 0 promoted 0 bought 2 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_POLITICAL_PHILOSOPHY
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup TechCivicCompletedPopup -> closed
+    grabbed p1: def: spy 7602178 at 54:10 level 1 xp 0 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    cause popup HistoricMoments -> closed
+turn 159 spies active 0 idle 4 missions 0 captured-enemy 0
+spy 3801092 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 54:11 start
+spy 3670021 LOC_CITIZEN_MAYA_MALE_6 level 1 at 37:38 travel
+spy 3735561 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 54:11 start
+spy 3604495 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 36:42 travel
+defender 7602178 at 54:10 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 159 spies 4 started 2 travelled 2 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NARANJO builds UNIT_WARRIOR
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup TechCivicCompletedPopup -> closed
+    grabbed p1: def: spy 7602178 at 54:10 level 1 xp 0 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    cause popup HistoricMoments -> closed
+turn 160 spies active 2 idle 0 missions 0 captured-enemy 0
+spy 3801092 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3735561 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 7602178 at 54:10 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 160 spies 2 started 0 travelled 0 promoted 0 bought 2 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_DEFENSIVE_TACTICS
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> CALAKMUL builds UNIT_WARRIOR
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup TechCivicCompletedPopup -> closed
+    grabbed p1: def: spy 7602178 at 54:10 level 1 xp 0 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+turn 161 spies active 2 idle 2 missions 0 captured-enemy 0
+spy 4063232 LOC_CITIZEN_MAYA_MODERN_FEMALE_4 level 1 at 36:42 travel
+spy 3801092 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3735561 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4259853 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 54:11 start
+spy 4194320 LOC_CITIZEN_MAYA_MALE_6 level 1 at 54:11 start
+spy 4128788 LOC_CITIZEN_MAYA_MODERN_MALE_9 level 1 at 37:38 travel
+defender 7602178 at 54:10 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 161 spies 6 started 2 travelled 2 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_RECORDED_HISTORY
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup TechCivicCompletedPopup -> closed
+    grabbed p1: def: spy 7602178 at 54:10 level 1 xp 0 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    cause session 2:2 -> closed sessions [2:2]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+    cause popup WorldCongressIntro -> closed
+    cause popup WorldCongressPopup -> closed
+    cause blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION: no handler
+spy 3801092 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3735561 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4259853 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4194320 LOC_CITIZEN_MAYA_MALE_6 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 7602178 at 54:10 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 161 spies 4 started 0 travelled 0 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing
+    no grab of p1 this turn
+turn 162 spies active 4 idle 0 missions 0 captured-enemy 0
+spy 3801092 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3735561 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4259853 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4194320 LOC_CITIZEN_MAYA_MALE_6 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 7602178 at 54:10 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 162 spies 4 started 0 travelled 0 promoted 0 bought 2 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_THEOLOGY
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> CALAKMUL builds UNIT_WARRIOR
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup WorldCongressPopup -> closed
+    grabbed p1: def: spy 7602178 at 54:10 level 1 xp 0 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    cause popup TechCivicCompletedPopup -> hidden
+turn 162 spies active 4 idle 2 missions 0 captured-enemy 0
+spy 3801092 LOC_CITIZEN_MAYA_FEMALE_6 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3735561 LOC_CITIZEN_MAYA_MODERN_FEMALE_3 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4259853 LOC_CITIZEN_MAYA_MODERN_MALE_10 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4194320 LOC_CITIZEN_MAYA_MALE_6 level 1 at 54:10 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4522006 LOC_CITIZEN_MAYA_MALE_8 level 1 at 37:38 notarget
+spy 4456471 LOC_CITIZEN_MAYA_FEMALE_7 level 1 at 36:42 notarget
+defender 7602178 at 54:10 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 162 spies 6 started 0 travelled 0 promoted 0 bought 0 gold 47155
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup NaturalDisasterPopup -> closed
+    grabbed p1: def: spy 7602178 at 54:11 level 1 xp 15 promos  op -1 targets 54:11,53:13,53:9,54:10,54:12,56:11,55:11,54:8
+    repost: def: post at 54:10 plotcan true requested plot
+    after: def: spy 7602178 at 54:11 level 1 xp 15 promos  op -1 targets 54:11,53:13,53:9,54:10,54:12,56:11,55:11,54:8
+    cause popup DiplomacyActionView -> closed
+    cause popup DiplomacyDealView -> closed
+    cause popup LeaderScene -> hidden
+    cause popup EspionagePopup -> closed
+    cause popup DiplomacyDealView -> closed
+    cause popup EspionagePopup -> closed
+    cause popup DiplomacyDealView -> closed
+    cause popup TechCivicCompletedPopup -> closed
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed
+    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_MILITARY_TACTICS
+    cause popup DiplomacyDealView -> closed

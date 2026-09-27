@@ -1,0 +1,2 @@
+{"tag": "swap", "file": "c16l_swap.lua", "set": {"ZP": "1", "ZOLD": "7471106", "ZX": "54", "ZY": "11"}, "at": [54, 11], "id": 7602178, "kind": "swap", "old": 7471106, "p": 1, "removed": true}
+{"tag": "swap2", "file": "c16l_swap.lua", "set": {"ZP": "1", "ZOLD": "7471106", "ZX": "54", "ZY": "11"}, "at": [54, 11], "id": 7602178, "kind": "swap", "old": 7471106, "p": 1, "removed": true}

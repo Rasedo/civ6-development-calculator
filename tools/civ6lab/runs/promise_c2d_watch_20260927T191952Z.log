@@ -1,0 +1,86 @@
+turn 151 (start)
+{"kind":"city","turn":151,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"promise","turn":151,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":151,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":151,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":151,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":151,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":151,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":151,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":151,"a":5,"b":7,"g":-40,"perTurn":-5}
+{"kind":"promise","turn":151,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":151,"a":7,"b":5,"g":40,"perTurn":-5}
+    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":151}
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":152}
+{"kind":"city","turn":152,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"promise","turn":152,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":152,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":152,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":152,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":152,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":152,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":152,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":152,"a":5,"b":7,"g":-35,"perTurn":-5}
+{"kind":"promise","turn":152,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":152,"a":7,"b":5,"g":35,"perTurn":-5}
+turn 152
+    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NARANJO builds UNIT_WARRIOR
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+{"kind":"city","turn":153,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"promise","turn":153,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":153,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":153,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":153,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":153,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":153,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":153,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":153,"a":5,"b":7,"g":-30,"perTurn":-5}
+{"kind":"promise","turn":153,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":153,"a":7,"b":5,"g":30,"perTurn":-5}
+turn 153
+    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NARANJO builds UNIT_WARRIOR
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+    cause session 4:4 -> session p4 sid 4 ToPlayer=0 FromPlayer=4 -> POSITIVE
+    cause popup DiplomacyActionView -> closed
+    cause popup LeaderScene -> hidden
+{"kind":"city","turn":154,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"promise","turn":154,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":154,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":154,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":154,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":154,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":154,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":154,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievance","turn":154,"a":5,"b":7,"g":-25,"perTurn":-5}
+{"kind":"promise","turn":154,"a":7,"b":5,"made":true}
+{"kind":"grievance","turn":154,"a":7,"b":5,"g":25,"perTurn":-5}
+turn 154
+    unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_APPRENTICESHIP
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+    cause popup TechCivicCompletedPopup -> closed
+{"kind":"city","turn":155,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"promise","turn":155,"a":1,"b":0,"made":true}
+{"kind":"grievance","turn":155,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":155,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":155,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":155,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":155,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":155,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievlog","turn":155,"a":5,"b":7,"entry":{"Amount":25,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":7,"Target":5,"Turn":154}}
+{"kind":"promise","turn":155,"a":7,"b":5,"made":true}
+{"kind":"grievlog","turn":155,"a":7,"b":5,"entry":{"Amount":25,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":7,"Target":5,"Turn":154}}
+turn 155
+    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NARANJO builds UNIT_WARRIOR
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+{"kind":"city","turn":155,"p":0,"id":65536,"x":36,"y":42,"orig":0}
+{"kind":"grievance","turn":155,"a":2,"b":3,"g":150,"perTurn":0}
+{"kind":"grievance","turn":155,"a":2,"b":5,"g":50,"perTurn":0}
+{"kind":"grievance","turn":155,"a":3,"b":2,"g":-150,"perTurn":0}
+{"kind":"grievance","turn":155,"a":4,"b":5,"g":138,"perTurn":0}
+{"kind":"grievance","turn":155,"a":5,"b":2,"g":-50,"perTurn":0}
+{"kind":"grievance","turn":155,"a":5,"b":4,"g":-138,"perTurn":0}
+{"kind":"grievlog","turn":155,"a":5,"b":7,"entry":{"Amount":25,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":7,"Target":5,"Turn":154}}
+{"kind":"promise","turn":155,"a":7,"b":5,"made":true}
+{"kind":"grievlog","turn":155,"a":7,"b":5,"entry":{"Amount":25,"Description":"Р’С‹РЅРµС\u0081РµРЅРѕ РѕС\u0081СѓР¶РґРµРЅРёРµ","Initiator":7,"Target":5,"Turn":154}}
+turn 156
