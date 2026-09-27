@@ -1,0 +1,581 @@
+
+$ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\h4.py --host 127.0.0.2 --deadline 170.0 menu
+states: CityStatePicker, CivRoyaleIntro, ConfirmKick, CreditsScreen, CrossPlayLogin, DebugHotloadCache, EditHotseatPlayer, FrontEnd, FrontEndPopup, HostGame, InvitePopup, JoiningRoom, LeaderPicker, LoadGameMenu, Lobby, Main State, MainMenu, Mods, MultiSelectWindow, My2K, Options, PBCNotifyRemind, PiratesIntro, SaveGameMenu, StagingRoom, StateTransition, SwitchLayoutPopup, Test, UserSetupWarning
+
+$ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\game.py --host 127.0.0.2 new --config C:\civ6-development-calculator\tools\civ6lab\h1\h1_duel.json --map-seed 1103 --game-seed 2103 --wait 160.0
+    map options world_age=2(default) sea_level=2(default) temperature=2(default) rainfall=2(default) resources=2(default) start=2(default)
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    map_options=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    leaders=ok
+    slots 0:1 1:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-966254459 script=Continents.lua size=388991850 cs=3 realism=2 majors=2 map_seed=1103 game_seed=2103 world_age=2 sea_level=2 temperature=2 rainfall=2 resources=2 start=2 autostart=true
+    hosting
+in game {"turn": 1, "map_seed": 1103, "map_options": {"world_age": 2, "sea_level": 2, "temperature": 2, "rainfall": 2, "resources": 2, "start": 2}, "game_seed": 2103, "humans": 1, "minors": 4, "majors": {"0": "LEADER_TRAJAN", "1": "LEADER_QIN"}}
+
+$ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\h1\dump.py --host 127.0.0.2 --deadline 170.0 play --out C:\civ6-development-calculator\tools\civ6lab\runs\h1_duelw1103_20260927T190654Z.jsonl --turns 250
+turn 1 moved=False cities=0 units=13 errors=0 at 1s
+    autoplay false
+turn 2 moved=False cities=4 units=11 errors=0 at 3s
+    autoplay false
+turn 3 moved=False cities=5 units=12 errors=0 at 6s
+    autoplay false
+turn 4 moved=False cities=5 units=14 errors=0 at 8s
+    autoplay false
+turn 5 moved=False cities=5 units=17 errors=0 at 10s
+    autoplay false
+turn 6 moved=False cities=5 units=18 errors=0 at 13s
+    autoplay false
+turn 7 moved=False cities=5 units=18 errors=0 at 15s
+    autoplay false
+turn 8 moved=False cities=5 units=19 errors=0 at 17s
+    autoplay false
+turn 9 moved=False cities=5 units=24 errors=0 at 20s
+    autoplay false
+turn 10 moved=False cities=5 units=25 errors=0 at 22s
+    autoplay false
+turn 11 moved=False cities=5 units=28 errors=0 at 25s
+    autoplay false
+turn 12 moved=False cities=5 units=31 errors=0 at 27s
+    autoplay false
+turn 13 moved=False cities=5 units=31 errors=0 at 29s
+    autoplay false
+turn 14 moved=False cities=5 units=33 errors=0 at 31s
+    autoplay false
+turn 15 moved=False cities=5 units=36 errors=0 at 34s
+    autoplay false
+turn 16 moved=False cities=5 units=37 errors=0 at 36s
+    autoplay false
+turn 17 moved=False cities=5 units=37 errors=0 at 38s
+    autoplay false
+turn 18 moved=False cities=5 units=39 errors=0 at 41s
+    autoplay false
+turn 19 moved=False cities=6 units=39 errors=0 at 43s
+    autoplay false
+turn 20 moved=False cities=6 units=38 errors=0 at 45s
+    autoplay false
+turn 21 moved=False cities=6 units=40 errors=0 at 48s
+    autoplay false
+turn 22 moved=False cities=6 units=41 errors=0 at 50s
+    autoplay false
+turn 23 moved=False cities=6 units=40 errors=0 at 52s
+    autoplay false
+turn 24 moved=False cities=6 units=40 errors=0 at 55s
+    autoplay false
+turn 25 moved=False cities=6 units=39 errors=0 at 57s
+    autoplay false
+turn 26 moved=False cities=6 units=40 errors=0 at 59s
+    autoplay false
+turn 27 moved=False cities=6 units=40 errors=0 at 62s
+    autoplay false
+turn 28 moved=False cities=6 units=38 errors=0 at 64s
+    autoplay false
+turn 29 moved=False cities=6 units=39 errors=0 at 67s
+    autoplay false
+turn 30 moved=False cities=6 units=41 errors=0 at 69s
+    autoplay false
+turn 31 moved=False cities=6 units=41 errors=0 at 72s
+    autoplay false
+turn 32 moved=False cities=6 units=47 errors=0 at 77s
+    autoplay false
+turn 33 moved=False cities=6 units=50 errors=0 at 80s
+    autoplay false
+turn 34 moved=False cities=6 units=48 errors=0 at 82s
+    autoplay false
+turn 35 moved=False cities=6 units=46 errors=0 at 85s
+    autoplay false
+turn 36 moved=False cities=6 units=47 errors=0 at 87s
+    autoplay false
+turn 37 moved=False cities=6 units=47 errors=0 at 89s
+    autoplay false
+turn 38 moved=False cities=6 units=49 errors=0 at 92s
+    autoplay false
+turn 39 moved=False cities=6 units=49 errors=0 at 94s
+    autoplay false
+turn 40 moved=False cities=6 units=52 errors=0 at 96s
+    autoplay false
+turn 41 moved=False cities=6 units=51 errors=0 at 99s
+    autoplay false
+turn 42 moved=False cities=6 units=52 errors=0 at 101s
+    autoplay false
+turn 43 moved=False cities=6 units=53 errors=0 at 103s
+    autoplay false
+turn 44 moved=False cities=7 units=52 errors=0 at 106s
+    autoplay false
+turn 45 moved=False cities=7 units=52 errors=0 at 108s
+    autoplay false
+turn 46 moved=False cities=7 units=54 errors=0 at 110s
+    autoplay false
+turn 47 moved=False cities=7 units=57 errors=0 at 113s
+    autoplay false
+turn 48 moved=False cities=7 units=59 errors=0 at 115s
+    autoplay false
+turn 49 moved=False cities=8 units=58 errors=0 at 118s
+    autoplay false
+turn 50 moved=False cities=8 units=59 errors=0 at 120s
+    autoplay false
+turn 51 moved=False cities=8 units=56 errors=0 at 123s
+    autoplay false
+turn 52 moved=False cities=8 units=58 errors=0 at 125s
+    autoplay false
+turn 53 moved=False cities=8 units=57 errors=0 at 128s
+    autoplay false
+turn 54 moved=False cities=8 units=57 errors=0 at 130s
+    autoplay false
+turn 55 moved=False cities=8 units=59 errors=0 at 133s
+    autoplay false
+turn 56 moved=False cities=8 units=58 errors=0 at 135s
+    autoplay false
+turn 57 moved=False cities=8 units=59 errors=0 at 138s
+    autoplay false
+turn 58 moved=False cities=8 units=62 errors=0 at 140s
+    autoplay false
+turn 59 moved=False cities=8 units=62 errors=0 at 142s
+    autoplay false
+turn 60 moved=False cities=8 units=65 errors=0 at 145s
+    autoplay false
+turn 61 moved=False cities=8 units=66 errors=0 at 147s
+recorded 61 turn(s) this call; the game is at turn 61
+
+$ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\h1\dump.py --host 127.0.0.2 --deadline 170.0 play --out C:\civ6-development-calculator\tools\civ6lab\runs\h1_duelw1103_20260927T190654Z.jsonl --turns 189
+    autoplay false
+turn 62 moved=False cities=8 units=67 errors=0 at 6s
+    autoplay false
+turn 63 moved=False cities=8 units=68 errors=0 at 8s
+    autoplay false
+turn 64 moved=False cities=8 units=68 errors=0 at 11s
+    autoplay false
+turn 65 moved=False cities=8 units=68 errors=0 at 13s
+    autoplay false
+turn 66 moved=False cities=8 units=67 errors=0 at 15s
+    autoplay false
+turn 67 moved=False cities=8 units=70 errors=0 at 18s
+    autoplay false
+turn 68 moved=False cities=8 units=70 errors=0 at 20s
+    autoplay false
+turn 69 moved=False cities=8 units=69 errors=0 at 23s
+    autoplay false
+turn 70 moved=False cities=8 units=71 errors=0 at 25s
+    autoplay false
+turn 71 moved=False cities=8 units=73 errors=0 at 28s
+    autoplay false
+turn 72 moved=False cities=8 units=73 errors=0 at 30s
+    autoplay false
+turn 73 moved=False cities=9 units=73 errors=0 at 33s
+    autoplay false
+turn 74 moved=False cities=9 units=74 errors=0 at 35s
+    autoplay false
+turn 75 moved=False cities=9 units=70 errors=0 at 37s
+    autoplay false
+turn 76 moved=False cities=9 units=68 errors=0 at 40s
+    autoplay false
+turn 77 moved=False cities=9 units=68 errors=0 at 42s
+    autoplay false
+turn 78 moved=False cities=9 units=68 errors=0 at 45s
+    autoplay false
+turn 79 moved=False cities=9 units=68 errors=0 at 47s
+    autoplay false
+turn 80 moved=False cities=9 units=67 errors=0 at 49s
+    autoplay false
+turn 81 moved=False cities=9 units=70 errors=0 at 52s
+    autoplay false
+turn 82 moved=False cities=9 units=70 errors=0 at 54s
+    autoplay false
+turn 83 moved=False cities=9 units=70 errors=0 at 57s
+    autoplay false
+turn 84 moved=False cities=9 units=72 errors=0 at 60s
+    autoplay false
+turn 85 moved=False cities=9 units=70 errors=0 at 62s
+    autoplay false
+turn 86 moved=False cities=9 units=69 errors=0 at 64s
+    autoplay false
+turn 87 moved=False cities=9 units=71 errors=0 at 67s
+    autoplay false
+turn 88 moved=False cities=9 units=71 errors=0 at 69s
+    autoplay false
+turn 89 moved=False cities=9 units=73 errors=0 at 72s
+    autoplay false
+turn 90 moved=False cities=9 units=72 errors=0 at 74s
+    autoplay false
+turn 91 moved=False cities=9 units=72 errors=0 at 77s
+    autoplay false
+turn 92 moved=False cities=9 units=70 errors=0 at 83s
+    autoplay false
+turn 93 moved=False cities=9 units=70 errors=0 at 85s
+    autoplay false
+turn 94 moved=False cities=9 units=70 errors=0 at 88s
+    autoplay false
+turn 95 moved=False cities=9 units=70 errors=0 at 90s
+    autoplay false
+turn 96 moved=False cities=9 units=68 errors=0 at 93s
+    autoplay false
+turn 97 moved=False cities=9 units=68 errors=0 at 96s
+    autoplay false
+turn 98 moved=False cities=9 units=66 errors=0 at 98s
+    autoplay false
+turn 99 moved=False cities=9 units=67 errors=0 at 101s
+    autoplay false
+turn 100 moved=False cities=9 units=66 errors=0 at 104s
+    autoplay false
+turn 101 moved=False cities=10 units=66 errors=0 at 106s
+    autoplay false
+turn 102 moved=False cities=10 units=66 errors=0 at 109s
+    autoplay false
+turn 103 moved=False cities=10 units=62 errors=0 at 111s
+    autoplay false
+turn 104 moved=False cities=10 units=62 errors=0 at 113s
+    autoplay false
+turn 105 moved=False cities=10 units=62 errors=0 at 116s
+    autoplay false
+turn 106 moved=False cities=10 units=63 errors=0 at 118s
+    autoplay false
+turn 107 moved=False cities=10 units=62 errors=0 at 120s
+    autoplay false
+turn 108 moved=False cities=10 units=63 errors=0 at 123s
+    autoplay false
+turn 109 moved=False cities=10 units=64 errors=0 at 126s
+    autoplay false
+turn 110 moved=False cities=11 units=64 errors=0 at 128s
+    autoplay false
+turn 111 moved=False cities=11 units=66 errors=0 at 131s
+    autoplay false
+turn 112 moved=False cities=11 units=67 errors=0 at 134s
+    autoplay false
+turn 113 moved=False cities=11 units=68 errors=0 at 136s
+    autoplay false
+turn 114 moved=False cities=11 units=68 errors=0 at 138s
+    autoplay false
+turn 115 moved=False cities=11 units=69 errors=0 at 141s
+    autoplay false
+turn 116 moved=False cities=11 units=70 errors=0 at 143s
+    autoplay false
+turn 117 moved=False cities=11 units=72 errors=0 at 146s
+recorded 56 turn(s) this call; the game is at turn 117
+
+$ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\h1\dump.py --host 127.0.0.2 --deadline 170.0 play --out C:\civ6-development-calculator\tools\civ6lab\runs\h1_duelw1103_20260927T190654Z.jsonl --turns 133
+    autoplay false
+turn 118 moved=False cities=12 units=73 errors=0 at 4s
+    autoplay false
+turn 119 moved=False cities=12 units=73 errors=0 at 6s
+    autoplay false
+turn 120 moved=False cities=12 units=74 errors=0 at 8s
+    autoplay false
+turn 121 moved=False cities=12 units=75 errors=0 at 11s
+    autoplay false
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":122}
+    cause popup HistoricMoments -> closed
+    cause popup WorldCongressPopup -> closed
+turn 122 moved=False cities=12 units=74 errors=0 at 21s
+    autoplay false
+turn 123 moved=False cities=12 units=74 errors=0 at 23s
+    autoplay false
+turn 124 moved=False cities=12 units=74 errors=0 at 26s
+    autoplay false
+turn 125 moved=False cities=12 units=73 errors=0 at 29s
+    autoplay false
+turn 126 moved=False cities=12 units=73 errors=0 at 31s
+    autoplay false
+turn 127 moved=False cities=12 units=72 errors=0 at 34s
+    autoplay false
+turn 128 moved=False cities=12 units=70 errors=0 at 37s
+    autoplay false
+turn 129 moved=False cities=12 units=69 errors=0 at 40s
+    autoplay false
+turn 130 moved=False cities=12 units=68 errors=0 at 42s
+    autoplay false
+turn 131 moved=False cities=12 units=66 errors=0 at 45s
+    autoplay false
+turn 132 moved=False cities=12 units=67 errors=0 at 48s
+    autoplay false
+turn 133 moved=False cities=12 units=70 errors=0 at 51s
+    autoplay false
+turn 134 moved=False cities=12 units=70 errors=0 at 53s
+    autoplay false
+turn 135 moved=False cities=13 units=66 errors=0 at 56s
+    autoplay false
+turn 136 moved=False cities=13 units=66 errors=0 at 58s
+    autoplay false
+turn 137 moved=False cities=13 units=65 errors=0 at 61s
+    autoplay false
+turn 138 moved=False cities=13 units=64 errors=0 at 64s
+    autoplay false
+turn 139 moved=False cities=13 units=64 errors=0 at 66s
+    autoplay false
+turn 140 moved=False cities=13 units=63 errors=0 at 69s
+    autoplay false
+turn 141 moved=False cities=13 units=66 errors=0 at 72s
+    autoplay false
+turn 142 moved=False cities=13 units=65 errors=0 at 74s
+    autoplay false
+turn 143 moved=False cities=14 units=65 errors=0 at 78s
+    autoplay false
+turn 144 moved=False cities=14 units=62 errors=0 at 81s
+    autoplay false
+turn 145 moved=False cities=14 units=62 errors=0 at 84s
+    autoplay false
+turn 146 moved=False cities=14 units=63 errors=0 at 87s
+    autoplay false
+turn 147 moved=False cities=14 units=64 errors=0 at 90s
+    autoplay false
+turn 148 moved=False cities=14 units=64 errors=0 at 93s
+    autoplay false
+turn 149 moved=False cities=14 units=63 errors=0 at 96s
+    autoplay false
+turn 150 moved=False cities=14 units=64 errors=0 at 99s
+    autoplay false
+turn 151 moved=False cities=14 units=63 errors=0 at 101s
+    autoplay false
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_EXPLORATION","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":152}
+    cause popup HistoricMoments -> closed
+    cause popup WorldCongressPopup -> closed
+turn 152 moved=False cities=14 units=60 errors=0 at 111s
+    autoplay false
+turn 153 moved=False cities=14 units=58 errors=0 at 114s
+    autoplay false
+turn 154 moved=False cities=14 units=58 errors=0 at 116s
+    autoplay false
+turn 155 moved=False cities=14 units=55 errors=0 at 119s
+    autoplay false
+turn 156 moved=False cities=14 units=53 errors=0 at 123s
+    autoplay false
+turn 157 moved=False cities=14 units=52 errors=0 at 125s
+    autoplay false
+turn 158 moved=False cities=14 units=50 errors=0 at 128s
+    autoplay false
+turn 159 moved=False cities=14 units=51 errors=0 at 130s
+    autoplay false
+turn 160 moved=False cities=14 units=49 errors=0 at 134s
+    autoplay false
+turn 161 moved=False cities=14 units=48 errors=0 at 136s
+    autoplay false
+turn 162 moved=False cities=14 units=48 errors=0 at 139s
+    autoplay false
+turn 163 moved=False cities=14 units=48 errors=0 at 142s
+    autoplay false
+turn 164 moved=False cities=14 units=49 errors=0 at 145s
+    autoplay false
+turn 165 moved=False cities=14 units=53 errors=0 at 147s
+recorded 48 turn(s) this call; the game is at turn 165
+
+$ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\h1\dump.py --host 127.0.0.2 --deadline 170.0 play --out C:\civ6-development-calculator\tools\civ6lab\runs\h1_duelw1103_20260927T190654Z.jsonl --turns 85
+    autoplay false
+turn 166 moved=False cities=14 units=56 errors=0 at 4s
+    autoplay false
+turn 167 moved=False cities=14 units=57 errors=0 at 7s
+    autoplay false
+turn 168 moved=False cities=14 units=57 errors=0 at 10s
+    autoplay false
+turn 169 moved=False cities=14 units=57 errors=0 at 13s
+    autoplay false
+turn 170 moved=False cities=14 units=57 errors=0 at 15s
+    autoplay false
+turn 171 moved=False cities=14 units=57 errors=0 at 18s
+    autoplay false
+turn 172 moved=False cities=14 units=58 errors=0 at 21s
+    autoplay false
+turn 173 moved=False cities=14 units=58 errors=0 at 24s
+    autoplay false
+turn 174 moved=False cities=14 units=57 errors=0 at 27s
+    autoplay false
+turn 175 moved=False cities=14 units=55 errors=0 at 30s
+    autoplay false
+turn 176 moved=False cities=14 units=54 errors=0 at 33s
+    autoplay false
+turn 177 moved=False cities=14 units=55 errors=0 at 36s
+    autoplay false
+turn 178 moved=False cities=14 units=55 errors=0 at 39s
+    autoplay false
+turn 179 moved=False cities=14 units=57 errors=0 at 41s
+    autoplay false
+turn 180 moved=False cities=14 units=58 errors=0 at 44s
+    autoplay false
+turn 181 moved=False cities=14 units=58 errors=0 at 47s
+    autoplay false
+turn 182 moved=False cities=14 units=57 errors=0 at 53s
+    autoplay false
+turn 183 moved=False cities=14 units=59 errors=0 at 56s
+    autoplay false
+turn 184 moved=False cities=14 units=57 errors=0 at 58s
+    autoplay false
+turn 185 moved=False cities=14 units=58 errors=0 at 61s
+    autoplay false
+turn 186 moved=False cities=14 units=58 errors=0 at 64s
+    autoplay false
+turn 187 moved=False cities=14 units=58 errors=0 at 67s
+    autoplay false
+turn 188 moved=False cities=14 units=57 errors=0 at 70s
+    autoplay false
+turn 189 moved=False cities=15 units=55 errors=0 at 72s
+    autoplay false
+turn 190 moved=False cities=15 units=57 errors=0 at 75s
+    autoplay false
+turn 191 moved=False cities=15 units=56 errors=0 at 78s
+    autoplay false
+turn 192 moved=False cities=15 units=59 errors=0 at 81s
+    autoplay false
+turn 193 moved=False cities=15 units=60 errors=0 at 84s
+    autoplay false
+turn 194 moved=False cities=15 units=60 errors=0 at 87s
+    autoplay false
+turn 195 moved=False cities=15 units=60 errors=0 at 89s
+    autoplay false
+turn 196 moved=False cities=15 units=60 errors=0 at 93s
+    autoplay false
+turn 197 moved=False cities=15 units=60 errors=0 at 96s
+    autoplay false
+turn 198 moved=False cities=15 units=60 errors=0 at 99s
+    autoplay false
+turn 199 moved=False cities=15 units=61 errors=0 at 101s
+    autoplay false
+turn 200 moved=False cities=15 units=56 errors=0 at 104s
+    autoplay false
+turn 201 moved=False cities=15 units=55 errors=0 at 107s
+    autoplay false
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_TOURISM","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":202}
+    cause popup WorldCongressPopup -> closed
+turn 202 moved=False cities=15 units=55 errors=0 at 117s
+    autoplay false
+turn 203 moved=False cities=15 units=54 errors=0 at 119s
+    autoplay false
+turn 204 moved=False cities=15 units=57 errors=0 at 122s
+    autoplay false
+turn 205 moved=False cities=16 units=56 errors=0 at 125s
+    autoplay false
+turn 206 moved=False cities=16 units=57 errors=0 at 129s
+    autoplay false
+turn 207 moved=False cities=16 units=57 errors=0 at 131s
+    autoplay false
+turn 208 moved=False cities=16 units=57 errors=0 at 134s
+    autoplay false
+turn 209 moved=False cities=16 units=64 errors=0 at 137s
+    autoplay false
+turn 210 moved=False cities=16 units=61 errors=0 at 141s
+    autoplay false
+turn 211 moved=False cities=16 units=57 errors=0 at 144s
+    autoplay false
+turn 212 moved=False cities=16 units=54 errors=0 at 147s
+recorded 47 turn(s) this call; the game is at turn 212
+
+$ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\h1\dump.py --host 127.0.0.2 --deadline 170.0 play --out C:\civ6-development-calculator\tools\civ6lab\runs\h1_duelw1103_20260927T190654Z.jsonl --turns 38
+    autoplay false
+turn 213 moved=False cities=16 units=52 errors=0 at 4s
+    autoplay false
+turn 214 moved=False cities=16 units=54 errors=0 at 7s
+    autoplay false
+turn 215 moved=False cities=16 units=53 errors=0 at 10s
+    autoplay false
+turn 216 moved=False cities=16 units=54 errors=0 at 13s
+    autoplay false
+turn 217 moved=False cities=16 units=53 errors=0 at 16s
+    autoplay false
+turn 218 moved=False cities=16 units=53 errors=0 at 19s
+    autoplay false
+turn 219 moved=False cities=16 units=51 errors=0 at 22s
+    autoplay false
+turn 220 moved=False cities=16 units=51 errors=0 at 24s
+    autoplay false
+turn 221 moved=False cities=16 units=52 errors=0 at 28s
+    autoplay false
+turn 222 moved=False cities=16 units=52 errors=0 at 31s
+    autoplay false
+turn 223 moved=False cities=16 units=55 errors=0 at 33s
+    autoplay false
+turn 224 moved=False cities=16 units=56 errors=0 at 36s
+    autoplay false
+turn 225 moved=False cities=16 units=56 errors=0 at 39s
+    autoplay false
+turn 226 moved=False cities=16 units=57 errors=0 at 42s
+    autoplay false
+turn 227 moved=False cities=17 units=58 errors=0 at 45s
+    autoplay false
+turn 228 moved=False cities=17 units=62 errors=0 at 48s
+    autoplay false
+turn 229 moved=False cities=17 units=61 errors=0 at 51s
+    autoplay false
+turn 230 moved=False cities=17 units=59 errors=0 at 54s
+    autoplay false
+turn 231 moved=False cities=17 units=59 errors=0 at 57s
+    autoplay false
+    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {"kind":"commemorate","allowed":1,"picked":"COMMEMORATION_TOURISM","blockerBefore":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","blockerNow":"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE","turn":232}
+    cause popup WorldCongressPopup -> closed
+turn 232 moved=False cities=17 units=61 errors=0 at 67s
+    autoplay false
+turn 233 moved=False cities=17 units=60 errors=0 at 70s
+    autoplay false
+turn 234 moved=False cities=17 units=61 errors=0 at 73s
+    autoplay false
+turn 235 moved=False cities=17 units=61 errors=0 at 76s
+    autoplay false
+turn 236 moved=False cities=18 units=60 errors=0 at 79s
+    autoplay false
+turn 237 moved=False cities=18 units=61 errors=0 at 81s
+    autoplay false
+turn 238 moved=False cities=18 units=63 errors=0 at 85s
+    autoplay false
+turn 239 moved=False cities=18 units=63 errors=0 at 88s
+    autoplay false
+turn 240 moved=False cities=19 units=63 errors=0 at 91s
+    autoplay false
+turn 241 moved=False cities=19 units=62 errors=0 at 94s
+    autoplay false
+turn 242 moved=False cities=19 units=60 errors=0 at 97s
+    autoplay false
+turn 243 moved=False cities=19 units=61 errors=0 at 100s
+    autoplay false
+turn 244 moved=False cities=19 units=62 errors=0 at 103s
+    autoplay false
+turn 245 moved=False cities=19 units=62 errors=0 at 106s
+    autoplay false
+turn 246 moved=False cities=19 units=64 errors=0 at 108s
+    autoplay false
+turn 247 moved=False cities=19 units=64 errors=0 at 111s
+    autoplay false
+turn 248 moved=False cities=19 units=66 errors=0 at 114s
+    autoplay false
+turn 249 moved=False cities=19 units=66 errors=0 at 117s
+    autoplay false
+turn 250 moved=False cities=19 units=65 errors=0 at 120s
+recorded 38 turn(s) this call; the game is at turn 250
+
+$ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\h4.py --host 127.0.0.2 --deadline 30 lua --state InGame Events.ExitToMainMenu()
+
+$ npx.cmd vite-node cpu/harness/run.ts -- C:\civ6-development-calculator\tools\civ6lab\runs\h1_duelw1103_20260927T190654Z.jsonl
+250 records, turns 1-250 -> C:\civ6-development-calculator\tools\civ6lab\runs\h1_duelw1103_20260927T190654Z.report.json
+check                         pass    fail  gapped   skipped
+buy.buildingCost              6973     484     484   
+buy.buildingGold              7457       0       0   
+buy.districtCost               391   17853   16274   
+buy.plotGold                   219   21735   17008   
+buy.unitCost                 28269    4467    4334   
+buy.unitGold                 24207    8529    8111   
+calib.foodBox                 2409     223       0   
+city.amenities                 795    1298    1226   wrap=46
+city.amenityTier              1239     854     809   wrap=46
+city.borderCost                  0    2093    1775   wrap=46
+city.centreYields             2031      62      62   wrap=46
+city.defense                  1641     498     486   
+city.foodSurplus              1182     911     870   wrap=46
+city.growthThreshold             0    2093    1775   wrap=46
+city.housing                   565    1528    1311   wrap=46
+city.loyaltyPerTurn            178    1372    1282   capital=497 wrap=92
+city.nextPlot                  974    1119     902   wrap=46
+city.yields                    283    1810    1629   wrap=46
+plot.yields                 244340   18864    7247   wrap=13000
+seat.maintBuildings            434      66      66   
+seat.maintDistricts            422      78      78   
+seat.maintUnits                372     128     128   
+seat.tourism                   164     336     336   
+step.border                    313    1525    1371   a plot may have been bought=239 wrap=45
+step.growth                    713    1354    1227   a Settler left the city=10 wrap=45
+step.loyalty                  2012       2       0   governor changed=18 wrap=90
+step.pressure                  143    1755    1659   no religion=105 a religious unit spread nearby=30 wrap=89
+distinct failures 10743; gaps 43

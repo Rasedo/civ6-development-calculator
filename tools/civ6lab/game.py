@@ -45,6 +45,8 @@ legendary). Unset, Continents rolls World Age and Sea Level itself.
 `max_turns` sets a CUSTOM turn limit (the score victory's turn; a running
 game ignores a later change);
 `realism` is Gathering Storm's disaster intensity (GAME_REALISM, 0-4, default 2);
+`leaders` (a list of LeaderType names) sets the major slots' leaders in slot
+order, the observer slot skipped;
 `majors` overrides the map size's default number of major civs; `all_ai`
 makes every major an AI and the host an OBSERVER in slot 0 (the majors take
 slots 1..n), a game that plays itself with no local player. `--map-seed` /
@@ -289,6 +291,18 @@ if cfg.all_ai then
     PlayerConfigurations[0]:SetSlotStatus(SlotStatus.SS_OBSERVER)
   end)
 end
+if cfg.leaders then
+  try("leaders", function()
+    local k = 1
+    for _, id in ipairs(GameConfiguration.GetParticipatingPlayerIDs()) do
+      local pc = PlayerConfigurations[id]
+      if cfg.leaders[k] and pc:GetSlotStatus() ~= SlotStatus.SS_OBSERVER and pc:GetSlotStatus() ~= SlotStatus.SS_CLOSED then
+        pc:SetLeaderTypeName(cfg.leaders[k])
+        k = k + 1
+      end
+    end
+  end)
+end
 for _, s in ipairs(out) do print(s) end
 local slots = {}
 for _, id in ipairs(GameConfiguration.GetParticipatingPlayerIDs()) do
@@ -380,13 +394,16 @@ def game_info(t: Tuner) -> dict:
 
 
 def _lua_table(cfg: dict) -> str:
-    """A JSON object as a Lua table literal (strings, numbers, booleans)."""
+    """A JSON object as a Lua table literal (strings, numbers, booleans, and
+    lists of strings)."""
     parts = []
     for k, v in cfg.items():
         if isinstance(v, bool):
             val = "true" if v else "false"
         elif isinstance(v, (int, float)):
             val = repr(v)
+        elif isinstance(v, list):
+            val = "{ " + ", ".join(json.dumps(str(x)) for x in v) + " }"
         else:
             val = json.dumps(str(v))
         parts.append(f"{k} = {val}")
