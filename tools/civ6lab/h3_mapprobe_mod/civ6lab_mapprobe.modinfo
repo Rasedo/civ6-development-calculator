@@ -26,6 +26,10 @@
 			<File>Maps/civ6lab_xp2_resourcegenerator.lua</File>
 			<File>Maps/civ6lab_xp2_riverslakes.lua</File>
 			<File>Maps/civ6lab_xp2_terraingenerator.lua</File>
+			<File>Maps/civ6lab_xp2_pangaea.lua</File>
+			<File>Maps/civ6lab_xp2_fractal.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_pangaea.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_fractal.lua</File>
 		</ImportFiles>
 	</InGameActions>
 	<Files>
@@ -47,5 +51,9 @@
 		<File>Maps/civ6lab_xp2_resourcegenerator.lua</File>
 		<File>Maps/civ6lab_xp2_riverslakes.lua</File>
 		<File>Maps/civ6lab_xp2_terraingenerator.lua</File>
+		<File>Maps/civ6lab_xp2_pangaea.lua</File>
+		<File>Maps/civ6lab_xp2_fractal.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_pangaea.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_fractal.lua</File>
 	</Files>
 </Mod>

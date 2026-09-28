@@ -580,11 +580,14 @@ class World:
         return sorted({c for c in self.continent if c >= 0})
 
     def find_second_continent(self, i: int, rng) -> bool:
-        """a continent on the plot and another one within hex distance rng"""
+        """a land plot with a continent and a land plot of another continent
+        within hex distance rng; water plots carrying a continent (lakes)
+        count on neither side"""
         c = self.continent[i]
-        if c < 0:
+        if c < 0 or self.is_water(i):
             return False
-        return any(self.continent[p] not in (-1, c) for p in self.within(i, int(rng)))
+        return any(self.continent[p] not in (-1, c) and not self.is_water(p)
+                   for p in self.within(i, int(rng)))
 
     def find_water(self, i: int, rng, fresh: bool) -> bool:
         """Map.FindWater: a plot within hex distance trunc(rng), the plot

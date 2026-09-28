@@ -1,0 +1,21 @@
+    mod handle 51
+    enabled in this configuration: 41 gathering_storm=true probe=true
+    map options world_age=2(config) sea_level=2(config) temperature=2(config) rainfall=2(config) resources=2(default) start=2(default)
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    map_options=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    max_turns=ok
+    slots 0:1 1:1 2:1 3:1 4:1 5:1 6:1 7:1 8:1 9:1 slot0=1
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=civ6lab_mapprobe_natives.lua size=-1101990427 cs=12 realism=2 majors=10 map_seed=1002 game_seed=2000 world_age=2 sea_level=2 temperature=2 rainfall=2 resources=2 start=2 autostart=true
+    hosting
+in game {"turn": 1, "map_seed": 1002, "map_options": {"world_age": 2, "sea_level": 2, "temperature": 2, "rainfall": 2, "resources": 2, "start": 2}, "game_seed": 2000, "humans": 1, "minors": 13, "majors": {"0": "LEADER_ROBERT_THE_BRUCE", "1": "LEADER_HOJO", "2": "LEADER_PHILIP_II", "3": "LEADER_JADWIGA", "4": "LEADER_JAYAVARMAN", "5": "LEADER_GORGO", "6": "LEADER_HAMMURABI", "7": "LEADER_CLEOPATRA", "8": "LEADER_SIMON_BOLIVAR", "9": "LEADER_LADY_SIX_SKY"}}
+{"tag": "lab4nat_h3_large_natives_m1002_g2000", "config": "tools/civ6lab/h3_large_natives.json", "map_seed": 1002, "game_seed": 2000, "first_draws": [6387, 26329, 29178, 15760], "state_after_first": [837254666], "draws_before_probe": 370783, "sync_seed_now": 1154461504, "map_options": {"world_age": "2", "sea_level": "2", "temperature": "2", "rainfall": "2", "resources": "2", "start": "2", "MAP_SIZE": "-1101990427"}, "map_dump": "C:\\civ6-development-calculator\\tools\\civ6lab\\runs\\h3_map_lab4nat_h3_large_natives_m1002_g2000.json", "probe_entries": 27179, "x_entries": 2982, "extra_lines": {}}
+-> C:\civ6-development-calculator\tools\civ6lab\runs\h3_session_20260928T025406Z.jsonl

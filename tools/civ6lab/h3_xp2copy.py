@@ -1,5 +1,5 @@
 """H-3: carry Gathering Storm's Continents and every map utility it loads
-into the probe mod under civ6lab_xp2_* names, with the includes rewritten
+(and Pangaea and Fractal) into the probe mod under civ6lab_xp2_* names, with the includes rewritten
 to those names. A map script run from a mod resolves `include` to the Base
 files, so a probe that includes "Continents" runs the Base script and Base
 utilities; the renamed copies pin the Expansion2 versions (modinfo order:
@@ -35,7 +35,7 @@ def resolve(name: str) -> pathlib.Path:
 
 
 def main() -> int:
-    todo, done = ["Continents"], {}
+    todo, done = ["Continents", "Pangaea", "Fractal"], {}
     while todo:
         name = todo.pop()
         stem = (name[:-4] if name.lower().endswith(".lua") else name).lower()

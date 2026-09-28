@@ -653,7 +653,7 @@ HKS_PAIRS = r"""
 -- accepts an absent index i only inside it. So the array keys are the longest
 -- ascending run of positive integers next visits first such that, with p the
 -- power of two at or above its last key, every later key exceeds p and next
--- accepts the lowest absent index in 1..p (all of 1..p present passes). Any
+-- accepts the highest absent index in 1..p (all of 1..p present passes). Any
 -- other table keeps next's order.
 local N = ...
 local next_ = next
@@ -670,7 +670,7 @@ local function arraysize(t, keys)
     local ok = true
     for j = run + 1, #keys do if keys[j] <= p then ok = false; break end end
     if ok then
-      for q = 1, p do
+      for q = p, 1, -1 do
         if rawget(t, q) == nil then ok = pcall(next_, t, q); break end
       end
     end

@@ -29,7 +29,7 @@ local raw = TerrainBuilder.GetRandomNumber
 local LOG, X = {}, {}
 local RID, RN = {}, 0
 
-include "civ6lab_xp2_continents"
+include(CIV6LAB_SCRIPT or "civ6lab_xp2_continents")
 
 local unpack_ = table.unpack or unpack
 
@@ -552,7 +552,29 @@ X[#X + 1] = "keys|RiverManager|" .. tostring(RiverManager ~= nil) .. "|" .. keys
 
 local RealGenerateMap = GenerateMap
 
+-- the players the map is made for, in player order:
+-- roster|<id>:<civ type>:<leader type>:<IsMajor>:<IsAlive>,... (every
+-- PlayerConfigurations entry with a civilization)
+local function roster()
+	local out = {}
+	for id = 0, 63 do
+		local okc, pc = pcall(function() return PlayerConfigurations[id] end)
+		if okc and pc ~= nil then
+			local ok1, civ = pcall(function() return pc:GetCivilizationTypeName() end)
+			local ok2, ldr = pcall(function() return pc:GetLeaderTypeName() end)
+			local ok3, maj = pcall(function() return Players[id]:IsMajor() end)
+			local ok4, alive = pcall(function() return Players[id]:IsAlive() end)
+			if ok1 and civ ~= nil and civ ~= "" then
+				out[#out + 1] = id .. ":" .. tostring(civ) .. ":" .. (ok2 and tostring(ldr) or "err") .. ":" ..
+					(ok3 and tostring(maj) or "err") .. ":" .. (ok4 and tostring(alive) or "err")
+			end
+		end
+	end
+	X[#X + 1] = "roster|" .. table.concat(out, ",")
+end
+
 function GenerateMap()
+	pcall(roster)
 	LOG[#LOG + 1] = "<GenerateMap"
 	local ok, err = pcall(RealGenerateMap)
 	LOG[#LOG + 1] = ">GenerateMap ok=" .. tostring(ok) .. " " .. tostring(err)
