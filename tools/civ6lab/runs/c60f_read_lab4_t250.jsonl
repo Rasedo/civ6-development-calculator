@@ -1,0 +1,7 @@
+{"kind":"fcity","tag":"t250","turn":250,"id":327680,"x":69,"y":21}
+{"kind":"seat","tag":"t250","turn":250,"alive":true,"cities":1,"war0":true,"gold":29.10}
+{"kind":"near","tag":"t250","turn":250,"owner":2,"id":9633815,"type":"UNIT_INFANTRY","x":68,"y":20,"damage":0}
+{"kind":"near","tag":"t250","turn":250,"owner":6,"id":11599905,"type":"UNIT_NUCLEAR_SUBMARINE","x":69,"y":22,"damage":0}
+{"kind":"near","tag":"t250","turn":250,"owner":2,"id":9568271,"type":"UNIT_INFANTRY","x":70,"y":18,"damage":31}
+{"kind":"near","tag":"t250","turn":250,"owner":2,"id":2686982,"type":"UNIT_GREAT_ADMIRAL","x":71,"y":18,"damage":0}
+{"kind":"city","tag":"t250","turn":250,"owner":62,"orig":2,"pop":13}

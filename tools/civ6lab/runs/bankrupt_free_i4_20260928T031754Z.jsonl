@@ -1,0 +1,32 @@
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "before", "balance": 29.1, "goldYield": 11.4, "maintenance": 10}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "made", "type": "UNIT_INFANTRY", "id": 2752517, "x": 69, "y": 20}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "made", "type": "UNIT_INFANTRY", "id": 2818052, "x": 68, "y": 19}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "made", "type": "UNIT_INFANTRY", "id": 2883587, "x": 69, "y": 19}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "made", "type": "UNIT_INFANTRY", "id": 2949121, "x": 67, "y": 19}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "after", "balance": 29.1, "goldYield": 11.4, "maintenance": 34}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "seat", "turn": 250, "seat": 62, "balance": 29.1, "goldYield": 11.4, "maintenance": 34, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 4, "units": [[2949121, "UNIT_INFANTRY"], [2883587, "UNIT_INFANTRY"], [2818052, "UNIT_INFANTRY"], [2752517, "UNIT_INFANTRY"]]}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "city", "turn": 250, "id": 327680, "name": "LOC_CITY_NAME_NGARUAWAHIA", "pop": 13, "amenities": 0, "need": 7, "lostBankruptcy": 0, "happiness": 0}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "seat", "turn": 251, "seat": 62, "balance": 13.5, "goldYield": 11.4, "maintenance": 27, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 3, "units": [[2883587, "UNIT_INFANTRY"], [2818052, "UNIT_INFANTRY"], [2752517, "UNIT_INFANTRY"]]}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "city", "turn": 251, "id": 327680, "name": "LOC_CITY_NAME_NGARUAWAHIA", "pop": 13, "amenities": 0, "need": 7, "lostBankruptcy": 0, "happiness": 0}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":252}"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "seat", "turn": 252, "seat": 62, "balance": 4.902, "goldYield": 11.4, "maintenance": 29, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 4, "units": [[3080192, "UNIT_CAVALRY"], [3014657, "UNIT_AT_CREW"], [2818052, "UNIT_INFANTRY"], [2752517, "UNIT_INFANTRY"]]}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "city", "turn": 252, "id": 327680, "name": "LOC_CITY_NAME_NGARUAWAHIA", "pop": 13, "amenities": 0, "need": 7, "lostBankruptcy": 0, "happiness": 0}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "seat", "turn": 253, "seat": 62, "balance": 0, "goldYield": 11.4, "maintenance": 23, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 3, "units": [[3080192, "UNIT_CAVALRY"], [3014657, "UNIT_AT_CREW"], [2752517, "UNIT_INFANTRY"]]}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "city", "turn": 253, "id": 327680, "name": "LOC_CITY_NAME_NGARUAWAHIA", "pop": 13, "amenities": -1, "need": 7, "lostBankruptcy": 1, "happiness": 0}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "seat", "turn": 254, "seat": 62, "balance": 0, "goldYield": 11.4, "maintenance": 19, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 2, "units": [[3080192, "UNIT_CAVALRY"], [2752517, "UNIT_INFANTRY"]]}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "city", "turn": 254, "id": 327680, "name": "LOC_CITY_NAME_NGARUAWAHIA", "pop": 13, "amenities": -1, "need": 7, "lostBankruptcy": 1, "happiness": 0}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"tag": "i4", "units_spec": "UNIT_INFANTRY:4", "kind": "seat", "turn": 255, "seat": 62, "balance": 0, "goldYield": 0, "maintenance": 0, "blocker": "NO_ENDTURN_BLOCKING", "nUnits": 0, "units": []}

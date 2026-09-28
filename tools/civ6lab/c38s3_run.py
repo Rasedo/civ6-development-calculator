@@ -36,13 +36,14 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--host", default="127.0.0.3")
     p.add_argument("--save", default="lab4_t100")
-    p.add_argument("--arm", choices=("builder", "military", "none"), required=True)
+    p.add_argument("--arm", choices=("builder", "military", "none", "netpos", "netneg"), required=True)
     p.add_argument("--gold", type=int, default=300)
     p.add_argument("--k", type=int, default=0, help="the military size (--arm military)")
     p.add_argument("--burn", type=int, default=0)
     p.add_argument("--turns", type=int, default=5)
     p.add_argument("--wait", type=float, default=300.0)
     p.add_argument("--noload", action="store_true", help="act on the game as it stands")
+    p.add_argument("--extra", default="", help="a GameCore lua file read with the others each turn")
     a = p.parse_args(argv)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     tag = {"arm": a.arm, "gold": a.gold, "k": a.k, "burn": a.burn, "save": a.save}
@@ -74,6 +75,9 @@ def main(argv=None) -> int:
             rec("cs", ln)
         for ln in t.run(IG, prod, timeout=60):
             rec("prod", ln)
+        if a.extra:
+            for ln in t.run(GC, pathlib.Path(a.extra).read_text(encoding="utf-8"), timeout=60):
+                rec("extra", ln)
 
     read()
     for _ in range(a.turns):

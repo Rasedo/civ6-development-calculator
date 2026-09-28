@@ -1,0 +1,58 @@
+{"scene": "t200prep3", "kind": "prelua", "code": "local c = Cities.GetCityInPlot(20, 32); c:ChangeLoyalty(80)", "text": "prelua done"}
+{"scene": "t200prep3", "kind": "fcity", "tag": "start", "turn": 200, "id": 327680, "x": 69, "y": 21}
+{"scene": "t200prep3", "kind": "fcity", "tag": "start", "turn": 200, "id": 262145, "x": 20, "y": 32}
+{"scene": "t200prep3", "kind": "seat", "tag": "start", "turn": 200, "alive": true, "cities": 2, "war0": true, "gold": 8.01}
+{"scene": "t200prep3", "kind": "p62", "tag": "start", "turn": 200, "id": 1245186, "type": "UNIT_FIELD_CANNON", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 20, "y": 33, "dist": 1, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "start", "turn": 200, "owner": 7, "id": 3997712, "type": "UNIT_LINE_INFANTRY", "x": 19, "y": 33, "damage": 55}
+{"scene": "t200prep3", "kind": "near", "tag": "start", "turn": 200, "owner": 62, "id": 1245186, "type": "UNIT_FIELD_CANNON", "x": 20, "y": 33, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "start", "turn": 200, "owner": 7, "id": 4784139, "type": "UNIT_LINE_INFANTRY", "x": 21, "y": 30, "damage": 0}
+{"scene": "t200prep3", "kind": "city", "tag": "start", "turn": 200, "owner": 62, "orig": 13, "pop": 9}
+{"scene": "t200prep3", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_INDUSTRIAL\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":200}"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"scene": "t200prep3", "kind": "fcity", "tag": "pre1", "turn": 201, "id": 327680, "x": 69, "y": 21}
+{"scene": "t200prep3", "kind": "fcity", "tag": "pre1", "turn": 201, "id": 262145, "x": 20, "y": 32}
+{"scene": "t200prep3", "kind": "seat", "tag": "pre1", "turn": 201, "alive": true, "cities": 2, "war0": true, "gold": 15.51}
+{"scene": "t200prep3", "kind": "p62", "tag": "pre1", "turn": 201, "id": 1245186, "type": "UNIT_FIELD_CANNON", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 20, "y": 33, "dist": 1, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "pre1", "turn": 201, "owner": 7, "id": 3997712, "type": "UNIT_LINE_INFANTRY", "x": 19, "y": 32, "damage": 59}
+{"scene": "t200prep3", "kind": "near", "tag": "pre1", "turn": 201, "owner": 62, "id": 1245186, "type": "UNIT_FIELD_CANNON", "x": 20, "y": 33, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "pre1", "turn": 201, "owner": 7, "id": 4784139, "type": "UNIT_LINE_INFANTRY", "x": 21, "y": 30, "damage": 0}
+{"scene": "t200prep3", "kind": "city", "tag": "pre1", "turn": 201, "owner": 62, "orig": 13, "pop": 9}
+{"scene": "t200prep3", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CASTLES"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CASTLES"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause session 2:2 -> closed sessions [2:2]"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause popup DiplomacyDealView -> hidden"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CASTLES"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_RESEARCH -> unblock: blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION -> nothing"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause popup WorldCongressIntro -> closed"}
+{"scene": "t200prep3", "kind": "fcity", "tag": "pre2", "turn": 202, "id": 327680, "x": 69, "y": 21}
+{"scene": "t200prep3", "kind": "fcity", "tag": "pre2", "turn": 202, "id": 262145, "x": 20, "y": 32}
+{"scene": "t200prep3", "kind": "seat", "tag": "pre2", "turn": 202, "alive": true, "cities": 2, "war0": true, "gold": 23.02}
+{"scene": "t200prep3", "kind": "p62", "tag": "pre2", "turn": 202, "id": 1245186, "type": "UNIT_FIELD_CANNON", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 20, "y": 33, "dist": 1, "damage": 0}
+{"scene": "t200prep3", "kind": "p62", "tag": "pre2", "turn": 202, "id": 1310723, "type": "UNIT_CAVALRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 69, "y": 20, "dist": 41, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "pre2", "turn": 202, "owner": 7, "id": 3997712, "type": "UNIT_LINE_INFANTRY", "x": 19, "y": 31, "damage": 64}
+{"scene": "t200prep3", "kind": "near", "tag": "pre2", "turn": 202, "owner": 62, "id": 1245186, "type": "UNIT_FIELD_CANNON", "x": 20, "y": 33, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "pre2", "turn": 202, "owner": 7, "id": 4784139, "type": "UNIT_LINE_INFANTRY", "x": 21, "y": 30, "damage": 0}
+{"scene": "t200prep3", "kind": "city", "tag": "pre2", "turn": 202, "owner": 62, "orig": 13, "pop": 9}
+{"scene": "t200prep3", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":202}"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause popup EraCompletePopup -> hidden"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":202}"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":202}"}
+{"scene": "t200prep3", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":203}"}
+{"scene": "t200prep3", "kind": "fcity", "tag": "pre3", "turn": 203, "id": 327680, "x": 69, "y": 21}
+{"scene": "t200prep3", "kind": "fcity", "tag": "pre3", "turn": 203, "id": 262145, "x": 20, "y": 32}
+{"scene": "t200prep3", "kind": "seat", "tag": "pre3", "turn": 203, "alive": true, "cities": 2, "war0": true, "gold": 25.02}
+{"scene": "t200prep3", "kind": "p62", "tag": "pre3", "turn": 203, "id": 1245186, "type": "UNIT_FIELD_CANNON", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 20, "y": 33, "dist": 1, "damage": 0}
+{"scene": "t200prep3", "kind": "p62", "tag": "pre3", "turn": 203, "id": 1310723, "type": "UNIT_CAVALRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 67, "y": 19, "dist": 43, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "pre3", "turn": 203, "owner": 7, "id": 3997712, "type": "UNIT_LINE_INFANTRY", "x": 20, "y": 31, "damage": 94}
+{"scene": "t200prep3", "kind": "near", "tag": "pre3", "turn": 203, "owner": 62, "id": 1245186, "type": "UNIT_FIELD_CANNON", "x": 20, "y": 33, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "pre3", "turn": 203, "owner": 7, "id": 2949124, "type": "UNIT_CUIRASSIER", "x": 21, "y": 29, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "pre3", "turn": 203, "owner": 7, "id": 4784139, "type": "UNIT_LINE_INFANTRY", "x": 21, "y": 30, "damage": 0}
+{"scene": "t200prep3", "kind": "near", "tag": "pre3", "turn": 203, "owner": 7, "id": 2621440, "type": "UNIT_CUIRASSIER", "x": 21, "y": 31, "damage": 0}
+{"scene": "t200prep3", "kind": "city", "tag": "pre3", "turn": 203, "owner": 62, "orig": 13, "pop": 9}

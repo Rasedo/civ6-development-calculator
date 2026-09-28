@@ -28,8 +28,39 @@ for p = 0, 62 do
       elseif isMilitary(row) then mil[#mil + 1] = u end
     end
     local made, cut, failed = 0, 0, 0
-    if ARM == "builder" then
+    local tre = pl:GetTreasury()
+    local function net() return tre:GetGoldYield() - tre:GetTotalMaintenance() end
+    local net0 = net()
+    if ARM == "builder" or ARM == "netpos" or ARM == "netneg" then
       for _, u in ipairs(bld) do units:Destroy(u); cut = cut + 1 end
+    end
+    if ARM == "netpos" then
+      -- the military destroyed, dearest upkeep first, until the net income is above +2
+      table.sort(mil, function(a, b) return (GameInfo.Units[a:GetType()].Maintenance or 0) > (GameInfo.Units[b:GetType()].Maintenance or 0) end)
+      local i = 1
+      while net() <= 2 and i <= #mil do units:Destroy(mil[i]); cut = cut + 1; i = i + 1 end
+    elseif ARM == "netneg" then
+      -- Musketmen created within 3 of the city until the net income is below -2
+      local city = pl:GetCities():GetCapitalCity()
+      if city == nil then for _, c in pl:GetCities():Members() do city = c; break end end
+      if city ~= nil then
+        local cx, cy = city:GetX(), city:GetY()
+        local idx = GameInfo.Units["UNIT_MUSKETMAN"].Index
+        for dx = -4, 4 do
+          for dy = -4, 4 do
+            local q = Map.GetPlot(cx + dx, cy + dy)
+            if net() >= -2 then break end
+            if q ~= nil then
+              local d = Map.GetPlotDistance(cx, cy, q:GetX(), q:GetY())
+              if d >= 1 and d <= 3 and not q:IsWater() and not q:IsImpassable() and not q:IsMountain()
+                 and q:GetUnitCount() == 0 and (q:GetOwner() == p or q:GetOwner() == -1) then
+                local u = units:Create(idx, q:GetX(), q:GetY())
+                if u ~= nil then made = made + 1 else failed = failed + 1 end
+              end
+            end
+          end
+        end
+      end
     elseif ARM == "military" then
       while #mil > K do units:Destroy(mil[#mil]); mil[#mil] = nil; cut = cut + 1 end
       if #mil < K then
@@ -68,7 +99,7 @@ for p = 0, 62 do
       local row = GameInfo.Units[u:GetType()]
       if row.UnitType == "UNIT_BUILDER" then nb = nb + 1 elseif isMilitary(row) then nm = nm + 1 end
     end
-    print(string.format('{"kind":"setup","p":%d,"arm":"%s","gold":%.2f,"military":%d,"builders":%d,"made":%d,"cut":%d,"failed":%d,"warWith0":%s}',
-      p, ARM, pl:GetTreasury():GetGoldBalance(), nm, nb, made, cut, failed, tostring(pl:GetDiplomacy():IsAtWarWith(0))))
+    print(string.format('{"kind":"setup","p":%d,"arm":"%s","gold":%.2f,"military":%d,"builders":%d,"made":%d,"cut":%d,"failed":%d,"warWith0":%s,"net0":%.2f,"net1":%.2f}',
+      p, ARM, pl:GetTreasury():GetGoldBalance(), nm, nb, made, cut, failed, tostring(pl:GetDiplomacy():IsAtWarWith(0)), net0, net()))
   end
 end

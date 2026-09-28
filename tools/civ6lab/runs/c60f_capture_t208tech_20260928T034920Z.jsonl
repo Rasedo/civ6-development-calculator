@@ -1,0 +1,33 @@
+{"scene": "t208tech", "kind": "prelua", "code": "Players[2]:GetTechs():SetTech(GameInfo.Technologies['TECH_REPLACEABLE_PARTS'].Index, true); print(Players[2]:GetTechs():HasTech(GameInfo.Technologies['TECH_REPLACEABLE_PARTS'].Index))", "text": "true"}
+{"scene": "t208tech", "kind": "prelua", "code": "Players[2]:GetTechs():SetTech(GameInfo.Technologies['TECH_REPLACEABLE_PARTS'].Index, true); print(Players[2]:GetTechs():HasTech(GameInfo.Technologies['TECH_REPLACEABLE_PARTS'].Index))", "text": "prelua done"}
+{"scene": "t208tech", "kind": "fcity", "tag": "start", "turn": 208, "id": 327680, "x": 69, "y": 21}
+{"scene": "t208tech", "kind": "fcity", "tag": "start", "turn": 208, "id": 262145, "x": 20, "y": 32}
+{"scene": "t208tech", "kind": "fcity", "tag": "start", "turn": 208, "id": 393218, "x": 32, "y": 38}
+{"scene": "t208tech", "kind": "fcity", "tag": "start", "turn": 208, "id": 458755, "x": 30, "y": 48}
+{"scene": "t208tech", "kind": "seat", "tag": "start", "turn": 208, "alive": true, "cities": 4, "war0": true, "gold": 51.34}
+{"scene": "t208tech", "kind": "p62", "tag": "start", "turn": 208, "id": 1572864, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 19, "dist": 53, "damage": 11}
+{"scene": "t208tech", "kind": "p62", "tag": "start", "turn": 208, "id": 1507329, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 33, "y": 38, "dist": 10, "damage": 15}
+{"scene": "t208tech", "kind": "p62", "tag": "start", "turn": 208, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 31, "y": 48, "dist": 1, "damage": 0}
+{"scene": "t208tech", "kind": "p62", "tag": "start", "turn": 208, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 30, "y": 47, "dist": 1, "damage": 0}
+{"scene": "t208tech", "kind": "near", "tag": "start", "turn": 208, "owner": 14, "id": 2424837, "type": "UNIT_BUILDER", "x": 28, "y": 46, "damage": 0}
+{"scene": "t208tech", "kind": "near", "tag": "start", "turn": 208, "owner": 62, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "x": 30, "y": 47, "damage": 0}
+{"scene": "t208tech", "kind": "near", "tag": "start", "turn": 208, "owner": 62, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "x": 31, "y": 48, "damage": 0}
+{"scene": "t208tech", "kind": "city", "tag": "start", "turn": 208, "owner": 62, "orig": 2, "pop": 1}
+{"scene": "t208tech", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR"}
+{"scene": "t208tech", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"scene": "t208tech", "kind": "log", "text": "    cause session 3:3 -> closed sessions [3:3]"}
+{"scene": "t208tech", "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"scene": "t208tech", "kind": "log", "text": "    cause popup DiplomacyDealView -> hidden"}
+{"scene": "t208tech", "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"scene": "t208tech", "kind": "fcity", "tag": "pre1", "turn": 209, "id": 327680, "x": 69, "y": 21}
+{"scene": "t208tech", "kind": "fcity", "tag": "pre1", "turn": 209, "id": 262145, "x": 20, "y": 32}
+{"scene": "t208tech", "kind": "fcity", "tag": "pre1", "turn": 209, "id": 393218, "x": 32, "y": 38}
+{"scene": "t208tech", "kind": "fcity", "tag": "pre1", "turn": 209, "id": 458755, "x": 30, "y": 48}
+{"scene": "t208tech", "kind": "seat", "tag": "pre1", "turn": 209, "alive": true, "cities": 4, "war0": true, "gold": 49.84}
+{"scene": "t208tech", "kind": "p62", "tag": "pre1", "turn": 209, "id": 1507329, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 33, "y": 38, "dist": 10, "damage": 47}
+{"scene": "t208tech", "kind": "p62", "tag": "pre1", "turn": 209, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 30, "y": 48, "dist": 0, "damage": 0}
+{"scene": "t208tech", "kind": "p62", "tag": "pre1", "turn": 209, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 30, "y": 49, "dist": 1, "damage": 0}
+{"scene": "t208tech", "kind": "near", "tag": "pre1", "turn": 209, "owner": 14, "id": 2424837, "type": "UNIT_BUILDER", "x": 28, "y": 46, "damage": 0}
+{"scene": "t208tech", "kind": "near", "tag": "pre1", "turn": 209, "owner": 62, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "x": 30, "y": 48, "damage": 0}
+{"scene": "t208tech", "kind": "near", "tag": "pre1", "turn": 209, "owner": 62, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "x": 30, "y": 49, "damage": 0}
+{"scene": "t208tech", "kind": "city", "tag": "pre1", "turn": 209, "owner": 62, "orig": 2, "pop": 1}

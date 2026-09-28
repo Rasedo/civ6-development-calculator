@@ -1,0 +1,79 @@
+{"scene": "t203rev", "kind": "fcity", "tag": "start", "turn": 203, "id": 327680, "x": 69, "y": 21}
+{"scene": "t203rev", "kind": "fcity", "tag": "start", "turn": 203, "id": 262145, "x": 20, "y": 32}
+{"scene": "t203rev", "kind": "seat", "tag": "start", "turn": 203, "alive": true, "cities": 2, "war0": true, "gold": 25.02}
+{"scene": "t203rev", "kind": "p62", "tag": "start", "turn": 203, "id": 1245186, "type": "UNIT_FIELD_CANNON", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 20, "y": 33, "dist": 14, "damage": 0}
+{"scene": "t203rev", "kind": "p62", "tag": "start", "turn": 203, "id": 1310723, "type": "UNIT_CAVALRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 67, "y": 19, "dist": 45, "damage": 0}
+{"scene": "t203rev", "kind": "near", "tag": "start", "turn": 203, "owner": 5, "id": 7143424, "type": "UNIT_FIELD_CANNON", "x": 32, "y": 37, "damage": 0}
+{"scene": "t203rev", "kind": "city", "tag": "start", "turn": 203, "owner": 5, "orig": 5, "pop": 1}
+{"scene": "t203rev", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_GRANARY"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"scene": "t203rev", "kind": "log", "text": "    cause popup NaturalDisasterPopup -> closed"}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre1", "turn": 204, "id": 327680, "x": 69, "y": 21}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre1", "turn": 204, "id": 262145, "x": 20, "y": 32}
+{"scene": "t203rev", "kind": "seat", "tag": "pre1", "turn": 204, "alive": true, "cities": 2, "war0": true, "gold": 32.02}
+{"scene": "t203rev", "kind": "p62", "tag": "pre1", "turn": 204, "id": 1245186, "type": "UNIT_FIELD_CANNON", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 20, "y": 33, "dist": 14, "damage": 96}
+{"scene": "t203rev", "kind": "near", "tag": "pre1", "turn": 204, "owner": 5, "id": 7143424, "type": "UNIT_FIELD_CANNON", "x": 33, "y": 36, "damage": 0}
+{"scene": "t203rev", "kind": "city", "tag": "pre1", "turn": 204, "owner": 5, "orig": 5, "pop": 1}
+{"scene": "t203rev", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_MONUMENT"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_MONUMENT"}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre2", "turn": 205, "id": 327680, "x": 69, "y": 21}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre2", "turn": 205, "id": 262145, "x": 20, "y": 32}
+{"scene": "t203rev", "kind": "seat", "tag": "pre2", "turn": 205, "alive": true, "cities": 2, "war0": true, "gold": 44.03}
+{"scene": "t203rev", "kind": "p62", "tag": "pre2", "turn": 205, "id": 1376259, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 19, "y": 32, "dist": 16, "damage": 0}
+{"scene": "t203rev", "kind": "near", "tag": "pre2", "turn": 205, "owner": 5, "id": 7143424, "type": "UNIT_FIELD_CANNON", "x": 33, "y": 36, "damage": 0}
+{"scene": "t203rev", "kind": "city", "tag": "pre2", "turn": 205, "owner": 5, "orig": 5, "pop": 1}
+{"scene": "t203rev", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds BUILDING_MONUMENT"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "log", "text": "    cause session 5:5 -> closed sessions [5:5]"}
+{"scene": "t203rev", "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"scene": "t203rev", "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre3", "turn": 206, "id": 327680, "x": 69, "y": 21}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre3", "turn": 206, "id": 262145, "x": 20, "y": 32}
+{"scene": "t203rev", "kind": "seat", "tag": "pre3", "turn": 206, "alive": true, "cities": 2, "war0": true, "gold": 51.03}
+{"scene": "t203rev", "kind": "p62", "tag": "pre3", "turn": 206, "id": 1376259, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 19, "y": 33, "dist": 15, "damage": 88}
+{"scene": "t203rev", "kind": "near", "tag": "pre3", "turn": 206, "owner": 5, "id": 8650757, "type": "UNIT_BUILDER", "x": 32, "y": 35, "damage": 0}
+{"scene": "t203rev", "kind": "near", "tag": "pre3", "turn": 206, "owner": 5, "id": 7143424, "type": "UNIT_FIELD_CANNON", "x": 33, "y": 38, "damage": 0}
+{"scene": "t203rev", "kind": "city", "tag": "pre3", "turn": 206, "owner": 5, "orig": 5, "pop": 1}
+{"scene": "t203rev", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "log", "text": "    cause popup NaturalDisasterPopup -> closed"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRAINING"}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre4", "turn": 207, "id": 327680, "x": 69, "y": 21}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre4", "turn": 207, "id": 262145, "x": 20, "y": 32}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre4", "turn": 207, "id": 393218, "x": 32, "y": 38}
+{"scene": "t203rev", "kind": "seat", "tag": "pre4", "turn": 207, "alive": true, "cities": 3, "war0": true, "gold": 58.04}
+{"scene": "t203rev", "kind": "p62", "tag": "pre4", "turn": 207, "id": 1572864, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 69, "y": 20, "dist": 46, "damage": 0}
+{"scene": "t203rev", "kind": "p62", "tag": "pre4", "turn": 207, "id": 1507329, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 32, "y": 38, "dist": 0, "damage": 15}
+{"scene": "t203rev", "kind": "near", "tag": "pre4", "turn": 207, "owner": 5, "id": 8257557, "type": "UNIT_FIELD_CANNON", "x": 32, "y": 37, "damage": 73}
+{"scene": "t203rev", "kind": "near", "tag": "pre4", "turn": 207, "owner": 62, "id": 1507329, "type": "UNIT_LINE_INFANTRY", "x": 32, "y": 38, "damage": 15}
+{"scene": "t203rev", "kind": "near", "tag": "pre4", "turn": 207, "owner": 5, "id": 7864324, "type": "UNIT_TANK", "x": 32, "y": 39, "damage": 6}
+{"scene": "t203rev", "kind": "near", "tag": "pre4", "turn": 207, "owner": 5, "id": 7143424, "type": "UNIT_FIELD_CANNON", "x": 33, "y": 37, "damage": 0}
+{"scene": "t203rev", "kind": "near", "tag": "pre4", "turn": 207, "owner": 5, "id": 8781827, "type": "UNIT_MODERN_ARMOR", "x": 33, "y": 38, "damage": 0}
+{"scene": "t203rev", "kind": "city", "tag": "pre4", "turn": 207, "owner": 62, "orig": 5, "pop": 1}
+{"scene": "t203rev", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> CALAKMUL builds UNIT_WARRIOR"}
+{"scene": "t203rev", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"scene": "t203rev", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre5", "turn": 208, "id": 327680, "x": 69, "y": 21}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre5", "turn": 208, "id": 262145, "x": 20, "y": 32}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre5", "turn": 208, "id": 393218, "x": 32, "y": 38}
+{"scene": "t203rev", "kind": "fcity", "tag": "pre5", "turn": 208, "id": 458755, "x": 30, "y": 48}
+{"scene": "t203rev", "kind": "seat", "tag": "pre5", "turn": 208, "alive": true, "cities": 4, "war0": true, "gold": 51.34}
+{"scene": "t203rev", "kind": "p62", "tag": "pre5", "turn": 208, "id": 1572864, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 19, "dist": 46, "damage": 11}
+{"scene": "t203rev", "kind": "p62", "tag": "pre5", "turn": 208, "id": 1507329, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 33, "y": 38, "dist": 1, "damage": 15}
+{"scene": "t203rev", "kind": "p62", "tag": "pre5", "turn": 208, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 31, "y": 48, "dist": 10, "damage": 0}
+{"scene": "t203rev", "kind": "p62", "tag": "pre5", "turn": 208, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 30, "y": 47, "dist": 9, "damage": 0}
+{"scene": "t203rev", "kind": "near", "tag": "pre5", "turn": 208, "owner": 18, "id": 2424841, "type": "UNIT_AT_CREW", "x": 32, "y": 35, "damage": 0}
+{"scene": "t203rev", "kind": "near", "tag": "pre5", "turn": 208, "owner": 62, "id": 1507329, "type": "UNIT_LINE_INFANTRY", "x": 33, "y": 38, "damage": 15}
+{"scene": "t203rev", "kind": "near", "tag": "pre5", "turn": 208, "owner": 6, "id": 6815771, "type": "UNIT_INFANTRY", "x": 33, "y": 41, "damage": 12}
+{"scene": "t203rev", "kind": "near", "tag": "pre5", "turn": 208, "owner": 5, "id": 8257557, "type": "UNIT_FIELD_CANNON", "x": 34, "y": 38, "damage": 82}
+{"scene": "t203rev", "kind": "near", "tag": "pre5", "turn": 208, "owner": 5, "id": 7864324, "type": "UNIT_TANK", "x": 34, "y": 39, "damage": 6}
+{"scene": "t203rev", "kind": "city", "tag": "pre5", "turn": 208, "owner": 62, "orig": 5, "pop": 1}

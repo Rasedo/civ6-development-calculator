@@ -1,0 +1,83 @@
+{"scene": "t250a", "kind": "fcity", "tag": "start", "turn": 250, "id": 327680, "x": 69, "y": 21}
+{"scene": "t250a", "kind": "seat", "tag": "start", "turn": 250, "alive": true, "cities": 1, "war0": true, "gold": 29.1}
+{"scene": "t250a", "kind": "near", "tag": "start", "turn": 250, "owner": 2, "id": 9633815, "type": "UNIT_INFANTRY", "x": 68, "y": 20, "damage": 0}
+{"scene": "t250a", "kind": "near", "tag": "start", "turn": 250, "owner": 6, "id": 11599905, "type": "UNIT_NUCLEAR_SUBMARINE", "x": 69, "y": 22, "damage": 0}
+{"scene": "t250a", "kind": "near", "tag": "start", "turn": 250, "owner": 2, "id": 9568271, "type": "UNIT_INFANTRY", "x": 70, "y": 18, "damage": 31}
+{"scene": "t250a", "kind": "near", "tag": "start", "turn": 250, "owner": 2, "id": 2686982, "type": "UNIT_GREAT_ADMIRAL", "x": 71, "y": 18, "damage": 0}
+{"scene": "t250a", "kind": "city", "tag": "start", "turn": 250, "owner": 62, "orig": 2, "pop": 13}
+{"scene": "t250a", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":250}"}
+{"scene": "t250a", "kind": "fcity", "tag": "pre1", "turn": 251, "id": 327680, "x": 69, "y": 21}
+{"scene": "t250a", "kind": "seat", "tag": "pre1", "turn": 251, "alive": true, "cities": 1, "war0": true, "gold": 31.5}
+{"scene": "t250a", "kind": "near", "tag": "pre1", "turn": 251, "owner": 6, "id": 11599905, "type": "UNIT_NUCLEAR_SUBMARINE", "x": 69, "y": 22, "damage": 0}
+{"scene": "t250a", "kind": "near", "tag": "pre1", "turn": 251, "owner": 2, "id": 8781832, "type": "UNIT_LINE_INFANTRY", "x": 69, "y": 24, "damage": 9}
+{"scene": "t250a", "kind": "near", "tag": "pre1", "turn": 251, "owner": 1, "id": 11796495, "type": "UNIT_MISSILE_CRUISER", "x": 70, "y": 24, "damage": 26}
+{"scene": "t250a", "kind": "near", "tag": "pre1", "turn": 251, "owner": 2, "id": 10092545, "type": "UNIT_FRIGATE", "x": 71, "y": 18, "damage": 10}
+{"scene": "t250a", "kind": "near", "tag": "pre1", "turn": 251, "owner": 2, "id": 9306140, "type": "UNIT_INFANTRY", "x": 71, "y": 22, "damage": 63}
+{"scene": "t250a", "kind": "near", "tag": "pre1", "turn": 251, "owner": 1, "id": 11468824, "type": "UNIT_MISSILE_CRUISER", "x": 71, "y": 24, "damage": 11}
+{"scene": "t250a", "kind": "city", "tag": "pre1", "turn": 251, "owner": 62, "orig": 2, "pop": 13}
+{"scene": "t250a", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":251}"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_TOURISM\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":252}"}
+{"scene": "t250a", "kind": "fcity", "tag": "pre2", "turn": 252, "id": 327680, "x": 69, "y": 21}
+{"scene": "t250a", "kind": "seat", "tag": "pre2", "turn": 252, "alive": true, "cities": 1, "war0": true, "gold": 34.9}
+{"scene": "t250a", "kind": "p62", "tag": "pre2", "turn": 252, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 69, "y": 20, "dist": 1, "damage": 0}
+{"scene": "t250a", "kind": "p62", "tag": "pre2", "turn": 252, "id": 2752517, "type": "UNIT_AT_CREW", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 20, "dist": 2, "damage": 14}
+{"scene": "t250a", "kind": "near", "tag": "pre2", "turn": 252, "owner": 2, "id": 8781832, "type": "UNIT_LINE_INFANTRY", "x": 67, "y": 20, "damage": 9}
+{"scene": "t250a", "kind": "near", "tag": "pre2", "turn": 252, "owner": 62, "id": 2752517, "type": "UNIT_AT_CREW", "x": 68, "y": 20, "damage": 14}
+{"scene": "t250a", "kind": "near", "tag": "pre2", "turn": 252, "owner": 62, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "x": 69, "y": 20, "damage": 0}
+{"scene": "t250a", "kind": "near", "tag": "pre2", "turn": 252, "owner": 6, "id": 11599905, "type": "UNIT_NUCLEAR_SUBMARINE", "x": 69, "y": 22, "damage": 0}
+{"scene": "t250a", "kind": "near", "tag": "pre2", "turn": 252, "owner": 1, "id": 11468824, "type": "UNIT_MISSILE_CRUISER", "x": 70, "y": 24, "damage": 11}
+{"scene": "t250a", "kind": "near", "tag": "pre2", "turn": 252, "owner": 2, "id": 10092545, "type": "UNIT_FRIGATE", "x": 71, "y": 18, "damage": 17}
+{"scene": "t250a", "kind": "near", "tag": "pre2", "turn": 252, "owner": 1, "id": 11796495, "type": "UNIT_MISSILE_CRUISER", "x": 71, "y": 24, "damage": 26}
+{"scene": "t250a", "kind": "city", "tag": "pre2", "turn": 252, "owner": 62, "orig": 2, "pop": 13}
+{"scene": "t250a", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"scene": "t250a", "kind": "fcity", "tag": "pre3", "turn": 253, "id": 327680, "x": 69, "y": 21}
+{"scene": "t250a", "kind": "seat", "tag": "pre3", "turn": 253, "alive": true, "cities": 1, "war0": true, "gold": 33.3}
+{"scene": "t250a", "kind": "p62", "tag": "pre3", "turn": 253, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 68, "y": 19, "dist": 2, "damage": 18}
+{"scene": "t250a", "kind": "near", "tag": "pre3", "turn": 253, "owner": 2, "id": 8781832, "type": "UNIT_LINE_INFANTRY", "x": 67, "y": 19, "damage": 9}
+{"scene": "t250a", "kind": "near", "tag": "pre3", "turn": 253, "owner": 62, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "x": 68, "y": 19, "damage": 18}
+{"scene": "t250a", "kind": "near", "tag": "pre3", "turn": 253, "owner": 2, "id": 9568271, "type": "UNIT_INFANTRY", "x": 68, "y": 20, "damage": 83}
+{"scene": "t250a", "kind": "near", "tag": "pre3", "turn": 253, "owner": 19, "id": 2162688, "type": "UNIT_MODERN_AT", "x": 71, "y": 18, "damage": 0}
+{"scene": "t250a", "kind": "near", "tag": "pre3", "turn": 253, "owner": 1, "id": 11796495, "type": "UNIT_MISSILE_CRUISER", "x": 71, "y": 23, "damage": 26}
+{"scene": "t250a", "kind": "near", "tag": "pre3", "turn": 253, "owner": 1, "id": 11468824, "type": "UNIT_MISSILE_CRUISER", "x": 71, "y": 24, "damage": 11}
+{"scene": "t250a", "kind": "city", "tag": "pre3", "turn": 253, "owner": 62, "orig": 2, "pop": 13}
+{"scene": "t250a", "kind": "rig", "war": true, "outer": 300, "outerMax": 300, "garrison": 199, "garrisonMax": 200, "ok": "true/true"}
+{"scene": "t250a", "kind": "attacker", "id": 4718604, "type": "UNIT_MODERN_ARMOR", "x": 68, "y": 21}
+{"scene": "t250a", "kind": "move", "text": "attackmove unit=4718604 from 68:21 to 69:21 moves=4 can=true requested=true err=nil"}
+{"scene": "t250a", "kind": "keep", "text": "city LOC_CITY_NAME_NGARUAWAHIA owner=62 orig=2"}
+{"scene": "t250a", "kind": "keep", "text": "directives KEEP=2 LIBERATE_FOUNDER=0 LIBERATE_PREVIOUS_OWNER=1 RAZE=3 REJECT=4"}
+{"scene": "t250a", "kind": "keep", "text": "keep can=false requested=true err=nil"}
+{"scene": "t250a", "kind": "seat", "tag": "captured", "turn": 253, "alive": true, "cities": 0, "war0": true, "gold": 33.3}
+{"scene": "t250a", "kind": "p62", "tag": "captured", "turn": 253, "id": 2818052, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": -9999, "y": -9999, "dist": 14994, "damage": 18}
+{"scene": "t250a", "kind": "near", "tag": "captured", "turn": 253, "owner": 2, "id": 8781832, "type": "UNIT_LINE_INFANTRY", "x": 67, "y": 19, "damage": 9}
+{"scene": "t250a", "kind": "near", "tag": "captured", "turn": 253, "owner": 2, "id": 9568271, "type": "UNIT_INFANTRY", "x": 68, "y": 20, "damage": 83}
+{"scene": "t250a", "kind": "near", "tag": "captured", "turn": 253, "owner": 0, "id": 4718604, "type": "UNIT_MODERN_ARMOR", "x": 68, "y": 21, "damage": 5}
+{"scene": "t250a", "kind": "near", "tag": "captured", "turn": 253, "owner": 19, "id": 2162688, "type": "UNIT_MODERN_AT", "x": 71, "y": 18, "damage": 0}
+{"scene": "t250a", "kind": "near", "tag": "captured", "turn": 253, "owner": 1, "id": 11796495, "type": "UNIT_MISSILE_CRUISER", "x": 71, "y": 23, "damage": 26}
+{"scene": "t250a", "kind": "near", "tag": "captured", "turn": 253, "owner": 1, "id": 11468824, "type": "UNIT_MISSILE_CRUISER", "x": 71, "y": 24, "damage": 11}
+{"scene": "t250a", "kind": "city", "tag": "captured", "turn": 253, "owner": 0, "orig": 2, "pop": 9}
+{"scene": "t250a", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_CONSIDER_RAZE_CITY -> nothing"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CONSIDER_RAZE_CITY -> unblock: blocker ENDTURN_BLOCKING_CONSIDER_RAZE_CITY -> keep LOC_CITY_NAME_NGARUAWAHIA"}
+{"scene": "t250a", "kind": "log", "text": "    cause session 7:7 -> closed sessions [7:7]"}
+{"scene": "t250a", "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"scene": "t250a", "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"scene": "t250a", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"scene": "t250a", "kind": "log", "text": "    cause session 1:1 -> closed sessions [1:1]"}
+{"scene": "t250a", "kind": "log", "text": "    cause popup LeaderScene -> open, no close"}
+{"scene": "t250a", "kind": "log", "text": "    cause popup BoostUnlockedPopup -> closed"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MYSTICISM"}
+{"scene": "t250a", "kind": "seat", "tag": "post1", "turn": 254, "alive": true, "cities": 0, "war0": true, "gold": 33.3}
+{"scene": "t250a", "kind": "near", "tag": "post1", "turn": 254, "owner": 0, "id": 4718604, "type": "UNIT_MODERN_ARMOR", "x": 69, "y": 21, "damage": 5}
+{"scene": "t250a", "kind": "city", "tag": "post1", "turn": 254, "owner": 0, "orig": 2, "pop": 8}
+{"scene": "t250a", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> NGARUAWAHIA builds BUILDING_GRANARY"}
+{"scene": "t250a", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"scene": "t250a", "kind": "log", "text": "    cause popup TechCivicCompletedPopup -> closed"}
+{"scene": "t250a", "kind": "seat", "tag": "post2", "turn": 255, "alive": true, "cities": 0, "war0": true, "gold": 33.3}
+{"scene": "t250a", "kind": "near", "tag": "post2", "turn": 255, "owner": 0, "id": 4718604, "type": "UNIT_MODERN_ARMOR", "x": 69, "y": 21, "damage": 5}
+{"scene": "t250a", "kind": "near", "tag": "post2", "turn": 255, "owner": 2, "id": 10092545, "type": "UNIT_FRIGATE", "x": 71, "y": 18, "damage": 56}
+{"scene": "t250a", "kind": "city", "tag": "post2", "turn": 255, "owner": 0, "orig": 2, "pop": 8}

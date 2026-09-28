@@ -86,6 +86,7 @@ def main(argv=None) -> int:
     p.add_argument("--deadline", type=float, default=178.0)
     p.add_argument("--until", type=int, default=252)
     p.add_argument("--tag", default="arm")
+    p.add_argument("--iglua", default="", help="an InGame Lua file run with ZMODE=arm after the load and ZMODE=read each turn")
     p.add_argument("--wait", type=float, default=120.0)
     a = p.parse_args(argv)
     cx, cy = a.city.split(":")
@@ -133,11 +134,21 @@ def main(argv=None) -> int:
     t.run(lab.IG, "LAB_UNIT_ARMED = nil LAB_UNIT_LOG = {}")
     for ln in t.run(lab.IG, ev.replace("ZMODE", "arm")):
         rec(json.dumps({"kind": "events", "text": ln}))
+    ig = ""
+    if a.iglua:
+        ig = pathlib.Path(a.iglua).read_text(encoding="utf-8").replace("ZCX", cx).replace("ZCY", cy)
+        for ln in t.run(lab.IG, ig.replace("ZMODE", "arm")):
+            rec(json.dumps({"kind": "iglua", "text": ln}))
     reader = LUA_READ.replace("ZCX", cx).replace("ZCY", cy).replace("ZBLOCK", a.block)
     known: set[int] = set()
     first = True
     first_turn = True
     while True:
+        if ig:
+            for ln in t.run(lab.IG, ig.replace("ZMODE", "read")):
+                rec(json.dumps({"kind": "iglua", "text": ln}))
+                if ln.startswith("snap|"):
+                    print("  ", ln, flush=True)
         for ln in t.run(lab.IG, ev.replace("ZMODE", "read")):
             if ln.startswith("log"):
                 continue

@@ -1,0 +1,30 @@
+{"scene": "t209unit", "kind": "prelua", "code": "local c = nil; for _, x in Players[2]:GetCities():Members() do c = x break end; local u = Players[2]:GetUnits():Create(GameInfo.Units['UNIT_MODERN_ARMOR'].Index, c:GetX(), c:GetY()); print(u and u:GetID() or -1, c:GetName())", "text": "8192028\tLOC_CITY_NAME_TE_HOKIANGA_NU_A_KUPE"}
+{"scene": "t209unit", "kind": "prelua", "code": "local c = nil; for _, x in Players[2]:GetCities():Members() do c = x break end; local u = Players[2]:GetUnits():Create(GameInfo.Units['UNIT_MODERN_ARMOR'].Index, c:GetX(), c:GetY()); print(u and u:GetID() or -1, c:GetName())", "text": "prelua done"}
+{"scene": "t209unit", "kind": "fcity", "tag": "start", "turn": 209, "id": 327680, "x": 69, "y": 21}
+{"scene": "t209unit", "kind": "fcity", "tag": "start", "turn": 209, "id": 262145, "x": 20, "y": 32}
+{"scene": "t209unit", "kind": "fcity", "tag": "start", "turn": 209, "id": 393218, "x": 32, "y": 38}
+{"scene": "t209unit", "kind": "fcity", "tag": "start", "turn": 209, "id": 458755, "x": 30, "y": 48}
+{"scene": "t209unit", "kind": "seat", "tag": "start", "turn": 209, "alive": true, "cities": 4, "war0": true, "gold": 49.84}
+{"scene": "t209unit", "kind": "p62", "tag": "start", "turn": 209, "id": 1507329, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 33, "y": 38, "dist": 10, "damage": 47}
+{"scene": "t209unit", "kind": "p62", "tag": "start", "turn": 209, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 30, "y": 48, "dist": 0, "damage": 0}
+{"scene": "t209unit", "kind": "p62", "tag": "start", "turn": 209, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 30, "y": 49, "dist": 1, "damage": 0}
+{"scene": "t209unit", "kind": "near", "tag": "start", "turn": 209, "owner": 14, "id": 2424837, "type": "UNIT_BUILDER", "x": 28, "y": 46, "damage": 0}
+{"scene": "t209unit", "kind": "near", "tag": "start", "turn": 209, "owner": 62, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "x": 30, "y": 48, "damage": 0}
+{"scene": "t209unit", "kind": "near", "tag": "start", "turn": 209, "owner": 62, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "x": 30, "y": 49, "damage": 0}
+{"scene": "t209unit", "kind": "city", "tag": "start", "turn": 209, "owner": 62, "orig": 2, "pop": 1}
+{"scene": "t209unit", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> TIKAL builds UNIT_WARRIOR"}
+{"scene": "t209unit", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler"}
+{"scene": "t209unit", "kind": "log", "text": "    cause popup InGamePopup -> closed"}
+{"scene": "t209unit", "kind": "fcity", "tag": "pre1", "turn": 210, "id": 327680, "x": 69, "y": 21}
+{"scene": "t209unit", "kind": "fcity", "tag": "pre1", "turn": 210, "id": 262145, "x": 20, "y": 32}
+{"scene": "t209unit", "kind": "fcity", "tag": "pre1", "turn": 210, "id": 393218, "x": 32, "y": 38}
+{"scene": "t209unit", "kind": "fcity", "tag": "pre1", "turn": 210, "id": 458755, "x": 30, "y": 48}
+{"scene": "t209unit", "kind": "seat", "tag": "pre1", "turn": 210, "alive": true, "cities": 4, "war0": true, "gold": 44.85}
+{"scene": "t209unit", "kind": "p62", "tag": "pre1", "turn": 210, "id": 1769472, "type": "UNIT_HELICOPTER", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 20, "y": 33, "dist": 17, "damage": 0}
+{"scene": "t209unit", "kind": "p62", "tag": "pre1", "turn": 210, "id": 1507329, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 33, "y": 38, "dist": 10, "damage": 81}
+{"scene": "t209unit", "kind": "p62", "tag": "pre1", "turn": 210, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 32, "y": 48, "dist": 2, "damage": 0}
+{"scene": "t209unit", "kind": "p62", "tag": "pre1", "turn": 210, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 29, "y": 49, "dist": 1, "damage": 0}
+{"scene": "t209unit", "kind": "near", "tag": "pre1", "turn": 210, "owner": 14, "id": 2424837, "type": "UNIT_BUILDER", "x": 28, "y": 46, "damage": 0}
+{"scene": "t209unit", "kind": "near", "tag": "pre1", "turn": 210, "owner": 62, "id": 1638403, "type": "UNIT_LINE_INFANTRY", "x": 29, "y": 49, "damage": 0}
+{"scene": "t209unit", "kind": "near", "tag": "pre1", "turn": 210, "owner": 62, "id": 1703938, "type": "UNIT_LINE_INFANTRY", "x": 32, "y": 48, "damage": 0}
+{"scene": "t209unit", "kind": "city", "tag": "pre1", "turn": 210, "owner": 62, "orig": 2, "pop": 1}

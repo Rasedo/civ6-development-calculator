@@ -1,0 +1,53 @@
+{"scene": "t200mex", "kind": "fcity", "tag": "start", "turn": 200, "id": 327680, "x": 69, "y": 21}
+{"scene": "t200mex", "kind": "fcity", "tag": "start", "turn": 200, "id": 262145, "x": 20, "y": 32}
+{"scene": "t200mex", "kind": "seat", "tag": "start", "turn": 200, "alive": true, "cities": 2, "war0": true, "gold": 8.01}
+{"scene": "t200mex", "kind": "p62", "tag": "start", "turn": 200, "id": 1245186, "type": "UNIT_FIELD_CANNON", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 20, "y": 33, "dist": 1, "damage": 0}
+{"scene": "t200mex", "kind": "near", "tag": "start", "turn": 200, "owner": 7, "id": 3997712, "type": "UNIT_LINE_INFANTRY", "x": 19, "y": 33, "damage": 55}
+{"scene": "t200mex", "kind": "near", "tag": "start", "turn": 200, "owner": 62, "id": 1245186, "type": "UNIT_FIELD_CANNON", "x": 20, "y": 33, "damage": 0}
+{"scene": "t200mex", "kind": "near", "tag": "start", "turn": 200, "owner": 7, "id": 4784139, "type": "UNIT_LINE_INFANTRY", "x": 21, "y": 30, "damage": 0}
+{"scene": "t200mex", "kind": "city", "tag": "start", "turn": 200, "owner": 62, "orig": 13, "pop": 9}
+{"scene": "t200mex", "kind": "rig", "war": true, "outer": 400, "outerMax": 400, "garrison": 199, "garrisonMax": 200, "ok": "true/true"}
+{"scene": "t200mex", "kind": "attacker", "id": 4063247, "type": "UNIT_MODERN_ARMOR", "x": 21, "y": 32}
+{"scene": "t200mex", "kind": "move", "text": "attackmove unit=4063247 from 21:32 to 20:32 moves=4 can=true requested=true err=nil"}
+{"scene": "t200mex", "kind": "keep", "text": "city LOC_CITY_NAME_MEXICO_CITY owner=62 orig=13"}
+{"scene": "t200mex", "kind": "keep", "text": "directives KEEP=2 LIBERATE_FOUNDER=0 LIBERATE_PREVIOUS_OWNER=1 RAZE=3 REJECT=4"}
+{"scene": "t200mex", "kind": "keep", "text": "keep can=false requested=true err=nil"}
+{"scene": "t200mex", "kind": "fcity", "tag": "captured", "turn": 200, "id": 327680, "x": 69, "y": 21}
+{"scene": "t200mex", "kind": "seat", "tag": "captured", "turn": 200, "alive": true, "cities": 1, "war0": true, "gold": 8.01}
+{"scene": "t200mex", "kind": "p62", "tag": "captured", "turn": 200, "id": 1245186, "type": "UNIT_FIELD_CANNON", "class": "FORMATION_CLASS_LAND_COMBAT", "x": -9999, "y": -9999, "dist": 14950, "damage": 0}
+{"scene": "t200mex", "kind": "near", "tag": "captured", "turn": 200, "owner": 7, "id": 3997712, "type": "UNIT_LINE_INFANTRY", "x": 18, "y": 33, "damage": 55}
+{"scene": "t200mex", "kind": "near", "tag": "captured", "turn": 200, "owner": 0, "id": 4063247, "type": "UNIT_MODERN_ARMOR", "x": 20, "y": 32, "damage": 4}
+{"scene": "t200mex", "kind": "near", "tag": "captured", "turn": 200, "owner": 7, "id": 4784139, "type": "UNIT_LINE_INFANTRY", "x": 21, "y": 30, "damage": 0}
+{"scene": "t200mex", "kind": "city", "tag": "captured", "turn": 200, "owner": 0, "orig": 13, "pop": 6}
+{"scene": "t200mex", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing"}
+{"scene": "t200mex", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> {\"kind\":\"commemorate\",\"allowed\":1,\"picked\":\"COMMEMORATION_INDUSTRIAL\",\"blockerBefore\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"blockerNow\":\"ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE\",\"turn\":200}"}
+{"scene": "t200mex", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"scene": "t200mex", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_CIVIC -> unblock: blocker ENDTURN_BLOCKING_CIVIC -> civic CIVIC_MILITARY_TRADITION"}
+{"scene": "t200mex", "kind": "fcity", "tag": "post1", "turn": 201, "id": 327680, "x": 69, "y": 21}
+{"scene": "t200mex", "kind": "seat", "tag": "post1", "turn": 201, "alive": true, "cities": 1, "war0": true, "gold": 16.21}
+{"scene": "t200mex", "kind": "near", "tag": "post1", "turn": 201, "owner": 7, "id": 3997712, "type": "UNIT_LINE_INFANTRY", "x": 17, "y": 31, "damage": 55}
+{"scene": "t200mex", "kind": "near", "tag": "post1", "turn": 201, "owner": 0, "id": 4063247, "type": "UNIT_MODERN_ARMOR", "x": 20, "y": 32, "damage": 4}
+{"scene": "t200mex", "kind": "near", "tag": "post1", "turn": 201, "owner": 7, "id": 4784139, "type": "UNIT_LINE_INFANTRY", "x": 21, "y": 30, "damage": 0}
+{"scene": "t200mex", "kind": "city", "tag": "post1", "turn": 201, "owner": 0, "orig": 13, "pop": 6}
+{"scene": "t200mex", "kind": "log", "text": "    unblock: blocker ENDTURN_BLOCKING_RESEARCH -> research TECH_CASTLES"}
+{"scene": "t200mex", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> MEXICO_CITY builds BUILDING_GRANARY"}
+{"scene": "t200mex", "kind": "log", "text": "    cause session 2:2 -> closed sessions [2:2]"}
+{"scene": "t200mex", "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"scene": "t200mex", "kind": "log", "text": "    cause popup DiplomacyDealView -> hidden"}
+{"scene": "t200mex", "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"scene": "t200mex", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> MEXICO_CITY builds BUILDING_GRANARY"}
+{"scene": "t200mex", "kind": "log", "text": "    cause session 3:3 -> closed sessions [3:3]"}
+{"scene": "t200mex", "kind": "log", "text": "    cause popup DiplomacyActionView -> hidden"}
+{"scene": "t200mex", "kind": "log", "text": "    cause popup DiplomacyDealView -> hidden"}
+{"scene": "t200mex", "kind": "log", "text": "    cause popup LeaderScene -> hidden"}
+{"scene": "t200mex", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_PRODUCTION -> unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> MEXICO_CITY builds BUILDING_GRANARY"}
+{"scene": "t200mex", "kind": "log", "text": "    cause blocker ENDTURN_BLOCKING_WORLD_CONGRESS_SESSION: no handler"}
+{"scene": "t200mex", "kind": "log", "text": "    cause popup WorldCongressIntro -> closed"}
+{"scene": "t200mex", "kind": "fcity", "tag": "post2", "turn": 202, "id": 327680, "x": 69, "y": 21}
+{"scene": "t200mex", "kind": "seat", "tag": "post2", "turn": 202, "alive": true, "cities": 1, "war0": true, "gold": 24.41}
+{"scene": "t200mex", "kind": "p62", "tag": "post2", "turn": 202, "id": 1310722, "type": "UNIT_CAVALRY", "class": "FORMATION_CLASS_LAND_COMBAT", "x": 69, "y": 20, "dist": 41, "damage": 0}
+{"scene": "t200mex", "kind": "near", "tag": "post2", "turn": 202, "owner": 7, "id": 3997712, "type": "UNIT_LINE_INFANTRY", "x": 18, "y": 29, "damage": 55}
+{"scene": "t200mex", "kind": "near", "tag": "post2", "turn": 202, "owner": 7, "id": 5308429, "type": "UNIT_BUILDER", "x": 18, "y": 29, "damage": 0}
+{"scene": "t200mex", "kind": "near", "tag": "post2", "turn": 202, "owner": 0, "id": 4063247, "type": "UNIT_MODERN_ARMOR", "x": 20, "y": 32, "damage": 4}
+{"scene": "t200mex", "kind": "near", "tag": "post2", "turn": 202, "owner": 7, "id": 4784139, "type": "UNIT_LINE_INFANTRY", "x": 21, "y": 30, "damage": 0}
+{"scene": "t200mex", "kind": "city", "tag": "post2", "turn": 202, "owner": 0, "orig": 13, "pop": 6}

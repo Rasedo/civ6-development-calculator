@@ -1,0 +1,16 @@
+{"kind":"city","turn":205,"x":32,"y":38,"owner":5,"orig":5,"name":"LOC_CITY_NAME_PARSA","era":7}
+{"kind":"melee","x":32,"y":38,"owner":5,"unit":"UNIT_WARRIOR","combat":20,"tech":"nil","hasTech":true,"civic":"nil","hasCivic":true,"res":"","stock":-1}
+{"kind":"melee","x":32,"y":38,"owner":5,"unit":"UNIT_SWORDSMAN","combat":35,"tech":"TECH_IRON_WORKING","hasTech":true,"civic":"nil","hasCivic":true,"res":"RESOURCE_IRON","stock":76}
+{"kind":"melee","x":32,"y":38,"owner":5,"unit":"UNIT_MUSKETMAN","combat":55,"tech":"TECH_GUNPOWDER","hasTech":true,"civic":"nil","hasCivic":true,"res":"RESOURCE_NITER","stock":10}
+{"kind":"melee","x":32,"y":38,"owner":5,"unit":"UNIT_INFANTRY","combat":75,"tech":"TECH_REPLACEABLE_PARTS","hasTech":false,"civic":"nil","hasCivic":true,"res":"RESOURCE_OIL","stock":68}
+{"kind":"melee","x":32,"y":38,"owner":5,"unit":"UNIT_MECHANIZED_INFANTRY","combat":85,"tech":"TECH_SATELLITES","hasTech":false,"civic":"nil","hasCivic":true,"res":"RESOURCE_OIL","stock":68}
+{"kind":"melee","x":32,"y":38,"owner":5,"unit":"UNIT_MAN_AT_ARMS","combat":45,"tech":"TECH_APPRENTICESHIP","hasTech":true,"civic":"nil","hasCivic":true,"res":"RESOURCE_IRON","stock":76}
+{"kind":"melee","x":32,"y":38,"owner":5,"unit":"UNIT_LINE_INFANTRY","combat":65,"tech":"TECH_MILITARY_SCIENCE","hasTech":true,"civic":"nil","hasCivic":true,"res":"RESOURCE_NITER","stock":10}
+{"kind":"city","turn":205,"x":30,"y":48,"owner":2,"orig":2,"name":"LOC_CITY_NAME_KAPITI","era":5}
+{"kind":"melee","x":30,"y":48,"owner":2,"unit":"UNIT_WARRIOR","combat":20,"tech":"nil","hasTech":true,"civic":"nil","hasCivic":true,"res":"","stock":-1}
+{"kind":"melee","x":30,"y":48,"owner":2,"unit":"UNIT_SWORDSMAN","combat":35,"tech":"TECH_IRON_WORKING","hasTech":true,"civic":"nil","hasCivic":true,"res":"RESOURCE_IRON","stock":0}
+{"kind":"melee","x":30,"y":48,"owner":2,"unit":"UNIT_MUSKETMAN","combat":55,"tech":"TECH_GUNPOWDER","hasTech":true,"civic":"nil","hasCivic":true,"res":"RESOURCE_NITER","stock":12}
+{"kind":"melee","x":30,"y":48,"owner":2,"unit":"UNIT_INFANTRY","combat":75,"tech":"TECH_REPLACEABLE_PARTS","hasTech":false,"civic":"nil","hasCivic":true,"res":"RESOURCE_OIL","stock":0}
+{"kind":"melee","x":30,"y":48,"owner":2,"unit":"UNIT_MECHANIZED_INFANTRY","combat":85,"tech":"TECH_SATELLITES","hasTech":false,"civic":"nil","hasCivic":true,"res":"RESOURCE_OIL","stock":0}
+{"kind":"melee","x":30,"y":48,"owner":2,"unit":"UNIT_MAN_AT_ARMS","combat":45,"tech":"TECH_APPRENTICESHIP","hasTech":true,"civic":"nil","hasCivic":true,"res":"RESOURCE_IRON","stock":0}
+{"kind":"melee","x":30,"y":48,"owner":2,"unit":"UNIT_LINE_INFANTRY","combat":65,"tech":"TECH_MILITARY_SCIENCE","hasTech":true,"civic":"nil","hasCivic":true,"res":"RESOURCE_NITER","stock":12}
