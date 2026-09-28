@@ -675,7 +675,6 @@ export interface Seat {
    *  Production in all Cities for 5 turns" — the turns still to run. */
   conquestProdTurns?: number;
   bestMeleeCS: number;
-  tilesPurchased: number;
   /** every ONE-TIME project this seat has completed. */
   projectsDone: string[];
   /** nuclear devices held, dense over `NUCLEAR_DEVICES`. CIV6: a finished

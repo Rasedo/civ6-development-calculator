@@ -248,8 +248,13 @@ def test_free_city_loyalty_and_join(rules, path) -> None:
     sim.city_loyalty[B0, F, col] = 90.0
     sim._free_cities_phase()
     loy = float(sim.city_loyalty[B0, F, col])
-    # +10 base, the pressure term, and what stands in it (the Monument's +1)
-    assert abs(loy - (90.0 + 10.0 + 20.0 * (own - foreign) / (own + foreign) + built)) < 1e-9, (loy, built)
+    # +10 base, the pressure term (`pressureTerm`: the stronger side over the
+    # weaker, 10 per unit of ratio past 1, capped at 20), and what stands in it
+    # (the Monument's +1)
+    hi, lo = max(own, foreign), min(own, foreign)
+    mag = 20.0 if lo <= 0 else min(20.0, 0.0 + (20.0 * (hi / lo - 1.0)) / 2.0)
+    press = 0.0 if own == foreign else (mag if own > foreign else -mag)
+    assert abs(loy - min(100.0, max(0.0, 90.0 + 10.0 + press + built))) < 1e-9, (loy, built, press)
     race = sim.city_free_press[B0, F, col]
     assert [float(x) for x in race[:sim.n_majors]] == pulls, (race.tolist(), pulls)
     # ...and at 0 it joins the row that pulled hardest, kept whole
@@ -542,7 +547,7 @@ def test_defence_and_strike(rules, path) -> None:
             s._bldg_version += 1
             s.city_outer_hp[B0, F, j] = int(s._walls_max_at(torch.tensor([F]), torch.tensor([j]))[B0])
             base = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]))[0][B0])
-            assert base == before + int(s._walls_tier_cs[1]), (before, base)
+            assert base == before + int(s._b_walls_cs[wi]), (before, base)
         u = put(s, 1, attack_plot(s, c), "WARRIOR")
         s._free_cities_phase()
         hp = int(s.major_unit_hp[B0, u])

@@ -17,7 +17,8 @@
  * The LUXURY and STRATEGIC rows below are NOT yet swept.
  */
 
-import type { Elevation, ImprovementId, ResourceCategory, TerrainId, YieldKey, Yields } from './types';
+import type { Elevation, ImprovementId, ResourceCategory, TerrainId, Tile, YieldKey, Yields } from './types';
+import { TERRAINS } from './terrains';
 
 export interface ResourceDef {
   id: string;
@@ -29,6 +30,14 @@ export interface ResourceDef {
   elevations: Elevation[];
   requiresFeature?: string[];
   okFeatures?: string[];
+  /** CIV6 (Resource_ValidFeatures beside Resource_ValidTerrains): features
+   *  the resource stands on WHATEVER the terrain beneath — Amber's Woods and
+   *  Rainforest, where `terrains` is its Coast alone. */
+  anyTerrainFeatures?: string[];
+  /** CIV6 (Improvement_ValidResources): the improvement that works it on a
+   *  WATER plot, where `improvement` works it on land (Amber: Fishing Boats
+   *  at sea, a Mine ashore). `resourceImprovement` reads the plot. */
+  waterImprovement?: ImprovementId;
   /** If set, resource never spawns on a feature. */
   noFeature?: boolean;
   /** CIV6 (Resources.PrereqTech): the technology that REVEALS the resource.
@@ -94,7 +103,21 @@ export const RESOURCES: Record<string, ResourceDef> = {
   SALT: { id: 'SALT', name: 'Salt', category: 'luxury', yields: { food: 1, gold: 1 }, improvement: 'MINE', terrains: ['DESERT', 'PLAINS', 'TUNDRA'], elevations: FLAT, noFeature: true },
   PEARLS: { id: 'PEARLS', name: 'Pearls', category: 'luxury', yields: { faith: 1 }, improvement: 'FISHING_BOATS', terrains: ['COAST'], elevations: FLAT },
   WHALES: { id: 'WHALES', name: 'Whales', category: 'luxury', yields: { production: 1, gold: 1 }, improvement: 'FISHING_BOATS', terrains: ['COAST'], elevations: FLAT },
+  // CIV6 (Expansion1_Resources.xml, which Gathering Storm loads): RESOURCECLASS_LUXURY,
+  // Happiness 4, +1 Culture, Resource_ValidTerrains Coast and
+  // Resource_ValidFeatures Jungle and Forest; Expansion1_Improvements.xml
+  // works it with Fishing Boats or a Mine (MustRemoveFeature false).
+  AMBER: { id: 'AMBER', name: 'Amber', category: 'luxury', yields: { culture: 1 }, improvement: 'MINE', waterImprovement: 'FISHING_BOATS', terrains: ['COAST'], elevations: ANY, anyTerrainFeatures: ['WOODS', 'RAINFOREST'] },
 };
+
+/** The improvement that works the resource on THIS plot: the row's water
+ *  improvement on a water plot, where it names one, else its own. */
+export function resourceImprovement(tile: Tile): ImprovementId | null {
+  if (!tile.resource) return null;
+  const def = RESOURCES[tile.resource];
+  if (!def) return null;
+  return def.waterImprovement && TERRAINS[tile.terrain].water ? def.waterImprovement : def.improvement;
+}
 
 /** the LUXURY rows in catalog order — the one shared order every luxury
  *  index rides: the tile plane's `lux`, and the Congress target space. */

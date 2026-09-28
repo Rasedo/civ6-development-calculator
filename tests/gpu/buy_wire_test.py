@@ -369,7 +369,6 @@ def case_tile(sim, base, row: int) -> None:
     tgt = int(ok[0])
     cost = float(sim._seat_tile_price(row, t1(ctr), t1(tgt))[0])
     sim.civ_treasury[0, row] = RICH
-    bought0 = int(sim.civ_tiles_purchased[0, row])
     acq0 = int(sim.city_acquired[0, row, j])
     sim._stash_buy(row, buy=(t1(3), t1(tgt), t1(j)))
     sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
@@ -378,7 +377,8 @@ def case_tile(sim, base, row: int) -> None:
     assert abs((RICH - float(sim.civ_treasury[0, row])) - cost) < 1e-6, (
         f"row {row}: tile charged {RICH - float(sim.civ_treasury[0, row])}, want {cost}"
     )
-    assert int(sim.civ_tiles_purchased[0, row]) == bought0 + 1, f"row {row}: purchase escalator did not move"
+    # no step per plot bought: the same plot's price again is unchanged
+    assert float(sim._seat_tile_price(row, t1(ctr), t1(tgt))[0]) == cost, f"row {row}: a purchase moved the next price"
     # the culture cost counts the plots taken by culture alone
     assert int(sim.city_acquired[0, row, j]) == acq0, f"row {row}: a purchase moved city_acquired"
 

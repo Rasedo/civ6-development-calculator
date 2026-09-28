@@ -113,11 +113,13 @@ export interface ProjectDef {
    *  `moveCapital`. */
   movesCapital?: boolean;
   /** CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS, Param1): this
-   *  project's price climbs with the game's own progress — `cost + param x
-   *  progress`, the param at Standard speed and scaled where it is read. The
-   *  engine's one notion of that progress is `districtCostIn`'s max(tech,
-   *  civic) share. Every district project carries one (Cost 25, Param1 1500). */
+   *  project's price climbs with the game's own progress — `progressCost`
+   *  over its install Cost, the climb Param1/100 − 1. Every district project
+   *  carries one (Cost 25, Param1 1500). */
   costProgressGame?: number;
+  /** the install's Standard-speed Cost of a GAME_PROGRESS row, what
+   *  `progressCost` scales; set by the catalog builder. */
+  progressBase?: number;
 }
 
 const P = (def: ProjectDef) => def;
@@ -514,7 +516,9 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
         gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_ENGINEER' }),
       },
     }),
-  ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: scaleByGameSpeed(p.cost) } : p]),
+  ].map((p) => [p.id, p.cost !== undefined
+    ? { ...p, cost: scaleByGameSpeed(p.cost), ...(p.costProgressGame !== undefined ? { progressBase: p.cost } : {}) }
+    : p]),
 );
 
 /** CIV6 (GS): the Exoplanet craft's journey — `SCIENCE_VICTORY_POINTS_REQUIRED`

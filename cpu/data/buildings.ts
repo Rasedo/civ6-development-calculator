@@ -230,6 +230,9 @@ export interface BuildingDef {
    *  highest tier it holds; the tiers stack, so each row requires the one
    *  below it. */
   walls?: number;
+  /** CIV6 (Buildings.OuterDefenseStrength): the Combat Strength this walls
+   *  row adds to its city centre (`wallsStrength`). */
+  wallsStrength?: number;
   /** CIV6 (Medieval and Renaissance Walls): "Cannot be purchased with
    *  Gold." */
   noPurchase?: boolean;
@@ -353,11 +356,12 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       floodBarrier: xml('Buildings_XP2', 'BuildingType=BUILDING_FLOOD_BARRIER', 'BlocksCoastalFlooding'),
     },
   },
-  { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0, walls: 1,
+  { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0, walls: 1, wallsStrength: 3,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_WALLS', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_WALLS', 'PrereqDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_WALLS', 'Maintenance'),
+      wallsStrength: xml('Buildings', 'BuildingType=BUILDING_WALLS', 'OuterDefenseStrength'),
       walls: { stylized: 'the engine tier index (1 Ancient, 2 Medieval, 3 Renaissance); the install carries OuterDefenseHitPoints, not a tier' },
     },
   },
@@ -928,18 +932,19 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
   // THE UPGRADED WALLS, appended last for the same index-stability reason as
   // the Archaeological Museum above. Both carry the Gathering Storm cost and
   // require the tier below; both refuse a gold purchase.
-  { id: 'MEDIEVAL_WALLS', name: 'Medieval Walls', district: 'CITY_CENTER', cost: 220, requiresAny: ['ANCIENT_WALLS'], maintenance: 0, walls: 2, noPurchase: true,
+  { id: 'MEDIEVAL_WALLS', name: 'Medieval Walls', district: 'CITY_CENTER', cost: 220, requiresAny: ['ANCIENT_WALLS'], maintenance: 0, walls: 2, wallsStrength: 3, noPurchase: true,
     src: {
       cost: xml('Buildings', 'BuildingType=BUILDING_CASTLE', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_CASTLE', 'PrereqDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_CASTLE', 'Maintenance'),
+      wallsStrength: xml('Buildings', 'BuildingType=BUILDING_CASTLE', 'OuterDefenseStrength'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_CASTLE', 'PrereqBuilding')] },
       walls: { stylized: 'the engine tier index (1 Ancient, 2 Medieval, 3 Renaissance); the install carries OuterDefenseHitPoints, not a tier' },
       noPurchase: { derived: 'true where the install row carries NO PurchaseYield', inputs: [xml('Buildings', 'BuildingType=BUILDING_CASTLE', 'PurchaseYield')] },
     },
   },
   {
-    id: 'RENAISSANCE_WALLS', name: 'Renaissance Walls', district: 'CITY_CENTER', cost: 300, requiresAny: ['MEDIEVAL_WALLS'], maintenance: 0, walls: 3, noPurchase: true,
+    id: 'RENAISSANCE_WALLS', name: 'Renaissance Walls', district: 'CITY_CENTER', cost: 300, requiresAny: ['MEDIEVAL_WALLS'], maintenance: 0, walls: 3, wallsStrength: 3, noPurchase: true,
     // CIV6 (BUILDING_TSIKHE): Cost 260 against the Star Fort's 300.
     // OuterDefenseHitPoints 200 against the Star
     // Fort's 100 — one tier's worth MORE perimeter, which puts a Georgian
@@ -958,6 +963,7 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       cost: xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'PrereqDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'Maintenance'),
+      wallsStrength: xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'OuterDefenseStrength'),
       requiresAny: { derived: 'the BuildingPrereqs rows of this building, as engine ids', inputs: [xml('BuildingPrereqs', 'Building=BUILDING_STAR_FORT', 'PrereqBuilding')] },
       walls: { stylized: 'the engine tier index (1 Ancient, 2 Medieval, 3 Renaissance); the install carries OuterDefenseHitPoints, not a tier' },
       noPurchase: { derived: 'true where the install row carries NO PurchaseYield', inputs: [xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'PurchaseYield')] },

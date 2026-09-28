@@ -264,7 +264,7 @@ def main() -> int:
     _cots = [i for i, r in enumerate(_prows) if int(r["mc"]) == 1]
     assert len(_cots) == 1, f"the wire names {len(_cots)} capital-moving projects"
     _cot = _prows[_cots[0]]
-    assert int(_cot["pcg"]) > 0, "the project takes no game-progress curve"
+    assert int(_cot["pgb"]) > 0 and int(_cot["pk"]) > 0, "the project takes no game-progress curve"
     assert int(_cot["pc"]) > 0, "the project has no base price"
     assert int(_cot["cv"]) == civs.index("PHOENICIA"), "the project is not Phoenicia's"
     _harb = next(i for i, d in enumerate(rules.districts) if d["id"] == "HARBOR")

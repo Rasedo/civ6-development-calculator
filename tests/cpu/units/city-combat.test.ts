@@ -8,7 +8,7 @@ import { commitProduction } from '../../../cpu/core/seatTurn';
 import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { ENCAMPMENT_HP, UNITS, WALLS_HP } from '../../../cpu/data/units';
-import { PALACE_CITY_CS, GARRISON_DAMAGE_SCALE, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../../../cpu/data/constants';
+import { PALACE_CITY_CS, GARRISON_HP_PER_CS, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../../../cpu/data/constants';
 import { DISTRICTS } from '../../../cpu/data/districts';
 import { tilesWithin } from '../../../world/hex';
 import type { City, CityState, DistrictId, GameState, Tile } from '../../../cpu/core/types';
@@ -287,11 +287,11 @@ describe("a city centre's standing strength", () => {
 
   // runs/garrison_scale_20260926T081246Z.jsonl: base 55 (a Line Infantry 65
   // less 10), an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage 0,
-  // 10, 25, 50, 75, 90
-  it('the garrison adds what its Combat stands above the base, scaled by its wounds', () => {
+  // 10, 25, 50, 75, 90 — Combat less a point per 10 damage, above the base
+  it('the garrison adds what its Combat less its wounds stands above the base', () => {
     const { state, city } = scene();
     const inf = spawnUnit(state, 'INFANTRY', city.centerIndex, 1)!;
-    expect(GARRISON_DAMAGE_SCALE).toBe(200);
+    expect(GARRISON_HP_PER_CS).toBe(10);
     // the strongest melee on its own centre adds exactly the cut
     expect(centreStrength(state, city)).toBe(65 + 10);
     state.seats.find((s) => s.seat === 1)!.bestMeleeCS = 65;

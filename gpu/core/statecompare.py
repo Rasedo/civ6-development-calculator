@@ -370,13 +370,6 @@ def _capital_tile(sim, b, rows):
     return [int(sim.civ_cap_tile[b, c]) for c in rows]
 
 
-def _civ_only(plane: str, absent):
-    def get(sim, b, rows):
-        t = getattr(sim, plane)[b].tolist()
-        return [absent if c == 0 else t[c - 1] for c in rows]
-    return get
-
-
 def _seat_pair_relation(plane: str, live):
     """A seat<->seat [n_majors, n_majors] relation read as a per-seat set of ABSOLUTE
     opponent seats. One index space: the row IS the seat, so every seat
@@ -671,7 +664,6 @@ SEAT = {
     "dealOffers": _deal_line("deal_offer_left", ("deal_offer_give", "deal_offer_ask")),
     "dealTerms": _deal_line("deal_term_left", ("deal_term_item",)),
     "promises": _promise_line,
-    "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
 }
 
 

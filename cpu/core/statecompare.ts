@@ -632,7 +632,6 @@ const SEAT: Record<string, Extractor> = {
     }
     return out;
   }),
-  tilesPurchased: overSeats((s) => s.tilesPurchased),
 };
 
 const perCiv = (state: GameState, fn: (seat: number) => number): number[] =>

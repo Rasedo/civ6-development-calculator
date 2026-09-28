@@ -133,7 +133,7 @@ def test_siege_tables(sim) -> None:
         assert bool(sim._type_civilian[i]), "a support chassis rides the civilian plane"
     assert bool(sim._type_melee.any()) and bool(sim._type_anticav.any()), \
         "the two classes a ram or a tower helps are unmarked"
-    print(f"  tables OK: bombard {bomb}, chassis {chassis}, tiers {sim._walls_tier_hp.tolist()} / CS {sim._walls_tier_cs.tolist()}")
+    print(f"  tables OK: bombard {bomb}, chassis {chassis}, tiers {sim._walls_tier_hp.tolist()} / CS {[int(sim._b_walls_cs[i]) for i in sim._walls_rows]}")
 
 
 def test_ranged_strength(sim) -> None:
@@ -291,7 +291,8 @@ def test_walls_tiers(rules, path) -> None:
     col = L(sim, 0)
     row0 = torch.zeros_like(col)
     assert sim._walls_tier_hp.tolist() == [0, 100, 200, 300, 400], sim._walls_tier_hp.tolist()
-    assert sim._walls_tier_cs.tolist() == [0, 3, 6, 9, 9], sim._walls_tier_cs.tolist()
+    # Buildings.OuterDefenseStrength: 3 on each wall building, stacking as they are built
+    assert [int(sim._b_walls_cs[i]) for i in sim._walls_rows] == [3, 3, 3]
     for bi in sim._walls_rows:
         sim.city_bldg[0, 0, 0, bi] = False
     assert int(sim._walls_tier_at(row0, col)[0]) == 0

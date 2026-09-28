@@ -114,12 +114,13 @@ def main() -> None:
             sim.city_pressure[:, 0, s, g] = 9000
             sim.city_followed[:, 0, s] = g
         sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
-        assert bool((sim.city_pressure[:, 0, 0, 1] == 1).all()), "religion-1 +1 pressure"
-        assert bool((sim.city_pressure[:, 0, 0, 2] == 1).all()), "religion-2 +1 pressure"
+        per = int(sim._pressure_per_turn)
+        assert bool((sim.city_pressure[:, 0, 0, 1] == per).all()), "religion-1 +2 pressure"
+        assert bool((sim.city_pressure[:, 0, 0, 2] == per).all()), "religion-2 +2 pressure"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "a tie is no majority"
         for _ in range(3):
             sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
-        assert bool((sim.city_pressure[:, 0, 0, 1] == 4).all()), "integer accumulation over turns"
+        assert bool((sim.city_pressure[:, 0, 0, 1] == 4 * per).all()), "integer accumulation over turns"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "still tied -> nobody"
         # Break the tie: religion 2 pulls past half of the total (the other
         # religion's 4 plus the atheism baseline) -> majority flip to 2.

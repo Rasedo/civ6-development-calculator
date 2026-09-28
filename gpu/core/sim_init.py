@@ -458,7 +458,7 @@ class SimInit:
             ("worship", torch.long, -1),
             ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
             ("pantheon_done", torch.bool, 0), ("prophets", torch.long, 0),
-            ("religion_done", torch.bool, 0), ("tiles_purchased", torch.long, 0),
+            ("religion_done", torch.bool, 0),
             ("inquisition", torch.bool, 0),
         )
         for _nm, _dt, _fill in _civ_scalars:
@@ -2615,7 +2615,7 @@ class SimInit:
         self._path_denom = int(_tr["pathDenom"])
         self._path_cap = int(round(float(_tr["pathMaxRatio"]) * self._path_denom))
         self._trade_dur_bumps = [int(x) for x in _tr["durEraBumps"]]  # eras adding +10/+20/+30
-        self._trader_cost_prog = int(_tr["traderCostProg"])
+        self._trader_progress = tuple(int(x) for x in _tr["traderProgress"])  # (install Cost, climb)
         # RIVER FLOOD, the Flood (Civ6) tables by severity.
         _ds = rules.disasters
         # THE TURN'S ONE DRAW (`eventRows`): each row's weight per site, in
@@ -2775,7 +2775,7 @@ class SimInit:
         # The outer-defense pool and the defensive Combat Strength by WALLS
         # TIER, plus the tech that grants the top tier outright.
         self._walls_tier_hp = torch.tensor([int(x) for x in rules.combat["wallsTierHp"]], dtype=torch.long, device=device)
-        self._walls_tier_cs = torch.tensor([int(x) for x in rules.combat["wallsTierCs"]], dtype=torch.long, device=device)
+        self._b_walls_cs = rules.b_walls_cs.to(device)  # [NB] each walls row's strength (`wallsStrength`)
         # a city centre's standing terms beside its base and walls
         # (`_centre_strength`): the Palace's, the garrison term's damage scale
         # (`_garrison_cs`), a minor's per envoy
@@ -2785,7 +2785,7 @@ class SimInit:
         self._city_start_melee_major = int(rules.combat["cityStartMeleeMajor"])
         self._city_start_melee_minor = int(rules.combat["cityStartMeleeMinor"])
         self._city_base_melee_cut = int(rules.combat["cityBaseMeleeCut"])
-        self._garrison_damage_scale = int(rules.combat["garrisonDamageScale"])
+        self._garrison_hp_per_cs = float(rules.combat["garrisonHpPerCs"])
         self._envoy_city_cs = int(rules.combat["envoyCityCs"])
         self._walls_tier_urban = int(rules.combat["wallsTierUrban"])
         self._urban_def_tech = int(rules.combat["urbanDefensesTech"])

@@ -653,15 +653,24 @@ export const PANTHEON_FAITH_COST = 25;
  * religion's radius (per-religion range in spreadReligiousPressure). */
 export const RELIGION_PRESSURE_RANGE = 10;
 export const JUST_WAR_RANGE = 3;
-/** CIV6 (RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE 1): what one following
- * city presses per turn — the Holy City presses
+/** CIV6: what one following city presses per turn —
+ * RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE 1 at
+ * RELIGION_SPREAD_STRENGTH_MULTIPLIER 200 (percent), 2: the game's own reads,
+ * a following city in range pressing 2 a turn online (runs/h1_duelw1104
+ * Guangzhou 26 and Shenyang 24 exact). The Holy City presses
  * RELIGION_SPREAD_HOLY_CITY_PRESSURE_MULTIPLIER 4 of it and a city with a
- * Holy Site RELIGION_SPREAD_HOLY_SITE_PRESSURE_MULTIPLIER 2. READING: the two
- * do not stack, the larger applies; a city presses itself too, which is how
- * a Holy City keeps its faith with no neighbour of its own. */
-export const RELIGION_PRESSURE_PER_TURN = 1;
-export const HOLY_CITY_PRESSURE_MULT = 4;
-export const HOLY_SITE_PRESSURE_MULT = 2;
+ * Holy Site RELIGION_SPREAD_HOLY_SITE_PRESSURE_MULTIPLIER 2, and the two
+ * STACK (Chengdu, a Holy City with a Holy Site, 16). A city presses itself
+ * too, which is how a Holy City keeps its faith with no neighbour. */
+export const RELIGION_PRESSURE_PER_TURN = srcConst('religion.pressurePerTurn', 2, {
+  derived: 'RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE x RELIGION_SPREAD_STRENGTH_MULTIPLIER / 100',
+  inputs: [xml('GlobalParameters', 'Name=RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE', 'Value'),
+    xml('GlobalParameters', 'Name=RELIGION_SPREAD_STRENGTH_MULTIPLIER', 'Value')],
+});
+export const HOLY_CITY_PRESSURE_MULT = srcConst('religion.holyCityPressureMult', 4,
+  xml('GlobalParameters', 'Name=RELIGION_SPREAD_HOLY_CITY_PRESSURE_MULTIPLIER', 'Value'));
+export const HOLY_SITE_PRESSURE_MULT = srcConst('religion.holySitePressureMult', 2,
+  xml('GlobalParameters', 'Name=RELIGION_SPREAD_HOLY_SITE_PRESSURE_MULTIPLIER', 'Value'));
 /** CIV6 (RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP 50): every city carries this
  * much "no religion" pressure per citizen — the UNCONVERTED group's pressure,
  * one of the groups the city's citizens are shared among

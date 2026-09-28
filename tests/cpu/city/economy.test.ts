@@ -9,10 +9,8 @@ import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount, purchase
 import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
 import { PROJECTS, projectYieldLump, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
 import { goldPurchasableBuildings } from '../../../cpu/core/rules';
-import { purchaseStep } from '../../../cpu/core/effects';
-import { scaleByGameSpeed } from '../../../cpu/data/constants';
-import { TECHS } from '../../../cpu/data/techs';
-import { CIVICS } from '../../../cpu/data/civics';   // every price is floored to a multiple of five (measured)
+import { purchaseStep } from '../../../cpu/core/effects';   // every price is floored to a multiple of five (measured)
+import { gameProgressPct } from '../../../cpu/data/constants';
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
 function foundAt(state: GameState, col: number, row: number): City {
@@ -250,12 +248,12 @@ describe('district projects', () => {
     const r = queueProject(state, city.id, 'RESEARCH_GRANTS', 0);
     expect(r.ok).toBe(true);
     const cost = itemCost(city.queue[0]);
-    // CIV6 (Projects.xml): Cost 25 + COST_PROGRESSION_GAME_PROGRESS 1500 x the
-    // further tree's share, each at the speed
+    // CIV6 (Projects.xml): Cost 25 on COST_PROGRESSION_GAME_PROGRESS 1500,
+    // floor(1/2 x 25 x (1 + 14P)), P the integer percent of the further tree
     const rs = seatOf(state, 0)!.research;
-    const p = Math.max(rs.techs.length / Object.keys(TECHS).length, rs.civics.length / Object.keys(CIVICS).length);
-    expect(p).toBeGreaterThan(0);
-    expect(cost).toBe(scaleByGameSpeed(25) + Math.floor(scaleByGameSpeed(1500) * p));
+    const pct = gameProgressPct(rs.techs.length, rs.civics.length);
+    expect(pct).toBe(14); // 11 of 77 techs
+    expect(cost).toBe(Math.floor((25 * 50 * (100 + 14 * pct)) / 10000));
     expect(cost).toBe(projectCost(state, 0, 'RESEARCH_GRANTS'));
 
     city.queue[0].progress = cost; // about to finish

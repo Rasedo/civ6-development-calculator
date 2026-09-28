@@ -26,7 +26,7 @@ import { stormFamilyAt, STORM_FAMILIES, droughtTerrain } from '../data/disasters
 import { floodRivers } from '../core/disasters';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES, isFloodplains } from '../../world/features';
-import { RESOURCES } from '../../world/resources';
+import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../data/cityStates';
 import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER, MP_SCALE } from '../data/constants';
@@ -109,7 +109,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       lux: t.resource && RESOURCES[t.resource].category === 'luxury' ? LUXURY_IDS.indexOf(t.resource) : -1,
       luxreq: (() => {
         if (!t.resource || RESOURCES[t.resource].category !== 'luxury') return -9;
-        const ri = IMPROVEMENT_IDS.indexOf(RESOURCES[t.resource].improvement ?? '');
+        const ri = IMPROVEMENT_IDS.indexOf(resourceImprovement(t) ?? '');
         return ri >= 0 ? ri : -9;
       })(),
       tdef: terrainDefense(t),
@@ -239,14 +239,14 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // action head carries no BUILD verb for, which no engine can place.
       rq: (() => {
         if (!t.resource) return -1;
-        const i = IMPROVEMENT_IDS.indexOf(RESOURCES[t.resource].improvement);
+        const i = IMPROVEMENT_IDS.indexOf(resourceImprovement(t)!);
         return i >= 0 ? i : -9;
       })(),
       fa_f:
         !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
           ? // resource tiles accept only the resource's improvement, ungated,
-            RESOURCES[t.resource]?.improvement === 'FARM'
+            resourceImprovement(t) === 'FARM'
           : !isWater(t) &&
             ((t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT') ||
               isFloodplains(t.feature)))
@@ -260,7 +260,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       mi:
         !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
-          ? RESOURCES[t.resource]?.improvement === 'MINE'
+          ? resourceImprovement(t) === 'MINE'
           : !isWater(t) && t.elevation === 'HILLS' && t.feature === null)
           ? 1
           : 0,
@@ -280,7 +280,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       fa_f_c:
         !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
-          ? RESOURCES[t.resource]?.improvement === 'FARM'
+          ? resourceImprovement(t) === 'FARM'
           : !isWater(t) && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT')
           ? 1 : 0,
       fa_h_c:
@@ -290,7 +290,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       mi_c:
         !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
-          ? RESOURCES[t.resource]?.improvement === 'MINE'
+          ? resourceImprovement(t) === 'MINE'
           : !isWater(t) && t.elevation === 'HILLS')
           ? 1 : 0,
       // CIV6 (Continents): the landmass id, -1 for water. Derived at map

@@ -65,6 +65,66 @@ export function scaleByGameSpeed(n: number): number {
   return Math.floor(n * GAME_SPEED);
 }
 
+/** GAMESPEED_ONLINE's `CostMultiplier` as the install writes it, a percent —
+ *  the integer form `progressCost` computes in. */
+export const COST_MULTIPLIER_PCT = srcConst('scenario.costMultiplierPct', 50,
+  xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CostMultiplier'));
+
+/** THE GAME'S PROGRESS, the denominators: every Technologies and every Civics
+ *  row a Gathering Storm game loads, whether or not this engine carries it —
+ *  77 and 61 (the harness's price fits, runs/h1_duelw1103 / 1104). */
+export const PROGRESS_TECH_COUNT = srcConst('scenario.progressTechCount', 77, {
+  derived: 'the count of Technologies rows Base <- Expansion1 <- Expansion2 load, TECH_POTTERY through TECH_FUTURE_TECH',
+  inputs: [xml('Technologies', 'TechnologyType=TECH_POTTERY', 'Cost'), xml('Technologies', 'TechnologyType=TECH_FUTURE_TECH', 'Cost')],
+});
+export const PROGRESS_CIVIC_COUNT = srcConst('scenario.progressCivicCount', 61, {
+  derived: 'the count of Civics rows Base <- Expansion1 <- Expansion2 load, CIVIC_CODE_OF_LAWS through CIVIC_FUTURE_CIVIC',
+  inputs: [xml('Civics', 'CivicType=CIVIC_CODE_OF_LAWS', 'Cost'), xml('Civics', 'CivicType=CIVIC_FUTURE_CIVIC', 'Cost')],
+});
+
+/** THE GAME'S PROGRESS as the prices read it: the integer percent of the
+ *  further of the two trees, max(floor(100·techs/77), floor(100·civics/61)). */
+export function gameProgressPct(techs: number, civics: number): number {
+  return Math.max(Math.floor((100 * techs) / PROGRESS_TECH_COUNT), Math.floor((100 * civics) / PROGRESS_CIVIC_COUNT));
+}
+
+/** A progress-priced cost at the online speed: floor(base × CostMultiplier ×
+ *  (1 + k × pct/100)), `base` the install's Standard-speed Cost and `k` the
+ *  climb over the whole game — COST_PROGRESSION_GAME_PROGRESS's Param1 read as
+ *  Param1/100 − 1 (the Trader's 400 → 3, 30 of 30 in runs/h1_duelw1103; a
+ *  GAME_PROGRESS district's 1000 → 9), the specialty districts' 9, the
+ *  plot's 4. Integer throughout, so both engines land on the same number. */
+export function progressCost(base: number, k: number, pct: number): number {
+  return Math.floor((base * COST_MULTIPLIER_PCT * (100 + k * pct)) / 10000);
+}
+
+/** A PLOT's price at the online speed, before the seat's own rows: ½·(base +
+ *  step·(d − 2))·(1 + k·P), d the ring (2 at the least), floored to a
+ *  multiple of PURCHASE_DIVISOR. Integer throughout (`_plot_price`). */
+export function plotPrice(ring: number, pct: number): number {
+  const n = (PLOT_BUY_BASE_COST + PLOT_BUY_RING_STEP * (Math.max(2, ring) - 2)) * COST_MULTIPLIER_PCT
+    * (100 + PLOT_BUY_K * pct);
+  return Math.floor(n / (10000 * PURCHASE_DIVISOR)) * PURCHASE_DIVISOR;
+}
+
+export const PLOT_BUY_BASE_COST = srcConst('scenario.plotBuyBase', 50, gp('PLOT_BUY_BASE_COST'));
+/** the plot price's step per ring past the second, and its climb over the
+ *  game — the harness's fit (runs/h1_duelw1103: 32,432 of 32,734 prices) */
+export const PLOT_BUY_RING_STEP = srcConst('scenario.plotBuyRingStep', 25, {
+  lab: 'runs/h1_duelw1103_20260927T190654Z.jsonl and runs/h1_duelw1104_20260927T192639Z.jsonl',
+  note: 'plotBuy rows: 32,432 of 32,734 in 1103 on floor-to-5(1/2 (50 + 25(d - 2))(1 + 4P))',
+});
+export const PLOT_BUY_K = srcConst('scenario.plotBuyK', 4, {
+  lab: 'runs/h1_duelw1103_20260927T190654Z.jsonl and runs/h1_duelw1104_20260927T192639Z.jsonl',
+  note: 'the same fit as PLOT_BUY_RING_STEP',
+});
+
+/** COST_PROGRESSION_GAME_PROGRESS's `CostProgressionParam1` as the climb `k`
+ *  of `progressCost`. */
+export function gameProgressK(param: number): number {
+  return param / 100 - 1;
+}
+
 /** a `GameSpeed_Durations` ONLINE_HALF row: the online count of `standard` */
 const onlineRow = (standard: number) => xml('GameSpeed_Durations',
   `GameSpeedScalingType=ONLINE_HALF&NumberOfTurnsOnStandard=${standard}`, 'NumberOfTurnsScaled');
@@ -311,15 +371,15 @@ export const CITY_BASE_MELEE_CUT = srcConst('combat.cityBaseMeleeCut', 10, {
   note: 'the Civilopedia\'s "strongest melee unit built by your civilization, minus 10"',
 });
 
-/** THE GARRISON TERM: a land military unit of the holder on the centre adds
- *  what its Combat stands above the holder's base, scaled down as it is
- *  wounded — max(0, Combat - base) x (1 - damage / 200), nothing when it is
- *  no stronger than the base (`garrisonCS`). The Civilopedia: "the strongest
+/** THE GARRISON TERM: a military unit of the holder on the centre adds what
+ *  its Combat, less one point per this many hit points of damage, stands
+ *  above the holder's base — max(0, Combat - damage / 10 - base), nothing
+ *  when it is no stronger (`garrisonCS`). The Civilopedia: "the strongest
  *  melee unit built by your civilization, minus 10, or ... the Combat
  *  Strength of a garrisoned military unit". */
-export const GARRISON_DAMAGE_SCALE = srcConst('combat.garrisonDamageScale', 200, {
-  lab: 'runs/garrison_scale_20260926T081246Z.jsonl',
-  note: 'lab4_t150, player 1\'s capital, base 55: an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage 0, 10, 25, 50, 75, 90; a Warrior (20) and a Musketman (55) add 0 at every damage',
+export const GARRISON_HP_PER_CS = srcConst('combat.garrisonHpPerCs', 10, {
+  lab: 'runs/garrison_scale_20260926T081246Z.jsonl and runs/h1_duelw1103_20260927T190654Z.jsonl',
+  note: 'base 55: an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage 0, 10, 25, 50, 75, 90; a Warrior (20) and a Musketman (55) add 0 at every damage; in the harness Duel 1103, Rome t22-26 a wounded Warrior, a Galley 30 on 20, a Caravel 66, a Battleship 73',
 });
 /** a city-state's centre, per envoy it holds from every major together */
 export const ENVOY_CITY_CS = srcConst('combat.envoyCityCs', 1, gp('COMBAT_STRENGTH_FROM_ENVOYS'));

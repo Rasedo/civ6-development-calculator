@@ -49,7 +49,6 @@ function addCiv(
     gpEarned: [],
     buildersTrained: 0,
     bestMeleeCS: 0,
-    tilesPurchased: 0,
     projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, // opt out of belief races unless a test opts in
     ...opts,

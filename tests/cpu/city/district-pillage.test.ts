@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
+import { DISTRICTS } from '../../../cpu/data/districts';
 import { BARB_SEAT, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders, orderUnit, standBuilding, standDistrict } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
@@ -55,12 +56,13 @@ describe('district pillage', () => {
     expect(computeCityStats(state, city).total.science).toBe(totalBefore);
   });
 
-  it('keeps static counts (maintenance) while pillaged — pillaged is still owned', () => {
+  it('a pillaged district pays no upkeep; its buildings still do', () => {
+    // runs/h1_duelw1104: Xian's Campus, `maintDistricts` 0 over three pillage windows
     const { state, city, campus } = cityWithCampus();
     const maintClean = cityMaintenance(state, city);
     expect(maintClean).toBeGreaterThan(0); // Campus upkeep = 1
     campus.districtPillaged = true;
-    expect(cityMaintenance(state, city)).toBe(maintClean); // cost stays
+    expect(cityMaintenance(state, city)).toBe(maintClean - DISTRICTS.CAMPUS.maintenance);
   });
 
   it('a hostile unit standing on a completed enemy district pillages it; a builder repairs it', () => {

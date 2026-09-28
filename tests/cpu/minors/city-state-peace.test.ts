@@ -56,7 +56,6 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
     settlers: 0,
     buildersTrained: 0,
     bestMeleeCS: 0,
-    tilesPurchased: 0,
     projectsDone: [],
   } as unknown as Seat;
   state.seats.push(civ);

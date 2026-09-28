@@ -534,6 +534,7 @@ function resourceValidOnTile(tile: Tile, def: ResourceDef): boolean {
   if (!def.elevations.includes(tile.elevation)) return false;
 
   const f = tile.feature;
+  if (f && def.anyTerrainFeatures?.includes(f)) return true;
   const farmFloodplains = isFloodplains(f) && def.improvement === 'FARM';
   if (f) {
     const allowed =

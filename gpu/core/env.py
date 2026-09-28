@@ -120,9 +120,9 @@ class BatchEnv:
         s = self.sim
         d = s.dtype
         dcp = s.rules.district_cost
-        t_pct = techs.sum(dim=1).to(d) / max(s.rules_dev.t_cost.shape[0], 1)
-        c_pct = civics.sum(dim=1).to(d) / max(s.rules_dev.c_cost.shape[0], 1)
-        d_cost = torch.floor(dcp["base"] * (1 + dcp["scale"] * torch.maximum(t_pct, c_pct)))
+        # `districtCostIn` at the SPECIALTY base
+        pct = s._progress_pct_of(techs.sum(dim=1), civics.sum(dim=1))
+        d_cost = s._progress_cost(int(dcp["base"]), int(dcp["k"]), pct).to(d)
         return [d_cost / 1000.0, settler_cost / 1000.0, s._builder_cost(builders).to(d) / 1000.0]
 
     def observe(self, seat: int) -> torch.Tensor:

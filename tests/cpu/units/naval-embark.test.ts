@@ -38,7 +38,6 @@ function addCivAtWar(state: GameState, col: number, row: number, techs: string[]
     gpEarned: [],
     buildersTrained: 0,
     bestMeleeCS: 0,
-    tilesPurchased: 0,
     projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
@@ -206,7 +205,6 @@ function bareCiv(state: GameState, atWar = true): Seat {
     gpEarned: [],
     buildersTrained: 0,
     bestMeleeCS: 0,
-    tilesPurchased: 0,
     projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };

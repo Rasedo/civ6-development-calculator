@@ -15,7 +15,7 @@ import { declareWar } from './phase';
 import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
 import { envoysOf, envoysReceived, hasMet, minorCity } from './cityStates';
-import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_TIER_CS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY } from '../data/units';
 import { UNIT_TYPE_IDX } from '../data/units';
 import { IMPROVEMENTS, improvementDefenseCS, improvementIsCover } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
@@ -33,7 +33,7 @@ import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnU
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE, XP_INTERCEPT } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_DAMAGE_SCALE, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_HP_PER_CS, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -1051,22 +1051,30 @@ function holderStrength(state: GameState, seat: number): number {
 }
 
 /**
- * THE GARRISON TERM — what a land military unit of the holder standing on the
- * centre adds: max(0, its Combat - `base`) x (1 - damage / 200), measured on
- * the preview (`GARRISON_DAMAGE_SCALE`), written as one product over one
- * division so the GPU's float64 lands on the same double. With several on
- * the centre, the strongest by this term. A naval unit, an aircraft and a
+ * THE GARRISON TERM — what a military unit of the holder standing on the
+ * centre adds: max(0, its Combat - damage / 10 - `base`), measured on the
+ * preview (`GARRISON_HP_PER_CS`). A ship in the city garrisons it as a land
+ * unit does (runs/h1_duelw1103: a Galley, a Caravel, a Battleship). With
+ * several on the centre, the strongest by this term. An aircraft and a
  * passenger are no garrison.
  */
 function garrisonCS(state: GameState, city: City, base: number): number {
   let best = 0;
   for (const u of unitsAt(state, city.centerIndex)) {
-    if (u.seat !== city.seat || unitDomain(u.type) !== 'military' || UNITS[u.type]?.naval || u.embarked) continue;
-    const over = Math.max(0, (UNITS[u.type]?.combat ?? 0) - base);
-    const g = (over * (GARRISON_DAMAGE_SCALE - (UNIT_HP - u.hp))) / GARRISON_DAMAGE_SCALE;
+    if (u.seat !== city.seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
+    const g = Math.max(0, (UNITS[u.type]?.combat ?? 0) - (UNIT_HP - u.hp) / GARRISON_HP_PER_CS - base);
     if (g > best) best = g;
   }
   return best;
+}
+
+/** CIV6 (Buildings.OuterDefenseStrength): each wall building the city has
+ *  built adds its own 3, and Urban Defenses, which arrive with a tech and no
+ *  building, add none (runs/h1_duelw1104 Arpinum 75 behind a 400 perimeter). */
+export function wallsStrength(city: { buildings: string[] }): number {
+  let n = 0;
+  for (const b of city.buildings) n += BUILDINGS[b]?.wallsStrength ?? 0;
+  return n;
 }
 
 /**
@@ -1076,7 +1084,7 @@ function garrisonCS(state: GameState, city: City, base: number): number {
  * - the holder's base (`holderStrength`);
  * - `Districts.CityStrengthModifier` over the city's complete, unpillaged
  *   districts (`DistrictDef.cityStrength`);
- * - each pre-modern walls tier's "+3 Combat Strength", stacking;
+ * - each wall building's own strength (`wallsStrength`);
  * - the Palace's +3 where the city holds it (a city-state's city does);
  * - the garrison term (`garrisonCS`). The Encampment asks without it
  *   (`garrisoned` false) — CIV6: it fights "similar to the parent City
@@ -1089,7 +1097,7 @@ function garrisonCS(state: GameState, city: City, base: number): number {
  */
 export function centreStrength(state: GameState, city: City, garrisoned = true): number {
   const base = holderStrength(state, city.seat);
-  let n = base + (WALLS_TIER_CS[wallsTier(state, city)] ?? 0);
+  let n = base + wallsStrength(city);
   for (const d of city.districts) {
     const t = state.map.tiles[d.tileIndex];
     if (t.districtComplete && !t.districtPillaged) n += DISTRICTS[d.type].cityStrength;

@@ -19,7 +19,7 @@ import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
 import { clearableFeatures } from '../../world/features';
-import { LUXURY_IDS, RESOURCES } from '../../world/resources';
+import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { isCiv, seatOf, tileSeat, unitsOf } from './seats';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import {
@@ -137,7 +137,7 @@ export function preference(state: GameState, res: number, seat: number,
       for (const t of state.map.tiles) {
         if (!t.resource || tileSeat(t) !== seat) continue;
         const rdef = RESOURCES[t.resource];
-        if (rdef.category === 'luxury' && t.improvement === rdef.improvement) counts[LUXURY_IDS.indexOf(t.resource)]++;
+        if (rdef.category === 'luxury' && t.improvement === resourceImprovement(t)) counts[LUXURY_IDS.indexOf(t.resource)]++;
       }
       return { outcome: 0, target: argmaxLow(counts) };
     }

@@ -142,6 +142,12 @@ export interface UnitDef {
    *  `CostProgressionParam1`. Scaled by `GAME_SPEED` exactly as `cost` is.
    *  Absent = a flat price forever. */
   costStep?: number;
+  /** CIV6 (Units.CostProgressionParam1 on a COST_PROGRESSION_GAME_PROGRESS
+   *  row): the climb over the game (`progressCost`, `gameProgressK`). */
+  costProgressGame?: number;
+  /** the install's Standard-speed Cost of a GAME_PROGRESS row, what
+   *  `progressCost` scales; set by the catalog builder. */
+  progressBase?: number;
   /** a building the TRAINING city must already hold (the Military Engineer's
    *  Armory). Per-CITY, so it is enforced in `trainableUnits`. */
   requiresBuilding?: string;
@@ -388,6 +394,7 @@ export interface UnitDef {
 const U = (def: UnitDef): UnitDef => ({
   ...def,
   cost: scaleByGameSpeed(def.cost),
+  ...(def.costProgressGame === undefined ? {} : { progressBase: def.cost }),
   ...(def.costStep === undefined ? {} : { costStep: scaleByGameSpeed(def.costStep) }),
 });
 
@@ -896,9 +903,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         settler: xml('Units', 'UnitType=UNIT_SETTLER', 'FoundCity', { expect: true }),
       },
     }),
-    // The TRADER, sourced from the Civ 6 wiki — 40 Production (progressive:
-    // COST_PROGRESSION_GAME_PROGRESS Param1 400, so the live price is
-    // traderCost()'s base x (1 + 4 x game progress)), 0 maintenance,
+    // The TRADER — 40 Production, progressive (COST_PROGRESSION_GAME_PROGRESS
+    // Param1 400: traderCost()'s floor(20 x (1 + 3P))), 0 maintenance,
     // unlocked by FOREIGN_TRADE. APPENDED LAST (roster order is the GPU's
     // unit index). A free Trader sits at a city centre until a route verb
     // spends it; "Switch City" is instant in real Civ 6, so any own city may
@@ -908,6 +914,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'TRADER',
       name: 'Trader',
       cost: 40,
+      costProgressGame: 400,
       maintenance: 0,
       moves: 2,
       combat: 0, // civilian: captured/killed rather than fighting
@@ -917,6 +924,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       description: 'Establishes a trade route (spent on the route, returned when it completes).',
       src: {
         cost: xml('Units', 'UnitType=UNIT_TRADER', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Units', 'UnitType=UNIT_TRADER', 'CostProgressionParam1'),
         maintenance: xml('Units', 'UnitType=UNIT_TRADER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_TRADER', 'BaseMoves'),
         combat: xml('Units', 'UnitType=UNIT_TRADER', 'Combat'),
@@ -3763,12 +3771,6 @@ export const ENCAMPMENT_HP = 100;
  * table as the exported `wallsTierHp` rules field.
  */
 export const WALLS_TIER_HP = [0, 100, 200, 300, 400];
-/**
- * CIV6: each pre-modern tier is "+3 Combat Strength" and they stack (total +9
- * at Renaissance Walls); "Unlike other types of Walls, Urban Defenses doesn't
- * increase the Combat Strength of defensible districts."
- */
-export const WALLS_TIER_CS = [0, 3, 6, 9, 9];
 /** CIV6: Urban Defenses "is unlocked with Steel" and needs no production —
  * unlocking it "builds modern fortifications around the City Centers of all
  * current and future cities and their Encampment districts". */

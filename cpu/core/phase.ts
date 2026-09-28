@@ -62,7 +62,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtProgressAdd, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost, spreadReligiousPressure } from './game';
+import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -105,7 +105,7 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
@@ -394,9 +394,23 @@ function citizenPressure(state: GameState, here: Tile, cities: City[]): number {
   return sub;
 }
 
-/** The own-against-foreign pressure term, `LOYALTY_PRESSURE_SCALE` wide. */
-function pressureTerm(own: number, foreign: number): number {
-  return own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
+/** The own-against-foreign pressure term. CIV6
+ *  (LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_*): the stronger side over
+ *  the weaker is a ratio r, and the term is NEUTRAL_LOYALTY + (MAX_LOYALTY −
+ *  NEUTRAL_LOYALTY)·(r − NEUTRAL_RATIO) / (MAX_RATIO − NEUTRAL_RATIO), at most
+ *  MAX_LOYALTY, positive when the city's own side presses harder — 10·(own −
+ *  foreign) / min(own, foreign) clamped at ±20 (runs/h1_duelw1104, median
+ *  error 0.06 over 324 rows). A side with no pressure at all against one with
+ *  some is the full MAX_LOYALTY; nobody pressing is 0. `_pressure_term` is the
+ *  GPU twin. */
+export function pressureTerm(own: number, foreign: number): number {
+  const hi = Math.max(own, foreign);
+  const lo = Math.min(own, foreign);
+  if (hi <= 0 || own === foreign) return 0;
+  const mag = lo <= 0 ? LOYALTY_PRESS_MAX_LOYALTY : Math.min(LOYALTY_PRESS_MAX_LOYALTY,
+    LOYALTY_PRESS_NEUTRAL_LOYALTY + ((LOYALTY_PRESS_MAX_LOYALTY - LOYALTY_PRESS_NEUTRAL_LOYALTY)
+      * (hi / lo - LOYALTY_PRESS_NEUTRAL_RATIO)) / (LOYALTY_PRESS_MAX_RATIO - LOYALTY_PRESS_NEUTRAL_RATIO));
+  return own > foreign ? mag : -mag;
 }
 
 export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {
@@ -923,9 +937,8 @@ export function districtSiteCost(
       ? Math.floor(base * districtDiscountMult(id))
       : base;
   const varied = districtVariantCost(state, actor.seat, id, cost0);
-  const add = districtProgressAdd(actor.research, id);
-  logDistrictCost(state.turn, actor.seat, id, base, cost0, varied, add);
-  return varied + add;
+  logDistrictCost(state.turn, actor.seat, id, base, cost0, varied);
+  return varied;
 }
 
 /** The GROUND a district or a wonder takes when it is placed, for every seat.

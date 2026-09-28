@@ -6,12 +6,11 @@ import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { seatPhase, levyGoldCost, levyUnits, loyaltyDelta, applyLoyalty, flipCity } from '../../../cpu/core/phase';
+import { seatPhase, levyGoldCost, levyUnits, loyaltyDelta, applyLoyalty, flipCity, pressureTerm } from '../../../cpu/core/phase';
 import { barbarianPhase, meleeAttack, attackTargets } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
 import { CITY_STATE_MAX_HP } from '../../../cpu/data/cityStates';
 import { declareWarOnCityState } from '../../../cpu/core/cityStates';
-import { LOYALTY_PRESSURE_SCALE } from '../../../cpu/data/seats';
 import type { CityState, CityStateType, GameState, City, Seat } from '../../../cpu/core/types';
 
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
@@ -40,7 +39,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     gpEarned: [],
     buildersTrained: 0,
     bestMeleeCS: 0,
-    tilesPurchased: 0,
     projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     ...opts,
@@ -268,7 +266,7 @@ describe('loyalty', () => {
     const pt = (ownEach: number, foreignEach: number): number => {
       const own = border.population * ownEach * 10;
       const foreign = rival.population * foreignEach * 6;
-      return (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
+      return pressureTerm(own, foreign);
     };
     const rest = loyaltyDelta(state, border, 'Content') - pt(1, 1);
     const off = (ownEach: number, foreignEach: number): number =>

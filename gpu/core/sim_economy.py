@@ -22,7 +22,9 @@ class SimEconomy:
         if self._n_lux == 0:
             return out
         alive = self.city_alive[:, row, :cols]
-        improved = (self.lux_id >= 0) & (self.tile_seat == int(self._ROW_SEAT[row])) & (self.improvement == self.lux_req)
+        # a PILLAGED improvement gives no copy (`luxuryAmenities`)
+        improved = ((self.lux_id >= 0) & (self.tile_seat == int(self._ROW_SEAT[row]))
+                    & (self.improvement == self.lux_req) & ~self.pillaged)
         counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
         counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
         own_copies = counts.clone()  # the seat's OWN improved copies, pre-Affluence
@@ -461,13 +463,36 @@ class SimEconomy:
         return r.builder_base + r.builder_per * n.to(self.dtype)
 
     def _trader_cost(self, row: int) -> torch.Tensor:
-        """traderCost: the roster base x (1 + prog x floor(100 x the furthest
-        tree fraction) / 100) — COST_PROGRESSION_GAME_PROGRESS, Param1 400."""
-        rdv = self.rules_dev
-        t_pct = self._seat_techs(row).sum(dim=1).double() / float(rdv.t_cost.shape[0])
-        c_pct = self._seat_civics(row).sum(dim=1).double() / float(rdv.c_cost.shape[0])
-        p = torch.floor(100.0 * torch.maximum(t_pct, c_pct)) / 100.0
-        return js_round(self._type_cost[self._trader_idx].double() * (1 + self._trader_cost_prog * p))
+        """`traderCost` — [B] long: floor(½·40·(1 + 3P)), COST_PROGRESSION_GAME_PROGRESS
+        Param1 400 through `_progress_cost`."""
+        base, k = self._trader_progress
+        return self._progress_cost(base, k, self._progress_pct(row))
+
+    def _progress_pct_of(self, techs_n: torch.Tensor, civics_n: torch.Tensor) -> torch.Tensor:
+        """`gameProgressPct` — [B] long: max(floor(100·techs/77),
+        floor(100·civics/61)), integer throughout."""
+        pr = self.rules.progress
+        t = torch.div(100 * techs_n.long(), int(pr["techCount"]), rounding_mode="floor")
+        c = torch.div(100 * civics_n.long(), int(pr["civicCount"]), rounding_mode="floor")
+        return torch.maximum(t, c)
+
+    def _progress_pct(self, row: int) -> torch.Tensor:
+        """[B] long — the game's progress for ANY seat row (`researchProgressPct`)."""
+        return self._progress_pct_of(self._seat_techs(row).sum(dim=1), self._seat_civics(row).sum(dim=1))
+
+    def _progress_cost(self, base, k, pct: torch.Tensor) -> torch.Tensor:
+        """`progressCost` — [B] long: floor(base × CostMultiplier% × (100 + k·pct)
+        / 10000), integer throughout. `base`/`k` a number or a [B] tensor."""
+        sp = int(self.rules.progress["speedPct"])
+        return torch.div(base * sp * (100 + k * pct.long()), 10000, rounding_mode="floor")
+
+    def _plot_price(self, ring: torch.Tensor, pct: torch.Tensor) -> torch.Tensor:
+        """`plotPrice` — [B] long: ½·(base + step·(d − 2))·(1 + k·P), floored
+        to a multiple of the divisor, integer throughout."""
+        b0, step, k, div = self.rules.plot_price
+        sp = int(self.rules.progress["speedPct"])
+        n = (b0 + step * (ring.long().clamp(min=2) - 2)) * sp * (100 + k * pct.long())
+        return torch.div(n, 10000 * div, rounding_mode="floor") * div
 
     def _seat_settlers(self, row: int) -> torch.Tensor:
         """[B] seat row `row`'s LIVE settler units — what the settlerCost
@@ -4702,7 +4727,7 @@ class SimEconomy:
         # the source's step: the Holy City x4 — CIV6 (Jerusalem's suzerain):
         # "Your cities with Holy Sites exert pressure as if they were Holy
         # Cities", so the founder's own Holy-Site cities take that step too —
-        # a Holy Site city x2, any other x1. The two do not stack.
+        # a Holy Site city x2, the two multiplied together.
         holy = emits & (s_cen == self.holy_tile.gather(1, s_fol.clamp(min=0)))
         site = torch.zeros(B, RC, dtype=torch.bool, device=self.device)
         if self._hs_idx >= 0:
@@ -4712,7 +4737,8 @@ class SimEconomy:
             # a suzerain effect is a MAJOR's; the free row claims none
             if self._suz_c_holy >= 0 and src < M:
                 holy = holy | (site & (s_fol == src) & self._suz_effect(src, self._suz_c_holy).unsqueeze(1))
-        step = torch.where(holy, self._holy_city_mult, torch.where(site, self._holy_site_mult, 1)) * self._pressure_per_turn
+        step = (torch.where(holy, self._holy_city_mult, 1) * torch.where(site, self._holy_site_mult, 1)
+                * self._pressure_per_turn)
         # CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
         # stronger from this city" — the SOURCE city's own governor, a major's.
         if self.n_governors and src < M:

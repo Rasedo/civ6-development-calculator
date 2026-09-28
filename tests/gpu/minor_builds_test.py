@@ -339,7 +339,7 @@ def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
     # start melee, its best melee) - 10, the walls, the Palace, the
     # Encampment's own district term and the envoys the minor holds
     want = (max(int(sim._city_start_melee_minor), int(sim.citystate_best_melee[B0, s]))
-            - int(sim._city_base_melee_cut) + int(sim._walls_tier_cs[tier])
+            - int(sim._city_base_melee_cut) + int((sim.city_bldg[B0, row, 0].long() * sim._b_walls_cs).sum())
             + int(sim._palace_city_cs) + int(sim._d_city_str[dv])
             + int(sim._minor_envoys_received()[B0, s]) * int(sim._envoy_city_cs))
     assert tier >= 1, "the walls did not reach the tier read"
@@ -418,14 +418,14 @@ def test_the_walled_minor_strikes(rules, path) -> None:
     sim._city_strikes(row, col0, alive)
     assert int(sim.unit_hp[B0, slot]) < hp0, "the walled minor held fire at a unit at war with it"
 
-    tier = int(sim._minor_walls_tier(s)[B0])
     g = int(sim.military_at[B0, ctr])
     gar = g >= 0 and int(sim.unit_seat[B0, g]) == 100 + s
     base = max(int(sim._city_start_melee_minor), int(sim.citystate_best_melee[B0, s])) - int(sim._city_base_melee_cut)
-    # the garrison term: max(0, Combat - base) x (1 - damage / 200)
-    gcs = (max(0, int(sim._type_combat[int(sim.unit_type[B0, g])]) - base)
-           * (200 - (100 - int(sim.unit_hp[B0, g]))) / 200) if gar else 0.0
-    want = (base + int(sim._walls_tier_cs[tier]) + int(sim._palace_city_cs) + gcs
+    # the garrison term: max(0, Combat - damage / 10 - base)
+    gcs = max(0.0, int(sim._type_combat[int(sim.unit_type[B0, g])]) - (100 - int(sim.unit_hp[B0, g])) / 10
+              - base) if gar else 0.0
+    walls = int((sim.city_bldg[B0, row, 0].long() * sim._b_walls_cs).sum())
+    want = (base + walls + int(sim._palace_city_cs) + gcs
             + int(sim._minor_envoys_received()[B0, s]) * int(sim._envoy_city_cs))
     got = float(sim._centre_strength(torch.full((sim.B,), row, dtype=torch.long), col0)[B0])
     assert got == want, f"the strike leaves from {got}, the centre says {want}"
@@ -610,11 +610,9 @@ def test_the_project_row(rules, path) -> None:
     sim.city_dist_tile[B0, row, 0, sim._campus_idx] = t
     sim._eff_version += 1
     prow = sim._proj_rows[grants]
-    rd = sim.rules_dev
-    tp = float(sim.citystate_techs[B0, s].sum()) / float(rd.t_cost.shape[0])
-    cp = float(sim.citystate_civics[B0, s].sum()) / float(rd.c_cost.shape[0])
     import math
-    cost = float(max(int(prow["pc"]), 0)) + math.floor(float(prow["pcg"]) * max(tp, cp))
+    pct = int(sim._progress_pct_of(sim.citystate_techs[:, s].sum(dim=1), sim.citystate_civics[:, s].sum(dim=1))[B0])
+    cost = float((int(prow["pgb"]) * 50 * (100 + int(prow["pk"]) * pct)) // 10000)
     sim.citystate_prod[B0, s] = cost
     sci0 = float(sim.citystate_tech_prog[B0, s])
     sim._minor_build(s)

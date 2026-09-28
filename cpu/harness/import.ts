@@ -314,10 +314,9 @@ function leaderRow(leader: string): number {
  * WHAT ONE TURN'S STATE DOES NOT SAY, read off the records before it: the
  * strongest melee unit each player has trained or bought (a city centre's
  * base, `Seat.bestMeleeCS`), how many plots each city has taken with culture
- * (`City.tilesAcquired`, what a border expansion costs) and how many plots
- * each player has bought (`Seat.tilesPurchased`, what the next one costs).
- * All three are reconstructed from diffs — a unit id new at t+1, a culture
- * box that fell, a plot gained past it — so a game recorded from its first
+ * (`City.tilesAcquired`, what a border expansion costs) and the Builders
+ * each player has gained. All three are reconstructed from diffs — a unit id
+ * new at t+1, a culture box that fell — so a game recorded from its first
  * turn carries them; a city first
  * seen after its founding turn is `unknownSince`, and a check reading its
  * count is skipped.
@@ -328,8 +327,6 @@ export interface History {
   bestMelee: Map<number, number>;
   /** culture expansions by the city's centre plot (a capture keeps them) */
   cultureTaken: Map<number, number>;
-  /** plots each player has bought: a city's gained plots past its culture one */
-  plotsBought: Map<number, number>;
   /** Builders each player has gained: a Builder id new at t+1 */
   builders: Map<number, number>;
   /** centre plots of cities already standing at the first record past turn 1 */
@@ -341,7 +338,7 @@ export interface History {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), plotsBought: new Map(), builders: new Map(),
+  return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(),
     unknownSince: new Set(), fireFood: new Map(), fireProd: new Map() };
 }
 
@@ -370,14 +367,9 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     for (const c of rec.cities) {
       const b = before.get(c.y * W + c.x);
       if (!b || b.owner !== c.owner) continue;
-      // the box fell: culture paid for a plot; every other plot the city
-      // gained this turn was bought
+      // the box fell: culture paid for a plot
       const k = c.y * W + c.x;
-      const took = num(c.culture) < num(b.culture) - 0.01 ? 1 : 0;
-      if (took) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
-      const had = new Set(b.plots);
-      const gained = c.plots.filter((q) => !had.has(q)).length;
-      if (gained > took) h.plotsBought.set(c.owner, (h.plotsBought.get(c.owner) ?? 0) + gained - took);
+      if (num(c.culture) < num(b.culture) - 0.01) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
     }
     const fname = (i: number) => cat.features[plotAt(rec, i)[P.feature] as number] ?? '';
     const fwas = (i: number) => cat.features[plotAt(h.last!, i)[P.feature] as number] ?? '';
@@ -495,7 +487,6 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     importPlayer(ctx, p, s);
     ctx.scopeSeat = undefined;
     s.bestMeleeCS = history?.bestMelee.get(p.id) ?? 0;
-    s.tilesPurchased = history?.plotsBought.get(p.id) ?? 0;
     s.buildersTrained = history?.builders.get(p.id) ?? 0;
   }
   for (const p of players) {

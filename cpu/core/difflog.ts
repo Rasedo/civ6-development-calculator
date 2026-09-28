@@ -62,10 +62,10 @@ function push(line: string): void {
  *  unrelated lines that never pair. */
 export function logDistrictCost(
   turn: number, seat: number, id: DistrictId,
-  base: number, disc: number, varied: number, add: number,
+  base: number, disc: number, varied: number,
 ): void {
   push(`dc:${seat}:${turn}:${id}`
-    + ` b${base} d${disc} v${varied} g${add} t${varied + add}`);
+    + ` b${base} d${disc} v${varied} t${varied}`);
 }
 
 /** WHICH writer last moved a seat's STRATEGIC bank, and to what — keyed on

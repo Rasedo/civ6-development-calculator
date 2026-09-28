@@ -53,7 +53,7 @@ import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
 import {
   scaleByGameSpeed, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
   MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP, TRADE_ROAD_MAX_STEPS,
-  STRATEGIC_IDS, emptyStockpile,
+  STRATEGIC_IDS, emptyStockpile, progressCost, gameProgressK, gameProgressPct,
 } from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -1097,18 +1097,14 @@ export function builderCost(state: GameState, seat: number): number {
 }
 
 /**
- * The TRADER's live price. CIV6: the Trader's production cost is progressive
- * with GAME PROGRESS (COST_PROGRESSION_GAME_PROGRESS, Param1 400): the base
- * cost x (1 + 4 x p), p = floor(100 x the furthest tree fraction this seat
- * has finished, techs or civics) / 100.
+ * The TRADER's live price. CIV6 (COST_PROGRESSION_GAME_PROGRESS, Param1 400):
+ * floor(½·40·(1 + 3P)), P the game's progress (`progressCost`; runs/h1_duelw1103
+ * 30 of 30).
  */
 export function traderCost(state: GameState, seat: number): number {
   const r = seatOf(state, seat)!.research;
-  const p =
-    Math.floor(
-      100 * Math.max(r.techs.length / Object.keys(TECHS).length, r.civics.length / Object.keys(CIVICS).length),
-    ) / 100;
-  return Math.round(UNITS.TRADER.cost * (1 + 4 * p));
+  const t = UNITS.TRADER;
+  return progressCost(t.progressBase!, gameProgressK(t.costProgressGame!), gameProgressPct(r.techs.length, r.civics.length));
 }
 
 /**

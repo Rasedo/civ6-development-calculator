@@ -144,7 +144,7 @@ export function emptySeat(seat: number): Seat {
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     grantedTitles: 0,
     gpp: {}, gpEarned: [],
-    buildersTrained: 0, relicReserve: 0, bestMeleeCS: 0, tilesPurchased: 0,
+    buildersTrained: 0, relicReserve: 0, bestMeleeCS: 0,
     projectsDone: [], spaceLy: -1, orbitalLasers: 0, stockpile: emptyStockpile(), camps: [], explored: [],
   };
 }

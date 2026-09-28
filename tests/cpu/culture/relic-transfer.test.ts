@@ -46,7 +46,6 @@ function addCiv(state: GameState, col: number, row: number, name: string): Seat 
     settlers: 0,
     buildersTrained: 0,
     bestMeleeCS: 0,
-    tilesPurchased: 0,
     projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   } as Seat;

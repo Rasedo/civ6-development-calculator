@@ -14,7 +14,7 @@ import { centreStrength } from '../../../cpu/core/combat';
 import { minorPhase } from '../../../cpu/core/minorBuild';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { cityStrikes } from '../../../cpu/core/phase';
-import { WALLS_TIER_CS } from '../../../cpu/data/units';
+import { BUILDINGS } from '../../../cpu/data/buildings';
 import { PALACE_CITY_CS } from '../../../cpu/data/constants';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, GameState } from '../../../cpu/core/types';
@@ -45,7 +45,7 @@ describe("a city-state's ranged strike", () => {
     cityStrikes(state, minorCity(cs), centreStrength(state, minorCity(cs)));
     expect(near.hp).toBeLessThan(hp0);
     // the 15 floor (no melee fielded) + the Ancient Walls' tier + the Palace
-    expect(centreStrength(state, minorCity(cs))).toBe(15 + (WALLS_TIER_CS[1] ?? 0) + PALACE_CITY_CS);
+    expect(centreStrength(state, minorCity(cs))).toBe(15 + BUILDINGS.ANCIENT_WALLS.wallsStrength! + PALACE_CITY_CS);
   });
 
   it('holds fire at peace, and without walls', () => {

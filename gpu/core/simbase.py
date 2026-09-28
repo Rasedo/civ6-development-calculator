@@ -153,6 +153,8 @@ class Rules:
     amenity_pop_per: int  # CITY_POP_PER_AMENITY — the need is ceil(pop / this)
     city_growth: tuple  # (CITY_GROWTH_THRESHOLD, _MULTIPLIER, _EXPONENT) — `_growth_needed`
     culture_cost: tuple  # (CULTURE_COST_FIRST_PLOT, _LATER_PLOT_MULTIPLIER, _LATER_PLOT_EXPONENT) — `_border_cost`
+    progress: dict  # {techCount, civicCount, speedPct} — `_progress_pct` / `_progress_cost`
+    plot_price: tuple  # (base, ring step, climb, divisor) — `_plot_price`
     # the install's `CivilizationLevels` table, one dict per class of player in
     # the exporter's order (TRIBE, CITY_STATE, FULL_CIV, FREE_CITIES). Ten
     # PERMISSIONS, not behaviours: a rule that forks on a class asks this row.
@@ -189,7 +191,7 @@ class Rules:
     seats: dict  # seat pacing, loyalty, GP costs, belief-pool sizes (cpu/data/seats.ts)
     beliefs: dict  # dense pantheon/follower/founder effect tables (data-file key order = claim-draw order)
     projects: dict  # {rows: [{d, y, yp, fp, g, ...}], gppFraction} in data order
-    wonders: dict  # {rows: [{cost, ut, uc, cy, growAll, petra, mult, adjD, adjR}], fpFid} in data order
+    wonders: dict  # {rows: [{cost, ut, uc, cy, growAll, petra, mult, adjD, adjR}], fpFeat} in data order
     improvements: dict  # FARM food/housing, builder roster idx, hillFarms civic
     districts: list  # catalog [{id, idx, cost, adjYield, adjacency, housing, ...}]
     governments: list  # [{id, tier, unlockCivic, slots:[m,e,d,w], cityYields[6], capitalYields[6]}] table order
@@ -279,6 +281,7 @@ class Rules:
     b_train_xp_pct: torch.Tensor  # long [NB] — the PERCENTAGE experience modifier this building grants a unit trained here; the Encampment and Harbor lines stack
     b_train_xp_cls: torch.Tensor  # bool [NB, NPC] — which promotion classes `b_train_xp_pct` reaches
     b_walls: torch.Tensor  # long [NB] — the WALLS TIER this row supplies (0 = not a walls row)
+    b_walls_cs: torch.Tensor  # long [NB] — the row's OuterDefenseStrength (`wallsStrength`)
     b_no_purchase: torch.Tensor  # bool [NB] — refuses a gold purchase (the upgraded walls)
     b_faith_units: torch.Tensor  # bool [NB] — grants the seat the faith LAND-UNIT purchase (Grand Master's Chapel)
     b_pill_faith_imp: torch.Tensor  # long [NB] — the Chapel's flat faith per pillaged improvement
@@ -380,6 +383,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         amenity_pop_per=int(r["amenityPopPer"]),
         city_growth=tuple(float(x) for x in r["cityGrowth"]),
         culture_cost=tuple(float(x) for x in r["cultureCost"]),
+        progress=r["progress"],
+        plot_price=tuple(int(x) for x in r["plotPrice"]),
         civ_levels=r["civLevels"],
         center_min_food=r["centerMinFood"],
         pillage_building_repair_pct=r["pillageBuildingRepairPct"],
@@ -505,6 +510,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_train_xp_pct=torch.tensor([int(b["trainXpPct"]) for b in B], dtype=torch.long),
         b_train_xp_cls=_class_mask([b["trainXpClasses"] for b in B], len(_P["classes"])),
         b_walls=torch.tensor([int(b["walls"]) for b in B], dtype=torch.long),
+        b_walls_cs=torch.tensor([int(b["wallsCs"]) for b in B], dtype=torch.long),
         b_no_purchase=torch.tensor([bool(b["noPurchase"]) for b in B], dtype=torch.bool),
         b_faith_units=torch.tensor([bool(b["faithBuyUnits"]) for b in B], dtype=torch.bool),
         b_pill_faith_imp=torch.tensor([int(b["pillageFaithImp"]) for b in B], dtype=torch.long),
@@ -891,7 +897,7 @@ _MUTABLE = [
     "unit_escorted", "military_at", "civilian_at", "support_at", "embarked_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_beliefs_earned", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",
-    "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",
+    "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
     "citystate_treasury", "citystate_faith",

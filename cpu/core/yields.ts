@@ -7,7 +7,7 @@ import { isWater, isMountain, hasRiver, naturalWonderAt, ringFeature, ringTerrai
 import { getModifiers, type YieldCtx, type Modifiers } from './effects';
 import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
-import { RESOURCES } from '../../world/resources';
+import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS } from '../data/improvements';
 import { droughtShielded } from '../data/disasters';
 import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
@@ -575,7 +575,7 @@ export function cityImprovedResourceKinds(
   for (const t of state.map.tiles) {
     if (!t.resource || t.pillaged || hidden.has(t.resource) || !tileBelongsTo(t, city)) continue;
     const def = RESOURCES[t.resource];
-    if (def?.category === category && t.improvement === def.improvement) out.add(t.resource);
+    if (def?.category === category && t.improvement === resourceImprovement(t)) out.add(t.resource);
   }
   return out;
 }

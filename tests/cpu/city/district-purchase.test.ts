@@ -20,7 +20,7 @@ import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../
 import { seatOf } from '../../../cpu/core/seats';
 import { governorsOf } from '../../../cpu/core/governors';
 import { purchaseSeatDistrict, districtSiteCost } from '../../../cpu/core/phase';
-import { computeUnlocks } from '../../../cpu/core/effects';
+import { computeUnlocks, purchaseStep } from '../../../cpu/core/effects';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../../../cpu/data/constants';
 import type { City, GameState, Seat } from '../../../cpu/core/types';
 
@@ -82,7 +82,7 @@ describe('the price is the builder’s cost through the purchase multiplier', ()
     const queued = city.queue.length;
     const bank = city.productionBank ?? 0;
     expect(purchaseSeatDistrict(state, seat, site, 'CAMPUS', false)).toBe(true);
-    expect(100000 - (seat.treasury ?? 0)).toBe(Math.round(cost * GOLD_PURCHASE_MULT));
+    expect(100000 - (seat.treasury ?? 0)).toBe(purchaseStep(cost * GOLD_PURCHASE_MULT));
     expect(state.map.tiles[site].district).toBe('CAMPUS');
     expect(state.map.tiles[site].districtComplete).toBe(true);
     expect(city.districts.some((d) => d.type === 'CAMPUS' && d.tileIndex === site)).toBe(true);
@@ -98,7 +98,7 @@ describe('the price is the builder’s cost through the purchase multiplier', ()
     seat.faith = 100000;
     seat.treasury = 7;
     expect(purchaseSeatDistrict(state, seat, site, 'CAMPUS', true)).toBe(true);
-    expect(100000 - (seat.faith ?? 0)).toBe(Math.round(cost * FAITH_PURCHASE_MULT));
+    expect(100000 - (seat.faith ?? 0)).toBe(purchaseStep(cost * FAITH_PURCHASE_MULT));
     expect(seat.treasury).toBe(7);           // the other purse is not touched
     expect(state.map.tiles[site].districtComplete).toBe(true);
   });

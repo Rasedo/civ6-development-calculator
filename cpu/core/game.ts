@@ -46,7 +46,7 @@ import { CIVICS } from '../data/civics';
 import { nextRandom } from './rand';
 import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
-import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed } from '../data/constants';
+import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
@@ -76,18 +76,25 @@ export function effectiveResearchCost(state: GameState, seat: number, id: string
  *  observation renders where no district is named. */
 export const DISTRICT_SPECIALTY_COST = 54;
 
+/** The climb a NUM_UNDER_AVG_PLUS_TECH district's price makes over the game:
+ *  ×(1 + 9P) (runs/h1_duelw1103: the Holy Site 92 and its kin). */
+export const DISTRICT_TECH_K = 9;
+
+/** The game's progress for one research state (`gameProgressPct`). */
+export function researchProgressPct(research: ResearchState): number {
+  return gameProgressPct(research.techs.length, research.civics.length);
+}
+
 /**
- * The real Civ 6 curve — floor(base·(1 + 9·max(tech%, civic%))), the tree you
- * are FURTHER through driving the price rather than the average. `base` is
- * REQUIRED: the install gives each row its own (`Districts.Cost` — Aqueduct
- * 36, Canal and Dam 81, Government Plaza and Diplomatic Quarter 30,
- * Neighborhood 54). It speed-scales like every other production cost, and
+ * A district's price before its discount: floor(½·base·(1 + k·P)), the tree
+ * you are FURTHER through driving it. `base` is the install's `Districts.Cost`
+ * (Aqueduct 36, Canal and Dam 81, Government Plaza and Diplomatic Quarter 30,
+ * Neighborhood 54), `k` the row's own climb — 9 on the specialty model, the
+ * GAME_PROGRESS rows' Param1/100 − 1 (`progressCost`).
  * `districtDiscounted` carries the under-represented discount on top.
  */
-export function districtCostIn(research: ResearchState, base: number): number {
-  const tPct = research.techs.length / Object.keys(TECHS).length;
-  const cPct = research.civics.length / Object.keys(CIVICS).length;
-  return Math.floor(scaleByGameSpeed(base) * (1 + 9 * Math.max(tPct, cPct)));
+export function districtCostIn(research: ResearchState, base: number, k = DISTRICT_TECH_K): number {
+  return progressCost(base, k, researchProgressPct(research));
 }
 
 /** CIV6 (`Districts.CostProgressionParam1`): what the under-represented
@@ -126,27 +133,19 @@ export function districtDiscounted(
   return D >= U && n < Math.ceil(D / U);
 }
 
-/** CIV6 (`Districts.CostProgressionModel`): a district's base against its
- *  OWN model. The NUM_UNDER_AVG_PLUS_TECH rows take the research curve; the
- *  GAME_PROGRESS rows take none here, because their climb is a flat ADD made
- *  after the discount and the variant ratio (`districtProgressAdd`). */
+/** The climb of a district row's price model: `DISTRICT_TECH_K` on the
+ *  NUM_UNDER_AVG_PLUS_TECH rows, Param1/100 − 1 on the GAME_PROGRESS ones. */
+export function districtK(type?: DistrictId): number {
+  const p = type === undefined ? undefined : DISTRICTS[type]?.costProgressGame;
+  return p === undefined ? DISTRICT_TECH_K : gameProgressK(p);
+}
+
+/** CIV6 (`Districts.CostProgressionModel`): a district's price before its
+ *  discount, against its OWN model (`districtCostIn`). */
 export function districtScaledBase(research: ResearchState, type?: DistrictId): number {
   const base = type !== undefined
     ? (DISTRICTS[type]?.cost ?? DISTRICT_SPECIALTY_COST) : DISTRICT_SPECIALTY_COST;
-  return type !== undefined && DISTRICTS[type]?.costProgressGame !== undefined
-    ? scaleByGameSpeed(base)
-    : districtCostIn(research, base);
-}
-
-/** The GAME_PROGRESS climb, added LAST. A civVariant carries its own base and
- *  the same parameter, so a Bath is `18 + term` rather than half of
- *  `36 + term`; folding the term into the base would halve it too. */
-export function districtProgressAdd(research: ResearchState, type?: DistrictId): number {
-  const p = type === undefined ? undefined : DISTRICTS[type]?.costProgressGame;
-  if (p === undefined) return 0;
-  const tPct = research.techs.length / Object.keys(TECHS).length;
-  const cPct = research.civics.length / Object.keys(CIVICS).length;
-  return Math.floor(scaleByGameSpeed(p) * Math.max(tPct, cPct));
+  return districtCostIn(research, base, districtK(type));
 }
 
 export function districtCost(state: GameState, seat: number, type?: DistrictId): number {
@@ -156,8 +155,7 @@ export function districtCost(state: GameState, seat: number, type?: DistrictId):
   const base = districtScaledBase(research, type);
   const cost = type !== undefined && districtDiscounted(state, seat, type)
     ? Math.floor(base * districtDiscountMult(type)) : base;
-  return (type !== undefined ? districtVariantCost(state, seat, type, cost) : cost)
-    + districtProgressAdd(research, type);
+  return type !== undefined ? districtVariantCost(state, seat, type, cost) : cost;
 }
 
 /** CIV6 (Bath): a civilization's unique district is "cheaper to build" —
@@ -402,26 +400,20 @@ export function dominationWinner(state: GameState): number {
 }
 
 /** A project's price: its own `Projects.Cost` row (already speed-scaled in
- *  the table), plus the GAME_PROGRESS climb where the row carries one — the
- *  six district projects, the Cothon's capital move. The repair alone is
- *  priced by the HP it restores. */
+ *  the table), or, where the row carries COST_PROGRESSION_GAME_PROGRESS — the
+ *  district projects, the Cothon's capital move — `progressCost` over its
+ *  install Cost and Param1. The repair alone is priced by the HP it
+ *  restores. */
 export function projectCost(state: GameState, seat: number, projectId: string, city?: City): number {
   const def = PROJECTS[projectId];
   // CIV6: "Walls gain HP equal to the Production invested into the project" —
   // so the whole repair costs exactly the perimeter HP it puts back.
   if (def?.repair && city) return Math.max(1, wallsMax(state, city) - outerPool(state, city) + encampOuterMissing(state, city));
-  const fixed = def?.cost ?? 0;
-  // CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS): the price climbs with the game's
-  // own progress, which this engine reads exactly where `districtCostIn`
-  // reads it — the larger of the tech and civic shares researched.
-  if (def?.costProgressGame !== undefined) {
+  if (def?.costProgressGame !== undefined && def.progressBase !== undefined) {
     const r = seatOf(state, seat)?.research;
-    const pct = r
-      ? Math.max(r.techs.length / Object.keys(TECHS).length, r.civics.length / Object.keys(CIVICS).length)
-      : 0;
-    return fixed + Math.floor(scaleByGameSpeed(def.costProgressGame) * pct);
+    return progressCost(def.progressBase, gameProgressK(def.costProgressGame), r ? researchProgressPct(r) : 0);
   }
-  return fixed;
+  return def?.cost ?? 0;
 }
 
 /** CIV6: the repair "becomes available after building Walls. A city can
@@ -1308,23 +1300,21 @@ export function isEncampHarborItem(item: QueueItem): boolean {
   return d === 'ENCAMPMENT' || d === 'HARBOR';
 }
 
-/** Gold price of a tile. Real Civ 6: ring-based base (50 for ring
- * ≤2, 75 for ring 3, +25/ring beyond as a scope extension), speed-scaled,
- * × (1 + 4·research progress), +5 (scaled) per tile EVER purchased
- * empire-wide — fully decoupled from the culture-growth counter. Without a
- * target tile (UI headline price) the ring-2 base is shown. The install
- * publishes no speed rule for a plot's price; this engine scales it as a
- * cost (`scaleByGameSpeed`). */
+/** Gold price of a tile. CIV6: ½·(50 + 25(d − 2))·(1 + 4P), d the plot's
+ * ring (2 at the least), P the game's progress, floored to a multiple of
+ * PURCHASE_DIVISOR — no step per plot bought — and the seat's policy and
+ * terrain rows taken after that floor (runs/h1_duelw1103: 32,432 of 32,734
+ * plot prices). Without a target tile (UI headline price) the ring-2 price
+ * is shown. */
 export function tilePurchaseCost(
   state: GameState,
   city: City | City,
   tileIndex?: number,
-  owner?: { research: ResearchState; tilesPurchased?: number; mods: Modifiers },
+  owner?: { research: ResearchState; mods: Modifiers },
 ): number {
   const os = seatOf(state, city.seat);
   const src = owner ?? {
     research: os!.research,
-    tilesPurchased: os?.tilesPurchased,
     mods: getModifiers(state, city.seat),
   };
   const center = state.map.tiles[city.centerIndex];
@@ -1336,13 +1326,8 @@ export function tilePurchaseCost(
     ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
     for (const r of src.mods.tileCost) if (r.terrain === t.terrain) terrainPct += r.pct;
   }
-  const tPct = src.research.techs.length / Object.keys(TECHS).length;
-  const cPct = src.research.civics.length / Object.keys(CIVICS).length;
-  const base = scaleByGameSpeed(50 + 25 * (ring - 2));
-  const step = scaleByGameSpeed(5);
-  return Math.round(
-    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (src.tilesPurchased ?? 0)) * src.mods.tilePurchaseMult * (1 + terrainPct / 100),
-  );
+  const price = plotPrice(ring, researchProgressPct(src.research));
+  return Math.round(price * src.mods.tilePurchaseMult * (1 + terrainPct / 100));
 }
 
 export function buyTile(state: GameState, cityId: number, tileIndex: number, seat: number): RuleResult {
@@ -1362,7 +1347,6 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   // count the culture cost climbs on: the game's `GetCultureCost` counts the
   // plots taken by culture alone (runs/h1_duelw1103 / 1104).
   claimTile(state, city, tileIndex);
-  buyer.tilesPurchased = (buyer.tilesPurchased ?? 0) + 1;
   return { ok: true };
 }
 
@@ -1747,8 +1731,9 @@ export function spreadReligiousPressure(state: GameState, src: number): void {
   // census already walks the majors then the free row in exactly this order.
   const cities = cityHolders(state).flatMap((sx) => sx.cities);
   // CIV6 (GlobalParameters): every city FOLLOWING a religion presses every
-  // city within range each turn — the Holy City at x4, a city with a Holy
-  // Site at x2, any other at x1 — times the Bishop's doubling at the source.
+  // city within range each turn — the Holy City at x4 and a city with a Holy
+  // Site at x2, the two multiplied together — times the Bishop's doubling at
+  // the source.
   // CIV6 (Jerusalem's suzerain): "Your cities with Holy Sites exert pressure
   // as if they were Holy Cities (4x Religion pressure on all cities within
   // 10 tiles)" — the founder's Holy-Site cities take the Holy City's step.
@@ -1762,7 +1747,7 @@ export function spreadReligiousPressure(state: GameState, src: number): void {
     const hasSite = !!hsTile && !!hsTile.districtComplete && !hsTile.districtPillaged;
     const asHoly = city.centerIndex === seatOf(state, g)!.religion.holyTile
       || (hasSite && city.seat === g && suzerainEffect(state, g, 'holySitePressure'));
-    const mult = asHoly ? HOLY_CITY_PRESSURE_MULT : hasSite ? HOLY_SITE_PRESSURE_MULT : 1;
+    const mult = (asHoly ? HOLY_CITY_PRESSURE_MULT : 1) * (hasSite ? HOLY_SITE_PRESSURE_MULT : 1);
     const cc = tiles[city.centerIndex];
     // CIV6 (Bishop): "Religious pressure to adjacent cities is 100% stronger
     // from this city."

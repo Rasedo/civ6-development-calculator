@@ -93,7 +93,7 @@ def main() -> None:
         else:
             assert int(row.get("rp", -1)) == space[k - 1][0], f"space step {k} must require the previous step"
     # THE REAL PRICES (GS 900/1500/1800/2100 and 600), each at the speed;
-    # a district project carries its own row (Cost 25 + 1500 x progress),
+    # a district project carries its own row (Cost 25, climbing 1500/100 - 1 = 14),
     # the repair pc -1 (priced by the HP it restores).
     sp = rules.scale_by_game_speed
     assert [int(r["pc"]) for _, r in space] == [sp(900), sp(1500), sp(1800), sp(2100)], \
@@ -104,8 +104,8 @@ def main() -> None:
     for i, r in enumerate(rows):
         if int(r["g"]) >= 0:
             # the six district projects, the rows that pay a Great Person class
-            assert (int(r["pc"]), int(r["pcg"])) == (sp(25), sp(1500)), \
-                f"district project row {i} is not Cost 25 + 1500 x progress: {r}"
+            assert (int(r["pc"]), int(r["pgb"]), int(r["pk"])) == (sp(25), 25, 14), \
+                f"district project row {i} is not Cost 25 at Param1 1500: {r}"
         elif int(r.get("rep", 0)):
             assert int(r["pc"]) == -1, f"the repair is priced by the HP it restores: {r}"
         else:

@@ -11,7 +11,8 @@ import { worldEraIndex } from '../../../cpu/core/eras';
 import { FREE_SEAT, atWarWithAny, emptySeat, isBarbSeat, isTerritorial, seatOf, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { CIV_LEADERS, FREE_CITY_DEFENSE, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_PERIOD, FREE_CITY_PAIR_COUNT, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
 import { ERAS } from '../../../cpu/data/techs';
-import { CITY_MAX_HP, WALLS_TIER_CS } from '../../../cpu/data/units';
+import { CITY_MAX_HP } from '../../../cpu/data/units';
+import { BUILDINGS } from '../../../cpu/data/buildings';
 import { isWater } from '../../../world/query';
 import type { GameState, City, Seat } from '../../../cpu/core/types';
 
@@ -366,7 +367,7 @@ describe('the Free City step', () => {
     expect(cityDefenseStrength(state, city)).toBe(FREE_CITY_DEFENSE);
     expect(FREE_CITY_DEFENSE).toBe(72);
     city.buildings.push('ANCIENT_WALLS');
-    expect(cityDefenseStrength(state, city)).toBe(FREE_CITY_DEFENSE + WALLS_TIER_CS[1]);
+    expect(cityDefenseStrength(state, city)).toBe(FREE_CITY_DEFENSE + BUILDINGS.ANCIENT_WALLS.wallsStrength!);
   });
 
   it('a walled Free City strikes a hostile unit beside it; an unwalled one does not', () => {

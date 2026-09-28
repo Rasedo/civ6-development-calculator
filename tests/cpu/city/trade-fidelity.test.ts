@@ -64,7 +64,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     gpEarned: [],
     buildersTrained: 0,
     bestMeleeCS: 0,
-    tilesPurchased: 0,
     projectsDone: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     ...opts,
@@ -278,10 +277,10 @@ describe('the Trader unit', () => {
     const state = makeState(makeMap(8, 8));
     const base = traderCost(state, 0);
     expect(base).toBe(UNITS.TRADER.cost); // no research: base price
-    const nT = Object.keys(TECHS).length;
-    for (const id of Object.keys(TECHS).slice(0, Math.ceil(nT / 2))) state.seats[0].research.techs.push(id);
-    const p = Math.floor(100 * (state.seats[0].research.techs.length / nT)) / 100;
-    expect(traderCost(state, 0)).toBe(Math.round(UNITS.TRADER.cost * (1 + 4 * p)));
+    // COST_PROGRESSION_GAME_PROGRESS Param1 400: floor(1/2 x 40 x (1 + 3P)),
+    // P the integer percent of techs / 77 (runs/h1_duelw1103, 30 of 30)
+    for (const id of Object.keys(TECHS).slice(0, 29)) state.seats[0].research.techs.push(id);
+    expect(traderCost(state, 0)).toBe(Math.floor(20 * (1 + 3 * 0.37))); // 42
   });
 
   // CIV6: "The base range for land trade routes is 15 tiles ... The base range

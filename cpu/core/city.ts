@@ -29,7 +29,7 @@ import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, cong
 import { suzerainEffect, minorCity, minorLuxuries } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { warWearinessPenalty, bankruptAmenities, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
-import { RESOURCES } from '../../world/resources';
+import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor } from './seats';
@@ -135,10 +135,15 @@ export function newCityGrantUnit(state: GameState, seat: number): string | null 
   return null;
 }
 
+/** CIV6: a city's upkeep — each COMPLETE district's, a PILLAGED one paying
+ *  none (the game's `maintDistricts` falls to 0 across three pillage windows
+ *  of one Campus, runs/h1_duelw1104), and every building's, a pillaged one
+ *  still paying. */
 export function cityMaintenance(state: GameState, city: City): number {
   let total = 0;
   for (const d of city.districts) {
-    if (state.map.tiles[d.tileIndex].districtComplete) total += districtMaintenance(d.type);
+    const t = state.map.tiles[d.tileIndex];
+    if (t.districtComplete && !t.districtPillaged) total += districtMaintenance(d.type);
   }
   const civ = civOf(state, city.seat);
   for (const b of city.buildings) total += buildingMaintenance(b, civ);
@@ -458,7 +463,9 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   for (const t of state.map.tiles) {
     if (!t.resource || tileSeat(t) !== seat) continue;
     const def = RESOURCES[t.resource];
-    if (def.category === 'luxury' && t.improvement === def.improvement && t.resource !== banned) {
+    // CIV6: a PILLAGED improvement gives no copy (runs/h1_duelw1104 Diamonds
+    // plot 628 t180-204: `GetResourceAmount` 1 -> 0, two cities -1 Amenity)
+    if (def.category === 'luxury' && t.improvement === resourceImprovement(t) && !t.pillaged && t.resource !== banned) {
       luxuries.add(t.resource);
       if (t.resource === dupLux) dupCopies++;
     }

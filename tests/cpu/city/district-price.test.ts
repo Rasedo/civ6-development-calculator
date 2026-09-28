@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat } from '../../../cpu/core/seats';
-import { districtCostIn, districtScaledBase, districtProgressAdd, districtCost, districtDiscountMult, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
+import { districtCostIn, districtScaledBase, districtCost, districtDiscountMult, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
 import { DISTRICTS } from '../../../cpu/data/districts';
-import { scaleByGameSpeed } from '../../../cpu/data/constants';
+import { scaleByGameSpeed, gameProgressPct } from '../../../cpu/data/constants';
 import { TECHS } from '../../../cpu/data/techs';
-import { CIVICS } from '../../../cpu/data/civics';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
@@ -45,41 +44,27 @@ describe('a district is priced off its own row', () => {
     // point of the per-row base
     expect(aqueduct).toBeLessThan(campus);
     expect(canal).toBeGreaterThan(campus);
-    // at zero research the two models AGREE, which is exactly why this test
-    // could not tell them apart before: the specialty curve is
-    // base x (1 + 9p) and the GAME_PROGRESS one base + floor(param x p),
-    // and both are `base` at p = 0.
+    // at zero research every model is the row's own base at the speed
     for (const [base, got] of [[36, aqueduct], [54, campus], [81, canal]] as const) {
       expect(got).toBe(scaleByGameSpeed(base));
-      expect(districtProgressAdd(rs, 'CAMPUS')).toBe(0);
     }
   });
 
-  it('parts the two models the moment research lands', () => {
-    // CIV6 (`Districts.CostProgressionModel`): six rows take
-    // COST_PROGRESSION_GAME_PROGRESS with Param1 1000 — the Aqueduct, Bath,
-    // Neighborhood, Mbanza, Canal and Dam — and every other specialty row
-    // takes NUM_UNDER_AVG_PLUS_TECH. The first climbs by a FLAT add on the
-    // game's own progress; the second multiplies its base.
+  it('climbs by the game\'s integer percent, k 9 on either model', () => {
+    // CIV6 (`Districts.CostProgressionModel`): the GAME_PROGRESS rows' Param1
+    // 1000 reads as a climb of 1000/100 - 1 = 9, the specialty rows' is 9
+    // too: floor(1/2 base (1 + 9P)), P the integer percent of max(techs / 77,
+    // civics / 61) (runs/h1_duelw1103, the Holy Site 92)
     const state = scene();
     const rs = state.seats[0].research;
-    rs.techs.push(...Object.keys(TECHS).slice(0, Math.ceil(Object.keys(TECHS).length / 2)));
-    const p = Math.max(rs.techs.length / Object.keys(TECHS).length,
-      rs.civics.length / Object.keys(CIVICS).length);
-    expect(p).toBeGreaterThan(0);
-
-    // the specialty row MULTIPLIES
-    expect(districtScaledBase(rs, 'CAMPUS'))
-      .toBe(Math.floor(scaleByGameSpeed(54) * (1 + 9 * p)));
-    expect(districtProgressAdd(rs, 'CAMPUS')).toBe(0);
-
-    // ...and a GAME_PROGRESS row keeps its flat base and ADDS
-    for (const [id, base] of [['AQUEDUCT', 36], ['CANAL', 81], ['DAM', 81],
+    rs.techs.push(...Object.keys(TECHS).slice(0, 29));
+    const pct = gameProgressPct(rs.techs.length, rs.civics.length);
+    expect(pct).toBe(37); // floor(2900 / 77)
+    for (const [id, base] of [['CAMPUS', 54], ['AQUEDUCT', 36], ['CANAL', 81], ['DAM', 81],
       ['NEIGHBORHOOD', 54]] as const) {
-      expect(districtScaledBase(rs, id)).toBe(scaleByGameSpeed(base));
-      expect(districtProgressAdd(rs, id))
-        .toBe(Math.floor(scaleByGameSpeed(1000) * p));
+      expect(districtScaledBase(rs, id)).toBe(Math.floor((base * 50 * (100 + 9 * pct)) / 10000));
     }
+    expect(districtScaledBase(rs, 'HOLY_SITE')).toBe(116); // 27 x 4.33 = 116.9
   });
 
   it('takes 40% off a specialty row and 25% off the two plaza rows', () => {

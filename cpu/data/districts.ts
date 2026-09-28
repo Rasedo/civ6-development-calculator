@@ -916,6 +916,9 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     allowMultiple: true, // "as many Dams as its territory covers different Rivers"
     adjacency: [],
     housing: 3,
+    // CIV6 (Expansion2_Districts.xml): `Entertainment="1"` — one Amenity to
+    // its city (runs/h1_duelw1104 Aquileia +1 at t114)
+    amenities: 1,
     maintenance: 0,
     appealAdjacent: 1,
     cityStrength: 0,
@@ -926,6 +929,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       cost: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Cost'),
       countsTowardLimit: xml('Districts', 'DistrictType=DISTRICT_DAM', 'RequiresPopulation'),
       housing: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Housing'),
+      amenities: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Entertainment'),
       maintenance: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Appeal'),
       cityStrength: xml('Districts', 'DistrictType=DISTRICT_DAM', 'CityStrengthModifier'),

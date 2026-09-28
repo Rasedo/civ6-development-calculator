@@ -119,7 +119,8 @@ def test_districts(sim) -> None:
 def test_garrison(sim) -> None:
     """runs/garrison_scale_20260926T081246Z.jsonl: base 55 (a Line Infantry
     65 less 10), an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage
-    0, 10, 25, 50, 75, 90."""
+    0, 10, 25, 50, 75, 90 — its Combat less a point per 10 damage, above the
+    base."""
     r, j = a_capital(sim)
     sim.city_is_cap[B0, r, j] = False
     ctr = int(sim.city_center[B0, r, j])
@@ -130,7 +131,7 @@ def test_garrison(sim) -> None:
                     torch.full((sim.B,), inf, dtype=torch.long))
     g = int(sim.military_at[B0, ctr])
     assert g >= 0, "the garrison did not take the centre"
-    assert int(sim._garrison_damage_scale) == 200
+    assert float(sim._garrison_hp_per_cs) == 10.0
     sim.civ_best_melee[B0, r] = 75
     assert strength(sim, r, j) == 65 + 10, "the strongest melee on its centre adds the cut"
     sim.civ_best_melee[B0, r] = 85

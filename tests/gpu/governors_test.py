@@ -80,7 +80,7 @@ def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
     _seat_city_loyalty, which reads the same LIVE pops this reconstruction
     does."""
     rng = int(sim.rules.seats["loyaltyRange"])
-    scale = float(sim.rules.seats["loyaltyScale"])
+    mx, mr, nl, nr = (float(x) for x in sim.rules.seats["loyaltyPress"])
     ap = sim._age_pressure.tolist()
     sc = int(sim.city_center[0, 0, c])
 
@@ -98,8 +98,14 @@ def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
 
     own_eff = row_press(0)
     for_eff = sum(row_press(row) for row in range(1, sim.n_majors))
-    tot = own_eff + for_eff
-    press = scale * (own_eff - for_eff) / tot if tot > 0 else 0.0
+    # `pressureTerm`: the stronger side over the weaker, linear from the
+    # neutral ratio to the max ratio, capped
+    hi, lo = max(own_eff, for_eff), min(own_eff, for_eff)
+    if hi <= 0 or own_eff == for_eff:
+        press = 0.0
+    else:
+        mag = mx if lo <= 0 else min(mx, nl + ((mx - nl) * (hi / lo - nr)) / (mr - nr))
+        press = mag if own_eff > for_eff else -mag
     amen = float(sim._loyalty_amenity[tier_idx_c])
     gov = sim._gov_loy if picked else 0.0
     if bool(sim.city_is_cap[0, 0, c]):

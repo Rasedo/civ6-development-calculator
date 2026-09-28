@@ -856,13 +856,11 @@ class SimMinors:
                               torch.full_like(zero_b, self._mb_military_pct), zero_b)
         trainable = None
         sc_map = {int(di): (int(ut), int(uc), int(plc)) for (di, ut, uc, plc, _fc) in self._scaffold}
-        t_pct = self.citystate_techs[:, s].sum(dim=1).double() / float(max(int(rd.t_cost.shape[0]), 1))
-        c_pct = self.citystate_civics[:, s].sum(dim=1).double() / float(max(int(rd.c_cost.shape[0]), 1))
-        # the research factor is the minor's; the BASE is the row's own
-        _mprog = torch.maximum(t_pct, c_pct)
-        d_fac = 1 + dcp["scale"] * _mprog
+        # the progress is the minor's; the BASE and the climb are the row's own
+        _mpct = self._progress_pct_of(self.citystate_techs[:, s].sum(dim=1),
+                                      self.citystate_civics[:, s].sum(dim=1))
         d_per = dcp["perDistrict"]
-        _d_pg = dcp["progressGame"]
+        d_k = dcp["perK"]
 
         # a pillaged building queued behind the item in hand comes first once
         # that item is done (`citystate_repair_wait`)
@@ -963,8 +961,11 @@ class SimMinors:
                     if not bool(avail.any()):
                         continue
                     toward(avail, 0.0)
-                    # `projectCost`: the row's own Cost plus the GAME_PROGRESS climb
-                    cost_p = float(max(int(prow["pc"]), 0)) + torch.floor(float(prow["pcg"]) * _mprog)
+                    # `projectCost`: the row's own Cost, or `progressCost` over
+                    # its install Cost and climb
+                    cost_p = (self._progress_cost(int(prow["pgb"]), int(prow["pk"]), _mpct).double()
+                              if int(prow["pgb"]) >= 0
+                              else torch.full_like(zero_b, float(max(int(prow["pc"]), 0))))
                     pay = avail & (self.citystate_prod[:, s] >= cost_p)
                     if pi in self._proj_fp:
                         # a project still running lights the next turn's grid
@@ -1041,22 +1042,19 @@ class SimMinors:
                 pct = (torch.full_like(zero_b, harbor_pct) if dv == int(self._harbor_didx)
                        else torch.where(self._citystate_didx[:, s] == dv, type_pct[typ], zero_b))
                 toward(avail, pct)
-                _b_dv = float(d_per[dv]) if dv < len(d_per) else float(dcp["base"])
-                # the row's OWN cost model — a minor builds real districts
-                # and the GAME_PROGRESS rows climb differently.
-                _g_dv = float(_d_pg[dv]) if dv < len(_d_pg) else 0.0
-                d_cost = (torch.full_like(d_fac, _b_dv) + torch.floor(_g_dv * _mprog)
-                          if _g_dv > 0 else torch.floor(_b_dv * d_fac))
+                # the row's OWN install Cost and climb — a minor builds real
+                # districts (`districtScaledBase`)
+                _b_dv = int(d_per[dv]) if dv < len(d_per) else int(dcp["base"])
+                _k_dv = int(d_k[dv]) if dv < len(d_k) else int(dcp["k"])
+                d_cost = self._progress_cost(_b_dv, _k_dv, _mpct).double()
                 if self._log_diff:
                     _nm = self.districts_cat[dv]['id']
                     for _b in range(B):
                         if not bool(avail[_b]):
                             continue
-                        _t = float(d_cost[_b])
-                        _g = float(torch.floor(_g_dv * _mprog[_b])) if _g_dv > 0 else 0.0
                         self._diff_events.setdefault(_b, []).append(
                             f"dm:{seat}:{int(self.turn)}:{_nm}"
-                            f" b{int(_t - _g)} g{int(_g)} t{int(_t)}"
+                            f" t{int(float(d_cost[_b]))}"
                             f" pot{int(float(self.citystate_prod[_b, s]))}")
                 pay = avail & (self.citystate_prod[:, s] >= d_cost)
                 self.citystate_repair_wait[:, s] &= ~pay

@@ -477,7 +477,6 @@ class SimPhase:
                & self._coastal_home_loyal[_civ_i.clamp(max=max(self._coastal_home_loyal.numel() - 1, 0))])
         return {
             "rng": int(rr["loyaltyRange"]),
-            "scale": float(rr["loyaltyScale"]),
             "lmax": float(rr["loyaltyMax"]),
             "keep": torch.where(cul_ally, torch.zeros_like(keep), keep),
             "age_p": self._age_pressure[self.civ_age[:, :nrow]],
@@ -497,6 +496,22 @@ class SimPhase:
             "z": torch.zeros(B, dtype=F, device=dev),
         }
 
+    def _pressure_term(self, own: torch.Tensor, foreign: torch.Tensor) -> torch.Tensor:
+        """`pressureTerm` — [B] f64: the stronger side over the weaker is a
+        ratio r, the term NEUTRAL_LOYALTY + (MAX_LOYALTY − NEUTRAL_LOYALTY)·(r −
+        NEUTRAL_RATIO) / (MAX_RATIO − NEUTRAL_RATIO), at most MAX_LOYALTY, signed
+        for the side that presses harder; an unopposed side is MAX_LOYALTY,
+        nobody pressing 0."""
+        mx, mr, nl, nr = (float(x) for x in self.rules.seats["loyaltyPress"])
+        own, foreign = own.double(), foreign.double()
+        hi = torch.maximum(own, foreign)
+        lo = torch.minimum(own, foreign)
+        r = hi / lo.clamp(min=1e-300)
+        mag = torch.where(lo <= 0, torch.full_like(hi, mx),
+                          (nl + ((mx - nl) * (r - nr)) / (mr - nr)).clamp(max=mx))
+        mag = torch.where((hi <= 0) | (own == foreign), torch.zeros_like(mag), mag)
+        return torch.where(own > foreign, mag, -mag)
+
     def _seat_city_loyalty(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            tier: torch.Tensor, gov: torch.Tensor,
                            pre: dict | None = None) -> torch.Tensor:
@@ -504,7 +519,7 @@ class SimPhase:
         bidx, nrow = self._bidx, self.n_majors
         if pre is None:
             pre = self._loyalty_pre(row)
-        rng, scale, lmax = pre["rng"], pre["scale"], pre["lmax"]
+        rng, lmax = pre["rng"], pre["lmax"]
         # "somebody else holds a city": the majors that EXIST and hold one,
         # this row excluded.
         held = self.city_alive[:, :nrow].any(dim=2) & self.civ_alive[:, :nrow]  # [B, n_majors]
@@ -529,8 +544,7 @@ class SimPhase:
         # CIV6: a Free City's citizens press on their neighbours like any other
         # city's; the Free Cities player has no age, so they press at the base
         foreign = foreign + self._citizen_pressure_from(here, self.FREE_ROW)
-        tot = own + foreign
-        press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
+        press = self._pressure_term(own, foreign)
         delta = (press
                  + self._loyalty_amenity[tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
                  + torch.where(gov, torch.full_like(loy_gov, self._gov_loy), loy_gov)
@@ -765,7 +779,6 @@ class SimPhase:
             prod = torch.where(moved.unsqueeze(1), prod2, prod)
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
-        scale = float(self.rules.seats["loyaltyScale"])
         lmax = float(self.rules.seats["loyaltyMax"])
         alive_c = alive.clone()
         joins = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
@@ -792,8 +805,7 @@ class SimPhase:
                 self.city_free_press[bidx, row, jc, _o] = torch.where(
                     act, self.city_free_press[bidx, row, jc, _o] + sub.to(self.city_free_press.dtype),
                     self.city_free_press[bidx, row, jc, _o])
-            tot = own + foreign
-            press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
+            press = self._pressure_term(own, foreign)
             delta = self._free_city_loyalty + press + self._built_loyalty(row, bidx, jc)
             loy = self.city_loyalty[bidx, row, jc]
             nxt = torch.where(act, (loy + delta).clamp(min=0, max=lmax), loy)

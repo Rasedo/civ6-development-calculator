@@ -326,7 +326,10 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     let d = 0;
     for (const city of state.seats[seat].cities) {
       for (const id of city.buildings) b += buildingMaintenance(id, civ);
-      for (const x of city.districts) if (state.map.tiles[x.tileIndex].districtComplete) d += districtMaintenance(x.type);
+      for (const x of city.districts) {
+        const t = state.map.tiles[x.tileIndex];
+        if (t.districtComplete && !t.districtPillaged) d += districtMaintenance(x.type);
+      }
     }
     const mods = getModifiers(state, seat);
     const u = state.units.filter((x) => x.seat === seat).reduce((n, x) => n + unitUpkeep(mods, x.type), 0);

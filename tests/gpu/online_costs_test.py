@@ -14,6 +14,12 @@ are runs/h1_duelw1103 / 1104:
   5. the floodplains: the desert row Food 2, the grassland and plains rows
      nothing, all three kept under a district; the Great Barrier Reef 3F 2S
   6. the Great Wall: its own Gold 2, and its adjacency rows wait on TECHS
+  7. loyalty pressure: 10 (own - foreign) / min(own, foreign), capped at 20
+  8. a pillaged luxury improvement gives no copy; the Dam's Entertainment 1;
+     a pillaged district pays no upkeep
+  9. the garrison: Combat less a point per 10 damage above the base, a hull
+     included; each wall building +3
+ 10. prices on the game's integer percent: the Trader, a plot, a district
 """
 
 from __future__ import annotations
@@ -143,10 +149,97 @@ def test_great_wall(sim) -> None:
     print("  6 the Great Wall OK")
 
 
+def test_pressure_term(sim) -> None:
+    t = lambda o, f: float(sim._pressure_term(torch.tensor([float(o)]), torch.tensor([float(f)]))[0])
+    got = [t(0, 0), t(30, 30), t(20, 10), t(10, 20), t(30, 10), t(100, 10), t(15, 10), t(5, 0), t(0, 5)]
+    assert got == [0, 0, 10, -10, 20, 20, 5, 20, -20], got
+    print("  7 loyalty pressure OK")
+
+
+def test_luxury_dam_upkeep(sim) -> None:
+    row = 0
+    ctr = int(sim.city_center[B0, row, 0])
+    cid = int(sim.city_id[B0, row, 0])
+    lux = [t for t in range(sim.T) if int(sim.lux_id[B0, t]) >= 0]
+    own = [int(x) for x in sim.neigh[ctr].tolist()
+           if x >= 0 and int(sim.tile_seat[B0, x]) == row and int(sim.tile_city[B0, x]) == cid]
+    if lux:
+        t = lux[0]
+        sim.tile_seat[B0, t] = row
+        sim.tile_city[B0, t] = cid
+        sim._tile_owner_ver += 1
+        sim.improvement[B0, t] = int(sim.lux_req[B0, t])
+        sim.pillaged[B0, t] = False
+        sim._eff_version += 1
+        have = torch.zeros(sim.B, sim.RC, dtype=torch.float64)
+        need = torch.ones(sim.B, sim.RC, dtype=torch.float64)
+        up = float(sim._luxury_amenities(row, have, need).sum())
+        sim.pillaged[B0, t] = True
+        sim._eff_version += 1
+        down = float(sim._luxury_amenities(row, have, need).sum())
+        assert down < up, f"a pillaged luxury still served: {up} -> {down}"
+    dams = [d for d in RULES["districts"] if d["id"] == "DAM"]
+    assert dams and int(dams[0]["amenities"]) == 1, dams
+    camp = next(i for i, d in enumerate(sim.districts_cat) if d["id"] == "CAMPUS")
+    site = own[0]
+    sim.district[B0, site] = camp
+    sim.district_complete[B0, site] = True
+    sim.district_pillaged[B0, site] = False
+    sim.city_dist_tile[B0, row, 0, camp] = site
+    sim._eff_version += 1
+    m0 = float(sim._seat_housing(row)[0][B0, 0])
+    sim.district_pillaged[B0, site] = True
+    sim._eff_version += 1
+    m1 = float(sim._seat_housing(row)[0][B0, 0])
+    assert m0 - m1 == float(sim._d_maint[camp]), (m0, m1)
+    print("  8 luxuries, the Dam, upkeep OK")
+
+
+def test_garrison_walls(sim) -> None:
+    row = 0
+    r = torch.full((sim.B,), row, dtype=torch.long)
+    c = torch.zeros(sim.B, dtype=torch.long)
+    walls = [i for i in sim._walls_rows]
+    for bi in walls:
+        sim.city_bldg[B0, row, 0, bi] = False
+    bare = float(sim._centre_strength(r, c, False)[B0])
+    for bi in walls[:2]:
+        sim.city_bldg[B0, row, 0, bi] = True
+    assert float(sim._centre_strength(r, c, False)[B0]) == bare + 6
+    ctr = int(sim.city_center[B0, row, 0])
+    g = int(sim.military_at[B0, ctr])
+    if g < 0:
+        gal = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "GALLEY")
+        sim._spawn_unit(row, torch.ones(sim.B, dtype=torch.bool), torch.full((sim.B,), ctr, dtype=torch.long),
+                        torch.full((sim.B,), gal, dtype=torch.long))
+        g = int(sim.military_at[B0, ctr])
+    assert g >= 0
+    sim.unit_hp[B0, g] = 75
+    base = float(sim._holder_strength(r)[B0])
+    comb = float(sim._type_combat[int(sim.unit_type[B0, g])])
+    add = float(sim._centre_strength(r, c)[B0]) - float(sim._centre_strength(r, c, False)[B0])
+    assert add == max(0.0, comb - 2.5 - base), (add, comb, base)
+    print("  9 garrison and walls OK")
+
+
+def test_progress_prices(sim) -> None:
+    sim.civ_techs[:, 0, :] = False
+    sim.civ_civics[:, 0, :] = False
+    sim.civ_techs[:, 0, :29] = True
+    pct = sim._progress_pct(0)
+    assert int(pct[B0]) == 37
+    assert int(sim._trader_cost(0)[B0]) == 42
+    assert int(sim._plot_price(torch.tensor([3]), pct[:1])[0]) == 90
+    rg = next(r for r in RULES["projects"]["rows"] if int(r["pk"]) == 14)
+    assert int(sim._progress_cost(int(rg["pgb"]), int(rg["pk"]), pct)[B0]) == (25 * 50 * (100 + 14 * 37)) // 10000
+    print("  10 progress prices OK")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
-    for scene in (test_costs, test_culture_after_growth, test_housing, test_floodplains, test_great_wall):
+    for scene in (test_costs, test_culture_after_growth, test_housing, test_floodplains, test_great_wall,
+                  test_pressure_term, test_luxury_dam_upkeep, test_garrison_walls, test_progress_prices):
         scene(fresh(rules, path))
     print("ONLINE COSTS OK")
     return 0

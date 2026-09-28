@@ -12,7 +12,7 @@ import { IMPROVEMENTS, type ImprovementDef, SEASIDE_RESORT_MIN_APPEAL } from '..
 import { droughtBars, fireFeature } from '../data/disasters';
 import { isSuzerain } from './cityStates';
 import { FEATURES, isFloodplains } from '../../world/features';
-import { RESOURCES } from '../../world/resources';
+import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS } from '../data/policies';
 import { seatGovernment } from './effects';
@@ -376,7 +376,7 @@ export function validImprovementsIn(
   // does with its builder-type gate — a wire order for any other unit no-ops.
   if (opts.builder !== undefined && opts.builder !== 'BUILDER') return [];
   if (tile.resource && !opts.hidden?.has(tile.resource)) {
-    const imp = RESOURCES[tile.resource].improvement;
+    const imp = resourceImprovement(tile)!;
     return unlocked(imp) && !droughtBars(tile, imp) ? [imp] : [];
   }
   if (isWater(tile)) {

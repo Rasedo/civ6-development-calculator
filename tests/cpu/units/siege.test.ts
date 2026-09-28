@@ -13,7 +13,8 @@ import {
 import { availableProjects, projectCost, queueProject } from '../../../cpu/core/game';
 import { completeProject } from '../../../cpu/core/production';
 import { buySeatBuilding, healCities, seatPhase } from '../../../cpu/core/phase';
-import { UNITS, WALLS_TIER_CS, WALLS_TIER_HP, REPAIR_QUIET_TURNS } from '../../../cpu/data/units';
+import { UNITS, WALLS_TIER_HP, REPAIR_QUIET_TURNS } from '../../../cpu/data/units';
+import { wallsStrength } from '../../../cpu/core/combat';
 
 // The siege round, against the pages it came from: City combat (Civ6) for the
 // perimeter, the damage classes and the siege; Battering Ram / Siege Tower for
@@ -109,7 +110,7 @@ describe('the damage split', () => {
 describe('the walls tiers', () => {
   it('CIV6: 100 / 200 / 300 and +3 Combat Strength each, stacking', () => {
     expect(WALLS_TIER_HP).toEqual([0, 100, 200, 300, 400]);
-    expect(WALLS_TIER_CS).toEqual([0, 3, 6, 9, 9]); // Urban Defenses adds none
+    // Buildings.OuterDefenseStrength: 3 on each wall building
     const { state, city } = war();
     expect(wallsTier(state, city)).toBe(0);
     const base = cityDefenseStrength(state, city);
@@ -117,7 +118,7 @@ describe('the walls tiers', () => {
     for (const b of ['ANCIENT_WALLS', 'MEDIEVAL_WALLS', 'RENAISSANCE_WALLS']) {
       city.buildings.push(b);
       seen.push(wallsMax(state, city));
-      expect(cityDefenseStrength(state, city) - base).toBe(WALLS_TIER_CS[wallsTier(state, city)]);
+      expect(cityDefenseStrength(state, city) - base).toBe(3 * wallsTier(state, city));
     }
     expect(seen).toEqual([100, 200, 300]);
   });
@@ -128,8 +129,9 @@ describe('the walls tiers', () => {
     grantTechs(state, 'STEEL');
     expect(wallsTier(state, city)).toBe(4);
     expect(wallsMax(state, city)).toBe(400);
-    // ...and it adds no Combat Strength of its own beyond the Renaissance tier
-    expect(WALLS_TIER_CS[4]).toBe(WALLS_TIER_CS[3]);
+    // ...and it adds no Combat Strength: the strength is the wall buildings'
+    // (runs/h1_duelw1104 Arpinum 75 behind a 400 perimeter)
+    expect(wallsStrength(city)).toBe(0);
   });
 
   it('CIV6: "while city defenses are damaged, you cannot build higher levels of Walls"', () => {
@@ -449,7 +451,7 @@ describe('the Encampment perimeter', () => {
     const unwalled = encampmentDefense(bare.state, att2, bare.enc)!.defCS;
     // CIV6 (Encampment): "Acquires Outer Defenses and Ranged Strike along with
     // the City Center once Walls have been built."
-    expect(walled - unwalled).toBe(WALLS_TIER_CS[1]);
+    expect(walled - unwalled).toBe(3);
 
     // ...and "excluding any bonus obtained for a Garrisoned unit": a defender
     // standing on the centre moves the CITY's strength and not the district's.
@@ -498,7 +500,7 @@ describe('the Encampment perimeter', () => {
     const { state, city } = withEncampment();
     const before = cityDefenseStrength(state, city);
     city.buildings.push('MEDIEVAL_WALLS');
-    expect(cityDefenseStrength(state, city) - before).toBe(WALLS_TIER_CS[2] - WALLS_TIER_CS[1]);
+    expect(cityDefenseStrength(state, city) - before).toBe(3);
   });
 });
 

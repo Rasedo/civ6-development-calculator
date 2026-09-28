@@ -57,7 +57,7 @@ def scaffold_p0(sim):
 def radius3_usable(sim, center, exclude=()):
     """On-map tiles within radius 3 of center that _place_district's elig
     would accept BUT for ownership: d_usable, empty (district/wonder/civ centre/
-    improvement all clear), not the center."""
+    improvement all clear, no feature it cannot yet clear), not the center."""
     ds = sim.pair_dist[center]
     out = []
     for t in range(sim.T):
@@ -70,6 +70,9 @@ def radius3_usable(sim, center, exclude=()):
         if int(sim.district[0, t]) >= 0 or int(sim.built_wonder[0, t]) >= 0:
             continue
         if int(sim.centre_slot_at[0, t]) >= 0 or int(sim.improvement[0, t]) >= 0:
+            continue
+        # a feature the seat cannot yet clear refuses the pave (`tile_ftu`)
+        if int(sim.tile_ftu[0, t]) >= 0 and not bool(sim.feat_stripped[0, t]):
             continue
         out.append(t)
     return out

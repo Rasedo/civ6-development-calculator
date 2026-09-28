@@ -17,7 +17,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -45,8 +44,7 @@ def test_the_wire(rules, path) -> None:
     names = [d.get("id", "?") for d in sim.districts_cat]
     assert len(per) == len(names), f"{len(per)} bases for {len(names)} districts"
     assert len(disc) == len(names), f"{len(disc)} discounts for {len(names)} districts"
-    sp = sim.rules.scale_by_game_speed
-
+    # the install's Standard-speed Cost: `_progress_cost` applies the speed
     want = {"AQUEDUCT": 36, "CANAL": 81, "DAM": 81, "NEIGHBORHOOD": 54,
             "GOVERNMENT_PLAZA": 30, "DIPLOMATIC_QUARTER": 30, "SPACEPORT": 1800,
             "CAMPUS": 54, "HARBOR": 54}
@@ -54,8 +52,7 @@ def test_the_wire(rules, path) -> None:
         if nm not in names:
             continue
         i = names.index(nm)
-        assert per[i] == sp(base), (
-            f"{nm} ships {per[i]}, expected {base} speed-scaled to {sp(base)}")
+        assert per[i] == base, f"{nm} ships {per[i]}, expected the install's {base}"
     # the ONLY two rows off the install's 40
     odd = sorted(names[i] for i, p in enumerate(disc) if p != 40)
     assert odd == ["DIPLOMATIC_QUARTER", "GOVERNMENT_PLAZA"], f"off-40 rows: {odd}"
@@ -87,10 +84,8 @@ def test_the_engine_pays_the_row(rules, path) -> None:
     dcp = sim.rules.district_cost
     per = dcp["perDistrict"]
     names = [d.get("id", "?") for d in sim.districts_cat]
-    t_pct = sim.civ_techs[:, row].sum(dim=1).double() / float(sim.rules_dev.t_cost.shape[0])
-    c_pct = sim.civ_civics[:, row].sum(dim=1).double() / float(sim.rules_dev.c_cost.shape[0])
-    fac = 1 + dcp["scale"] * torch.maximum(t_pct, c_pct)
-    price = {nm: float(torch.floor(float(per[names.index(nm)]) * fac)[B0])
+    pct = sim._progress_pct(row)
+    price = {nm: float(sim._progress_cost(int(per[names.index(nm)]), int(dcp["perK"][names.index(nm)]), pct)[B0])
              for nm in ("AQUEDUCT", "CAMPUS", "DAM")}
     assert price["AQUEDUCT"] < price["CAMPUS"] < price["DAM"], price
     # ...and the discount is the row's, not a shared 0.6
@@ -104,38 +99,30 @@ def test_the_engine_pays_the_row(rules, path) -> None:
 
 
 def test_the_two_models_part(rules, path) -> None:
-    """CIV6 (`Districts.CostProgressionModel`): a GAME_PROGRESS row keeps its
-    flat base and ADDS `Param1 x progress`; a NUM_UNDER_AVG_PLUS_TECH row
-    MULTIPLIES its base by the research factor. They agree at zero research
-    and part the moment a tech lands, so a poke that never researches cannot
-    tell them apart — which is how one curve stood in for both."""
+    """CIV6 (`Districts.CostProgressionModel`): floor(1/2 base (1 + k P)), P
+    the integer percent of max(techs / 77, civics / 61), k the row's climb —
+    a GAME_PROGRESS row's Param1 1000 read as 1000/100 - 1 = 9, a specialty
+    row's 9 (runs/h1_duelw1103, the Holy Site 92)."""
     sim = build(path)
     dcp = sim.rules.district_cost
-    pg = dcp["progressGame"]
-    per = dcp["perDistrict"]
-    hot = [i for i, v in enumerate(pg) if v]
-    assert hot, "no row carries the GAME_PROGRESS parameter"
-
-    # halfway through the tech tree, so `progress` is unmistakably non-zero
+    per, ks = dcp["perDistrict"], dcp["perK"]
+    assert all(int(k) == 9 for k in ks), ks
     nt = sim.civ_techs.shape[2]
-    sim.civ_techs[:, 0, : nt // 2] = True
-    p = float(sim._district_progress(0)[0])
-    assert p > 0, "the scene researched nothing"
-
-    fac = float(sim._district_research_fac(0)[0])
-    for si, (di, *_rest) in enumerate(sim._scaffold):
+    sim.civ_techs[:, 0, :] = False
+    sim.civ_techs[:, 0, : min(29, nt)] = True
+    pct = int(sim._progress_pct(0)[0])
+    assert pct == 37, f"29 of 77 techs read as {pct}%"
+    for si, (di, _ut, _uc, _plc, fc) in enumerate(sim._scaffold):
+        if fc >= 0:
+            continue  # the Spaceport is flat
+        if bool(sim._district_discounted(0, di).any()):
+            continue
         cost = float(sim._district_cost_si(0, si)[0])
-        base = float(per[di]) if di < len(per) else float(dcp["base"])
-        if di in hot:
-            # ...and it must not be the multiplied one, or the two models
-            # would be one again
-            want = base + int(float(pg[di]) * p)
-            assert abs(cost - want) < 1e-6 or sim._district_discounted(0, di).any(), \
-                f"row {di}: GAME_PROGRESS wanted {want}, got {cost}"
-            assert abs(cost - base * fac) > 1e-9 or p == 0, \
-                f"row {di} still takes the specialty curve"
-    print(f"  4 the two models OK — {len(hot)} GAME_PROGRESS rows add "
-          f"{int(float(pg[hot[0]]) * p)} at progress {p:.3f}, the rest multiply")
+        base = int(per[di]) if di < len(per) else int(dcp["base"])
+        want = (base * 50 * (100 + 9 * pct)) // 10000
+        if not sim._d_variants.get(di):
+            assert cost == want, f"row {di}: wanted {want}, got {cost}"
+    print(f"  4 the progress price OK — every row floor(1/2 base (1 + 9P)) at P {pct}%")
 
 
 def main() -> int:

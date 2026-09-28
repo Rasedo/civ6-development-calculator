@@ -40,7 +40,7 @@ import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, walls
 import { seatGrowth } from './seatTurn';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, centreStrength } from './combat';
-import { districtScaledBase, districtProgressAdd, goldAffordable, projectCost, repairAvailable } from './game';
+import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { computeCityStats } from './city';
 import { minorCity, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, type Unlocks } from './effects';
@@ -726,7 +726,7 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
     const district = want.district;
     // the row's OWN base, not the specialty one: a minor builds real
     // districts too and the install prices an Aqueduct at 36
-    const cost = districtScaledBase(cityState.research, district) + districtProgressAdd(cityState.research, district);
+    const cost = districtScaledBase(cityState.research, district);
     toward(district === 'HARBOR' ? MINOR_HARBOR_PROD_PCT
       : district === CITY_STATE_TYPE_DISTRICT[cityState.type] ? MINOR_TYPE_DISTRICT_PROD_PCT[cityState.type] : 0);
     // the MINOR's own price and the pool it is judged against. A minor's
@@ -734,8 +734,6 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
     // small, permanent drift in a MAJOR's purse with no other symptom.
     const _dl = (globalThis as { __diffLog?: string[] }).__diffLog;
     if (_dl) _dl.push(`dm:${cityState.seat}:${state.turn}:${district}`
-      + ` b${districtScaledBase(cityState.research, district)}`
-      + ` g${districtProgressAdd(cityState.research, district)}`
       + ` t${cost} pot${Math.floor(pot)}`);
     if (pot < cost) return;
     cityState.prodProgress = pot - cost;

@@ -160,9 +160,18 @@ export const FREE_CITY_GRANT_CLASSES = srcConst('seats.freeCityGrantClasses',
 export const FREE_CITY_GRANT_WEIGHTS = srcConst('seats.freeCityGrantWeights', [29, 27, 12, 1], {
   lab: FREE_CITY_CENSUS,
 });
-/** Max per-turn swing from population pressure. Real Civ 6 ±20. */
-export const LOYALTY_PRESSURE_SCALE = srcConst('seats.loyaltyScale', 20,
+/** CIV6 (LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_*): the citizen
+ *  pressure term is linear in the ratio of the stronger side to the weaker —
+ *  NEUTRAL_LOYALTY at NEUTRAL_RATIO, MAX_LOYALTY at MAX_RATIO and beyond,
+ *  signed for whichever side presses harder (`pressureTerm`). */
+export const LOYALTY_PRESS_MAX_LOYALTY = srcConst('seats.loyaltyPressMaxLoyalty', 20,
   gp('LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_MAX_LOYALTY'));
+export const LOYALTY_PRESS_MAX_RATIO = srcConst('seats.loyaltyPressMaxRatio', 3,
+  gp('LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_MAX_RATIO'));
+export const LOYALTY_PRESS_NEUTRAL_LOYALTY = srcConst('seats.loyaltyPressNeutralLoyalty', 0,
+  gp('LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_NEUTRAL_LOYALTY'));
+export const LOYALTY_PRESS_NEUTRAL_RATIO = srcConst('seats.loyaltyPressNeutralRatio', 1,
+  gp('LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_NEUTRAL_RATIO'));
 /** CIV6 (the Loyalty pedia): "Each Citizen exerts a base pressure of 1". */
 export const CITIZEN_PRESSURE_BASE = srcConst('seats.citizenPressureBase', 1,
   gp('CITIZEN_IDENTITY_PRESSURE_BASE'));

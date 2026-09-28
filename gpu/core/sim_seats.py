@@ -1641,49 +1641,29 @@ class SimSeats:
             base = torch.where(_w, _open, base)
         return base
 
-    def _district_progress(self, row: int) -> torch.Tensor:
-        """[B] f64 — the GAME's own progress for this seat: its technologies
-        or its civics, whichever fraction is larger. ONE reader, because two
-        cost models read the same share and must never spell it differently."""
-        rdv = self.rules_dev
-        t_pct = self.civ_techs[:, row].sum(dim=1).double() / float(rdv.t_cost.shape[0])
-        c_pct = self.civ_civics[:, row].sum(dim=1).double() / float(rdv.c_cost.shape[0])
-        return torch.maximum(t_pct, c_pct)
-
-    def _district_research_fac(self, row: int) -> torch.Tensor:
-        """[B] f64 — the RESEARCH factor a NUM_UNDER_AVG_PLUS_TECH district's
-        base is scaled by. The factor is the SEAT's; the base is the row's
-        own."""
-        return 1 + self.rules.district_cost["scale"] * self._district_progress(row)
-
     def _district_cost_si(self, row: int, si: int,
-                          d_fac: torch.Tensor | None = None) -> torch.Tensor:
+                          pct: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — what scaffold row `si` costs seat row `row` RIGHT NOW: the
         row's own base against the research factor, the under-represented
         discount, and the civilization's variant multiplier. ONE composer, so
         a district BOUGHT is priced off the same number a district BUILT is —
         a discount cannot be worth a different amount to a buyer.
 
-        `d_fac` is the caller's already-computed research factor where it has
-        one (the queue walk computes it once for every scaffold row)."""
+        `pct` is the caller's already-computed progress (`_progress_pct`)
+        where it has one (the queue walk computes it once for every scaffold
+        row)."""
         dcp = self.rules.district_cost
         di, _utech, _uciv, _plc, fc = self._scaffold[si]
         d_per = dcp["perDistrict"]
+        d_k = dcp["perK"]
         d_disc = dcp["discountPct"]
-        if d_fac is None:
-            d_fac = self._district_research_fac(row)
-        # this row's OWN base (`Districts.Cost`) against the seat's research
-        # factor — a shared 54 priced an Aqueduct as a Campus
-        _b_si = float(d_per[di]) if di < len(d_per) else float(dcp["base"])
-        # CIV6 (COST_PROGRESSION_GAME_PROGRESS): six rows climb on the game's
-        # own progress instead of the specialty curve, and the climb is a flat
-        # ADD made after the discount and the variant ratio — the install
-        # gives the Bath and the Mbanza their own base AND the same parameter,
-        # so a Bath is `18 + term`, not half of `36 + term`.
-        _d_pg = dcp["progressGame"]
-        _g_si = float(_d_pg[di]) if di < len(_d_pg) else 0.0
-        d_cost = (torch.full_like(d_fac, _b_si) if _g_si > 0
-                  else torch.floor(_b_si * d_fac)).to(self.dtype)
+        if pct is None:
+            pct = self._progress_pct(row)
+        # this row's OWN install Cost and climb (`districtScaledBase`) — a
+        # shared 54 priced an Aqueduct as a Campus
+        _b_si = int(d_per[di]) if di < len(d_per) else int(dcp["base"])
+        _k_si = int(d_k[di]) if di < len(d_k) else int(dcp["k"])
+        d_cost = self._progress_cost(_b_si, _k_si, pct).to(self.dtype)
         if fc >= 0:
             # A FLAT-priced district (the Spaceport): no research scaling, no
             # under-represented discount.
@@ -1698,26 +1678,24 @@ class SimSeats:
         for _v in self._d_variants.get(di, []):
             _pm = self._row_plays_idx(row, int(_v["civ"]))
             out = torch.where(_pm, torch.floor(out * float(_v["costMult"])), out)
-        add = (torch.floor(_g_si * self._district_progress(row)).to(self.dtype)
-               if _g_si > 0 else torch.zeros_like(out))
-        self._log_dcost(row, di, d_cost, _after_disc, out, add)
-        return out + add
+        self._log_dcost(row, di, d_cost, _after_disc, out)
+        return out
 
-    def _log_dcost(self, row: int, di: int, base, disc, varied, add) -> None:
+    def _log_dcost(self, row: int, di: int, base, disc, varied) -> None:
         """`logDistrictCost`'s twin. The price is COMPOSED — base, discount,
-        variant, the GAME_PROGRESS add — and a total that agrees while a part
-        does not is exactly what one number hides. `disc` is post-DISCOUNT and
-        pre-VARIANT on BOTH engines: a printed term the two sides spell
-        differently shows a disagreement neither of them has."""
+        variant — and a total that agrees while a part does not is exactly
+        what one number hides. `disc` is post-DISCOUNT and pre-VARIANT on BOTH
+        engines: a printed term the two sides spell differently shows a
+        disagreement neither of them has."""
         if not self._log_diff:
             return
         for _b in range(self.B):
-            _d, _v, _a = float(disc[_b]), float(varied[_b]), float(add[_b])
+            _d, _v = float(disc[_b]), float(varied[_b])
             self._diff_events.setdefault(_b, []).append(
                 f"dc:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
                 f":{self.districts_cat[di]['id']}"
                 f" b{int(float(base[_b]))} d{int(_d)} v{int(_v)}"
-                f" g{int(_a)} t{int(_v + _a)}")
+                f" t{int(_v)}")
 
     def _district_cap(self, row: int, j: int) -> torch.Tensor:
         """[B] long — how many SPECIALTY districts city slot `j` may hold:
@@ -2013,18 +1991,14 @@ class SimSeats:
 
     def _seat_tile_price(self, row: int, ctr: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
         ring = self.pair_dist[ctr, tgt].clamp(min=2)
-        tpct = self.civ_techs[:, row].sum(dim=1).double() / max(1, self.civ_techs.shape[2])
-        cpct = self.civ_civics[:, row].sum(dim=1).double() / max(1, self.civ_civics.shape[2])
-        # `tilePurchaseCost`: the ring base and the per-purchase step, each
-        # through the speed as a cost
-        base = self.rules.scale_by_game_speed(torch.full_like(tpct, 1.0) * (50.0 + 25.0 * (ring - 2).double()))
-        step = torch.full_like(tpct, float(self.rules.scale_by_game_speed(5)))
+        # `tilePurchaseCost`: the plot's own price, then the seat's rows
+        price = self._plot_price(ring, self._progress_pct(row)).double()
         tpm = self._gov_mods(row)[6].double()
         # CIV6 (EFFECT_ADJUST_PLOT_PURCHASE_COST_TERRAIN): the roster's terrain rows (`TILE_COST_ROWS`)
         _tpct = torch.zeros_like(tpm)
         for _tc, _tl, _tt, _tp in self._live_rows(row, self._tile_cost_rows):
             _tpct = _tpct + (self._row_is(row, _tc, _tl) & (self.terrain.gather(1, tgt.unsqueeze(1)).squeeze(1) == _tt)).double() * _tp
-        return js_round((base * (1.0 + 4.0 * torch.maximum(tpct, cpct)) + step * self.civ_tiles_purchased[:, row].double()) * tpm * (1.0 + _tpct / 100.0))
+        return js_round(price * tpm * (1.0 + _tpct / 100.0))
 
     def _seat_tile_buy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 3: the TILE-BUY candidate — ONE legality body for the wire
@@ -2468,7 +2442,7 @@ class SimSeats:
         gate = self._governor_flag(row, chan)  # [B, RC]
         if not bool(gate.any()):
             return no, none_t, none_t
-        d_fac = self._district_research_fac(row)
+        pct_d = self._progress_pct(row)
         mult = self.rules.faith_purchase_mult if via_faith else self.rules.gold_purchase_mult
         purse = self.civ_faith[:, row] if via_faith else self.civ_treasury[:, row]
         ok, tile, si_out = no.clone(), none_t.clone(), none_t.clone()
@@ -2476,7 +2450,7 @@ class SimSeats:
             unl = active & ~ok & self._district_unlocked(row, si)
             if not bool(unl.any()):
                 continue
-            cost = self._district_cost_si(row, si, d_fac)
+            cost = self._district_cost_si(row, si, pct_d)
             base = js_round(cost.double() * mult)
             price = self._faith_price(row, base) if via_faith else self._gold_price(row, base)
             unl = unl & self._afford(purse, price)
@@ -2527,14 +2501,14 @@ class SimSeats:
         want = want & (tile >= 0) & (tile < self.T) & gate & (slot >= 0)
         if not bool(want.any()):
             return none
-        d_fac = self._district_research_fac(row)
+        pct_d = self._progress_pct(row)
         mult = self.rules.faith_purchase_mult if via_faith else self.rules.gold_purchase_mult
         out = none.clone()
         for si, (di, _utech, _uciv, plc, _fc) in enumerate(self._scaffold):
             want_si = want & (si_code == si) & self._district_unlocked(row, si)
             if not bool(want_si.any()):
                 continue
-            cost = self._district_cost_si(row, si, d_fac)
+            cost = self._district_cost_si(row, si, pct_d)
             base = js_round(cost.double() * mult)
             price = self._faith_price(row, base) if via_faith else self._gold_price(row, base)
             purse = self.civ_faith[:, row] if via_faith else self.civ_treasury[:, row]
@@ -2915,7 +2889,6 @@ class SimSeats:
                     self._reveal_around(_rows, row, tt[_rows], 1)  # acquireTile's revealAround(seat, tile, 1)
                     self.tile_city[_rows, tt[_rows]] = self.city_id[_rows, row, jt[_rows]]
                     # `claimTile`: a purchase leaves the culture count alone
-                    self.civ_tiles_purchased[_rows, row] += 1
                     self._eff_version += 1
                     bought = bought | ok_t
         # THE MISSILE SILO'S LAUNCH. The silo is an improvement, so the order
@@ -3072,7 +3045,7 @@ class SimSeats:
             is_d = act & (a >= self.DISTRICT_BASE) & (a < self.DISTRICT_BASE + nS)
             if bool(is_d.any()) and self._scaffold \
                     and dtile is not None and j < int(dtile.shape[1]):
-                d_fac = self._district_research_fac(row)
+                pct_d = self._progress_pct(row)
                 reg_j = self.city_dist_tile[:, row, j]  # [B, nD] THIS city's registry — the list TS counts
                 spec_cnt = ((reg_j >= 0) & self._is_specialty.reshape(1, -1)).sum(dim=1)
                 cap_j = self._district_cap(row, j)
@@ -3086,7 +3059,7 @@ class SimSeats:
                     want_d = want_d & has_tech & self._district_slot_free(row, j, di) & under_cap
                     if not bool(want_d.any()):
                         continue
-                    d_cost_si = self._district_cost_si(row, si, d_fac)
+                    d_cost_si = self._district_cost_si(row, si, pct_d)
                     placed = self._place_district(row, j, di, want_d, plc, dtile[:, j, si])
                     if bool(placed.any()):
                         self._q_push(row, j, placed,
@@ -3151,21 +3124,17 @@ class SimSeats:
                     if not bool(rows_p.any()):
                         continue
                     # `projectCost`: the row's own speed-scaled `Projects.Cost`
-                    # (`pc`), plus the GAME_PROGRESS climb where the row
-                    # carries one (`pcg`, the six district projects and the
-                    # Cothon's move); the repair is priced by the HP it restores.
+                    # (`pc`), or `progressCost` over its install Cost (`pgb`)
+                    # and climb (`pk`) where it carries COST_PROGRESSION_GAME_PROGRESS
+                    # (the district projects and the Cothon's move); the
+                    # repair is priced by the HP it restores.
                     pc_fixed = max(int(prow_a["pc"]), 0)
-                    pc_prog = int(prow_a["pcg"])
+                    pc_base = int(prow_a["pgb"])
                     if int(prow_a["rep"]):
                         price_a = self._repair_cost(row, j)
-                    elif pc_prog:
-                        # CIV6 (the install cost model COST_PROGRESSION_GAME_PROGRESS): the price
-                        # climbs with the game's own progress, the larger of
-                        # the tech and civic shares researched.
-                        _tp = self.civ_techs[:, row].to(torch.float64).mean(dim=1)
-                        _cp = self.civ_civics[:, row].to(torch.float64).mean(dim=1)
-                        price_a = (_z_pc + float(pc_fixed)
-                                   + torch.floor(pc_prog * torch.maximum(_tp, _cp)))
+                    elif pc_base >= 0:
+                        price_a = _z_pc + self._progress_cost(pc_base, int(prow_a["pk"]),
+                                                              self._progress_pct(row)).to(_z_pc.dtype)
                     else:
                         price_a = _z_pc + float(pc_fixed)
                     self._q_push(row, j, rows_p,
@@ -9741,14 +9710,14 @@ class SimSeats:
         dreg = self.city_dist_tile[:, row, :cols]
         dflat = dreg.clamp(min=0).reshape(B, -1)
         dcomp = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg)
-        # cityMaintenance — per-type district upkeep over COMPLETED districts
-        # (no pillage gate) + buildingMaintenance over EVERY building (no
-        # pillage and no regional skip; cityMaintenance has neither), + the
+        # cityMaintenance — per-type district upkeep over COMPLETED, UNPILLAGED
+        # districts + buildingMaintenance over EVERY building (a pillaged one
+        # still pays, and no regional skip), + the
         # capital's PALACE, which TS carries as an autoCapital entry in
         # city.buildings and the GPU carries as an is_cap bonus.
         # per INSTANCE off the tile plane — the registry keeps one per type
         maint = (self._d_maint.double().reshape(1, 1, -1)
-                 * self._dist_counts(row, pillage_gate=False)[:, :cols].double()).sum(dim=2)
+                 * self._dist_counts(row)[:, :cols].double()).sum(dim=2)
         maint = maint + torch.einsum("bjn,bn->bj", bldg.double(), self._b_cols(row)["maintenance"])
         maint = maint + float(self.rules.palace_maintenance) * is_cap_a
         # WATER: fresh > coastal > none, then the Aqueduct — a fresh city gains
@@ -11682,21 +11651,20 @@ class SimSeats:
 
     def _garrison_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
                      seat: torch.Tensor, base: torch.Tensor) -> torch.Tensor:
-        """[B] f64 — `garrisonCS`, THE GARRISON TERM: a land military unit of
-        the holder on the centre adds max(0, its Combat - `base`) x (1 -
-        damage / 200), one integer product over one division as TS writes it,
-        so both engines land on the same double. A hull, an aircraft and a
-        passenger are no garrison; the tile seats one military unit."""
+        """[B] f64 — `garrisonCS`, THE GARRISON TERM: a military unit of the
+        holder on the centre, a hull included, adds max(0, its Combat - damage
+        / 10 - `base`), associated as TS writes it. An aircraft and a passenger
+        are no garrison; the tile seats one military unit."""
         bidx = self._bidx
         ctr = self.city_center[bidx, hrow, hcol.clamp(min=0)].clamp(min=0)
         gslot = self.military_at[bidx, ctr]
         gs0 = gslot.clamp(min=0)
         gty = self.unit_type[bidx, gs0].clamp(min=0, max=self.NU - 1)
         gar = ((gslot >= 0) & (self.unit_seat[bidx, gs0] == seat)
-               & ~self.unit_naval[gty] & ~self.unit_emb[bidx, gs0])
-        over = (self._type_combat[gty] - base).clamp(min=0)
-        dmg = int(self.rules.combat["unitHp"]) - self.unit_hp[bidx, gs0]
-        g = (over * (self._garrison_damage_scale - dmg)).to(torch.float64) / self._garrison_damage_scale
+               & ~self.unit_emb[bidx, gs0])
+        dmg = (int(self.rules.combat["unitHp"]) - self.unit_hp[bidx, gs0]).to(torch.float64)
+        g = (self._type_combat[gty].to(torch.float64) - dmg / self._garrison_hp_per_cs
+             - base.to(torch.float64)).clamp(min=0)
         return torch.where(gar, g, torch.zeros_like(g))
 
     def _centre_strength(self, hrow: torch.Tensor, hcol: torch.Tensor,
@@ -11706,7 +11674,7 @@ class SimSeats:
         city-state's row with its one column 0): the holder's base
         (`_holder_strength`), `Districts.CityStrengthModifier` over the city's
         complete, unpillaged districts counted per instance off the tile plane
-        (`_dist_counts`' rule), the walls tier's adder, the Palace's +3 where
+        (`_dist_counts`' rule), each wall building's strength, the Palace's +3 where
         the city holds it (`_palace_at`: a capital, a minor's city), the
         garrison term (`_garrison_cs`) — left out where `garrisoned` is False
         (the Encampment) — and a city-state's +1 per envoy it holds
@@ -11718,7 +11686,8 @@ class SimSeats:
         minor = (hrow >= self._CITY_MINOR0) & (hrow < self._CITY_MINOR0 + self.S)
         seat = self._ROW_SEAT[hrow]
         base = self._holder_strength(hrow)
-        cs = base + self._walls_tier_cs[self._walls_tier_at(hrow, hcol)]
+        # each wall building built adds its own strength (`wallsStrength`)
+        cs = base + (self.city_bldg[bidx, hrow, hc0].long() * self._b_walls_cs.unsqueeze(0)).sum(dim=1)
         live = ((self.tile_seat == seat.unsqueeze(1))
                 & (self.tile_city == self.city_id[bidx, hrow, hc0].unsqueeze(1))
                 & (self.district >= 0) & self.district_complete & ~self.district_pillaged)

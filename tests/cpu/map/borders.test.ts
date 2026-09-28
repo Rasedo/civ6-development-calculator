@@ -53,8 +53,8 @@ describe('cultural border growth', () => {
     expect(tileCity(target)).toBe(city.id);
     expect(seatOf(state, 0)!.treasury).toBe(1000 - cost);
     expect(city.tilesAcquired).toBe(0); // a purchase moves neither the culture box nor the count its cost climbs on
-    expect(seatOf(state, 0)!.tilesPurchased).toBe(1);
-    expect(tilePurchaseCost(state, city)).toBe(scaleByGameSpeed(50) + scaleByGameSpeed(5)); // +5, speed-scaled, per purchase
+    // no step per plot bought: the next ring-2 plot costs the same
+    expect(tilePurchaseCost(state, city)).toBe(scaleByGameSpeed(50));
 
     // far tile: not a candidate
     const far = tileAtCoords(state.map, 16, 9);

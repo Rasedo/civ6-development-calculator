@@ -151,7 +151,7 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
       const target = settleAt(state, tileAtCoords(state.map, 16, 5).index, 1); // >10 from the Holy City, <=10 from hsCity
       seatOf(state, 0)!.religion = { pantheon: null, founded: true, name: 'Test', follower: null, founder: null, worship: null, enhancer: null, holyTile: holyCity.centerIndex };
       // a city presses only the religion it FOLLOWS; the Holy Site city x2, and
-      // under Jerusalem's suzerain "as if it were a Holy City", x4
+      // under Jerusalem's suzerain "as if it were a Holy City" x4 on top of it
       holyCity.followedReligion = 0;
       hsCity.followedReligion = 0;
       if (withJerusalem) addNamedCs(state, 'Jerusalem', 'religious', 27, 2, { 0: 3 });
@@ -159,7 +159,7 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
       return target.religionPressure?.[0] ?? 0;
     };
     expect(run(false)).toBe(HOLY_SITE_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
-    expect(run(true)).toBe(HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
+    expect(run(true)).toBe(HOLY_CITY_PRESSURE_MULT * HOLY_SITE_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
   });
 
   it('Jerusalem never double-counts the Holy City itself', () => {
@@ -172,7 +172,7 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     holyCity.followedReligion = 0;
     addNamedCs(state, 'Jerusalem', 'religious', 27, 2, { 0: 3 });
     endTurn(state);
-    // the Holy City's x4 once — its Holy Site does not stack a second step on top
-    expect(target.religionPressure?.[0] ?? 0).toBe(HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
+    // the Holy City's x4 once, times its Holy Site's x2 — never a second x4
+    expect(target.religionPressure?.[0] ?? 0).toBe(HOLY_CITY_PRESSURE_MULT * HOLY_SITE_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
   });
 });
