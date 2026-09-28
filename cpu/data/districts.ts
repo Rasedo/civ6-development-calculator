@@ -1216,7 +1216,7 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; src?: SrcMap; unlockId: strin
       unlockId: xml('Districts', 'DistrictType=DISTRICT_ENCAMPMENT', 'PrereqTech', { expect: 'TECH_BRONZE_WORKING' }),
     },
   },
-  { id: 'AERODROME', unlockId: 'FLIGHT',
+  { id: 'AERODROME', unlockId: 'FLIGHT', placement: 'flat',
     src: {
       unlockId: xml('Districts', 'DistrictType=DISTRICT_AERODROME', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
     },
