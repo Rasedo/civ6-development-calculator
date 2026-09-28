@@ -10740,6 +10740,10 @@ class SimSeats:
             frm_f, self.hills[rows, s_idx].long() * self._mp_scale, self.tmove[rows, s_idx])
         fresh_f = ~self.feat_stripped[rows, s_idx] & frm_f
         self.feat_stripped[rows, s_idx] |= frm_f
+        # ...and its job flags go to the bare ground's, read again once a
+        # razed centre stands empty
+        if bool(fresh_f.any()):
+            self._bare_ground_jobs(rows[fresh_f], s_idx[fresh_f])
         self.improvement[rows, s_idx] = -1
         # Founding does NOT clear tile.pillaged: a pillaged farm's flag survives
         # the founding — the improvement dies, the flag stays, and later readers

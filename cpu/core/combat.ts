@@ -1739,12 +1739,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // below, and the conquest is what destroys the shelterers.
   const encamp = encampmentDefense(state, attacker, target);
   // CIV6: one military unit to a tile — the move onto a religious unit's
-  // tile is refused where the mover's own military already stands.
+  // tile is refused where any military unit already stands, the mover's own
+  // or a seat at peace with it.
   if (enemies.length === 0 && !seatTarget && !cityStateTarget && !encamp && !isWater(target) && !def.naval
       && unitsAt(state, targetIndex).some((u) => unitReligious(u.type) && unitsHostile(state, attacker, u)
         && unitVisibleTo(state, u, attacker.seat))
-      && !unitsAt(state, targetIndex).some((u) => u.id !== attacker.id && u.seat === attacker.seat
-        && unitStackSlot(u) === 'military')) {
+      && !unitsAt(state, targetIndex).some((u) => u.id !== attacker.id && unitStackSlot(u) === 'military')) {
     const r = stepUnit(state, attacker, target);
     return r === 'moved' || r === 'halted' ? MOVED_ONTO : no('Cannot move there.');
   }

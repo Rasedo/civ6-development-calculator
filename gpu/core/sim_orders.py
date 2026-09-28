@@ -863,9 +863,10 @@ class SimOrders:
                     cs_hit = cs_t & ~city_t
                     unit_hit = (host_m | host_c) & ~city_hit & ~cs_hit & ~enc_t
                     # CIV6: one military unit to a tile — the move is refused
-                    # where the mover's own military already stands
-                    own_mil = (_ms >= 0) & (m_seat == row)
-                    coloc = host_r & ~host_m & ~host_c & ~own_mil & ~city_hit & ~cs_hit & ~enc_t
+                    # where any military unit already stands, the mover's own
+                    # or a seat at peace with it (seen or not)
+                    any_mil = self.military_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0
+                    coloc = host_r & ~host_m & ~host_c & ~any_mil & ~city_hit & ~cs_hit & ~enc_t
                     _css = self.citystate_at.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)
                     for b_ in valid.nonzero(as_tuple=True)[0].tolist():
                         v = int(sc[b_])
