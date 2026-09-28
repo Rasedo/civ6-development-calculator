@@ -19,6 +19,9 @@ for _, u in pl:GetUnits():Members() do
   if u:GetType() == spyRow.Index then spies[#spies + 1] = u end
 end
 local started, travelled, promoted, bought = 0, 0, 0, 0
+-- ZMAXSTART (c16n_cycle.py --max-start): at most that many missions started
+-- a turn, so missions complete one batch at a time; unset, no limit
+local maxStart = tonumber("ZMAXSTART") or 99
 for _, u in ipairs(spies) do
   local xp = u:GetExperience()
   local canP, res = UnitManager.CanStartCommand(u, UnitCommandTypes.PROMOTE, true, true)
@@ -42,7 +45,9 @@ for _, u in ipairs(spies) do
   if not busy then
     if c ~= nil and c:GetX() == ZCX and c:GetY() == ZCY then
       local t = {[UnitOperationTypes.PARAM_X] = ZDX, [UnitOperationTypes.PARAM_Y] = ZDY}
-      if UnitManager.CanStartOperation(u, op.Hash, nil, t) then
+      if started >= maxStart then
+        state = "wait"
+      elseif UnitManager.CanStartOperation(u, op.Hash, nil, t) then
         UnitManager.RequestOperation(u, op.Hash, t)
         started = started + 1
         state = "start"

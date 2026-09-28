@@ -1,0 +1,1061 @@
+################ c16n cycle op UNITOPERATION_SPY_SIPHON_FUNDS cap 20 city 66:27 district 66:28 post 66:28 defender 1:262146 missions True hold True answer POSITIVE
+hook seat 1 installed true nil
+defender 262146 at 66:27 level 1 op -1
+turn 8 spies 0 started 0 travelled 0 promoted 0 bought 4 gold 50000
+c2 {"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"perTurn":0,"griev":0,"turn":8,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_CLAIM_GREAT_PERSON -> nothing
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+spy 524288 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 11:24 travel
+spy 458754 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 16:24 travel
+spy 589828 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 13:29 travel
+spy 655365 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 13:20 travel
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 9 spies 4 started 0 travelled 4 promoted 0 bought 0 gold 50000
+c2 {"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"perTurn":0,"griev":0,"turn":9,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds BUILDING_MONUMENT
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup TechCivicCompletedPopup -> closed
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds BUILDING_MONUMENT
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+turn 10 spies active 0 idle 0 missions 0 captured-enemy 0
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 10 spies 0 started 0 travelled 0 promoted 0 bought 4 gold 50000
+c2 {"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"perTurn":0,"griev":0,"turn":10,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds UNIT_BUILDER
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds BUILDING_MONUMENT
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+turn 11 spies active 0 idle 8 missions 0 captured-enemy 0
+spy 983040 LOC_CITIZEN_CANADA_FEMALE_10 level 1 at 16:24 travel
+spy 1048583 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 11:24 travel
+spy 1114120 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 at 13:29 travel
+spy 1179657 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 13:20 travel
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 start
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:27 start
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:27 start
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:27 start
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 11 spies 8 started 4 travelled 4 promoted 0 bought 0 gold 50000
+c2 {"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"perTurn":0,"griev":0,"turn":11,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds BUILDING_MONUMENT
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+turn 12 spies active 4 idle 0 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 12 spies 4 started 0 travelled 0 promoted 0 bought 4 gold 50000
+c2 {"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"perTurn":0,"griev":0,"turn":12,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds UNIT_BUILDER
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> PARIS builds BUILDING_GRANARY
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+turn 13 spies active 4 idle 8 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1769486 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 16:24 travel
+spy 1835023 LOC_CITIZEN_CANADA_MALE_5 level 1 at 11:24 travel
+spy 1900560 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 1 at 13:29 travel
+spy 1966097 LOC_CITIZEN_CANADA_MALE_9 level 1 at 13:20 travel
+spy 2031634 LOC_CITIZEN_CANADA_FEMALE_10 level 1 at 66:27 start
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:27 start
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 at 66:27 start
+spy 2228245 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:27 start
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 13 spies 12 started 4 travelled 4 promoted 0 bought 0 gold 50000
+c2 {"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"perTurn":0,"griev":0,"turn":13,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> HALIFAX builds UNIT_BUILDER
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds BUILDING_GRANARY
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+turn 14 spies active 8 idle 0 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2031634 LOC_CITIZEN_CANADA_FEMALE_10 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2228245 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 14 spies 8 started 0 travelled 0 promoted 0 bought 4 gold 50000
+c2 {"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"perTurn":0,"griev":0,"turn":14,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_CLAIM_GREAT_PERSON -> nothing
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds BUILDING_GRANARY
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 1  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 15 spies active 6 idle 9 missions 4 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:27 start
+spy 2621454 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 11:24 travel
+spy 2555919 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 16:24 travel
+spy 2031634 LOC_CITIZEN_CANADA_FEMALE_10 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2228245 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2687000 LOC_CITIZEN_CANADA_MALE_8 level 1 at 13:29 travel
+spy 2752537 LOC_CITIZEN_CANADA_MODERN_MALE_8 level 1 at 13:20 travel
+spy 2883611 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 66:27 start
+spy 2949148 LOC_CITIZEN_CANADA_MALE_5 level 1 at 66:27 start
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 1 at 66:27 start
+spy 3080222 LOC_CITIZEN_CANADA_MALE_9 level 1 at 66:27 start
+defender 262146 at 66:27 level 1 op -1
+turn 15 spies 15 started 5 travelled 4 promoted 1 bought 0 gold 50000
+c2 {"griev":0,"perTurn":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"turn":15,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 turn 15 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 turn 15 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds UNIT_BUILDER
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup EspionagePopup -> closed
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds BUILDING_GRANARY
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 1  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 1  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 16 spies active 9 idle 0 missions 4 captured-enemy 0
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2031634 LOC_CITIZEN_CANADA_FEMALE_10 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2228245 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2883611 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2949148 LOC_CITIZEN_CANADA_MALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3080222 LOC_CITIZEN_CANADA_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 16 spies 9 started 0 travelled 0 promoted 0 bought 4 gold 50000
+c2 {"griev":0,"perTurn":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"turn":16,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup EspionagePopup -> closed
+    no grab of p1 this turn
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2031634 LOC_CITIZEN_CANADA_FEMALE_10 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2228245 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2883611 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2949148 LOC_CITIZEN_CANADA_MALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3080222 LOC_CITIZEN_CANADA_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 16 spies 9 started 0 travelled 0 promoted 0 bought 4 gold 50000
+c2 {"promises":{"DONT_SPY_ON_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false},"perTurn":0,"griev":0,"turn":16,"log":{}}
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    no grab of p1 this turn
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+hook seat 1 installed true nil
+spy 3538956 LOC_CITIZEN_CANADA_MODERN_MALE_8 level 1 at 66:27 start
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 2 at 66:27 start
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 1 at 66:27 start
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:27 start
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:27 start
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2228245 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3342360 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:27 start
+spy 2883611 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2949148 LOC_CITIZEN_CANADA_MALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3080222 LOC_CITIZEN_CANADA_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:27 level 1 op -1
+turn 17 spies 12 started 6 travelled 0 promoted 0 bought 4 gold 50000
+c2 {"turn":17,"log":{},"perTurn":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"griev":0}
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 2162708 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 turn 17 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 2228245 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 turn 17 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> PARIS builds BUILDING_WALLS
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 2  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 1  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 18 spies active 10 idle 5 missions 8 captured-enemy 0
+spy 3538956 LOC_CITIZEN_CANADA_MODERN_MALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3997717 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 16:24 travel
+spy 3342360 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2883611 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2949148 LOC_CITIZEN_CANADA_MALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3080222 LOC_CITIZEN_CANADA_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3735585 LOC_CITIZEN_CANADA_MALE_6 level 1 at 16:24 travel
+spy 3801122 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 11:24 travel
+spy 3866659 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 13:29 travel
+spy 3932196 LOC_CITIZEN_CANADA_MALE_2 level 1 at 13:20 travel
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 18 spies 15 started 0 travelled 5 promoted 0 bought 0 gold 50000
+c2 {"turn":18,"log":{},"perTurn":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"griev":0}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> HALIFAX builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> PARIS builds BUILDING_WALLS
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 3  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 1  SIPHON_FUNDS KILLED / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 2  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 19 spies active 7 idle 1 missions 12 captured-enemy 0
+spy 3538956 LOC_CITIZEN_CANADA_MODERN_MALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3342360 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2949148 LOC_CITIZEN_CANADA_MALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 1 at 66:27 start
+defender 262146 at 66:27 level 1 op -1
+turn 19 spies 8 started 1 travelled 0 promoted 1 bought 4 gold 50000
+c2 {"turn":19,"log":{},"perTurn":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"griev":0}
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 2949148 LOC_CITIZEN_CANADA_MALE_5 level 1 turn 19 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> MONTREAL builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> PARIS builds BUILDING_WALLS
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 3  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 1  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 1  SIPHON_FUNDS KILLED / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 2  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 20 spies active 7 idle 10 missions 12 captured-enemy 0
+spy 4456449 LOC_CITIZEN_CANADA_MALE_4 level 1 at 13:20 travel
+spy 3538956 LOC_CITIZEN_CANADA_MODERN_MALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4718610 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:27 start
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4390933 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 13:29 travel
+spy 3342360 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:27 start
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 start
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 1 at 16:24 travel
+spy 4325409 LOC_CITIZEN_CANADA_MALE_7 level 1 at 11:24 travel
+spy 4259874 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 16:24 travel
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:27 start
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:27 start
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 20 spies 17 started 5 travelled 5 promoted 1 bought 0 gold 50000
+c2 {"turn":20,"perTurn":0,"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    no grab of p1 this turn
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+spy 3538956 LOC_CITIZEN_CANADA_MODERN_MALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4718610 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3342360 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 66:27 start
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at 16:24 notarget
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 20 spies 13 started 1 travelled 0 promoted 0 bought 3 gold 50000
+c2 {"turn":20,"griev":0,"perTurn":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"log":{}}
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> PARIS builds BUILDING_WALLS
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 3  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 2  SIPHON_FUNDS KILLED / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 5  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 21 spies active 7 idle 8 missions 18 captured-enemy 0
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 2 at 66:27 start
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 1 at 66:27 wait
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:27 wait
+spy 4718610 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:27 wait
+spy 3342360 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 5046313 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 11:24 travel
+spy 5111850 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 13:29 travel
+spy 5177387 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 13:20 travel
+defender 262146 at 66:27 level 1 op -1
+turn 21 spies 15 started 1 travelled 3 promoted 3 bought 1 gold 50000
+c2 {"turn":21,"griev":0,"perTurn":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 3342360 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 turn 21 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_CLAIM_GREAT_PERSON -> nothing
+    popup EspionagePopup -> closed
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 3  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 2  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 2  SIPHON_FUNDS KILLED / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 5  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 22 spies active 7 idle 9 missions 18 captured-enemy 0
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 2 at 66:27 start
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:27 wait
+spy 4718610 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:27 wait
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5242914 LOC_CITIZEN_CANADA_MALE_3 level 1 at 16:24 travel
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 22 spies 16 started 1 travelled 1 promoted 0 bought 2 gold 50000
+c2 {"turn":22,"griev":0,"perTurn":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> OTTAWA builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    no grab of p1 this turn
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+spy 5767180 LOC_CITIZEN_CANADA_FEMALE_6 level 1 at 13:20 notarget
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:27 start
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:27 wait
+spy 4718610 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:27 wait
+spy 5701654 LOC_CITIZEN_CANADA_FEMALE_8 level 1 at 13:29 notarget
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 22 spies 17 started 1 travelled 0 promoted 0 bought 0 gold 50000
+c2 {"turn":22,"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"log":{}}
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    idle seat 0 0 
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 3  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 2  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 2  SIPHON_FUNDS KILLED / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 5  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 23 spies active 8 idle 12 missions 18 captured-enemy 0
+spy 5767180 LOC_CITIZEN_CANADA_FEMALE_6 level 1 at 13:20 travel
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:27 start
+spy 4718610 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:27 wait
+spy 5701654 LOC_CITIZEN_CANADA_FEMALE_8 level 1 at 13:29 travel
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 23 spies 20 started 1 travelled 2 promoted 0 bought 0 gold 50000
+c2 {"turn":23,"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> HALIFAX builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    idle seat 0 9 SPY,SPY,SPY,SPY,BUILDER,SPY,SPY,SPY,SPY
+    no grab of p1 this turn
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:27 start
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4718610 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:27 wait
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 23 spies 18 started 1 travelled 0 promoted 0 bought 0 gold 50000
+c2 {"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"turn":23,"log":{}}
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    idle seat 0 0 
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 3  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 2  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 2  SIPHON_FUNDS KILLED / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 5  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 24 spies active 9 idle 9 missions 18 captured-enemy 0
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4718610 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:27 start
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 24 spies 18 started 1 travelled 0 promoted 0 bought 0 gold 50000
+c2 {"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"turn":24,"log":{}}
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup NaturalDisasterPopup -> closed
+    idle seat 0 14 SPY,SPY,SPY,SPY,SPY,SPY,SPY,SPY,SPY,BUILDER,SPY,SPY,SPY,SPY
+    retry 1: idle seat 0 1 SPY | unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 turn 24 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_MALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=2 InitialResult=4 LevelAfter=3 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 4  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 3  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 2  SIPHON_FUNDS KILLED / NO_RESULT
+tally 2  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 8  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 25 spies active 2 idle 17 missions 24 captured-enemy 0
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:27 start
+spy 3473422 LOC_CITIZEN_CANADA_MALE_8 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6225938 LOC_CITIZEN_CANADA_FEMALE_8 level 1 at 66:27 wait
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:27 wait
+spy 6094870 LOC_CITIZEN_CANADA_MALE_3 level 1 at 66:27 wait
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 1 at 66:27 wait
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 wait
+spy 6160413 LOC_CITIZEN_CANADA_FEMALE_6 level 1 at 66:27 wait
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:27 wait
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:27 wait
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 25 spies 19 started 1 travelled 0 promoted 3 bought 0 gold 50000
+c2 {"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"turn":25,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> HALIFAX builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    idle seat 0 15 BUILDER,SPY,SPY,SPY,SPY,SPY,SPY,SPY,BUILDER,SPY,BUILDER,SPY,SPY,SPY,SPY
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=26 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_MALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=2 InitialResult=4 LevelAfter=3 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 4  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 3  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 3  SIPHON_FUNDS KILLED / NO_RESULT
+tally 2  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 8  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 26 spies active 2 idle 16 missions 25 captured-enemy 0
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3407887 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6225938 LOC_CITIZEN_CANADA_FEMALE_8 level 1 at 66:27 start
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:27 wait
+spy 6094870 LOC_CITIZEN_CANADA_MALE_3 level 1 at 66:27 wait
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 2 at 66:27 wait
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 2 at 66:27 wait
+spy 6160413 LOC_CITIZEN_CANADA_FEMALE_6 level 1 at 66:27 wait
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 2 at 66:27 wait
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:27 wait
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:27 level 1 op -1
+turn 26 spies 18 started 1 travelled 0 promoted 0 bought 2 gold 50000
+c2 {"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"turn":26,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    idle seat 0 18 BUILDER,SPY,SPY,SPY,SPY,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,SPY,SPY
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=27 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=26 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_MALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=2 InitialResult=4 LevelAfter=3 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 5  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 3  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 3  SIPHON_FUNDS KILLED / NO_RESULT
+tally 2  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 8  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 27 spies active 2 idle 16 missions 26 captured-enemy 0
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6225938 LOC_CITIZEN_CANADA_FEMALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:27 start
+spy 6094870 LOC_CITIZEN_CANADA_MALE_3 level 1 at 66:27 wait
+spy 6488090 LOC_CITIZEN_CANADA_MODERN_FEMALE_2 level 1 at 16:24 travel
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 2 at 66:27 wait
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 2 at 66:27 wait
+spy 6160413 LOC_CITIZEN_CANADA_FEMALE_6 level 1 at 66:27 wait
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 2 at 66:27 wait
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:27 wait
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:27 level 1 op -1
+turn 27 spies 18 started 1 travelled 1 promoted 0 bought 0 gold 50000
+c2 {"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"turn":27,"log":{}}
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    idle seat 0 17 BUILDER,SPY,SPY,SPY,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,SPY,SPY
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=27 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=26 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_MALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=2 InitialResult=4 LevelAfter=3 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 5  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 3  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 3  SIPHON_FUNDS KILLED / NO_RESULT
+tally 2  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 8  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 28 spies active 3 idle 15 missions 26 captured-enemy 0
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 3 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6225938 LOC_CITIZEN_CANADA_FEMALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6094870 LOC_CITIZEN_CANADA_MALE_3 level 1 at 66:27 start
+spy 6553626 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 2 at 16:24 travel
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 2 at 66:27 wait
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 2 at 66:27 wait
+spy 6160413 LOC_CITIZEN_CANADA_FEMALE_6 level 1 at 66:27 wait
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 2 at 66:27 wait
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:27 wait
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:28 level 1 op UNITOPERATION_SPY_COUNTERSPY
+turn 28 spies 18 started 1 travelled 1 promoted 1 bought 0 gold 50000
+c2 {"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"turn":28,"log":{}}
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    idle seat 0 16 BUILDER,SPY,SPY,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,SPY,SPY
+    grabbed p1: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=29 EscapeResult=-1 InitialResult=1 LevelAfter=3 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=27 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=26 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_MALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=2 InitialResult=4 LevelAfter=3 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 6  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 3  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 3  SIPHON_FUNDS KILLED / NO_RESULT
+tally 2  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 8  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 29 spies active 3 idle 15 missions 27 captured-enemy 0
+spy 6619151 LOC_CITIZEN_CANADA_MODERN_FEMALE_2 level 1 at 66:27 start
+spy 6225938 LOC_CITIZEN_CANADA_FEMALE_8 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6094870 LOC_CITIZEN_CANADA_MALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6553626 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 3 at -9999:-9999 idle
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 2 at 66:27 wait
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 2 at 66:27 wait
+spy 6160413 LOC_CITIZEN_CANADA_FEMALE_6 level 1 at 66:27 wait
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 2 at 66:27 wait
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:27 wait
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:27 level 1 op -1
+turn 29 spies 18 started 1 travelled 0 promoted 0 bought 0 gold 50000
+c2 {"griev":0,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"turn":29,"log":{}}
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    idle seat 0 16 BUILDER,SPY,SPY,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,SPY,SPY
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=30 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=29 EscapeResult=-1 InitialResult=1 LevelAfter=3 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=27 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=26 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_MALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=2 InitialResult=4 LevelAfter=3 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 6  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 3  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 4  SIPHON_FUNDS KILLED / NO_RESULT
+tally 2  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 8  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 30 spies active 3 idle 14 missions 28 captured-enemy 0
+spy 6619151 LOC_CITIZEN_CANADA_MODERN_FEMALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6094870 LOC_CITIZEN_CANADA_MALE_3 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 6553626 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 3 at -9999:-9999 idle
+spy 4653083 LOC_CITIZEN_CANADA_MALE_6 level 2 at 66:27 start
+spy 4587548 LOC_CITIZEN_CANADA_FEMALE_9 level 2 at 66:27 wait
+spy 6160413 LOC_CITIZEN_CANADA_FEMALE_6 level 1 at 66:27 wait
+spy 4522014 LOC_CITIZEN_CANADA_MODERN_MALE_3 level 2 at -9999:-9999 idle
+spy 5570591 LOC_CITIZEN_CANADA_FEMALE_5 level 1 at 66:27 wait
+spy 5832738 LOC_CITIZEN_CANADA_MODERN_MALE_10 level 1 at 66:27 wait
+spy 5505059 LOC_CITIZEN_CANADA_MALE_7 level 1 at 66:27 wait
+spy 4784165 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 2 at 66:27 wait
+spy 4849702 LOC_CITIZEN_CANADA_MALE_2 level 1 at 66:27 wait
+spy 5963816 LOC_CITIZEN_CANADA_MODERN_FEMALE_3 level 1 at 66:27 wait
+spy 5439529 LOC_CITIZEN_CANADA_MODERN_MALE_4 level 1 at 66:27 wait
+spy 5373994 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 wait
+spy 5898283 LOC_CITIZEN_CANADA_MODERN_FEMALE_10 level 1 at 66:27 wait
+defender 262146 at 66:27 level 1 op -1
+turn 30 spies 17 started 1 travelled 0 promoted 0 bought 3 gold 50000
+c2 {"turn":30,"promises":{"DONT_SPY_ON_ME":false,"DONT_SETTLE_NEAR_ME":false,"KEEP_TROOPS_AWAY_FROM_ME":false,"DONT_DIG_UP_MY_ARTIFACTS":false,"DONT_CONVERT_MY_CITIES":false},"perTurn":0,"griev":0,"log":{}}
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> HALIFAX builds UNIT_BUILDER
+    unblock: policies seat 0 slots 2 filled 0:SLOT_MILITARY:POLICY_VETERANCY,1:SLOT_ECONOMIC:POLICY_SCRIPTURE ok true nil
+    popup EspionagePopup -> closed
+    idle seat 0 16 BUILDER,BUILDER,SPY,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,BUILDER,SPY,SPY,SPY,SPY
+    grabbed p1: def: spy 262146 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 1 xp 15 promos  op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 tech0 true, civic0 true, city 65536 builds NONE
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE -> nothing
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=31 EscapeResult=-1 InitialResult=4 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=30 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=29 EscapeResult=-1 InitialResult=1 LevelAfter=3 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=27 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=26 EscapeResult=-1 InitialResult=0 LevelAfter=2 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_MALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=2 InitialResult=4 LevelAfter=3 LootInfo=52 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=52 Name=LOC_CITIZEN_CANADA_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=24 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=5 LevelAfter=3 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=21 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_8 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=0 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MALE_5 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=19 EscapeResult=-1 InitialResult=0 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=2 InitialResult=4 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_3 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=17 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_10 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=0 InitialResult=4 LevelAfter=1 LootInfo=56 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=15 EscapeResult=2 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 6  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / CAPTURED
+tally 1  SIPHON_FUNDS FAIL_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 2  SIPHON_FUNDS FAIL_MUST_ESCAPE / KILLED
+tally 3  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 4  SIPHON_FUNDS KILLED / NO_RESULT
+tally 2  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / FAIL_MUST_ESCAPE
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / KILLED
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 8  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 31 spies active 4 idle 14 missions 29 captured-enemy 0

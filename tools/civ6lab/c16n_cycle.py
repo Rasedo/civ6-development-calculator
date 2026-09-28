@@ -36,6 +36,12 @@ import promise_loop  # noqa: E402
 
 HERE = pathlib.Path(__file__).parent
 GC, IG = lab.GC, lab.IG
+# the empty-policy-slot blocker, answered for the local seat
+POLICIES = (HERE / "c16n_policies.lua").read_text(encoding="utf-8")
+# the governor blockers (a free title, an idle governor), answered for seat 0
+GOV = (HERE / "c16n_gov.lua").read_text(encoding="utf-8")
+# seat 0's units still waiting for orders spend their moves
+IDLE = (HERE / "c16n_idle.lua").read_text(encoding="utf-8").replace("ZSEAT", "0")
 
 LUA_DEF_GC = """
 local u = Players[ZDP]:GetUnits():FindID(ZDEF)
@@ -60,6 +66,7 @@ def main(argv=None) -> int:
     p.add_argument("--post", help="the plot the counterspy guards; 'none' leaves it unposted")
     p.add_argument("--defender", required=True)
     p.add_argument("--missions", action="store_true")
+    p.add_argument("--max-start", type=int, default=99, help="missions started a turn at most")
     p.add_argument("--hold", action="store_true")
     p.add_argument("--answer", choices=("POSITIVE", "NEGATIVE"), default="POSITIVE")
     p.add_argument("--gold", type=int, default=50000)
@@ -81,7 +88,7 @@ def main(argv=None) -> int:
     t = h4.connect(a.host)
     turn_lua = (HERE / "c16w_turn.lua").read_text(encoding="utf-8")
     for k, v in (("ZOP", a.op), ("ZCAP", str(a.cap)), ("ZCX", cx), ("ZCY", cy), ("ZDX", dx), ("ZDY", dy),
-                 ("ZDP", dp), ("ZDEF", did)):
+                 ("ZDP", dp), ("ZDEF", did), ("ZMAXSTART", str(a.max_start))):
         turn_lua = turn_lua.replace(k, v)
     hist_lua = (HERE / "spy_history.lua").read_text(encoding="utf-8")
     watch = (HERE / "c2n_watch.lua").read_text(encoding="utf-8").replace("ZA", "0").replace("ZB", dp)
@@ -112,27 +119,45 @@ def main(argv=None) -> int:
         log(t.run(IG, watch.replace("ZSINCE", str(t0 - 1)))[-1])
         for ln in t.run(IG, accept):
             log("    " + ln)
+        gov_out = t.run(IG, GOV, timeout=30)[-1]
+        if not gov_out.endswith("nothing"):
+            log("    " + gov_out)
         seen: set[str] = set()
         for _ in range(12):
             name = t.run(IG, blocker0)[-1].split()[-1]
             if name == "none" or (name in seen and name != "ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE"):
                 break
             seen.add(name)
-            log("    unblock: " + t.run(IG, unblock0, timeout=30)[-1])
+            log("    unblock: " + t.run(IG, POLICIES if name == "ENDTURN_BLOCKING_FILL_CIVIC_SLOT" else unblock0, timeout=30)[-1])
         for cause in lab.diagnose(t, 0):
             if cause[0] == "popup":
                 log(f"    popup {cause[1]} -> {lab.handle(t, 0, cause)}")
+        # the mission requests land on the game's clock; then the units still
+        # waiting for orders spend their moves
+        time.sleep(1.0)
+        log("    " + t.run(GC, IDLE)[-1])
         t.run(GC, f'Players[{dp}]:SetProperty("LAB_GRAB", 1)')
-        t.run(IG, lab.LUA_ENDTURN)
         got = False
-        end = time.monotonic() + 60
-        while time.monotonic() < end:
-            if t.run(IG, "print(Game.GetLocalPlayer())")[-1] == dp:
-                got = True
+        # seat 0's end of turn, retried: a unit that came back to orders (an
+        # arrival, a failed start) holds it until its moves are spent again
+        for attempt in range(4):
+            if attempt:
+                out = t.run(GC, IDLE)[-1]
+                name = t.run(IG, blocker0)[-1].split()[-1]
+                if name not in ("none", "ENDTURN_BLOCKING_UNITS", "ENDTURN_BLOCKING_FILL_CIVIC_SLOT"):
+                    out += " | unblock: " + t.run(IG, unblock0, timeout=30)[-1]
+                log(f"    retry {attempt}: {out}")
+            t.run(IG, lab.LUA_ENDTURN)
+            end = time.monotonic() + 15
+            while time.monotonic() < end:
+                if t.run(IG, "print(Game.GetLocalPlayer())")[-1] == dp:
+                    got = True
+                    break
+                if lab.turn(t) != t0:
+                    break
+                time.sleep(0.1)
+            if got or lab.turn(t) != t0:
                 break
-            if lab.turn(t) != t0:
-                break
-            time.sleep(0.1)
         if got:
             try:
                 d0 = t.run(IG, defl.replace("ZMODE", "read"))[-1]
@@ -148,7 +173,7 @@ def main(argv=None) -> int:
                     if name == "none" or name in seen_d:
                         break
                     seen_d.add(name)
-                    log(f"    p{dp} unblock: " + t.run(IG, unblock_d, timeout=30)[-1])
+                    log(f"    p{dp} unblock: " + t.run(IG, POLICIES if name == "ENDTURN_BLOCKING_FILL_CIVIC_SLOT" else unblock_d, timeout=30)[-1])
                 t.run(IG, lab.LUA_ENDTURN)
                 end = time.monotonic() + 20
                 while time.monotonic() < end:

@@ -30,6 +30,7 @@ end
 for _, c in p:GetCities():Members() do
   local bq = c:GetBuildQueue()
   local cb = bq:CurrentlyBuilding()
-  out[#out + 1] = "city " .. c:GetID() .. " builds " .. tostring(cb) .. " in " .. tostring(bq:GetTurnsLeft())
+  -- GetTurnsLeft is InGame only ("Not Implemented" in GameCore)
+  out[#out + 1] = "city " .. c:GetID() .. " builds " .. tostring(cb)
 end
 print("gcfix seat ZSEAT " .. (#out > 0 and table.concat(out, ", ") or "nothing"))
