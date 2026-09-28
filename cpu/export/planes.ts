@@ -25,7 +25,7 @@ import { UNITS } from '../data/units';
 import { stormFamilyAt, STORM_FAMILIES, droughtTerrain } from '../data/disasters';
 import { floodRivers } from '../core/disasters';
 import { TERRAINS } from '../../world/terrains';
-import { FEATURES } from '../../world/features';
+import { FEATURES, isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../data/cityStates';
@@ -216,13 +216,13 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         if (t.feature === 'WOODS') a += 1;
         if (t.feature === 'RAINFOREST' || t.feature === 'MARSH') a -= 1;
         if (t.feature === 'OASIS') a += 1;
-        if (t.feature === 'FLOODPLAINS') a -= 1;
+        if (isFloodplains(t.feature)) a -= 1;
         return a;
       })(),
       apf:
         t.feature === 'WOODS' || t.feature === 'OASIS'
           ? 1
-          : t.feature === 'RAINFOREST' || t.feature === 'MARSH' || t.feature === 'FLOODPLAINS'
+          : t.feature === 'RAINFOREST' || t.feature === 'MARSH' || isFloodplains(t.feature)
             ? -1
             : 0,
       aps: (t.riverMask ?? 0) !== 0 || t.terrain === 'LAKE' ? 1 : 0,
@@ -249,7 +249,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
             RESOURCES[t.resource]?.improvement === 'FARM'
           : !isWater(t) &&
             ((t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT') ||
-              t.feature === 'FLOODPLAINS'))
+              isFloodplains(t.feature)))
           ? 1
           : 0,
       fa_h:
@@ -300,7 +300,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // CIV6 (Mountain Tunnel): the connected MOUNTAIN component this tile
       // belongs to, -1 off a mountain. Static, so it bakes.
       mrange: t.mountainRange ?? -1,
-      fp: t.feature === 'FLOODPLAINS' ? 1 : 0,
+      fp: isFloodplains(t.feature) ? 1 : 0,
       dc: droughtTerrain(t) ? 1 : 0,
       // the storm FAMILY that may start here (`STORM_FAMILIES` index), -1 none
       sf: (() => { const f = stormFamilyAt(t); return f ? STORM_FAMILIES.indexOf(f) : -1; })(),

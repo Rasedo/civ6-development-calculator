@@ -123,6 +123,8 @@ export interface DumpCity {
   maxLoyalty: Read<number>;
   loyaltyPerTurn: Read<number>;
   loyaltyLevel: Read<number>;
+  /** the game's per-turn loyalty terms, one `{ source: amount }` per row */
+  loyaltyBreakdown?: Read<Record<string, number>[]>;
   majorityReligion: Read<number>;
   religions: Read<DumpReligionInCity[]>;
   governor: Read<number>;

@@ -1179,6 +1179,9 @@ class SimInit:
         self._holy_city_mult = int(rr["holyCityMult"])
         self._holy_site_mult = int(rr["holySiteMult"])
         self._atheism_per_pop = int(rr["atheismPerPop"])
+        # Religious Colonization's founding pressure: the rate per two citizens
+        # (rounded up) plus this
+        self._colonize_extra = int(rr["colonizeExtra"])
         self._holy_founding_per_pop = int(rr["holyCityFoundingPerPop"])
         self._route_dest_pressure = float(rr["routeDestPressure"])
         self._route_origin_pressure = float(rr["routeOriginPressure"])
@@ -1381,7 +1384,7 @@ class SimInit:
         _wd = rules.wonders
         self._wond_rows = list(_wd["rows"])
         self._wond_n = len(self._wond_rows)
-        self._fp_fid = int(_wd["fpFid"])
+        self._fp_feat = torch.tensor([bool(x) for x in _wd["fpFeat"]], dtype=torch.bool, device=device)
         self.built_wonder = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.built_wonder_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.city_wonder = torch.full((B, self.CITY_ROWS, civ_city_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
@@ -2669,8 +2672,10 @@ class SimInit:
         self._accident_district_p = torch.tensor([float(x) for x in _ds["accidentDistrictP"]], dtype=torch.float64, device=device)
         self._accident_bldg_p = torch.tensor([float(x) for x in _ds["accidentBldgP"]], dtype=torch.float64, device=device)
         self._accident_pop_p = torch.tensor([float(x) for x in _ds["accidentPopP"]], dtype=torch.float64, device=device)
+        # its damage rows in the install's order, one draw each
+        self._accident_rows = [[str(k) for k in r] for r in _ds["accidentRows"]]
         # ...and its unit rows on the reactor's plot: the land share, the
-        # inclusive band, the civilians' kill chance
+        # damage MinHP + rand(MaxHP - MinHP), the civilians' kill chance
         self._accident_land_p = [float(x) for x in _ds["accidentLandP"]]
         self._accident_dmg_lo = [int(x) for x in _ds["accidentDmgLo"]]
         self._accident_dmg_hi = [int(x) for x in _ds["accidentDmgHi"]]

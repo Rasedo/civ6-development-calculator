@@ -89,7 +89,12 @@ export const SETTLE_PROMISE_REACH = srcConst('eras.settlePromiseReach', 3, {
 });
 
 /** CIV6 (DIPLOACTION_DECLARE_WAR_OF_RETRIBUTION): "a player who has broken a
- *  promise to you within the past 30 turns" — the window a break opens,
- *  online through `speedTurns`. */
-export const RETRIBUTION_TURNS = srcConst('eras.retributionTurns', speedTurns(30), speedTurnsSrc(
-  { pedia: 'LOC_DIPLOACTION_DECLARE_WAR_OF_RETRIBUTION_DESCRIPTION: "a player who has broken a promise to you within the past 30 turns"' }, 30));
+ *  promise to you within the past 30 turns" — the window a break opens, 30
+ *  turns at the online speed too: not scaled by `speedTurns`. MEASURED: a
+ *  settle promise broken at t126 read broken through t155 and free at t157,
+ *  and a founding within reach at t158 cost nothing. */
+export const RETRIBUTION_TURNS = srcConst('eras.retributionTurns', 30, {
+  lab: 'runs/c2d_duration.jsonl (runs/promise_c2d_break_20260927T191450Z.log, runs/promise_c2d_watch_20260927T192042Z.log, '
+    + 'runs/promise_c2d_probe32_20260927T192113Z.log): IsPromiseMade true through t155 after the t126 break, false at t157',
+  note: 'LOC_DIPLOACTION_DECLARE_WAR_OF_RETRIBUTION_DESCRIPTION: "a player who has broken a promise to you within the past 30 turns"',
+});

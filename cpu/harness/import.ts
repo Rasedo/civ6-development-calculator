@@ -31,6 +31,7 @@ import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, emptySeat, freeSeatOf, markCityCentre, seatOf, seatOfCityState, setTileOwner, setWar } from '../core/seats';
 import { governorsOf } from '../core/governors';
+import { FERTILITY_CAP } from '../core/disasters';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../data/governors';
 import { CIV_LEADERS } from '../data/seats';
 import { BUILDINGS } from '../data/buildings';
@@ -86,10 +87,8 @@ const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(pre
 const TERRAIN_BASE: Record<string, TerrainId> = {
   GRASS: 'GRASSLAND', PLAINS: 'PLAINS', DESERT: 'DESERT', TUNDRA: 'TUNDRA', SNOW: 'SNOW',
 };
-const FEATURE_AS_BASE = new Set(['FEATURE_FLOODPLAINS_GRASSLAND', 'FEATURE_FLOODPLAINS_PLAINS']);
 const FEATURE_ID: Record<string, string> = {
-  FEATURE_FOREST: 'WOODS', FEATURE_JUNGLE: 'RAINFOREST', FEATURE_FLOODPLAINS_GRASSLAND: 'FLOODPLAINS',
-  FEATURE_FLOODPLAINS_PLAINS: 'FLOODPLAINS', FEATURE_BARRIER_REEF: 'GREAT_BARRIER_REEF',
+  FEATURE_FOREST: 'WOODS', FEATURE_JUNGLE: 'RAINFOREST', FEATURE_BARRIER_REEF: 'GREAT_BARRIER_REEF',
   FEATURE_KILIMANJARO: 'MOUNT_KILIMANJARO', FEATURE_EVEREST: 'MOUNT_EVEREST',
   FEATURE_CLIFFS_DOVER: 'CLIFFS_OF_DOVER', FEATURE_BURNING_FOREST: 'BURNING_WOODS',
   FEATURE_BURNT_FOREST: 'BURNT_WOODS', FEATURE_BURNING_JUNGLE: 'BURNING_RAINFOREST',
@@ -206,12 +205,8 @@ function tileOf(ctx: Ctx, rec: TurnRecord, i: number): Tile {
     if (fname === 'FEATURE_VOLCANO') volcano = true;
     else {
       const id = FEATURE_ID[fname] ?? strip(fname, 'FEATURE_');
-      if (id in FEATURES) {
-        feature = id as FeatureId;
-        // the grassland and plains floodplains are features of their own in
-        // the game, which the engine carries as its one (desert) FLOODPLAINS
-        if (FEATURE_AS_BASE.has(fname)) gap(ctx, 'feature-as-base', fname);
-      } else gap(ctx, 'feature', fname);
+      if (id in FEATURES) feature = id as FeatureId;
+      else gap(ctx, 'feature', fname);
     }
   }
   let resource: string | null = null;
@@ -339,10 +334,15 @@ export interface History {
   builders: Map<number, number>;
   /** centre plots of cities already standing at the first record past turn 1 */
   unknownSince: Set<number>;
+  /** a fire's fertility by plot: +1 Food when it turns burnt, +1 Production
+   *  when its feature regrows (`RandomEvent_Yields` Turns 2 and 6) */
+  fireFood: Map<number, number>;
+  fireProd: Map<number, number>;
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), plotsBought: new Map(), builders: new Map(), unknownSince: new Set() };
+  return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), plotsBought: new Map(), builders: new Map(),
+    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map() };
 }
 
 /** Fold one record into the history, in turn order. */
@@ -379,6 +379,17 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const gained = c.plots.filter((q) => !had.has(q)).length;
       if (gained > took) h.plotsBought.set(c.owner, (h.plotsBought.get(c.owner) ?? 0) + gained - took);
     }
+    const fname = (i: number) => cat.features[plotAt(rec, i)[P.feature] as number] ?? '';
+    const fwas = (i: number) => cat.features[plotAt(h.last!, i)[P.feature] as number] ?? '';
+    for (let i = 0; i < W * rec.head.H; i++) {
+      const was = fwas(i);
+      const now = fname(i);
+      if (was === now) continue;
+      if (now.startsWith('FEATURE_BURNT_')) h.fireFood.set(i, (h.fireFood.get(i) ?? 0) + 1);
+      else if (was.startsWith('FEATURE_BURNT_') && (now === 'FEATURE_FOREST' || now === 'FEATURE_JUNGLE')) {
+        h.fireProd.set(i, (h.fireProd.get(i) ?? 0) + 1);
+      }
+    }
   }
   h.last = rec;
 }
@@ -403,6 +414,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     tiles.push(tileOf(ctx, rec, i));
   }
   ctx.scopeTile = undefined;
+  for (const [i, n] of history?.fireFood ?? []) tiles[i].fertility = Math.min(FERTILITY_CAP, n);
+  for (const [i, n] of history?.fireProd ?? []) tiles[i].fertilityProd = Math.min(FERTILITY_CAP, n);
   for (const t of tiles) {
     t.riverMask = edgeMask(rec, t.index, P.riverBits);
     t.cliffMask = edgeMask(rec, t.index, P.cliffBits);
@@ -692,6 +705,18 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       };
     }
     ctx.scopeSeat = undefined;
+  }
+
+  // a resource the engine lacks on an owned plot is its owner's gap too: a
+  // luxury pays every city of the seat, a strategic its stockpile
+  for (const [i, gs] of ctx.tileGaps!) {
+    const seat = seatOfGame(plotAt(rec, i)[P.owner] as number);
+    if (seat === NO_SEAT || !seatOf(state, seat)) continue;
+    for (const g of gs) {
+      if (!g.startsWith('resource:')) continue;
+      if (!ctx.seatGaps!.has(seat)) ctx.seatGaps!.set(seat, new Set());
+      ctx.seatGaps!.get(seat)!.add(g);
+    }
   }
 
   // the luxuries a seat holds beyond its own improved plots came by a deal or

@@ -13,7 +13,7 @@ import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, type BeliefEffects, type BeliefDef } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, followersOf, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { alliedAtLevel, civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity, majorityReligionOf } from './seats';
 import { hexDistance } from '../../world/hex';
 import { cityGreatWorks } from './greatWorks';
@@ -841,6 +841,24 @@ export function foreignFollowerCount(state: GameState, seat: number): number {
   return n;
 }
 
+/** The FOLLOWERS of religion `g` a founder belief pays per: every citizen in
+ *  the world following it — each city's share (`followersOf`), majority or
+ *  not, in a major's cities, the Free Cities' and a city-state's
+ *  (runs/b91w_worldchurch.jsonl: World Church paid 36.75 Culture for 147
+ *  followers, 11 of them in cities of another majority). `_religion_followers`
+ *  is the twin. */
+export function religionFollowers(state: GameState, g: number): number {
+  if (g < 0) return 0;
+  let n = 0;
+  const add = (pres: readonly number[] | undefined, pop: number) => {
+    if (pres && g < pres.length && pres[g] > 0) n += followersOf(pres, pop)[g];
+  };
+  for (const o of state.seats) for (const c of o.cities) add(c.religionPressure, c.population);
+  for (const c of state.freeSeat?.cities ?? []) add(c.religionPressure, c.population);
+  for (const cs of state.cityStates ?? []) add(cs.religionPressure, cs.population);
+  return n;
+}
+
 /** The CITIES FOLLOWING religion `g` a founder belief pays per: every city in
  *  the world whose majority follows it — a major's, the Free Cities', a
  *  city-state's (runs/b91s2_follow_lab4_t150_20260926T1320Z.jsonl:
@@ -1008,6 +1026,8 @@ function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): 
   fpPush(m, founderBelief);   // the founder belief PAID — Mvemba's borrowed one moves with the majority
   // a per-city founder belief pays over the world's cities following
   if (founderBelief && FOUNDER_BELIEFS[founderBelief]?.effects.perCity) fpPush(m, citiesFollowing(state, founderReligionOf(state, seat)));
+  // a per-follower founder belief pays over the world's followers
+  if (founderBelief && FOUNDER_BELIEFS[founderBelief]?.effects.perFollowers) fpPush(m, religionFollowers(state, founderReligionOf(state, seat)));
   fpPush(m, rel?.enhancer ?? null);
 
   const gov = s.government;
@@ -1225,11 +1245,12 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
   const beliefSeat = { followers: pop, cities: cities.length };
   applyBeliefEffects(mods, rel?.pantheon ? PANTHEONS[rel.pantheon] : undefined, beliefSeat);
   // the founder belief PAID: the seat's own, or (Mvemba) the majority
-  // religion's — per city, over the religion's cities following worldwide
+  // religion's — per follower and per city following, worldwide
   const founderBelief = founderBeliefOf(state, seat);
   if (founderBelief) {
+    const g = founderReligionOf(state, seat);
     applyBeliefEffects(mods, FOUNDER_BELIEFS[founderBelief],
-      { followers: pop, cities: citiesFollowing(state, founderReligionOf(state, seat)) });
+      { followers: religionFollowers(state, g), cities: citiesFollowing(state, g) });
   }
   if (rel?.founded) {
     applyBeliefEffects(mods, rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer] : undefined, beliefSeat);
@@ -1380,9 +1401,12 @@ function applyBeliefEffects(
   if (fx.riverCity) mods.riverCity = fx.riverCity;
   if (fx.faithPerWonder) mods.faithPerWonder += fx.faithPerWonder;
 
+  // CIV6 (BELIEF_YIELD_PER_FOLLOWER): Amount per PerXItems followers,
+  // FRACTIONAL — World Church paid 0.25 Culture a follower (36.75 for 147,
+  // runs/b91w_worldchurch.jsonl)
   if (fx.perFollowers) {
     const followers = seat ? seat.followers : 0;
-    const times = Math.floor(followers / fx.perFollowers.per);
+    const times = followers / fx.perFollowers.per;
     if (times > 0) {
       for (const [k, v] of Object.entries(fx.perFollowers.yields)) {
         const key = k as keyof Yields;

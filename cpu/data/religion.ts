@@ -92,8 +92,9 @@ export interface BeliefEffects {
   holySiteReligiousHeal?: number;
   /** CIV6 (Religious Colonization, EFFECT_ENABLE_RELIGION_AUTO_SPREAD):
    *  "Cities start with this Religion in place if founded by a player who
-   *  has this as their majority Religion" — the pressure of the religion a
-   *  new city starts with, its citizen following it. */
+   *  has this as their majority Religion" — the religion's pressure a new
+   *  city starts with per two citizens (`colonizeFoundingPressure`), its
+   *  citizens following it. */
   colonizePressure?: number;
 }
 
@@ -391,8 +392,8 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
   },
   RELIGIOUS_COLONIZATION: {
     'effects.colonizePressure': {
-      lab: 'runs/b91s3_colonization_20260926T130735Z.jsonl',
-      note: 'a population-1 city founded by a seat whose majority religion holds the belief starts with its citizen following it and 202 pressure of it, the neighbours\' 2 added as in the control arm (no row in the install names the amount)',
+      lab: 'runs/b91c_colonization.jsonl, runs/b91s3_colonization_20260926T130735Z.jsonl',
+      note: 'the per-two-citizens rate of the founding pressure 200 x ceil(pop/2) + 2 (colonizeFoundingPressure); no row in the install names the amount',
     },
   },
 };
@@ -666,6 +667,16 @@ export const HOLY_SITE_PRESSURE_MULT = 2;
  * one of the groups the city's citizens are shared among
  * (`followedReligionOf`). */
 export const ATHEISM_PRESSURE_PER_POP = 50;
+/** CIV6 (Religious Colonization): the pressure a city founded under the belief
+ * starts with — the belief's `colonizePressure` per two citizens, rounded up,
+ * plus 2. MEASURED at founding populations 1 / 4 / 7 / 10 / 13: 202 / 402 /
+ * 802 / 1002 / 1402, read in the founding turn. */
+export const COLONIZE_PRESSURE_EXTRA = srcConst('religion.colonizePressureExtra', 2, {
+  lab: 'runs/b91c_colonization.jsonl (5 of 5; 200 x pop misses 4 of 5)',
+});
+export function colonizeFoundingPressure(perTwoPop: number, pop: number): number {
+  return perTwoPop * Math.ceil(pop / 2) + COLONIZE_PRESSURE_EXTRA;
+}
 /** CIV6 (RELIGION_SPREAD_HOLY_CITY_PRESSURE_PER_POP 200): what a religion's
  * Holy City starts with per citizen the turn it is founded. */
 export const HOLY_CITY_FOUNDING_PRESSURE_PER_POP = 200;

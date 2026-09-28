@@ -234,12 +234,11 @@ def main() -> None:
     assert mark in cols.tolist(), f"a FIGHTER answers land units — {mark} is not in {cols.tolist()}"
     bcols = sim._air_strike_targets(row, torch.tensor([[fs]]), torch.tensor([[aero]]),
                                     torch.tensor([[BOMBER]]))[0, 0]
-    assert mark not in bcols.tolist(), (
-        "CIV6: a bomber's damage is 'effective against cities and naval units but "
-        "not against land units'")
+    assert mark in bcols.tolist(), (
+        "the live game offered a Bomber a lone land unit (runs/b89b_bomber.jsonl)")
     live = [int(t) for t in cols.tolist() if t >= 0]
     assert live == sorted(live), "the head must read TILE-INDEX ascending on both engines"
-    print(f"  3 strike head OK (fighter offers {len(live)} tile(s), bomber declines the land target)")
+    print(f"  3 strike head OK (fighter offers {len(live)} tile(s), the bomber the land target too)")
 
     # -- 4: the sortie, and who answers it ----------------------------------
     k = cols.tolist().index(mark)

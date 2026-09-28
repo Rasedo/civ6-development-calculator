@@ -10,7 +10,7 @@ import {
   airStrikeTargets, rebaseTargets, airStrikeOffers, airDefenseOf, antiAirOf,
   antiAirCover, airCoverAgainst, AIR_COVER_MAX,
 } from '../../../cpu/core/air';
-import { airStrike } from '../../../cpu/core/combat';
+import { airStrike, damageRoll } from '../../../cpu/core/combat';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 import type { Unit } from '../../../cpu/core/types';
 
@@ -96,20 +96,29 @@ describe('training an aircraft', () => {
 });
 
 describe('the strike head', () => {
-  it('a fighter answers land, a bomber answers cities and ships', () => {
+  it('a fighter answers land, a bomber cities, ships and land units too', () => {
     // CIV6: a FIGHTER's damage is "effective against land units, but not
-    // against cities and naval units"; a BOMBER's is the mirror.
+    // against cities and naval units"; the live game offered a Bomber a lone
+    // Infantry and a lone Anti-Air Gun (runs/b89b_bomber.jsonl).
     const { state, pad } = airState();
     setWar(state, 0, 1, true);
     const fighter = spawnUnit(state, FIGHTER, pad.index, 0)!;
     const bomber = spawnUnit(state, BOMBER, pad.index, 0)!;
     const land = tileAtCoords(state.map, 8, 11);
     spawnUnit(state, GUNNER, land.index, 1);
+    const inf = tileAtCoords(state.map, 9, 11);
+    spawnUnit(state, 'INFANTRY', inf.index, 1);
+    const civ = tileAtCoords(state.map, 7, 11);
+    spawnUnit(state, 'BUILDER', civ.index, 1);
 
     expect(airStrikeOffers(state, fighter, land.index)).toBe(true);
-    expect(airStrikeOffers(state, bomber, land.index)).toBe(false);
+    expect(airStrikeOffers(state, bomber, land.index)).toBe(true);
+    expect(airStrikeOffers(state, bomber, inf.index)).toBe(true);
+    expect(airStrikeOffers(state, bomber, civ.index)).toBe(false);
     expect(airStrikeTargets(state, fighter, 12)).toContain(land.index);
-    expect(airStrikeTargets(state, bomber, 12)).not.toContain(land.index);
+    expect(airStrikeTargets(state, bomber, 12)).toContain(land.index);
+    expect(airStrikeTargets(state, bomber, 12)).toContain(inf.index);
+    expect(airStrikeTargets(state, bomber, 12)).not.toContain(civ.index);
 
     // a target outside the operational range is no target
     const far = tileAtCoords(state.map, 20, 20);
@@ -235,10 +244,47 @@ describe('the sortie', () => {
     setWar(state, 0, 1, true);
     const bomber = spawnUnit(state, BOMBER, pad.index, 0)!;
     const land = tileAtCoords(state.map, 8, 11);
-    spawnUnit(state, GUNNER, land.index, 1);
+    spawnUnit(state, 'BUILDER', land.index, 1);
     const mp = bomber.movesLeft;
     expect(airStrike(state, bomber.id, land.index, 0).ok).toBe(false);
     expect(bomber.movesLeft).toBe(mp);
+  });
+
+  it('a bomber strikes a land combat unit at Bombard - 17: one draw, nothing back', () => {
+    // CIV6 (ABILITY_AIR_BOMBER_ATTACK_UNIT_DEBUFF): "-17 Bombard Strength vs.
+    // units" — COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER 17; the live game's
+    // Bomber struck a lone Infantry once, one draw (runs/b89b_bomber.jsonl)
+    expect(UNITS[BOMBER].ranged!.strength).toBe(UNITS[BOMBER].bombard! - 17);
+    const { state, pad } = airState();
+    setWar(state, 0, 1, true);
+    const bomber = spawnUnit(state, BOMBER, pad.index, 0)!;
+    const land = tileAtCoords(state.map, 8, 11);
+    const inf = spawnUnit(state, 'INFANTRY', land.index, 1)!;
+    const probe = { ...state };
+    const want = damageRoll(probe, UNITS[BOMBER].ranged!.strength - UNITS.INFANTRY.combat!);
+    expect(airStrike(state, bomber.id, land.index, 0).ok).toBe(true);
+    expect(state.rngState).toBe(probe.rngState);   // one draw
+    expect(100 - inf.hp).toBe(want);
+    expect(bomber.hp).toBe(100);
+    expect(bomber.xp ?? 0).toBe(3);
+  });
+
+  it('a bomber duels a lone Anti-Air Gun: the gun\'s draw, then the bomber\'s mirrored, no burst, no XP', () => {
+    const { state, pad } = airState();
+    setWar(state, 0, 1, true);
+    const bomber = spawnUnit(state, BOMBER, pad.index, 0)!;
+    const land = tileAtCoords(state.map, 8, 11);
+    const gun = spawnUnit(state, GUNNER, land.index, 1)!;
+    const d = UNITS[BOMBER].ranged!.strength - UNITS[GUNNER].antiAir!;
+    const probe = { ...state };
+    const gunWant = damageRoll(probe, d);
+    const bomberWant = damageRoll(probe, -d);
+    expect(airStrike(state, bomber.id, land.index, 0).ok).toBe(true);
+    expect(state.rngState).toBe(probe.rngState);   // two draws: no burst from the struck gun
+    expect(100 - gun.hp).toBe(gunWant);
+    expect(100 - bomber.hp).toBe(bomberWant);
+    expect(bomber.xp ?? 0).toBe(0);
+    expect(gun.xp ?? 0).toBe(0);
   });
 });
 

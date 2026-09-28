@@ -390,12 +390,18 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
     if (beliefHousing) total += beliefHousing;
   }
   if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
+  // CIV6: the improvements' Housing / TilesRequired shares sum over the city
+  // and pay WHOLE housing — `GetHousingFromImprovements` is the floor of the
+  // city's sum, 1,366 of 1,366 cities where a per-kind floor would differ
+  // (one Farm and one Pasture pay 1; runs/h1_duelw1103 / 1104).
+  let impHousing = 0;
   for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
     if (!tileBelongsTo(t, city) || !t.improvement) continue;
     const idef = IMPROVEMENTS[t.improvement as ImprovementId];
-    total += idef.housing;
+    impHousing += idef.housing;
     if (idef.housingCivic && m.impUpgrades.has(idef.housingCivic)) total += 1;
   }
+  total += Math.floor(impHousing);
 
   total += m.housingAll;
   /* CIV6 (Insulae / Medina Quarter): "+1/+2 Housing in all cities with at
@@ -553,10 +559,19 @@ export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): nu
     .sort((a, b) => a.dist - b.dist || b.res - a.res || b.ySum - a.ySum || a.i - b.i)[0].i;
 }
 
-export function acquireTile(state: GameState, city: City, tileIndex: number): void {
+/** A plot joins the city: its owner, and the seat's sight of it. A purchase
+ *  is this alone; `acquireTile` is this plus the count the culture cost
+ *  climbs on. */
+export function claimTile(state: GameState, city: City, tileIndex: number): void {
   setTileOwner(state.map.tiles[tileIndex], city.seat, city.id);
-  city.tilesAcquired += 1;
   revealAround(state, city.seat, tileIndex, 1);
+}
+
+/** A plot the city takes with its culture (or a minor's envoys): the claim,
+ *  and `tilesAcquired` — the `n` of `borderGrowthCost`. */
+export function acquireTile(state: GameState, city: City, tileIndex: number): void {
+  claimTile(state, city, tileIndex);
+  city.tilesAcquired += 1;
 }
 
 /** CIV6 (LOC_PLOTINFO_SWAP_TILE_OWNER_TOOLTIP): "Claim this tile to be worked

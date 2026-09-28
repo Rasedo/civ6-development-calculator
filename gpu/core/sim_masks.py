@@ -4014,18 +4014,16 @@ class SimMasks:
         pad.scatter_(2, col, idx)
         return pad[:, :, :width]
 
-    def _air_tile_offer(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """[B, T] x4 — hostile LAND units, hostile SHIPS, a hostile major
-        CENTRE, and a hostile land unit that is no flat target (a military
-        one, or one with Anti-Air), per tile. An aircraft holds neither
-        occupancy plane, so what stands on a tile is exactly what those two
-        carry (`airStrikeOffers`); a civilian is never a strike's target, a
-        lone Support chassis is (`airTarget`)."""
+    def _air_tile_offer(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """[B, T] x3 — hostile LAND units, hostile SHIPS and a hostile major
+        CENTRE, per tile. An aircraft holds neither occupancy plane, so what
+        stands on a tile is exactly what those two carry (`airStrikeOffers`);
+        a civilian is never a strike's target, a lone Support chassis is
+        (`airTarget`)."""
         B, T, dev = self.B, self.T, self.device
         neg = torch.full((B, T), -1, dtype=torch.long, device=dev)
         land = torch.zeros(B, T, dtype=torch.bool, device=dev)
         sea = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        hard = torch.zeros(B, T, dtype=torch.bool, device=dev)
         for plane in (self._visible_military_at(row), self.support_at, self._shot_embarked_plane(True)):
             pc = plane.clamp(min=0)
             here = plane >= 0
@@ -4036,10 +4034,9 @@ class SimMasks:
             nav = self.unit_naval[tc]
             sea = sea | (h & nav)
             land = land | (h & ~nav)
-            hard = hard | (h & ~nav & (self._type_dom_mil[tc] | (self._anti_air_at(tc, s) > 0)))
         cs = self._centre_seat_plane()
         ctr = self._seats_hostile(row, self._centre_target_seat(cs))
-        return land, sea, ctr, hard
+        return land, sea, ctr
 
     def _air_wreckable(self, row: int) -> torch.Tensor:
         """[B, T] — a tile an air pillage may wreck: at war with its owner,
@@ -4204,9 +4201,11 @@ class SimMasks:
         CIV6 (Air combat): a strike reaches anything inside the aircraft's
         OPERATIONAL RANGE, a FIGHTER's damage is "effective against land units,
         but not against cities and naval units" and a BOMBER's "against cities
-        and naval units but not against land units" — save a land tile whose
-        hostiles are Support chassis with no Anti-Air, which a Bomber struck
-        for the flat 65 (runs/b89t_fire_20260926.jsonl)."""
+        and naval units but not against land units" — yet a Bomber is offered
+        every hostile land tile: a lone Support chassis with no Anti-Air for
+        the flat 65 (runs/b89t_fire_20260926.jsonl), a land combat unit for
+        its strike and a lone Anti-Air Gun for its duel
+        (runs/b89b_bomber.jsonl)."""
         B, N = tc.shape
         W, dev = self._air_strike_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
@@ -4220,9 +4219,9 @@ class SimMasks:
         rngv = (self._type_ranged_range[ti[:, cols]]
                 + self._promo_val(ti[:, cols], self.unit_promos.gather(1, sc[:, cols]),
                                   "RANGE")).unsqueeze(2)
-        land, sea, ctr, hard = self._air_tile_offer(row)
+        land, sea, ctr = self._air_tile_offer(row)
         bomb = (k == 2).unsqueeze(2)
-        offer = torch.where(bomb, (ctr | sea | (land & ~hard)).unsqueeze(1), (land & ~ctr).unsqueeze(1))
+        offer = torch.where(bomb, (ctr | sea | land).unsqueeze(1), (land & ~ctr).unsqueeze(1))
         cand = (
             (dist > 0) & (dist <= rngv) & offer
             & (k > 0).unsqueeze(2)

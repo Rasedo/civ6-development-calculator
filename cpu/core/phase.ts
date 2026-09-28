@@ -9,6 +9,7 @@ import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production
 import { isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
+import { isFloodplains } from '../../world/features';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { nextRandom } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
@@ -449,6 +450,20 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
  * CIV6 (Border Control Treaty, outcome B): "Target player's borders cannot
  * grow via Culture." The box still FILLS; nothing is bought.
  */
+/**
+ * The Culture a city's border box takes this turn: the city as its growth
+ * left it. CIV6: the game reads the city's Culture after the growth step
+ * (runs/h1_duelw1104, Nidaros t5 → 6: box 4.195 + 1.723 − 5, the 1.723 its
+ * post-growth yield; Rome's growth turn t3 in 1103 and 1104 likewise), so a city whose
+ * population moved is read again — its luxuries re-ranked, its citizens
+ * re-placed — and one that did not keeps the read it grew on. The GPU twin is
+ * `_culture_after_growth`.
+ */
+export function cultureAfterGrowth(state: GameState, city: City, popBefore: number, stats: CityStats): number {
+  if (city.population === popBefore) return stats.total.culture;
+  return computeCityStats(state, city).total.culture;
+}
+
 export function cityBorderGrowth(state: GameState, city: City, seat: number, culture: number): void {
   city.cultureBox += culture;
   // CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is TRUE for a
@@ -922,7 +937,7 @@ export function districtSiteCost(
  * bonus resource (`canPlaceDistrictIn` already refused luxury/strategic). */
 export function paveGround(tile: Tile): void {
   tile.improvement = null;
-  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
+  tile.feature = isFloodplains(tile.feature) ? tile.feature : null;
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
 }
 
@@ -2956,8 +2971,9 @@ export function seatPhase(state: GameState): void {
     const civCityDefectors: City[] = [];
     for (const civCity of walkCities) {
       const stats = grown.get(civCity.id)!;
+      const popBefore = civCity.population;
       seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
-      cityBorderGrowth(state, civCity, actor.seat, stats.total.culture);
+      cityBorderGrowth(state, civCity, actor.seat, cultureAfterGrowth(state, civCity, popBefore, stats));
       if (applyLoyalty(state, civCity, stats.amenities.tier.name, rGovIds.has(civCity.id))) {
         civCityDefectors.push(civCity);
       }

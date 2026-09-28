@@ -63,7 +63,9 @@ export type FeatureId =
   | 'BURNING_RAINFOREST'
   | 'BURNT_RAINFOREST'
   | 'EYJAFJALLAJOKULL'
-  | 'VESUVIUS';
+  | 'VESUVIUS'
+  | 'FLOODPLAINS_GRASSLAND'
+  | 'FLOODPLAINS_PLAINS';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 

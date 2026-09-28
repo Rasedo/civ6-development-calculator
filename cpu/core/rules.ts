@@ -11,7 +11,7 @@ import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { IMPROVEMENTS, type ImprovementDef, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { droughtBars, fireFeature } from '../data/disasters';
 import { isSuzerain } from './cityStates';
-import { FEATURES } from '../../world/features';
+import { FEATURES, isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS } from '../data/policies';
@@ -432,7 +432,7 @@ export function validImprovementsIn(
     ((bareGround(tile) &&
       (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS') &&
       (flat || (hills && hillFarmsOk))) ||
-      tile.feature === 'FLOODPLAINS' || rowFarm)
+      isFloodplains(tile.feature) || rowFarm)
   ) {
     out.push('FARM');
   }
@@ -586,7 +586,7 @@ export function canPlaceDistrictIn(
   // traverse at least 2 adjacent sides of the future Dam tile", with a
   // "Limit of one per River".
   if (def.placement.floodplainRiver) {
-    if (tile.feature !== 'FLOODPLAINS') return no('Must be on a floodplain.');
+    if (!isFloodplains(tile.feature)) return no('Must be on a floodplain.');
     if (riverSideCount(tile) < 2) return no('The river must run along two of its sides.');
     for (const t of riverReach(map, tile)) {
       if (t.index !== tile.index && t.district === type) return no(`This river already has a ${def.name}.`);

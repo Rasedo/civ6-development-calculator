@@ -30,6 +30,7 @@ import {
 import type { GameMap, MapGenOptions, TerrainId, Tile } from './types';
 import { RESOURCES, type ResourceDef } from './resources';
 import { TERRAINS } from './terrains';
+import { isFloodplains } from './features';
 import { naturalWonderAt } from './query';
 import { MIN_DISTANCE_NW, WONDERS, wonderQuota, type GroundKind, type NaturalWonderDef } from './wonders';
 
@@ -533,7 +534,7 @@ function resourceValidOnTile(tile: Tile, def: ResourceDef): boolean {
   if (!def.elevations.includes(tile.elevation)) return false;
 
   const f = tile.feature;
-  const farmFloodplains = f === 'FLOODPLAINS' && def.improvement === 'FARM';
+  const farmFloodplains = isFloodplains(f) && def.improvement === 'FARM';
   if (f) {
     const allowed =
       def.requiresFeature?.includes(f) || def.okFeatures?.includes(f) || farmFloodplains;

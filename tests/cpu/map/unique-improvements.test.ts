@@ -112,12 +112,18 @@ describe('the three new adjacency sources', () => {
     const t = at(s.state, 16, 16);
     t.improvement = 'GREAT_WALL';
     at(s.state, 17, 16).improvement = 'GREAT_WALL';
+    // Adjacency_YieldChanges GreatWall_Gold / GreatWall_Culture: PrereqTech
+    // TECH_MASONRY and TECH_CASTLES — techs, not civics
     let y = improvementAdjacency(makeYieldCtx(s.state, 0), t, 'GREAT_WALL');
-    expect(y.gold).toBe(2);
-    expect(y.culture).toBe(0);
-    grantCivics(s.state, 'CASTLES');
+    expect([y.gold, y.culture]).toEqual([0, 0]);
+    grantTechs(s.state, 'MASONRY');
     y = improvementAdjacency(makeYieldCtx(s.state, 0), t, 'GREAT_WALL');
-    expect(y.culture).toBe(2);
+    expect([y.gold, y.culture]).toEqual([2, 0]);
+    grantTechs(s.state, 'CASTLES');
+    y = improvementAdjacency(makeYieldCtx(s.state, 0), t, 'GREAT_WALL');
+    expect([y.gold, y.culture]).toEqual([2, 2]);
+    // the segment's own Improvement_YieldChanges Gold 2 (Expansion2's update)
+    expect(IMPROVEMENTS.GREAT_WALL.yields).toEqual({ gold: 2 });
   });
 
   it('pays the Ice Hockey Rink per adjacent cold TILE', () => {
@@ -137,7 +143,7 @@ describe('the three new adjacency sources', () => {
     t.improvement = 'MEKEWAP';
     at(s.state, 17, 16).resource = 'SILK';
     expect(improvementAdjacency(makeYieldCtx(s.state, 0), t, 'MEKEWAP').gold).toBe(0);
-    grantCivics(s.state, 'CARTOGRAPHY');
+    grantTechs(s.state, 'CARTOGRAPHY');
     expect(improvementAdjacency(makeYieldCtx(s.state, 0), t, 'MEKEWAP').gold).toBe(2);
   });
 });

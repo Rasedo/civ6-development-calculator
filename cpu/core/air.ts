@@ -401,30 +401,27 @@ export function airStrikeTargets(state: GameState, unit: Unit, width: number): n
  * What `tileIndex` offers THIS aircraft. Which enemies STAND there, never
  * which one is first in the list: a list-order rule would let the two engines
  * point the same column at different tiles. A civilian is never an air
- * strike's target, a lone Support chassis is (`airTarget`). A BOMBER is also
- * offered a land tile whose hostiles are Support chassis with no Anti-Air,
- * which take the flat blow: the live game fired a Bomber at a lone Battering
- * Ram and a lone Observation Balloon for 65 each
- * (runs/b89t_fire_20260926.jsonl).
+ * strike's target, a lone Support chassis is (`airTarget`). A BOMBER is
+ * offered every hostile land tile too: a lone Support chassis with no
+ * Anti-Air takes the flat blow (a lone Battering Ram and a lone Observation
+ * Balloon took 65 each, runs/b89t_fire_20260926.jsonl), a land combat unit
+ * the Bomber's strike and a lone Anti-Air Gun its duel
+ * (runs/b89b_bomber.jsonl).
  */
 export function airStrikeOffers(state: GameState, unit: Unit, tileIndex: number): boolean {
   const t = state.map.tiles[tileIndex];
   if (!t) return false;
   let land = false;
   let sea = false;
-  let hard = false;
   for (const u of unitsAt(state, tileIndex)) {
     if (isAirUnit(u.type) || unitDomain(u.type) === 'civilian' || !unitsHostile(state, unit, u)) continue;
     if (!unitVisibleTo(state, u, unit.seat)) continue;
     if (UNITS[u.type]?.naval) sea = true;
-    else {
-      land = true;
-      if (unitDomain(u.type) === 'military' || antiAirAt(state, u) > 0) hard = true;
-    }
+    else land = true;
   }
   const holder = cityAtIndex(state, tileIndex);
   const centre = holder !== undefined && unitsHostile(state, unit, { seat: holder.holder.seat });
-  return UNITS[unit.type]!.air! === 'BOMBER' ? (centre || sea || (land && !hard)) : (land && !centre);
+  return UNITS[unit.type]!.air! === 'BOMBER' ? (centre || sea || land) : (land && !centre);
 }
 
 /** this seat's own bases with room, ordered by tile index and cut to width. */
@@ -472,8 +469,11 @@ const COVER_SLOTS = ['military', 'civilian', 'embarked', 'support'] as const;
  * defenses, which activate when they are attacked by an aircraft", which is a
  * hull answering for its own hex alone. The strongest answer fires, ties going
  * to the lowest tile index and then to the tile's own occupancy order.
+ * `duelled`, the weapon the sortie fights, fires no burst of its own.
  */
-export function airCoverAgainst(state: GameState, striker: Unit, tileIndex: number): Unit | undefined {
+export function airCoverAgainst(
+  state: GameState, striker: Unit, tileIndex: number, duelled?: Unit,
+): Unit | undefined {
   const at = state.map.tiles[tileIndex];
   if (!at) return undefined;
   let best: Unit | undefined;
@@ -481,6 +481,7 @@ export function airCoverAgainst(state: GameState, striker: Unit, tileIndex: numb
   for (const t of tilesWithin(state.map, at.col, at.row, AIR_COVER_MAX)) {
     const d = hexDistance(at.col, at.row, t.col, t.row);
     for (const u of unitsAt(state, t.index)) {
+      if (u === duelled) continue;
       const aa = antiAirAt(state, u);
       if (aa <= 0 || !unitsHostile(state, striker, u)) continue;
       if (d > antiAirCover(u.type) && !(d === 0 && UNITS[u.type]?.naval)) continue;

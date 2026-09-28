@@ -302,7 +302,8 @@ class SimMinors:
         seat: the improvement goes, every feature but floodplains goes, a bonus
         resource goes."""
         self.improvement[rows, tiles] = -1
-        nofp = self.feat_id[rows, tiles] != self._fp_fid
+        fid = self.feat_id[rows, tiles]
+        nofp = (fid < 0) | ~self._fp_feat[fid.clamp(min=0)]
         if bool(nofp.any()):
             self._strip_feature_at(rows[nofp], tiles[nofp])
         fresh_rs = (self.res_priority[rows, tiles] == 1) & ~self.res_stripped[rows, tiles]
@@ -367,8 +368,10 @@ class SimMinors:
         act = self.citystate_alive[:, s]
         total, eff, need, _tier = self._seat_city_stats(row)
         col = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        pop0 = self.city_pop[:, row, 0].clone()
         self._seat_city_growth(row, col, act, eff[:, 0], need[:, 0])
-        self._seat_border_growth(row, col, act, total[:, 0, 4] * act.double())
+        self._seat_border_growth(row, col, act,
+                                 self._culture_after_growth(row, 0, pop0, total[:, 0, 4]) * act.double())
 
     def _minor_envoy_tiles(self) -> None:
         """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`.

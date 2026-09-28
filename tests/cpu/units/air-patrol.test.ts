@@ -510,7 +510,7 @@ describe('a plain air strike on a lone Support chassis', () => {
     expect(ram.hp).toBe(100 - PRIORITY_TARGET_DAMAGE);
   });
 
-  it('a bomber is offered it and deals the same blow; never a land combat unit or a lone gun', () => {
+  it('a bomber is offered it and deals the same blow; a land combat unit and a lone gun too', () => {
     const { state, pad } = airState();
     const bomber = spawnUnit(state, BOMBER, pad.index, 0)!;
     const ram = spawnUnit(state, 'BATTERING_RAM', tileAtCoords(state.map, 8, 11).index, 1)!;
@@ -518,8 +518,8 @@ describe('a plain air strike on a lone Support chassis', () => {
     const gun = spawnUnit(state, GUNNER, tileAtCoords(state.map, 6, 13).index, 1)!;
     const offered = airStrikeTargets(state, bomber, AIR_STRIKE_COLS);
     expect(offered).toContain(ram.tileIndex);
-    expect(offered).not.toContain(foe.tileIndex);
-    expect(offered).not.toContain(gun.tileIndex);
+    expect(offered).toContain(foe.tileIndex);
+    expect(offered).toContain(gun.tileIndex);
     const r0 = state.rngState;
     expect(airStrike(state, bomber.id, ram.tileIndex, 0).ok).toBe(true);
     expect(ram.hp).toBe(100 - PRIORITY_TARGET_DAMAGE);

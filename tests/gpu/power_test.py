@@ -30,7 +30,7 @@ because a gate lane reaches an Industrial-era grid only by accident:
   9. THE STOCKPILE the plants burn — `_seat_accrue_stockpile` per improved
      source and its ceiling, `_charge_unit_resource` at the train, and the
      heal `_res_starved` denies a unit whose source the seat has lost.
- 10. THE ACCIDENT — `_nuclear_accident`'s six draws and its measured
+ 10. THE ACCIDENT — `_nuclear_accident`'s draw per damage row and its measured
      payloads, and `_random_event` opening a reactor's rows only past each
      MinTurnAtRisk (the TS twin is tests/cpu/map/disasters.test.ts).
 """
@@ -600,13 +600,14 @@ STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
 
 def test_reactor_accident(sim) -> None:
     """10. THE ACCIDENT — MEASURED over 225 forced accidents: the damage rows'
-    Percentages are per-accident CHANCES. Six draws, always; the plant
+    Percentages are per-accident CHANCES. One draw per damage row (3 / 8 / 9)
+    and one more for a land unit struck, a civilian alone none; the plant
     pillaged every time and kept, the top of the chain still standing (the
     Factory) at BUILDING_PILLAGED's 20 / 100 / none, the Industrial Zone and
     every building in it at 0 / 50 / 100, one citizen lost at 0 / 0 / 80,
     fallout on the reactor's own plot alone for 2 / 10 / 20 turns; the land
     units on that plot struck at 0 / 50 / 100
-    for 20-50, its civilians killed at 0 / 50 / 100, a unit off it untouched.
+    for 20 + rand(30), its civilians killed at 0 / 50 / 100, a unit off it untouched.
     And the site: a reactor is one only past each row's MinTurnAtRisk."""
     row, j = a_city(sim)
     izt = put_district(sim, row, j, sim._iz_idx)
@@ -625,6 +626,8 @@ def test_reactor_accident(sim) -> None:
     assert sim._accident_weight == [1, 1, 1]
     assert sim._accident_land_p == [0, 0.5, 1] and sim._accident_civ_kill_p == [0, 0.5, 1]
     assert sim._accident_dmg_lo == [0, 20, 20] and sim._accident_dmg_hi == [0, 50, 50]
+    assert [len(r) for r in sim._accident_rows] == [3, 8, 9]
+    assert sim._accident_rows[1].index("UNIT_DAMAGE_LAND") == 5
     uids = [u["id"] for u in json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))["units"]]
     lo = sim.POOL_LO["major"]
     # a Warrior and a Builder on the reactor's plot, a Warrior in the centre
@@ -649,7 +652,10 @@ def test_reactor_accident(sim) -> None:
             arm()
             s0 = int(sim.rng_state[0])
             sim._nuclear_accident(hit, at, sev)
-            assert (s0 + 6 * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), "an accident draws six times"
+            hurt = int(sim.major_unit_hp[0, slots[0]]) < 100
+            n_draws = len(sim._accident_rows[sev]) + int(hurt)
+            assert (s0 + n_draws * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), \
+                "an accident draws once per damage row, once more for the struck warrior"
             assert int(sim.tile_fallout[0, izt]) == int(sim._accident_fallout[sev])
             assert int((sim.tile_fallout[0] > 0).sum()) == 1, "fallout on the reactor's plot alone"
             assert bool(sim.city_bldg_pillaged[0, row, j, nuc]), "every accident pillages the plant"
@@ -672,10 +678,20 @@ def test_reactor_accident(sim) -> None:
         assert abs(lost / N - pp) < 0.04, f"severity {sev}: citizen lost {lost}/{N}"
         assert abs(struck / N - sim._accident_land_p[sev]) < 0.04, f"severity {sev}: land struck {struck}/{N}"
         assert abs(killed / N - sim._accident_civ_kill_p[sev]) < 0.04, f"severity {sev}: civilians {killed}/{N}"
-        assert all(20 <= x <= 50 for x in band), f"severity {sev}: band {sorted(band)}"
+        # 20 + rand(30): MaxHP exclusive
+        assert all(20 <= x < 50 for x in band), f"severity {sev}: band {sorted(band)}"
     for s, (t, _ty, plane) in zip(slots, units):
         sim.major_unit_alive[0, s] = False
         plane[0, t] = -1
+    # a civilian alone on the plot takes no damage draw: CATASTROPHIC's nine
+    for _ in range(20):
+        sim.major_unit_alive[0, slots[1]] = True
+        sim.civilian_at[0, izt] = slots[1] + lo
+        s0 = int(sim.rng_state[0])
+        sim._nuclear_accident(hit, at, 2)
+        assert (s0 + 9 * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), "a civilian alone drew a damage"
+        assert not bool(sim.major_unit_alive[0, slots[1]]), "CATASTROPHIC kills the civilian"
+    sim.civilian_at[0, izt] = -1
     sim.tile_fallout[0] = 0
     sim.district_pillaged[0, izt] = False
     sim.city_bldg_pillaged[0, row, j] = False
@@ -700,7 +716,7 @@ def test_reactor_accident(sim) -> None:
     sim._accident_weight = w0
     sim.city_reactor_age[0, row, j] = -1
     sim.city_bldg[0, row, j, nuc] = False
-    print("  accident OK: six draws, the plant pillaged, the chain's top, the zone, one citizen and the "
+    print("  accident OK: a draw per damage row and one per land strike, the plant pillaged, the chain's top, the zone, one citizen and the "
           "plot's units at the rows' chances, fallout on the reactor's plot alone, a site only past each MinTurnAtRisk")
 
 

@@ -42,7 +42,8 @@ describe('wonder effects', () => {
     const t = tileAtCoords(map, 5, 5);
     t.feature = 'GREAT_BARRIER_REEF';
     t.terrain = 'COAST';
-    expect(tileYields(bareCtx(map), t)).toMatchObject({ food: 2, science: 2 });
+    // Features.xml: FEATURE_BARRIER_REEF Food 3, Science 2, the coast beneath paying nothing
+    expect(tileYields(bareCtx(map), t)).toMatchObject({ food: 3, science: 2, gold: 0 });
     expect(isImpassable(t)).toBe(false);
   });
 

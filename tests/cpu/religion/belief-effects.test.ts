@@ -7,7 +7,7 @@
  * (BELIEF_YIELD_PER_DISTRICT), SACRED_PLACES (BELIEF_YIELD_PER_CITY_WITH_WONDER),
  * MISSIONARY_ZEAL (ABILITY_RELIGIOUS_IGNORE_TERRAIN_COST), MONASTIC_ISOLATION
  * (EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS 100), RELIGIOUS_COLONIZATION (the
- * measured 200 a new city starts with), HOLY_WATERS
+ * measured 200 x ceil(pop/2) + 2 a new city starts with), HOLY_WATERS
  * (MODIFIER_ALL_UNITS_ADJUST_HEAL_RELIGION_PER_TURN 10); the Dar-e Mehr's
  * Building_YieldsPerEra; the cities following a founder belief pays per; the
  * worship building a city's majority religion offers.
@@ -17,14 +17,14 @@ import { makeMap, makeState, tileAtCoords, expandBorders, standBuilding } from '
 import { foundCity, condemnHeretic } from '../../../cpu/core/game';
 import { seatOf, emptySeat, setWar } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
-import { makeYieldCtx } from '../../../cpu/core/effects';
+import { makeYieldCtx, religionFollowers } from '../../../cpu/core/effects';
 import { availableBuildings } from '../../../cpu/core/rules';
 import { placeCityStateAt } from '../../../cpu/core/cityStates';
 import { moveCostInto, riverCharge, religiousHeal, spawnUnit } from '../../../cpu/core/units';
 import { transferCity } from '../../../cpu/core/phase';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { gameEraIndex } from '../../../cpu/core/yields';
-import { FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../../../cpu/data/religion';
+import { FOUNDER_BELIEFS, ENHANCER_BELIEFS, colonizeFoundingPressure } from '../../../cpu/data/religion';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { ERA_LENGTH } from '../../../cpu/data/seats';
 import { MP_SCALE } from '../../../cpu/data/constants';
@@ -114,6 +114,34 @@ describe('Founder beliefs', () => {
     other.followedReligion = 1;
     expect(faith() - f0).toBe(4);
   });
+
+  it('World Church pays 0.25 Culture per follower anywhere, unfloored, a minority\'s followers included', () => {
+    const { state, city } = sandboxCity();
+    religion(state, 'WORLD_CHURCH', null);
+    state.seats.push(emptySeat(1));
+    const other = foundCity(state, tileAtCoords(state.map, 16, 16).index, 1).city!;
+    const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', tileAtCoords(state.map, 3, 16).index);
+    const culture = () => computeCityStats(state, city).breakdown.bonuses.culture;
+    const c0 = culture();
+    // one follower at home: a quarter, not floored away
+    city.religionPressure = [500, 0];
+    expect(religionFollowers(state, 0)).toBe(1);
+    expect(culture() - c0).toBe(0.25);
+    // one of a foreign city's four citizens, the unconverted its majority
+    other.population = 4;
+    other.religionPressure = [60, 0];
+    expect(religionFollowers(state, 0)).toBe(2);
+    expect(culture() - c0).toBe(0.5);
+    // a city-state's two
+    cs.population = 2;
+    cs.religionPressure = [500, 0];
+    expect(religionFollowers(state, 0)).toBe(4);
+    expect(culture() - c0).toBe(1);
+    // another religion's followers count nothing
+    other.religionPressure = [0, 60];
+    expect(religionFollowers(state, 0)).toBe(3);
+    expect(culture() - c0).toBe(0.75);
+  });
 });
 
 describe('Enhancer beliefs', () => {
@@ -154,15 +182,20 @@ describe('Enhancer beliefs', () => {
     }
   });
 
-  it('Religious Colonization: a city founded by a seat whose majority religion holds it starts following it at 200', () => {
+  it('Religious Colonization: a city founded by a seat whose majority religion holds it starts following it at 202', () => {
     for (const [enhancer, want] of [[null, -1], ['RELIGIOUS_COLONIZATION', 0]] as const) {
       const { state, city } = sandboxCity();
       religion(state, null, enhancer);
       city.followedReligion = 0;
       const next = foundCity(state, tileAtCoords(state.map, 16, 16).index, 0).city!;
       expect(next.followedReligion ?? -1).toBe(want);
-      expect(next.religionPressure?.[0] ?? 0).toBe(want >= 0 ? 200 : 0);
+      expect(next.religionPressure?.[0] ?? 0).toBe(want >= 0 ? 202 : 0);
     }
+  });
+
+  it('Religious Colonization: the founding pressure is 200 per two citizens, rounded up, plus 2', () => {
+    const rate = ENHANCER_BELIEFS.RELIGIOUS_COLONIZATION.effects.colonizePressure!;
+    expect([1, 4, 7, 10, 13].map((pop) => colonizeFoundingPressure(rate, pop))).toEqual([202, 402, 802, 1002, 1402]);
   });
 
   it('Holy Waters: +10 healing on or next to a Holy Site of a city following the religion, for any religious unit', () => {

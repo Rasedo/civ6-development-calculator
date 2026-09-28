@@ -239,8 +239,10 @@ class SimPhase:
                 continue
             cact = cact_all[:, j]
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
+            pop0 = self.city_pop[:, row, j].clone()
             self._seat_city_growth(row, jc, cact, eff[:, j], need[:, j])
-            cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
+            cul_c = torch.where(cact, self._culture_after_growth(row, j, pop0, total[:, j, 4]),
+                                torch.zeros_like(total[:, j, 4]))
             self._seat_border_growth(row, jc, cact, cul_c)
             flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j], loy_pre)
             self._city_strikes(row, jc, cact)
@@ -835,6 +837,19 @@ class SimPhase:
                 _w = _m.nonzero(as_tuple=True)[0]
                 if _w.numel():
                     self._log_pop(_w, row, col[_w], _t)
+
+    def _culture_after_growth(self, row: int, j: int, pop_before: torch.Tensor,
+                              cul: torch.Tensor) -> torch.Tensor:
+        """`cultureAfterGrowth` — [B] the Culture column `j`'s border box takes:
+        the city as its growth left it. A game whose population moved reads
+        the column again (the luxuries re-ranked, the citizens re-placed); the
+        rest keep `cul`, the read it grew on."""
+        moved = self.city_pop[:, row, j] != pop_before
+        if not bool(moved.any()):
+            return cul
+        yf = self._seat_amenity(row)[2][:, j:j + 1]
+        again = self._seat_city_walk(row, j, amen_yf=yf)[:, 0, 4]
+        return torch.where(moved, again.to(cul.dtype), cul)
 
     def _produce_pre(self, row: int) -> dict:
         """The SEAT half of `_seat_city_produce`'s multiplier chain, built once

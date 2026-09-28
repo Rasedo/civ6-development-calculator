@@ -583,7 +583,7 @@ def main() -> None:
     s, v, _, _, quiet = lone(GUNNER)
     assert not quiet and int(s.unit_hp[0, v]) != 35, "a lone Anti-Air Gun fights at its Anti-Air"
     # a BOMBER is offered a lone Support chassis with no Anti-Air, and deals the
-    # same flat blow; never a land combat unit or a lone gun
+    # same flat blow; a land combat unit and a lone gun too
     s = fresh(rules, path)
     at_war(s, row, foe)
     ae2 = aerodrome(s, row, a_city(s, row))
@@ -595,15 +595,60 @@ def main() -> None:
     spawn(s, foe, GUNNER, tgun)
     bc = s._air_strike_targets(row, torch.tensor([[b2]]), torch.tensor([[ae2]]),
                                torch.tensor([[BOMBER]]))[0, 0].tolist()
-    assert tm in bc and tsoft not in bc and tgun not in bc, (bc, tm, tsoft, tgun)
+    assert tm in bc and tsoft in bc and tgun in bc, (bc, tm, tsoft, tgun)
     r1 = s.rng_state.clone()
     order(s, row, b2, s._A_AIR_STRIKE + bc.index(tm))
     assert int(s.unit_hp[0, vm]) == 35, f"the bomber's blow on a lone Support chassis — {int(s.unit_hp[0, vm])}"
     assert torch.equal(r1, s.rng_state) or int(s.pair_dist[tm, tgun]) <= 1, "the flat blow drew"
     print("  13 a lone Support chassis under a plain strike OK (flat 65, no draw; the gun fights)")
 
+    # -- 14: a BOMBER on a land combat unit and on a lone gun -----------------
+    # runs/b89b_bomber.jsonl: the Bomber strikes at Bombard - 17 (its Ranged
+    # column); a combat unit one-sided, one draw; a lone Anti-Air Gun in a
+    # duel — the gun's damage first, then the Bomber's at the mirrored
+    # difference, no burst from the struck gun and no experience either side
+    assert int(s._type_ranged_strength[BOMBER]) == int(s._type_bombard[BOMBER]) - 17
+
+    def bomber_on(ty):
+        s = fresh(rules, path)
+        at_war(s, row, foe)
+        ae2 = aerodrome(s, row, a_city(s, row))
+        b2 = spawn(s, row, BOMBER, ae2)
+        t2 = bare_land(s, ae2, 2, int(s._type_ranged_range[BOMBER]))[0]
+        v = spawn(s, foe, ty, t2)
+        bc = s._air_strike_targets(row, torch.tensor([[b2]]), torch.tensor([[ae2]]),
+                                   torch.tensor([[BOMBER]]))[0, 0].tolist()
+        assert t2 in bc, (bc, t2)
+        d_cs = int(s._type_anti_air[ty]) or int(s._type_combat[ty])
+        d = float(int(s._type_ranged_strength[BOMBER]) - d_cs)
+        one = torch.ones(s.B, dtype=torch.bool)
+        r0 = s.rng_state.clone()
+        want_d = int(s._damage_roll(one, torch.full((s.B,), d, dtype=torch.float64))[0])
+        want_b = int(s._damage_roll(one, torch.full((s.B,), -d, dtype=torch.float64))[0])
+        s.rng_state.copy_(r0)
+        xp0 = (int(s.unit_xp[0, b2]), int(s.unit_xp[0, v]))
+        order(s, row, b2, s._A_AIR_STRIKE + bc.index(t2))
+        draws = ((int(s.rng_state[0]) - int(r0[0])) & 0xFFFFFFFF) // 0x6D2B79F5
+        return (100 - int(s.unit_hp[0, v]), 100 - int(s.unit_hp[0, b2]), draws,
+                (int(s.unit_xp[0, b2]) - xp0[0], int(s.unit_xp[0, v]) - xp0[1]), want_d, want_b)
+
+    # the sturdiest land combat chassis, so the strike leaves it standing
+    HARD = max((i for i in range(s.NU) if int(s._type_combat[i]) > 0 and int(s._type_anti_air[i]) == 0
+                and not bool(s.unit_naval[i]) and int(s._type_air[i]) == 0
+                and not bool(s._type_support[i]) and not bool(s._type_civilian[i])),
+               key=lambda i: (int(s._type_combat[i]), -i))
+    dmg, took, draws, xp, want_d, _ = bomber_on(HARD)
+    assert (dmg, took, draws) == (want_d, 0, 1), (dmg, took, draws, want_d)
+    assert dmg < 100, "the struck unit stands"
+    assert xp[0] > 0 and xp[1] > 0, f"the strike pays both sides — {xp}"
+    dmg, took, draws, xp, want_d, want_b = bomber_on(GUNNER)
+    assert (dmg, took, draws) == (want_d, want_b, 2), (dmg, took, draws, want_d, want_b)
+    assert xp == (0, 0), f"the duel pays no experience — {xp}"
+    print("  14 a bomber on a land combat unit (one draw) and a lone gun (the duel) OK")
+
     print("AIR PATROL OK — deploy, return, the patrol's heal, interception, the order of a sortie, "
-          "the bomb's 50%, Priority Target, the seat-pair terms, the lone Support chassis")
+          "the bomb's 50%, Priority Target, the seat-pair terms, the lone Support chassis, "
+          "the bomber's strike and duel")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,7 @@
 /**
- * Tile features. Yield modifiers follow base Civ 6:
- * woods +1P, rainforest +1F, marsh +1F, floodplains +3F (on bare desert),
- * oasis +3F+1G, reef +1F+1P (Gathering Storm feature, included because it
- * matters for coastal play), ice impassable.
+ * Tile features. Yield modifiers follow Civ 6 with Gathering Storm:
+ * woods +1P, rainforest +1F, marsh +1F, desert floodplains +2F, grassland and
+ * plains floodplains nothing, oasis +3F+1G, reef +1F+1P, ice impassable.
  */
 
 import type { TerrainId, YieldKey, Yields } from './types';
@@ -25,6 +24,17 @@ interface FeatureDef {
   naturalWonder?: boolean;
   adjacentYields?: Partial<Yields>;
   doublesAdjacentTerrain?: boolean;
+  /** CIV6 (Expansion2_Features.xml `Feature_Floodplains`, tag
+   *  CLASS_FLOODPLAINS): one of the three floodplains — the class a flood
+   *  strikes and most floodplains rules name (`isFloodplains`). */
+  floodplains?: boolean;
+}
+
+/** The FLOODPLAINS CLASS: the desert, grassland and plains floodplains. A rule
+ *  the install writes against `FEATURE_FLOODPLAINS` alone reads the desert
+ *  row by name instead. */
+export function isFloodplains(feature: string | null | undefined): boolean {
+  return !!feature && FEATURES[feature]?.floodplains === true;
 }
 
 /** Features a builder can CLEAR — the Deforestation Treaty's target space,
@@ -61,13 +71,18 @@ export const FEATURES: Record<string, FeatureDef> = {
     removable: true,
     chopYield: 'food',
   },
+  // CIV6 (Features.xml FEATURE_FLOODPLAINS, Food 3, which
+  // Expansion2_Features.xml's Feature_YieldChanges update sets to 2): the
+  // DESERT floodplains. Gathering Storm's grassland and plains floodplains are
+  // features of their own, appended below.
   FLOODPLAINS: {
     id: 'FLOODPLAINS',
     name: 'Floodplains',
-    yields: { food: 3 },
+    yields: { food: 2 },
     terrains: ['DESERT'],
     allowHills: false,
     removable: false,
+    floodplains: true,
   },
   OASIS: {
     id: 'OASIS',
@@ -130,7 +145,8 @@ Object.assign(FEATURES, {
   CRATER_LAKE: { id: 'CRATER_LAKE', name: 'Crater Lake', yields: { science: 1, faith: 5 }, ...NW },
   DEAD_SEA: { id: 'DEAD_SEA', name: 'Dead Sea', yields: { faith: 2, culture: 2 }, ...NW },
   GALAPAGOS: { id: 'GALAPAGOS', name: 'Galápagos Islands', yields: {}, impassable: true, adjacentYields: { science: 2 }, ...NW },
-  GREAT_BARRIER_REEF: { id: 'GREAT_BARRIER_REEF', name: 'Great Barrier Reef', yields: { food: 2, science: 2 }, ...NW },
+  // CIV6 (Features.xml Feature_YieldChanges): FEATURE_BARRIER_REEF Food 3, Science 2
+  GREAT_BARRIER_REEF: { id: 'GREAT_BARRIER_REEF', name: 'Great Barrier Reef', yields: { food: 3, science: 2 }, ...NW },
   PANTANAL: { id: 'PANTANAL', name: 'Pantanal', yields: { food: 2, culture: 2 }, ...NW },
   ULURU: { id: 'ULURU', name: 'Uluru', yields: {}, impassable: true, adjacentYields: { culture: 2, faith: 2 }, ...NW },
   TORRES_DEL_PAINE: { id: 'TORRES_DEL_PAINE', name: 'Torres del Paine', yields: {}, impassable: true, doublesAdjacentTerrain: true, ...NW },
@@ -163,4 +179,16 @@ Object.assign(FEATURES, {
 Object.assign(FEATURES, {
   EYJAFJALLAJOKULL: { id: 'EYJAFJALLAJOKULL', name: 'Eyjafjallajökull', yields: {}, impassable: true, adjacentYields: { food: 1, culture: 1 }, ...NW },
   VESUVIUS: { id: 'VESUVIUS', name: 'Vesuvius', yields: {}, impassable: true, adjacentYields: { production: 1 }, ...NW },
+} satisfies Record<string, FeatureDef>);
+
+// GATHERING STORM'S OTHER TWO FLOODPLAINS, appended after the volcano wonders.
+// CIV6 (Expansion2_Features.xml): FEATURE_FLOODPLAINS_GRASSLAND on Grassland
+// and FEATURE_FLOODPLAINS_PLAINS on Plains (`Feature_ValidTerrains`), no
+// Feature_YieldChanges row — the plot yields its terrain alone (the game's
+// plots read 2F on grassland and 1F 1P on plains, runs/h1_duelw1103 / 1104) —
+// RequiresRiver, DefenseModifier -2 and Appeal -1 as the desert row, and both
+// in `Feature_Floodplains`.
+Object.assign(FEATURES, {
+  FLOODPLAINS_GRASSLAND: { id: 'FLOODPLAINS_GRASSLAND', name: 'Floodplains (Grassland)', yields: {}, terrains: ['GRASSLAND'], allowHills: false, removable: false, floodplains: true },
+  FLOODPLAINS_PLAINS: { id: 'FLOODPLAINS_PLAINS', name: 'Floodplains (Plains)', yields: {}, terrains: ['PLAINS'], allowHills: false, removable: false, floodplains: true },
 } satisfies Record<string, FeatureDef>);

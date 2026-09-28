@@ -441,11 +441,18 @@ class SimEconomy:
         return growth, yld
 
     def _growth_needed(self, pop: torch.Tensor) -> torch.Tensor:
-        p = pop.to(self.dtype)
-        return torch.floor(15 + 8 * (p - 1) + (p - 1).clamp(min=0) ** 1.5)
+        """`growthFoodNeeded`: (THRESHOLD + MULTIPLIER·(p−1) + (p−1)^EXPONENT)
+        at the online speed, floored after the scaling. f64."""
+        base, mult, exp = self.rules.city_growth
+        p = pop.double()
+        return self.rules.scale_by_game_speed(base + mult * (p - 1) + (p - 1).clamp(min=0) ** exp)
 
     def _border_cost(self, n: torch.Tensor) -> torch.Tensor:
-        return torch.floor(10 + (6 * (n.to(self.dtype) + 1)) ** 1.3)
+        """`borderGrowthCost`: (FIRST_PLOT + (MULTIPLIER·n)^EXPONENT) at the
+        online speed, floored after the scaling; `n` the plots the city took
+        with culture, from 0. f64."""
+        first, mult, exp = self.rules.culture_cost
+        return self.rules.scale_by_game_speed(first + (mult * n.double()) ** exp)
 
     def _builder_cost(self, n: torch.Tensor) -> torch.Tensor:
         """`builderCost`: the Builder's scaled Cost + its scaled step per
@@ -1978,7 +1985,11 @@ class SimEconomy:
     def _nuclear_accident(self, hit: torch.Tensor, centre: torch.Tensor, sev: int) -> None:
         """`nuclearAccident` — a nuclear accident at severity `sev` in the
         city centred on `centre`, a major's or a Free City's, MEASURED over 225
-        forced accidents. SIX draws, always. Every accident pillages the Power
+        forced accidents. ONE draw per `RandomEvent_Damages` row of the
+        severity, in the install's order (`_accident_rows`), each row's draw
+        deciding that row, and one more right after UNIT_DAMAGE_LAND when it
+        strikes a land unit on the plot: the damage, one for the plot
+        (`_holds_land_target`). Every accident pillages the Power
         Plant (runs/reactor_reactor_base_20260927T053410Z.jsonl,
         runs/reactor_reactor_base_20260927T053613Z.jsonl,
         runs/reactor_reactor_base_20260927T054059Z.jsonl); then the row's
@@ -1986,22 +1997,43 @@ class SimEconomy:
         still standing and its DISTRICT_PILLAGED chance the zone and every
         building in it. ONE citizen is lost at its population chance (never
         the last), and the units on the reactor's own plot take the row's
-        UNIT_DAMAGE_LAND share and band and its UNIT_KILLED_CIVILIAN chance
+        UNIT_DAMAGE_LAND share and damage and its UNIT_KILLED_CIVILIAN chance
         (`_strike_units`). Fallout lies on that plot, the Industrial Zone, for
         the row's turns. No building is destroyed, no ring improvement
         pillaged, no unit off the plot struck; the plant stays, ageing on."""
-        r_district = self._next_random(hit)
-        r_bldg = self._next_random(hit)
-        r_pop = self._next_random(hit)
-        r_land = self._next_random(hit)
-        r_civilian = self._next_random(hit)
-        r_hp = self._next_random(hit)
         rows = hit.nonzero(as_tuple=True)[0]
         c = centre[rows]
         row_of = self._seat_row[self.tile_seat[rows, c].clamp(min=0)]
         slot = self.centre_slot_at[rows, c]
+        # the reactor's plot, the Industrial Zone; -1 without one
+        plot_at = torch.full_like(centre, -1)
         if self._iz_idx >= 0:
-            iz = self.city_dist_tile[rows, row_of, slot.clamp(min=0), self._iz_idx]
+            plot_at[rows] = self.city_dist_tile[rows, row_of, slot.clamp(min=0), self._iz_idx]
+        on_plot = hit & (plot_at >= 0)
+        lo, hi = self._accident_dmg_lo[sev], self._accident_dmg_hi[sev]
+        roll: dict[str, torch.Tensor] = {}
+        dmg = torch.zeros_like(centre)
+        for kind in self._accident_rows[sev]:
+            r = self._next_random(hit)
+            roll[kind] = r
+            if kind == "UNIT_DAMAGE_LAND":
+                struck = (on_plot & (r < self._accident_land_p[sev])
+                          & self._holds_land_target(on_plot, plot_at.clamp(min=0)))
+                r_hp = self._next_random(struck)
+                dmg = torch.where(struck, lo + torch.floor(r_hp * float(hi - lo)).to(torch.long), dmg)
+        never = torch.ones(self.B, dtype=torch.float64, device=self.device)
+
+        def fires(kind: str, p) -> torch.Tensor:
+            # a row the severity does not carry never fires
+            return roll.get(kind, never) < p
+
+        r_bldg_hit = fires("BUILDING_PILLAGED", self._accident_bldg_p[sev])
+        r_district_hit = fires("DISTRICT_PILLAGED", self._accident_district_p[sev])
+        r_land_hit = fires("UNIT_DAMAGE_LAND", self._accident_land_p[sev])
+        r_civilian_hit = fires("UNIT_KILLED_CIVILIAN", self._accident_civ_kill_p[sev])
+        r_pop_hit = fires("POPULATION_LOSS", self._accident_pop_p[sev])
+        if self._iz_idx >= 0:
+            iz = plot_at[rows]
             has = iz >= 0
             rr, tt = rows[has], iz[has]
             if rr.numel():
@@ -2014,21 +2046,19 @@ class SimEconomy:
                     if bool(plant.any()):
                         self.city_bldg_pillaged[rr[plant], rw[plant], sw[plant], nb] = True
                         self._eff_version += 1
-                bl = r_bldg[rr] < self._accident_bldg_p[sev]
+                bl = r_bldg_hit[rr]
                 self._pillage_tile_buildings(rr[bl], tt[bl])
-                pil = r_district[rr] < self._accident_district_p[sev]
+                pil = r_district_hit[rr]
                 self._pillage_district(rr[pil], tt[pil])
                 on = torch.zeros_like(hit)
                 on[rr] = True
                 plot = torch.zeros_like(centre)
                 plot[rr] = tt
-                lo, hi = self._accident_dmg_lo[sev], self._accident_dmg_hi[sev]
-                dmg = lo + torch.floor(r_hp * float(hi - lo + 1)).to(torch.long)
                 owner = self.tile_seat.gather(1, plot.unsqueeze(1)).squeeze(1)
-                self._strike_units(on, plot, owner, on & (r_land < self._accident_land_p[sev]),
-                                   torch.zeros_like(on), on & (r_civilian < self._accident_civ_kill_p[sev]),
+                self._strike_units(on, plot, owner, on & r_land_hit,
+                                   torch.zeros_like(on), on & r_civilian_hit,
                                    dmg, torch.zeros_like(dmg), torch.full_like(centre, -1))
-        lose = r_pop[rows] < self._accident_pop_p[sev]
+        lose = r_pop_hit[rows]
         for R in (*range(self.n_majors), self.FREE_ROW):
             sel = lose & (row_of == R)
             if not bool(sel.any()):
@@ -2188,6 +2218,29 @@ class SimEconomy:
             ok = self.fertilizable[pr2, tc[pr2]]
             r2, t2 = pr2[ok], tc[pr2][ok]
             self.fertility_prod[r2, t2] = (self.fertility_prod[r2, t2] + 1).clamp(max=3)
+
+    def _holds_land_target(self, hit: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        """[B] bool — `holdsLandTarget`: where `hit`, whether `tile` [B] holds
+        a unit UNIT_DAMAGE_LAND hurts — `_strike_units`' land set: no
+        civilian and no hull."""
+        B, dev = self.B, self.device
+        tcu = tile.unsqueeze(1)
+        bidx = torch.arange(B, device=dev)
+        out = torch.zeros(B, dtype=torch.bool, device=dev)
+        for pool in ("major", "barb"):
+            u_type = getattr(self, f"{pool}_unit_type")
+            n = getattr(self, f"{pool}_unit_alive").shape[1]
+            lo_p, hi_p = self.POOL_LO[pool], self.POOL_HI[pool]
+            for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+                slot = plane.gather(1, tcu).squeeze(1)
+                on = hit & (slot >= lo_p) & (slot < hi_p)
+                if not bool(on.any()):
+                    continue
+                us = (slot - lo_p).clamp(min=0, max=n - 1)
+                utype = u_type[bidx, us].clamp(min=0, max=self.NU - 1)
+                civilian = self._type_noncombat[utype] & ~self._type_support[utype]
+                out = out | (on & ~civilian & ~self.unit_naval[utype])
+        return out
 
     def _strike_units(self, hit: torch.Tensor, tile: torch.Tensor, owner: torch.Tensor,
                       land_hit: torch.Tensor, naval_hit: torch.Tensor, civ_hit: torch.Tensor,
@@ -6523,16 +6576,20 @@ class SimEconomy:
                 1, self._citystate_yidx,
                 ((_env >= 1) & _acs).double() * float(self.rules.citystate["capitalBonus"]))
         if has_bel:
-            # Founder capital incomes — perF (per-N followers, empire-wide) +
-            # perC (per city following the founder religion, worldwide:
-            # `citiesFollowing`). Followers = this row's own live pop sum.
+            # Founder capital incomes — perF (per N followers of the founder
+            # religion worldwide, fractional: `religionFollowers`) + perC (per
+            # city following it, worldwide: `citiesFollowing`).
             perF = self._bel_add("perF", row)  # [B, 7] = N, then the 6 yields
             perC = self._bel_add("perC", row)  # [B, 6]
             _liv = self.city_alive[:, row, :cols]
-            _fol = (self.city_pop[:, row, :cols] * _liv.long()).sum(dim=1).double()
-            _times = torch.where(perF[:, 0] > 0, torch.floor(_fol / perF[:, 0].clamp(min=1)), torch.zeros_like(_fol))
-            _nfol = (self._cities_following(self._founder_religion(row)).double()
-                     if bool((perC != 0).any()) else torch.zeros_like(_fol))
+            _zero = torch.zeros(B, dtype=F64, device=dev)
+            _frel = (self._founder_religion(row)
+                     if bool((perF[:, 0] > 0).any()) or bool((perC != 0).any()) else None)
+            _fol = (self._religion_followers(_frel).double()
+                    if _frel is not None and bool((perF[:, 0] > 0).any()) else _zero)
+            _times = torch.where(perF[:, 0] > 0, _fol / perF[:, 0].clamp(min=1), _zero)
+            _nfol = (self._cities_following(_frel).double()
+                     if _frel is not None and bool((perC != 0).any()) else _zero)
             b_cap = b_cap + perF[:, 1:] * _times.unsqueeze(1) + perC * _nfol.unsqueeze(1)
             # CIV6 (Lay Ministry, Sacred Places): per completed district of a
             # type and per city holding a completed World Wonder, over the
@@ -6757,7 +6814,7 @@ class SimEconomy:
         if gmul is not None:
             eff = eff * gmul
         eff = torch.where(surplus > 0, eff, surplus)
-        need = torch.floor(15 + 8 * (pop - 1) + (pop - 1).clamp(min=0) ** 1.5)
+        need = self._growth_needed(pop)
         return total, eff, need, tier_idx
 
     def seat_score(self, row: int) -> torch.Tensor:

@@ -379,7 +379,8 @@ def case_tile(sim, base, row: int) -> None:
         f"row {row}: tile charged {RICH - float(sim.civ_treasury[0, row])}, want {cost}"
     )
     assert int(sim.civ_tiles_purchased[0, row]) == bought0 + 1, f"row {row}: purchase escalator did not move"
-    assert int(sim.city_acquired[0, row, j]) == acq0 + 1, f"row {row}: city_acquired did not move"
+    # the culture cost counts the plots taken by culture alone
+    assert int(sim.city_acquired[0, row, j]) == acq0, f"row {row}: a purchase moved city_acquired"
 
     # a CLAIMED tile is refused
     sim.restore(base)

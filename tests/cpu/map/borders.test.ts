@@ -7,11 +7,10 @@ import { borderCandidates, pickBorderTile } from '../../../cpu/core/city';
 import { hexDistance } from '../../../world/hex';
 
 describe('cultural border growth', () => {
-  it('expansion cost rises with tiles acquired', () => {
-    expect(borderGrowthCost(0)).toBe(20);
-    expect(borderGrowthCost(1)).toBe(35);
-    expect(borderGrowthCost(2)).toBe(52); // 10 + (6·3)^1.3
-    expect(borderGrowthCost(9)).toBe(214); // the real curve's late-game bite
+  it('expansion cost rises with tiles acquired, at the online speed', () => {
+    // floor((10 + (6n)^1.3) / 2), n counted from 0: the game's GetCultureCost
+    // on n 0-5, 7, 8, 10, 11 (runs/h1_duelw1103 / 1104)
+    expect([0, 1, 2, 3, 4, 5, 7, 8, 10, 11].map(borderGrowthCost)).toEqual([5, 10, 17, 26, 36, 46, 69, 81, 107, 120]);
   });
 
   it('culture claims new tiles over time, adjacent and within 5 rings', () => {
@@ -53,7 +52,7 @@ describe('cultural border growth', () => {
     expect(buyTile(state, city.id, target.index, 0).ok).toBe(true);
     expect(tileCity(target)).toBe(city.id);
     expect(seatOf(state, 0)!.treasury).toBe(1000 - cost);
-    expect(city.tilesAcquired).toBe(1); // purchases skip the culture BOX but advance the acquired count
+    expect(city.tilesAcquired).toBe(0); // a purchase moves neither the culture box nor the count its cost climbs on
     expect(seatOf(state, 0)!.tilesPurchased).toBe(1);
     expect(tilePurchaseCost(state, city)).toBe(scaleByGameSpeed(50) + scaleByGameSpeed(5)); // +5, speed-scaled, per purchase
 

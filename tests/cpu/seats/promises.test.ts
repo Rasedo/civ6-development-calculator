@@ -60,8 +60,9 @@ describe('the promise rows', () => {
   it('carries the install row on every kind', () => {
     expect(PROMISES.map((p) => [p.favorCost, p.refusal, p.incursion])).toEqual([
       [30, 25, 25], [30, 25, 25], [30, 25, 25], [30, 25, 25]]);
-    // the 30-turn clocks online through GameSpeed_Durations ONLINE_HALF
-    expect([PROMISE_TURNS, PROMISE_BROKEN_GRIEVANCE, RETRIBUTION_TURNS]).toEqual([20, 100, 20]);
+    // the promise's 30 turns online through GameSpeed_Durations ONLINE_HALF;
+    // the broken window's 30 unscaled
+    expect([PROMISE_TURNS, PROMISE_BROKEN_GRIEVANCE, RETRIBUTION_TURNS]).toEqual([20, 100, 30]);
   });
 });
 
@@ -168,7 +169,7 @@ describe('the incursion', () => {
 });
 
 describe('the clock', () => {
-  it('runs promises, refusals and the window toward 0', () => {
+  it('runs promises, refusals and the window toward 0, the window the longer', () => {
     const state = table();
     settlePromises(state, [[0, 1, PROMISE_SPY], [0, 2, PROMISE_CONVERT]], [[1, 0, PROMISE_SPY]]);
     promiseIncursion(state, 0, 1, PROMISE_SPY, 1);
@@ -179,6 +180,9 @@ describe('the clock', () => {
     expect(promiseBrokenWith(state, 0, 1, PROMISE_SPY)).toBe(RETRIBUTION_TURNS - 1);
     for (let t = 1; t < PROMISE_TURNS; t++) dealPhase(state);
     expect(state.promises ?? {}).toEqual({});
+    expect(promiseBrokenWith(state, 0, 1, PROMISE_SPY)).toBe(RETRIBUTION_TURNS - PROMISE_TURNS);
+    expect(warConditionHolds(state, 0, 1, 'brokenPromise')).toBe(true);
+    for (let t = PROMISE_TURNS; t < RETRIBUTION_TURNS; t++) dealPhase(state);
     expect(state.promiseBroken ?? {}).toEqual({});
     expect(warConditionHolds(state, 0, 1, 'brokenPromise')).toBe(false);
   });

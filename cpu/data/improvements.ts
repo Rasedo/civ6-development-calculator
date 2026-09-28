@@ -38,6 +38,8 @@ interface ImpAdjacency {
   seaResource?: boolean;
   /** the civic the rule needs before it pays at all. */
   requiresCivic?: string;
+  /** the TECH the rule needs before it pays at all (`PrereqTech`). */
+  requiresTech?: string;
   /** the TECH that improves the rule, beside `upgradeCivic`. */
   upgradeTech?: string;
   per: number;
@@ -823,13 +825,13 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     uniqueTo: 'EGYPT',
     terrains: ['DESERT', 'TUNDRA', 'PLAINS', 'GRASSLAND'],
     elevations: ['FLAT', 'HILLS'],
-    features: ['FLOODPLAINS'],
+    features: ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'],
     noAdjacentSame: true,
     // CIV6 (SPHINX_WONDERADJACENCY_FAITH): "+2 Faith if next to a wonder" —
     // a yes/no requirement set, so two wonders pay it once
     adjacency: [{ builtWonder: true, once: true, per: 1, yields: { faith: 2 } }],
     // CIV6 (SPHINX_FLOODPLAINS_CULTURE): "+1 Culture if built on Floodplains"
-    featureYields: { features: ['FLOODPLAINS'], yields: { culture: 1 } },
+    featureYields: { features: ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'], yields: { culture: 1 } },
     // Improvements.xml (Expansion2_Improvements.xml): `Appeal="2"`
     appealAdjacent: 2,
     tourismFrom: 'culture',
@@ -962,7 +964,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     uniqueTo: 'FRANCE',
     terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
     elevations: ['FLAT', 'HILLS'],
-    features: ['FLOODPLAINS'],
+    features: ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'],
     noAdjacentSame: true,
     requiresAdjacentResource: true,
     appealAdjacent: 1,
@@ -1081,7 +1083,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     name: 'Great Wall',
     code: 'Gw',
     plunder: { kind: 'gold', amount: 50 },
-    yields: {},
+    // CIV6 (Improvement_YieldChanges, YIELD_GOLD 0 in Improvements.xml, which
+    // Expansion2_Improvements.xml's update sets to 2): the segment's own Gold
+    yields: { gold: 2 },
     housing: 0,
     resourceOnly: false,
     uniqueTo: 'CHINA',
@@ -1096,19 +1100,20 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     // (PLOT_DAMAGE_TO_WALKING_INTO / _ADJACENT 10 is the Zombie Defense game
     // mode's TypeProperties row — DLC/Portugal/Data/Portugal_Improvements_MODE.xml —
     // not the baseline ruleset's; the Great Wall damages nobody here.)
-    // CIV6 (GreatWall_Gold at Masonry, GreatWall_Culture at Castles): per
-    // adjacent SEGMENT, which is the row's own kind.
+    // CIV6 (GreatWall_Gold at the Masonry TECH, GreatWall_Culture at the
+    // Castles TECH): per adjacent SEGMENT, which is the row's own kind.
     adjacency: [
-      { improvement: 'GREAT_WALL', per: 1, yields: { gold: 2 } },
-      { improvement: 'GREAT_WALL', requiresCivic: 'CASTLES', per: 1, yields: { culture: 2 } },
+      { improvement: 'GREAT_WALL', requiresTech: 'MASONRY', per: 1, yields: { gold: 2 } },
+      { improvement: 'GREAT_WALL', requiresTech: 'CASTLES', per: 1, yields: { culture: 2 } },
     ],
     tourismFrom: 'culture',
     tourismTech: 'FLIGHT',
-    description: '+4 defence and 2 turns of fortification to its occupant, 10 damage to an enemy entering or passing. +2 gold per adjacent segment, +2 culture per segment from Castles. Along the border only.',
+    description: '+4 defence and 2 turns of fortification to its occupant. +2 gold, +2 gold per adjacent segment from Masonry, +2 culture per adjacent segment from Castles. Along the border only.',
     src: {
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_GREAT_WALL', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_GREAT_WALL', 'PlunderAmount'),
       housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_GREAT_WALL', 'Housing'),
+      'yields.gold': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_GREAT_WALL&YieldType=YIELD_GOLD', 'YieldChange'),
       resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_GREAT_WALL', 'ResourceType')] },
       uniqueTo: xml('CivilizationTraits', 'TraitType=TRAIT_CIVILIZATION_IMPROVEMENT_GREAT_WALL', 'CivilizationType', { expect: 'CIVILIZATION_CHINA' }),
       terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_GREAT_WALL, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_GREAT_WALL', 'TerrainType')] },
@@ -1120,10 +1125,11 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       grantsFortification: xml('Improvements', 'ImprovementType=IMPROVEMENT_GREAT_WALL', 'GrantFortification'),
       disasterResistant: xml('Improvements_XP2', 'ImprovementType=IMPROVEMENT_GREAT_WALL', 'DisasterResistant', { expect: true }),
       'adjacency.0.improvement': xml('Adjacency_YieldChanges', 'ID=GreatWall_Gold', 'AdjacentImprovement', { expect: 'IMPROVEMENT_GREAT_WALL' }),
+      'adjacency.0.requiresTech': xml('Adjacency_YieldChanges', 'ID=GreatWall_Gold', 'PrereqTech', { expect: 'TECH_MASONRY' }),
       'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=GreatWall_Gold', 'TilesRequired'),
       'adjacency.0.yields.gold': xml('Adjacency_YieldChanges', 'ID=GreatWall_Gold', 'YieldChange'),
       'adjacency.1.improvement': xml('Adjacency_YieldChanges', 'ID=GreatWall_Culture', 'AdjacentImprovement', { expect: 'IMPROVEMENT_GREAT_WALL' }),
-      'adjacency.1.requiresCivic': xml('Adjacency_YieldChanges', 'ID=GreatWall_Culture', 'PrereqTech', { expect: 'TECH_CASTLES' }),
+      'adjacency.1.requiresTech': xml('Adjacency_YieldChanges', 'ID=GreatWall_Culture', 'PrereqTech', { expect: 'TECH_CASTLES' }),
       'adjacency.1.per': xml('Adjacency_YieldChanges', 'ID=GreatWall_Culture', 'TilesRequired'),
       'adjacency.1.yields.culture': xml('Adjacency_YieldChanges', 'ID=GreatWall_Culture', 'YieldChange'),
       tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_GREAT_WALL', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
@@ -1257,7 +1263,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     adjacency: [
       { bonusResource: true, per: 2, yields: { food: 1 },
         upgradeCivic: 'CONSERVATION', upgradePer: 1 },
-      { luxuryResource: true, requiresCivic: 'CARTOGRAPHY', per: 1, yields: { gold: 2 } },
+      { luxuryResource: true, requiresTech: 'CARTOGRAPHY', per: 1, yields: { gold: 2 } },
     ],
     // CIV6 (Improvement_BonusYieldChanges 24)
     researchYields: [{ civic: 'CIVIL_SERVICE', yields: { production: 1 } }],
@@ -1279,7 +1285,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'adjacency.0.upgradeCivic': xml('Adjacency_YieldChanges', 'ID=Mekewap_SecondBonusAdjacency', 'PrereqCivic', { expect: 'CIVIC_CONSERVATION' }),
       'adjacency.0.upgradePer': xml('Adjacency_YieldChanges', 'ID=Mekewap_SecondBonusAdjacency', 'TilesRequired'),
       'adjacency.1.luxuryResource': xml('Adjacency_YieldChanges', 'ID=Mekewap_ThirdBonusAdjacency', 'AdjacentResourceClass', { expect: 'RESOURCECLASS_LUXURY' }),
-      'adjacency.1.requiresCivic': xml('Adjacency_YieldChanges', 'ID=Mekewap_ThirdBonusAdjacency', 'PrereqTech', { expect: 'TECH_CARTOGRAPHY' }),
+      'adjacency.1.requiresTech': xml('Adjacency_YieldChanges', 'ID=Mekewap_ThirdBonusAdjacency', 'PrereqTech', { expect: 'TECH_CARTOGRAPHY' }),
       'adjacency.1.per': xml('Adjacency_YieldChanges', 'ID=Mekewap_ThirdBonusAdjacency', 'TilesRequired'),
       'adjacency.1.yields.gold': xml('Adjacency_YieldChanges', 'ID=Mekewap_ThirdBonusAdjacency', 'YieldChange'),
       'researchYields.0.civic': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_MEKEWAP&YieldType=YIELD_PRODUCTION&PrereqCivic=CIVIC_CIVIL_SERVICE', 'PrereqCivic', { expect: 'CIVIC_CIVIL_SERVICE' }),
@@ -1591,7 +1597,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     uniqueTo: 'SUMERIA',
     terrains: ['DESERT', 'TUNDRA', 'PLAINS', 'GRASSLAND', 'SNOW'],
     elevations: ['FLAT'],
-    features: ['FLOODPLAINS'],
+    features: ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'],
     // CIV6 (ZIGGURAT_RIVERADJACENCY_CULTURE): "+1 Culture if next to River"
     riverYields: { culture: 1 },
     tourismFrom: 'culture',

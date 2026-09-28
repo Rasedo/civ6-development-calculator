@@ -157,9 +157,9 @@ class BatchEnv:
             [
                 alive.to(d),
                 pop.to(d) / 10.0,
-                s.city_growth[:, row] / need,
+                (s.city_growth[:, row] / need).to(d),
                 torch.where(cur >= 0, s.city_progress[:, row, :, 0] / denom, torch.zeros_like(denom)),
-                s.city_cbox[:, row] / s._border_cost(s.city_acquired[:, row]).clamp(min=1),
+                (s.city_cbox[:, row] / s._border_cost(s.city_acquired[:, row]).clamp(min=1)).to(d),
                 owned / 20.0,
                 torch.where(alive, s.city_hp[:, row], torch.zeros_like(s.city_hp[:, row])).to(d) / 200.0,
                 s.city_loyalty[:, row].to(d) / 100.0,

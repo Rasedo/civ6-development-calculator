@@ -2914,7 +2914,7 @@ class SimSeats:
                     self._tile_owner_ver += 1  # nothing else to retag
                     self._reveal_around(_rows, row, tt[_rows], 1)  # acquireTile's revealAround(seat, tile, 1)
                     self.tile_city[_rows, tt[_rows]] = self.city_id[_rows, row, jt[_rows]]
-                    self.city_acquired[_rows, row, jt[_rows]] += 1
+                    # `claimTile`: a purchase leaves the culture count alone
                     self.civ_tiles_purchased[_rows, row] += 1
                     self._eff_version += 1
                     bought = bought | ok_t
@@ -3510,7 +3510,7 @@ class SimSeats:
             g, v = aboard.nonzero(as_tuple=True)
             self.unit_tile[g, v] = dest[g]
 
-    def _air_cover_scan(self, row: int, tile: torch.Tensor):
+    def _air_cover_scan(self, row: int, tile: torch.Tensor, duelled: torch.Tensor | None = None):
         """(slot, has) — the anti-air weapon that answers a strike at `tile`,
         `airCoverAgainst`'s twin.
 
@@ -3520,7 +3520,8 @@ class SimSeats:
         they have additional close-range defenses, which activate when they are
         attacked by an aircraft", which is a hull answering for its own hex
         alone. The strongest answer fires, ties going to the lowest tile index
-        and then to the tile's own occupancy order."""
+        and then to the tile's own occupancy order. `duelled` [B] (-1 none),
+        the weapon the sortie fights, fires no burst of its own."""
         B, dev = tile.shape[0], self.device
         neg = torch.full_like(tile, -1)
         keys, slots = [], []
@@ -3540,6 +3541,8 @@ class SimSeats:
                 aa = self._anti_air_at(ty, seat)
                 ok = (live_t & (sl >= 0) & (aa > 0) & self._seats_hostile(row, seat)
                       & ((cov >= dist) | ((dist == 0) & self.unit_naval[ty])))
+                if duelled is not None:
+                    ok = ok & (sl != duelled)
                 key = aa * (4 * self.T) - (at.clamp(min=0) * 4 + prank)
                 keys.append(torch.where(ok, key, torch.full_like(key, -1)))
                 slots.append(torch.where(ok, sl, neg))
@@ -3679,7 +3682,7 @@ class SimSeats:
             self._log_xp(rs, ss, "ix")
 
     def _air_answers(self, fire: torch.Tensor, atk_kind: str, u: int, row: int,
-                     tgt: torch.Tensor) -> torch.Tensor:
+                     tgt: torch.Tensor, duelled: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — the sorties that fly on to their target, `airAnswers`.
 
         CIV6 (Interceptions): "Once combat is resolved with any anti-air
@@ -3692,7 +3695,8 @@ class SimSeats:
         A fighter turned back has spent its sortie. A bomber the INTERCEPTION
         downs flies on and strikes at its health after the fight, and is gone
         after its blow (`_air_downed`); a plane the anti-air burst shoots down
-        leaves."""
+        leaves. `duelled` [B] (-1 none) is the weapon the sortie is about to
+        fight, which answers in that fight and fires no burst."""
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
         through = fire.clone()
@@ -3701,7 +3705,7 @@ class SimSeats:
         if bool(ifire.any()):
             self._intercept_fight(ifire, atk_kind, u, tgt, i_slot, i_sup)
             through = through & ~(ifire & (self._type_air[at0] == 1))
-        c_slot, c_has = self._air_cover_scan(row, tgt.clamp(min=0))
+        c_slot, c_has = self._air_cover_scan(row, tgt.clamp(min=0), duelled)
         cfire = through & c_has
         if bool(cfire.any()):
             flying = _hp_p[:, u] > 0
@@ -3779,8 +3783,13 @@ class SimSeats:
         Support chassis with no Anti-Air of its own deals the same flat blow
         with no draw, after the sortie's answers
         (runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl); a
-        lone Anti-Air Gun fights at its Anti-Air. A civilian is never struck
-        (`airTarget`)."""
+        lone Anti-Air Gun fights at its Anti-Air. A BOMBER strikes a land unit
+        at its Ranged column (Bombard less COMBAT_BOMBARD_VS_UNIT_STRENGTH_
+        MODIFIER): a combat unit one-sided, one draw; a lone Anti-Air Gun in a
+        DUEL — the gun's damage drawn first, then the Bomber's at the mirrored
+        difference, the gun firing no burst of its own and neither side
+        banking experience (runs/b89b_bomber.jsonl). A civilian is never
+        struck (`airTarget`)."""
         ttc = tgt.clamp(min=0)
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
@@ -3822,8 +3831,17 @@ class SimSeats:
         # an order other than the patrol ends it
         _pat = getattr(self, f"{atk_kind}_unit_patrol")
         _pat[:, u] = torch.where(go, torch.full_like(_pat[:, u], -1), _pat[:, u])
+        ds0 = d_slot.clamp(min=0)
+        d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+        aa = self._anti_air_at(d_type, d_seat)
+        # a BOMBER on a lone anti-air chassis fights it: the gun answers in
+        # the duel, not with a burst of its own
+        duel = go_unit & (self._type_air[at0] == 2) & self._type_support[d_type] & (aa > 0)
+        if priority:
+            duel = torch.zeros_like(duel)
         # PRIORITY TARGET, as fired, takes no answer from the ground or the air
-        through = go if priority else self._air_answers(go, atk_kind, u, row, tgt)
+        through = go if priority else self._air_answers(
+            go, atk_kind, u, row, tgt, duelled=torch.where(duel, d_slot, torch.full_like(d_slot, -1)))
         city_t = go_city & through
         if bool(city_t.any()):
             fired = self._ranged_attack(city_t, tgt, atk_kind, u, row)
@@ -3833,10 +3851,7 @@ class SimSeats:
         unit_att = go_unit & through
         if not bool(unit_att.any()):
             return
-        ds0 = d_slot.clamp(min=0)
-        d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
         d_hp0 = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
-        aa = self._anti_air_at(d_type, d_seat)
         def_cs = torch.where(aa > 0, aa, self._type_combat[d_type])
         def_cs = def_cs + self._air_defense_cs(
             aa, d_seat, self.unit_tile.gather(1, ds0.unsqueeze(1)).squeeze(1))
@@ -3865,18 +3880,26 @@ class SimSeats:
         d_dmg = torch.where(
             flat, torch.full_like(d_hp0, self._priority_target_damage),
             self._damage_roll(unit_att & ~flat, atk_e - def_e, k="air", tile=tgt))
+        # the duel: the gun's damage drawn first, then the bomber's at the
+        # mirrored difference (runs/c34w_strike_b89b_aa_20260927T191029Z.jsonl)
+        duel = duel & unit_att
+        if bool(duel.any()):
+            b_dmg = self._damage_roll(duel, def_e - atk_e, k="airb", tile=tgt)
+            _hp_p[:, u] = torch.where(duel, _hp_p[:, u] - b_dmg, _hp_p[:, u])
         g = unit_att.nonzero(as_tuple=True)[0]
         ds = d_slot[g]
         self.unit_hp[g, ds] -= d_dmg[g]
         _mp = getattr(self, f"{atk_kind}_unit_mp")
         _mp[:, u] = torch.where(unit_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
         self._spend_one_attack(atk_kind, u, unit_att)
-        # the strike kills no plane: a bomber the interception downed banks
-        # nothing (its hp) and gives the defender no kill bonus
-        a_died = torch.zeros_like(unit_att)
+        # a plain strike kills no plane: a bomber the interception downed
+        # banks nothing (its hp) and gives the defender no kill bonus; the
+        # duel's gun may down the bomber
+        a_died = duel & (_hp_p[:, u] <= 0)
         d_died = unit_att & ((d_hp0 - d_dmg) <= 0)
+        # the duel pays neither side experience
         self._award_pair_xp(
-            unit_att, a_kind=atk_kind, u=u, a_type=_type_p[:, u], a_seat=a_seat,
+            unit_att & ~duel, a_kind=atk_kind, u=u, a_type=_type_p[:, u], a_seat=a_seat,
             d_slot=d_slot, d_type=d_type, d_is_barb=d_seat == BARB_SEAT,
             ranged=True, a_died=a_died, d_died=d_died)
         self._ww_battle(unit_att, row, self._row_of(d_seat), tgt,
@@ -5096,6 +5119,26 @@ class SimSeats:
             return torch.where(own, torch.full_like(self.civ_founder[:, row], row), torch.full_like(self.civ_founder[:, row], -1))
         dom = self._dominant_religion()[:, row]
         return torch.where(own, torch.full_like(dom, row), torch.where(paid, dom, torch.full_like(dom, -1)))
+
+    def _religion_followers(self, g: torch.Tensor) -> torch.Tensor:
+        """[B] long — `religionFollowers`' twin: every citizen in the world
+        following religion `g` ([B]), each city's share (`_followers_of`),
+        majority or not — the majors' and the Free Cities' rows, and each
+        live city-state's composed city."""
+        M, B = self.n_majors, self.B
+        gc = g.clamp(min=0)
+        pres = torch.cat([self.city_pressure[:, :M, :self.RC], self.city_pressure[:, self.FREE_ROW:self.FREE_ROW + 1, :self.RC]], dim=1)
+        pop = torch.cat([self.city_pop[:, :M, :self.RC], self.city_pop[:, self.FREE_ROW:self.FREE_ROW + 1, :self.RC]], dim=1)
+        alive = torch.cat([self.city_alive[:, :M, :self.RC], self.city_alive[:, self.FREE_ROW:self.FREE_ROW + 1, :self.RC]], dim=1)
+        f, _ = self._followers_of(pres, torch.where(alive, pop, torch.zeros_like(pop)))   # [B, R, RC, n+1]
+        idx = gc.reshape(B, 1, 1, 1).expand(-1, f.shape[1], f.shape[2], 1)
+        n = (f.gather(3, idx).squeeze(3) * alive.long()).sum(dim=(1, 2))
+        if self.S > 0:
+            M0, S = self._CITY_MINOR0, self.S
+            fm, _ = self._followers_of(self.city_pressure[:, M0:M0 + S, 0], self.citystate_pop[:, :S])   # [B, S, n+1]
+            n = n + (fm.gather(2, gc.reshape(B, 1, 1).expand(-1, S, 1)).squeeze(2)
+                     * self.citystate_alive[:, :S].long()).sum(dim=1)
+        return torch.where(g >= 0, n, torch.zeros_like(n))
 
     def _cities_following(self, g: torch.Tensor) -> torch.Tensor:
         """[B] long — `citiesFollowing`'s twin: every city in the world whose
@@ -7908,6 +7951,10 @@ class SimSeats:
                 rc = int(r["rc"])
                 if rc >= 0 and not bool(cv[:, rc].any()):
                     continue
+                # ...or on a TECH (the Great Wall's Masonry and Castles rows)
+                rt = int(r["rt"])
+                if rt >= 0 and not bool(tv[:, rt].any()):
+                    continue
                 uc, ut = int(r["uc"]), int(r["ut"])
                 up = (cv[:, uc] if uc >= 0 else
                       torch.zeros(self.B, dtype=torch.bool, device=self.device))
@@ -7954,6 +8001,8 @@ class SimSeats:
                     groups = (n > 0).to(self.dtype)
                 if rc >= 0:
                     groups = groups * cv[:, rc].reshape(-1, 1).to(self.dtype)
+                if rt >= 0:
+                    groups = groups * tv[:, rt].reshape(-1, 1).to(self.dtype)
                 base = torch.tensor(r["y"], dtype=self.dtype, device=self.device)
                 upy = torch.tensor(r["uy"], dtype=self.dtype, device=self.device)
                 pay = (torch.where(up.reshape(-1, 1, 1), upy.reshape(1, 1, 6),
@@ -9677,7 +9726,7 @@ class SimSeats:
         [B, cols] f64.
 
         Every term is dyadic (water 2/3/5, building housing integral,
-        improvement housing 0.5), so the f64 sum is exact in any order and the
+        improvement housing floored whole), so the f64 sum is exact in any order and the
         bucket order below — TS's water → districts → buildings → river →
         improvements → housingAll → conditional — costs nothing to keep.
         Water access DERIVES from the centre tile on every read
@@ -9777,7 +9826,9 @@ class SimSeats:
             & (self.tile_city.gather(1, wf).reshape_as(win) == self.city_id[:, row, :cols].unsqueeze(2))
             & (imp_w >= 0)
         )
-        housing = housing + (self._imp_housing[imp_w.clamp(min=0)].double() * own.double()).sum(dim=2)
+        # the Housing / TilesRequired shares sum over the city and pay WHOLE
+        # housing, the floor of the city's sum (`computeHousing`)
+        housing = housing + torch.floor((self._imp_housing[imp_w.clamp(min=0)].double() * own.double()).sum(dim=2))
         # CIV6 (Monastery): "+1 additional Housing (with Colonialism)"
         hc = self._imp_house_civic[imp_w.clamp(min=0)]
         if bool((hc >= 0).any()):
@@ -10633,7 +10684,7 @@ class SimSeats:
         new_cap = ~alive_row[rows].any(dim=1)
         # CIV6 (Religious Colonization): the founder's majority religion, read
         # before the new city joins its count, carries the belief — the city
-        # starts with its citizen following it on the belief's pressure
+        # starts with its citizen following it on the belief's founding pressure
         colon_g = colon_p = None
         if row < self.n_majors and bool((self._enh["colon"] != 0).any()):
             colon_g = self._dominant_religion()[rows, row]
@@ -10668,7 +10719,10 @@ class SimSeats:
         if colon_g is not None:
             _ch = colon_p > 0
             if bool(_ch.any()):
-                self.city_pressure[rows[_ch], row, slot[_ch], colon_g[_ch]] = colon_p[_ch].to(self.city_pressure.dtype)
+                # the rate per two citizens, rounded up, plus the extra
+                _cpop = self.city_pop[rows[_ch], row, slot[_ch]]
+                _cpres = colon_p[_ch] * ((_cpop + 1) // 2) + self._colonize_extra
+                self.city_pressure[rows[_ch], row, slot[_ch], colon_g[_ch]] = _cpres.to(self.city_pressure.dtype)
                 self.city_followed[rows[_ch], row, slot[_ch]] = colon_g[_ch]
         self.city_prod_bank[rows, row, slot] = 0
         for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):

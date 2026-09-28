@@ -26,6 +26,7 @@
 import type { GameMap, ImprovementId, Tile } from './types';
 import { neighbors } from '../../world/hex';
 import { isMountain, naturalWonderAt } from '../../world/query';
+import { isFloodplains } from '../../world/features';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { FIRE_APPEAL, fireFeature } from '../data/disasters';
@@ -49,7 +50,7 @@ export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>
     if (n.district) appeal += DISTRICTS[n.district].appealAdjacent;
     if (camps?.has(n.index)) appeal -= 1;
     if (n.feature === 'RAINFOREST' || n.feature === 'MARSH') appeal -= 1;
-    if (n.feature === 'FLOODPLAINS') appeal -= 1;
+    if (isFloodplains(n.feature)) appeal -= 1;
     if (fireFeature(n.feature)) appeal += FIRE_APPEAL;
     if (n.pillaged) appeal -= 1; // "-1 each adjacent pillaged tile"
     if (n.improvement) appeal += IMPROVEMENTS[n.improvement as ImprovementId].appealAdjacent ?? 0;

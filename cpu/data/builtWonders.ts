@@ -495,7 +495,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'GREAT_BATH', name: 'Great Bath', code: 'GT', cost: 180,
-      requiresTech: 'POTTERY', placement: { onFeature: ['FLOODPLAINS'] },
+      requiresTech: 'POTTERY', placement: { onFeature: ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
       effects: { cityHousing: 3, cityAmenities: 1, floodMitigation: true, faithPerFlood: 1 },
       description: '+3 housing, +1 amenity, +1 faith per flood the city has taken, and floods along its river do no damage.',
       src: {
@@ -511,12 +511,15 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'ETEMENANKI', name: 'Etemenanki', code: 'ET', cost: 220,
-      requiresTech: 'WRITING', placement: { onFeature: ['FLOODPLAINS', 'MARSH'] },
+      requiresTech: 'WRITING', placement: { onFeature: ['FLOODPLAINS', 'MARSH', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
       cityYields: { science: 2 },
       effects: {
         tileYields: [
           { feature: 'MARSH', empire: true, yields: { science: 2, production: 1 } },
           { feature: 'FLOODPLAINS', yields: { science: 1, production: 1 } },
+          // Portugal_Expansion2.xml: the grassland and plains floodplains' own rows
+          { feature: 'FLOODPLAINS_GRASSLAND', yields: { science: 1, production: 1 } },
+          { feature: 'FLOODPLAINS_PLAINS', yields: { science: 1, production: 1 } },
         ],
       },
       description: "+2 science; +2 science and +1 production on every Marsh in the empire; +1 science and +1 production on this city's Floodplains.",
@@ -530,6 +533,10 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'effects.tileYields.0.yields.production': xml('ModifierArguments', 'ModifierId=ETEMENANKI_PRODUCTION_MARSH&Name=Amount', 'Value'),
         'effects.tileYields.1.yields.science': xml('ModifierArguments', 'ModifierId=ETEMENANKI_SCIENCE_FLOODPLAINS&Name=Amount', 'Value'),
         'effects.tileYields.1.yields.production': xml('ModifierArguments', 'ModifierId=ETEMENANKI_PRODUCTION_FLOODPLAINS&Name=Amount', 'Value'),
+        'effects.tileYields.2.yields.science': xml('ModifierArguments', 'ModifierId=ETEMENANKI_SCIENCE_GRASS_FLOODPLAINS&Name=Amount', 'Value'),
+        'effects.tileYields.2.yields.production': xml('ModifierArguments', 'ModifierId=ETEMENANKI_PRODUCTION_GRASS_FLOODPLAINS&Name=Amount', 'Value'),
+        'effects.tileYields.3.yields.science': xml('ModifierArguments', 'ModifierId=ETEMENANKI_SCIENCE_PLAINS_FLOODPLAINS&Name=Amount', 'Value'),
+        'effects.tileYields.3.yields.production': xml('ModifierArguments', 'ModifierId=ETEMENANKI_PRODUCTION_PLAINS_FLOODPLAINS&Name=Amount', 'Value'),
       },
     }),
     W({
@@ -598,7 +605,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'MONT_ST_MICHEL', name: 'Mont St. Michel', code: 'MS', cost: 710,
-      requiresCivic: 'DIVINE_RIGHT', placement: { onFeature: ['FLOODPLAINS', 'MARSH'] },
+      requiresCivic: 'DIVINE_RIGHT', placement: { onFeature: ['FLOODPLAINS', 'MARSH', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
       cityYields: { faith: 2 },
       effects: { apostleMartyr: true, occupyDefense: 6 },
       description: '+2 faith, 2 relic slots; every Apostle carries Martyr, and the unit standing on it gets +6 defence.',

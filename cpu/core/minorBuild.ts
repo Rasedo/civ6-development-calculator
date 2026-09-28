@@ -38,7 +38,7 @@ import { CIV_LEVELS } from '../data/civLevels';
 import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, wallsMax } from './rules';
 import { seatGrowth } from './seatTurn';
-import { bankruptcy, cityBorderGrowth, cityStrikes, paveGround } from './phase';
+import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, centreStrength } from './combat';
 import { districtScaledBase, districtProgressAdd, goldAffordable, projectCost, repairAvailable } from './game';
 import { computeCityStats } from './city';
@@ -178,8 +178,9 @@ export function minorEconomy(state: GameState, cityState: CityState): number {
 export function minorGrowth(state: GameState, cityState: CityState): void {
   const city = minorCity(cityState);
   const stats = computeCityStats(state, city);
+  const popBefore = city.population;
   seatGrowth(city, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
-  cityBorderGrowth(state, city, cityState.seat, stats.total.culture);
+  cityBorderGrowth(state, city, cityState.seat, cultureAfterGrowth(state, city, popBefore, stats));
   cityState.population = city.population;
   cityState.foodBox = city.foodBox;
   cityState.cultureBox = city.cultureBox;

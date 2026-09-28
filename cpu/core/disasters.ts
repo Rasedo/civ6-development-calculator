@@ -5,6 +5,7 @@ import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
 import { neighborTile, neighbors, offsetToAxial, axialToOffset, tileAt, tilesWithin, hexDistance } from '../../world/hex';
 import { isWater } from '../../world/query';
+import { isFloodplains } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { RESOURCES } from '../../world/resources';
 import { nextRandom } from './rand';
@@ -29,7 +30,7 @@ import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLD
 import { EVENT_NORM_PER_MAP, EVENT_NORM_PER_SITE, FIRST_TIME_OCCURRENCE_BOOST, VOLCANO_WAKE_P, DROUGHT_DISTANCE_WEIGHTS } from '../data/disasters';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_SPREAD_CROSS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
-import { ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
+import { ACCIDENT_ROWS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
 import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, windBand, STORM_MOVEMENT, type StormEvent } from '../data/disasters';
 import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
@@ -181,6 +182,15 @@ interface UnitStrike {
  * rows (`stormSpares`, `stormExtraPct`) read `ev`; an event with none passes
  * null.
  */
+/** whether `tile` holds a unit UNIT_DAMAGE_LAND hurts — `strikeUnits`' land
+ *  set: no civilian, aircraft, spy or hull. `_holds_land_target` is the twin. */
+function holdsLandTarget(state: GameState, tile: Tile): boolean {
+  return unitsAt(state, tile.index).some((u) => {
+    const dom = unitDomain(u.type);
+    return dom !== 'air' && dom !== 'spy' && dom !== 'civilian' && !UNITS[u.type]?.naval;
+  });
+}
+
 function strikeUnits(state: GameState, tile: Tile, owner: number, s: UnitStrike, ev: StormEvent | null): void {
   for (const u of [...unitsAt(state, tile.index)]) {
     const dom = unitDomain(u.type);
@@ -250,7 +260,7 @@ export function riverReach(map: GameMap, start: Tile): Tile[] {
       stack.push(n);
     }
   }
-  const out = map.tiles.filter((t: Tile) => seen.has(t.index) && t.feature === 'FLOODPLAINS');
+  const out = map.tiles.filter((t: Tile) => seen.has(t.index) && isFloodplains(t.feature));
   return out.length ? out : [start];
 }
 
@@ -313,7 +323,7 @@ export function floodRivers(map: GameMap): FloodRiver[] {
   const seen = new Uint8Array(map.tiles.length);
   const out: FloodRiver[] = [];
   for (const t of map.tiles) {
-    if (t.feature !== 'FLOODPLAINS' || seen[t.index]) continue;
+    if (!isFloodplains(t.feature) || seen[t.index]) continue;
     seen[t.index] = 1;
     const river = [t];
     for (let i = 0; i < river.length; i++) {
@@ -370,7 +380,7 @@ function floodStart(map: GameMap, river: readonly Tile[]): Tile {
   let best: Tile | null = null;
   let far = -1;
   for (const u of [...river].sort((a, b) => a.index - b.index)) {
-    if (u.feature !== 'FLOODPLAINS') continue;
+    if (!isFloodplains(u.feature)) continue;
     const du = dist.get(u.index) ?? 0;
     if (du > far) {
       best = u;
@@ -992,7 +1002,10 @@ export function ageReactors(cities: readonly City[]): void {
 
 /**
  * A NUCLEAR ACCIDENT at one severity, in one city — MEASURED over 225 forced
- * accidents. SIX draws, always. Every accident pillages the Power Plant
+ * accidents. ONE draw per `RandomEvent_Damages` row of the severity, in the
+ * install's order (`ACCIDENT_ROWS`), each row's draw deciding that row, and
+ * one more right after UNIT_DAMAGE_LAND when it strikes a land unit on the
+ * plot: the damage, one for the plot. Every accident pillages the Power Plant
  * (105 of 105, runs/reactor_reactor_base_20260927T053410Z.jsonl,
  * runs/reactor_reactor_base_20260927T053613Z.jsonl,
  * runs/reactor_reactor_base_20260927T054059Z.jsonl); then the row's
@@ -1001,34 +1014,39 @@ export function ageReactors(cities: readonly City[]): void {
  * and every building in it (`pillageDistrict`), as every event's rows do.
  * ONE citizen is lost at its population chance (never the last), and the
  * units on the reactor's own plot take the row's UNIT_DAMAGE_LAND share and
- * band and its UNIT_KILLED_CIVILIAN chance (`strikeUnits`, one roll per plot
+ * damage and its UNIT_KILLED_CIVILIAN chance (`strikeUnits`, one roll per plot
  * as every event reads them). Fallout lies on that plot, the Industrial Zone,
  * for the row's turns. No building is destroyed, no ring improvement
  * pillaged, no unit off the plot struck; the plant stays, ageing on.
  */
 export function nuclearAccident(state: GameState, seat: number, city: City, sev: number): void {
-  const rDistrict = nextRandom(state);
-  const rBldg = nextRandom(state);
-  const rPop = nextRandom(state);
-  const rLand = nextRandom(state);
-  const rCivilian = nextRandom(state);
-  const rHp = nextRandom(state);
   const iz = city.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
-  if (iz) {
-    const t = state.map.tiles[iz.tileIndex];
+  const t = iz ? state.map.tiles[iz.tileIndex] : null;
+  const roll = new Map<string, number>();
+  let landDmg = 0;
+  for (const kind of ACCIDENT_ROWS[sev]) {
+    const r = nextRandom(state);
+    roll.set(kind, r);
+    if (kind === 'UNIT_DAMAGE_LAND' && r < ACCIDENT_LAND_P[sev] && t && holdsLandTarget(state, t)) {
+      landDmg = ACCIDENT_DMG_LO[sev] + Math.floor(nextRandom(state) * (ACCIDENT_DMG_HI[sev] - ACCIDENT_DMG_LO[sev]));
+    }
+  }
+  // a row the severity does not carry never fires
+  const fires = (kind: string, p: number) => (roll.get(kind) ?? 1) < p;
+  if (t) {
     t.falloutTurns = Math.max(t.falloutTurns ?? 0, ACCIDENT_FALLOUT[sev]);
     if (!envImmune(state, t)) pillageHeld({ city }, 'NUCLEAR_POWER_PLANT');
-    if (rBldg < ACCIDENT_BLDG_P[sev]) pillageTileBuildings(state, t);
-    if (rDistrict < ACCIDENT_DISTRICT_P[sev]) pillageDistrict(state, t);
+    if (fires('BUILDING_PILLAGED', ACCIDENT_BLDG_P[sev])) pillageTileBuildings(state, t);
+    if (fires('DISTRICT_PILLAGED', ACCIDENT_DISTRICT_P[sev])) pillageDistrict(state, t);
     strikeUnits(state, t, tileSeat(t), {
-      land: rLand < ACCIDENT_LAND_P[sev],
+      land: fires('UNIT_DAMAGE_LAND', ACCIDENT_LAND_P[sev]),
       naval: false,
-      civ: rCivilian < ACCIDENT_CIV_KILL_P[sev],
-      landDmg: ACCIDENT_DMG_LO[sev] + Math.floor(rHp * (ACCIDENT_DMG_HI[sev] - ACCIDENT_DMG_LO[sev] + 1)),
+      civ: fires('UNIT_KILLED_CIVILIAN', ACCIDENT_CIV_KILL_P[sev]),
+      landDmg,
       navalDmg: 0,
     }, null);
   }
-  if (rPop < ACCIDENT_POP_P[sev] && city.population > 1) {
+  if (fires('POPULATION_LOSS', ACCIDENT_POP_P[sev]) && city.population > 1) {
     city.population -= 1;
     logPopWrite(state, city, 'ds');
     (state.aidHit ??= []).push(seat);  // CIV6 (Aid Request trigger)

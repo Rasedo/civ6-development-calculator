@@ -43,6 +43,8 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
   for (const r of rules) {
     // CIV6 (Terrace_MedievalAdjacency): a rule may WAIT on a civic of its own
     if (r.requiresCivic && !ctx.mods.impUpgrades.has(r.requiresCivic)) continue;
+    // ...or on a TECH (the Adjacency_YieldChanges row's PrereqTech)
+    if (r.requiresTech && !ctx.mods.impUpgradeTechs.has(r.requiresTech)) continue;
     const up = (!!r.upgradeCivic && ctx.mods.impUpgrades.has(r.upgradeCivic))
       || (!!r.upgradeTech && ctx.mods.impUpgradeTechs.has(r.upgradeTech));
     const per = (up && r.upgradePer) || r.per;

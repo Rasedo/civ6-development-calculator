@@ -3,7 +3,7 @@ import { setTileOwner, freeSeatOf, FREE_SEAT } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodRivers, erupt, drought, ageReactors, droughtCandidate, eventRows } from '../../../cpu/core/disasters';
-import { ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_DURATION, FLOOD_WEIGHT } from '../../../cpu/data/disasters';
+import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_DURATION, FLOOD_WEIGHT } from '../../../cpu/data/disasters';
 import { EVENT_NORM_PER_MAP, EVENT_NORM_PER_SITE, FIRST_TIME_OCCURRENCE_BOOST, VOLCANO_WAKE_P, DROUGHT_DISTANCE_WEIGHTS, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_CIV_KILL_P } from '../../../cpu/data/disasters';
 import { NO_SEAT } from '../../../cpu/core/types';
 import { hexDistance } from '../../../world/hex';
@@ -38,6 +38,7 @@ function stormFree(state: GameState, watched: Tile[]): boolean {
 import { neighborTile, neighbors } from '../../../world/hex';
 import type { GameState, Tile } from '../../../cpu/core/types';
 import { disbandUnit, spawnUnit } from '../../../cpu/core/units';
+import { nextRandom } from '../../../cpu/core/rand';
 import { tileYields } from '../../../cpu/core/yields';
 import { generateMap } from '../../../world/mapgen';
 
@@ -774,12 +775,54 @@ describe('the nuclear accident', () => {
       }
       expect(Math.abs(struck / N - ACCIDENT_LAND_P[sev])).toBeLessThan(0.04);
       expect(Math.abs(killed / N - ACCIDENT_CIV_KILL_P[sev])).toBeLessThan(0.04);
-      for (const d of band) expect(d >= 20 && d <= 50).toBe(true);
+      // 20 + rand(30): MaxHP exclusive
+      for (const d of band) expect(d >= 20 && d < 50).toBe(true);
       if (sev > 0) expect(band.size).toBeGreaterThan(20);
       expect(city.buildings).toContain('NUCLEAR_POWER_PLANT');
       expect(city.pillagedBuildings).toContain('NUCLEAR_POWER_PLANT');
     }
     expect([...ACCIDENT_LAND_P, ...ACCIDENT_CIV_KILL_P]).toEqual([0, 0.5, 1, 0, 0.5, 1]);
+  });
+
+  it('draws once per damage row, and once more for a land unit struck', () => {
+    expect(ACCIDENT_ROWS.map((r) => r.length)).toEqual([3, 8, 9]);
+    /** the draws `fn` spends: each draw adds one fixed step to the state */
+    const draws = (state: GameState, fn: () => void): number => {
+      const probe = { rngState: state.rngState } as GameState;
+      fn();
+      for (let n = 0; n < 32; n++) {
+        if (probe.rngState === state.rngState) return n;
+        nextRandom(probe);
+      }
+      throw new Error('more than 32 draws');
+    };
+    for (let sev = 0; sev < 3; sev++) {
+      const { state, city } = reactorBoard(40);
+      for (let i = 0; i < 50; i++) expect(draws(state, () => nuclearAccident(state, 0, city, sev))).toBe([3, 8, 9][sev]);
+    }
+    // CATASTROPHIC strikes every land unit: one more draw, a civilian alone none
+    const { state, city, izTile } = reactorBoard(40);
+    state.unitsMode = true;
+    const b = spawnUnit(state, 'BUILDER', izTile.index, 0)!;
+    expect(draws(state, () => nuclearAccident(state, 0, city, 2))).toBe(9);
+    expect(state.units.some((x) => x.id === b.id)).toBe(false);
+    for (let i = 0; i < 50; i++) {
+      const w = spawnUnit(state, 'WARRIOR', izTile.index, 0)!;
+      expect(draws(state, () => nuclearAccident(state, 0, city, 2))).toBe(10);
+      state.units = state.units.filter((x) => x.id !== w.id);
+    }
+    // MAJOR's land row at 50: 9 draws exactly when the warrior was struck
+    let struck = 0;
+    for (let i = 0; i < 200; i++) {
+      const w = spawnUnit(state, 'WARRIOR', izTile.index, 0)!;
+      const n = draws(state, () => nuclearAccident(state, 0, city, 1));
+      const hit = state.units.find((x) => x.id === w.id)!.hp < 100;
+      expect(n).toBe(hit ? 9 : 8);
+      if (hit) struck++;
+      state.units = state.units.filter((x) => x.id !== w.id);
+    }
+    expect(struck).toBeGreaterThan(60);
+    expect(struck).toBeLessThan(140);
   });
 
   it('a reactor is a site only past each severity\'s MinTurnAtRisk', () => {

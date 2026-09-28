@@ -25,10 +25,10 @@
  */
 import type { City, GameState, Tile } from '../core/types';
 import { computeCityStats, tileYieldsForCenter, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism } from '../core/city';
-import { tileYields } from '../core/yields';
+import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { cityDefenseStrength } from '../core/combat';
-import { applyLoyalty, cityBorderGrowth, districtSiteCost, loyaltyDelta } from '../core/phase';
+import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
 import { buildingPurchaseCost, settlerCost, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost } from '../core/game';
 import { buildingCostIn } from '../core/rules';
@@ -36,7 +36,7 @@ import { builderCost, traderCost } from '../core/units';
 import { monumentalityBuyMult } from '../core/eras';
 import { civOf, hiddenResourcesFor, seatOf } from '../core/seats';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
-import { LOYALTY_RANGE } from '../data/seats';
+import { LOYALTY_MAX, LOYALTY_RANGE } from '../data/seats';
 import { RELIGION_PRESSURE_RANGE } from '../data/religion';
 import { UNITS } from '../data/units';
 import type { DistrictId, YieldKey } from '../../world/types';
@@ -113,13 +113,13 @@ function congressSat(rec: TurnRecord): boolean {
   return !!c && typeof c === 'object' && Object.keys(c).some((k) => /^\d+$/.test(k));
 }
 
-/** the checks no plot of the city's feeds: a dropped row on one of its plots
- *  is no gap of theirs */
+/** the checks no plot of the city's feeds: a dropped row on one of its plots,
+ *  or a dropped resource of its seat's, is no gap of theirs */
 const PLOT_BLIND = new Set(['buy.buildingCost', 'buy.buildingGold', 'buy.unitCost', 'buy.unitGold',
   'buy.districtCost', 'buy.plotGold', 'city.defense', 'city.growthThreshold', 'step.pressure']);
 
 function gapsFor(gaps: string[], check: string): { gaps?: string[] } {
-  const g = PLOT_BLIND.has(check) ? gaps.filter((x) => !x.startsWith('plot ')) : gaps;
+  const g = PLOT_BLIND.has(check) ? gaps.filter((x) => !x.startsWith('plot ') && !x.startsWith('resource:')) : gaps;
   return g.length ? { gaps: g } : {};
 }
 
@@ -254,9 +254,17 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     if (wrapsL) out.push({ turn, check: 'city.loyaltyPerTurn', subject, ok: true, skip: 'wrap' });
     else if (bool(c.capital)) out.push({ turn, check: 'city.loyaltyPerTurn', subject, ok: true, skip: 'capital' });
     else {
+      // the whole per-turn change the turn step applies (the governor's term
+      // and the seat's terms beside the city's own), read off a city held at
+      // mid loyalty so no bound clips it
       const stats = computeCityStats(state, city);
-      const ours = loyaltyDelta(state, city, stats.amenities.tier.name);
-      push('city.loyaltyPerTurn', near(ours, gameLpt, 0.05), gameLpt, round3(ours));
+      const was = city.loyalty;
+      city.loyalty = LOYALTY_MAX / 2;
+      applyLoyalty(state, city, stats.amenities.tier.name, num(c.governor) >= 0);
+      const ours = city.loyalty - LOYALTY_MAX / 2;
+      city.loyalty = was;
+      push('city.loyaltyPerTurn', near(ours, gameLpt, 0.05), gameLpt, round3(ours),
+        { breakdown: c.loyaltyBreakdown, tier: stats.amenities.tier.name });
     }
     push('city.defense', cityDefenseStrength(state, city) === num((c.districts[0] ?? [])[5] as number),
       num((c.districts[0] ?? [])[5] as number), cityDefenseStrength(state, city),
@@ -274,6 +282,15 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         if (cat.wonders.includes(cat.buildings[idx])) continue;
         const id = engineRowOf(cat, 'building', idx);
         if (!id) continue;
+        // a pillaged building's row: the game's cost reader answers the full
+        // price (runs/h1_duelw1104, Xian's Library t41-53: 45, gold 180), not
+        // the repair the engine prices, so neither check has a reading
+        if (buildingPillaged(city, id)) {
+          for (const check of ['buy.buildingCost', 'buy.buildingGold']) {
+            out.push({ turn, check, subject, ok: true, skip: 'pillaged: the reader answers the full price' });
+          }
+          continue;
+        }
         buyPush(`buy.buildingCost`, near(buildingCostIn(state, city, id), num(cost), 0.5), num(cost), buildingCostIn(state, city, id), { building: id });
         const price = goldPrice(state, city.seat, buildingPurchaseCost(state, city.seat, id));
         buyPush(`buy.buildingGold`, price === num(gold), num(gold), price, { building: id });
@@ -418,12 +435,30 @@ function notStarted(a: TurnRecord, b: TurnRecord): Set<number> {
   return new Set([...moving].filter(([, m]) => !m).map(([o]) => o));
 }
 
+/**
+ * The players whose every city with culture coming in holds its border box
+ * exactly across the pair while its food moves: the game banked no border
+ * culture for the whole seat that turn (runs/h1_duelw1103, the autoplayed
+ * seat 0, every city t82-101), a state the record carries no reader for.
+ */
+function bordersHeld(a: TurnRecord, b: TurnRecord): Set<number> {
+  const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
+  const moving = new Map<number, boolean>();
+  for (const c1 of b.cities) {
+    const c0 = before.get(`${c1.owner}:${c1.id}`);
+    if (!c0 || !(num(c0.cultureYield) > 0) || c0.plots.length !== c1.plots.length) continue;
+    moving.set(c1.owner, (moving.get(c1.owner) ?? false) || num(c1.culture) !== num(c0.culture));
+  }
+  return new Set([...moving].filter(([, m]) => !m).map(([o]) => o));
+}
+
 export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, history?: History,
   prev?: TurnRecord): CheckResult[] {
   const out: CheckResult[] = [];
   const turn = a.turn;
   const acts = diffActions(a, b);
   const late = new Set([...acts.notStarted, ...(prev ? notStarted(prev, a) : [])]);
+  const held = bordersHeld(a, b);
   const imp = importTurn(a, cat, history);
   const state = imp.state;
   const after = new Map(b.cities.map((c) => [`${c.owner}:${c.id}`, c]));
@@ -477,18 +512,20 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       // border growth
       const plotsBefore = new Set(state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id).map((t) => t.index));
       const boxBefore = city.cultureBox;
-      cityBorderGrowth(state, city, seat, st.total.culture);
+      const culture = cultureAfterGrowth(state, city, before.pop, st);
+      cityBorderGrowth(state, city, seat, culture);
       const gainedOurs = state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id && !plotsBefore.has(t.index)).map((t) => t.index);
       const gainedGame = acts.plotsGained.get(k) ?? [];
       const bought = (acts.goldSpent.get(c.owner) ?? 0) > 0 && gainedGame.some((q) => !gainedOurs.includes(q));
       const borderSkip = skipAll ?? (wraps ? 'wrap' : bought ? 'a plot may have been bought'
-        : imp.tilesUnknown.has(city.centerIndex) ? 'expansions before the record' : null);
+        : imp.tilesUnknown.has(city.centerIndex) ? 'expansions before the record'
+        : held.has(c.owner) ? 'the seat banked no border culture' : null);
       if (borderSkip || !next) out.push({ turn, check: 'step.border', subject, ok: true, skip: borderSkip ?? 'no t+1' });
       else {
         const same = gainedOurs.length === gainedGame.length && gainedOurs.every((q) => gainedGame.includes(q));
         res('step.border', same && near(city.cultureBox, num(next.culture), 0.05),
           { culture: num(next.culture), gained: gainedGame }, { culture: round3(city.cultureBox), gained: gainedOurs },
-          { boxBefore: round3(boxBefore), culture: round3(st.total.culture), cost: st.border.cost });
+          { boxBefore: round3(boxBefore), culture: round3(culture), cost: st.border.cost });
       }
       // loyalty
       const loyBefore = city.loyalty;

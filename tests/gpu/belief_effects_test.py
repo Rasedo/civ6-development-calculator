@@ -9,8 +9,8 @@ DISTRICT, +1 Faith per Holy Site, +1 Culture per Theater Square), SACRED_PLACES
 MISSIONARY_ZEAL (ABILITY_RELIGIOUS_IGNORE_TERRAIN_COST), MONASTIC_ISOLATION
 (EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS, ReductionPercent 100), HOLY_WATERS
 (+10 religious healing at a following city's Holy Site), RELIGIOUS_COLONIZATION
-(runs/b91s3_colonization_20260926T130735Z.jsonl: a founded city starts
-following the religion on 200 of it); the Dar-e Mehr's Building_YieldsPerEra
+(runs/b91c_colonization.jsonl: a founded city starts following the religion
+on 200 x ceil(pop/2) + 2 of it); the Dar-e Mehr's Building_YieldsPerEra
 (+1 Faith per game era since constructed or last repaired); a per-city founder
 belief's cities following, worldwide; the worship building a city's majority
 religion offers. The TS twin is tests/cpu/religion/belief-effects.test.ts.
@@ -24,9 +24,9 @@ Proven here:
   6 the Dar-e Mehr stamps its era at the faith buy, pays per era since, and
     carries the stamp through a conquest; the digest names it;
   7 Pilgrimage pays per city following anywhere: a foreign major's, a
-    city-state's;
+    city-state's; World Church 0.25 Culture per follower anywhere, unfloored;
   8 Religious Colonization: a city founded under a majority religion holding
-    it starts following it on 200;
+    it starts following it on 202 (200 per two citizens, rounded up, + 2);
   9 a worship building is offered by the city's majority religion, whoever
     founded it, and none once the city holds one.
 """
@@ -58,6 +58,7 @@ MONASTIC = next(i for i, r in enumerate(ENH) if r["theoKeep"])
 HW = next(i for i, r in enumerate(ENH) if r["hwHeal"])
 COLON = next(i for i, r in enumerate(ENH) if r["colon"])
 PILGRIM = next(i for i, r in enumerate(FOU) if r["perC"][5] > 0)
+WORLD = next(i for i, r in enumerate(FOU) if r["perF"][0] > 0 and r["perF"][1 + 4] > 0)
 
 
 def cap_slot(sim, row: int) -> int:
@@ -280,6 +281,46 @@ def test_pilgrimage(rules, path) -> None:
     print("  7 Pilgrimage OK — +2 Faith per city following: its own, a foreign major's, a city-state's")
 
 
+def test_world_church(rules, path) -> None:
+    """World Church: 0.25 Culture per follower of the religion anywhere,
+    unfloored, a minority's followers included (runs/b91w_worldchurch.jsonl)."""
+    sim = opened(rules, path, 4)
+    j = cap_slot(sim, ROW)
+    religion(sim, ROW, founder=WORLD)
+    sim.city_pressure[B0] = 0
+    sim.city_pop[B0, ROW, j] = 1
+    k = int(sim.city_alive[B0, 1].long().argmax())
+    sim.city_pop[B0, 1, k] = 4
+    s = int(sim.citystate_alive[B0].long().argmax())
+    assert bool(sim.citystate_alive[B0, s]), "no live city-state"
+    sim.citystate_pop[B0, s] = 2
+    sim._eff_version += 1
+    c0, yf = totals(sim, ROW)
+    c0 = float(c0[j, 4])
+
+    def gain() -> float:
+        sim._eff_version += 1
+        return (float(totals(sim, ROW)[0][j, 4]) - c0) / float(yf[j])
+
+    def followers() -> int:
+        return int(sim._religion_followers(torch.tensor([ROW]))[B0])
+
+    # one follower at home: a quarter, not floored away
+    sim.city_pressure[B0, ROW, j, ROW] = 500
+    assert followers() == 1 and abs(gain() - 0.25) < 1e-9, (followers(), gain())
+    # one of a foreign city's four citizens, the unconverted its majority
+    sim.city_pressure[B0, 1, k, ROW] = 60
+    assert followers() == 2 and abs(gain() - 0.5) < 1e-9, (followers(), gain())
+    # a city-state's two
+    sim.city_pressure[B0, sim._CITY_MINOR0 + s, 0, ROW] = 500
+    assert followers() == 4 and abs(gain() - 1.0) < 1e-9, (followers(), gain())
+    # another religion's followers count nothing
+    sim.city_pressure[B0, 1, k, ROW] = 0
+    sim.city_pressure[B0, 1, k, 1] = 60
+    assert followers() == 3 and abs(gain() - 0.75) < 1e-9, (followers(), gain())
+    print("  7b World Church OK — 0.25 Culture a follower anywhere, a minority's included")
+
+
 def test_colonization(rules, path) -> None:
     for enh, want in ((-1, -1), (COLON, ROW)):
         sim = opened(rules, path, 4)
@@ -294,8 +335,10 @@ def test_colonization(rules, path) -> None:
         assert bool(sim._found_city_at(ROW, ONES, torch.tensor([t]))[B0]), "the founding failed"
         k = int(((sim.city_center[B0, ROW] == t) & sim.city_alive[B0, ROW]).long().argmax())
         assert int(sim.city_followed[B0, ROW, k]) == want, int(sim.city_followed[B0, ROW, k])
-        assert int(sim.city_pressure[B0, ROW, k, ROW]) == (200 if want >= 0 else 0), int(sim.city_pressure[B0, ROW, k, ROW])
-    print("  8 Religious Colonization OK — the founded city follows the majority religion on 200")
+        # 200 per two citizens, rounded up, plus 2: 202 at population 1
+        assert int(sim.city_pressure[B0, ROW, k, ROW]) == (202 if want >= 0 else 0), int(sim.city_pressure[B0, ROW, k, ROW])
+    assert sim._colonize_extra == 2
+    print("  8 Religious Colonization OK — the founded city follows the majority religion on 202")
 
 
 def test_worship_offer(rules, path) -> None:
@@ -339,6 +382,7 @@ def main() -> int:
     test_holy_waters(rules, path)
     test_dar_e_mehr(rules, path)
     test_pilgrimage(rules, path)
+    test_world_church(rules, path)
     test_colonization(rules, path)
     test_worship_offer(rules, path)
     print("BATTERY OK belief_effects")

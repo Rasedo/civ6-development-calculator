@@ -18,11 +18,22 @@ export const CITY_WORK_RADIUS = srcConst('seats.workRadius', 3,
 export const BORDER_MAX_RADIUS = srcConst('constants.BORDER_MAX_RADIUS', 5,
   gp('PLOT_INFLUENCE_MAX_ACQUIRE_DISTANCE'));
 
-/** Culture needed for a city's next border expansion (n = tiles acquired so
- * far). The real Civ 6 curve, 10 + (6t)^1.3 with t the 1-based tile
- * count — first tile still ~20, but later tiles cost properly more. */
+export const CULTURE_COST_FIRST_PLOT = srcConst('constants.cultureCostFirstPlot', 10,
+  gp('CULTURE_COST_FIRST_PLOT'));
+export const CULTURE_COST_LATER_PLOT_MULTIPLIER = srcConst('constants.cultureCostLaterPlotMultiplier', 6,
+  gp('CULTURE_COST_LATER_PLOT_MULTIPLIER'));
+export const CULTURE_COST_LATER_PLOT_EXPONENT = srcConst('constants.cultureCostLaterPlotExponent', 1.3,
+  gp('CULTURE_COST_LATER_PLOT_EXPONENT'));
+
+/** Culture needed for a city's next border expansion, `n` the plots the city
+ * has taken WITH CULTURE so far, counted from 0 (a purchase is not counted):
+ * (CULTURE_COST_FIRST_PLOT + (MULTIPLIER · n)^EXPONENT) at the online speed,
+ * floored after the speed's scaling — 5, 10, 17, 26, 36, 46 … 120, the game's
+ * `GetCultureCost` on n 0–5, 7, 8, 10, 11 in runs/h1_duelw1103 / 1104. The GPU
+ * twin is `_border_cost`. */
 export function borderGrowthCost(n: number): number {
-  return Math.floor(10 + Math.pow(6 * (n + 1), 1.3));
+  return scaleByGameSpeed(CULTURE_COST_FIRST_PLOT
+    + Math.pow(CULTURE_COST_LATER_PLOT_MULTIPLIER * n, CULTURE_COST_LATER_PLOT_EXPONENT));
 }
 
 /**
@@ -342,9 +353,18 @@ export const PILLAGE_BUILDING_REPAIR_PERCENT = srcConst('pillageBuildingRepairPc
   gp('PILLAGE_BUILDING_REPAIR_PERCENT'));
 export const CITY_CENTER_MIN_PRODUCTION = 1;
 
-/** Food needed to grow from `pop` to `pop`+1 (Civ 6 formula). */
+export const CITY_GROWTH_THRESHOLD = srcConst('constants.cityGrowthThreshold', 15, gp('CITY_GROWTH_THRESHOLD'));
+export const CITY_GROWTH_MULTIPLIER = srcConst('constants.cityGrowthMultiplier', 8, gp('CITY_GROWTH_MULTIPLIER'));
+export const CITY_GROWTH_EXPONENT = srcConst('constants.cityGrowthExponent', 1.5, gp('CITY_GROWTH_EXPONENT'));
+
+/** Food needed to grow from `pop` to `pop`+1: (THRESHOLD + MULTIPLIER·(p−1) +
+ * (p−1)^EXPONENT) at the online speed, floored after the speed's scaling —
+ * 7, 12, 16, 22, 27, 33, 38 … 57, the game's `GetGrowthThreshold` on
+ * population 1–7 and 10 in runs/h1_duelw1103 / 1104. The GPU twin is
+ * `_growth_needed`. */
 export function growthFoodNeeded(pop: number): number {
-  return Math.floor(15 + 8 * (pop - 1) + Math.pow(pop - 1, 1.5));
+  return scaleByGameSpeed(CITY_GROWTH_THRESHOLD + CITY_GROWTH_MULTIPLIER * (pop - 1)
+    + Math.pow(pop - 1, CITY_GROWTH_EXPONENT));
 }
 
 export function housingGrowthFactor(remaining: number): number {

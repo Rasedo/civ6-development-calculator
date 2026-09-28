@@ -418,8 +418,12 @@ describe('religious pressure spread', () => {
     endTurn(state);
     expect(cap.religionPressure![0]).toBe(p + HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
     expect(near.religionPressure![0]).toBe(HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
-    const need = Math.floor((ATHEISM_PRESSURE_PER_POP * near.population) / (HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN)) + 1;
-    for (let t = 1; t < need; t++) endTurn(state);
+    // the city grows meanwhile, so its baseline is read each turn
+    let guard = 0;
+    while ((near.followedReligion ?? null) === null && guard++ < 30) {
+      expect(near.religionPressure![0]).toBeLessThanOrEqual(ATHEISM_PRESSURE_PER_POP * near.population);
+      endTurn(state);
+    }
     expect(near.followedReligion).toBe(0); // within RELIGION_PRESSURE_RANGE
     expect(far.religionPressure?.[0] ?? 0).toBe(0);
     expect(far.followedReligion ?? null).toBeNull();

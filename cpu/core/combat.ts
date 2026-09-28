@@ -36,6 +36,7 @@ import { fuelShortCS } from './stockpile';
 import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_DAMAGE_SCALE, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
+import { isFloodplains } from '../../world/features';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
 import { isExplored, revealAround, unexploredByAll } from './fog';
 import { wipeConstruction } from './production';
@@ -97,7 +98,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
 export function featureDefense(feature: string | null | undefined): number {
   // the pack's burning and burnt Woods and Rainforest carry the same 3
   if (feature === 'WOODS' || feature === 'RAINFOREST' || fireFeature(feature)) return 3;
-  if (feature === 'MARSH' || feature === 'FLOODPLAINS') return -2;
+  if (feature === 'MARSH' || isFloodplains(feature)) return -2;
   if (feature === 'REEF') return 3;
   return 0;
 }
@@ -1941,16 +1942,17 @@ function interceptFight(
  * strikes at its health after the fight, and is gone after its blow (2 of 2,
  * runs/c34w_strike_d1edge_20260927T012915Z.jsonl,
  * runs/c34w_strike_d1kill_20260927T013012Z.jsonl; `airDowned`); a plane the
- * anti-air burst shoots down leaves. True when the plane flies on to its
- * target.
+ * anti-air burst shoots down leaves. `duelled` is a weapon the sortie is
+ * about to fight, which answers in that fight and fires no burst. True when
+ * the plane flies on to its target.
  */
-function airAnswers(state: GameState, attacker: Unit, targetIndex: number): boolean {
+function airAnswers(state: GameState, attacker: Unit, targetIndex: number, duelled?: Unit): boolean {
   const icp = interceptorAgainst(state, attacker, targetIndex);
   if (icp) {
     interceptFight(state, attacker, icp, targetIndex);
     if (UNITS[attacker.type]?.air === 'FIGHTER') return sortieEnded(state, attacker);
   }
-  const cover = airCoverAgainst(state, attacker, targetIndex);
+  const cover = airCoverAgainst(state, attacker, targetIndex, duelled);
   if (cover) {
     const flying = attacker.hp > 0;
     airCoverAnswer(state, attacker, cover, targetIndex);
@@ -2027,8 +2029,12 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
  * Tower and an Observation Balloon each took 65, a second strike killed, and
  * only the sorties flown beside an Anti-Air Gun drew (its answer)
  * (runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl). A lone
- * Anti-Air Gun fights at its Anti-Air. A civilian is never struck
- * (`airTarget`).
+ * Anti-Air Gun fights at its Anti-Air. A BOMBER strikes a land unit at its
+ * Bombard less COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER (its Ranged column):
+ * a combat unit one-sided, one draw; a lone Anti-Air Gun in a DUEL — the
+ * gun's damage drawn first, then the Bomber's at the mirrored difference, the
+ * gun firing no burst of its own and neither side banking experience
+ * (runs/b89b_bomber.jsonl). A civilian is never struck (`airTarget`).
  */
 export function airStrike(
   state: GameState, attackerId: number, targetIndex: number, seat: number, priority = false,
@@ -2061,11 +2067,15 @@ export function airStrike(
   if (enemies.length === 0) return { ok: false, reason: 'Nothing to strike.' };
   attacker.patrol = undefined;
   logUnitOrder(state, seat, attackerId, 'ranged', targetIndex);
-  // PRIORITY TARGET takes no answer from the ground or the air
-  if (!support && !airAnswers(state, attacker, targetIndex)) return { ok: true };
   // CIV6 (Air combat): "all air attacks are ranged", so the naval hex's
   // higher-chassis rule answers this blow too.
   const defender = support ?? stackDefender(state, enemies, true);
+  // a BOMBER on a lone anti-air chassis fights it: the gun answers in the
+  // duel, not with a burst of its own
+  const duel = !support && kind === 'BOMBER' && unitDomain(defender.type) === 'support'
+    && antiAirAt(state, defender) > 0;
+  // PRIORITY TARGET takes no answer from the ground or the air
+  if (!support && !airAnswers(state, attacker, targetIndex, duel ? defender : undefined)) return { ok: true };
   if (support || (unitDomain(defender.type) === 'support' && antiAirAt(state, defender) <= 0)) {
     // a flat share of the Support unit's hit points, no draw, nothing back
     // (`PRIORITY_TARGET_DAMAGE`)
@@ -2088,12 +2098,18 @@ export function airStrike(
       })
       + allianceWarCS(state, defender.seat, attacker.seat);
     defender.hp -= damageRoll(state, atkE - defE, 'air', targetIndex);
+    // the duel: the gun's damage drawn first, then the bomber's at the
+    // mirrored difference (runs/c34w_strike_b89b_aa_20260927T191029Z.jsonl)
+    if (duel) attacker.hp -= damageRoll(state, defE - atkE, 'airb', targetIndex);
   }
   spendAttack(attacker, true);
-  awardBattleXp(state, attacker, defender,
-    { ranged: true, aDied: false, dDied: defender.hp <= 0 });
+  // the duel pays neither side experience
+  if (!duel) {
+    awardBattleXp(state, attacker, defender,
+      { ranged: true, aDied: false, dDied: defender.hp <= 0 });
+  }
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, {
-    aDied: false, dDied: defender.hp <= 0,
+    aDied: duel && attacker.hp <= 0, dDied: defender.hp <= 0,
   });
   if (defender.hp <= 0) {
     killUnit(state, defender);

@@ -6,7 +6,7 @@ import { placeGreatWorkIn } from './greatWorks';
 import { GWO_RELIC } from '../data/greatWorks';
 import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
-import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
+import { claimTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
 import { canFoundCity, availableBuildings, buildingCompletable, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
@@ -44,7 +44,7 @@ import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { nextRandom } from './rand';
-import { ENHANCER_BELIEFS, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed } from '../data/constants';
 import { srcConst, xml } from '../data/provenance';
@@ -305,14 +305,14 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   }
   // CIV6 (Religious Colonization): the founder's majority religion, read
   // before the new city joins its count, carries the belief — the city starts
-  // with its citizen following it on the belief's pressure
+  // with its citizen following it on the belief's founding pressure
   const colonRel = majorityReligionOf(state, seat);
   const colonRow = colonRel >= 0 ? seatOf(state, colonRel)?.religion : undefined;
   const colon = colonRow?.founded && colonRow.enhancer ? ENHANCER_BELIEFS[colonRow.enhancer]?.effects.colonizePressure ?? 0 : 0;
   list.push(city);
   if (colon > 0) {
     city.religionPressure = new Array(state.seats.length).fill(0);
-    city.religionPressure[colonRel] = colon;
+    city.religionPressure[colonRel] = colonizeFoundingPressure(colon, city.population);
     city.followedReligion = colonRel;
   }
   logPopWrite(state, city, 'fd');
@@ -1358,12 +1358,10 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
     if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     buyer.treasury -= cost;
   }
-  // Purchases claim the tile but do NOT advance the culture-growth BOX
-  // (real Civ 6 keeps the two schedules separate). They DO advance the
-  // acquired COUNT — the next border tile costs more however this one was
-  // gained — which is why the claim goes through `acquireTile`: a
-  // hand-copied `setTileOwner` here would leave `tilesAcquired` behind.
-  acquireTile(state, city, tileIndex);
+  // A purchase claims the plot and touches neither the culture box nor the
+  // count the culture cost climbs on: the game's `GetCultureCost` counts the
+  // plots taken by culture alone (runs/h1_duelw1103 / 1104).
+  claimTile(state, city, tileIndex);
   buyer.tilesPurchased = (buyer.tilesPurchased ?? 0) + 1;
   return { ok: true };
 }

@@ -11,10 +11,10 @@ import { computeUnlocksIn } from '../../cpu/core/effects';
 import { computeCityStats, assignWorkedTiles, luxuryAmenities } from '../../cpu/core/city';
 
 describe('rule formulas', () => {
-  it('growth thresholds follow the Civ 6 curve', () => {
-    expect(growthFoodNeeded(1)).toBe(15);
-    expect(growthFoodNeeded(2)).toBe(24); // 15 + 8 + 1
-    expect(growthFoodNeeded(3)).toBe(33); // 15 + 16 + 2.83 -> floor
+  it('growth thresholds follow the Civ 6 curve at the online speed', () => {
+    // floor((15 + 8(p-1) + (p-1)^1.5) / 2): the game's GetGrowthThreshold on
+    // population 1-7 and 10 (runs/h1_duelw1103 / 1104)
+    expect([1, 2, 3, 4, 5, 6, 7, 10].map(growthFoodNeeded)).toEqual([7, 12, 16, 22, 27, 33, 38, 57]);
   });
 
   it('housing growth factors', () => {

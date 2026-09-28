@@ -55,8 +55,8 @@ const HILLS: Elevation[] = ['HILLS'];
 const ANY: Elevation[] = ['FLAT', 'HILLS'];
 
 export const RESOURCES: Record<string, ResourceDef> = {
-  WHEAT: { id: 'WHEAT', name: 'Wheat', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['PLAINS'], elevations: FLAT, okFeatures: ['FLOODPLAINS'], harvestAmount: 20, harvestYield: 'food' },
-  RICE: { id: 'RICE', name: 'Rice', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['GRASSLAND'], elevations: FLAT, okFeatures: ['MARSH'], harvestAmount: 20, harvestYield: 'food' },
+  WHEAT: { id: 'WHEAT', name: 'Wheat', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['PLAINS'], elevations: FLAT, okFeatures: ['FLOODPLAINS', 'FLOODPLAINS_PLAINS'], harvestAmount: 20, harvestYield: 'food' },
+  RICE: { id: 'RICE', name: 'Rice', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['GRASSLAND'], elevations: FLAT, okFeatures: ['MARSH', 'FLOODPLAINS_GRASSLAND'], harvestAmount: 20, harvestYield: 'food' },
   CATTLE: { id: 'CATTLE', name: 'Cattle', category: 'bonus', yields: { food: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND'], elevations: FLAT, noFeature: true, harvestAmount: 20, harvestYield: 'food' },
   SHEEP: { id: 'SHEEP', name: 'Sheep', category: 'bonus', yields: { food: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT'], elevations: HILLS, noFeature: true, harvestAmount: 20, harvestYield: 'food' },
   STONE: { id: 'STONE', name: 'Stone', category: 'bonus', yields: { production: 1 }, improvement: 'QUARRY', terrains: ['GRASSLAND'], elevations: ANY, noFeature: true, harvestAmount: 20, harvestYield: 'production' },
@@ -68,18 +68,18 @@ export const RESOURCES: Record<string, ResourceDef> = {
 
   HORSES: { id: 'HORSES', name: 'Horses', category: 'strategic', revealTech: 'ANIMAL_HUSBANDRY', yields: { food: 1, production: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   IRON: { id: 'IRON', name: 'Iron', category: 'strategic', revealTech: 'BRONZE_WORKING', yields: { science: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: HILLS, noFeature: true },
-  NITER: { id: 'NITER', name: 'Niter', category: 'strategic', revealTech: 'MILITARY_ENGINEERING', yields: { food: 1, production: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], elevations: FLAT, noFeature: true },
+  NITER: { id: 'NITER', name: 'Niter', category: 'strategic', revealTech: 'MILITARY_ENGINEERING', yields: { food: 1, production: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], elevations: FLAT, okFeatures: ['FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
   COAL: { id: 'COAL', name: 'Coal', category: 'strategic', revealTech: 'INDUSTRIALIZATION', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS'], elevations: HILLS, noFeature: true },
   OIL: { id: 'OIL', name: 'Oil', category: 'strategic', revealTech: 'REFINING', yields: { production: 3 }, improvement: 'OIL_WELL', terrains: ['DESERT', 'TUNDRA', 'SNOW'], elevations: FLAT, noFeature: true },
   ALUMINUM: { id: 'ALUMINUM', name: 'Aluminum', category: 'strategic', revealTech: 'RADIO', yields: { science: 1 }, improvement: 'MINE', terrains: ['DESERT', 'PLAINS'], elevations: HILLS, noFeature: true },
   URANIUM: { id: 'URANIUM', name: 'Uranium', category: 'strategic', revealTech: 'COMBINED_ARMS', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: ANY, noFeature: true },
 
   WINE: { id: 'WINE', name: 'Wine', category: 'luxury', yields: { food: 1, gold: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
-  COTTON: { id: 'COTTON', name: 'Cotton', category: 'luxury', yields: { gold: 3 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
+  COTTON: { id: 'COTTON', name: 'Cotton', category: 'luxury', yields: { gold: 3 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, okFeatures: ['FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
   SILK: { id: 'SILK', name: 'Silk', category: 'luxury', yields: { gold: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, requiresFeature: ['WOODS'] },
   DYES: { id: 'DYES', name: 'Dyes', category: 'luxury', yields: { faith: 1 }, improvement: 'PLANTATION', terrains: ['PLAINS', 'GRASSLAND'], elevations: FLAT, requiresFeature: ['RAINFOREST', 'WOODS'] },
   SPICES: { id: 'SPICES', name: 'Spices', category: 'luxury', yields: { food: 2 }, improvement: 'PLANTATION', terrains: ['PLAINS'], elevations: FLAT, requiresFeature: ['RAINFOREST'] },
-  SUGAR: { id: 'SUGAR', name: 'Sugar', category: 'luxury', yields: { food: 2 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'DESERT'], elevations: FLAT, requiresFeature: ['MARSH', 'FLOODPLAINS'] },
+  SUGAR: { id: 'SUGAR', name: 'Sugar', category: 'luxury', yields: { food: 2 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'DESERT'], elevations: FLAT, requiresFeature: ['MARSH', 'FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
   CITRUS: { id: 'CITRUS', name: 'Citrus', category: 'luxury', yields: { food: 2 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   TEA: { id: 'TEA', name: 'Tea', category: 'luxury', yields: { science: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND'], elevations: ANY, noFeature: true },
   TOBACCO: { id: 'TOBACCO', name: 'Tobacco', category: 'luxury', yields: { faith: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },

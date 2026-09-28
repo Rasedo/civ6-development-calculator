@@ -904,6 +904,31 @@ const accident = (sev: string) => `RandomEventType=RANDOM_EVENT_NUCLEAR_ACCIDENT
 const ACCIDENT_SEVS = ['MINOR', 'MAJOR', 'CATASTROPHIC'] as const;
 const accidentDmg = (kind: string, col = 'Percentage') =>
   ACCIDENT_SEVS.map((s) => xml('RandomEvent_Damages', `${accident(s)}&DamageType=${kind}`, col));
+/**
+ * THE ACCIDENT'S DRAWS: its `RandomEvent_Damages` rows in the install's order,
+ * ONE draw each, a 100% row and a row with nothing to hit alike, each row's
+ * draw its own chance — MEASURED (runs/c1d_draws.jsonl): MINOR 3, MAJOR 8,
+ * CATASTROPHIC 9 draws with the Power Plant intact or pillaged; MINOR's 2nd
+ * draw under 20 pillaged the Factory, MAJOR's 3rd under 50 the zone,
+ * CATASTROPHIC's 4th under 80 the citizen. A land unit struck by
+ * UNIT_DAMAGE_LAND takes one more draw right after that row, its damage
+ * `MinHP + rand(MaxHP - MinHP)` (`ACCIDENT_DMG_LO`, `ACCIDENT_DMG_HI`). The
+ * rows the engine gives no effect (IMPROVEMENT_PILLAGED, BUILDING_DESTROYED,
+ * UNIT_DAMAGE_NAVAL, CITY_GARRISON: no ring improvement, no building
+ * destroyed, the plot is land and no city centre) still draw.
+ */
+const accidentRows = (sev: typeof ACCIDENT_SEVS[number], kinds: readonly string[]) =>
+  srcConst(`disasters.accidentRows${sev}`, kinds, {
+    derived: `the RANDOM_EVENT_NUCLEAR_ACCIDENT_${sev} rows of RandomEvent_Damages in XML order (Expansion2_RandomEvents.xml)`,
+    inputs: kinds.map((k) => xml('RandomEvent_Damages', `${accident(sev)}&DamageType=${k}`, 'DamageType', { expect: k })),
+  });
+export const ACCIDENT_ROWS: readonly (readonly string[])[] = [
+  accidentRows('MINOR', ['IMPROVEMENT_PILLAGED', 'BUILDING_PILLAGED', 'RADIATION_LEAKED']),
+  accidentRows('MAJOR', ['UNIT_KILLED_CIVILIAN', 'IMPROVEMENT_PILLAGED', 'DISTRICT_PILLAGED', 'BUILDING_PILLAGED',
+    'RADIATION_LEAKED', 'UNIT_DAMAGE_LAND', 'UNIT_DAMAGE_NAVAL', 'CITY_GARRISON']),
+  accidentRows('CATASTROPHIC', ['IMPROVEMENT_PILLAGED', 'BUILDING_DESTROYED', 'DISTRICT_PILLAGED', 'POPULATION_LOSS',
+    'RADIATION_LEAKED', 'UNIT_DAMAGE_LAND', 'UNIT_DAMAGE_NAVAL', 'CITY_GARRISON', 'UNIT_KILLED_CIVILIAN']),
+];
 export const ACCIDENT_WEIGHT = srcConst('disasters.accidentWeight', [1, 1, 1] as const, {
   derived: 'each accident row\'s OccurrencesPerGame at REALISM_SETTING_MODERATE, in severity order',
   inputs: ACCIDENT_SEVS.map((s) => freq(`NUCLEAR_ACCIDENT_${s}`)),
@@ -959,7 +984,8 @@ export const ACCIDENT_LAND_P = srcConst('disasters.accidentLandP', [0, 0.5, 1] a
   ],
 });
 const accidentBand = (name: string, col: 'MinHP' | 'MaxHP', v: readonly number[]) => srcConst(`disasters.${name}`, v, {
-  derived: `each accident row's UNIT_DAMAGE_LAND ${col}, inclusive; MINOR carries none and reads 0`,
+  derived: `each accident row's UNIT_DAMAGE_LAND ${col}; the damage is MinHP + rand(MaxHP - MinHP), `
+    + 'MaxHP exclusive (runs/c1d_draws.jsonl: 20 + GetRandNum(30), 6 of 6; a range of 31 misses 2); MINOR carries none and reads 0',
   inputs: [
     xml('RandomEvent_Damages', `${accident('MINOR')}&DamageType=UNIT_DAMAGE_LAND`, col, { absent: true }),
     ...accidentDmg('UNIT_DAMAGE_LAND', col).slice(1),

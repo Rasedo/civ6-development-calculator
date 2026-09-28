@@ -90,8 +90,9 @@ def poke_rows(rules, path):
     """a. The install rows reach the engine."""
     sim = build(rules, path)
     assert sim._promises == [(30, 25, 25)] * 4, sim._promises
-    # the 30-turn clocks online through GameSpeed_Durations ONLINE_HALF
-    assert (sim._promise_turns, sim._promise_broken_griev, sim._retribution_turns) == (20, 100, 20)
+    # the promise's 30 turns online through GameSpeed_Durations ONLINE_HALF;
+    # the broken window's 30 unscaled
+    assert (sim._promise_turns, sim._promise_broken_griev, sim._retribution_turns) == (20, 100, 30)
     assert (sim._promise_broken_mult, sim._settle_promise_reach) == (200, 3)
     assert sim.n_majors >= 3, "the scene wants three majors"
     print("  a rows OK")
@@ -166,21 +167,28 @@ def poke_incursion(rules, path):
 
 
 def poke_clock(rules, path):
-    """d. The promises, the refusals and the window run toward 0."""
+    """d. The promises, the refusals and the window run toward 0; the broken
+    window outlasts the promise's term."""
     sim = build(rules, path)
     settle(sim, {0: [(1, SPY), (2, CONVERT)]}, {1: [(0, SPY)]})
     term = sim._promise_turns
-    assert sim._retribution_turns == term, "the scene runs both clocks as one"
+    window = sim._retribution_turns
+    assert window > term
     assert int(sim.seat_promise[0, 0, 2, CONVERT]) == -term, "each ask of a record is settled on its own"
     sim._promise_incursion(0, 1, SPY, n1(sim))
     settle(sim, {0: [(1, DIG)]}, {1: [(0, DIG)]})
     sim._deal_phase()
     assert int(sim.seat_promise[0, 0, 1, DIG]) == term - 1
     assert int(sim.seat_promise[0, 0, 2, CONVERT]) == -(term - 1)
-    assert int(sim.seat_promise_broken[0, 0, 1, SPY]) == term - 1
+    assert int(sim.seat_promise_broken[0, 0, 1, SPY]) == window - 1
     for _ in range(term - 1):
         sim._deal_phase()
-    assert not bool(sim.seat_promise.any()) and not bool(sim.seat_promise_broken.any())
+    assert not bool(sim.seat_promise.any())
+    assert int(sim.seat_promise_broken[0, 0, 1, SPY]) == window - term
+    assert bool(sim._war_condition(0, 1, 8)[0]), "the window still open"
+    for _ in range(window - term):
+        sim._deal_phase()
+    assert not bool(sim.seat_promise_broken.any())
     assert not bool(sim._war_condition(0, 1, 8)[0]), "the window closed"
     print("  d clock OK")
 

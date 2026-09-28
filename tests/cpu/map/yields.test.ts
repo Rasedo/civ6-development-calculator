@@ -27,11 +27,20 @@ describe('tile yields', () => {
     t.feature = 'WOODS';
     expect(tileYields(ctx, t)).toMatchObject({ food: 2, production: 1 });
 
+    // Gathering Storm: the desert floodplains pay Food 2; the grassland and
+    // plains floodplains pay their terrain alone
     t.feature = 'FLOODPLAINS';
     t.terrain = 'DESERT';
-    expect(tileYields(ctx, t)).toMatchObject({ food: 3, production: 0 });
+    expect(tileYields(ctx, t)).toMatchObject({ food: 2, production: 0 });
+    t.feature = 'FLOODPLAINS_GRASSLAND';
+    t.terrain = 'GRASSLAND';
+    expect(tileYields(ctx, t)).toMatchObject({ food: 2, production: 0, gold: 0 });
+    t.feature = 'FLOODPLAINS_PLAINS';
+    t.terrain = 'PLAINS';
+    expect(tileYields(ctx, t)).toMatchObject({ food: 1, production: 1, gold: 0 });
 
     t.feature = null;
+    t.terrain = 'GRASSLAND';
   });
 
   it('mountains yield nothing', () => {
