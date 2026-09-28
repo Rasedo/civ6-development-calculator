@@ -200,6 +200,184 @@ One generator (0x8b6c10, 16-bit max); 224 labelled draw sites.
 - Espionage: "Rolling Espionage Result" (mission, escape), "Police Exit
   Covered", "Spy EscapeRoute".
 
+## Tools added for these readings
+
+`dll_hash.py` names a 32-bit type hash (the game's hash is CRC32 without its
+final inversion: TERRAIN_GRASS 0x83e7c630 as the game reports).
+`dll_rowmap.py` maps a database row struct's fields to their columns (from
+the table's loader). `dll_luabind.py` lists a Lua registrar's bindings with
+the virtual slots each one calls. The plot's virtual slots: +0x18 the
+movement cost, +0x30 the plot's district/ownership info (+0x1c the owner,
++0x10 the district id), byte +0x3a bit 3 IsImpassable, word +0x2c the
+terrain (mountains 2, 5, 8, 11, 14; 15/16 Coast/Ocean), byte +0x47 the route.
+
+## C-20: the Trader's path and range
+
+XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at
+0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900,
+context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`.
+
+- Range, a budget walked along the path, in 1/256: the origin node starts
+  at TRADE_ROUTE_BASE_RANGE 15 (+ player trade +0x1b0). Per edge: a
+  land<->water switch (0x558300) caps the budget at 1; then a from-plot
+  holding a TradeEmbark district (Districts byte +0xe1 bit 7: City Centre,
+  Harbor, Royal Navy Dockyard, Cothon) of the ORIGIN city or of a city where
+  the player has a constructed trading post (City_Trade 0x1f99d0, false
+  against a player the owner is at war with) refuels it to
+  TRADE_ROUTE_LAND_RANGE_REFUEL 15 when the next plot is land, WATER_RANGE
+  30 (+ Portugal's row) when water; the destination's own district to 3;
+  the step costs 1. An edge leaving less than 0 is refused (0x5590a9).
+- Step cost (1/100 move): 100; +10000 for a switch not at a refuelling
+  district; onto a city centre or a tunnelled mountain +0; a route +10 when
+  it is the highest-PlacementValue route (Railroad), else +50; water with no
+  route +50; land with no route +100 x the plot's movement cost.
+- Closed nodes: impassable, a mountain with no tunnel, a plot a major has
+  not revealed, water when the player's Trader cannot embark, a foreign
+  centre of a player at war, a plot whose feature has DangerValue > 0
+  (burning forest / jungle, the Bermuda Triangle) unless it is the
+  destination; a switch edge needs a TradeEmbark district at one end.
+- The path is the least-cost path within that budget (A*, heuristic
+  0x271490), not a greedy step, and the range is the budget, not a hex
+  distance between the ends.
+- Records: the 31 distinct startable paths in `runs/trade_path_*` fit the
+  budget with the origin's refuel alone (31 / 31). The sweep's
+  GetTradeRoutePath paths (read from the trade manager's path cache,
+  0x9af6c0, which answers pairs CanStartTradeRoute refuses: 10 of the 54
+  recorded) carry 44 pure-land legs of 16..26 steps between the recorded
+  active posts; with no CanStart and no constructed-post read per row they
+  are listed, not scored.
+
+## C-34: the interception's damage, XP, weariness and the answers
+
+- The damage law (0x519090; struct 0x519370): damage = trunc((24 + r) x
+  expf(x) + 0.5), clamped [1, 100], x = (k x D) >> 8 in 1/256, D the
+  strength difference in 1/256, k = trunc(COMBAT_POWER_SCALING 0.04 x 256)
+  = 10. The factor per point is e^(10/256) = 1.03984, not 1.04: a 1.04 fit
+  sees 0.99597 D (26.89 at 27) — the "~0.1". Check `dll_damage.py`: the
+  12 drawn interceptions 12 / 12 and their previews 12 / 12 (the 1.04 law
+  8 / 12 and 0 / 12); the laws part on 81 of 1452 (r, D) cells in
+  0..11 x -60..60.
+- The air resolver 0x203cb0 (struct: [+0] the plane, [+8] the target,
+  [+0x10] the interceptor, [+0x18] the anti-air unit) computes the
+  interception, then the anti-air answer, then the strike, with no test of
+  the plane's health between them: the cover answers a bomber the
+  interception downed, and a burst that downs a bomber does not stop its
+  strike (the strike runs at the accumulated damage's wound term).
+- XP: the interceptor's = 0x5197e0 with the MELEE / UNIT_VS_UNIT types, the
+  kill flag 0 and the interceptor as the DEFENDER: min(8 cap GP +0x31c,
+  ceil(ceil(2 + S_plane / S_interceptor) x its XP percent)), S the Combat
+  column plus corps/army (0x56dc90). Fighter 100 v Bomber 85: 3 before the
+  percent; the measured 4 (Georgia's Fighter) is the percent (> 0) — the
+  same unread Georgian XP percent as B-89's Infantry. The plane earns
+  nothing from the interception. The anti-air gun's XP is the RANGED
+  defender formula on the plane's Ranged column: 0 against a Bomber
+  (Ranged 0).
+- War weariness (0x1fb680, from the combat log 0x20d280): it reads only
+  the struct's [+0] and [+8] and the combat's location — the interceptor
+  and the anti-air unit never enter it. Per side: (1 in lands allied to the
+  unit, else 2) + WAR_WEARINESS_PER_UNIT_KILLED 3 when that side's unit is
+  dead at the log (+10 for a WMD on the attacking side), x (16 +
+  era/casus-belli term) x (100 + the players' percents) / 100.
+
+## C-41: the eruption's soil, the ring and the gates
+
+The volcano's eruption 0xa22000 runs the damage pass 0xa1c1a0 FIRST, then
+the soil pass 0xa219e0. The natural-wonder eruption 0xa22150 runs 0xa1c760
+then 0xa21680 over EACH wonder plot's six neighbours (a plot two wonder
+plots share is taken twice). Check: `dll_eruption.py`.
+
+- Soil: for each RandomEvent_Yields row of the severity (XML order), for
+  each neighbour (NE, E, SE, SW, W, NW): skip an impassable plot, a water
+  plot, and a feature that is neither Removable (Woods, Rainforest, Marsh)
+  nor the row's own (Volcanic Soil); ONE draw rand(100) < Percentage: the
+  row's ReplaceFeature (true on every eruption row) paints Volcanic Soil
+  and the row's yield gains +1 (0xa190d0). So each row paints: a plot is
+  painted when ANY row lands, and the production / science rows land at
+  their own Percentage on every eligible plot. Painted share on 201 bare
+  eligible plots (`runs/volcano_own_*`): 30/67, 46/67, 54/67 against the
+  DLL's 0.448 / 0.662 / 0.862 (logL -121.6) and the engines' food-gated
+  0.35 / 0.50 / 0.75 (-127.4); 34 painted plots gained no food (the engines
+  paint only with food). The yield gains read low under both (the rings
+  were re-erupted without a reset).
+- Damage: for each RandomEvent_Damages row, for each neighbour: skip an
+  impassable plot and a feature neither Removable nor Eruptable; a BONUS
+  resource (RESOURCECLASS_BONUS) on the plot is removed before the draw —
+  land or WATER, any owner; one draw rand(100) < Percentage applies the
+  row through the shared applier 0x336a50.
+- The owned-plot gate belongs to the damage TYPE, not the family:
+  IMPROVEMENT_PILLAGED 0x33aba0, IMPROVEMENT_DESTROYED 0x337210,
+  DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS
+  0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and
+  UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage
+  percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80),
+  eruptions and the accident (0x2d0e00, 0x2d33a0) share the appliers.
+- Unit damage: ONE "Random Event Unit Damage Roll" PER UNIT of the row's
+  domain on the plot (not dead, not civilian), MinHP + rand(MaxHP - MinHP)
+  — this is C-1's "several land units" answer: one draw each.
+
+## C-49: the storm's walk
+
+Game_Climate: the turn's walk 0x28ecd0, one step 0x28c500 ("Storm
+Direction"), the step's strike 0x286f80.
+
+- Latitude (0x69d80): lat = Bottom + (Top - Bottom) x (100y // H) // 100
+  (the map's 90 / -90; x / W on a Y-wrapping map). Every PrevailingWinds row
+  with Min <= lat <= Max joins (both ends inclusive: at 60, 30, 5, 0, -5,
+  -30, -60 two bands pool).
+- A step: one weighted draw over the band's directions whose neighbour
+  EXISTS (an edge is out of the vector, not a dropped step); the storm
+  MOVES there whatever the terrain; the step costs 1 on a terrain in the
+  storm's RandomEvent_Terrains list (hurricanes: Ocean only; an empty list
+  is every terrain) and 2 elsewhere, out of Movement 8; when the drawn step
+  costs more than what is left, the walk ends for the turn. No other storm
+  blocks a plot.
+- Each step strikes the footprint at the new centre (0x286f80), each plot
+  at most once per storm (the storm's struck list, +0x38), at 100% of the
+  rows' Percentage, 50% on the storm's last turn (turn - start + 1 >=
+  Duration). The engines strike only where the walk stops.
+
+## B-24r: the governor operations
+
+- APPOINT_GOVERNOR (0x48c219 -> CanAppoint 0x430fa0 -> Appoint 0x430590):
+  the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which takes an
+  INDEX when it is below the table's size and a HASH otherwise — and the
+  governor record stores the raw value ([+4]). The install's screens pass
+  the row INDEX (GovernorPanel.lua 551, GovernorDetailsPanel.lua 375-376:
+  the governor Index and the promotion Index; GovernorAssignmentChooser.lua
+  402-404: the Index, PARAM_PLAYER_ONE the city's owner, PARAM_CITY_DEST the
+  city ID). `c1g_gov.lua` passed row.Hash: the points were spent (4 -> 6 ->
+  7) on a governor recorded under its hash, which every index-keyed read
+  then misses — the "misroute". The path to try: the Index in both params.
+  GameCore Lua has ChangeGovernorPoints and no appoint call.
+- Carbon: the climate observer 0x288740 takes the AMOUNT of a resource
+  consumed (x CLIMATE_CO2_PERCENT_FROM_UNITS 50% for a unit's upkeep) and
+  the resource's CO2perkWh: carbon follows the resources burnt, not the
+  Power generated. The Industrialist's +1 Power per resource
+  (EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR) adds no carbon of its own.
+
+## C-26: the struck unit's terms (install audit)
+
+`c26_strike_terms.py` (record `runs/c26_strike_terms.txt`) lists each
+omitted term's modifiers and requirements from the layered install; the
+district-defender strength 0x520270 (called by the district attack 0x207080)
+carries the diplomatic-visibility ("ESPIONAGE") bonus.
+
+- Apply to a unit a city or Encampment strikes (no opponent requirement):
+  the position terms of `chassisAbilityCS` — Khevsureti and Highlander
+  (hills / woods), Hoplite (adjacent Hoplite), Varu's -5 (adjacent at war),
+  Carolean (unused moves), Huszar (allies), Cossack / Malon Raider (near own
+  territory), Garde / Redcoat (continent), Black Army (levies),
+  Conquistador (adjacent religious unit), U-Boat (Ocean), Mountie (park) —
+  and Ngao Mbeba's +10 (REQUIREMENT_COMBAT_TYPE_MATCHES COMBAT_RANGED and
+  NOT attacking: a city's shot is ranged); `visibilityCS` (0x520270).
+- Do not apply: `allianceWarCS` (Military Alliance level 1 and Enkidu both
+  require REQUIREMENT_COMBAT_VERSUS_TYPE_MATCHES COMBAT_UNIT_VS_UNIT); the
+  P-51's and Dogfighting's vs-fighter rows (opponent promotion class); De
+  Zeven Provincien (attacking a district); `barbarianCombatCS` is 0 by
+  construction (no barbarian owns a district).
+- Unread: Cyber Warfare (REQUIREMENT_OPPONENT_ERA_AT_LEAST) against a
+  district opponent.
+
 ## DLL rules the engines contradict (noted, not chased)
 
 - Policy price: rounded down to 5 with E() per GameSpeed column, no free
@@ -218,3 +396,16 @@ One generator (0x8b6c10, 16-bit max); 224 labelled draw sites.
   city-anchored with a distance mix).
 - Per-map event rows scale with the map's area over Standard's (engines:
   one normaliser 250 — whether it follows the map size is unchecked).
+- Trade range: a budget walked along the path (15, refuelled to 15 / 30 at
+  the origin's and own-post cities' TradeEmbark districts), the path a
+  least-cost A* (engines: a hex distance per leg, a greedy step).
+- Combat damage: e^(10/256) per strength point in float32 (engines: 1.04).
+- Interception XP: ceil(2 + S_plane/S_interceptor) through the percent
+  (engines: a flat 4).
+- Eruption: damage before soil; every Yields row paints and adds its yield
+  on every eligible plot (engines: food-gated paint); water bonus resources
+  lost; unit damage one draw per unit and no owner gate; a wonder's ring
+  not deduplicated.
+- Storms: steps onto off-terrain cost 2 of Movement 8 and are taken (engines:
+  dropped); the footprint strikes at every step, each plot once per storm.
+- Random-event unit damage: one draw per unit (engines: one per plot).
