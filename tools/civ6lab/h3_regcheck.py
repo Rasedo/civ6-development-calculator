@@ -24,7 +24,8 @@ from tools.civ6map import check, world as W  # noqa: E402
 from tools.civ6map.generate import generate  # noqa: E402
 
 LEADERS = ["LEADER_ROBERT_THE_BRUCE", "LEADER_HOJO", "LEADER_PHILIP_II", "LEADER_JADWIGA", "LEADER_JAYAVARMAN",
-           "LEADER_GORGO", "LEADER_HAMMURABI", "LEADER_CLEOPATRA", "LEADER_SIMON_BOLIVAR", "LEADER_LADY_SIX_SKY"]
+           "LEADER_GORGO", "LEADER_HAMMURABI", "LEADER_CLEOPATRA", "LEADER_SIMON_BOLIVAR", "LEADER_LADY_SIX_SKY",
+           "LEADER_MENELIK", "LEADER_KRISTINA"]
 DEFAULT = ["h3_session_20260927T015420Z.jsonl", "h3_session_20260927T114117Z.jsonl",
            "h3_session_20260927T114551Z.jsonl", "h3_session_20260927T114633Z.jsonl"]
 

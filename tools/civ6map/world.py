@@ -20,8 +20,7 @@ from .gameinfo import GameInfo
 
 OPEN_NATIVES = {
     "Map.GetContinentPlots": "the order of the plots it answers (plot order here)",
-    "StartPositioner": "the minor regions (the DLL reading scores 17 of 168 region records), the largest-landmass "
-                       "filter, and ocean starts",
+    "StartPositioner": "the largest-landmass filter and ocean starts",
 }
 
 NE, E, SE, SW, W, NW = range(6)
@@ -385,7 +384,7 @@ class World:
             return False
         if fr["RequiresRiver"] and not self.is_river(i):                       # 5
             return False
-        if fr["Lake"] and any(self.is_water(n) for n in nb):                   # 6
+        if fr["Lake"] and any(self.is_water(n) and not self.is_ice(n) for n in nb):  # 6
             return False
         if lake and not fr["Lake"]:                                            # 7
             return False
@@ -405,7 +404,7 @@ class World:
         if f in self.f_adj_feature and not any(self.feature[n] in self.f_adj_feature[f] for n in nb):  # 13
             return False
         if f in self.f_not_near:                                               # 14
-            r = self.N // 256
+            r = self.avoid_radius()
             if any(self.feature[q] in self.f_not_near[f] for q in self.within(i, r)):
                 return False
         mnw = fr["MinDistanceNW"]
@@ -413,6 +412,13 @@ class World:
             if any(self.is_natural_wonder(q) for q in self.within(i, mnw)):
                 return False
         return True
+
+    def avoid_radius(self) -> int:
+        """Feature_NotNearFeatures' hex radius: W * H times
+        AVOID_FEATURE_MAX_MULTIPLIER as 8.8 fixed point (0.004 -> 1/256),
+        capped at AVOID_FEATURE_MAX_THRESHOLD"""
+        mult = int(float(self.gp.get("AVOID_FEATURE_MAX_MULTIPLIER", 0)) * 256)
+        return min((self.N * mult) >> 8, self.gpi("AVOID_FEATURE_MAX_THRESHOLD", 24))
 
     def footprint(self, i: int, f: int, custom: bool = False, replace: bool = False) -> list[int] | None:
         """the plots a natural wonder with Tiles > 1 and no CustomPlacement
@@ -649,17 +655,15 @@ class Starts:
     records; tools/civ6lab/h3_regcheck.py runs this code against them).
 
     Entries: one per (continent, landmass) over the plots with a continent,
-    in plot order (a landmass: a component of land and mountains as the last
-    area recalculation saw it, id (k << 16) | (k - 1) by its lowest plot;
-    water plots carry landmass -1), each with its plots' GetPlotFertility(i,
+    in plot order (a landmass: a component of land and mountains, or of
+    water, a lake its own, as the last area recalculation saw it, id
+    (k << 16) | (k - 1) by its lowest plot), each with its plots' GetPlotFertility(i,
     -1) sum and a box grown by one bound per plot (x below W: W = x; else x
     above E: E = x; else y below S: S = y; else y above N: N = y), sorted by
     fertility descending (EASTL sort). A region's plots are its entry's
     plots inside its box, in plot order; TotalPlots every plot of the box.
 
-    Stood in and recorded in World.unspecified: the minor regions (the
-    DLL reading below; the game's minor regions and Fertility differ on
-    most records), the fourth argument of
+    Stood in and recorded in World.unspecified: the fourth argument of
     DivideMapIntoMajorRegions (the largest landmass only; Continents passes
     false) and the ocean starts (none: a roster without an ocean-start
     leader never reads them)."""
@@ -669,11 +673,14 @@ class Starts:
         self.major: list[Region] = []
         self.minor: list[Region] = []
         self.min_major = self.min_minor = 0
+        self.minor_entries: list[Region] = []
+        self.lmid: list[int] = []
 
     # ------------------------------------------------------------ entries
     def landmass_ids(self) -> list[int]:
-        """per plot its landmass id, -1 on water (as the last area
-        recalculation saw it: a lake wonder's plots stay land)"""
+        """per plot its landmass id: the components of land (mountains
+        included) and of water, a lake its own, as the last area
+        recalculation saw them (a lake wonder's plots stay land)"""
         w = self.w
         wet = [w.areas[w.area_of[p]].water for p in range(w.N)]
         lid = [0] * w.N
@@ -691,7 +698,7 @@ class Starts:
                     if not lid[n] and wet[n] == wet[s]:
                         lid[n] = v
                         stack.append(n)
-        return [-1 if wet[p] else lid[p] for p in range(w.N)]
+        return lid
 
     def entries(self, fert: list[int], lmid: list[int]) -> list[Region]:
         ent: dict[tuple[int, int], Region] = {}
@@ -801,30 +808,30 @@ class Starts:
 
     # ------------------------------------------------------------ natives
     def DivideMapIntoMajorRegions(self, n, min_major, min_minor, largest_only):
-        """the entries of fertility at least both minimums take the n civs"""
+        """the entries of fertility at least both minimums take the n civs;
+        the other entries of at least the minor minimum wait for the minor
+        division"""
         self.w.rng.ledger.append(("native", "StartPositioner.DivideMapIntoMajorRegions", 0))
         if largest_only:
             self.w.unspecified.append("StartPositioner: DivideMapIntoMajorRegions' largest-landmass filter")
         self.min_major, self.min_minor = int(min_major), int(min_minor)
         fert = [self.w.plot_fertility(i) for i in range(self.w.N)]
-        lmid = self.landmass_ids()
-        units = [e for e in self.entries(fert, lmid) if self.is_major(e)]
-        self.major = self.allocate(units, int(n), fert, lmid)
+        self.lmid = self.landmass_ids()
+        ent = self.entries(fert, self.lmid)
+        self.minor_entries = [e for e in ent if e.fertility >= self.min_minor and not self.is_major(e)]
+        self.major = self.allocate([e for e in ent if self.is_major(e)], int(n), fert, self.lmid)
 
     def DivideMapIntoMinorRegions(self, n):
-        """the entries of at least the minor minimum that are not majors, then
-        a copy of every major region with no civs, each re-summed over its
-        box (its own plots) with GetPlotFertility(i, -1, true); the n civs and
-        the split as for the majors, the cuts on GetPlotFertility(i, -1)"""
+        """the major division's minor entries, then a copy of every major
+        region with no civs, each re-summed over its box (its own plots) with
+        GetPlotFertility(i, -1, true) on the map as it now stands; the n civs
+        and the split as for the majors, the cuts on GetPlotFertility(i, -1)"""
         self.w.rng.ledger.append(("native", "StartPositioner.DivideMapIntoMinorRegions", 0))
-        self.w.unspecified.append("StartPositioner: the minor regions (the DLL reading misses most records)")
-        fert =[self.w.plot_fertility(i) for i in range(self.w.N)]
-        lmid = self.landmass_ids()
-        units = [e for e in self.entries(fert, lmid) if e.fertility >= self.min_minor and not self.is_major(e)]
-        units += [r.copy() for r in self.major]
+        fert = [self.w.plot_fertility(i) for i in range(self.w.N)]
+        units = [e.copy() for e in self.minor_entries] + [r.copy() for r in self.major]
         for u in units:
-            u.fertility = sum(self.GetPlotFertility(i, -1, True) for i in self.box(u) if self.owns(u, i, lmid))
-        self.minor = self.allocate(units, int(n), fert, lmid)
+            u.fertility = sum(self.GetPlotFertility(i, -1, True) for i in self.box(u) if self.owns(u, i, self.lmid))
+        self.minor = self.allocate(units, int(n), fert, self.lmid)
 
     def GetNumMajorCivStarts(self):
         return len(self.major)
@@ -877,15 +884,17 @@ class Starts:
         the truncated box centre; 100 when cx == E or cy == N; else
         |trunc(10 (x - cx) / (E - cx))| + |trunc(10 (y - cy) / (N - cy))|)
         plus the distance term. Outside the major regions, checked: the
-        distance term alone with R halved. The distance term: over the start
-        plots set so far, the largest of 100, 75, 50, 25 at hex distance
-        < R, R, R + 1, R + 2, R = START_DISTANCE_FERTILITY_EXCLUSION_ZONE"""
+        distance term alone. The distance term: over the start plots set so
+        far in ascending plot order, the largest of 100, 75, 50, 25 at hex
+        distance < R, R, R + 1, R + 2, R = START_DISTANCE_FERTILITY_EXCLUSION_ZONE;
+        outside the regions R is halved (truncated) before every start
+        visited: 3, 1, 0, 0, ..."""
         i = int(i)
         region = -1 if region is None else int(region)
         base = self.w.plot_fertility(i)
-        zone = self.w.gpi("START_DISTANCE_FERTILITY_EXCLUSION_ZONE", 6)
         x, y = self.w.xy(i)
-        if 0 <= region < len(self.major):
+        inside = 0 <= region < len(self.major)
+        if inside:
             r = self.major[region]
             d = self.w.gpi("START_DISTANCE_MAJOR_CIVILIZATION", 12) // 3
             f = r.flags
@@ -902,11 +911,12 @@ class Starts:
         elif not check:
             return base
         else:
-            pct, zone = 0, zone // 2
+            pct = 0
+        zone = self.w.gpi("START_DISTANCE_FERTILITY_EXCLUSION_ZONE", 6)
         near = 0
-        for p in self.w.player_start.values():
-            if p is None:
-                continue
+        for p in sorted(p for p in self.w.player_start.values() if p is not None):
+            if not inside:
+                zone //= 2
             dist = self.w.distance(x, y, *self.w.xy(p))
             near = max(near, 100 if dist < zone else 75 if dist == zone else 50 if dist == zone + 1
                        else 25 if dist == zone + 2 else 0)

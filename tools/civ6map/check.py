@@ -1,7 +1,7 @@
 """A generated map against the game's own: the draw stream and the map.
 
     python tools/civ6map/check.py --session tools/civ6lab/runs/h3_session_<stamp>.jsonl \
-        [--majors LEADER_A,LEADER_B,...] [--oracle continents]
+        [--majors LEADER_A,LEADER_B,...] [--minors LEADER_MINOR_CIV_X,...] [--oracle continents]
 
 The size, the city-state count and the map options are the recorded game's
 (its config file and the options it read back); the majors are the session
@@ -118,6 +118,8 @@ def main() -> int:
     p.add_argument("--script", default=PROBE_SCRIPT)
     p.add_argument("--majors", default="LEADER_ROBERT_THE_BRUCE,LEADER_HOJO",
                    help="the game's majors in player order (the session log's 'in game' line)")
+    p.add_argument("--minors", default="",
+                   help="the city-states' leader types in player order (a city-state with a start bias draws; unnamed ones have none)")
     p.add_argument("--show", type=int, default=6, help="Lua draws of context around the first difference")
     p.add_argument("--save-dump")
     p.add_argument("--oracle", action="append", default=[], choices=["continents"],
@@ -129,7 +131,7 @@ def main() -> int:
         oracle_continents(json.loads(pathlib.Path(rec["map_dump"]).read_text(encoding="utf-8")))
     size, n_minors, options = session_setup(rec)
     world, _ = generate(a.script, size, int(rec["map_seed"]), majors=a.majors.split(","),
-                        n_minors=n_minors, minors=[], options=options)
+                        n_minors=n_minors, minors=[m for m in a.minors.split(",") if m], options=options)
     if world.unspecified:
         print("unspecified natives stood in:", sorted(set(world.unspecified)))
     ours = world.rng.ledger

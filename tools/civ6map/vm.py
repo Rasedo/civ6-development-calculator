@@ -267,8 +267,14 @@ class Api:
         if self.log_print:
             self.prints.append("\t".join(str(a) for a in args))
 
-    def hks_order(self, keys):
-        return self._list(table_order([int(keys[k]) for k in keys]))
+    def hks_order(self, keys, size):
+        """the visit order of a table whose keys are all numbers: the keys in
+        its array part (1..size) ascending, then the others in the node order
+        of hks.table_order"""
+        ks = [keys[k] for k in keys]
+        arr = sorted(int(k) for k in ks if k == int(k) and 1 <= k <= size)
+        rest = [int(k) for k in ks if not (k == int(k) and 1 <= k <= size)]
+        return self._list(arr + (table_order(rest) if len(rest) > 1 else rest))
 
     def _list(self, xs):
         return self.lua.table_from(list(xs))
@@ -640,10 +646,39 @@ class Api:
 
 
 HKS_PAIRS = r"""
--- pairs over a table whose keys are all numbers visits them in Havok
--- Script's node order (hks.table_order); any other table keeps next's order
+-- pairs over a table whose keys are all numbers visits its array part in
+-- index order and then its other keys in Havok Script's node order
+-- (Api.hks_order). The array part is read off next itself: next visits the
+-- array part first, ascending, every other key lies beyond it, and next(t, i)
+-- accepts an absent index i only inside it. So the array keys are the longest
+-- ascending run of positive integers next visits first such that, with p the
+-- power of two at or above its last key, every later key exceeds p and next
+-- accepts the lowest absent index in 1..p (all of 1..p present passes). Any
+-- other table keeps next's order.
 local N = ...
 local next_ = next
+local function arraysize(t, keys)
+  local run = 0
+  while run < #keys do
+    local k = keys[run + 1]
+    if k < 1 or k ~= math.floor(k) or (run > 0 and k <= keys[run]) then break end
+    run = run + 1
+  end
+  while run > 0 do
+    local p = 1
+    while p < keys[run] do p = p * 2 end
+    local ok = true
+    for j = run + 1, #keys do if keys[j] <= p then ok = false; break end end
+    if ok then
+      for q = 1, p do
+        if rawget(t, q) == nil then ok = pcall(next_, t, q); break end
+      end
+    end
+    if ok then return p end
+    run = run - 1
+  end
+  return 0
+end
 function pairs(t)
   local keys, allnum = {}, true
   for k in next_, t do
@@ -651,7 +686,7 @@ function pairs(t)
     keys[#keys + 1] = k
   end
   if not allnum or #keys < 2 then return next_, t, nil end
-  local order = N.hks_order(keys)
+  local order = N.hks_order(keys, arraysize(t, keys))
   local i = 0
   return function() i = i + 1; local k = order[i]; if k ~= nil then return k, t[k] end end, t, nil
 end
