@@ -145,7 +145,9 @@ class BatchEnv:
         pop = s.city_pop[:, row]
         cur = s._q_head(row)
         need = s._growth_needed(pop).clamp(min=1)
-        denom = s.city_cost[:, row, :, 0].clamp(min=1)
+        # the head's price as TS's `itemCost` reads it NOW — a building's is
+        # live (a congress discount can land while it waits), not the stored one
+        denom = s._live_building_cost(row)[:, :, 0].clamp(min=1)
         # OWNED TILES per city: `tile_seat` names the holding row and
         # `tile_city` the PERSISTENT id within it — the `ownerSeat` /
         # `ownerCity` pair TS filters on, one derivation for every seat.
