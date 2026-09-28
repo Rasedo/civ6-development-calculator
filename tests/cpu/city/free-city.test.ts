@@ -2,14 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { hexRingWalk, neighbors, tilesWithin } from '../../../world/hex';
-import { eraUnitOfClass, flipCity, freeCityPairType, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar } from '../../../cpu/core/phase';
+import { eraUnitOfClass, flipCity, freeCityPairType, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { computeCityStats, luxuryAmenities } from '../../../cpu/core/city';
 import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
 import { worldEraIndex } from '../../../cpu/core/eras';
 import { FREE_SEAT, atWarWithAny, emptySeat, isBarbSeat, isTerritorial, seatOf, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
-import { CIV_LEADERS, FREE_CITY_DEFENSE, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_PERIOD, FREE_CITY_PAIR_COUNT, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
+import { CIV_LEADERS, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_PERIOD, FREE_CITY_PAIR_COUNT, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
 import { ERAS } from '../../../cpu/data/techs';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -357,17 +357,32 @@ describe('the Free City step', () => {
     expect(ids.filter((id) => !state.units.some((u) => u.id === id))).toEqual([first]);
   });
 
-  it('a Free City stands on its own flat base, 72 with no walls', () => {
+  it("a Free City stands on its former owner's base, the owner's live best melee", () => {
     const { state, border } = scene(30);
     const before = cityDefenseStrength(state, border);
     border.loyalty = 0;
     flipCity(state, border);
     const city = state.freeSeat!.cities[0];
+    expect(city.formerSeat).toBe(0);
     expect(before).toBe(10);   // an Ancient major's base: max(20, its best melee) - 10
-    expect(cityDefenseStrength(state, city)).toBe(FREE_CITY_DEFENSE);
-    expect(FREE_CITY_DEFENSE).toBe(72);
+    expect(cityDefenseStrength(state, city)).toBe(before);
+    // the former owner's best melee rises: so does the Free City's base
+    seatOf(state, 0)!.bestMeleeCS = 45;
+    expect(cityDefenseStrength(state, city)).toBe(35);
     city.buildings.push('ANCIENT_WALLS');
-    expect(cityDefenseStrength(state, city)).toBe(FREE_CITY_DEFENSE + BUILDINGS.ANCIENT_WALLS.wallsStrength!);
+    expect(cityDefenseStrength(state, city)).toBe(35 + BUILDINGS.ANCIENT_WALLS.wallsStrength!);
+  });
+
+  it("a capture takes the captured Free City's grants, never handing them to the captor", () => {
+    const { state, border, rival } = scene(30);
+    border.loyalty = 0;
+    flipCity(state, border);
+    const city = state.freeSeat!.cities[0];
+    const granted = state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.id);
+    expect(granted.length).toBe(FREE_CITY_PAIR_COUNT);
+    transferCity(state, FREE_SEAT, rival, city, 'conquered');
+    expect(rival.cities.some((c) => c.name === border.name && (c.formerSeat ?? -1) === -1)).toBe(true);
+    expect(state.units.some((u) => granted.includes(u.id))).toBe(false);
   });
 
   it('a walled Free City strikes a hostile unit beside it; an unwalled one does not', () => {

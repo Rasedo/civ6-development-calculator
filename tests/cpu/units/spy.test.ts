@@ -34,7 +34,7 @@ import {
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
   SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_COUNTERSPY,
   SPY_M_LISTENING_POST, SPY_M_FABRICATE_SCANDAL, SPY_ESCAPE_ROUTES,
-  SPY_SCANDAL_ENVOYS_BASE,
+  SPY_SCANDAL_ENVOYS_BASE, SPY_ESCAPE_CAPTURE_BAND,
 } from '../../../cpu/data/espionage';
 import { envoysOf } from '../../../cpu/core/cityStates';
 import { DED_BODYGUARD, CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS } from '../../../cpu/data/seats';
@@ -537,18 +537,30 @@ describe('what a finished mission does', () => {
     }
   }
 
-  it('the police guess one offered route; the escape is 3d6 against 10 + level, -4 on a right guess', () => {
-    // measured: one-route cities, where the guess is certain, let 10 of 54
-    // spies away; a Recruit's right-guessed score is 7 (3d6 <= 7: 16%)
+  it('the police cover one offered route; the escape is 3d6 at or over 10 - level, +4 on a right guess', () => {
+    // GameCore_XP2_Release.dll ResolveEscape 0x52ce40; measured: one-route
+    // cities, where the cover is certain, let 10 of 54 spies away; a
+    // Recruit's covered target is 14 (3d6 >= 14: 16%)
     const guessed = escapeRate(0, true);
     expect(guessed).toBeGreaterThan(0.05);
     expect(guessed).toBeLessThan(0.3);
-    // Ace Driver's four levels: 11 (62%) on the same certain guess
+    // Ace Driver's four levels: 10 (62%) under the same certain cover
     expect(escapeRate(spyBit('ACE_DRIVER'), true)).toBeGreaterThan(guessed + 0.25);
-    // four routes standing, the guess misses three times in four: a Recruit
-    // reads 11 (62%) then (every rate here is diluted alike by the roll's own
-    // CAPTURED and KILLED bands, which never reach the escape)
+    // four routes standing, the police cover the Airplane 4 times in 10
+    // (weight longest TravelTime - its own + 1): a Recruit reads 10 (62%)
+    // otherwise (every rate here is diluted alike by the roll's own CAPTURED
+    // and KILLED bands, which never reach the escape)
     expect(escapeRate(0, false)).toBeGreaterThan(guessed + 0.15);
+  });
+
+  it('the police cover a route weighted by TravelTime, and an escape reads three bands', () => {
+    // "Police Exit Covered" 0x528560: the longest TravelTime - the route's
+    // own + 1 — on foot 1, by vehicle 2, by boat 3, by air 4
+    const longest = Math.max(...SPY_ESCAPE_ROUTES.map((r) => r.turns));
+    expect(SPY_ESCAPE_ROUTES.map((r) => longest - r.turns + 1)).toEqual([4, 3, 2, 1]);
+    // the outcome table 0x52b090: escaped at v or over, captured on
+    // v - 2 .. v - 1, killed below — no counterspy term
+    expect(SPY_ESCAPE_CAPTURE_BAND).toBe(2);
   });
 
   it('a lost escape splits the career: the cell, or the grave', () => {

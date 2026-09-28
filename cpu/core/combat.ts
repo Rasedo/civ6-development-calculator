@@ -24,16 +24,16 @@ import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum, cityGovernorEffects } from './governors';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
-import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT, FREE_CITY_DEFENSE } from '../data/seats';
+import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, raiseBestMelee, unitReligious, unitStackSlot } from './units';
 import { nextRandom } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
-import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE, XP_INTERCEPT } from './air';
+import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_HP_PER_CS, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_POWER_SCALING, COMBAT_MINIMUM_DAMAGE } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_HP_PER_CS, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_MAX_EXTRA_DAMAGE, damageExponent, damageOf } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -356,10 +356,14 @@ function seatXpPct(state: GameState, unit: Unit): number {
   return unitXpPct(unit) + governmentXpPct(state, unit.seat) + sky;
 }
 
-/** the strength a chassis brings to the XP ratio: its Ranged Strength when it
- *  is the one shooting, its Combat Strength otherwise. */
+/** the strength a chassis brings to the XP ratio (DLL 0x5197e0): its RAW
+ *  Ranged column when it is the one shooting, its Combat Strength otherwise.
+ *  A bomber's strike is a BOMBARD (the air resolver 0x203cb0 picks it when
+ *  Bombard exceeds Ranged), so it brings its Bombard 110, not the 93 it
+ *  strikes a unit with. */
 function xpStrength(unitType: string, shooting: boolean): number {
   const def = UNITS[unitType];
+  if (shooting && def?.air === 'BOMBER') return def.bombard ?? 0;
   return (shooting ? def?.ranged?.strength : def?.combat) ?? def?.combat ?? 0;
 }
 
@@ -885,26 +889,19 @@ export function gdrNavalCS(attacker: Unit, foeType: string): number {
 
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1,
                            parts?: { a: number; d: number; at?: number; as?: number; dt?: number; ds?: number }): number {
-  // CIV6 (GlobalParameters, measured live — lab 3 "The damage formula
-  // itself"): `damage = round((COMBAT_BASE_DAMAGE + rand(COMBAT_MAX_EXTRA_DAMAGE))
-  // × (1 + COMBAT_POWER_SCALING)^(S_att − S_def))` — 24 plus an integer draw
-  // in 0..11, times 1.04 per strength point, floored at COMBAT_MINIMUM_DAMAGE.
-  // The community's 30·e^(0.04Δ) with a continuous 0.8–1.2 factor agrees only
-  // within |Δ| ≤ 5 and misses by 3 at Δ = 30; COMBAT_DAMAGE_MULTIPLIER_MINIMUM
-  // does not floor the multiplier. `Math.pow(1.04, q / 10)` with
-  // q = round(diff·10) is the curve pre-quantized to 0.1 so the GPU's table —
-  // indexed by that q — reproduces this exact JS double; one ulp in `base`
-  // can flip the rounded damage. Strength stays FRACTIONAL up to here (the
-  // game sums float terms and floors once, if at all).
-  // Theological and city combat resolve through here too: both "work the
-  // same way as normal combat".
-  const q = Math.round(strengthDiff * 10);
-  const base = Math.pow(1 + COMBAT_POWER_SCALING, q / 10);
+  // CIV6 (GameCore_XP2_Release.dll 0x519090): `damageOf` — 24 plus an
+  // integer draw in 0..11, times e^(x/256) in single precision, the exponent
+  // x from `damageExponent`, truncated after +0.5 and clamped to [1, 100].
+  // The GPU reads the same factors from the exported table, indexed by x.
+  // Strength stays FRACTIONAL up to here. Theological and city combat resolve
+  // through here too: both "work the same way as normal combat".
+  const x = damageExponent(strengthDiff);
   // Combat log (tooling): every roll of the
   // CIV6_LOG game — the GPU _damage_roll twin. k = call-site tag, t =
   // target tile, c = the rng counter BEFORE the draw (absolute stream
-  // position). `diff` logs the
-  // quantized q (10·strengthDiff) so both engines print an identical int.
+  // position). `diff` logs round(10·strengthDiff) so both engines print an
+  // identical int.
+  const q = Math.round(strengthDiff * 10);
   const c0 = state.rngState >>> 0;
   const r = nextRandom(state);
   // the game's GetRandNum(COMBAT_MAX_EXTRA_DAMAGE): ONE draw mapped to 0..11
@@ -912,7 +909,7 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   // that mapping on this engine's unit draw — exact in a double, and the GPU
   // twin computes the identical floor)
   const roll = Math.floor(r * COMBAT_MAX_EXTRA_DAMAGE);
-  const dmg = Math.max(COMBAT_MINIMUM_DAMAGE, Math.round((COMBAT_BASE_DAMAGE + roll) * base));
+  const dmg = damageOf(roll, x);
   const cb = (globalThis as any).__cbLog;
   // `parts` (where a call site passes them) splits the diff into the two
   // strengths, so a disagreement names its SIDE before its term.
@@ -1042,12 +1039,20 @@ export function rangedCityPenalty(unitType: string, outerHp: number): number {
 /** The base a holder's centres and Encampments stand on: max(the start era's
  *  melee strength — a major's and a minor's each its own row — the strongest
  *  melee unit the seat has ever trained or bought, `Seat.bestMeleeCS`) - 10
- *  (`CITY_BASE_MELEE_CUT`); for the Free Cities player a flat base of its
- *  own, measured at 72 with no walls standing. */
+ *  (`CITY_BASE_MELEE_CUT`). The Free Cities player trains toward no base of
+ *  its own: its cities stand on their former owners' (`cityBaseSeat`). */
 function holderStrength(state: GameState, seat: number): number {
-  if (isFreeSeat(seat)) return FREE_CITY_DEFENSE;
   const start = isCityStateSeat(seat) ? CITY_START_MELEE_MINOR : CITY_START_MELEE_MAJOR;
-  return Math.max(start, seatOf(state, seat)?.bestMeleeCS ?? 0) - CITY_BASE_MELEE_CUT;
+  const best = isFreeSeat(seat) ? 0 : seatOf(state, seat)?.bestMeleeCS ?? 0;
+  return Math.max(start, best) - CITY_BASE_MELEE_CUT;
+}
+
+/** The seat whose base a city's centre stands on: its holder's, and a Free
+ *  City's the seat it revolted from (`City.formerSeat`; lab 5d,
+ *  runs/c60f_defprev_obs1_t150.jsonl and the other c60f_defprev records: Parsa 92 = p5's, Kapiti and
+ *  Ngaruawahia 55 = p2's, Da Lat 64 = p2's, 4 of 4). */
+function cityBaseSeat(city: City): number {
+  return isFreeSeat(city.seat) && (city.formerSeat ?? -1) >= 0 ? city.formerSeat! : city.seat;
 }
 
 /**
@@ -1096,7 +1101,7 @@ export function wallsStrength(city: { buildings: string[] }): number {
  * `_centre_strength`.
  */
 export function centreStrength(state: GameState, city: City, garrisoned = true): number {
-  const base = holderStrength(state, city.seat);
+  const base = holderStrength(state, cityBaseSeat(city));
   let n = base + wallsStrength(city);
   for (const d of city.districts) {
     const t = state.map.tiles[d.tileIndex];
@@ -1152,19 +1157,29 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
  * `striker` is the seat that owns the firing city or Encampment: the
  * roster's rows read it as the unit's OPPONENT, a district that is never
  * wounded (`rosterCS` with no foe hit points and a district foe).
+ *
+ * The unique units' position terms (`chassisAbilityCS`, read at the struck
+ * tile as a defence against a RANGED shot, so Ngao Mbeba's +10 is paid) and
+ * the diplomatic-visibility bonus against the striker (`visibilityCS`, the
+ * district-attack path's defender strength 0x520270) ride too — no roster row
+ * needs an attacking UNIT for them (runs/c26_strike_terms.txt). The
+ * unit-vs-unit rows (`allianceWarCS`), the vs-fighter and district-attack
+ * rows, and `barbarianCombatCS` (no barbarian holds a district) do not.
  */
 export function cityStrikeDefenderCS(state: GameState, defender: Unit, tile: Tile, striker: number): number {
   const base = defender.embarked
     ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
     : (UNITS[defender.type]?.combat ?? 0) + formationCS(defender) + terrainDefense(tile)
       - woundPenalty(defender)
-      + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile });
+      + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile })
+      + chassisAbilityCS(state, defender, tile.index, { defendingRanged: true });
   // CIV6 (Military Advisory / Oligarchy / Fascism): a flat unit adder is the
   // unit's own strength wherever it fights, a city's shot included.
   return base + generalAuraCS(state, defender, tile.index)
     + gdrBeamCS(state, defender) // the beam "applies ... when defending"
     + congressUnitCS(state, defender) + governmentUnitCS(state, defender)
-    + rosterCS(state, defender, striker, null, true);
+    + rosterCS(state, defender, striker, null, true)
+    + visibilityCS(state, defender.seat, striker);
 }
 
 /** The flat Combat Strength the WORLD CONGRESS hands one unit: Military
@@ -1435,7 +1450,7 @@ function cityAssault(
   if ((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CIV6_BATTLE_PROBE) {
     console.log(`TS-BATTLE seed=${state.map.seed} t=${state.turn} tgt=${city.centerIndex} atkCS=${atkCS} defCS=${defCS} ` +
       `combat=${UNITS[attacker.type]?.combat ?? 0} wound=${woundPenalty(attacker)} xp=${attacker.xp ?? 0} ` +
-      `best=${holderStrength(state, city.seat)}`);
+      `best=${holderStrength(state, cityBaseSeat(city))}`);
   }
   const dmgToCity = damageRoll(state, atkCS - defCS, kCity, city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, kAttacker, city.centerIndex);
@@ -1908,8 +1923,11 @@ function airCoverAnswer(state: GameState, attacker: Unit, answerer: Unit, target
  *  runs/c34w_strike_d1edge_20260927T012915Z.jsonl,
  *  runs/c34w_strike_d1inf_20260927T012850Z.jsonl,
  *  runs/c34w_strike_d1kill_20260927T013012Z.jsonl). An interceptor at 0 HP or
- *  less is gone; one that stands banks `XP_INTERCEPT`, and the plane banks
- *  nothing from the fight. The plane's own fate is `airAnswers`'. */
+ *  less is gone; one that stands scores as a melee DEFENDER with no kill
+ *  bonus (DLL 0x203cb0 / 0x5197e0), and the plane banks nothing from the
+ *  fight. An interception adds no war weariness: the weariness pass
+ *  (0x1fb680) reads only the plane and its target. The plane's own fate is
+ *  `airAnswers`'. */
 function interceptFight(
   state: GameState, attacker: Unit, icp: { unit: Unit; support: number }, targetIndex: number,
 ): void {
@@ -1930,7 +1948,13 @@ function interceptFight(
   if (it.hp <= 0) {
     disbandUnit(state, it.id);
   } else if (xpEligible(it)) {
-    bankXp(it, cityXp(XP_INTERCEPT, seatXpPct(state, it), xpMult(state, it, false)));
+    // DLL 0x5197e0 with the MELEE / UNIT_VS_UNIT types, the interceptor the
+    // DEFENDER and the kill flag 0: ceil(2 + S_plane / S_interceptor) on the
+    // Combat columns, then its XP percent, capped
+    bankXp(it, battleXp(xpStrength(it.type, false), xpStrength(attacker.type, false), {
+      foeDied: false, ranged: false, initiated: false,
+      pct: seatXpPct(state, it), mult: xpMult(state, it, false),
+    }));
     logXpWrite(state, it, 'ix');
   }
 }
@@ -1946,13 +1970,15 @@ function interceptFight(
  * `interceptFight`), then the anti-air cover (`airCoverAgainst`: a parked
  * weapon "provides cover from air attacks up to 1 hex away", and "SHIPS with
  * the Anti-Air Strength stat" answer for their own hex). A fighter turned
- * back has spent its sortie. A bomber the INTERCEPTION downs flies on and
- * strikes at its health after the fight, and is gone after its blow (2 of 2,
+ * back has spent its sortie. The air resolver (DLL 0x203cb0) runs the
+ * interception, the anti-air answer and the strike with NO test of the
+ * plane's health between them: the cover answers a bomber the interception
+ * downed, and a plane the burst downs still strikes, at the wound its
+ * accumulated damage leaves, and is gone after its blow (2 of 2,
  * runs/c34w_strike_d1edge_20260927T012915Z.jsonl,
- * runs/c34w_strike_d1kill_20260927T013012Z.jsonl; `airDowned`); a plane the
- * anti-air burst shoots down leaves. `duelled` is a weapon the sortie is
- * about to fight, which answers in that fight and fires no burst. True when
- * the plane flies on to its target.
+ * runs/c34w_strike_d1kill_20260927T013012Z.jsonl; `airDowned`). `duelled` is
+ * a weapon the sortie is about to fight, which answers in that fight and
+ * fires no burst. True when the plane flies on to its target.
  */
 function airAnswers(state: GameState, attacker: Unit, targetIndex: number, duelled?: Unit): boolean {
   const icp = interceptorAgainst(state, attacker, targetIndex);
@@ -1961,15 +1987,11 @@ function airAnswers(state: GameState, attacker: Unit, targetIndex: number, duell
     if (UNITS[attacker.type]?.air === 'FIGHTER') return sortieEnded(state, attacker);
   }
   const cover = airCoverAgainst(state, attacker, targetIndex, duelled);
-  if (cover) {
-    const flying = attacker.hp > 0;
-    airCoverAnswer(state, attacker, cover, targetIndex);
-    if (flying && attacker.hp <= 0) return sortieEnded(state, attacker);
-  }
+  if (cover) airCoverAnswer(state, attacker, cover, targetIndex);
   return true;
 }
 
-/** a bomber the interception downed, gone once its blow has landed */
+/** a plane its answers downed, gone once its blow has landed */
 function airDowned(state: GameState, attacker: Unit): void {
   if (attacker.hp <= 0) disbandUnit(state, attacker.id);
 }

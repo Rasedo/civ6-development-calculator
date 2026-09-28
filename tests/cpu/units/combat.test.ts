@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MP_SCALE } from '../../../cpu/data/constants';
+import { MP_SCALE, damageExponent, damageOf } from '../../../cpu/data/constants';
 import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import type { CityState } from '../../../cpu/core/types';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, orderUnit } from '../helpers';
@@ -505,6 +505,23 @@ describe('XP & levels', () => {
     expect(unitLevel({})).toBe(1); // a brand new unit starts at level 1
   });
 
+  it('the damage law is the DLL\'s e^(10/256) per point in single precision', () => {
+    // GameCore_XP2_Release.dll 0x519090 as tools/civ6lab/dll_damage.py ports
+    // it (12 of 12 drawn interceptions): (draw, Δ) -> damage
+    const cells: [number, number, number][] = [
+      [6, 3, 34], [6, -3, 27], [6, 27, 86], [0, 27, 69], [11, 27, 100], [6, 0, 30],
+      [0, -60, 2], [11, 40, 100], [6, 3.65, 35], [6, -3.65, 26], [5, 17.5, 57],
+    ];
+    for (const [r, d, want] of cells) expect(damageOf(r, damageExponent(d))).toBe(want);
+    // x = (10·floor(256Δ)) >> 8, both floors toward −∞
+    expect(damageExponent(27)).toBe(270);
+    expect(damageExponent(-0.05)).toBe(-1);
+    expect(damageExponent(0.05)).toBe(0);
+    // clamped to [1, 100]
+    expect(damageOf(0, -5000)).toBe(1);
+    expect(damageOf(11, 5000)).toBe(100);
+  });
+
   it('battleXp: foeCS/ownCS, doubled for a kill, plus the battle and initiator terms', () => {
     const o = { foeDied: false, ranged: false, initiated: false, pct: 0, mult: 1 };
     // 20 vs 20, non-ranged, no initiator: 1 + 2 = 3
@@ -515,10 +532,17 @@ describe('XP & levels', () => {
     expect(battleXp(20, 20, { ...o, ranged: true })).toBe(2);
     // "If one of the units is dead, the base XP is multiplied by 2"
     expect(battleXp(20, 20, { ...o, foeDied: true })).toBe(4);
-    // 0.5 rounds UP: 10 vs 25 -> 2.5 + 2 = 4.5 -> 5
+    // rounded UP (DLL 0x5197e0): 10 vs 25 -> 2.5 + 2 = 4.5 -> 5
     expect(battleXp(10, 25, o)).toBe(5);
+    // an Infantry (75) struck by a Bomber's Bombard 110: ceil(1 + 110/75) = 3,
+    // where nearest rounding read 2; the Bomber: ceil(1 + 1 + 75/110) = 3
+    expect(battleXp(75, 110, { ...o, ranged: true })).toBe(3);
+    expect(battleXp(110, 75, { ...o, ranged: true, initiated: true })).toBe(3);
+    // the percent rounds up again: 3 x 110% = 3.3 -> 4
+    expect(battleXp(75, 110, { ...o, ranged: true, pct: 10 })).toBe(4);
     // the cap
     expect(battleXp(10, 200, o)).toBe(XP_BATTLE_CAP);
+    expect(XP_BATTLE_CAP).toBe(8); // Expansion2's EXPERIENCE_MAXIMUM_ONE_COMBAT
     // the percentage modifiers ride the whole base
     expect(battleXp(20, 20, { ...o, pct: 100 })).toBe(6);
     expect(battleXp(20, 20, { ...o, mult: 2 })).toBe(6);

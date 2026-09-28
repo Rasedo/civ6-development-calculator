@@ -47,14 +47,22 @@ describe('map generation', () => {
     expect(map.tiles.some((t) => t.riverMask !== 0)).toBe(true);
   });
 
-  it('floodplains appear only on flat desert river tiles', () => {
+  it('floodplains lie on flat river plots of their own terrain, the desert, grassland and plains kinds', () => {
+    // CIV6 (Expansion2 FeatureGenerator.lua, `GenerateFloodplains(.., 4, 10)`):
+    // a run of at least 4 and at most 10 plots along a river from its mouth
+    const kind: Record<string, string> = { FLOODPLAINS: 'DESERT', FLOODPLAINS_GRASSLAND: 'GRASSLAND', FLOODPLAINS_PLAINS: 'PLAINS' };
+    let n = 0;
     for (const t of map.tiles) {
-      if (t.feature === 'FLOODPLAINS') {
-        expect(t.terrain).toBe('DESERT');
-        expect(t.elevation).toBe('FLAT');
-        expect(t.riverMask).not.toBe(0);
-      }
+      if (!t.feature || !(t.feature in kind)) continue;
+      n += 1;
+      expect(t.terrain).toBe(kind[t.feature]);
+      expect(t.elevation).toBe('FLAT');
+      expect(t.riverMask).not.toBe(0);
     }
+    const all = [1, 2, 3, 4, 5, 6].map((k) => generateMap({ ...OPTS, seed: 1000 + k }))
+      .flatMap((m) => m.tiles).filter((t) => t.feature && t.feature in kind);
+    expect(n + all.length).toBeGreaterThan(0);
+    expect(all.some((t) => t.feature === 'FLOODPLAINS_GRASSLAND' || t.feature === 'FLOODPLAINS_PLAINS')).toBe(true);
   });
 
   it('ocean tiles never touch land; coast lies within four plots of it', () => {

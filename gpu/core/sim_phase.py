@@ -112,6 +112,11 @@ class SimPhase:
         d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
         if bool(d_emb.any()):
             def_cs = torch.where(d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
+        # the unique units' position terms, read at the struck tile against a
+        # RANGED shot (`chassisAbilityCS` — Ngao Mbeba's +10 included); an
+        # embarked target takes the era's flat override instead
+        _ch = self._chassis_ability_cs(d_seat, d_type, tt, def_ranged=True)
+        def_cs = def_cs + torch.where(d_emb, torch.zeros_like(_ch), _ch).to(def_cs.dtype)
         # the centre's standing strength, whoever holds it (`centreStrength`);
         # a major's government and governor terms ride on top
         atk_cs = self._centre_strength(torch.full_like(col, row), col)
@@ -146,6 +151,9 @@ class SimPhase:
         def_e = def_e + self._roster_cs(_def_seat, d_type, tt, torch.full_like(tt, seat), None, True,
                                         self.unit_formation[bidx, ds0],
                                         self.unit_levied[bidx, ds0]).to(def_e.dtype)
+        # the diplomatic-visibility bonus against the striking seat (the
+        # district attack's defender strength, `visibilityCS`)
+        def_e = def_e + self._vis_cs(d_seat, torch.full_like(tt, seat)).to(def_e.dtype)
         self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)
 
@@ -824,12 +832,7 @@ class SimPhase:
                 if not bool(ok.any()):
                     continue
                 win = int(first_argmax(torch.where(ok, race, torch.full_like(race, -1.0)).unsqueeze(0))[0])
-                # the city's grants go with the join, the same turn
-                gone = (self.unit_alive[b] & (self.unit_seat[b] == FREE_SEAT)
-                        & (self.unit_free_city[b] == self.city_id[b, row, j])).nonzero(as_tuple=True)[0]
-                if gone.numel():
-                    self._occ_clear(torch.full_like(gone, b), self.unit_tile[b, gone], gone)
-                    self.unit_alive[b, gone] = False
+                # the city's grants go with the join (`_transfer_city`)
                 self._transfer_city(b, row, j, win, conquest=False)
 
     def _seat_city_growth(self, row: int, col: torch.Tensor, act: torch.Tensor,
@@ -859,8 +862,8 @@ class SimPhase:
         moved = self.city_pop[:, row, j] != pop_before
         if not bool(moved.any()):
             return cul
-        yf = self._seat_amenity(row)[2][:, j:j + 1]
-        again = self._seat_city_walk(row, j, amen_yf=yf)[:, 0, 4]
+        amen = self._seat_amenity(row)
+        again = self._seat_city_walk(row, j, amen_yf=amen[2][:, j:j + 1], amen_tier=amen[0])[:, 0, 4]
         return torch.where(moved, again.to(cul.dtype), cul)
 
     def _produce_pre(self, row: int) -> dict:

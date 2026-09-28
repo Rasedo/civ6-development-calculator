@@ -110,20 +110,24 @@ def main() -> None:
     sim.feat_stripped[B0, t] = True
     assert paintable(sim, t), "a chopped plot is bare"
     sim.feat_stripped[B0, t] = False
-    for f in (FLOODPLAINS, GEO, SOIL):
+    for f in (FLOODPLAINS, GEO):
         sim.feat_id[B0, t] = f
         assert not paintable(sim, t), f"feature {f} is never painted"
+    # the Eruptable soil is drawn on again
+    sim.feat_id[B0, t] = SOIL
+    assert paintable(sim, t), "Volcanic Soil takes the draw"
     sim.feat_id[B0, t] = -1
+    # a district, a city centre or a wonder takes the draw but no paint (`_erupt`)
     for plane, v in ((sim.district, 0), (sim.centre_slot_at, 0), (sim.built_wonder, 0)):
         plane[B0, t] = v
-        assert not paintable(sim, t), "a district, a city centre or a wonder refuses"
+        assert paintable(sim, t), "a district, a city centre or a wonder takes the draw"
         plane[B0, t] = -1
     for plane in (sim.water, sim.tile_mountain, sim.tile_submerged):
         plane[B0, t] = True
         assert not paintable(sim, t), "water, a Mountain or a drowned plot refuses"
         plane[B0, t] = False
     assert not paintable(sim, -1)
-    print("  1 envelope OK — bare, improved, Woods, Rainforest, Marsh in; the rest out")
+    print("  1 envelope OK — bare, improved, Woods, Rainforest, Marsh, Volcanic Soil in; the rest out")
 
     # 2 — a painted Woods reads as a chopped one, plus the soil's name
     chop = fresh(rules, path, slot=1)
@@ -156,8 +160,10 @@ def main() -> None:
     assert torch.equal(adj, paint.d_static_adj)
     print("  2 painted Woods OK — reads as chopped, Lumber Mill gone, soil live and permanent")
 
-    # 3 — the eruption: one draw per eligible ring plot, at its SEVERITY's
-    # chance (GENTLE / CATASTROPHIC / MEGACOLOSSAL 35 / 50 / 75)
+    # 3 — the eruption: damage first, one draw per damage row per reached
+    # neighbour; then one draw per Yields row per eligible neighbour, every
+    # row painting at its own chance (GENTLE / CATASTROPHIC / MEGACOLOSSAL
+    # food 35 / 50 / 75, production 15 / 25 / 35, science 0 / 10 / 15)
     sim3 = fresh(rules, path, slot=3)
     # any volcano of the map, active or not: `_erupt` is handed its ring
     volc = sim3.volcano_at[B0].nonzero().flatten().tolist()
@@ -173,42 +179,61 @@ def main() -> None:
     assert sim3._er_sci_p.tolist()[VOLC0:] == [0.0, 0.1, 0.15]
     assert sim3._er_cul_p.tolist() == [0, 0, 0, 0, 0.5, 0, 0, 0]
     silted = [[0, 0, 0] for _ in range(3)]
+    kinds = sim3._ERUPTION_DAMAGE_KINDS
     for sev in range(3):
         plots = painted = 0
+        er = VOLC0 + sev
+        rowt = torch.full((sim3.B,), er, dtype=torch.long)
+        n_kinds = sum(int(float(sim3._eruption_damage_p(k, rowt)[B0]) > 0) for k in kinds)
+        banded = float(sim3._er_dmg_hi[er]) > 0
+        yields = [float(py[er]) for py in (sim3._er_paint_p, sim3._er_prod_p, sim3._er_sci_p, sim3._er_cul_p)]
+        n_yields = sum(int(y > 0) for y in yields)
         for it in range(400):
             sim3 = fresh(rules, path, slot=3)
             sim3.rng_state[B0] = 7919 * (it + 1) + sev
             v = volc[it % len(volc)]
             ring = [int(n) for n in sim3.neigh[v].tolist() if int(n) >= 0]
+            # no unit on the ring, so every draw is a row's
+            for n in ring:
+                for plane in (sim3.military_at, sim3.civilian_at, sim3.support_at, sim3.embarked_at):
+                    plane[B0, n] = -1
+            reach = [n for n in ring if bool(sim3._eruption_reaches(torch.tensor([n]))[0])]
+            cities = sum(int(bool(sim3._centre_held(torch.tensor([n]))[0])) for n in reach)
             elig = {n for n in ring if paintable(sim3, n)}
+            takes = {n for n in elig if int(sim3.district[B0, n]) < 0 and int(sim3.centre_slot_at[B0, n]) < 0
+                     and int(sim3.built_wonder[B0, n]) < 0}
             before = sim3.feat_id[B0].clone()
             s0 = int(sim3.rng_state[B0])
-            sim3._erupt(hit, ring_of(sim3, v), torch.full((sim3.B,), VOLC0 + sev, dtype=torch.long))
-            assert (s0 + (4 * len(elig) + 6 * len(ring)) * STEP) & 0xFFFFFFFF == int(sim3.rng_state[B0]), \
-                "an eruption draws four times per eligible ring plot, then six per ring plot"
+            sim3._erupt(hit, ring_of(sim3, v), rowt)
+            want_draws = n_kinds * len(reach) + (2 * cities if banded else 0) + n_yields * len(elig)
+            assert (s0 + want_draws * STEP) & 0xFFFFFFFF == int(sim3.rng_state[B0]), \
+                "an eruption draws once per damage row per reached plot, then once per Yields row per eligible plot"
             for n in ring:
                 silt = (int(sim3.fertility_prod[B0, n]), int(sim3.fertility_sci[B0, n]),
                         int(sim3.fertility_cul[B0, n]))
-                if n in elig:
+                if n in takes:
                     plots += 1
                     painted += int(int(sim3.feat_id[B0, n]) == SOIL)
                     if int(sim3.feat_id[B0, n]) != SOIL:
                         assert silt == (0, 0, 0), f"unpainted plot {n} silted {silt}"
                     silted[sev] = [a + int(b > 0) for a, b in zip(silted[sev], silt)]
-                else:
-                    assert int(sim3.feat_id[B0, n]) == int(before[n]), f"ineligible plot {n} was painted"
+                elif int(before[n]) != SOIL:
+                    assert int(sim3.feat_id[B0, n]) == int(before[n]), f"plot {n} taking no paint was painted"
             if plots >= 1200:
                 break
-        p = float(sim3._er_paint_p[VOLC0 + sev])
+        p = 1.0
+        for y in yields:
+            p *= 1.0 - y
+        p = 1.0 - p
         assert plots >= 300, f"only {plots} eligible ring plots over the runs"
         rate = painted / plots
         assert abs(rate - p) < 0.05, f"severity {sev}: painted {painted}/{plots} = {rate:.3f} against {p}"
-        for k, py in enumerate((sim3._er_prod_p, sim3._er_sci_p, sim3._er_cul_p)):
-            want = float(py[VOLC0 + sev])
-            got = silted[sev][k] / painted
-            assert abs(got - want) < 0.06, f"severity {sev} silt {k}: {silted[sev][k]}/{painted} against {want}"
-        print(f"  3 eruption paint OK — severity {sev}: {painted}/{plots} = {rate:.3f} against {p}, "
-              f"silt {silted[sev]} of {painted}")
+        for k in range(3):
+            want = yields[k + 1]
+            got = silted[sev][k] / plots
+            assert abs(got - want) < 0.05, f"severity {sev} silt {k}: {silted[sev][k]}/{plots} against {want}"
+        print(f"  3 eruption paint OK — severity {sev}: {painted}/{plots} = {rate:.3f} against {p:.3f}, "
+              f"silt {silted[sev]} of {plots}")
 
     # 4 — the turn's draw names the severity: over the eruptions it fires,
     # GENTLE / CATASTROPHIC / MEGACOLOSSAL come in proportion to 4 / 2.5 / 1.5
@@ -275,7 +300,8 @@ def main() -> None:
     assert abs(rows_seen[0] / n - 4 / 6.5) < 0.03, f"GENTLE {rows_seen[0]}/{n} against 4/6.5"
     print(f"  5 Kilimanjaro OK — {rows_seen} over {n} draws against 4 / 2.5, over its ring")
 
-    # 6 — THE DAMAGE ROWS, plot by plot (`eruptTile`), on OWNED plots only:
+    # 6 — THE DAMAGE ROWS, plot by plot (`_eruption_damage`), the improvement rows on
+    # OWNED plots only, the unit rows on any:
     # every open ring plot a Farm, all but one owned; a Warrior and a Builder
     # on an owned one, a Warrior and a bonus resource on the unowned one, a
     # Galley on a water one
@@ -309,6 +335,7 @@ def main() -> None:
                 s.pillaged[B0, n] = False
                 s.tile_seat[B0, n] = 0 if n != open6 else -1
             s.res_priority[B0, open6] = 1
+            s.res_id[B0, open6] = 0
             w = put(s, owned6[0], "WARRIOR")
             b = put(s, owned6[0], "BUILDER")
             u = put(s, open6, "WARRIOR")
@@ -316,7 +343,10 @@ def main() -> None:
             s._erupt(one, ring_of(s, v6), torch.full((s.B,), row, dtype=torch.long))
             assert int(s.improvement[B0, open6]) == s.FARM and not bool(s.pillaged[B0, open6]), \
                 "an unowned plot takes no damage row"
-            assert int(s.major_unit_hp[B0, u]) == 100, "a unit on an unowned plot is untouched"
+            # the unit rows are not the owner's (the applier 0x336a50): a
+            # unit on an unowned plot takes its own draw where the row fires
+            hurt_u = 100 - int(s.major_unit_hp[B0, u]) if bool(s.major_unit_alive[B0, u]) else 100
+            assert (hurt_u == 0) == (row == VOLC0), f"row {row}: the unit on the unowned plot took {hurt_u}"
             assert bool(s.res_stripped[B0, open6]) and int(s.res_priority[B0, open6]) == 0, \
                 "a bonus resource on the ring goes whoever owns the plot"
             for n in owned6:
@@ -336,7 +366,8 @@ def main() -> None:
         if row == VOLC0:
             assert bands == {0}, f"GENTLE hurt a land unit: {bands}"
         else:
-            assert all(40 <= d <= 60 for d in bands) and len(bands) > 5, f"CATASTROPHIC band {bands}"
+            # each unit's own draw, MinHP + rand(MaxHP - MinHP) (0x3366a0)
+            assert all(40 <= d < 60 for d in bands) and len(bands) > 5, f"CATASTROPHIC band {bands}"
         print(f"  6 eruption damage OK — row {row}: destroyed {gone}/{farms}, civilians {kills}/{N6}, "
               f"land band {min(bands)}-{max(bands)}")
 

@@ -93,7 +93,10 @@ def test_award(sim) -> None:
     assert bx(20, 20, ranged=True) == 2, "a ranged battle pays +1, not +2"
     assert bx(20, 20, died=True) == 4, "a kill doubles the base"
     assert bx(10, 25) == 5, "0.5 rounds UP"
-    assert bx(10, 200) == XP_BATTLE_CAP, "unit battles cap at 8"
+    assert bx(75, 110, ranged=True) == 3, "the ratio term rounds UP (ceil(1 + 110/75))"
+    assert bx(110, 75, ranged=True, init=True) == 3, "the attacker's ceil(2 + 75/110)"
+    assert bx(75, 110, ranged=True, pct=10) == 4, "the percent rounds UP again"
+    assert bx(10, 200) == XP_BATTLE_CAP == 8, "unit battles cap at 8"
     assert bx(20, 20, pct=100) == 6 and bx(20, 20, mult=2) == 6, "the modifiers ride the base"
     assert bx(0, 20) == 0, "a chassis with no strength banks nothing"
     cx = lambda base, pct=0, mult=1: int(sim._city_xp(one * base, one * pct, one * mult)[0])

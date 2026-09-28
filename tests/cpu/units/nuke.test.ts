@@ -143,7 +143,7 @@ describe('what stops one', () => {
     const sea = tileAtCoords(state.map, 11, 8);
     sea.terrain = 'COAST';
     const ship = spawnUnit(state, 'MISSILE_CRUISER', sea.index, 1)!;
-    // S 110 against D 75: the weakest roll deals round(24 × 1.04^35) = 95
+    // S 110 against D 75: the weakest roll deals 24 × e^(350/256) = 94
     expect(nukeInterceptStrength(state, 0, at.index)).toBe(110);
     expect(NUKE_SILO_DEFENSE).toBe(75);
     for (let i = 0; i < 3; i++) detonate(state, 0, DEV, at.index);

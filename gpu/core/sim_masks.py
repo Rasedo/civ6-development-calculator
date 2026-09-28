@@ -198,14 +198,24 @@ class SimMasks:
         c0 = int(self.rng_state[b]) if log_hit else 0
         r = self._next_random(mask)
         q = js_round(diff * 10).to(torch.long)
-        # The table spans q in [-2000, 2000] (diff +-200), so XP level bonuses
-        # (up to +15 CS) cannot push |diff| past it. TS damageRoll has no clamp;
-        # the table's reach is what keeps the two engines bit-exact.
-        base = self._dmg_base[(q + 2000).clamp(0, 4000)]
+        # `damageExponent`: the difference at 1/1000, D = floor(256 * diff),
+        # x = (k * D) >> 8 — integer floors on both engines
+        milli = js_round(diff.to(torch.float64) * 1000).to(torch.long)
+        d256 = torch.div(milli * 256, 1000, rounding_mode="floor")
+        x = torch.div(self._dmg_k256 * d256, 256, rounding_mode="floor")
+        # the table's reach, as `damageOf` holds x: past it every draw clamps
+        # to the same damage
+        R = self._dmg_reach
+        base = self._dmg_base[(x + R).clamp(0, 2 * R)]
         # the game's GetRandNum(12): ONE draw mapped to 0..11 — floor(r * 12) is
         # exact in float64 and TS damageRoll computes the identical floor
         roll = torch.floor(r * self._dmg_max_extra).to(torch.long)
-        dmg = js_round((self._dmg_base_damage + roll).to(torch.float64) * base).clamp(min=self._dmg_min).to(torch.long)
+        # `damageOf`: the product and the half each rounded to f32 (an f64
+        # product of a small integer and an f32 factor is exact, so the f32
+        # rounding of it is the f32 product), truncated, clamped
+        v = ((self._dmg_base_damage + roll).to(torch.float64) * base).to(torch.float32).to(torch.float64)
+        v = (v + 0.5).to(torch.float32).to(torch.float64)
+        dmg = torch.trunc(v).to(torch.long).clamp(min=self._dmg_min, max=self._dmg_max)
         if log_hit:
             t_ = int(tile[b]) if tile is not None else -1
             # `parts` splits the diff into the two strengths (TS damageRoll's
@@ -981,13 +991,16 @@ class SimMasks:
         foe_died: torch.Tensor, ranged: bool, initiated: bool,
         pct: torch.Tensor, mult: torch.Tensor,
     ) -> torch.Tensor:
+        """`battleXp` — GameCore_XP2_Release.dll 0x5197e0: the battle terms
+        plus the foe's strength over the unit's own (doubled on a kill),
+        rounded up; then x the XP percent and the multipliers, rounded up
+        again; then the cap. `mult` may be FRACTIONAL (the Impi's 1.25), so
+        both ceilings run in f64 in TS's order — every quantity is a small
+        integer or a dyadic product, which f64 carries exactly."""
         adds = (XP_RANGED_BATTLE if ranged else XP_MELEE_BATTLE) + (XP_INITIATOR if initiated else 0)
-        # `mult` may be FRACTIONAL (the Impi's 1.25), so the division runs in
-        # f64 and floors exactly as TS's `Math.floor` does — every quantity
-        # here is a small integer, which f64 carries exactly.
-        num = ((foe_cs * torch.where(foe_died, 2, 1) + adds * own_cs) * (100 + pct)).double() * mult.double()
-        den = (own_cs * 100).clamp(min=1).double()
-        out = torch.floor((2 * num + den) / (2 * den)).long()
+        num = (foe_cs * torch.where(foe_died, 2, 1) + adds * own_cs).double()
+        base = torch.ceil(num / own_cs.clamp(min=1).double())
+        out = torch.ceil(base * (100 + pct).double() * mult.double() / 100).long()
         return torch.where(own_cs > 0, out.clamp(max=XP_BATTLE_CAP), torch.zeros_like(out))
 
     def _city_xp(self, base: torch.Tensor, pct: torch.Tensor, mult: torch.Tensor) -> torch.Tensor:
@@ -1010,12 +1023,14 @@ class SimMasks:
         return mult.double() * self._type_xp_rate[types.clamp(min=0, max=self.NU - 1)]
 
     def _xp_strength(self, t: torch.Tensor, shooting: bool) -> torch.Tensor:
-        """the strength a chassis brings to the XP ratio: its Ranged Strength
-        when it is the one shooting, its Combat Strength otherwise."""
+        """the strength a chassis brings to the XP ratio (`xpStrength`): its
+        RAW Ranged column when it is the one shooting — a bomber's Bombard,
+        its strike being a bombard — its Combat Strength otherwise."""
         c = self._type_combat[t.clamp(min=0)].long()
         if not shooting:
             return c
         r = self._type_ranged_strength[t.clamp(min=0)].long()
+        r = torch.where(self._type_air[t.clamp(min=0)] == 2, self._type_bombard[t.clamp(min=0)].long(), r)
         return torch.where(r > 0, r, c)
 
     def _battle_gain(

@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
-import { minorEconomy, minorPlan, minorPurchases, minorUpgrades } from '../../../cpu/core/minorBuild';
+import { minorBuilderWork, minorEconomy, minorPlan, minorPurchases, minorUpgrades } from '../../../cpu/core/minorBuild';
 import { walkUnit } from '../../../cpu/core/walker';
 import { computeCityStats } from '../../../cpu/core/city';
 import { builderCost, spawnUnit } from '../../../cpu/core/units';
@@ -47,6 +47,14 @@ function scene(): { state: GameState; cs: CityState } {
 }
 
 const army = (state: GameState, cs: CityState): Unit[] => state.units.filter((u) => u.seat === cs.seat);
+
+/** A pillaged Monument the minor repairs first: its production is off the
+ *  Builder (`minorTrainsBuilder`). */
+function pillageForRepair(cs: CityState): void {
+  cs.buildings = [...(cs.buildings ?? []), 'MONUMENT'];
+  cs.pillagedBuildings = ['MONUMENT'];
+  cs.repairWait = false;
+}
 
 /** Set the stream so its next draw satisfies `pred`. */
 function seek(state: GameState, pred: (r: number) => boolean): void {
@@ -89,10 +97,17 @@ describe("a city-state's purse", () => {
     expect(cs.treasury).toBeGreaterThanOrEqual(0);
   });
 
-  it('buys a Builder when none stands and the treasury covers it, at the episode rate', () => {
+  it('buys a Builder only with Builder work and none standing or in production', () => {
     const { state, cs } = scene();
     const price = purchaseStep(builderCost(state, cs.seat) * GOLD_PURCHASE_MULT);
     cs.treasury = price + 50;
+    // the Builder row trains one while none stands: no purchase
+    expect(minorBuilderWork(state, cs)).toBe(true);
+    minorPurchases(state, cs);
+    expect(army(state, cs).filter((u) => u.type === 'BUILDER').length).toBe(0);
+    cs.treasury = price + 50;
+    // a pillaged building's repair takes the production: the Builder is bought
+    pillageForRepair(cs);
     minorPurchases(state, cs);
     expect(army(state, cs).filter((u) => u.type === 'BUILDER').length).toBe(1);
     expect(cs.treasury).toBe(50);
@@ -103,8 +118,22 @@ describe("a city-state's purse", () => {
     expect(army(state, cs).filter((u) => u.type === 'BUILDER').length).toBe(1);
   });
 
+  it('has no Builder work with every owned plot improved, until one is pillaged', () => {
+    const { state, cs } = scene();
+    const owned = state.map.tiles.filter((t) => tileSeat(t) === cs.seat && t.index !== cs.centerIndex);
+    for (const t of owned) t.improvement = 'FARM';
+    expect(minorBuilderWork(state, cs)).toBe(false);
+    pillageForRepair(cs);
+    cs.treasury = 500;
+    minorPurchases(state, cs);
+    expect(army(state, cs).filter((u) => u.type === 'BUILDER').length).toBe(0);
+    owned[0].pillaged = true;
+    expect(minorBuilderWork(state, cs)).toBe(true);
+  });
+
   it('draws for a Builder but buys none at a rate of 0, and asks no draw it cannot pay', () => {
     const { state, cs } = scene();
+    pillageForRepair(cs);
     cs.builderBuyRate = 0;
     cs.treasury = 500;
     const rng = state.rngState;

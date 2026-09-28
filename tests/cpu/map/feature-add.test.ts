@@ -1,17 +1,22 @@
 /**
  * VOLCANIC SOIL — an eruption paints its ring. CIV6 (`RandomEvent_Yields`,
- * FEATURE_VOLCANIC_SOIL YIELD_FOOD, `ReplaceFeature="true"`): each eligible
- * land plot of the ring becomes Volcanic Soil with the severity's chance
- * (`ERUPTION_PAINT_P`), replacing Woods or Rainforest; Floodplains, a Geothermal
- * Fissure, water and Mountains are never painted (the lab 4 volcano scene).
- * The GPU twin is tests/gpu/feature_add_test.py.
+ * FEATURE_VOLCANIC_SOIL, `ReplaceFeature="true"`, the soil pass 0xa219e0):
+ * each Yields row of the severity draws once per eligible land neighbour and
+ * paints Volcanic Soil where it lands — every row paints, so a plot is
+ * painted with 1 - the product of the rows' misses — replacing Woods or
+ * Rainforest; Floodplains, a Geothermal Fissure, water and Mountains are
+ * never painted. The GPU twin is tests/gpu/feature_add_test.py.
  */
 import { describe, expect, it } from 'vitest';
 import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
 import { disasterPhase, erupt, paintVolcanicSoil, soilPaintable } from '../../../cpu/core/disasters';
-import { ERUPTION_PAINT_P, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS } from '../../../cpu/data/disasters';
+import { ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS } from '../../../cpu/data/disasters';
+/** an eruption row's chance to paint a plot: every Yields row paints, so 1 -
+ *  the product of their misses */
+const paintedP = (row: number) => 1 - [ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P]
+  .reduce((q, a) => q * (1 - a[row]), 1);
 /** the volcano's three rows' paint chances, GENTLE / CATASTROPHIC / MEGACOLOSSAL */
-const VOLCANO_PAINT_P = [0, 1, 2].map((sev) => ERUPTION_PAINT_P[volcanoRow(sev)]);
+const VOLCANO_PAINT_P = [0, 1, 2].map((sev) => paintedP(volcanoRow(sev)));
 import { bareGround, validImprovementsIn } from '../../../cpu/core/rules';
 import { tileYields } from '../../../cpu/core/yields';
 import { neighbors } from '../../../world/hex';
@@ -20,7 +25,7 @@ import type { GameState, Tile } from '../../../cpu/core/types';
 import type { FeatureId, ImprovementId } from '../../../world/types';
 
 describe('Volcanic Soil', () => {
-  it('paints bare land and Woods, Rainforest or Marsh, and nothing else', () => {
+  it('draws on bare land, Woods, Rainforest, Marsh and Volcanic Soil, and nothing else', () => {
     const state = makeState(makeMap(16, 16));
     const at = (c: number, r: number) => tileAtCoords(state.map, c, r);
     expect(soilPaintable(at(2, 2))).toBe(true);
@@ -32,11 +37,14 @@ describe('Volcanic Soil', () => {
       t.feature = f;
       expect(soilPaintable(t)).toBe(true);
     }
-    for (const f of ['FLOODPLAINS', 'GEOTHERMAL_FISSURE', 'OASIS', 'VOLCANIC_SOIL', 'ULURU'] as const) {
+    for (const f of ['FLOODPLAINS', 'GEOTHERMAL_FISSURE', 'OASIS', 'ULURU'] as const) {
       const t = at(5, 2);
       t.feature = f;
       expect(soilPaintable(t)).toBe(false);
     }
+    // the Eruptable soil is drawn on again
+    at(5, 2).feature = 'VOLCANIC_SOIL';
+    expect(soilPaintable(at(5, 2))).toBe(true);
     const water = at(6, 2);
     water.terrain = 'COAST';
     expect(soilPaintable(water)).toBe(false);
@@ -46,15 +54,10 @@ describe('Volcanic Soil', () => {
     const drowned = at(8, 2);
     drowned.submerged = true;
     expect(soilPaintable(drowned)).toBe(false);
+    // a district, a city centre or a wonder takes the draw but no paint
     const campus = at(9, 2);
     campus.district = 'CAMPUS';
-    expect(soilPaintable(campus)).toBe(false);
-    const centre = at(10, 2);
-    centre.district = 'CITY_CENTER';
-    expect(soilPaintable(centre)).toBe(false);
-    const wonder = at(11, 2);
-    wonder.builtWonder = 'PYRAMIDS';
-    expect(soilPaintable(wonder)).toBe(false);
+    expect(soilPaintable(campus)).toBe(true);
   });
 
   it('replaces the Woods and its Lumber Mill, keeps any other improvement', () => {
@@ -190,7 +193,7 @@ describe('Volcanic Soil', () => {
     // storm or the meteor is all the turn's draw can name. Over the phases
     // that erupted, the severity is GENTLE / CATASTROPHIC / MEGACOLOSSAL in
     // proportion to 4 / 2.5 / 1.5 — read off how often a bare ring plot is
-    // painted, the weighted mean of the three paint chances.
+    // painted, the weighted mean of the three rows' paint chances.
     const state: GameState = makeState(makeMap(16, 16, 'COAST'));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
@@ -203,8 +206,9 @@ describe('Volcanic Soil', () => {
     let plots = 0;
     let painted = 0;
     let eruptions = 0;
-    for (let i = 0; i < 8000; i++) {
+    for (let i = 0; i < 32000; i++) {
       for (const t of ring) { t.terrain = 'DESERT'; t.elevation = 'FLAT'; t.feature = null; t.meteor = false; }
+      v.volcanoActive = true;
       state.eventLog = [];
       disasterPhase(state);
       if (!state.eventLog.some((e) => e.includes('eruption'))) continue;
@@ -212,8 +216,9 @@ describe('Volcanic Soil', () => {
       plots += ring.length;
       painted += ring.filter((t) => t.feature === 'VOLCANIC_SOIL').length;
     }
-    // the volcano's 8 over the per-site 240, whatever else the turn may draw
-    expect(Math.abs(eruptions / 8000 - 8 / 240)).toBeLessThan(0.006);
+    // the volcano's 80 tenths of the draw's 2500, whatever else the turn may
+    // draw (the roll may put it to sleep first, one turn in 250)
+    expect(Math.abs(eruptions / 32000 - 80 / 2500)).toBeLessThan(0.006);
     const w = [4, 2.5, 1.5];
     const mean = w.reduce((a, x, s) => a + x * VOLCANO_PAINT_P[s], 0) / 8;
     expect(Math.abs(painted / plots - mean)).toBeLessThan(0.04);

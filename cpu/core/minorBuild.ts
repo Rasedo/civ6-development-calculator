@@ -49,7 +49,7 @@ import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorRouteCandidate, minorTrade, tradeCapacity } from './trade';
-import { FREE_SEAT, civsAtWar, majorityReligionOf, seatOf, tileSeat } from './seats';
+import { FREE_SEAT, civsAtWar, hiddenResourcesFor, majorityReligionOf, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestMelee, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
 import { nextRandom } from './rand';
@@ -263,8 +263,9 @@ function minorCanUpgrade(state: GameState, cityState: CityState, u: Unit): boole
 
 /**
  * THE MINOR'S PURCHASES (C-38's census; the rates in cpu/data/cityStates.ts).
- * A Builder, on a turn none stands and the treasury covers its price: one draw
- * at the episode's rate (`builderBuyRate`). Then a military unit, on a turn
+ * A Builder, on a turn the minor has Builder work (`minorBuilderWork`), none
+ * stands or is in production (`minorTrainsBuilder`) and the treasury covers
+ * its price: one draw at the episode's rate (`builderBuyRate`). Then a military unit, on a turn
  * the treasury holds `MINOR_MILITARY_BUY_FLOOR` — or a Warrior Monk is in
  * reach — one draw at the rate its military count sets (`MINOR_MILITARY_BUY_BP`,
  * tripled within `MINOR_LOSS_BUY_TURNS` of a loss). A drawn purchase buys a
@@ -278,7 +279,8 @@ function minorCanUpgrade(state: GameState, cityState: CityState, u: Unit): boole
  */
 export function minorPurchases(state: GameState, cityState: CityState): void {
   const units = state.units.filter((u) => u.seat === cityState.seat);
-  if (!units.some((u) => u.type === 'BUILDER')) {
+  if (!units.some((u) => u.type === 'BUILDER') && !minorTrainsBuilder(state, cityState)
+      && minorBuilderWork(state, cityState)) {
     const price = purchaseStep(builderCost(state, cityState.seat) * GOLD_PURCHASE_MULT);
     if (goldAffordable(cityState.treasury, price)
       && Math.floor(nextRandom(state) * 1000) < (cityState.builderBuyRate ?? 0)) {
@@ -292,6 +294,35 @@ export function minorPurchases(state: GameState, cityState: CityState): void {
   }
   minorBuyMilitary(state, cityState, units);
   minorBuyNaval(state, cityState);
+}
+
+/** Is the minor's production on a Builder this turn? The Builder row is the
+ *  table's first and wants one whenever none stands, so its Builder is in
+ *  production unless a pillaged building's repair takes the turn first
+ *  (`minorBuild`); asked with none standing. */
+function minorTrainsBuilder(state: GameState, cityState: CityState): boolean {
+  if (MINOR_BUILD_ROWS[0].kind !== 'builder') throw new Error('minorTrainsBuilder: the Builder row is not first');
+  return !(minorRepairTarget(state, cityState) && !cityState.repairWait);
+}
+
+/** Has the minor BUILDER WORK — an owned plot (its centre aside) holding a
+ *  pillaged improvement, or none and a valid improvement for it
+ *  (`validImprovements`, the minor's research): any land plot, a water plot
+ *  only under a resource it sees (lab 5d, runs/c38s3_builder_g300_k0_b0_20260928T024946Z.jsonl
+ *  and runs/c38h1_work.jsonl: 0 buys in 35 minor-turns without work, 6 of 6
+ *  with work bought within 1–3 turns). `_minor_builder_work` is the twin. */
+export function minorBuilderWork(state: GameState, cityState: CityState): boolean {
+  const hidden = hiddenResourcesFor(state, cityState.seat);
+  for (const t of state.map.tiles) {
+    if (tileSeat(t) !== cityState.seat || t.index === cityState.centerIndex) continue;
+    if (t.improvement) {
+      if (t.pillaged) return true;
+      continue;
+    }
+    if (isWater(t) && (!t.resource || hidden.has(t.resource))) continue;
+    if (validImprovements(state, t, cityState.seat).length > 0) return true;
+  }
+  return false;
 }
 
 function minorBuyMilitary(state: GameState, cityState: CityState, units: Unit[]): void {

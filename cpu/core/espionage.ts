@@ -19,7 +19,7 @@ import {
   SPY_MAX_LEVEL, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS, SPY_TRAVEL_COLS,
   SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN,
   SPY_TRAVEL_TURNS_MAX, SPY_ROLL_DICE, SPY_ROLL_FACES, SPY_ROLL_LEVEL_BASE, SPY_COUNTERSPY_ROLL,
-  SPY_CAPTURE_PCT, SPY_ESCAPE_BASE, SPY_ESCAPE_LEVEL, SPY_ESCAPE_POLICE, SPY_ESCAPE_COUNTERSPY_LEVEL,
+  SPY_COUNTERSPY_LEVEL_ROLL, SPY_ESCAPE_BASE, SPY_ESCAPE_LEVEL, SPY_ESCAPE_POLICE, SPY_ESCAPE_CAPTURE_BAND,
   BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
   SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
   SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
@@ -366,20 +366,21 @@ function hasGovernor(state: GameState, holder: Seat, city: City): boolean {
   return holder.cities.includes(city) && cityHasGovernor(state, city);
 }
 
-/** the holder's counterspy posts that DEFEND the district at `tileIndex`,
- *  highest level first, ties in slot order — the first is the post that
- *  pursues. CIV6 (LOC_ESPIONAGECHOOSER_COUNTERSPY): a post will "Protect
- *  {1_District} (and all adjacent districts) from enemy spies" — the
- *  district it stands on and every district within 1 of it; and
- *  (Surveillance) "When Counterspying all city districts are defended". */
-function counterspiesGuarding(state: GameState, holder: number, city: City, tileIndex: number): Unit[] {
+/** the holder's counterspy that PURSUES a spy working at `tileIndex` — the
+ *  FIRST in the holder's unit list (GameCore_XP2_Release.dll finder 0x52ac80,
+ *  tools/civ6lab/dll_readings.md "C-16"), whatever its level: a post within
+ *  hex distance 1 of the plot, any district of any city — CIV6
+ *  (LOC_ESPIONAGECHOOSER_COUNTERSPY) a post will "Protect {1_District} (and
+ *  all adjacent districts) from enemy spies" — or anywhere in the plot's city
+ *  with (Surveillance) "When Counterspying all city districts are defended". */
+function counterspyPursuing(state: GameState, holder: number, city: City, tileIndex: number): Unit | undefined {
   const at = state.map.tiles[tileIndex];
-  return state.units.filter((u) => {
+  return state.units.find((u) => {
     if (u.seat !== holder || !isSpy(u.type) || u.spyMission !== SPY_M_COUNTERSPY) return false;
     const p = state.map.tiles[u.tileIndex];
     return hexDistance(p.col, p.row, at.col, at.row) <= 1
       || (cityHoldsTile(city, u.tileIndex) && promoValue(u, 'SPY_SURVEIL') > 0);
-  }).sort((a, b) => spyLevel(b) - spyLevel(a));
+  });
 }
 
 /** CIV6 (Great Work Heist): "Great Works of Writing will be displayed first,
@@ -489,10 +490,6 @@ export function minorMissionLevel(state: GameState, unit: Unit, m: number): numb
     + quartermasterLevels(state, unit.seat) + congressPactLevels(state, m));
 }
 
-function roll(state: GameState, pct: number): boolean {
-  return Math.floor(nextRandom(state) * 100) < pct;
-}
-
 function resolveMission(state: GameState, unit: Unit, m: number): void {
   const def = SPY_MISSIONS[m];
   const here = spyCity(state, unit);
@@ -512,9 +509,10 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     return;
   }
   const lvl = effectiveLevel(state, unit, here.city, m);
-  // a counterspy guarding the district lowers the realised roll, flat
-  const guard = counterspiesGuarding(state, here.seat.seat, here.city, unit.tileIndex).length > 0
-    ? SPY_COUNTERSPY_ROLL : 0;
+  // the pursuing counterspy lowers the realised roll by 3 plus 1 per level
+  // above the first (`ComputeNeededDieRoll` 0x529b60)
+  const post = counterspyPursuing(state, here.seat.seat, here.city, unit.tileIndex);
+  const guard = post ? SPY_COUNTERSPY_ROLL + SPY_COUNTERSPY_LEVEL_ROLL * spyLevel(post) : 0;
   const out = def.certain ? MISSION_SUCCESS_UNDETECTED
     : missionOutcome(missionRoll(state) - guard, missionThreshold(def, lvl));
   // CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_SPY): an offensive operation run in
@@ -567,14 +565,15 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
  * city" — by Airplane, Boat, Vehicle or on Foot, gated on the city's own
  * districts, and a survivor reappears in the CAPITAL after the route's ride
  * home. The spy takes the FASTEST route whose district stands (the driver's
- * choice where the real game asks the player). The police guess one of the
- * offered routes, uniformly; the score is the install's base + a level term
- * per level (Ace Driver "+4 levels" among them) + the police term on a right
- * guess + the counterspy term per level of the post guarding the district,
- * and the spy gets away when the mission roll's 3d6 lands at or under it. A
- * failed escape is the catch: "imprisoned, but not killed" where a MAJOR runs
- * the prison — a minor keeps no cell, so its catch ends the career — or the
- * spy is killed.
+ * choice where the real game asks the player). The police cover one offered
+ * route, drawn with weight (longest TravelTime − the route's own + 1)
+ * (`policeCover`); the target v is the install's base less a level term per
+ * level above the first (Ace Driver "+4 levels" among them), +4 when the
+ * police cover the route taken, and no counterspy term — ResolveEscape
+ * passes none (GameCore_XP2_Release.dll 0x52ce40). One 3d6: the spy gets
+ * away at v or over; on v − 2 .. v − 1 it is caught, "imprisoned, but not
+ * killed" where a MAJOR runs the prison — a minor keeps no cell, so its
+ * catch ends the career — and below that it is killed.
  */
 function spyEscape(state: GameState, unit: Unit,
                    districts: { type: string; tileIndex: number }[], jailer: number,
@@ -586,16 +585,12 @@ function spyEscape(state: GameState, unit: Unit,
   }
   const offered = SPY_ESCAPE_ROUTES.filter((r) => r.district === null || live.has(r.district));
   const route = offered[0];
-  const guessed = offered[Math.floor(nextRandom(state) * offered.length)] === route;
-  // CIV6: "when enemy Spies are performing missions in those districts, there
-  // is a much higher chance than normal that they will be caught" — the post
-  // guarding the district the spy worked from leans on the ESCAPE.
-  const posted = jailer >= 0 && city ? counterspiesGuarding(state, jailer, city, unit.tileIndex) : [];
-  const score = SPY_ESCAPE_BASE
-    + SPY_ESCAPE_LEVEL * (spyLevel(unit) + 1 + promoValue(unit, 'SPY_ESCAPE_LEVEL'))
-    + (guessed ? SPY_ESCAPE_POLICE : 0)
-    + (posted.length > 0 ? SPY_ESCAPE_COUNTERSPY_LEVEL * (spyLevel(posted[0]) + 1) : 0);
-  if (missionRoll(state) <= score) {
+  const guessed = policeCover(state, offered) === route;
+  const v = SPY_ESCAPE_BASE
+    - SPY_ESCAPE_LEVEL * (spyLevel(unit) + promoValue(unit, 'SPY_ESCAPE_LEVEL'))
+    - (guessed ? SPY_ESCAPE_POLICE : 0);
+  const r = missionRoll(state);
+  if (r >= v) {
     const home = citiesOf(state, unit.seat).find((c) => c.isCapital)
       ?? citiesOf(state, unit.seat)[0];
     if (!home) {
@@ -607,20 +602,34 @@ function spyEscape(state: GameState, unit: Unit,
     unit.spyTurns = route.turns;
     return;
   }
-  if (jailer >= 0 && roll(state, SPY_CAPTURE_PCT)) {
-    spyCaptured(state, unit, jailer, posted);
+  if (jailer >= 0 && r >= v - SPY_ESCAPE_CAPTURE_BAND) {
+    spyCaptured(state, unit, jailer, city && counterspyPursuing(state, jailer, city, unit.tileIndex));
     return;
   }
   disbandUnit(state, unit.id);
 }
 
-/** The catch — from the roll's own CAPTURED band or a lost escape. */
-function spyCaptured(state: GameState, unit: Unit, jailer: number, posted: Unit[]): void {
+/** The police's cover — ONE draw over the offered routes, each weighted by
+ *  the longest route's TravelTime − its own + 1 (GameCore_XP2_Release.dll
+ *  "Police Exit Covered" 0x528560): on foot 1, by vehicle 2, by boat 3, by
+ *  air 4. */
+function policeCover(state: GameState, offered: readonly (typeof SPY_ESCAPE_ROUTES)[number][]): (typeof SPY_ESCAPE_ROUTES)[number] {
+  const longest = Math.max(...SPY_ESCAPE_ROUTES.map((r) => r.turns));
+  let total = 0;
+  for (const r of offered) total += longest - r.turns + 1;
+  let pick = Math.floor(nextRandom(state) * total);
+  for (const r of offered) {
+    pick -= longest - r.turns + 1;
+    if (pick < 0) return r;
+  }
+  return offered[offered.length - 1];
+}
+
+/** The catch — from the roll's own CAPTURED band or an escape's. */
+function spyCaptured(state: GameState, unit: Unit, jailer: number, captor: Unit | undefined): void {
   // CIV6 (Spies and Espionage): a spy "may gain levels from successful
-  // offensive operations, or capturing an enemy Spy" — the post that made
-  // the catch likelier is the one that earns it: the pursuer, the first
-  // guarding post (the highest level).
-  const captor = posted[0];
+  // offensive operations, or capturing an enemy Spy" — the pursuing post
+  // (`counterspyPursuing`) is the one that earns it.
   if (captor) levelUpSpy(state, captor);
   // CIV6: captured spies "are imprisoned, but not killed", and the owner
   // "can then attempt to trade with the civilization who captured the Spy,
@@ -645,8 +654,7 @@ function spyAftermath(state: GameState, unit: Unit, out: number,
     return;
   }
   if (out === MISSION_CAPTURED && jailer >= 0) {
-    const posted = city ? counterspiesGuarding(state, jailer, city, unit.tileIndex) : [];
-    spyCaptured(state, unit, jailer, posted);
+    spyCaptured(state, unit, jailer, city && counterspyPursuing(state, jailer, city, unit.tileIndex));
     return;
   }
   disbandUnit(state, unit.id);

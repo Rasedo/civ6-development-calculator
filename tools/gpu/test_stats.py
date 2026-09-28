@@ -63,10 +63,11 @@ def _last_pass_head(rows: list[dict]) -> str:
 
 
 def record(results, wall: float, ok: bool, mem: dict | None = None,
-           oom: bool = False, box: str | None = None) -> None:
+           oom: bool = False, box: str | None = None, serve_cost: list | None = None) -> None:
     """Append one battery record. `results` is battery.py's (name, secs, rc)
-    list. Never raises: a statistics writer that can fail a green battery is
-    worse than no statistics."""
+    list; `serve_cost` the green serve shards' seeds and turn-loop seconds,
+    which `plan_shards` pairs seeds by. Never raises: a statistics writer
+    that can fail a green battery is worse than no statistics."""
     try:
         rows = _rows()
         head = _git("rev-parse", "HEAD")
@@ -98,6 +99,8 @@ def record(results, wall: float, ok: bool, mem: dict | None = None,
             "oom_lanes": [s["lane"] for s in steps if s["status"] == "oom"],
             "steps": steps,
         }
+        if serve_cost:
+            rec["serve_cost"] = serve_cost
         LOG.parent.mkdir(parents=True, exist_ok=True)
         # ONE ATTEMPT, ONE ROW. A re-run that fails the SAME lanes with no
         # green in between is the same unresolved attempt looked at again,

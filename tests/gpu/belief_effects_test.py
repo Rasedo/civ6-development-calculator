@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import load_rules, fixture_paths, FIXTURES
 from core import statecompare
-from warmup import opened
+from warmup import opened, warm_base
 
 B0, ROW = 0, 0
 ONES = torch.ones(1, dtype=torch.bool)
@@ -59,6 +59,12 @@ HW = next(i for i, r in enumerate(ENH) if r["hwHeal"])
 COLON = next(i for i, r in enumerate(ENH) if r["colon"])
 PILGRIM = next(i for i, r in enumerate(FOU) if r["perC"][5] > 0)
 WORLD = next(i for i, r in enumerate(FOU) if r["perF"][0] > 0 and r["perF"][1 + 4] > 0)
+
+
+def fresh(rules, path, turns: int = 0):
+    """the opened world at `turns`, built once and restored for every scene —
+    every plane a scene writes is `_MUTABLE`, so the restore is the whole job"""
+    return warm_base((str(path), turns), lambda: opened(rules, path, turns))
 
 
 def cap_slot(sim, row: int) -> int:
@@ -97,7 +103,7 @@ def religion(sim, row: int, founder: int = -1, enhancer: int = -1) -> None:
 
 
 def test_pools(rules, path) -> None:
-    sim = opened(rules, path)
+    sim = fresh(rules, path)
     assert sim._bel_class_n[2] == 9 and sim._bel_class_n[3] == 9, f"pools {sim._bel_class_n}"
     colon = [i for i, r in enumerate(ENH) if r["colon"]]
     assert colon == [COLON] and int(ENH[COLON]["colon"]) == 200, f"Religious Colonization {colon}"
@@ -105,7 +111,7 @@ def test_pools(rules, path) -> None:
 
 
 def test_founders(rules, path) -> None:
-    sim = opened(rules, path, 4)
+    sim = fresh(rules, path, 4)
     j = cap_slot(sim, ROW)
     district(sim, ROW, j, sim._hs_idx)
     ts_idx = int(next(d for d in sim.districts_cat if d["id"] == "THEATER_SQUARE")["idx"])
@@ -122,7 +128,7 @@ def test_founders(rules, path) -> None:
     t2, _ = totals(sim, ROW)
     assert float(t2[j, 4]) < float(t1[j, 4]), "an unfinished Theater Square paid"
     # SACRED PLACES: +2 of four yields per city holding a completed wonder
-    sim2 = opened(rules, path, 4)
+    sim2 = fresh(rules, path, 4)
     j2 = cap_slot(sim2, ROW)
     w = 0
     t = own_tile(sim2, ROW, j2)
@@ -140,7 +146,7 @@ def test_founders(rules, path) -> None:
 
 
 def test_zeal(rules, path) -> None:
-    sim = opened(rules, path)
+    sim = fresh(rules, path)
     frm, dest = 0, int(sim.neigh[0][sim.neigh[0] >= 0][0])
     sim.road[B0, frm] = False
     sim.road[B0, dest] = False
@@ -184,7 +190,7 @@ def place(sim, tile: int, utype: int, seat: int) -> int:
 def test_monastic(rules, path) -> None:
     lost = {}
     for enh in (-1, MONASTIC):
-        sim = opened(rules, path, 4)
+        sim = fresh(rules, path, 4)
         j = cap_slot(sim, ROW)
         ctr = int(sim.city_center[B0, ROW, j])
         religion(sim, 1, enhancer=enh)
@@ -203,7 +209,7 @@ def test_monastic(rules, path) -> None:
 
 
 def test_holy_waters(rules, path) -> None:
-    sim = opened(rules, path, 4)
+    sim = fresh(rules, path, 4)
     j = cap_slot(sim, ROW)
     hs = district(sim, ROW, j, sim._hs_idx)
     sim.city_followed[B0, ROW, j] = ROW
@@ -222,7 +228,7 @@ def test_holy_waters(rules, path) -> None:
 
 
 def test_dar_e_mehr(rules, path) -> None:
-    sim = opened(rules, path, 4)
+    sim = fresh(rules, path, 4)
     j = cap_slot(sim, ROW)
     district(sim, ROW, j, sim._hs_idx)
     sim.city_bldg[B0, ROW, j, sim._shrine_bidx] = True
@@ -257,7 +263,7 @@ def test_dar_e_mehr(rules, path) -> None:
 
 
 def test_pilgrimage(rules, path) -> None:
-    sim = opened(rules, path, 4)
+    sim = fresh(rules, path, 4)
     j = cap_slot(sim, ROW)
     religion(sim, ROW, founder=PILGRIM)
     f0, yf = totals(sim, ROW)
@@ -284,7 +290,7 @@ def test_pilgrimage(rules, path) -> None:
 def test_world_church(rules, path) -> None:
     """World Church: 0.25 Culture per follower of the religion anywhere,
     unfloored, a minority's followers included (runs/b91w_worldchurch.jsonl)."""
-    sim = opened(rules, path, 4)
+    sim = fresh(rules, path, 4)
     j = cap_slot(sim, ROW)
     religion(sim, ROW, founder=WORLD)
     sim.city_pressure[B0] = 0
@@ -323,7 +329,7 @@ def test_world_church(rules, path) -> None:
 
 def test_colonization(rules, path) -> None:
     for enh, want in ((-1, -1), (COLON, ROW)):
-        sim = opened(rules, path, 4)
+        sim = fresh(rules, path, 4)
         religion(sim, ROW, enhancer=enh)
         sim.city_followed[B0, ROW] = torch.where(sim.city_alive[B0, ROW], ROW, -1)
         centres = torch.cat([(sim.centre_slot_at[B0] >= 0).nonzero(as_tuple=True)[0],
@@ -342,7 +348,7 @@ def test_colonization(rules, path) -> None:
 
 
 def test_worship_offer(rules, path) -> None:
-    sim = opened(rules, path, 4)
+    sim = fresh(rules, path, 4)
     j = cap_slot(sim, ROW)
     district(sim, ROW, j, sim._hs_idx)
     sim.city_bldg[B0, ROW, j, sim._shrine_bidx] = True

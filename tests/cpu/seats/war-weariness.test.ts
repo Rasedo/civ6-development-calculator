@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { warWearinessBattle, warWearinessTurn, warWearinessPeace, wwGet, wwMax, wwSum, wwEraBase } from '../../../cpu/core/weariness';
+import { warWearinessBattle, warWearinessTurn, warWearinessPeace, warWearinessLosses, wwGet, wwSum, wwEraBase } from '../../../cpu/core/weariness';
 import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, warWearinessPenalty } from '../../../cpu/data/seats';
 import { seededGame } from '../helpers';
 import { seatOf, setTileOwner, setWar, BARB_SEAT, seatOfCityState } from '../../../cpu/core/seats';
@@ -109,7 +109,7 @@ describe('war weariness — the per-battle model', () => {
     expect(wwSum(seatOf(state, cityState))).toBe(0);
   });
 
-  it('wars score SEPARATELY and only the worst is felt', () => {
+  it('wars score SEPARATELY', () => {
     const state = newGame(2);
     const { away } = tiles(state, 0);
     const a = 1;
@@ -120,8 +120,35 @@ describe('war weariness — the per-battle model', () => {
     const one = WW_ERA_BASE_SURPRISE[0] * WW_ABROAD_MULT;
     expect(wwGet(seatOf(state, 0)!, a)).toBe(one * 2);
     expect(wwGet(seatOf(state, 0)!, b)).toBe(one);
-    expect(wwMax(seatOf(state, 0)!)).toBe(one * 2); // NOT the sum
     expect(wwSum(seatOf(state, 0)!)).toBe(one * 3);
+  });
+
+  it('each opponent\'s WWP // 400 goes to the cities it founded, then third parties\', then the seat\'s own, capped by need', () => {
+    const state = newGame(3);
+    const s = seatOf(state, 0)!;
+    const cap = s.cities[0];
+    // [founder, population]: two of the seat's own, one each of the at-war
+    // opponent 1, the at-peace opponent 2, and a third seat 3 with no weariness
+    const rows: [number, number][] = [[0, 6], [0, 4], [1, 5], [2, 2], [3, 3]];
+    s.cities = rows.map(([f, pop], i) => ({ ...cap, id: 100 + i, founderSeat: f, population: pop }));
+    s.ww = { 1: WAR_WEARINESS_PER_AMENITY * 10, 2: WAR_WEARINESS_PER_AMENITY * 3 + 399 };
+    setWar(state, 0, 1, true);
+    setWar(state, 0, 2, false);
+    // opponent 1: 10 to its city, need 3 + 3 = 6, 4 left; opponent 2: 3, need
+    // 1 + 1 = 2, 1 left; the pool 5 to the third party's city (need 2 + 1),
+    // 2 to the seat's most populous city (need 3 + 0)
+    const loss = warWearinessLosses(state, 0);
+    expect([100, 101, 102, 103, 104].map((id) => loss.get(id))).toEqual([2, 0, 6, 2, 3]);
+    // at peace with 1 its city is capped at need + 1: 4, the pool 6 + 1
+    setWar(state, 0, 1, false);
+    const peace = warWearinessLosses(state, 0);
+    expect([100, 101, 102, 103, 104].map((id) => peace.get(id))).toEqual([3, 1, 4, 2, 3]);
+    // opponent 3 alone: its city need + 1, the cities 1 and 2 founded are
+    // third parties' now (need + 1), a founded city loses at most its need,
+    // and the rest is lost
+    s.ww = { 3: WAR_WEARINESS_PER_AMENITY * 50 };
+    const flood = warWearinessLosses(state, 0);
+    expect([100, 101, 102, 103, 104].map((id) => flood.get(id))).toEqual([3, 2, 4, 2, 3]);
   });
 
   it('a war fought this turn does not decay; a phoney war sheds 50 and peace sheds 200', () => {
@@ -178,7 +205,7 @@ describe('war weariness — the per-battle model', () => {
       warWearinessTurn(state, 0);
       warWearinessTurn(state, civ);
     }
-    expect(wwMax(seatOf(state, 0)!)).toBe(0);
-    expect(wwMax(seatOf(state, civ))).toBe(0);
+    expect(wwSum(seatOf(state, 0)!)).toBe(0);
+    expect(wwSum(seatOf(state, civ))).toBe(0);
   });
 });

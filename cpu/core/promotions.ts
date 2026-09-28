@@ -27,8 +27,9 @@ export const MAX_LEVEL = 8;
  *  ends." */
 export const PROMOTE_HEAL = 50;
 
-/** CIV6: "combat XP granted in battles between units is capped at 8 XP
- *  maximum" — city combat is not capped. */
+/** CIV6 (Expansion2_GlobalParameters.xml EXPERIENCE_MAXIMUM_ONE_COMBAT 8,
+ *  replacing Base's 10): combat XP from one battle between units — city
+ *  combat is not capped. */
 export const XP_BATTLE_CAP = 8;
 /** CIV6: "+1 XP if this is a ranged battle. +2 XP if this is a non-ranged
  *  battle. +1 XP for the unit that initiates the combat." */
@@ -47,18 +48,17 @@ export const XP_CITY_FELLED = 10;
 export const XP_BARB_VETERAN = 1;
 
 /**
- * CIV6 XP from a battle between units: "The base amount of XP a unit can
- * receive after a battle is calculated by dividing the Combat Strength of the
- * enemy by the Combat Strength of that unit. If one of the units is dead, the
- * base XP is multiplied by 2", then "+1 XP if this is a ranged battle. +2 XP
- * if this is a non-ranged battle. +1 XP for the unit that initiates", then the
- * percentage modifiers, then "rounded up or down to the next closest integer
- * (0.5 is rounded up to 1)", then the cap.
+ * XP from a battle between units — GameCore_XP2_Release.dll 0x5197e0
+ * (tools/civ6lab/dll_readings.md, `dll_xp.py`), called by every resolver:
+ * the battle term (EXPERIENCE_COMBAT_RANGED 1 for a ranged battle,
+ * EXPERIENCE_NOT_COMBAT_RANGED 2 otherwise), +EXPERIENCE_COMBAT_ATTACKER_BONUS 1
+ * for the initiator, plus the foe's strength over the unit's own, doubled
+ * (EXPERIENCE_KILL_BONUS 2) when the foe died, rounded UP; then × the unit's
+ * XP percent (and the whole-award multipliers), rounded UP again; then the cap.
  *
- * EXACT INTEGER ARITHMETIC, on purpose: the only fraction in the rule is
- * foeCS/ownCS, so the whole award is one rational and both engines round the
- * same numerator over the same denominator. A float pipeline would put an
- * f32/f64 split on a .5 boundary.
+ * Both ceilings divide small integers: a true quotient off an integer sits at
+ * least 1/den away from it, so the correctly rounded IEEE quotient ceils the
+ * same on both engines.
  */
 export function battleXp(
   ownCS: number, foeCS: number,
@@ -66,9 +66,8 @@ export function battleXp(
 ): number {
   if (ownCS <= 0) return 0;
   const adds = (o.ranged ? XP_RANGED_BATTLE : XP_MELEE_BATTLE) + (o.initiated ? XP_INITIATOR : 0);
-  const num = (foeCS * (o.foeDied ? 2 : 1) + adds * ownCS) * (100 + o.pct) * o.mult;
-  const den = ownCS * 100;
-  return Math.min(XP_BATTLE_CAP, Math.floor((2 * num + den) / (2 * den)));
+  const base = Math.ceil((foeCS * (o.foeDied ? 2 : 1) + adds * ownCS) / ownCS);
+  return Math.min(XP_BATTLE_CAP, Math.ceil(base * (100 + o.pct) * o.mult / 100));
 }
 
 /** CIV6 city combat: a flat base, the same percentage modifiers, and no cap. */

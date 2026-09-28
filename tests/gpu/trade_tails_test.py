@@ -123,6 +123,37 @@ def test_admiral_hull(rules, path) -> None:
     print("  2 the admirals OK — a hull takes the percentage, a passenger the plain gold")
 
 
+def test_plunder_value(rules, path) -> None:
+    """max(50, 5V), V the route's yields with Gold at 1 and the others at 2
+    (`_route_yield_value`, the TS twin's 'the plunder payout')."""
+    assert (sim_turns := fresh(rules, path))._trade_plunder_turns == 5 and sim_turns._gold_equiv_other == 2
+    for extra, want_v, want_gold in ((False, 4.0, 50.0), (True, 20.0, 100.0)):
+        sim = fresh(rules, path)
+        t = free_tile(sim, water=False)
+        park_route(sim, 1, t)       # a domestic route from row 1's city 0 to itself
+        if extra:
+            # seven complete districts more at the destination: food 5, production 5
+            ids = [d["id"] for d in sim.districts_cat]
+            spare = [x for x in range(sim.T) if bool(sim.passable[0, x]) and x != t
+                     and int(sim.centre_slot_at[0, x]) < 0][:7]
+            for name, tile in zip(("CAMPUS", "HOLY_SITE", "THEATER_SQUARE", "COMMERCIAL_HUB",
+                                   "INDUSTRIAL_ZONE", "ENCAMPMENT", "GOVERNMENT_PLAZA"), spare):
+                sim.city_dist_tile[0, 1, 0, ids.index(name)] = tile
+                sim.district_complete[0, tile] = True
+        sim._eff_version += 1
+        hb, hk = torch.zeros(1, dtype=torch.long), torch.zeros(1, dtype=torch.long)
+        v = float(sim._route_yield_value(1, hb, hk)[0])
+        assert v == want_v, f"V {v}, want {want_v}"
+        put(sim, 0, sim._warrior_idx, t)
+        at_war(sim, 0, 1)
+        g0 = float(sim.civ_treasury[0, 0])
+        sim._trade_walk_tick(1, torch.ones(sim.B, dtype=torch.bool))
+        assert int(sim.seat_routes[0, 1, 0, 0]) == -1, "the route was not plundered"
+        got = float(sim.civ_treasury[0, 0]) - g0
+        assert got == want_gold, f"banked {got}, want {want_gold}"
+    print("  3 the payout OK — V 4 pays the floor 50, V 20 pays 5V = 100")
+
+
 def test_walk_through_a_portal(rules, path) -> None:
     sim = fresh(rules, path)
     # two mountains of one range, each beside land, at least 3 apart
@@ -161,7 +192,7 @@ def test_walk_through_a_portal(rules, path) -> None:
     if away:
         back = int(sim._trade_walk_step(rows, torch.tensor([a]), torch.tensor([away[0]]), water)[0])
         assert back != b, "the portal was taken away from the target"
-    print("  3 the portal walk OK — onto the mountain, and through to the next portal")
+    print("  4 the portal walk OK — onto the mountain, and through to the next portal")
 
 
 def main() -> int:
@@ -169,6 +200,7 @@ def main() -> int:
     path = fixture_paths()[0]
     test_escort_radius(rules, path)
     test_admiral_hull(rules, path)
+    test_plunder_value(rules, path)
     test_walk_through_a_portal(rules, path)
     print("BATTERY OK trade_tails")
     return 0

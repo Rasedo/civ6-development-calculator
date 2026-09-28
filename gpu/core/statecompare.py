@@ -836,6 +836,7 @@ CITY = {
     "tilesAcquired": _cty("city_acquired"),
     "origCapitalSeat": _cty("city_orig_cap"),
     "founderSeat": _cty("city_founder"),
+    "formerSeat": _cty("city_former"),
     "loyalty": _cty("city_loyalty"),
     "spySources": lambda sim, b, rows: [
         int(sim.city_spy_sources[b, c, s].sum()) for c, s in rows
@@ -972,6 +973,8 @@ TILE = {
     "droughtTurns": _tile("drought"),
     "stormEvent": _tile("storm_event"),
     "stormTurns": _tile("storm_left"),
+    "stormId": lambda sim, b, rows: _np.where(sim.storm_left[b].numpy() > 0, sim.storm_id[b].numpy(), -1),
+    "stormStruck": _tile("storm_struck"),
     "fireStart": _tile("fire_start"),
     "featureId": lambda sim, b, rows: sim.feat_id[b].masked_fill(sim.feat_stripped[b], -1).numpy(),
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),

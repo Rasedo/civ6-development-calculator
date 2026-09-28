@@ -107,7 +107,7 @@ def main() -> None:
     rxp = fx_of(["CODE_OF_LAWS", "DIVINE_RIGHT"])[12]["rxp"]
     assert float(rxp[0]) == 2.0, f"SURVEY doubles recon experience, got {float(rxp[0])}"
     tw = fx_of(["CODE_OF_LAWS", "SCORCHED_EARTH", "COLONIALISM"])[12]["rplun"]
-    assert float(tw[0]) == 1.5, f"TOTAL_WAR pays +50% route plunder, got {float(tw[0])}"
+    assert float(tw[0]) == 50.0, f"TOTAL_WAR pays +50% route plunder, got {float(tw[0])}"
     e1 = fx_of(["CODE_OF_LAWS", "POLITICAL_PHILOSOPHY"])[12]["envoy1"]
     assert bool(e1[0]), "DIPLOMATIC_LEAGUE takes AUTOCRACY's diplomatic slot"
     gpp = fx_of(["CODE_OF_LAWS", "SUFFRAGE", "MILITARY_TRADITION", "COLONIALISM"])[12]["gpp"]

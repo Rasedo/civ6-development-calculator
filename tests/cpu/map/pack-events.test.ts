@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { setTileOwner } from '../../../cpu/core/seats';
 import { disasterPhase, eventRows, erupt, eruptionRing, meteorCandidate } from '../../../cpu/core/disasters';
+import { STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
+import { TURN_LIMIT } from '../../../cpu/core/game';
 import {
   ERUPTION_ROWS, ERUPTION_WEIGHT, ERUPTION_WONDER, RANDOM_EVENT_START_TURN, METEOR_WEIGHT, FIRE_WEIGHT,
   FIRE_BURNT_TURN, FIRE_REGROW_TURN,
@@ -12,7 +14,7 @@ import { claimMeteorSite, classLine, meteorGrantUnit, spawnUnit, terrainMp } fro
 import { featureDefense } from '../../../cpu/core/combat';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { tileYields } from '../../../cpu/core/yields';
-import { DIR_E, hexDistance, neighborTile, neighbors } from '../../../world/hex';
+import { DIR_E, DIR_NE, DIR_NW, DIR_SE, DIR_SW, DIR_W, hexDistance, neighborTile, neighbors } from '../../../world/hex';
 import { FEATURES } from '../../../world/features';
 import { WONDERS } from '../../../world/wonders';
 import { generateMap } from '../../../world/mapgen';
@@ -26,7 +28,7 @@ import { bareCtx } from '../helpers';
 import type { GameState, Tile } from '../../../cpu/core/types';
 
 /** the family of every row of the turn's draw, in draw order */
-const drawOrder = () => eventRows(0).map((r) => (r.family === 'eruption' ? ERUPTION_ROWS[r.sev] : `${r.family}${r.sev}`));
+const drawOrder = () => eventRows(0, STANDARD_MAP_AREA).map((r) => (r.family === 'eruption' ? ERUPTION_ROWS[r.sev] : `${r.family}${r.sev}`));
 
 describe('the draw carries the Gathering Storm pack rows', () => {
   it('in the live table\'s order: Eyjafjallajokull first, the pack\'s three last', () => {
@@ -91,7 +93,7 @@ describe('the Meteor Shower', () => {
     expect(meteorCandidate(state.map.tiles[0], none)).toBe(false);
   });
 
-  it('is ONE site at 6 / 250 a turn however many plots it may strike, and leaves one Meteor Site', () => {
+  it('is ONE site at its area-scaled weight however many plots it may strike, and leaves one Meteor Site', () => {
     // the island's seven plots are its only sites, counted once
     const { state, plots } = island();
     const N = 8000;
@@ -105,7 +107,10 @@ describe('the Meteor Shower', () => {
       meteors++;
       expect(plots.filter((t) => t.meteor).length).toBe(1);
     }
-    expect(Math.abs(meteors / N - 6 / 250)).toBeLessThan(0.006);
+    // trunc(10 x 6) x 196 // 4536 = 2 of the draw's 10 x 250
+    const p = Math.floor(60 * 14 * 14 / STANDARD_MAP_AREA) / (10 * TURN_LIMIT);
+    expect(p).toBe(2 / 2500);
+    expect(Math.abs(meteors / N - p)).toBeLessThan(0.001);
   }, 60000);
 
   it('grants the Heavy Cavalry one past the seat\'s research in its nearest city, burning no fuel', () => {
@@ -298,7 +303,7 @@ describe('the fires', () => {
     expect(canPlaceDistrictIn(state, city, 'CAMPUS', plot.index, { unlocks: null, ownsTile: () => true }).ok).toBe(true);
   });
 
-  it('starts on a live Woods or Rainforest plot, each row ONE site at 6 / 250 a turn', () => {
+  it('starts on a live Woods or Rainforest plot, each row ONE site at its area-scaled weight', () => {
     // one Woods plot and one Rainforest plot on a sea island
     const state = makeState(makeMap(14, 14, 'COAST'));
     state.disasters = true;
@@ -319,20 +324,26 @@ describe('the fires', () => {
       if (burning(island[1]) === 'BURNING_WOODS') forest++;
       if (burning(island[2]) === 'BURNING_RAINFOREST') jungle++;
     }
-    expect(Math.abs(forest / N - 6 / 250)).toBeLessThan(0.006);
-    expect(Math.abs(jungle / N - 6 / 250)).toBeLessThan(0.006);
+    const p = Math.floor(60 * 14 * 14 / STANDARD_MAP_AREA) / (10 * TURN_LIMIT);
+    expect(Math.abs(forest / N - p)).toBeLessThan(0.001);
+    expect(Math.abs(jungle / N - p)).toBeLessThan(0.001);
   }, 60000);
 });
 
 describe('the natural wonders\' eruptions', () => {
-  it('a two-plot wonder\'s ring is every plot touching either, each once', () => {
+  it('a two-plot wonder\'s eruption walks each plot\'s six neighbours, a shared one twice', () => {
     const state = makeState(makeMap(12, 12));
     const a = tileAtCoords(state.map, 5, 5);
     const b = neighbors(state.map, a)[0];
     const ring = eruptionRing(state.map, [a, b]);
-    expect(ring.length).toBe(8);
-    expect(new Set(ring.map((t) => t.index)).size).toBe(8);
-    expect(ring.some((t) => t === a || t === b)).toBe(false);
+    // 6 + 6: the two plots each other's, the two plots they share twice
+    expect(ring.length).toBe(12);
+    expect(new Set(ring.map((t) => t.index)).size).toBe(8 + 2);
+    expect(ring.filter((t) => t === a || t === b)).toHaveLength(2);
+    // NE, E, SE, SW, W, NW from the lower-index plot
+    const first = [a, b].sort((x, y) => x.index - y.index)[0];
+    expect(ring.slice(0, 6).map((t) => t.index)).toEqual(
+      [DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW].map((d) => neighborTile(state.map, first, d)!.index));
   });
 
   it('Eyjafjallajokull and Vesuvius erupt on their own rows while the wonder stands, one site each', () => {

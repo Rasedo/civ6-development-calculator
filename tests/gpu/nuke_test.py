@@ -356,7 +356,7 @@ def main() -> int:
     assert float(s8._nuke_intercept_strength(row, L(s8, cap1))[0][b]) == 102.5, "a half-dead supporter gives +2.5"
     s8.major_unit_hp[b, g8b] = 100
     # a SAM against the silo channel: S 100 vs D 75 − plot, the weakest roll
-    # round(24 × 1.04^25) = 64 on flat ground — the plot term only widens it
+    # 24 × e^(250/256) = 64 on flat ground — the plot term only widens it
     plot = int(s8._plot_defense_mod(L(s8, cap1))[b])
     assert 100 - (75 - plot) >= 25
     for _ in range(3):
@@ -367,7 +367,7 @@ def main() -> int:
     assert int(s8.major_unit_hp[b, g8]) == 100, "a silo launch never hurts the interceptor"
 
     # an Anti-Air Gun at 1 HP: S 80.1 against D 75 − plot deals at most
-    # round(35 × 1.04^(5.1 + plot)) — never above 50 while plot <= 3
+    # 35 × e^(10 (5.1 + plot) / 256) — never above 50 while plot <= 3
     s9 = fresh(rules, paths[0])
     s9.civ_wmd[b, row, 0] = 1
     vic9 = place_mil(s9, foe, cap1, plain)

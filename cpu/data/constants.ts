@@ -184,43 +184,23 @@ export const PURCHASE_DIVISOR = srcConst('scenario.purchaseDivisor', 5, gp('PURC
  *  Gold (`GOVERNMENT_UNLOCK_WITH_FAITH` false) through one `UNLOCK_POLICIES`
  *  operation that opens both the cards and the government for the turn. The
  *  online speed's row names the cost's three figures; `policyUnlockCost`
- *  reads them as the base starting at the maximum the first turn past the
- *  window and dropping by the step each further turn, never below the
- *  minimum, the whole scaled by k = max(kT(techs), kC(civics)) and rounded
- *  to the nearest POLICY_UNLOCK_ROUND. kT and kC are the measured tables
- *  below, each entry the price at the maximum base (k × the maximum). */
+ *  escalates each by the game's progress (`policyEscalated`) and takes the
+ *  maximum less the step per turn past the window, never below the minimum,
+ *  rounded DOWN to a multiple of PURCHASE_DIVISOR
+ *  (`PlayerCulture::GetCostToUnlockPolicies`, GameCore_XP2 0x398e70). */
 export const CIVIC_UNLOCK_MAX_COST = srcConst('scenario.civicUnlockMaxCost', 50,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockMaxCost'));
 export const CIVIC_UNLOCK_PER_TURN_DROP = srcConst('scenario.civicUnlockPerTurnDrop', 5,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockPerTurnDrop'));
 export const CIVIC_UNLOCK_MIN_COST = srcConst('scenario.civicUnlockMinCost', 10,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CivicUnlockMinCost'));
-/** kT: the price at the maximum base (50 x kT) for a seat of
- *  POLICY_UNLOCK_TECH_FIRST techs, then one entry per further tech. Outside
- *  the table the nearest measured step carries on (`policyUnlockTerm`). */
-export const POLICY_UNLOCK_TECH_FIRST = srcConst('scenario.policyUnlockTechFirst', 33, {
-  lab: 'runs/bds4_probe_20260926T135815Z.jsonl, runs/bds3_ladder_cheap_20260926T135028Z.jsonl and runs/bds3_ladder_dear_20260926T135428Z.jsonl',
-  note: 'the grant ladders read the tech term at 33 to 65 techs',
-});
-export const POLICY_UNLOCK_TECH_PRICE = srcConst('scenario.policyUnlockTechPrice',
-  [235, 245, 250, 255, 265, 270, 275, 275, 285, 290, 295, 305, 310, 315, 320, 325, 330, 335, 345, 350, 355, 365, 365, 370, 380, 385, 390, 395, 405, 410, 410, 420, 425] as const, {
-    lab: 'runs/bds4_probe_20260926T135815Z.jsonl, runs/bds3_ladder_cheap_20260926T135028Z.jsonl and runs/bds3_ladder_dear_20260926T135428Z.jsonl',
-    note: 'GetCostToUnlockPolicies (read in GameCore) at s = 0 against the tech COUNT, techs granted and removed one at a time: T 33..65; no linear law fits (steps of 0 at 40, 55, 63)',
-  });
-/** kC: the price at the maximum base (50 x kC) for a seat of
- *  POLICY_UNLOCK_CIVIC_FIRST civics, then one entry per further civic. */
-export const POLICY_UNLOCK_CIVIC_FIRST = srcConst('scenario.policyUnlockCivicFirst', 19, {
-  lab: 'runs/bds4_probe_20260926T135815Z.jsonl',
-  note: 'the probe reads the civic term at 19 to 32 civics, where it rises above the tech term',
-});
-export const POLICY_UNLOCK_CIVIC_PRICE = srcConst('scenario.policyUnlockCivicPrice',
-  [185, 190, 200, 210, 215, 225, 230, 235, 245, 250, 260, 270, 275, 280] as const, {
-    lab: 'runs/bds4_probe_20260926T135815Z.jsonl',
-    note: 'GetCostToUnlockPolicies at s = 0 with techs removed below the civic floor: C 19..32; the price is the larger of the two terms',
-  });
-export const POLICY_UNLOCK_ROUND = srcConst('scenario.policyUnlockRound', 5, {
-  lab: 'runs/bds4_probe_20260926T135815Z.jsonl, runs/bds3_ladder_cheap_20260926T135028Z.jsonl and runs/bds3_ladder_dear_20260926T135428Z.jsonl',
-  note: 'every read price is a multiple of 5, the nearest; of the 41 distinct in-table cells landing on an exact half, 36 read the half up (3 down, all at 39 techs, whose table entry is the edge of its interval; 2 on the fall)',
+/** The escalation's end point, a percent of the unescalated figure at the
+ *  game's full progress: E(x) = x + (x·ESC/100 − x)·p/100 in integers, p
+ *  the game's progress (`gameProgressPct`), GameCore_XP2 0x5267a0 type 1;
+ *  `tools/civ6lab/dll_policy.py` fits 853 of 853 lab price reads. */
+export const GAME_COST_ESCALATION = srcConst('scenario.gameCostEscalation', 1000, {
+  ...gp('GAME_COST_ESCALATION'),
+  note: 'the policy-unlock price escalates its three figures by it (dll_policy.py on runs/bds4_probe_20260926T135815Z.jsonl and runs/bds3_ladder_*: 853 of 853)',
 });
 
 /** ANARCHY. CIV6 (the Governments pedia): "If you switch to a previously
@@ -579,14 +559,47 @@ export const CITY_NAMES = [
   'Foxglove', 'Greyharbor', 'Hollowbrook', 'Ivorygate', 'Juniper', 'Kestrel',
 ];
 
-/** CIV6 (GlobalParameters, measured live — tools/civ6lab/reports/lab3_report.md,
- *  "The damage formula itself"): one hit deals
- *  `round((COMBAT_BASE_DAMAGE + rand(COMBAT_MAX_EXTRA_DAMAGE)) × (1 + COMBAT_POWER_SCALING)^(S_att − S_def))`,
- *  floored at COMBAT_MINIMUM_DAMAGE — an integer draw 0..11 and a compound 4% per
- *  strength point. The community's 30·e^(0.04Δ)·(0.8..1.2) agrees only within
- *  |Δ| ≤ 5 and misses by 3 damage at Δ = 30. COMBAT_DAMAGE_MULTIPLIER_MINIMUM
- *  0.25 does NOT floor this multiplier (a Warrior previews 1 against a GDR). */
+/** CIV6 (GameCore_XP2_Release.dll 0x519090, tools/civ6lab/dll_readings.md
+ *  "C-34"; `dll_damage.py` 12 of 12 drawn interceptions and 12 of 12
+ *  previews): one hit deals
+ *  `trunc((COMBAT_BASE_DAMAGE + rand(COMBAT_MAX_EXTRA_DAMAGE)) × expf(x / 256) + 0.5)`
+ *  in single precision, clamped to [COMBAT_MINIMUM_DAMAGE, COMBAT_MAX_HIT_POINTS],
+ *  where D = floor(256 × (S_att − S_def)) and x = (k × D) >> 8 with
+ *  k = trunc(256 × COMBAT_POWER_SCALING) = 10 — a factor e^(10/256) = 1.03984
+ *  per strength point. COMBAT_DAMAGE_MULTIPLIER_MINIMUM 0.25 does NOT floor
+ *  this multiplier (a Warrior previews 1 against a GDR). */
 export const COMBAT_BASE_DAMAGE = srcConst('combat.baseDamage', 24, gp('COMBAT_BASE_DAMAGE'));
 export const COMBAT_MAX_EXTRA_DAMAGE = srcConst('combat.maxExtraDamage', 12, gp('COMBAT_MAX_EXTRA_DAMAGE'));
 export const COMBAT_POWER_SCALING = srcConst('combat.powerScaling', 0.04, gp('COMBAT_POWER_SCALING'));
 export const COMBAT_MINIMUM_DAMAGE = srcConst('combat.minimumDamage', 1, gp('COMBAT_MINIMUM_DAMAGE'));
+export const COMBAT_MAX_HIT_POINTS = srcConst('combat.maxHitPoints', 100, gp('COMBAT_MAX_HIT_POINTS'));
+/** the DLL's COMBAT_POWER_SCALING in 1/256ths, truncated (0x519370): 10 */
+export const COMBAT_POWER_SCALING_256 = Math.trunc(COMBAT_POWER_SCALING * 256);
+/** the reach of the exported factor table, in 1/256ths of the exponent: a
+ *  strength difference of ±200 */
+export const DAMAGE_EXPONENT_REACH = 2000;
+
+/** the damage law's exponent x, in 1/256ths, for a strength difference. The
+ *  difference is rounded to 1/1000 first, so both engines floor one integer
+ *  whatever float noise their sums carry; then D = floor(256·Δ) and
+ *  x = (k·D) >> 8, both floors as the DLL's shifts are. */
+export function damageExponent(strengthDiff: number): number {
+  const milli = Math.round(strengthDiff * 1000);
+  const d256 = Math.floor((milli * 256) / 1000);
+  return Math.floor((COMBAT_POWER_SCALING_256 * d256) / 256);
+}
+
+/** e^(x / 256) as the DLL's single-precision `expf` returns it. */
+export function damageFactor(x: number): number {
+  return Math.fround(Math.exp(x / 256));
+}
+
+/** one hit's damage from the draw `roll` (0..11) and the exponent `x`: the
+ *  product and the half added in single precision, truncated, clamped. The
+ *  exponent is held to the exported table's reach, past which every draw
+ *  already clamps to the same damage. */
+export function damageOf(roll: number, x: number): number {
+  const xc = Math.max(-DAMAGE_EXPONENT_REACH, Math.min(DAMAGE_EXPONENT_REACH, x));
+  const v = Math.trunc(Math.fround(Math.fround((COMBAT_BASE_DAMAGE + roll) * damageFactor(xc)) + 0.5));
+  return Math.min(COMBAT_MAX_HIT_POINTS, Math.max(COMBAT_MINIMUM_DAMAGE, v));
+}

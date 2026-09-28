@@ -7,8 +7,8 @@ The TS twin is tests/cpu/city/eco-residue.test.ts.
   1. a building buys off its fractional scaled cost (`_b_cols` "buyCost"): the
      Granary (Cost 65) for 130 gold, where a unit keeps its truncated cost.
   2. the policy unlock (`_policy_unlock_cost`): free the turn after a civic,
-     then 50 dropping 5 a turn to 10, times the larger of the measured tech
-     and civic terms, rounded to 5 (halves up);
+     then max(E(50) - s E(5), E(10)) rounded down to 5, E the escalation at
+     the seat's progress;
      a government change outside the window
      pays it once, and one the purse cannot meet is refused.
   3. a city-state's city holds the Palace (`_palace_at`): +5 Gold.
@@ -79,8 +79,9 @@ def test_policy_unlock(sim, rj) -> None:
         return int(g[0]) if bool(has[0]) else -1
 
     assert sim.rules.civic_unlock == (50, 5, 10)
-    (tf, tp), (cf, cp), rnd = sim.rules.policy_unlock_terms
-    assert (tf, len(tp), cf, len(cp), rnd) == (33, 33, 19, 14, 5)
+    assert sim.rules.cost_escalation == 1000
+    p57 = torch.tensor([57])
+    assert [int(sim._policy_escalated(x, p57)[0]) for x in (50, 5, 10)] == [306, 30, 61]
     held_civics = sim.civ_civics[:, ROW].clone()
     sim.civ_civic_turn[:, ROW] = 10
 
@@ -90,12 +91,12 @@ def test_policy_unlock(sim, rj) -> None:
         sim.civ_civics[:, ROW] = False
         sim.civ_civics[:, ROW, :c] = True
 
-    # (techs, civics, turn -> price): 44 / 29 the tech term's 305 down the
-    # fall (the lab's 215 at base 35); 48 techs at base 25 the half read up
-    # (162.5 -> 165); 30 civics' 270 over 33 techs' 235; past the tables the
-    # nearest step carries on (70 techs: 450; no techs, 2 civics: 100)
+    # (techs, civics, turn -> price) = max(E(50) - s E(5), E(10)) rounded
+    # down to 5: 44 / 29 at p 57 down the fall (the lab's 215 at s 3); 48
+    # techs at p 62 169 -> 165; 30 civics' p 49 over 33 techs' 42 (270); 70
+    # techs p 90 (455); no techs, 2 civics p 3 (60, 55, 10)
     cases = ((44, 29, {11: 0, 12: 305, 13: 275, 15: 215, 100: 60}), (48, 22, {17: 165}),
-             (33, 30, {12: 270}), (70, 30, {12: 450}), (0, 2, {12: 100, 13: 90, 100: 20}))
+             (33, 30, {12: 270}), (70, 30, {12: 455}), (0, 2, {12: 60, 13: 55, 100: 10}))
     for t_n, c_n, wants in cases:
         counts(t_n, c_n)
         for t, want in wants.items():
@@ -103,12 +104,12 @@ def test_policy_unlock(sim, rj) -> None:
             got = float(sim._policy_unlock_cost(ROW)[0])
             assert got == float(want), (t_n, c_n, t, got, want)
     sim.civ_civics[:, ROW] = held_civics
-    # three turns past the window: the row's 40 at 2 civics' k = 2, refused one short
+    # s = 2 at 2 civics' p 3: 63 - 2 x 6 = 51 rounded down, refused one short
     sim.civ_techs[:, ROW] = False
     sim.civ_civic_turn[:, ROW] = 1
     sim.turn = 5
     cost = float(sim._policy_unlock_cost(ROW)[0])
-    assert cost == 80.0, cost
+    assert cost == 50.0, cost
     sim.civ_treasury[:, ROW] = cost - 1
     record(gov["OLIGARCHY"])
     assert now() == gov["AUTOCRACY"] and float(sim.civ_treasury[0, ROW]) == cost - 1
@@ -125,7 +126,7 @@ def test_policy_unlock(sim, rj) -> None:
     assert now() == gov["CLASSICAL_REPUBLIC"] and float(sim.civ_treasury[0, ROW]) == 0.0
     sim.turn = turn0
     sim.restore(snap)
-    print("  2 the policy unlock: free, 50 dropping 5 to 10 times k, paid once, refused short OK")
+    print("  2 the policy unlock: free, max(E(50) - s E(5), E(10)) down to 5, paid once, refused short OK")
 
 
 def test_minor_palace(sim) -> None:

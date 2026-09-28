@@ -1,6 +1,7 @@
-import type { GameState, Seat } from './types';
-import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WW_WMD_LAUNCHED } from '../data/seats';
-import { atWarWithAny, cityAtTile, isBarbSeat, isCiv, seatOf, seatsAllied, tileSeat, warIsFormal } from './seats';
+import type { City, GameState, Seat } from './types';
+import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WW_WMD_LAUNCHED, WW_LOSS_AT_WAR_CITY, WW_LOSS_NONFOUNDED_CITY, WW_LOSS_FOUNDED_CITY, warWearinessPenalty } from '../data/seats';
+import { amenitiesNeeded } from '../data/constants';
+import { atWarWithAny, cityAtTile, citiesOf, civsAtWar, isBarbSeat, isCiv, seatOf, seatsAllied, tileSeat, warIsFormal } from './seats';
 import { civEraIndex } from './city';
 
 import { gpPermOf } from '../data/greatPeople';
@@ -40,14 +41,49 @@ export function wwGet(seat: Seat, other: number): number {
   return seat.ww?.[other] ?? 0;
 }
 
-export function wwMax(seat: Seat | undefined): number {
-  if (!seat?.ww) return 0;
-  let m = 0;
-  for (const k in seat.ww) {
-    const v = seat.ww[k];
-    if (v > m) m = v;
+/** THE WAR-WEARINESS AMENITY LOSS of each city of `seat`, by city id
+ *  (GameCore_XP2 0x3cda00, `tools/civ6lab/dll_ww.py`). Each opponent o with
+ *  weariness W[o] > 0 costs L(o) = W[o] // 400 (`warWearinessPenalty`), which
+ *  goes first to the seat's cities o originally owned (`founderSeat`) — the
+ *  at-war opponents' first, each such city taking at most its need
+ *  ceil(pop / 2) plus `WW_LOSS_AT_WAR_CITY`, then the at-peace opponents',
+ *  plus `WW_LOSS_NONFOUNDED_CITY`; what they leave is pooled for the cities
+ *  a third seat founded (plus `WW_LOSS_NONFOUNDED_CITY`), then the seat's own
+ *  founded cities (plus `WW_LOSS_FOUNDED_CITY`); within each group the most
+ *  populous first, ties in the city list's order; what is left is lost.
+ *  `_ww_losses` is the twin. */
+export function warWearinessLosses(state: GameState, seat: number): Map<number, number> {
+  const out = new Map<number, number>();
+  const s = seatOf(state, seat);
+  const cities = citiesOf(state, seat);
+  for (const c of cities) out.set(c.id, 0);
+  if (!s?.ww || cities.length === 0) return out;
+  const ww = s.ww;
+  const foes = Object.keys(ww).map(Number).filter((o) => ww[o] > 0).sort((a, b) => a - b);
+  if (foes.length === 0) return out;
+  const founder = (c: City): number => c.founderSeat ?? c.seat;
+  const fill = (group: City[], rest: number, cap: number): number => {
+    const byPop = [...group].sort((a, b) => b.population - a.population);
+    for (const c of byPop) {
+      if (rest <= 0) break;
+      const n = Math.min(rest, amenitiesNeeded(c.population) + cap);
+      out.set(c.id, (out.get(c.id) ?? 0) + n);
+      rest -= n;
+    }
+    return rest;
+  };
+  let pool = 0;
+  for (const war of [true, false]) {
+    for (const o of foes) {
+      if (civsAtWar(state, seat, o) !== war) continue;
+      pool += fill(cities.filter((c) => founder(c) === o), warWearinessPenalty(ww[o]),
+        war ? WW_LOSS_AT_WAR_CITY : WW_LOSS_NONFOUNDED_CITY);
+    }
   }
-  return m;
+  const foeSet = new Set(foes);
+  pool = fill(cities.filter((c) => founder(c) !== seat && !foeSet.has(founder(c))), pool, WW_LOSS_NONFOUNDED_CITY);
+  fill(cities.filter((c) => founder(c) === seat), pool, WW_LOSS_FOUNDED_CITY);
+  return out;
 }
 
 export function wwSum(seat: Seat | undefined): number {

@@ -726,6 +726,7 @@ const CITY: Record<string, Extractor> = {
   tilesAcquired: overCities((r) => r.city.tilesAcquired),
   origCapitalSeat: overCities((r) => r.city.origCapitalSeat ?? -1),
   founderSeat: overCities((r) => r.city.founderSeat ?? -1),
+  formerSeat: overCities((r) => r.city.formerSeat ?? -1),
   loyalty: overCities((r) => r.city.loyalty ?? 100),
   spySources: overCities((r) => (r.city.spySources ?? []).reduce((a, b) => a + b, 0)),
   // Ids the production layout does not carry (PALACE, the scripted-held
@@ -859,6 +860,8 @@ const TILE: Record<string, Extractor> = {
   droughtTurns: overTiles((t) => t.droughtTurns),
   stormEvent: overTiles((t) => ((t.stormTurns ?? 0) > 0 ? (t.stormEvent ?? -1) : -1)),
   stormTurns: overTiles((t) => t.stormTurns ?? 0),
+  stormId: overTiles((t) => ((t.stormTurns ?? 0) > 0 ? (t.stormId ?? -1) : -1)),
+  stormStruck: overTiles((t) => t.stormStruck ?? -1),
   fireStart: overTiles((t) => t.fireStart ?? -1),
   featureId: overTiles((t) => (t.feature === null ? -1 : (FEAT_IDX_SC.get(t.feature) ?? -1))),
   lowland: overTiles((t) => t.lowland ?? 0),

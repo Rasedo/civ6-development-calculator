@@ -10,7 +10,7 @@ import {
   CLIMATE_PHASES, CO2_PER_POINT, CO2_PER_DEGREE, CARBON_PER_POWER, climatePhase, deforestationModifier,
   pollutionPoints, FLOOD_BARRIER_PER_TILE,
 } from '../../../cpu/data/climate';
-import { FLOOD_WEIGHT, FLOOD_CIPD, DROUGHT_WEIGHT, STORM_EVENTS } from '../../../cpu/data/disasters';
+import { FLOOD_WEIGHT, FLOOD_CIPD, DROUGHT_WEIGHT, STORM_EVENTS, STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
 import { eventRows, floodWeights, stormWeights } from '../../../cpu/core/disasters';
 import { availableBuildings, buildingCostIn } from '../../../cpu/core/rules';
 import { availableProjects } from '../../../cpu/core/game';
@@ -344,24 +344,32 @@ describe('what a warmed world does to its weather', () => {
     expect(warmingDegrees(state)).toBe(0);
     emitPoints(state, 3);
     expect(warmingDegrees(state)).toBeCloseTo(1.5, 9);
-    // the floods 20 / 20 / 20: the mix holds, the family grows
+    // the floods 20 / 20 / 20: the mix holds, the family grows — integer
+    // tenths plus trunc(CIPD x w x T) // 100
     expect([...FLOOD_CIPD]).toEqual([20, 20, 20]);
-    expect(floodWeights(0)).toEqual([...FLOOD_WEIGHT]);
-    const warm = floodWeights(2);
-    FLOOD_WEIGHT.forEach((w, s) => expect(warm[s]).toBeCloseTo(w * 1.4, 12));
-    // the storms 0 on the milder row, 50 on the worse
+    expect(floodWeights(0)).toEqual(FLOOD_WEIGHT.map((w) => w * 10));
+    expect(floodWeights(2)).toEqual([28, 21, 14]);
+    // nothing is added until the product reaches 100: 20 x 20 x 0.24 = 96
+    expect(floodWeights(0.24)).toEqual([20, 15, 10]);
+    expect(floodWeights(0.25)).toEqual([21, 15, 10]);
+    // the storms 0 on the milder row, 50 on the worse, on a Standard map
     expect(STORM_EVENTS.map((e) => e.cipd)).toEqual([0, 50, 0, 50, 0, 50, 0, 50]);
-    const st = stormWeights(2);
-    STORM_EVENTS.forEach((e, i) => expect(st[i]).toBeCloseTo(e.weight * (e.cipd ? 2 : 1), 12));
+    const std = STANDARD_MAP_AREA;
+    const st = stormWeights(2, std);
+    STORM_EVENTS.forEach((e, i) => expect(st[i]).toBe(Math.floor(e.weight * 10) * (e.cipd ? 2 : 1)));
     // the droughts MAJOR 0, EXTREME 50; the pack's fires 50 each; the
     // eruptions, the accidents and the meteor hold
-    const rows = eventRows(2);
+    const rows = eventRows(2, std);
     const drought = rows.filter((r) => r.family === 'drought').map((r) => r.weight);
-    expect(drought[0]).toBe(DROUGHT_WEIGHT[0]);
-    expect(drought[1]).toBeCloseTo(DROUGHT_WEIGHT[1] * 2, 12);
+    expect(drought).toEqual([DROUGHT_WEIGHT[0] * 10, DROUGHT_WEIGHT[1] * 20]);
     const fires = rows.filter((r) => r.family === 'fire').map((r) => r.weight);
-    expect(fires).toEqual([12, 12]);
-    const base = eventRows(0);
+    expect(fires).toEqual([120, 120]);
+    // a once-per-map row scales with the map's area, a per-site row does not
+    const duel = eventRows(0, 44 * 26);
+    const stdRows = eventRows(0, std);
+    duel.forEach((r, i) => expect(r.weight).toBe(['storm', 'drought', 'meteor', 'fire'].includes(r.family)
+      ? Math.floor(stdRows[i].weight * 44 * 26 / std) : stdRows[i].weight));
+    const base = eventRows(0, std);
     rows.forEach((r, i) => {
       if (r.family === 'eruption' || r.family === 'accident' || r.family === 'meteor') {
         expect(r.weight).toBe(base[i].weight);

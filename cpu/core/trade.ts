@@ -15,7 +15,7 @@ import { isCoastalLand, isImpassable, isWater, isMountain } from '../../world/qu
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { tradeWalkPath, tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnUnit } from './units';
-import { TRADE_ROAD_MAX_STEPS } from '../data/constants';
+import { TRADE_ROAD_MAX_STEPS, scaleByGameSpeed } from '../data/constants';
 import { civEraIndex } from './city';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
@@ -351,11 +351,22 @@ export function tradeRouteMinDuration(state: GameState): number {
   return TRADE_ROUTE_DURATION + bump;
 }
 
-/** Gold paid to the seat whose unit plunders a route. The DESTRUCTION rule is
- * sourced (an enemy unit on the Trader's tile kills route and Trader and pays
- * its owner gold); this magnitude is a stylization — the real base value is
- * not documented anywhere public (docs/AUDIT.md). */
-export const PLUNDER_ROUTE_GOLD = 50;
+/** THE PLUNDER PAYOUT (Trade_Manager plunder, GameCore_XP2 0x5545e0;
+ *  `tools/civ6lab/dll_plunder.py` 16 of 16 plunders): max(PLUNDER_ROUTE_GOLD,
+ *  V × PLUNDER_ROUTE_TURNS), V the route's yield value (`routeYieldValue`),
+ *  the turns TRADE_ROUTE_TURN_DURATION_BASE at the game speed halved (online
+ *  20 × 50% // 2 = 5), the 50 a literal of the DLL, unscaled. */
+export const PLUNDER_ROUTE_GOLD = srcConst('trade.plunderGold', 50, {
+  lab: 'runs/plunder_sweep_a0_20260927T004045Z.jsonl and the other plunder records (dll_plunder.py 16 of 16: the two 50s the route term could not reach, Quebec→Halifax V 6 and Quebec→Ngaruawahia V 8)',
+  note: 'a literal in the DLL (0x5545e0), not a GlobalParameters row',
+});
+export const PLUNDER_ROUTE_TURNS = srcConst('trade.plunderTurns',
+  Math.floor(scaleByGameSpeed(20) / 2), {
+    derived: 'TRADE_ROUTE_TURN_DURATION_BASE through the speed\'s CostMultiplier, halved (GameCore_XP2 0x5545e0 via 0x5254d0)',
+    inputs: [xml('GlobalParameters', 'Name=TRADE_ROUTE_TURN_DURATION_BASE', 'Value', { expect: 20 })],
+  });
+export const GOLD_EQUIVALENT_OTHER_YIELDS = srcConst('trade.goldEquivalentOther', 2,
+  xml('GlobalParameters', 'Name=GOLD_EQUIVALENT_OTHER_YIELDS', 'Value'));
 
 /** A walker STUCK by terrain change (flood/volcano blocking its descent) can
  * never complete the round trip its expiry waits for — after this many turns
@@ -417,16 +428,21 @@ export function plunderedByHull(state: GameState, tileIndex: number, raider: num
   return state.units.some((u) => u.seat === raider && u.tileIndex === tileIndex && !!UNITS[u.type]?.naval);
 }
 
-/** The Gold the `raider` seat banks for plundering the route whose Trader
- *  stands on `tileIndex`: the base, the seat's own multiplier (Total War,
- *  Letter of Marque), and the admirals' permanent percentage when its hull
- *  plunders (`plunderedByHull`). */
-export function routePlunderGold(state: GameState, raider: number, tileIndex: number): number {
+/** The Gold the `raider` seat banks for plundering `owner`'s route `r`, whose
+ *  Trader stands on `tileIndex`: base = max(PLUNDER_ROUTE_GOLD,
+ *  floor(V × PLUNDER_ROUTE_TURNS)), then base + base × pct // 100, pct the
+ *  raider's plunder percent (Total War, Letter of Marque); the admirals'
+ *  permanent percentage on top when its hull plunders (`plunderedByHull`).
+ *  A city-state raider carries no percent. */
+export function routePlunderGold(state: GameState, raider: number, owner: Seat, r: TradeRoute, tileIndex: number): number {
   const rs = seatOf(state, raider);
   if (!rs) return 0;
+  const base = Math.max(PLUNDER_ROUTE_GOLD, Math.floor(routeYieldValue(state, owner, r) * PLUNDER_ROUTE_TURNS));
+  if (isCityStateSeat(raider)) return base;
+  const pct = getModifiers(state, raider).routePlunderPct;
+  const gold = base + Math.floor((base * pct) / 100);
   const hull = plunderedByHull(state, tileIndex, raider);
-  return PLUNDER_ROUTE_GOLD * getModifiers(state, raider).routePlunderMult
-    * (hull ? 1 + gpPermOf(rs, 'routePlunderPct') / 100 : 1);
+  return gold * (hull ? 1 + gpPermOf(rs, 'routePlunderPct') / 100 : 1);
 }
 
 /** The FREE Trader this seat owns on the LOWEST tile index — the unit the
@@ -765,6 +781,230 @@ export function minorRouteYields(state: GameState, r: TradeRoute): Yields | null
   return civCity ? districtRouteYields(state, civCity, 'international') : null;
 }
 
+/** What ONE of a city-state's routes pays its city (centre `center`): the
+ *  destination's rows (`minorRouteYields`) plus the path term; null where the
+ *  destination is gone. */
+export function minorRouteOriginYields(state: GameState, minor: Seat, center: number, r: TradeRoute): Yields | null {
+  const y = minorRouteYields(state, r);
+  if (!y) return null;
+  y.gold += routePathGold(state, minor.seat, center, routeDestCenter(state, minor, r), y.gold);
+  return y;
+}
+
+/** What ONE route of seat `owner` pays its DESTINATION city — the per-route
+ *  share of the destination's incoming terms in `cityTradeYields`: a
+ *  city-state destination Democracy's half on its suzerain's route; a major's
+ *  city Democracy's half, and from a foreign major Cleopatra's Gold, the
+ *  destination seat's incoming-route rows and the city's Great Person Gold;
+ *  every route in the destination seat's improvement rows. Before the
+ *  destination seat's Letters of Marque cut. */
+export function routeDestYields(state: GameState, owner: number, r: TradeRoute): Yields {
+  const out = emptyYields();
+  const allyHalf = (dest: City, cs: CityState | undefined): void => {
+    if (isCityStateSeat(owner) || isBarbSeat(owner) || owner === dest.seat) return;
+    const y = getModifiers(state, owner).allyRouteYield;
+    if (!y || !Object.values(y).some((v) => v)) return;
+    if (cs ? isSuzerain(state, cs, owner) : seatsAllied(state, owner, dest.seat)) addYields(out, y);
+  };
+  if (r.toCs !== undefined) {
+    const cs = state.cityStates.find((c) => c.id === r.toCs);
+    if (cs) allyHalf(minorCity(cs), cs);
+    return out;
+  }
+  const dSeat = r.toSeat ?? owner;
+  const dest = seatOf(state, dSeat)?.cities.find((c) => c.id === (r.toSeat !== undefined ? r.toSeatCity : r.to));
+  if (!dest || isCityStateSeat(dSeat)) return out;
+  allyHalf(dest, undefined);
+  const major = state.seats.some((s) => s.seat === owner);
+  const foreign = major && owner !== dSeat && r.toSeat === dSeat;
+  if (foreign) {
+    if (leaderOf(state, dSeat) === 'CLEOPATRA') out.gold += CLEOPATRA_INCOMING_ROUTE_GOLD;
+    for (const row of getModifiers(state, dSeat).incomingRouteYields) out[row.yield] += row.amount;
+    out.gold += gpCityPermOf(dest, 'foreignRouteGold');
+  }
+  if (major && (foreign || (owner === dSeat && r.toSeat === undefined))) {
+    for (const row of getModifiers(state, dSeat).routeImprovement) {
+      if (row.side === 'destination') out[row.yield] += row.amount * cityImprovementCount(state, dest, row.improvement);
+    }
+  }
+  return out;
+}
+
+/** A seat's Letters of Marque cut on a route's yields, each floored
+ *  (`cityTradeYields`' own); a city-state holds none. */
+function routeYieldCut(state: GameState, seat: number, y: Yields): Yields {
+  if (isCityStateSeat(seat)) return y;
+  const cut = getModifiers(state, seat).routeYieldMult;
+  if (cut !== 1) for (const k of Object.keys(y) as (keyof Yields)[]) y[k] = Math.floor(y[k] * cut);
+  return y;
+}
+
+/** THE ROUTE'S VALUE V the plunder pays on: the route's yields at its origin
+ *  and at its destination summed, Gold at 1 and every other yield at
+ *  `GOLD_EQUIVALENT_OTHER_YIELDS` (Trade_Manager plunder, GameCore_XP2
+ *  0x5545e0, the route yields 0x559b30 / 0x559bc0). */
+export function routeYieldValue(state: GameState, owner: Seat, r: TradeRoute): number {
+  let o: Yields | null;
+  if (isCityStateSeat(owner.seat)) {
+    const cs = owner as CityState;
+    o = minorRouteOriginYields(state, owner, cs.centerIndex, r);
+  } else {
+    const city = owner.cities.find((c) => c.id === r.from);
+    o = city ? routeOriginYields(state, city, r, getModifiers(state, owner.seat).routeGold) : null;
+  }
+  const d = routeDestYields(state, owner.seat, r);
+  const dSeat = r.toCs !== undefined ? NO_SEAT : (r.toSeat ?? owner.seat);
+  const y = emptyYields();
+  if (o) addYields(y, routeYieldCut(state, owner.seat, o));
+  if (dSeat !== NO_SEAT) addYields(y, routeYieldCut(state, dSeat, d));
+  else addYields(y, d);
+  let v = 0;
+  for (const k of Object.keys(y) as YieldKey[]) v += y[k] * (k === 'gold' ? 1 : GOLD_EQUIVALENT_OTHER_YIELDS);
+  return v;
+}
+
+/** What ONE of a major's routes pays its ORIGIN city `city` (the route's
+ *  `from`), before the seat's Letters of Marque cut: `routeGold` (the
+ *  seat's Caravansaries row) and every per-route adder of the leg's kind.
+ *  `cityTradeYields` sums it over the city's routes; the plunder payout
+ *  reads it for one route (`routeYieldValue`). */
+export function routeOriginYields(state: GameState, city: City, route: TradeRoute, routeGold: number): Yields {
+  const seat = city.seat;
+  const out = emptyYields();
+  const gpOwner = seatOf(state, seat);
+  const gpStratGold = gpPermOf(gpOwner, 'strategicRouteGold');
+  const rowsHere = getModifiers(state, seat).routeImprovement;
+  const originWonderGold = wonderRouteOriginGold(state, city);
+  out.gold += routeGold;
+  // the ORIGIN side of the same rows: this seat's route out, per named
+  // improvement at its destination city
+  if (rowsHere.length) {
+    const destCity = route.toSeat !== undefined
+      ? seatOf(state, route.toSeat)?.cities.find((c) => c.id === route.toSeatCity)
+      : route.to !== undefined ? seatOf(state, seat)?.cities.find((c) => c.id === route.to) : undefined;
+    if (destCity) for (const r of rowsHere) if (r.side === 'origin') out[r.yield] += r.amount * cityImprovementCount(state, destCity, r.improvement);
+  }
+  out.gold += routeChainGold(state, seat, route);
+  out.gold += originWonderGold;
+  if (route.toCs !== undefined) {
+    const cityState = state.cityStates.find((c) => c.id === route.toCs);
+    if (cityState) {
+      // SOVEREIGNTY outcome A doubles what a minor of the named TYPE pays
+      // the route sent to it.
+      const csPay = cityStateRouteYields(
+        cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type)));
+      addYields(out, csPay);
+      out.gold += routePathGold(state, seat, city.centerIndex, cityState.centerIndex, csPay.gold);
+      // a SURVIVED City-State Emergency pays its target +2 gold on every
+      // minor leg, forever
+      out.gold += emergencyCsRouteGold(state, seat);
+      out.gold += routePostGold(state, seat, cityState.centerIndex);
+      out.gold += routeLengthGold(state, seat, city.centerIndex, cityState.centerIndex, route);
+      // CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
+      out.faith += gpPermOf(gpOwner, 'csRouteFaith');
+      // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
+      // provide +2 Culture and +1 Gold for every specialty district in the
+      // ORIGIN city" — this city, whichever minor the route reaches.
+      if (suzerainEffect(state, seat, 'csRouteYields')) {
+        const n = completedDistrictCount(state, city, true);
+        out.culture += KUMASI_ROUTE_CULTURE * n;
+        out.gold += KUMASI_ROUTE_GOLD * n;
+      }
+    }
+    return out;
+  }
+  if (route.toSeat !== undefined) {
+    const civSeat = seatOf(state, route.toSeat);
+    const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
+    if (civSeat && civCity) {
+      addYields(out, routeYieldsInternational(state, city, civCity, seat));
+      out.gold += routePathGold(state, seat, city.centerIndex, civCity.centerIndex,
+        districtRouteYields(state, civCity, 'international').gold);
+      // CIV6 (Religious Community): the ORIGIN's worship buildings, on this leg
+      out.gold += religiousCommunityGold(state, seat, city);
+      // CIV6 (Sahel Merchants): the ORIGIN's own flat Desert, on this leg
+      addYields(out, intlRouteTerrainYields(state, city, seat));
+      // CIV6 (The Grand Embassy): "Receives Science or Culture from Trade
+      // Routes to civilizations that are MORE ADVANCED than Russia. +1 per
+      // 3 technologies or civics ahead" (`PROGRESS_TRADE_ROWS`)
+      const per = getModifiers(state, seat).progressTradePer;
+      if (per > 0) {
+        out.science += Math.floor(progressAhead(state, seat, route.toSeat, false) / per);
+        out.culture += Math.floor(progressAhead(state, seat, route.toSeat, true) / per);
+      }
+      // CIV6 (Alliance, level 1): the typed alliance pays its route bonus
+      // on every paying leg - the sender half.
+      const aty = allianceTypeWith(state, seat, route.toSeat);
+      if (aty >= 0 && ALLIANCE_ROUTE_TO[aty] > 0) {
+        out[ALLIANCE_ROUTE_YKEY[aty] as YieldKey] += ALLIANCE_ROUTE_TO[aty];
+      }
+      // CIV6 (Democracy): a route to an ALLY's city, or to a minor this seat
+      // is SUZERAIN of, pays the government's own flat yields.
+      const csDest = isCityStateSeat(route.toSeat)
+        ? (state.cityStates ?? []).find((c) => c.seat === route.toSeat)
+        : undefined;
+      if (seatsAllied(state, seat, route.toSeat)
+          || (csDest && isSuzerain(state, csDest, seat))) {
+        addYields(out, getModifiers(state, seat).allyRouteYield);
+      }
+      out.gold += routePostGold(state, seat, civCity.centerIndex);
+      out.gold += routeLengthGold(state, seat, city.centerIndex, civCity.centerIndex, route);
+      // CIV6 (Amsterdam): the destination's own luxuries pay this seat's route
+      out.gold += routeDestLuxuryGold(state, seat, civCity);
+      // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_TO_OTHERS): "This
+      // city provides +2 Gold to foreign Trade Routes" — the destination's
+      out.gold += gpCityPermOf(civCity, 'foreignRouteGold');
+      // CIV6 (John Rockefeller): "+2 Gold for each Strategic resource
+      // improved by the destination city" — each kind it has improved
+      if (gpStratGold) out.gold += gpStratGold * cityImprovedResourceKinds(state, civCity, 'strategic').size;
+      // CIV6 (University of Sankore): "Other Civilizations' Trade Routes
+      // to this city provide +1 Science and +1 Gold for them."
+      const snd = wonderRouteSenderYields(state, civCity);
+      out.science += snd.science;
+      out.gold += snd.gold;
+      // TRADE POLICY outcome A pays the SENDER for every route that ends at
+      // the named seat.
+      out.gold += congressTradeGold(state, route.toSeat);
+      // CIV6 (Reform the Coinage, Golden face): "International Trade Routes
+      // provide +3 Gold per specialty district in the foreign city."
+      if (goldenDedication(state, seat, DED_COINAGE)) {
+        out.gold += COINAGE_INTL_GOLD_PER_SPEC * specialtyDistricts(state, civCity);
+      }
+    }
+    return out;
+  }
+  const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
+  if (dest) {
+    addYields(out, routeYields(state, dest));
+    out.gold += routePathGold(state, seat, city.centerIndex, dest.centerIndex,
+      districtRouteYields(state, dest, 'domestic').gold);
+    out.gold += routeLengthGold(state, seat, city.centerIndex, dest.centerIndex, route);
+    // CIV6 (Raja Todar Mal): "+0.5 Gold for each specialty district at the
+    // destination" of a route to your own city
+    out.gold += gpPermOf(gpOwner, 'domesticRouteGoldPerSpecialty') * specialtyDistricts(state, dest);
+    if (gpStratGold) out.gold += gpStratGold * cityImprovedResourceKinds(state, dest, 'strategic').size;
+    // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's rows,
+    // the same reader the international leg uses
+    addRouteRows(state, out, getModifiers(state, seat).domesticRouteYields, city, dest);
+    // CIV6 (Qhapaq Ñan,
+    // EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): the
+    // ORIGIN city's own mountains pay this seat on every domestic leg
+    for (const r of getModifiers(state, seat).routeTerrain) {
+      out[r.yield] += r.amount * cityMountainCount(state, city);
+    }
+    // CIV6 (Surplus Logistics): "Your Trade Routes ending here provide +2
+    // Food to their starting city" — the DESTINATION's governor pays the
+    // ORIGIN, which is the city this walk is computing.
+    out.food += governorSum(state, dest, (e) => e.routeStartFood);
+    const relT = seatOf(state, seat)!.religion;
+    if (relT?.founded && relT.enhancer && dest.followedReligion === seat) {
+      const tr = ENHANCER_BELIEFS[relT.enhancer]?.effects.tradeReligionYields;
+      if (tr) addYields(out, tr);
+    }
+  }
+  return out;
+}
+
 /** `routeGold` is CARAVANSARIES' "+2 Gold from all Trade Routes" — the
  *  seat's own modifier, passed in because the yield walk already holds it. */
 export function cityTradeYields(state: GameState, city: City, routeGold: number): Yields {
@@ -776,10 +1016,8 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     addYields(out, incomingAllyRouteYields(state, city));
     const minor = seatOf(state, seat);
     for (const r of minor?.tradeRoutes ?? []) {
-      const y = minorRouteYields(state, r);
-      if (!y) continue;
-      addYields(out, y);
-      out.gold += routePathGold(state, seat, city.centerIndex, routeDestCenter(state, minor!, r), y.gold);
+      const y = minorRouteOriginYields(state, minor!, city.centerIndex, r);
+      if (y) addYields(out, y);
     }
     return out;
   }
@@ -800,8 +1038,6 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
   // city receives +2 Gold from foreign Trade Routes"
   const gpForeign = gpCityPermOf(city, 'foreignRouteGold');
   if (gpForeign) out.gold += gpForeign * incomingIntlRoutes(state, city);
-  const gpOwner = seatOf(state, seat);
-  const gpStratGold = gpPermOf(gpOwner, 'strategicRouteGold');
   // CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
   // the DESTINATION side): every route ending here pays this seat per
   // named improvement of this city (`ROUTE_IMPROVEMENT_ROWS`)
@@ -810,136 +1046,9 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     const incoming = incomingRoutes(state, city);
     for (const r of rowsHere) if (r.side === 'destination') out[r.yield] += r.amount * incoming * cityImprovementCount(state, city, r.improvement);
   }
-  const originWonderGold = wonderRouteOriginGold(state, city);
   for (const route of seatOf(state, seat)?.tradeRoutes ?? []) {
     if (route.from !== city.id) continue;
-    out.gold += routeGold;
-    // the ORIGIN side of the same rows: this seat's route out, per named
-    // improvement at its destination city
-    if (rowsHere.length) {
-      const destCity = route.toSeat !== undefined
-        ? seatOf(state, route.toSeat)?.cities.find((c) => c.id === route.toSeatCity)
-        : route.to !== undefined ? seatOf(state, seat)?.cities.find((c) => c.id === route.to) : undefined;
-      if (destCity) for (const r of rowsHere) if (r.side === 'origin') out[r.yield] += r.amount * cityImprovementCount(state, destCity, r.improvement);
-    }
-    out.gold += routeChainGold(state, seat, route);
-    out.gold += originWonderGold;
-    if (route.toCs !== undefined) {
-      const cityState = state.cityStates.find((c) => c.id === route.toCs);
-      if (cityState) {
-        // SOVEREIGNTY outcome A doubles what a minor of the named TYPE pays
-        // the route sent to it.
-        const csPay = cityStateRouteYields(
-          cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type)));
-        addYields(out, csPay);
-        out.gold += routePathGold(state, seat, city.centerIndex, cityState.centerIndex, csPay.gold);
-        // a SURVIVED City-State Emergency pays its target +2 gold on every
-        // minor leg, forever
-        out.gold += emergencyCsRouteGold(state, seat);
-        out.gold += routePostGold(state, seat, cityState.centerIndex);
-        out.gold += routeLengthGold(state, seat, city.centerIndex, cityState.centerIndex, route);
-        // CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
-        out.faith += gpPermOf(gpOwner, 'csRouteFaith');
-        // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
-        // provide +2 Culture and +1 Gold for every specialty district in the
-        // ORIGIN city" — this city, whichever minor the route reaches.
-        if (suzerainEffect(state, seat, 'csRouteYields')) {
-          const n = completedDistrictCount(state, city, true);
-          out.culture += KUMASI_ROUTE_CULTURE * n;
-          out.gold += KUMASI_ROUTE_GOLD * n;
-        }
-      }
-      continue;
-    }
-    if (route.toSeat !== undefined) {
-      const civSeat = seatOf(state, route.toSeat);
-      const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
-      if (civSeat && civCity) {
-        addYields(out, routeYieldsInternational(state, city, civCity, seat));
-        out.gold += routePathGold(state, seat, city.centerIndex, civCity.centerIndex,
-          districtRouteYields(state, civCity, 'international').gold);
-        // CIV6 (Religious Community): the ORIGIN's worship buildings, on this leg
-        out.gold += religiousCommunityGold(state, seat, city);
-        // CIV6 (Sahel Merchants): the ORIGIN's own flat Desert, on this leg
-        addYields(out, intlRouteTerrainYields(state, city, seat));
-        // CIV6 (The Grand Embassy): "Receives Science or Culture from Trade
-        // Routes to civilizations that are MORE ADVANCED than Russia. +1 per
-        // 3 technologies or civics ahead" (`PROGRESS_TRADE_ROWS`)
-        const per = getModifiers(state, seat).progressTradePer;
-        if (per > 0) {
-          out.science += Math.floor(progressAhead(state, seat, route.toSeat, false) / per);
-          out.culture += Math.floor(progressAhead(state, seat, route.toSeat, true) / per);
-        }
-        // CIV6 (Alliance, level 1): the typed alliance pays its route bonus
-        // on every paying leg - the sender half.
-        const aty = allianceTypeWith(state, seat, route.toSeat);
-        if (aty >= 0 && ALLIANCE_ROUTE_TO[aty] > 0) {
-          out[ALLIANCE_ROUTE_YKEY[aty] as YieldKey] += ALLIANCE_ROUTE_TO[aty];
-        }
-        // CIV6 (Democracy): a route to an ALLY's city, or to a minor this seat
-        // is SUZERAIN of, pays the government's own flat yields.
-        const csDest = isCityStateSeat(route.toSeat)
-          ? (state.cityStates ?? []).find((c) => c.seat === route.toSeat)
-          : undefined;
-        if (seatsAllied(state, seat, route.toSeat)
-            || (csDest && isSuzerain(state, csDest, seat))) {
-          addYields(out, getModifiers(state, seat).allyRouteYield);
-        }
-        out.gold += routePostGold(state, seat, civCity.centerIndex);
-        out.gold += routeLengthGold(state, seat, city.centerIndex, civCity.centerIndex, route);
-        // CIV6 (Amsterdam): the destination's own luxuries pay this seat's route
-        out.gold += routeDestLuxuryGold(state, seat, civCity);
-        // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_TO_OTHERS): "This
-        // city provides +2 Gold to foreign Trade Routes" — the destination's
-        out.gold += gpCityPermOf(civCity, 'foreignRouteGold');
-        // CIV6 (John Rockefeller): "+2 Gold for each Strategic resource
-        // improved by the destination city" — each kind it has improved
-        if (gpStratGold) out.gold += gpStratGold * cityImprovedResourceKinds(state, civCity, 'strategic').size;
-        // CIV6 (University of Sankore): "Other Civilizations' Trade Routes
-        // to this city provide +1 Science and +1 Gold for them."
-        const snd = wonderRouteSenderYields(state, civCity);
-        out.science += snd.science;
-        out.gold += snd.gold;
-        // TRADE POLICY outcome A pays the SENDER for every route that ends at
-        // the named seat.
-        out.gold += congressTradeGold(state, route.toSeat);
-        // CIV6 (Reform the Coinage, Golden face): "International Trade Routes
-        // provide +3 Gold per specialty district in the foreign city."
-        if (goldenDedication(state, seat, DED_COINAGE)) {
-          out.gold += COINAGE_INTL_GOLD_PER_SPEC * specialtyDistricts(state, civCity);
-        }
-      }
-      continue;
-    }
-    const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
-    if (dest) {
-      addYields(out, routeYields(state, dest));
-      out.gold += routePathGold(state, seat, city.centerIndex, dest.centerIndex,
-        districtRouteYields(state, dest, 'domestic').gold);
-      out.gold += routeLengthGold(state, seat, city.centerIndex, dest.centerIndex, route);
-      // CIV6 (Raja Todar Mal): "+0.5 Gold for each specialty district at the
-      // destination" of a route to your own city
-      out.gold += gpPermOf(gpOwner, 'domesticRouteGoldPerSpecialty') * specialtyDistricts(state, dest);
-      if (gpStratGold) out.gold += gpStratGold * cityImprovedResourceKinds(state, dest, 'strategic').size;
-      // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's rows,
-      // the same reader the international leg uses
-      addRouteRows(state, out, getModifiers(state, seat).domesticRouteYields, city, dest);
-      // CIV6 (Qhapaq Ñan,
-      // EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): the
-      // ORIGIN city's own mountains pay this seat on every domestic leg
-      for (const r of getModifiers(state, seat).routeTerrain) {
-        out[r.yield] += r.amount * cityMountainCount(state, city);
-      }
-      // CIV6 (Surplus Logistics): "Your Trade Routes ending here provide +2
-      // Food to their starting city" — the DESTINATION's governor pays the
-      // ORIGIN, which is the city this walk is computing.
-      out.food += governorSum(state, dest, (e) => e.routeStartFood);
-      const relT = seatOf(state, seat)!.religion;
-      if (relT?.founded && relT.enhancer && dest.followedReligion === seat) {
-        const tr = ENHANCER_BELIEFS[relT.enhancer]?.effects.tradeReligionYields;
-        if (tr) addYields(out, tr);
-      }
-    }
+    addYields(out, routeOriginYields(state, city, route, routeGold));
   }
   // CIV6 (Letters of Marque): "Trade Route yields -50%."
   const cut = getModifiers(state, seat).routeYieldMult;
@@ -1117,7 +1226,7 @@ export function tradeRouteWalk(state: GameState, actor: Seat): void {
     if (raider === null) continue;
     plundered.add(r);
     const rs = seatOf(state, raider);
-    if (rs) rs.treasury += routePlunderGold(state, raider, r.walkTile!);
+    if (rs) rs.treasury += routePlunderGold(state, raider, actor, r, r.walkTile!);
   }
   if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
 }

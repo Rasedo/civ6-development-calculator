@@ -40,10 +40,19 @@ def build():
 
 
 def floodplain(sim) -> int:
+    """a non-centre floodplain tile, OWNED by a seat that is not Egypt: the
+    improvement, district, building and population rows refuse an unowned
+    plot (the applier 0x336a50), and Egypt's ground takes no flood damage"""
     tiles = [t for t in range(sim.T)
              if bool(sim.floodplain[0, t]) and int(sim.centre_slot_at[0, t]) < 0]
     assert tiles, "fixture has no non-centre floodplain tile"
-    return tiles[0]
+    t = tiles[0]
+    if int(sim.tile_seat[0, t]) < 0:
+        owner = next(s for s in range(sim.n_majors)
+                     if not bool(sim._seat_plays(torch.tensor([s]), "EGYPT")[0]))
+        sim.tile_seat[0, t] = owner
+        sim._tile_owner_ver += 1
+    return t
 
 
 def solo(sim, t: int) -> None:
@@ -128,9 +137,11 @@ def main() -> None:
             seen.add(100 - int(hp_plane[0, slot]))
     assert seen - {0}, "no flood ever damaged the unit standing on it"
     assert 0 in seen, "a Moderate flood must leave the unit untouched"
+    # each unit's own draw, MinHP + rand(MaxHP - MinHP) (the applier 0x3366a0):
+    # MaxHP itself is never dealt
     for d in seen:
-        assert d == 0 or lo <= d <= hi, f"a flood dealt {d}, outside the sourced {lo}-{hi} band"
-    print(f"  unit damage stayed inside {lo}-{hi} over {len(seen)} distinct values")
+        assert d == 0 or lo <= d < hi, f"a flood dealt {d}, outside the sourced {lo}..{hi - 1} band"
+    print(f"  unit damage stayed inside {lo}..{hi - 1} over {len(seen)} distinct values")
 
     # THE SILT. Food and production are separate rolls off the same flood, so
     # one flood may pay both.
@@ -233,12 +244,21 @@ def poke_river_reach() -> None:
         sim._next_random(torch.ones(1, dtype=torch.bool, device=sim.device))
         spent += 1
     # destroy, district, BUILDING, damage, civilian, population, and the two
-    # fertility yields — eight columns a tile; the severity is the turn's
+    # fertility yields — eight columns a tile, then one per land unit standing
+    # there (the unit-damage applier 0x3366a0); the severity is the turn's
     # draw's, not the river's
-    assert spent == 8 * n, f"a {n}-tile flood spent {spent} draws, not 8 x {n}"
+    units = sum(int(int(sim.military_at[0, t]) >= 0) + int(int(sim.support_at[0, t]) >= 0) for t in reach)
+    assert spent == 8 * n + units, f"a {n}-tile flood spent {spent} draws, not 8 x {n} + {units}"
+    egypt = [s for s in range(sim.n_majors) if bool(sim._seat_plays(torch.tensor([s]), "EGYPT")[0])]
     for t in reach:
-        assert bool(sim.pillaged[0, t]) or int(sim.improvement[0, t]) < 0, \
-            f"tile {t} is on the flooded river and kept its improvement whole"
+        owner = int(sim.tile_seat[0, t])
+        if owner >= 0 and owner not in egypt:
+            assert bool(sim.pillaged[0, t]) or int(sim.improvement[0, t]) < 0, \
+                f"tile {t} is on the flooded river and kept its improvement whole"
+        elif owner < 0:
+            # the improvement rows refuse an unowned plot (the applier 0x336a50)
+            assert not bool(sim.pillaged[0, t]) and int(sim.improvement[0, t]) >= 0, \
+                f"tile {t} is unowned and the flood pillaged it"
     for t in off:
         assert not bool(sim.pillaged[0, t]) and int(sim.improvement[0, t]) >= 0, \
             f"tile {t} is on ANOTHER river and the flood reached it"

@@ -17,8 +17,8 @@ import { srcConst, xml, type SrcMap } from './provenance';
  * site) pairs with that column as the pair's WEIGHT: floods and eruptions ran
  * about ten times their column (one weight per river, per volcano), storms
  * and droughts near theirs (one weight per event). `disasterPhase` makes the
- * draw; every weight below is the column itself, and the draw turns it into
- * an absolute chance over its normaliser (`EVENT_NORM_*`).
+ * draw; every weight below is the column itself, which the draw reads in
+ * tenths (`EVENT_OCC_SCALE`).
  */
 const freq = (ev: string) => xml('RandomEvent_Frequencies',
   `RandomEventType=RANDOM_EVENT_${ev}&RealismSettingType=REALISM_SETTING_MODERATE`,
@@ -44,33 +44,31 @@ export const FLOOD_CIPD = srcConst('disasters.floodCipd', [20, 20, 20] as const,
   inputs: [cipd('FLOOD_MODERATE'), cipd('FLOOD_MAJOR'), cipd('FLOOD_1000_YEAR')],
 });
 
-/** A row's weight at `degrees` of warming: CIV6 (`ChanceIncreasePerDegree`)
- *  "the chance of Storms, River Flooding, and Drought occurring increases"
- *  as the CO2 rises — the column's percent per degree, on the row's own
- *  weight. */
+/** An integer row weight at `degrees` of warming: CIV6
+ *  (`ChanceIncreasePerDegree`) "the chance of Storms, River Flooding, and
+ *  Drought occurring increases" as the CO2 rises — the weight plus
+ *  trunc(CIPD × weight × degrees) // 100, in integers, so nothing is added
+ *  until that product reaches 100 (GameCore_XP2 0x28da10). */
 export function warmedWeight(weight: number, cipdPct: number, degrees: number): number {
-  return weight * (1 + (cipdPct / 100) * degrees);
+  return weight + Math.floor(Math.floor(cipdPct * weight * degrees) / 100);
 }
 
 /**
- * THE EMPTY TURN — MEASURED: a (row, site) pair fires with the ABSOLUTE
- * per-turn chance weight / N, the weight its `warmedWeight`, and the turn is
- * empty with what is left. A row counted once per map (the storms, the
- * droughts, the fires, the meteor) divides by 250, the Standard reading; a
- * row counted per site (a flooding river, an active volcano, a volcano
- * wonder, a reactor) by 251, read at Duel and at Standard. When the chances
- * sum past 1 they are scaled to sum to 1 (the warm read caps the sum).
+ * THE DRAW'S FIXED POINT (Game_RandomEvents, GameCore_XP2 0x335260 / 0x339020;
+ * `tools/civ6lab/dll_readings.md`): a row's `OccurrencesPerGame` is read in
+ * tenths, trunc(10·Occ), and the turn's one draw runs over 10·N, N the game's
+ * turns — the remainder the empty turn. A row counted once per map scales
+ * with the map's area over MAPSIZE_STANDARD's (`STANDARD_MAP_AREA`, integer),
+ * a row counted per site does not (the Duel reads: once-per-map Occ / 991,
+ * inside the measured (933, 1120]; per site the measured 251).
  */
-export const EVENT_NORM_PER_MAP = srcConst('disasters.eventNormPerMap', 250, {
-  lab: 'C-74 (C-74-S1, runs/event_turns_lab4_t250.jsonl and the six obs games): P(row) = '
-    + 'Occ x (1 + CIPD/100 x T) / 250 for the once-per-map rows at Standard (95%: 250-285)',
+export const EVENT_OCC_SCALE = srcConst('disasters.eventOccScale', 10, {
+  lab: '(GameCore_XP2 0x335260, dll_volcano.py / dll_drought.py on runs/c74s2_turn_c74s2_duel1_20260926T074416Z.jsonl '
+    + 'and the other Duel reads): the weights in tenths of OccurrencesPerGame, the draw over 10 x N',
 });
-export const EVENT_NORM_PER_SITE = srcConst('disasters.eventNormPerSite', 251, {
-  lab: 'runs/c74s2_turn_c74s2_duel1_20260926T074416Z.jsonl to runs/c74s2_turn_c74s2_duel8_20260926T084042Z.jsonl '
-    + '(8 Duel games, 1,680 per-turn reads; fit tools/civ6lab/c74s2_boost.py): '
-    + 'percent = floor(100 x Occ x b x (1 + CIPD/100 x T) / N) fits 1,244 of 1,250 flood reads and 649 of 649 '
-    + 'eruption reads for N in (250.62, 251.25], b the first-occurrence boost; the lab4 Standard sweep fits 13 of 13 '
-    + 'eruptions at 251 (tools/civ6lab/c74s2_s1check.py)',
+export const STANDARD_MAP_AREA = srcConst('disasters.standardMapArea', 84 * 54, {
+  derived: 'MAPSIZE_STANDARD GridWidth x GridHeight, the area a once-per-map row\'s weight is scaled against (0x28d0f0)',
+  inputs: [xml('Maps', 'MapSizeType=MAPSIZE_STANDARD', 'GridWidth'), xml('Maps', 'MapSizeType=MAPSIZE_STANDARD', 'GridHeight')],
 });
 
 /** CIV6 (RANDOM_EVENT_FIRST_TIME_OCCURRENCE_BOOST, Expansion2_GlobalParameters):
@@ -84,13 +82,19 @@ export const FIRST_TIME_OCCURRENCE_BOOST = srcConst('disasters.firstTimeOccurren
   inputs: [xml('GlobalParameters', 'Name=RANDOM_EVENT_FIRST_TIME_OCCURRENCE_BOOST', 'Value')],
 });
 
-/** Each DORMANT volcano's chance a turn to wake — MEASURED: every volcano
- *  starts dormant (20 of 20 at turn 1), wakes at about 0.6% a turn and was
- *  read going back to sleep once in 1,604 active volcano-turns; only an
- *  active one erupts (61 of 61 eruptions fell on an active turn). */
-export const VOLCANO_WAKE_P = srcConst('disasters.volcanoWakeP', 0.006, {
-  lab: 'runs/c74s2_turn_c74s2_duel1_20260926T074416Z.jsonl to runs/c74s2_turn_c74s2_duel8_20260926T084042Z.jsonl '
-    + '(tools/civ6lab/c74s2_volc_fit.py): 13 wakes over 2,217 dormant volcano-turns',
+/** THE VOLCANO ROLL (Game_RandomEvents "Active Volcano Roll", GameCore_XP2
+ *  0x335040; `volcanoRoll`): every volcano starts DORMANT, and ONE roll a
+ *  turn for the whole map keeps the active share near the realism setting's
+ *  `PercentVolcanoesActive` — waking one dormant volcano below it, putting
+ *  one active volcano to sleep at or above it. Only an active one erupts. */
+export const PERCENT_VOLCANOES_ACTIVE = srcConst('disasters.percentVolcanoesActive', 70,
+  xml('RealismSettings', 'RealismSettingType=REALISM_SETTING_MODERATE', 'PercentVolcanoesActive'));
+/** The roll's N, the turns the game's span is read at: the Duel wakes fit
+ *  500 (15.3 expected against 15 read, 2.7 sleeps against 2; logL -93.8) and
+ *  not the event draw's 250 (31.1 wakes, logL -100.3). */
+export const VOLCANO_ROLL_TURNS = srcConst('disasters.volcanoRollTurns', 500, {
+  lab: '(dll_volcano.py on runs/c74s2_turn_c74s2_duel1_20260926T074416Z.jsonl to '
+    + 'runs/c74s2_turn_c74s2_duel8_20260926T084042Z.jsonl): the wakes fit N 500, the event draw 250',
 });
 
 /** CIV6 (`RANDOM_EVENT_START_TURN`, Expansion2_GlobalParameters): the first
@@ -123,17 +127,10 @@ export function droughtTerrain(t: { terrain: string; elevation: string }): boole
   return (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation !== 'MOUNTAIN';
 }
 
-/**
- * THE DROUGHT'S ANCHOR — MEASURED (C-74-S1, 127 droughts): a drought starts
- * within 3 of a city centre (124 of 127), named after the nearest city. Its
- * start plot's distance from the centre ran 0: 11, 1: 41, 2: 46, 3: 26 — the
- * weights of the distance draw, the index the distance; the list's length
- * less one is the reach.
- */
-export const DROUGHT_DISTANCE_WEIGHTS = srcConst('disasters.droughtDistanceWeights', [11, 41, 46, 26] as const, {
-  lab: 'C-74 (C-74-S1, runs/event_turns_lab4_t250.jsonl and the six obs games): 124 of 127 droughts '
-    + 'start within 3 of a city centre, at distance 0 / 1 / 2 / 3 in 11 / 41 / 46 / 26',
-});
+/** THE DROUGHT'S SPACING (`RandomEvents.Spacing`, both drought rows): a
+ *  start plot's weight in the map-wide pick is 1 + min(its distance to the
+ *  nearest live event, this) (GameCore_XP2 0x287e80, `droughtStart`). */
+export const DROUGHT_SPACING = srcConst('disasters.droughtSpacing', 15, drought('DROUGHT_MAJOR', 'Spacing'));
 
 /** Dry ground for a drought's patch: its terrain above the sea and CIV6
  *  (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP) "Drought targets areas that
@@ -257,8 +254,8 @@ export const STORM_FAMILIES: readonly StormFamily[] = srcConst('disasters.stormF
 /**
  * CIV6 (`Expansion2_RandomEvents.xml`, `<PrevailingWinds>`): 22 rows giving a
  * WEIGHTED heading per latitude band, the heading a storm's walk draws each
- * step from (the walk is measured, ask 16). Eight bands, lower bound
- * inclusive, by signed degree (north positive, `windBand`); each row's six
+ * step from (the walk is measured, ask 16). Eight bands, both ends
+ * inclusive, by signed degree (north positive, `windWeights`); each row's six
  * weights are in the hex direction order E, NE, NW, W, SW, SE (`AXIAL_DIRS`).
  *   60..90    NW 1  W 2  SW 2        -5..0     W 1   SW 1
  *   30..60    NE 2  E 2  SE 1        -30..-5   NW 1  W 2   SW 2
@@ -270,6 +267,13 @@ export const WIND_BAND_LO: readonly number[] = srcConst('disasters.windBandLo',
     derived: 'the distinct `PrevailingWinds.MinimumLatitude` values, descending',
     inputs: [xml('PrevailingWinds', 'MinimumLatitude=60&DirectionType=DIRECTION_WEST',
       'MinimumLatitude')],
+  });
+/** each band's `MaximumLatitude`, in `WIND_BAND_LO`'s order */
+export const WIND_BAND_HI: readonly number[] = srcConst('disasters.windBandHi',
+  [90, 60, 30, 5, 0, -5, -30, -60], {
+    derived: 'each band\'s `PrevailingWinds.MaximumLatitude`, in WIND_BAND_LO\'s order',
+    inputs: [xml('PrevailingWinds', 'MinimumLatitude=60&DirectionType=DIRECTION_WEST', 'MaximumLatitude'),
+      xml('PrevailingWinds', 'MinimumLatitude=-90&DirectionType=DIRECTION_WEST', 'MaximumLatitude')],
   });
 /** one band's six weights, in the engine's E, NE, NW, W, SW, SE order */
 const WIND_DIRS = ['EAST', 'NORTHEAST', 'NORTHWEST', 'WEST', 'SOUTHWEST', 'SOUTHEAST'] as const;
@@ -293,26 +297,43 @@ export const PREVAILING_WINDS: readonly (readonly number[])[] = [
 ];
 
 /**
- * The `PREVAILING_WINDS` band of a map row. `mapgen`'s latitude is
- * `|row - half| / half` with `half = (height - 1) / 2`; the winds need it
- * SIGNED, north (row 0) positive, in degrees: lat = (half - row) / half x 90.
- * Compared in integers so both engines land on the same band at every
- * boundary: with x = 2 (half - row) = (height - 1) - 2 row and s = height - 1,
- * lat >= 60 is 3x >= 2s, lat >= 30 is 3x >= s, lat >= 5 is 18x >= s, and the
- * southern bands mirror them.
+ * A map row's LATITUDE for the winds (Game_Climate 0x69d80, `tools/civ6lab/
+ * dll_readings.md` "the storm's walk"): the game's lat = Bottom + (Top − Bottom) ×
+ * (100y // H) // 100, Top 90 and Bottom −90, y the game's row. The engine's
+ * rows are the game's y (`world@1`) with the game's north and south
+ * directions swapped (the game's NE is the engine's SE), and the
+ * `PrevailingWinds` table is its own north-south mirror, so the engine reads
+ * the rows by name at the mirrored latitude 90 − 180 × (100 row // H) // 100.
  */
-export function windBand(row: number, height: number): number {
-  const s = height - 1;
-  const x = s - 2 * row;
-  if (3 * x >= 2 * s) return 0;
-  if (3 * x >= s) return 1;
-  if (18 * x >= s) return 2;
-  if (x >= 0) return 3;
-  if (18 * x >= -s) return 4;
-  if (3 * x >= -s) return 5;
-  if (3 * x >= -2 * s) return 6;
-  return 7;
+export function windLatitude(row: number, height: number): number {
+  return 90 - Math.floor((180 * Math.floor((100 * row) / height)) / 100);
 }
+
+/** The six heading weights a storm's step draws from at `row`: every
+ *  `PrevailingWinds` band whose latitudes hold the row's (`windLatitude`),
+ *  both ends inclusive — a boundary latitude pools two bands (0x28c500). */
+export function windWeights(row: number, height: number): number[] {
+  const lat = windLatitude(row, height);
+  const out = [0, 0, 0, 0, 0, 0];
+  PREVAILING_WINDS.forEach((w, i) => {
+    if (WIND_BAND_LO[i] <= lat && lat <= WIND_BAND_HI[i]) for (let d = 0; d < 6; d++) out[d] += w[d];
+  });
+  return out;
+}
+
+/** a storm's step onto its own `RandomEvent_Terrains` costs this much of
+ *  `STORM_MOVEMENT`, onto any other plot `STORM_STEP_COST_OFF` (0x28c500) */
+export const STORM_STEP_COST_ON = srcConst('disasters.stormStepCostOn', 1, {
+  lab: '(GameCore_XP2 0x28c500, tools/civ6lab/dll_readings.md): a step onto the storm\'s own terrain costs 1',
+});
+export const STORM_STEP_COST_OFF = srcConst('disasters.stormStepCostOff', 2, {
+  lab: '(GameCore_XP2 0x28c500, tools/civ6lab/dll_readings.md): a step onto any other terrain costs 2',
+});
+/** the percent of a storm's damage rows its footprint strikes at on the
+ *  storm's LAST turn (turn − start + 1 ≥ Duration; 0x286f80) */
+export const STORM_LAST_TURN_PCT = srcConst('disasters.stormLastTurnPct', 50, {
+  lab: '(GameCore_XP2 0x286f80, tools/civ6lab/dll_readings.md): 100% of the rows\' Percentage, 50% on the last turn',
+});
 
 /** CIV6 (`RandomEvents`, `Movement="8"` on every storm row — MEASURED,
  *  ask 16): the unit steps a storm's centre walks in its movement
@@ -640,8 +661,9 @@ export const ERUPTION_BLDG_P = eruptPct('eruptionBldgP', 'BUILDING_PILLAGED', [1
 export const ERUPTION_POP_P = eruptPct('eruptionPopP', 'POPULATION_LOSS', [0.3, 0.4, 0, 0.2, 1, 0, 0.2, 0.35]);
 export const ERUPTION_CIV_KILL_P = eruptPct('eruptionCivKillP', 'UNIT_KILLED_CIVILIAN', [0.3, 0.4, 0, 0.2, 1, 0, 0.2, 0.35]);
 const eruptBand = (name: string, col: 'MinHP' | 'MaxHP', v: readonly number[]) => srcConst(`disasters.${name}`, v, {
-  derived: `each eruption row's UNIT_DAMAGE_LAND ${col}, inclusive; CITY_GARRISON and CITY_WALLS carry the `
-    + 'same band on every row, so one roll serves all three; a GENTLE row carries none and reads 0',
+  derived: `each eruption row's UNIT_DAMAGE_LAND ${col}; CITY_GARRISON and CITY_WALLS carry the `
+    + 'same band on every row — the city\'s one roll reads it inclusive, each land unit\'s own draw '
+    + 'MinHP + rand(MaxHP - MinHP) (the applier 0x3366a0); a GENTLE row carries none and reads 0',
   inputs: [...eruptDmg('UNIT_DAMAGE_LAND', col), ...eruptDmg('CITY_GARRISON', col), ...eruptDmg('CITY_WALLS', col)],
 });
 export const ERUPTION_DMG_LO = eruptBand('eruptionDmgLo', 'MinHP', [40, 60, 0, 40, 70, 0, 40, 60]);
@@ -802,10 +824,11 @@ export const FIRE_POP_TURN = srcConst('disasters.firePopTurn', 0, {
   derived: 'the MaxTurn of the fire rows\' POPULATION_LOSS row (MinTurn 0)',
   inputs: fireDmg('POPULATION_LOSS', 'MaxTurn'),
 });
-/** UNIT_DAMAGE_LAND's inclusive band, MinHP 50 / MaxHP 101: a unit at full
- *  health dies on a roll of 100 or 101. */
+/** UNIT_DAMAGE_LAND's band, MinHP 50 / MaxHP 101, drawn per unit as MinHP +
+ *  rand(MaxHP − MinHP) (the applier 0x3366a0): 50..100, so a unit at full
+ *  health dies on a draw of 100. */
 export const FIRE_DMG = srcConst('disasters.fireDmg', [50, 101] as const, {
-  derived: 'the fire rows\' UNIT_DAMAGE_LAND MinHP and MaxHP, inclusive',
+  derived: 'the fire rows\' UNIT_DAMAGE_LAND MinHP and MaxHP',
   inputs: [...fireDmg('UNIT_DAMAGE_LAND', 'MinHP'), ...fireDmg('UNIT_DAMAGE_LAND', 'MaxHP')],
 });
 /** CIV6 (`Features`, the pack's four fire rows): the burning and burnt plot
@@ -851,7 +874,9 @@ export const FLOOD_BLDG_P = srcConst('disasters.floodBldgP', [1, 1, 1] as const,
  *  percentage at every severity. */
 export const FLOOD_POP_P = srcConst('disasters.floodPopP', [0, 0.15, 0.25] as const,
   floodPage('Population / Civilians killed — 0 / 15% / 25%'));
-/** "Units" and "Garrison — 30-50 HP / 50-70 HP", inclusive of both ends. */
+/** "Units" and "Garrison — 30-50 HP / 50-70 HP" (the rows' MinHP / MaxHP):
+ *  the garrison's one roll reads both ends, each land unit's own draw
+ *  MinHP + rand(MaxHP − MinHP) (the applier 0x3366a0). */
 export const FLOOD_DAMAGE_LO = srcConst('disasters.floodDmgLo', [0, 30, 50] as const,
   floodPage('Units / Garrison — 30-50 HP / 50-70 HP, the low end'));
 export const FLOOD_DAMAGE_HI = srcConst('disasters.floodDmgHi', [0, 50, 70] as const,
@@ -910,7 +935,7 @@ const accidentDmg = (kind: string, col = 'Percentage') =>
  * draw its own chance — MEASURED (runs/c1d_draws.jsonl): MINOR 3, MAJOR 8,
  * CATASTROPHIC 9 draws with the Power Plant intact or pillaged; MINOR's 2nd
  * draw under 20 pillaged the Factory, MAJOR's 3rd under 50 the zone,
- * CATASTROPHIC's 4th under 80 the citizen. A land unit struck by
+ * CATASTROPHIC's 4th under 80 the citizen. Each land unit struck by
  * UNIT_DAMAGE_LAND takes one more draw right after that row, its damage
  * `MinHP + rand(MaxHP - MinHP)` (`ACCIDENT_DMG_LO`, `ACCIDENT_DMG_HI`). The
  * rows the engine gives no effect (IMPROVEMENT_PILLAGED, BUILDING_DESTROYED,

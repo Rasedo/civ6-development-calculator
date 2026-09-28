@@ -186,18 +186,17 @@ export function generateMap(opts: MapGenOptions): GameMap {
     }
   }
 
-  generateRivers(map, elev, seaLevel, deriveSeed(seed, 'rivers'));
+  const rivers = generateRivers(map, elev, seaLevel, deriveSeed(seed, 'rivers'));
+  // CIV6 (Expansion2 FeatureGenerator.lua `AddFeatures`): "First let's add
+  // Floodplains", before every other feature
+  placeFloodplains(map, rivers);
 
   const rngF = mulberry32(deriveSeed(seed, 'features'));
   for (const t of map.tiles) {
     const lat = latJ[t.index];
     const m = moisture[t.index];
     if (isLandIdx(t.index)) {
-      if (t.elevation === 'MOUNTAIN') continue;
-      if (t.terrain === 'DESERT' && t.elevation === 'FLAT' && t.riverMask !== 0) {
-        t.feature = 'FLOODPLAINS';
-        continue;
-      }
+      if (t.elevation === 'MOUNTAIN' || isFloodplains(t.feature)) continue;
       if (t.terrain === 'PLAINS' && lat < 0.22 && m > 0.5 && rngF() < 0.7) {
         t.feature = 'RAINFOREST';
         continue;
@@ -471,11 +470,53 @@ function vertexElevation(
   return sum / n;
 }
 
-function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed: number): void {
+/** CIV6 (Expansion2 FeatureGenerator.lua): the minimum floodplain size 4 and
+ *  the maximum 10, the run lengths TerrainBuilder.GenerateFloodplains reads. */
+const FLOODPLAIN_MIN_RUN = 4;
+const FLOODPLAIN_MAX_RUN = 10;
+/** the floodplain each river terrain takes (`Feature_ValidTerrains`) */
+const FLOODPLAIN_OF: Partial<Record<TerrainId, 'FLOODPLAINS' | 'FLOODPLAINS_GRASSLAND' | 'FLOODPLAINS_PLAINS'>> = {
+  DESERT: 'FLOODPLAINS', GRASSLAND: 'FLOODPLAINS_GRASSLAND', PLAINS: 'FLOODPLAINS_PLAINS',
+};
+
+/**
+ * `TerrainBuilder.GenerateFloodplains` as the game runs it (the H-3 native,
+ * `tools/civ6map/world.py` `generate_floodplains`, every plot of the game's
+ * own maps matched): per river, from its mouth towards its source, the first
+ * maximal run of at least `FLOODPLAIN_MIN_RUN` consecutive flat, featureless
+ * Desert, Grassland or Plains plots; its `FLOODPLAIN_MAX_RUN` plots nearest
+ * the mouth take the floodplain of their terrain. Every river is judged on
+ * the map as it stands before any floodplain (the union of the runs). A
+ * river is its plots in the order its walk laid them (`generateRivers`).
+ */
+function placeFloodplains(map: GameMap, rivers: readonly number[][]): void {
+  const take = new Map<number, 'FLOODPLAINS' | 'FLOODPLAINS_GRASSLAND' | 'FLOODPLAINS_PLAINS'>();
+  const ok = (t: Tile) => t.elevation === 'FLAT' && t.feature === null && FLOODPLAIN_OF[t.terrain] !== undefined;
+  for (const plots of rivers) {
+    let run: number[] = [];
+    for (const i of [...[...plots].reverse(), -1]) {
+      if (i >= 0 && ok(map.tiles[i])) {
+        run.push(i);
+        continue;
+      }
+      if (run.length >= FLOODPLAIN_MIN_RUN) {
+        for (const q of run.slice(0, FLOODPLAIN_MAX_RUN)) take.set(q, FLOODPLAIN_OF[map.tiles[q].terrain]!);
+        break;
+      }
+      run = [];
+    }
+  }
+  for (const [q, f] of take) map.tiles[q].feature = f;
+}
+
+/** Lays the rivers; returns each river's plots in the order its walk laid
+ *  them — each step's two flanking plots, each plot once. */
+function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed: number): number[][] {
   const rng = mulberry32(seed);
   const isLandIdx = (i: number) => elev[i] >= seaLevel;
   const landTiles = map.tiles.filter((t) => isLandIdx(t.index));
-  if (landTiles.length === 0) return;
+  const rivers: number[][] = [];
+  if (landTiles.length === 0) return rivers;
 
   const riverCount = Math.max(2, Math.round(landTiles.length / 55));
 
@@ -497,6 +538,8 @@ function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed
   for (const src of sources) {
     let v: Vertex = { col: src.col, row: src.row, side: rng() < 0.5 ? 'N' : 'S' };
     const visited = new Set<string>([vertexKey(v)]);
+    const plots: number[] = [];
+    rivers.push(plots);
 
     for (let step = 0; step < 120; step++) {
       if (touchesWater(map, v, isLandIdx)) break;
@@ -518,7 +561,9 @@ function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed
       usedEdges.add(id);
       for (const f of best.flanks) {
         const t = tileAt(map, f.col, f.row);
-        if (t) t.riverMask |= 1 << f.dir;
+        if (!t) continue;
+        t.riverMask |= 1 << f.dir;
+        if (!plots.includes(t.index)) plots.push(t.index);
       }
       visited.add(vertexKey(best.to));
       v = best.to;
@@ -527,6 +572,7 @@ function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed
       }
     }
   }
+  return rivers;
 }
 
 function resourceValidOnTile(tile: Tile, def: ResourceDef): boolean {

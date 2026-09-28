@@ -206,15 +206,16 @@ const spyRoll = {
 export const SPY_ROLL_DICE = srcConst('eras.espionage.rollDice', 3, spyRoll);
 export const SPY_ROLL_FACES = srcConst('eras.espionage.rollFaces', 6, spyRoll);
 export const SPY_ROLL_LEVEL_BASE = srcConst('eras.espionage.rollLevelBase', 2, spyRoll);
-/** A counterspy guarding the district a mission is run in lowers that
- *  mission's roll by 3, flat, whatever the post's level (the install's
- *  UnitOperations EnemyProbChange 3). The mission preview
- *  (`GetResultProbability`) shows no such term; the realised roll carries it. */
-export const SPY_COUNTERSPY_ROLL = srcConst('eras.espionage.counterspyRoll', 3, {
-  lab: 'runs/escape_cs_c16w_guard3b.log and runs/escape_cs_c16w_guard3c.log (save c16w_guard3_t156, '
-    + 'fit tools/civ6lab/c16w_mission_fit.py): 41 missions against a level-3 post on the target district, '
-    + 'logL -65.6 at a shift of 3 against -88.0 with no term',
-});
+/** The counterspy that pursues a mission lowers its realised roll by
+ *  EnemyProbChange 3 + EnemyLevelProbChange 1 per level above the first
+ *  (GameCore_XP2_Release.dll `ComputeNeededDieRoll` 0x529b60,
+ *  tools/civ6lab/dll_readings.md "C-16"; every offensive UnitOperations row
+ *  carries the same pair). The mission preview (`GetResultProbability`)
+ *  shows no such term; the realised roll carries it. */
+export const SPY_COUNTERSPY_ROLL = srcConst('eras.espionage.counterspyRoll', 3,
+  xml('UnitOperations', 'OperationType=UNITOPERATION_SPY_SIPHON_FUNDS', 'EnemyProbChange'));
+export const SPY_COUNTERSPY_LEVEL_ROLL = srcConst('eras.espionage.counterspyLevelRoll', 1,
+  xml('UnitOperations', 'OperationType=UNITOPERATION_SPY_SIPHON_FUNDS', 'EnemyLevelProbChange'));
 export const SPY_TRAVEL_TURNS_MIN = 1;
 export const SPY_TRAVEL_TILES_PER_TURN = 8;
 export const SPY_TRAVEL_TURNS_MAX = 5;
@@ -263,15 +264,16 @@ const partisans = {
 export const SPY_PARTISANS_MIN = srcConst('eras.espionage.partisansMin', 2, partisans);
 export const SPY_PARTISANS_MAX = srcConst('eras.espionage.partisansMax', 4, partisans);
 /**
- * THE ESCAPE. The police guess one of the routes the city offers, uniformly;
- * the escape's score is ESPIONAGE_ESCAPE_BASE_CHANCE + LEVEL_BOOST per level
- * (the install's levels, 1 for a Recruit) + the spy's escape promotion
- * levels + POLICE_CORRECT_MODIFIER when the guess names the route taken +
- * COUNTERSPY_LEVEL_MODIFIER per level of the counterspy posted there, and
- * the spy gets away when the mission roll's 3d6 lands at or under the score.
- * The guess and the dice are measured (tools/civ6lab/spy_loop.py, 129
- * escapes of bought spies: one-route cities, where the guess is certain, let
- * 10 of 54 away, two-route cities 41 of 63), the terms the install's.
+ * THE ESCAPE — GameCore_XP2_Release.dll ResolveEscape 0x52ce40 (the target
+ * 0x529ab0, the outcome table 0x52b090; tools/civ6lab/dll_readings.md
+ * "C-16", `dll_escape.py`). The police cover one offered route, weighted by
+ * the longest TravelTime − the route's own + 1 ("Police Exit Covered"
+ * 0x528560); the target is v = ESPIONAGE_ESCAPE_BASE_CHANCE − LEVEL_BOOST ×
+ * (the install's level − 1, a Recruit's 1) − the spy's escape promotion
+ * levels − POLICE_CORRECT_MODIFIER when the police cover the route taken;
+ * one 3d6 then reads escaped at v or over, captured on v − 2 .. v − 1,
+ * killed below. ResolveEscape passes no counterspy (0x52cf77), so
+ * ESPIONAGE_ESCAPE_COUNTERSPY_LEVEL_MODIFIER never reaches an escape.
  */
 export const SPY_ESCAPE_BASE = srcConst('eras.espionage.escapeBase', 10,
   gp('ESPIONAGE_ESCAPE_BASE_CHANCE'));
@@ -279,11 +281,12 @@ export const SPY_ESCAPE_LEVEL = srcConst('eras.espionage.escapeLevel', 1,
   gp('ESPIONAGE_ESCAPE_LEVEL_BOOST'));
 export const SPY_ESCAPE_POLICE = srcConst('eras.espionage.escapePolice', -4,
   gp('ESPIONAGE_ESCAPE_POLICE_CORRECT_MODIFIER'));
-export const SPY_ESCAPE_COUNTERSPY_LEVEL = srcConst('eras.espionage.escapeCounterspyLevel', -1,
-  gp('ESPIONAGE_ESCAPE_COUNTERSPY_LEVEL_MODIFIER'));
-/** a lost escape ends in the cell this often, else the spy is killed. */
-export const SPY_CAPTURE_PCT = srcConst('eras.espionage.capturePct', 29, {
-  lab: 'C-16 — tools/civ6lab/spy_loop.py: 34 of 117 lost escapes ended CAPTURED, the rest KILLED',
+/** the CAPTURED band's width below the escape target (the outcome table
+ *  0x52b090) */
+export const SPY_ESCAPE_CAPTURE_BAND = srcConst('eras.espionage.escapeCaptureBand', 2, {
+  lab: 'tools/civ6lab/dll_readings.md C-16 (ResolveEscape 0x52ce40, table 0x52b090), scored by '
+    + 'tools/civ6lab/dll_escape.py on runs/escape_lab4_t100_20260924T004749Z.log and the other escape logs: '
+    + 'the band beats the flat 29% capture on 214 paired escapes (logL -196.9 against -200.0)',
 });
 
 /**

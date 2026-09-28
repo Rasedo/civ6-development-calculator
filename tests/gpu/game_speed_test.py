@@ -22,9 +22,17 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import load_rules, fixture_paths, FIXTURES
-from great_person_test import fresh, make_person, order
+from great_person_test import fresh as developed, make_person, order
+from warmup import warm_base
 
 ROW = 1  # a civ row; every poke below is seat-generic
+# the Great Person catalogue planes a scene writes, outside `_MUTABLE`
+_STATIC = ("_gp_site", "_gp_charges", "_gp_effects")
+
+
+def fresh(rules, path):
+    """great_person_test's 25-turn world, built once and restored per scene"""
+    return warm_base(str(path), lambda: developed(rules, path), _STATIC)
 
 
 def test_the_speed(rules) -> None:

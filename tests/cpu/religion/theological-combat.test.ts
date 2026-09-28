@@ -38,7 +38,8 @@ describe('theological combat', () => {
 
   it('the blows ROLL, on the same exponential curve a military fight uses', () => {
     // A Missionary cannot initiate, so this is ONE exchange. 110 vs 100 puts
-    // the Apostle's blow at 30*e^0.4*[0.8, 1.2] and the reply at 30*e^-0.4*[...].
+    // the Apostle's blow at (24..35)·e^(100/256) = 35..52 and the reply at
+    // (24..35)·e^(−100/256) = 16..24 (the DLL's law, `damageOf`).
     const seen = new Set<number>();
     for (let seed = 0; seed < 40; seed++) {
       const { state, att, def } = duel(100, 100, 'MISSIONARY');
@@ -46,8 +47,8 @@ describe('theological combat', () => {
       endTurn(state);
       const dealt = 100 - def.hp;
       const taken = 100 - att.hp;
-      expect(dealt).toBeGreaterThanOrEqual(36);
-      expect(dealt).toBeLessThanOrEqual(54);
+      expect(dealt).toBeGreaterThanOrEqual(35);
+      expect(dealt).toBeLessThanOrEqual(52);
       expect(taken).toBeGreaterThanOrEqual(16);
       expect(taken).toBeLessThanOrEqual(24);
       seen.add(dealt);

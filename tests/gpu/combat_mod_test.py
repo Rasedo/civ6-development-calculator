@@ -10,8 +10,9 @@ Checks:
      every HP 0..100 (the shared IEEE expression both engines evaluate).
   B. _river_cross(frm, to) mirrors crossesRiver: it equals the exported
      riverMask bit for the frm->to neighbour direction, for every river tile.
-  C. _damage_roll reproduces round((24 + floor(12 r)) * 1.04^(q/10)), q=round(diff*10), from the
-     0.1-granular fixture table + js_round — bit-exact for fractional diffs.
+  C. _damage_roll reproduces the DLL's trunc((24 + floor(12 r)) * expf(x/256) + 0.5)
+     in single precision, x = (10 * floor(256 * diff)) >> 8, clamped to [1, 100]
+     (an independent reference: math.exp rounded to f32, as tools/civ6lab/dll_damage.py).
   D. Integrated melee: with a wounded attacker AND a wounded defender the CB
      log's quantized `diff` equals the full-assembly reference (combat +
      terrain + fortify - wound - 5*river); forcing the river edge drops the
@@ -27,6 +28,7 @@ Checks:
 from __future__ import annotations
 
 import math
+import struct
 import sys
 from pathlib import Path
 
@@ -281,25 +283,44 @@ def test_river_cross(sim) -> None:
     print(f"  B. _river_cross mirrors the exported riverMask bit ({checked} edges)")
 
 
+def _f32(v: float) -> float:
+    return struct.unpack("<f", struct.pack("<f", v))[0]
+
+
+def _dll_damage(r: int, delta: float) -> int:
+    """GameCore_XP2_Release.dll 0x519090, as tools/civ6lab/dll_damage.py
+    ports it."""
+    d256 = math.floor(delta * 256)
+    x = (10 * d256) >> 8
+    e = _f32(math.exp(_f32((x & 0xFF) * 0.00390625 + (x >> 8))))
+    v = int(_f32(_f32((24 + r) * e) + 0.5))
+    return max(1, min(100, v))
+
+
 def test_damage_roll_table(sim) -> None:
-    dmgbase = sim._dmg_base
-    diffs = torch.tensor([0.0, -2.5, 3.7, -9.9, 12.3, -37.0, 41.6, -0.1], dtype=torch.float64)
-    for dv in diffs.tolist():
+    assert sim._dmg_k256 == 10 and sim._dmg_max == 100
+    diffs = [0.0, -2.5, 3.75, -9.5, 12.25, -37.0, 41.5, -0.5, 27.0, -27.0, 150.0, -150.0]
+    for dv in diffs:
         diff = torch.tensor([dv], dtype=torch.float64)
         rng0 = sim.rng_state.clone()
         mask = torch.tensor([True])
         got = int(sim._damage_roll(mask, diff)[0])
-        # reference: same draw from the same rng state, quantized table lookup
+        # reference: same draw from the same rng state, the DLL's law
         sim.rng_state = rng0.clone()
         r = sim._next_random(mask)
-        q = int(js_round(diff * 10)[0])
-        base = float(dmgbase[(q + 2000)])  # the table is centred at index 2000
         roll = int(torch.floor(r * sim._dmg_max_extra)[0])
         assert 0 <= roll < sim._dmg_max_extra
-        want = max(sim._dmg_min, int(js_round((sim._dmg_base_damage + roll) * torch.tensor([base], dtype=torch.float64))[0]))
+        want = _dll_damage(roll, dv)
         assert got == want, f"damage_roll(diff={dv}) = {got}, reference = {want}"
         sim.rng_state = rng0.clone()  # leave the stream untouched for the next diff
-    print(f"  C. _damage_roll reproduces the 0.1-granular 1.04^diff table with the 0..11 roll ({len(diffs)} diffs)")
+    # every (draw, difference) cell of the law against the table, no draw
+    for roll in range(12):
+        for d in range(-60, 61):
+            x = (10 * math.floor(d * 256)) >> 8
+            base = float(sim._dmg_base[x + sim._dmg_reach])
+            v = _f32(_f32((24 + roll) * base) + 0.5)
+            assert max(1, min(100, int(v))) == _dll_damage(roll, d), (roll, d)
+    print(f"  C. _damage_roll reproduces the DLL's e^(10/256) law with the 0..11 roll ({len(diffs)} diffs, 1452 cells)")
 
 
 def _diff_of(events, k):

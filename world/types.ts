@@ -205,9 +205,9 @@ export interface Tile {
   road?: boolean;
   goodyHut: boolean;
   volcano: boolean;
-  /** this volcano is ACTIVE and may erupt. Every volcano starts dormant and
-   *  wakes on the turn's draw (`wakeVolcanoes`); never read off the world
-   *  file. */
+  /** this volcano is ACTIVE and may erupt. Every volcano starts dormant; the
+   *  map's one roll a turn wakes one or puts one to sleep (`volcanoRoll`);
+   *  never read off the world file. */
   volcanoActive?: boolean;
   /** the rows of the turn's random-event draw (a bit per `eventRows` index)
    *  that have fired on the site keyed on this plot — a flooding river's
@@ -275,6 +275,12 @@ export interface Tile {
    *  footprint's effects. Absent or 0 turns = no storm. */
   stormEvent?: number;
   stormTurns?: number;
+  /** the storm centred here, by its serial (`GameState.stormSerial`); it
+   *  travels with the record. */
+  stormId?: number;
+  /** the serial of the last storm whose footprint struck this plot — a storm
+   *  strikes each plot once (`stormTurn`). */
+  stormStruck?: number;
   /** CIV6 (`RandomEvent_Yields`, the pack's fires): the turn the FIRE this
    *  plot belongs to began — the event's clock, which a plot the fire spreads
    *  to shares. The plot burns, is burnt at the fire's Turn 2 and regrows at

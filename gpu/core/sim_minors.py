@@ -202,17 +202,29 @@ class SimMinors:
 
     def _minor_route_income(self, s: int) -> torch.Tensor | None:
         """[B, RC, 6] f64 — `minorRouteYields` over minor `s`'s routes, on its
-        one city's column: a city-state destination's flat Gold and specialty
-        under Sovereignty's multiplier, a major city the international column
-        of `District_TradeRouteYields` over its completed districts plus the
-        centre row. A destination gone pays nothing. None with no route."""
+        one city's column (`_minor_route_k` summed). None with no route."""
+        rk = self._minor_route_k(s)
+        if rk is None:
+            return None
+        row = self._CITY_MINOR0 + s
+        out = torch.zeros(self.B, self.RC, 6, dtype=torch.float64, device=self.device)
+        out[:, 0] = rk.sum(dim=1) * self.city_alive[:, row, 0].double().unsqueeze(1)
+        return out
+
+    def _minor_route_k(self, s: int) -> torch.Tensor | None:
+        """[B, K, 6] f64 — what each of minor `s`'s routes pays its city
+        (`minorRouteOriginYields`): a city-state destination's flat Gold and
+        specialty under Sovereignty's multiplier, a major city the
+        international column of `District_TradeRouteYields` over its completed
+        districts plus the centre row, and the path term. A destination gone
+        pays nothing. None with no route."""
         row = self._CITY_MINOR0 + s
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
         if not bool(act.any()):
             return None
         B, S, dev = self.B, self.S, self.device
-        inc = torch.zeros(B, 6, dtype=torch.float64, device=dev)
+        rk = torch.zeros(B, rr.shape[1], 6, dtype=torch.float64, device=dev)
         # the PATH TERM's inputs per paying leg (`routePathGold`): the
         # destination centre and D, the Gold the destination's rows pay
         _p_dest = torch.full_like(rr[:, :, 1], -1)
@@ -223,9 +235,9 @@ class SimMinors:
             css = raw.clamp(min=0, max=S - 1)
             ok_c = act & (rr[:, :, 1] <= -2) & (raw < S) & self.citystate_alive[:, :S].gather(1, css)
             m = self._congress_cs_route_mult().gather(1, css).double() * ok_c.double()  # [B, K]
-            inc[:, 2] = inc[:, 2] + (self._minor_cs_route_gold * m).sum(dim=1)
+            rk[:, :, 2] += self._minor_cs_route_gold * m
             ycol = self._citystate_yidx[:, :S].gather(1, css)
-            inc.scatter_add_(1, ycol, self._minor_cs_route_spec * m)
+            rk.scatter_add_(2, ycol.unsqueeze(2), (self._minor_cs_route_spec * m).unsqueeze(2))
             _p_dest = torch.where(ok_c, self.citystate_center[:, :S].gather(1, css), _p_dest)
             # D is every Gold the destination pays the route: the flat Gold,
             # and the specialty where the minor's type pays Gold
@@ -247,17 +259,15 @@ class SimMinors:
             _comp_d = _comp.gather(1, _rx.unsqueeze(3).expand(B, K, RCw, _nD)).gather(
                 2, _col.unsqueeze(3).expand(B, K, 1, _nD)).squeeze(2)  # [B, K, nD]
             intl6 = self._route_centre_intl.reshape(1, 1, 6) + _comp_d.double() @ self._route_intl_y  # [B, K, 6]
-            inc = inc + (intl6 * valid.double().unsqueeze(2)).sum(dim=1)
+            rk = rk + intl6 * valid.double().unsqueeze(2)
             _p_dest = torch.where(valid, self.city_center.gather(1, _rx).gather(2, _col).squeeze(2), _p_dest)
             _p_d = torch.where(valid, intl6[:, :, 2], _p_d)
             _p_want = _p_want | valid
         if bool(_p_want.any()):
             _p_o = self.citystate_center[:, s].unsqueeze(1).expand_as(_p_dest)
-            inc[:, 2] = inc[:, 2] + self._route_path_gold(
-                row, torch.where(_p_want, _p_o, torch.full_like(_p_o, -1)), _p_dest, _p_d, _p_want).sum(dim=1)
-        out = torch.zeros(B, self.RC, 6, dtype=torch.float64, device=dev)
-        out[:, 0] = inc * self.city_alive[:, row, 0].double().unsqueeze(1)
-        return out
+            rk[:, :, 2] += self._route_path_gold(
+                row, torch.where(_p_want, _p_o, torch.full_like(_p_o, -1)), _p_dest, _p_d, _p_want)
+        return rk
 
     def _minor_repair(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B] bool, [B] f64) — `repairAvailable` and `projectCost` for minor
@@ -1141,9 +1151,10 @@ class SimMinors:
         return (belief == self._monk_follower) & self.city_bldg[:, row, 0, self._temple_bidx] & hs_ok
 
     def _minor_purchases(self, s: int) -> None:
-        """`minorPurchases` (C-38's census). A Builder, on a turn none stands
-        and the treasury covers its price: one draw at the episode's rate
-        (`citystate_builder_buy`). Then a military unit, on a turn the
+        """`minorPurchases` (the city-state census). A Builder, on a turn the minor has
+        Builder work (`_minor_builder_work`), none stands or is in production
+        (`_minor_trains_builder`) and the treasury covers its price: one draw
+        at the episode's rate (`citystate_builder_buy`). Then a military unit, on a turn the
         treasury holds the floor — or a Warrior Monk is in reach — one draw at
         the rate its military count sets (per ten thousand), tripled within the
         loss window. A drawn purchase buys a Warrior Monk with Faith where the
@@ -1154,6 +1165,37 @@ class SimMinors:
         (`_minor_buy_naval`)."""
         self._minor_buy_land(s)
         self._minor_buy_naval(s)
+
+    def _minor_trains_builder(self, s: int) -> torch.Tensor:
+        """[B] bool — `minorTrainsBuilder`: the Builder row is the table's
+        first, so with none standing its Builder is in production unless a
+        pillaged building's repair takes the turn first."""
+        if self._mb_kind[0] != "builder":
+            raise AssertionError("_minor_trains_builder: the Builder row is not first")
+        return ~((self._minor_repair_target(s) >= 0) & ~self.citystate_repair_wait[:, s])
+
+    def _minor_builder_work(self, s: int) -> torch.Tensor:
+        """[B] bool — `minorBuilderWork`: an owned plot of minor `s` (its
+        centre aside) holding a pillaged improvement, or none and a valid
+        improvement for it — a land plot `_minor_imp_legal` offers, a water
+        plot under a resource the minor sees whose improvement its research
+        unlocks."""
+        row = self._CITY_MINOR0 + s
+        own = self.tile_seat == 100 + s
+        own = own.scatter(1, self.citystate_center[:, s].clamp(min=0).unsqueeze(1), False)
+        imp = self.improvement >= 0
+        pil = own & imp & self.pillaged
+        free = (own & ~imp & ~self.nwonder & (self.district < 0) & (self.built_wonder < 0)
+                & self.passable)
+        land = free & ~self.water & self._minor_imp_legal(s).any(dim=2)
+        rq = torch.where(self._res_hidden(row), torch.full_like(self.res_imp, -1), self.res_imp)
+        rqc = rq.clamp(min=0)
+        ut = self._imp_unlock[rqc]
+        uc = torch.tensor(self._imp_unlock_civic, dtype=torch.long, device=self.device)[rqc]
+        tok = (ut < 0) | self.citystate_techs[:, s].gather(1, ut.clamp(min=0))
+        cok = (uc < 0) | self.citystate_civics[:, s].gather(1, uc.clamp(min=0))
+        sea = free & self.water & self._res_live() & (rq >= 0) & tok & cok
+        return (pil | land | sea).any(dim=1)
 
     def _minor_buy_land(self, s: int) -> None:
         """The Builder, then the military unit — `minorPurchases` up to the
@@ -1169,6 +1211,8 @@ class SimMinors:
             price_b = self._purchase_step(
                 self._builder_cost(self.citystate_builders_trained[:, s]).double() * gold_mult)
             elig = alive & ~has_b & self._afford(self.citystate_treasury[:, s], price_b)
+            if bool(elig.any()):
+                elig = elig & ~self._minor_trains_builder(s) & self._minor_builder_work(s)
             if bool(elig.any()):
                 r = self._next_random(elig)
                 buy = elig & (torch.floor(r * 1000).long() < self.citystate_builder_buy[:, s])

@@ -21,7 +21,7 @@ import { promoRows } from '../../../cpu/data/promotions';
 import {
   SPY_UNIT, SPY_MISSIONS, SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_FOMENT_UNREST,
   SPY_M_COUNTERSPY, SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_ESCAPE_ROUTES, SPY_SURVEILLANCE_REACH,
-  SPY_COUNTERSPY_ROLL,
+  SPY_COUNTERSPY_ROLL, SPY_COUNTERSPY_LEVEL_ROLL, SPY_TRAVELLING,
 } from '../../../cpu/data/espionage';
 import { buildingPillaged, cityBuildingYields, darkBuildings } from '../../../cpu/core/yields';
 import { availableBuildings, goldPurchasableBuildings, buildingCostIn } from '../../../cpu/core/rules';
@@ -168,17 +168,21 @@ describe('the counterspy defends the district it stands on and the adjacent ones
     }
   });
 
-  it('a guarding post lowers the mission roll by 3, flat, whatever its level', () => {
+  it('the pursuing post lowers the mission roll by 3 plus 1 per level above the first', () => {
+    // GameCore_XP2_Release.dll ComputeNeededDieRoll 0x529b60: EnemyProbChange
+    // 3 + EnemyLevelProbChange 1 x (the post's level - 1)
     expect(SPY_COUNTERSPY_ROLL).toBe(3);
-    // a seed whose 3d6 lands exactly 2 over Siphon Funds' fresh threshold:
-    // success undetected unguarded, fail undetected (2 - 3 = -1) guarded
+    expect(SPY_COUNTERSPY_LEVEL_ROLL).toBe(1);
+    // a seed whose 3d6 lands exactly 3 over Siphon Funds' fresh threshold:
+    // success undetected unguarded; a Recruit post (3) leaves 0, a success
+    // that must escape; a post one level up (4) leaves -1, fail undetected
     const t = missionThreshold(SPY_MISSIONS[SPY_M_SIPHON_FUNDS], 0);
     let seed = 1;
     for (;; seed++) {
       const probe = { rngState: seed } as GameState;
       let r = 0;
       for (let i = 0; i < 3; i++) r += Math.floor(nextRandom(probe) * 6) + 1;
-      if (r === t + 2) break;
+      if (r === t + 3) break;
     }
     const run = (guardLevel: number | null) => {
       const { state, theirs } = spyState();
@@ -197,14 +201,17 @@ describe('the counterspy defends the district it stands on and the adjacent ones
     };
     const open = run(null);
     expect(open.spy.spyLevel).toBe(1);
-    for (const lvl of [0, 2]) {
-      const guarded = run(lvl);
-      expect(guarded.spy.spyLevel ?? 0).toBe(0);
-      expect(guarded.state.units).toContain(guarded.spy);
-    }
+    expect(open.spy.spyMission ?? 0).not.toBe(SPY_TRAVELLING);
+    // the Recruit post: still a success (the level earned), but seen
+    const recruit = run(0);
+    expect(recruit.spy.spyLevel).toBe(1);
+    // one level up: the roll fails unseen, the spy stays put
+    const agent = run(1);
+    expect(agent.spy.spyLevel ?? 0).toBe(0);
+    expect(agent.state.units).toContain(agent.spy);
   });
 
-  it('of two guarding posts the higher level pursues, whatever the slot order', () => {
+  it('of two guarding posts the first in the unit list pursues, whatever its level', () => {
     const gates = SPY_ESCAPE_ROUTES.map((r) => r.district);
     for (const r of SPY_ESCAPE_ROUTES) if (r.district !== null) (r as { district: string }).district = 'NO_SUCH_DISTRICT';
     try {
@@ -223,8 +230,9 @@ describe('the counterspy defends the district it stands on and the adjacent ones
         for (let i = 0; i < turnsOf(SPY_M_SIPHON_FUNDS); i++) tickSpies(state, 0);
         if (spyHeldWith(state, 0, 1) === 1) {
           caught = true;
-          expect(high.spyLevel).toBe(3);
-          expect(low.spyLevel ?? 0).toBe(0);
+          // the finder 0x52ac80 takes the FIRST post within 1 of the plot
+          expect(low.spyLevel).toBe(1);
+          expect(high.spyLevel).toBe(2);
         }
       }
       expect(caught).toBe(true);

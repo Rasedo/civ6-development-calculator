@@ -708,7 +708,9 @@ def test_reactor_accident(sim) -> None:
     for age, want in ((9, set()), (10, {0}), (25, {0, 1}), (30, {0, 1, 2})):
         seen.clear()
         sim.city_reactor_age[0, row, j] = age
-        for _ in range(600):
+        # at weight 60 an open row fires on about a quarter of the turns, so
+        # a hundred turns miss one — or a row wrongly open — at odds near 1e-12
+        for _ in range(100):
             sim.storm_left.zero_()
             sim._random_event(strip)
         assert seen == want, f"reactor age {age} opened {sorted(seen)}, not {sorted(want)}"

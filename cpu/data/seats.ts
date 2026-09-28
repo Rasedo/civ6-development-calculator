@@ -113,19 +113,10 @@ export const FREE_CITY_LOYALTY_PER_TURN = srcConst('seats.freeCityLoyaltyPerTurn
 export const LOYALTY_AFTER_CULTURAL_TRANSFER = srcConst('seats.loyaltyAfterCulturalTransfer', 100,
   gp('LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY'));
 
-/** THE FREE CITY'S DEFENCE. No install row carries it (the Free Cities
- *  leader's trait has no modifier and `GlobalParameters` no city-strength
- *  cell), so every magnitude here is the live game's own, read off one real
- *  revolt watched for ten turns. The watch file names the city, the turn and
- *  every unit within two tiles. */
+/** THE FREE CITY'S REVOLT, the live game's own: one real revolt watched for
+ *  ten turns. The watch file names the city, the turn and every unit within
+ *  two tiles. */
 const FREE_CITY_WATCH = 'tools/civ6lab/runs/freecity_watch_20260921T001500Z.jsonl';
-/** The Free Cities player's own strength floor: its centre and its
- *  Encampment stood at 72 on every turn of the watch with no walls standing
- *  (the same city read 53 under its founder WITH walls and 43 under its
- *  captor) — where every other seat's floor is 15 or its best melee unit. */
-export const FREE_CITY_DEFENSE = srcConst('seats.freeCityDefense', 72, {
-  lab: `${FREE_CITY_WATCH}: centre and Encampment "def" 72 on turns 115-124, walls false`,
-});
 /** THE FREE CITIES' GRANTS, over the 28 revolts of the watched games — the
  *  census `tools/civ6lab/free_city_census.py` reads (C-60). */
 const FREE_CITY_CENSUS = 'C-60: runs/cs_watch_obs1_20260923T173434Z.jsonl, runs/cs_watch_obs2_20260923T173434Z.jsonl,'
@@ -232,12 +223,12 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 // independently backs it. `WAR_WEARINESS_PER_WMD_LAUNCHED = 10` likewise backs
 // the thread's "+10 * base" nuke reading (12x total with the abroad multiplier).
 //
-// NOT MODELLED, and known to exist because the data names them:
-//   * WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, NONFOUNDED_CITY 1,
-//     FOUNDED_CITY 0}. What these three DO is published nowhere; reading them
-//     as a per-city split is an inference off their names. The rule that IS
-//     published is the one below: "-1 Amenity for every 400 WWP you currently
-//     have, which is then applied to your cities".
+// THE AMENITY LOSS is split over the cities (`warWearinessLosses`,
+// GameCore_XP2 0x3cda00): each opponent's WWP // 400 goes to the cities it
+// originally owned, then to third-party-founded cities, then to the seat's
+// own, each city capped at its need plus
+// WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, NONFOUNDED_CITY 1,
+// FOUNDED_CITY 0}.
 //
 // UNITS ARE NOW REAL WWP. The accumulator stays an INTEGER, so the derived
 // amenity penalty is integer too and there is no float-association risk.
@@ -264,6 +255,16 @@ export const WW_PEACE_TREATY = srcConst('warWeariness.peaceTreaty', 2000,
   gp('WAR_WEARINESS_DECAY_PEACE_DECLARED'));
 export const WAR_WEARINESS_PER_AMENITY = srcConst('warWeariness.perAmenity', 400,
   gp('WAR_WEARINESS_POINTS_FOR_AMENITY_LOSS'));
+/** A city's cap on the war-weariness amenities it takes, over its need
+ *  ceil(pop / 2): a city an at-war opponent originally owned, one another
+ *  seat founded, one the seat founded (GameCore_XP2 0x3cda00;
+ *  `tools/civ6lab/dll_ww.py` on runs/ww_xsec_*: caps 20 of 20). */
+export const WW_LOSS_AT_WAR_CITY = srcConst('warWeariness.lossAtWarCity', 3,
+  gp('WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_AT_WAR_CITY'));
+export const WW_LOSS_NONFOUNDED_CITY = srcConst('warWeariness.lossNonfoundedCity', 1,
+  gp('WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_NONFOUNDED_CITY'));
+export const WW_LOSS_FOUNDED_CITY = srcConst('warWeariness.lossFoundedCity', 0,
+  gp('WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_FOUNDED_CITY'));
 /** CIV6 (War weariness): "every time you drop a nuke, the war weariness it
  *  will incur is equal to 12 times the Era Base value. There is no difference
  *  between dropping a Nuclear Device or a Thermonuclear Device" — 624 WWP in

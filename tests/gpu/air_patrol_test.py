@@ -293,10 +293,12 @@ def main() -> None:
     three_b = bomber_run(3)[0]
     assert three_b > one_b, (
         f"CIV6: each other patrol adds +5 — one patrol dealt {one_b}, three {three_b}")
-    # the interceptor banks a flat 4, the bomber nothing from the fight: its
-    # XP is its strike's alone, as an unintercepted strike's
-    assert sim._xp_intercept == 4
-    assert ixp1 == 4, f"the interceptor banked {ixp1}"
+    # the interceptor scores as a melee DEFENDER with no kill bonus (DLL
+    # 0x5197e0): ceil(2 + S_bomber / S_interceptor); the bomber nothing from
+    # the fight — its XP is its strike's alone, as an unintercepted strike's
+    want_ix = -(-(2 * int(sim._type_combat[FIGHTER]) + int(sim._type_combat[BOMBER]))
+                // int(sim._type_combat[FIGHTER]))
+    assert ixp1 == want_ix == 4, f"the interceptor banked {ixp1}, the rule {want_ix}"
     bxp0 = bomber_run(0, check=False)[2]
     assert bxp1 == bxp0 > 0, f"the bomber banked {bxp1} intercepted, {bxp0} not"
     # a bomber the interception downs still strikes, and is gone after its blow
@@ -304,11 +306,11 @@ def main() -> None:
     _, struck, bxpd, ixpd, hpd, alived = bomber_run(1, hp=1, check=False)
     assert hpd <= 0 and not alived, "the downed bomber stays"
     assert struck > 0, "a bomber the interception downed did not strike"
-    assert bxpd == 0 and ixpd == 4, f"a downed bomber banked {bxpd}, its interceptor {ixpd}"
+    assert bxpd == 0 and ixpd == want_ix, f"a downed bomber banked {bxpd}, its interceptor {ixpd}"
     print(f"  4 fighter turned back, bomber flies on OK (+5 backing: {one_b} -> {three_b}; "
-          f"the interceptor +4, a downed bomber strikes for {struck})")
+          f"the interceptor +{want_ix}, a downed bomber strikes for {struck})")
 
-    # -- 5: the answers come first ------------------------------------------
+    # -- 5: the answers come first, with no health gate (DLL 0x203cb0) ------
     sim = fresh(rules, path)
     at_war(sim, row, foe)
     j = a_city(sim, row)
@@ -321,11 +323,13 @@ def main() -> None:
     hull = spawn(sim, foe, HULL, sea[0])
     bc = sim._air_strike_targets(row, torch.tensor([[bs]]), torch.tensor([[aero]]),
                                  torch.tensor([[BOMBER]]))[0, 0].tolist()
+    r5 = sim.rng_state.clone()
     order(sim, row, bs, sim._A_AIR_STRIKE + bc.index(sea[0]))
-    assert not bool(sim.unit_alive[0, bs]), "the hull's answer downed the bomber"
-    assert int(sim.unit_hp[0, hull]) == 100, (
-        "CIV6: 'if the attacking bomber survives, combat is then resolved with the original target'")
-    print("  5 the answers come first OK (a bomber shot down never strikes)")
+    assert not bool(sim.unit_alive[0, bs]), "the hull's answer downed the bomber, gone after its blow"
+    assert int(sim.unit_hp[0, hull]) < 100, "a bomber the burst downed still strikes"
+    draws5 = ((int(sim.rng_state[0]) - int(r5[0])) & 0xFFFFFFFF) // 0x6D2B79F5
+    assert draws5 == 2, f"the burst, then the strike — {draws5} draws"
+    print("  5 the answers come first OK (a bomber the burst downed still strikes, 2 draws)")
 
     # -- 6: a bomber striking a CITY meets the cover ------------------------
     sim = fresh(rules, path)
@@ -608,6 +612,9 @@ def main() -> None:
     # duel — the gun's damage first, then the Bomber's at the mirrored
     # difference, no burst from the struck gun and no experience either side
     assert int(s._type_ranged_strength[BOMBER]) == int(s._type_bombard[BOMBER]) - 17
+    # the XP reads the RAW columns (DLL 0x5197e0): the bomber's strike is a
+    # bombard, so it brings its Bombard to the ratio, not the 93
+    assert int(s._xp_strength(torch.tensor([BOMBER]), True)[0]) == int(s._type_bombard[BOMBER])
 
     def bomber_on(ty):
         s = fresh(rules, path)

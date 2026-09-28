@@ -80,6 +80,8 @@ class SimInit:
             ("is_cap", torch.bool, False, None),
             ("orig_cap", torch.long, -1, None),
             ("founder", torch.long, -1, None),
+            # the row a Free City revolted from (`City.formerSeat`), -1 elsewhere
+            ("former", torch.long, -1, None),
             ("loyalty", dtype, 100.0, None),
             ("acquired", torch.long, 0, None),
             ("growth", dtype, 0, None),
@@ -903,11 +905,11 @@ class SimInit:
         self._spy_roll_faces = int(_sp["rollFaces"])
         self._spy_roll_level_base = int(_sp["rollLevelBase"])
         self._spy_counterspy_roll = int(_sp["counterspyRoll"])
-        self._spy_capture_pct = int(_sp["capturePct"])
+        self._spy_counterspy_level_roll = int(_sp["counterspyLevelRoll"])
         self._spy_escape_base = int(_sp["escapeBase"])
         self._spy_escape_level = int(_sp["escapeLevel"])
         self._spy_escape_police = int(_sp["escapePolice"])
-        self._spy_escape_counter_level = int(_sp["escapeCounterspyLevel"])
+        self._spy_escape_capture_band = int(_sp["escapeCaptureBand"])
         self._bodyguard_num = int(_sp["bodyguardNum"])
         self._bodyguard_den = int(_sp["bodyguardDen"])
         self._spy_unrest = int(_sp["unrestLoyalty"])
@@ -1780,8 +1782,8 @@ class SimInit:
             for v in f["volcanoes"]:
                 self.volcano_at[b, v] = True
         # an ACTIVE volcano, the eruption rows' sites (`Tile.volcanoActive`):
-        # every volcano starts dormant and wakes on its own draw
-        # (`_wake_volcanoes`)
+        # every volcano starts dormant, and the map's one roll a turn wakes
+        # or sleeps one (`_volcano_roll`)
         self.volcano_active = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
         # the PRODUCTION half of flood silt — real Civ 6 rolls food and
@@ -1866,8 +1868,6 @@ class SimInit:
         self._intercept_support_cs = int(rules.combat["interceptSupportCs"])
         # PRIORITY TARGET's flat blow (`PRIORITY_TARGET_DAMAGE`)
         self._priority_target_damage = int(rules.combat["priorityTargetDamage"])
-        # the interceptor's flat XP (`XP_INTERCEPT`)
-        self._xp_intercept = int(rules.combat["xpIntercept"])
         self._nuke_cols = int(rules.nuclear["nukeCols"])
         _nkc = sum(1 for n in self._act_names if n.startswith("NUKE_"))
         assert self._nuke_cols == 0 or _nkc % self._nuke_cols == 0, (
@@ -2368,7 +2368,7 @@ class SimInit:
             self._gov_cdef = torch.tensor([float(r["cityDefense"]) for r in _govs], dtype=dtype, device=device)
             self._gov_crng = torch.tensor([float(r["cityRanged"]) for r in _govs], dtype=dtype, device=device)
             self._gov_rxp = torch.tensor([float(r["reconXpMult"]) for r in _govs], dtype=dtype, device=device)
-            self._gov_rplun = torch.tensor([float(r["routePlunderMult"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_rplun = torch.tensor([float(r["routePlunderPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_pillm = torch.tensor([float(r["pillageMult"]) for r in _govs], dtype=dtype, device=device)
             self._gov_faith_units = torch.tensor([bool(r["faithBuyLandUnits"]) for r in _govs], dtype=torch.bool, device=device)
             self._gov_rgold = torch.tensor([float(r["routeGold"]) for r in _govs], dtype=dtype, device=device)
@@ -2408,7 +2408,7 @@ class SimInit:
                 + self._gov_wmdup.abs().sum()
                 + self._gov_vbarb.abs().sum() + self._gov_cdef.abs().sum()
                 + self._gov_crng.abs().sum() + (self._gov_rxp - 1).abs().sum()
-                + (self._gov_rplun - 1).abs().sum() + self._gov_rgold.abs().sum()
+                + self._gov_rplun.abs().sum() + self._gov_rgold.abs().sum()
                 + (self._gov_pillm - 1).abs().sum()
                 + self._gov_infl.abs().sum() + self._gov_envoy1.sum()
                 + self._gov_culsuz.abs().sum() + self._gov_gpp.abs().sum()
@@ -2465,7 +2465,7 @@ class SimInit:
             self._pol_cdef = torch.tensor([float(r["cityDefense"]) for r in _pols], dtype=dtype, device=device)
             self._pol_crng = torch.tensor([float(r["cityRanged"]) for r in _pols], dtype=dtype, device=device)
             self._pol_rxp = torch.tensor([float(r["reconXpMult"]) for r in _pols], dtype=dtype, device=device)
-            self._pol_rplun = torch.tensor([float(r["routePlunderMult"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_rplun = torch.tensor([float(r["routePlunderPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_pillm = torch.tensor([float(r["pillageMult"]) for r in _pols], dtype=dtype, device=device)
             self._pol_rgold = torch.tensor([float(r["routeGold"]) for r in _pols], dtype=dtype, device=device)
             self._pol_infl = torch.tensor([float(r["influencePerTurn"]) for r in _pols], dtype=dtype, device=device)
@@ -2548,7 +2548,7 @@ class SimInit:
                 + self._pol_wmdup.abs().sum()
                 + self._pol_vbarb.abs().sum() + self._pol_cdef.abs().sum()
                 + self._pol_crng.abs().sum() + (self._pol_rxp - 1).abs().sum()
-                + (self._pol_rplun - 1).abs().sum() + self._pol_rgold.abs().sum()
+                + self._pol_rplun.abs().sum() + self._pol_rgold.abs().sum()
                 + (self._pol_pillm - 1).abs().sum()
                 + self._pol_infl.abs().sum() + self._pol_envoy1.sum()
                 + self._pol_culsuz.abs().sum() + self._pol_gpp.abs().sum()
@@ -2604,6 +2604,8 @@ class SimInit:
         self._route_centre_intl = torch.tensor([float(x) for x in _tr["centreRouteIntl"]], dtype=torch.float64, device=device)  # [6]
         self._trade_duration = int(_tr["duration"])  # route lifetime
         self._trade_plunder_gold = int(_tr["plunderGold"])
+        self._trade_plunder_turns = int(_tr["plunderTurns"])  # V × this (`routePlunderGold`)
+        self._gold_equiv_other = int(_tr["goldEquivalentOther"])  # a non-Gold yield's Gold weight in V
         self._trader_guard_radius = int(_tr["guardRadius"])  # an escort's reach (`routePlunderer`)
         self._trade_walk_rail = int(_tr["walkRail"])
         # the path term (`routePathGold`): the score per water plot, railroad
@@ -2680,20 +2682,23 @@ class SimInit:
         self._accident_dmg_lo = [int(x) for x in _ds["accidentDmgLo"]]
         self._accident_dmg_hi = [int(x) for x in _ds["accidentDmgHi"]]
         self._accident_civ_kill_p = [float(x) for x in _ds["accidentCivKillP"]]
-        # THE EMPTY TURN: a (row, site) pair's absolute chance is its weight
-        # over the row's normaliser, per map or per site (`eventNorm`)
-        self._event_norm_map = float(_ds["eventNormPerMap"])
-        self._event_norm_site = float(_ds["eventNormPerSite"])
+        # THE DRAW'S FIXED POINT (`randomEvent`): the weights in tenths of
+        # OccurrencesPerGame (`EVENT_OCC_SCALE`), the draw over that x the
+        # game's turns, a once-per-map row scaled by the map's area over
+        # MAPSIZE_STANDARD's
+        self._event_occ_scale = int(_ds["eventOccScale"])
+        self._event_turns = int(_ds["eventTurns"])
+        self._standard_map_area = int(_ds["standardMapArea"])
         # a per-site pair not yet fired this game carries 100 + this share in
         # hundredths (`FIRST_TIME_OCCURRENCE_BOOST`)
         self._first_boost = int(_ds["firstTimeOccurrenceBoost"])
-        # a dormant volcano's chance a turn to wake (`VOLCANO_WAKE_P`)
-        self._volcano_wake_p = float(_ds["volcanoWakeP"])
-        # a drought's start plot: the weight of each distance from its city's
-        # centre (`DROUGHT_DISTANCE_WEIGHTS`), the index the distance
-        self._drought_dist_w = [int(x) for x in _ds["droughtDistanceWeights"]]
-        # [T, T] 1 where two plots lie within that reach (`_drought_sites`)
-        self._drought_within = (self.pair_dist <= len(self._drought_dist_w) - 1).to(torch.float32)
+        # THE VOLCANO ROLL (`volcanoRoll`): the realism's active percent and
+        # the turns the roll reads the game's span at
+        self._pct_volcanoes_active = int(_ds["percentVolcanoesActive"])
+        self._volcano_roll_turns = int(_ds["volcanoRollTurns"])
+        # a drought's start plot weighs 1 + min(its distance to a live event,
+        # this) (`droughtStart`)
+        self._drought_spacing = int(_ds["droughtSpacing"])
         # THE EIGHT ERUPTION ROWS (`ERUPTION_ROWS`: Eyjafjallajokull's two,
         # Kilimanjaro's two, Vesuvius's, then the volcano's three), one entry
         # per row: the per-plot Volcanic Soil chance and the
@@ -2732,17 +2737,24 @@ class SimInit:
         self._st_weight = [float(e["weight"]) for e in _st]
         self._st_cipd = [float(e["cipd"]) for e in _st]
         # CIV6 (`PrevailingWinds`, `PREVAILING_WINDS`): the weighted heading per
-        # latitude band, [8 bands, 6 hex directions E NE NW W SW SE]; and the
-        # band of every tile's row (`windBand`, the same integer comparisons)
-        self._wind_w = torch.tensor([[int(v) for v in b] for b in _ds["winds"]], dtype=torch.long, device=device)
+        # latitude band, [8 bands, 6 hex directions E NE NW W SW SE], each band's
+        # latitudes; and every tile's pooled weights (`windWeights`: the row's
+        # latitude `windLatitude`, every band holding it, both ends inclusive)
+        _ww = torch.tensor([[int(v) for v in b] for b in _ds["winds"]], dtype=torch.long, device=device)
+        _wlo = [int(x) for x in _ds["windBandLo"]]
+        _whi = [int(x) for x in _ds["windBandHi"]]
         _wr = torch.arange(self.T, device=device) // self.W
-        _ws, _wx = self.H - 1, (self.H - 1) - 2 * _wr
-        _wb = torch.full_like(_wx, 7)
-        for _bi, _ok in ((6, 3 * _wx >= -2 * _ws), (5, 3 * _wx >= -_ws), (4, 18 * _wx >= -_ws),
-                         (3, _wx >= 0), (2, 18 * _wx >= _ws), (1, 3 * _wx >= _ws), (0, 3 * _wx >= 2 * _ws)):
-            _wb = torch.where(_ok, torch.full_like(_wb, _bi), _wb)
-        self._wind_band = _wb  # [T]
-        self._st_movement = int(_ds["stormMovement"])  # `STORM_MOVEMENT`: unit steps per walk
+        _lat = 90 - torch.div(180 * torch.div(100 * _wr, self.H, rounding_mode="floor"), 100, rounding_mode="floor")
+        self._wind_pool = torch.zeros(self.T, 6, dtype=torch.long, device=device)  # [T, 6]
+        for _bi in range(len(_wlo)):
+            _in = (_lat >= _wlo[_bi]) & (_lat <= _whi[_bi])
+            self._wind_pool += _in.long().unsqueeze(1) * _ww[_bi].unsqueeze(0)
+        self._st_movement = int(_ds["stormMovement"])  # `STORM_MOVEMENT`: points a turn's walk spends
+        # a step's cost onto the storm's own terrain and onto any other, and the
+        # damage rows' percent on the storm's last turn
+        self._st_step_on = int(_ds["stormStepCostOn"])
+        self._st_step_off = int(_ds["stormStepCostOff"])
+        self._st_last_pct = int(_ds["stormLastTurnPct"])
         self._st_family_t = torch.tensor(self._st_family, dtype=torch.long, device=device)
 
         def _stf(k: str) -> torch.Tensor:
@@ -2919,6 +2931,10 @@ class SimInit:
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
         self._seat_route_cache = None   # ((turn,r,_eff_version,_rp_kill_version), [B,RC]|None)
+        # row -> (the descent's inputs, cloned; its (arrived, eff, posts)) — `_route_path_gold`
+        self._path_gold_memo: dict = {}
+        # (row, record) -> (the recorded reads, the result) — `_seat_city_stats`
+        self._stats_memo: dict = {}
         self._suz_rows_cache = None  # ((turn, _eff_version), {code: [B, n_majors] bool})
         self._congress_slot_cache = None  # (congress_active clone, {r: (outcome, target)})
         # statecompare's per-digest memo: set by state_digest_all around one
@@ -3301,16 +3317,19 @@ class SimInit:
         # CIV6 (Railroad): the 0.25-Movement route a Military Engineer lays
         # over the road, at the cost of 1 Iron and 1 Coal.
         self.railroad = torch.tensor([[t.get("rr", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # Damage table stays float64 regardless of sim dtype: the RNG factor
-        # is float64 and damage rounds to integers the TS engine must match.
-        # CIV6 (GlobalParameters, measured live): damage = round((COMBAT_BASE_DAMAGE
-        # + rand(COMBAT_MAX_EXTRA_DAMAGE)) * (1 + COMBAT_POWER_SCALING)^diff), floored
-        # at COMBAT_MINIMUM_DAMAGE. The table is the exporter's 0.1-granular
-        # 1.04^diff over +-200 (one double per q, shared with TS damageRoll).
+        # CIV6 (GameCore_XP2_Release.dll 0x519090): damage =
+        # trunc((COMBAT_BASE_DAMAGE + rand(COMBAT_MAX_EXTRA_DAMAGE)) * expf(x/256)
+        # + 0.5) in single precision, clamped to [COMBAT_MINIMUM_DAMAGE,
+        # COMBAT_MAX_HIT_POINTS]. The table is the exporter's `damageFactor`
+        # per exponent x in 1/256ths over +-dmgReach, each an f32 value held
+        # in f64; `_damage_roll` rounds its products to f32 as TS `damageOf`.
         self._dmg_base = torch.tensor(cb["dmgBase"], dtype=torch.float64, device=device)
+        self._dmg_reach = int(cb["dmgReach"])
+        self._dmg_k256 = int(cb["dmgK256"])
         self._dmg_base_damage = int(cb["dmgBaseDamage"])
         self._dmg_max_extra = int(cb["dmgMaxExtra"])
         self._dmg_min = int(cb["dmgMin"])
+        self._dmg_max = int(cb["dmgMax"])
         # The BARBARIAN ladder maps a ladder POSITION (0..3 melee, 4/5 ranged,
         # 6 scout, 7/8 naval) to a ROSTER index. barb_unit_type holds that roster index,
         # exactly like major_unit_type and major_unit_type, so combat / moves / ranged strength /
@@ -3938,7 +3957,6 @@ class SimInit:
         # (`_free_pair_type`), then every `_free_grant_period`th of the city's
         # turns one unit, its class drawn over `_free_grant_w` and its chassis
         # `_free_grant_units[class, era]` (-1 where the era has none)
-        self._free_def = int(rules.seats["freeCityDefense"])
         self._free_pair_n = int(rules.seats["freeCityPairCount"])
         self._free_pair_cls = int(rules.seats["freeCityPairClass"])
         self._free_grant_period = int(rules.seats["freeCityGrantPeriod"])
@@ -4140,6 +4158,12 @@ class SimInit:
         # turns it has left (`Tile.stormEvent` / `Tile.stormTurns`)
         self.storm_event = torch.full((B, T), -1, dtype=torch.long, device=dev)
         self.storm_left = torch.zeros(B, T, dtype=torch.long, device=dev)
+        # the storm's serial, travelling with its record (`Tile.stormId`), the
+        # serial of the last storm that struck each plot (`Tile.stormStruck`)
+        # and each game's last serial handed out (`GameState.stormSerial`)
+        self.storm_id = torch.full((B, T), -1, dtype=torch.long, device=dev)
+        self.storm_struck = torch.full((B, T), -1, dtype=torch.long, device=dev)
+        self.storm_serial = torch.zeros(B, dtype=torch.long, device=dev)
         # the turn the FIRE a plot belongs to began, -1 none (`Tile.fireStart`),
         # and a METEOR SITE on the plot (`Tile.meteor`)
         self.fire_start = torch.full((B, T), -1, dtype=torch.long, device=dev)

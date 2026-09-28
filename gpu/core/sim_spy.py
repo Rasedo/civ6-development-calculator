@@ -430,11 +430,6 @@ class SimSpy:
         return max(0, int(self.unit_spy_level[b, v]) + self._spy_op_levels(b, v, m)
                    + self._quartermaster_levels(b, row) + self._congress_pact_levels(b, m))
 
-    def _spy_roll(self, b: int, pct: int) -> bool:
-        one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        one[b] = True
-        return int(self._next_random(one)[b] * 100) < pct
-
     def _resolve_mission(self, row: int, b: int, v: int) -> None:
         m = int(self.unit_spy_mission[b, v])
         mdef = self._spy_missions[m]
@@ -456,9 +451,11 @@ class SimSpy:
             self.unit_spy_turns[b, v] = int(self._spy_mission_turns(row, m, _sc)[b])
             return
         lvl = self._spy_effective_level(row, b, v, m, hr, hc)
-        # a counterspy guarding the district lowers the realised roll, flat
-        guard = (self._spy_counterspy_roll
-                 if self._counterspies_guarding(b, hr, hc, int(self.unit_tile[b, v])).numel() else 0)
+        # the pursuing counterspy lowers the realised roll by 3 plus 1 per
+        # level above the first (`ComputeNeededDieRoll` 0x529b60)
+        post = self._counterspy_pursuing(b, hr, hc, int(self.unit_tile[b, v]))
+        guard = (self._spy_counterspy_roll + self._spy_counterspy_level_roll
+                 * min(int(self.unit_spy_level[b, post]), self._spy_max_level)) if post >= 0 else 0
         out = (self.M_SUCCESS_UNDETECTED if bool(mdef["certain"])
                else self._mission_outcome(self._mission_roll(b) - guard, self._mission_threshold(m, lvl)))
         if mdef["offensive"]:
@@ -518,14 +515,15 @@ class SimSpy:
         city's own districts, and a survivor reappears in the CAPITAL after
         the route's ride home. The spy takes the FASTEST route whose district
         stands (the driver's choice where the real game asks the player). The
-        police guess one of the offered routes, uniformly; the score is the
-        install's base + a level term per level (Ace Driver "+4 levels" among
-        them) + the police term on a right guess + the counterspy term per
-        level of the post guarding the district, and the spy gets away when
-        the mission roll's 3d6 lands at or under it. A failed escape is the
-        catch: "imprisoned,
-        but not killed" where a MAJOR runs the prison — a minor keeps no cell,
-        so its catch ends the career — or the spy is killed (`spyEscape`)."""
+        police cover one offered route, drawn with weight (longest TravelTime
+        - the route's own + 1); the target v is the install's base less a
+        level term per level above the first (Ace Driver "+4 levels" among
+        them), +4 when the police cover the route taken, and no counterspy
+        term — ResolveEscape passes none (GameCore_XP2_Release.dll 0x52ce40).
+        One 3d6: the spy gets away at v or over; on v - 2 .. v - 1 it is
+        caught, "imprisoned, but not killed" where a MAJOR runs the prison — a
+        minor keeps no cell, so its catch ends the career — and below that it
+        is killed (`spyEscape`)."""
         rr = hr if hr >= 0 else self._CITY_MINOR0 + max(cs, 0)
         cc = hc if hr >= 0 else 0
         rrT = torch.full((1, 1), rr, dtype=torch.long, device=self.device)
@@ -536,21 +534,24 @@ class SimSpy:
         route = offered[0]
         one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         one[b] = True
-        guessed = offered[int(self._next_random(one)[b] * len(offered))] is route
-        posted = torch.zeros(0, dtype=torch.long, device=self.device)
-        if hr >= 0:
-            # CIV6: "when enemy Spies are performing missions in those
-            # districts, there is a much higher chance than normal that they
-            # will be caught" — the post guarding the district the spy worked
-            # from leans on the ESCAPE (`counterspiesGuarding`).
-            posted = self._counterspies_guarding(b, hr, hc, int(self.unit_tile[b, v]))
-        score = (self._spy_escape_base
-                 + self._spy_escape_level * (int(self.unit_spy_level[b, v]) + 1
+        # `policeCover`: ONE draw over the offered routes, weighted by the
+        # longest TravelTime - the route's own + 1 ("Police Exit Covered")
+        longest = max(int(r["turns"]) for r in self._spy_escape_routes)
+        total = sum(longest - int(r["turns"]) + 1 for r in offered)
+        pick = int(self._next_random(one)[b] * total)
+        cover = offered[-1]
+        for r in offered:
+            pick -= longest - int(r["turns"]) + 1
+            if pick < 0:
+                cover = r
+                break
+        guessed = cover is route
+        v_esc = (self._spy_escape_base
+                 - self._spy_escape_level * (int(self.unit_spy_level[b, v])
                                              + self._spy_promo_sum(b, v, "SPY_ESCAPE_LEVEL"))
-                 + (self._spy_escape_police if guessed else 0)
-                 + (self._spy_escape_counter_level * (int(self.unit_spy_level[b, int(posted[0])]) + 1)
-                    if posted.numel() else 0))
-        if self._mission_roll(b) <= score:
+                 - (self._spy_escape_police if guessed else 0))
+        roll = self._mission_roll(b)
+        if roll >= v_esc:
             cap = self.city_is_cap[b, row]
             alv = self.city_alive[b, row]
             if not bool(alv.any()):
@@ -561,20 +562,19 @@ class SimSpy:
             self.unit_spy_target[b, v] = int(self.city_center[b, row, slot])
             self.unit_spy_turns[b, v] = route["turns"]
             return
-        if hr >= 0 and self._spy_roll(b, self._spy_capture_pct):
-            self._spy_captured(row, b, v, hr, posted)
+        if hr >= 0 and roll >= v_esc - self._spy_escape_capture_band:
+            self._spy_captured(row, b, v, hr, self._counterspy_pursuing(b, hr, hc, int(self.unit_tile[b, v])))
             return
         self.unit_alive[b, v] = False
 
-    def _spy_captured(self, row: int, b: int, v: int, hr: int, posted: torch.Tensor) -> None:
-        """The catch — from the roll's own CAPTURED band or a lost escape
+    def _spy_captured(self, row: int, b: int, v: int, hr: int, captor: int) -> None:
+        """The catch — from the roll's own CAPTURED band or an escape's
         (`spyCaptured`)."""
         # CIV6 (Spies and Espionage): a spy "may gain levels from
         # successful offensive operations, or capturing an enemy Spy" —
-        # the post that made the catch likelier is the one that earns it:
-        # the pursuer, the first guarding post (the highest level).
-        if posted.numel():
-            self._level_up_spy(b, int(posted[0]))
+        # the pursuing post (`_counterspy_pursuing`) is the one that earns it.
+        if captor >= 0:
+            self._level_up_spy(b, captor)
         # CIV6: captured spies "are imprisoned, but not killed", and the
         # owner "can then attempt to trade with the civilization who
         # captured the Spy, securing their release" — at the level it
@@ -594,8 +594,7 @@ class SimSpy:
             self._spy_escape(row, b, v, hr, hc, cs=cs)
             return
         if out == self.M_CAPTURED and hr >= 0:
-            posted = self._counterspies_guarding(b, hr, hc, int(self.unit_tile[b, v]))
-            self._spy_captured(row, b, v, hr, posted)
+            self._spy_captured(row, b, v, hr, self._counterspy_pursuing(b, hr, hc, int(self.unit_tile[b, v])))
             return
         self.unit_alive[b, v] = False
 
@@ -753,24 +752,23 @@ class SimSpy:
         one[b] = True
         self._promo_offer_draw(one, torch.full((self.B,), v, dtype=torch.long, device=self.device))
 
-    def _counterspies_guarding(self, b: int, hr: int, hc: int, t: int) -> torch.Tensor:
-        """the holder's counterspy posts that DEFEND the district at `t`,
-        highest level first, ties in slot order — the first is the post that
-        pursues. CIV6 (LOC_ESPIONAGECHOOSER_COUNTERSPY): a post will "Protect
-        {1_District} (and all adjacent districts) from enemy spies" — the
-        district it stands on and every district within 1 of it; and
-        (Surveillance) "When Counterspying all city districts are defended"
-        (`counterspiesGuarding`)."""
+    def _counterspy_pursuing(self, b: int, hr: int, hc: int, t: int) -> int:
+        """the holder's counterspy that PURSUES a spy working at `t`, its
+        slot or -1 — the FIRST in slot order, whatever its level
+        (GameCore_XP2_Release.dll finder 0x52ac80): a post within hex
+        distance 1 of the plot, any district of any city — CIV6
+        (LOC_ESPIONAGECHOOSER_COUNTERSPY) "Protect {1_District} (and all
+        adjacent districts) from enemy spies" — or anywhere in the plot's
+        city with (Surveillance) "When Counterspying all city districts are
+        defended" (`counterspyPursuing`)."""
         posts = (self._spies_of(hr)[b]
                  & (self.unit_spy_mission[b] == self._spy_m_counterspy)).nonzero(as_tuple=True)[0]
-        keep = []
         for u in posts.tolist():
             ut = int(self.unit_tile[b, u])
             if int(self.pair_dist[ut, t]) <= 1 or (
                     self._city_holds_tile(b, hr, hc, ut) and self._spy_promo_sum(b, u, "SPY_SURVEIL") > 0):
-                keep.append(u)
-        keep.sort(key=lambda u: -min(int(self.unit_spy_level[b, u]), self._spy_max_level))  # stable: ties keep slot order
-        return torch.tensor(keep, dtype=torch.long, device=self.device)
+                return u
+        return -1
 
     def _counter_levels(self, b: int, hr: int, hc: int, t: int = -1) -> int:
         """CIV6 (Diplomatic Quarter): "Enemy Spies operate at 2 levels below

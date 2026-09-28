@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
+import { nextRandom } from '../../../cpu/core/rand';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { disasterPhase, stormWeights, eventRows, stormFootprint, stormTile, stormWalk } from '../../../cpu/core/disasters';
 import { hexDistance } from '../../../world/hex';
-import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, WIND_BAND_LO, windBand, RANDOM_EVENT_START_TURN } from '../../../cpu/data/disasters';
+import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, WIND_BAND_LO, WIND_BAND_HI, windLatitude, windWeights, STORM_MOVEMENT, STORM_LAST_TURN_PCT, RANDOM_EVENT_START_TURN, STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { tileYields } from '../../../cpu/core/yields';
 import type { GameState, Tile } from '../../../cpu/core/types';
@@ -29,8 +30,8 @@ const EV = (id: string) => STORM_EVENTS[STORM_EVENTS.findIndex((e) => e.id === i
 /** a family's two rows, in table order */
 const familyPair = (f: string) => STORM_EVENTS.flatMap((e, i) => (e.family === f ? [i] : []));
 
-function draws(s0: number, s1: number): number {
-  for (let k = 0; k <= 12; k++) if (((s0 + k * STEP) >>> 0) === (s1 >>> 0)) return k;
+function draws(s0: number, s1: number, most = 12): number {
+  for (let k = 0; k <= most; k++) if (((s0 + k * STEP) >>> 0) === (s1 >>> 0)) return k;
   throw new Error(`the stream moved by a non-draw amount: ${s0} -> ${s1}`);
 }
 
@@ -99,13 +100,15 @@ describe('the eight storms are the install\'s table', () => {
     expect(PREVAILING_WINDS[1]).toEqual([2, 2, 0, 0, 0, 1]);
     expect(PREVAILING_WINDS[2]).toEqual([0, 0, 2, 2, 1, 0]);
     expect(PREVAILING_WINDS[6]).toEqual([2, 1, 0, 0, 0, 2]);
-    // a 26-row map: row 0 is the north pole's band, the equator sits between rows 12 and 13
-    expect([0, 5, 9, 12, 13, 16, 20, 25].map((r) => windBand(r, 26))).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-    // the boundaries are lower-inclusive: on a 181-row map row 30 is exactly lat 60
-    expect(windBand(30, 181)).toBe(0);
-    expect(windBand(31, 181)).toBe(1);
-    expect(windBand(90, 181)).toBe(3); // lat 0
-    expect(windBand(91, 181)).toBe(4); // just south
+    expect(WIND_BAND_HI).toEqual([90, 60, 30, 5, 0, -5, -30, -60]);
+    // the DLL's latitude, 90 - 180 x (100 row // H) // 100 in the engine's rows
+    expect([0, 17, 33, 50, 51, 99].map((r) => windLatitude(r, 100))).toEqual([90, 60, 31, 0, -1, -88]);
+    expect(windWeights(0, 100)).toEqual(PREVAILING_WINDS[0]);
+    // both ends inclusive: lat 60 pools the polar and the mid-latitude band,
+    // the equator its two
+    expect(windWeights(17, 100)).toEqual([2, 2, 1, 2, 2, 1]);
+    expect(windWeights(50, 100)).toEqual([0, 0, 1, 2, 1, 0]);
+    expect(windWeights(51, 100)).toEqual(PREVAILING_WINDS[4]);
   });
 
   it('a family starts on its own terrains, flat or hills, never a mountain', () => {
@@ -151,30 +154,33 @@ describe('the eight storms are the install\'s table', () => {
     expect(state.eventLog.every((e) => !e.startsWith('Storm') || e.startsWith('Storm: BLIZZARD'))).toBe(true);
   });
 
-  it('the walk is eight band-drawn steps, one draw each, dropped where the family cannot go', () => {
-    // CIV6 (`Movement 8`, measured): on an all-snow board a blizzard walks
-    // freely. Row 8 of 16 reads band 5 (-30..-5: NW 1 W 2 SW 2), so every
-    // step heads west-ish and the resultant is 4-8 hexes, never eastward.
+  it('the walk spends 8 points, 1 a step on the storm\'s own terrain and 2 elsewhere, striking at every step', () => {
+    // on an all-snow board a blizzard takes eight 1-point steps, then draws a
+    // ninth it cannot pay. Row 8 of 16 is the equator (NW 1 W 2 SW 1): every
+    // step heads west-ish. Every step strikes the footprint at the new
+    // centre, each plot once: ten draws a newly struck plot.
+    expect(STORM_MOVEMENT).toBe(8);
     const state = board(null, 'SNOW');
     const idx = STORM_EVENTS.findIndex((e) => e.id === 'BLIZZARD_SIGNIFICANT');
     const start = tileAtCoords(state.map, 8, 8);
     start.stormEvent = idx;
     start.stormTurns = 2;
-    expect(windBand(8, 16)).toBe(5);
+    start.stormId = 7;
+    expect(windLatitude(8, 16)).toBe(0);
     const s0 = state.rngState;
-    const end = stormWalk(state, start, STORM_EVENTS[idx]);
-    expect(draws(s0, state.rngState)).toBe(8);
-    expect(end.stormEvent).toBe(idx);
-    expect(end.stormTurns).toBe(2);
-    expect(start.stormEvent).toBe(-1);
-    expect(start.stormTurns).toBe(0);
+    const end = stormWalk(state, start, STORM_EVENTS[idx], false, 100);
+    const struck = state.map.tiles.filter((t) => t.stormStruck === 7).length;
+    expect(struck).toBeGreaterThan(0);
+    expect(draws(s0, state.rngState, 1000)).toBe(9 + 10 * struck);
+    expect([end.stormEvent, end.stormTurns, end.stormId]).toEqual([idx, 2, 7]);
+    expect([start.stormEvent, start.stormTurns]).toEqual([-1, 0]);
     const dist = hexDistance(start.col, start.row, end.col, end.row);
-    expect(dist).toBeGreaterThanOrEqual(4);
+    expect(dist).toBeGreaterThanOrEqual(1);
     expect(dist).toBeLessThanOrEqual(8);
     expect(end.col).toBeLessThanOrEqual(start.col);
     expect(state.map.tiles.filter((t) => (t.stormTurns ?? 0) > 0)).toHaveLength(1);
-    // a hurricane on the one OCEAN tile of a grassland board has nowhere to
-    // go: eight draws, eight dropped steps, the record where it was
+    // a hurricane on the one OCEAN tile of a grassland board steps onto the
+    // land at 2 points a step: four steps, then a fifth draw it cannot pay
     const land = board(null, 'GRASSLAND');
     const sea = tileAtCoords(land.map, 8, 8);
     sea.terrain = 'OCEAN';
@@ -182,11 +188,14 @@ describe('the eight storms are the install\'s table', () => {
     const cat4 = STORM_EVENTS.findIndex((e) => e.id === 'HURRICANE_CAT_4');
     sea.stormEvent = cat4;
     sea.stormTurns = 2;
+    sea.stormId = 3;
     const s1 = land.rngState;
-    expect(stormWalk(land, sea, STORM_EVENTS[cat4])).toBe(sea);
-    expect(draws(s1, land.rngState)).toBe(8);
-    expect(sea.stormEvent).toBe(cat4);
-    // another storm's centre blocks a step the same way
+    const off = stormWalk(land, sea, STORM_EVENTS[cat4], false, 100);
+    expect(off).not.toBe(sea);
+    const struck1 = land.map.tiles.filter((t) => t.stormStruck === 3).length;
+    expect(draws(s1, land.rngState, 1000)).toBe(5 + 10 * struck1);
+    expect(off.stormEvent).toBe(cat4);
+    // another storm's centre on every neighbour ends the walk at its first draw
     const snow = board(null, 'SNOW');
     const c = tileAtCoords(snow.map, 8, 8);
     c.stormEvent = idx;
@@ -196,38 +205,47 @@ describe('the eight storms are the install\'s table', () => {
       n.stormEvent = idx;
       n.stormTurns = 1;
     }
-    expect(stormWalk(snow, c, STORM_EVENTS[idx])).toBe(c);
+    const s2 = snow.rngState;
+    expect(stormWalk(snow, c, STORM_EVENTS[idx], false, 100)).toBe(c);
+    expect(draws(s2, snow.rngState)).toBe(1);
   });
 
-  it('a storm damages on its first two turns and walks on its last two', () => {
-    // ENTRY: the footprint at the strike plot, no walk. MOVEMENT: walk, then
-    // the footprint. DISSIPATION: walk, no footprint. Read off the draws a
-    // phase makes: a tornado on the board's one PLAINS HILL in a sea can
-    // never leave its tile, so every step is a dropped draw and the
-    // footprint is one tile's eleven. That hill is the board's only
-    // tornado plot, and no city stands to anchor a drought, so the turn's
-    // event draw is empty (one draw) or names a tornado, whose centre pick
-    // lands on the busy hill (two draws).
-    const state = board(null, 'COAST');
+  it('a storm strikes its strike plot on entry and every step after, each plot once, its last turn at half', () => {
+    // the entry turn: the footprint at the strike plot, ten draws a plot
+    const state = board(null, 'SNOW');
+    const idx = STORM_EVENTS.findIndex((e) => e.id === 'BLIZZARD_SIGNIFICANT');
     const c = tileAtCoords(state.map, 8, 8);
-    c.terrain = 'PLAINS';
-    c.elevation = 'HILLS';
-    c.feature = 'WOODS';
-    c.stormEvent = STORM_EVENTS.findIndex((e) => e.id === 'TORNADO_FAMILY');
+    c.stormEvent = idx;
     c.stormTurns = 3;
-    const counts: number[] = [];
-    for (let i = 0; i < 3; i++) {
-      const s0 = state.rngState;
-      disasterPhase(state);
-      let k = 0;
-      for (; k < 80; k++) if (((s0 + k * STEP) >>> 0) === (state.rngState >>> 0)) break;
-      counts.push(k);
+    c.stormId = 1;
+    state.turn = 1;   // no event draw before the start turn
+    const s0 = state.rngState;
+    disasterPhase(state);
+    const first = state.map.tiles.filter((t) => t.stormStruck === 1).length;
+    expect(first).toBe(STORM_EVENTS[idx].hexes);
+    expect(draws(s0, state.rngState, 200)).toBe(10 * first);
+    // a plot struck once is never struck again by the same storm
+    const struckAt = new Set(state.map.tiles.filter((t) => t.stormStruck === 1).map((t) => t.index));
+    disasterPhase(state);
+    disasterPhase(state);
+    expect(state.map.tiles.filter((t) => (t.stormTurns ?? 0) > 0)).toHaveLength(0);
+    for (const i of struckAt) expect(state.map.tiles[i].stormStruck).toBe(1);
+    // the last turn halves every damage row's chance: a certain pillage row
+    // lands half the time
+    expect(STORM_LAST_TURN_PCT).toBe(50);
+    const g = board(null);
+    const t = tileAtCoords(g.map, 5, 5);
+    setTileOwner(t, 0);
+    const ev = STORM_EVENTS.find((e) => e.impPill >= 1)!;
+    let hit = 0;
+    for (let i = 0; i < 2000; i++) {
+      t.improvement = 'FARM';
+      t.pillaged = false;
+      stormTile(g, t, ev, false, STORM_LAST_TURN_PCT);
+      if (t.pillaged || !t.improvement) hit++;
     }
-    expect(state.eventLog.some((e) => e.startsWith('Storm:'))).toBe(false);
-    const event = counts.map((k, i) => k - [11, 8 + 11, 8][i]);
-    expect(event.every((e) => e === 1 || e === 2)).toBe(true);
-    expect(c.stormTurns).toBe(0);
-    expect(c.stormEvent).toBe(-1);
+    // pillaged at half its certain row, or destroyed at half its own
+    expect(Math.abs(hit / 2000 - (1 - 0.5 * (1 - ev.impDest * 0.5)))).toBeLessThan(0.04);
   });
 
   it('the canonical disc is centre, ring 1, ring 2, each ring by tile index', () => {
@@ -262,7 +280,7 @@ describe('the eight storms are the install\'s table', () => {
     t.fertilityProd = 1;
     expect(tileYields(makeYieldCtx(state, 0), t)).toEqual(before);
   });
-  it('a storm tile draws eleven times whatever stands there', () => {
+  it('a storm tile draws ten times whatever stands there, then once per unit its share strikes', () => {
     const state = board(null);
     const tile = tileAtCoords(state.map, 5, 5);
     for (const [ev, unit] of [['TORNADO_FAMILY', null], ['HURRICANE_CAT_5', 'WARRIOR']] as const) {
@@ -270,8 +288,12 @@ describe('the eight storms are the install\'s table', () => {
       const s0 = state.rngState;
       stormTile(state, tile, EV(ev), false);
       // improvement, destroy, district, BUILDING, population, civilian, land,
-      // naval, one HP band, and the two fertility yields
-      expect(draws(s0, state.rngState)).toBe(11);
+      // naval, and the two fertility yields; then the struck unit's own
+      // damage draw (GameCore_XP2_Release.dll 0x3366a0) when the land share hit
+      const probe = { rngState: s0 } as GameState;
+      for (let i = 0; i < 6; i++) nextRandom(probe);
+      const landHit = nextRandom(probe) < EV(ev).landP;
+      expect(draws(s0, state.rngState)).toBe(10 + (unit && landHit ? 1 : 0));
     }
   });
 
@@ -345,17 +367,19 @@ describe('the eight storms are the install\'s table', () => {
 
   it('a warmed world grows each row by its own ChanceIncreasePerDegree', () => {
     // CIV6 (`RandomEvents.ChanceIncreasePerDegree`): 0 on each family's milder
-    // row, 50 on its worse — weight x (1 + 50/100 x 2) at two degrees
-    const base = stormWeights(0);
-    expect(base).toEqual(STORM_EVENTS.map((e) => e.weight));
-    const warm = stormWeights(2);
+    // row, 50 on its worse — w + trunc(50 x w x 2) // 100 at two degrees, the
+    // weights in tenths on a Standard map
+    const std = STANDARD_MAP_AREA;
+    const base = stormWeights(0, std);
+    expect(base).toEqual(STORM_EVENTS.map((e) => Math.floor(e.weight * 10)));
+    const warm = stormWeights(2, std);
     for (const f of STORM_FAMILIES) {
       const [a, b] = familyPair(f);
       expect(warm[a]).toBe(base[a]);
-      expect(warm[b]).toBeCloseTo(base[b] * 2, 12);
+      expect(warm[b]).toBe(base[b] * 2);
     }
     // ...and the draw reads exactly these rows, in the live table's order
-    const rows = eventRows(2);
+    const rows = eventRows(2, std);
     expect(rows.filter((r) => r.family === 'storm').map((r) => r.weight)).toEqual(warm);
     expect(rows.map((r) => r.family)).toEqual([
       'eruption', 'eruption', 'flood', 'flood', 'flood',

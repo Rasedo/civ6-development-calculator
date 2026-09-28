@@ -88,6 +88,9 @@ export interface City {
    *  cities of the other party"), which the capital field alone cannot
    *  answer. */
   founderSeat?: number;
+  /** The seat a FREE CITY revolted from: its centre stands on that seat's
+   *  base (`holderStrength`). -1 on every other city. */
+  formerSeat?: number;
   /** CITIZEN ASSIGNMENT for the district SLOTS: how many citizens the player
    * has pinned into each district, by PLACEABLE_DISTRICTS index; -1 where the
    * automatic rule decides. `Tile.locked` is the same choice for plots. */
@@ -422,6 +425,8 @@ export interface GameState {
   iceAtStart?: number;
   map: GameMap;
   turn: number;
+  /** the last storm serial handed out (`Tile.stormId`) */
+  stormSerial?: number;
   seatActions?: SeatActionLog;
   sandbox: boolean;
   /** Great-person ids recruited BY ANYONE, in claim order. Real Civ 6 great

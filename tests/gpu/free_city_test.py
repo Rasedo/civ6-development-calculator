@@ -531,9 +531,20 @@ def test_defence_and_strike(rules, path) -> None:
     F = sim.FREE_ROW
     hrow = torch.tensor([F])
     hcol = torch.tensor([col])
-    assert int(sim._holder_strength(hrow)[B0]) == 72, "the Free City's flat base is 72"
-    assert int(sim._holder_strength(torch.tensor([0]))[B0]) != 72
+    # the Free City stands on its former owner's base (`city_former`), live
+    assert int(sim.city_former[B0, F, col]) == 0, int(sim.city_former[B0, F, col])
+    assert int(sim._holder_strength(hrow, hcol)[B0]) == int(sim._holder_strength(torch.tensor([0]))[B0])
+    sim.civ_best_melee[B0, 0] = 45
+    assert int(sim._holder_strength(hrow, hcol)[B0]) == 45 - sim._city_base_melee_cut
     assert int(sim._city_defense_cs(hrow, hcol)[0][B0]) == int(sim._centre_strength(hrow, hcol)[B0])
+    # a capture takes the city's grants, never handing them to the captor
+    granted = ((sim.unit_alive[B0] & (sim.unit_seat[B0] == FREE_SEAT)
+                & (sim.unit_free_city[B0] == sim.city_id[B0, F, col])).nonzero(as_tuple=True)[0]).tolist()
+    assert granted, "the revolt granted nothing"
+    snap = sim.snapshot()
+    sim._transfer_city(B0, F, col, 1, conquest=True)
+    assert not any(bool(sim.unit_alive[B0, u]) for u in granted), "a captured city's grants stayed"
+    sim.restore(snap)
     # an unwalled Free City fires nothing; a walled one strikes a hostile
     # unit beside it
     for walled in (False, True):
@@ -552,7 +563,7 @@ def test_defence_and_strike(rules, path) -> None:
         s._free_cities_phase()
         hp = int(s.major_unit_hp[B0, u])
         assert (hp < 100) if walled else (hp == 100), (walled, hp)
-    print("  8 the defence OK — a flat 72, walls on top; a walled Free City strikes")
+    print("  8 the defence OK — the former owner's base, walls on top; a capture takes the grants; a walled Free City strikes")
 
 
 def test_free_unit_defends(rules, path) -> None:

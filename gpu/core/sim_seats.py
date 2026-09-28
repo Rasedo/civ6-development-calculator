@@ -1173,9 +1173,12 @@ class SimSeats:
             chg = ok & self._policy_set_changes(row, chosen)
             ok = ok & (~chg | _unlock(chg))
             if bool(ok.any()):
-                self.civ_policies[:, row] = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
-                # the government memo's fast path trusts this version alone
-                self._eff_version += 1
+                laid = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
+                # the same set laid again changes nothing; a new one moves the
+                # version, which the government memo's fast path trusts alone
+                if not torch.equal(laid, self.civ_policies[:, row]):
+                    self.civ_policies[:, row] = laid
+                    self._eff_version += 1
         return carried
 
     def _apply_citizens(self, row: int, active: torch.Tensor, spec, lock, swap=None) -> None:
@@ -3608,8 +3611,9 @@ class SimSeats:
         seat-pair terms; the plane's damage is drawn first, then the
         interceptor's (runs/c34w_strike_d0_20260927T012444Z.jsonl and the
         other c34w_strike records `interceptFight` names). An interceptor at 0
-        HP or less is gone; one that stands banks `_xp_intercept` through the
-        percentage modifiers, and the plane banks nothing from the fight."""
+        HP or less is gone; one that stands scores as a melee DEFENDER with no
+        kill bonus, and the plane banks nothing from the fight. No war
+        weariness: no key here is in WW_BATTLE_KEYS."""
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         _t = torch.ones_like(fire)
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
@@ -3643,10 +3647,13 @@ class SimSeats:
         earn = self._xp_eligible(types) & (seat != BARB_SEAT) & (seat != FREE_SEAT)
         rs, ss, seat, types = rs[earn], ss[earn], seat[earn], types[earn]
         if rs.numel() > 0:
-            gain = self._city_xp(
-                torch.full_like(ss, self._xp_intercept),
-                self.unit_xp_pct[rs, ss] + self._seat_xp_pct(types, seat, rs),
-                self._xp_mult(seat, types, False, rs))
+            # the interceptor scores as a melee DEFENDER with the kill flag 0
+            # (DLL 0x5197e0): ceil(2 + S_plane / S_interceptor), its percent
+            gain = self._battle_xp(
+                self._xp_strength(types, False), self._xp_strength(at0[rs], False),
+                foe_died=torch.zeros_like(rs, dtype=torch.bool), ranged=False, initiated=False,
+                pct=self.unit_xp_pct[rs, ss] + self._seat_xp_pct(types, seat, rs),
+                mult=self._xp_mult(seat, types, False, rs))
             self.unit_xp[rs, ss] = self._bank_xp(self.unit_xp[rs, ss], self.unit_level[rs, ss], gain)
             self._log_xp(rs, ss, "ix")
 
@@ -3661,11 +3668,12 @@ class SimSeats:
         target, it is forced to only engage the enemy fighter and will not
         attack the ground target." The patrol answers first
         (`_intercept_fight`), then the anti-air cover `_air_cover_scan` finds.
-        A fighter turned back has spent its sortie. A bomber the INTERCEPTION
-        downs flies on and strikes at its health after the fight, and is gone
-        after its blow (`_air_downed`); a plane the anti-air burst shoots down
-        leaves. `duelled` [B] (-1 none) is the weapon the sortie is about to
-        fight, which answers in that fight and fires no burst."""
+        A fighter turned back has spent its sortie. No test of the plane's
+        health stands between the interception, the anti-air answer and the
+        strike (DLL 0x203cb0): a plane either of them downs still strikes at the wound its
+        accumulated damage leaves and is gone after its blow (`_air_downed`).
+        `duelled` [B] (-1 none) is the weapon the sortie is about to fight,
+        which answers in that fight and fires no burst."""
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
         through = fire.clone()
@@ -3677,9 +3685,7 @@ class SimSeats:
         c_slot, c_has = self._air_cover_scan(row, tgt.clamp(min=0), duelled)
         cfire = through & c_has
         if bool(cfire.any()):
-            flying = _hp_p[:, u] > 0
             self._air_cover_answer(cfire, atk_kind, u, tgt, c_slot)
-            through = through & ~(cfire & flying & (_hp_p[:, u] <= 0))
         dead = fire & ~through & (_hp_p[:, u] <= 0)
         if bool(dead.any()):
             _alive_p[:, u] = _alive_p[:, u] & ~dead
@@ -8386,7 +8392,7 @@ class SimSeats:
             out = add if out is None else out + add
         return out
 
-    def _seat_route_income(self, row: int) -> torch.Tensor | None:
+    def _seat_route_income(self, row: int, per_route: bool = False) -> torch.Tensor | None:
         """cityTradeYields for ANY seat row — per-COLUMN ORIGIN income from this
         row's outgoing routes, [B, cols, 6] double in engine yield
         order (food, prod, gold, sci, cul, faith), or None when the row holds
@@ -8420,7 +8426,11 @@ class SimSeats:
         enhancer claim — which moves the Messenger term — bumps _bel_version.
         Callers iterate rows strictly sequentially, so the slot is always
         overwritten by a different row before the same row is re-requested.
-        Consumers read one column, read-only."""
+        Consumers read one column, read-only.
+
+        `per_route` (a major row): the ORIGIN terms per route instead, [B, K,
+        6], uncached and before the Letters of Marque cut — `routeOriginYields`'
+        twin, which the plunder payout reads (`_route_yield_value`)."""
         if row >= self.n_majors:
             # a MINOR's one city: Democracy's "+4 Food and +4 Production for
             # BOTH CITIES" on its suzerain's route in, then its own routes out
@@ -8433,7 +8443,7 @@ class SimSeats:
                 return _own_m
             return _ally_m if _own_m is None else _ally_m + _own_m
         key = (self.turn, row, self._eff_version, self._rp_kill_version, self._bel_stamp())
-        if self._seat_route_cache is not None and self._seat_route_cache[0] == key:
+        if not per_route and self._seat_route_cache is not None and self._seat_route_cache[0] == key:
             return self._seat_route_cache[1]
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
@@ -8453,8 +8463,9 @@ class SimSeats:
                       or any(r[5] == 1
                              for r in self._live_rows(row, self._route_improvement_rows))
                       or _ally_in is not None)
-        if not bool(act.any()) and not _dest_rows:
-            self._seat_route_cache = (key, None)
+        if not bool(act.any()) and (per_route or not _dest_rows):
+            if not per_route:
+                self._seat_route_cache = (key, None)
             return None
         B = self.B
         cols = self.RC
@@ -8475,14 +8486,26 @@ class SimSeats:
         _comp_o = (_reg_o >= 0) & self.district_complete.gather(1, _reg_o.clamp(min=0).reshape(B, -1)).reshape_as(_reg_o)
         dom6 = self._route_centre_dom.reshape(1, 1, 6) + _comp_o.double() @ self._route_dom_y  # [B, cols, 6]
         inc = torch.zeros(B, cols * 6, dtype=torch.float64, device=self.device)
+        # every term below until the incoming ones is PER ROUTE: it lands in
+        # `rk` [B, K, 6] and reaches the origin column once, summed
+        rk = torch.zeros(B, rr.shape[1], 6, dtype=torch.float64, device=self.device)
+
+        def _rk_add(y, v: torch.Tensor) -> None:
+            """one per-route term: `y` the yield column (an int or [B, K]),
+            `v` its [B, K] amount"""
+            v = torch.broadcast_to(v, rk.shape[:2]).to(rk.dtype)
+            if isinstance(y, torch.Tensor):
+                rk.scatter_add_(2, y.unsqueeze(2), v.unsqueeze(2))
+            else:
+                rk[:, :, y] += v
         _rg = self._gov_mods(row)[12]["rgold"]
         if bool((_rg != 0).any()):
-            inc.scatter_add_(1, from_j * 6 + 2, _rg.double().unsqueeze(1) * (act & has_from).double())
+            _rk_add(2, _rg.double().unsqueeze(1) * (act & has_from).double())
         # domestic legs
         pays_d = act & (rr[:, :, 1] >= 0) & has_from & has_dest
         pd = pays_d.double()
         for _yc in range(6):
-            inc.scatter_add_(1, from_j * 6 + _yc, dom6[:, :, _yc].gather(1, dest_j) * pd)
+            _rk_add(_yc, dom6[:, :, _yc].gather(1, dest_j) * pd)
         # the PATH TERM's inputs per paying leg (`routePathGold`), filled by
         # each leg kind below: the destination centre and D, the Gold the
         # destination's own rows pay
@@ -8494,13 +8517,13 @@ class SimSeats:
         _tdm = self._gp_perm(row, "domesticRouteGoldPerSpecialty").double()
         if bool((_tdm != 0).any()):
             _spec_o = (_comp_o & self._is_specialty.reshape(1, 1, -1)).sum(dim=2).double()  # [B, cols]
-            inc.scatter_add_(1, from_j * 6 + 2, _tdm.unsqueeze(1) * _spec_o.gather(1, dest_j) * pd)
+            _rk_add(2, _tdm.unsqueeze(1) * _spec_o.gather(1, dest_j) * pd)
         # CIV6 (John Rockefeller): "+2 Gold for each Strategic resource improved
         # by the destination city" — each kind it has improved
         _rkf = self._gp_perm(row, "strategicRouteGold").double()
         if bool((_rkf != 0).any()):
             _kd = self._city_improved_res_kinds(row, 2).double()  # 2 = strategic
-            inc.scatter_add_(1, from_j * 6 + 2, _rkf.unsqueeze(1) * _kd.gather(1, dest_j) * pd)
+            _rk_add(2, _rkf.unsqueeze(1) * _kd.gather(1, dest_j) * pd)
         # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's
         # rows, the same shape the international leg pays
         if self._domestic_route_rows:
@@ -8514,7 +8537,7 @@ class SimSeats:
                 _pay = pays_d & _who.unsqueeze(1)
                 if _rx_d:
                     _pay = _pay & _across_d
-                inc.scatter_add_(1, from_j * 6 + _ry, _ra * _pay.double())
+                _rk_add(_ry, _ra * _pay.double())
         # CIV6 (Qhapaq Ñan,
         # EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_TERRAIN_FOR_DOMESTIC): the
         # ORIGIN city's own mountains pay on every domestic leg
@@ -8522,7 +8545,7 @@ class SimSeats:
             _tw = self._row_is(row, _tc, _tl)
             if bool(_tw.any()):
                 _mtn = self._city_terrain_count(row, self.tile_mountain).gather(1, from_j).double()
-                inc.scatter_add_(1, from_j * 6 + _ty, _ta * _mtn * pd * _tw.double().unsqueeze(1))
+                _rk_add(_ty, _ta * _mtn * pd * _tw.double().unsqueeze(1))
         # CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
         # the ORIGIN side): this row's route out, per named improvement at its
         # destination city (`ROUTE_IMPROVEMENT_ROWS`) — the domestic leg
@@ -8532,20 +8555,20 @@ class SimSeats:
             _iw = self._row_is(row, _ic, _il)
             if bool(_iw.any()):
                 _cnt_d = self._city_improvement_count(_ii)[:, row].gather(1, dest_j).double()
-                inc.scatter_add_(1, from_j * 6 + _iy, _ia * _cnt_d * pd * _iw.double().unsqueeze(1))
+                _rk_add(_iy, _ia * _cnt_d * pd * _iw.double().unsqueeze(1))
         if self.n_governors and row < self.n_majors:
             # CIV6 (Surplus Logistics): "Your Trade Routes ending here provide
             # +2 Food to their starting city" — the DESTINATION's governor
             # pays the ORIGIN column.
             _sl = self._governor_sum(row, "routeStartFood")
             if bool((_sl != 0).any()):
-                inc.scatter_add_(1, from_j * 6 + 0, _sl.gather(1, dest_j) * pd)
+                _rk_add(0, _sl.gather(1, dest_j) * pd)
         # CIV6 (Isolationism): "Domestic routes provide +2 Food, +2
         # Production."
         _dr = self._gov_mods(row)[12]["domroute"].double()
         if bool((_dr != 0).any()):
             for _kc in range(6):
-                inc.scatter_add_(1, from_j * 6 + _kc, _dr[:, _kc].unsqueeze(1) * pd)
+                _rk_add(_kc, _dr[:, _kc].unsqueeze(1) * pd)
         if self._enh_any and bool((self.civ_enhancer[:, row] >= 0).any()):
             tr6 = self._enh["tradeRel"][self.civ_enhancer[:, row] + 1]
             if bool((tr6 != 0).any()):
@@ -8553,7 +8576,7 @@ class SimSeats:
                 rel_ok = (pays_d & (dest_fol == row) & self.civ_religion_done[:, row].unsqueeze(1)).double()
                 if bool((rel_ok != 0).any()):
                     for _kc in range(6):
-                        inc.scatter_add_(1, from_j * 6 + _kc, tr6[:, _kc].unsqueeze(1) * rel_ok)
+                        _rk_add(_kc, tr6[:, _kc].unsqueeze(1) * rel_ok)
         if self.S > 0 and bool(is_cs.any()):
             S = self.S
             _tr = self.rules.trade
@@ -8573,9 +8596,9 @@ class SimSeats:
             _p_want = _p_want | pays_c
             # a SURVIVED City-State Emergency pays its target +2 gold on every
             # minor leg — added AFTER the yield, so Sovereignty does not double it
-            inc.scatter_add_(1, from_j * 6 + 2, citystate_gold * pc
+            _rk_add(2, citystate_gold * pc
                              + pays_c.double() * self._emergency_cs_route_gold(row).unsqueeze(1))
-            inc.scatter_add_(1, from_j * 6 + ycol, citystate_spec * pc)
+            _rk_add(ycol, citystate_spec * pc)
             # CIV6 (Democracy): a route to a minor this seat is SUZERAIN of pays
             # the government's own +4 Food and +4 Production, the same clause the
             # ally leg takes.
@@ -8584,7 +8607,7 @@ class SimSeats:
                 _suz_d = pays_c & self._suzerain_mask(row)[:, :S].gather(1, css)
                 if bool(_suz_d.any()):
                     for _kc in range(6):
-                        inc.scatter_add_(1, from_j * 6 + _kc,
+                        _rk_add(_kc,
                                          _arc[:, _kc].unsqueeze(1) * _suz_d.double())
             # CIV6 (Kumasi's suzerain): routes to ANY city-state pay "+2
             # Culture and +1 Gold for every specialty district in the origin
@@ -8596,17 +8619,17 @@ class SimSeats:
                 # pays the route, never the suzerain's own bonus (9170 t240:
                 # three districts paid 12 culture here and 6 on TS)
                 kf = kum.double().unsqueeze(1) * pays_c.double() * spec_o
-                inc.scatter_add_(1, from_j * 6 + 4, self._suz_route_cul * kf)
-                inc.scatter_add_(1, from_j * 6 + 2, self._suz_route_gold * kf)
+                _rk_add(4, self._suz_route_cul * kf)
+                _rk_add(2, self._suz_route_gold * kf)
             # the destination's Trading Post gold (`_route_post_gold`) —
             # added AFTER the yield, so Sovereignty does not double it
             # CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
             _fad = self._gp_perm(row, "csRouteFaith").double()
             if bool((_fad != 0).any()):
-                inc.scatter_add_(1, from_j * 6 + 5, _fad.unsqueeze(1) * pays_c.double())
+                _rk_add(5, _fad.unsqueeze(1) * pays_c.double())
             pg_c = self._route_post_gold(row, self.citystate_center[:, :S].gather(1, css))
             if bool((pg_c > 0).any()):
-                inc.scatter_add_(1, from_j * 6 + 2, pg_c.double() * pays_c.double())
+                _rk_add(2, pg_c.double() * pays_c.double())
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
         # (seat_route_dcity >= 0) pays District_TradeRouteYields' INTERNATIONAL
         # column over the dest's completed districts plus the centre row.
@@ -8710,9 +8733,9 @@ class SimSeats:
             _p_dest = torch.where(pays_i, _dctr, _p_dest)
             _p_d = torch.where(pays_i, intl6[:, :, 2], _p_d)
             _p_want = _p_want | pays_i
-            inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
+            _rk_add(2, gold_i * pays_i.double())
             for _yc in (0, 1, 3, 4, 5):
-                inc.scatter_add_(1, from_j * 6 + _yc, intl6[:, :, _yc] * pays_i.double())
+                _rk_add(_yc, intl6[:, :, _yc] * pays_i.double())
             # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows.
             # An INTERCONTINENTAL row pays only where the two ENDPOINTS sit
             # on different landmasses, and it ADDS to the plain row rather
@@ -8726,7 +8749,7 @@ class SimSeats:
                 _pay = pays_i & _who.unsqueeze(1)
                 if _rx_i:
                     _pay = _pay & _across_i
-                inc.scatter_add_(1, from_j * 6 + _ry, _ra * _pay.double())
+                _rk_add(_ry, _ra * _pay.double())
             # CIV6 (Sahel Merchants): "International Trade Routes gain +1 Gold
             # for every flat Desert tile in the ORIGIN city" — the international
             # twin of the domestic per-terrain rows (`INTL_ROUTE_TERRAIN_ROWS`)
@@ -8741,7 +8764,7 @@ class SimSeats:
                 # the ORIGIN city's own tiles, so the count is gathered by
                 # `from_j` — `_rx`/`_col` address the DESTINATION
                 _cnt_t = self._city_terrain_count(row, _plane).gather(1, from_j).double()
-                inc.scatter_add_(1, from_j * 6 + _ty, _ta * _cnt_t * (pays_i & _tw.unsqueeze(1)).double())
+                _rk_add(_ty, _ta * _cnt_t * (pays_i & _tw.unsqueeze(1)).double())
             # CIV6 (The Grand Embassy): "Receives Science or Culture from Trade
             # Routes to civilizations that are MORE ADVANCED than Russia. +1 per
             # 3 technologies or civics ahead" (`PROGRESS_TRADE_ROWS`)
@@ -8757,9 +8780,9 @@ class SimSeats:
                 _ah_t = (_all_t.gather(1, _drow) - _mine_t.unsqueeze(1)).clamp(min=0)
                 _ah_c = (_all_c.gather(1, _drow) - _mine_c.unsqueeze(1)).clamp(min=0)
                 _ok = pays_i & _pw.unsqueeze(1)  # `pays_i` already carries valid_dest
-                inc.scatter_add_(1, from_j * 6 + 3,
+                _rk_add(3,
                                  torch.div(_ah_t, _pper, rounding_mode="floor").double() * _ok.double())
-                inc.scatter_add_(1, from_j * 6 + 4,
+                _rk_add(4,
                                  torch.div(_ah_c, _pper, rounding_mode="floor").double() * _ok.double())
             # the ORIGIN side of the improvement rows on the international leg
             for _ic, _il, _ii, _iy, _ia, _is in self._live_rows(row, self._route_improvement_rows):
@@ -8768,18 +8791,18 @@ class SimSeats:
                 _iw = self._row_is(row, _ic, _il)
                 if bool(_iw.any()):
                     _cnt_i = self._city_improvement_count(_ii).gather(1, _rx).gather(2, _col).squeeze(2).double()
-                    inc.scatter_add_(1, from_j * 6 + _iy, _ia * _cnt_i * (pays_i & _iw.unsqueeze(1)).double())
+                    _rk_add(_iy, _ia * _cnt_i * (pays_i & _iw.unsqueeze(1)).double())
             if bool(_cleo_d.any()):
-                inc.scatter_add_(1, from_j * 6 + 0, self._cleo_in_food * (pays_i & _cleo_d).double())
+                _rk_add(0, self._cleo_in_food * (pays_i & _cleo_d).double())
             if snd_s is not None and bool((snd_s != 0).any()):
-                inc.scatter_add_(1, from_j * 6 + 3, snd_s * pays_i.double())
+                _rk_add(3, snd_s * pays_i.double())
             # CIV6 (Alliance, level 1): the typed alliance pays its route
             # bonus on every paying leg - the sender half.
             _aty = self.seat_alliance_type[:, row].gather(1, dr)
             _yc = self._al_route_ycol[_aty.clamp(min=0)]
             _hit = pays_i & (_aty >= 0) & (_yc >= 0)
             if bool(_hit.any()):
-                inc.scatter_add_(1, from_j * 6 + _yc.clamp(min=0),
+                _rk_add(_yc.clamp(min=0),
                                  self._al_route_to[_aty.clamp(min=0)].double() * _hit.double())
             # CIV6 (Democracy): "Your Trade Routes to an Ally or Suzerain's
             # city provide +4 Food and +4 Production for both cities" — this
@@ -8789,7 +8812,7 @@ class SimSeats:
                 _ally_d = pays_i & (self.seat_ally_turns[:, row].gather(1, dr) > 0)
                 if bool(_ally_d.any()):
                     for _kc in range(6):
-                        inc.scatter_add_(1, from_j * 6 + _kc,
+                        _rk_add(_kc,
                                          _ar[:, _kc].unsqueeze(1) * _ally_d.double())
         # THE PATH TERM (`routePathGold`) of every paying leg, to the ORIGIN
         # column's Gold
@@ -8797,7 +8820,7 @@ class SimSeats:
             _p_o = self.city_center[:, row].gather(1, from_j)
             _pg = self._route_path_gold(row, torch.where(_p_want, _p_o, torch.full_like(_p_o, -1)),
                                         _p_dest, _p_d, _p_want)
-            inc.scatter_add_(1, from_j * 6 + 2, _pg)
+            _rk_add(2, _pg)
         # CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2
         # Gold for every Bonus resource within 3 tiles of the city and in
         # this city's territory" — a flat add on every outgoing route.
@@ -8809,7 +8832,7 @@ class SimSeats:
                 _d3 = self.pair_dist[_ctrw] <= 3  # [B, cols, T]
                 _ownc = _slw.unsqueeze(1) == torch.arange(cols, device=self.device).reshape(1, cols, 1)
                 _cntw = (_d3 & _ownc & (self.res_cat == 1).unsqueeze(1)).sum(dim=2).double()
-                inc.scatter_add_(1, from_j * 6 + 2,
+                _rk_add(2,
                                  (_pw * _cntw).gather(1, from_j) * (act & has_from).double())
         ch = self.seat_route_chain[:, row]  # [B, K, CMAX] the stored course
         # CIV6 (Hunza): "+1 Gold for every 5 tiles a Trade Route travels"
@@ -8843,7 +8866,7 @@ class SimSeats:
                     _pays_h = _pays_h | (_intl_h & has_from & _hith.any(dim=2))
                 _tiles = self._route_travel_tiles(ch, _octr.clamp(min=0), _dctr_h.clamp(min=0))
                 _hgold = (_tiles // self._suz_route_tiles_per).double() * self._suz_route_len_gold
-                inc.scatter_add_(1, from_j * 6 + 2,
+                _rk_add(2,
                                  _hgold * (_pays_h & has_from).double() * _hz.double().unsqueeze(1))
         # `routeChainGold`: the modifiers that name the stored chain's Trading
         # Posts, to the ORIGIN column
@@ -8867,7 +8890,11 @@ class SimSeats:
                 if bool(_bb.any()):
                     _fgn = live_c & (self.tile_seat.gather(1, chf).reshape(ch.shape) != row)
                     cg = cg + _fgn.double().sum(dim=2) * _bb.double().unsqueeze(1)
-            inc.scatter_add_(1, from_j * 6 + 2, cg * (act & has_from).double())
+            _rk_add(2, cg * (act & has_from).double())
+        if per_route:
+            return rk
+        for _yc in range(6):
+            inc.scatter_add_(1, from_j * 6 + _yc, rk[:, :, _yc])
         # CIV6 (Mediterranean's Bride): "+2 Gold for Egypt" on every other
         # civilization's route INTO the city (`incomingIntlRoutes`).
         _cleo = self._row_leads(row, "CLEOPATRA")
@@ -9969,7 +9996,8 @@ class SimSeats:
                 _z = torch.where(_spec >= zmin, zamt, torch.zeros_like(_spec))
                 extra = _z if extra is None else extra + _z
         balance = have + lux_add - need if extra is None else have + lux_add + extra - need
-        balance = balance - self._ww_penalty(row, torch.float64).unsqueeze(1)
+        _wwv = self._ww_losses(row).double()
+        balance = balance - _wwv
         # CIV6 (GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE): every city of a seat
         # whose treasury has fallen to the line loses amenities to bankruptcy
         balance = balance - self._bankrupt_amenities(row).unsqueeze(1)
@@ -9986,9 +10014,7 @@ class SimSeats:
         # construction and `computeCityStats` never walks them, so a line
         # from here can only print against `(no line)`.
         if self._log_diff and row < self.n_majors:
-            _wwv = self._ww_penalty(row, torch.float64)
             for _ab in range(self.B):
-                _ww1 = float(_wwv[_ab])
                 _lines = self._diff_events.setdefault(_ab, [])
                 def _spec_n(_b: int, _cc: int) -> int:
                     """`completedDistrictCount(state, city, true)`'s twin —
@@ -10008,7 +10034,7 @@ class SimSeats:
                     _lines.append(
                         f"c:{int(self._ROW_SEAT[row])}:{int(self.city_id[_ab, row, _c])}"
                         f" base{float(_amen_base[_ab, _c]):g}"
-                        f" lux{float(lux_add[_ab, _c]):g} ww{_ww1:g}"
+                        f" lux{float(lux_add[_ab, _c]):g} ww{float(_wwv[_ab, _c]):g}"
                         f" have{float(balance[_ab, _c] + need[_ab, _c]):g}"
                         f" need{float(need[_ab, _c]):g} bal{float(balance[_ab, _c]):g}"
                         f" tier{int(tier_idx[_ab, _c])}"
@@ -10038,6 +10064,7 @@ class SimSeats:
         self.city_is_cap[b, row, col] = False
         self.city_orig_cap[b, row, col] = -1
         self.city_founder[b, row, col] = -1
+        self.city_former[b, row, col] = -1
         self.city_pop[b, row, col] = 0
         self.city_growth[b, row, col] = 0
         self.city_cbox[b, row, col] = 0
@@ -10065,6 +10092,10 @@ class SimSeats:
         self.city_pressure[b, row, col, :] = 0
         self.city_free_press[b, row, col, :] = 0
         self.city_freed_turn[b, row, col] = -1
+        # the walk's stash: a city no walk has read yet carries none
+        # (`workedTiles` / `amenityTier` unset on a new City object)
+        self.city_worked[b, row, col, :] = -1
+        self.city_amen_tier[b, row, col] = -1
 
     def _city_col_at(self, row: int, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """`cityAtTile` in COLUMN space — the column of seat row `row`'s
@@ -10135,6 +10166,14 @@ class SimSeats:
                 bool(self.city_alive[b, dst_row].sum() >= int(self.rules.seats["maxCities"])))
             if int(self.city_alive[b, src_row].sum()) <= 1:
                 self._grievance_last_city(b, dst_row)
+        # a Free City's own grants (`unit_free_city`) go when it leaves the
+        # Free Cities, joined or captured, never to the taker (`transferCity`)
+        if src_row == self.FREE_ROW:
+            gone = (self.unit_alive[b] & (self.unit_seat[b] == FREE_SEAT)
+                    & (self.unit_free_city[b] == cid)).nonzero(as_tuple=True)[0]
+            if gone.numel():
+                self._occ_clear(torch.full_like(gone, b), self.unit_tile[b, gone], gone)
+                self.unit_alive[b, gone] = False
         old_pop = int(self.city_pop[b, src_row, src_col])
         old_acq = int(self.city_acquired[b, src_row, src_col])
         old_orig = int(self.city_orig_cap[b, src_row, src_col])
@@ -10237,6 +10276,10 @@ class SimSeats:
         self.city_is_cap[b, dst_row, col] = False  # a received city is never a capital (TS isCapital: false)
         self.city_orig_cap[b, dst_row, col] = old_orig  # ...but it is still whoever founded it
         self.city_founder[b, dst_row, col] = old_founder
+        self.city_former[b, dst_row, col] = src_row if dst_row == self.FREE_ROW else -1
+        # the flipped City is a new object: no walk has read it yet
+        self.city_worked[b, dst_row, col, :] = -1
+        self.city_amen_tier[b, dst_row, col] = -1
         # CIV6 (Military Emergency): "The Target has conquered the city of
         # another nation; it must be Liberated!" The seat that LOST it is the
         # affected one.
@@ -11636,14 +11679,18 @@ class SimSeats:
         return torch.where(ctr_seat == FREE_SEAT, torch.full_like(ctr_seat, self.FREE_ROW),
                            ctr_seat.clamp(min=0, max=self.n_majors - 1))
 
-    def _holder_strength(self, hrow: torch.Tensor) -> torch.Tensor:
+    def _holder_strength(self, hrow: torch.Tensor, hcol: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `holderStrength`, for a city-plane ROW per game: max(the
         start era's melee strength — a major's and a minor's each its own row
         — the strongest melee unit the holder has trained or bought, a major's
         `civ_best_melee` and a city-state's `citystate_best_melee`) less the
-        cut, and on the Free Cities row a flat base of its own
-        (`_free_def`)."""
+        cut. With the city's column `hcol`, a Free City stands on the row it
+        revolted from (`city_former`, `cityBaseSeat`); the Free Cities row
+        itself trains toward no base."""
         bidx = self._bidx
+        if hcol is not None:
+            fr = self.city_former[bidx, self.FREE_ROW, hcol.clamp(min=0)]
+            hrow = torch.where((hrow == self.FREE_ROW) & (hcol >= 0) & (fr >= 0), fr, hrow)
         major = hrow < self.n_majors
         s0 = (hrow - self._CITY_MINOR0).clamp(min=0, max=max(self.S - 1, 0))
         minor = (hrow >= self._CITY_MINOR0) & (hrow < self._CITY_MINOR0 + self.S)
@@ -11652,8 +11699,7 @@ class SimSeats:
                                        torch.zeros(self.B, dtype=self.civ_best_melee.dtype, device=self.device)))
         start = torch.where(minor, torch.full_like(best, self._city_start_melee_minor),
                             torch.full_like(best, self._city_start_melee_major))
-        return torch.where(hrow == self.FREE_ROW, torch.full_like(best, self._free_def),
-                           torch.maximum(best, start) - self._city_base_melee_cut)
+        return torch.maximum(best, start) - self._city_base_melee_cut
 
     def _garrison_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
                      seat: torch.Tensor, base: torch.Tensor) -> torch.Tensor:
@@ -11691,7 +11737,7 @@ class SimSeats:
         hc0 = hcol.clamp(min=0)
         minor = (hrow >= self._CITY_MINOR0) & (hrow < self._CITY_MINOR0 + self.S)
         seat = self._ROW_SEAT[hrow]
-        base = self._holder_strength(hrow)
+        base = self._holder_strength(hrow, hcol)
         # each wall building built adds its own strength (`wallsStrength`)
         cs = base + (self.city_bldg[bidx, hrow, hc0].long() * self._b_walls_cs.unsqueeze(0)).sum(dim=1)
         live = ((self.tile_seat == seat.unsqueeze(1))
@@ -12852,7 +12898,7 @@ class SimSeats:
                       f"atk_e={float(atk_e[_b]):.1f} def_cs={float(def_cs[_b]):.1f} "
                       f"combat={float(self._type_combat[int(a_type[_b, u])]):.0f} "
                       f"wound={float(self._wound(a_hp[:, u], a_type[:, u])[_b]):.1f} "
-                      f"xp={int(a_xp[_b, u])} best={int(self._holder_strength(hrow)[_b])}")
+                      f"xp={int(a_xp[_b, u])} best={int(self._holder_strength(hrow, slot)[_b])}")
         # DRAW ORDER is the parity contract: the city's damage first, the
         # counter second, exactly as TS's cityAssault draws them.
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
@@ -14006,6 +14052,21 @@ class SimSeats:
         f = frm[bb, kk]
         t = dest[bb, kk]
         water = self._trade_water_level(row)[bb]
+        own_post = self.trading_post[:, row] if row < self.n_majors else None
+        city_map = self._centre_city_map() if own_post is not None else None
+        # The descent is a pure function of its legs and of the planes it
+        # reads, which move far less often than the city walk reads this term:
+        # it is kept per row against an exact copy of every one of them.
+        key = (bb, f, t, water, self.passable, self.wpass, self.improvement, self.tile_range,
+               self.water, self.railroad, self.tile_seat, own_post, city_map)
+        memo = self._path_gold_memo.get(row)
+        if memo is not None and all(
+                (a is None and b is None) or (a is not None and b is not None and torch.equal(a, b))
+                for a, b in zip(memo[0], key)):
+            arrived, eff, posts = memo[1]
+            gold = d[bb, kk] * eff.double() / float(self._path_denom) + posts.double()
+            out[bb, kk] = torch.where(arrived, gold, torch.zeros_like(gold))
+            return out
         alive = ((f >= 0) & (t >= 0) & self._trade_walkable(bb, f.clamp(min=0), water)
                  & self._trade_walkable(bb, t.clamp(min=0), water))
         cur = torch.where(alive, f, torch.full_like(f, -1))
@@ -14013,8 +14074,6 @@ class SimSeats:
         plots = torch.ones_like(f)
         score = torch.zeros_like(f)
         posts = torch.zeros_like(f)
-        own_post = self.trading_post[:, row] if row < self.n_majors else None
-        city_map = self._centre_city_map() if own_post is not None else None
         for _ in range(TRADE_ROAD_MAX_STEPS):
             walking = alive & ~arrived
             if not bool(walking.any()):
@@ -14035,6 +14094,8 @@ class SimSeats:
             alive = alive & (arrived | stepped)
             arrived = arrived | (alive & (cur == t))
         eff = torch.clamp(torch.div(self._path_denom * score, plots, rounding_mode="floor"), max=self._path_cap)
+        self._path_gold_memo[row] = (tuple(None if k is None else k.clone() for k in key),
+                                     (arrived, eff, posts))
         gold = d[bb, kk] * eff.double() / float(self._path_denom) + posts.double()
         out[bb, kk] = torch.where(arrived, gold, torch.zeros_like(gold))
         return out
@@ -14290,6 +14351,81 @@ class SimSeats:
             bump = bump + (we >= be).long() * 10
         return self._trade_duration + bump
 
+    def _route_dest_yields(self, row: int, hb: torch.Tensor, hk: torch.Tensor) -> torch.Tensor:
+        """[n, 6] f64 — what row `row`'s routes (hb, hk) pay their DESTINATION
+        city, after the destination seat's Letters of Marque cut
+        (`routeDestYields`): a city-state destination Democracy's half on its
+        suzerain's route; a major's city Democracy's half on an ally's route,
+        and from a foreign major Cleopatra's Gold, the destination seat's
+        incoming-route rows and the city's Great Person Gold; every route of a
+        major the destination seat's improvement rows. One route at a time:
+        only plundered routes ask."""
+        n = int(hb.shape[0])
+        out = torch.zeros(n, 6, dtype=torch.float64, device=self.device)
+        major = row < self.n_majors
+        _fgk = self._gp_city_perm_names.index("foreignRouteGold")
+        for i in range(n):
+            b, k = int(hb[i]), int(hk[i])
+            code = int(self.seat_routes[b, row, k, 1])
+            dcity = int(self.seat_route_dcity[b, row, k])
+            y = torch.zeros(6, dtype=torch.float64, device=self.device)
+            if code <= -2:
+                s = -code - 2
+                if (major and s < self.S and bool(self.citystate_alive[b, s])
+                        and bool(self._suzerain_mask(row)[b, s])):
+                    y = y + self._gov_mods(row)[12]["allyroute"][b].double()
+                out[i] = y
+                continue
+            if dcity >= 0:
+                d, cid = int(self.seat_route_dseat[b, row, k]), dcity
+            elif code >= 0:
+                d, cid = row, code
+            else:
+                continue
+            if d >= self.n_majors:
+                continue
+            hitc = (self.city_id[b, d] == cid) & self.city_alive[b, d]
+            if not bool(hitc.any()):
+                continue
+            c = int(hitc.long().argmax())
+            if major and d != row and bool(self.seat_ally_turns[b, row, d] > 0):
+                y = y + self._gov_mods(row)[12]["allyroute"][b].double()
+            foreign = major and d != row and dcity >= 0
+            if foreign:
+                if bool(self._leads_vec("CLEOPATRA")[b, d]):
+                    y[2] += self._cleo_in_gold
+                for _wc, _wl, _wy, _wa in self._live_rows(d, self._incoming_route_yield_rows):
+                    if bool(self._row_is(d, _wc, _wl)[b]):
+                        y[_wy] += _wa
+                y[2] += float(self.city_gp_perm[b, d, c, _fgk])
+            if major and (foreign or d == row):
+                for _ic, _il, _ii, _iy, _ia, _is in self._live_rows(d, self._route_improvement_rows):
+                    if _is == 1 and bool(self._row_is(d, _ic, _il)[b]):
+                        y[_iy] += _ia * float(self._city_improvement_count(_ii)[b, d, c])
+            cut = float(self._gov_mods(d)[12]["routeymul"][b])
+            out[i] = torch.floor(y * cut) if cut != 1 else y
+        return out
+
+    def _route_yield_value(self, row: int, hb: torch.Tensor, hk: torch.Tensor) -> torch.Tensor:
+        """[n] f64 — THE ROUTE'S VALUE V of row `row`'s routes (hb, hk)
+        (`routeYieldValue`): the route's origin yields (`_seat_route_income`
+        per route, a minor's `_minor_route_k`) after the owner's Letters of
+        Marque cut, plus its destination yields (`_route_dest_yields`), Gold
+        at 1 and every other yield at GOLD_EQUIVALENT_OTHER_YIELDS."""
+        n = int(hb.shape[0])
+        if row >= self.n_majors:
+            rk = self._minor_route_k(row - self._CITY_MINOR0)
+        else:
+            rk = self._seat_route_income(row, per_route=True)
+        o = rk[hb, hk] if rk is not None else torch.zeros(n, 6, dtype=torch.float64, device=self.device)
+        if row < self.n_majors:
+            cut = self._gov_mods(row)[12]["routeymul"].double()[hb].unsqueeze(1)
+            o = torch.where(cut != 1, torch.floor(o * cut), o)
+        y = o + self._route_dest_yields(row, hb, hk)
+        w = torch.full((6,), float(self._gold_equiv_other), dtype=torch.float64, device=self.device)
+        w[2] = 1.0
+        return (y * w).sum(dim=1)
+
     def _trade_walk_tick(self, row: int, active: torch.Tensor) -> None:
         """The Trader's WALK, then PLUNDER — phase.ts's trade-block head.
 
@@ -14308,7 +14444,6 @@ class SimSeats:
         escort of the owner's within `_trader_guard_radius` on the walker's
         ground guards it. CIV6 (Reform the Coinage, Golden face): "your
         Traders cannot be plundered"."""
-        dev = self.device
         act = self.seat_routes[:, row, :, 0] >= 0  # [B, K]
         leg = self.seat_route_leg[:, row]
         walking = act & (leg >= 0) & active.unsqueeze(1)
@@ -14387,25 +14522,27 @@ class SimSeats:
         # the raider's HULL on the Trader's tile (`plunderedByHull`): the
         # military plane is where a ship stands, and no other plane holds one
         _hull = (s_m[hit] == hr) & self.unit_naval[self.unit_type[hb, ms[hit].clamp(min=0)].clamp(min=0)]
+        # THE PAYOUT (`routePlunderGold`): max(50, floor(V x the turns)), V
+        # the route's yield value, read before the route goes
+        _v = self._route_yield_value(row, hb, hk)
+        _base = torch.maximum(torch.full_like(_v, float(self._trade_plunder_gold)),
+                              torch.floor(_v * self._trade_plunder_turns))
         mj = hr < self.n_majors
         if bool(mj.any()):
-            _gold = torch.full((int(mj.sum()),), float(self._trade_plunder_gold),
-                               dtype=torch.float64, device=dev)
-            _gold = _gold * self._fx_at_seat("rplun", hr[mj], hb[mj]).double()
+            # the raider's plunder percent (Total War, Letter of Marque)
+            _pct = self._fx_at_seat("rplun", hr[mj], hb[mj]).double()
+            _gold = _base[mj] + torch.floor(_base[mj] * _pct / 100)
             # CIV6 (Francis Drake, Ching Shih): a permanent percentage on top,
             # an ability of the naval classes alone — it pays when a hull
             # plunders.
             _pp = 1 + self._gp_perm_at(hr[mj], "routePlunderPct", hb[mj]).double() / 100
             _gold = _gold * torch.where(_hull[mj], _pp, torch.ones_like(_pp))
             self.civ_treasury.index_put_((hb[mj], hr[mj]), _gold, accumulate=True)
-        # a city-state raider banks the plain gold into its own treasury (it
+        # a city-state raider banks the base into its own treasury (it
         # carries no government or Great Person rows)
         cs = (hr >= 100) & (hr < 100 + self.citystate_treasury.shape[1])
         if bool(cs.any()):
-            self.citystate_treasury.index_put_(
-                (hb[cs], hr[cs] - 100),
-                torch.full((int(cs.sum()),), float(self._trade_plunder_gold), dtype=torch.float64, device=dev),
-                accumulate=True)
+            self.citystate_treasury.index_put_((hb[cs], hr[cs] - 100), _base[cs], accumulate=True)
         self.seat_routes[hb, row, hk] = -1
         self.seat_route_dseat[hb, row, hk] = -1
         self.seat_route_dcity[hb, row, hk] = -1

@@ -244,7 +244,30 @@ def test_city_strike_roster(rules, path) -> None:
     assert gap("OTTOMAN", "WARRIOR") == 0, "the Bombard is siege alone"
     assert gap("GERMANY", "WARRIOR") == 0, "Barbarossa's +7 is against a city-state's city only"
     assert gap("SCYTHIA", "WARRIOR") == 0, "a city is never wounded"
-    print("  8 city strike OK — the struck unit takes its roster's rows")
+    # runs/c26_strike_terms.txt: the unique units' position terms, read as a
+    # defence against a RANGED shot — Ngao Mbeba's +10 (`chassisAbilityCS`)
+    sim = fresh(rules, path)
+    play(sim, 1, None)
+    ngao, war = UNITS.index("NGAO_MBEBA"), UNITS.index("WARRIOR")
+    own_n = _strike_def_e(sim, "NGAO_MBEBA") - float(sim._type_combat[ngao])
+    sim = fresh(rules, path)
+    play(sim, 1, None)
+    own_w = _strike_def_e(sim, "WARRIOR") - float(sim._type_combat[war])
+    assert own_n - own_w == 10, f"Ngao Mbeba's +10 against a city's shot — {own_n} vs {own_w}"
+    # the diplomatic-visibility bonus against the striking seat (`visibilityCS`)
+    sim = fresh(rules, path)
+    play(sim, 1, None)
+    sim.seat_delegation[B0, 0, 1] = 0
+    sim.seat_delegation[B0, 1, 0] = 0
+    before = _strike_def_e(sim, "WARRIOR")
+    sim = fresh(rules, path)
+    play(sim, 1, None)
+    sim.seat_delegation[B0, 0, 1] = 0
+    sim.seat_delegation[B0, 1, 0] = 1
+    vis = float(sim._vis_cs(T(1), T(0))[B0])
+    after = _strike_def_e(sim, "WARRIOR")
+    assert vis > 0 and after - before == vis, f"the visibility bonus rides the shot — {before} -> {after}, vis {vis}"
+    print("  8 city strike OK — the struck unit takes its roster's rows, its position terms and its intel")
 
 
 def test_roosevelt(rules, path) -> None:

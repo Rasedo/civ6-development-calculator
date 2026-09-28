@@ -2061,6 +2061,17 @@
           "note": "who FOUNDED the city, whoever holds it now: what the grievance decay's occupation modifier asks about. -1 on a city annexed from a minor, which no ledger remembers."
         },
         {
+          "name": "formerSeat",
+          "compare": "exact",
+          "covers": [
+            "City.formerSeat"
+          ],
+          "planes": [
+            "city_former"
+          ],
+          "note": "the seat a Free City revolted from, whose base its centre stands on (`cityBaseSeat` / `_holder_strength`). -1 on every other city."
+        },
+        {
           "name": "loyalty",
           "compare": "milli",
           "covers": [
@@ -2906,6 +2917,30 @@
           "planes": [
             "storm_left"
           ]
+        },
+        {
+          "name": "stormId",
+          "compare": "exact",
+          "covers": [
+            "Tile.stormId",
+            "GameState.stormSerial"
+          ],
+          "planes": [
+            "storm_id",
+            "storm_serial"
+          ],
+          "note": "the serial of the storm centred here, -1 when none is live"
+        },
+        {
+          "name": "stormStruck",
+          "compare": "exact",
+          "covers": [
+            "Tile.stormStruck"
+          ],
+          "planes": [
+            "storm_struck"
+          ],
+          "note": "the serial of the last storm whose footprint struck the plot, -1 none: a storm strikes a plot once"
         },
         {
           "name": "fireStart",

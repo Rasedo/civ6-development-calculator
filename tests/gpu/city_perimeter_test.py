@@ -428,8 +428,9 @@ def test_theological(rules, path) -> None:
     sim._theological_combat_phase()
     dealt = 100 - int(sim.major_unit_hp[0, sb])
     taken = 100 - int(sim.major_unit_hp[0, sa])
-    # 110 vs 100: the Apostle's blow is 30*e^0.4*[0.8, 1.2], the reply the inverse
-    assert 36 <= dealt <= 54, f"the Apostle's blow was {dealt}, outside 36-54"
+    # 110 vs 100: the Apostle's blow is (24..35)·e^(100/256) = 35..52, the
+    # reply (24..35)·e^(-100/256) = 16..24 (the DLL's law, `_damage_roll`)
+    assert 35 <= dealt <= 52, f"the Apostle's blow was {dealt}, outside 35-52"
     assert 16 <= taken <= 24, f"the Missionary's reply was {taken}, outside 16-24"
     assert int(sim.rng_state[0]) != before, "theological combat drew nothing"
     print(f"  theological OK: {dealt} dealt, {taken} taken — the exponential roll, not a linear constant")

@@ -10,7 +10,7 @@ import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, grantTechs, st
 import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { buildingPurchaseCost, buildingFaithCost, unitPurchaseCost } from '../../../cpu/core/game';
 import { applySeatPolicies } from '../../../cpu/core/phase';
-import { faithPrice, goldPrice, makeYieldCtx, policyUnlockCost, policyUnlockTerm, seatGovernment } from '../../../cpu/core/effects';
+import { faithPrice, goldPrice, makeYieldCtx, policyEscalated, policyUnlockCost, seatGovernment } from '../../../cpu/core/effects';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { computeCityStats } from '../../../cpu/core/city';
 import { advanceGreatPeople, gpCapped, patronizeGreatPerson } from '../../../cpu/core/greatPeople';
@@ -23,7 +23,7 @@ import { builderJobAt, jobCtx } from '../../../cpu/core/targetSites';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { GREAT_PEOPLE, GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { GOVERNMENT_LIST, POLICY_LIST } from '../../../cpu/data/policies';
-import { CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_PER_TURN_DROP, GAME_SPEED, POLICY_UNLOCK_TECH_FIRST, POLICY_UNLOCK_TECH_PRICE, POLICY_UNLOCK_CIVIC_FIRST, POLICY_UNLOCK_CIVIC_PRICE, POLICY_UNLOCK_ROUND } from '../../../cpu/data/constants';
+import { CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_PER_TURN_DROP, GAME_SPEED, GAME_COST_ESCALATION } from '../../../cpu/data/constants';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, GameState, SeatActionRecord } from '../../../cpu/core/types';
 
@@ -53,34 +53,32 @@ describe('the policy unlock', () => {
     return state;
   }
 
-  it('is free the turn after a civic, then the base dropping a step a turn to the minimum, times the larger measured term', () => {
+  it('is free the turn after a civic, then max(E(50) - s·E(5), E(10)) rounded down to 5 at the seat\'s progress', () => {
     const state = scene();
     const s = seatOf(state, 0)!;
-    expect([CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST]).toEqual([50, 5, 10]);
-    expect([POLICY_UNLOCK_TECH_FIRST, POLICY_UNLOCK_TECH_PRICE.length, POLICY_UNLOCK_CIVIC_FIRST, POLICY_UNLOCK_CIVIC_PRICE.length, POLICY_UNLOCK_ROUND])
-      .toEqual([33, 33, 19, 14, 5]);
+    expect([CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, GAME_COST_ESCALATION]).toEqual([50, 5, 10, 1000]);
     s.government.civicTurn = 10;
     const counts = (t: number, c: number) => {
       s.research.techs = Array.from({ length: t }, (_, i) => `TECH_${i}`);
       s.research.civics = Array.from({ length: c }, (_, i) => `CIVIC_${i}`);
     };
     const at = (turn: number) => { state.turn = turn; return policyUnlockCost(state, 0); };
-    // 44 techs, 29 civics: the tech term's 305 over the civic term's 260 —
-    // the lab's 215 three turns down the fall (35 x 305 / 50 = 213.5)
+    // 44 techs, 29 civics: p = max(4400 // 77, 2900 // 61) = 57, E(50) 306,
+    // E(5) 30, E(10) 61 — the lab's 215 three turns down the fall
     counts(44, 29);
+    expect([policyEscalated(50, 57), policyEscalated(5, 57), policyEscalated(10, 57)]).toEqual([306, 30, 61]);
     expect([at(11), at(12), at(13), at(15), at(100)]).toEqual([0, 305, 275, 215, 60]);
-    // 48 techs at base 25: 25 x 325 / 50 = 162.5, the half read up (165)
+    // 48 techs: p 62, 329 - 5 x 32 = 169 rounded down
     counts(48, 22);
     expect(at(17)).toBe(165);
-    // 33 techs, 30 civics: the civic term's 270 wins
+    // 33 techs, 30 civics: the civic side's p 49 wins, E(50) 270
     counts(33, 30);
     expect(at(12)).toBe(270);
-    // outside the tables the nearest measured step carries on: 70 techs is
-    // 425 + 5 x 5; no techs and 2 civics the civic term's 185 - 5 x 17
+    // 70 techs: p 90, E(50) 455; no techs and 2 civics: p 3, E(50) 63, E(5) 6, E(10) 12
     counts(70, 30);
-    expect(at(12)).toBe(450);
+    expect(at(12)).toBe(455);
     counts(0, 2);
-    expect([policyUnlockTerm(POLICY_UNLOCK_TECH_PRICE, POLICY_UNLOCK_TECH_FIRST, 0), at(12), at(13), at(100)]).toEqual([-95, 100, 90, 20]);
+    expect([at(12), at(13), at(100)]).toEqual([60, 55, 10]);
   });
 
   it('charges a government change outside the window once, and refuses one the purse cannot meet', () => {
@@ -88,9 +86,10 @@ describe('the policy unlock', () => {
     const s = seatOf(state, 0)!;
     s.government.civicTurn = 1;
     s.research.techs = [];
-    state.turn = 5; // three turns past the window: the row's 40 at 2 civics' k = 2
+    s.research.civics = ['CODE_OF_LAWS', 'POLITICAL_PHILOSOPHY'];
+    state.turn = 5; // s = 2 at p 3: 63 - 2 x 6 = 51, rounded down
     const cost = policyUnlockCost(state, 0);
-    expect(cost).toBe(80);
+    expect(cost).toBe(50);
     s.treasury = cost - 1;
     applySeatPolicies(state, s, REC(GOV('OLIGARCHY')));
     expect(seatGovernment(state, 0)).toBe('AUTOCRACY');

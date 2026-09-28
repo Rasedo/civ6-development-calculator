@@ -1,5 +1,5 @@
 
-import { ANARCHY_TURNS, PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, POLICY_UNLOCK_TECH_FIRST, POLICY_UNLOCK_TECH_PRICE, POLICY_UNLOCK_CIVIC_FIRST, POLICY_UNLOCK_CIVIC_PRICE, POLICY_UNLOCK_ROUND } from '../data/constants';
+import { ANARCHY_TURNS, PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, GAME_COST_ESCALATION, gameProgressPct } from '../data/constants';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { TerrainId, Tile } from '../../world/types';
 import { hiddenResourcesFor } from './seats';
@@ -368,7 +368,7 @@ export interface Modifiers {
   cityRanged: number;
   reconXpMult: number;
   pillageMult: number;
-  routePlunderMult: number;
+  routePlunderPct: number;
   routeGold: number;
   faithBuyLandUnits: boolean;
   influencePerTurn: number;
@@ -604,7 +604,7 @@ export function defaultModifiers(): Modifiers {
     cityRanged: 0,
     reconXpMult: 1,
     pillageMult: 1,
-    routePlunderMult: 1,
+    routePlunderPct: 0,
     faithBuyLandUnits: false,
     routeGold: 0,
     influencePerTurn: 0,
@@ -687,7 +687,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.cityRanged) mods.cityRanged += fx.cityRanged;
   if (fx.reconXpMult) mods.reconXpMult *= fx.reconXpMult;
   if (fx.pillageMult) mods.pillageMult *= fx.pillageMult;
-  if (fx.routePlunderMult) mods.routePlunderMult *= fx.routePlunderMult;
+  if (fx.routePlunderPct) mods.routePlunderPct += fx.routePlunderPct;
   if (fx.faithBuyLandUnits) mods.faithBuyLandUnits = true;
   if (fx.routeGold) mods.routeGold += fx.routeGold;
   if (fx.influencePerTurn) mods.influencePerTurn += fx.influencePerTurn;
@@ -1577,40 +1577,32 @@ export function adoptGovernment(state: GameState, seat: number, index: number): 
   if (back) s.government.anarchyEnd = state.turn + ANARCHY_TURNS;
 }
 
-/** One measured multiplier table read at count `n` (`first` the count of its
- *  first entry), in the table's units (the price at the maximum base).
- *  Below the table the first step carries on down, above it the last step
- *  carries on up. */
-export function policyUnlockTerm(table: readonly number[], first: number, n: number): number {
-  const i = n - first;
-  const last = table.length - 1;
-  if (i < 0) return table[0] + (table[1] - table[0]) * i;
-  if (i > last) return table[last] + (table[last] - table[last - 1]) * (i - last);
-  return table[i];
+/** A policy-unlock figure `x` escalated by the game's progress `p` (an
+ *  integer percent, `gameProgressPct`): x + (x·GAME_COST_ESCALATION/100 − x)·p/100,
+ *  each division truncating (GameCore_XP2 0x5267a0 type 1). */
+export function policyEscalated(x: number, p: number): number {
+  return x + Math.floor((Math.floor((x * GAME_COST_ESCALATION) / 100) - x) * p / 100);
 }
 
 /** THE POLICY UNLOCK's Gold for seat `seat` this turn: 0 in the free window
  *  (the turn after the seat completed a civic, `GovernmentState.civicTurn`),
- *  else base × k rounded to the nearest POLICY_UNLOCK_ROUND (halves up) in
- *  integers. The base is `CIVIC_UNLOCK_MAX_COST` the first turn past the
- *  window, dropping by `CIVIC_UNLOCK_PER_TURN_DROP` each further turn to
- *  `CIVIC_UNLOCK_MIN_COST`; k is the larger of the tech term at the seat's
- *  researched techs and the civic term at its civics
- *  (`POLICY_UNLOCK_TECH_PRICE`, `POLICY_UNLOCK_CIVIC_PRICE`, each the price
- *  at the maximum base, so k = term / `CIVIC_UNLOCK_MAX_COST`). One payment
- *  opens the government and the cards for the turn (`UNLOCK_POLICIES`).
- *  `_policy_unlock_cost` is the twin. */
+ *  else max(E(max) − s·E(drop), E(min)) rounded DOWN to a multiple of
+ *  PURCHASE_DIVISOR, E the escalation at the seat's progress
+ *  (`policyEscalated`, p = max(100·civics // 61, 100·techs // 77)), the
+ *  three figures `CIVIC_UNLOCK_MAX_COST` / `_PER_TURN_DROP` / `_MIN_COST`,
+ *  s the turns past the first one outside the window
+ *  (`PlayerCulture::GetCostToUnlockPolicies`, GameCore_XP2 0x398e70). One
+ *  payment opens the government and the cards for the turn
+ *  (`UNLOCK_POLICIES`). `_policy_unlock_cost` is the twin. */
 export function policyUnlockCost(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
   const past = state.turn - 1 - s.government.civicTurn;
   if (past <= 0) return 0;
-  const row = Math.max(CIVIC_UNLOCK_MIN_COST, CIVIC_UNLOCK_MAX_COST - CIVIC_UNLOCK_PER_TURN_DROP * (past - 1));
-  const term = Math.max(
-    policyUnlockTerm(POLICY_UNLOCK_TECH_PRICE, POLICY_UNLOCK_TECH_FIRST, s.research.techs.length),
-    policyUnlockTerm(POLICY_UNLOCK_CIVIC_PRICE, POLICY_UNLOCK_CIVIC_FIRST, s.research.civics.length));
-  const step = CIVIC_UNLOCK_MAX_COST * POLICY_UNLOCK_ROUND;
-  return POLICY_UNLOCK_ROUND * Math.floor((row * term + step / 2) / step);
+  const p = gameProgressPct(s.research.techs.length, s.research.civics.length);
+  const v = Math.max(policyEscalated(CIVIC_UNLOCK_MAX_COST, p) - (past - 1) * policyEscalated(CIVIC_UNLOCK_PER_TURN_DROP, p),
+    policyEscalated(CIVIC_UNLOCK_MIN_COST, p));
+  return v - (v % PURCHASE_DIVISOR);
 }
 
 /** Would `adoptGovernment(state, seat, index)` CHANGE the government the

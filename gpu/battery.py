@@ -275,6 +275,64 @@ def plan_pool(want_shards: int) -> tuple[int, int, str]:
         f"longer)")
 
 
+def seed_costs(rows: list) -> dict[int, float]:
+    """Each fixture seed's serve cost in turn-loop seconds at the pace of the
+    latest recorded run, from the shard costs the last ten runs recorded.
+
+    A shard times its seeds TOGETHER (one batch), so a seed's cost is not
+    measured, it is solved for: least squares over every recorded shard,
+    each run's shards scaled to that run's mean seed (a busy box or a slower
+    engine moves every shard alike), pulled lightly toward the mean seed so
+    a seed only ever recorded beside the same partner splits the pair's cost
+    evenly until a new pairing tells the two apart. Empty without history."""
+    import numpy as np
+    recs = [r["serve_cost"] for r in rows if r.get("serve_cost")][-10:]
+    if not recs:
+        return {}
+    eqs: list[tuple[list[int], float]] = []
+    for sc in recs:
+        pace = sum(x["loop_s"] for x in sc) / max(1, sum(len(x["seeds"]) for x in sc))
+        eqs += [(x["seeds"], x["loop_s"] / pace) for x in sc if pace > 0]
+    seeds = sorted({s for ss, _ in eqs for s in ss})
+    col = {s: i for i, s in enumerate(seeds)}
+    ridge = 0.1
+    a = np.zeros((len(eqs) + len(seeds), len(seeds)))
+    b = np.zeros(len(eqs) + len(seeds))
+    for i, (ss, v) in enumerate(eqs):
+        for s in ss:
+            a[i, col[s]] = 1.0
+        b[i] = v
+    for j in range(len(seeds)):
+        a[len(eqs) + j, j] = ridge ** 0.5
+        b[len(eqs) + j] = ridge ** 0.5
+    rel = np.linalg.lstsq(a, b, rcond=None)[0]
+    last = recs[-1]
+    pace = sum(x["loop_s"] for x in last) / max(1, sum(len(x["seeds"]) for x in last))
+    return {s: float(rel[col[s]]) * pace for s in seeds}
+
+
+def plan_shards(seeds: list[int], k: int, head_s: float) -> tuple[list[list[int]], str]:
+    """The seeds of each of `k` serve shards, and why. With every seed's cost
+    recorded (`seed_costs`) the seeds are dealt heaviest first, each to the
+    lightest shard with room, shard sizes as the contiguous split's; the
+    first shard starts `head_s` behind (vitest runs ahead of it in its lane).
+    Without that history, the contiguous split of the sorted seeds."""
+    cut = [round(i * len(seeds) / k) for i in range(k + 1)]
+    contiguous = [seeds[cut[i]:cut[i + 1]] for i in range(k)]
+    costs = seed_costs(_stats._rows())
+    if not costs or any(s not in costs for s in seeds):
+        return contiguous, "contiguous split (no recorded cost for every seed)"
+    sizes = [len(g) for g in contiguous]
+    load = [head_s] + [0.0] * (k - 1)
+    groups: list[list[int]] = [[] for _ in range(k)]
+    for s in sorted(seeds, key=lambda s: (-costs[s], s)):
+        i = min((i for i in range(k) if len(groups[i]) < sizes[i]), key=lambda i: (load[i], i))
+        groups[i].append(s)
+        load[i] += costs[s]
+    return [sorted(g) for g in groups], (
+        f"paired by recorded cost — est. shard loop {min(load):.0f}-{max(load):.0f}s")
+
+
 def mem_watch() -> None:
     """Sample free memory while the lanes run. Below the low-water mark the
     poke pool stops ADMITTING work; it never kills anything."""
@@ -332,6 +390,8 @@ import battery_live as _live  # noqa: E402
 LANE_CAP = 1800.0
 
 results: list[tuple[str, float, int]] = []
+# each green serve shard's `SERVE COST` line: its seeds and turn-loop seconds
+serve_costs: list[dict] = []
 lock = threading.Lock()
 failed = threading.Event()
 
@@ -419,6 +479,11 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
         status = "ok" if p.returncode == 0 else f"FAIL rc={p.returncode}"
         if p.returncode == 0 or not looks_oom(p.stdout + p.stderr):
             print(f"  {name:<14} {dt:6.1f}s  {status}", flush=True)
+        if p.returncode == 0 and name.startswith("serve"):
+            _sc = re.search(r"^SERVE COST seeds=([\d,]+) turns=(\d+) loop_s=([\d.]+)", p.stdout, re.M)
+            if _sc:
+                serve_costs.append({"lane": name, "seeds": [int(x) for x in _sc.group(1).split(",")],
+                                    "turns": int(_sc.group(2)), "loop_s": float(_sc.group(3))})
         if p.returncode == 0 and name.startswith("eval"):
             for ln in p.stdout.strip().splitlines()[-1:]:
                 print(f"    | {ln}", flush=True)
@@ -642,7 +707,11 @@ def _main() -> int:
         mem_min_free[0] = free_mb() or 10 ** 9
         _mem_free_start = mem_min_free[0]
         threading.Thread(target=mem_watch, daemon=True).start()
-        _cut = [round(i * len(_seeds) / _k) for i in range(_k + 1)]
+        if HUNT:
+            _groups = [_seeds]
+        else:
+            _groups, _why_shards = plan_shards(_seeds, _k, lane_cost().get("vitest", 0.0))
+            print(f"shards: {_why_shards}", flush=True)
         serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns",
                      str(int(HUNT_TURNS)) if HUNT and HUNT_TURNS else "250"]
         if HUNT and (HUNT_RESUME or HUNT_CKPT_EVERY):
@@ -659,7 +728,7 @@ def _main() -> int:
                 # ...and its function-level attribution over a turn window
                 serve_cmd += ["--cprofile", _argval("--cprofile")]
         serve_cmd += ["--seeds"]
-        _shards = [("serve_" + "abcdefghijklmnop"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
+        _shards = [("serve_" + "abcdefghijklmnop"[i], serve_cmd + [",".join(map(str, _groups[i]))], 1)
                    for i in range(_k)]
         _serve_names = [s[0] for s in _shards]
         if HUNT:
@@ -1001,7 +1070,8 @@ def _main() -> int:
               + " (a probe, not a battery verdict — nothing recorded)")
         return 1 if failed.is_set() else 0
     _stats.record(results, wall, not failed.is_set() and not oom.is_set(), mem=_mem,
-                  oom=oom.is_set(), box="clean" if _live.mode() == "measure" else "working")
+                  oom=oom.is_set(), box="clean" if _live.mode() == "measure" else "working",
+                  serve_cost=serve_costs or None)
     if oom.is_set() and not failed.is_set():
         # NOT a pass — the run did not finish — and NOT a fail, because the
         # code is not what broke. The cadence clock does not advance.

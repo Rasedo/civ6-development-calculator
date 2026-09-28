@@ -266,7 +266,11 @@ describe('the sortie', () => {
     expect(state.rngState).toBe(probe.rngState);   // one draw
     expect(100 - inf.hp).toBe(want);
     expect(bomber.hp).toBe(100);
+    // the XP reads the RAW columns and rounds up (DLL 0x5197e0): the Bomber
+    // ceil(2 + 75/110) = 3 (4 of 4 strikes), the Infantry ceil(1 + 110/75) =
+    // 3 — the city-state's bare +3; nearest rounding off the 93 read 2
     expect(bomber.xp ?? 0).toBe(3);
+    expect(inf.xp ?? 0).toBe(3);
   });
 
   it('a bomber duels a lone Anti-Air Gun: the gun\'s draw, then the bomber\'s mirrored, no burst, no XP', () => {

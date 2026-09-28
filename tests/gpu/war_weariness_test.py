@@ -122,15 +122,15 @@ def main() -> None:
     assert int(sim.ww[0, citystate_row, :].sum()) == 0, "a minor keeps no accumulator"
     print("  a city-state is a valid opponent and holds nothing itself")
 
-    # --- wars score SEPARATELY; only the worst is felt --------------------
+    # --- wars score SEPARATELY --------------------------------------------
     sim.ww[:] = 0
     sim._ww_battle(one(sim), 0, 1, away)
     sim._ww_battle(one(sim), 0, 1, away)
     sim._ww_battle(one(sim), 0, 2, away)
     step = b * abroad
-    assert int(sim._ww_max(0)[0]) == step * 2, int(sim._ww_max(0)[0])
+    assert int(sim.ww[0, 0, 1]) == step * 2 and int(sim.ww[0, 0, 2]) == step, sim.ww[0, 0, :3]
     assert int(sim._ww_sum(0)[0]) == step * 3, int(sim._ww_sum(0)[0])
-    print(f"  the max {step * 2} is the worst war, NOT the sum {step * 3}")
+    print(f"  each war its own accumulator ({step * 2}, {step})")
 
     # --- decay: fought this turn / phoney / at peace with everyone --------
     sim.ww[:] = 0
@@ -159,14 +159,37 @@ def main() -> None:
     assert int(sim.ww[0, 0, 2]) == 900, "the OTHER war is untouched"
     print(f"  a treaty sheds {int(rww['peaceTreaty'])} from one war only")
 
-    # --- the amenity conversion, with no ceiling -------------------------
+    # --- the amenity loss, split over the cities by founder --------------
+    # [founder, population]: two of row 0's own, one each of the at-war
+    # opponent 1, the at-peace opponent 2 and a third row 3 with no weariness
+    snap_l = sim.snapshot()
     sim.ww[:] = 0
-    sim.ww[:, 0, 1] = per * 12 + (per - 1)
-    assert int(sim._ww_penalty(0)[0]) == 12, int(sim._ww_penalty(0)[0])
-    assert int(sim._ww_penalty(1)[0]) == 0, "civ 0 has fought nothing"
-    sim.ww[:, 0, 1] = per - 1
-    assert int(sim._ww_penalty(0)[0]) == 0, "the remainder buys nothing"
-    print(f"  {per} points buy one amenity, remainder lost, and 12 is reachable (no cap)")
+    rows = ((0, 6), (0, 4), (1, 5), (2, 2), (3, 3))
+    sim.city_alive[:, 0] = False
+    for k, (f, pop) in enumerate(rows):
+        sim.city_alive[:, 0, k] = True
+        sim.city_founder[:, 0, k] = f
+        sim.city_pop[:, 0, k] = pop
+    sim.ww[:, 0, 1] = per * 10
+    sim.ww[:, 0, 2] = per * 3 + per - 1
+    sim.war[:, 0, :] = sim.war[:, :, 0] = False
+    sim.war[:, 0, 1] = sim.war[:, 1, 0] = True
+
+    def losses() -> list[int]:
+        return [int(x) for x in sim._ww_losses(0)[0, :len(rows)]]
+
+    # opponent 1: 10 to its city, need 3 + 3; opponent 2: 3, need 1 + 1; the
+    # pool 5 to the third party's city (need 2 + 1), then 2 to row 0's most
+    # populous city (need 3 + 0)
+    assert losses() == [2, 0, 6, 2, 3], losses()
+    sim.war[:, 0, 1] = sim.war[:, 1, 0] = False
+    assert losses() == [3, 1, 4, 2, 3], losses()
+    sim.ww[:, 0, :] = 0
+    sim.ww[:, 0, 3] = per * 50
+    assert losses() == [3, 2, 4, 2, 3], losses()
+    assert int(sim._ww_losses(1)[0].sum()) == 0, "civ 1 has fought nothing"
+    sim.restore(snap_l)
+    print(f"  each opponent's WWP // {per} to its founded cities, third parties', then the seat's own, capped by need")
 
     # --- the accumulator round-trips snapshot/restore ---------------------
     sim.ww[:] = 0
@@ -186,8 +209,8 @@ def main() -> None:
     sim.sync_war()
     for _ in range(30):
         sim.step()
-    assert int(sim._ww_max(0)[0]) == 0, (
-        f"a phoney war accrued {int(sim._ww_max(0)[0])}. The per-BATTLE model's "
+    assert int(sim._ww_sum(0)[0]) == 0, (
+        f"a phoney war accrued {int(sim._ww_sum(0)[0])}. The per-BATTLE model's "
         "whole point is that DECLARING a war costs nothing — the old flat "
         "+1/turn could not tell a phoney war from a bloody one"
     )

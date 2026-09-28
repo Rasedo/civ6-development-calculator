@@ -471,6 +471,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         cp_lo, cp_hi = int(lo), int(hi)
         cp = cProfile.Profile()
 
+    loop_t0 = _pc()
     try:
         for t in range(t0, turns):
             if cp is not None:
@@ -610,6 +611,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             except OSError:
                 pass
             ch.kill()
+    loop_s = _pc() - loop_t0
     if profile:
         total = sum(prof.values())
         print(f"PROFILE — turn-loop wall {total:.1f}s over {turns - t0} turns "
@@ -632,6 +634,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     if bad:
         print(f"SERVE GATE (BATCHED) RED — first: {first}")
         sys.exit(1)
+    # the shard's cost, which the battery records to pair seeds into shards
+    print(f"SERVE COST seeds={','.join(map(str, seeds))} turns={turns - t0} loop_s={loop_s:.1f}")
     print(f"SERVE GATE (BATCHED) OK — {len(seeds)} games x {turns} turns in one batch: "
           f"obs equal everywhere, the neutral world group and diplomatic table equal on {world_checked} "
           f"(game, turn) pairs and {groups_checked} per-seat groups, every decision equal from either observation, "

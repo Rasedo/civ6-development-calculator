@@ -630,9 +630,9 @@ def poke_ww_differential(rules, path):
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     snap = sim.snapshot()
     sim._seat_phase()
-    assert int(sim._ww_max(1)[0]) == 0 and int(sim._ww_max(2)[0]) == 0, (
+    assert int(sim._ww_sum(1)[0]) == 0 and int(sim._ww_sum(2)[0]) == 0, (
         f"a declared but UNFOUGHT war accrued weariness "
-        f"({int(sim._ww_max(1)[0])}/{int(sim._ww_max(2)[0])})"
+        f"({int(sim._ww_sum(1)[0])}/{int(sim._ww_sum(2)[0])})"
     )
 
     # ...and it DECAYS while it sits there, at the at-war rate.

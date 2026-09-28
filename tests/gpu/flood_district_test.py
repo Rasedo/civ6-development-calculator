@@ -34,10 +34,19 @@ def build():
 
 
 def floodplain(sim) -> int:
+    """a non-centre floodplain tile, OWNED by a seat that is not Egypt: the
+    district rows refuse an unowned plot (the applier 0x336a50), and Egypt's
+    ground takes no flood damage"""
     tiles = [t for t in range(sim.T)
              if bool(sim.floodplain[0, t]) and int(sim.centre_slot_at[0, t]) < 0]
     assert tiles, "fixture has no non-centre floodplain tile"
-    return tiles[0]
+    t = tiles[0]
+    if int(sim.tile_seat[0, t]) < 0:
+        owner = next(s for s in range(sim.n_majors)
+                     if not bool(sim._seat_plays(torch.tensor([s]), "EGYPT")[0]))
+        sim.tile_seat[0, t] = owner
+        sim._tile_owner_ver += 1
+    return t
 
 
 def main() -> None:

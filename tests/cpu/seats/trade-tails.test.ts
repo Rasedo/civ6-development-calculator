@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { spawnUnit, tradeWalkable, tradeWalkReachable, tradeWalkStep, TRADE_WATER_NONE } from '../../../cpu/core/units';
-import { plunderedByHull, routePlunderGold, PLUNDER_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { plunderedByHull, routePlunderGold, routeOriginYields, routeYieldValue, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS } from '../../../cpu/core/trade';
 import { portalExit } from '../../../cpu/core/rules';
 import { GP_ABILITY, GP_PERM } from '../../../cpu/data/greatPeople';
 import { deriveMountainRanges } from '../../../world/query';
-import type { GameState } from '../../../cpu/core/types';
+import { settleAt } from '../helpers';
+import type { DistrictId, GameState, TradeRoute } from '../../../cpu/core/types';
 
 /**
  * THE TRADE ROUTE'S TAILS.
@@ -23,6 +24,8 @@ import type { GameState } from '../../../cpu/core/types';
  * The GPU twin is tests/gpu/trade_tails_test.py.
  */
 const PCT = GP_PERM.indexOf('routePlunderPct');
+/** a route whose ends resolve to nothing: V 0, the payout's floor */
+const NO_ROUTE: TradeRoute = { from: -1 };
 
 function raiderScene(pct: number): GameState {
   const state = makeState(makeMap(20, 20));
@@ -49,8 +52,8 @@ describe("the admirals' plunder reward", () => {
     spawnUnit(state, 'WARRIOR', dry, 1);
     expect(plunderedByHull(state, wet, 1)).toBe(true);
     expect(plunderedByHull(state, dry, 1)).toBe(false);
-    expect(routePlunderGold(state, 1, wet)).toBe(PLUNDER_ROUTE_GOLD * 1.5);
-    expect(routePlunderGold(state, 1, dry)).toBe(PLUNDER_ROUTE_GOLD);
+    expect(routePlunderGold(state, 1, seatOf(state, 0)!, NO_ROUTE, wet)).toBe(PLUNDER_ROUTE_GOLD * 1.5);
+    expect(routePlunderGold(state, 1, seatOf(state, 0)!, NO_ROUTE, dry)).toBe(PLUNDER_ROUTE_GOLD);
   });
 
   it('pays an EMBARKED passenger the plain amount — it is a land unit', () => {
@@ -60,14 +63,42 @@ describe("the admirals' plunder reward", () => {
     u.tileIndex = wet;
     u.embarked = true;
     expect(plunderedByHull(state, wet, 1)).toBe(false);
-    expect(routePlunderGold(state, 1, wet)).toBe(PLUNDER_ROUTE_GOLD);
+    expect(routePlunderGold(state, 1, seatOf(state, 0)!, NO_ROUTE, wet)).toBe(PLUNDER_ROUTE_GOLD);
   });
 
   it('pays a hull nothing extra without the admiral', () => {
     const state = raiderScene(0);
     const wet = tileAtCoords(state.map, 8, 6).index;
     spawnUnit(state, 'GALLEY', wet, 1);
-    expect(routePlunderGold(state, 1, wet)).toBe(PLUNDER_ROUTE_GOLD);
+    expect(routePlunderGold(state, 1, seatOf(state, 0)!, NO_ROUTE, wet)).toBe(PLUNDER_ROUTE_GOLD);
+  });
+});
+
+describe('the plunder payout', () => {
+  it('pays max(50, 5V), V the route\'s yields with Gold at 1 and every other yield at 2', () => {
+    expect([PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS]).toEqual([50, 5, 2]);
+    const state = makeState(makeMap(24, 12));
+    state.seats.push(emptySeat(1));
+    const a = settleAt(state, tileAtCoords(state.map, 4, 5).index, 0);
+    const b = settleAt(state, tileAtCoords(state.map, 14, 5).index, 0);
+    const owner = seatOf(state, 0)!;
+    const r: TradeRoute = { from: a.id, to: b.id };
+    // the destination's centre alone: food 1, production 1 — V 4, the floor 50
+    expect(routeYieldValue(state, owner, r)).toBe(4);
+    expect(routePlunderGold(state, 1, owner, r, 0)).toBe(50);
+    // seven complete districts more: food 5, production 5 — V 20, 5V 100
+    const add: [DistrictId, number][] = [['CAMPUS', 12], ['HOLY_SITE', 13], ['THEATER_SQUARE', 15],
+      ['COMMERCIAL_HUB', 16], ['INDUSTRIAL_ZONE', 17], ['ENCAMPMENT', 11], ['GOVERNMENT_PLAZA', 10]];
+    for (const [type, col] of add) {
+      const t = tileAtCoords(state.map, col, 5);
+      t.district = type;
+      t.districtComplete = true;
+      b.districts.push({ type, tileIndex: t.index });
+    }
+    const o = routeOriginYields(state, a, r, 0);
+    expect([o.food, o.production, o.gold]).toEqual([5, 5, 0]);
+    expect(routeYieldValue(state, owner, r)).toBe(20);
+    expect(routePlunderGold(state, 1, owner, r, 0)).toBe(100);
   });
 });
 

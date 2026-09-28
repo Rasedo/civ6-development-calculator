@@ -792,7 +792,6 @@ function joinFromFreeCity(state: GameState, city: City): void {
     }
   }
   if (!winner) return;
-  for (const u of state.units.filter((x) => x.seat === FREE_SEAT && x.freeCity === city.id)) disbandUnit(state, u.id);
   transferCity(state, FREE_SEAT, winner, city, 'joined');
 }
 
@@ -1257,6 +1256,12 @@ export function transferCity(
 ): boolean {
   // The losing seat's city list — one lookup, because every seat holds its own.
   const loser = seatOf(state, fromSeat);
+  // A Free City's own grants (`Unit.freeCity`) go when it leaves the Free
+  // Cities, joined or captured, in `state.units` order, never to the taker
+  // (lab 5d, runs/c60f_capture_t250a_20260928T025820Z.jsonl and the other c60f_capture records: 3 of 3).
+  if (isFreeSeat(fromSeat)) {
+    for (const u of state.units.filter((x) => x.seat === FREE_SEAT && x.freeCity === civCity.id)) disbandUnit(state, u.id);
+  }
   if (why === 'conquered') {
     // CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus
     // Production in all Cities for 5 turns" — the window opens on the CAPTURE,
@@ -1354,6 +1359,7 @@ export function transferCity(
     // founded it — that is the whole point of the occupied-capital penalty
     origCapitalSeat: civCity.origCapitalSeat ?? -1,
     founderSeat: civCity.founderSeat ?? -1,
+    formerSeat: isFreeSeat(to.seat) ? fromSeat : -1,
     buildings: keptBuildings,
     // a pillaged building stays pillaged in the new owner's hands — the
     // repair is the queue's, whoever holds the queue

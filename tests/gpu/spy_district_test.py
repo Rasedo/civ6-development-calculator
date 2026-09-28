@@ -174,21 +174,23 @@ def main() -> None:
     # every adjacent district ("and all adjacent districts"), every district
     # of the city with Surveillance
     sim.unit_promos[B0, guard] = 0
-    assert sim._counterspies_guarding(B0, foe, theirs, ctr_t).tolist() == [guard]
-    assert sim._counterspies_guarding(B0, foe, theirs, iz).tolist() == [guard], "a post on the centre left the adjacent Zone"
-    assert sim._counterspies_guarding(B0, foe, theirs, far).numel() == 0, "a post on the centre guarded two hexes out unpromoted"
-    # the highest level pursues, whatever the slot order; ties keep the slot order
+    assert sim._counterspy_pursuing(B0, foe, theirs, ctr_t) == guard
+    assert sim._counterspy_pursuing(B0, foe, theirs, iz) == guard, "a post on the centre left the adjacent Zone"
+    assert sim._counterspy_pursuing(B0, foe, theirs, far) == -1, "a post on the centre guarded two hexes out unpromoted"
+    # the FIRST post in slot order pursues, whatever its level (the finder
+    # 0x52ac80)
     high = spawn_spy(sim, foe, iz)
     sim.unit_spy_mission[B0, high] = sim._spy_m_counterspy
-    assert sim._counterspies_guarding(B0, foe, theirs, iz).tolist() == sorted([guard, high])
-    sim.unit_spy_level[B0, high] = 2
-    lo_first = sim._counterspies_guarding(B0, foe, theirs, iz).tolist()
-    assert lo_first == [high, guard], f"the higher post does not pursue first: {lo_first}"
+    first = min(guard, high)
+    assert sim._counterspy_pursuing(B0, foe, theirs, iz) == first
+    sim.unit_spy_level[B0, max(guard, high)] = 2
+    assert sim._counterspy_pursuing(B0, foe, theirs, iz) == first, "a higher post jumped the unit list"
+    sim.unit_spy_level[B0, max(guard, high)] = 0
     sim.unit_alive[B0, high] = False
     sim._gen_ver += 1
     sim.unit_promos[B0, guard] = 1 << pcol(sim, "SPY_SURVEIL")
-    assert sim._counterspies_guarding(B0, foe, theirs, iz).tolist() == [guard]
-    assert sim._counterspies_guarding(B0, foe, theirs, far).tolist() == [guard], "Surveillance did not extend the guard"
+    assert sim._counterspy_pursuing(B0, foe, theirs, iz) == guard
+    assert sim._counterspy_pursuing(B0, foe, theirs, far) == guard, "Surveillance did not extend the guard"
     # Polygraph: the post reads anywhere in the city
     sim.unit_promos[B0, guard] = 1 << pcol(sim, "SPY_HOME_ENEMY_LEVEL")
     sim.unit_tile[B0, guard] = far
@@ -196,7 +198,7 @@ def main() -> None:
     assert sim._counter_levels(B0, foe, theirs, iz) == base_iz + 1, "Polygraph on a district did not reach the city"
     sim.unit_alive[B0, guard] = False
     sim._gen_ver += 1
-    print("  3 counterspy OK — its own and the adjacent districts guarded, the highest level first; "
+    print("  3 counterspy OK — its own and the adjacent districts guarded, the first post pursues; "
           "Surveillance every district, +1 level within one hex; Polygraph city-wide")
 
     # -- 4: Sabotage pillages the Zone's buildings; the queue repairs them ---
@@ -256,18 +258,18 @@ def main() -> None:
     assert not bool(sim._seat_buildable(foe)[B0, theirs, wk]), "a repaired building is still offered"
     print(f"  4 sabotage OK — the Workshop pillaged and dark, repaired at {want:.0f} of {full:.0f}")
 
-    # -- 5: a guarding post lowers the mission roll by 3, flat ----------------
-    assert sim._spy_counterspy_roll == 3
+    # -- 5: the pursuing post lowers the roll by 3 + 1 per level above the first
+    assert sim._spy_counterspy_roll == 3 and sim._spy_counterspy_level_roll == 1
     lvl5 = sim._spy_effective_level(row, B0, v, sim._spy_m_sabotage, foe, theirs)
     t5 = sim._mission_threshold(sim._spy_m_sabotage, lvl5)
     seed5 = None
     for _seed in range(1, 20000):
         sim.rng_state[B0] = _seed
         _r = sum(int(sim._next_random(_one)[B0] * sim._spy_roll_faces) + 1 for _ in range(sim._spy_roll_dice))
-        if _r == t5 + 2:          # success unseen unguarded, fail unseen (2 - 3 = -1) guarded
-            seed5 = _seed
+        if _r == t5 + 3:          # unguarded success unseen; a Recruit post (3) leaves 0, success seen;
+            seed5 = _seed         # one level up (4) leaves -1, fail unseen
             break
-    assert seed5 is not None, f"no seed in 20000 rolls T+2 against T={t5}"
+    assert seed5 is not None, f"no seed in 20000 rolls T+3 against T={t5}"
 
     def sabotage() -> bool:
         sim.city_bldg_pillaged[B0, foe, theirs, wk] = False
@@ -280,17 +282,17 @@ def main() -> None:
         sim._tick_spies(row)
         return bool(sim.city_bldg_pillaged[B0, foe, theirs, wk])
 
-    for glvl in (0, 2):
-        post = spawn_spy(sim, foe, ctr_t)       # on the centre, beside the Zone
-        sim.unit_spy_mission[B0, post] = sim._spy_m_counterspy
-        sim.unit_spy_level[B0, post] = glvl
-        before = int(sim.unit_spy_level[B0, v])
-        assert not sabotage(), f"a level-{glvl} post did not turn T+2 into a failure"
-        assert bool(sim.unit_alive[B0, v]) and int(sim.unit_spy_level[B0, v]) == before
-        sim.unit_alive[B0, post] = False
-        sim._gen_ver += 1
-    assert sabotage(), "the same roll unguarded did not succeed"
-    print("  5 guard OK — a post guarding the district lowers the roll by 3, whatever its level")
+    post = spawn_spy(sim, foe, ctr_t)       # on the centre, beside the Zone
+    sim.unit_spy_mission[B0, post] = sim._spy_m_counterspy
+    sim.unit_spy_level[B0, post] = 1
+    before = int(sim.unit_spy_level[B0, v])
+    assert not sabotage(), "a post one level up did not turn T+3 into a failure"
+    assert bool(sim.unit_alive[B0, v]) and int(sim.unit_spy_level[B0, v]) == before
+    sim.unit_spy_level[B0, post] = 0
+    assert sabotage(), "a Recruit post (3) turned T+3 into a failure"
+    sim.unit_alive[B0, post] = False
+    sim._gen_ver += 1
+    print("  5 guard OK — the pursuing post lowers the roll by 3 + its level above the first")
 
     print("BATTERY OK spy_district")
 

@@ -94,7 +94,7 @@ export interface PolicyEffects {
   /** multiplies the yields a pillage or a coastal raid pays */
   pillageMult?: number;
   /** multiplies the gold a plundered trade route pays */
-  routePlunderMult?: number;
+  routePlunderPct?: number;
   /** CIV6 (Theocracy): "Can buy land combat units with Faith." */
   faithBuyLandUnits?: boolean;
   /** gold added to every trade route this seat runs */
@@ -420,7 +420,7 @@ const POLICY_SRC: Record<string, SrcMap> = {
   TOTAL_WAR: {
     kind: xml('Policies', 'PolicyType=POLICY_TOTAL_WAR', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
     'effects.pillageMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=TOTAL_WAR_PLUNDER_BONUS&Name=Amount', 'Value')] },
-    'effects.routePlunderMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=TOTAL_WAR_PLUNDER_BONUS&Name=Amount', 'Value')] },
+    'effects.routePlunderPct': xml('ModifierArguments', 'ModifierId=TOTAL_WAR_PLUNDER_BONUS&Name=Amount', 'Value'),
   },
   COLONIZATION: {
     kind: xml('Policies', 'PolicyType=POLICY_COLONIZATION', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
@@ -702,7 +702,7 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
       prodBoost: { target: 'unit', classes: ['melee', 'ranged', 'antiCavalry'], eraMax: EVERY_ERA, pct: 0.5 },
     }),
     P('TOTAL_WAR', 'Total War', 'military', '+50% yields from pillaging and coastal raids, +50% trade-route plunder.', undefined, {
-      pillageMult: 1.5, routePlunderMult: 1.5,
+      pillageMult: 1.5, routePlunderPct: 50,
     }),
 
     P('COLONIZATION', 'Colonization', 'economic', '+50% production toward Settlers.', 'SCORCHED_EARTH', {
@@ -798,7 +798,7 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
       'Naval Raiders: +100% Production, +2 Movement. Yields doubled from plundering Trade Routes. BUT: Trade Route yields -50%.', {
       navalRaiderProdMult: 2,
       navalRaiderMoves: 2,
-      routePlunderMult: 2,
+      routePlunderPct: 100,
       routeYieldMult: 0.5,
     }),
     DK('ROBBER_BARONS', 'Robber Barons', 4, 6,

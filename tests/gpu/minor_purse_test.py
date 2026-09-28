@@ -131,6 +131,16 @@ def test_upkeep(rules, path) -> None:
     print("  2 upkeep OK — the units' Maintenance out of the city's Gold, never below 0")
 
 
+def pillage_for_repair(sim, s: int) -> None:
+    """a pillaged Monument the minor repairs first: its production is off
+    the Builder (`_minor_trains_builder`)"""
+    row = sim._CITY_MINOR0 + s
+    b = BLD.index("MONUMENT")
+    sim.city_bldg[B0, row, 0, b] = True
+    sim.city_bldg_pillaged[B0, row, 0, b] = True
+    sim.citystate_repair_wait[B0, s] = False
+
+
 def test_builder_buy(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
@@ -140,6 +150,14 @@ def test_builder_buy(rules, path) -> None:
                                  * float(sim.rules.gold_purchase_mult))[B0])
     bt = int(sim.citystate_builders_trained[B0, s])
     sim.citystate_treasury[B0, s] = p + 50.0
+    # the Builder row trains one while none stands: no purchase
+    assert bool(sim._minor_builder_work(s)[B0]) and bool(sim._minor_trains_builder(s)[B0])
+    sim._minor_purchases(s)
+    assert "BUILDER" not in kinds(sim, s), kinds(sim, s)
+    clear_army(sim, s)
+    sim.citystate_treasury[B0, s] = p + 50.0
+    # a pillaged building's repair takes the production: the Builder is bought
+    pillage_for_repair(sim, s)
     sim._minor_purchases(s)
     assert kinds(sim, s) == ["BUILDER"], kinds(sim, s)
     assert float(sim.citystate_treasury[B0, s]) == 50.0
@@ -150,6 +168,7 @@ def test_builder_buy(rules, path) -> None:
     # a rate of 0 still draws; a treasury short of the price asks nothing
     sim = build(rules, path)
     clear_army(sim, s)
+    pillage_for_repair(sim, s)
     sim.citystate_builder_buy[B0, s] = 0
     sim.citystate_treasury[B0, s] = 500.0
     rng = int(sim.rng_state[B0])
@@ -159,6 +178,20 @@ def test_builder_buy(rules, path) -> None:
     rng = int(sim.rng_state[B0])
     sim._minor_purchases(s)
     assert int(sim.rng_state[B0]) == rng
+    # every owned plot improved: no work, no Builder bought, until one is pillaged
+    sim = build(rules, path)
+    clear_army(sim, s)
+    pillage_for_repair(sim, s)
+    own = (sim.tile_seat[B0] == 100 + s)
+    own[int(sim.citystate_center[B0, s])] = False
+    sim.improvement[B0][own] = 0
+    sim.pillaged[B0][own] = False
+    assert not bool(sim._minor_builder_work(s)[B0]), "an improved territory still offers work"
+    sim.citystate_treasury[B0, s] = 500.0
+    sim._minor_purchases(s)
+    assert "BUILDER" not in kinds(sim, s), kinds(sim, s)
+    sim.pillaged[B0, int(own.nonzero()[0])] = True
+    assert bool(sim._minor_builder_work(s)[B0]), "a pillaged improvement is work"
     print("  3 Builder purchase OK — none standing, the price covered, the episode's rate")
 
 

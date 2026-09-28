@@ -75,8 +75,11 @@ def los_tables(width: int, height: int, rmax: int) -> tuple[torch.Tensor, torch.
 
     n_t = 1 + 3 * rmax * (rmax + 1) - 1
     T = width * height
-    tgt = torch.full((T, n_t), -1, dtype=torch.long)
-    mid = torch.full((T, n_t, max(rmax - 1, 1)), -1, dtype=torch.long)
+    n_m = max(rmax - 1, 1)
+    # filled as python lists and handed to torch once: an element write into
+    # a tensor costs microseconds, and there are a few hundred thousand here
+    tgt = [[-1] * n_t for _ in range(T)]
+    mid = [[[-1] * n_m for _ in range(n_t)] for _ in range(T)]
     for a in range(T):
         ac, ar = a % width, a // width
         aq, arr = axial(ac, ar)
@@ -87,7 +90,8 @@ def los_tables(width: int, height: int, rmax: int) -> tuple[torch.Tensor, torch.
                 if n < 1 or n > rmax:
                     continue
                 b = br * width + bc
-                tgt[a, k] = b
+                tgt[a][k] = b
+                mid_ak = mid[a][k]
                 bq, brr = axial(bc, br)
                 ax, az, ay = aq + 1e-6, arr + 2e-6, -aq - arr - 3e-6
                 bx, bz, by = bq + 1e-6, brr + 2e-6, -bq - brr - 3e-6
@@ -104,9 +108,10 @@ def los_tables(width: int, height: int, rmax: int) -> tuple[torch.Tensor, torch.
                         rz = -rx - ry
                     mc, mr = offset(rx, rz)
                     if 0 <= mc < width and 0 <= mr < height:
-                        mid[a, k, i - 1] = mr * width + mc
+                        mid_ak[i - 1] = mr * width + mc
                 k += 1
-    return tgt, mid
+    return (torch.tensor(tgt, dtype=torch.long).reshape(T, n_t),
+            torch.tensor(mid, dtype=torch.long).reshape(T, n_t, n_m))
 
 
 def neighbor_table(width: int, height: int) -> torch.Tensor:
@@ -172,7 +177,7 @@ class Rules:
     faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
     purchase_divisor: int  # every gold / faith price is floored to a multiple of this (PURCHASE_DIVISOR 5, measured)
     civic_unlock: tuple  # (CivicUnlockMaxCost, CivicUnlockPerTurnDrop, CivicUnlockMinCost) — `policyUnlockCost`
-    policy_unlock_terms: tuple  # ((tech first, tech prices), (civic first, civic prices), the rounding step) — `policyUnlockCost`
+    cost_escalation: int  # GAME_COST_ESCALATION 1000, the policy unlock's escalation end point — `policyEscalated`
     anarchy_turns: int  # the turns a return to a held government leaves the seat in none (ANARCHY_TURNS)
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
@@ -322,7 +327,7 @@ class Rules:
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
     c_prereqs: list
-    war_weariness: dict  # {perTurn, decay, perAmenity, cap} — flat amenity drag at war
+    war_weariness: dict  # the warWeariness block: era bases, decays, perAmenity and the per-city loss caps
     trade: dict  # {marketBidx, lighthouseBidx, foreignTradeCidx, capWonderWidx, range} — trade capacity/route anchors
     eras: dict  # {length, found, conquer, wonder, pantheon, religion, gp} — era-score events + age thresholds
     actions: dict  # {unit: [name, ...]} — the unit-action enum, index = mask column
@@ -400,9 +405,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         purchase_divisor=int(r["scenario"]["purchaseDivisor"]),
         civic_unlock=(int(r["scenario"]["civicUnlockMaxCost"]), int(r["scenario"]["civicUnlockPerTurnDrop"]),
                       int(r["scenario"]["civicUnlockMinCost"])),
-        policy_unlock_terms=((int(r["scenario"]["policyUnlockTechFirst"]), tuple(int(x) for x in r["scenario"]["policyUnlockTechPrice"])),
-                             (int(r["scenario"]["policyUnlockCivicFirst"]), tuple(int(x) for x in r["scenario"]["policyUnlockCivicPrice"])),
-                             int(r["scenario"]["policyUnlockRound"])),
+        cost_escalation=int(r["scenario"]["gameCostEscalation"]),
         anarchy_turns=int(r["scenario"]["anarchyTurns"]),
         turn_limit=r["scenario"]["turnLimit"],
         space_ly_target=r["scenario"]["spaceLyTarget"],
@@ -569,6 +572,9 @@ def _rules_stamp_for(dirpath: Path) -> str:
     return _RULES_STAMP_CACHE[key]
 
 
+_FIXTURE_FORMAT: dict[tuple[str, int, int], bool] = {}
+
+
 def fixture_paths(dirpath: Path = FIXTURES) -> list[Path]:
     """Every EXPORTED fixture in `dirpath`, sorted — and nothing else.
 
@@ -583,12 +589,20 @@ def fixture_paths(dirpath: Path = FIXTURES) -> list[Path]:
       `paths[0]` reads clean while its neighbour walking the whole list
       dies — so it is raised HERE, naming every one, instead of surfacing
       one lane at a time as a format refusal.
+
+    Each file's format is parsed once per (mtime, size): a whole fixture is
+    megabytes of JSON, and a poke lane calls this once per scene.
     """
     out, orphans = [], []
     for p in sorted(dirpath.glob("seed*.json")):
         if p.name.endswith(".world.json"):
             continue
-        (out if json.loads(p.read_text()).get("format") == 4 else orphans).append(p)
+        st = p.stat()
+        key = (str(p), st.st_mtime_ns, st.st_size)
+        cur = _FIXTURE_FORMAT.get(key)
+        if cur is None:
+            cur = _FIXTURE_FORMAT[key] = json.loads(p.read_text()).get("format") == 4
+        (out if cur else orphans).append(p)
     if orphans:
         raise RuntimeError(
             f"{dirpath}: {len(orphans)} orphaned fixture(s) from an older generation "
@@ -885,6 +899,7 @@ _MUTABLE = [
     "fertility", "fertility_prod", "fertility_sci", "fertility_cul",
     "tile_locked", "drought", "improvement", "pillaged", "district",
     "storm_event", "storm_left",  # the STORM centred on a tile and the turns it has left
+    "storm_id", "storm_struck", "storm_serial",  # its serial, the last storm to strike a plot, the counter
     "fire_start",  # the turn a plot's FIRE began, -1 none
     "tile_meteor",  # METEOR SITES: laid by the draw, taken by the first unit in
     "tile_goody",  # TRIBAL VILLAGES: claimed and gone
@@ -910,9 +925,123 @@ _MUTABLE = [
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_unit_acq",  # copies of each chassis a seat has ever acquired (the progressive price)
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_former", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_gpp_turn",  # Great Person points EARNED this turn, per class (a competition reads it)
     "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",
     "volcano_active", "tile_event_fired",  # the turn's random event: waking volcanoes, first occurrences
 ]
+
+
+# ---------------------------------------------------------------------------
+# Read-set memo: an engine call run once with every instance-attribute read
+# recorded, and answered again while every one of those reads still holds.
+#
+# A tensor read holds while it is the same object at the same version counter
+# (every in-place write moves it), or else while its bits equal the copy taken
+# when the entry was stored — so a write that stores what was already there,
+# or a plane rebuilt to the same values, keeps the entry. A scalar holds while
+# it compares equal and is of the same type; any other object while it is the
+# same object. The derived caches (`*_cache`, `*_memo`, `*_stamp`) are not
+# recorded: each is checked against a key it computes from reads that ARE
+# recorded, so while those hold, what a cache hands back is what it handed
+# back the first time. The engine's evolving state lives in tensors and
+# scalars (`snapshot` carries nothing else and a resumed game replays
+# exactly), so the python containers a call reads are its catalogues.
+# ---------------------------------------------------------------------------
+
+STATS_MEMO_CHECK = os.environ.get("CIV6_STATS_MEMO_CHECK") == "1"
+_MEMO_SCALARS = (int, float, bool, str, type(None), torch.dtype, torch.device)
+_MEMO_DERIVED = ("_cache", "_memo", "_stamp")
+_TRACKING: dict[type, type] = {}
+_ABSENT = object()
+
+
+def _tracking_class(cls: type) -> type:
+    t = _TRACKING.get(cls)
+    if t is None:
+        def __getattribute__(self, name):
+            v = object.__getattribute__(self, name)
+            d = object.__getattribute__(self, "__dict__")
+            if name in d and not name.endswith(_MEMO_DERIVED):
+                reads = d["_memo_reads"]
+                if name not in reads:
+                    if isinstance(v, torch.Tensor):
+                        reads[name] = (0, v, v._version)
+                    elif isinstance(v, _MEMO_SCALARS):
+                        reads[name] = (1, v, None)
+                    else:
+                        reads[name] = (2, v, None)
+            return v
+
+        def __setattr__(self, name, v):
+            object.__getattribute__(self, "__dict__")["_memo_writes"].add(name)
+            object.__setattr__(self, name, v)
+
+        t = _TRACKING[cls] = type(cls.__name__, (cls,),
+                                  {"__getattribute__": __getattribute__, "__setattr__": __setattr__})
+    return t
+
+
+def _bits(t: torch.Tensor) -> torch.Tensor:
+    """the tensor as its bit pattern — `torch.equal` calls -0.0 and 0.0 equal"""
+    if t.dtype == torch.float64:
+        return t.view(torch.int64)
+    if t.dtype == torch.float32:
+        return t.view(torch.int32)
+    return t
+
+
+def record_reads(obj, fn, *args, may_set: tuple[str, ...] = ()):
+    """Run `fn(*args)` (a method bound to `obj`) with `obj`'s reads recorded.
+    Returns (result, reads) — `reads` None when the call cannot be memoised:
+    it set an attribute other than a derived cache or `may_set`, or wrote into
+    a tensor it read, or it ran inside another recorded call."""
+    d = obj.__dict__
+    if "_memo_reads" in d:
+        return fn(*args), None
+    d["_memo_reads"], d["_memo_writes"] = {}, set()
+    cls = type(obj)
+    object.__setattr__(obj, "__class__", _tracking_class(cls))
+    try:
+        out = fn(*args)
+    finally:
+        object.__setattr__(obj, "__class__", cls)
+        reads, writes = d.pop("_memo_reads"), d.pop("_memo_writes")
+    if any(not w.endswith(_MEMO_DERIVED) and w not in may_set for w in writes):
+        return out, None
+    # one copy per plane per version, shared by every entry that read it
+    shadow = d.setdefault("_memo_shadow_cache", {})
+    ents = []
+    for name, (k, ref, ver) in reads.items():
+        if k == 0:
+            if d.get(name, _ABSENT) is not ref or ref._version != ver:
+                return out, None
+            sh = shadow.get(name)
+            if sh is None or sh[0] is not ref or sh[1] != ref._version:
+                sh = shadow[name] = (ref, ref._version, ref.clone())
+            ents.append([name, 0, ref, ref._version, sh[2]])
+        else:
+            ents.append([name, k, ref, None, None])
+    return out, ents
+
+
+def reads_hold(d: dict, ents: list) -> bool:
+    """Do the recorded reads `ents` still hold on the instance dict `d`?"""
+    for e in ents:
+        cur = d.get(e[0], _ABSENT)
+        k = e[1]
+        if k == 0:
+            if cur is e[2] and cur._version == e[3]:
+                continue
+            c = e[4]
+            if not (isinstance(cur, torch.Tensor) and cur.dtype == c.dtype and cur.shape == c.shape
+                    and torch.equal(_bits(cur), _bits(c))):
+                return False
+            e[2], e[3] = cur, cur._version
+        elif k == 1:
+            if type(cur) is not type(e[2]) or cur != e[2]:
+                return False
+        elif cur is not e[2]:
+            return False
+    return True
