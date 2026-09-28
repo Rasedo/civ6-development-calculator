@@ -10300,12 +10300,13 @@ class SimSeats:
         # breached one as its number, a full one full at the new tier
         if conquest:
             self.city_outer_hp[b, dst_row, col] = 0
-        elif old_full:
-            self.city_outer_hp[b, dst_row, col] = self._walls_max_at(
+        else:
+            _new_max = self._walls_max_at(
                 torch.full((self.B,), dst_row, dtype=torch.long, device=self.device),
                 torch.full((self.B,), col, dtype=torch.long, device=self.device))[b].to(self.city_outer_hp.dtype)
-        else:
-            self.city_outer_hp[b, dst_row, col] = old_outer
+            # a breach keeps its number, never above the new holder's own
+            # tier (TS `outerPool` reads min(outerHp, wallsMax))
+            self.city_outer_hp[b, dst_row, col] = _new_max if old_full else min(int(old_outer), int(_new_max))
         # the CONQUEROR manages nothing yet: TS's flipped literal carries no
         # `specialistPref`, so every slot goes back to the automatic rule.
         self.city_spec_pin[b, dst_row, col, :] = -1
