@@ -49,5 +49,5 @@ by one scripted decision server (`policy/`), verified against each other by
   is in flight, the next action. It is rewritten, never appended to.
 - Scratch files go to `.claude/scratchpad/`. Heredocs are banned: Write the
   script or commit message to a file.
-- The lead orchestrates: at most four subagents at a time; none spawns its
+- The lead orchestrates: at most three subagents at a time; none spawns its
   own, and agents never commit (the lead commits named paths).
