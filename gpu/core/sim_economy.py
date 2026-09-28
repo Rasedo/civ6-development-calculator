@@ -6638,7 +6638,7 @@ class SimEconomy:
         # building, Diplomatic Quarter building, and palace in a city."
         _gby = self._gov_mods(row)[12]["govbldy"]
         if bool((_gby != 0).any()):
-            _stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols], self.city_bldg_pillaged[:, row, :cols])
+            _stand = self.city_bldg[:, row, sl] & ~self._bldg_dark(self.city_dist_tile[:, row, sl], self.city_bldg_pillaged[:, row, sl])
             _n = (_stand & self._b_gov_yield.reshape(1, 1, -1)).sum(dim=2).double()
             # the PALACE is a capital TERM on this engine, never a
             # `city_bldg` bit, so the count adds it by hand
@@ -6662,6 +6662,8 @@ class SimEconomy:
             trade = _rt[:, sl] * alivef.unsqueeze(2)
 
         total = tiles_y + dist_y + bld_y + citz + bon + trade
+        # a full-width plane read on a one-column walk broadcasts silently
+        assert total.shape[1] == n, f"city walk widened to {total.shape[1]} columns, expected {n}"
         total[:, :, 1:] = total[:, :, 1:] * amen_yf.unsqueeze(2)
         # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
         # (`HAPPY_YIELD_ROWS`) — a percentage over the same total, on the
