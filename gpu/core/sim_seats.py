@@ -8736,7 +8736,8 @@ class SimSeats:
                     continue
                 _plane = self.terrain == _tt
                 if _tflat:
-                    _plane = _plane & ~self.hills
+                    # flat is neither Hills nor Mountain (TS: elevation FLAT)
+                    _plane = _plane & ~self.hills & ~self.tile_mountain
                 # the ORIGIN city's own tiles, so the count is gathered by
                 # `from_j` — `_rx`/`_col` address the DESTINATION
                 _cnt_t = self._city_terrain_count(row, _plane).gather(1, from_j).double()
