@@ -101,7 +101,8 @@ def main() -> int:
     # -- 4 the walk and the round trip -----------------------------------------
     exp = int(sim.seat_route_exp[B0, row, k])
     moved = False
-    for turn in range(int(sim.turn) + 1, exp + 40):
+    # a greedy walk can stall short of home; the rail then ends the route
+    for turn in range(int(sim.turn) + 1, exp + sim._trade_walk_rail + 2):
         sim.turn = turn
         at = int(sim.seat_route_walk[B0, row, k])
         sim._minor_trade(s)

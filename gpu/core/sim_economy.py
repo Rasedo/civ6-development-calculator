@@ -6696,10 +6696,8 @@ class SimEconomy:
         # found
         _grows = self._live_rows(row, self._governor_yield_rows)
         if _grows:
-            _est = self._governor_established(row)[:, sl] if j is None else \
-                self._governor_established(row)[:, sl][:, j:j + 1]
-            _own = (self.city_founder[:, row, sl] == row) if j is None else \
-                (self.city_founder[:, row, sl] == row)[:, j:j + 1]
+            _est = self._governor_established(row)[:, sl]
+            _own = self.city_founder[:, row, sl] == row
             for _gc, _gl, _gy, _gp, _gf in _grows:
                 _hit = _est & (_own == bool(_gf)) & self._row_is(row, _gc, _gl).unsqueeze(1)
                 total[:, :, _gy] = torch.where(_hit, total[:, :, _gy] * (1.0 + _gp / 100.0), total[:, :, _gy])
@@ -6707,7 +6705,7 @@ class SimEconomy:
         # "+3% ... for each Promotion they have earned, including their first"
         _trows = self._live_rows(row, self._governor_title_yield_rows)
         if _trows:
-            _tit = self._governor_titles(row)[:, sl] if j is None else                 self._governor_titles(row)[:, sl][:, j:j + 1]
+            _tit = self._governor_titles(row)[:, sl]
             for _tc, _tl, _ty, _tp in _trows:
                 _tw = self._row_is(row, _tc, _tl).unsqueeze(1) & (_tit > 0)
                 _f = 1.0 + (_tit.double() * _tp) / 100.0
