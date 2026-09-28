@@ -668,6 +668,13 @@ class SimGp:
         r = m.nonzero(as_tuple=True)[0]
         self.city_bldg[r, row, cc[r], :nb] |= want[r, :nb]
         self._bldg_version += 1
+        # granted walls stand at their full pool, as a built one does
+        if self._walls_rows:
+            wm = r[(want[r, :nb] & (self._b_walls[:nb] > 0).unsqueeze(0)).any(dim=1)]
+            if len(wm) > 0:
+                _wf = self._walls_max_at(torch.full_like(cc, row), cc)[wm]
+                self.city_outer_hp[wm, row, cc[wm]] = _wf
+                self._fit_encamp_outer(wm, row, cc[wm], _wf)
         # CIV6: a city never holds two of one building, so a granted one comes
         # off the production slot; the hammers already spent BANK, which is
         # where every carried-over hammer goes. `dropQueuedBuilding` is the twin.

@@ -32,7 +32,8 @@ import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import { dedicationEvent } from './eras';
 import { nextRandom } from './rand';
 import { spawnUnit, disbandUnit, bestUnlockedOfClass, unitFullMoves, unitsAt, unitStackSlot } from './units';
-import { repairDrip, urbanDefensesFit } from './rules';
+import { fitEncampOuter, repairDrip, urbanDefensesFit, wallsMax } from './rules';
+import { BUILDINGS } from '../data/buildings';
 import { itemCost } from './game';
 import { UNITS, URBAN_DEFENSES_TECH, civReplacement } from '../data/units';
 import { xpToNextLevel } from './promotions';
@@ -346,6 +347,8 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       if (!city.buildings.includes(b)) city.buildings.push(b);
       dropQueuedBuilding(city, b);
     }
+    // granted walls stand at their full pool, as a built one does
+    if (fx.buildings.some((b) => BUILDINGS[b]?.walls)) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
   }
   // THE WONDER ON THE TILE (DISTRICT_WONDER_IN_TILE): the site is the plot
   // the wonder is being raised on, and the grant is paid into that wonder.
