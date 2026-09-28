@@ -1,0 +1,208 @@
+################ c16w cycle seat 0 op UNITOPERATION_SPY_SIPHON_FUNDS cap 12 extra 8 city 66:27 district 66:28 post 66:28 defender 1:262146
+setup: four spy civics granted, 8 extra grants
+defender 262146 at 66:27 level 1 op -1
+turn 8 spies 0 started 0 travelled 0 promoted 0 bought 4 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CLAIM_GREAT_PERSON -> nothing
+    no grab of p1 this turn
+turn 9 spies active 0 idle 4 missions 0 captured-enemy 0
+spy 524288 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 11:24 travel
+spy 458754 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 16:24 travel
+spy 589828 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 13:29 travel
+spy 655365 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 13:20 travel
+defender 262146 at 66:27 level 2 op -1
+turn 9 spies 4 started 0 travelled 4 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds BUILDING_MONUMENT
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    no grab of p1 this turn
+turn 10 spies active 0 idle 0 missions 0 captured-enemy 0
+defender 262146 at 66:27 level 2 op -1
+turn 10 spies 0 started 0 travelled 0 promoted 0 bought 4 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds UNIT_BUILDER
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    no grab of p1 this turn
+turn 11 spies active 0 idle 8 missions 0 captured-enemy 0
+spy 983040 LOC_CITIZEN_CANADA_MODERN_FEMALE_4 level 1 at 16:24 travel
+spy 1048583 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 11:24 travel
+spy 1114120 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 13:29 travel
+spy 1179657 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 at 13:20 travel
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 start
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:27 start
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:27 start
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:27 start
+defender 262146 at 66:27 level 2 op -1
+turn 11 spies 8 started 4 travelled 4 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    grabbed p1: def: spy 262146 at 66:27 level 2 xp 15 promos PROMOTION_SPY_SMEAR_CAMPAIGN op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:28 level 2 xp 15 promos PROMOTION_SPY_SMEAR_CAMPAIGN op UNITOPERATION_SPY_COUNTERSPY targets 
+    gcfix seat 1 nothing
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_UNITS -> nothing
+turn 12 spies active 0 idle 4 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 refused
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:27 refused
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:27 refused
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:27 refused
+defender 262146 at 66:28 level 2 op UNITOPERATION_SPY_COUNTERSPY
+turn 12 spies 4 started 0 travelled 0 promoted 0 bought 0 gold 43135
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    post standing; p1 not grabbed
+turn 13 spies active 0 idle 8 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 start
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:27 start
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:27 start
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:27 start
+spy 1966097 LOC_CITIZEN_CANADA_MODERN_FEMALE_4 level 1 at 66:27 start
+spy 2031634 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:27 start
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:27 start
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 at 66:27 start
+defender 262146 at 66:28 level 2 op UNITOPERATION_SPY_COUNTERSPY
+turn 13 spies 8 started 8 travelled 0 promoted 0 bought 4 gold 49941
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup NaturalDisasterPopup -> closed
+    post standing; p1 not grabbed
+turn 14 spies active 0 idle 8 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 start
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:27 start
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:27 start
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:27 start
+spy 1966097 LOC_CITIZEN_CANADA_MODERN_FEMALE_4 level 1 at 66:27 start
+spy 2031634 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:27 start
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:27 start
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 at 66:27 start
+defender 262146 at 66:28 level 2 op UNITOPERATION_SPY_COUNTERSPY
+turn 14 spies 8 started 8 travelled 0 promoted 0 bought 4 gold 49926
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup NaturalDisasterPopup -> closed
+    post standing; p1 not grabbed
+turn 16 spies active 0 idle 8 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 start
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:27 start
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:27 start
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:27 start
+spy 1966097 LOC_CITIZEN_CANADA_MODERN_FEMALE_4 level 1 at 66:27 start
+spy 2031634 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:27 start
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:27 start
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 at 66:27 start
+defender 262146 at 66:28 level 2 op UNITOPERATION_SPY_COUNTERSPY
+turn 16 spies 8 started 8 travelled 0 promoted 0 bought 4 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    post standing; p1 not grabbed
+turn 17 spies active 8 idle 4 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1966097 LOC_CITIZEN_CANADA_MODERN_FEMALE_4 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2031634 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2293782 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 16:24 travel
+spy 2359319 LOC_CITIZEN_CANADA_FEMALE_1 level 1 at 11:24 travel
+spy 2424856 LOC_CITIZEN_CANADA_MALE_4 level 1 at 13:29 travel
+spy 2490393 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 13:20 travel
+defender 262146 at 66:28 level 2 op UNITOPERATION_SPY_COUNTERSPY
+turn 17 spies 12 started 0 travelled 4 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    post standing; p1 not grabbed
+    cause session 1:1 -> closed sessions [1:1]
+    cause popup DiplomacyActionView -> hidden
+    cause popup LeaderScene -> hidden
+turn 18 spies active 8 idle 0 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1966097 LOC_CITIZEN_CANADA_MODERN_FEMALE_4 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2031634 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:28 level 2 op UNITOPERATION_SPY_COUNTERSPY
+turn 18 spies 8 started 0 travelled 0 promoted 0 bought 4 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    post standing; p1 not grabbed
+turn 19 spies active 8 idle 8 missions 0 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1966097 LOC_CITIZEN_CANADA_MODERN_FEMALE_4 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2031634 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2752534 LOC_CITIZEN_CANADA_MALE_6 level 1 at 13:20 travel
+spy 2686999 LOC_CITIZEN_CANADA_MODERN_FEMALE_8 level 1 at 13:29 travel
+spy 2621464 LOC_CITIZEN_CANADA_MALE_2 level 1 at 11:24 travel
+spy 2555929 LOC_CITIZEN_CANADA_MODERN_FEMALE_5 level 1 at 16:24 travel
+spy 2818074 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:27 start
+spy 2883611 LOC_CITIZEN_CANADA_FEMALE_1 level 1 at 66:27 start
+spy 2949148 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:27 start
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:27 start
+defender 262146 at 66:28 level 2 op UNITOPERATION_SPY_COUNTERSPY
+turn 19 spies 16 started 4 travelled 4 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    post standing; p1 not grabbed
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=20 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_6 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=20 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=20 EscapeResult=-1 InitialResult=5 LevelAfter=2 LootInfo=72 Name=LOC_CITIZEN_CANADA_MODERN_MALE_9 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=20 EscapeResult=-1 InitialResult=1 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_4 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=20 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_7 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=20 EscapeResult=-1 InitialResult=2 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_MODERN_MALE_2 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=20 EscapeResult=-1 InitialResult=4 LevelAfter=1 LootInfo=72 Name=LOC_CITIZEN_CANADA_MODERN_FEMALE_1 Operation=46 PlotIndex=2138
+mission CityName=LOC_CITY_NAME_PARIS CompletionTurn=20 EscapeResult=-1 InitialResult=3 LevelAfter=1 LootInfo=0 Name=LOC_CITIZEN_CANADA_FEMALE_9 Operation=46 PlotIndex=2138
+tally 1  SIPHON_FUNDS CAPTURED / NO_RESULT
+tally 3  SIPHON_FUNDS FAIL_MUST_ESCAPE / NO_RESULT
+tally 2  SIPHON_FUNDS FAIL_UNDETECTED / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_MUST_ESCAPE / NO_RESULT
+tally 1  SIPHON_FUNDS SUCCESS_UNDETECTED / NO_RESULT
+turn 20 spies active 8 idle 3 missions 8 captured-enemy 0
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:27 start
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2031634 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:27 start
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:27 start
+spy 2162708 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2818074 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2883611 LOC_CITIZEN_CANADA_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2949148 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:27 level 2 op -1
+turn 20 spies 11 started 3 travelled 0 promoted 1 bought 1 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 1310731 LOC_CITIZEN_CANADA_MODERN_FEMALE_1 level 1 turn 20 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 1376268 LOC_CITIZEN_CANADA_MODERN_MALE_2 level 1 turn 20 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_CITY_CENTER of 2 for spy 1441805 LOC_CITIZEN_CANADA_MODERN_MALE_7 level 1 turn 20 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE -> escape route DISTRICT_COMMERCIAL_HUB of 2 for spy 2162708 LOC_CITIZEN_CANADA_MODERN_FEMALE_6 level 1 turn 20 city LOC_CITY_NAME_PARIS p1 at 66:28 pursuer police
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    popup DiplomacyActionView -> closed
+    popup LeaderScene -> hidden
+    popup EspionagePopup -> closed
+    grabbed p1: def: spy 262146 at 66:27 level 2 xp 15 promos PROMOTION_SPY_SMEAR_CAMPAIGN op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:27 level 2 xp 15 promos PROMOTION_SPY_SMEAR_CAMPAIGN op -1 targets 66:27,66:28,66:26
+    gcfix seat 1 nothing
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_UNITS -> nothing
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+    cause popup EspionagePopup -> closed
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2031634 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 2 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2097171 LOC_CITIZEN_CANADA_MODERN_MALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3080217 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 16:24 notarget
+spy 2818074 LOC_CITIZEN_CANADA_MODERN_FEMALE_9 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2883611 LOC_CITIZEN_CANADA_FEMALE_1 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 2949148 LOC_CITIZEN_CANADA_MALE_4 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+spy 3014685 LOC_CITIZEN_CANADA_MODERN_FEMALE_7 level 1 at 66:28 busy:UNITOPERATION_SPY_SIPHON_FUNDS
+defender 262146 at 66:27 level 2 op -1
+turn 20 spies 8 started 0 travelled 0 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    grabbed p1: def: spy 262146 at 66:27 level 2 xp 15 promos PROMOTION_SPY_SMEAR_CAMPAIGN op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 262146 at 66:27 level 2 xp 15 promos PROMOTION_SPY_SMEAR_CAMPAIGN op -1 targets 66:27,66:28,66:26
+    gcfix seat 1 nothing
+    p1 unblock: unblock: blocker ENDTURN_BLOCKING_UNITS -> nothing
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler

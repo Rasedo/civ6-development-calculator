@@ -53,6 +53,7 @@ def main(argv=None) -> int:
     p.add_argument("--city", default="54:11")
     p.add_argument("--district", default="54:10")
     p.add_argument("--defender", default="1:7471106")
+    p.add_argument("--post", help="the plot the defender's counterspy guards (default: --district)")
     p.add_argument("--gold", type=int, default=50000)
     p.add_argument("--wait", type=float, default=120.0)
     p.add_argument("--deadline", type=float, default=178.0)
@@ -77,10 +78,14 @@ def main(argv=None) -> int:
     hist_lua = (HERE / "spy_history.lua").read_text(encoding="utf-8")
     unblock = lab._seat(lab.UNBLOCK.read_text(encoding="utf-8"), 0)
     blocker = lab._seat(lab.LUA_BLOCKER, 0)
-    defl = (HERE / "c16w_def.lua").read_text(encoding="utf-8").replace("ZID", did).replace("ZDX", dx).replace("ZDY", dy)
+    unblock_d = lab._seat(lab.UNBLOCK.read_text(encoding="utf-8"), int(a.defender.split(":")[0]))
+    blocker_d = lab._seat(lab.LUA_BLOCKER, int(a.defender.split(":")[0]))
+    gcfix = lab._seat((HERE / "c16n_gcfix.lua").read_text(encoding="utf-8"), int(a.defender.split(":")[0]))
+    px, py = (a.post or a.district).split(":")
+    defl = (HERE / "c16w_def.lua").read_text(encoding="utf-8").replace("ZID", did).replace("ZDX", px).replace("ZDY", py)
     grab = LUA_GRAB.replace("ZOWNER", dp)
     if a.setup:
-        log(f"################ c16w cycle seat 0 op {a.op} cap {a.cap} extra {a.extra} city {a.city} district {a.district} defender {a.defender}")
+        log(f"################ c16w cycle seat 0 op {a.op} cap {a.cap} extra {a.extra} city {a.city} district {a.district} post {a.post or a.district} defender {a.defender}")
         log(t.run(GC, c16w_run.SETUP.replace("ZEXTRA", str(a.extra)))[-1])
     for _ in range(a.turns):
         t0 = lab.turn(t)
@@ -124,6 +129,16 @@ def main(argv=None) -> int:
                     log("    repost: " + t.run(IG, defl.replace("ZMODE", "post"))[-1])
                     time.sleep(1.0)
                     log("    after: " + t.run(IG, defl.replace("ZMODE", "read"))[-1])
+                # the grabbed seat answers its own blockers (a civic, a
+                # research) or its end of turn is refused and the turn stands
+                log("    " + t.run(GC, gcfix)[-1])
+                seen_d: set[str] = set()
+                for _ in range(8):
+                    name = t.run(IG, blocker_d)[-1].split()[-1]
+                    if name == "none" or name in seen_d:
+                        break
+                    seen_d.add(name)
+                    log(f"    p{dp} unblock: " + t.run(IG, unblock_d, timeout=30)[-1])
                 t.run(IG, lab.LUA_ENDTURN)
                 time.sleep(0.5)
             finally:

@@ -218,6 +218,19 @@ class SimGp:
         return out
 
     # ---------------------------------------------------------------- the site
+    def _head_wonder_tile(self, row: int, colc: torch.Tensor) -> torch.Tensor:
+        """[B, K] — the plot the queued head wonder of each city column in
+        `colc` is raised on, -1 where the head is no wonder. A WONDER's site
+        lives in the city's wonder registry, not in `city_qtile` (which names
+        a district's plot)."""
+        hq = self._q_head(row).gather(1, colc)
+        wi = hq - self.WONDER_BASE
+        isw = (wi >= 0) & (wi < max(self._wond_n, 1))
+        nW = self.city_wonder.shape[3]
+        wreg = self.city_wonder[:, row].gather(1, colc.unsqueeze(2).expand(-1, -1, nW))
+        at = wreg.gather(2, wi.clamp(min=0, max=nW - 1).unsqueeze(2)).squeeze(2)
+        return torch.where(isw, at, torch.full_like(at, -1))
+
     def _gp_site_ok(self, row: int, sc: torch.Tensor, tc: torch.Tensor) -> torch.Tensor:
         """[B, N] — may the unit at each rank spend a charge where it stands?
 
@@ -308,7 +321,7 @@ class SimGp:
             _isw = (_hq >= self.WONDER_BASE) & (_hq < self.WONDER_BASE + max(self._wond_n, 1))
             a_wond = own & (_col >= 0) & (self.built_wonder.gather(1, tc) >= 0) \
                 & ~self.built_wonder_complete.gather(1, tc) & _isw \
-                & (self.city_qtile[:, row, :, 0].gather(1, _colc) == tc)
+                & (self._head_wonder_tile(row, _colc) == tc)
         # 14 this seat's City Center whose city lacks the row's building
         # (James of St. George's Castle)
         a_ctr = _none
@@ -686,7 +699,7 @@ class SimGp:
         cur = self._q_head(row).gather(1, cc.unsqueeze(1)).squeeze(1)
         wi = cur - self.WONDER_BASE
         is_w = (wi >= 0) & (wi < max(self._wond_n, 1)) \
-            & (self.city_qtile[:, row, :, 0].gather(1, cc.unsqueeze(1)).squeeze(1) == hc)
+            & (self._head_wonder_tile(row, cc.unsqueeze(1)).squeeze(1) == hc)
         dbl_to = self._gp_fx(cls, at, "wonderEraDouble").long()
         w_era = self._wonder_era[wi.clamp(min=0, max=max(self._wond_n - 1, 0))] if self._wond_n else torch.zeros_like(wi)
         mult = torch.where((dbl_to >= 0) & (w_era <= dbl_to), 2.0, 1.0).double()

@@ -11,3 +11,6 @@
 {"tag": "read4", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "read", "ZPROMO": "x"}, "appointed": false, "kind": "gov", "points": 10, "spent": 7, "step": "read"}
 {"tag": "appoint_hash", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "appoint", "ZPROMO": "x", "ZGT": "row.Hash"}, "appointed": false, "call": true, "can": true, "kind": "gov", "points": 10, "spent": 7, "step": "appoint"}
 {"tag": "appoint_idx4", "file": "c1g_gov.lua", "set": {"ZK": "1", "ZSTEP": "appoint", "ZPROMO": "x", "ZGT": "4"}, "appointed": false, "call": true, "can": true, "kind": "gov", "points": 14, "spent": 12, "step": "appoint"}
+{"tag": "pts", "file": "b24g_points.lua", "set": {"ZP": "0", "ZN": "12"}, "after": 15, "before": 3, "call": true, "kind": "points", "n": 12, "seat": 0}
+{"tag": "idx_appoint", "file": "c1g_gov.lua", "set": {"ZGOV": "GOVERNOR_THE_BUILDER", "ZSTEP": "appoint", "ZPROMO": "x", "ZCITY": "-1", "ZK": "1"}, "appointed": false, "call": true, "can": false, "gov": "GOVERNOR_THE_BUILDER", "govIndex": 4, "kind": "gov", "points": 3, "seat": 0, "spent": 3, "step": "appoint"}
+{"tag": "pts2", "file": "b24g_points.lua", "set": {"ZP": "0", "ZN": "12"}, "after": 13, "before": 1, "call": true, "kind": "points", "n": 12, "seat": 0}

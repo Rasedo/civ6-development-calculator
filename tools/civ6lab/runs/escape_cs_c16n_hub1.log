@@ -1,0 +1,30 @@
+################ c16w cycle seat 0 op UNITOPERATION_SPY_SIPHON_FUNDS cap 12 extra 8 city 66:27 district 66:28 post 66:28 defender 1:327683
+setup: four spy civics granted, 8 extra grants
+defender 327683 at 66:27 level 1 op -1
+turn 8 spies 0 started 0 travelled 0 promoted 0 bought 4 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_CLAIM_GREAT_PERSON -> nothing
+    no grab of p1 this turn
+turn 9 spies active 0 idle 4 missions 0 captured-enemy 0
+spy 524288 LOC_CITIZEN_CANADA_MALE_1 level 1 at 11:24 travel
+spy 458754 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 16:24 travel
+spy 589828 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 13:29 travel
+spy 655365 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 13:20 travel
+defender 327683 at 66:27 level 2 op -1
+turn 9 spies 4 started 0 travelled 4 promoted 0 bought 0 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_PRODUCTION -> VANCOUVER builds BUILDING_MONUMENT
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    grabbed p1: def: spy 327683 at 66:27 level 2 xp 15 promos PROMOTION_SPY_GUERILLA_LEADER op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 327683 at 66:28 level 2 xp 15 promos PROMOTION_SPY_GUERILLA_LEADER op UNITOPERATION_SPY_COUNTERSPY targets 
+turn 10 spies active 0 idle 0 missions 0 captured-enemy 0
+spy 1114120 LOC_CITIZEN_CANADA_MALE_1 level 1 at 66:27 start
+spy 1179657 LOC_CITIZEN_CANADA_MODERN_MALE_6 level 1 at 66:27 start
+spy 1245194 LOC_CITIZEN_CANADA_FEMALE_3 level 1 at 66:27 start
+spy 1310731 LOC_CITIZEN_CANADA_MODERN_MALE_9 level 1 at 66:27 start
+defender 393219 at 66:27 level 1 op -1
+turn 11 spies 4 started 4 travelled 0 promoted 0 bought 4 gold 50000
+    unblock: unblock: blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT -> nothing
+    grabbed p1: def: spy 393219 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    repost: def: post at 66:28 plotcan true requested plot
+    after: def: spy 393219 at 66:27 level 1 xp 15 promos  op -1 targets 66:27,66:28,66:26
+    cause blocker ENDTURN_BLOCKING_FILL_CIVIC_SLOT: no handler

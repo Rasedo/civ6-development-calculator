@@ -498,7 +498,7 @@ def test_action_sites(rules, path, R) -> None:
     sim.built_wonder[B0, plot] = wi
     sim.built_wonder_complete[B0, plot] = False
     sim.city_current[B0, ROW, 0, 0] = sim.WONDER_BASE + wi
-    sim.city_qtile[B0, ROW, 0, 0] = plot
+    sim.city_wonder[B0, ROW, 0, wi] = plot
     sim.city_cost[B0, ROW, 0, 0] = 5000.0
     sim.city_progress[B0, ROW, 0, 0] = 0.0
     iz = p.put_district("INDUSTRIAL_ZONE")

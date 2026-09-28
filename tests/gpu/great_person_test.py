@@ -346,7 +346,7 @@ def poke_wonder_buyout(rules, path):
     sim._gp_effects[cls, at, k] = 1
     ctr = int(sim.city_center[0, ROW, 0])
     assert ctr >= 0, "row has no city to spend in"
-    sim.city_qtile[0, ROW, 0, 0] = ctr  # the head's own plot is where the person stands
+    sim.city_wonder[0, ROW, 0, 0] = ctr  # the head wonder's registry plot is where the person stands
 
     # POOR: the treasury is the cap — production = treasury / 2, gold to zero
     sim.city_current[0, ROW, 0, 0] = sim.WONDER_BASE
