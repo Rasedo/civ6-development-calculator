@@ -847,8 +847,8 @@ class SimEconomy:
         BUILDING_PILLAGED is a column of its OWN, with its own Percentage,
         rolled ONE PER TILE. A hit on a district not itself pillaged takes ONE
         building, the top of the district's chain — the dearest standing
-        unpillaged, ties to the first in the layout, a Dar-e Mehr passed over
-        — a city-state's alike."""
+        unpillaged, ties to the first in the layout; nothing when that top is
+        a Dar-e Mehr (0x24af90 / 0x33a780) — a city-state's alike."""
         if not rows.numel():
             return
         ok = ((self.district[rows, tiles] >= 0) & self.district_complete[rows, tiles]
@@ -859,9 +859,10 @@ class SimEconomy:
         """Pillage the buildings of the district standing on each (rows,
         tiles) plot in the city that holds it — a major's or the Free Cities'
         city owning the plot, a city-state's whose registry holds it: every
-        standing one, or (`top_only`) the dearest standing unpillaged one,
-        ties to the first in the layout. CIV6 (Dar-e Mehr): "Cannot be
-        pillaged by natural disasters". A city-state's repair of what falls
+        standing one but a Dar-e Mehr, or (`top_only`) the dearest standing
+        unpillaged one, ties to the first in the layout, none when it is a
+        Dar-e Mehr. CIV6 (Dar-e Mehr): "Cannot be pillaged by natural
+        disasters". A city-state's repair of what falls
         waits for the item in hand (`citystate_repair_wait`).
         `districtHolder` / `pillageHeld`'s twin."""
         if not rows.numel():
@@ -873,11 +874,13 @@ class SimEconomy:
 
         def take(br: torch.Tensor, r: int, col: torch.Tensor, bd: torch.Tensor) -> torch.Tensor:
             cand = (self.city_bldg[br, r, col] & ~self.city_bldg_pillaged[br, r, col]
-                    & (self._b_req_district.unsqueeze(0) == bd.unsqueeze(1))
-                    & ~self._b_disaster_proof.unsqueeze(0))
+                    & (self._b_req_district.unsqueeze(0) == bd.unsqueeze(1)))
             if top_only:
                 top = torch.where(cand, key.unsqueeze(0), torch.full_like(cand, -1.0, dtype=torch.float64)).argmax(dim=1)
-                cand = (torch.nn.functional.one_hot(top, NB).bool() & cand.any(dim=1, keepdim=True))
+                cand = (torch.nn.functional.one_hot(top, NB).bool() & cand.any(dim=1, keepdim=True)
+                        & ~self._b_disaster_proof[top].unsqueeze(1))
+            else:
+                cand = cand & ~self._b_disaster_proof.unsqueeze(0)
             if bool(cand.any()):
                 self.city_bldg_pillaged[br, r, col] |= cand
                 self._eff_version += 1

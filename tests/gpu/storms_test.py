@@ -629,7 +629,25 @@ def main() -> int:
     s._pillage_tile_buildings(one, torch.tensor([ct]))
     assert fell(mrow, 0) == ["UNIVERSITY"], fell(mrow, 0)
     assert bool(s.citystate_repair_wait[0, m]), "the minor's repair did not wait"
-    print("  14 building pillage OK — the top of the chain alone, all with the district, a city-state's alike")
+    # a Dar-e Mehr on top of the chain: nothing falls (0x24af90 / 0x33a780)
+    temple, dem = bids.index("TEMPLE"), bids.index("DAR_E_MEHR")
+    holy = next(int(d["idx"]) for d in s.districts_cat if d["id"] == "HOLY_SITE")
+    h = next(x for x in range(s.T) if int(sl[x]) == j and int(s.district[0, x]) < 0 and x != t
+             and int(s.centre_slot_at[0, x]) < 0 and not bool(s.water[0, x]))
+    s.district[0, h] = holy
+    s.district_complete[0, h] = True
+    s.district_pillaged[0, h] = False
+    s.city_dist_tile[0, 0, j, holy] = h
+    s.city_bldg[0, 0, j, temple] = True
+    s.city_bldg[0, 0, j, dem] = True
+    s.city_bldg_pillaged[0, 0, j] = False
+    s._pillage_tile_buildings(one, torch.tensor([h]))
+    assert fell(0, j) == [], fell(0, j)
+    s.city_bldg[0, 0, j, dem] = False
+    s._pillage_tile_buildings(one, torch.tensor([h]))
+    assert fell(0, j) == ["TEMPLE"], fell(0, j)
+    print("  14 building pillage OK — the top of the chain alone (none under a Dar-e Mehr), all with the district, "
+          "a city-state's alike")
 
     # the last turn's percent scales the fertility rows too, each row's
     # Percentage x pct // 100 (0x286f80)

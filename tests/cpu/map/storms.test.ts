@@ -379,6 +379,20 @@ describe('the eight storms are the install\'s table', () => {
     stormTile(state, ct, bldgOnly, false);
     expect(cs.pillagedBuildings).toEqual(['UNIVERSITY']);
     expect(cs.repairWait).toBe(true);
+    // a Dar-e Mehr on top of the chain: nothing falls (it cannot be pillaged),
+    // the Temple under it included
+    const hs = tileAtCoords(state.map, 4, 5);
+    setTileOwner(hs, 0, city.id);
+    hs.district = 'HOLY_SITE';
+    hs.districtComplete = true;
+    city.districts.push({ type: 'HOLY_SITE', tileIndex: hs.index });
+    city.buildings.push('TEMPLE', 'DAR_E_MEHR');
+    city.pillagedBuildings = [];
+    stormTile(state, hs, bldgOnly, false);
+    expect(city.pillagedBuildings).toEqual([]);
+    city.buildings = city.buildings.filter((b) => b !== 'DAR_E_MEHR');
+    stormTile(state, hs, bldgOnly, false);
+    expect(city.pillagedBuildings).toEqual(['TEMPLE']);
   });
 
   it('a warmed world grows each row by its own ChanceIncreasePerDegree', () => {

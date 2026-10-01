@@ -85,10 +85,12 @@ function pillageDistrict(state: GameState, tile: Tile): void {
  * pillaged takes ONE building, the top of the district's chain (University
  * over Library, Meeting House over Temple:
  * runs/c74s3_bldg_pillage_20260926T133346Z.jsonl, 6 of 6), a city-state's
- * alike. READING: the top is the dearest building standing unpillaged there
- * (`BuildingDef.cost`, ties to the first in the production layout); a
- * Dar-e Mehr, which "Cannot be pillaged by natural disasters", is passed
- * over. A pillaged district's buildings went with it.
+ * alike. The top is the dearest building standing unpillaged there
+ * (`BuildingDef.cost`, ties to the first in the production layout; the
+ * district's chooser 0x24af90 keeps the first strictly greater Cost); when
+ * that top is a Dar-e Mehr (Buildings_XP2 Pillage="false", "Cannot be
+ * pillaged by natural disasters") nothing falls (the applier 0x33a780 tests
+ * the chosen one). A pillaged district's buildings went with it.
  */
 function pillageTileBuildings(state: GameState, tile: Tile): void {
   // A city CENTRE is never pillaged (`pillageDistrict`'s own rule, and no
@@ -100,11 +102,11 @@ function pillageTileBuildings(state: GameState, tile: Tile): void {
   let top: string | undefined;
   for (const id of centerBuildingIds()) {
     const def = BUILDINGS[id];
-    if (def.district !== tile.district || def.disasterProof || !h.city.buildings?.includes(id)
+    if (def.district !== tile.district || !h.city.buildings?.includes(id)
       || buildingPillaged(h.city, id)) continue;
     if (top === undefined || def.cost > BUILDINGS[top].cost) top = id;
   }
-  if (top) pillageHeld(h, top);
+  if (top && !BUILDINGS[top].disasterProof) pillageHeld(h, top);
 }
 
 /** The city — a major's, the Free Cities', a city-state's — whose registry

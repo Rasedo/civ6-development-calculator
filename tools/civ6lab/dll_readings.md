@@ -412,6 +412,17 @@ damage percent (0x468060), the player's event immunity (0x468100), the
 unit's own counter (+0x1110) and its ability list each zero the damage
 after the draw. A spared unit still spends its draw.
 
+## C-74: BUILDING_PILLAGED's building — CLOSED
+
+The applier 0x33a780 (owned plot, the district's city) asks the district's
+chooser 0x24af90: nothing on a pillaged district or an InternalOnly one
+(Districts +0xe1 bit 4: the City Centre, the wonder district); otherwise,
+over the city's buildings in that district not yet pillaged, the first with
+a strictly greater Buildings.Cost (+0x24). The applier then refuses a
+building whose Buildings_XP2 row has Pillage false (+0x48 bit 16:
+BUILDING_DAR_E_MEHR, BUILDING_FLOOD_BARRIER), so a Dar-e Mehr atop its
+Holy Site spares the Temple under it. No draw.
+
 ## DLL rules the engines contradict
 
 None known: every rule read above ships on both engines.
