@@ -2324,34 +2324,39 @@ class SimEconomy:
         owner = self.tile_seat.gather(1, tcu).squeeze(1)
         # the improvement, district, building and population rows need an
         # OWNED plot; the unit rows do not (the applier 0x336a50); every
-        # damage row's chance at `pct` of its Percentage (the storm's last
-        # turn halves them)
+        # row's chance, the fertility rows' too, at `pct` of its Percentage
+        # truncated to a whole percent (0x286f80: the storm's last turn
+        # halves them)
         owned = hit & (owner >= 0)
-        k = torch.as_tensor(pct, dtype=torch.float64, device=self.device).expand(self.B) / 100
+        pct_b = torch.as_tensor(pct, dtype=torch.float64, device=self.device).expand(self.B)
+
+        def k(p: torch.Tensor) -> torch.Tensor:
+            return torch.floor(torch.round(p * 100) * pct_b / 100) / 100
+
         lowland = self.tile_lowland.gather(1, tcu).squeeze(1) > 0
-        pill_p = torch.where(lowland & (self._st_low_pill[ev] > 0), self._st_low_pill[ev], self._st_imp_pill[ev]) * k
-        dist_p = torch.where(lowland & (self._st_low_dist[ev] > 0), self._st_low_dist[ev], self._st_dist_pill[ev]) * k
+        pill_p = k(torch.where(lowland & (self._st_low_pill[ev] > 0), self._st_low_pill[ev], self._st_imp_pill[ev]))
+        dist_p = k(torch.where(lowland & (self._st_low_dist[ev] > 0), self._st_low_dist[ev], self._st_dist_pill[ev]))
         rows = (owned & (r_pill < pill_p)).nonzero(as_tuple=True)[0]
         if rows.numel():
             self._scorch(rows, tc[rows])
-        gone = (owned & (r_destroy < self._st_imp_dest[ev] * k)).nonzero(as_tuple=True)[0]
+        gone = (owned & (r_destroy < k(self._st_imp_dest[ev]))).nonzero(as_tuple=True)[0]
         self._destroy_improvement(gone, tc[gone])
         dist = (owned & (r_district < dist_p)).nonzero(as_tuple=True)[0]
         if dist.numel():
             self._pillage_district(dist, tc[dist])
-        bld = (owned & (r_bldg < self._st_bldg_pill[ev] * k)).nonzero(as_tuple=True)[0]
+        bld = (owned & (r_bldg < k(self._st_bldg_pill[ev]))).nonzero(as_tuple=True)[0]
         if bld.numel():
             self._pillage_tile_buildings(bld, tc[bld])
         # a CITIZEN of the tile's owning city, on its own roll
-        self._lose_citizen((owned & (r_pop < self._st_pop[ev] * k)).nonzero(as_tuple=True)[0], owner, tc)
+        self._lose_citizen((owned & (r_pop < k(self._st_pop[ev]))).nonzero(as_tuple=True)[0], owner, tc)
         # UNITS: one share roll per domain, then one draw per unit of the
         # domain the roll struck, the land row's before the naval row's
-        land = self._unit_damage_draws(hit & (r_land < self._st_land_p[ev] * k), tc, False,
+        land = self._unit_damage_draws(hit & (r_land < k(self._st_land_p[ev])), tc, False,
                                        self._st_land_lo[ev], self._st_land_hi[ev])
-        naval = self._unit_damage_draws(hit & (r_naval < self._st_naval_p[ev] * k), tc, True,
+        naval = self._unit_damage_draws(hit & (r_naval < k(self._st_naval_p[ev])), tc, True,
                                         self._st_naval_lo[ev], self._st_naval_hi[ev])
         self._strike_units(hit, tc, owner, land, naval,
-                           hit & (r_civilian < self._st_civ_kill[ev] * k), ev)
+                           hit & (r_civilian < k(self._st_civ_kill[ev])), ev)
         # FERTILITY, each yield its own roll — or, past Phase IV, the reverse:
         # CIV6 "all Storms and Droughts now start removing fertility from
         # tiles instead of adding it".
@@ -2359,10 +2364,10 @@ class SimEconomy:
         if dry.numel():
             self._defertilize(dry, tc[dry])
         live = hit & ~strip & self._fertility_live()
-        fr = (live & (r_food < self._st_fert_food[ev])).nonzero(as_tuple=True)[0]
+        fr = (live & (r_food < k(self._st_fert_food[ev]))).nonzero(as_tuple=True)[0]
         if fr.numel():
             self._fertilize(fr, tc[fr])
-        pr2 = (live & (r_prod < self._st_fert_prod[ev])).nonzero(as_tuple=True)[0]
+        pr2 = (live & (r_prod < k(self._st_fert_prod[ev]))).nonzero(as_tuple=True)[0]
         if pr2.numel():
             ok = self.fertilizable[pr2, tc[pr2]]
             r2, t2 = pr2[ok], tc[pr2][ok]

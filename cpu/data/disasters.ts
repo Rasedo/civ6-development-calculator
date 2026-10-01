@@ -329,8 +329,9 @@ export const STORM_STEP_COST_ON = srcConst('disasters.stormStepCostOn', 1, {
 export const STORM_STEP_COST_OFF = srcConst('disasters.stormStepCostOff', 2, {
   lab: '(GameCore_XP2 0x28c500, tools/civ6lab/dll_readings.md): a step onto any other terrain costs 2',
 });
-/** the percent of a storm's damage rows its footprint strikes at on the
- *  storm's LAST turn (turn − start + 1 ≥ Duration; 0x286f80) */
+/** the percent of a storm's damage and fertility rows its footprint strikes
+ *  at on the storm's LAST turn (turn − start + 1 ≥ Duration; 0x286f80), each
+ *  row's Percentage × it // 100 */
 export const STORM_LAST_TURN_PCT = srcConst('disasters.stormLastTurnPct', 50, {
   lab: '(GameCore_XP2 0x286f80, tools/civ6lab/dll_readings.md): 100% of the rows\' Percentage, 50% on the last turn',
 });

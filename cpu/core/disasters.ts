@@ -1168,7 +1168,7 @@ export function disasterPhase(state: GameState): void {
  * lives three turns. ENTRY: its footprint strikes the strike plot. Every
  * later turn the centre walks (`stormWalk`), its footprint striking at every
  * step; on the storm's LAST turn (turn − start + 1 ≥ Duration) at
- * `STORM_LAST_TURN_PCT` of the damage rows' chances. A storm strikes each
+ * `STORM_LAST_TURN_PCT` of the damage and fertility rows' chances. A storm strikes each
  * plot once (`Tile.stormStruck`). Each storm's clock ticks before the next
  * one walks, so a storm dissipating this turn frees its final tile for a
  * later storm's walk.
@@ -1198,7 +1198,7 @@ function stormsTurn(state: GameState, live: Tile[], strip: boolean): void {
  * ends for the turn when the drawn step costs more than is left. A plot
  * holding another storm's centre ends it too — one record per plot. Each
  * step strikes the footprint at the new centre (`stormTurn`, at `pct` of the
- * damage rows' chances). Returns the tile the record ends on.
+ * rows' chances). Returns the tile the record ends on.
  */
 export function stormWalk(state: GameState, center: Tile, ev: StormEvent, strip: boolean, pct: number): Tile {
   const map = state.map;
@@ -1248,7 +1248,7 @@ export function stormFootprint(map: GameMap, center: Tile, hexes: number): Tile[
 
 /** ONE strike of a storm's footprint around `center`: each plot the storm
  *  has not yet struck (`Tile.stormStruck` against the centre's `stormId`),
- *  in the footprint's order, at `pct` of the damage rows' chances. */
+ *  in the footprint's order, at `pct` of the rows' chances. */
 function stormTurn(state: GameState, center: Tile, ev: StormEvent, strip: boolean, pct: number): void {
   const id = center.stormId ?? -1;
   for (const t of stormFootprint(state.map, center, ev.hexes)) {
@@ -1309,22 +1309,23 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
 
   const owner = tileSeat(tile);
   // the improvement, district, building and population rows need an OWNED
-  // plot; the unit rows do not (the applier 0x336a50); every damage row's
-  // chance at `pct` of its Percentage (the storm's last turn halves them)
+  // plot; the unit rows do not (the applier 0x336a50); every row's chance,
+  // the fertility rows' too, at `pct` of its Percentage truncated to a whole
+  // percent (0x286f80: the storm's last turn halves them)
   const owned = owner >= 0;
   const lowland = (tile.lowland ?? 0) > 0;
-  const k = pct / 100;
-  const pillP = (lowland && ev.lowlandPill > 0 ? ev.lowlandPill : ev.impPill) * k;
-  const distP = (lowland && ev.lowlandDist > 0 ? ev.lowlandDist : ev.distPill) * k;
+  const k = (p: number) => Math.floor(Math.round(p * 100) * pct / 100) / 100;
+  const pillP = k(lowland && ev.lowlandPill > 0 ? ev.lowlandPill : ev.impPill);
+  const distP = k(lowland && ev.lowlandDist > 0 ? ev.lowlandDist : ev.distPill);
   if (owned && rPill < pillP) scorch(state, tile);
-  if (owned && rDestroy < ev.impDest * k) destroyImprovement(state, tile);
+  if (owned && rDestroy < k(ev.impDest)) destroyImprovement(state, tile);
   if (owned && rDistrict < distP) pillageDistrict(state, tile);
-  if (owned && rBldgS < ev.bldgPill * k) pillageTileBuildings(state, tile);
-  if (owned && rPop < ev.pop * k) losePopulation(state, tile);
+  if (owned && rBldgS < k(ev.bldgPill)) pillageTileBuildings(state, tile);
+  if (owned && rPop < k(ev.pop)) losePopulation(state, tile);
   // one draw per unit of each domain the share struck, the land row's first
-  const land = rLand < ev.landP * k ? unitDamageDraws(state, tile, false, ev.landLo, ev.landHi) : null;
-  const naval = rNaval < ev.navalP * k ? unitDamageDraws(state, tile, true, ev.navalLo, ev.navalHi) : null;
-  strikeUnits(state, tile, owner, { land, naval, civ: rCivilian < ev.civKill * k }, ev);
+  const land = rLand < k(ev.landP) ? unitDamageDraws(state, tile, false, ev.landLo, ev.landHi) : null;
+  const naval = rNaval < k(ev.navalP) ? unitDamageDraws(state, tile, true, ev.navalLo, ev.navalHi) : null;
+  strikeUnits(state, tile, owner, { land, naval, civ: rCivilian < k(ev.civKill) }, ev);
   // FERTILITY, each yield its own roll — or, past Phase IV, the reverse:
   // CIV6 "all Storms and Droughts now start removing fertility from tiles
   // instead of adding it".
@@ -1332,8 +1333,8 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
     defertilize(tile);
     return;
   }
-  if (rFood < ev.fertFood) fertilize(state, tile);
-  if (rProd < ev.fertProd && fertilityLive(state) && !isWater(tile) && tile.elevation !== 'MOUNTAIN') {
+  if (rFood < k(ev.fertFood)) fertilize(state, tile);
+  if (rProd < k(ev.fertProd) && fertilityLive(state) && !isWater(tile) && tile.elevation !== 'MOUNTAIN') {
     tile.fertilityProd = Math.min(FERTILITY_CAP, tile.fertilityProd + 1);
   }
 }

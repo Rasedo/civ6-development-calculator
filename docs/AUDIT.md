@@ -48,7 +48,7 @@ re-adds them.
 | C-20 the route's transportation efficiency | 1 | the A* path and the range budget (BUILD); the sweep's plot-by-plot score (LAB) |
 | C-26 civilization abilities, the residue | 1 | Cyber Warfare vs a district (LAB) |
 | C-38 a city-state's play | 1 | the Builder row's gate and buy rate, quests, naval rate, tier-3 rows (LAB); later-era starts (no start era) |
-| C-49 named storms | 1 | storms as records (BUILD); the last turn's fertility, the resultants' score (LAB) |
+| C-49 named storms | 1 | storms as records (BUILD); the resultants' score (LAB) |
 | C-60 the Free City's own play | 1 | the base's freeze, ring 2 of the walk, a Support grant, the disband line, its own techs (LAB) |
 | C-74 the turn's one random event, the residue | 1 | the volcano N, spacing's live events, warming order, eruption paint on districts, the spread, chain top, district hits, minor repair, meteor, late rivers (LAB) |
 | C-93 the turn's order | 1 | tourism's banking, the victory and turn-limit checks, the turn-opening Great Person draw, the climate step against the storms (LAB) |
@@ -148,10 +148,8 @@ commit.
   Shipped: a city-state buys a Builder only while it has Builder work (`minorBuilderWork` / `_minor_builder_work`: a pillaged improvement, or an owned plot a valid improvement would take) and none stands or trains (lab 5d).
   - LAB: the per-turn rate given work and its rise with the bank (300 → ~55% a work-turn, 110 / 160 far lower); the buys whose work only the AI sees (Fishing Boats, Mine → Farm swaps, a farm rebuilt every other turn). The Builder ROW's own gate: the engines train one whenever none stands, so with the purchase gate a buy happens only while a repair takes the turn.
 - **C-49. NAMED STORMS.** Weight 1.
-  `stormWalk` / `_storm_walk` ship the measured model: eight unit steps on the movement turn from the `PrevailingWinds` band at the centre's current latitude, eight more with no footprint on dissipation.
-  Shipped: the DLL's storm walk (0x28ecd0 / 0x28c500 / 0x286f80): latitude and inclusive wind bands (`windLatitude`, `windWeights` / `_wind_pool`), a step among existing neighbours costing 1 on the storm's terrain and 2 elsewhere out of 8, the footprint striking at every step, each plot once a storm (`stormId`, `stormStruck`), the last turn at `STORM_LAST_TURN_PCT` 50.
+  Shipped: the DLL's storm walk (0x28ecd0 / 0x28c500 / 0x286f80): latitude and inclusive wind bands (`windLatitude`, `windWeights` / `_wind_pool`), a step among existing neighbours costing 1 on the storm's terrain and 2 elsewhere out of 8, the footprint striking at every step, each plot once a storm (`stormId`, `stormStruck`), the last turn at `STORM_LAST_TURN_PCT` 50 of every damage and fertility row, truncated to a whole percent.
   - BUILD: storms as records rather than plot fields (a step onto another storm's centre ends the walk; the DLL does not block).
-  - LAB: whether the last turn's 50% scales the fertility rows (the engines scale the damage rows alone).
   - LAB: a terrain dump of the sweep saves, to score the resultants.
 - **C-60. THE FREE CITY'S OWN PLAY.** Weight 1.
   The seat is in on both engines (revolt, race, join, Eleanor's skip, open to attack, the religion walk). Its city stands on a flat 72 base (`FREE_CITY_DEFENSE`; `holderStrength` / `_holder_strength`, measured once, Medieval, no walls, no garrison) with every holder's terms on top (`centreStrength`); a walled Free City fires the ordinary strikes; the centre heals at the ordinary rate and its loyalty restarts at 100. REACHED by `tests/cpu/city/free-city.test.ts` and the `free_city` lane.

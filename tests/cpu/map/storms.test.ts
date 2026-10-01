@@ -245,7 +245,23 @@ describe('the eight storms are the install\'s table', () => {
       if (t.pillaged || !t.improvement) hit++;
     }
     // pillaged at half its certain row, or destroyed at half its own
-    expect(Math.abs(hit / 2000 - (1 - 0.5 * (1 - ev.impDest * 0.5)))).toBeLessThan(0.04);
+    const half = (p: number) => Math.floor(Math.round(p * 100) / 2) / 100;
+    expect(Math.abs(hit / 2000 - (1 - 0.5 * (1 - half(ev.impDest))))).toBeLessThan(0.04);
+    // ...and the fertility rows too, each truncated to a whole percent
+    const fe = STORM_EVENTS.reduce((a, e) => (e.fertFood > a.fertFood ? e : a));
+    expect(fe.fertFood).toBeGreaterThan(0.2);
+    const draw = (pct: number) => {
+      let n = 0;
+      for (let i = 0; i < 3000; i++) {
+        const u = tileAtCoords(g.map, 9, 9);
+        u.fertility = 0;
+        stormTile(g, u, fe, false, pct);
+        if (u.fertility > 0) n++;
+      }
+      return n / 3000;
+    };
+    expect(Math.abs(draw(100) - fe.fertFood)).toBeLessThan(0.035);
+    expect(Math.abs(draw(STORM_LAST_TURN_PCT) - half(fe.fertFood))).toBeLessThan(0.035);
   });
 
   it('the canonical disc is centre, ring 1, ring 2, each ring by tile index', () => {

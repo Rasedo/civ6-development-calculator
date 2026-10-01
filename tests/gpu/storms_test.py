@@ -29,6 +29,7 @@ over blizzards.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -629,6 +630,27 @@ def main() -> int:
     assert fell(mrow, 0) == ["UNIVERSITY"], fell(mrow, 0)
     assert bool(s.citystate_repair_wait[0, m]), "the minor's repair did not wait"
     print("  14 building pillage OK — the top of the chain alone, all with the district, a city-state's alike")
+
+    # the last turn's percent scales the fertility rows too, each row's
+    # Percentage x pct // 100 (0x286f80)
+    fe = int(sim._st_fert_food.argmax())
+    pf = float(sim._st_fert_food[fe])
+    assert pf > 0.2, pf
+    plot = free_tile(sim, False)
+
+    def fert_rate(pct: int, n: int = 1500) -> float:
+        got = 0
+        for _ in range(n):
+            sim.fertility[0, plot] = 0
+            sim._storm_tile(torch.tensor([True]), torch.tensor([plot]), torch.tensor([fe]),
+                            torch.tensor([False]), pct)
+            got += int(sim.fertility[0, plot] > 0)
+        return got / n
+
+    half = math.floor(round(pf * 100) * sim._st_last_pct / 100) / 100
+    assert abs(fert_rate(100) - pf) < 0.04
+    assert abs(fert_rate(sim._st_last_pct) - half) < 0.04, half
+    print("  15 last turn OK — the fertility rows at the last turn's percent, truncated")
     print("BATTERY OK storms")
     return 0
 

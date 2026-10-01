@@ -335,7 +335,10 @@ Direction"), the step's strike 0x286f80.
 - Each step strikes the footprint at the new centre (0x286f80), each plot
   at most once per storm (the storm's struck list, +0x38), at 100% of the
   rows' Percentage, 50% on the storm's last turn (turn - start + 1 >=
-  Duration). The engines strike only where the walk stops.
+  Duration): Percentage x pct // 100 in integers against rand(100), the
+  RandomEvent_Damages rows' "Pillage Improvement Chance" and the
+  RandomEvent_Yields rows' "Boosted Yield Chance" alike (both read the same
+  pct argument).
 
 ## B-24r: the governor operations
 
