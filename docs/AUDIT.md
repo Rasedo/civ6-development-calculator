@@ -37,7 +37,7 @@ re-adds them.
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer, the plant line's pick (LAB) |
-| B-31r trade-route tails | 1 | the hull percentage's combination, the destination term (LAB); the destination's free choice (P8) |
+| B-31r trade-route tails | 1 | the destination term (LAB); the destination's free choice (P8) |
 | B-D unsourced data values | 1 | the unread and unscaled durations, "Standard Speed" amounts, the per-opponent reader (LAB) |
 | B-86 the emergency combat terms' reach | 1 | the lost Nuclear emergency's -1, raising a Military emergency (LAB) |
 | B-89 fire on a religious unit | 1 | a second gun's burst, ships, the gun's XP vs a Fighter (LAB) |
@@ -80,8 +80,8 @@ commit.
   - LAB: Renewable Subsidizer (Reyna's Dam +2 Gold / +2 Power sits on a building with no RegionalRange); whether "highest" or a fixed type order picks the plant line (nuclear 4 > oil 3 > coal 0 always).
   - BLOCKER C-38: Foreign Investor copies the strategics a minor accumulates and Affluence the luxuries it imports (`*_COPY_*_FOR_IMPORT`); a minor improves nothing here.
 - **B-31r. TRADE-ROUTE TAILS.** Weight 1.
-  Shipped: the plunder payout is max(`PLUNDER_ROUTE_GOLD` 50, floor(V × `PLUNDER_ROUTE_TURNS` 5)) plus the plunderer's percent (`routePlunderPct`: Total War 50, Letter of Marque 100), V the route's origin and destination yields, each after its own seat's Letters of Marque cut, Gold ×1 and the rest ×`GOLD_EQUIVALENT_OTHER_YIELDS` 2 (`routeOriginYields` / `routeDestYields` / `routeYieldValue`, the GPU's per-route `_seat_route_income(row, per_route=True)`; DLL 0x5545e0, 16 of 16 plunders).
-  - LAB: how the admirals' hull percentage combines with the plunder percent (the engines multiply it on top); the destination term of V, read in the DLL, never exercised by a record.
+  Shipped: the plunder payout is max(`PLUNDER_ROUTE_GOLD` 50, floor(V × `PLUNDER_ROUTE_TURNS` 5)) plus the plundering unit's one percent — the policies' (`routePlunderPct`: Total War 50, Letter of Marque 100) and, on a hull, the admirals' (Drake 50, Ching Shih 60) added, each an EFFECT_ADJUST_UNIT_PLUNDER_YIELDS on the unit (DLL 0x5545e0 reads unit +0x1858) — V the route's origin and destination yields, each after its own seat's Letters of Marque cut, Gold ×1 and the rest ×`GOLD_EQUIVALENT_OTHER_YIELDS` 2 (`routeOriginYields` / `routeDestYields` / `routeYieldValue`, the GPU's per-route `_seat_route_income(row, per_route=True)`; DLL 0x5545e0, 16 of 16 plunders).
+  - LAB: the destination term of V, read in the DLL, never exercised by a record.
   - P8: the destination is one candidate row plus take/skip; the free-choice head is P8 work.
 - **B-D. UNSOURCED DATA VALUES.** Weight 1.
   The online speed ships: `GAME_SPEED` is `GAMESPEED_ONLINE`'s `CostMultiplier` 50, and every cost the install scales (units and their steps, techs, civics, buildings, wonders, projects, districts, the Builder and Settler steps, the worship Faith price) and every `ScaleByGameSpeed` / `Scale` grant (Great People, wonder grants, tribal villages) goes through it, truncated as the lab's purchase record truncates odd costs (`scaleByGameSpeed` / `scale_by_game_speed`). The tile-purchase ring step and the space flight's light years are this engine's readings of the speed.

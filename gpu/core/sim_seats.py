@@ -14362,14 +14362,14 @@ class SimSeats:
                               torch.floor(_v * self._trade_plunder_turns))
         mj = hr < self.n_majors
         if bool(mj.any()):
-            # the raider's plunder percent (Total War, Letter of Marque)
-            _pct = self._fx_at_seat("rplun", hr[mj], hb[mj]).double()
+            # the plundering unit's one percent (0x5545e0, unit +0x1858): the
+            # raider's policies' (Total War, Letter of Marque) plus, when a
+            # hull plunders, the admirals' (Francis Drake, Ching Shih) — each
+            # an EFFECT_ADJUST_UNIT_PLUNDER_YIELDS on the unit, so they add
+            _pp = self._gp_perm_at(hr[mj], "routePlunderPct", hb[mj]).double()
+            _pct = (self._fx_at_seat("rplun", hr[mj], hb[mj]).double()
+                    + torch.where(_hull[mj], _pp, torch.zeros_like(_pp)))
             _gold = _base[mj] + torch.floor(_base[mj] * _pct / 100)
-            # CIV6 (Francis Drake, Ching Shih): a permanent percentage on top,
-            # an ability of the naval classes alone — it pays when a hull
-            # plunders.
-            _pp = 1 + self._gp_perm_at(hr[mj], "routePlunderPct", hb[mj]).double() / 100
-            _gold = _gold * torch.where(_hull[mj], _pp, torch.ones_like(_pp))
             self.civ_treasury.index_put_((hb[mj], hr[mj]), _gold, accumulate=True)
         # a city-state raider banks the base into its own treasury (it
         # carries no government or Great Person rows)

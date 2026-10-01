@@ -101,8 +101,14 @@ def test_escort_radius(rules, path) -> None:
 
 def test_admiral_hull(rules, path) -> None:
     gal = UIDS.index("GALLEY")
-    for pct, hull, want in ((50, True, 1.5), (0, True, 1.0), (60, False, 1.0)):
+    # the admiral's percentage ADDS to the policies' (Total War 50): one
+    # percent on the plundering unit, 50 + 50 x 110 // 100 = 105
+    for pct, pol, hull, want in ((50, 0, True, 1.5), (0, 0, True, 1.0), (60, 0, False, 1.0), (60, 50, True, 2.1)):
         sim = fresh(rules, path)
+        if pol:
+            real = sim._fx_at_seat
+            sim._fx_at_seat = lambda key, seat, rows=None, real=real, pol=pol: (
+                torch.full_like(seat, pol, dtype=sim.dtype) if key == "rplun" else real(key, seat, rows))
         k = sim._gp_perm_names.index("routePlunderPct")
         sea = free_tile(sim, water=True)
         park_route(sim, 1, sea)
@@ -119,8 +125,8 @@ def test_admiral_hull(rules, path) -> None:
         assert int(sim.seat_routes[0, 1, 0, 0]) == -1, "the route was not plundered"
         got = float(sim.civ_treasury[0, 0]) - g0
         assert abs(got - sim._trade_plunder_gold * want) < 1e-9, \
-            f"pct {pct}, hull {hull}: banked {got}, want {sim._trade_plunder_gold * want}"
-    print("  2 the admirals OK — a hull takes the percentage, a passenger the plain gold")
+            f"pct {pct}, policy {pol}, hull {hull}: banked {got}, want {sim._trade_plunder_gold * want}"
+    print("  2 the admirals OK — a hull takes the percentage on top of the policies', a passenger the plain gold")
 
 
 def test_plunder_value(rules, path) -> None:

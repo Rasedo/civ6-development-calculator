@@ -68,8 +68,12 @@ Trade_Manager plunder 0x5545e0 (yield loop 0x554860..0x554a4e, route yields
   GOLD_EQUIVALENT_OTHER_YIELDS 2 otherwise) — the route's per-turn yields.
 - base = max(50, V × speed(TRADE_ROUTE_TURN_DURATION_BASE 20) // 2)
   (Online 10 → 5V; Standard 10V; the 50 a literal, unscaled).
-- payout = base + base × pct // 100 (the plunderer's plunder percent, player
-  field +0x1858, when > 0); Gold; no draw.
+- payout = base + base × pct // 100 (the plundering UNIT's plunder percent,
+  unit field +0x1858 — the caller passes the unit whose +0x2e0 owner it
+  tests — when > 0); Gold; no draw. Total War and Letter of Marque
+  (MODIFIER_PLAYER_UNITS_ADJUST_PLUNDER_YIELDS, every unit) and the
+  admirals' naval abilities (MODIFIER_PLAYER_UNIT_ADJUST_PLUNDER_YIELDS)
+  all write EFFECT_ADJUST_UNIT_PLUNDER_YIELDS into that one field: they add.
 - Verified 16 / 16 plunders (`runs/plunder_*`), including the two 50s the
   route term could not reach (Quebec→Halifax V 6, Quebec→Ngaruawahia V 8).
   The records' destination yields are all 0: the destination term is read,

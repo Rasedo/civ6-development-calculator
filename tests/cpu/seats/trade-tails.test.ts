@@ -67,6 +67,21 @@ describe("the admirals' plunder reward", () => {
     expect(routePlunderGold(state, 1, seatOf(state, 0)!, NO_ROUTE, wet)).toBe(PLUNDER_ROUTE_GOLD);
   });
 
+  it('adds the admiral\'s percentage to the policies\' — one percent on the unit', () => {
+    // Ching Shih 60 + Total War 50: 50 + 50 x 110 // 100, not 50 x 1.5 x 1.6
+    const state = raiderScene(60);
+    const s1 = seatOf(state, 1)!;
+    s1.research.civics.push('CODE_OF_LAWS', 'SCORCHED_EARTH');
+    s1.government.chosen = 'CHIEFDOM';
+    s1.government.policies = ['TOTAL_WAR'];
+    const wet = tileAtCoords(state.map, 6, 6).index;
+    const dry = tileAtCoords(state.map, 12, 12).index;
+    spawnUnit(state, 'GALLEY', wet, 1);
+    spawnUnit(state, 'WARRIOR', dry, 1);
+    expect(routePlunderGold(state, 1, seatOf(state, 0)!, NO_ROUTE, wet)).toBe(105);
+    expect(routePlunderGold(state, 1, seatOf(state, 0)!, NO_ROUTE, dry)).toBe(75);
+  });
+
   it('pays a hull nothing extra without the admiral', () => {
     const state = raiderScene(0);
     const wet = tileAtCoords(state.map, 8, 6).index;

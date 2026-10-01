@@ -318,18 +318,19 @@ export function plunderedByHull(state: GameState, tileIndex: number, raider: num
 /** The Gold the `raider` seat banks for plundering `owner`'s route `r`, whose
  *  Trader stands on `tileIndex`: base = max(PLUNDER_ROUTE_GOLD,
  *  floor(V × PLUNDER_ROUTE_TURNS)), then base + base × pct // 100, pct the
- *  raider's plunder percent (Total War, Letter of Marque); the admirals'
- *  permanent percentage on top when its hull plunders (`plunderedByHull`).
- *  A city-state raider carries no percent. */
+ *  plundering unit's one plunder percent (GameCore_XP2 0x5545e0 reads unit
+ *  +0x1858): the raider's policies' (Total War, Letter of Marque, every unit)
+ *  plus the admirals' permanent percentage when its hull plunders
+ *  (`plunderedByHull`) — each an EFFECT_ADJUST_UNIT_PLUNDER_YIELDS on the
+ *  unit, so they add. A city-state raider carries no percent. */
 export function routePlunderGold(state: GameState, raider: number, owner: Seat, r: TradeRoute, tileIndex: number): number {
   const rs = seatOf(state, raider);
   if (!rs) return 0;
   const base = Math.max(PLUNDER_ROUTE_GOLD, Math.floor(routeYieldValue(state, owner, r) * PLUNDER_ROUTE_TURNS));
   if (isCityStateSeat(raider)) return base;
-  const pct = getModifiers(state, raider).routePlunderPct;
-  const gold = base + Math.floor((base * pct) / 100);
-  const hull = plunderedByHull(state, tileIndex, raider);
-  return gold * (hull ? 1 + gpPermOf(rs, 'routePlunderPct') / 100 : 1);
+  const hull = plunderedByHull(state, tileIndex, raider) ? gpPermOf(rs, 'routePlunderPct') : 0;
+  const pct = getModifiers(state, raider).routePlunderPct + hull;
+  return base + Math.floor((base * pct) / 100);
 }
 
 /** The FREE Trader this seat owns on the LOWEST tile index — the unit the
