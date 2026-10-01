@@ -1061,8 +1061,12 @@ function eruptionDamage(state: GameState, tile: Tile, kind: EruptionDamage, row:
       return;
     case 'CITY_GARRISON':
     case 'CITY_WALLS': {
-      if (!cityAtIndex(state, tile.index)) return;
-      const dmg = lo + Math.floor(nextRandom(state) * (hi - lo + 1));
+      // the band MinHP + rand(MaxHP − MinHP) where a centre stands; the walls'
+      // only while they stand unbroken (GameCore_XP2 0x336000 / 0x336170)
+      const held = cityAtIndex(state, tile.index);
+      if (!held) return;
+      if (kind === 'CITY_WALLS' && outerPool(state, held.city) <= 0) return;
+      const dmg = lo + Math.floor(nextRandom(state) * (hi - lo));
       if (kind === 'CITY_GARRISON') hitCityHp(state, tile, dmg);
       else hitCityWalls(state, tile, dmg);
       return;

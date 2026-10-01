@@ -2045,9 +2045,13 @@ class SimEconomy:
             dmgs = self._unit_damage_draws(land, tile, False, lo, hi)
             self._strike_units(land, tile, owner, dmgs, None, torch.zeros_like(land), none)
         elif kind in ("CITY_GARRISON", "CITY_WALLS"):
+            # the band MinHP + rand(MaxHP - MinHP) where a centre stands; the
+            # walls' only while they stand unbroken (0x336000 / 0x336170)
             city = land & self._centre_held(tile)
+            if kind == "CITY_WALLS":
+                city = city & (self._centre_outer_hp(tile) > 0)
             r = self._next_random(city)
-            dmg = lo + torch.floor(r * (hi - lo + 1).double()).to(torch.long)
+            dmg = lo + torch.floor(r * (hi - lo).double()).to(torch.long)
             garrison = kind == "CITY_GARRISON"
             self._hit_centre(city, tile, dmg, hp=garrison, walls=not garrison)
         else:
@@ -2059,6 +2063,17 @@ class SimEconomy:
         ctr = self._centre_seat_plane().gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
         crow = self._seat_row[ctr.clamp(min=0)]
         return (tile >= 0) & (ctr >= 0) & ((crow < self.n_majors) | (crow == self.FREE_ROW))
+
+    def _centre_outer_hp(self, tile: torch.Tensor) -> torch.Tensor:
+        """[B] the perimeter left on the city centre at `tile` [B] (0 where no
+        held centre stands) — `outerPool`."""
+        t1 = tile.clamp(min=0).unsqueeze(1)
+        ctr = self._centre_seat_plane().gather(1, t1).squeeze(1)
+        crow = self._seat_row[ctr.clamp(min=0)]
+        hcol = self.centre_slot_at.gather(1, t1).squeeze(1).clamp(min=0)
+        b = torch.arange(self.B, device=self.device)
+        oh = self.city_outer_hp[b, crow.clamp(max=self.city_outer_hp.shape[1] - 1), hcol]
+        return torch.where(self._centre_held(tile), oh, torch.zeros_like(oh))
 
     def _hit_centre(self, hurt: torch.Tensor, tile: torch.Tensor, dmg: torch.Tensor,
                     hp: bool = True, walls: bool = True) -> None:

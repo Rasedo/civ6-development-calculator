@@ -198,12 +198,14 @@ def main() -> None:
                     plane[B0, n] = -1
             reach = [n for n in ring if bool(sim3._eruption_reaches(torch.tensor([n]))[0])]
             cities = sum(int(bool(sim3._centre_held(torch.tensor([n]))[0])) for n in reach)
+            walled = sum(int(float(sim3._centre_outer_hp(torch.tensor([n]))[0]) > 0) for n in reach)
             elig = {n for n in ring if paintable(sim3, n)}
             takes = elig
             before = sim3.feat_id[B0].clone()
             s0 = int(sim3.rng_state[B0])
             sim3._erupt(hit, ring_of(sim3, v), rowt)
-            want_draws = n_kinds * len(reach) + (2 * cities if banded else 0) + n_yields * len(elig)
+            # the garrison band where a centre stands, the walls band while walls stand
+            want_draws = n_kinds * len(reach) + (cities + walled if banded else 0) + n_yields * len(elig)
             assert (s0 + want_draws * STEP) & 0xFFFFFFFF == int(sim3.rng_state[B0]), \
                 "an eruption draws once per damage row per reached plot, then once per Yields row per eligible plot"
             for n in ring:
