@@ -408,6 +408,4 @@ after the draw. A spared unit still spends its draw.
 
 ## DLL rules the engines contradict
 
-- Trade range: a budget walked along the path (15, refuelled to 15 / 30 at
-  the origin's and own-post cities' TradeEmbark districts), the path a
-  least-cost search (engines: a hex distance per leg, a greedy step).
+None known: every rule read above ships on both engines.

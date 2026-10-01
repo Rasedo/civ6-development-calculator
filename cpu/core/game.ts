@@ -319,9 +319,10 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     const owner = seatOf(state, seat);
     if (owner) owner.capitalTile = tile.index;  // static once founded
   }
-  allRoadsLeadToRome(state, seat, tile.index);
   trajansColumn(state, seat, city);
   revealAround(state, seat, tile.index, 3);
+  // the road to the capital walks the ground the city just revealed
+  allRoadsLeadToRome(state, seat, tile.index);
   // CIV6 (Ancestral Hall): "New cities receive a free Builder." The grant is
   // the SEAT's, so the first city — founded before any Plaza stands — never
   // sees it.

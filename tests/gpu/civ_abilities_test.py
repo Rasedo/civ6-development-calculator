@@ -140,18 +140,10 @@ def site_near(sim, cap: int, lo: int = 4, hi: int = 7) -> int:
     return int(hit[0])
 
 
-def walk(sim, row: int, frm: int, to: int) -> list[int]:
-    water = sim._trade_water_level(row)
-    cur = torch.tensor([frm], dtype=torch.long)
-    tgt = torch.tensor([to], dtype=torch.long)
-    path = [frm]
-    for _ in range(40):
-        nxt = sim._trade_walk_step(ONE, cur, tgt, water)
-        if int(nxt[0]) == int(cur[0]):
-            break
-        cur = nxt
-        path.append(int(cur[0]))
-    return path
+def course(sim, row: int, frm: int, to: int) -> list[int] | None:
+    """A route's course from `frm` to `to` for row `row` as the map stands
+    (`tradeCourse`), None where the walk never reaches it."""
+    return sim._trade_course(B0, row, frm, to, sim._trade_graphs(row, [B0])[B0])
 
 
 # ---------------------------------------------------------------------------
@@ -172,25 +164,26 @@ def test_rome_founding(rules, path) -> None:
     sim = fresh(rules, path)
     rome = row_of(sim, "ROME")
     cap = int(sim.civ_cap_tile[B0, rome])
-    water = sim._trade_water_level(rome)
+    sim.seat_explored[:] = True  # the walk crosses revealed plots only
     # the first settleable plot 4..7 out that the Trader's walk reaches, so the
     # road clause is the thing under test whatever world the fixture holds
     d = sim.pair_dist[cap].to(torch.long)
     cand = (settleable(sim) & (d >= 4) & (d <= 7)).nonzero(as_tuple=True)[0].tolist()
-    t = next((int(x) for x in cand
-              if bool(sim._trade_walk_ok(ONE, torch.tensor([x]), torch.tensor([cap]), water)[0])), -1)
+    t = next((int(x) for x in cand if course(sim, rome, int(x), cap) is not None), -1)
     assert t >= 0, "no plot near the capital that the Trader's walk reaches"
     assert not bool(sim.trading_post[B0, rome, t])
     found = sim._found_city_at(rome, torch.tensor([True]), torch.tensor([t]))
     assert bool(found[B0]), "the founding itself failed"
     assert bool(sim.trading_post[B0, rome, t]), "no Trading Post at the new city"
-    path_ = walk(sim, rome, t, cap)
-    assert path_[-1] == cap and len(path_) > 2, path_
+    # the road lowered the laid course's cost only, so it is still the course
+    path_ = course(sim, rome, t, cap)
+    assert path_ is not None and path_[-1] == cap and len(path_) > 2, path_
     for i in path_:
         if not bool(sim.water[B0, i]):
             assert bool(sim.road[B0, i]), f"no road on the course at {i}"
-    # a city too far from the capital gets the post and no road
-    far_ok = settleable(sim) & (sim.pair_dist[cap].to(torch.long) > sim._trade_sea_range)
+    # a city out of every Rome city's walk budget (30 at most) gets the post and no road
+    rc = sim.city_center[B0, rome][sim.city_alive[B0, rome]]
+    far_ok = settleable(sim) & (sim.pair_dist[rc].to(torch.long).min(dim=0).values > 30)
     if bool(far_ok.any()):
         f = int(far_ok.nonzero(as_tuple=True)[0][0])
         roads = sim.road[B0].clone()
@@ -214,18 +207,15 @@ def test_rome_conquest(rules, path) -> None:
     rome, egypt = row_of(sim, "ROME"), row_of(sim, "EGYPT")
     c_t = int(sim.city_center[B0, egypt, 0])
     cap = int(sim.civ_cap_tile[B0, rome])
-    water = sim._trade_water_level(rome)
-    mar = sim._centre_maritime_map()[B0]
-    sea = bool(water[B0] > 0) and bool(mar[c_t]) and bool(mar[cap])
-    rng = sim._trade_sea_range if sea else sim._trade_range
-    reach = int(sim.pair_dist[c_t, cap]) <= rng and bool(
-        sim._trade_walk_ok(ONE, torch.tensor([c_t]), torch.tensor([cap]), water)[0])
+    sim.seat_explored[:] = True  # the walk crosses revealed plots only
     assert sim._transfer_city(B0, egypt, 0, rome, conquest=True), "the conquest itself failed"
     assert bool(sim.trading_post[B0, rome, c_t]), "no Trading Post in the conquered city"
-    if reach:
-        for i in walk(sim, rome, c_t, cap):
-            if not bool(sim.water[B0, i]):
-                assert bool(sim.road[B0, i]), f"no road on the course at {i}"
+    # the walk from the city as it now stands; the road lowered only its cost
+    path_ = course(sim, rome, c_t, cap)
+    reach = path_ is not None
+    for i in path_ or []:
+        if not bool(sim.water[B0, i]):
+            assert bool(sim.road[B0, i]), f"no road on the course at {i}"
     print(f"  3 Rome conquest OK — the post, and the road ({'in' if reach else 'out of'} range)")
 
 
@@ -236,12 +226,13 @@ def test_rome_chain_gold(rules, path) -> None:
     t = site_near(sim, cap)
     sim._found_city_at(rome, torch.tensor([True]), torch.tensor([t]))
     assert int(sim.tile_seat[B0, t]) == rome
-    # a route from the capital to city-state 0, chained through the own city
+    # a route from the capital to city-state 0 whose course passes through the
+    # own city (its Trading Post stamped at founding)
     sim.seat_routes[B0, rome, 0, 0] = int(sim.city_id[B0, rome, 0])
     sim.seat_routes[B0, rome, 0, 1] = -2
     sim.seat_route_exp[B0, rome, 0] = int(sim.turn) + 5
-    sim.seat_route_chain[B0, rome, 0, :] = -1
-    sim.seat_route_chain[B0, rome, 0, 0] = t
+    sim.seat_route_course[B0, rome, 0, :] = -1
+    sim.seat_route_course[B0, rome, 0, :3] = torch.tensor([cap, t, int(sim.citystate_center[B0, 0])])
     sim._eff_version += 1
     inc = sim._seat_route_income(rome)
     assert inc is not None

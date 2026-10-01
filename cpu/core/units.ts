@@ -22,7 +22,7 @@ const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial, DIR_E, DIR_W } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
-import { canRemoveFeature, portalAt, portalExit, type RuleResult } from './rules';
+import { canRemoveFeature, portalAt, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
@@ -52,7 +52,7 @@ import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
 import {
   scaleByGameSpeed, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS,
-  MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP, TRADE_ROAD_MAX_STEPS,
+  MP_SCALE, EMBARK_TRANSITION_MP, ROAD_TIER_MP, ROAD_TIER_BRIDGES, RAILROAD_MP,
   STRATEGIC_IDS, emptyStockpile, progressCost, gameProgressK, gameProgressPct,
 } from '../data/constants';
 import { TECHS } from '../data/techs';
@@ -307,83 +307,6 @@ export function tradeWaterLevel(state: GameState, seat: number): number {
   const techs = seatOf(state, seat)?.research.techs;
   return techs?.includes('CELESTIAL_NAVIGATION') ? TRADE_WATER_OPEN : TRADE_WATER_NONE;
 }
-
-/** May a Trader at this water level stand here? A portal's mountain is
- *  ground to walk onto, as it is to every unit (`portalAt`). */
-export function tradeWalkable(tile: Tile, water: number): boolean {
-  if (portalAt(tile)) return true;
-  if (isImpassable(tile)) return false;
-  return !isWater(tile) || water >= TRADE_WATER_OPEN;
-}
-
-/**
- * ONE step of a Trader's walk: from `fromIndex`, the passable neighbour with
- * the lowest hexDistance to `targetIndex` (ties by direction order) — the
- * SAME integer stepping rule the war-march uses, so both engines agree by
- * construction. Returns `fromIndex` unchanged when arrived or stuck (no
- * strictly-closer passable neighbour). Zero draws, integer-only.
- *
- * CIV6 (Mountain Tunnel, Qhapaq Ñan): "Trade Routes traveling through it" —
- * a Trader standing on a portal may take it as a unit does (`portalExit`), a
- * seventh candidate after the six directions, taken only when strictly
- * closer.
- */
-export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: number, water: number): number {
-  const map = state.map;
-  const dest = map.tiles[targetIndex];
-  const at = map.tiles[fromIndex];
-  if (!dest || !at || fromIndex === targetIndex) return fromIndex;
-  let best: Tile | undefined;
-  let bestD = hexDistance(at.col, at.row, dest.col, dest.row);
-  for (const n of neighbors(map, at)) {
-    if (!tradeWalkable(n, water)) continue;
-    const d = hexDistance(n.col, n.row, dest.col, dest.row);
-    if (d < bestD) {
-      bestD = d;
-      best = n;
-    }
-  }
-  const exit = portalExit(map, at);
-  if (exit >= 0) {
-    const e = map.tiles[exit];
-    if (hexDistance(e.col, e.row, dest.col, dest.row) < bestD) best = e;
-  }
-  return best ? best.index : fromIndex;
-}
-
-/**
- * Can a Trader descend from `fromIndex` to `toIndex` at this water level?
- * CIV6: "the route may start in an inland city, then go to a coastal city ...
- * move over sea to another city with a Harbor, then continue on land" — one
- * descent walks both modes, and only a pair no descent reaches leaves its
- * Trader parked at the origin.
- */
-export function tradeWalkReachable(state: GameState, fromIndex: number, toIndex: number, water: number): boolean {
-  return tradeWalkPath(state, fromIndex, toIndex, water) !== null;
-}
-
-/** The plots of that descent, both ends included — the Trader's path — or
- *  null where no descent reaches `toIndex`. */
-export function tradeWalkPath(state: GameState, fromIndex: number, toIndex: number, water: number): number[] | null {
-  const map = state.map;
-  const dest = map.tiles[toIndex];
-  const start = map.tiles[fromIndex];
-  if (!dest || !start) return null;
-  if (isImpassable(dest) || isImpassable(start)) return null;
-  const path = [fromIndex];
-  let at = fromIndex;
-  for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at !== toIndex; step++) {
-    const next = tradeWalkStep(state, at, toIndex, water);
-    if (next === at) return null;
-    at = next;
-    path.push(at);
-  }
-  return at === toIndex ? path : null;
-}
-
-/** the trade walk is bounded by the route range — a route
- *  longer than this cannot exist (canAddTradeRoute gates on TRADE_ROUTE_RANGE),
- *  so the bound is a safety rail, not a rule. */
 
 /** The MP a river crossing costs (real Civ 6 ends movement; this model charges
  *  a flat 3 points). */

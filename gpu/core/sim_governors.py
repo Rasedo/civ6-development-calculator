@@ -511,8 +511,8 @@ class SimGovernors:
     def _governor_pass_route_gold(self, row: int) -> torch.Tensor:
         """[B, RC] f64 — CIV6 (Land Acquisition): "+3 Gold per turn from each
         foreign Trade Route passing through the city" — a foreign route passes
-        through where its stored course (`seat_route_chain`) holds this
-        centre."""
+        through where its stored course (`seat_route_course`) crosses this
+        centre short of both its ends."""
         per = self._governor_sum(row, "passRouteGold")
         if not bool((per != 0).any()):
             return per
@@ -521,9 +521,12 @@ class SimGovernors:
         for r2 in range(self.n_majors):
             if r2 == row:
                 continue
-            ch = self.seat_route_chain[:, r2]  # [B, K, CMAX]
-            live = (self.seat_routes[:, r2, :, 0] >= 0).unsqueeze(2) & (ch >= 0)
-            cnt.scatter_add_(1, ch.clamp(min=0).reshape(B, -1), live.reshape(B, -1).long())
+            crs = self.seat_route_course[:, r2]  # [B, K, L]
+            n = (crs >= 0).sum(dim=2, keepdim=True)
+            pos = torch.arange(crs.shape[2], device=self.device)
+            live = ((self.seat_routes[:, r2, :, 0] >= 0).unsqueeze(2) & (crs >= 0)
+                    & (pos >= 1) & (pos < n - 1))
+            cnt.scatter_add_(1, crs.clamp(min=0).reshape(B, -1), live.reshape(B, -1).long())
         centres = self.city_center[:, row]
         return per * cnt.gather(1, centres.clamp(min=0)).double()
 

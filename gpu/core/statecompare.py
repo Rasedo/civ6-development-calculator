@@ -488,12 +488,12 @@ def _centre_of(sim, b: int, row: int, city_id: int) -> int:
 
 def _routes_of(sim, b: int, seat: int) -> list[int]:
     """Every live route of `seat`, as flattened [fromTile, destTile, kind,
-    exp, born, walkTile, leg, chain x routeChainMax] rows sorted ascending — the `routes`
+    exp, born, walkTile, leg, course x courseMax] rows sorted ascending — the `routes`
     extractor's twin. Kind: 0 domestic, 1 city-state, 2 international.
     `seat_routes[..., 1]` carries the domestic destination city id, or
     -(2 + city-state index), or -1 for international (whose destination is
     the dseat/dcity pair). The walk triple is the Trader: its birth turn,
-    current tile and leg (-1 parked, 0 out, 1 home)."""
+    current tile and leg (0 out, 1 home)."""
     row = _seat_row(sim, seat)
     rr = sim.seat_routes[b, row].tolist()
     ds = sim.seat_route_dseat[b, row].tolist()
@@ -502,7 +502,7 @@ def _routes_of(sim, b: int, seat: int) -> list[int]:
     bo = sim.seat_route_born[b, row].tolist()
     wk = sim.seat_route_walk[b, row].tolist()
     lg = sim.seat_route_leg[b, row].tolist()
-    ch = sim.seat_route_chain[b, row].tolist()
+    ch = sim.seat_route_course[b, row].tolist()
     out: list[list[int]] = []
     for k, pair in enumerate(rr):
         frm = int(pair[0])

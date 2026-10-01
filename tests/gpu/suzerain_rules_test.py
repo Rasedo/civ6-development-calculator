@@ -376,17 +376,13 @@ def main() -> None:
     assert float(sim._suz_land_buy_mult(0)[0, 0]) == 1.0, "the discount outlived the suzerainty"
     print("ngazargamu ok — 20% a row, the pair sharing one, gone with the suzerainty")
 
-    # Hunza's course: origin -> chain -> destination, in whole hexes
-    _o = int(sim.city_center[0, 0, 0])
-    _d = int(sim.citystate_center[0, 0])
-    _empty = torch.full((sim.B, 1, 1), -1, dtype=torch.long)
-    _ot = torch.full((sim.B, 1), _o, dtype=torch.long)
-    _dt = torch.full((sim.B, 1), _d, dtype=torch.long)
-    _direct = int(sim._route_travel_tiles(_empty, _ot, _dt)[0, 0])
-    assert _direct == int(sim.pair_dist[_o, _d]), "a chainless course is the plain distance"
-    _mid = torch.full((sim.B, 1, 1), _d, dtype=torch.long)
-    assert int(sim._route_travel_tiles(_mid, _ot, _dt)[0, 0]) == _direct,         "a hop AT the destination adds nothing"
-    print("hunza ok — the course is origin through the chain to the destination")
+    # Hunza's tiles travelled: the steps of the stored course, plots less one
+    _crs = torch.full((sim.B, 2, 5), -1, dtype=torch.long)
+    _crs[:, 0, :4] = torch.tensor([10, 11, 12, 13])
+    _tt = sim._route_travel_tiles(_crs)
+    assert int(_tt[0, 0]) == 3, "four plots are three tiles travelled"
+    assert int(_tt[0, 1]) == 0, "no course travels nothing"
+    print("hunza ok — the tiles travelled are the course's steps")
 
     print("SUZERAIN RULES OK — every coded perk fires, only for the strict "
           "suzerain, and Geneva's percent only at peace")

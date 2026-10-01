@@ -10,7 +10,7 @@ origin coded 0 for its one city):
      Lighthouse (`_trade_capacity`'s minor arm);
   2. its free Trader takes the scorer's destination (`_minor_route_candidate`)
      and is spent on it (`_minor_trade`): the term, the walker at the centre,
-     no chain;
+     the stored course;
   3. the route pays its city the destination's rows (`_minor_route_income`);
   4. it walks and comes home with its Trader at the end of its term;
   5. a major's war on the minor cancels its route to that major.
@@ -48,7 +48,7 @@ def trading_minor(sim) -> int:
         if not bool(sim.citystate_alive[B0, s]):
             continue
         sim.citystate_civics[B0, s, sim._trade_ftc] = True
-        if bool(sim._minor_route_candidate(s)[0][B0]):
+        if bool(sim._minor_route_candidate(s, torch.ones(sim.B, dtype=torch.bool))[0][B0]):
             return s
     raise AssertionError("no minor on this fixture has a destination in range")
 
@@ -70,7 +70,7 @@ def main() -> int:
     print(f"  1 capacity OK — minor {s}: the civic 1, the Market 2")
 
     # -- 2 the route --------------------------------------------------------
-    found, code, dseat, dcity, dct = sim._minor_route_candidate(s)
+    found, code, dseat, dcity, dct = sim._minor_route_candidate(s, torch.ones(sim.B, dtype=torch.bool))
     a_trader(sim, s)
     t0 = traders(sim, s)
     sim._minor_trade(s)
@@ -82,7 +82,9 @@ def main() -> int:
     assert int(rr[k, 1]) == int(code[B0]) and int(sim.seat_route_dseat[B0, row, k]) == int(dseat[B0])
     assert int(sim.seat_route_walk[B0, row, k]) == int(sim.citystate_center[B0, s]), "the walker starts home"
     assert int(sim.seat_route_exp[B0, row, k]) == int(sim.turn) + int(sim._trade_min_duration()[B0])
-    assert bool((sim.seat_route_chain[B0, row, k] < 0).all()), "a minor rides no Trading Post"
+    crs = [int(x) for x in sim.seat_route_course[B0, row, k] if int(x) >= 0]
+    assert crs and crs[0] == int(sim.citystate_center[B0, s]) and crs[-1] == int(dct[B0]), \
+        f"the stored course {crs} does not run from the minor's centre to its destination"
     assert traders(sim, s) == t0 - 1, "the Trader was not spent"
     print(f"  2 route OK — to code {int(code[B0])} (seat row {int(dseat[B0])}), the Trader spent")
 
@@ -101,7 +103,7 @@ def main() -> int:
     # -- 4 the walk and the round trip -----------------------------------------
     exp = int(sim.seat_route_exp[B0, row, k])
     moved = False
-    # a greedy walk can stall short of home; the rail then ends the route
+    # the Trader walks the stored course out and home; the term then ends the route
     for turn in range(int(sim.turn) + 1, exp + sim._trade_walk_rail + 2):
         sim.turn = turn
         at = int(sim.seat_route_walk[B0, row, k])
@@ -126,7 +128,7 @@ def main() -> int:
         for s2 in range(sim.S):
             if s2 != s:
                 sim.citystate_alive[B0, s2] = False
-        f2 = sim._minor_route_candidate(s)
+        f2 = sim._minor_route_candidate(s, torch.ones(sim.B, dtype=torch.bool))
         if not bool(f2[0][B0]) or int(f2[2][B0]) != r2:
             continue
         a_trader(sim, s)
@@ -137,7 +139,7 @@ def main() -> int:
         assert not bool(((sim.seat_routes[B0, row, :, 0] >= 0) & (sim.seat_route_dseat[B0, row] == r2)).any()), \
             "the war left the route standing"
         assert traders(sim, s) == tb + 1, "the cancelled route's Trader did not come home"
-        f3 = sim._minor_route_candidate(s)
+        f3 = sim._minor_route_candidate(s, torch.ones(sim.B, dtype=torch.bool))
         assert not bool(f3[0][B0]) or int(f3[2][B0]) != r2, "a destination at war was offered"
         hit = True
         break

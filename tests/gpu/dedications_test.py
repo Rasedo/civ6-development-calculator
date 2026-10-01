@@ -138,6 +138,8 @@ def main() -> None:
     sim.seat_routes[0, 0, 0, 0] = sim.city_id[0, 0, col]
     sim.seat_routes[0, 0, 0, 1] = sim.city_id[0, 0, col]  # domestic, to itself
     sim.seat_route_exp[0, 0, 0] = sim.turn
+    sim.seat_route_walk[0, 0, 0] = sim.city_center[0, 0, col]  # the Trader home
+    sim.seat_route_leg[0, 0, 0] = 0
     sim._eff_version += 1
     sim._expire_seat_routes(0)
     assert score(sim, 0) == 1, score(sim, 0)

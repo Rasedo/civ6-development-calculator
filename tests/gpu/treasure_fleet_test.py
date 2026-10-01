@@ -94,7 +94,7 @@ def _route_to(sim, row: int, dest_seat: int, dest_col: int) -> None:
     sim.seat_route_dseat[B0, row, 0] = dest_seat
     sim.seat_route_dcity[B0, row, 0] = int(sim.city_id[B0, dest_seat, dest_col])
     sim.seat_route_exp[B0, row, 0] = int(sim.turn) + 5
-    sim.seat_route_chain[B0, row, 0, :] = -1
+    sim.seat_route_course[B0, row, 0, :] = -1
     sim._eff_version += 1
 
 

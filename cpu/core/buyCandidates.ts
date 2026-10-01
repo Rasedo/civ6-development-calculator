@@ -12,7 +12,8 @@ import type { City, DistrictId, GameState, Seat } from './types';
 import { civOf, civsAtWar, seatOf } from './seats';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, CITY_WORK_RADIUS } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
-import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routeInRange, routePostGold } from './trade';
+import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routePostGold } from './trade';
+import { tradeCourse, tradeReach } from './tradePath';
 import { isExplored } from './fog';
 import {
   buildingFaithCost, faithBuyableClass, faithBuysLandUnits, goldAffordable, naturalistCost, rockBandCost,
@@ -49,10 +50,12 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
   if (state.unitsMode && !freeTrader(state, actor.seat)) return [-1, -1];
   let best: { from: number; dest: number; ySum: number } | null = null;
   for (const from of actor.cities) {
+    // one walk from the origin answers the range of every destination
+    const reach = tradeReach(state, actor.seat, from.centerIndex);
     for (const to of actor.cities) {
       if (to.id === from.id) continue;
       if (routes.some((x) => x.from === from.id && x.to === to.id)) continue;
-      if (!routeInRange(state, actor.seat, from.centerIndex, to.centerIndex)) continue;
+      if (!tradeCourse(reach, to.centerIndex)) continue;
       const y = routeYields(state, to);
       const ySum = y.food + y.production;
       if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: to.centerIndex, ySum };
@@ -64,7 +67,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       const ci = cityState.id;
       const gMet = hasMet(cityState, actor.seat);
       const gHas = routes.some((x) => x.from === from.id && x.toCs === cityState.id);
-      const gRch = routeInRange(state, actor.seat, from.centerIndex, cityState.centerIndex);
+      const gRch = tradeCourse(reach, cityState.centerIndex) !== null;
       // EVERY city-state, gate by gate — a candidate one engine holds and the
       // other refuses is the whole question, and only the gates answer it.
       const dlG = (globalThis as { __diffLog?: string[] }).__diffLog;
@@ -86,7 +89,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       for (const pc of other.cities) {
         if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
         if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
-        if (!routeInRange(state, actor.seat, from.centerIndex, pc.centerIndex)) continue;
+        if (!tradeCourse(reach, pc.centerIndex)) continue;
         const py = routeYieldsInternational(state, from, pc, actor.seat);
         const ySum = py.food + py.production + py.gold + py.science + py.culture + py.faith
           + routePostGold(state, actor.seat, pc.centerIndex);

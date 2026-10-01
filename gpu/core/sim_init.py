@@ -146,6 +146,7 @@ class SimInit:
         self.tile_goody = torch.tensor([[t.get("goody", 0) for t in f["tiles"]] for f in fixtures],
                                        dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
+        self._neigh_list = self.neigh.tolist()  # the same table, for the per-game path walk
         # `onOrNextToShallowWater`'s twin, baked: TEST_ANY of "the plot IS
         # coast" and "the plot is ADJACENT to coast". Terrain is static on both
         # engines today; the day a tile's terrain can CHANGE (a drowned tile
@@ -983,18 +984,18 @@ class SimInit:
         self.seat_route_dcity = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_exp = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         # the WALK: the servicing Trader's turn of birth, current tile, and
-        # leg (-1 parked at origin/sea, 0 walking out, 1 walking home) — what
+        # leg (0 walking out along the course, 1 walking home) — what
         # plunder targets and the round-trip expiry reads.
         self.seat_route_born = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_walk = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_leg = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
-        # the stored COURSE (`TradeRoute.chain`): the Trading-Post centres the
-        # route rides through, walk order, -1-padded — `routeChain` computes it
-        # ONCE at commit on both engines, the pass-through gold reads it every
-        # turn, and a freed slot is wiped at its next commit.
-        self._route_chain_max = max(int(self.rules.seats["routeChainMax"]), 1)
-        self.seat_route_chain = torch.full(
-            (B, self.NS, k_routes, self._route_chain_max), -1,
+        # the stored COURSE (`TradeRoute.course`): the plots of the route's
+        # path, origin to destination, -1-padded — `tradeCourse` computes it
+        # ONCE at commit on both engines, the walker, the path term and the
+        # posts passed read it every turn, and a freed slot is wiped at its
+        # next commit.
+        self.seat_route_course = torch.full(
+            (B, self.NS, k_routes, int(self.rules.trade["courseMax"])), -1,
             dtype=torch.long, device=device)
         # CIV6 (Trading Post): one bool per (major row, CENTRE tile) — the row
         # holds a Trading Post there. Stamped at both endpoints when a route
@@ -2596,8 +2597,23 @@ class SimInit:
         self._trade_lgh = int(_tr["lighthouseBidx"])
         self._trade_ftc = int(_tr["foreignTradeCidx"])
         self._trade_wonders = [int(x) for x in _tr["capWonderWidx"]]
-        self._trade_range = int(_tr["range"])
-        self._trade_sea_range = int(_tr["seaRange"])
+        # the Trader's path (`_trade_reach`): the range budget and its refuels,
+        # the step costs, the districts it embarks at, the features it never
+        # crosses, the course's capacity
+        self._trade_base_range = int(_tr["baseRange"])
+        self._trade_land_refuel = int(_tr["landRefuel"])
+        self._trade_water_refuel = int(_tr["waterRefuel"])
+        self._trade_dest_refuel = int(_tr["destRefuel"])
+        self._trade_cost_step = int(_tr["costStep"])
+        self._trade_cost_switch = int(_tr["costSwitch"])
+        self._trade_cost_rail = int(_tr["costRail"])
+        self._trade_cost_route = int(_tr["costRoute"])
+        self._trade_cost_water = int(_tr["costWater"])
+        self._trade_cost_land = int(_tr["costLand"])
+        # the placeable ones; the centre is every living city's own
+        self._trade_embark_didx = [i for i, d in enumerate(rules.districts) if d["id"] in _tr["embarkDistricts"]]
+        self._trade_danger_fid = [int(x) for x in _tr["dangerFid"]]
+        self._trade_course_max = int(_tr["courseMax"])
         # District_TradeRouteYields' CITY_CENTER row: the flat head of every
         # route, domestic and international (engine yield order)
         self._route_centre_dom = torch.tensor([float(x) for x in _tr["centreRouteDom"]], dtype=torch.float64, device=device)  # [6]
@@ -2931,8 +2947,8 @@ class SimInit:
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
         self._seat_route_cache = None   # ((turn,r,_eff_version,_rp_kill_version), [B,RC]|None)
-        # row -> (the descent's inputs, cloned; its (arrived, eff, posts)) — `_route_path_gold`
-        self._path_gold_memo: dict = {}
+        # (game, row, origin) -> (the graph it walked, its walk) — `_trade_reach`
+        self._trade_reach_memo: dict = {}
         # (row, record) -> (the recorded reads, the result) — `_seat_city_stats`
         self._stats_memo: dict = {}
         self._suz_rows_cache = None  # ((turn, _eff_version), {code: [B, n_majors] bool})

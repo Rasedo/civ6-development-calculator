@@ -50,11 +50,11 @@ import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
-import { ROUTE_CHAIN_MAX, routeOriginCenter } from './trade';
+import { routeOriginCenter } from './trade';
 import { GP_CITY_PERM, GP_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { scoreLines } from './score';
-import { emptyStockpile } from '../data/constants';
+import { TRADE_COURSE_MAX, emptyStockpile } from '../data/constants';
 
 // the exported feature index (FEAT_IDS order = the catalog's own)
 const FEAT_IDX_SC = new Map(Object.keys(FEATURES).map((f, i) => [f, i]));
@@ -243,7 +243,7 @@ const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Ex
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
 
 /** Every route of one holder — a major or a city-state — as flattened
- *  [fromTile, destTile, kind, exp, born, walkTile, leg, chain...] rows, sorted.
+ *  [fromTile, destTile, kind, exp, born, walkTile, leg, course...] rows, sorted.
  *  Destinations are keyed by CENTRE TILE — the digest's own city join key — so
  *  the comparison does not ride on city-id minting, which the city group
  *  deliberately does not compare. Kind: 0 domestic, 1 city-state, 2
@@ -262,7 +262,7 @@ function routeRowsOf(state: GameState, s: Seat): number[] {
           : centreOf(s.seat, r.to ?? -1);
     return [routeOriginCenter(state, s, r), dest, kind, r.expiresTurn ?? -1,
       r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1,
-      ...Array.from({ length: ROUTE_CHAIN_MAX }, (_, i) => (r.chain ?? [])[i] ?? -1)];
+      ...Array.from({ length: TRADE_COURSE_MAX }, (_, i) => (r.course ?? [])[i] ?? -1)];
   });
   rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
   return rows.flat();

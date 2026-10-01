@@ -779,11 +779,12 @@ export interface TradeRoute {
   createdTurn?: number;
   /** the servicing Trader's CURRENT tile (walks 1 tile/turn) */
   walkTile?: number;
-  /** -1 parked at origin (sea route), 0 walking out, 1 walking home */
+  /** 0 walking out, 1 walking home */
   walkLeg?: number;
-  /** the OWN-post centres the route passes, origin and destination
-   *  excluded, in walk order — `routeChain`'s BFS, `ROUTE_CHAIN_MAX` deep. */
-  chain?: number[];
+  /** the route's COURSE: the plots of its path, origin to destination,
+   *  fixed at creation (`tradeCourse`) — what the Trader walks and the path
+   *  term, the posts passed and the length read. */
+  course?: number[];
 }
 
 export interface ReligionState {

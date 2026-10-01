@@ -9,7 +9,7 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { declareWarOnCityState, minorCity } from '../../../cpu/core/cityStates';
 import {
-  cityStateRouteYields, cityTradeYields, minorRouteCandidate, minorRouteYields, minorTrade, routeOriginCenter,
+  cityStateRouteYields, cityTradeYields, minorRouteCandidate, minorRouteYields, minorTrade, routeDestCenter, routeOriginCenter,
   tradeCapacity, tradeRouteMinDuration,
 } from '../../../cpu/core/trade';
 import { spawnUnit } from '../../../cpu/core/units';
@@ -80,7 +80,9 @@ describe("a city-state's route", () => {
     expect(r.from).toBe(-1);
     expect(routeOriginCenter(state, cs, r)).toBe(cs.centerIndex);
     expect(r.expiresTurn).toBe(state.turn + tradeRouteMinDuration(state));
-    expect(r.chain).toEqual([]);
+    // the stored course runs from its city to the destination
+    expect(r.course![0]).toBe(cs.centerIndex);
+    expect(r.course![r.course!.length - 1]).toBe(routeDestCenter(state, cs, r));
     // no free Trader, no second route; the one it runs is no candidate again
     minorTrade(state, cs);
     expect(cs.tradeRoutes).toHaveLength(1);

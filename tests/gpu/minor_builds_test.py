@@ -771,7 +771,7 @@ def test_the_trader_row(rules, path) -> None:
         uc = int(sim._type_civic[sim._trader_idx])
         if uc >= 0:
             sim.citystate_civics[B0, s, uc] = True
-        if not bool(sim._minor_route_candidate(s)[0][B0]):
+        if not bool(sim._minor_route_candidate(s, torch.ones(sim.B, dtype=torch.bool))[0][B0]):
             continue
         idle_builder(sim, s)
         plan(sim, s, [kind_row(rules, "trader")])

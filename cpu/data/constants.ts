@@ -513,10 +513,15 @@ export function emptyStockpile(): number[] {
   return STRATEGIC_IDS.map(() => 0);
 }
 
-/** How far a Trader's road-laying walk may reach in one leg. It lives here,
- *  in a LEAF module: `TRADE_WALK_EXPIRY_RAIL` is computed from it at module
- *  load, and a cycle between trade.ts and units.ts would leave that NaN. */
-export const TRADE_ROAD_MAX_STEPS = 32;
+/** The most plots a route's stored course holds, both ends included — a
+ *  CAPACITY choice (the GPU keeps the course in a fixed tensor axis), wider
+ *  than any course a map here makes; a longer path is out of range on both
+ *  engines. It lives here, in a LEAF module: `TRADE_WALK_EXPIRY_RAIL` is
+ *  computed from it at module load, and a cycle between trade.ts and units.ts
+ *  would leave that NaN. */
+export const TRADE_COURSE_MAX = srcConst('trade.courseMax', 96, {
+  stylized: 'a storage capacity for the route course, not a rule; a 44 x 26 map fits any budget-walked path under it',
+});
 
 /** CIV6 (GS): "The maximum stockpile amount is initially 50 for each resource
  *  but constructing Encampment buildings in your empire (Barracks, Armory,

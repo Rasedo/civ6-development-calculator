@@ -140,31 +140,32 @@ describe("Amsterdam's destination luxuries and Hunza's road", () => {
 
   it('pays a whole gold per five tiles the route travels', () => {
     const { state } = scene();
-    const a = tileAtCoords(state.map, 5, 5).index;
-    const b = tileAtCoords(state.map, 17, 5).index;
-    const route: TradeRoute = { from: 0, chain: [] };
-    expect(routeTravelTiles(state, a, b, route)).toBe(12);
-    expect(routeLengthGold(state, 0, a, b, route)).toBe(0);
+    // the tiles travelled are the steps of the stored course
+    const course = Array.from({ length: 13 }, (_, k) => tileAtCoords(state.map, 5 + k, 5).index);
+    const route: TradeRoute = { from: 0, course };
+    expect(routeTravelTiles(route)).toBe(12);
+    expect(routeLengthGold(state, 0, route)).toBe(0);
     suzerainOf(state, 'routeLengthGold');
-    expect(routeLengthGold(state, 0, a, b, route))
+    expect(routeLengthGold(state, 0, route))
       .toBe(HUNZA_ROUTE_GOLD * Math.floor(12 / HUNZA_TILES_PER_GOLD));
-    // the CHAIN is part of the course, so a detour is longer
-    route.chain = [tileAtCoords(state.map, 11, 11).index];
-    expect(routeTravelTiles(state, a, b, route)).toBeGreaterThan(12);
+    // a longer course travels further
+    route.course = [...course, tileAtCoords(state.map, 18, 5).index, tileAtCoords(state.map, 19, 5).index];
+    expect(routeTravelTiles(route)).toBe(14);
   });
 });
 
 describe("Jakarta's passing-through half", () => {
-  it('pays again for a post in a FOREIGN chain city, never for its own', () => {
+  it('pays again for a post in a FOREIGN city the course passes, never for its own', () => {
     const { state } = scene();
     state.seats.push(emptySeat(1));
     const mine = settleAt(state, tileAtCoords(state.map, 10, 10).index, 0);
     const theirs = settleAt(state, tileAtCoords(state.map, 16, 16).index, 1);
     seatOf(state, 0)!.tradingPosts = [mine.centerIndex, theirs.centerIndex];
-    const route: TradeRoute = { from: 0, chain: [mine.centerIndex, theirs.centerIndex] };
+    const ends = [tileAtCoords(state.map, 4, 4).index, tileAtCoords(state.map, 20, 20).index];
+    const route: TradeRoute = { from: 0, course: [ends[0], mine.centerIndex, theirs.centerIndex, ends[1]] };
     const base = routeChainGold(state, 0, route);
     suzerainOf(state, 'routePostGold');
-    // one extra gold, for the FOREIGN chain city alone
+    // one extra gold, for the FOREIGN city passed alone
     expect(routeChainGold(state, 0, route) - base).toBe(1);
   });
 });

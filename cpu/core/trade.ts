@@ -11,11 +11,12 @@ import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isC
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { isCoastalLand, isImpassable, isWater, isMountain } from '../../world/query';
+import { isImpassable, isWater, isMountain } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { tradeWalkPath, tradeWalkReachable, tradeWalkStep, tradeWaterLevel, disbandUnit, spawnUnit } from './units';
-import { TRADE_ROAD_MAX_STEPS, scaleByGameSpeed } from '../data/constants';
+import { disbandUnit, spawnUnit } from './units';
+import { routeInRange, tradeCourse, tradeReach } from './tradePath';
+import { TRADE_COURSE_MAX, scaleByGameSpeed } from '../data/constants';
 import { civEraIndex } from './city';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
@@ -33,49 +34,6 @@ import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { srcConst, xml } from '../data/provenance';
 import { getModifiers, progressAhead, followerReligionsForCity, followerBeliefForReligion } from './effects';
 import { governorSum } from './governors';
-/**
- * CIV6: "The base range for land trade routes is 15 tiles ... The base range
- * for sea trade routes is 30 tiles." A route counts as a sea route when BOTH
- * ends have maritime access and the seat can put a Trader on the water —
- * "both the origin city and the destination city require maritime access ...
- * in order to establish sea Trade Routes". Range is not extendable by
- * technology in Civ 6; only Trading Posts extend it (`routeInRange`).
- */
-export const TRADE_ROUTE_RANGE_LAND = 15;
-/** the deepest post CHAIN either engine walks — a CAPACITY choice like the
- *  queue's five (the GPU stores the chain in a fixed tensor axis); six hops
- *  of 15+ tiles outruns any map here. */
-export const ROUTE_CHAIN_MAX = 6;
-export const TRADE_ROUTE_RANGE_SEA = 30;
-
-/**
- * CIV6: "Cities with maritime access are those that are adjacent to a body of
- * water connected to the sea, or that have a Harbor on such a body."
- */
-export function cityMaritime(state: GameState, centerIndex: number, city?: City): boolean {
-  const centre = state.map.tiles[centerIndex];
-  if (centre && isCoastalLand(state.map, centre)) return true;
-  return (city?.districts ?? []).some(
-    (d) => d.type === 'HARBOR' && state.map.tiles[d.tileIndex]?.districtComplete,
-  );
-}
-
-/** `cityMaritime` for a bare CENTRE tile — the city standing there is looked
- *  up across every seat, because a Trading Post can sit at anyone's centre.
- *  A city-state's Harbor (the minor ladder builds one) is a water anchor
- *  exactly like a major's. */
-export function centreMaritime(state: GameState, centerIndex: number): boolean {
-  const centre = state.map.tiles[centerIndex];
-  if (centre && isCoastalLand(state.map, centre)) return true;
-  for (const s of state.seats) {
-    const c = s.cities.find((x) => x.centerIndex === centerIndex);
-    if (c) return cityMaritime(state, centerIndex, c);
-  }
-  const cs = (state.cityStates ?? []).find((x) => x.centerIndex === centerIndex);
-  return (cs?.districts ?? []).some(
-    (d) => d.type === 'HARBOR' && state.map.tiles[d.tileIndex]?.districtComplete,
-  );
-}
 
 /** a living city — any major's, or a city-state — standing at this centre. */
 export function centreHasCity(state: GameState, centerIndex: number): boolean {
@@ -83,69 +41,17 @@ export function centreHasCity(state: GameState, centerIndex: number): boolean {
     || state.cityStates.some((c) => c.centerIndex === centerIndex);
 }
 
-/** The range ONE leg between these two centres may span. */
-export function tradeRouteRange(
-  state: GameState,
-  seat: number,
-  originCenter: number,
-  destCenter: number,
-): number {
-  if (tradeWaterLevel(state, seat) === 0) return TRADE_ROUTE_RANGE_LAND;
-  return centreMaritime(state, originCenter) && centreMaritime(state, destCenter)
-    ? TRADE_ROUTE_RANGE_SEA
-    : TRADE_ROUTE_RANGE_LAND;
-}
-
-/** CIV6 (Trading Post): "If a Trade Route reaches a city with a Trading Post,
- *  it may then continue up to 15 additional tiles to reach another city. If
- *  that city also has a Trading Post, the route may extend a further 15
- *  tiles, and so on" — a breadth-first walk over the seat's OWN posts (a
- *  civilization "cannot make use of Trading Posts established by other
- *  civilizations"), each leg at that leg's own land/sea range. */
-export function routeChain(
-  state: GameState,
-  seat: number,
-  originCenter: number,
-  destCenter: number,
-): number[] | null {
-  const legOk = (a: number, b: number): boolean => {
-    const at = state.map.tiles[a];
-    const bt = state.map.tiles[b];
-    return hexDistance(at.col, at.row, bt.col, bt.row) <= tradeRouteRange(state, seat, a, b);
-  };
-  const posts = (seatOf(state, seat)?.tradingPosts ?? [])
-    .filter((p) => p !== originCenter && centreHasCity(state, p));
-  const parent = new Map<number, number>([[originCenter, -1]]);
-  const depth = new Map<number, number>([[originCenter, 0]]);
-  const queue = [originCenter];
-  while (queue.length > 0) {
-    const a = queue.shift()!;
-    if (legOk(a, destCenter)) {
-      // the CHAIN — origin excluded, in walk order (`posts` is sorted, the
-      // queue FIFO, so the first discovery is the one both engines make)
-      const chain: number[] = [];
-      for (let x = a; x !== originCenter; x = parent.get(x)!) chain.push(x);
-      return chain.reverse();
-    }
-    if (depth.get(a)! >= ROUTE_CHAIN_MAX) continue;
-    for (const p of posts) {
-      if (!parent.has(p) && legOk(a, p)) {
-        parent.set(p, a);
-        depth.set(p, depth.get(a)! + 1);
-        queue.push(p);
-      }
-    }
+/** The cities a route's stored course passes THROUGH that hold this seat's
+ *  Trading Post — the course's plots short of both ends, each a living
+ *  city's centre carrying the post. */
+export function routeCoursePosts(state: GameState, seat: number, r: TradeRoute): number[] {
+  const course = r.course ?? [];
+  const posts = seatOf(state, seat)?.tradingPosts ?? [];
+  const out: number[] = [];
+  for (let i = 1; i < course.length - 1; i++) {
+    if (posts.includes(course[i]) && centreHasCity(state, course[i])) out.push(course[i]);
   }
-  return null;
-}
-
-export function routeInRange(
-  state: GameState,
-  seat: number,
-  originCenter: number,
-  destCenter: number,
-): boolean {
-  return routeChain(state, seat, originCenter, destCenter) !== null;
+  return out;
 }
 
 /** stamp one civ's Trading Post at a centre — sorted, append-once. */
@@ -159,9 +65,9 @@ export function stampTradingPost(owner: Seat, centerIndex: number): void {
 /**
  * CIV6 (All Roads Lead to Rome): "All cities you found or conquer start with
  * a Trading Post and, if within Trade Route range of your Capital, a road to
- * it." The road is the Trader's own course (`tradeWalkStep`), laid on every
- * passable land tile of the descent, capital excluded when it is the city
- * itself.
+ * it." The road is a route's course from the city to the capital
+ * (`tradeCourse`), laid on every passable land plot of it, both ends
+ * included.
  */
 export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: number): void {
   const owner = seatOf(state, seat);
@@ -169,19 +75,11 @@ export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: 
   stampTradingPost(owner, centerIndex);
   const cap = owner.cities.find((c) => c.isCapital && c.centerIndex !== centerIndex);
   if (!cap) return;
+  const course = tradeCourse(tradeReach(state, seat, centerIndex), cap.centerIndex);
+  if (!course) return;
   const tiles = state.map.tiles;
-  const here = tiles[centerIndex];
-  const there = tiles[cap.centerIndex];
-  if (hexDistance(here.col, here.row, there.col, there.row) > tradeRouteRange(state, seat, centerIndex, cap.centerIndex)) return;
-  const water = tradeWaterLevel(state, seat);
-  if (!tradeWalkReachable(state, centerIndex, cap.centerIndex, water)) return;
-  if (!isWater(here)) here.road = true;
-  let at = centerIndex;
-  for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at !== cap.centerIndex; step++) {
-    at = tradeWalkStep(state, at, cap.centerIndex, water);
-    // passable land only: a portal's mountain carries no road
-    if (!isWater(tiles[at]) && !isImpassable(tiles[at])) tiles[at].road = true;
-  }
+  // passable land only: a portal's mountain carries no road
+  for (const at of course) if (!isWater(tiles[at]) && !isImpassable(tiles[at])) tiles[at].road = true;
 }
 
 /** The Trading Post this seat holds at a route's foreign DESTINATION: +1
@@ -193,24 +91,16 @@ export function routePostGold(state: GameState, seat: number, destCenter: number
   return 1 + (suzerainEffect(state, seat, 'routePostGold') ? 1 : 0);
 }
 
-/** The tiles a route TRAVELS: origin to destination, hopping through the
- *  stored chain. `hexDistance` is the leg the Trader walks, which is how
- *  `routeChain` itself measures a leg. */
-export function routeTravelTiles(state: GameState, originCenter: number, destCenter: number, r: TradeRoute): number {
-  const tiles = state.map.tiles;
-  const leg = (a: number, b: number): number =>
-    hexDistance(tiles[a].col, tiles[a].row, tiles[b].col, tiles[b].row);
-  let at = originCenter;
-  let n = 0;
-  for (const c of r.chain ?? []) { n += leg(at, c); at = c; }
-  return n + leg(at, destCenter);
+/** The tiles a route TRAVELS: the steps of its stored course. */
+export function routeTravelTiles(r: TradeRoute): number {
+  return Math.max((r.course ?? []).length - 1, 0);
 }
 
 /** CIV6 (Hunza): "+1 Gold for every 5 tiles a Trade Route travels"
  *  (`MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_PATH_TILE`, Amount 0.2). */
-export function routeLengthGold(state: GameState, seat: number, originCenter: number, destCenter: number, r: TradeRoute): number {
+export function routeLengthGold(state: GameState, seat: number, r: TradeRoute): number {
   if (!suzerainEffect(state, seat, 'routeLengthGold')) return 0;
-  return HUNZA_ROUTE_GOLD * Math.floor(routeTravelTiles(state, originCenter, destCenter, r) / HUNZA_TILES_PER_GOLD);
+  return HUNZA_ROUTE_GOLD * Math.floor(routeTravelTiles(r) / HUNZA_TILES_PER_GOLD);
 }
 
 /** CIV6 (Amsterdam): "+1 Gold for each Luxury resource at the destination" of an
@@ -226,22 +116,21 @@ export function routeDestLuxuryGold(state: GameState, seat: number, dest: City):
   return AMSTERDAM_DEST_LUXURY_GOLD * seen.size;
 }
 
-/** The stored CHAIN's own Gold — the modifiers that name a route's Trading
- *  Posts; the post's own +1 is the path's (`routePathGold`), which the lab
- *  read on foreign cities alone and never for another civilization's post. */
+/** The Gold of the Trading Posts a route's course passes through — the
+ *  modifiers that name them; the post's own +1 is the path's
+ *  (`routePathGold`), which the lab read on foreign cities alone and never
+ *  for another civilization's post. */
 export function routeChainGold(state: GameState, seat: number, r: TradeRoute): number {
   // CIV6 (Jakarta): "Your Trading Posts in FOREIGN cities provide +1
   // Gold to your Trade Routes PASSING THROUGH or going to the city" — the
-  // passing-through half. The chain rides this seat's own posts by
-  // construction, so the only test left is whether the city is foreign.
+  // passing-through half.
   const jakarta = suzerainEffect(state, seat, 'routePostGold');
   // CIV6 (All Roads Lead to Rome): "+1 Gold for passing through Trading
-  // Posts in your own cities" — a chain hop IS one of the seat's posts.
+  // Posts in your own cities".
   const rome = civOf(state, seat) === 'ROME';
   if (!jakarta && !rome) return 0;
   let g = 0;
-  for (const c of r.chain ?? []) {
-    if (!centreHasCity(state, c)) continue;
+  for (const c of routeCoursePosts(state, seat, r)) {
     const own = tileSeat(state.map.tiles[c]) === seat;
     if (jakarta && !own) g += 1;
     if (rome && own) g += ROME_OWN_POST_GOLD;
@@ -258,8 +147,7 @@ export function routeChainGold(state: GameState, seat: number, r: TradeRoute): n
  * water plot and RAIL per railroad plot past the origin, PORTAL per portal
  * the Trader takes; T one per foreign city the path crosses that holds this
  * seat's Trading Post (the destination's own post is `routePostGold`). The
- * path is the engine's own (`tradeWalkPath` at the seat's water level); a
- * pair no descent reaches has none and earns nothing here.
+ * path is the route's stored course (`tradeCourse`).
  */
 export const ROUTE_PATH_WATER = srcConst('trade.pathWater', 2,
   xml('GlobalParameters', 'Name=TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_SCORE_WATER_TILE', 'Value'));
@@ -277,21 +165,19 @@ export const ROUTE_PATH_DENOM = srcConst('trade.pathDenom', 256, {
   note: 'the ratio is floored to 256ths; _SCORE_MULTIPLE_DOMAINS 15 enters nowhere',
 });
 
-export function routePathGold(state: GameState, seat: number, originCenter: number, destCenter: number, d: number): number {
-  const path = tradeWalkPath(state, originCenter, destCenter, tradeWaterLevel(state, seat));
-  if (!path) return 0;
+export function routePathGold(state: GameState, seat: number, r: TradeRoute, d: number): number {
+  const path = r.course ?? [];
+  if (path.length < 2) return 0;
   const tiles = state.map.tiles;
-  const posts = seatOf(state, seat)?.tradingPosts ?? [];
   let score = 0;
-  let t = 0;
   for (let i = 1; i < path.length; i++) {
     const at = tiles[path[i]];
     const prev = tiles[path[i - 1]];
     if (isWater(at)) score += ROUTE_PATH_WATER;
     if (at.railroad) score += ROUTE_PATH_RAIL;
     if (hexDistance(prev.col, prev.row, at.col, at.row) > 1) score += ROUTE_PATH_PORTAL;
-    if (i < path.length - 1 && tileSeat(at) !== seat && posts.includes(at.index) && centreHasCity(state, at.index)) t += 1;
   }
+  const t = routeCoursePosts(state, seat, r).filter((c) => tileSeat(tiles[c]) !== seat).length;
   const eff = Math.min(ROUTE_PATH_MAX_RATIO * ROUTE_PATH_DENOM, Math.floor((ROUTE_PATH_DENOM * score) / path.length));
   return (d * eff) / ROUTE_PATH_DENOM + t;
 }
@@ -368,10 +254,11 @@ export const PLUNDER_ROUTE_TURNS = srcConst('trade.plunderTurns',
 export const GOLD_EQUIVALENT_OTHER_YIELDS = srcConst('trade.goldEquivalentOther', 2,
   xml('GlobalParameters', 'Name=GOLD_EQUIVALENT_OTHER_YIELDS', 'Value'));
 
-/** A walker STUCK by terrain change (flood/volcano blocking its descent) can
- * never complete the round trip its expiry waits for — after this many turns
- * past the minimum the route ends anyway. A rail, not a rule. */
-export const TRADE_WALK_EXPIRY_RAIL = 2 * TRADE_ROAD_MAX_STEPS;
+/** A walker that cannot come home (its origin city gone) never completes the
+ * round trip its expiry waits for — after this many turns past the minimum
+ * the route ends anyway: longer than any round trip of a stored course. A
+ * rail, not a rule. */
+export const TRADE_WALK_EXPIRY_RAIL = 2 * TRADE_COURSE_MAX;
 
 /**
  * CIV6 (TRADER_IS_WITHIN_FOUR_REQUIREMENT, REQUIREMENT_PLOT_NEARBY_UNIT_TAG_MATCHES
@@ -781,13 +668,13 @@ export function minorRouteYields(state: GameState, r: TradeRoute): Yields | null
   return civCity ? districtRouteYields(state, civCity, 'international') : null;
 }
 
-/** What ONE of a city-state's routes pays its city (centre `center`): the
+/** What ONE of a city-state's routes pays its city: the
  *  destination's rows (`minorRouteYields`) plus the path term; null where the
  *  destination is gone. */
-export function minorRouteOriginYields(state: GameState, minor: Seat, center: number, r: TradeRoute): Yields | null {
+export function minorRouteOriginYields(state: GameState, minor: Seat, r: TradeRoute): Yields | null {
   const y = minorRouteYields(state, r);
   if (!y) return null;
-  y.gold += routePathGold(state, minor.seat, center, routeDestCenter(state, minor, r), y.gold);
+  y.gold += routePathGold(state, minor.seat, r, y.gold);
   return y;
 }
 
@@ -846,8 +733,7 @@ function routeYieldCut(state: GameState, seat: number, y: Yields): Yields {
 export function routeYieldValue(state: GameState, owner: Seat, r: TradeRoute): number {
   let o: Yields | null;
   if (isCityStateSeat(owner.seat)) {
-    const cs = owner as CityState;
-    o = minorRouteOriginYields(state, owner, cs.centerIndex, r);
+    o = minorRouteOriginYields(state, owner, r);
   } else {
     const city = owner.cities.find((c) => c.id === r.from);
     o = city ? routeOriginYields(state, city, r, getModifiers(state, owner.seat).routeGold) : null;
@@ -894,12 +780,12 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       const csPay = cityStateRouteYields(
         cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type)));
       addYields(out, csPay);
-      out.gold += routePathGold(state, seat, city.centerIndex, cityState.centerIndex, csPay.gold);
+      out.gold += routePathGold(state, seat, route, csPay.gold);
       // a SURVIVED City-State Emergency pays its target +2 gold on every
       // minor leg, forever
       out.gold += emergencyCsRouteGold(state, seat);
       out.gold += routePostGold(state, seat, cityState.centerIndex);
-      out.gold += routeLengthGold(state, seat, city.centerIndex, cityState.centerIndex, route);
+      out.gold += routeLengthGold(state, seat, route);
       // CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
       out.faith += gpPermOf(gpOwner, 'csRouteFaith');
       // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
@@ -918,8 +804,7 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
     const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
     if (civSeat && civCity) {
       addYields(out, routeYieldsInternational(state, city, civCity, seat));
-      out.gold += routePathGold(state, seat, city.centerIndex, civCity.centerIndex,
-        districtRouteYields(state, civCity, 'international').gold);
+      out.gold += routePathGold(state, seat, route, districtRouteYields(state, civCity, 'international').gold);
       // CIV6 (Religious Community): the ORIGIN's worship buildings, on this leg
       out.gold += religiousCommunityGold(state, seat, city);
       // CIV6 (Sahel Merchants): the ORIGIN's own flat Desert, on this leg
@@ -948,7 +833,7 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
         addYields(out, getModifiers(state, seat).allyRouteYield);
       }
       out.gold += routePostGold(state, seat, civCity.centerIndex);
-      out.gold += routeLengthGold(state, seat, city.centerIndex, civCity.centerIndex, route);
+      out.gold += routeLengthGold(state, seat, route);
       // CIV6 (Amsterdam): the destination's own luxuries pay this seat's route
       out.gold += routeDestLuxuryGold(state, seat, civCity);
       // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_TO_OTHERS): "This
@@ -976,9 +861,8 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
   const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
   if (dest) {
     addYields(out, routeYields(state, dest));
-    out.gold += routePathGold(state, seat, city.centerIndex, dest.centerIndex,
-      districtRouteYields(state, dest, 'domestic').gold);
-    out.gold += routeLengthGold(state, seat, city.centerIndex, dest.centerIndex, route);
+    out.gold += routePathGold(state, seat, route, districtRouteYields(state, dest, 'domestic').gold);
+    out.gold += routeLengthGold(state, seat, route);
     // CIV6 (Raja Todar Mal): "+0.5 Gold for each specialty district at the
     // destination" of a route to your own city
     out.gold += gpPermOf(gpOwner, 'domesticRouteGoldPerSpecialty') * specialtyDistricts(state, dest);
@@ -1016,7 +900,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
     addYields(out, incomingAllyRouteYields(state, city));
     const minor = seatOf(state, seat);
     for (const r of minor?.tradeRoutes ?? []) {
-      const y = minorRouteOriginYields(state, minor!, city.centerIndex, r);
+      const y = minorRouteOriginYields(state, minor!, r);
       if (y) addYields(out, y);
     }
     return out;
@@ -1099,16 +983,14 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
   }
   route.expiresTurn = state.turn + tradeRouteMinDuration(state);
   route.createdTurn = state.turn;
-  route.chain = routeChain(state, seat, originCenter, destCenter) ?? [];
+  // the COURSE, computed once here and walked for the route's life (the
+  // trade manager's path cache); every caller has checked the range, so the
+  // destination is on it
+  route.course = tradeCourse(tradeReach(state, seat, originCenter), destCenter) ?? [];
   route.walkTile = originCenter;
-  // The walk runs at the seat's own water level: a pure land descent when it
-  // has no Celestial Navigation, sea legs when it has. Only a pair NO descent
-  // reaches parks its Trader at the origin.
-  const water = tradeWaterLevel(state, seat);
-  const walks = tradeWalkReachable(state, originCenter, destCenter, water);
-  route.walkLeg = walks ? 0 : -1;
+  route.walkLeg = 0;
   // the walker lays road on every LAND tile it stands on; the origin is turn 0
-  if (walks && !isWater(state.map.tiles[originCenter])) state.map.tiles[originCenter].road = true;
+  if (!isWater(state.map.tiles[originCenter])) state.map.tiles[originCenter].road = true;
   (seatOf(state, seat)!.tradeRoutes ??= []).push(route);
   // CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading Post
   // in the destination city" — the post the ordinary route only plants when
@@ -1190,11 +1072,11 @@ export function addIntlTradeRoute(state: GameState, from: number, toSeat: number
 /**
  * THE WALK and PLUNDER of one holder's routes — a major's or a city-state's.
  *
- * THE WALK: each route's Trader advances one descent step toward its leg
- * target, laying road as it goes; it turns around at the destination and
- * starts a fresh round trip at home. (The two legs may descend different
- * lines — the descent is greedy per step, not a stored path — so the return
- * can lay a second road line.)
+ * THE WALK: each route's Trader advances one plot along the route's stored
+ * course (`TradeRoute.course`) toward its leg's end, laying road as it goes;
+ * it turns around at the destination and starts a fresh round trip at home.
+ * Both legs walk the one course. A route whose origin or destination city is
+ * gone does not walk.
  *
  * PLUNDER, real Civ 6: a unit hostile to the route's owner standing on the
  * Trader's tile destroys the route AND its Trader, and the raider's seat
@@ -1202,23 +1084,21 @@ export function addIntlTradeRoute(state: GameState, from: number, toSeat: number
  */
 export function tradeRouteWalk(state: GameState, actor: Seat): void {
   const routes = (actor.tradeRoutes ??= []);
-  const water = tradeWaterLevel(state, actor.seat);
   for (const r of routes) {
-    if ((r.walkLeg ?? -1) < 0 || r.walkTile === undefined) continue;
-    const originC = routeOriginCenter(state, actor, r);
-    const destC = routeDestCenter(state, actor, r);
-    if (originC < 0 || destC < 0) continue;
-    const target = r.walkLeg === 0 ? destC : originC;
-    const next = tradeWalkStep(state, r.walkTile, target, water);
-    if (next !== r.walkTile) {
-      r.walkTile = next;
-      // roads go on passable LAND only — a sea leg lays nothing, and
-      // neither does a portal's mountain
-      if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) state.map.tiles[next].road = true;
-      claimTileEnRoute(state, actor.seat, next);
-    }
-    if (r.walkLeg === 0 && r.walkTile === destC) r.walkLeg = 1;
-    else if (r.walkLeg === 1 && r.walkTile === originC) r.walkLeg = 0;
+    const course = r.course ?? [];
+    if ((r.walkLeg ?? -1) < 0 || r.walkTile === undefined || course.length < 2) continue;
+    if (routeOriginCenter(state, actor, r) < 0 || routeDestCenter(state, actor, r) < 0) continue;
+    const at = course.indexOf(r.walkTile);
+    if (at < 0) continue;
+    const i = r.walkLeg === 0 ? at + 1 : at - 1;
+    const next = course[i];
+    r.walkTile = next;
+    // roads go on passable LAND only — a sea leg lays nothing, and
+    // neither does a portal's mountain
+    if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) state.map.tiles[next].road = true;
+    claimTileEnRoute(state, actor.seat, next);
+    if (r.walkLeg === 0 && i === course.length - 1) r.walkLeg = 1;
+    else if (r.walkLeg === 1 && i === 0) r.walkLeg = 0;
   }
   const plundered = new Set<TradeRoute>();
   for (const r of routes) {
@@ -1233,9 +1113,8 @@ export function tradeRouteWalk(state: GameState, actor: Seat): void {
 
 /**
  * THE ROUND-TRIP EXPIRY of one holder's routes. Completion is the minimum
- * term running out WITH the Trader home (a parked sea walker is always home,
- * a stuck one ends at the rail); a route whose destination city is gone ends
- * too. A route that ENDS hands its Trader back at the origin; only plunder
+ * term running out WITH the Trader home (one that cannot come home ends at
+ * the rail); a route whose destination city is gone ends too. A route that ENDS hands its Trader back at the origin; only plunder
  * destroys the unit.
  *
  * CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
@@ -1250,7 +1129,6 @@ export function tradeRouteExpiry(state: GameState, actor: Seat): void {
   const cur = actor.tradeRoutes ?? [];
   const isDone = (x: TradeRoute): boolean => {
     if (x.expiresTurn === undefined || state.turn < x.expiresTurn) return false;
-    if ((x.walkLeg ?? -1) < 0) return true;
     if (state.turn >= x.expiresTurn + TRADE_WALK_EXPIRY_RAIL) return true;
     return x.walkTile === routeOriginCenter(state, actor, x);
   };
@@ -1283,24 +1161,24 @@ export function tradeRouteExpiry(state: GameState, actor: Seat): void {
  * summed (`minorRouteYields`) — the other city-states in id order, then every
  * major's cities in seat and array order, strictly-greater beats, so ties
  * keep the first. A minor has no fog, meets no one and holds no Trading
- * Post, so the gates are the range (one leg, `routeInRange`), a route not
+ * Post, so the gates are the range (`tradeReach` from its city), a route not
  * already running, no war with the destination's holder, and Trade Policy's
  * ban on a banned major. Null = none.
  */
 export function minorRouteCandidate(state: GameState, cityState: CityState): TradeRoute | null {
   const routes = cityState.tradeRoutes ?? [];
-  const from = cityState.centerIndex;
+  const reach = tradeReach(state, cityState.seat, cityState.centerIndex);
   const cands: TradeRoute[] = [];
   for (const dest of [...state.cityStates].sort((a, b) => a.id - b.id)) {
     if (dest.id === cityState.id || routes.some((x) => x.toCs === dest.id)) continue;
-    if (!routeInRange(state, cityState.seat, from, dest.centerIndex)) continue;
+    if (!tradeCourse(reach, dest.centerIndex)) continue;
     cands.push({ from: -1, to: -1, toCs: dest.id });
   }
   for (const other of state.seats) {
     if (civsAtWar(state, cityState.seat, other.seat) || congressIntlBanned(state, other.seat)) continue;
     for (const pc of other.cities) {
       if (routes.some((x) => x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
-      if (!routeInRange(state, cityState.seat, from, pc.centerIndex)) continue;
+      if (!tradeCourse(reach, pc.centerIndex)) continue;
       cands.push({ from: -1, to: -1, toSeat: other.seat, toSeatCity: pc.id });
     }
   }

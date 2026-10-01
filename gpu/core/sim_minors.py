@@ -98,20 +98,21 @@ class SimMinors:
                          & (self.major_unit_type == self._trader_idx)).sum(dim=1)
         return out
 
-    def _minor_route_candidate(self, s: int):
+    def _minor_route_candidate(self, s: int, want: torch.Tensor):
         """`minorRouteCandidate` — where minor `s`'s free Trader goes: the new
         in-range destination whose route pays the most, its six yields summed
         (`_minor_route_yield6`), strictly-greater beats in the scan order —
         the other city-states by index, then every major's cities in row and
-        slot order — so ties keep the first. The gates: one leg of range, the
-        route not already running, no war with the destination's holder,
-        Trade Policy's ban. Returns ([B] found, [B] dest code (-(2+cs) or -1),
+        slot order — so ties keep the first. The gates: the range (the walk
+        from its city, in the games `want`), the route not already running, no
+        war with the destination's holder, Trade Policy's ban. Returns ([B] found, [B] dest code (-(2+cs) or -1),
         [B] dest seat row, [B] dest city id, [B] dest centre)."""
         B, S, dev = self.B, self.S, self.device
         row = self._CITY_MINOR0 + s
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
-        reach = self._route_reach_from(row)[:, 0]  # [B, T]
+        reach = self._trade_reach_rows(row, want.nonzero(as_tuple=True)[0].tolist(),
+                                       self.citystate_center[:, s:s + 1])[:, 0]  # [B, T]
         best = torch.full((B,), -1.0, dtype=torch.float64, device=dev)
         found = torch.zeros(B, dtype=torch.bool, device=dev)
         code = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -163,10 +164,9 @@ class SimMinors:
         """`minorTrade` — minor `s`'s routes walk and meet their raiders
         (`_trade_walk_tick`); a free Trader under its capacity takes the
         scorer's destination (`_minor_route_candidate`) and is spent on it —
-        the commit `commitRoute` makes: the term, the walker at the centre, no
-        chain (a city-state holds no Trading Post), leg 0 on a land descent and
-        road on the centre, -1 parked where none reaches; then the round trips
-        that are done end (`_expire_seat_routes`)."""
+        the commit `commitRoute` makes: the term, the stored course, the
+        walker at the centre on leg 0, road on the centre; then the round
+        trips that are done end (`_expire_seat_routes`)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         self._trade_walk_tick(row, alive)
@@ -175,7 +175,7 @@ class SimMinors:
             t_has, t_slot, t_tile = self._free_trader(row)
             want = alive & (used < self._trade_capacity(row)) & t_has
             if bool(want.any()):
-                found, code, dseat, dcity, dct = self._minor_route_candidate(s)
+                found, code, dseat, dcity, dct = self._minor_route_candidate(s, want)
                 go = want & found
                 if bool(go.any()):
                     rows = go.nonzero(as_tuple=True)[0]
@@ -188,12 +188,9 @@ class SimMinors:
                     self.seat_route_exp[rows, row, slot] = int(self.turn) + self._trade_min_duration()[rows]
                     self.seat_route_born[rows, row, slot] = int(self.turn)
                     self.seat_route_walk[rows, row, slot] = o_ct[rows]
-                    self.seat_route_chain[rows, row, slot] = -1
-                    wl = self._trade_water_level(row)[rows]
-                    walks = self._trade_walk_ok(rows, o_ct[rows], dct[rows], wl)
-                    self.seat_route_leg[rows, row, slot] = torch.where(
-                        walks, torch.zeros_like(slot), torch.full_like(slot, -1))
-                    lr = rows[walks & self.passable[rows, o_ct[rows]]]
+                    self.seat_route_leg[rows, row, slot] = 0
+                    self._trade_store_course(row, rows, slot, o_ct[rows], dct[rows])
+                    lr = rows[~self.water[rows, o_ct[rows]]]
                     if len(lr) > 0:
                         self.road[lr, o_ct[lr]] = True
                     self.major_unit_alive[rows, t_slot[rows]] = False
@@ -225,9 +222,8 @@ class SimMinors:
             return None
         B, S, dev = self.B, self.S, self.device
         rk = torch.zeros(B, rr.shape[1], 6, dtype=torch.float64, device=dev)
-        # the PATH TERM's inputs per paying leg (`routePathGold`): the
-        # destination centre and D, the Gold the destination's rows pay
-        _p_dest = torch.full_like(rr[:, :, 1], -1)
+        # the PATH TERM's inputs per paying leg (`routePathGold`): D, the Gold
+        # the destination's rows pay
         _p_d = torch.zeros(rr.shape[:2], dtype=torch.float64, device=dev)
         _p_want = torch.zeros_like(act)
         if S > 0:
@@ -238,7 +234,6 @@ class SimMinors:
             rk[:, :, 2] += self._minor_cs_route_gold * m
             ycol = self._citystate_yidx[:, :S].gather(1, css)
             rk.scatter_add_(2, ycol.unsqueeze(2), (self._minor_cs_route_spec * m).unsqueeze(2))
-            _p_dest = torch.where(ok_c, self.citystate_center[:, :S].gather(1, css), _p_dest)
             # D is every Gold the destination pays the route: the flat Gold,
             # and the specialty where the minor's type pays Gold
             _p_d = torch.where(ok_c, (self._minor_cs_route_gold + self._minor_cs_route_spec * (ycol == 2).double()) * m, _p_d)
@@ -260,13 +255,10 @@ class SimMinors:
                 2, _col.unsqueeze(3).expand(B, K, 1, _nD)).squeeze(2)  # [B, K, nD]
             intl6 = self._route_centre_intl.reshape(1, 1, 6) + _comp_d.double() @ self._route_intl_y  # [B, K, 6]
             rk = rk + intl6 * valid.double().unsqueeze(2)
-            _p_dest = torch.where(valid, self.city_center.gather(1, _rx).gather(2, _col).squeeze(2), _p_dest)
             _p_d = torch.where(valid, intl6[:, :, 2], _p_d)
             _p_want = _p_want | valid
         if bool(_p_want.any()):
-            _p_o = self.citystate_center[:, s].unsqueeze(1).expand_as(_p_dest)
-            rk[:, :, 2] += self._route_path_gold(
-                row, torch.where(_p_want, _p_o, torch.full_like(_p_o, -1)), _p_dest, _p_d, _p_want)
+            rk[:, :, 2] += self._route_path_gold(row, _p_d, _p_want)
         return rk
 
     def _minor_repair(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -934,7 +926,7 @@ class SimMinors:
                 avail = gate & unl & (self._minor_traders(s) < self._trade_capacity(row))
                 if not bool(avail.any()):
                     continue
-                avail = avail & self._minor_route_candidate(s)[0]
+                avail = avail & self._minor_route_candidate(s, avail)[0]
                 if not bool(avail.any()):
                     continue
                 toward(avail, 0.0)

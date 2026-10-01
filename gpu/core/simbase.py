@@ -725,7 +725,6 @@ SUPPORT_CS = 2
 # level and stalls at the threshold until it promotes; the level itself pays no
 # Combat Strength — the CHOSEN PROMOTION does. Barbarians accrue nothing (no
 # barb xp plane) and civilians never fight.
-TRADE_ROAD_MAX_STEPS = 32  # the `tradeWalkReachable`/walk safety rail
 #: the CITIZEN-ASSIGNMENT wire's "leave this pin alone" value. A pin is a
 #: count, -1 hands the slot back to the automatic rule, and this sits below
 #: both so a record can name one district without restating the rest.
@@ -858,7 +857,7 @@ _MUTABLE = [
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
     "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
-    "seat_route_chain",  # the stored course (Trading-Post centre per hop, -1-padded)
+    "seat_route_course",  # the stored course (the path's plots, origin to destination, -1-padded)
     "trading_post",  # Trading Posts by (major row, centre tile)
     "city_id",
     "unit_next",

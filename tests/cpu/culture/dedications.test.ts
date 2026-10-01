@@ -113,7 +113,8 @@ describe('the four new dedications', () => {
     const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
     commit(state, 0, DED_COINAGE);
     seatOf(state, 0)!.tradeRoutes = [
-      { from: city.id, to: city.id, expiresTurn: state.turn }, // the term is up this very turn
+      // the term is up this very turn, the Trader home
+      { from: city.id, to: city.id, expiresTurn: state.turn, walkTile: city.centerIndex, walkLeg: 0 },
     ];
     endTurn(state);
     const gained = seatOf(state, 0)!.eraScore ?? 0;

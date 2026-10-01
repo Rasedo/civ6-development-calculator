@@ -1288,15 +1288,15 @@ export function computeCityStats(
     bonuses.gold += perFeature * n;
   }
   // CIV6 (Land Acquisition): "+3 Gold per turn from each foreign Trade
-  // Route passing through the city" — a foreign route whose stored CHAIN
-  // holds this centre.
+  // Route passing through the city" — a foreign route whose stored course
+  // crosses this centre short of both its ends.
   const perPass = governorSum(state, city, (e) => e.passRouteGold);
   if (perPass) {
     let n = 0;
     for (const sx of state.seats) {
       if (sx.seat === city.seat) continue;
       for (const r of sx.tradeRoutes ?? []) {
-        if ((r.chain ?? []).includes(city.centerIndex)) n += 1;
+        if ((r.course ?? []).slice(1, -1).includes(city.centerIndex)) n += 1;
       }
     }
     bonuses.gold += perPass * n;

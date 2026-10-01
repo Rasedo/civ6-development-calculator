@@ -3,11 +3,13 @@ import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfC
 import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, routeYields, specialtyDistricts, cityMaritime, tradeRouteRange, routeInRange, routeChain, routeChainGold, routePathGold, stampTradingPost, routePostGold, wonderRouteOriginGold, ROUTE_CHAIN_MAX, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA } from '../../../cpu/core/trade';
+import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, routeYields, specialtyDistricts, routeChainGold, routeCoursePosts, routePathGold, stampTradingPost, routePostGold, wonderRouteOriginGold, TRADE_ROUTE_DURATION } from '../../../cpu/core/trade';
+import { routeInRange, tradeCourse, tradeReach, TRADE_BASE_RANGE, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_STEP, TRADE_COST_LAND, type TradeReach } from '../../../cpu/core/tradePath';
+import { TRADE_COURSE_MAX } from '../../../cpu/data/constants';
 import { computeCityStats } from '../../../cpu/core/city';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 import { GOVERNORS } from '../../../cpu/data/governors';
-import { tradeWalkPath, tradeWalkReachable, tradeWaterLevel, TRADE_WATER_NONE, TRADE_WATER_OPEN } from '../../../cpu/core/units';
+import { tradeWaterLevel, TRADE_WATER_NONE, TRADE_WATER_OPEN } from '../../../cpu/core/units';
 import { deriveMountainRanges, isWater } from '../../../world/query';
 import { hexDistance } from '../../../world/hex';
 import { applySeatActionRecord, declareWar, seatPhase, warTargets } from '../../../cpu/core/phase';
@@ -15,7 +17,12 @@ import { routeCandidateRow } from '../../../cpu/core/buyCandidates';
 import { spawnUnit, trainableUnits, traderCost } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { TECHS } from '../../../cpu/data/techs';
-import type { City, CityState, CityStateType, GameState, Seat } from '../../../cpu/core/types';
+import type { City, CityState, CityStateType, GameState, Seat, TradeRoute } from '../../../cpu/core/types';
+
+/** a route carrying the course the walk finds from `o` to `d` for seat 0 */
+function coursed(state: GameState, o: number, d: number): TradeRoute {
+  return { from: 0, course: tradeCourse(tradeReach(state, 0, o), d)! };
+}
 
 // A sandbox of two seat-0 cities where the origin holds a Market (so
 // tradeCapacity >= 1) and the destination holds a completed specialty district.
@@ -173,20 +180,21 @@ describe('route duration', () => {
     expect(state.seats[0].tradeRoutes![0].expiresTurn).toBe(7 + TRADE_ROUTE_DURATION);
   });
 
-  it('a PARKED (sea) route drops exactly at the term — the walker is always home', () => {
+  it('the walker follows the stored course out and home, one plot a turn', () => {
     const { state, origin, dest } = twoCitySandbox();
     state.turn = 1;
-    addTradeRoute(state, origin.id, dest.id, 0); // expires at 1 + DURATION
-    expect(state.seats[0].tradeRoutes!.length).toBe(1);
-    state.seats[0].tradeRoutes![0].walkLeg = -1; // the sea shape: parked at origin
-
-    state.turn = TRADE_ROUTE_DURATION; // still one turn short of expiry
-    seatPhase(state);
-    expect(state.seats[0].tradeRoutes!.length).toBe(1);
-
-    state.turn = 1 + TRADE_ROUTE_DURATION; // expiry turn reached
-    seatPhase(state);
-    expect(state.seats[0].tradeRoutes!.length).toBe(0);
+    addTradeRoute(state, origin.id, dest.id, 0);
+    const r = state.seats[0].tradeRoutes![0];
+    const course = r.course!;
+    expect([course[0], course[course.length - 1]]).toEqual([origin.centerIndex, dest.centerIndex]);
+    const seen: number[] = [r.walkTile!];
+    for (let k = 0; k < 2 * (course.length - 1); k++) {
+      seatPhase(state);
+      seen.push(r.walkTile!);
+    }
+    // out along the course, then back along the same plots
+    expect(seen).toEqual([...course, ...course.slice(0, -1).reverse()]);
+    for (const i of course) expect(state.map.tiles[i].road).toBe(true);
   });
 
   it('a WALKING route holds past the term until its Trader completes the round trip', () => {
@@ -262,9 +270,11 @@ describe('the Trader unit', () => {
     // the active route still counts against capacity for training
     expect(trainableUnits(state, 0).some((d) => d.id === 'TRADER')).toBe(false);
 
-    // force the parked shape and run out the term: the Trader comes home
+    // the walker one plot from home on its way back, the term run out: the
+    // Trader comes home
     const r = state.seats[0].tradeRoutes![0];
-    r.walkLeg = -1;
+    r.walkTile = r.course![1];
+    r.walkLeg = 1;
     state.turn = (r.expiresTurn ?? 0);
     seatPhase(state);
     expect(state.seats[0].tradeRoutes!.length).toBe(0);
@@ -283,75 +293,73 @@ describe('the Trader unit', () => {
     expect(traderCost(state, 0)).toBe(Math.floor(20 * (1 + 3 * 0.37))); // 42
   });
 
-  // CIV6: "The base range for land trade routes is 15 tiles ... The base range
-  // for sea trade routes is 30 tiles", and "both the origin city and the
-  // destination city require maritime access ... in order to establish sea
-  // Trade Routes".
-  it('a sea route reaches twice as far, and only with maritime access at both ends', () => {
+  // THE RANGE (0x5579b0): a budget walked along the path — 15 from the
+  // origin, 1 a step, refuelled at the origin's and posted cities' districts.
+  it('the range is a budget of steps along the path, not a distance', () => {
     const state = makeState(makeMap(40, 12));
     state.sandbox = true;
     const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
-    const far = foundCity(state, tileAtCoords(state.map, 24, 6).index, 0).city!;
+    const at15 = foundCity(state, tileAtCoords(state.map, 2 + TRADE_BASE_RANGE, 6).index, 0).city!;
+    const at16 = foundCity(state, tileAtCoords(state.map, 2 + TRADE_BASE_RANGE + 1, 2).index, 0).city!;
     origin.buildings.push('MARKET');
-    const d = hexDistance(
-      state.map.tiles[origin.centerIndex].col, state.map.tiles[origin.centerIndex].row,
-      state.map.tiles[far.centerIndex].col, state.map.tiles[far.centerIndex].row,
-    );
-    expect(d).toBeGreaterThan(TRADE_ROUTE_RANGE_LAND);
-    expect(d).toBeLessThanOrEqual(TRADE_ROUTE_RANGE_SEA);
-    expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(false);
-
-    // give both centres a coastal neighbour...
-    tileAtCoords(state.map, 2, 5).terrain = 'COAST';
-    tileAtCoords(state.map, 24, 5).terrain = 'COAST';
-    expect(cityMaritime(state, origin.centerIndex, origin)).toBe(true);
-    expect(cityMaritime(state, far.centerIndex, far)).toBe(true);
-    // ...which is still not enough without Celestial Navigation
-    expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(false);
-    seatOf(state, 0)!.research.techs.push('CELESTIAL_NAVIGATION');
-    expect(tradeRouteRange(state, 0, origin.centerIndex, far.centerIndex))
-      .toBe(TRADE_ROUTE_RANGE_SEA);
-    expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
-
-    // a HARBOR gives the access a landlocked centre lacks
-    const inland = foundCity(state, tileAtCoords(state.map, 12, 9).index, 0).city!;
-    expect(cityMaritime(state, inland.centerIndex, inland)).toBe(false);
-    const ht = tileAtCoords(state.map, 12, 8);
-    ht.district = 'HARBOR';
-    ht.districtComplete = true;
-    inland.districts.push({ type: 'HARBOR', tileIndex: ht.index });
-    expect(cityMaritime(state, inland.centerIndex, inland)).toBe(true);
+    expect(routeInRange(state, 0, origin.centerIndex, at15.centerIndex)).toBe(true);
+    expect(canAddTradeRoute(state, origin.id, at15.id, 0).ok).toBe(true);
+    const reach = tradeReach(state, 0, origin.centerIndex);
+    expect(reach.steps[at15.centerIndex]).toBe(TRADE_BASE_RANGE);
+    expect(reach.left[at15.centerIndex]).toBe(0);
+    expect(routeInRange(state, 0, origin.centerIndex, at16.centerIndex)).toBe(false);
+    // a wall of mountains in the way is walked around, and the detour spends
+    // the budget: the same hex distance falls out of range
+    const d = hexDistance(state.map.tiles[origin.centerIndex].col, state.map.tiles[origin.centerIndex].row,
+      state.map.tiles[at15.centerIndex].col, state.map.tiles[at15.centerIndex].row);
+    expect(d).toBe(TRADE_BASE_RANGE);
+    for (let r = 3; r < 10; r++) tileAtCoords(state.map, 9, r).elevation = 'MOUNTAIN';
+    expect(routeInRange(state, 0, origin.centerIndex, at15.centerIndex)).toBe(false);
   });
 
-  it('a Trader embarks the sea leg and lays no road on water', () => {
+  // THE COST (0x558970): 100 a step; onto bare land 100 x its movement cost,
+  // onto a road 50, onto a Railroad 10, onto a city centre nothing.
+  it('the path is the least-cost one: roads, railroads and centres are cheap', () => {
+    const state = makeState(makeMap(20, 8));
+    state.sandbox = true;
+    const origin = foundCity(state, tileAtCoords(state.map, 2, 4).index, 0).city!;
+    const dest = foundCity(state, tileAtCoords(state.map, 10, 4).index, 0).city!;
+    const reach = () => tradeReach(state, 0, origin.centerIndex);
+    // a flat row: 7 bare plots then the centre
+    expect(reach().g[dest.centerIndex]).toBe(8 * TRADE_COST_STEP + 7 * TRADE_COST_LAND);
+    // hills on the straight row: the walk goes round when that is cheaper
+    for (let c = 3; c < 10; c++) tileAtCoords(state.map, c, 4).elevation = 'HILLS';
+    const bent = tradeCourse(reach(), dest.centerIndex)!;
+    expect(bent.slice(1, -1).some((i) => state.map.tiles[i].row !== 4)).toBe(true);
+    // a road back on the row takes the Trader straight again
+    for (let c = 3; c < 10; c++) tileAtCoords(state.map, c, 4).road = true;
+    expect(reach().g[dest.centerIndex]).toBe(8 * TRADE_COST_STEP + 7 * TRADE_COST_ROUTE);
+    for (let c = 3; c < 10; c++) tileAtCoords(state.map, c, 4).railroad = true;
+    expect(reach().g[dest.centerIndex]).toBe(8 * TRADE_COST_STEP + 7 * TRADE_COST_RAIL);
+    expect(tradeCourse(reach(), dest.centerIndex)!.every((i) => state.map.tiles[i].row === 4)).toBe(true);
+  });
+
+  it('a Trader embarks at a city centre, crosses the water, and lays no road on it', () => {
     const state = makeState(makeMap(20, 8));
     state.sandbox = true;
     state.unitsMode = true;
-    // a one-tile channel splits the map; only a sea leg crosses it
-    for (let r = 0; r < 8; r++) tileAtCoords(state.map, 9, r).terrain = 'COAST';
-    const origin = foundCity(state, tileAtCoords(state.map, 4, 4).index, 0).city!;
-    const across = foundCity(state, tileAtCoords(state.map, 14, 4).index, 0).city!;
+    // a four-wide channel splits the map; both cities stand on its shores
+    for (let r = 0; r < 8; r++) for (const c of [9, 10, 11, 12]) tileAtCoords(state.map, c, r).terrain = 'COAST';
+    const origin = foundCity(state, tileAtCoords(state.map, 8, 4).index, 0).city!;
+    const across = foundCity(state, tileAtCoords(state.map, 13, 4).index, 0).city!;
     origin.buildings.push('MARKET');
     const s = seatOf(state, 0)!;
     spawnUnit(state, 'TRADER', origin.centerIndex, 0);
-
-    // WITHOUT Celestial Navigation the descent stops at the water and the
-    // Trader parks at the origin.
-    expect(tradeWalkReachable(state, origin.centerIndex, across.centerIndex, TRADE_WATER_NONE)).toBe(false);
-    expect(addTradeRoute(state, origin.id, across.id, 0).ok).toBe(true);
-    expect(s.tradeRoutes![0].walkLeg).toBe(-1);
-
-    // WITH it, the same pair walks.
-    s.tradeRoutes = [];
+    // WITHOUT Celestial Navigation the water is closed
+    expect(tradeWaterLevel(state, 0)).toBe(TRADE_WATER_NONE);
+    expect(canAddTradeRoute(state, origin.id, across.id, 0).ok).toBe(false);
+    // WITH it, the same pair walks
     s.research.techs.push('CELESTIAL_NAVIGATION');
     expect(tradeWaterLevel(state, 0)).toBe(TRADE_WATER_OPEN);
-    expect(tradeWalkReachable(state, origin.centerIndex, across.centerIndex, TRADE_WATER_OPEN)).toBe(true);
-    spawnUnit(state, 'TRADER', origin.centerIndex, 0);
     expect(addTradeRoute(state, origin.id, across.id, 0).ok).toBe(true);
     const route = s.tradeRoutes![0];
     expect(route.walkLeg).toBe(0);
-
-    // walk it across the channel: the water tile it stands on takes NO road
+    // walk it across the channel: the water it stands on takes NO road
     let onWater = false;
     for (let i = 0; i < 20 && route.walkTile !== across.centerIndex; i++) {
       seatPhase(state);
@@ -365,21 +373,99 @@ describe('the Trader unit', () => {
     expect(route.walkTile).toBe(across.centerIndex);
   });
 
+  // a land<->water switch away from a centre needs a TradeEmbark district
+  // at one end (0x558db0), caps the range at 1, and a refuelling district
+  // tops it up (0x5579b0): an inland city reaches the sea through its Harbor
+  it('an inland city embarks only at a Harbor, which refuels its sea leg', () => {
+    const state = makeState(makeMap(30, 8));
+    state.sandbox = true;
+    for (let r = 0; r < 8; r++) for (let c = 9; c <= 20; c++) tileAtCoords(state.map, c, r).terrain = 'COAST';
+    const origin = foundCity(state, tileAtCoords(state.map, 6, 4).index, 0).city!;
+    const across = foundCity(state, tileAtCoords(state.map, 21, 4).index, 0).city!;
+    seatOf(state, 0)!.research.techs.push('CELESTIAL_NAVIGATION');
+    expect(routeInRange(state, 0, origin.centerIndex, across.centerIndex)).toBe(false);
+    const ht = tileAtCoords(state.map, 9, 4);
+    ht.district = 'HARBOR';
+    origin.districts.push({ type: 'HARBOR', tileIndex: ht.index });
+    const reach = tradeReach(state, 0, origin.centerIndex);
+    const course = tradeCourse(reach, across.centerIndex)!;
+    expect(course).toContain(ht.index);
+    // the switch onto the Harbor leaves nothing; the Harbor refuels 30 onto water
+    expect(reach.left[ht.index]).toBe(0);
+    expect(reach.left[tileAtCoords(state.map, 10, 4).index]).toBe(29);
+    // the switch onto it, away from a refuelling district, is dear
+    expect(reach.g[ht.index]).toBeGreaterThan(10000);
+  });
+
+  // 0x5579b0: the DESTINATION city's own TradeEmbark district refuels to 3
+  // (context +0x1b0) and waives the switch cost — the walk runs again bound
+  // to that one destination
+  it("the destination's Harbor refuels the last steps to 3", () => {
+    const state = makeState(makeMap(44, 8));
+    state.sandbox = true;
+    // thirty plots of water between a coastal origin and an inland destination
+    for (let r = 0; r < 8; r++) for (let c = 9; c <= 38; c++) tileAtCoords(state.map, c, r).terrain = 'COAST';
+    const origin = foundCity(state, tileAtCoords(state.map, 8, 4).index, 0).city!;
+    const dest = foundCity(state, tileAtCoords(state.map, 40, 4).index, 0).city!;
+    seatOf(state, 0)!.research.techs.push('CELESTIAL_NAVIGATION');
+    // the sea leg spends the origin's 30 on the last water plot: no way ashore
+    expect(routeInRange(state, 0, origin.centerIndex, dest.centerIndex)).toBe(false);
+    const ht = tileAtCoords(state.map, 38, 4);
+    ht.district = 'HARBOR';
+    dest.districts.push({ type: 'HARBOR', tileIndex: ht.index });
+    const reach = tradeReach(state, 0, origin.centerIndex);
+    expect(reach.left[ht.index]).toBe(0);
+    expect(reach.g[dest.centerIndex]).toBe(-1);
+    // bound to the destination, its Harbor refuels to 3: ashore and home
+    const course = tradeCourse(reach, dest.centerIndex)!;
+    expect(course).toEqual([origin.centerIndex, ...Array.from({ length: 31 }, (_, i) => tileAtCoords(state.map, 9 + i, 4).index),
+      dest.centerIndex]);
+    // the same Harbor of ANOTHER destination's city is no refuel
+    const other = foundCity(state, tileAtCoords(state.map, 43, 0).index, 0).city!;
+    expect(routeInRange(state, 0, origin.centerIndex, other.centerIndex)).toBe(false);
+  });
+
   it('crosses Ocean with Celestial Navigation and no Cartography', () => {
     const state = makeState(makeMap(20, 8));
     for (let r = 0; r < 8; r++) {
       tileAtCoords(state.map, 9, r).terrain = 'OCEAN';
       tileAtCoords(state.map, 10, r).terrain = 'OCEAN';
+      tileAtCoords(state.map, 11, r).terrain = 'OCEAN';
     }
-    const origin = foundCity(state, tileAtCoords(state.map, 4, 4).index, 0).city!;
-    const across = foundCity(state, tileAtCoords(state.map, 14, 4).index, 0).city!;
+    const origin = foundCity(state, tileAtCoords(state.map, 8, 4).index, 0).city!;
+    const across = foundCity(state, tileAtCoords(state.map, 12, 4).index, 0).city!;
     const s = seatOf(state, 0)!;
-    expect(tradeWaterLevel(state, 0)).toBe(TRADE_WATER_NONE);
     s.research.techs.push('CELESTIAL_NAVIGATION');
     expect(s.research.techs).not.toContain('CARTOGRAPHY');
-    const water = tradeWaterLevel(state, 0);
-    expect(water).toBe(TRADE_WATER_OPEN);
-    expect(tradeWalkReachable(state, origin.centerIndex, across.centerIndex, water)).toBe(true);
+    expect(tradeWaterLevel(state, 0)).toBe(TRADE_WATER_OPEN);
+    expect(routeInRange(state, 0, origin.centerIndex, across.centerIndex)).toBe(true);
+  });
+
+  // 0x558db0: a major walks only what it has revealed, never through a
+  // foreign centre of a holder at war, and never through a burning plot
+  it('closes unrevealed plots, a warring centre and a danger feature', () => {
+    const state = makeState(makeMap(24, 8));
+    state.sandbox = true;
+    const origin = foundCity(state, tileAtCoords(state.map, 2, 4).index, 0).city!;
+    const dest = foundCity(state, tileAtCoords(state.map, 12, 4).index, 0).city!;
+    const straight = tradeCourse(tradeReach(state, 0, origin.centerIndex), dest.centerIndex)!;
+    expect(straight.length).toBe(11);
+    // a burning plot on the row is walked around, never through
+    const fire = tileAtCoords(state.map, 7, 4);
+    fire.feature = 'BURNING_WOODS';
+    const round = tradeCourse(tradeReach(state, 0, origin.centerIndex), dest.centerIndex)!;
+    expect(round).not.toContain(fire.index);
+    fire.feature = null;
+    // a rival's centre on the row: open at peace, closed at war
+    const civ = addCiv(state, 7, 4);
+    expect(tradeCourse(tradeReach(state, 0, origin.centerIndex), dest.centerIndex)).toContain(civ.cities[0].centerIndex);
+    declareWar(state, 0, civ.seat);
+    expect(tradeCourse(tradeReach(state, 0, origin.centerIndex), dest.centerIndex)).not.toContain(civ.cities[0].centerIndex);
+    // fog: the unrevealed ground is closed to a major
+    state.unitsMode = true;
+    state.fogOfWar = true;
+    seatOf(state, 0)!.explored = state.map.tiles.map((t) => (t.col <= 6 ? 1 : 0));
+    expect(routeInRange(state, 0, origin.centerIndex, dest.centerIndex)).toBe(false);
   });
 });
 
@@ -421,7 +507,7 @@ describe('the route candidate weighs every destination at once', () => {
     expect(hexDistance(
       state.map.tiles[origin.centerIndex].col, state.map.tiles[origin.centerIndex].row,
       state.map.tiles[far.cities[0].centerIndex].col,
-      state.map.tiles[far.cities[0].centerIndex].row)).toBeGreaterThan(TRADE_ROUTE_RANGE_LAND);
+      state.map.tiles[far.cities[0].centerIndex].row)).toBeGreaterThan(TRADE_BASE_RANGE);
     const cand = routeCandidateRow(state, state.seats[0]);
     expect(cand[1]).toBe(near.centerIndex);
   });
@@ -461,7 +547,9 @@ describe('trading posts', () => {
     const { state, origin, dest } = twoCitySandbox();
     state.turn = 1;
     addTradeRoute(state, origin.id, dest.id, 0);
-    state.seats[0].tradeRoutes![0].walkLeg = -1; // parked: always home
+    const r = state.seats[0].tradeRoutes![0];
+    r.walkTile = r.course![1]; // one plot from home on the way back
+    r.walkLeg = 1;
     state.turn = 1 + TRADE_ROUTE_DURATION;
     seatPhase(state);
     expect(state.seats[0].tradeRoutes!.length).toBe(0);
@@ -486,26 +574,26 @@ describe('trading posts', () => {
   // Post, it may then continue up to 15 additional tiles to reach another
   // city" — and a civilization "cannot make use of Trading Posts established
   // by other civilizations".
-  it('routeInRange chains one leg-range at a time through the seat OWN posts', () => {
+  it('a city holding the seat OWN post refuels the walk through it', () => {
     const state = makeState(makeMap(24, 24));
     state.sandbox = true;
     const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
     const mid = foundCity(state, tileAtCoords(state.map, 11, 6).index, 0).city!;
     const far = foundCity(state, tileAtCoords(state.map, 20, 6).index, 0).city!;
     origin.buildings.push('MARKET');
-    expect(routeInRange(state, 0, origin.centerIndex, far.centerIndex)).toBe(false); // 18 > 15
+    expect(routeInRange(state, 0, origin.centerIndex, far.centerIndex)).toBe(false); // 18 steps > 15
     expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(false);
     stampTradingPost(state.seats[0], mid.centerIndex);
     expect(routeInRange(state, 0, origin.centerIndex, far.centerIndex)).toBe(true);
     expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
-    // the chain reads the OWNER's posts alone
+    // the refuel reads the walker's OWN posts alone
     expect(routeInRange(state, 1, origin.centerIndex, far.centerIndex)).toBe(false);
-    // a post whose city has died chains nothing
+    // a post whose city has died refuels nothing
     state.seats[0].cities = state.seats[0].cities.filter((c) => c.id !== mid.id);
     expect(routeInRange(state, 0, origin.centerIndex, far.centerIndex)).toBe(false);
   });
 
-  it('a post at the origin own centre never extends the chain', () => {
+  it('a post at the origin own centre adds no range', () => {
     const state = makeState(makeMap(24, 24));
     state.sandbox = true;
     const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
@@ -539,77 +627,61 @@ describe('trading posts', () => {
     expect(gold()).toBe(bare + 2);
   });
 
-  it('routeChain returns the course: first discovery, endpoints excluded, and the commit stores it', () => {
+  it('the commit stores the course, and the posts it passes are read off it', () => {
     const state = makeState(makeMap(24, 24));
     state.sandbox = true;
     const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
     const mid = foundCity(state, tileAtCoords(state.map, 11, 6).index, 0).city!;
-    const mid2 = foundCity(state, tileAtCoords(state.map, 13, 10).index, 0).city!;
     const far = foundCity(state, tileAtCoords(state.map, 20, 6).index, 0).city!;
     origin.buildings.push('MARKET');
-    // a direct leg has no course; an unreachable pair has no chain at all
-    expect(routeChain(state, 0, origin.centerIndex, mid.centerIndex)).toEqual([]);
-    expect(routeChain(state, 0, origin.centerIndex, far.centerIndex)).toBeNull();
     stampTradingPost(state.seats[0], mid.centerIndex);
-    stampTradingPost(state.seats[0], mid2.centerIndex);
-    // both posts bridge; the FIFO walk over the SORTED list makes the lower
-    // centre the first discovery — the course both engines must store
-    const lower = Math.min(mid.centerIndex, mid2.centerIndex);
-    expect(routeChain(state, 0, origin.centerIndex, far.centerIndex)).toEqual([lower]);
+    const course = tradeCourse(tradeReach(state, 0, origin.centerIndex), far.centerIndex)!;
     expect(addTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
-    expect(state.seats[0].tradeRoutes![0].chain).toEqual([lower]);
+    const r = state.seats[0].tradeRoutes![0];
+    expect(r.course).toEqual(course);
+    expect(routeCoursePosts(state, 0, r)).toEqual([mid.centerIndex]);
+    // the stored course stands when the ground changes under it
+    stampTradingPost(state.seats[0], origin.centerIndex);
+    for (let c = 3; c < 20; c++) tileAtCoords(state.map, c, 7).railroad = true;
+    expect(r.course).toEqual(course);
   });
 
-  it('the course is capped at ROUTE_CHAIN_MAX posts', () => {
-    const state = makeState(makeMap(80, 8));
-    state.sandbox = true;
-    // nine centres in a 9-tile-apart row — a seat holds at most six cities,
-    // so rivals own the middle ones; the POSTS are seat 0's regardless
-    const a = addCiv(state, 11, 4, { seat: 1 });
-    const b = addCiv(state, 65, 4, { seat: 2 });
-    const centres: number[] = [];
-    for (let k = 0; k <= 8; k++) {
-      const x = 2 + 9 * k;
-      if (k === 0 || k === 8) centres.push(foundCity(state, tileAtCoords(state.map, x, 4).index, 0).city!.centerIndex);
-      else if (k === 1) centres.push(a.cities[0].centerIndex);
-      else if (k === 7) centres.push(b.cities[0].centerIndex);
-      else centres.push(foundCity(state, tileAtCoords(state.map, x, 4).index, a.seat).city!.centerIndex);
-    }
-    for (let k = 1; k <= 7; k++) stampTradingPost(state.seats[0], centres[k]);
-    // six posts deep is the longest legal course; the seventh hop is refused
-    const chain = routeChain(state, 0, centres[0], centres[7]);
-    expect(chain).toEqual([1, 2, 3, 4, 5, 6].map((k) => centres[k]));
-    expect(chain!.length).toBe(ROUTE_CHAIN_MAX);
-    expect(routeChain(state, 0, centres[0], centres[8])).toBeNull();
+  it('a course longer than TRADE_COURSE_MAX plots is out of range', () => {
+    const T = TRADE_COURSE_MAX + 2;
+    const reach: TradeReach = {
+      state: makeState(makeMap(4, 4)), seat: 0,
+      graph: { water: 0, major: true, holder: new Map(), embark: new Map(), refuel: new Set(), exit: new Map() },
+      origin: 0, g: new Int32Array(T).fill(1), left: new Int32Array(T),
+      parent: Int32Array.from({ length: T }, (_, i) => i - 1), steps: Int32Array.from({ length: T }, (_, i) => i),
+    };
+    expect(tradeCourse(reach, TRADE_COURSE_MAX - 1)!.length).toBe(TRADE_COURSE_MAX);
+    expect(tradeCourse(reach, TRADE_COURSE_MAX)).toBeNull();
   });
 
-  it('a chain of own posts pays nothing of its own; a crossed FOREIGN city with this seat\'s post pays 1', () => {
+  it('an own post passed pays nothing of its own; a passed FOREIGN city with this seat\'s post pays 1', () => {
     const state = makeState(makeMap(24, 24));
     state.sandbox = true;
     const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
     const far = foundCity(state, tileAtCoords(state.map, 20, 6).index, 0).city!;
     origin.buildings.push('MARKET');
-    // a rival city standing on the Trader's own path, halfway
-    const path = tradeWalkPath(state, origin.centerIndex, far.centerIndex, tradeWaterLevel(state, 0))!;
-    const midT = state.map.tiles[path[9]];
-    const civ = addCiv(state, midT.col, midT.row);
+    // a rival city standing on the row, halfway
+    const civ = addCiv(state, 11, 6);
     const mid = civ.cities[0];
-    expect(tradeWalkPath(state, origin.centerIndex, far.centerIndex, tradeWaterLevel(state, 0))).toEqual(path);
     stampTradingPost(state.seats[0], mid.centerIndex);
     expect(addTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
     const r = state.seats[0].tradeRoutes![0];
-    expect(r.chain).toEqual([mid.centerIndex]);
+    expect(r.course).toContain(mid.centerIndex);
     expect(routeChainGold(state, 0, r)).toBe(0);
-    // no water, no rail, no portal: the path pays T alone — the crossed
+    // no water, no rail, no portal: the path pays T alone — the passed
     // foreign city holding seat 0's post
-    expect(routePathGold(state, 0, origin.centerIndex, far.centerIndex, 0)).toBe(1);
+    expect(routePathGold(state, 0, r, 0)).toBe(1);
     const gold1 = cityTradeYields(state, origin, 0).gold;
     // the rival's own post there pays seat 0 nothing
     stampTradingPost(civ, mid.centerIndex);
     expect(cityTradeYields(state, origin, 0).gold).toBe(gold1);
-    // without seat 0's post the crossed city pays nothing
+    // without seat 0's post the passed city pays nothing
     seatOf(state, 0)!.tradingPosts = [];
-    expect(routePathGold(state, 0, origin.centerIndex, far.centerIndex, 0)).toBe(0);
+    expect(routePathGold(state, 0, r, 0)).toBe(0);
   });
 
   // CIV6 (Land Acquisition): "+3 Gold per turn from each foreign Trade Route
@@ -624,7 +696,7 @@ describe('trading posts', () => {
     civ.cities[0].buildings.push('MARKET');
     stampTradingPost(civ, mine.centerIndex); // the rival's own post at MY centre
     expect(addTradeRoute(state, civ.cities[0].id, rfar.id, civ.seat).ok).toBe(true);
-    expect(civ.tradeRoutes![0].chain).toEqual([mine.centerIndex]);
+    expect(civ.tradeRoutes![0].course!.slice(1, -1)).toContain(mine.centerIndex);
     const bare = computeCityStats(state, mine).breakdown.bonuses.gold;
     // Reyna established at `mine` — Land Acquisition is her BASE ability
     seatOf(state, 0)!.governors = GOVERNORS.map((_, i) => (
@@ -708,18 +780,19 @@ describe('the route path term (transportation efficiency)', () => {
     const { state, origin, dest } = scene();
     const o = origin.centerIndex;
     const d = dest.centerIndex;
-    const path = tradeWalkPath(state, o, d, tradeWaterLevel(state, 0))!;
+    const r = coursed(state, o, d);
+    const path = r.course!;
     expect([path[0], path[path.length - 1]]).toEqual([o, d]);
     const n = path.length;
-    expect(routePathGold(state, 0, o, d, 3)).toBe(0);
+    expect(routePathGold(state, 0, r, 3)).toBe(0);
     // the origin plot's railroad counts nothing
     state.map.tiles[o].railroad = true;
-    expect(routePathGold(state, 0, o, d, 3)).toBe(0);
+    expect(routePathGold(state, 0, r, 3)).toBe(0);
     for (let k = 1; k < n; k++) {
       state.map.tiles[path[k]].railroad = true;
-      expect(routePathGold(state, 0, o, d, 3)).toBe((3 * Math.min(256, Math.floor((512 * k) / n))) / 256);
+      expect(routePathGold(state, 0, r, 3)).toBe((3 * Math.min(256, Math.floor((512 * k) / n))) / 256);
     }
-    expect(routePathGold(state, 0, o, d, 3)).toBe(3);
+    expect(routePathGold(state, 0, r, 3)).toBe(3);
     // the international leg pays it on top of the destination's rows (the
     // centre's 3 Gold is D)
     origin.buildings.push('MARKET');
@@ -728,17 +801,25 @@ describe('the route path term (transportation efficiency)', () => {
     expect(cityTradeYields(state, origin, 0).gold - bare).toBe(3 + 3);
   });
 
-  it('pays 2 per water plot, and nothing where no descent reaches', () => {
+  it('pays 2 per water plot, and a course of one plot pays nothing', () => {
     const { state, origin, dest } = scene();
     for (let r = 0; r < 8; r++) tileAtCoords(state.map, 5, r).terrain = 'COAST';
     const o = origin.centerIndex;
     const d = dest.centerIndex;
-    expect(routePathGold(state, 0, o, d, 3)).toBe(0);
+    expect(routePathGold(state, 0, { from: 0, course: [o] }, 3)).toBe(0);
+    // no Celestial Navigation: the water closes the way
+    expect(tradeCourse(tradeReach(state, 0, o), d)).toBeNull();
     seatOf(state, 0)!.research.techs.push('CELESTIAL_NAVIGATION');
-    const path = tradeWalkPath(state, o, d, tradeWaterLevel(state, 0))!;
-    const wet = path.slice(1).filter((i) => isWater(state.map.tiles[i])).length;
+    // a land<->water switch away from a centre needs a Harbor: none here
+    expect(tradeCourse(tradeReach(state, 0, o), d)).toBeNull();
+    // the origin's Harbor on the channel opens it, and refuels the far shore
+    const ht = tileAtCoords(state.map, 5, 4);
+    ht.district = 'HARBOR';
+    origin.districts.push({ type: 'HARBOR', tileIndex: ht.index });
+    const r = coursed(state, o, d);
+    const wet = r.course!.slice(1).filter((i) => isWater(state.map.tiles[i])).length;
     expect(wet).toBe(1);
-    expect(routePathGold(state, 0, o, d, 3)).toBe((3 * Math.floor((256 * 2 * wet) / path.length)) / 256);
+    expect(routePathGold(state, 0, r, 3)).toBe((3 * Math.floor((256 * 2 * wet) / r.course!.length)) / 256);
   });
 
   it('pays 15 per portal the Trader takes', () => {
@@ -749,14 +830,14 @@ describe('the route path term (transportation efficiency)', () => {
     tileAtCoords(state.map, 9, 5).improvement = 'MOUNTAIN_TUNNEL';
     const from = tileAtCoords(state.map, 6, 5).index;
     const to = tileAtCoords(state.map, 11, 5).index;
-    const path = tradeWalkPath(state, from, to, TRADE_WATER_NONE)!;
-    expect(path.length).toBe(5);
+    const r = coursed(state, from, to);
+    expect(r.course!.length).toBe(5);
     // 15 of 5 plots saturates: the whole of D
-    expect(routePathGold(state, 0, from, to, 4)).toBe(4);
+    expect(routePathGold(state, 0, r, 4)).toBe(4);
     // a longer walk: 15 over its n plots
-    const far = tileAtCoords(state.map, 15, 5).index;
-    const n = tradeWalkPath(state, from, far, TRADE_WATER_NONE)!.length;
+    const rf = coursed(state, from, tileAtCoords(state.map, 15, 5).index);
+    const n = rf.course!.length;
     expect(n).toBe(9);
-    expect(routePathGold(state, 0, from, far, 4)).toBe((4 * Math.min(256, Math.floor((256 * 15) / n))) / 256);
+    expect(routePathGold(state, 0, rf, 4)).toBe((4 * Math.min(256, Math.floor((256 * 15) / n))) / 256);
   });
 });

@@ -16,6 +16,7 @@ import { MAJOR_START_DIST } from '../../../seeder/place';
 import { applySeatUnitOrders, assertCityRegistryCoherent, declareWar, seatPhase, sueForPeace, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, captureCityState } from '../../../cpu/core/combat';
 import { routePlunderer, tradeCapacity } from '../../../cpu/core/trade';
+import { tradeCourse, tradeReach } from '../../../cpu/core/tradePath';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { ensureGpOffer, gpOfferCost } from '../../../cpu/core/greatPeople';
 import type { CityState, GameState, City, Seat } from '../../../cpu/core/types';
@@ -548,10 +549,12 @@ describe('civ CS trade routes', () => {
     };
     seatPhase(state);
     expect(civ.tradeRoutes?.length).toBe(1);
+    const course = tradeCourse(tradeReach(state, civ.seat, civCity.centerIndex), cityState.centerIndex)!;
+    expect([course[0], course[course.length - 1]]).toEqual([civCity.centerIndex, cityState.centerIndex]);
     expect(civ.tradeRoutes![0]).toEqual({
       from: civCity.id, to: -1, toCs: cityState.id,
       expiresTurn: state.turn + 20, createdTurn: state.turn, // route duration, era 0
-      walkTile: civCity.centerIndex, walkLeg: 0, chain: [],
+      walkTile: civCity.centerIndex, walkLeg: 0, course,
     });
     const y1 = computeCityStats(state, civCity).total;
     // cityStateRouteYields: +3 gold, +1 science (both tier-scaled; band like the

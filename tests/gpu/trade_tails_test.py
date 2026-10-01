@@ -179,19 +179,26 @@ def test_walk_through_a_portal(rules, path) -> None:
         return
     a, b, tgt = pick
     tunnel = sim.TUNNEL
+    sim.seat_explored[:] = True
+    sim.road[0] = False
+    sim.railroad[0] = False
     assert not bool(sim._trade_walkable(rows, torch.tensor([a]), water)[0]), "a bare mountain is walkable"
+    assert not sim._trade_graphs(0, [0])[0][0][a], "the walk entered a bare mountain"
     sim.improvement[0, a] = tunnel
     sim.improvement[0, b] = tunnel
     assert bool(sim._trade_walkable(rows, torch.tensor([a]), water)[0]), "a portal's mountain must be walkable"
     assert int(sim._portal_exit(torch.tensor([a]), rows)[0]) == b
-    nxt = int(sim._trade_walk_step(rows, torch.tensor([a]), torch.tensor([tgt]), water)[0])
-    assert nxt == b, f"the Trader on the portal stepped to {nxt}, not through to {b}"
-    # heading AWAY from the exit, the Trader never takes it
+    # from the portal, the exit (one step, onto a plot costing nothing) is the
+    # cheapest way to the plot beside the far portal: at least 3 plots overland
+    gr = sim._trade_graphs(0, [0])[0]
+    course = sim._trade_course(0, 0, a, tgt, gr)
+    assert course == [a, b, tgt], f"the course from the portal is {course}, not through to {b}"
+    # heading AWAY from the exit, the course never takes it
     away = [int(x) for x in sim.neigh[a].tolist() if x >= 0 and bool(sim.passable[0, x])
             and int(sim.pair_dist[b, x]) > int(sim.pair_dist[b, a])]
     if away:
-        back = int(sim._trade_walk_step(rows, torch.tensor([a]), torch.tensor([away[0]]), water)[0])
-        assert back != b, "the portal was taken away from the target"
+        back = sim._trade_course(0, 0, a, away[0], gr)
+        assert back is not None and b not in back, "the portal was taken away from the target"
     print("  4 the portal walk OK — onto the mountain, and through to the next portal")
 
 

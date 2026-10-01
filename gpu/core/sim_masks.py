@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 import sys
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers
@@ -1798,9 +1799,9 @@ class SimMasks:
                 & ~self.district_pillaged)
 
     def _trade_walkable(self, rows: torch.Tensor, tiles: torch.Tensor, water: torch.Tensor) -> torch.Tensor:
-        """`tradeWalkable` — may a Trader at this water level stand here? A
-        portal's mountain is ground to walk onto, as it is to every unit.
-        `water` broadcasts against `tiles`."""
+        """`plotOpen`'s ground half — may a Trader at this water level stand
+        here? A portal's mountain is ground to walk onto, as it is to every
+        unit. `water` broadcasts against `tiles`."""
         out = (
             self.passable[rows, tiles]
             | ((water >= 1) & self.wpass[rows, tiles])
@@ -1810,56 +1811,215 @@ class SimMasks:
             out = out | (self._imp_portal[imp.clamp(min=0)] & (imp >= 0))
         return out
 
-    def _trade_walk_step(self, rows: torch.Tensor, cur: torch.Tensor, target: torch.Tensor,
-                         water: torch.Tensor) -> torch.Tensor:
-        """ONE step of a Trader's walk (`tradeWalkStep`): the walkable
-        neighbour strictly closer to `target` by hexDistance, ties by
-        direction order — the war-march's integer rule, so both engines agree
-        by construction — and, standing on a portal, its exit as a seventh
-        candidate after the six (CIV6: "Trade Routes traveling through it").
-        Arrived or stuck rows return `cur` unchanged. Zero draws,
-        integer-only."""
-        dev = self.device
-        ar6 = torch.arange(6, device=dev)
-        nb = self.neigh[cur.clamp(min=0)]
-        nbc = nb.clamp(min=0)
-        okn = (nb >= 0) & self._trade_walkable(rows.unsqueeze(1), nbc, water.unsqueeze(1))
-        d_nb = self.pair_dist[target.clamp(min=0).unsqueeze(1), nbc].to(torch.long)
-        d_cur = self.pair_dist[target.clamp(min=0), cur.clamp(min=0)].to(torch.long)
-        key = torch.where(okn & (d_nb < d_cur.unsqueeze(1)), d_nb * 8 + ar6, 10**9)
-        pex = self._portal_exit(cur.clamp(min=0), rows)
-        d_px = self.pair_dist[target.clamp(min=0), pex.clamp(min=0)].to(torch.long)
-        key7 = torch.where((pex >= 0) & (d_px < d_cur), d_px * 8 + 6, 10**9)
-        best = torch.minimum(key.min(dim=1).values, key7)
-        ok = (cur >= 0) & (target >= 0) & (cur != target) & (best < 10**9)
-        nxt = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
-        nxt = torch.where(best % 8 == 6, pex, nxt)
-        return torch.where(ok, nxt, cur)
+    def _trade_graphs(self, row: int, games: list[int]) -> dict[int, tuple]:
+        """Per game `b` of `games`: the facts `tradeReach` reads for row
+        `row`'s Traders, origin aside — (open, water, centre, embark, refuel
+        at a post, danger, term, exit), each a list over the plots, then the
+        embark plots short of a centre.
 
-    def _trade_walk_ok(self, rows: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor,
-                       water: torch.Tensor) -> torch.Tensor:
-        """Can a Trader descend from `frm` to `dest` at this water level — the
-        `tradeWalkReachable` twin. Only a pair NO descent reaches leaves its
-        Trader parked at the origin."""
-        if len(rows) == 0:
-            return torch.zeros(0, dtype=torch.bool, device=self.device)
-        alive = (
-            (frm >= 0) & (dest >= 0)
-            & self._trade_walkable(rows, frm.clamp(min=0), water)
-            & self._trade_walkable(rows, dest.clamp(min=0), water)
-        )
-        cur = torch.where(alive, frm, torch.full_like(frm, -1))
-        arrived = alive & (cur == dest)
-        for _ in range(TRADE_ROAD_MAX_STEPS):
-            walking = alive & ~arrived
-            if not bool(walking.any()):
-                break
-            nxt = self._trade_walk_step(rows, cur.clamp(min=0), dest.clamp(min=0), water)
-            stepped = walking & (nxt != cur)
-            cur = torch.where(stepped, nxt, cur)
-            alive = alive & (arrived | stepped)
-            arrived = arrived | (alive & (cur == dest))
-        return arrived
+        open: `plotOpen` — walkable at the row's water level, revealed to a
+        major, not a centre of a holder at war with the row. centre: a living
+        city's centre (majors, the Free Cities, city-states). embark: the
+        centre of the city a TradeEmbark plot belongs to, -1 elsewhere. refuel
+        at a post: an embark plot of a city whose centre holds the row's
+        Trading Post, its holder not at war with the row. danger: a feature
+        with a DangerValue. term: `plotTerm`, what stepping onto the plot adds.
+        exit: the portal exit (`_portal_exit`), -1 elsewhere."""
+        if not games:
+            return {}
+        dev, T = self.device, self.T
+        gi = torch.tensor(games, dtype=torch.long, device=dev)
+        n = len(games)
+        tiles = torch.arange(T, device=dev).unsqueeze(0).expand(n, T)
+        wl = self._trade_water_level(row)[gi]
+        opn = self._trade_walkable(gi.unsqueeze(1), tiles, wl.unsqueeze(1))
+        if row < self.n_majors and self.fog_of_war:
+            opn = opn & self.seat_explored[gi, row]
+        # every living city: its centre's holder row and its embark plots
+        holder = torch.full((n, T + 1), -1, dtype=torch.long, device=dev)
+        embark = torch.full((n, T + 1), -1, dtype=torch.long, device=dev)
+        blocks = [(r2, self.city_center[gi, r2], self.city_alive[gi, r2], self.city_dist_tile[gi, r2])
+                  for r2 in list(range(self.n_majors)) + [self.FREE_ROW]]
+        m0 = self._CITY_MINOR0
+        for s in range(self.S):
+            blocks.append((m0 + s, self.citystate_center[gi, s:s + 1], self.citystate_alive[gi, s:s + 1],
+                           self.city_dist_tile[gi, m0 + s, 0:1]))
+        for r2, ct, al, dt in blocks:
+            at = torch.where(al & (ct >= 0), ct, torch.full_like(ct, T))
+            holder.scatter_(1, at, torch.full_like(at, r2))
+            embark.scatter_(1, at, at)
+            for di in self._trade_embark_didx:
+                ht = dt[:, :, di]
+                hat = torch.where(al & (ct >= 0) & (ht >= 0), ht, torch.full_like(ht, T))
+                embark.scatter_(1, hat, at)
+        holder, embark = holder[:, :T], embark[:, :T]
+        centre = holder >= 0
+        war_h = self.war[gi, row].gather(1, holder.clamp(min=0)) & centre & (holder != row)
+        opn = opn & ~war_h
+        if row < self.n_majors:
+            post = self.trading_post[gi, row] & centre & ((holder == row) | ~war_h)
+            refuel = (embark >= 0) & post.gather(1, embark.clamp(min=0))
+        else:
+            refuel = torch.zeros(n, T, dtype=torch.bool, device=dev)
+        danger = self._fid_in(self._trade_danger_fid)[gi]
+        water = self.water[gi]
+        portal = self._portal_plane()[gi]
+        land = self._trade_cost_land * (self.tmove[gi] + self._mp_scale) // self._mp_scale
+        term = torch.where(self.road[gi], torch.full_like(land, self._trade_cost_route), land)
+        term = torch.where(self.water[gi] & ~self.road[gi], torch.full_like(land, self._trade_cost_water), term)
+        term = torch.where(self.railroad[gi], torch.full_like(land, self._trade_cost_rail), term)
+        term = torch.where(centre | portal, torch.zeros_like(land), term)
+        exit_ = torch.full((n, T), -1, dtype=torch.long, device=dev)
+        if bool(portal.any()):
+            for i in range(n):
+                pt = portal[i].nonzero(as_tuple=True)[0]
+                if len(pt):
+                    exit_[i, pt] = self._portal_exit(pt, gi[i].expand(len(pt)))
+        cols = [x.tolist() for x in (opn, water, centre, embark, refuel, danger, term, exit_)]
+        out = {}
+        for i, b in enumerate(games):
+            gr = [c[i] for c in cols]
+            # the TradeEmbark plots short of a centre, ascending
+            gr.append([p for p, e in enumerate(gr[3]) if e >= 0 and e != p])
+            out[b] = tuple(gr)
+        return out
+
+    def _trade_reach(self, b: int, row: int, origin: int, gr: tuple, dest: int = -1) -> tuple:
+        """`tradeReach`'s twin (`walk`), plot for plot: the walk from `origin`
+        over every plot for game `b`, row `row` — (g, left, parent, steps)
+        lists, g -1 where unreached. Dijkstra's walk, one label per plot: the
+        least cost pops first, the lower plot index on a tie; a label is
+        replaced by a cheaper one, or by an equally cheap one leaving more
+        range; edges in neighbour-direction order, then the portal exit. Bound
+        to a destination centre `dest` (-1 none), that city's own TradeEmbark
+        plots refuel to `_trade_dest_refuel` where no other refuel applies.
+        Kept per (game, row, origin, dest) against the graph it walked."""
+        key = (b, row, origin, dest)
+        memo = self._trade_reach_memo.get(key)
+        if memo is not None and memo[0] == gr:
+            return memo[1]
+        opn, water, centre, embark, refuel, danger, term, exit_, _harb = gr
+        T = self.T
+        neigh = self._neigh_list
+        g = [-1] * T
+        left = [0] * T
+        parent = [-1] * T
+        steps = [0] * T
+        done = [False] * T
+        g[origin] = 0
+        left[origin] = self._trade_base_range
+        heap = [origin]
+        step, sw_cost = self._trade_cost_step, self._trade_cost_switch
+        lref, wref, dref = self._trade_land_refuel, self._trade_water_refuel, self._trade_dest_refuel
+        while heap:
+            k = heapq.heappop(heap)
+            u = k % T
+            if done[u] or (k - u) // T != g[u]:
+                continue
+            done[u] = True
+            if u != origin and danger[u]:
+                continue
+            nb = [x for x in neigh[u] if x >= 0]
+            if exit_[u] >= 0:
+                nb.append(exit_[u])
+            wu, cu = water[u], centre[u]
+            fuel = embark[u] >= 0 and (embark[u] == origin or refuel[u])
+            dfuel = not fuel and dest >= 0 and embark[u] == dest
+            for v in nb:
+                if done[v] or not opn[v]:
+                    continue
+                wv = water[v]
+                sw = not cu and not centre[v] and wu != wv
+                if sw and embark[u] < 0 and embark[v] < 0:
+                    continue
+                r = left[u]
+                if sw and r > 1:
+                    r = 1
+                if fuel:
+                    r = wref if wv else lref
+                elif dfuel:
+                    r = dref
+                lv = r - 1
+                if lv < 0:
+                    continue
+                gv = g[u] + step + (sw_cost if sw and not fuel and not dfuel else 0) + term[v]
+                if g[v] < 0 or gv < g[v] or (gv == g[v] and lv > left[v]):
+                    g[v] = gv
+                    left[v] = lv
+                    parent[v] = u
+                    steps[v] = steps[u] + 1
+                    heapq.heappush(heap, gv * T + v)
+        out = (g, left, parent, steps)
+        self._trade_reach_memo[key] = (gr, out)
+        return out
+
+    def _trade_dest_bound(self, reach: tuple, gr: tuple, origin: int) -> set[int]:
+        """The destination centres whose course the destination's refuel can
+        change: a TradeEmbark plot of theirs short of the centre that the walk
+        reached and that does not already refuel (`tradeCourse`'s test)."""
+        g = reach[0]
+        embark, refuel = gr[3], gr[4]
+        return {embark[p] for p in gr[8] if g[p] >= 0 and embark[p] != origin and not refuel[p]}
+
+    def _trade_course(self, b: int, row: int, origin: int, dest: int, gr: tuple) -> list[int] | None:
+        """`tradeCourse` — the course to `dest` out of the walk from `origin`
+        (game `b`, row `row`, graph `gr`), origin to destination, walked again
+        bound to `dest` where its refuel can change it; None where the walk
+        never reaches it or the course would run past `_trade_course_max`
+        plots."""
+        if dest < 0 or dest == origin:
+            return None
+        reach = self._trade_reach(b, row, origin, gr)
+        if dest in self._trade_dest_bound(reach, gr, origin):
+            reach = self._trade_reach(b, row, origin, gr, dest)
+        g, _left, parent, steps = reach
+        if g[dest] < 0 or steps[dest] >= self._trade_course_max:
+            return None
+        out = []
+        x = dest
+        while x >= 0:
+            out.append(x)
+            x = parent[x]
+        return out[::-1]
+
+    def _trade_store_course(self, row: int, rows: torch.Tensor, slot: torch.Tensor,
+                            origins: torch.Tensor, dests: torch.Tensor) -> None:
+        """Commit the COURSE of the route row `row` opens in each game of
+        `rows` at `slot`, from `origins` to `dests` (all [n]) — `tradeCourse`
+        out of the origin's walk, -1-padded; all -1 where none reaches."""
+        games = rows.tolist()
+        graphs = self._trade_graphs(row, games)
+        self.seat_route_course[rows, row, slot] = -1
+        for i, b in enumerate(games):
+            o, d = int(origins[i]), int(dests[i])
+            course = self._trade_course(b, row, o, d, graphs[b])
+            if course:
+                self.seat_route_course[b, row, int(slot[i]), :len(course)] = torch.tensor(
+                    course, dtype=torch.long, device=self.device)
+
+    def _trade_reach_rows(self, row: int, games: list[int], origins: torch.Tensor) -> torch.Tensor:
+        """[B, O, T] bool — for each game of `games` and each origin centre in
+        `origins` [B, O] (-1 none), every plot a route from there may END at
+        (`tradeCourse` not null); False in every other game."""
+        B, T = self.B, self.T
+        O = origins.shape[1]
+        out = torch.zeros(B, O, T, dtype=torch.bool, device=self.device)
+        graphs = self._trade_graphs(row, games)
+        L = self._trade_course_max
+        for b in games:
+            gr = graphs[b]
+            for j, o in enumerate(origins[b].tolist()):
+                if o < 0:
+                    continue
+                reach = self._trade_reach(b, row, o, gr)
+                g, _left, _parent, steps = reach
+                ok = [gv >= 0 and st < L for gv, st in zip(g, steps)]
+                for d in self._trade_dest_bound(reach, gr, o):
+                    g2, _l2, _p2, s2 = self._trade_reach(b, row, o, gr, d)
+                    ok[d] = g2[d] >= 0 and s2[d] < L
+                ok[o] = False
+                out[b, j] = torch.tensor(ok, dtype=torch.bool, device=self.device)
+        return out
 
     def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river3: torch.Tensor,
                     utype: torch.Tensor | None = None, promos: torch.Tensor | None = None,

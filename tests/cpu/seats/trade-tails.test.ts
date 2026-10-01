@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
-import { spawnUnit, tradeWalkable, tradeWalkReachable, tradeWalkStep, TRADE_WATER_NONE } from '../../../cpu/core/units';
+import { spawnUnit } from '../../../cpu/core/units';
+import { TRADE_COST_LAND, TRADE_COST_STEP, tradeCourse, tradeReach } from '../../../cpu/core/tradePath';
 import { plunderedByHull, routePlunderGold, routeOriginYields, routeYieldValue, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS } from '../../../cpu/core/trade';
 import { portalExit } from '../../../cpu/core/rules';
 import { GP_ABILITY, GP_PERM } from '../../../cpu/data/greatPeople';
@@ -114,13 +115,17 @@ function ridgeScene(portal: 'MOUNTAIN_TUNNEL' | 'MOUNTAIN_ROAD'): GameState {
 }
 
 describe('a Trader through a mountain portal', () => {
+  const course = (state: GameState, from: number, to: number) => tradeCourse(tradeReach(state, 0, from), to);
+
   it('walks onto a portal and nowhere else on the ridge', () => {
     const state = ridgeScene('MOUNTAIN_TUNNEL');
-    expect(tradeWalkable(tileAtCoords(state.map, 7, 5), TRADE_WATER_NONE)).toBe(true);
-    expect(tradeWalkable(tileAtCoords(state.map, 8, 5), TRADE_WATER_NONE)).toBe(false);
+    const reach = tradeReach(state, 0, tileAtCoords(state.map, 6, 5).index);
+    expect(reach.g[tileAtCoords(state.map, 7, 5).index]).toBeGreaterThan(0);
+    expect(reach.g[tileAtCoords(state.map, 8, 5).index]).toBe(-1);
+    expect(reach.g[tileAtCoords(state.map, 7, 4).index]).toBe(-1);
   });
 
-  it('takes the portal when its exit is closer, and crosses a wall it could not', () => {
+  it('takes the portal across a wall it could not cross, onto the portal free of cost', () => {
     const state = ridgeScene('MOUNTAIN_TUNNEL');
     const from = tileAtCoords(state.map, 6, 5).index;
     const to = tileAtCoords(state.map, 10, 5).index;
@@ -128,27 +133,22 @@ describe('a Trader through a mountain portal', () => {
     const east = tileAtCoords(state.map, 9, 5).index;
     expect(portalExit(state.map, state.map.tiles[west])).toBe(east);
     // the step ONTO the west face, then the jump to the east face
-    expect(tradeWalkStep(state, from, to, TRADE_WATER_NONE)).toBe(west);
-    expect(tradeWalkStep(state, west, to, TRADE_WATER_NONE)).toBe(east);
-    expect(tradeWalkReachable(state, from, to, TRADE_WATER_NONE)).toBe(true);
+    expect(course(state, from, to)).toEqual([from, west, east, to]);
+    // a step onto a portal pays the step alone; onto flat ground 100 more
+    const reach = tradeReach(state, 0, from);
+    expect(reach.g[west]).toBe(TRADE_COST_STEP);
+    expect(reach.g[east]).toBe(2 * TRADE_COST_STEP);
+    expect(reach.g[to]).toBe(3 * TRADE_COST_STEP + TRADE_COST_LAND);
     // without the portals the wall stands
     tileAtCoords(state.map, 7, 5).improvement = null;
     tileAtCoords(state.map, 9, 5).improvement = null;
-    expect(tradeWalkReachable(state, from, to, TRADE_WATER_NONE)).toBe(false);
-  });
-
-  it('never takes a portal back AWAY from its target', () => {
-    const state = ridgeScene('MOUNTAIN_TUNNEL');
-    const west = tileAtCoords(state.map, 7, 5).index;
-    const home = tileAtCoords(state.map, 4, 5).index;
-    // heading west from the west face, the east exit is farther: walk on
-    expect(tradeWalkStep(state, west, home, TRADE_WATER_NONE)).not.toBe(tileAtCoords(state.map, 9, 5).index);
+    expect(course(state, from, to)).toBeNull();
   });
 
   it("treats Qhapaq Ñan as the same network as the Tunnel", () => {
     const state = ridgeScene('MOUNTAIN_ROAD');
     const from = tileAtCoords(state.map, 6, 5).index;
     const to = tileAtCoords(state.map, 10, 5).index;
-    expect(tradeWalkReachable(state, from, to, TRADE_WATER_NONE)).toBe(true);
+    expect(course(state, from, to)).not.toBeNull();
   });
 });

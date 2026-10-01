@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, grantTechs } from '../helpers';
 import { emptySeat, seatOfCityState, setTileOwner, NO_SEAT } from '../../../cpu/core/seats';
-import { spawnUnit, refreshUnits, stepUnit, waterEnterable, navalHeal, tradeWalkStep, tradeWaterLevel } from '../../../cpu/core/units';
+import { spawnUnit, refreshUnits, stepUnit, waterEnterable, navalHeal } from '../../../cpu/core/units';
 import { routeChainGold } from '../../../cpu/core/trade';
+import { tradeCourse, tradeReach } from '../../../cpu/core/tradePath';
 import { levyGoldCost, transferCity, seatPhase } from '../../../cpu/core/phase';
 import { floodTile } from '../../../cpu/core/disasters';
 import { ITERU_RIVER_PROD_MULT } from '../../../cpu/data/civilizations';
@@ -36,14 +37,8 @@ describe('All Roads Lead to Rome', () => {
     state.seats[0].civ = civ('ROME');
     const { cap, second } = twoCities(state);
     expect(state.seats[0].tradingPosts).toEqual([cap.centerIndex, second.centerIndex].sort((a, b) => a - b));
-    // the road is the Trader's own course, both ends included
-    const water = tradeWaterLevel(state, 0);
-    let at = second.centerIndex;
-    const path = [at];
-    while (at !== cap.centerIndex) {
-      at = tradeWalkStep(state, at, cap.centerIndex, water);
-      path.push(at);
-    }
+    // the road is a route's course from the city to the capital, both ends included
+    const path = tradeCourse(tradeReach(state, 0, second.centerIndex), cap.centerIndex)!;
     expect(path.length).toBeGreaterThan(2);
     for (const i of path) expect(state.map.tiles[i].road).toBe(true);
     // nobody else gets either
@@ -67,10 +62,13 @@ describe('All Roads Lead to Rome', () => {
     expect(state.map.tiles[theirs.centerIndex].road).toBe(true);
   });
 
-  it('pays +1 Gold for a chain hop through an own city, which pays nobody else', () => {
+  it('pays +1 Gold for a course through an own post city, which pays nobody else', () => {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     const cap = settleAt(state, tileAtCoords(state.map, 6, 6).index, 0);
-    const route = { chain: [cap.centerIndex] } as TradeRoute;
+    state.seats[0].tradingPosts = [cap.centerIndex];
+    const route: TradeRoute = {
+      from: 0, course: [tileAtCoords(state.map, 5, 6).index, cap.centerIndex, tileAtCoords(state.map, 7, 6).index],
+    };
     expect(routeChainGold(state, 0, route)).toBe(0);
     state.seats[0].civ = civ('ROME');
     expect(routeChainGold(state, 0, route)).toBe(1);

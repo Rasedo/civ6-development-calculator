@@ -152,6 +152,8 @@ def main() -> None:
     s.seat_routes[0, 1, 1, 0] = fid
     s.seat_routes[0, 1, 1, 1] = int(s.city_id[0, 1, 0])
     s.seat_route_exp[0, 1, 1] = int(s.turn) + 5  # future
+    # both walkers home: completion waits on the Trader standing at the origin
+    s.seat_route_walk[0, 1, :2] = int(s.city_center[0, 1, 0])
     s._expire_seat_routes(1)
     # THE SURVIVOR MOVES DOWN. TS rebuilds a compacted array, so a dropped
     # route leaves no hole and the slot order stays creation order — which is
@@ -190,17 +192,18 @@ def main() -> None:
         s3.seat_route_dseat[0, 1, _k] = 0
         s3.seat_route_dcity[0, 1, _k] = int(s3.city_id[0, 0, 0])
         s3.seat_route_exp[0, 1, _k] = int(s3.turn) + 5
-        # a per-route mark that must travel with its own route, and the CHAIN
-        # with it — the clearing sites never wipe the chain, so a compaction
+        # a per-route mark that must travel with its own route, and the COURSE
+        # with it — the clearing sites never wipe the course, so a compaction
         # that left it behind would hand a survivor its neighbour's course.
         s3.seat_route_born[0, 1, _k] = 100 + _k
-        s3.seat_route_chain[0, 1, _k, 0] = 500 + _k
+        s3.seat_route_course[0, 1, _k, 0] = 500 + _k
     s3.seat_route_exp[0, 1, 1] = int(s3.turn)          # the MIDDLE one is due
+    s3.seat_route_walk[0, 1, 1] = int(s3.city_center[0, 1, 0])  # and its Trader home
     s3._expire_seat_routes(1)
     assert [int(s3.seat_route_born[0, 1, _k]) for _k in range(3)] == [100, 102, -1], \
         "the survivors must close up IN ORDER, the middle one gone"
-    assert [int(s3.seat_route_chain[0, 1, _k, 0]) for _k in range(3)] == [500, 502, 501], \
-        "each survivor's CHAIN travels down with it (the dead slot keeps the dropped route's stale course, wiped at its next commit)"
+    assert [int(s3.seat_route_course[0, 1, _k, 0]) for _k in range(3)] == [500, 502, 501], \
+        "each survivor's COURSE travels down with it (the dead slot keeps the dropped route's stale course, wiped at its next commit)"
 
     # --- 5) a CAPTURED destination drops the route -------------------------
     #   The case a dest TILE could not see: transferCity re-mints the flipped
@@ -235,26 +238,27 @@ def main() -> None:
     assert int(s3.seat_route_dseat[0, 1, 0]) == -1 and int(s3.seat_route_dcity[0, 1, 0]) == -1 \
         and int(s3.seat_route_exp[0, 1, 0]) == -1, "restore must roll back route metadata"
 
-    # --- 7) THE WALK: one descent step per turn, road behind ---------------
-    # the first fixture, in order, whose two capitals share a land path, read
-    # off whatever worlds the seeder locked
+    # --- 7) THE WALK: one plot of the stored course per turn, road behind --
+    # the first fixture, in order, where one major's capital reaches another's
+    # (every plot revealed, so the walk is the map's own), read off whatever
+    # worlds the seeder locked
     s5, orow, drow = None, -1, -1
     for _p in paths:
         _s = settle_all(BatchSim([load_fixture(_p)], rules, device="cpu", dtype=torch.float64))
+        _s.seat_explored[:] = True
         for _o in range(_s.n_majors):
+            if not bool(_s.city_alive[0, _o, 0]):
+                continue
+            _reach = _s._trade_reach_rows(_o, [0], _s.city_center[:, _o, 0:1])[0, 0]
             for _d in range(_s.n_majors):
-                if _o == _d or not bool(_s.city_alive[0, _o, 0]) or not bool(_s.city_alive[0, _d, 0]):
-                    continue
-                if bool(_s._trade_walk_ok(torch.tensor([0]), torch.tensor([int(_s.city_center[0, _o, 0])]),
-                                          torch.tensor([int(_s.city_center[0, _d, 0])]),
-                                          torch.zeros(1, dtype=torch.long))[0]):
+                if _o != _d and bool(_s.city_alive[0, _d, 0]) and bool(_reach[int(_s.city_center[0, _d, 0])]):
                     s5, orow, drow = _s, _o, _d
                     break
             if s5 is not None:
                 break
         if s5 is not None:
             break
-    assert s5 is not None, "no locked world gives two capitals a land path"
+    assert s5 is not None, "no locked world lets one capital reach another"
     o_t = int(s5.city_center[0, orow, 0])
     d_t = int(s5.city_center[0, drow, 0])
     s5.seat_routes[0, orow, 0, 0] = int(s5.city_id[0, orow, 0])
@@ -265,12 +269,18 @@ def main() -> None:
     s5.seat_route_born[0, orow, 0] = int(s5.turn)
     s5.seat_route_walk[0, orow, 0] = o_t
     s5.seat_route_leg[0, orow, 0] = 0
+    one = torch.zeros(1, dtype=torch.long)
+    s5._trade_store_course(orow, one, one, torch.tensor([o_t]), torch.tensor([d_t]))
+    course5 = [int(x) for x in s5.seat_route_course[0, orow, 0] if int(x) >= 0]
+    assert course5[0] == o_t and course5[-1] == d_t, "the stored course runs origin to destination"
+    for a_, z_ in zip(course5, course5[1:]):
+        assert int(s5.pair_dist[a_, z_]) == 1 or int(s5._portal_exit(torch.tensor([a_]), one)[0]) == z_, \
+            "each step of the course is a neighbour or a portal's exit"
     s5._trade_walk_tick(orow, torch.ones(s5.B, dtype=torch.bool))
     w1 = int(s5.seat_route_walk[0, orow, 0])
-    assert w1 != o_t, "a land walker must step on turn one"
-    assert bool(s5.road[0, w1]), "the walker lays road where it lands"
-    d0 = int(s5.pair_dist[o_t, d_t])
-    assert int(s5.pair_dist[w1, d_t]) == d0 - 1, "the descent step closes on the destination"
+    assert w1 == course5[1], "the walker takes the course's next plot"
+    if bool(s5.passable[0, w1]):
+        assert bool(s5.road[0, w1]), "the walker lays road where it lands on land"
     # ROUND-TRIP EXPIRY: the term arriving with the walker OUT holds
     s5.seat_route_exp[0, orow, 0] = int(s5.turn)
     s5._expire_seat_routes(orow)
@@ -348,6 +358,7 @@ def main() -> None:
     # range of this fixture's row-1 capital.
     s7.civ_civics[0, 1, s7._trade_ftc] = True
     s7.seat_citystate_met[0, 1, :] = True
+    s7.seat_explored[:] = True  # the walk crosses revealed plots only
     f7, d7 = s7._seat_route_candidate(1)
     assert int(f7[0]) == -1, "no free Trader — the candidate must refuse"
     ok_sp = s7._spawn_unit(1, torch.ones(s7.B, dtype=torch.bool), s7.city_center[:, 1, 0].clamp(min=0), s7._trader_idx)
@@ -364,12 +375,12 @@ def main() -> None:
     assert tr7 == 0, "the applied route must SPEND the Trader"
     print("candidate + apply ok")
 
-    # --- SEA LEGS: the water level, the two ranges, and roads on land only --
-    # CIV6: "The base range for land trade routes is 15 tiles ... The base range
-    # for sea trade routes is 30 tiles"; Celestial Navigation opens the water,
-    # Ocean included — the lab's route crossed Ocean with no Cartography.
+    # --- SEA LEGS: the water level, the refuels, and roads on land only -----
+    # GlobalParameters: TRADE_ROUTE_BASE_RANGE 15, a refuel to 15 onto land and
+    # 30 onto water at a TradeEmbark district; Celestial Navigation opens the
+    # water, Ocean included — the lab's route crossed Ocean with no Cartography.
     s8 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    assert s8._trade_sea_range == 2 * s8._trade_range, (s8._trade_sea_range, s8._trade_range)
+    assert (s8._trade_base_range, s8._trade_land_refuel, s8._trade_water_refuel) == (15, 15, 30)
     assert s8._celestial_tech >= 0 and s8._cartography_tech >= 0
     row = 0
     s8.civ_techs[:, row, s8._celestial_tech] = False
@@ -392,23 +403,24 @@ def main() -> None:
             got = bool(s8._trade_walkable(r1, torch.tensor([tiles[0]]), torch.tensor([lvl]))[0])
             assert got == want, f"water tile {tiles[0]} at level {lvl}: {got}"
 
-    # MARITIME ACCESS decides which range a pair gets
-    yes = torch.ones(s8.B, dtype=torch.bool)
-    no = torch.zeros(s8.B, dtype=torch.bool)
-    assert int(s8._trade_pair_range(row, yes, yes)[0]) == s8._trade_sea_range
-    assert int(s8._trade_pair_range(row, yes, no)[0]) == s8._trade_range
-    s8.civ_techs[:, row, s8._celestial_tech] = False
-    assert int(s8._trade_pair_range(row, yes, yes)[0]) == s8._trade_range,         "no Celestial Navigation, no sea range"
-    s8.civ_techs[:, row, s8._celestial_tech] = True
-    # a HARBOR gives a landlocked centre the access its tile lacks
-    col = int(s8.city_alive[0, row].nonzero()[0])
-    ctr = int(s8.city_center[0, row, col])
-    if not bool(s8.coastal_land[0, ctr]) and s8._harbor_didx >= 0:
-        ht = next(t for t in range(s8.T) if int(s8.district[0, t]) < 0 and t != ctr)
-        s8.city_dist_tile[0, row, col, s8._harbor_didx] = ht
-        s8.district_complete[0, ht] = True
-        assert bool(s8._city_maritime(row)[0, col]), "a complete Harbor must grant maritime access"
-    print(f"  sea range {s8._trade_sea_range} vs land {s8._trade_range}, water levels + maritime access ok")
+    # THE WALK from a coastal capital: no water plot without Celestial
+    # Navigation; with it the centre refuels the Trader to 30 onto the water,
+    # so a water plot is reached and none past 30 steps
+    s8.seat_explored[:] = True
+    crow = next((r_ for r_ in range(s8.n_majors) if bool(s8.city_alive[0, r_, 0])
+                 and bool(s8.coastal_land[0, int(s8.city_center[0, r_, 0])])), -1)
+    assert crow >= 0, "no coastal capital in this fixture"
+    o8 = s8.city_center[:, crow, 0:1]
+    s8.civ_techs[:, crow, s8._celestial_tech] = False
+    reach8 = s8._trade_reach_rows(crow, [0], o8)[0, 0]
+    assert not bool((reach8 & s8.water[0]).any()), "no Celestial Navigation, no water plot"
+    s8.civ_techs[:, crow, s8._celestial_tech] = True
+    reach8 = s8._trade_reach_rows(crow, [0], o8)[0, 0]
+    assert bool((reach8 & s8.water[0]).any()), "a sea-capable Trader puts out from its coastal centre"
+    gr8 = s8._trade_graphs(crow, [0])[0]
+    _g8, _l8, _p8, st8 = s8._trade_reach(0, crow, int(o8[0, 0]), gr8)
+    assert max(st8[t] for t in range(s8.T) if bool(reach8[t]) and bool(s8.water[0, t])) <= 30
+    print("  water levels, the sea walk and its refuel ok")
 
     # THE WALK lays road on LAND ONLY. Drive one step onto a water tile and
     # check the tile stays roadless.
@@ -427,59 +439,51 @@ def main() -> None:
     s9.seat_route_walk[0, 0, 0] = nb[0]
     s9.seat_route_leg[0, 0, 0] = 0
     s9.road[0, wt] = False
-    step = s9._trade_walk_step(torch.tensor([0]), torch.tensor([nb[0]]), torch.tensor([wt]),
-                               s9._trade_water_level(0))
-    assert int(step[0]) == wt, "a sea-capable Trader must step onto the water"
+    s9.seat_route_course[0, 0, 0] = -1
+    s9.seat_route_course[0, 0, 0, 0] = nb[0]
+    s9.seat_route_course[0, 0, 0, 1] = wt
+    s9._trade_walk_tick(0, torch.ones(s9.B, dtype=torch.bool))
+    assert int(s9.seat_route_walk[0, 0, 0]) == wt, "the walker steps onto the course's water plot"
     assert not bool(s9.road[0, wt]), "the walk must lay no road on water"
     print("  the sea leg steps onto water and lays no road there")
 
-    # --- TRADING POSTS: the stamp, the chain, and the destination gold ---
+    # --- TRADING POSTS: the stamp, the refuel, and the destination gold ---
     # CIV6 (Trading Post): stamped in "the origin and destination cities"
-    # when a route runs its FULL term; each own post extends range one more
-    # leg; a foreign destination's post pays +1 gold (+1 under Bandar
-    # Jakarta's suzerain).
+    # when a route runs its FULL term; a city holding the row's own post
+    # refuels the walk (City_Trade 0x1f99d0); a foreign destination's post
+    # pays +1 gold (+1 under Bandar Jakarta's suzerain).
     s10 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert "trading_post" in _MUTABLE and s10.trading_post.dtype == torch.bool
     assert tuple(s10.trading_post.shape) == (s10.B, s10.n_majors, s10.T)
     row10 = 0
-    s10.civ_techs[:, row10, s10._celestial_tech] = False  # land ranges only
+    s10.civ_techs[:, row10, s10._celestial_tech] = False  # land walks only
+    s10.seat_explored[:] = True
     colA = int(s10.city_alive[0, row10].nonzero()[0])
     oA = int(s10.city_center[0, row10, colA])
-    rngL = s10._trade_range
-    # a mid tile one leg out and a target one leg beyond IT, over land range
-    mid = tgt = -1
-    for m in range(s10.T):
-        if int(s10.pair_dist[oA, m]) != rngL:
-            continue
-        far = ((s10.pair_dist[oA] > rngL) & (s10.pair_dist[m] <= rngL)).nonzero(as_tuple=True)[0]
-        if len(far) > 0:
-            mid, tgt = m, int(far[0])
-            break
-    assert mid >= 0, "no chainable (mid, target) pair on this map"
-    reach0 = s10._route_reach_from(row10)
-    assert bool(reach0[0, colA, mid]) and not bool(reach0[0, colA, tgt])
-    # a post with NO city at its centre chains nothing
-    s10.trading_post[0, row10, mid] = True
-    r_dead = s10._route_reach_from(row10)
-    assert not bool(r_dead[0, colA, tgt]), "a post with no living city must not chain"
-    # a living city at the post's centre opens the second leg
     row_b = 1
-    col_b = int(s10.city_alive[0, row_b].nonzero()[0])
-    s10.city_center[0, row_b, col_b] = mid
-    r_live = s10._route_reach_from(row10)
-    assert bool(r_live[0, colA, tgt]), "an own post at a living city must extend one leg"
-    # a post at the ORIGIN's own centre is excluded from the chain
-    s10.trading_post[0, row10, mid] = False
-    s10.trading_post[0, row10, oA] = True
-    r_self = s10._route_reach_from(row10)
-    assert not bool(r_self[0, colA, tgt]), "a post at the origin itself must not extend"
-    s10.trading_post[0, row10, oA] = False
-    # ANOTHER row's post never chains for this row
-    s10.trading_post[0, row_b, mid] = True
-    r_other = s10._route_reach_from(row10)
-    assert not bool(r_other[0, colA, tgt]), "another civilization's post must not chain"
-    s10.trading_post[0, row_b, mid] = False
-    print("  the post chain: own posts at living cities only, origin excluded")
+
+    def _reach10() -> torch.Tensor:
+        return s10._trade_reach_rows(row10, [0], s10.city_center[:, row10, colA:colA + 1])[0, 0]
+
+    reach0 = _reach10()
+    centres = [int(c) for c in s10._centre_city_map()[0].nonzero(as_tuple=True)[0].tolist() if int(c) != oA]
+    # a post with NO city at its centre refuels nothing
+    bare = next(t for t in range(s10.T) if bool(reach0[t]) and not bool(s10._centre_city_map()[0, t]))
+    s10.trading_post[0, row10, bare] = True
+    assert torch.equal(_reach10(), reach0), "a post with no living city must not refuel"
+    s10.trading_post[0, row10, bare] = False
+    # ANOTHER row's posts never refuel this row
+    for c in centres:
+        s10.trading_post[0, row_b, c] = True
+    assert torch.equal(_reach10(), reach0), "another civilization's post must not refuel"
+    s10.trading_post[0, row_b] = False
+    # the row's own posts at living cities refuel the walk past its first budget
+    for c in centres:
+        s10.trading_post[0, row10, c] = True
+    reach1 = _reach10()
+    assert bool((reach1 & ~reach0).any()), "no plot is reached only through a post"
+    s10.trading_post[0, row10] = False
+    print("  the post refuel: own posts at living cities only")
 
     # destination gold: 0 bare, 1 with a post, 2 under Jakarta's suzerain
     csc10 = int(s10.citystate_center[0, 0])
@@ -514,7 +518,8 @@ def main() -> None:
     s11.seat_routes[0, 0, 0, 0] = int(s11.city_id[0, 0, colC])
     s11.seat_routes[0, 0, 0, 1] = -2
     s11.seat_route_exp[0, 0, 0] = int(s11.turn)  # term arrived
-    s11.seat_route_leg[0, 0, 0] = -1  # parked: always home
+    s11.seat_route_leg[0, 0, 0] = 0
+    s11.seat_route_walk[0, 0, 0] = oC  # the Trader home
     s11._expire_seat_routes(0)
     assert int(s11.seat_routes[0, 0, 0, 0]) < 0, "the completed route must drop"
     assert bool(s11.trading_post[0, 0, oC]) and bool(s11.trading_post[0, 0, csC]),         "completion must stamp BOTH endpoints"
@@ -529,36 +534,58 @@ def main() -> None:
     assert not bool(s11.trading_post[0, 0].any()), "a route cut short must stamp nothing"
     print("  completion stamps both endpoints; a dest-dead drop stamps nothing")
 
-    # --- 12) the stored course: reach == walk, chain gold, Land Acquisition --
+    # --- 12) the stored course: reach == course, chain gold, Land Acquisition
     s12 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    assert "seat_route_chain" in _MUTABLE, "the course must ride snapshot/restore"
-    CM = int(rj["seats"]["routeChainMax"])
-    assert CM == 6 and s12._route_chain_max == CM, "routeChainMax should wire as 6"
-    assert tuple(s12.seat_route_chain.shape) == (s12.B, s12.seat_routes.shape[1], s12.seat_routes.shape[2], CM)
-    # posts at every OTHER living centre; the vectorized reach must agree with
-    # the python course walk on EVERY tile (two independent bodies, the cap in
-    # both) — and some tile must be reachable only THROUGH a post
+    assert "seat_route_course" in _MUTABLE, "the course must ride snapshot/restore"
+    CM = int(rj["trade"]["courseMax"])
+    assert CM == 96 and s12._trade_course_max == CM, "courseMax should wire as 96"
+    assert tuple(s12.seat_route_course.shape) == (s12.B, s12.seat_routes.shape[1], s12.seat_routes.shape[2], CM)
+    # posts at every OTHER living centre; the reach plane must agree with the
+    # course read off the walk on EVERY tile, and every course must run
+    # origin to destination by neighbours or portal exits
+    s12.seat_explored[:] = True
     o = int(s12.city_center[0, 0, 0])
     assert bool(s12.city_alive[0, 0, 0])
     for c in s12._centre_city_map()[0].nonzero(as_tuple=True)[0].tolist():
         if int(c) != o:
             s12.trading_post[0, 0, int(c)] = True
-    reach = s12._route_reach_from(0)[0, 0]
-    mb = s12._centre_maritime_map()[0]
-    sb = bool(s12._trade_water_level(0)[0] > 0)
-
-    def _leg(a, c):
-        rng = s12._trade_sea_range if sb and bool(mb[a]) and bool(mb[c]) else s12._trade_range
-        return int(s12.pair_dist[a, c]) <= rng
-
-    chained = 0
+    reach = s12._route_reach_from(0, [0])[0, 0]
+    gr12 = s12._trade_graphs(0, [0])[0]
+    n_reach = 0
     for d in range(s12.T):
-        direct = _leg(o, d)
-        want = direct or bool(s12._route_chain_of(0, 0, o, d))
-        assert bool(reach[d]) == want, f"reach[{d}]={bool(reach[d])} but the walk says {want}"
-        chained += int(want and not direct)
-    assert chained > 0, "no tile reachable only through a post — the cross-check proved nothing"
-    print(f"  reach == course walk on every tile ({chained} tiles only a post reaches)")
+        course = s12._trade_course(0, 0, o, d, gr12)
+        assert bool(reach[d]) == (course is not None), f"reach[{d}]={bool(reach[d])} but the course says {course}"
+        if course is not None:
+            n_reach += 1
+            assert course[0] == o and course[-1] == d and len(set(course)) == len(course)
+    assert n_reach > 0, "the walk reached nothing — the cross-check proved nothing"
+    print(f"  reach == course on every tile ({n_reach} plots reached)")
+
+    # the DESTINATION's Harbor refuels to 3: one row of plots, a coastal
+    # origin, thirty water plots (the last the destination's Harbor), one
+    # land plot and the destination — `tradeCourse`'s walk bound to it
+    assert s12._trade_dest_refuel == 3
+    W = s12.W
+    row_p = [2 * W + c for c in range(W)]
+    assert all(s12.pair_dist[a, z] == 1 for a, z in zip(row_p, row_p[1:33])), "the map's row is not a line of neighbours"
+    T12 = s12.T
+    o_p, h_p, d_p = row_p[0], row_p[30], row_p[32]
+    opn = [False] * T12
+    water = [False] * T12
+    centre = [False] * T12
+    embark = [-1] * T12
+    for p in row_p[:33]:
+        opn[p] = True
+    for p in row_p[1:31]:
+        water[p] = True
+    centre[o_p] = centre[d_p] = True
+    embark[o_p], embark[d_p], embark[h_p] = o_p, d_p, d_p
+    gr_line = (opn, water, centre, embark, [False] * T12, [False] * T12, [0] * T12, [-1] * T12, [h_p])
+    base = s12._trade_reach(0, 0, o_p, gr_line)
+    assert base[1][h_p] == 0 and base[0][d_p] < 0, "the origin's 30 runs out on the Harbor"
+    assert s12._trade_dest_bound(base, gr_line, o_p) == {d_p}
+    assert s12._trade_course(0, 0, o_p, d_p, gr_line) == row_p[:33], "the destination's Harbor takes it ashore"
+    print("  the destination's Harbor refuels to 3")
 
     # chain gold: a course city pays nothing of its own — the post's +1 is
     # the path's — and neither does a rival's post there
@@ -569,74 +596,56 @@ def main() -> None:
     s13.seat_routes[0, 0, 0, 0] = fid
     s13.seat_routes[0, 0, 0, 1] = fid
     g_a = float(s13._seat_route_income(0)[0, 0, 2])
-    s13.seat_route_chain[0, 0, 0, 0] = mid_c
+    _nb13 = [int(x) for x in s13.neigh[mid_c] if int(x) >= 0]
+    s13.seat_route_course[0, 0, 0, :3] = torch.tensor([_nb13[0], mid_c, _nb13[-1]])
     s13._eff_version += 1
     assert float(s13._seat_route_income(0)[0, 0, 2]) == g_a, "a course city paid on its own"
     s13.trading_post[0, 1, mid_c] = True
     s13._eff_version += 1
     assert float(s13._seat_route_income(0)[0, 0, 2]) == g_a, "a rival's post paid this row"
-    print("  chain gold OK (no course city and no rival post pays of its own)")
+    s13.trading_post[0, 0, mid_c] = True
+    s13._eff_version += 1
+    assert float(s13._seat_route_income(0)[0, 0, 2]) == g_a + 1.0, "the passed foreign city's own post pays the path's 1"
+    print("  chain gold OK (no course city and no rival post pays of its own; the own post pays the path's 1)")
 
     # THE PATH TERM (`routePathGold`): D x min(1, floor(256 S / n) / 256) + T
-    # over the Trader's descent — 2 per railroad plot past the origin, 2 per
-    # water plot, T the crossed foreign cities holding this row's post
+    # over the stored course — 2 per railroad plot past the origin, 2 per
+    # water plot, T the passed foreign cities holding this row's post
     s15 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert (s15._path_water, s15._path_rail, s15._path_portal, s15._path_denom, s15._path_cap) == (2, 2, 15, 256, 256)
-    one_b = torch.zeros(1, dtype=torch.long)
-    wl15 = s15._trade_water_level(0)
 
-    def _walk(a: int, z: int) -> list[int]:
-        cur = torch.tensor([a])
-        out = [a]
-        for _ in range(32):
-            if int(cur[0]) == z:
-                break
-            nxt = s15._trade_walk_step(one_b, cur, torch.tensor([z]), wl15)
-            if int(nxt[0]) == int(cur[0]):
-                return []
-            cur = nxt
-            out.append(int(cur[0]))
-        return out if out[-1] == z else []
-
-    def _pg(a: int, z: int, d: float) -> float:
-        return float(s15._route_path_gold(0, torch.tensor([[a]]), torch.tensor([[z]]),
-                                          torch.tensor([[d]], dtype=torch.float64),
+    def _pg(d: float) -> float:
+        return float(s15._route_path_gold(0, torch.tensor([[d]], dtype=torch.float64),
                                           torch.ones(1, 1, dtype=torch.bool))[0, 0])
 
-    o15 = int(s15.city_center[0, 0, 0])
-    # a foreign city (a major's or a minor's) and a destination past it whose
-    # descent from row 0's city crosses it
-    c1 = far = -1
-    for c in s15._centre_city_map()[0].nonzero(as_tuple=True)[0].tolist():
-        if int(s15.tile_seat[0, c]) == 0 or int(s15.pair_dist[o15, c]) > 20:
-            continue
-        beyond = ((s15.pair_dist[c] <= 3) & (s15.pair_dist[o15] > s15.pair_dist[o15, c])).nonzero(as_tuple=True)[0]
-        far = next((int(t) for t in beyond.tolist() if c in _walk(o15, int(t))[1:-1]), -1)
-        if far >= 0:
-            c1 = c
-            break
-    assert far >= 0, "no descent from row 0's city crosses a foreign city"
-    path = _walk(o15, far)
+    # a foreign city (a major's or a minor's) in the middle of a three-plot
+    # course of neighbours, slot 0 of row 0
+    c1 = next(int(c) for c in s15._centre_city_map()[0].nonzero(as_tuple=True)[0].tolist()
+              if int(s15.tile_seat[0, int(c)]) != 0)
+    _nb15 = [int(x) for x in s15.neigh[c1] if int(x) >= 0]
+    path = [_nb15[0], c1, _nb15[-1]]
     n = len(path)
+    s15.seat_route_course[0, 0, 0] = -1
+    s15.seat_route_course[0, 0, 0, :n] = torch.tensor(path)
     s15.railroad[0] = False
     base = (s15.water[0, torch.tensor(path[1:])].long() * 2).sum().item()
-    assert _pg(o15, far, 4.0) == 4.0 * min(256, (256 * base) // n) / 256
-    # the crossed foreign city with this row's post pays 1; a rival's own post there nothing
+    assert _pg(4.0) == 4.0 * min(256, (256 * base) // n) / 256
+    # the passed foreign city with this row's post pays 1; a rival's own post there nothing
     s15.trading_post[0, 1, c1] = True
-    assert _pg(o15, far, 0.0) == 0.0
+    assert _pg(0.0) == 0.0
     s15.trading_post[0, 0, c1] = True
-    assert _pg(o15, far, 0.0) == 1.0, "the crossed city holding this row's post pays 1"
+    assert _pg(0.0) == 1.0, "the passed city holding this row's post pays 1"
     # railroads past the origin, one plot at a time, up to D
     s15.railroad[0, path[0]] = True
     for k in range(1, n):
         s15.railroad[0, path[k]] = True
         want = 4.0 * min(256, (256 * (base + 2 * k)) // n) / 256 + 1.0
-        assert _pg(o15, far, 4.0) == want, (k, _pg(o15, far, 4.0), want)
-    assert _pg(o15, far, 4.0) == 5.0
-    # no descent, no path term: a destination nobody stands on
-    wall = next(t for t in range(s15.T) if not bool(s15.passable[0, t]) and not bool(s15.wpass[0, t]))
-    assert _pg(o15, wall, 4.0) == 0.0
-    print(f"  path term OK ({n} plots: rails to D, the crossed post +1)")
+        assert _pg(4.0) == want, (k, _pg(4.0), want)
+    assert _pg(4.0) == 5.0
+    # no course, no path term
+    s15.seat_route_course[0, 0, 0] = -1
+    assert _pg(4.0) == 0.0
+    print(f"  path term OK ({n} plots: rails to D, the passed post +1)")
 
     # CIV6 (Land Acquisition): +3 per FOREIGN route whose course crosses the
     # city — Reyna's BASE ability, own routes never counted, dead routes dark
@@ -649,11 +658,16 @@ def main() -> None:
     fid1 = int(s14.city_id[0, 1, 0])
     s14.seat_routes[0, 1, 0, 0] = fid1
     s14.seat_routes[0, 1, 0, 1] = fid1
-    s14.seat_route_chain[0, 1, 0, 0] = ctr
+    _nb14 = [int(x) for x in s14.neigh[ctr] if int(x) >= 0]
+    _crs14 = torch.tensor([_nb14[0], ctr, _nb14[-1]])
+    s14.seat_route_course[0, 1, 0, :3] = _crs14
     assert float(s14._governor_pass_route_gold(0)[0, 0]) == 3.0, "one foreign crossing pays 3"
+    s14.seat_route_course[0, 1, 0, 2] = -1
+    assert float(s14._governor_pass_route_gold(0)[0, 0]) == 0.0, "a course ENDING at the city does not pass through it"
+    s14.seat_route_course[0, 1, 0, :3] = _crs14
     s14.seat_routes[0, 0, 0, 0] = int(s14.city_id[0, 0, 0])
     s14.seat_routes[0, 0, 0, 1] = int(s14.city_id[0, 0, 0])
-    s14.seat_route_chain[0, 0, 0, 0] = ctr
+    s14.seat_route_course[0, 0, 0, :3] = _crs14
     assert float(s14._governor_pass_route_gold(0)[0, 0]) == 3.0, "the seat's OWN route never counts"
     s14.seat_routes[0, 1, 0, 0] = -1
     assert float(s14._governor_pass_route_gold(0)[0, 0]) == 0.0, "a dead route's stale course is dark"

@@ -1408,7 +1408,6 @@ export function transferCity(
   else flipped.outerHp = civCity.outerHp;
   to.cities.push(flipped);
   logPopWrite(state, flipped, 'tr');
-  if (why === 'conquered') allRoadsLeadToRome(state, to.seat, civCity.centerIndex);
   // CIV6 (Military Emergency): "The Target has conquered the city of another
   // nation; it must be Liberated!" The seat that LOST it is the affected one.
   if (why === 'conquered' && isCiv(fromSeat) && isCiv(to.seat)) {
@@ -1419,6 +1418,9 @@ export function transferCity(
     addEraScore(state, to.seat, ERA_SCORE_CONQUER);
     revealAround(state, to.seat, civCity.centerIndex, 3);
   }
+  // the road to the capital walks the city as it now stands: its new holder,
+  // its districts, the ground it revealed
+  if (why === 'conquered') allRoadsLeadToRome(state, to.seat, civCity.centerIndex);
   // Real Civ 6 pays the captor gold for taking a city. One rate, every captor.
   if (plunder) to.treasury += 40;
   state.eventLog.push(`${civCity.name} defected to ${to.name}! (${why})`);
