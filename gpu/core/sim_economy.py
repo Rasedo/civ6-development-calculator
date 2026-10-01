@@ -1710,9 +1710,10 @@ class SimEconomy:
         """`randomEvent` — THE TURN'S ONE RANDOM EVENT: at most one event a
         turn. Each (row, site) pair weighs an integer: a row counted once per
         map its row weight (`_event_rows`), one site whether or not its start
-        plot exists; a per-site pair the row weight x (100 + the
+        plot exists; a per-site pair the row's tenths x (100 + the
         first-occurrence boost while that site has not had that row, 100
-        after) // 100 (`tile_event_fired` on its key plot). ONE draw
+        after) // 100 (`tile_event_fired` on its key plot), a flood's boosted
+        weight then warmed. ONE draw
         rand(max(10 N, the sum)) walks the pairs in row order, sites in order:
         the pair whose running sum first exceeds it fires; past them all the
         turn is empty. A drawn row that finds no start plot is an empty turn:
@@ -1727,6 +1728,7 @@ class SimEconomy:
         B, T, dev = self.B, self.T, self.device
         every = torch.ones(B, dtype=torch.bool, device=dev)
         rows = self._event_rows()
+        deg = self._warming_degrees()
         per_site = (self._EV_FLOOD, self._EV_ERUPTION, self._EV_ACCIDENT)
         # `stormFamilyAt` is null on a SUBMERGED tile: while nothing has
         # drowned the static per-family lists are the live sets; after a
@@ -1760,10 +1762,16 @@ class SimEconomy:
                 stand.append(torch.ones(B, 1, dtype=torch.bool, device=dev))
         # each (row, site) pair's integer weight, 0 where the site stands not
         pairs: list[torch.Tensor] = []
-        for i, ((fam, _s, w), key) in enumerate(zip(rows, keys)):
+        for i, ((fam, s, w), key) in enumerate(zip(rows, keys)):
             if fam in per_site:
                 fired = (self.tile_event_fired.gather(1, key.clamp(min=0)) >> i) & 1
-                pw = torch.div(w.unsqueeze(1) * (100 + self._first_boost * (1 - fired)), 100, rounding_mode="floor")
+                pct = 100 + self._first_boost * (1 - fired)
+                if fam == self._EV_FLOOD:
+                    # the boosted tenths, then warmed (`warmedWeight`)
+                    pb = torch.div(self._occ_tenths(self._flood_weight[s]) * pct, 100, rounding_mode="floor")
+                    pw = pb + torch.floor(torch.floor(self._flood_cipd[s] * pb * deg.unsqueeze(1)) / 100).long()
+                else:
+                    pw = torch.div(w.unsqueeze(1) * pct, 100, rounding_mode="floor")
             else:
                 pw = w.unsqueeze(1).expand_as(key)
             pairs.append(torch.where(stand[i], pw, torch.zeros_like(pw)))

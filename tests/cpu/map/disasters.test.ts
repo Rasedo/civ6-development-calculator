@@ -4,7 +4,7 @@ import { governorsOf } from '../../../cpu/core/governors';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize, TURN_LIMIT } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodRivers, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows } from '../../../cpu/core/disasters';
+import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, sitePairWeight, floodRivers, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows } from '../../../cpu/core/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_DURATION, FLOOD_WEIGHT } from '../../../cpu/data/disasters';
 import { EVENT_OCC_SCALE, STANDARD_MAP_AREA, FIRST_TIME_OCCURRENCE_BOOST, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_CIV_KILL_P, ERUPTION_CIV_KILL_P } from '../../../cpu/data/disasters';
 import { NO_SEAT } from '../../../cpu/core/types';
@@ -550,6 +550,18 @@ describe('the turn\'s one random event', () => {
     expect(Math.abs(rate(true) - boosted / SPAN)).toBeLessThan(0.0025);
     expect(Math.abs(rate(false) - 45 / SPAN)).toBeLessThan(0.0025);
   }, 60000);
+
+  it('a flood pair is boosted first, then warmed', () => {
+    const flood = eventRows(0, AREA).find((r) => r.family === 'flood' && r.sev === 0)!;
+    expect(flood.weight).toBe(20);
+    // 20 x 130 // 100 = 26, then 26 + floor(floor(20 x 26 x 0.2) / 100) = 27;
+    // warming first would give (20 + 0) x 130 // 100 = 26
+    expect(sitePairWeight(flood, 130, 0.2)).toBe(27);
+    expect(sitePairWeight(flood, 100, 0.2)).toBe(20);
+    expect(sitePairWeight(flood, 100, 0.25)).toBe(21);
+    const eruption = eventRows(0, AREA).find((r) => r.family === 'eruption')!;
+    expect(sitePairWeight(eruption, 130, 2)).toBe(Math.floor(eruption.weight * 130 / 100));
+  });
 
   it('a river floods only once a major has revealed a plot of it', () => {
     const { state, a, b } = eventBoard();

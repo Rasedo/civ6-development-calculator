@@ -148,7 +148,9 @@ RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights
 - Warming: extra = trunc(ChanceIncreasePerDegree × weight × T) // 100 in
   integers, T = CO2 / (the map's CO2For1DegreeTempRise / 1000): nothing
   until C·weight·T reaches 100 — the lab's "holds its cold value while
-  T < ~0.4–0.5".
+  T < ~0.4–0.5". A flood's weight (0xa2cfc0) warms the BOOSTED weight:
+  w' = trunc(10·Occ) × (100 + boost) // 100, then w' + trunc(T × (C × w'))
+  // 100 in float32.
 - What wakes a volcano (`dll_volcano.py`): ONE roll a turn for the map.
   pct = active share over the volcanoes AND volcanic wonders; D = N // (2V);
   below PercentVolcanoesActive (MODERATE 70): D //= ((70 − pct)·V // 100)

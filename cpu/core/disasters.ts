@@ -728,14 +728,25 @@ function siteKeys(state: GameState, sites: EventSites, row: EventRow): Tile[] | 
   }
 }
 
+/** A per-site (row, site) pair's integer weight at `pct` (100, or 100 + the
+ *  first-occurrence boost): the row's tenths × pct // 100; a flood's boosted
+ *  tenths then warmed by its `ChanceIncreasePerDegree` (0xa2cfc0 boosts
+ *  before it warms). */
+export function sitePairWeight(row: EventRow, pct: number, degrees: number): number {
+  if (row.family !== 'flood') return Math.floor((row.weight * pct) / 100);
+  return warmedWeight(Math.floor((occTenths(FLOOD_WEIGHT[row.sev]) * pct) / 100), FLOOD_CIPD[row.sev], degrees);
+}
+
 /**
  * THE TURN'S ONE RANDOM EVENT (Game_RandomEvents "Random Event Roll",
  * GameCore_XP2 0x338710 / 0x335260; `tools/civ6lab/dll_readings.md`): at
  * most one event a turn. Each (row, site) pair weighs an integer: a row
  * counted once per map its row weight (`eventRows`), one site whether or not
- * its start plot exists; a per-site pair the row weight × (100 +
+ * its start plot exists; a per-site pair the row's tenths × (100 +
  * `FIRST_TIME_OCCURRENCE_BOOST` while that site has not had that row, 100
- * after) // 100 (`Tile.eventFired` on its key plot, `siteKeys`). ONE draw
+ * after) // 100 (`Tile.eventFired` on its key plot, `siteKeys`), a flood's
+ * boosted weight then warmed (`warmedWeight`; the flood weight 0xa2cfc0
+ * boosts before it warms). ONE draw
  * rand(max(10·N, Σ)), N the game's turns (`EVENT_OCC_SCALE` × `TURN_LIMIT`),
  * walks the pairs in row order, sites in order: the pair whose running sum
  * first exceeds it fires; past them all the turn is empty. The draw is spent
@@ -744,13 +755,13 @@ function siteKeys(state: GameState, sites: EventSites, row: EventRow): Tile[] | 
  * plots, the drought's a weighted one over the map (`droughtStart`).
  */
 function randomEvent(state: GameState, strip: boolean): void {
-  const rows = eventRows(warmingDegrees(state), state.map.width * state.map.height);
+  const degrees = warmingDegrees(state);
+  const rows = eventRows(degrees, state.map.width * state.map.height);
   const sites = eventSites(state);
   const keys = rows.map((row) => siteKeys(state, sites, row));
   const pairs = keys.map((k, i) => (k === null
     ? [rows[i].weight]
-    : k.map((t) => Math.floor((rows[i].weight
-      * (((t.eventFired ?? 0) >> i) & 1 ? 100 : 100 + FIRST_TIME_OCCURRENCE_BOOST)) / 100))));
+    : k.map((t) => sitePairWeight(rows[i], ((t.eventFired ?? 0) >> i) & 1 ? 100 : 100 + FIRST_TIME_OCCURRENCE_BOOST, degrees))));
   let total = 0;
   for (const p of pairs) for (const x of p) total += x;
   const at = Math.floor(nextRandom(state) * Math.max(EVENT_OCC_SCALE * TURN_LIMIT, total));
