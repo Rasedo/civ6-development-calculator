@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { setTileOwner, freeSeatOf, FREE_SEAT } from '../../../cpu/core/seats';
+import { setTileOwner, freeSeatOf, FREE_SEAT, seatOf } from '../../../cpu/core/seats';
+import { governorsOf } from '../../../cpu/core/governors';
+import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize, TURN_LIMIT } from '../../../cpu/core/game';
 import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, floodRivers, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows } from '../../../cpu/core/disasters';
@@ -814,6 +816,24 @@ describe('the nuclear accident', () => {
       expect(city.pillagedBuildings).toContain('NUCLEAR_POWER_PLANT');
     }
     expect([...ACCIDENT_LAND_P, ...ACCIDENT_CIV_KILL_P]).toEqual([0, 0.5, 1, 0, 0.5, 1]);
+  });
+
+  it('Reinforced Materials keeps the zone and its chain, never the plant', () => {
+    for (let sev = 0; sev < 3; sev++) {
+      const { state, city, izTile } = reactorBoard(40);
+      city.buildings.push('WORKSHOP', 'FACTORY');
+      const g = governorsOf(seatOf(state, 0)!)[GOVERNOR_INDEX.LIANG];
+      g.appointed = true;
+      g.cityId = city.id;
+      g.establishTurns = 0;
+      g.promotions = promotionBitValue(GOVERNOR_PROMOTION_INDEX.REINFORCED_MATERIALS!);
+      for (let i = 0; i < 200; i++) {
+        city.pillagedBuildings = [];
+        nuclearAccident(state, 0, city, sev);
+        expect(city.pillagedBuildings).toEqual(['NUCLEAR_POWER_PLANT']);
+        expect(izTile.districtPillaged).toBeFalsy();
+      }
+    }
   });
 
   it('draws once per damage row, and once more for a land unit struck', () => {

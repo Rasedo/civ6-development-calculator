@@ -120,7 +120,8 @@ Ranged). Check: `dll_xp.py`.
   (Infantry 75), corps/army terms added; k = KILL_BONUS 2 on a kill.
 - attacker: ceil(ATTACKER_BONUS 1 + base + k·D/A); defender: ceil(base +
   k·A/D); then × the side's XP percent, rounded UP again; capped at
-  EXPERIENCE_MAXIMUM_ONE_COMBAT (10 in the install); barbarian soft cap 1.
+  EXPERIENCE_MAXIMUM_ONE_COMBAT (Base 10, Expansion2 8: the game runs 8);
+  barbarian soft cap 1.
 - The Bomber's +3 on Infantry: 4 / 4 strikes. The Infantry's +4 is ceil(1 +
   110/75) = 3 then a positive XP percent (≥ 11%); the city-state's +3 is the
   bare 3. Open: the Georgian Infantry's XP percent (read it, or strike a
@@ -378,34 +379,27 @@ carries the diplomatic-visibility ("ESPIONAGE") bonus.
 - Unread: Cyber Warfare (REQUIREMENT_OPPONENT_ERA_AT_LEAST) against a
   district opponent.
 
-## DLL rules the engines contradict (noted, not chased)
+## C-1: the nuclear accident's plant and the spared unit's draw — CLOSED
 
-- Policy price: rounded down to 5 with E() per GameSpeed column, no free
-  window inside the price (engines: half-up rounding of base·k, 0 in the window).
-- War weariness: one allocation by original owner and population, capped
-  by need (engines: floor(WWP/400) from every city).
-- Escape: no counterspy term (engines: −1 per counterspy level); capture a
-  3d6 band (engines: a flat 29%). Mission: +1 per counterspy level above the
-  first (engines: 3 flat); the pursuer is the first post in the unit list
-  within 1 of the target (engines: the highest level).
-- Combat XP: ceil twice, the RAW Bombard / Ranged column, cap 10 (engines:
-  nearest rounding, the debuffed ranged strength, cap 8).
-- Volcanoes: an active volcano can go dormant; wakes are one map roll a
-  turn (engines: never dormant again; 0.6% per dormant volcano).
-- Droughts: map-wide weighted pick, no river, not coastal (engines:
-  city-anchored with a distance mix).
-- Per-map event rows scale with the map's area over Standard's (engines:
-  one normaliser 250 — whether it follows the map size is unchecked).
+The accident 0x2d33a0 walks the event's RandomEvent_Damages rows; for EACH
+row, before its draw, it pillages every Buildings_XP2 row with
+NuclearReactor (byte +0x48 bit 8: BUILDING_POWER_PLANT alone) in the city
+owning the plot, through the city's building pillage 0x193190 directly —
+not the damage applier 0x336a50 — when the plot's district is owned and not
+already pillaged. So the plant goes with no draw and past Reinforced
+Materials (lab 5e: 9 of 9; the engines follow). Then one "Pillage Improvement Chance"
+rand(100) < Percentage applies the row through 0x336a50, and a ring walk
+over 1..Hexes (RandomEvents +0x30) follows — Hexes defaults to 0 and the
+accident rows set none, so nothing beyond the plot.
+
+The unit applier 0x3366a0 takes "Random Event Unit Damage Roll" for every
+unit that passes the alive / domain gates BEFORE any immunity: the owner's
+damage percent (0x468060), the player's event immunity (0x468100), the
+unit's own counter (+0x1110) and its ability list each zero the damage
+after the draw. A spared unit still spends its draw.
+
+## DLL rules the engines contradict
+
 - Trade range: a budget walked along the path (15, refuelled to 15 / 30 at
   the origin's and own-post cities' TradeEmbark districts), the path a
-  least-cost A* (engines: a hex distance per leg, a greedy step).
-- Combat damage: e^(10/256) per strength point in float32 (engines: 1.04).
-- Interception XP: ceil(2 + S_plane/S_interceptor) through the percent
-  (engines: a flat 4).
-- Eruption: damage before soil; every Yields row paints and adds its yield
-  on every eligible plot (engines: food-gated paint); water bonus resources
-  lost; unit damage one draw per unit and no owner gate; a wonder's ring
-  not deduplicated.
-- Storms: steps onto off-terrain cost 2 of Movement 8 and are taken (engines:
-  dropped); the footprint strikes at every step, each plot once per storm.
-- Random-event unit damage: one draw per unit (engines: one per plot).
+  least-cost search (engines: a hex distance per leg, a greedy step).

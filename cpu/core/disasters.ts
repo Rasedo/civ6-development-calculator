@@ -1076,8 +1076,12 @@ export function ageReactors(cities: readonly City[]): void {
  * accidents. ONE draw per `RandomEvent_Damages` row of the severity, in the
  * install's order (`ACCIDENT_ROWS`), each row's draw deciding that row, and
  * right after UNIT_DAMAGE_LAND when it fires one more per land unit on the
- * plot: that unit's damage (`unitDamageDraws`). Every accident pillages the Power Plant
- * (105 of 105, runs/reactor_reactor_base_20260927T053410Z.jsonl,
+ * plot: that unit's damage (`unitDamageDraws`). Every accident pillages the
+ * Power Plant with no draw, Reinforced Materials or not: the accident
+ * pillages every NuclearReactor building itself, outside the damage rows
+ * (GameCore_XP2 0x2d33a0; 9 of 9 under Reinforced Materials in
+ * runs/c1d_draws.jsonl; 105 of 105 in
+ * runs/reactor_reactor_base_20260927T053410Z.jsonl,
  * runs/reactor_reactor_base_20260927T053613Z.jsonl,
  * runs/reactor_reactor_base_20260927T054059Z.jsonl); then the row's
  * BUILDING_PILLAGED chance takes the top of the Industrial Zone's chain still
@@ -1107,7 +1111,7 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
   const fires = (kind: string, p: number) => (roll.get(kind) ?? 1) < p;
   if (t) {
     t.falloutTurns = Math.max(t.falloutTurns ?? 0, ACCIDENT_FALLOUT[sev]);
-    if (!envImmune(state, t)) pillageHeld({ city }, 'NUCLEAR_POWER_PLANT');
+    pillageHeld({ city }, 'NUCLEAR_POWER_PLANT');
     if (fires('BUILDING_PILLAGED', ACCIDENT_BLDG_P[sev])) pillageTileBuildings(state, t);
     if (fires('DISTRICT_PILLAGED', ACCIDENT_DISTRICT_P[sev])) pillageDistrict(state, t);
     strikeUnits(state, t, tileSeat(t), {

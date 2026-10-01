@@ -2116,7 +2116,8 @@ class SimEconomy:
         deciding that row, and right after UNIT_DAMAGE_LAND when it fires one
         more per land unit on the plot: that unit's damage
         (`_unit_damage_draws`). Every accident pillages the Power
-        Plant (runs/reactor_reactor_base_20260927T053410Z.jsonl,
+        Plant with no draw, Reinforced Materials or not
+        (runs/reactor_reactor_base_20260927T053410Z.jsonl,
         runs/reactor_reactor_base_20260927T053613Z.jsonl,
         runs/reactor_reactor_base_20260927T054059Z.jsonl); then the row's
         BUILDING_PILLAGED chance takes the top of the Industrial Zone's chain
@@ -2166,8 +2167,7 @@ class SimEconomy:
                     self.tile_fallout[rr, tt], self._accident_fallout[sev].expand_as(tt))
                 if self._nuclear_bidx >= 0:
                     rw, sw, nb = row_of[has], slot[has].clamp(min=0), self._nuclear_bidx
-                    plant = (self.city_bldg[rr, rw, sw, nb] & ~self.city_bldg_pillaged[rr, rw, sw, nb]
-                             & ~self._env_immune()[rr, tt])
+                    plant = self.city_bldg[rr, rw, sw, nb] & ~self.city_bldg_pillaged[rr, rw, sw, nb]
                     if bool(plant.any()):
                         self.city_bldg_pillaged[rr[plant], rw[plant], sw[plant], nb] = True
                         self._eff_version += 1
