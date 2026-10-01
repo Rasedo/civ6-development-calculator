@@ -9,10 +9,9 @@ plot of an erupting volcano's ring becomes Volcanic Soil with the severity's
 chance, replacing Woods or Rainforest.
 
 Proven here:
-  * the envelope (`_soil_paintable`) — bare land, an improved plot, Woods and
-    Rainforest are candidates; water, a Mountain, a district, a city centre, a
-    wonder, Floodplains, Marsh, a Geothermal Fissure and soil already there
-    are not;
+  * the envelope (`_soil_paintable`) — bare land, an improved plot, Woods,
+    Rainforest, a district, a city centre and a wonder are candidates; water,
+    a Mountain, Floodplains, a Geothermal Fissure are not;
   * a painted Woods reads exactly as a chopped one (yields, appeal, the
     bare-ground jobs, its Lumber Mill gone), with the soil's name live
     (`featureId`), and nothing can strip or chop the soil back;
@@ -117,7 +116,7 @@ def main() -> None:
     sim.feat_id[B0, t] = SOIL
     assert paintable(sim, t), "Volcanic Soil takes the draw"
     sim.feat_id[B0, t] = -1
-    # a district, a city centre or a wonder takes the draw but no paint (`_erupt`)
+    # a district, a city centre or a wonder takes the draw and the paint (`_erupt`)
     for plane, v in ((sim.district, 0), (sim.centre_slot_at, 0), (sim.built_wonder, 0)):
         plane[B0, t] = v
         assert paintable(sim, t), "a district, a city centre or a wonder takes the draw"
@@ -200,8 +199,7 @@ def main() -> None:
             reach = [n for n in ring if bool(sim3._eruption_reaches(torch.tensor([n]))[0])]
             cities = sum(int(bool(sim3._centre_held(torch.tensor([n]))[0])) for n in reach)
             elig = {n for n in ring if paintable(sim3, n)}
-            takes = {n for n in elig if int(sim3.district[B0, n]) < 0 and int(sim3.centre_slot_at[B0, n]) < 0
-                     and int(sim3.built_wonder[B0, n]) < 0}
+            takes = elig
             before = sim3.feat_id[B0].clone()
             s0 = int(sim3.rng_state[B0])
             sim3._erupt(hit, ring_of(sim3, v), rowt)

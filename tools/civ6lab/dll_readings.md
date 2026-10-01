@@ -292,7 +292,10 @@ plots share is taken twice). Check: `dll_eruption.py`.
   plot, and a feature that is neither Removable (Woods, Rainforest, Marsh)
   nor the row's own (Volcanic Soil); ONE draw rand(100) < Percentage: the
   row's ReplaceFeature (true on every eruption row) paints Volcanic Soil
-  and the row's yield gains +1 (0xa190d0). So each row paints: a plot is
+  and the row's yield gains +1 (0xa190d0) — no district, city-centre or
+  wonder gate (the feature goes on through the raw setter 0x896c40; the
+  records' city centres gained the rows' yields and all 105 district plots
+  in the rings stood on Volcanic Soil). So each row paints: a plot is
   painted when ANY row lands, and the production / science rows land at
   their own Percentage on every eligible plot. Painted share on 201 bare
   eligible plots (`runs/volcano_own_*`): 30/67, 46/67, 54/67 against the

@@ -188,6 +188,35 @@ describe('Volcanic Soil', () => {
     }
   });
 
+  it('a city centre, a district and a wonder take the paint and the yields like any plot', () => {
+    const state: GameState = makeState(makeMap(12, 12));
+    const v = tileAtCoords(state.map, 6, 6);
+    v.elevation = 'MOUNTAIN';
+    v.volcano = true;
+    const [centre, campus, wonder] = neighbors(state.map, v);
+    centre.district = 'CITY_CENTER';
+    campus.district = 'CAMPUS';
+    campus.districtComplete = true;
+    wonder.builtWonder = 'PYRAMIDS';
+    const row = volcanoRow(VOLCANO_PAINT_P.length - 1);
+    const p = 1 - [ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P]
+      .reduce((q, r) => q * (1 - r[row]), 1);
+    const N = 1500;
+    const painted = [0, 0, 0];
+    let fed = 0;
+    for (let i = 0; i < N; i++) {
+      for (const t of [centre, campus, wonder]) {
+        t.feature = null;
+        t.fertility = 0;
+      }
+      erupt(state, [v], row);
+      [centre, campus, wonder].forEach((t, k) => { if (t.feature === 'VOLCANIC_SOIL') painted[k]++; });
+      if (centre.fertility > 0) fed++;
+    }
+    for (const n of painted) expect(Math.abs(n / N - p)).toBeLessThan(0.04);
+    expect(Math.abs(fed / N - ERUPTION_PAINT_P[row])).toBeLessThan(0.04);
+  });
+
   it('the turn\'s draw picks the eruption\'s severity by the rows\' weights', () => {
     // a sea with one active volcano ringed by desert: an eruption, a dust
     // storm or the meteor is all the turn's draw can name. Over the phases

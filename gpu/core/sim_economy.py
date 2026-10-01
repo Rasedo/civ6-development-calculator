@@ -1966,8 +1966,8 @@ class SimEconomy:
         `RandomEvent_Yields` row (Food, Production, Science, Culture, where the
         row carries one), for each neighbour on land the row reaches
         (`_soil_paintable`), ONE draw at its chance paints Volcanic Soil and
-        adds +1 of the row's yield (`_silt`). A plot holding a district, a city
-        centre or a wonder takes neither."""
+        adds +1 of the row's yield (`_silt`) — a district's, a city centre's or
+        a wonder's plot alike."""
         none = torch.full_like(row, -1)
         K = ring.shape[1]
         for kind in self._ERUPTION_DAMAGE_KINDS:
@@ -1997,11 +1997,7 @@ class SimEconomy:
                 nd = torch.where(present, ring[:, d], none)
                 elig = self._soil_paintable(nd)
                 r = self._next_random(elig)
-                t1 = nd.clamp(min=0).unsqueeze(1)
-                takes = ((self.district.gather(1, t1).squeeze(1) < 0)
-                         & (self.centre_slot_at.gather(1, t1).squeeze(1) < 0)
-                         & (self.built_wonder.gather(1, t1).squeeze(1) < 0))
-                land = elig & (r < p) & takes
+                land = elig & (r < p)
                 if not bool(land.any()):
                     continue
                 lr = land.nonzero(as_tuple=True)[0]

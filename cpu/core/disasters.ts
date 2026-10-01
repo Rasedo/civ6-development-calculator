@@ -990,8 +990,10 @@ function silt(state: GameState, tile: Tile, key: 'fertility' | 'fertilityProd' |
  * YIELD_FOOD (`ERUPTION_PAINT_P`), YIELD_PRODUCTION, YIELD_SCIENCE,
  * YIELD_CULTURE, where the row carries one — for each neighbour on land the
  * row reaches (`soilPaintable`), ONE draw at its chance paints Volcanic Soil
- * and adds +1 of the row's yield (every row paints). A plot holding a
- * district, a city centre or a wonder takes neither.
+ * and adds +1 of the row's yield (every row paints) — a district's, a city
+ * centre's or a wonder's plot alike (the soil pass gates on impassable, water
+ * and feature alone; the lab's centres gained the rows' yields, its 105
+ * district plots all stood on Volcanic Soil, runs/volcano_own_*.jsonl).
  */
 export function erupt(state: GameState, plots: readonly Tile[], row: number): void {
   const ring = eruptionRing(state.map, plots);
@@ -1012,7 +1014,7 @@ export function erupt(state: GameState, plots: readonly Tile[], row: number): vo
     if (p <= 0) continue;
     for (const n of ring) {
       if (!soilPaintable(n)) continue;
-      if (nextRandom(state) >= p || n.district || n.builtWonder) continue;
+      if (nextRandom(state) >= p) continue;
       if (n.feature !== 'VOLCANIC_SOIL') paintVolcanicSoil(n);
       silt(state, n, key);
     }
