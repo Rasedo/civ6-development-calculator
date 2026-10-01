@@ -31,6 +31,7 @@ export function loadWorld(world: WorldFile): GameState {
   checkCatalog('elevation', c.elevations, new Set(['FLAT', 'HILLS', 'MOUNTAIN']));
 
   const m = world.map;
+  if (typeof m.wrapX !== 'boolean') throw new Error('world file map carries no wrapX');
   const tiles: Tile[] = [];
   for (let i = 0; i < m.terrain.length; i++) {
     tiles.push({
@@ -59,7 +60,7 @@ export function loadWorld(world: WorldFile): GameState {
       ownerCity: -1,
     });
   }
-  const map: GameMap = { width: m.width, height: m.height, seed: world.gen.seed, tiles };
+  const map: GameMap = { width: m.width, height: m.height, wrapX: m.wrapX, seed: world.gen.seed, tiles };
 
   const state = createGameFromMap(map, world.rngInit);
 

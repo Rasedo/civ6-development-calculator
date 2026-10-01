@@ -27,7 +27,7 @@ export function inGeneralAura(state: GameState, unit: Unit, tileIndex: number): 
   for (const g of state.units) {
     if (g.type !== auraType || g.seat !== unit.seat) continue;
     const gt = state.map.tiles[g.tileIndex];
-    if (hexDistance(tile.col, tile.row, gt.col, gt.row) <= GENERAL_AURA_RANGE) return true;
+    if (hexDistance(state.map, tile.col, tile.row, gt.col, gt.row) <= GENERAL_AURA_RANGE) return true;
   }
   return false;
 }

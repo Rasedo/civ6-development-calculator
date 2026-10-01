@@ -715,9 +715,9 @@ describe('the turn\'s one random event', () => {
     const live = new Set([ev.index]);
     const none = new Set<number>();
     const cands = state.map.tiles.filter((t) => droughtCandidate(state.map, t, none, live));
-    const w = (t: Tile) => 1 + Math.min(hexDistance(t.col, t.row, ev.col, ev.row), DROUGHT_SPACING);
+    const w = (t: Tile) => 1 + Math.min(hexDistance(state.map, t.col, t.row, ev.col, ev.row), DROUGHT_SPACING);
     const total = cands.reduce((x, t) => x + w(t), 0);
-    const near = (t: Tile) => hexDistance(t.col, t.row, ev.col, ev.row) <= 4;
+    const near = (t: Tile) => hexDistance(state.map, t.col, t.row, ev.col, ev.row) <= 4;
     const pNear = cands.filter(near).reduce((x, t) => x + w(t), 0) / total;
     const N = 6000;
     let hits = 0;

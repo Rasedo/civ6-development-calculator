@@ -555,7 +555,7 @@ export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): nu
     const y = tileYields(yctx, t);
     const ySum = y.food + y.production + y.gold + y.science + y.culture + y.faith;
     return {
-      dist: hexDistance(center.col, center.row, t.col, t.row),
+      dist: hexDistance(state.map, center.col, center.row, t.col, t.row),
       res: resourcePriority(t),
       ySum,
       i,
@@ -600,9 +600,9 @@ export function swapTileOk(state: GameState, city: City, tileIndex: number): boo
   if (t.district || t.builtWonder) return false;
   if (t.improvement && IMPROVEMENTS[t.improvement as ImprovementId].noSwap) return false;
   const ctr = state.map.tiles[city.centerIndex];
-  if (hexDistance(ctr.col, ctr.row, t.col, t.row) > CITY_WORK_RADIUS) return false;
+  if (hexDistance(state.map, ctr.col, ctr.row, t.col, t.row) > CITY_WORK_RADIUS) return false;
   const lc = state.map.tiles[loser.centerIndex];
-  if (hexDistance(lc.col, lc.row, t.col, t.row) <= 1) return false;
+  if (hexDistance(state.map, lc.col, lc.row, t.col, t.row) <= 1) return false;
   return neighbors(state.map, t).some((n) => tileBelongsTo(n, city));
 }
 
@@ -674,7 +674,7 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
       // Measured from the WONDER TILE, not from the city holding it, on the
       // BASE reach. A Mexico City suzerain extends the DISTRICT regional
       // effects its Civilopedia line names, which a wonder's aura is not.
-      if (hexDistance(t.col, t.row, center.col, center.row) <= REGIONAL_RANGE) n += amt;
+      if (hexDistance(state.map, t.col, t.row, center.col, center.row) <= REGIONAL_RANGE) n += amt;
     }
   }
   return n;
@@ -849,7 +849,7 @@ function hexDistance2(state: GameState, a: number, b: number): number {
   const ta = state.map.tiles[a];
   const tb = state.map.tiles[b];
   if (!ta || !tb) return 1 << 20;
-  return hexDistance(ta.col, ta.row, tb.col, tb.row);
+  return hexDistance(state.map, ta.col, ta.row, tb.col, tb.row);
 }
 
 /** CIV6: a National Park "provides Tourism equal to the total Appeal of

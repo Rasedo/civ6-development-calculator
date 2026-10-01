@@ -467,7 +467,7 @@ export function cultureBomb(state: GameState, city: City, tileIndex: number, uno
     if (tileSeat(t) === city.seat && tileCity(t) === city.id) continue;
     const near = owner.cities.some((c) => {
       const ctr = state.map.tiles[c.centerIndex];
-      return hexDistance(ctr.col, ctr.row, t.col, t.row) <= CULTURE_BOMB_RANGE;
+      return hexDistance(state.map, ctr.col, ctr.row, t.col, t.row) <= CULTURE_BOMB_RANGE;
     });
     if (!near) continue;
     wipeConstruction(state, t);   // reads the plot's OLD owner, so it goes first

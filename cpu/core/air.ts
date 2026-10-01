@@ -153,7 +153,7 @@ export function canRebaseTo(state: GameState, unit: Unit, tileIndex: number): bo
   const a = state.map.tiles[unit.tileIndex];
   const b = state.map.tiles[tileIndex];
   if (!a || !b) return false;
-  return hexDistance(a.col, a.row, b.col, b.row) <= rebaseRange(unit.type);
+  return hexDistance(state.map, a.col, a.row, b.col, b.row) <= rebaseRange(unit.type);
 }
 
 export function rebaseAir(state: GameState, unit: Unit, tileIndex: number): boolean {
@@ -180,7 +180,7 @@ export function canDeployTo(state: GameState, unit: Unit, tileIndex: number): bo
   const a = state.map.tiles[unit.tileIndex];
   const b = state.map.tiles[tileIndex];
   if (!a || !b) return false;
-  return hexDistance(a.col, a.row, b.col, b.row) <= deployRange(unit.type);
+  return hexDistance(state.map, a.col, a.row, b.col, b.row) <= deployRange(unit.type);
 }
 
 /** the hexes the DEPLOY head offers: this seat's own district and city-centre
@@ -234,7 +234,7 @@ export function interceptorAgainst(
   for (const u of state.units) {
     if (u.patrol === undefined || !unitsHostile(state, striker, u)) continue;
     const p = state.map.tiles[u.patrol];
-    const d = hexDistance(p.col, p.row, at.col, at.row);
+    const d = hexDistance(state.map, p.col, p.row, at.col, at.row);
     if (d > INTERCEPT_RANGE) continue;
     hpSum += u.hp;
     const s = UNITS[u.type]?.combat ?? 0;
@@ -272,7 +272,7 @@ export function priorityTargets(state: GameState, unit: Unit, width: number): nu
   for (const t of state.map.tiles) {
     if (out.length >= width) break;
     if (t.index === unit.tileIndex) continue;
-    if (hexDistance(here.col, here.row, t.col, t.row) > airRange(unit)) continue;
+    if (hexDistance(state.map, here.col, here.row, t.col, t.row) > airRange(unit)) continue;
     if (priorityDefender(state, unit, t.index)) out.push(t.index);
   }
   return out;
@@ -293,7 +293,7 @@ export function displaceAirFrom(state: GameState, tileIndex: number, scatter = t
       const from = state.map.tiles[plane.tileIndex];
       const bases = airBasesOf(state, plane.seat)
         .filter((t) => t !== tileIndex && airBaseFree(state, plane.seat, t))
-        .map((t) => ({ t, d: hexDistance(from.col, from.row, state.map.tiles[t].col, state.map.tiles[t].row) }))
+        .map((t) => ({ t, d: hexDistance(state.map, from.col, from.row, state.map.tiles[t].col, state.map.tiles[t].row) }))
         .filter((b) => b.d <= rebaseRange(plane.type))
         .sort((a, b) => a.d - b.d || a.t - b.t);
       if (bases.length > 0) {
@@ -333,7 +333,7 @@ export function airStrikeReaches(state: GameState, unit: Unit, tileIndex: number
   const a = state.map.tiles[unit.tileIndex];
   const b = state.map.tiles[tileIndex];
   if (!a || !b) return false;
-  return hexDistance(a.col, a.row, b.col, b.row) <= airRange(unit);
+  return hexDistance(state.map, a.col, a.row, b.col, b.row) <= airRange(unit);
 }
 
 /** CIV6 (Bomber): a bomber "may attack tile improvements and districts",
@@ -362,7 +362,7 @@ export function airPillageTargets(state: GameState, unit: Unit, width: number): 
   if (!here || !isAirUnit(unit.type) || !airPillageFit(unit)) return out;
   for (const t of state.map.tiles) {
     if (t.index === unit.tileIndex) continue;
-    if (hexDistance(here.col, here.row, t.col, t.row) > airRange(unit)) continue;
+    if (hexDistance(state.map, here.col, here.row, t.col, t.row) > airRange(unit)) continue;
     if (airPillageOffers(state, unit, t.index)) out.push(t.index);
     if (out.length >= width) break;
   }
@@ -380,7 +380,7 @@ export function airStrikeTargets(state: GameState, unit: Unit, width: number): n
   if (!here || !isAirUnit(unit.type)) return out;
   for (const t of state.map.tiles) {
     if (t.index === unit.tileIndex) continue;
-    if (hexDistance(here.col, here.row, t.col, t.row) > airRange(unit)) continue;
+    if (hexDistance(state.map, here.col, here.row, t.col, t.row) > airRange(unit)) continue;
     if (airStrikeOffers(state, unit, t.index)) out.push(t.index);
     if (out.length >= width) break;
   }
@@ -469,7 +469,7 @@ export function airCoverAgainst(
   let best: Unit | undefined;
   let bestKey = [0, 0, 0];
   for (const t of tilesWithin(state.map, at.col, at.row, AIR_COVER_MAX)) {
-    const d = hexDistance(at.col, at.row, t.col, t.row);
+    const d = hexDistance(state.map, at.col, at.row, t.col, t.row);
     for (const u of unitsAt(state, t.index)) {
       if (u === duelled) continue;
       const aa = antiAirAt(state, u);

@@ -58,7 +58,7 @@ export function homeDistance(state: GameState, homes: readonly number[], t: Tile
   let best = Infinity;
   for (const i of homes) {
     const h = state.map.tiles[i];
-    best = Math.min(best, hexDistance(t.col, t.row, h.col, h.row));
+    best = Math.min(best, hexDistance(state.map, t.col, t.row, h.col, h.row));
   }
   return best;
 }
@@ -75,7 +75,7 @@ export function walkUnit(
     return d < weights.length ? weights[d] : 0;
   };
   const ring = tilesWithin(state.map, at.col, at.row, k)
-    .filter((t) => hexDistance(t.col, t.row, at.col, at.row) === k && walkerGround(state, t, u.seat))
+    .filter((t) => hexDistance(state.map, t.col, t.row, at.col, at.row) === k && walkerGround(state, t, u.seat))
     .sort((a, b) => a.index - b.index);
   let total = 0;
   for (const t of ring) total += weight(t);
@@ -92,11 +92,11 @@ export function walkUnit(
   }
   for (let s = 0; s < k && u.tileIndex !== target.index && u.movesLeft > 0; s++) {
     const cur = state.map.tiles[u.tileIndex];
-    const d0 = hexDistance(cur.col, cur.row, target.col, target.row);
+    const d0 = hexDistance(state.map, cur.col, cur.row, target.col, target.row);
     let next: Tile | null = null;
     for (let dir = 0; dir < 6; dir++) {
       const n = neighborTile(state.map, cur, dir);
-      if (!n || hexDistance(n.col, n.row, target.col, target.row) >= d0) continue;
+      if (!n || hexDistance(state.map, n.col, n.row, target.col, target.row) >= d0) continue;
       if (!walkerGround(state, n, u.seat) || !tileFreeForUnit(state, n.index, u.seat, u)) continue;
       next = n;
       break;

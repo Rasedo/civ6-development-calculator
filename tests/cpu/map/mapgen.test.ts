@@ -35,7 +35,7 @@ describe('map generation', () => {
     for (const t of map.tiles) {
       for (let d = 0; d < 6; d++) {
         if (!(t.riverMask & (1 << d))) continue;
-        const [nc, nr] = neighborOffset(t.col, t.row, d);
+        const [nc, nr] = neighborOffset(map, t.col, t.row, d);
         if (!inBounds(map, nc, nr)) continue;
         const n = tileAt(map, nc, nr)!;
         expect(n.riverMask & (1 << oppositeDir(d))).toBeTruthy();
@@ -76,7 +76,7 @@ describe('map generation', () => {
       );
       if (t.terrain === 'OCEAN') expect(touchesLand).toBe(false);
       if (t.terrain === 'COAST') {
-        const d = Math.min(...land.map((u) => hexDistance(t.col, t.row, u.col, u.row)));
+        const d = Math.min(...land.map((u) => hexDistance(map, t.col, t.row, u.col, u.row)));
         expect(d).toBeLessThanOrEqual(4);
         if (d > 1) expanded++;
       }

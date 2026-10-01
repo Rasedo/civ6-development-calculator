@@ -27,7 +27,7 @@ describe('cultural border growth', () => {
     expect(owned.length).toBe(before + city.tilesAcquired);
     const center = state.map.tiles[city.centerIndex];
     for (const t of owned) {
-      expect(hexDistance(center.col, center.row, t.col, t.row)).toBeLessThanOrEqual(5);
+      expect(hexDistance(state.map, center.col, center.row, t.col, t.row)).toBeLessThanOrEqual(5);
     }
   });
 

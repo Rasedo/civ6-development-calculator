@@ -121,7 +121,7 @@ export function spyDestinations(state: GameState, unit: Unit, width = SPY_TRAVEL
     if (s.explored.length > 0 && s.explored[t] !== 1) return;
     seen.add(t);
     const tile = state.map.tiles[t];
-    out.push({ t, d: hexDistance(here.col, here.row, tile.col, tile.row) });
+    out.push({ t, d: hexDistance(state.map, here.col, here.row, tile.col, tile.row) });
   };
   for (const actor of state.seats) {
     if (seatsAllied(state, unit.seat, actor.seat)) continue;
@@ -147,7 +147,7 @@ export function spyTravelTurns(state: GameState, from: number, to: number): numb
   const a = state.map.tiles[from];
   const b = state.map.tiles[to];
   if (!a || !b) return SPY_TRAVEL_TURNS_MIN;
-  const d = hexDistance(a.col, a.row, b.col, b.row);
+  const d = hexDistance(state.map, a.col, a.row, b.col, b.row);
   return Math.min(SPY_TRAVEL_TURNS_MAX,
     SPY_TRAVEL_TURNS_MIN + Math.floor(d / SPY_TRAVEL_TILES_PER_TURN));
 }
@@ -352,7 +352,7 @@ export function cityCounterLevels(state: GameState, city: City, atTile?: number)
     if (surv > 0 && u.spyMission === SPY_M_COUNTERSPY && atTile !== undefined) {
       const a = state.map.tiles[u.tileIndex];
       const b = state.map.tiles[atTile];
-      if (hexDistance(a.col, a.row, b.col, b.row) <= SPY_SURVEILLANCE_REACH) n += surv;
+      if (hexDistance(state.map, a.col, a.row, b.col, b.row) <= SPY_SURVEILLANCE_REACH) n += surv;
     }
   }
   // CIV6 (Local Informants): "Enemy Spies operate at 3 levels below normal in
@@ -378,7 +378,7 @@ function counterspyPursuing(state: GameState, holder: number, city: City, tileIn
   return state.units.find((u) => {
     if (u.seat !== holder || !isSpy(u.type) || u.spyMission !== SPY_M_COUNTERSPY) return false;
     const p = state.map.tiles[u.tileIndex];
-    return hexDistance(p.col, p.row, at.col, at.row) <= 1
+    return hexDistance(state.map, p.col, p.row, at.col, at.row) <= 1
       || (cityHoldsTile(city, u.tileIndex) && promoValue(u, 'SPY_SURVEIL') > 0);
   });
 }

@@ -14,6 +14,9 @@ class SimInit:
         B = len(fixtures)
         f0 = fixtures[0]
         self.B, self.W, self.H = B, f0["width"], f0["height"]
+        # the map wraps in x (`GameMap.wrapX`): every hex table reads columns
+        # modulo the width
+        self.wrap_x = bool(f0["wrapX"])
         T = self.W * self.H
         self.T = T
         # ------------------------------------------------------------------
@@ -145,7 +148,7 @@ class SimInit:
         # ANDs the two live (the baked-derivation trap).
         self.tile_goody = torch.tensor([[t.get("goody", 0) for t in f["tiles"]] for f in fixtures],
                                        dtype=torch.bool, device=device)
-        self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
+        self.neigh = neighbor_table(self.W, self.H, self.wrap_x).to(device)  # [T, 6]
         self._neigh_list = self.neigh.tolist()  # the same table, for the per-game path walk
         # `onOrNextToShallowWater`'s twin, baked: TEST_ANY of "the plot IS
         # coast" and "the plot is ADJACENT to coast". Terrain is static on both
@@ -170,7 +173,7 @@ class SimInit:
             for k, x in enumerate(cand[:12]):
                 _ring[t, k] = x
         self.ring2 = _ring  # [T, 12]
-        self.pair_dist = pair_distances(self.W, self.H).to(device)  # [T, T] int16
+        self.pair_dist = pair_distances(self.W, self.H, self.wrap_x).to(device)  # [T, T] int16
         # The distance-3 ring, [T, 18], sorted ascending and padded -1 at map
         # edges — the SNIPE ring's contract one hex out, so SNIPE3 columns
         # scan ring tiles in tile-index order like SNIPE columns do.
@@ -1485,7 +1488,7 @@ class SimInit:
         self._sight_hills = int(rules.improvements["sightHills"])
         self._sight_mountain = int(rules.improvements["sightMountain"])
         self._sight_max = int(rules.improvements["sightMax"])
-        _lt, _lm = los_tables(self.W, self.H, self._sight_max)
+        _lt, _lm = los_tables(self.W, self.H, self.wrap_x, self._sight_max)
         self._los_tgt, self._los_mid = _lt.to(device), _lm.to(device)
         self._feat_cat_y = torch.tensor(rules.improvements["featCatalogY"], dtype=self.dtype, device=device)
         # `feat_id` is LIVE (`_paint_soil` writes it); `feat_id0` keeps the
@@ -3291,7 +3294,7 @@ class SimInit:
         assert all(bool(f.get("unitsMode", 0)) == self.units_mode for f in fixtures)
         # ONE BATCH IS ONE WORLD PRESET: every plane dimension above was baked
         # from fixtures[0], so a mixed-shape batch would mis-index silently.
-        for _k in ("width", "height", "cityStateMax"):
+        for _k in ("width", "height", "wrapX", "cityStateMax"):
             assert all(f.get(_k) == fixtures[0].get(_k) for f in fixtures), \
                 f"mixed-preset batch: {_k} differs across fixtures"
         assert all(len(f["civs"]) == self.n_majors for f in fixtures), \

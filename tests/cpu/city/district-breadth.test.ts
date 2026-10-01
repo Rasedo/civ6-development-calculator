@@ -100,7 +100,7 @@ function makeSourceCity(civ: Seat, centerIndex: number, izTileIndex: number): Ci
 
 function tileAtDist(state: GameState, center: Tile, dist: number, banned: Set<number>): Tile {
   const t = state.map.tiles.find(
-    (x) => hexDistance(center.col, center.row, x.col, x.row) === dist && !banned.has(x.index),
+    (x) => hexDistance(state.map, center.col, center.row, x.col, x.row) === dist && !banned.has(x.index),
   );
   expect(t, `a tile at hex distance ${dist} must exist`).toBeTruthy();
   return t!;

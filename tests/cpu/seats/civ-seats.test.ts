@@ -110,7 +110,7 @@ describe('civ placement and expansion', () => {
       for (const other of a.seats) {
         if (other.seat === r.seat) continue;
         const oc = a.map.tiles[other.cities[0].centerIndex];
-        expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(MAJOR_START_DIST);
+        expect(hexDistance(a.map, center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(MAJOR_START_DIST);
       }
     }
   });

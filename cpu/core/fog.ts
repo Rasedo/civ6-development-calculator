@@ -3,7 +3,7 @@ import type { GameState, Tile } from './types';
 import type { GameMap } from '../../world/types';
 import { citiesOf, civOf, isCiv, leaderOf, seatOf, seatsAllied, tileSeat, unitsOf } from './seats';
 import { ALLIANCE_SHARED_VIS_ROWS, rowIsFor } from '../data/civilizations';
-import { tilesWithin, hexDistance, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
+import { tilesWithin, hexDistance, axialDelta, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
 import { dedicationEvent } from './eras';
 import { promoValue, promoFlag } from './promotions';
@@ -37,13 +37,15 @@ export function sightThrough(t: Tile, seeThrough: boolean): number {
  * The tiles strictly BETWEEN two tiles on the hex line joining them: a cube
  * lerp with the (1e-6, 2e-6, -3e-6) nudge and cube rounding, rounding each
  * coordinate with floor(x + 0.5) so both engines land on the same hex at
- * every half. An off-map hex on the line is simply absent. The GPU builds
- * the same lines once per map (`los_tables`).
+ * every half. An off-map hex on the line is simply absent. On a wrapping map
+ * the line runs the shorter way round (`axialDelta`). The GPU builds the same
+ * lines once per map (`los_tables`).
  */
 export function hexLineBetween(map: GameMap, a: Tile, b: Tile): Tile[] {
   const [aq, ar] = offsetToAxial(a.col, a.row);
-  const [bq, br] = offsetToAxial(b.col, b.row);
-  const n = hexDistance(a.col, a.row, b.col, b.row);
+  const [dq, dr] = axialDelta(map, a.col, a.row, b.col, b.row);
+  const bq = aq + dq, br = ar + dr;
+  const n = hexDistance(map, a.col, a.row, b.col, b.row);
   const ax = aq + 1e-6, az = ar + 2e-6, ay = -aq - ar - 3e-6;
   const bx = bq + 1e-6, bz = br + 2e-6, by = -bq - br - 3e-6;
   const out: Tile[] = [];

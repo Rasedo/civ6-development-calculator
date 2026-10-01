@@ -41,7 +41,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
   const landFraction = opts.landFraction ?? 0.35;
   const withResources = opts.withResources ?? true;
 
-  const map: GameMap = { width, height, seed, tiles: [] };
+  const map: GameMap = { width, height, wrapX: false, seed, tiles: [] };
   for (let row = 0; row < height; row++) {
     for (let col = 0; col < width; col++) {
       map.tiles.push({
@@ -420,7 +420,7 @@ function placeWonders(map: GameMap, seed: number): void {
       if (!tiles) continue;
       if (
         placedTiles.some((p) =>
-          tiles.some((t) => hexDistance(p.col, p.row, t.col, t.row) < MIN_DISTANCE_NW),
+          tiles.some((t) => hexDistance(map, p.col, p.row, t.col, t.row) < MIN_DISTANCE_NW),
         )
       ) {
         continue;
@@ -441,7 +441,7 @@ function placeWonders(map: GameMap, seed: number): void {
 }
 
 function touchesWater(map: GameMap, v: Vertex, isLandIdx: (i: number) => boolean): boolean {
-  for (const [c, r] of vertexTouchingTiles(v)) {
+  for (const [c, r] of vertexTouchingTiles(map, v)) {
     const t = tileAt(map, c, r);
     if (t && !isLandIdx(t.index)) return true;
   }
@@ -456,7 +456,7 @@ function vertexElevation(
 ): number {
   let sum = 0;
   let n = 0;
-  for (const [c, r] of vertexTouchingTiles(v)) {
+  for (const [c, r] of vertexTouchingTiles(map, v)) {
     const t = tileAt(map, c, r);
     if (!t) {
       sum += 1.5; // repel rivers from the map border
@@ -528,7 +528,7 @@ function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed
   for (const t of topLand) {
     if (sources.length >= riverCount) break;
     if (neighbors(map, t).some((n) => !isLandIdx(n.index))) continue;
-    if (sources.some((s) => hexDistance(s.col, s.row, t.col, t.row) < 6)) continue;
+    if (sources.some((s) => hexDistance(map, s.col, s.row, t.col, t.row) < 6)) continue;
     sources.push(t);
   }
 
@@ -543,7 +543,7 @@ function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed
 
     for (let step = 0; step < 120; step++) {
       if (touchesWater(map, v, isLandIdx)) break;
-      const options = vertexNeighbors(v).filter((e) => !visited.has(vertexKey(e.to)));
+      const options = vertexNeighbors(map, v).filter((e) => !visited.has(vertexKey(e.to)));
       if (options.length === 0) break;
 
       let best = options[0];

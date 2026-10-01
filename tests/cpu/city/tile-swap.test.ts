@@ -111,8 +111,8 @@ describe('the tile swap', () => {
     const { state, a, b } = scene();
     const ac = state.map.tiles[a.centerIndex];
     const bc = state.map.tiles[b.centerIndex];
-    const dA = (t: { col: number; row: number }) => hexDistance(ac.col, ac.row, t.col, t.row);
-    const dB = (t: { col: number; row: number }) => hexDistance(bc.col, bc.row, t.col, t.row);
+    const dA = (t: { col: number; row: number }) => hexDistance(state.map, ac.col, ac.row, t.col, t.row);
+    const dB = (t: { col: number; row: number }) => hexDistance(state.map, bc.col, bc.row, t.col, t.row);
     // distance 2 and 3: offered while a plot of A's touches it, refused once none does
     for (const d of [2, 3]) {
       const t = state.map.tiles.find((u) => dA(u) === d && dB(u) >= 2 && neighbors(state.map, u).some((n) => tileBelongsTo(n, a)))!;

@@ -175,7 +175,7 @@ export function routePathGold(state: GameState, seat: number, r: TradeRoute, d: 
     const prev = tiles[path[i - 1]];
     if (isWater(at)) score += ROUTE_PATH_WATER;
     if (at.railroad) score += ROUTE_PATH_RAIL;
-    if (hexDistance(prev.col, prev.row, at.col, at.row) > 1) score += ROUTE_PATH_PORTAL;
+    if (hexDistance(state.map, prev.col, prev.row, at.col, at.row) > 1) score += ROUTE_PATH_PORTAL;
   }
   const t = routeCoursePosts(state, seat, r).filter((c) => tileSeat(tiles[c]) !== seat).length;
   const eff = Math.min(ROUTE_PATH_MAX_RATIO * ROUTE_PATH_DENOM, Math.floor((ROUTE_PATH_DENOM * score) / path.length));
@@ -289,7 +289,7 @@ export function routePlunderer(state: GameState, tileIndex: number, seat: number
     if (state.units.some((g) => {
       if (g.seat !== seat || g.hp <= 0 || UNITS[g.type]?.guardsTraders !== ground) return false;
       const gt = state.map.tiles[g.tileIndex];
-      return !!gt && hexDistance(gt.col, gt.row, here.col, here.row) <= TRADER_GUARD_RADIUS;
+      return !!gt && hexDistance(state.map, gt.col, gt.row, here.col, here.row) <= TRADER_GUARD_RADIUS;
     })) return null;
   }
   let raider: number | null = null;
@@ -458,7 +458,7 @@ export function claimTileEnRoute(state: GameState, seat: number, tileIndex: numb
   if (!t || tileSeat(t) !== NO_SEAT) return false;
   const near = citiesOf(state, seat).some((c) => {
     const ctr = state.map.tiles[c.centerIndex];
-    return ctr !== undefined && hexDistance(ctr.col, ctr.row, t.col, t.row) <= radius;
+    return ctr !== undefined && hexDistance(state.map, ctr.col, ctr.row, t.col, t.row) <= radius;
   });
   if (!near) return false;
   setTileOwner(t, seat);

@@ -440,7 +440,7 @@ export function issueQuest(
   const span = state.map.tiles.length + 1;
   for (const i of state.barbSeat.camps) {
     const t = state.map.tiles[i];
-    const d = hexDistance(t.col, t.row, center.col, center.row);
+    const d = hexDistance(state.map, t.col, t.row, center.col, center.row);
     if (d > QUEST_CAMP_RADIUS) continue;
     const key = d * span + i;
     if (key < campKey) {

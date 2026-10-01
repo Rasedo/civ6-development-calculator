@@ -685,22 +685,9 @@ class SimPhase:
             ground = ground | self._portal_plane()
         ok = (ground & ~self._blocked_for(tiles, FREE_SEAT) & (tiles != ctr.unsqueeze(1))
               & (self.district < 0))
-        # each plot's place on its ring's walk: axial offsets from the centre,
-        # the ring k, then the leg the plot lies on and its step along it
-        ar = torch.arange(T, device=self.device)
-        row_t = ar // self.W
-        q_t = ar % self.W - (row_t - (row_t & 1)) // 2
-        dq = q_t.unsqueeze(0) - q_t[ctr].unsqueeze(1)
-        dr = row_t.unsqueeze(0) - row_t[ctr].unsqueeze(1)
-        s = dq + dr
+        # each plot's ring k and its place on that ring's walk
         k = self.pair_dist[ctr].long()
-        pos = torch.where(
-            (s == -k) & (dr > -k), -dr,                                   # NE leg
-            torch.where((dr == -k) & (dq < k), k + dq,                    # E leg
-            torch.where((dq == k) & (dr < 0), 3 * k + dr,                 # SE leg
-            torch.where((s == k) & (dr < k), 3 * k + dr,                  # SW leg
-            torch.where((dr == k) & (dq > -k), 4 * k - dq,                # W leg
-                        6 * k - dr)))))                                   # NW leg
+        pos = simbase.ring_walk_places(ctr, k, self.W, self.H, self.wrap_x)
         span = 6 * T
         key = torch.where(ok, k * span + pos, torch.full_like(tiles, T * span))
         best = key.min(dim=1).values

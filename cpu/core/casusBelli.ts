@@ -53,7 +53,7 @@ function empiresAdjacent(state: GameState, seat: number, target: number): boolea
   const mine = citiesOf(state, seat).map((c) => tiles[c.centerIndex]);
   const theirs = citiesOf(state, target).map((c) => tiles[c.centerIndex]);
   const near = (a: { col: number; row: number }, b: { col: number; row: number }) =>
-    hexDistance(a.col, a.row, b.col, b.row) <= TERRITORIAL_WAR_RANGE;
+    hexDistance(state.map, a.col, a.row, b.col, b.row) <= TERRITORIAL_WAR_RANGE;
   let a = 0;
   for (const c of mine) if (theirs.some((o) => near(c, o))) a++;
   let b = 0;

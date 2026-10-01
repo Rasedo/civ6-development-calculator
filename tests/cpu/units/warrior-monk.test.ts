@@ -152,7 +152,7 @@ describe('Disciples', () => {
     const city = allCities(state)[0];
     const ct = state.map.tiles[city.centerIndex];
     const ft = state.map.tiles[foe.tileIndex];
-    expect(hexDistance(ct.col, ct.row, ft.col, ft.row)).toBeLessThanOrEqual(10);
+    expect(hexDistance(state.map, ct.col, ct.row, ft.col, ft.row)).toBeLessThanOrEqual(10);
     expect(meleeAttack(state, monk.id, foe.tileIndex, 0).ok).toBe(true);
     expect(foe.hp).toBeLessThanOrEqual(0);
     expect(pressureNear(state, 0)).toBe(KILL_SPREAD_PRESSURE);

@@ -429,7 +429,7 @@ describe('the band tree', () => {
 function hexFar(state: GameState, a: number, b: number): boolean {
   const ta = state.map.tiles[a];
   const tb = state.map.tiles[b];
-  return hexDistance(ta.col, ta.row, tb.col, tb.row) > CONCERT_SHARE_RANGE;
+  return hexDistance(state.map, ta.col, ta.row, tb.col, tb.row) > CONCERT_SHARE_RANGE;
 }
 
 describe('the progressive faith price', () => {

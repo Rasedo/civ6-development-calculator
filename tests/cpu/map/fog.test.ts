@@ -73,7 +73,7 @@ describe('sight is occlusion by elevation (ask 11)', () => {
     expect(hexLineBetween(state.map, o, e3).map((t) => t.index)).toEqual([e1.index, e2.index]);
     expect(hexLineBetween(state.map, o, e1)).toEqual([]);
     for (const b of state.map.tiles) {
-      const d = hexDistance(o.col, o.row, b.col, b.row);
+      const d = hexDistance(state.map, o.col, o.row, b.col, b.row);
       if (d < 2 || d > 5) continue;
       const mids = hexLineBetween(state.map, o, b);
       expect(mids).toHaveLength(d - 1);

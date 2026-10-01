@@ -54,6 +54,7 @@ export function buildWorld(seed: number, p: WorldPreset, genStamp: string): Worl
     map: {
       width: map.width,
       height: map.height,
+      wrapX: map.wrapX,
       terrain: map.tiles.map((t) => idx(catalogs.terrains, t.terrain)),
       elevation: map.tiles.map((t) => idx(catalogs.elevations, t.elevation)),
       feature: map.tiles.map((t) => idx(catalogs.features, t.feature)),

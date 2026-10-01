@@ -432,7 +432,7 @@ export function governorLoyaltyAura(state: GameState, city: City): number {
         const aura = own ? e.loyaltyToOwn : e.loyaltyToForeign;
         if (!aura) continue;
         const t = state.map.tiles[c.centerIndex];
-        if (hexDistance(here.col, here.row, t.col, t.row) > aura.range) continue;
+        if (hexDistance(state.map, here.col, here.row, t.col, t.row) > aura.range) continue;
         n += own ? aura.loyalty : -aura.loyalty;
       }
     }
@@ -450,7 +450,7 @@ export function governorLoyaltyAura(state: GameState, city: City): number {
         if (c.id === city.id && c.seat === city.seat) return false;
         if (!cityGovernorEffects(state, c).length) return false;
         const t = state.map.tiles[c.centerIndex];
-        return hexDistance(here.col, here.row, t.col, t.row) <= r.range;
+        return hexDistance(state.map, here.col, here.row, t.col, t.row) <= r.range;
       });
       if (near) n += s.seat === city.seat ? r.amount : -r.amount;
     }

@@ -24,7 +24,7 @@ from warmup import settle_all
 
 def main() -> None:
     # -- 1: the hex line, once per map — the straight row and the line's shape
-    tgt, mid = los_tables(16, 16, 5)
+    tgt, mid = los_tables(16, 16, False, 5)
     W = 16
     a = 10 * W + 5
     row = {int(tgt[a, k]): k for k in range(tgt.shape[1]) if int(tgt[a, k]) >= 0}
@@ -34,7 +34,7 @@ def main() -> None:
         f"the straight line east from (5,10) to (8,10) passes (6,10),(7,10): {mid[a, k].tolist()}"
     # every line: distance - 1 mids, each adjacent to the last, the first beside the eye
     from core.simbase import neighbor_table
-    nb = neighbor_table(16, 16)
+    nb = neighbor_table(16, 16, False)
     for k2 in range(tgt.shape[1]):
         b = int(tgt[a, k2])
         if b < 0:

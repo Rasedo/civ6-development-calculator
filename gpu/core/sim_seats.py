@@ -9803,7 +9803,7 @@ class SimSeats:
         # this seat: Civ 6 pays the improvement's housing to the city whose
         # culture borders contain the tile, and a tile lies inside exactly
         # one. https://civilization.fandom.com/wiki/Housing_(Civ6)
-        win = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H).reshape(B, cols, -1)
+        win = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H, self.wrap_x).reshape(B, cols, -1)
         wf = win.clamp(min=0).reshape(B, -1)
         imp_w = self.improvement.gather(1, wf).reshape_as(win)
         own = (
@@ -10497,7 +10497,7 @@ class SimSeats:
 
     def _seat_border_key(self, row: int, center: torch.Tensor):
         B = self.B
-        tiles = tiles_from_offsets(center, self._off5, self.W, self.H)
+        tiles = tiles_from_offsets(center, self._off5, self.W, self.H, self.wrap_x)
         tc = tiles.clamp(min=0)
         nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)
         g = self._rcy_globals()

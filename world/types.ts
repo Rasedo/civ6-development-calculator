@@ -294,6 +294,9 @@ export interface Tile {
 export interface GameMap {
   width: number;
   height: number;
+  /** the map wraps in x: column 0 and column width - 1 are neighbours
+   *  (`world/hex.ts` reads columns modulo the width) */
+  wrapX: boolean;
   seed: number;
   tiles: Tile[];
 }

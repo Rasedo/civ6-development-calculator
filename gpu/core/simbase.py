@@ -33,12 +33,39 @@ FIXTURES = Path(os.environ.get("CIV6_WORLDS_DIR")
                 or Path(__file__).resolve().parent.parent.parent / "seeder" / "worlds").resolve()
 
 # ---------------------------------------------------------------------------
-# Hex math (mirrors world/hex.ts: pointy-top, odd-r offset)
+# Hex math (mirrors world/hex.ts: pointy-top, odd-r offset). A map with
+# `wrap_x` wraps in x: columns are read modulo the width, distances go the
+# shorter way round, rows never wrap.
 # ---------------------------------------------------------------------------
 
 
-def hex_distance_from(width: int, height: int, center: int) -> torch.Tensor:
-    """Distance of every tile index from `center` (odd-r offset coords)."""
+def _cube(dq, dr):
+    return (abs(dq) + abs(dr) + abs(dq + dr)) // 2
+
+
+def _axial(c, r):
+    return c - ((r - (r & 1)) >> 1), r
+
+
+def hex_shift(width: int, wrap_x: bool, ac: int, ar: int, bc: int, br: int) -> int:
+    """`axialDelta`'s column shift for the step from (ac, ar) to (bc, br): 0,
+    -width or +width, the first of the shortest; 0 on a map that does not
+    wrap."""
+    if not wrap_x:
+        return 0
+    (qa, _), (qb, _) = _axial(ac, ar), _axial(bc, br)
+    dr = br - ar
+    best, shift = _cube(qb - qa, dr), 0
+    for s in (-width, width):
+        n = _cube(qb + s - qa, dr)
+        if n < best:
+            best, shift = n, s
+    return shift
+
+
+def hex_distance_from(width: int, height: int, wrap_x: bool, center: int) -> torch.Tensor:
+    """Distance of every tile index from `center` (odd-r offset coords), the
+    shorter way round on a wrapping map."""
     idx = torch.arange(width * height)
     col, row = idx % width, idx // width
 
@@ -49,29 +76,82 @@ def hex_distance_from(width: int, height: int, center: int) -> torch.Tensor:
     q, r = to_axial(col, row)
     cq, cr = to_axial(torch.tensor(center % width), torch.tensor(center // width))
     dq, dr = q - cq, r - cr
-    return (dq.abs() + dr.abs() + (dq + dr).abs()) // 2
+    d = (dq.abs() + dr.abs() + (dq + dr).abs()) // 2
+    if wrap_x:
+        for s in (-width, width):
+            e = dq + s
+            d = torch.minimum(d, (e.abs() + dr.abs() + (e + dr).abs()) // 2)
+    return d
 
 
-def los_tables(width: int, height: int, rmax: int) -> tuple[torch.Tensor, torch.Tensor]:
+def axial_delta(a: torch.Tensor, b: torch.Tensor, width: int, wrap_x: bool) -> tuple[torch.Tensor, torch.Tensor]:
+    """`axialDelta` elementwise over tile indices: the axial step (dq, dr)
+    from `a` to `b`, the shorter way round on a wrapping map (the first of
+    shifts 0, -width, +width)."""
+    ra = torch.div(a, width, rounding_mode="floor")
+    rb = torch.div(b, width, rounding_mode="floor")
+    qa = a % width - torch.div(ra - (ra & 1), 2, rounding_mode="floor")
+    qb = b % width - torch.div(rb - (rb & 1), 2, rounding_mode="floor")
+    dq, dr = qb - qa, rb - ra
+    if wrap_x:
+        best = (dq.abs() + dr.abs() + (dq + dr).abs()) // 2
+        base = dq
+        for s in (-width, width):
+            e = base + s
+            n = (e.abs() + dr.abs() + (e + dr).abs()) // 2
+            better = n < best
+            dq = torch.where(better, e, dq)
+            best = torch.where(better, n, best)
+    return dq, dr
+
+
+def ring_walk_places(ctr: torch.Tensor, k: torch.Tensor, width: int, height: int, wrap_x: bool) -> torch.Tensor:
+    """[B, T] each plot's place on the `hexRingWalk` of its ring `k` [B, T]
+    round the centre `ctr` [B]: from the ring's W corner along its NE, E, SE,
+    SW, W and NW legs, the plot's leg and its step along it. On a wrapping
+    map a plot sits on its ring at every column shift that keeps it at
+    distance k, and the walk meets it first at the least such place."""
+    T = width * height
+    ar = torch.arange(T, device=ctr.device)
+    row_t = ar // width
+    q_t = ar % width - (row_t - (row_t & 1)) // 2
+    dq0 = q_t.unsqueeze(0) - q_t[ctr].unsqueeze(1)
+    dr = row_t.unsqueeze(0) - row_t[ctr].unsqueeze(1)
+    pos = torch.full_like(k, 6 * T)
+    n_shift = (3 * (height + width)) // (2 * width) + 2 if wrap_x else 0
+    for sh in range(-n_shift, n_shift + 1):
+        dq = dq0 + sh * width
+        s = dq + dr
+        on = (dq.abs() + dr.abs() + s.abs()) // 2 == k
+        at = torch.where(
+            (s == -k) & (dr > -k), -dr,                                   # NE leg
+            torch.where((dr == -k) & (dq < k), k + dq,                    # E leg
+            torch.where((dq == k) & (dr < 0), 3 * k + dr,                 # SE leg
+            torch.where((s == k) & (dr < k), 3 * k + dr,                  # SW leg
+            torch.where((dr == k) & (dq > -k), 4 * k - dq,                # W leg
+                        6 * k - dr)))))                                   # NW leg
+        pos = torch.where(on, torch.minimum(pos, at), pos)
+    return pos
+
+
+def los_tables(width: int, height: int, wrap_x: bool, rmax: int) -> tuple[torch.Tensor, torch.Tensor]:
     """`hexLineBetween` for every pair within `rmax`, once per map. Returns
     (targets [T, N], mids [T, N, rmax - 1]): for each tile, the tiles at
     distance 1..rmax (-1 padded) and, per target, the tiles strictly BETWEEN
     on the hex line — a cube lerp with the (1e-6, 2e-6, -3e-6) nudge and
     cube rounding, each coordinate rounded with floor(x + 0.5) exactly as
-    the TS helper does, an off-map hex on the line absent (-1)."""
+    the TS helper does, an off-map hex on the line absent (-1). On a
+    wrapping map a target is each plot once and the line runs the shorter
+    way round (`hex_shift`)."""
     import math
-
-    def axial(c, r):
-        return c - ((r - (r & 1)) >> 1), r
 
     def offset(q, r):
         return q + ((r - (r & 1)) >> 1), r
 
     def dist(c1, r1, c2, r2):
-        q1, s1 = axial(c1, r1)
-        q2, s2 = axial(c2, r2)
-        dq, dr = q1 - q2, s1 - s2
-        return (abs(dq) + abs(dr) + abs(dq + dr)) // 2
+        q1, s1 = _axial(c1, r1)
+        q2, s2 = _axial(c2, r2)
+        return _cube(q1 - q2, s1 - s2)
 
     n_t = 1 + 3 * rmax * (rmax + 1) - 1
     T = width * height
@@ -82,17 +162,27 @@ def los_tables(width: int, height: int, rmax: int) -> tuple[torch.Tensor, torch.
     mid = [[[-1] * n_m for _ in range(n_t)] for _ in range(T)]
     for a in range(T):
         ac, ar = a % width, a // width
-        aq, arr = axial(ac, ar)
+        aq, arr = _axial(ac, ar)
         k = 0
+        seen: set[int] = set()
         for br in range(max(0, ar - rmax), min(height, ar + rmax + 1)):
-            for bc in range(max(0, ac - rmax - 1), min(width, ac + rmax + 2)):
+            cols = (range(ac - rmax - 1, ac + rmax + 2) if wrap_x
+                    else range(max(0, ac - rmax - 1), min(width, ac + rmax + 2)))
+            for bc in cols:
+                if wrap_x:
+                    bc %= width
+                    b = br * width + bc
+                    if b in seen:
+                        continue
+                    seen.add(b)
+                    bc += hex_shift(width, True, ac, ar, bc, br)
                 n = dist(ac, ar, bc, br)
                 if n < 1 or n > rmax:
                     continue
-                b = br * width + bc
+                b = br * width + bc % width
                 tgt[a][k] = b
                 mid_ak = mid[a][k]
-                bq, brr = axial(bc, br)
+                bq, brr = _axial(bc, br)
                 ax, az, ay = aq + 1e-6, arr + 2e-6, -aq - arr - 3e-6
                 bx, bz, by = bq + 1e-6, brr + 2e-6, -bq - brr - 3e-6
                 for i in range(1, n):
@@ -107,14 +197,16 @@ def los_tables(width: int, height: int, rmax: int) -> tuple[torch.Tensor, torch.
                     else:
                         rz = -rx - ry
                     mc, mr = offset(rx, rz)
-                    if 0 <= mc < width and 0 <= mr < height:
-                        mid_ak[i - 1] = mr * width + mc
+                    if 0 <= mr < height and (wrap_x or 0 <= mc < width):
+                        mid_ak[i - 1] = mr * width + mc % width
                 k += 1
     return (torch.tensor(tgt, dtype=torch.long).reshape(T, n_t),
             torch.tensor(mid, dtype=torch.long).reshape(T, n_t, n_m))
 
 
-def neighbor_table(width: int, height: int) -> torch.Tensor:
+def neighbor_table(width: int, height: int, wrap_x: bool) -> torch.Tensor:
+    """[T, 6] the neighbour in each direction (E NE NW W SW SE), -1 off the
+    map; a column off either side wraps on a map with `wrap_x`."""
     even = [(1, 0), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
     odd = [(1, 0), (1, -1), (0, -1), (-1, 0), (0, 1), (1, 1)]
     out = torch.full((width * height, 6), -1, dtype=torch.long)
@@ -123,6 +215,8 @@ def neighbor_table(width: int, height: int) -> torch.Tensor:
         offs = odd if r % 2 else even
         for d, (dc, dr) in enumerate(offs):
             nc, nr = c + dc, r + dr
+            if wrap_x:
+                nc %= width
             if 0 <= nc < width and 0 <= nr < height:
                 out[i, d] = nr * width + nc
     return out
@@ -767,13 +861,13 @@ ASSIST_TOWER = 2
 
 M32 = 0xFFFFFFFF
 
-_PAIR_DIST_CACHE: dict[tuple[int, int], torch.Tensor] = {}
+_PAIR_DIST_CACHE: dict[tuple[int, int, bool], torch.Tensor] = {}
 
 
-def pair_distances(width: int, height: int) -> torch.Tensor:
-    key = (width, height)
+def pair_distances(width: int, height: int, wrap_x: bool) -> torch.Tensor:
+    key = (width, height, wrap_x)
     if key not in _PAIR_DIST_CACHE:
-        rows = [hex_distance_from(width, height, i) for i in range(width * height)]
+        rows = [hex_distance_from(width, height, wrap_x, i) for i in range(width * height)]
         _PAIR_DIST_CACHE[key] = torch.stack(rows).to(torch.int16)
     return _PAIR_DIST_CACHE[key]
 
@@ -811,16 +905,28 @@ def tiles_within_offsets(radius: int) -> torch.Tensor:
     return _OFFSETS_CACHE[radius]
 
 
-def tiles_from_offsets(centers: torch.Tensor, offsets: torch.Tensor, width: int, height: int) -> torch.Tensor:
+def tiles_from_offsets(centers: torch.Tensor, offsets: torch.Tensor, width: int, height: int,
+                       wrap_x: bool) -> torch.Tensor:
+    """[N, M] the plot at each axial offset from each centre (`tilesAtOffsets`),
+    -1 off the map. On a wrapping map columns wrap, and where the map is
+    narrow enough for two offsets to name one plot the later one is -1."""
     col = centers % width
     row = torch.div(centers, width, rounding_mode="floor")
     q = col - ((row - (row & 1)) >> 1)
     tq = q.unsqueeze(1) + offsets[:, 0].unsqueeze(0)
     tr = row.unsqueeze(1) + offsets[:, 1].unsqueeze(0)
     tcol = tq + ((tr - (tr & 1)) >> 1)
+    if wrap_x:
+        tcol = tcol % width
     ok = (tcol >= 0) & (tcol < width) & (tr >= 0) & (tr < height)
-    idx = tr * width + tcol
-    return torch.where(ok, idx, torch.full_like(idx, -1))
+    idx = torch.where(ok, tr * width + tcol, torch.full_like(tcol, -1))
+    span = int((offsets[:, 0].max() - offsets[:, 0].min()).item()) + 1 if offsets.shape[0] else 0
+    if wrap_x and width < span:
+        m = idx.shape[1]
+        earlier = torch.ones(m, m, dtype=torch.bool, device=idx.device).tril(-1)
+        dup = ((idx.unsqueeze(2) == idx.unsqueeze(1)) & earlier & (idx >= 0).unsqueeze(2)).any(dim=2)
+        idx = torch.where(dup, torch.full_like(idx, -1), idx)
+    return idx
 
 
 # CIV6_ALIAS_CHECK=1 turns on the per-step state-discipline assertions (alias

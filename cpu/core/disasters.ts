@@ -3,7 +3,7 @@ import type { City, CityState, GameState, Tile } from './types';
 import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
-import { neighborTile, neighbors, offsetToAxial, axialToOffset, tileAt, hexDistance, DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW } from '../../world/hex';
+import { neighborTile, neighbors, tilesAtOffsets, hexDistance, DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW } from '../../world/hex';
 import { hasRiver, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
@@ -624,7 +624,7 @@ export function droughtStart(state: GameState): Tile | undefined {
   for (const t of map.tiles) {
     if (!droughtCandidate(map, t, centres, live)) continue;
     let d: number = DROUGHT_SPACING;
-    for (const e of events) d = Math.min(d, hexDistance(t.col, t.row, e.col, e.row));
+    for (const e of events) d = Math.min(d, hexDistance(state.map, t.col, t.row, e.col, e.row));
     cands.push(t);
     weights.push(1 + d);
     total += 1 + d;
@@ -1254,15 +1254,7 @@ export function stormWeights(degrees: number, area: number): number[] {
 /** The first `hexes` slots of `STORM_DISC` around a centre, on-map ones only,
  *  in the disc's canonical order. */
 export function stormFootprint(map: GameMap, center: Tile, hexes: number): Tile[] {
-  const [cq, cr] = offsetToAxial(center.col, center.row);
-  const out: Tile[] = [];
-  for (let k = 0; k < hexes && k < STORM_DISC.length; k++) {
-    const [dq, dr] = STORM_DISC[k];
-    const [c, r] = axialToOffset(cq + dq, cr + dr);
-    const t = tileAt(map, c, r);
-    if (t) out.push(t);
-  }
-  return out;
+  return tilesAtOffsets(map, center.col, center.row, STORM_DISC.slice(0, hexes));
 }
 
 /** ONE strike of a storm's footprint around `center`: each plot the storm

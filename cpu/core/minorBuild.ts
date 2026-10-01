@@ -813,7 +813,7 @@ function nearestFreeCity(state: GameState, u: Unit): City | undefined {
   let bestD = Infinity;
   for (const c of state.freeSeat?.cities ?? []) {
     const t = state.map.tiles[c.centerIndex];
-    const d = hexDistance(at.col, at.row, t.col, t.row);
+    const d = hexDistance(state.map, at.col, at.row, t.col, t.row);
     if (d < bestD) {
       bestD = d;
       best = c;

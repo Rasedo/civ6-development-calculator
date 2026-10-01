@@ -203,7 +203,7 @@ describe('the rider\u2019s sight', () => {
     const mover = state.units.find((u) => u.type === 'WARRIOR')!;
     const centre = state.map.tiles[to];
     const ring = (n: number) => tilesWithin(state.map, centre.col, centre.row, n)
-      .filter((t) => hexDistance(t.col, t.row, centre.col, centre.row) === n);
+      .filter((t) => hexDistance(state.map, t.col, t.row, centre.col, centre.row) === n);
     const far = ring(4);
     expect(far.length).toBeGreaterThan(0);
     // dark BEFORE the step — otherwise the assertion below proves nothing
@@ -218,7 +218,7 @@ describe('the rider\u2019s sight', () => {
     expect(stepUnit(state, mover, state.map.tiles[to])).not.toBe('blocked');
     const centre = state.map.tiles[to];
     const far = tilesWithin(state.map, centre.col, centre.row, 4)
-      .filter((t) => hexDistance(t.col, t.row, centre.col, centre.row) === 3);
+      .filter((t) => hexDistance(state.map, t.col, t.row, centre.col, centre.row) === 3);
     // a Builder sees no further than its escort, so the third ring stays dark
     expect(far.some((t) => seen(state, t.index))).toBe(false);
   });

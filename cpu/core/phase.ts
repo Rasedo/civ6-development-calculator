@@ -168,7 +168,7 @@ function nearestDistance(state: GameState, a: number, bs: number[]): number {
   let best = Infinity;
   for (const b of bs) {
     const bt = state.map.tiles[b];
-    best = Math.min(best, hexDistance(at.col, at.row, bt.col, bt.row));
+    best = Math.min(best, hexDistance(state.map, at.col, at.row, bt.col, bt.row));
   }
   return best;
 }
@@ -385,7 +385,7 @@ function citizenPressure(state: GameState, here: Tile, cities: City[]): number {
   let sub = 0;
   for (const c of cities) {
     const t = state.map.tiles[c.centerIndex];
-    const d = hexDistance(here.col, here.row, t.col, t.row);
+    const d = hexDistance(state.map, here.col, here.row, t.col, t.row);
     if (d <= LOYALTY_RANGE) {
       const each = CITIZEN_PRESSURE_BASE + (c.isCapital ? CITIZEN_PRESSURE_CAPITAL : 0) + agePressure(state, c.seat);
       sub += Math.max(0, c.population - emergencyPressureCut(state, c.seat)) * each * (LOYALTY_RANGE + 1 - d);
@@ -592,7 +592,7 @@ function wonderLoyaltyAura(state: GameState, city: City): boolean {
     const range = w.def.effects?.loyaltyAura ?? 0;
     if (!range) continue;
     const t = state.map.tiles[w.tileIndex];
-    if (hexDistance(t.col, t.row, center.col, center.row) <= range) return true;
+    if (hexDistance(state.map, t.col, t.row, center.col, center.row) <= range) return true;
   }
   return false;
 }
@@ -2169,7 +2169,7 @@ export function cityStrikes(state: GameState, city: City, strikeCS: number): voi
     let bestTile = -1;
     let bestDist = 99;
     for (const t of state.map.tiles) {
-      const d = hexDistance(origin.col, origin.row, t.col, t.row);
+      const d = hexDistance(state.map, origin.col, origin.row, t.col, t.row);
       if (d < 1 || d > 2) continue;
       // ANY unit hostile to the city's seat that a shot may take (`shootable`:
       // a military one): a city's strike picks its target by distance, never
@@ -2924,7 +2924,7 @@ export function seatPhase(state: GameState): void {
           const at = q.kind === 'district'
             ? q.tileIndex
             : civCity.districts.find((d) => d.type === BUILDINGS[q.building]?.district)?.tileIndex;
-          if (at !== undefined && crossesRiver(state.map.tiles[civCity.centerIndex], state.map.tiles[at])) {
+          if (at !== undefined && crossesRiver(state.map, state.map.tiles[civCity.centerIndex], state.map.tiles[at])) {
             for (const r of seatMods.riverCrossProd) if (r.kind === q.kind) _em *= 1 + r.pct / 100;
           }
         }

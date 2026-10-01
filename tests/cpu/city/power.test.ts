@@ -182,7 +182,7 @@ describe('power', () => {
     // REGIONAL_RANGE away, `far`'s one hex beyond it
     const near = foundCity(state, tileAtCoords(state.map, 9 + REGIONAL_RANGE, 8).index, 0).city!;
     const far = foundCity(state, tileAtCoords(state.map, 9, 9 + REGIONAL_RANGE).index, 0).city!;
-    expect(hexDistance(9, 8, 9, 9 + REGIONAL_RANGE)).toBe(REGIONAL_RANGE + 1);
+    expect(hexDistance(state.map, 9, 8, 9, 9 + REGIONAL_RANGE)).toBe(REGIONAL_RANGE + 1);
     for (const c of [near, far]) c.buildings.push('RESEARCH_LAB');
     expect(lit(state, near)).toBe(true);
     expect(far.powered).toBe(false);

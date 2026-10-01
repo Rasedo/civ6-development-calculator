@@ -16,9 +16,7 @@
  * city-states city-state ids 0..m-1 in ascending player id, the Free Cities
  * player `FREE_SEAT`, the barbarians `BARB_SEAT`. Tile index = the game's
  * plot index (y * W + x, row = the game's y), the layout `world@1` uses.
- * The game's map wraps in x and the engine's does not: `wrapped` answers
- * whether two plots are nearer across the seam, so a check whose reach
- * crosses it can skip.
+ * The map wraps in x when the record's head says so (`GameMap.wrapX`).
  *
  * A city's worked plots are pinned (`Tile.locked`) and its district slots
  * take the game's specialist counts (`City.specialistPref`), so the engine's
@@ -26,7 +24,7 @@
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
-import type { City, CityState, CityStateType, DistrictId, FeatureId, GameState, ImprovementId, TerrainId, Tile, Unit } from '../core/types';
+import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, ImprovementId, TerrainId, Tile, Unit } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, emptySeat, freeSeatOf, markCityCentre, seatOf, seatOfCityState, setTileOwner, setWar } from '../core/seats';
@@ -47,7 +45,7 @@ import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { hexDistance } from '../../world/hex';
+import { neighborTile } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type TurnRecord } from './record';
 import { engineId } from './aliases';
 
@@ -69,7 +67,6 @@ export interface Imported {
   gaps: Map<string, number>;
   /** engine religion id (its founder's seat) by the game's religion type */
   religionSeat: Map<number, number>;
-  width: number;
   /** cities whose culture-expansion count the history cannot know */
   tilesUnknown: Set<number>;
   /** the gaps met importing each seat (its research, government, policies,
@@ -265,44 +262,15 @@ function tileOf(ctx: Ctx, rec: TurnRecord, i: number): Tile {
   };
 }
 
-/** The game plot index of the neighbour in ENGINE direction d, x wrapping as
- *  the game's map does. */
-function gameNeighbour(W: number, H: number, i: number, d: number): number | null {
-  const x = i % W;
-  const y = Math.floor(i / W);
-  const odd = (y & 1) === 1;
-  // engine odd-r: 0 E, 1 NE (row - 1), 2 NW, 3 W, 4 SW (row + 1), 5 SE
-  const table: [number, number][] = odd
-    ? [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]]
-    : [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]];
-  const [dx, dy] = table[d];
-  const ny = y + dy;
-  if (ny < 0 || ny >= H) return null;
-  const nx = (x + dx + W) % W;
-  return ny * W + nx;
-}
-
-function edgeMask(rec: TurnRecord, i: number, field: number): number {
-  const W = rec.head.W;
-  const H = rec.head.H;
-  const own = plotAt(rec, i)[field] as number;
+function edgeMask(map: GameMap, rec: TurnRecord, t: Tile, field: number): number {
+  const own = plotAt(rec, t.index)[field] as number;
   let m = 0;
   for (const [bit, d] of OWN_EDGES) if (own & bit) m |= 1 << d;
   for (const [d, bit] of NEIGHBOUR_EDGES) {
-    const n = gameNeighbour(W, H, i, d);
-    if (n !== null && ((plotAt(rec, n)[field] as number) & bit)) m |= 1 << d;
+    const n = neighborTile(map, t, d);
+    if (n && ((plotAt(rec, n.index)[field] as number) & bit)) m |= 1 << d;
   }
   return m;
-}
-
-/** Hex distance on the game's map, x wrapping; and whether the wrapped way
- *  is SHORTER than the engine's straight one. */
-export function wrapped(width: number, a: number, b: number): boolean {
-  const ca = a % width, ra = Math.floor(a / width);
-  const cb = b % width, rb = Math.floor(b / width);
-  const straight = hexDistance(ca, ra, cb, rb);
-  const round = Math.min(hexDistance(ca + width, ra, cb, rb), hexDistance(ca, ra, cb + width, rb));
-  return round < straight;
 }
 
 function leaderRow(leader: string): number {
@@ -408,11 +376,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   ctx.scopeTile = undefined;
   for (const [i, n] of history?.fireFood ?? []) tiles[i].fertility = Math.min(FERTILITY_CAP, n);
   for (const [i, n] of history?.fireProd ?? []) tiles[i].fertilityProd = Math.min(FERTILITY_CAP, n);
+  const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles };
   for (const t of tiles) {
-    t.riverMask = edgeMask(rec, t.index, P.riverBits);
-    t.cliffMask = edgeMask(rec, t.index, P.cliffBits);
+    t.riverMask = edgeMask(map, rec, t, P.riverBits);
+    t.cliffMask = edgeMask(map, rec, t, P.cliffBits);
   }
-  const state = createGameFromMap({ width: W, height: H, seed: 0, tiles }, num(rec.seed) >>> 0);
+  const state = createGameFromMap(map, num(rec.seed) >>> 0);
   state.turn = rec.turn;
 
   const seatOfPlayer = new Map<number, number>();
@@ -754,7 +723,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   state.nextUnitId = nextId;
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
-    gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat, width: W,
+    gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
   };
 }

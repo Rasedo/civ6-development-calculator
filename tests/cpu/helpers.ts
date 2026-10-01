@@ -28,7 +28,7 @@ import { loadWorld } from '../../cpu/world/load';
 import { buildWorld } from '../../seeder/build';
 import { WORLD_PRESETS } from '../../seeder/presets';
 
-export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND'): GameMap {
+export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND', wrapX = false): GameMap {
   const tiles: Tile[] = [];
   for (let row = 0; row < height; row++) {
     for (let col = 0; col < width; col++) {
@@ -60,7 +60,7 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
       });
     }
   }
-  return { width, height, seed: 0, tiles };
+  return { width, height, wrapX, seed: 0, tiles };
 }
 
 export function makeState(map: GameMap = makeMap()): GameState {
@@ -162,7 +162,7 @@ export function settleFirstCity(state: GameState, seat = 0): City {
   let bestD = Infinity;
   for (const t of state.map.tiles) {
     if (!canFoundCity(state, t.index, seat).ok) continue;
-    const d = hexDistance(t.col, t.row, cc, cr);
+    const d = hexDistance(state.map, t.col, t.row, cc, cr);
     if (d < bestD) {
       bestD = d;
       best = t;

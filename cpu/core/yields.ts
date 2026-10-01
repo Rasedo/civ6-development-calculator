@@ -675,7 +675,7 @@ export function cityPower(state: GameState, city: City): CityPower {
       if (!inst) continue;
       const tile = state.map.tiles[inst.tileIndex];
       if (!tile.districtComplete || tile.districtPillaged) continue;
-      if (hexDistance(tile.col, tile.row, center.col, center.row) > reach) continue;
+      if (hexDistance(state.map, tile.col, tile.row, center.col, center.row) > reach) continue;
       // CIV6 (Industrialist, EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR):
       // the plant's OWN city's governor raises what each resource provides
       rate = Math.max(rate, (BUILDINGS[id]?.fuelRate ?? 0)
@@ -738,7 +738,7 @@ export function regionalEffects(
         // CIV6 (Tesla, Paxton): the SOURCE district's own reach bonus, on
         // top of the row's range or the shared one
         const _gpReach = gpTilePermOf(tile, 'regionalRange');
-        if (hexDistance(tile.col, tile.row, center.col, center.row) > (def.regionalRange ?? reach) + _gpReach) continue;
+        if (hexDistance(state.map, tile.col, tile.row, center.col, center.row) > (def.regionalRange ?? reach) + _gpReach) continue;
         // CIV6 (Vertical Integration): "This city receives Production from any
         // number of Industrial Zones within 6 tiles, not just the first." The
         // promotion names ONE district, so no other regional line stacks.

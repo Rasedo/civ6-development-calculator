@@ -36,14 +36,13 @@ import { builderCost, traderCost } from '../core/units';
 import { monumentalityBuyMult } from '../core/eras';
 import { civOf, hiddenResourcesFor, seatOf } from '../core/seats';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
-import { LOYALTY_MAX, LOYALTY_RANGE } from '../data/seats';
-import { RELIGION_PRESSURE_RANGE } from '../data/religion';
+import { LOYALTY_MAX } from '../data/seats';
 import { UNITS } from '../data/units';
 import type { DistrictId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type TurnRecord } from './record';
-import { engineRowOf, importTurn, wrapped, type History, type Imported } from './import';
+import { engineRowOf, importTurn, type History, type Imported } from './import';
 
 export interface CheckResult {
   turn: number;
@@ -52,16 +51,13 @@ export interface CheckResult {
   ok: boolean;
   game?: unknown;
   ours?: unknown;
-  /** why the check did not run: an action in the diff, a wrap, a missing reader */
+  /** why the check did not run: an action in the diff, a missing reader */
   skip?: string;
   gaps?: string[];
   state?: Record<string, unknown>;
 }
 
 const TOL = 0.02;
-/** the checks that read a city's work radius, skipped together at the seam */
-const CITY_AREA_CHECKS = ['city.yields', 'city.centreYields', 'city.housing', 'city.amenities', 'city.amenityTier',
-  'city.growthThreshold', 'city.foodSurplus', 'city.borderCost', 'city.nextPlot'];
 const near = (a: number, b: number, tol = TOL) => Math.abs(a - b) <= tol;
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
@@ -133,13 +129,6 @@ function plotGaps(imp: Imported, t: { index: number; col: number; row: number })
   return out;
 }
 
-/** Does any plot within `radius` of `center` sit nearer across the x seam? */
-function reachWraps(imp: Imported, center: number, radius: number): boolean {
-  const W = imp.width;
-  const t = imp.state.map.tiles[center];
-  return t.col < radius || t.col >= W - radius;
-}
-
 /** The cities the imported state holds, each with the game city behind it. */
 function citiesOfImport(imp: Imported): { city: City; dump: DumpCity; minor: boolean }[] {
   const out: { city: City; dump: DumpCity; minor: boolean }[] = [];
@@ -181,10 +170,6 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       ctx = ctxBySeat.get(t.ownerSeat)!;
     }
     const subject = `plot ${t.index} (${t.col},${t.row})`;
-    if (t.col === 0 || t.col === imp.width - 1) {
-      out.push({ turn, check: 'plot.yields', subject, ok: true, skip: 'wrap' });
-      continue;
-    }
     let oy = YIELD_KEYS.map((k) => tileYields(ctx, t)[k]);
     let ok = oy.every((v, i) => near(v, gy[i]));
     // a building or wonder of the owning city may pay this plot (the
@@ -209,50 +194,42 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const gaps = cityGaps(imp, c);
     const push = (check: string, ok: boolean, game: unknown, ours: unknown, st?: Record<string, unknown>) =>
       out.push({ turn, check, subject, ok, game, ours, ...gapsFor(gaps, check), ...(ok || !st ? {} : { state: st }) });
-    if (reachWraps(imp, city.centerIndex, 3)) {
-      for (const check of CITY_AREA_CHECKS) out.push({ turn, check, subject, ok: true, skip: 'wrap' });
+    const stats = computeCityStats(state, city);
+    const gy = c.yields.map(num);
+    // the game's city Gold is before its buildings' and districts' upkeep
+    const oy = YIELD_KEYS.map((k: YieldKey) => round3(k === 'gold' ? stats.total.gold + stats.maintenance : stats.total[k]));
+    const cityState = {
+      pop: city.population, worked: stats.workedTiles.length, specialists: stats.specialistTotal,
+      gameWorked: c.worked.length - 1, buildings: city.buildings, districts: city.districts.map((d) => d.type),
+      breakdown: Object.fromEntries(Object.entries(stats.breakdown).map(([k, y]) => [k, YIELD_KEYS.map((q) => round3(y[q]))])),
+      tier: stats.amenities.tier.name,
+    };
+    push('city.yields', oy.every((v, i) => near(v, gy[i], 0.05)), gy, oy, cityState);
+    const centre = plotAt(rec, city.centerIndex)[P.yields] as number[];
+    const oc = tileYieldsForCenter(makeYieldCtx(state, city.seat), state.map.tiles[city.centerIndex]);
+    const occ = YIELD_KEYS.map((k) => oc[k]);
+    push('city.centreYields', occ.every((v, i) => near(v, centre[i])), centre, occ);
+    push('city.housing', near(stats.housing, num(c.housing)), num(c.housing), stats.housing,
+      { parts: c.housingParts, pop: city.population });
+    push('city.amenities', stats.amenities.have === num(c.amenities) && stats.amenities.needed === num(c.amenitiesNeeded),
+      [num(c.amenities), num(c.amenitiesNeeded)], [stats.amenities.have, stats.amenities.needed], { parts: c.amenityParts });
+    const tierGame = 6 - num(c.happiness);
+    push('city.amenityTier', amenityTierIndex(stats.amenities.tier.name) === tierGame,
+      AMENITY_TIERS[tierGame]?.name, stats.amenities.tier.name);
+    push('city.growthThreshold', near(growthFoodNeeded(city.population), num(c.growthThreshold)),
+      num(c.growthThreshold), growthFoodNeeded(city.population), { pop: city.population });
+    push('city.foodSurplus', near(stats.foodSurplus, num(c.foodSurplus), 0.05), num(c.foodSurplus),
+      round3(stats.foodSurplus), { effective: round3(stats.effectiveFoodSurplus) });
+    if (imp.tilesUnknown.has(city.centerIndex)) {
+      out.push({ turn, check: 'city.borderCost', subject, ok: true, skip: 'expansions before the record' });
     } else {
-      const stats = computeCityStats(state, city);
-      const gy = c.yields.map(num);
-      // the game's city Gold is before its buildings' and districts' upkeep
-      const oy = YIELD_KEYS.map((k: YieldKey) => round3(k === 'gold' ? stats.total.gold + stats.maintenance : stats.total[k]));
-      const cityState = {
-        pop: city.population, worked: stats.workedTiles.length, specialists: stats.specialistTotal,
-        gameWorked: c.worked.length - 1, buildings: city.buildings, districts: city.districts.map((d) => d.type),
-        breakdown: Object.fromEntries(Object.entries(stats.breakdown).map(([k, y]) => [k, YIELD_KEYS.map((q) => round3(y[q]))])),
-        tier: stats.amenities.tier.name,
-      };
-      push('city.yields', oy.every((v, i) => near(v, gy[i], 0.05)), gy, oy, cityState);
-      const centre = plotAt(rec, city.centerIndex)[P.yields] as number[];
-      const oc = tileYieldsForCenter(makeYieldCtx(state, city.seat), state.map.tiles[city.centerIndex]);
-      const occ = YIELD_KEYS.map((k) => oc[k]);
-      push('city.centreYields', occ.every((v, i) => near(v, centre[i])), centre, occ);
-      push('city.housing', near(stats.housing, num(c.housing)), num(c.housing), stats.housing,
-        { parts: c.housingParts, pop: city.population });
-      push('city.amenities', stats.amenities.have === num(c.amenities) && stats.amenities.needed === num(c.amenitiesNeeded),
-        [num(c.amenities), num(c.amenitiesNeeded)], [stats.amenities.have, stats.amenities.needed], { parts: c.amenityParts });
-      const tierGame = 6 - num(c.happiness);
-      push('city.amenityTier', amenityTierIndex(stats.amenities.tier.name) === tierGame,
-        AMENITY_TIERS[tierGame]?.name, stats.amenities.tier.name);
-      push('city.growthThreshold', near(growthFoodNeeded(city.population), num(c.growthThreshold)),
-        num(c.growthThreshold), growthFoodNeeded(city.population), { pop: city.population });
-      push('city.foodSurplus', near(stats.foodSurplus, num(c.foodSurplus), 0.05), num(c.foodSurplus),
-        round3(stats.foodSurplus), { effective: round3(stats.effectiveFoodSurplus) });
-      if (imp.tilesUnknown.has(city.centerIndex)) {
-        out.push({ turn, check: 'city.borderCost', subject, ok: true, skip: 'expansions before the record' });
-      } else {
-        push('city.borderCost', near(stats.border.cost, num(c.nextPlotCost)), num(c.nextPlotCost), stats.border.cost,
-          { tilesAcquired: city.tilesAcquired, plots: c.plots.length });
-      }
-      push('city.nextPlot', stats.border.nextTile === num(c.nextPlot), num(c.nextPlot), stats.border.nextTile);
+      push('city.borderCost', near(stats.border.cost, num(c.nextPlotCost)), num(c.nextPlotCost), stats.border.cost,
+        { tilesAcquired: city.tilesAcquired, plots: c.plots.length });
     }
-    // loyalty: every city within the loyalty range presses, so the seam is
-    // any city pair nearer across it
+    push('city.nextPlot', stats.border.nextTile === num(c.nextPlot), num(c.nextPlot), stats.border.nextTile);
+    // loyalty
     const gameLpt = num(c.loyaltyPerTurn);
-    const wrapsL = rec.cities.some((o) => o !== c && wrapped(imp.width, city.centerIndex, o.y * imp.width + o.x)
-      && hexDistanceWrapped(imp.width, city.centerIndex, o.y * imp.width + o.x) <= LOYALTY_RANGE);
-    if (wrapsL) out.push({ turn, check: 'city.loyaltyPerTurn', subject, ok: true, skip: 'wrap' });
-    else if (bool(c.capital)) out.push({ turn, check: 'city.loyaltyPerTurn', subject, ok: true, skip: 'capital' });
+    if (bool(c.capital)) out.push({ turn, check: 'city.loyaltyPerTurn', subject, ok: true, skip: 'capital' });
     else {
       // the whole per-turn change the turn step applies (the governor's term
       // and the seat's terms beside the city's own), read off a city held at
@@ -313,7 +290,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     }
     for (const [plot, price] of c.plotBuy) {
       const ours = tilePurchaseCost(state, city, plot);
-      buyPush('buy.plotGold', ours === price, price, ours, { plot, distance: hexDistanceWrapped(imp.width, city.centerIndex, plot) });
+      buyPush('buy.plotGold', ours === price, price, ours, { plot, distance: tileDistance(state, city.centerIndex, plot) });
     }
   }
 
@@ -347,10 +324,10 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
   return out;
 }
 
-function hexDistanceWrapped(width: number, a: number, b: number): number {
-  const ca = a % width, ra = Math.floor(a / width);
-  const cb = b % width, rb = Math.floor(b / width);
-  return Math.min(hexDistance(ca, ra, cb, rb), hexDistance(ca + width, ra, cb, rb), hexDistance(ca, ra, cb + width, rb));
+/** the hex distance between two plots, by index */
+function tileDistance(state: GameState, a: number, b: number): number {
+  const ta = state.map.tiles[a], tb = state.map.tiles[b];
+  return hexDistance(state.map, ta.col, ta.row, tb.col, tb.row);
 }
 
 /** What changed between two consecutive records, per city and per seat. */
@@ -495,15 +472,14 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const skipAll = acts.cityChanged.has(k) || !next ? 'city changed hands or vanished'
         : late.has(c.owner) ? 'a turn start missing from a record' : null;
       const st = stats.get(city)!;
-      const wraps = reachWraps(imp, city.centerIndex, 3);
       const res = (check: string, ok: boolean, game: unknown, ours: unknown, s?: Record<string, unknown>) =>
         out.push({ turn, check, subject, ok, game, ours, ...gapsFor(gaps, check), ...(ok || !s ? {} : { state: s }) });
 
       // growth
       const before = { pop: city.population, food: city.foodBox };
       const settlerOut = acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
-        && hexDistanceWrapped(imp.width, u.plot, city.centerIndex) <= 1);
-      const growSkip = skipAll ?? (wraps ? 'wrap' : settlerOut ? 'a Settler left the city' : null);
+        && tileDistance(state, u.plot, city.centerIndex) <= 1);
+      const growSkip = skipAll ?? (settlerOut ? 'a Settler left the city' : null);
       seatGrowth(city, st.effectiveFoodSurplus, st.growthNeeded, state.turn);
       if (growSkip || !next) out.push({ turn, check: 'step.growth', subject, ok: true, skip: growSkip ?? 'no t+1' });
       else {
@@ -520,7 +496,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const gainedOurs = state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id && !plotsBefore.has(t.index)).map((t) => t.index);
       const gainedGame = acts.plotsGained.get(k) ?? [];
       const bought = (acts.goldSpent.get(c.owner) ?? 0) > 0 && gainedGame.some((q) => !gainedOurs.includes(q));
-      const borderSkip = skipAll ?? (wraps ? 'wrap' : bought ? 'a plot may have been bought'
+      const borderSkip = skipAll ?? (bought ? 'a plot may have been bought'
         : imp.tilesUnknown.has(city.centerIndex) ? 'expansions before the record'
         : held.has(c.owner) ? 'the seat banked no border culture' : null);
       if (borderSkip || !next) out.push({ turn, check: 'step.border', subject, ok: true, skip: borderSkip ?? 'no t+1' });
@@ -534,9 +510,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const loyBefore = city.loyalty;
       const hasGov = num(c.governor) >= 0;
       applyLoyalty(state, city, st.amenities.tier.name, hasGov);
-      const wrapsL = a.cities.some((o) => o !== c && wrapped(imp.width, city.centerIndex, o.y * imp.width + o.x)
-        && hexDistanceWrapped(imp.width, city.centerIndex, o.y * imp.width + o.x) <= LOYALTY_RANGE);
-      const loySkip = skipAll ?? (wrapsL ? 'wrap' : acts.governorChanged.has(k) ? 'governor changed' : null);
+      const loySkip = skipAll ?? (acts.governorChanged.has(k) ? 'governor changed' : null);
       if (loySkip || !next) out.push({ turn, check: 'step.loyalty', subject, ok: true, skip: loySkip ?? 'no t+1' });
       else {
         res('step.loyalty', near(city.loyalty ?? 100, num(next.loyalty), 0.05), num(next.loyalty), round3(city.loyalty ?? 100),
@@ -544,10 +518,8 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       }
       // religious pressure
       const sc = spreadCities.get(`${seat}:${city.id}`);
-      const spreadNear = acts.spreads.some((s) => hexDistanceWrapped(imp.width, s.plot, city.centerIndex) <= 3);
-      const wrapsR = a.cities.some((o) => o !== c && wrapped(imp.width, city.centerIndex, o.y * imp.width + o.x)
-        && hexDistanceWrapped(imp.width, city.centerIndex, o.y * imp.width + o.x) <= RELIGION_PRESSURE_RANGE);
-      const relSkip = skipAll ?? (spreadNear ? 'a religious unit spread nearby' : wrapsR ? 'wrap' : null);
+      const spreadNear = acts.spreads.some((s) => tileDistance(state, s.plot, city.centerIndex) <= 3);
+      const relSkip = skipAll ?? (spreadNear ? 'a religious unit spread nearby' : null);
       if (!sc || relSkip || !next || !Array.isArray(next.religions) || !Array.isArray(c.religions)) {
         out.push({ turn, check: 'step.pressure', subject, ok: true, skip: relSkip ?? 'no reader' });
       } else {

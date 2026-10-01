@@ -135,21 +135,21 @@ def static_of(rules, world: dict, device: str = "cpu") -> Static:
     """The game's `Static`, from rules.json (`rules`, as `load_rules` reads
     it) and its world file (`world`, as `load_fixture` reads it). Reads no
     engine state."""
-    return _static(rules, int(world["width"]), int(world["height"]), len(world["civs"]),
+    return _static(rules, int(world["width"]), int(world["height"]), bool(world["wrapX"]), len(world["civs"]),
                    int(world.get("cityStateMax", 0)), device)
 
 
 def static_for(sim) -> Static:
     """`static_of` for a caller that holds a sim and no world file: the
-    sim's rules and the world's four dimensions, which is all `static_of`
-    reads from the world."""
-    return _static(sim.rules, sim.W, sim.H, sim.n_majors, sim.S, sim.device)
+    sim's rules and the world's shape and seat counts, which is all
+    `static_of` reads from the world."""
+    return _static(sim.rules, sim.W, sim.H, sim.wrap_x, sim.n_majors, sim.S, sim.device)
 
 
-def _static(rules, width: int, height: int, n_majors: int, n_citystates: int, device: str) -> Static:
+def _static(rules, width: int, height: int, wrap_x: bool, n_majors: int, n_citystates: int, device: str) -> Static:
     T = width * height
-    neigh = simbase.neighbor_table(width, height).to(device)
-    pair_dist = simbase.pair_distances(width, height).to(device)
+    neigh = simbase.neighbor_table(width, height, wrap_x).to(device)
+    pair_dist = simbase.pair_distances(width, height, wrap_x).to(device)
     # the distance-2 ring, each row ascending and padded -1: the tiles two
     # steps out, in tile-index order
     ar = torch.arange(T, device=device).expand(T, -1)

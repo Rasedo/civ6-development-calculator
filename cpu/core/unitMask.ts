@@ -258,7 +258,7 @@ function ringTarget(ctx: MaskCtx, t: Tile): boolean {
 function ring(state: GameState, here: Tile, d: number): Tile[] {
   const out: Tile[] = [];
   for (const t of state.map.tiles) {
-    if (hexDistance(here.col, here.row, t.col, t.row) === d) out.push(t);
+    if (hexDistance(state.map, here.col, here.row, t.col, t.row) === d) out.push(t);
   }
   return out;
 }
@@ -446,7 +446,7 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
         let k = 0;
         for (const t of state.map.tiles) {
           if (k >= AIR_STRIKE_COLS) break;
-          const d = hexDistance(here.col, here.row, t.col, t.row);
+          const d = hexDistance(state.map, here.col, here.row, t.col, t.row);
           if (d <= 0 || d > airRange(u) || !warGround(ctx, t) || !wreckable(ctx, t)) continue;
           out.add(A_AIR_PILLAGE + k);
           k += 1;

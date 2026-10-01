@@ -5,7 +5,7 @@
  */
 
 import { ATHEISM_PRESSURE_PER_POP, ENHANCER_BELIEFS } from '../data/religion';
-import type { GameState, City, Seat, Tile, Unit } from './types';
+import type { GameMap, GameState, City, Seat, Tile, Unit } from './types';
 import { seatWonderSum } from './wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC, BUILDER_COST_STEP } from '../data/units';
@@ -20,7 +20,7 @@ export function formationCS(unit: Unit): number {
 /** CIV6: fortification tops out at two turns dug in. */
 const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
-import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial, DIR_E, DIR_W } from '../../world/hex';
+import { neighbors, neighborTile, hexDistance, directionTo, DIR_E, DIR_W } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
 import { canRemoveFeature, portalAt, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -250,7 +250,7 @@ export function riverCharge(state: GameState, from: Tile, to: Tile, mover?: { ty
   if (isWater(to)) return 0;
   if (roadStep(from, to) && roadBridges(state)) return 0;
   if (mover && religiousIgnoresTerrain(state, mover)) return 0;
-  return crossesRiver(from, to) ? RIVER_CROSS_MP : 0;
+  return crossesRiver(state.map, from, to) ? RIVER_CROSS_MP : 0;
 }
 
 /**
@@ -312,16 +312,10 @@ export function tradeWaterLevel(state: GameState, seat: number): number {
  *  a flat 3 points). */
 export const RIVER_CROSS_MP = 3 * MP_SCALE;
 
-export function crossesRiver(from: Tile, to: Tile): boolean {
+export function crossesRiver(map: GameMap, from: Tile, to: Tile): boolean {
   if (from.riverMask === 0) return false;
-  const [fq, fr] = offsetToAxial(from.col, from.row);
-  const [tq, tr] = offsetToAxial(to.col, to.row);
-  for (let d = 0; d < 6; d++) {
-    if (fq + AXIAL_DIRS[d][0] === tq && fr + AXIAL_DIRS[d][1] === tr) {
-      return (from.riverMask & (1 << d)) !== 0;
-    }
-  }
-  return false;
+  const d = directionTo(map, from, to);
+  return d >= 0 && (from.riverMask & (1 << d)) !== 0;
 }
 
 export function unitsAt(state: GameState, tileIndex: number): Unit[] {
@@ -439,7 +433,7 @@ export function unitVisibleTo(state: GameState, u: Unit, seat: number): boolean 
     if (v.seat !== seat) continue;
     const vt = state.map.tiles[v.tileIndex];
     const reach = chassis && UNITS[v.type]?.revealStealth ? unitSight(v, state) : 1;
-    if (hexDistance(vt.col, vt.row, t.col, t.row) <= reach) return true;
+    if (hexDistance(state.map, vt.col, vt.row, t.col, t.row) <= reach) return true;
   }
   return false;
 }
@@ -523,7 +517,7 @@ export function inEnemyZoc(
   for (const n of neighbors(state.map, tile)) {
     // CIV6 (Zone of Control): rivers block ZOC — an exerter across a river
     // from the entered tile halts nothing.
-    if (crossesRiver(tile, n)) continue;
+    if (crossesRiver(state.map, tile, n)) continue;
     for (const u of unitsAt(state, n.index)) {
       const relU = unitReligious(u.type);
       if (relU !== relMover) continue;
@@ -1490,7 +1484,7 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
         if (other.seat === seat || other.seat === owner || !isCiv(other.seat)) continue;
         const reached = other.cities.some((c) => {
           const cc = state.map.tiles[c.centerIndex];
-          return hexDistance(cc.col, cc.row, here.col, here.row) <= CONCERT_SHARE_RANGE;
+          return hexDistance(state.map, cc.col, cc.row, here.col, here.row) <= CONCERT_SHARE_RANGE;
         });
         if (reached) band.tourismTo[other.seat] = (band.tourismTo[other.seat] ?? 0) + Math.floor(lump * near / 100);
       }
@@ -1611,12 +1605,12 @@ export function spawnUnit(
   let spot = isAirUnit(unitType) || isSpy(unitType)
     ? near
     : [near, ...neighbors(state.map, near)]
-      .sort((a, b) => hexDistance(near.col, near.row, a.col, a.row) - hexDistance(near.col, near.row, b.col, b.row))
+      .sort((a, b) => hexDistance(state.map, near.col, near.row, a.col, a.row) - hexDistance(state.map, near.col, near.row, b.col, b.row))
       .find((t) => tileFreeForUnit(state, t.index, seat, probe));
   if (!spot && far) {
     let bd = Infinity;
     for (const t of state.map.tiles) {
-      const d = hexDistance(near.col, near.row, t.col, t.row);
+      const d = hexDistance(state.map, near.col, near.row, t.col, t.row);
       if (d < bd && tileFreeForUnit(state, t.index, seat, probe)) {
         spot = t;
         bd = d;
@@ -2048,7 +2042,7 @@ function nearestCityTo(state: GameState, owner: Seat, tile: Tile): City | undefi
   let bestD = Infinity;
   for (const c of owner.cities) {
     const ctr = state.map.tiles[c.centerIndex];
-    const d = hexDistance(ctr.col, ctr.row, tile.col, tile.row);
+    const d = hexDistance(state.map, ctr.col, ctr.row, tile.col, tile.row);
     if (d < bestD) {
       bestD = d;
       best = c;

@@ -34,6 +34,9 @@ export interface WorldCityState {
 interface WorldMapLayers {
   width: number;
   height: number;
+  /** the map wraps in x (`GameMap.wrapX`); a seam plot's river and cliff
+   *  masks name the edges across the seam */
+  wrapX: boolean;
   terrain: number[];
   elevation: number[];
   feature: number[];

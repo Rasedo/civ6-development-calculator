@@ -594,7 +594,7 @@ describe('the naval raider is invisible', () => {
     const eye = spawnUnit(state, watcher, home.index, 0)!;
     eye.tileIndex = home.index;
     const spot = state.map.tiles.find(
-      (t) => isWater(t) && hexDistance(home.col, home.row, t.col, t.row) === dist,
+      (t) => isWater(t) && hexDistance(state.map, home.col, home.row, t.col, t.row) === dist,
     )!;
     const raider = spawnUnit(state, 'PRIVATEER', spot.index, civ.seat)!;
     raider.tileIndex = spot.index;

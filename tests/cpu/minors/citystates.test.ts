@@ -51,7 +51,7 @@ describe('city-state placement', () => {
       for (const other of a.cityStates) {
         if (other.id === cityState.id) continue;
         const oc = a.map.tiles[other.centerIndex];
-        expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(CITY_STATE_START_DIST);
+        expect(hexDistance(a.map, center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(CITY_STATE_START_DIST);
       }
     }
   });
@@ -63,11 +63,11 @@ describe('city-state placement', () => {
     const ring1 = tilesWithin(state.map, 6, 6, 1).find((t) => t.index !== cityState.centerIndex)!;
     expect(canFoundCity(state, ring1.index, 0).ok).toBe(false);
     const ring2 = tilesWithin(state.map, 6, 6, 2).find(
-      (t) => hexDistance(t.col, t.row, 6, 6) === 2,
+      (t) => hexDistance(state.map, t.col, t.row, 6, 6) === 2,
     )!;
     expect(canFoundCity(state, ring2.index, 0).ok).toBe(false); // min city distance 4
     const ring3 = tilesWithin(state.map, 6, 6, 3).find(
-      (t) => hexDistance(t.col, t.row, 6, 6) === 3,
+      (t) => hexDistance(state.map, t.col, t.row, 6, 6) === 3,
     )!;
     expect(canFoundCity(state, ring3.index, 0).ok).toBe(false); // dist 3 blocked too
     const far = tileAtCoords(state.map, 10, 10);
@@ -343,7 +343,7 @@ describe('a hostile walker marches on a minor', () => {
     // hand the minor a distance-2 tile: an ADJACENT raider attacks the city
     // first (the majors' own precedence), so the pillage needs open ground
     const ground = state.map.tiles.find((n) =>
-      hexDistance(n.col, n.row, t.col, t.row) === 2)!;
+      hexDistance(state.map, n.col, n.row, t.col, t.row) === 2)!;
     setTileOwner(ground, cs.seat);
     ground.improvement = 'FARM';
     const barb = spawnUnit(state, 'WARRIOR', ground.index, BARB_SEAT)!;
@@ -358,7 +358,7 @@ describe('a hostile walker marches on a minor', () => {
     job.improvement = 'FARM';
     const start = tileAtCoords(state.map, 12, 12);
     const barb = spawnUnit(state, 'WARRIOR', start.index, BARB_SEAT)!;
-    const d = (a: { col: number; row: number }) => hexDistance(a.col, a.row, job.col, job.row);
+    const d = (a: { col: number; row: number }) => hexDistance(state.map, a.col, a.row, job.col, job.row);
     expect(d(start)).toBeLessThan(13);
     hostileUnitAct(state, barb);
     expect(d(state.map.tiles[barb.tileIndex])).toBeLessThan(d(start));
@@ -371,7 +371,7 @@ describe('a hostile walker marches on a minor', () => {
     const start = tileAtCoords(state.map, 6, 12);
     const barb = spawnUnit(state, 'WARRIOR', start.index, BARB_SEAT)!;
     const ct = state.map.tiles[cs.centerIndex];
-    const d = (a: { col: number; row: number }) => hexDistance(a.col, a.row, ct.col, ct.row);
+    const d = (a: { col: number; row: number }) => hexDistance(state.map, a.col, a.row, ct.col, ct.row);
     const d0 = d(start);
     hostileUnitAct(state, barb);
     expect(d(state.map.tiles[barb.tileIndex])).toBeLessThan(d0);

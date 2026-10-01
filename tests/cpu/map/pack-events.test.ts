@@ -444,7 +444,7 @@ describe('Eyjafjallajokull and Vesuvius on the map', () => {
       const landDist = (t: Tile) => {
         let best = Infinity;
         for (const u of map.tiles) {
-          if (!water(u)) best = Math.min(best, hexDistance(t.col, t.row, u.col, u.row));
+          if (!water(u)) best = Math.min(best, hexDistance(map, t.col, t.row, u.col, u.row));
         }
         return best;
       };
@@ -460,7 +460,7 @@ describe('Eyjafjallajokull and Vesuvius on the map', () => {
           expect(plots.some((a) => neighborTile(map, a, DIR_E) === plots.find((b) => b !== a))).toBe(true);
         }
         if (sp.customPlacement === 'PLACEMENT_CLIFFS_DOVER') {
-          expect(hexDistance(plots[0].col, plots[0].row, plots[1].col, plots[1].row)).toBe(1);
+          expect(hexDistance(map, plots[0].col, plots[0].row, plots[1].col, plots[1].row)).toBe(1);
         }
         for (const t of plots) {
           if (sp.minDistanceLand !== undefined) expect(landDist(t)).toBeGreaterThanOrEqual(sp.minDistanceLand);

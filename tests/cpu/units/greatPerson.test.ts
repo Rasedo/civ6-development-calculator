@@ -468,7 +468,7 @@ describe('the verb clauses', () => {
     const seat = state.seats[0];
     const cap = state.map.tiles[seat.cities[0].centerIndex];
     const spot = state.map.tiles.find((t) => tileSeat(t) < 0 && dryFree(state, t)
-      && hexDistance(t.col, t.row, cap.col, cap.row) >= 6)!;
+      && hexDistance(state.map, t.col, t.row, cap.col, cap.row) >= 6)!;
     const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', spot.index);
     setMet(cs, 0);
     const u = stand(state, 'GP_STAMFORD_RAFFLES', cs.centerIndex);
@@ -514,7 +514,7 @@ describe('the verb clauses', () => {
     const state = newGame();
     const cap = state.map.tiles[state.seats[0].cities[0].centerIndex];
     const spot = state.map.tiles.find((t) => tileSeat(t) < 0 && dryFree(state, t)
-      && hexDistance(t.col, t.row, cap.col, cap.row) >= 6)!;
+      && hexDistance(state.map, t.col, t.row, cap.col, cap.row) >= 6)!;
     // the enemy is a CITY-STATE here — the minor branch of `districtTilesOfOwner`;
     // the GPU poke takes a major's capital
     const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', spot.index);

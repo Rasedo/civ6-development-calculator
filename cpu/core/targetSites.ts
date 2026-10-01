@@ -110,7 +110,7 @@ export function foundSites(state: GameState): number[] {
     if (tileSeat(t) >= 0 || isWater(t) || isImpassable(t) || naturalWonderAt(t) || t.feature === 'OASIS'
       || fireFeature(t.feature)) continue;
     if (t.district || t.builtWonder) continue;
-    if (centres.some((c) => hexDistance(c.col, c.row, t.col, t.row) < CITY_MIN_DIST)) continue;
+    if (centres.some((c) => hexDistance(state.map, c.col, c.row, t.col, t.row) < CITY_MIN_DIST)) continue;
     out.push(t.index);
   }
   return out;

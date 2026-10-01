@@ -197,7 +197,7 @@ def main() -> int:
     centre = None
     from core.simbase import tiles_from_offsets
     for t in range(sim.T):
-        fp = tiles_from_offsets(torch.tensor([t]), sim._storm_offs, sim.W, sim.H)
+        fp = tiles_from_offsets(torch.tensor([t]), sim._storm_offs, sim.W, sim.H, sim.wrap_x)
         if bool((fp >= 0).all()) and bool((sim.military_at[0, fp.flatten()] < 0).all()) \
                 and bool((sim.support_at[0, fp.flatten()] < 0).all()) \
                 and bool((sim.embarked_at[0, fp.flatten()] < 0).all()):
@@ -478,7 +478,7 @@ def main() -> int:
     c = int(cand.nonzero()[0][0])
     from core.simbase import tiles_from_offsets  # noqa: E402
     area = [int(t) for t in tiles_from_offsets(torch.tensor([c]), s12._storm_offs[: s12._drought_hexes],
-                                                  s12.W, s12.H)[0].tolist()
+                                                  s12.W, s12.H, s12.wrap_x)[0].tolist()
             if int(t) >= 0 and not bool(s12.water[0, int(t)])]
     one = torch.tensor([True])
     strip = torch.tensor([False])

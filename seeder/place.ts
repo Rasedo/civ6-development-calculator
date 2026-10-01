@@ -79,7 +79,7 @@ function landNear(map: GameMap, t: Tile): number {
   return n;
 }
 
-const far = (a: Tile, b: Tile, d: number): boolean => hexDistance(a.col, a.row, b.col, b.row) >= d;
+const far = (map: GameMap, a: Tile, b: Tile, d: number): boolean => hexDistance(map, a.col, a.row, b.col, b.row) >= d;
 
 export function placeCivs(map: GameMap, seed: number, nCivs: number): { starts: Tile[]; civs: WorldCiv[] } {
   const legal = map.tiles.filter((t) => startLegal(t) && landNear(map, t) >= MIN_LAND_NEARBY);
@@ -102,7 +102,7 @@ export function placeCivs(map: GameMap, seed: number, nCivs: number): { starts: 
       const cands = legal.filter(
         (t) =>
           (res.get(t.index) ?? 0) >= START_RESOURCE_MIN &&
-          starts.every((s) => far(s, t, dist)) &&
+          starts.every((s) => far(map, s, t, dist)) &&
           (starts.length === 0 || Math.abs((res.get(t.index) ?? 0) - (res.get(starts[0].index) ?? 0)) <= spread),
       );
       if (cands.length > 0) {
@@ -132,7 +132,7 @@ export function placeCityStates(map: GameMap, seed: number, nCs: number, civStar
     const rng: Rng = mulberry32(deriveSeed(seed, `place/cs/${s}`));
     for (const dist of [CITY_STATE_START_DIST, 4]) {
       const cands = legal.filter(
-        (t) => civStarts.every((c) => far(c, t, dist)) && placed.every((p) => far(p, t, dist)),
+        (t) => civStarts.every((c) => far(map, c, t, dist)) && placed.every((p) => far(map, p, t, dist)),
       );
       if (cands.length === 0) continue;
       const tile = cands[randInt(rng, cands.length)];

@@ -30,7 +30,7 @@ from __future__ import annotations
 import torch
 
 from .engine import BatchSim
-from .simbase import BARB_SEAT, Rules, UNIT_SLOTS
+from .simbase import BARB_SEAT, Rules, UNIT_SLOTS, axial_delta
 from .neutral import living_order
 
 def n_unit_acts(rules: Rules) -> int:
@@ -58,12 +58,6 @@ class BatchEnv:
         self.horizon = int(rules.turn_limit) if horizon is None else horizon
         self._episode = 0
         self._score_prev: dict[int, torch.Tensor] = {}
-        s = self.sim
-        t = torch.arange(s.T, device=s.device)
-        row = torch.div(t, s.W, rounding_mode="floor")
-        col = t % s.W
-        self._ax_q = (col - torch.div(row - (row & 1), 2, rounding_mode="floor")).to(torch.long)
-        self._ax_r = row.to(torch.long)
 
     def reset(self, scramble: int | None = None) -> None:
         self.sim.reset()
@@ -369,12 +363,10 @@ class BatchEnv:
         alive = smap >= 0
         sc = smap.clamp(min=0)
         tile = s.unit_tile.gather(1, sc).clamp(min=0)
-        uq, ur = self._ax_q[tile], self._ax_r[tile]  # [B, N]
         camp = s.camp_tile  # [B, K], -1 padded
         live_camp = camp >= 0
-        cq, cr = self._ax_q[camp.clamp(min=0)], self._ax_r[camp.clamp(min=0)]  # [B, K]
-        dq = cq.unsqueeze(1) - uq.unsqueeze(2)  # [B, N, K]
-        dr = cr.unsqueeze(1) - ur.unsqueeze(2)
+        # the axial step from each unit to each camp, the shorter way round
+        dq, dr = axial_delta(tile.long().unsqueeze(2), camp.clamp(min=0).long().unsqueeze(1), s.W, s.wrap_x)  # [B, N, K]
         dist = (dq.abs() + dr.abs() + (dq + dr).abs()) // 2
         dist = torch.where(live_camp.unsqueeze(1), dist, torch.full_like(dist, 9999))
         near_d, near_k = dist.min(dim=2)  # [B, N]

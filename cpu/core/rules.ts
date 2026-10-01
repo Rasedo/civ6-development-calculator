@@ -70,13 +70,13 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
   // centre plane)
   for (const c of cityHolders(state).flatMap((s) => s.cities)) {
     const centre = state.map.tiles[c.centerIndex];
-    if (hexDistance(centre.col, centre.row, tile.col, tile.row) < CITY_MIN_DIST) {
+    if (hexDistance(state.map, centre.col, centre.row, tile.col, tile.row) < CITY_MIN_DIST) {
       return no(`Too close to ${c.name} (min ${CITY_MIN_DIST} tiles).`);
     }
   }
   for (const cityState of state.cityStates ?? []) {
     const centre = state.map.tiles[cityState.centerIndex];
-    if (hexDistance(centre.col, centre.row, tile.col, tile.row) < CITY_MIN_DIST) {
+    if (hexDistance(state.map, centre.col, centre.row, tile.col, tile.row) < CITY_MIN_DIST) {
       return no(`Too close to the city-state of ${cityState.name}.`);
     }
   }
@@ -552,7 +552,7 @@ export function canPlaceDistrictIn(
   }
 
   if (!opts.ownsTile(tile)) return no('Tile not owned by this city.');
-  const dist = hexDistance(center.col, center.row, tile.col, tile.row);
+  const dist = hexDistance(state.map, center.col, center.row, tile.col, tile.row);
   if (dist === 0) return no('City center occupies this tile.');
   if (dist > CITY_WORK_RADIUS) return no('Too far from the city center.');
   if (tile.district) return no('Another district is here.');
@@ -1030,7 +1030,7 @@ export function canPlaceWonder(
   if (wonderExists(state, wonderId)) return no(`${def.name} already exists in the world.`);
 
   if (!tileBelongsTo(tile, city)) return no('Tile not owned by this city.');
-  const dist = hexDistance(center.col, center.row, tile.col, tile.row);
+  const dist = hexDistance(state.map, center.col, center.row, tile.col, tile.row);
   if (dist === 0 || dist > CITY_WORK_RADIUS) return no('Must be within 3 tiles of the city center.');
   if (tile.district || tile.builtWonder) return no('Tile already occupied.');
   if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');

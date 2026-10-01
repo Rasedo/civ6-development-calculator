@@ -72,7 +72,7 @@ describe('movement', () => {
     const from = tileAtCoords(state.map, 8, 8);
     const to = tileAtCoords(state.map, 9, 8);
     from.riverMask = 1 << DIR_E;
-    expect(crossesRiver(from, to)).toBe(true);
+    expect(crossesRiver(state.map, from, to)).toBe(true);
 
     const unit = spawnUnit(state, 'BUILDER', from.index, 0)!;
     unit.tileIndex = from.index; // force exact tile

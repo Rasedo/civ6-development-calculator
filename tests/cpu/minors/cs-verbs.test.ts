@@ -228,8 +228,8 @@ describe('civ quests (deterministic, zero-draw)', () => {
     const q = cityState.seatQuest?.[civ.seat];
     expect(q?.kind).toBe('clearCamp');
     // nearest to the CS center
-    const dc = hexDistance(state.map.tiles[close].col, state.map.tiles[close].row, ct.col, ct.row);
-    const df = hexDistance(state.map.tiles[far].col, state.map.tiles[far].row, ct.col, ct.row);
+    const dc = hexDistance(state.map, state.map.tiles[close].col, state.map.tiles[close].row, ct.col, ct.row);
+    const df = hexDistance(state.map, state.map.tiles[far].col, state.map.tiles[far].row, ct.col, ct.row);
     expect(q?.campIndex).toBe(dc <= df ? close : far);
     expect(state.rngState).toBe(rng0);
   });
@@ -237,7 +237,7 @@ describe('civ quests (deterministic, zero-draw)', () => {
   it('asks for a camp within 5 tiles alone (Quests_Text.xml)', () => {
     const { state, civ, cityState } = scenario('scientific');
     const ct = state.map.tiles[cityState.centerIndex];
-    const at = (d: number) => state.map.tiles.find((t) => hexDistance(t.col, t.row, ct.col, ct.row) === d)!.index;
+    const at = (d: number) => state.map.tiles.find((t) => hexDistance(state.map, t.col, t.row, ct.col, ct.row) === d)!.index;
     expect(QUEST_CAMP_RADIUS).toBe(5);
     state.barbSeat.camps = [at(6)];
     expect(issueQuest(state, cityState, civ.seat)?.kind).toBe('buildDistrict');

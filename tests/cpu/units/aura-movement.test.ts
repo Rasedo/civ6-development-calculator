@@ -31,7 +31,7 @@ function tileAt(state: GameState, ctr: number, dist: number): number {
   for (const t of state.map.tiles) {
     if (t.index === ctr) continue;
     if (isWater(t) || isImpassable(t)) continue; // land units cannot spawn here
-    if (hexDistance(c.col, c.row, t.col, t.row) !== dist) continue;
+    if (hexDistance(state.map, c.col, c.row, t.col, t.row) !== dist) continue;
     if (state.units.some((u) => u.tileIndex === t.index)) continue;
     return t.index;
   }

@@ -310,7 +310,7 @@ describe('the Trader unit', () => {
     expect(routeInRange(state, 0, origin.centerIndex, at16.centerIndex)).toBe(false);
     // a wall of mountains in the way is walked around, and the detour spends
     // the budget: the same hex distance falls out of range
-    const d = hexDistance(state.map.tiles[origin.centerIndex].col, state.map.tiles[origin.centerIndex].row,
+    const d = hexDistance(state.map, state.map.tiles[origin.centerIndex].col, state.map.tiles[origin.centerIndex].row,
       state.map.tiles[at15.centerIndex].col, state.map.tiles[at15.centerIndex].row);
     expect(d).toBe(TRADE_BASE_RANGE);
     for (let r = 3; r < 10; r++) tileAtCoords(state.map, 9, r).elevation = 'MOUNTAIN';
@@ -504,7 +504,7 @@ describe('the route candidate weighs every destination at once', () => {
     expandBorders(state, near, 2);
     origin.buildings.push('MARKET');
     const far = addCiv(state, 38, 20);
-    expect(hexDistance(
+    expect(hexDistance(state.map, 
       state.map.tiles[origin.centerIndex].col, state.map.tiles[origin.centerIndex].row,
       state.map.tiles[far.cities[0].centerIndex].col,
       state.map.tiles[far.cities[0].centerIndex].row)).toBeGreaterThan(TRADE_BASE_RANGE);

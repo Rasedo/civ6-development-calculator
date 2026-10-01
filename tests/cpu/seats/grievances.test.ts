@@ -239,7 +239,7 @@ describe('grievances', () => {
         settlePromises(state, [[1, 0, PROMISE_SETTLE]], answer === 'keep' ? [[0, 1, PROMISE_SETTLE]] : []);
       }
       const rival = state.map.tiles.filter((t) => tileSeat(t) === 1);
-      const border = (t: Tile) => Math.min(...rival.map((r) => hexDistance(t.col, t.row, r.col, r.row)));
+      const border = (t: Tile) => Math.min(...rival.map((r) => hexDistance(state.map, t.col, t.row, r.col, r.row)));
       return {
         state,
         seen: reaches.map((reach) => {

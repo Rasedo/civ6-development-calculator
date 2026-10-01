@@ -1,7 +1,8 @@
 // The autoplay importer and checks: a hand-built turn record of a 6x4 game map
 // becomes the engine GameState the H-1 checks read.
 import { describe, expect, it } from 'vitest';
-import { advanceHistory, importTurn, newHistory, wrapped } from '../../../cpu/harness/import';
+import { advanceHistory, importTurn, newHistory } from '../../../cpu/harness/import';
+import { hexDistance } from '../../../world/hex';
 import { diffActions, stateChecks } from '../../../cpu/harness/checks';
 import type { Catalog, DumpCity, DumpPlayer, DumpUnit, TurnRecord } from '../../../cpu/harness/record';
 import { seatOfCityState } from '../../../cpu/core/seats';
@@ -222,19 +223,21 @@ describe('the history', () => {
   });
 });
 
-describe('wrapped', () => {
-  it('is true only where the way round the x seam is shorter', () => {
-    expect(wrapped(W, 0, 5)).toBe(true);
-    expect(wrapped(W, 0, 2)).toBe(false);
+describe('the wrap', () => {
+  it('the imported map wraps in x as the record head says', () => {
+    const map = importTurn(record(10), CAT).state.map;
+    expect(map.wrapX).toBe(true);
+    expect(hexDistance(map, 0, 0, 5, 0)).toBe(1);
+    expect(hexDistance(map, 0, 0, 2, 0)).toBe(2);
   });
 });
 
 describe('the checks', () => {
-  it('compare a plain plot, and skip the seam', () => {
+  it('compare a plain plot and a seam plot', () => {
     const rs = stateChecks(record(10), CAT);
     const plot = (i: number) => rs.find((r) => r.check === 'plot.yields' && r.subject.startsWith(`plot ${i} `));
     expect(plot(13)?.ok).toBe(true);
-    expect(rs.find((r) => r.check === 'plot.yields' && r.subject.startsWith('plot 6 '))?.skip).toBe('wrap');
+    expect(plot(6)?.skip).toBeUndefined();
   });
 
   it('read the actions off two records: a new unit and a spent charge', () => {

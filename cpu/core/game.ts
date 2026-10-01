@@ -293,7 +293,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   let extra = getModifiers(state, seat).cityTiles;
   if (extra > 0) {
     const second = tilesWithin(state.map, tile.col, tile.row, 2)
-      .filter((t) => !tileClaimed(t) && hexDistance(tile.col, tile.row, t.col, t.row) === 2)
+      .filter((t) => !tileClaimed(t) && hexDistance(state.map, tile.col, tile.row, t.col, t.row) === 2)
       .sort((a, b) => a.index - b.index);
     for (const t of second) {
       if (extra <= 0) break;
@@ -836,7 +836,7 @@ export function condemnHeretic(state: GameState, unit: Unit): RuleResult {
   const loss = theoLoss(state, loser, CONDEMN_PRESSURE_SWING);
   for (const c of allCities(state)) {
     const ct = state.map.tiles[c.centerIndex];
-    if (hexDistance(dt.col, dt.row, ct.col, ct.row) > CONDEMN_PRESSURE_RANGE) continue;
+    if (hexDistance(state.map, dt.col, dt.row, ct.col, ct.row) > CONDEMN_PRESSURE_RANGE) continue;
     let pres = c.religionPressure;
     if (!pres || pres.length !== nRel) {
       pres = new Array(nRel).fill(0);
@@ -1324,7 +1324,7 @@ export function tilePurchaseCost(
   let terrainPct = 0;
   if (tileIndex !== undefined) {
     const t = state.map.tiles[tileIndex];
-    ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
+    ring = Math.max(2, hexDistance(state.map, center.col, center.row, t.col, t.row));
     for (const r of src.mods.tileCost) if (r.terrain === t.terrain) terrainPct += r.pct;
   }
   const price = plotPrice(ring, researchProgressPct(src.research));
@@ -1624,7 +1624,7 @@ function theologicalCombatPhase(state: GameState): void {
       // shore." No amphibious penalty either — "this isn't physical combat".
       if (att.embarked && u.embarked) continue;
       const ut = state.map.tiles[u.tileIndex];
-      if (hexDistance(at.col, at.row, ut.col, ut.row) !== 1) continue;
+      if (hexDistance(state.map, at.col, at.row, ut.col, ut.row) !== 1) continue;
       def = u;
       break;
     }
@@ -1652,7 +1652,7 @@ function theologicalCombatPhase(state: GameState): void {
       const loss = loserRel >= 0 ? theoLoss(state, loserRel, THEO_PRESSURE_SWING) : 0;
       for (const c of allCities(state)) {
         const ct = state.map.tiles[c.centerIndex];
-        if (hexDistance(dt.col, dt.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
+        if (hexDistance(state.map, dt.col, dt.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
         let pres = c.religionPressure;
         if (!pres || pres.length !== nRel) {
           pres = new Array(nRel).fill(0);
@@ -1817,7 +1817,7 @@ export function spreadReligiousPressure(state: GameState, src: number): void {
       // CIV6 (Religious alliance 1): allies' religions exert no pressure on
       // each other's cities.
       if (g !== city.seat && alliedAtLevel(state, city.seat, g, ALLIANCE_RELIGIOUS, 1)) continue;
-      if (hexDistance(cc.col, cc.row, src.tile.col, src.tile.row) > range[g]) continue;
+      if (hexDistance(state.map, cc.col, cc.row, src.tile.col, src.tile.row) > range[g]) continue;
       addG[g] += src.w;
     }
     for (const t of routeTerms.get(city.centerIndex) ?? []) {

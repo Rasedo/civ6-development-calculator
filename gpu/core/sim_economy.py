@@ -1878,7 +1878,7 @@ class SimEconomy:
         `centre` [B] where `hit`: the footprint's plots in `STORM_DISC` order,
         water skipped, one slot at a time so each game's draws run in the TS
         walk's order (`_drought_tile`)."""
-        area = tiles_from_offsets(centre.clamp(min=0), self._storm_offs[: self._drought_hexes], self.W, self.H)
+        area = tiles_from_offsets(centre.clamp(min=0), self._storm_offs[: self._drought_hexes], self.W, self.H, self.wrap_x)
         turns, destroy_p = self._drought_duration[sev], self._drought_destroy_p[sev]
         for j in range(area.shape[1]):
             t = area[:, j]
@@ -2273,7 +2273,7 @@ class SimEconomy:
         ev = self.storm_event.gather(1, centre.unsqueeze(1)).squeeze(1).clamp(min=0)
         sid = self.storm_id.gather(1, centre.unsqueeze(1)).squeeze(1)
         hexes = self._st_hexes[ev]
-        area = tiles_from_offsets(centre, self._storm_offs, self.W, self.H)  # [B, 19]
+        area = tiles_from_offsets(centre, self._storm_offs, self.W, self.H, self.wrap_x)  # [B, 19]
         for j in range(area.shape[1]):
             t = area[:, j].clamp(min=0)
             on = (hit & (hexes > j) & (area[:, j] >= 0)
@@ -5080,7 +5080,7 @@ class SimEconomy:
         near3 = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
         off3 = tiles_within_offsets(self._just_war_range).to(dev)
         win = tiles_from_offsets(
-            self.city_center[:, :nrow, :RC].clamp(min=0).reshape(-1), off3, self.W, self.H
+            self.city_center[:, :nrow, :RC].clamp(min=0).reshape(-1), off3, self.W, self.H, self.wrap_x
         ).reshape(B, nrow * RC, -1)
         for g in range(O):
             srci = torch.zeros(B, T, dtype=torch.long, device=dev)
@@ -5153,7 +5153,7 @@ class SimEconomy:
         off = self._gen_off
         land = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
         sea = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
-        mwin = tiles_from_offsets(self.major_unit_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, simbase.MAJOR_POOL_MAX, -1)
+        mwin = tiles_from_offsets(self.major_unit_tile.clamp(min=0).reshape(-1), off, self.W, self.H, self.wrap_x).reshape(B, simbase.MAJOR_POOL_MAX, -1)
 
         def dilate(mask: torch.Tensor, win: torch.Tensor) -> torch.Tensor:
             src = torch.zeros(B, T, dtype=torch.long, device=dev)
@@ -6074,7 +6074,7 @@ class SimEconomy:
         B, cols = self.B, self.RC
         ctr = self.city_center[:, row].clamp(min=0)
         ids = self.city_id[:, row]
-        tiles = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H).reshape(B, cols, -1)
+        tiles = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H, self.wrap_x).reshape(B, cols, -1)
         M = tiles.shape[2]
         tcf = tiles.clamp(min=0).reshape(B, cols * M)
 
@@ -6228,7 +6228,7 @@ class SimEconomy:
             ty_oth = ty_oth - hidY
             oth_sc = oth_sc - (hidY[:, :, 2:].double() * w[2:].reshape(1, 1, 4)).sum(dim=2)
 
-        tiles = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H).reshape(B, n, -1)
+        tiles = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H, self.wrap_x).reshape(B, n, -1)
         M = tiles.shape[2]
         tc3 = tiles.clamp(min=0)
         tcf = tc3.reshape(B, n * M)

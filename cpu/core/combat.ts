@@ -406,7 +406,7 @@ function shareJointWarXp(state: GameState, earner: Unit, foe: number, gain: numb
     for (const u of unitsOf(state, o)) {
       if (u.hp <= 0 || !xpEligible(u)) continue;
       const ut = state.map.tiles[u.tileIndex];
-      if (hexDistance(at.col, at.row, ut.col, ut.row) <= ENKIDU_SHARE_RANGE) {
+      if (hexDistance(state.map, at.col, at.row, ut.col, ut.row) <= ENKIDU_SHARE_RANGE) {
         bankXp(u, gain);
         logXpWrite(state, u, 'ej');
       }
@@ -512,7 +512,7 @@ export function flankCount(state: GameState, defTileIndex: number, attacker: Uni
   const dt = state.map.tiles[defTileIndex];
   let n = 0;
   for (const t of neighbors(state.map, dt)) {
-    if (crossesRiver(dt, t)) continue;
+    if (crossesRiver(state.map, dt, t)) continue;
     for (const u of unitsAt(state, t.index)) {
       if (u.id === attacker.id) continue;
       if (unitDomain(u.type) !== 'military') continue;
@@ -595,7 +595,7 @@ function nearFollowingCity(state: GameState, tile: Tile, g: number): boolean {
   for (const c of allCities(state)) {
     if (c.followedReligion !== g) continue;
     const t = state.map.tiles[c.centerIndex];
-    if (hexDistance(tile.col, tile.row, t.col, t.row) <= JUST_WAR_RANGE) return true;
+    if (hexDistance(state.map, tile.col, tile.row, t.col, t.row) <= JUST_WAR_RANGE) return true;
   }
   return false;
 }
@@ -622,7 +622,7 @@ export function theoFlankCount(state: GameState, defTileIndex: number, attacker:
   const dt = state.map.tiles[defTileIndex];
   let n = 0;
   for (const t of neighbors(state.map, dt)) {
-    if (crossesRiver(dt, t)) continue;
+    if (crossesRiver(state.map, dt, t)) continue;
     for (const u of unitsAt(state, t.index)) {
       if (u.id === attacker.id) continue;
       if ((UNITS[u.type]?.religiousStrength ?? 0) <= 0) continue;
@@ -1408,7 +1408,7 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
   return (
     (UNITS[attacker.type]?.combat ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) -
     woundPenalty(attacker) -
-    (!amph && crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[targetIndex])
+    (!amph && crossesRiver(state.map, state.map.tiles[attacker.tileIndex], state.map.tiles[targetIndex])
       ? RIVER_ATTACK_PENALTY
       : 0) -
     (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0) +
@@ -1678,7 +1678,7 @@ function disciplesSpread(
   const n = state.seats.length;
   for (const c of allCities(state)) {
     const cc = state.map.tiles[c.centerIndex];
-    if (hexDistance(cc.col, cc.row, at.col, at.row) > KILL_SPREAD_RANGE) continue;
+    if (hexDistance(state.map, cc.col, cc.row, at.col, at.row) > KILL_SPREAD_RANGE) continue;
     let pres = c.religionPressure;
     if (!pres || pres.length !== n) {
       pres = new Array(n).fill(0);
@@ -1719,7 +1719,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   if (attacksLeftOf(attacker) <= 0) return no('The attack is spent.');
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
-  if (hexDistance(from.col, from.row, target.col, target.row) !== 1) {
+  if (hexDistance(state.map, from.col, from.row, target.col, target.row) !== 1) {
     return no('Target must be adjacent.');
   }
   if (!amphibiousReach(state, attacker, targetIndex)) return no('Embarked units strike an open shore only.');
@@ -1803,7 +1803,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const defender = stackDefender(state, enemies, false);
   const defDef = UNITS[defender.type];
   const amph = promoFlag(attacker, 'AMPHIBIOUS');
-  const atkCS = def.combat + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0)
+  const atkCS = def.combat + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && crossesRiver(state.map, from, target) ? RIVER_ATTACK_PENALTY : 0)
     - (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
@@ -2176,7 +2176,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (attacker.embarked) return no('Embarked units cannot attack.');
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
-  if (hexDistance(from.col, from.row, target.col, target.row) > unitAttackRange(attacker)) {
+  if (hexDistance(state.map, from.col, from.row, target.col, target.row) > unitAttackRange(attacker)) {
     return no('Out of range.');
   }
   const enemies = unitsAt(state, targetIndex).filter(
@@ -2388,7 +2388,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   const range = unitAttackRange(unit);
   const out: number[] = [];
   for (const t of state.map.tiles) {
-    const d = hexDistance(from.col, from.row, t.col, t.row);
+    const d = hexDistance(state.map, from.col, from.row, t.col, t.row);
     if (d < 1 || d > range) continue;
     if (!amphibiousReach(state, unit, t.index)) continue;
     const hasEnemy = unitsAt(state, t.index).some(
@@ -2441,7 +2441,7 @@ export function nukeTargets(state: GameState, unit: Unit, k: number, width: numb
   const reach = nukeReach(unit, k);
   if (!here || reach < 0 || wmdHeld(state, unitSeat(unit), k) <= 0) return out;
   for (const t of state.map.tiles) {
-    if (hexDistance(here.col, here.row, t.col, t.row) > reach) continue;
+    if (hexDistance(state.map, here.col, here.row, t.col, t.row) > reach) continue;
     if (!nukeOffers(state, unitSeat(unit), k, t.index)) continue;
     out.push(t.index);
     if (out.length >= width) break;
@@ -2468,7 +2468,7 @@ export function siloReaches(state: GameState, seat: number, k: number, tileIndex
   if (!def || !at) return false;
   if (!isExplored(state, seat, tileIndex)) return false;
   return siloTiles(state, seat).some((s) => {
-    const d = hexDistance(s.col, s.row, at.col, at.row);
+    const d = hexDistance(state.map, s.col, s.row, at.col, at.row);
     return d <= def.range && d > def.radius;
   });
 }
@@ -2842,11 +2842,11 @@ function campCandidates(state: GameState): Tile[] {
     if (preferFog && !unexploredByAll(state, t.index)) return false; // camps rise in the fog
     for (const c of allCities(state)) {
       const ct = state.map.tiles[c.centerIndex];
-      if (hexDistance(ct.col, ct.row, t.col, t.row) < 5) return false;
+      if (hexDistance(state.map, ct.col, ct.row, t.col, t.row) < 5) return false;
     }
     for (const campIdx of state.barbSeat.camps) {
       const camp = state.map.tiles[campIdx];
-      if (hexDistance(camp.col, camp.row, t.col, t.row) < 5) return false;
+      if (hexDistance(state.map, camp.col, camp.row, t.col, t.row) < 5) return false;
     }
     return true;
   });
@@ -2914,7 +2914,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
       t.districtComplete &&
       !t.districtPillaged;
     if (!impJob && !distJob) continue;
-    const d = hexDistance(here.col, here.row, t.col, t.row);
+    const d = hexDistance(state.map, here.col, here.row, t.col, t.row);
     if (d < bestDist) {
       bestDist = d;
       target = t;
@@ -2939,7 +2939,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
       if (!unitsHostile(state, unit, other)) continue;
       for (const oc of other.cities) {
         const t = map.tiles[oc.centerIndex];
-        const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 512)
+        const key = hexDistance(state.map, here.col, here.row, t.col, t.row) * (2048 * 512)
           + other.seat * 2048
           + oc.centerIndex;
         if (key < bestKey) {
@@ -2951,7 +2951,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     for (const csx of state.cityStates) {
       if (!cityStateAttackable(state, csx, unitSeat(unit))) continue;
       const t = map.tiles[csx.centerIndex];
-      const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 512)
+      const key = hexDistance(state.map, here.col, here.row, t.col, t.row) * (2048 * 512)
         + seatOfCityState(csx.id) * 2048
         + csx.centerIndex;
       if (key < bestKey) {
@@ -2977,11 +2977,11 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
       )
       .sort(
         (a, b) =>
-          hexDistance(a.col, a.row, target!.col, target!.row) -
-          hexDistance(b.col, b.row, target!.col, target!.row),
+          hexDistance(state.map, a.col, a.row, target!.col, target!.row) -
+          hexDistance(state.map, b.col, b.row, target!.col, target!.row),
       )[0];
-    const stepD = hexDistance(step?.col ?? 0, step?.row ?? 0, target.col, target.row);
-    if (!step || stepD >= hexDistance(at.col, at.row, target.col, target.row) || (!marchOnto && stepD < 1)) {
+    const stepD = hexDistance(state.map, step?.col ?? 0, step?.row ?? 0, target.col, target.row);
+    if (!step || stepD >= hexDistance(state.map, at.col, at.row, target.col, target.row) || (!marchOnto && stepD < 1)) {
       return;
     }
     // The shared MP contract pays for the step (embark/disembark costs all
@@ -3078,7 +3078,7 @@ export function barbarianPhase(state: GameState): void {
     const camp = map.tiles[campIdx];
     const nearCamp = barbs.filter(
       (u) =>
-        hexDistance(map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
+        hexDistance(state.map, map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
     );
     const horseCamp = campNearHorses(state, campIdx);
     if (nearCamp.length === 0) {
@@ -3125,7 +3125,7 @@ export function barbarianPhase(state: GameState): void {
     const guard = barbUnits(state).find(
       (u) =>
         !guards.has(u.id) &&
-        hexDistance(map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
+        hexDistance(state.map, map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
     );
     if (guard) guards.add(guard.id);
   }

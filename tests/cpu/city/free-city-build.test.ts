@@ -94,7 +94,7 @@ describe("the Free City's build table", () => {
     expect(after.some((u, i) => u.tileIndex !== before[i])).toBe(true);
     for (const u of after) {
       const t = state.map.tiles[u.tileIndex];
-      expect(hexDistance(t.col, t.row, ctr.col, ctr.row)).toBeLessThanOrEqual(6);
+      expect(hexDistance(state.map, t.col, t.row, ctr.col, ctr.row)).toBeLessThanOrEqual(6);
     }
   });
 });

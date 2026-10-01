@@ -298,7 +298,7 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     const cs2 = addCs(b, 20, 20);
     idleBuilder(b, cs2);
     plan(cs2, [], 20);
-    const far = tilesWithin(b.map, 20, 20, 3).filter((t) => hexDistance(t.col, t.row, 20, 20) >= 2);
+    const far = tilesWithin(b.map, 20, 20, 3).filter((t) => hexDistance(state.map, t.col, t.row, 20, 20) >= 2);
     for (let k = 0; k < MINOR_SMALL_MILITARY; k++) spawnUnit(b, 'WARRIOR', far[k].index, cs2.seat);
     const p2 = turnOf(b, cs2);
     expect(cs2.prodProgress).toBe(p2 * half);
@@ -320,7 +320,7 @@ describe("the minor's training", () => {
     const army = state.units.filter((u) => u.seat === cs.seat && u.type === 'WARRIOR');
     expect(army).toHaveLength(3);
     // the new unit lands beside the centre, under the minor's seat
-    expect(hexDistance(state.map.tiles[army[2].tileIndex].col, state.map.tiles[army[2].tileIndex].row, 12, 12))
+    expect(hexDistance(state.map, state.map.tiles[army[2].tileIndex].col, state.map.tiles[army[2].tileIndex].row, 12, 12))
       .toBeLessThanOrEqual(1);
     // three stand: the row wants no fourth
     const pot = cs.prodProgress!;
@@ -393,8 +393,8 @@ describe("the minor's Builders", () => {
     const picks = minorImprovementPicks(state, cs, b);
     for (const [ti] of picks) {
       const t = state.map.tiles[ti];
-      expect(hexDistance(t.col, t.row, 12, 12)).toBeGreaterThanOrEqual(1);
-      expect(hexDistance(t.col, t.row, 12, 12)).toBeLessThanOrEqual(MINOR_BUILDER_RADIUS);
+      expect(hexDistance(state.map, t.col, t.row, 12, 12)).toBeGreaterThanOrEqual(1);
+      expect(hexDistance(state.map, t.col, t.row, 12, 12)).toBeLessThanOrEqual(MINOR_BUILDER_RADIUS);
       expect(t.index).not.toBe(lake.index);
     }
     // bare flat grassland takes a Farm; the hill takes no Mine without Mining

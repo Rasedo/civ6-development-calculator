@@ -60,7 +60,7 @@ function spyState() {
 function districtAt(state: GameState, city: City, type: string, dist: number): number {
   const ctr = state.map.tiles[city.centerIndex];
   const t = state.map.tiles.find(
-    (x) => !x.district && x.terrain !== 'OCEAN' && hexDistance(x.col, x.row, ctr.col, ctr.row) === dist,
+    (x) => !x.district && x.terrain !== 'OCEAN' && hexDistance(state.map, x.col, x.row, ctr.col, ctr.row) === dist,
   )!;
   setTileOwner(t, city.seat, city.id);
   t.district = type as never;
@@ -87,7 +87,7 @@ describe('the jump names a district tile', () => {
     expect(dests).toContain(campus);
     expect(dests).not.toContain(mine.centerIndex);
     const here = state.map.tiles[mine.centerIndex];
-    const d = dests.map((t) => hexDistance(here.col, here.row, state.map.tiles[t].col, state.map.tiles[t].row));
+    const d = dests.map((t) => hexDistance(state.map, here.col, here.row, state.map.tiles[t].col, state.map.tiles[t].row));
     expect(d).toEqual([...d].sort((a, b) => a - b));
 
     expect(beginTravel(state, spy, campus)).toBe(true);

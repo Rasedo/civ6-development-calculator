@@ -30,7 +30,7 @@ function tileAt(state: GameState, ctr: number, dist: number, banned: number[] = 
     if (t.index === ctr || banned.includes(t.index)) continue;
     if ((tileSeat(t)) === 0) continue;
     if (isWater(t) || isImpassable(t)) continue;
-    if (hexDistance(c.col, c.row, t.col, t.row) !== dist) continue;
+    if (hexDistance(state.map, c.col, c.row, t.col, t.row) !== dist) continue;
     if (state.units.some((u) => u.tileIndex === t.index)) continue;
     return t.index;
   }
@@ -152,7 +152,7 @@ describe('spawn-at-claim & capture', () => {
     const cap = state.map.tiles[seatOf(state, 0)!.cities[0].centerIndex];
     const g = after[after.length - 1];
     const gt = state.map.tiles[g.tileIndex];
-    expect(hexDistance(cap.col, cap.row, gt.col, gt.row)).toBeLessThanOrEqual(1);
+    expect(hexDistance(state.map, cap.col, cap.row, gt.col, gt.row)).toBeLessThanOrEqual(1);
     expect(g.charges).toBe(1);
   });
 

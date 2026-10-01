@@ -174,7 +174,7 @@ describe('the eight storms are the install\'s table', () => {
     expect(draws(s0, state.rngState, 1000)).toBe(9 + 10 * struck);
     expect([end.stormEvent, end.stormTurns, end.stormId]).toEqual([idx, 2, 7]);
     expect([start.stormEvent, start.stormTurns]).toEqual([-1, 0]);
-    const dist = hexDistance(start.col, start.row, end.col, end.row);
+    const dist = hexDistance(state.map, start.col, start.row, end.col, end.row);
     expect(dist).toBeGreaterThanOrEqual(1);
     expect(dist).toBeLessThanOrEqual(8);
     expect(end.col).toBeLessThanOrEqual(start.col);

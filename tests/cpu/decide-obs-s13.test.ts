@@ -91,7 +91,7 @@ describe('the targets group', () => {
       expect(tileSeat(t)).toBeLessThan(0);
       for (const c of [a, b]) {
         const ct = state.map.tiles[c.centerIndex];
-        expect(hexDistance(ct.col, ct.row, t.col, t.row)).toBeGreaterThanOrEqual(CITY_MIN_DIST);
+        expect(hexDistance(state.map, ct.col, ct.row, t.col, t.row)).toBeGreaterThanOrEqual(CITY_MIN_DIST);
       }
     }
   });

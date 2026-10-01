@@ -3178,6 +3178,10 @@
         "why": "world identity (see GameMap.width)."
       },
       {
+        "path": "GameMap.wrapX",
+        "why": "world geometry (see GameMap.width)."
+      },
+      {
         "path": "Seat.name",
         "why": "presentation."
       },

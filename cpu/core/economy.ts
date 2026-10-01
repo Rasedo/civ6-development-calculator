@@ -128,7 +128,7 @@ export function pillagePlunder(
   for (const o of enkiduAllies(state, seat, foe)) {
     const near = unitsOf(state, o).some((u) => {
       const ut = state.map.tiles[u.tileIndex];
-      return u.hp > 0 && hexDistance(at.col, at.row, ut.col, ut.row) <= ENKIDU_SHARE_RANGE;
+      return u.hp > 0 && hexDistance(state.map, at.col, at.row, ut.col, ut.row) <= ENKIDU_SHARE_RANGE;
     });
     const os = seatOf(state, o);
     if (near && os) for (const l of lumps) payPlunder(os, l.kind, l.lump);

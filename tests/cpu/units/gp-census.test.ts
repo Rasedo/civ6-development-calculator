@@ -242,7 +242,7 @@ describe('the grants', () => {
     expect(p).toBeDefined();
     expect(isWater(state.map.tiles[p.tileIndex])).toBe(true);
     // ...the NEAREST such water, the lower index on a tie
-    const d = (i: number) => hexDistance(inland.col, inland.row, state.map.tiles[i].col, state.map.tiles[i].row);
+    const d = (i: number) => hexDistance(state.map, inland.col, inland.row, state.map.tiles[i].col, state.map.tiles[i].row);
     const best = state.map.tiles.filter((t) => isWater(t) && !isImpassable(t) && t.terrain !== 'OCEAN')
       .reduce((m, t) => Math.min(m, d(t.index)), Infinity);
     expect(d(p.tileIndex)).toBe(best);
@@ -276,7 +276,7 @@ describe('the grants', () => {
     const t0 = traders().length;
     expect(activateGreatPerson(state, stand(state, 'GP_MARCO_POLO', hub))).toBe(true);
     expect(traders().length).toBe(t0 + 1);
-    expect(hexDistance(
+    expect(hexDistance(state.map, 
       state.map.tiles[traders()[t0].tileIndex].col, state.map.tiles[traders()[t0].tileIndex].row,
       state.map.tiles[city.centerIndex].col, state.map.tiles[city.centerIndex].row)).toBeLessThanOrEqual(1);
     expect(gpPermOf(state.seats[0], 'tradeCapacity')).toBe(1);
@@ -432,7 +432,7 @@ describe('the standing channels', () => {
     // an owned tile on the border, beside unclaimed ground within reach
     const cap = state.map.tiles[city.centerIndex];
     const edge = state.map.tiles.find((t) => tileSeat(t) === 0 && t.ownerCity === city.id && !t.district
-      && !isWater(t) && !isImpassable(t) && hexDistance(t.col, t.row, cap.col, cap.row) <= 2
+      && !isWater(t) && !isImpassable(t) && hexDistance(state.map, t.col, t.row, cap.col, cap.row) <= 2
       && neighbors(state.map, t).some((n) => tileSeat(n) < 0))!;
     expect(edge).toBeDefined();
     const wild = neighbors(state.map, edge).filter((n) => tileSeat(n) < 0);
@@ -481,7 +481,7 @@ describe('the route clauses', () => {
     const city = seat.cities[0];
     const cap = state.map.tiles[city.centerIndex];
     const spot = state.map.tiles.find((t) => tileSeat(t) < 0 && !isWater(t) && !isImpassable(t)
-      && free(state, t.index) && hexDistance(t.col, t.row, cap.col, cap.row) >= 6)!;
+      && free(state, t.index) && hexDistance(state.map, t.col, t.row, cap.col, cap.row) >= 6)!;
     const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', spot.index);
     setMet(cs, 0);
     seat.tradeRoutes = [{ from: city.id, toCs: cs.id }];

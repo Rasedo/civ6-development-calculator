@@ -9,8 +9,8 @@ area is LAKE. Volcanoes go to the volcano layer, goody huts to the goody
 layer. A feature or resource the engine has no id for is left out and
 counted in `gen.dropped`. `map.wrapX` says the map wraps in x, as the game's does:
 column 0 and column width - 1 are neighbours, and the river and cliff masks
-of the seam plots name edges across it; the engines read no such field yet
-and treat the map as bounded.
+of the seam plots name edges across it; the engines read it into
+`GameMap.wrapX` (the fixture's `wrapX`) and wrap every hex primitive.
 Majors start with a Settler and a Warrior on their start plot; city-states
 at theirs.
 """

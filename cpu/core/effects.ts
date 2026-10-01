@@ -805,7 +805,7 @@ export function greatWorkLoyalty(state: GameState, city: City): number {
     if (!rows.length) continue;
     for (const c of s.cities) {
       const t = state.map.tiles[c.centerIndex];
-      const d = hexDistance(here.col, here.row, t.col, t.row);
+      const d = hexDistance(state.map, here.col, here.row, t.col, t.row);
       const works = cityGreatWorks(c);
       if (!works) continue;
       for (const r of rows) if (d <= r.range) n += r.amount * works;

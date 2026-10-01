@@ -242,7 +242,7 @@ describe("a city-state's upgrades", () => {
     minorUpgrades(state, cs, 1);
     expect(a.type).toBe('WARRIOR');
     cs.research.techs.push('BRONZE_WORKING', 'MINING', 'IRON_WORKING');
-    const off = state.map.tiles.find((t) => tileSeat(t) < 0 && hexDistance(t.col, t.row, 6, 6) === 4)!;
+    const off = state.map.tiles.find((t) => tileSeat(t) < 0 && hexDistance(state.map, t.col, t.row, 6, 6) === 4)!;
     a.tileIndex = off.index;
     minorUpgrades(state, cs, 1);
     expect(a.type).toBe('WARRIOR');
@@ -257,7 +257,7 @@ describe('the walker', () => {
     const ctr = state.map.tiles[cs.centerIndex];
     walkUnit(state, u, [cs.centerIndex], [0, 1000, 0, 0], [0, 1000]);
     const at = state.map.tiles[u.tileIndex];
-    expect(hexDistance(at.col, at.row, ctr.col, ctr.row)).toBe(1);
+    expect(hexDistance(state.map, at.col, at.row, ctr.col, ctr.row)).toBe(1);
     // and back home when only home weighs anything
     u.movesLeft = u.movesFull ?? 2;
     walkUnit(state, u, [cs.centerIndex], [0, 1000, 0, 0], [1000]);
