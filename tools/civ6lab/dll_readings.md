@@ -172,7 +172,9 @@ RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights
   river (plot byte +0x37), not water and not beside an ocean-sized water
   body (0x82a10), Plains / Grassland (hills too), not under an event —
   weight 1 + min(hex distance to the nearest live event's current plot,
-  Spacing 15). No city anchor. Verified: 13 / 13 placed droughts start on a
+  Spacing 15), the live events being the DROUGHTS alone (m_aDroughts
+  +0x948 in 0x28ce90; storms are m_aStorms +0x8b0), each at the last plot
+  of its stored footprint (0x288430 → 0x28aa00). No city anchor. Verified: 13 / 13 placed droughts start on a
   candidate, 34 / 34 droughts that found no plot had none (without the
   river clause 16 / 34, without the water clause 23 / 34). `Spacing` is this
   distance weight, the storm and one-off pickers take the same form.
