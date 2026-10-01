@@ -1156,3 +1156,32 @@ Next: load `c16n_l1_t31`, `c16n_cycle.py --hook --max-start 1` until about 40 mi
 
 ### C-2, B-24r: not reached
 The rig game is the B-24r duel (seat 0 Canada has all seven governors, Reyna unassigned): B-24r's Reyna reads can run on `c16n_l1_t31` or `b24g_four_t8`. C-2's Don't Spy promise: `c16n_cycle.py --answer POSITIVE` logs `c2` lines each turn (`c2n_watch.lua`); France never asked in 23 turns.
+
+## 14. Host 127.0.0.4 scenes (lab 5g): the three arms of the level-1 post, the Don't Spy ask
+
+Every arm loads `c16n_l1_t31` (`h4.py load`), sets `c16g_autoend.lua` (AutoEndTurn 0) and `c16g_capacity.lua --set ZN=12` (seat 0's captured spies sit off-map at -9999 and still fill its capacity, so the loop stops buying), then `c16n_cycle.py --hook --max-start 1 --cap 20 --missions --hold`, target Siphon Funds on Paris's Commercial Hub 66:28. `c16n_cycle.py` now answers a Dedication with `commemorate.lua` (seat 0 and the grabbed seat) and takes `--grab-lua` / `--grab-set` (an InGame file run while the defender is grabbed). One mission resolved per turn: every mission of the three arms resolved alone.
+
+### C-16. The mission term: on the district, adjacent, none
+Logs `runs/escape_cs_c16g_l1hub.log` (`--post 66:28`, t31-104), `runs/escape_cs_c16g_adj.log` (`--post 66:27`, the centre, distance 1; t31-88), `runs/escape_cs_c16g_none.log` (`--post none`, t31-121); fits `c16n_fit.py` (T = 11 + (L - 1) + s), attackers level 1-3.
+
+| arm | missions | bands (succ-undet / succ-esc / fail-undet / fail-esc / captured / killed) | logL s = 0 / 1 / 2 / 3 / 4 / 5 | best |
+|---|---|---|---|---|
+| post on the hub (level 1) | 45 | 1 / 8 / 1 / 14 / 11 / 10 | -90.1 / -79.4 / -73.6 / **-72.3** / -75.5 / -104.0 | 3 |
+| post on the centre, adjacent | 41 | 4 / 8 / 2 / 11 / 7 / 9 | -79.7 / -72.8 / **-70.4** / -72.2 / -78.2 / -90.1 | 2 (3 at -1.7) |
+| no post | 72 | 25 / 20 / 3 / 13 / 9 / 2 | **-116.7** / -126.0 / -142.7 / -167.9 / -204.1 / -339.7 | 0 |
+
+The shipped 3 + (level - 1) = 3 stands on the post's own district (0 at -17.8, 1 at -7.1); an adjacent post applies (0 at -9.2) and a flat 3 for both arms costs 1.7 against the best per arm (2 adjacent); no post, 0 (3 at -51.1). The 5f caveat (the no-post control in the same city unread) is closed.
+
+The post comes off exactly when a resolution against it ends CAPTURED or KILLED (`c16g_postoff.py`: captured 12 of 12, killed 11 of 11 over the two posted arms, read off at the next grab); a success or failure with an escape pending, or undetected, leaves it standing (0 of 30); one turn with no mission resolution read it off (an escape that ended in capture or death, unpaired).
+
+### C-16. The escape with a counterspy pursuing
+`c16g_escape.py` over the three logs: one 3d6, escaped at R >= v, captured v - 2 .. v - 1, killed below, v = v0 - L (+4 on the police's right guess, + c with a counterspy pursuing), the guess weighted 5 - TravelTime (`w`), uniform (`u`) or never right (`0`). Every escape here offered two routes (centre, hub). Police pursuing (the no-post arm and one guarded turn): 31 escapes, 21 escaped, 3 captured, 7 killed; best `u` v0 9 (-26.5), `0` v0 11 at -0.9. The level-1 counterspy pursuing (the pursuer line names the defender, "Жоселина"): 40 escapes, 14 escaped, 12 captured, 14 killed. Joint, one v0 and guess model, c on the counterspy's escapes: c = 0 -73.2, 1 -71.6, **2 -70.8**, 3 -71.3, 4 -72.2, 5 -75.3. A counterspy term of 2-3 is preferred over none by 2.4 logL — suggestive, not settled; the shipped escape carries none.
+
+### C-2. The Don't Spy ask, both ways
+`c2g_stmt.lua` (Events.DiplomacyStatement -> "C2STMT" lines in Lua.log, copied to `runs/c2g_stmt.log`), `c2g_demand.lua` (`DiplomacyManager.RequestSession(asker, other, "WARNING_STOP_SPYING_ON_ME")`, the call of DiplomacyActionView's CHOICE_DEMAND_PROMISE_DONT_SPY), `c2g_answer.lua`, `c2g_close.lua`, `c2g_probe.lua`; log `runs/c2g_promise.log`, save `c2g_made_t36`.
+* France's AI never asks on its own: 10 turns unhooked under 1-per-turn missions (`runs/c2g_dontspy.log`) brought one HIDDEN_AGENDA_KUDO and no ask; France's grievances against seat 0 read 0 on all 222 `c2` lines of the three hooked C-16 arms (158 missions resolved, 48 of them captured or killed outright; no promise standing: an incursion costs nothing).
+* Seat 0 asked France (t31): France refused (statement sub NEGATIVE); seat 0's grievances against France 25 at once. France asked seat 0 at the grab (seat 0 not local): the engine answered NEGATIVE for seat 0; France's log "refusal to promise" 25 at t36, 16 at t37 (`GetGrievanceChangePerTurn` -9). So the refusal's 25 holds for the Don't Spy kind.
+* With seat 0 local, France's ask answered POSITIVE (the second `AddResponse` lands the POSITIVE statement): `Players[1]:IsPromiseMade(0, DONT_SPY_ON_ME)` true, no grievance. The asker's side reads true after a refusal too, so this reader says "asked", not "kept"; the grievance log separates them.
+* The kept promise (asked t36, no spying) read true at every grab through t61 (26 turns): not `speedTurns(30)` = 20. Its end was not reached: at t62 (an era change) and, in a second pass, at t44 and right after loading `c2g_made_t36`, seat 0's requests stopped landing (COMMEMORATE, BUILD, end of turn; no session open, DiplomacyActionView hidden; Autoplay could not end the turn either). The wedge follows the tuner-made ask, cause unread. The 200% on a broken Don't Spy promise was not reached.
+
+### B-24r: not reached.

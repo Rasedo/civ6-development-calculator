@@ -8,12 +8,15 @@ the seat local before its AI acts when its LAB_GRAB property is 1 — the
    travel to the target city, start --op on --district); `c2n_watch.lua`
    (the promises seat 0 has made to the defender, its grievances, the
    grievance log); every AI session answered --answer (POSITIVE makes an
-   asked promise); `unblock.lua` until no blocker is named;
+   asked promise); `unblock.lua` until no blocker is named (a Dedication by
+   `commemorate.lua`, an empty policy slot by `c16n_policies.lua`);
 2. the defender's LAB_GRAB set, seat 0's end of turn requested; once the
    defender reads local: its counterspy read and re-posted on --post when
    off it; `c16n_gcfix.lua` (research / civic set from GameCore, and with
    --hold their progress reset so none completes); its blockers answered;
-   its end of turn requested and awaited; seat 0 made local again;
+   with --grab-lua, that InGame file (--grab-set TOKEN=VALUE) runs and its
+   lines are logged; its end of turn requested and awaited; seat 0 made
+   local again;
 3. the turn change awaited; `spy_history.lua` logs the completed missions.
 
 Everything appends to --log (`c16w_mission_fit.py` / `escape_fit.py` read it;
@@ -69,6 +72,8 @@ def main(argv=None) -> int:
     p.add_argument("--max-start", type=int, default=99, help="missions started a turn at most")
     p.add_argument("--hold", action="store_true")
     p.add_argument("--answer", choices=("POSITIVE", "NEGATIVE"), default="POSITIVE")
+    p.add_argument("--grab-lua", help="an InGame file run while the defender is grabbed (local), every turn of the call")
+    p.add_argument("--grab-set", action="append", default=[], help="TOKEN=VALUE substituted in --grab-lua")
     p.add_argument("--gold", type=int, default=50000)
     p.add_argument("--wait", type=float, default=100.0)
     p.add_argument("--deadline", type=float, default=178.0)
@@ -97,9 +102,23 @@ def main(argv=None) -> int:
     blocker0 = lab._seat(lab.LUA_BLOCKER, 0)
     unblock_d = lab._seat(lab.UNBLOCK.read_text(encoding="utf-8"), int(dp))
     blocker_d = lab._seat(lab.LUA_BLOCKER, int(dp))
+    # a new era's Dedication: `unblock.lua` answers nothing, `commemorate.lua` does
+    commem = lab.COMMEMORATE.read_text(encoding="utf-8").replace("ZPICK", "")
+    commem0, commem_d = lab._seat(commem, 0), lab._seat(commem, int(dp))
+
+    def answer(name: str, seat_unblock: str, seat_commem: str) -> str:
+        if name == "ENDTURN_BLOCKING_FILL_CIVIC_SLOT":
+            return POLICIES
+        if name == "ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE":
+            return seat_commem
+        return seat_unblock
     gcfix = lab._seat((HERE / "c16n_gcfix.lua").read_text(encoding="utf-8"), int(dp)).replace("ZHOLD", "1" if a.hold else "0")
     defl = (HERE / "c16w_def.lua").read_text(encoding="utf-8").replace("ZID", did).replace("ZDX", px).replace("ZDY", py)
     def_gc = LUA_DEF_GC.replace("ZDP", dp).replace("ZDEF", did)
+    grab_lua = pathlib.Path(a.grab_lua).read_text(encoding="utf-8") if a.grab_lua else ""
+    for kv in a.grab_set:
+        k, v = kv.split("=", 1)
+        grab_lua = grab_lua.replace(k, v)
     if a.setup:
         log(f"################ c16n cycle op {a.op} cap {a.cap} city {a.city} district {a.district} post {post} "
             f"defender {a.defender} missions {a.missions} hold {a.hold} answer {a.answer}")
@@ -128,7 +147,7 @@ def main(argv=None) -> int:
             if name == "none" or (name in seen and name != "ENDTURN_BLOCKING_SPY_CHOOSE_ESCAPE_ROUTE"):
                 break
             seen.add(name)
-            log("    unblock: " + t.run(IG, POLICIES if name == "ENDTURN_BLOCKING_FILL_CIVIC_SLOT" else unblock0, timeout=30)[-1])
+            log("    unblock: " + t.run(IG, answer(name, unblock0, commem0), timeout=30)[-1])
         for cause in lab.diagnose(t, 0):
             if cause[0] == "popup":
                 log(f"    popup {cause[1]} -> {lab.handle(t, 0, cause)}")
@@ -145,7 +164,7 @@ def main(argv=None) -> int:
                 out = t.run(GC, IDLE)[-1]
                 name = t.run(IG, blocker0)[-1].split()[-1]
                 if name not in ("none", "ENDTURN_BLOCKING_UNITS", "ENDTURN_BLOCKING_FILL_CIVIC_SLOT"):
-                    out += " | unblock: " + t.run(IG, unblock0, timeout=30)[-1]
+                    out += " | unblock: " + t.run(IG, answer(name, unblock0, commem0), timeout=30)[-1]
                 log(f"    retry {attempt}: {out}")
             t.run(IG, lab.LUA_ENDTURN)
             end = time.monotonic() + 15
@@ -166,6 +185,9 @@ def main(argv=None) -> int:
                     log("    repost: " + t.run(IG, defl.replace("ZMODE", "post"))[-1])
                     time.sleep(1.0)
                     log("    after: " + t.run(IG, defl.replace("ZMODE", "read"))[-1])
+                if grab_lua:
+                    for ln in t.run(IG, grab_lua, timeout=30):
+                        log(f"    p{dp} grab-lua: " + ln)
                 log("    " + t.run(GC, gcfix)[-1])
                 seen_d: set[str] = set()
                 for _ in range(8):
@@ -173,7 +195,7 @@ def main(argv=None) -> int:
                     if name == "none" or name in seen_d:
                         break
                     seen_d.add(name)
-                    log(f"    p{dp} unblock: " + t.run(IG, POLICIES if name == "ENDTURN_BLOCKING_FILL_CIVIC_SLOT" else unblock_d, timeout=30)[-1])
+                    log(f"    p{dp} unblock: " + t.run(IG, answer(name, unblock_d, commem_d), timeout=30)[-1])
                 t.run(IG, lab.LUA_ENDTURN)
                 end = time.monotonic() + 20
                 while time.monotonic() < end:
