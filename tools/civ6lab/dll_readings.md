@@ -426,6 +426,15 @@ takes every building of the district but the Pillage-false ones, then the
 district; every event reaches both through the shared applier 0x336a50,
 so a flood's, an eruption's, a fire's and an accident's act as a storm's.
 
+## C-93: the climate step after the events — CLOSED
+
+The turn's world step 0xa55190 calls the random-event step 0x338710 —
+the droughts' tick and the storms' walk (0x288f40: 0x2876c0, 0x28ecd0), the
+volcano roll 0x335040, the weights and "Random Event Roll" — and only then
+the climate component's turn (0x2d1f20's component, the one the district
+repair's FLOODED / CONTAMINATED reasons read). The engines' `endTurn` runs
+`disasterPhase` then `climateTurn`, the same order.
+
 ## DLL rules the engines contradict
 
 None known: every rule read above ships on both engines.
