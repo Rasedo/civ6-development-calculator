@@ -421,7 +421,10 @@ over the city's buildings in that district not yet pillaged, the first with
 a strictly greater Buildings.Cost (+0x24). The applier then refuses a
 building whose Buildings_XP2 row has Pillage false (+0x48 bit 16:
 BUILDING_DAR_E_MEHR, BUILDING_FLOOD_BARRIER), so a Dar-e Mehr atop its
-Holy Site spares the Temple under it. No draw.
+Holy Site spares the Temple under it. No draw. DISTRICT_PILLAGED (0x33a910)
+takes every building of the district but the Pillage-false ones, then the
+district; every event reaches both through the shared applier 0x336a50,
+so a flood's, an eruption's, a fire's and an accident's act as a storm's.
 
 ## DLL rules the engines contradict
 
