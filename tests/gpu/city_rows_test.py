@@ -16,6 +16,7 @@ Terms), the granted units and spy capacity, and the first city (Kupe).
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -212,7 +213,8 @@ def test_tile_price(rules, path) -> None:
     play(sim, 0, "ROME")
     plain = float(sim._seat_tile_price(0, ctr, tgt)[B0])
     play(sim, 0, "CANADA")
-    assert abs(float(sim._seat_tile_price(0, ctr, tgt)[B0]) - round(plain * 0.5)) < 1e-9, "The Last Best West"
+    # half, rounded half up as the engines round (`js_round`)
+    assert abs(float(sim._seat_tile_price(0, ctr, tgt)[B0]) - math.floor(plain * 0.5 + 0.5)) < 1e-9, "The Last Best West"
     print("  5 tile price OK — half on the tundra")
 
 

@@ -271,15 +271,19 @@ def test_mosque_and_dar_e_mehr(rules, path) -> None:
     sim._eff_version += 1
     assert buy_missionary() == base + 1, "the Mosque's +1 spread did not reach the Missionary"
 
-    # the Dar-e Mehr stands through a disaster's building hit, which takes
-    # the dearest other building of the Holy Site (the Mosque), one alone
-    dem = BIDS.index("DAR_E_MEHR")
-    sim.city_bldg[B0, ROW, j, dem] = True
+    # a disaster's building hit takes the dearest building of the Holy Site
+    # (the Mosque), one alone; a Dar-e Mehr there (Pillage false) is chosen
+    # and stands, and nothing falls (0x24af90 / 0x33a780)
     t = int(sim.city_dist_tile[B0, ROW, j, sim._hs_idx])
     sim._pillage_tile_buildings(torch.tensor([B0]), torch.tensor([t]))
     assert bool(sim.city_bldg_pillaged[B0, ROW, j, mosque]), "the disaster missed the Mosque"
     assert not bool(sim.city_bldg_pillaged[B0, ROW, j, sim._temple_bidx]), "a building hit took a second building"
-    assert not bool(sim.city_bldg_pillaged[B0, ROW, j, dem]), "a disaster pillaged the Dar-e Mehr"
+    dem = BIDS.index("DAR_E_MEHR")
+    sim.city_bldg[B0, ROW, j, mosque] = False
+    sim.city_bldg_pillaged[B0, ROW, j] = False
+    sim.city_bldg[B0, ROW, j, dem] = True
+    sim._pillage_tile_buildings(torch.tensor([B0]), torch.tensor([t]))
+    assert not bool(sim.city_bldg_pillaged[B0, ROW, j].any()), "a disaster pillaged under the Dar-e Mehr"
     print("  4 Mosque +1 spread, Dar-e Mehr disaster-proof OK")
 
 

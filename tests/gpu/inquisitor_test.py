@@ -245,7 +245,9 @@ def test_theological(sim) -> None:
     assert int(sim.major_unit_hp[0, m]) < hp_before, "the Inquisitor did not open a duel"
 
     # a MISSIONARY may be the target and never the initiator
-    for slot in (q, m):
+    # every other religious unit off the board, the earlier scenes' included
+    rel = sim._rel_strength[sim.major_unit_type[0].clamp(min=0, max=sim.NU - 1)] > 0
+    for slot in (sim.major_unit_alive[0] & rel).nonzero().flatten().tolist():
         sim.major_unit_alive[0, slot] = False
         sim._vacate("major", torch.tensor([0]), torch.tensor([slot]))
     tc = free_tile(sim, ctr)

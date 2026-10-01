@@ -849,6 +849,9 @@ def poke_raider_zoc(rules, path, PRIVATEER, SUBMARINE, FRIGATE):
     _lone_war(sim)
     post = _lane(sim, int(sim.city_center[0, 0, 0]), 5)
     dest = _lane(sim, post, 1)
+    # no river edge between them: a river blocks the halt whatever the hulls
+    sim.river_mask[0, dest] = 0
+    sim.river_mask[0, post] = 0
     holder = place_mil(sim, 1, post, FRIGATE)
 
     def halted(mover: int) -> bool:
