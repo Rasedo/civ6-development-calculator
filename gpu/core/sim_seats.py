@@ -10076,6 +10076,7 @@ class SimSeats:
         self.city_bldg_pillaged[b, row, col, :] = False
         self.city_bldg_era[b, row, col, :] = -1
         self.city_reactor_age[b, row, col] = -1
+        self.city_gp_perm[b, row, col, :] = 0
         self._bldg_version += 1
         self.city_followed[b, row, col] = -1
         self.city_pressure[b, row, col, :] = 0
@@ -10316,6 +10317,7 @@ class SimSeats:
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
         self.city_lasers[b, dst_row, col] = old_lz  # the stations ride the flip with the Spaceport that holds them
         self.city_reactor_age[b, dst_row, col] = old_age
+        self.city_gp_perm[b, dst_row, col, :] = 0  # a Great Person's grants stay behind (TS: a fresh City)
         self.city_powered[b, dst_row, col] = False  # the new owner's own turn re-resolves the grid
         for _p, _v in zip(("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"), old_gw):
             getattr(self, _p)[b, dst_row, col, :] = _v
