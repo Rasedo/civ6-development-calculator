@@ -298,30 +298,115 @@ export const WW_WMD_LAUNCHED = srcConst('nuclear.wwLaunched', 10,
  * CivFanatics thread, with the caveat above. The GlobalParameters rows have
  * NOT been read directly — a claim about shipped game data must name a source
  * that was actually fetched. */
-export const ERA_LENGTH = 50;
-export const ERA_SCORE_FOUND = 2; // founded a city
-export const ERA_SCORE_CONQUER = 3; // gained a city by capture/flip/transfer
-export const ERA_SCORE_WONDER = 3; // completed a world wonder
-export const ERA_SCORE_PANTHEON = 1;
-export const ERA_SCORE_RELIGION = 2;
-export const ERA_SCORE_GP = 1; // earned a Great Person
+/**
+ * THE MOMENTS the engines pay, each its Moments row's EraScore; which one
+ * fires is the DLL's (GameCore_XP2 Game_History_MomentHandlers, read in
+ * tools/civ6lab/dll_readings.md C-94). A plain founding or capture records
+ * none. A founding: ON_DESERT / ON_SNOW / ON_TUNDRA by the centre's terrain;
+ * NEW_CONTINENT when none of the founder's other cities stands on the
+ * centre's continent; NEAR_OTHER_CIV_CITY when another major's city the
+ * founder has explored lies within MOMENT_NEAR_CIV_RANGE (0x306b40). A
+ * pantheon or a religion: FIRST_IN_WORLD when no other major holds one, else
+ * the plain row (0x314840, 0x3057a0). A world wonder: GAME_ERA when its era
+ * is the game era's or later, else PAST_ERA (0x3110a0). A city gained from a
+ * major: FOREIGN_CAPITAL when it was that major's original capital,
+ * PLAYER_DEFEATED when it was that major's last city; a city back with the
+ * major that founded it, other than by its loyalty, TO_ORIGINAL_OWNER
+ * (0x3088a0). A Great Person: GREAT_PERSON_CREATED_GAME_ERA and _PAST_ERA
+ * both pay 1.
+ */
+const moment = (id: string, v: number) =>
+  srcConst(`eras.moment.${id}`, v, xml('Moments', `MomentType=MOMENT_${id}`, 'EraScore'));
+export const MOMENT_ON_DESERT = moment('CITY_BUILT_ON_DESERT', 1);
+export const MOMENT_ON_SNOW = moment('CITY_BUILT_ON_SNOW', 1);
+export const MOMENT_ON_TUNDRA = moment('CITY_BUILT_ON_TUNDRA', 1);
+export const MOMENT_NEW_CONTINENT = moment('CITY_BUILT_NEW_CONTINENT', 2);
+export const MOMENT_NEAR_CIV_CITY = moment('CITY_BUILT_NEAR_OTHER_CIV_CITY', 1);
+export const MOMENT_NEAR_CIV_RANGE = srcConst('eras.momentNearCivRange', 5,
+  { lab: 'C-94', note: 'GameCore_XP2 0x306b40: the plot search radius (tools/civ6lab/dll_readings.md)' });
+export const MOMENT_PANTHEON = moment('PANTHEON_FOUNDED', 1);
+export const MOMENT_PANTHEON_FIRST = moment('PANTHEON_FOUNDED_FIRST_IN_WORLD', 2);
+export const MOMENT_RELIGION = moment('RELIGION_FOUNDED', 2);
+export const MOMENT_RELIGION_FIRST = moment('RELIGION_FOUNDED_FIRST_IN_WORLD', 3);
+export const MOMENT_WONDER_GAME_ERA = moment('BUILDING_CONSTRUCTED_GAME_ERA_WONDER', 4);
+export const MOMENT_WONDER_PAST_ERA = moment('BUILDING_CONSTRUCTED_PAST_ERA_WONDER', 3);
+export const MOMENT_FOREIGN_CAPITAL = moment('CITY_TRANSFERRED_FOREIGN_CAPITAL', 4);
+export const MOMENT_PLAYER_DEFEATED = moment('CITY_TRANSFERRED_PLAYER_DEFEATED', 5);
+export const MOMENT_TO_ORIGINAL_OWNER = moment('CITY_TRANSFERRED_TO_ORIGINAL_OWNER', 2);
+export const ERA_SCORE_GP = moment('GREAT_PERSON_CREATED_GAME_ERA', 1);
 /** CIV6 (Taj Mahal): the wonder pays only for moments "usually worth 2 or
  *  more Era Score", so the threshold is a rule, not a tuning knob. */
 export const ERA_SCORE_MOMENT_MIN = srcConst('eras.momentMin', 2,
   modArg('TAJ_MAHAL_EXTRA_ERA_SCORE', 'MinScore'));
-/** CIV6 (Ages): the era-score bars are PER CIV and MOVE — the Dark bar is
- *  DARK_AGE_SCORE_BASE_THRESHOLD "+ city number when era begin - 5 * dark ages
- *  you entered before + 5 * golden/hero ages you entered before", the Golden
- *  bar the same off GOLDEN_AGE_SCORE_BASE_THRESHOLD (so the gap is a fixed 14).
- *  The score window resets each era here, which is the real game's cumulative
- *  "current points" term folded away. No speed scaling is published for either
- *  bar; both numbers are GlobalParameters cells, not model tuning. */
+/**
+ * THE GAME ERA'S TIMING (GameCore_XP2 Game_Eras 0x2c2dc0, 0x2c4c80). After
+ * the turn counter moves, while the game is short of the last era: with no
+ * countdown running, one starts (NEXT_ERA_TURN_COUNTDOWN) on a turn at least
+ * the era's minimum less the countdown past its first turn when the era's
+ * maximum less the countdown has come, or when at least half the major
+ * civilizations stand in a later era; a running countdown ticks once a turn
+ * and the next era begins the turn it runs out, ten turns after it started.
+ * The minimum and maximum are the Eras_XP1 rows (40 and 60 for every era
+ * Ancient through Information) at the speed's CostMultiplier, truncated
+ * (0x5254d0). The H-1 Duels' eras began at 31, 61, 91, 121, 151, 181, 201,
+ * 231 and 31, 61, 91, 121, 151, 173, 193, 223 — 16 of 16 by this rule.
+ */
+export const ERA_MIN_TURNS = srcConst('eras.minTurns', 20,
+  xml('Eras_XP1', 'EraType=ERA_ANCIENT', 'GameEraMinimumTurns', { scale: 0.5, note: 'every era Ancient..Information writes 40; × CostMultiplier 50 / 100' }));
+export const ERA_MAX_TURNS = srcConst('eras.maxTurns', 30,
+  xml('Eras_XP1', 'EraType=ERA_ANCIENT', 'GameEraMaximumTurns', { scale: 0.5, note: 'every era Ancient..Information writes 60; × CostMultiplier 50 / 100' }));
+export const ERA_COUNTDOWN = srcConst('eras.countdown', 10, gp('NEXT_ERA_TURN_COUNTDOWN'));
+/**
+ * CIV6 (Ages; Game_Eras 0x2c0e80, 0x2c55d0, 0x2c6be0). The era score is the
+ * whole game's. As an era begins each major's age is its score against the
+ * bars the era before fixed — Dark below the Dark bar, Golden at or above
+ * the Golden bar (Heroic out of a Dark age), Normal between — and then its
+ * new bars are fixed: the score now, plus DARK_AGE / GOLDEN_AGE
+ * _SCORE_BASE_THRESHOLD at the speed's SCALING_SLIGHT multiplier (truncated:
+ * 11 and 22 online), plus THRESHOLD_SHIFT_PER_CITY for each city past the
+ * first, PER_PAST_GOLDEN_AGE for each Golden or Heroic age entered and
+ * PER_PAST_DARK_AGE for each Dark one (this one counted), plus the entered
+ * era's Eras_XP2 EraScoreThresholdShift; neither bar below 0. The game's
+ * start fixes the first bars the same way off a score of 0 (8 and 19). The
+ * other THRESHOLD_SHIFT rows are 0 in Gathering Storm. Every bar of the H-1
+ * Duels 1103 / 1104 (both majors, every era) by this rule.
+ */
 export const ERA_DARK_T = srcConst('eras.darkT', 14,
   gp('DARK_AGE_SCORE_BASE_THRESHOLD'));
 export const ERA_GOLDEN_T = srcConst('eras.goldenT', 28,
   gp('GOLDEN_AGE_SCORE_BASE_THRESHOLD'));
-export const AGE_PREV_STEP = srcConst('eras.agePrevStep', 5,
+/** GAMESPEED_ONLINE's SCALING_SLIGHT multiplier, a percent: the age bars'
+ *  speed scaling (0x2c6be0 names SCALING_SLIGHT; 0x525500 multiplies). */
+export const AGE_SLIGHT_PCT = srcConst('eras.slightPct', 80,
+  xml('GameSpeed_Scalings', 'GameSpeedScalingType=ONLINE_SLIGHT', 'DefaultCostMultiplier'));
+export const AGE_DARK_BASE = Math.floor(ERA_DARK_T * AGE_SLIGHT_PCT / 100);
+export const AGE_GOLDEN_BASE = Math.floor(ERA_GOLDEN_T * AGE_SLIGHT_PCT / 100);
+export const AGE_SHIFT_PER_CITY = srcConst('eras.shiftPerCity', 1, gp('THRESHOLD_SHIFT_PER_CITY'));
+export const AGE_SHIFT_PAST_GOLDEN = srcConst('eras.shiftPastGolden', 5,
   gp('THRESHOLD_SHIFT_PER_PAST_GOLDEN_AGE'));
+export const AGE_SHIFT_PAST_DARK = srcConst('eras.shiftPastDark', -5,
+  gp('THRESHOLD_SHIFT_PER_PAST_DARK_AGE'));
+/** each era's Eras_XP2 EraScoreThresholdShift, by ERAS index: only the
+ *  Ancient row writes one */
+export const AGE_ERA_SHIFT: readonly number[] = [
+  srcConst('eras.ancientShift', -3, xml('Eras_XP2', 'EraType=ERA_ANCIENT', 'EraScoreThresholdShift')),
+  ...Array<number>(8).fill(srcConst('eras.laterShift', 0, {
+    derived: '0 where the install writes no EraScoreThresholdShift (no Eras_XP2 row after the Ancient one does)',
+    inputs: [xml('Eras_XP2', 'EraType=ERA_CLASSICAL', 'EraScoreThresholdShift')],
+  })),
+];
+
+/** The [Dark, Golden] bars a major's age is next judged by, fixed as era
+ *  `era` begins on `score` with `cities` cities and `golden` / `dark` ages
+ *  entered (the one beginning counted). */
+export function ageBars(score: number, cities: number, golden: number, dark: number, era: number): [number, number] {
+  const shift = AGE_SHIFT_PER_CITY * Math.max(0, cities - 1)
+    + AGE_SHIFT_PAST_GOLDEN * golden + AGE_SHIFT_PAST_DARK * dark + AGE_ERA_SHIFT[era];
+  return [Math.max(0, score + AGE_DARK_BASE + shift), Math.max(0, score + AGE_GOLDEN_BASE + shift)];
+}
+
+/** the bars every major begins the game with: score 0, no city, no age */
+export const AGE_START_BARS = ageBars(0, 0, 0, 0, 0);
 /** `Seat.age`: 0 a Dark Age, 1 Normal, 2 Golden. A HEROIC age is a Golden one
  *  reached out of a Dark one, so it carries this same code and only
  *  `prevAge` tells the two apart — which is why every "is this seat in a

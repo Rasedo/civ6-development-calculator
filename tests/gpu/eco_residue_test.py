@@ -193,14 +193,15 @@ def test_holy_site_faith(rules, rj, path) -> None:
     sim.city_bldg[0, g, j, dm] = True
     k = int(sim._bpe_col[dm])
     assert k >= 0, "the Dar-e Mehr carries no per-era row"
-    era = sim._game_era()
+    era = int(sim.game_era[0])
     sim.city_bldg_era[0, g, j, k] = era
     sim._eff_version += 1
     now = int(sim._holy_site_faith()[0, hs])
-    turn0 = sim.turn
-    sim.turn = (era + 2) * sim._era_len  # two game eras on
+    sim.game_era[:] = era + 2  # two game eras on
+    sim._era_version += 1
     assert int(sim._holy_site_faith()[0, hs]) == now + 2, (now, int(sim._holy_site_faith()[0, hs]))
-    sim.turn = turn0
+    sim.game_era[:] = era
+    sim._era_version += 1
     dm_faith = int(rj["buildings"][dm]["yields"][5])
     sim.city_bldg_pillaged[0, g, j, dm] = True
     sim._eff_version += 1

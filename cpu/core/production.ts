@@ -20,9 +20,9 @@ import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate'
 import { emitCarbon, repairBehindBarrier } from './climate';
 import { PROJECTS, projectYieldLump, gpClassesOf, gppFractionOf } from '../data/projects';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
-import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
+import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
-import { addEraScore, buildingDedications, dedicationEvent } from './eras';
+import { buildingDedications, dedicationEvent, wonderMoment } from './eras';
 import { spawnUnit, bestTrainableNaval } from './units';
 import { grantFreeProphet } from './greatPeople';
 import { gpPermOf } from '../data/greatPeople';
@@ -305,7 +305,7 @@ export function completeQueueItem(
     }
     case 'wonder': {
       state.map.tiles[item.tileIndex].builtWonderComplete = true;
-      addEraScore(state, city.seat, ERA_SCORE_WONDER);
+      wonderMoment(state, city.seat, WONDER_ERA_INDEX[item.wonder] ?? 0);
       // CIV6 (Dynastic Cycle): a random Eureka and Inspiration from the ERA OF
       // THE WONDER, before any other completion payout draws
       grantEraBoosts(state, city.seat, ERAS[WONDER_ERA_INDEX[item.wonder] ?? 0]);

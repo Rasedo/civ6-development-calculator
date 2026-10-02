@@ -361,6 +361,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     ownerSeatInit,
     ownerInit,
     eraScoreInit: state.seats.map((s) => s.eraScore ?? 0),
+    barsInit: state.seats.map((s) => [s.darkBar ?? 0, s.goldenBar ?? 0]),
     worldHash: world.worldHash,
   };
 }

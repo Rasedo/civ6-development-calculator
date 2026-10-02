@@ -642,10 +642,10 @@ class SimPhase:
                 # A revolt is never a conquest, so it never razes and never
                 # plunders, whoever receives.
                 if win >= 0 and bool(self._skips_free_city(win)[b]):
-                    self._transfer_city(b, row, j, win, conquest=False)
+                    self._transfer_city(b, row, j, win, conquest=False, loyalty=True)
                 else:
                     pair = self._free_pair_type(row)
-                    self._transfer_city(b, row, j, self.FREE_ROW, conquest=False)
+                    self._transfer_city(b, row, j, self.FREE_ROW, conquest=False, loyalty=True)
                     # the revolt GRANTS the Free City the former owner's best
                     # melee pair on the flip turn itself (`flipCity`)
                     one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -820,7 +820,7 @@ class SimPhase:
                     continue
                 win = int(first_argmax(torch.where(ok, race, torch.full_like(race, -1.0)).unsqueeze(0))[0])
                 # the city's grants go with the join (`_transfer_city`)
-                self._transfer_city(b, row, j, win, conquest=False)
+                self._transfer_city(b, row, j, win, conquest=False, loyalty=True)
 
     def _seat_city_growth(self, row: int, col: torch.Tensor, act: torch.Tensor,
                           eff: torch.Tensor, need: torch.Tensor) -> None:
@@ -1381,7 +1381,12 @@ class SimPhase:
                 wi = (cur - self.WONDER_BASE).clamp(min=0)
                 wt = self.city_wonder[bidx, row, col, :][wr, wi[wr]]
                 self.built_wonder_complete[wr, wt.clamp(min=0)] = True
-                self._add_era_score(row, self._era_pts["wonder"], made_w.long())
+                # `wonderMoment`: GAME_ERA when the wonder's era is the game
+                # era or later, else PAST_ERA
+                _wcur = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _wcur[wr] = self._wonder_era[wi[wr].clamp(min=0, max=self._wond_n - 1)] >= self.game_era[wr]
+                self._add_era_score(row, self._moment_wonder_game, (made_w & _wcur).long())
+                self._add_era_score(row, self._moment_wonder_past, (made_w & ~_wcur).long())
                 # CIV6 (Dynastic Cycle): a random Eureka and Inspiration from
                 # the ERA OF THE WONDER, at TS's position — right after the
                 # era score and before any other completion payout draws
@@ -2468,7 +2473,7 @@ class SimPhase:
         for _fc, _fl, _fa in self._live_rows(row, self._gp_favor_rows):
             _fw = hit & self._row_is(row, _fc, _fl)
             self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + _fw.to(self.civ_diplo_favor.dtype) * _fa
-        self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned
+        self._add_era_score(row, self._era_gp, hit.long())  # per GP earned
         # CIV6 (Sky and Stars): "+1 Era Score each time a Great
         # Person is Earned."
         self._dedication_event(row, self._ded_sky, hit)
@@ -2542,7 +2547,10 @@ class SimPhase:
         self.civ_faith[:, row] = torch.where(popen, self.civ_faith[:, row] - pfc, self.civ_faith[:, row])
         self.pantheon_claimed_n.add_(popen.long())
         self.civ_pantheon_done[:, row] = self.civ_pantheon_done[:, row] | popen
-        self._add_era_score(row, self._era_pts["pantheon"], popen.long())
+        # `pantheonMoment`: FIRST_IN_WORLD when no other major holds one
+        _oth = torch.cat((self.civ_pantheon_done[:, :row], self.civ_pantheon_done[:, row + 1:self.n_majors]), dim=1).any(dim=1)
+        self._add_era_score(row, self._moment_pantheon_first, (popen & ~_oth).long())
+        self._add_era_score(row, self._moment_pantheon, (popen & _oth).long())
 
     def _can_found(self, row: int) -> torch.Tensor:
         """[B] `canFoundReligion`: no seat ban, no religion yet, a pantheon, a
@@ -2672,7 +2680,10 @@ class SimPhase:
         self.civ_beliefs_earned[:, row] = torch.where(
             found_ok, torch.full_like(self.civ_beliefs_earned[:, row], self._religion_initial_beliefs),
             self.civ_beliefs_earned[:, row])
-        self._add_era_score(row, self._era_pts["religion"], found_ok.long())
+        # `religionMoment`: FIRST_IN_WORLD when no other major holds one
+        _oth = torch.cat((self.civ_religion_done[:, :row], self.civ_religion_done[:, row + 1:self.n_majors]), dim=1).any(dim=1)
+        self._add_era_score(row, self._moment_religion_first, (found_ok & ~_oth).long())
+        self._add_era_score(row, self._moment_religion, (found_ok & _oth).long())
         _alv = self.city_alive[:, row]
         _cap = self.city_is_cap[:, row] & _alv
         _ctr = self.city_center[:, row]

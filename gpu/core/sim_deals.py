@@ -151,7 +151,7 @@ class SimDeals:
         elif kind == self._deal_k_city:
             cell = self._deal_city_cell(giver, va) & ok.unsqueeze(1)
             for b in torch.nonzero(cell.any(dim=1)).flatten().tolist():
-                self._transfer_city(int(b), giver, int(cell[b].long().argmax()), taker, conquest=False)
+                self._transfer_city(int(b), giver, int(cell[b].long().argmax()), taker, conquest=False, loyalty=False)
         elif kind == self._deal_k_spy:
             # the spy that comes home is the one that was caught, at the level
             # it was caught at; when the cell holds several, the HIGHEST goes

@@ -221,7 +221,7 @@ def main() -> None:
     s4._expire_seat_routes(1)
     assert int(s4.seat_routes[0, 1, 0, 0]) >= 0, "the route must be live BEFORE the capture, or the lane proves nothing"
     captor = 2 if s4.n_majors >= 3 else 1
-    assert s4._transfer_city(0, 0, 0, captor, conquest=True), "the capture must annex, not raze, for this lane"
+    assert s4._transfer_city(0, 0, 0, captor, conquest=True, loyalty=False), "the capture must annex, not raze, for this lane"
     assert int(s4.centre_slot_at[0, cap_tile]) >= 0, "the captured centre is STILL a live city centre — a tile key would keep paying"
     assert not bool(((s4.city_id[0, 0] == cap_cid) & s4.city_alive[0, 0]).any()), "row 0 must no longer hold that city id"
     s4._expire_seat_routes(1)

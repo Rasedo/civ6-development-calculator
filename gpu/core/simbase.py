@@ -252,6 +252,7 @@ class Rules:
     amenity_pop_per: int  # CITY_POP_PER_AMENITY — the need is ceil(pop / this)
     city_growth: tuple  # (CITY_GROWTH_THRESHOLD, _MULTIPLIER, _EXPONENT) — `_growth_needed`
     culture_cost: tuple  # (CULTURE_COST_FIRST_PLOT, _LATER_PLOT_MULTIPLIER, _LATER_PLOT_EXPONENT) — `_border_cost`
+    plot_influence: dict  # borderPlotCost's PLOT_INFLUENCE_* terms — `_seat_border_key`
     progress: dict  # {techCount, civicCount, speedPct} — `_progress_pct` / `_progress_cost`
     plot_price: tuple  # (base, ring step, climb, divisor) — `_plot_price`
     # the install's `CivilizationLevels` table, one dict per class of player in
@@ -482,6 +483,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         amenity_pop_per=int(r["amenityPopPer"]),
         city_growth=tuple(float(x) for x in r["cityGrowth"]),
         culture_cost=tuple(float(x) for x in r["cultureCost"]),
+        plot_influence={k: int(v) for k, v in r["plotInfluence"].items()},
         progress=r["progress"],
         plot_price=tuple(int(x) for x in r["plotPrice"]),
         civ_levels=r["civLevels"],
@@ -958,7 +960,7 @@ _MUTABLE = [
     "citystate_levy_seat", "citystate_levy_ends",
     "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_alliance_type", "seat_alliance_pts", "civ_sci_rate", "civ_cul_rate", "civ_tour_rate", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held", "seat_promise", "seat_promise_broken",
-    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "era_score_past", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_civic_turn", "civ_gov_anarchy_end", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
+    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "dark_bar", "golden_bar", "game_era", "era_start", "era_countdown", "road_tier", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_civic_turn", "civ_gov_anarchy_end", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)

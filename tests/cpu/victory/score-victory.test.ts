@@ -2,10 +2,9 @@ import { describe, it, expect } from 'vitest';
 import type { GameState } from '../../../cpu/core/types';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { endTurn, TURN_LIMIT } from '../../../cpu/core/game';
-import { eraBoundary } from '../../../cpu/core/eras';
+import { enterEra } from '../../../cpu/core/eras';
 import { scoreLeader, scoreLines } from '../../../cpu/core/score';
 import { SCORING_LINE_ITEMS } from '../../../cpu/data/scoring';
-import { ERA_LENGTH } from '../../../cpu/data/seats';
 import { GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
 import { FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS } from '../../../cpu/data/religion';
 import { placeCityStateAt } from '../../../cpu/core/cityStates';
@@ -73,8 +72,7 @@ describe('the Score', () => {
     s.religion.founder = Object.keys(FOUNDER_BELIEFS)[0];
     s.religion.worship = Object.keys(WORSHIP_BELIEFS)[0];
     s.religion.enhancer = Object.keys(ENHANCER_BELIEFS)[0];
-    s.eraScore = 9;
-    s.eraScorePast = 30;
+    s.eraScore = 39;
     // the capital's Palace, a Monument and a pillaged Granary are buildings,
     // and the completed Pyramids one more
     a.buildings.push('MONUMENT');
@@ -117,16 +115,13 @@ describe('the Score', () => {
     expect(scoreLines(state, seatOf(state, 1)!)[line('converted')]).toBe(2);
   });
 
-  it('the era boundary banks the closed era into the whole game\'s era score', () => {
+  it('a new era keeps the whole game\'s era score', () => {
     const state = makeState(makeMap(20, 12));
     settleAt(state, 2 * 20 + 3);
     const s = seatOf(state, 0)!;
-    s.eraScore = 12;
-    s.eraScorePast = 5;
-    state.turn = ERA_LENGTH;
-    eraBoundary(state);
-    expect(s.eraScore).toBe(0);
-    expect(s.eraScorePast).toBe(17);
+    s.eraScore = 17;
+    enterEra(state);
+    expect(s.eraScore).toBe(17);
     expect(scoreLines(state, s)[line('eraScore')]).toBe(17);
   });
 });

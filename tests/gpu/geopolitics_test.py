@@ -695,7 +695,7 @@ def poke_transfer(rules, path):
     ev0 = sim._eff_version
     sim.civ_grievance.zero_()
 
-    sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False)
+    sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False, loyalty=True)
 
     # A LOYALTY FLIP earns no grievances: nobody declared anything, and TS
     # gates the whole accrual on `why === 'conquered'`.

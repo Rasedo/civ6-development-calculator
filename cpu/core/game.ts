@@ -28,8 +28,8 @@ import { commitProduction } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
-import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, ERA_SCORE_FOUND, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH, COMPETITIONS } from '../data/seats';
-import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
+import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, COMPETITIONS } from '../data/seats';
+import { foundingMoments, religionMoment, gameEraTurn, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
@@ -180,6 +180,9 @@ export function createGameFromMap(map: GameState['map'], rngInit: number): GameS
     removableAtStart: standingRemovable(map),
     iceAtStart: map.tiles.filter((t) => t.feature === 'ICE').length,
     turn: 1,
+    gameEra: 0,
+    eraStartTurn: 1,
+    eraCountdown: -1,
     sandbox: false,
     claimedGreatPeople: [],
     gpOffer: GP_CLASSES.map(() => -1),
@@ -312,13 +315,13 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     city.followedReligion = colonRel;
   }
   logPopWrite(state, city, 'fd');
-  addEraScore(state, seat, ERA_SCORE_FOUND);
   if (city.isCapital) {
     const owner = seatOf(state, seat);
     if (owner) owner.capitalTile = tile.index;  // static once founded
   }
   trajansColumn(state, seat, city);
   revealAround(state, seat, tile.index, 3);
+  foundingMoments(state, seat, tile.index);
   // the road to the capital walks the ground the city just revealed
   allRoadsLeadToRome(state, seat, tile.index);
   // CIV6 (Ancestral Hall): "New cities receive a free Builder." The grant is
@@ -1371,8 +1374,7 @@ export function endTurn(state: GameState): void {
   state.turn += 1;
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
-  eraBoundary(state); // era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
-  eraInspirations(state);
+  if (gameEraTurn(state)) eraInspirations(state);
   // THE EXOPLANET FLIGHT — CIV6: the craft covers 1 light-year/turn plus one
   // per completed laser station, and the win fires on ARRIVAL, not launch.
   // Ascending seat order + the victoryType guard: a same-turn tie goes to the
@@ -1557,15 +1559,14 @@ export function grantEraBoosts(state: GameState, seat: number, era: string): voi
 /**
  * CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
  * Inspiration from that era." Runs at the era boundary, right after
- * `eraBoundary` commits the new age, in ascending seat order. A seat draws
+ * `enterEra` commits the new age, in ascending seat order. A seat draws
  * only when the new era still holds a civic it has neither unlocked nor
  * triggered — an unpayable seat must not advance the shared stream. The
  * granted Inspiration is an Inspiration like any other, so it pays the Pen,
  * Brush and Voice dedication the same way a detected one does.
  */
 function eraInspirations(state: GameState): void {
-  if (state.turn % ERA_LENGTH !== 0) return;
-  const era = ERAS[Math.min(Math.floor(state.turn / ERA_LENGTH), ERAS.length - 1)];
+  const era = ERAS[state.gameEra ?? 0];
   for (let seat = 0; seat < state.seats.length; seat++) {
     const sx = seatOf(state, seat);
     if (!sx || !suzerainEffect(state, seat, 'eraInspiration')) continue;
@@ -1989,7 +1990,7 @@ export function adoptBeliefs(state: GameState, seat: number, picks: readonly (re
     rel.founded = true;
     rel.beliefsEarned = RELIGION_INITIAL_BELIEFS;
     rel.name = RELIGION_NAMES[seat % RELIGION_NAMES.length];
-    addEraScore(state, seat, ERA_SCORE_RELIGION);
+    religionMoment(state, seat);
     rel.holyTile = (sx.cities.find((c) => c.isCapital) ?? sx.cities[0])?.centerIndex ?? null;
     grantFoundingPressure(state, seat);
     state.eventLog.push(`${sx.name} founded ${rel.name}.`);

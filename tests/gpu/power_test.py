@@ -733,7 +733,7 @@ def test_free_city_reactor(sim) -> None:
     sim.city_bldg[0, row, j, nuc] = True
     sim.city_reactor_age[0, row, j] = 25
     centre = int(sim.city_center[0, row, j])
-    sim._transfer_city(0, row, j, sim.FREE_ROW, conquest=False)
+    sim._transfer_city(0, row, j, sim.FREE_ROW, conquest=False, loyalty=True)
     fr = sim.FREE_ROW
     col = int(sim.centre_slot_at[0, centre])
     assert col >= 0 and bool(sim.city_alive[0, fr, col]), "the city is Free"

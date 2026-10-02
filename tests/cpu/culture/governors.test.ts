@@ -1,15 +1,15 @@
-import { seatOf, citiesOf } from '../../../cpu/core/seats';
+import { seatOf } from '../../../cpu/core/seats';
 import { describe, it, expect } from 'vitest';
 import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat, FREE_SEAT } from '../../../cpu/core/seats';
 import { dedicationEvent } from '../../../cpu/core/eras';
 import { DED_MONUMENTALITY, DED_EXODUS, DED_EVENT_SCORE } from '../../../cpu/data/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
-import { addEraScore, eraBoundary, agePressure } from '../../../cpu/core/eras';
+import { addEraScore, enterEra, agePressure } from '../../../cpu/core/eras';
 import { governorAt, governorPhase, governorsOf, governorTitlesAvailable, governorTitlesEarned, governorTitlesSpent, hasPromotion } from '../../../cpu/core/governors';
 import { GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_TITLE_CIVICS, promotionBit, promotionBitValue } from '../../../cpu/data/governors';
 import { tilesWithin } from '../../../world/hex';
-import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, GOVERNOR_LOYALTY, LOYALTY_MAX } from '../../../cpu/data/seats';
+import { AGE_PRESSURE, GOVERNOR_LOYALTY, LOYALTY_MAX } from '../../../cpu/data/seats';
 import type { GameState, City, Governor, Seat } from '../../../cpu/core/types';
 
 // -- local builders (the geopolitics.test.ts / the other civs.test.ts pattern) --------
@@ -168,38 +168,30 @@ describe('governors / era score', () => {
     expect(governorTitlesAvailable(state, civ.seat)).toBe(0);
   });
 
-  // ---- eraBoundary: threshold ages + reset ------------------------------------
-  it('eraBoundary assigns Dark/Normal/Golden at the exact thresholds then resets the window', () => {
+  // ---- enterEra: the ages at the bars, the next bars ---------------------------
+  it('enterEra judges each seat by the bars the era before fixed, then fixes the next', () => {
     const state = makeState();
     addCiv(state, 5, 5); // one civ → civs 0 (seat 0) and 1
-    state.turn = ERA_LENGTH; // a boundary turn
-    // the bars are PER SEAT now: base + cities +-5 per past dark/golden age
-    const bar = (i: number) => ERA_DARK_T + citiesOf(state, i).length
-      + AGE_PREV_STEP * ((seatOf(state, i)?.goldenAges ?? 0) - (seatOf(state, i)?.darkAges ?? 0));
-    const gap = ERA_GOLDEN_T - ERA_DARK_T;
-    [bar(0) - 1, bar(1) + gap].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; }); // seat 0 just-below-Dark, civ at Golden
-    eraBoundary(state);
+    const bars = (i: number) => [seatOf(state, i)!.darkBar!, seatOf(state, i)!.goldenBar!];
+    // seat 0 just below its Dark bar, seat 1 at its Golden bar
+    seatOf(state, 0)!.eraScore = bars(0)[0] - 1;
+    seatOf(state, 1)!.eraScore = bars(1)[1];
+    enterEra(state);
     expect([0, 1].map((i) => seatOf(state, i)?.age)).toEqual([0, 2]); // Dark, Golden
-    expect([0, 1].map((i) => seatOf(state, i)?.eraScore ?? 0)).toEqual([0, 0]); // window reset
-    // ...and the drift's memory ticks
+    expect([0, 1].map((i) => seatOf(state, i)?.eraScore)).toEqual([7, 19]); // the score is the game's
     expect(seatOf(state, 0)?.darkAges).toBe(1);
     expect(seatOf(state, 1)?.goldenAges).toBe(1);
+    // the next bars: the score + 11 / 22, one city past the first for seat 1's
+    // two... none here (one city each), -5 for the Dark age, +5 for the Golden
+    expect(bars(0)).toEqual([7 + 11 - 5, 7 + 22 - 5]);
+    expect(bars(1)).toEqual([19 + 11 + 5, 19 + 22 + 5]);
 
-    // the Normal band: the (drifted) dark bar → Normal, golden bar - 1 → Normal
-    state.turn = 2 * ERA_LENGTH;
-    [bar(0), bar(1) + gap - 1].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; });
-    eraBoundary(state);
+    // the Normal band: at the Dark bar, one short of the Golden bar
+    seatOf(state, 0)!.eraScore = bars(0)[0];
+    seatOf(state, 1)!.eraScore = bars(1)[1] - 1;
+    enterEra(state);
     expect([0, 1].map((i) => seatOf(state, i)?.age)).toEqual([1, 1]);
-  });
-
-  it('eraBoundary is a no-op off a boundary turn', () => {
-    const state = makeState();
-    addCiv(state, 5, 5);
-    state.turn = ERA_LENGTH - 1;
-    [7, 7].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; });
-    eraBoundary(state);
-    expect(seatOf(state, 0)?.age).toBeUndefined(); // no ages assigned
-    expect([0, 1].map((i) => seatOf(state, i)?.eraScore)).toEqual([7, 7]); // window untouched
+    expect(state.gameEra).toBe(2);
   });
 
   // ---- addEraScore: accrues on the SEAT ----------------------------------------

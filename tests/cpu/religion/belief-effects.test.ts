@@ -26,7 +26,6 @@ import { completeQueueItem } from '../../../cpu/core/production';
 import { gameEraIndex } from '../../../cpu/core/yields';
 import { FOUNDER_BELIEFS, ENHANCER_BELIEFS, colonizeFoundingPressure } from '../../../cpu/data/religion';
 import { BUILDINGS } from '../../../cpu/data/buildings';
-import { ERA_LENGTH } from '../../../cpu/data/seats';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
@@ -256,12 +255,12 @@ describe('the Dar-e Mehr pays +1 Faith per game era since constructed or last re
   it('stamps the era it is built in and pays one Faith per era since', () => {
     const { state, city } = withDarEMehr();
     expect(BUILDINGS.DAR_E_MEHR.yieldsPerEra).toEqual({ faith: 1 });
-    state.turn = ERA_LENGTH + 3;
+    state.gameEra = 1;
     standBuilding(state, city, 'DAR_E_MEHR');
     expect(city.buildingEras).toEqual({ DAR_E_MEHR: 1 });
     const faith = () => computeCityStats(state, city).breakdown.buildings.faith;
     const f0 = faith();
-    state.turn = 3 * ERA_LENGTH;
+    state.gameEra = 3;
     expect(gameEraIndex(state)).toBe(3);
     expect(faith() - f0).toBe(2);
     // a dark Dar-e Mehr pays nothing

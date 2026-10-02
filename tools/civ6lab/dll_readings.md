@@ -464,6 +464,110 @@ live storm record's struck list (m_aStorms +0x8b0, stride 0x68, the vector at
 +0x38..+0x40). Droughts' and fires' plots are not read. A burning plot fails
 the predicate anyway (it carries a feature).
 
+## Border plot: GetNextBuyablePlot — READ
+
+0x1aa7f0 scores every plot within PLOT_INFLUENCE_MAX_ACQUIRE_DISTANCE (5)
+of the centre that is unowned and touches a plot of this city (owner and
+city id): cost = d * DISTANCE_MULTIPLIER * 2; a resource the player can see
+(0x4ab4b0, the reveal condition) adds RESOURCE_COST when d <= 3, any other
+plot adds WATER_COST if water (0x834d0) and RING_COST when d > 3; an
+improvement adds RING_COST if it is the barbarian camp (0x362130), else
+IMPROVEMENT_COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per
+yield point to the owner (0x82280); then over its six neighbours, each
+UNOWNED one with a seen resource -1 and with a natural wonder -1, and -1 once
+more if such a wonder lies within 3 of the centre. The lowest cost collects
+a tie list; 0x1ab1c0 draws one ("GetNextBuyablePlot picker") whenever the
+list is non-empty. BASE_MULTIPLIER and DISTANCE_DIVISOR are not read here.
+The turn's handler 0x1a9bc0 (City_Culture.cpp) banks culture × (100 +
+percent) / 100 when the civ level annexes with culture, and when the box
+covers the cost spends it and annexes the STORED plot (+0x1c) if still
+unowned, else a fresh pick (nothing annexed if none); at most one plot a
+turn. Every turn, every city, it then re-picks and stores the next plot.
+Fit on the H-1 Duels with the game's own plot yields: 2,489 of 2,780
+city-turns (the rest: unseen resources the fitter cannot tell).
+
+## C-94: the game era, the ages and the founding moments — READ
+
+Game_Eras.cpp. The per-turn update 0x2c2dc0 (gated by a game option,
+hash 0xf10572be) runs with the game's other end-of-turn steps after the
+counter moves; m_eCurrentGameEra +0x108, its first turn +0x168, the
+countdown variable +0x170 (value +0x1c8, -1 idle). Check:
+`.claude/scratchpad/era_player_check.py` over the H-1 dumps.
+
+- Short of the last chronological era (0x93e8a0): with the countdown idle
+  and 0x2c4c80 true, the countdown is set to NEXT_ERA_TURN_COUNTDOWN
+  (GlobalParameters +0x524, 10); a running countdown is decremented the same
+  call; when it falls below 0 it is reset to -1 and the next era begins
+  (0x93eaa0 next era; ages 0x2c0e80; 0x2c6d70 sets the era and its turn).
+  So the era begins 10 turns after the countdown starts.
+- 0x2c4c80: false when turn < MinTurn − 10; true when turn ≥ MaxTurn − 10;
+  else true when at least half the game's players vector (+0xb50; the majors,
+  eliminated ones counted — no alive test) stand in a chronologically later
+  era than the game's (0x2c3940 counts them; 0x2c3900 the rest; the test
+  is ahead ≥ total − ahead). MinTurn 0x2c3870 = start + scale(Eras_XP1
+  GameEraMinimumTurns), MaxTurn 0x2c37c0 = start + scale(GameEraMaximumTurns)
+  (Eras_XP1 row +0x24 / +0x2c), scale 0x5254d0 = x × GameSpeeds.
+  CostMultiplier / 100 truncated: online 20 / 30. The first era's start is
+  the game's first turn.
+- A player's era (0x467eb0, the techs object +0xf8) is the highest era of
+  its techs and civics as of its turn's end: a tech granted in its turn
+  shows in the next record's era field (1104 t162 → t163) and in the check
+  that ran after that turn.
+- Verified: era starts 31, 61, 91, 121, 151, 181, 201, 231 (1103) and
+  31, 61, 91, 121, 151, 173, 193, 223 (1104), 16 of 16; the countdown's
+  start by the half-ahead clause on 1103 t191, 1104 t163 and t183.
+
+The ages, 0x2c0e80 at the era change, per player in the game's list: the
+score s = the sum of the player's era-score vector (+0x5b8, 22 types,
+never reset — the whole game's, `GetPlayerCurrentScore`); Golden when
+s ≥ the Golden threshold 0x2c3b60, Dark when s < the Dark threshold
+0x2c3a70 (each = max(0, base + Σ shifts)), Heroic when Golden out of a
+Dark age (the copied previous flag). Then the next thresholds: 0x2c6be0
+sets the bases to s + scale_SLIGHT(GOLDEN_AGE_SCORE_BASE_THRESHOLD 28) and
+s + scale_SLIGHT(DARK_AGE_SCORE_BASE_THRESHOLD 14) (0x525500 with
+SCALING_SLIGHT 0x50b150fa: × GameSpeed_Scalings.DefaultCostMultiplier
+/ 100 truncated, ONLINE_SLIGHT 80 → 22 / 11; 100 where the speed has no
+SLIGHT row); 0x2c55d0 the eleven shifts: THRESHOLD_SHIFT_PER_CITY ×
+max(0, cities − 1); MISSING_AMENITY and the four INCOMPLETE_* (0 in GS);
+[10] the entered era's Eras_XP2 EraScoreThresholdShift (Ancient −3);
+then 0x2c0e80 adds PER_PAST_GOLDEN_AGE 5 to [7] for a Golden or Heroic age
+entered and PER_PAST_DARK_AGE −5 to [8] for a Dark one (cumulative). The
+game's start (0x2c69c0) fixes the first bars off s = 0: 8 / 19 online.
+Thresholds never move mid-era (the city count is read at the change).
+Verified: every age and both bars of both majors at every era change of
+the H-1 Duels, 16 / 16 each (`era.age`, `era.bars`).
+
+Moments (Game_History_MomentHandlers.cpp, Game_History_Manager.cpp).
+Recording 0x3004e0 pays the row's EraScore unless the game era is before
+its MinimumGameEra or after its MaximumGameEra, the game's START era is at
+or past its ObsoleteEra, or the same moment for the same player lies within
+RepeatTurnCooldown (speed-scaled) turns. 0x315af0: has the player ever
+recorded this moment type (the whole history). The city-founded handler
+0x306b40 records, for a founding with no plain founding moment:
+BECAME_LARGEST_CIV_BY_MARGIN when its cities − 3 ≥ every other major's
+(once a game); NEAR_NATURAL_WONDER, a natural wonder within 2 (once per
+wonder); NEAR_OTHER_CIV_CITY, another player's city within 5 (every time);
+NEAR_FLOODABLE_RIVER and NEAR_VOLCANO within 2 (once a game); NEW_CONTINENT
+when none of its other cities stands on the plot's continent (every time,
+not the first city); ON_DESERT / ON_SNOW / ON_TUNDRA by the centre's
+terrain, flat or hills (every time). The other-civ test (0x312b00): the
+plot holds a city whose owner is not the founder, is a full civ (0x469db0,
+CIVILIZATION_LEVEL_FULL_CIV), the founder has met (0x3daaf0) and the plot
+is revealed to the founder. Pantheon 0x314840: FIRST_IN_WORLD when no
+other player holds a pantheon, else the plain row; religion 0x3057a0:
+FIRST_IN_WORLD while no player has recorded it, else the plain row. A
+world wonder 0x3110a0: GAME_ERA_WONDER (4) when the wonder's era is the
+game era or later, else PAST_ERA_WONDER (3). A city transferred 0x3088a0
+(paid to the new owner): TO_ORIGINAL_OWNER when its original owner (+0x218)
+is the new owner and the reason is not BY_CULTURAL_IDENTITY, once per city
+and player (0x315b50); then, when the old owner is a full civ,
+PLAYER_DEFEATED when the old owner's city count is ≤ 1, else
+FOREIGN_CAPITAL when the city is an original capital (+0x648) of the old
+owner. A city-state's or a Free City's city records neither. Great People
+0x3142a0: GAME_ERA / PAST_ERA, both 1. Fit: `step.eraScore` 394 / 482
+(1103) and 372 / 480 (1104), from 382 and 365; the rest are moments the
+engines do not record.
+
 ## DLL rules the engines contradict
 
 None known: every rule read above ships on both engines.

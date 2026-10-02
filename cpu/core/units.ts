@@ -165,8 +165,8 @@ function railStep(from: Tile, to: Tile): boolean {
   return !!from.railroad && !!to.railroad;
 }
 
-/** The road TIER the world has reached, 0..3 — latched at each era boundary
- *  (eras.ts), the one site both engines already fire in lockstep. */
+/** The road TIER the world has reached, 0..3 — latched as each game era
+ *  begins (`enterEra`). */
 export function roadTier(state: GameState): number {
   return state.roadTier ?? 0;
 }

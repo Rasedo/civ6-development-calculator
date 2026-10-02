@@ -259,7 +259,7 @@ def poke_capture_luxury_pool(rules, path):
     need = torch.full((sim.B, sim.RC), 10.0, dtype=sim.dtype)
     base = float(sim._luxury_amenities(0, have, need).sum())
 
-    sim._transfer_city(0, r + 1, j, 0, conquest=True)  # civ r is block row r+1
+    sim._transfer_city(0, r + 1, j, 0, conquest=True, loyalty=False)  # civ r is block row r+1
     c_new = int(sim.centre_slot_at[0, c_t])
     assert c_new >= 0 and bool(sim.city_alive[0, 0, c_new]), "capture did not land a seat-0 city"
     assert int(sim.city_slot_at(0)[0, t]) == c_new, "the luxury tile did not re-own to the captured city (the ring)"

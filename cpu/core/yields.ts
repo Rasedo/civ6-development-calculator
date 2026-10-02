@@ -19,8 +19,6 @@ import { GP_BUILDING_YIELDS, gpPermOf, gpTilePermOf } from '../data/greatPeople'
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
 import { cityGovernorEffects, cityGovernorPromos, governorSum } from './governors';
-import { ERA_LENGTH } from '../data/seats';
-import { ERAS } from '../data/techs';
 
 function terrainYields(tile: Tile): Yields {
   const out = emptyYields();
@@ -389,10 +387,9 @@ export function repairBuilding(city: { pillagedBuildings?: string[] }, id: strin
   if (city.pillagedBuildings.length === 0) delete city.pillagedBuildings;
 }
 
-/** the GAME era: the ERA_LENGTH timeline every seat's age turns on
- *  (`eraBoundary`), capped at the last era. */
+/** the GAME era (`gameEraTurn`), an ERAS index */
 export function gameEraIndex(state: GameState): number {
-  return Math.min(Math.floor(state.turn / ERA_LENGTH), ERAS.length - 1);
+  return state.gameEra ?? 0;
 }
 
 /** a building carrying `yieldsPerEra` was constructed or repaired: its

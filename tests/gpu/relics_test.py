@@ -167,7 +167,7 @@ def main() -> None:
         if dest < s3.RC:
             hold_works(s3, 0, 2, dest, 0, 2)  # a dead slot's ghost
             before = [getattr(s3, p)[0, 1, j].clone() for p in PLANES]
-            s3._transfer_city(0, 1, j, 2, conquest=False)
+            s3._transfer_city(0, 1, j, 2, conquest=False, loyalty=True)
             for p, v in zip(PLANES, before):
                 assert torch.equal(getattr(s3, p)[0, 2, dest], v), f"{p} must ride the transfer slot for slot"
                 assert bool((getattr(s3, p)[0, 1, j] == -1).all()), f"the dead source slot must not keep {p}"

@@ -124,7 +124,9 @@ def test_founding(rules, path) -> None:
     assert int(sim.holy_tile[B0, ROW]) == int(sim.city_center[B0, ROW, j]), "the holy tile is the capital's centre"
     assert int(sim.city_pressure[B0, ROW, j, ROW]) - press0 == \
         int(sim._holy_founding_per_pop) * int(sim.city_pop[B0, ROW, j]), "the Holy City's founding pressure"
-    assert int(sim.era_score[B0, ROW]) - era0 == int(sim._era_pts["religion"]), "the founding's era score"
+    first = not bool(torch.cat((sim.civ_religion_done[B0, :ROW], sim.civ_religion_done[B0, ROW + 1:sim.n_majors])).any())
+    want = sim._moment_religion_first if first else sim._moment_religion
+    assert int(sim.era_score[B0, ROW]) - era0 == want, "the founding's era score (`religionMoment`)"
     print("  1 founding OK — the Follower first, one other class, the open pool; holy tile, pressure, era score")
 
 

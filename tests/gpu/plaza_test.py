@@ -177,7 +177,7 @@ def poke_conquest_window(rules, path):
                   if r != ROW and bool(sim.city_alive[0, r].any())), -1)
     assert other >= 0, "the fixture has no second major with a city"
     scol = int(sim.city_alive[0, other].nonzero(as_tuple=True)[0][0])
-    sim._transfer_city(0, other, scol, ROW, conquest=True)
+    sim._transfer_city(0, other, scol, ROW, conquest=True, loyalty=False)
     assert int(sim.conquest_turns[0, ROW]) == 5, "the capture did not open the window"
 
     # and the tail ticks it out

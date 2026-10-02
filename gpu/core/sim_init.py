@@ -580,16 +580,21 @@ class SimInit:
         self.civ_emg_route_gold = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.civ_emg_nuke_cs = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
         self.civ_emg_nuke_cut = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
-        # Per-seat era-score accumulator, one column per seat row — the TS
-        # `state.eraScore` mirror. Integer, zero-draw;
-        # resets at every eraLength boundary (right after `self.turn += 1`, the
-        # endTurn eraBoundary mirror). Loaded from the fixture's t0 snapshot.
-        # _MUTABLE for snapshot/restore.
+        # Per-seat era score over the whole game, one column per seat row —
+        # the TS `Seat.eraScore` mirror. Integer, zero-draw; loaded from the
+        # fixture's t0 snapshot. _MUTABLE for snapshot/restore.
         self.era_score = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
-        # ...and the era score of every era already closed, banked at the same
-        # boundary (`Seat.eraScorePast`): with `era_score` the whole game's,
-        # which the Score counts. Zero at t0.
-        self.era_score_past = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        # the Age bars the current game era fixed as it began (`Seat.darkBar`
+        # / `goldenBar`, `_enter_era`), from the fixture's t0 snapshot
+        self.dark_bar = torch.tensor([[int(v[0]) for v in f["barsInit"][: self.n_majors]] for f in fixtures],
+                                     dtype=torch.long, device=device).reshape(B, self.n_majors)
+        self.golden_bar = torch.tensor([[int(v[1]) for v in f["barsInit"][: self.n_majors]] for f in fixtures],
+                                       dtype=torch.long, device=device).reshape(B, self.n_majors)
+        # the GAME ERA per game (`GameState.gameEra`), the turn it began and
+        # the countdown to the next (-1 none) — `_game_era_turn`
+        self.game_era = torch.zeros(B, dtype=torch.long, device=device)
+        self.era_start = torch.ones(B, dtype=torch.long, device=device)
+        self.era_countdown = torch.full((B,), -1, dtype=torch.long, device=device)
         # CIV6 (Ages): how many DARK and GOLDEN/HEROIC ages each civ has
         # entered — the per-civ threshold drift's memory.
         self.dark_ages = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
@@ -754,9 +759,25 @@ class SimInit:
         self._c_grow_b = float(_er2["congressGrowthB"])
         self._c_mig_loy = float(_er2["congressMigLoyalty"])
         self._c_gw_mult = int(_er2["congressGwMult"])
-        self._era_len = int(_er["length"])
+        self._era_min = int(_er["minTurns"])
+        self._era_max = int(_er["maxTurns"])
+        self._era_cd = int(_er["countdown"])
         self._era_count = int(_er["count"])
-        self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
+        # the Moments the engines pay (`foundingMoments` and its neighbours)
+        self._era_gp = int(_er["gp"])
+        self._moment_terrain = [(int(t), int(v)) for t, v in _er["momentTerrain"]]
+        self._moment_new_continent = int(_er["momentNewContinent"])
+        self._moment_near_civ = int(_er["momentNearCivCity"])
+        self._moment_near_range = int(_er["momentNearCivRange"])
+        self._moment_pantheon = int(_er["momentPantheon"])
+        self._moment_pantheon_first = int(_er["momentPantheonFirst"])
+        self._moment_religion = int(_er["momentReligion"])
+        self._moment_religion_first = int(_er["momentReligionFirst"])
+        self._moment_wonder_game = int(_er["momentWonderGameEra"])
+        self._moment_wonder_past = int(_er["momentWonderPastEra"])
+        self._moment_foreign_cap = int(_er["momentForeignCapital"])
+        self._moment_defeated = int(_er["momentPlayerDefeated"])
+        self._moment_to_orig = int(_er["momentToOriginalOwner"])
         self._era_moment_min = int(_er["momentMin"])
         # Per-seat Age (0 Dark / 1 Normal / 2 Golden), assigned at each era
         # boundary from the just-ended window's score; era 0 is all Normal (the
@@ -781,9 +802,13 @@ class SimInit:
         self.civ_gov_anarchy_end = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
-        self._era_dark = int(_er["darkT"])    # GlobalParameters DARK_AGE_SCORE_BASE_THRESHOLD
-        self._era_gold = int(_er["goldenT"])  # GOLDEN_AGE_SCORE_BASE_THRESHOLD
-        self._age_step = int(_er["agePrevStep"])
+        # `ageBars`: the speed-scaled bases and the shifts
+        self._age_dark_base = int(_er["darkBase"])
+        self._age_gold_base = int(_er["goldenBase"])
+        self._age_shift_city = int(_er["shiftPerCity"])
+        self._age_shift_golden = int(_er["shiftPastGolden"])
+        self._age_shift_dark = int(_er["shiftPastDark"])
+        self._age_era_shift = torch.tensor([int(x) for x in _er["eraShift"]], dtype=torch.long, device=device)
         self._age_pressure = torch.tensor([float(x) for x in _er["agePressure"]], dtype=torch.float64, device=device)
         # CIV6 (the Loyalty pedia): each citizen's base pressure and a capital's extra
         self._citizen_press_base = float(rules.seats["citizenPressureBase"])
@@ -2123,9 +2148,9 @@ class SimInit:
             [[bool(t.get("rd", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
         # CIV6: "all roads in your territory will upgrade to the next level
-        # automatically" on reaching the era that brings the tier. Latched at
-        # the era boundary, the site both engines already fire in lockstep.
-        self.road_tier = 0
+        # automatically" on reaching the era that brings the tier: per game,
+        # latched as its game era begins (`_enter_era`)
+        self.road_tier = torch.zeros(B, dtype=torch.long, device=device)
         self.district_pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         nD = len(self.districts_cat)
         self.d_static_adj = torch.tensor(
@@ -2582,8 +2607,8 @@ class SimInit:
         self._mp_scale = int(rules.mp_scale)
         # CIV6 (Mountain Tunnel): the published exit price, "2 Movement"
         self._portal_mp = 2
-        self._road_tier_mp = list(rules.road_tier_mp)
-        self._road_tier_bridges = list(rules.road_tier_bridges)
+        self._road_tier_mp = torch.tensor(list(rules.road_tier_mp), dtype=torch.long, device=device)
+        self._road_tier_bridges = torch.tensor(list(rules.road_tier_bridges), dtype=torch.bool, device=device)
         self._road_tier_era = list(rules.road_tier_era)
         self._railroad_mp = int(rules.railroad_mp)
         self._wonder_coastal_mask = int(rules.wonder_coastal_mask)
@@ -3101,6 +3126,7 @@ class SimInit:
         self._project_charge_live = bool((self._b_project_charge != 0).any())
         self._bsum_row_cache = None
         self._bldg_version = 0  # every `city_bldg` write moves it
+        self._era_version = 0  # every game era a game enters moves it
         # CIV6 (Water Works): housing per Neighborhood/Aqueduct, amenities per
         # Canal/Dam — the district roster, by catalog id.
         _dids = [str(d["id"]) for d in self.districts_cat]
@@ -4400,7 +4426,6 @@ class SimInit:
         return {
             "mut": {k: getattr(self, k).clone() for k in _MUTABLE},
             "turn": self.turn,
-            "road_tier": self.road_tier,
         }
 
     def restore(self, snap: dict) -> None:
@@ -4412,7 +4437,6 @@ class SimInit:
         # a scan for `self.tile_seat[...] =`.
         self._tile_owner_ver += 1
         self.turn = snap["turn"]
-        self.road_tier = snap.get("road_tier", 0)
         self._eff_version += 1
         self._fbase_cache = None
         self._food_cache = None

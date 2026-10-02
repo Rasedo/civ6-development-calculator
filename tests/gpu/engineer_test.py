@@ -380,7 +380,7 @@ def main() -> None:
     sim.road[0, t] = sim.road[0, nb] = True
     sim.railroad[0, t] = sim.railroad[0, nb] = False
     for tier, mp in enumerate(sim._road_tier_mp):
-        sim.road_tier = tier
+        sim.road_tier[:] = tier
         terr, _ = sim._road_terms(frm[0], frm[1], dry)
         assert int(terr[0]) + sim._mp_scale == int(mp), (
             f"CIV6: a tier-{tier} road step costs {mp} quarter points")
@@ -392,7 +392,7 @@ def main() -> None:
     wet = torch.full((1,), 3 * sim._mp_scale, dtype=torch.long)
     sim.railroad[0, t] = sim.railroad[0, nb] = False
     for tier, bridged in enumerate(sim._road_tier_bridges):
-        sim.road_tier = tier
+        sim.road_tier[:] = tier
         _, riv = sim._road_terms(frm[0], frm[1], wet)
         assert (int(riv[0]) == 0) == bool(bridged), (
             f"a tier-{tier} route {'bridges' if bridged else 'fords'} a river")

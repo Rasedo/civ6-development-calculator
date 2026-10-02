@@ -368,6 +368,11 @@ export interface GameState {
   victoryRow?: number;
   /** the ROAD TIER the world has reached, 0..3 (`ROAD_TIER_MP`). */
   roadTier?: number;
+  /** the GAME ERA (an ERAS index), the turn it began, and the countdown to
+   *  the next one (-1 while none runs) — `gameEraTurn`. */
+  gameEra?: number;
+  eraStartTurn?: number;
+  eraCountdown?: number;
   congressSessions?: number;
   /** the ANNOUNCED slate for the next Regular Session: resolution indices
    *  drawn at the previous session's close (-1 = empty slot). */
@@ -721,12 +726,13 @@ export interface Seat {
   fuelShort?: number;
   camps: number[];
   gpEarned: string[];
-  /** the era score earned in the CURRENT era — the window the Age bars read,
-   *  reset at every era boundary. */
+  /** the era score this seat has earned over the whole game */
   eraScore?: number;
-  /** the era score earned in every era already closed; with `eraScore` it is
-   *  the whole game's, which the Score counts. */
-  eraScorePast?: number;
+  /** the Age bars the current game era fixed as it began (`ageBars`): a
+   *  score below `darkBar` at the next era's start is a Dark age, one at or
+   *  above `goldenBar` a Golden one. */
+  darkBar?: number;
+  goldenBar?: number;
   /** how many DARK / GOLDEN-or-HEROIC ages this civ has entered — the
    *  per-civ threshold drift's memory. */
   darkAges?: number;

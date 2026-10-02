@@ -24,9 +24,9 @@ import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum, cityGovernorEffects } from './governors';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
-import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
+import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
-import { addEraScore, goldenDedication, worldEraIndex } from './eras';
+import { goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, raiseBestMelee, unitReligious, unitStackSlot } from './units';
 import { nextRandom } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
@@ -2778,7 +2778,6 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   logPopWrite(state, _csList[_csList.length - 1], 'cs');
   revealAround(state, seat, cityState.centerIndex, 3);
   raiseEmergency(state, EMERGENCY_CITY_STATE, seat, id, csPatrons(state, cityState, seat));
-  addEraScore(state, seat, ERA_SCORE_CONQUER); // the CONQUEROR gained a city
   state.eventLog.push(`${cityState.name} conquered — the city-state joins your empire.`);
 }
 
@@ -2830,7 +2829,6 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   });
   logPopWrite(state, actor.cities[actor.cities.length - 1], 'cs');
   raiseEmergency(state, EMERGENCY_CITY_STATE, actor.seat, id, csPatrons(state, cityState, actor.seat));
-  addEraScore(state, actor.seat, ERA_SCORE_CONQUER); // gained a city (actor CS conquest)
   state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);
 }
 

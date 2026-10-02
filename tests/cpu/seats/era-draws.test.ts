@@ -4,7 +4,6 @@ import { endTurn, foundCity } from '../../../cpu/core/game';
 import { killUnit, markAntiquitySite, clearCampFor } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
 import { BARB_SEAT, emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
-import { ERA_LENGTH } from '../../../cpu/data/seats';
 import { ERAS } from '../../../cpu/data/techs';
 import { CIVICS } from '../../../cpu/data/civics';
 import { tilesWithin } from '../../../world/hex';
@@ -33,7 +32,9 @@ function boardAtEraEdge(): GameState {
   state.seats.push(emptySeat(1));
   foundCity(state, tileAtCoords(state.map, 3, 3).index, 0);
   foundCity(state, tileAtCoords(state.map, 15, 15).index, 1);
-  state.turn = ERA_LENGTH - 1; // one endTurn away from the boundary
+  // the Ancient era's countdown on its last tick: one endTurn begins the next
+  state.turn = 30;
+  state.eraCountdown = 0;
   return state;
 }
 
@@ -43,8 +44,8 @@ describe("Vilnius's era Inspiration", () => {
     suzerainOf(state, 'Vilnius', 0);
     const before = state.seats.map((s) => [...s.research.boosted]);
     endTurn(state);
-    expect(state.turn % ERA_LENGTH).toBe(0);
-    const era = ERAS[Math.min(Math.floor(state.turn / ERA_LENGTH), ERAS.length - 1)];
+    expect([state.gameEra, state.eraStartTurn]).toEqual([1, 31]);
+    const era = ERAS[state.gameEra!];
 
     const fresh = state.seats[0].research.boosted.filter((id) => !before[0].includes(id));
     // the era edge also runs detectBoosts elsewhere in the turn, so the draw is
@@ -62,7 +63,7 @@ describe("Vilnius's era Inspiration", () => {
     cityState.envoys = {}; // met, but nobody has envoys
     const before = state.seats.map((s) => [...s.research.boosted]);
     endTurn(state);
-    const era = ERAS[Math.min(Math.floor(state.turn / ERA_LENGTH), ERAS.length - 1)];
+    const era = ERAS[state.gameEra!];
     for (let s = 0; s < 2; s++) {
       const fresh = state.seats[s].research.boosted.filter((id) => !before[s].includes(id));
       expect(fresh.filter((id) => CIVICS[id]?.era === era).length).toBe(0);

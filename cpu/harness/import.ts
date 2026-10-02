@@ -63,6 +63,7 @@ import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost } from '../core/game';
 import { builderCost, traderCost } from '../core/units';
 import { computeUnlocks } from '../core/effects';
+import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { districtSiteCost } from '../core/phase';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
 import { aliases, engineId, gameHash } from './aliases';
@@ -331,11 +332,15 @@ export interface History {
   /** the age each era transition gave each player, in order (`AGE_DARK`,
    *  `AGE_NORMAL`, `AGE_GOLDEN_ONLY`, `AGE_HEROIC`) */
   ages: Map<number, number[]>;
-  /** each player's era score standing when the current era began */
-  eraStartScore: Map<number, number>;
   /** the turns a new era began on: the first record whose age thresholds
    *  moved for any major (the world's era is the game's, one for all) */
   eraTurns: number[];
+  /** the game era as the game began them (an ERAS index and its first
+   *  turn), and the countdown the engine's rule (`eraCountdownStep`) runs
+   *  over the records' player eras */
+  gameEra: number;
+  eraStartTurn: number;
+  eraCountdown: number;
 }
 
 export const AGE_DARK = 0;
@@ -346,6 +351,11 @@ export const AGE_HEROIC = 3;
 /** a record player's age, read off the game's three age flags */
 export function ageOf(p: DumpPlayer): number {
   return bool(p.heroic) ? AGE_HEROIC : bool(p.goldenAge) ? AGE_GOLDEN_ONLY : bool(p.darkAge) ? AGE_DARK : AGE_NORMAL;
+}
+
+/** a record's major players' own eras, in id order */
+export function majorEras(rec: TurnRecord): number[] {
+  return [...rec.players].sort((a, b) => a.id - b.id).filter((p) => bool(p.major)).map((p) => num(p.era));
 }
 
 /** Did a new era begin between two records: has any major's pair of age
@@ -363,8 +373,8 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(),
-    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), ages: new Map(), eraStartScore: new Map(),
-    eraTurns: [] };
+    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), ages: new Map(),
+    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
 }
 
 /** Fold one record into the history, in turn order. */
@@ -407,17 +417,25 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         h.fireProd.set(i, (h.fireProd.get(i) ?? 0) + 1);
       }
     }
-    // a new era: every major's age for it, and the score it began on (the
-    // score the record before it closed the last era with)
+    // the game era's countdown over each turn since the last record, on
+    // this record's player eras (a player's era moves at its turn's end)
+    let c = h.eraCountdown;
+    for (let t = h.last.turn + 1; t <= rec.turn; t++) {
+      c = eraCountdownStep(h.gameEra, h.eraStartTurn, c, t, majorEras(rec));
+      if (c === ERA_BEGINS) c = -1;
+    }
+    h.eraCountdown = c;
+    // a new era: every major's age for it
     if (eraBegan(h.last, rec)) {
       h.eraTurns.push(rec.turn);
+      h.gameEra += 1;
+      h.eraStartTurn = rec.turn;
+      h.eraCountdown = -1;
       for (const p of rec.players) {
         if (!bool(p.major)) continue;
         const list = h.ages.get(p.id) ?? [];
         list.push(ageOf(p));
         h.ages.set(p.id, list);
-        const was = h.last.players.find((q) => q.id === p.id);
-        h.eraStartScore.set(p.id, num(was?.eraScore) || 0);
       }
     }
   }
@@ -453,6 +471,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
   const state = createGameFromMap(map, num(rec.seed) >>> 0);
   state.turn = rec.turn;
+  if (history) {
+    state.gameEra = history.gameEra;
+    state.eraStartTurn = history.eraStartTurn;
+    state.eraCountdown = history.eraCountdown;
+  }
 
   const seatOfPlayer = new Map<number, number>();
   const playerOfSeat = new Map<number, number>();
@@ -870,9 +893,8 @@ function importPlayer(ctx: Ctx, p: DumpPlayer, s: GameState['seats'][number]): v
 /**
  * A major's ages: the current one off the record's flags (a Heroic age is
  * the engine's Golden code), the eras the history saw begin counted into
- * `darkAges` / `goldenAges` with the one before the current as `prevAge`,
- * and the game's whole-game era score split at the current era's start into
- * `eraScorePast` and the current era's `eraScore`.
+ * `darkAges` / `goldenAges` with the one before the current as `prevAge`;
+ * the game's whole-game era score and its two age bars.
  */
 function importAges(s: GameState['seats'][number], p: DumpPlayer, history?: History): void {
   const engineAge = (a: number) => (a >= AGE_GOLDEN_ONLY ? AGE_GOLDEN : a === AGE_DARK ? 0 : 1);
@@ -881,10 +903,9 @@ function importAges(s: GameState['seats'][number], p: DumpPlayer, history?: Hist
   s.darkAges = ages.filter((a) => a === AGE_DARK).length;
   s.goldenAges = ages.filter((a) => a >= AGE_GOLDEN_ONLY).length;
   s.prevAge = ages.length >= 2 ? engineAge(ages[ages.length - 2]) : 1;
-  const total = num(p.eraScore) || 0;
-  const past = history?.eraStartScore.get(p.id) ?? 0;
-  s.eraScorePast = past;
-  s.eraScore = total - past;
+  s.eraScore = num(p.eraScore) || 0;
+  s.darkBar = num(p.darkThreshold) || 0;
+  s.goldenBar = num(p.goldenThreshold) || 0;
 }
 
 const CLEARABLE = clearableFeatures();

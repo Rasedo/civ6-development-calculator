@@ -105,12 +105,12 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
-import { addEraScore, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
+import { pantheonMoment, transferMoments, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
@@ -1256,6 +1256,8 @@ export function transferCity(
 ): boolean {
   // The losing seat's city list — one lookup, because every seat holds its own.
   const loser = seatOf(state, fromSeat);
+  // the losing seat held no other city: its last (the moments read it)
+  const wasLast = (loser?.cities.length ?? 0) <= 1;
   // A Free City's own grants (`Unit.freeCity`) go when it leaves the Free
   // Cities, joined or captured, in `state.units` order, never to the taker
   // (lab 5d, runs/c60f_capture_t250a_20260928T025820Z.jsonl and the other c60f_capture records: 3 of 3).
@@ -1274,7 +1276,7 @@ export function transferCity(
       // "Captured the final city of a civilization: 150 (all remaining civs
       // gain Grievances against you)" — the loser's list is about to lose this
       // one, so one city left IS the last.
-      if ((loser?.cities.length ?? 0) <= 1) grievanceLastCity(state, to.seat);
+      if (wasLast) grievanceLastCity(state, to.seat);
     }
   }
   if (loser) {
@@ -1415,7 +1417,7 @@ export function transferCity(
   }
   // the Free Cities player scores no era and explores nothing
   if (isCiv(to.seat)) {
-    addEraScore(state, to.seat, ERA_SCORE_CONQUER);
+    transferMoments(state, fromSeat, to.seat, civCity, why === 'loyalty collapsed' || why === 'joined', wasLast);
     revealAround(state, to.seat, civCity.centerIndex, 3);
   }
   // the road to the capital walks the city as it now stands: its new holder,
@@ -2822,7 +2824,7 @@ export function seatPhase(state: GameState): void {
         actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
         const pick = open[Math.floor(nextRandom(state) * open.length)];
         state.claimedPantheons.push(pick);
-        addEraScore(state, actor.seat, ERA_SCORE_PANTHEON);
+        pantheonMoment(state, actor.seat);
         actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
         state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
       }

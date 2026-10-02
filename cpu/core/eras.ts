@@ -5,14 +5,19 @@ import { getModifiers } from './effects';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
 import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, DED_TO_ARMS, SKY_EUREKAS } from '../data/seats';
-import { TECHS } from '../data/techs';
+import { ERAS, TECHS } from '../data/techs';
 import { promoValue } from './promotions';
 import { spawnUnit } from './units';
 import { BUILDINGS, BUILDING_ERA_INDEX, buildingVariantFor } from '../data/buildings';
 import { GW_HOLDERS } from '../data/greatWorks';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { ROAD_TIER_ERA } from '../data/constants';
-import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PREV_STEP, AGE_PRESSURE, HEROIC_DEDICATIONS, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
+import { hexDistance } from '../../world/hex';
+import { isExplored } from './fog';
+import {
+  MOMENT_ON_DESERT, MOMENT_ON_SNOW, MOMENT_ON_TUNDRA, MOMENT_NEW_CONTINENT, MOMENT_NEAR_CIV_CITY, MOMENT_NEAR_CIV_RANGE,
+  MOMENT_PANTHEON, MOMENT_PANTHEON_FIRST, MOMENT_RELIGION, MOMENT_RELIGION_FIRST, MOMENT_WONDER_GAME_ERA,
+  MOMENT_WONDER_PAST_ERA, MOMENT_FOREIGN_CAPITAL, MOMENT_PLAYER_DEFEATED, MOMENT_TO_ORIGINAL_OWNER, ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_MIN_TURNS, ERA_MAX_TURNS, ERA_COUNTDOWN, ageBars, AGE_PRESSURE, HEROIC_DEDICATIONS, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 /** CIV6 (Great People): the WORLD era — "the era of the Great Person and the
  *  World Era when the Great Person appears in the queue". The furthest any seat
@@ -38,17 +43,112 @@ export function addEraScore(state: GameState, seat: number, per: number, count =
   }
 }
 
-/** Era boundary — runs right AFTER `state.turn += 1` in endTurn (the GPU
- *  mirrors at its own turn increment). At each ERA_LENGTH multiple every
- *  civ's Age for the NEW era comes from the just-ended window's score,
- *  then the accumulators reset for the new window. */
-export function eraBoundary(state: GameState): void {
-  if (state.turn % ERA_LENGTH !== 0) return;
+/** The moments a city major `seat` founded at `centre` records
+ *  (`MOMENT_ON_DESERT`'s rule), on the state the founding left — the city
+ *  among the seat's own, its sight revealed. */
+export function foundingMoments(state: GameState, seat: number, centre: number): void {
+  if (!isCiv(seat)) return;
+  const map = state.map;
+  const tile = map.tiles[centre];
+  for (const sx of state.seats) {
+    if (sx.seat === seat) continue;
+    const near = sx.cities.some((c) => {
+      const t = map.tiles[c.centerIndex];
+      return hexDistance(map, tile.col, tile.row, t.col, t.row) <= MOMENT_NEAR_CIV_RANGE
+        && isExplored(state, seat, c.centerIndex);
+    });
+    if (near) {
+      addEraScore(state, seat, MOMENT_NEAR_CIV_CITY);
+      break;
+    }
+  }
+  const cont = tile.continent ?? -1;
+  const others = citiesOf(state, seat).filter((c) => c.centerIndex !== centre);
+  if (cont >= 0 && others.length > 0 && others.every((c) => (map.tiles[c.centerIndex].continent ?? -1) !== cont)) {
+    addEraScore(state, seat, MOMENT_NEW_CONTINENT);
+  }
+  const terrain = tile.terrain === 'DESERT' ? MOMENT_ON_DESERT : tile.terrain === 'SNOW' ? MOMENT_ON_SNOW
+    : tile.terrain === 'TUNDRA' ? MOMENT_ON_TUNDRA : 0;
+  if (terrain > 0) addEraScore(state, seat, terrain);
+}
+
+/** The pantheon or religion `seat` just founded: the FIRST_IN_WORLD moment
+ *  when no other major holds one, else the plain one. */
+export function pantheonMoment(state: GameState, seat: number): void {
+  const first = !state.seats.some((s) => s.seat !== seat && s.religion.pantheon);
+  addEraScore(state, seat, first ? MOMENT_PANTHEON_FIRST : MOMENT_PANTHEON);
+}
+export function religionMoment(state: GameState, seat: number): void {
+  const first = !state.seats.some((s) => s.seat !== seat && s.religion.founded);
+  addEraScore(state, seat, first ? MOMENT_RELIGION_FIRST : MOMENT_RELIGION);
+}
+
+/** A world wonder of ERAS index `era` completed by `seat`: the GAME_ERA
+ *  moment when that era is the game era or later, else PAST_ERA. */
+export function wonderMoment(state: GameState, seat: number, era: number): void {
+  addEraScore(state, seat, era >= (state.gameEra ?? 0) ? MOMENT_WONDER_GAME_ERA : MOMENT_WONDER_PAST_ERA);
+}
+
+/** A city passing from `fromSeat` to major `toSeat`: TO_ORIGINAL_OWNER when
+ *  `toSeat` founded it and its loyalty did not carry it; from a major,
+ *  PLAYER_DEFEATED when it was that major's last city (`wasLast`), else
+ *  FOREIGN_CAPITAL when it was that major's original capital. */
+export function transferMoments(state: GameState, fromSeat: number, toSeat: number,
+  city: { founderSeat?: number; origCapitalSeat?: number }, byLoyalty: boolean, wasLast: boolean): void {
+  if (!isCiv(toSeat)) return;
+  if (city.founderSeat === toSeat && !byLoyalty) addEraScore(state, toSeat, MOMENT_TO_ORIGINAL_OWNER);
+  if (!isCiv(fromSeat)) return;
+  if (wasLast) addEraScore(state, toSeat, MOMENT_PLAYER_DEFEATED);
+  else if (city.origCapitalSeat === fromSeat) addEraScore(state, toSeat, MOMENT_FOREIGN_CAPITAL);
+}
+
+/** The GAME ERA (`ERA_MIN_TURNS`'s rule) — runs right AFTER `state.turn += 1`
+ *  in endTurn, the GPU's `_game_era_turn` at its own turn increment. Starts
+ *  the countdown when the era's minimum less the countdown has come and
+ *  either its maximum less the countdown has too or at least half the major
+ *  seats (eliminated ones counted) stand in a later era by their techs and
+ *  civics; ticks a running one; begins the next era (`enterEra`) the turn it
+ *  runs out. True on that turn. */
+export function gameEraTurn(state: GameState): boolean {
+  const eras = state.seats.map((sx) => civEraIndex(sx.research.techs, sx.research.civics));
+  const next = eraCountdownStep(state.gameEra ?? 0, state.eraStartTurn ?? 1, state.eraCountdown ?? -1, state.turn, eras);
+  if (next !== ERA_BEGINS) {
+    state.eraCountdown = next;
+    return false;
+  }
+  enterEra(state);
+  return true;
+}
+
+/** what `eraCountdownStep` returns on the turn the next era begins */
+export const ERA_BEGINS = -2;
+
+/** One turn of the game era's countdown: the countdown after turn `turn`
+ *  (-1 none running), or ERA_BEGINS when the next era begins on it. `eras`
+ *  are the major seats' own eras (`civEraIndex`). */
+export function eraCountdownStep(era: number, start: number, countdown: number, turn: number,
+  eras: readonly number[]): number {
+  if (era >= ERAS.length - 1) return -1;
+  let c = countdown;
+  if (c < 0 && turn >= start + ERA_MIN_TURNS - ERA_COUNTDOWN) {
+    let ahead = 0;
+    for (const e of eras) if (e > era) ahead++;
+    if (turn >= start + ERA_MAX_TURNS - ERA_COUNTDOWN || 2 * ahead >= eras.length) c = ERA_COUNTDOWN;
+  }
+  if (c < 0) return -1;
+  c -= 1;
+  return c >= 0 ? c : ERA_BEGINS;
+}
+
+/** A new GAME ERA begins: its index and first turn, the road tier it brings,
+ *  and each major seat's Age, dedications and next bars (`ageBars`). */
+export function enterEra(state: GameState): void {
+  const era = (state.gameEra ?? 0) + 1;
+  state.gameEra = era;
+  state.eraStartTurn = state.turn;
+  state.eraCountdown = -1;
   // CIV6: "all roads in your territory will upgrade to the next level
-  // automatically" on reaching the era that brings the tier. Latched here
-  // rather than off a raw turn comparison because this site is already proven
-  // to fire at the same moment in both engines, and never falls back.
-  const era = Math.floor(state.turn / ERA_LENGTH);
+  // automatically" on reaching the era that brings the tier.
   let tier = 0;
   for (let i = 0; i < ROAD_TIER_ERA.length; i++) if (era >= ROAD_TIER_ERA[i]) tier = i;
   state.roadTier = Math.max(state.roadTier ?? 0, tier);
@@ -57,13 +157,7 @@ export function eraBoundary(state: GameState): void {
     if (!seat) continue;
     const s = seat.eraScore ?? 0;
     const was = seat.age ?? 1; // era 0 is Normal for everyone
-    // CIV6 (Ages): the bars are THIS CIV's — cities counted as the era
-    // begins, past dark ages lowering them and past golden/heroic ages
-    // raising them, the Golden bar a fixed 12 above the Dark one.
-    const darkT = ERA_DARK_T + citiesOf(state, c).length
-      + AGE_PREV_STEP * ((seat.goldenAges ?? 0) - (seat.darkAges ?? 0));
-    const goldT = darkT + (ERA_GOLDEN_T - ERA_DARK_T);
-    const now = s < darkT ? 0 : s >= goldT ? 2 : 1;
+    const now = s < (seat.darkBar ?? 0) ? 0 : s >= (seat.goldenBar ?? 0) ? 2 : 1;
     // DEDICATIONS. Each civ commits to one dedication per era —
     // except the HEROIC AGE, real Civ 6's reward for climbing straight out of
     // a DARK age into a GOLDEN one, which grants THREE. That test is why the
@@ -81,19 +175,13 @@ export function eraBoundary(state: GameState): void {
     // identical on both engines, and it exercises every offered dedication in
     // turn rather than pinning one forever. A HEROIC age takes the next
     // `ded[c]` entries of the same window (three).
-    const era = Math.floor(state.turn / ERA_LENGTH);
     const window = DEDICATION_ERAS[Math.min(era, DEDICATION_ERAS.length - 1)];
     seat.dedicationPicks = window.length === 0
       ? []
       : Array.from({ length: seat.dedications }, (_, k) => window[(era + c + k) % window.length]);
     commitGoldenGrants(state, c, era);
-  }
-  for (let c = 0; c < state.seats.length; c++) {
-    const seat = seatOf(state, c);
-    if (!seat) continue;
-    // the window banks into the whole game's era score, then resets
-    seat.eraScorePast = (seat.eraScorePast ?? 0) + (seat.eraScore ?? 0);
-    seat.eraScore = 0;
+    [seat.darkBar, seat.goldenBar] = ageBars(s, citiesOf(state, c).length,
+      seat.goldenAges ?? 0, seat.darkAges ?? 0, era);
   }
 }
 

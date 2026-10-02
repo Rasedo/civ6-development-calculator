@@ -400,7 +400,7 @@ def main() -> None:
         sim2.ded_picks[:, r2, 0] = sim2._ded_sky
         sim2.civ_age[:, r2] = 2
     atomic = next(e for e, w in enumerate(sim2._sky_eurekas) if w)
-    sim2._commit_golden_grants(atomic)
+    sim2._commit_golden_grants(atomic, torch.ones(sim2.B, dtype=torch.bool, device=sim2.device))
     for t2 in sim2._sky_eurekas[atomic]:
         assert bool(sim2.civ_tech_boosted[0, 0, t2]), f"Sky and Stars left tech {t2} unboosted"
     sim3 = build()
@@ -409,7 +409,7 @@ def main() -> None:
         sim3.ded_picks[:, r3, 0] = sim3._ded_automaton
         sim3.civ_age[:, r3] = 2
     had = int((sim3.major_unit_alive & (sim3.major_unit_type == sim3._gdr_idx)).sum())
-    sim3._commit_golden_grants(atomic)
+    sim3._commit_golden_grants(atomic, torch.ones(sim3.B, dtype=torch.bool, device=sim3.device))
     now = int((sim3.major_unit_alive & (sim3.major_unit_type == sim3._gdr_idx)).sum())
     assert now > had, "Automaton Warfare's golden face put no robot in a capital"
     print("sky eurekas + automaton robot ok")

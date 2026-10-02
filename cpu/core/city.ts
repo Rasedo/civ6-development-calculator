@@ -10,7 +10,7 @@ import { CIVICS } from '../data/civics';
 /** base tourism every completed wonder pays (real Civ 6). */
 export const WONDER_TOURISM_BASE = 2;
 import { cityTradeYields } from './trade';
-import { hasRiver, isWater } from '../../world/query';
+import { hasRiver, isWater, naturalWonderAt } from '../../world/query';
 import { revealAround } from './fog';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
@@ -31,7 +31,7 @@ import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIB
 import { bankruptAmenities, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES } from '../../world/features';
-import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
+import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
 import { warWearinessLosses } from './weariness';
@@ -544,26 +544,69 @@ export function resourcePriority(tile: Tile): number {
   return cat === 'luxury' ? 3 : cat === 'strategic' ? 2 : 1;
 }
 
-/** The tile culture growth would claim next (Civ 6-ish priorities). */
-export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): number | null {
+/**
+ * CIV6 (City_Culture, the GetNextBuyablePlot scorer): what claiming plot `t`
+ * COSTS city `city` — the lowest cost is claimed. Every term is a
+ * `PLOT_INFLUENCE_*` GlobalParameter except the 3-ring bound and the
+ * neighbours' -1s, which the DLL spells as literals:
+ * - distance d to the centre: d · DISTANCE_MULTIPLIER · 2;
+ * - a resource the seat can see: RESOURCE_COST within 3 rings; any other
+ *   plot pays WATER_COST if water and RING_COST beyond 3 rings;
+ * - an improvement: RING_COST on a barbarian outpost, IMPROVEMENT_COST on
+ *   any other (a Tribal Village included);
+ * - a natural wonder: NW_COST;
+ * - YIELD_POINT_COST per point of the plot's yields to the seat;
+ * - -1 per UNOWNED neighbour holding a seen resource, -1 per unowned
+ *   neighbouring natural wonder, and -1 once more if such a wonder lies
+ *   within 3 rings of the centre.
+ */
+export function borderPlotCost(state: GameState, city: City, t: Tile, yctx: YieldCtx,
+  hidden: ReadonlySet<string>, camps: ReadonlySet<number>): number {
+  const P = PLOT_INFLUENCE;
+  const ctr = state.map.tiles[city.centerIndex];
+  const d = hexDistance(state.map, ctr.col, ctr.row, t.col, t.row);
+  let cost = d * P.distanceMultiplier * 2;
+  if (t.resource !== null && !hidden.has(t.resource)) {
+    if (d <= 3) cost += P.resourceCost;
+  } else {
+    if (isWater(t)) cost += P.waterCost;
+    if (d > 3) cost += P.ringCost;
+  }
+  if (camps.has(t.index)) cost += P.ringCost;
+  else if (t.improvement !== null || t.goodyHut) cost += P.improvementCost;
+  if (naturalWonderAt(t)) cost += P.nwCost;
+  const y = tileYields(yctx, t);
+  cost += P.yieldPointCost * (y.food + y.production + y.gold + y.science + y.culture + y.faith);
+  let nwNear = false;
+  for (const n of neighbors(state.map, t)) {
+    if (tileClaimed(n)) continue;
+    if (n.resource !== null && !hidden.has(n.resource)) cost -= 1;
+    if (naturalWonderAt(n)) {
+      cost -= 1;
+      if (hexDistance(state.map, ctr.col, ctr.row, n.col, n.row) <= 3) nwNear = true;
+    }
+  }
+  return nwNear ? cost - 1 : cost;
+}
+
+/** The plots culture growth would claim next: every candidate at the lowest
+ *  `borderPlotCost`, in tile-index order. The game draws one of them. */
+export function borderBestPlots(state: GameState, city: City, ctx?: YieldCtx): number[] {
   const yctx = ctx ?? makeYieldCtx(state, city.seat);
-  const center = state.map.tiles[city.centerIndex];
-  const candidates = borderCandidates(state, city);
-  if (candidates.length === 0) return null;
-  const score = (i: number) => {
-    const t = state.map.tiles[i];
-    const y = tileYields(yctx, t);
-    const ySum = y.food + y.production + y.gold + y.science + y.culture + y.faith;
-    return {
-      dist: hexDistance(state.map, center.col, center.row, t.col, t.row),
-      res: resourcePriority(t),
-      ySum,
-      i,
-    };
-  };
-  return candidates
-    .map(score)
-    .sort((a, b) => a.dist - b.dist || b.res - a.res || b.ySum - a.ySum || a.i - b.i)[0].i;
+  const hidden = hiddenResourcesFor(state, city.seat);
+  const camps = campTiles(state);
+  let best = Infinity;
+  let out: number[] = [];
+  for (const i of borderCandidates(state, city).sort((a, b) => a - b)) {
+    const c = borderPlotCost(state, city, state.map.tiles[i], yctx, hidden, camps);
+    if (c < best) { best = c; out = [i]; } else if (c === best) out.push(i);
+  }
+  return out;
+}
+
+/** The tile culture growth would claim next: the first of `borderBestPlots`. */
+export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): number | null {
+  return borderBestPlots(state, city, ctx)[0] ?? null;
 }
 
 /** A plot joins the city: its owner, and the seat's sight of it. A purchase

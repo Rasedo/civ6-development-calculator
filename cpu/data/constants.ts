@@ -18,7 +18,20 @@ export const CITY_WORK_RADIUS = srcConst('seats.workRadius', 3,
 export const BORDER_MAX_RADIUS = srcConst('constants.BORDER_MAX_RADIUS', 5,
   gp('PLOT_INFLUENCE_MAX_ACQUIRE_DISTANCE'));
 
-export const CULTURE_COST_FIRST_PLOT = srcConst('constants.cultureCostFirstPlot', 10,
+/** The terms of a plot's culture-claim COST (`borderPlotCost`): the
+ * `PLOT_INFLUENCE_*` GlobalParameters the DLL's GetNextBuyablePlot scorer
+ * reads. The lowest cost is claimed. */
+export const PLOT_INFLUENCE = {
+  distanceMultiplier: srcConst('constants.plotInfluence.distanceMultiplier', 100, gp('PLOT_INFLUENCE_DISTANCE_MULTIPLIER')),
+  ringCost: srcConst('constants.plotInfluence.ringCost', 100, gp('PLOT_INFLUENCE_RING_COST')),
+  waterCost: srcConst('constants.plotInfluence.waterCost', 25, gp('PLOT_INFLUENCE_WATER_COST')),
+  improvementCost: srcConst('constants.plotInfluence.improvementCost', -5, gp('PLOT_INFLUENCE_IMPROVEMENT_COST')),
+  resourceCost: srcConst('constants.plotInfluence.resourceCost', -105, gp('PLOT_INFLUENCE_RESOURCE_COST')),
+  nwCost: srcConst('constants.plotInfluence.nwCost', -105, gp('PLOT_INFLUENCE_NW_COST')),
+  yieldPointCost: srcConst('constants.plotInfluence.yieldPointCost', -1, gp('PLOT_INFLUENCE_YIELD_POINT_COST')),
+} as const;
+
+export const CULTURE_COST_FIRST_PLOT =srcConst('constants.cultureCostFirstPlot', 10,
   gp('CULTURE_COST_FIRST_PLOT'));
 export const CULTURE_COST_LATER_PLOT_MULTIPLIER = srcConst('constants.cultureCostLaterPlotMultiplier', 6,
   gp('CULTURE_COST_LATER_PLOT_MULTIPLIER'));
@@ -236,9 +249,8 @@ export const MP_SCALE = srcConst('mpScale', 4, {
  * own Civilopedia page gives its Movement Cost and whether it bridges:
  *   Ancient 1.0 no bridges | Classical 1.0 bridges
  *   Industrial 0.75 bridges | Modern 0.5 bridges
- * The tier is the WORLD's era count here, latched where the era boundary
- * already fires in lockstep on both engines — "your territory" is a per-seat
- * reading this model does not carry.
+ * The tier is the game era's, latched as each game era begins (`enterEra`)
+ * — "your territory" is a per-seat reading this model does not carry.
  */
 export const ROAD_TIER_MP: readonly number[] = srcConst('roadTierMp', [4, 4, 3, 2], {
   derived: 'Routes.MovementCost x MP_SCALE for ROUTE_ANCIENT_ROAD, ROUTE_MEDIEVAL_ROAD, '

@@ -5408,7 +5408,7 @@ class SimEconomy:
         `_bldg_era_yields`). Every other tile is 0. The `holySiteFaith` twin,
         memoised on the effect version the district adjacency itself is
         memoised on, the building version and the game era."""
-        key = (self._eff_version, self._bldg_version, self._game_era())
+        key = (self._eff_version, self._bldg_version, self._era_version)
         if self._hs_faith_cache is not None and self._hs_faith_cache[0] == key:
             return self._hs_faith_cache[1]
         B, T, dev = self.B, self.T, self.device
@@ -7090,7 +7090,7 @@ class SimEconomy:
                                      & (self._minor_followed() == row)).long().sum(dim=1)
         counts = {
             # the whole game's era score: the closed eras' and this one's
-            "eraScore": self.era_score_past[:, row] + self.era_score[:, row],
+            "eraScore": self.era_score[:, row],
             "civics": self.civ_civics[:, row].long().sum(dim=1),
             "cities": alive.long().sum(dim=1),
             # completed districts, the centre and a wonder's own excluded

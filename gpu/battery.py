@@ -853,6 +853,7 @@ def _main() -> int:
                 ("inquisitor", [py, "tests/gpu/inquisitor_test.py"], 4),  # Launch Inquisition -> the purchase -> Remove Heresy -> Condemn, and the duel rules
                 ("promo_effects", [py, "tests/gpu/promo_effects_test.py"], 4),  # the twenty promotion kinds that are not Combat Strength
                 ("era_draws", [py, "tests/gpu/era_draws_test.py"], 4),  # the restored random draws, and the artifact's own civilization
+                ("game_era", [py, "tests/gpu/game_era_test.py"], 4),  # the game era's countdown, per game, and the age bars it fixes
                 ("power", [py, "tests/gpu/power_test.py"], 4),  # GS POWER: demand, the plant's reach, Cardiff, the powered halves
                 ("climate", [py, "tests/gpu/climate_test.py"], 4),  # GS CLIMATE: carbon, the seven phases, the sea, the barrier, a warmed world's weather
                 ("engineer", [py, "tests/gpu/engineer_test.py"], 4),  # the Military Engineer: fort, airstrip, road, the 20% charge

@@ -542,7 +542,7 @@ def test_defence_and_strike(rules, path) -> None:
                 & (sim.unit_free_city[B0] == sim.city_id[B0, F, col])).nonzero(as_tuple=True)[0]).tolist()
     assert granted, "the revolt granted nothing"
     snap = sim.snapshot()
-    sim._transfer_city(B0, F, col, 1, conquest=True)
+    sim._transfer_city(B0, F, col, 1, conquest=True, loyalty=False)
     assert not any(bool(sim.unit_alive[B0, u]) for u in granted), "a captured city's grants stayed"
     sim.restore(snap)
     # an unwalled Free City fires nothing; a walled one strikes a hostile

@@ -174,7 +174,7 @@ def test_capture_plunder(rules, path):
     while bool(sim.city_alive[0, r + 1].any()) and bool((~sim.city_alive[0, 0]).any()):
         jj = int(sim.city_alive[0, r + 1].nonzero()[0, 0])
         t0 = float(sim.civ_treasury[0, 0])
-        sim._transfer_city(0, r + 1, jj, 0, conquest=True)
+        sim._transfer_city(0, r + 1, jj, 0, conquest=True, loyalty=False)
         caps += 1
         assert float(sim.civ_treasury[0, 0]) == t0 + 40.0, "capture must plunder +40 (TS combat.ts:354)"
         if bool(sim.city_alive[0, r + 1].any()):
@@ -191,7 +191,7 @@ def test_capture_plunder(rules, path):
         sim.city_alive[0, 0, :] = True
         sim.war[0, 0, 1 + r2] = sim.war[0, 1 + r2, 0] = True
         t1 = float(sim.civ_treasury[0, 0])
-        sim._transfer_city(0, r2 + 1, j2, 0, conquest=True)
+        sim._transfer_city(0, r2 + 1, j2, 0, conquest=True, loyalty=False)
         assert float(sim.civ_treasury[0, 0]) == t1, "raze must not plunder"
         assert bool(sim.war[0, 0, 1 + r2]), "raze must not end the war (TS early return)"
     print(f"  capture plunder OK ({caps} captures: +40 each, war ends on the last; raze: neither)")
@@ -241,7 +241,7 @@ def test_capture_pools(rules, path):
     assert int(sim.city_alive[0, 0].sum()) < max_cities, "seat 0 full — the capture would raze"
     ctr, enc, wmax = _plant_pools(sim, r, j)
 
-    assert sim._transfer_city(0, r, j, 0, conquest=True), "the capture razed"
+    assert sim._transfer_city(0, r, j, 0, conquest=True, loyalty=False), "the capture razed"
     col = int(sim.centre_slot_at[0, ctr])
     assert col >= 0 and bool(sim.city_alive[0, 0, col])
     # the WALLS are gone — the building, not just the pool behind it
@@ -261,7 +261,7 @@ def test_capture_pools(rules, path):
     # ...and a LOYALTY flip keeps every one of them
     sim2 = build(rules, path, steps=20)
     ctr2, enc2, _ = _plant_pools(sim2, r, j)
-    assert sim2._transfer_city(0, r, j, 0, conquest=False), "the loyalty flip failed"
+    assert sim2._transfer_city(0, r, j, 0, conquest=False, loyalty=True), "the loyalty flip failed"
     col2 = int(sim2.centre_slot_at[0, ctr2])
     assert bool(sim2.city_bldg[0, 0, col2, sim2._walls_bidx]), "a loyalty flip destroys no Walls"
     assert int(sim2.city_outer_hp[0, 0, col2]) == 60, "the perimeter rides a loyalty flip"

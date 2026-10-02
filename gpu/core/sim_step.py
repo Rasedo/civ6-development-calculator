@@ -109,64 +109,7 @@ class SimStep:
         if self.n_majors > 1 and self._civ_city_reg_check:
             self._check_rc_registry_invariant()
 
-        if self._era_len > 0 and self.turn % self._era_len == 0:
-            # CIV6: "all roads in your territory will upgrade to the next
-            # level automatically" on reaching the era that brings the tier,
-            # latched at the same site TS latches it.
-            _era = self.turn // self._era_len
-            _tier = 0
-            for _i, _e in enumerate(self._road_tier_era):
-                if _era >= _e:
-                    _tier = _i
-            if _tier > self.road_tier:
-                self.road_tier = _tier
-            sc = self.era_score
-            # The PREVIOUS age, the Heroic test's substrate. CLONED because
-            # civ_age is written IN PLACE below — a bare reference would read
-            # back the NEW age and the Dark->Golden test could never fire.
-            _was = self.civ_age.clone()
-            # CIV6 (Ages): the bars are THIS CIV's — cities counted as the
-            # era begins, past dark ages lowering them and past golden or
-            # heroic ages raising them, the Golden bar a fixed gap above.
-            _nc = self.city_alive[:, :self.n_majors].long().sum(dim=2)
-            _dt = self._era_dark + _nc + self._age_step * (self.golden_ages - self.dark_ages)
-            _gt = _dt + (self._era_gold - self._era_dark)
-            self.civ_age.copy_(torch.where(
-                sc < _dt,
-                torch.zeros_like(self.civ_age),
-                torch.where(sc >= _gt, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
-            ))
-            self.prev_age.copy_(_was)
-            self.dark_ages += (self.civ_age == 0).long()
-            self.golden_ages += (self.civ_age == 2).long()
-            self._eff_version += 1  # a new AGE is a new Dark-Age card pool
-            self.dedications.copy_(torch.where(
-                (_was == 0) & (self.civ_age == 2),
-                torch.full_like(self.dedications, self._heroic_ded),
-                torch.ones_like(self.dedications),
-            ))
-            _era_i = int(self.turn // self._era_len)
-            # Each civ picks from the WINDOW its world era offers, round-robin
-            # over that window rather than over the whole catalog.
-            _ew = min(_era_i, len(self._ded_eras) - 1)
-            _wlen = self._ded_era_len[_ew]
-            self.ded_picks[:] = -1
-            for _c in range(self.n_majors):
-                for _k in range(self.ded_picks.shape[2]):
-                    if _wlen == 0:
-                        continue
-                    _take = self.dedications[:, _c] > _k
-                    _pick = self._ded_eras[_ew][(_era_i + _c + _k) % _wlen]
-                    self.ded_picks[:, _c, _k] = torch.where(
-                        _take,
-                        torch.full_like(self.ded_picks[:, _c, _k], _pick),
-                        torch.full_like(self.ded_picks[:, _c, _k], -1),
-                    )
-            self._commit_golden_grants(_era_i)
-            # the window banks into the whole game's era score, then resets
-            self.era_score_past += self.era_score
-            self.era_score[:] = 0
-            self._era_inspirations()
+        self._game_era_turn()
         # THE EXOPLANET FLIGHT — CIV6: 1 light-year/turn plus one per laser
         # station standing behind it, and the win fires on ARRIVAL, not launch.
         # Ties in one turn go to the lowest row (argmax takes the FIRST True),

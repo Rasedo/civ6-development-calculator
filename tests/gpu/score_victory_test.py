@@ -39,7 +39,6 @@ def level(sim) -> None:
         sim.civ_civics[B0, r] = False
         sim.civ_techs[B0, r] = False
         sim.era_score[B0, r] = 0
-        sim.era_score_past[B0, r] = 0
         sim.civ_gp_earned[B0, r] = 0
         sim.city_bldg[B0, r] = False
         for p in ("civ_follower", "civ_founder", "civ_enhancer"):
@@ -102,8 +101,7 @@ def test_counts(rules, path) -> None:
     sim.civ_follower[B0, r] = 0
     sim.civ_founder[B0, r] = 0
     sim.civ_enhancer[B0, r] = 0
-    sim.era_score[B0, r] = 9
-    sim.era_score_past[B0, r] = 30
+    sim.era_score[B0, r] = 39
     # the capital's Palace, a Monument and a pillaged Granary are buildings,
     # and the completed Pyramids one more
     bids = [bd["id"] for bd in sim.rules.buildings]
@@ -154,15 +152,14 @@ def test_converted(rules, path) -> None:
 
 def test_era_bank(rules, path) -> None:
     sim = fresh(rules, path)
-    sim.era_score[B0, 0] = 12
-    sim.era_score_past[B0, 0] = 5
-    sim.turn = sim._era_len - 1
+    sim.era_score[B0, 0] = 17
+    sim.turn = 30
+    sim.era_countdown[:] = 0
     sim.step()
-    assert int(sim.turn) % sim._era_len == 0
-    assert int(sim.era_score[B0, 0]) == 0, "the boundary resets the era's window"
-    assert int(sim.era_score_past[B0, 0]) == 17, (
-        f"the boundary banks the closed era: {int(sim.era_score_past[B0, 0])}, wanted 17")
-    print("  3 era bank OK — 5 + 12 banked at the boundary, the window reset")
+    assert int(sim.game_era[B0]) == 1, "the step begins the next game era"
+    assert int(sim.era_score[B0, 0]) == 17, (
+        f"a new era keeps the whole game's era score: {int(sim.era_score[B0, 0])}, wanted 17")
+    print("  3 era score OK — the whole game's 17 kept as the next era begins")
 
 
 def test_ties(rules, path) -> None:

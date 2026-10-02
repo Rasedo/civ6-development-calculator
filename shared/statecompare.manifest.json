@@ -165,6 +165,16 @@
           "planes": []
         },
         {
+          "name": "gameEra",
+          "compare": "exact",
+          "covers": [
+            "GameState.gameEra",
+            "GameState.eraStartTurn",
+            "GameState.eraCountdown"
+          ],
+          "planes": []
+        },
+        {
           "name": "pantheonsClaimed",
           "compare": "exact",
           "covers": [
@@ -809,13 +819,23 @@
           ]
         },
         {
-          "name": "eraScorePast",
+          "name": "darkBar",
           "compare": "exact",
           "covers": [
-            "Seat.eraScorePast"
+            "Seat.darkBar"
           ],
           "planes": [
-            "era_score_past"
+            "dark_bar"
+          ]
+        },
+        {
+          "name": "goldenBar",
+          "compare": "exact",
+          "covers": [
+            "Seat.goldenBar"
+          ],
+          "planes": [
+            "golden_bar"
           ]
         },
         {

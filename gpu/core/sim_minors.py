@@ -401,10 +401,10 @@ class SimMinors:
         ground back and buys nothing new until the count passes its own mark.
 
         WHICH plot is `_seat_border_key`, the culture claim's own pick and its
-        own refusals, clause for clause with `pickBorderTile` — nearest first,
-        then resource priority, then yield sum, then tile index; a plot
-        another player holds is not taken and a plot with no owned neighbour
-        is out of reach. The GAME's choice rule is unmeasured.
+        own refusals, clause for clause with `pickBorderTile` — the lowest
+        `borderPlotCost`, then the lowest tile index; a plot another player
+        holds is not taken and a plot with no owned neighbour is out of
+        reach.
         """
         if self.S == 0:
             return
@@ -431,7 +431,7 @@ class SimMinors:
                 claim = ready & ok.any(dim=1)
                 if not bool(claim.any()):
                     break
-                key = torch.where(ok, key0, self._inf_f)
+                key = torch.where(ok, self._seat_border_cost(row, center, tiles, tc, nbs, key0), self._inf_f)
                 best = key.argmin(dim=1)
                 rows = claim.nonzero(as_tuple=True)[0]
                 spot = tiles[rows, best[rows]]

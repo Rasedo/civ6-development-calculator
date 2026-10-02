@@ -117,11 +117,12 @@ def test_era_inspirations(rules, path) -> None:
     sim._eff_version += 1
     assert bool(sim._suz_effect(row, sim._suz_c_era).all()), "the suzerain contest was not won"
 
-    sim.turn = sim._era_len  # the first era boundary
+    sim.game_era[:] = 1  # the Classical era just begun
     era_i = 1
+    every = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
     was = sim.civ_civic_boosted[:, row].clone()
     n_other = [int(sim.civ_civic_boosted[0, r].sum()) for r in range(sim.n_majors)]
-    sim._era_inspirations()
+    sim._era_inspirations(every)
     fresh = sim.civ_civic_boosted[:, row] & ~was
     ncv = min(sim.civ_civic_boosted.shape[2], sim._civic_era.numel())
     for b in range(sim.B):
@@ -142,7 +143,7 @@ def test_era_inspirations(rules, path) -> None:
     # shared stream must stay exactly where it is
     sim.civ_civic_boosted[:, row, :ncv] |= (sim._civic_era[:ncv] == era_i).reshape(1, -1)
     quiet = sim.rng_state.clone()
-    sim._era_inspirations()
+    sim._era_inspirations(every)
     assert bool((sim.rng_state == quiet).all()), "an unpayable suzerain still drew"
     print("  _era_inspirations OK: one civic of the new era, suzerain only")
 

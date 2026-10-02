@@ -208,7 +208,7 @@ def test_rome_conquest(rules, path) -> None:
     c_t = int(sim.city_center[B0, egypt, 0])
     cap = int(sim.civ_cap_tile[B0, rome])
     sim.seat_explored[:] = True  # the walk crosses revealed plots only
-    assert sim._transfer_city(B0, egypt, 0, rome, conquest=True), "the conquest itself failed"
+    assert sim._transfer_city(B0, egypt, 0, rome, conquest=True, loyalty=False), "the conquest itself failed"
     assert bool(sim.trading_post[B0, rome, c_t]), "no Trading Post in the conquered city"
     # the walk from the city as it now stands; the road lowered only its cost
     path_ = course(sim, rome, c_t, cap)

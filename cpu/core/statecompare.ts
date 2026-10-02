@@ -390,6 +390,7 @@ const GAME: Record<string, Extractor> = {
   },
   lastSessionTurn: (s) => [s.lastSessionTurn ?? -1],
   roadTier: (s) => [s.roadTier ?? 0],
+  gameEra: (s) => [[s.gameEra ?? 0, s.eraStartTurn ?? 1, s.eraCountdown ?? -1]],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],
   // one flat row: each class's claimed list behind its LENGTH (the lists
@@ -531,7 +532,8 @@ const SEAT: Record<string, Extractor> = {
   warWeariness: overSeats((s) => wwPairs(s.ww, (v) => v !== 0)),
   warWearinessTurn: overSeats((s) => wwPairs(s.wwTurn, (v) => v >= 0)),
   eraScore: overSeats((s) => s.eraScore ?? 0),
-  eraScorePast: overSeats((s) => s.eraScorePast ?? 0),
+  darkBar: overSeats((s) => s.darkBar ?? 0),
+  goldenBar: overSeats((s) => s.goldenBar ?? 0),
   score: overSeats((s, state) => scoreLines(state, s)),
   age: overSeats((s) => s.age ?? 1),
   governmentsHeld: overSeats((s) => s.government.held ?? 0),

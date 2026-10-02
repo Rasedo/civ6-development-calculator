@@ -241,14 +241,16 @@ def test_dar_e_mehr(rules, path) -> None:
     sim._bel_version += 1
     sim._eff_version += 1
     assert sim._bpe_n == 1 and int(sim._bpe_bidx[0]) == dem, "the Dar-e Mehr carries the per-era row"
-    sim.turn = sim._era_len + 3
+    sim.game_era[:] = 1
+    sim._era_version += 1
     sim.civ_faith[B0, ROW] = 10_000.0
     sim._stash_buy(ROW, worship=torch.full((1,), j, dtype=torch.long))
     sim._seat_buy_ladder(ROW, ONES, sim._seat_army_count(ROW))
     assert bool(sim.city_bldg[B0, ROW, j, dem]), "the Dar-e Mehr was not bought"
     assert int(sim.city_bldg_era[B0, ROW, j, 0]) == 1, "the stamp is not the game era"
     f0 = float(totals(sim, ROW)[0][j, 5])
-    sim.turn = 3 * sim._era_len
+    sim.game_era[:] = 3
+    sim._era_version += 1
     t1, yf = totals(sim, ROW)
     assert abs(float(t1[j, 5]) - f0 - 2 * float(yf[j])) < 1e-9, f"two eras: {float(t1[j, 5]) - f0}"
     # the digest names the stamp
@@ -256,7 +258,7 @@ def test_dar_e_mehr(rules, path) -> None:
     assert got == [dem, 1], f"digest {got}"
     # a conquest carries it
     ctr = int(sim.city_center[B0, ROW, j])
-    assert sim._transfer_city(B0, ROW, j, 1, conquest=True), "the conquest failed"
+    assert sim._transfer_city(B0, ROW, j, 1, conquest=True, loyalty=False), "the conquest failed"
     k = int((sim.city_center[B0, 1] == ctr).long().argmax())
     assert bool(sim.city_alive[B0, 1, k]) and int(sim.city_bldg_era[B0, 1, k, 0]) == 1, "the stamp did not ride"
     print("  6 Dar-e Mehr OK — stamped at era 1, +2 Faith at era 3, carried through a conquest, in the digest")

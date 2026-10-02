@@ -52,7 +52,7 @@ function scoreCounts(state: GameState, s: Seat): Record<ScoreCount, number> {
   }
   const r = s.religion;
   return {
-    eraScore: (s.eraScorePast ?? 0) + (s.eraScore ?? 0),
+    eraScore: s.eraScore ?? 0,
     civics: s.research.civics.length,
     cities: s.cities.length,
     districts,

@@ -1,24 +1,23 @@
 """The governors / era-score poke lane — the age and governor-loyalty surfaces
 the scripted rollout only reaches organically (no seat accrues to GOLDEN_T
-in-gate, era boundaries land at fixed turns, and the greedy governor pick and
+in-gate, and the greedy governor pick and
 capital immunity ride inside the loyalty loops).
 
     $env:PYTHONUTF8='1'; python tests/gpu/governors_test.py
 
 Every poke builds a BatchSim from a fixture, forces state in-memory, then
-drives the exact engine twin (_transfer_city, the step-tail era boundary,
+drives the exact engine twin (_transfer_city, the step-tail game era,
 _seat_city_loyalty/_seat_loyalty_flips, _seat_phase). EVERY constant comes from rules.json
-through the engine's own loaders (sim._era_len/_era_dark/_era_gold/_era_pts/
+through the engine's own loaders (the fixture's bars, rules.eras, sim._moment_*/
 _gov_title_civics/_gov_loy/_age_pressure/_citizen_press_*) — nothing is hardcoded.
 
 Covered:
-  a. Event hooks: _transfer_city bumps the RECEIVER's era_score by the
-     conquer const (and nobody else's); _era_pts is exactly rules.json.eras.
-     found/wonder/pantheon/religion/gp share the identical `+= const` shape at
-     their own sites, and their score→age arithmetic is covered by poke b.
-  b. Boundary math: at a turn that crosses a multiple of eras.length each seat's
-     new-era Age comes from the just-ended window's score — darkT-1→Dark,
-     darkT→Normal, goldenT-1→Normal, goldenT→Golden — then era_score resets 0.
+  a. Event hooks: _transfer_city pays the RECEIVER its transfer moment
+     (and nobody else); the moment table is exactly rules.json.eras.
+  b. The ages as a game era begins: each seat's Age comes from its
+     whole-game score against the bars the era before fixed — dark-1→Dark,
+     dark→Normal, golden-1→Normal, golden→Golden — and the next bars are
+     fixed off the score (ageBars).
   c. Age pressure: in the seat-0 loyalty twin every SOURCE seat's citizens
      press at base + capital + its age term (Dark -½ / Normal 0 / Golden +½);
      asserted by an EXACT reconstruction across five age combos
@@ -162,63 +161,74 @@ def two_city_setup(rules, path):
 
 # ------------------------------------------------------------------ pokes -----
 def poke_event_hooks(rules, path):
-    """a. _transfer_city bumps ONLY the receiver's era_score by conquer;
-    _era_pts is exactly rules.json.eras (found/wonder/pantheon/religion/gp are
-    the same shape at their own sites)."""
+    """a. _transfer_city pays ONLY the receiver its transfer moments
+    (`transferMoments`): a major's last city PLAYER_DEFEATED, its original
+    capital FOREIGN_CAPITAL, any other city none; the moment table is
+    exactly rules.json.eras."""
     er = rules.eras
     sim = build(rules, path)
-    for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1)):
-        assert sim._era_pts[k] == int(er.get(k, d)), f"_era_pts[{k}] must mirror rules.json"
-
-    conquer = sim._era_pts["conquer"]
+    assert (sim._moment_defeated, sim._moment_foreign_cap, sim._moment_to_orig) == (
+        int(er["momentPlayerDefeated"]), int(er["momentForeignCapital"]), int(er["momentToOriginalOwner"]))
     civ_only_from = next(r for r in range(sim.n_majors - 1) if bool(sim.city_alive[0, r + 1].any()))
     civ_only_to = next(r for r in range(sim.n_majors - 1) if r != civ_only_from)
-    j = int(sim.city_alive[0, civ_only_from + 1].nonzero(as_tuple=True)[0][0])
+    src, dst = civ_only_from + 1, civ_only_to + 1
+    j = int(sim.city_alive[0, src].nonzero(as_tuple=True)[0][0])
+    last = int(sim.city_alive[0, src].sum()) <= 1
+    cap = int(sim.city_orig_cap[0, src, j]) == src
+    pay = sim._moment_defeated if last else sim._moment_foreign_cap if cap else 0
     before = sim.era_score[0].clone()
-    sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False)
+    sim._transfer_city(0, src, j, dst, conquest=False, loyalty=False)
     delta = (sim.era_score[0] - before).tolist()
     exp = [0] * (sim.n_majors)
-    exp[civ_only_to + 1] = conquer
-    assert delta == exp, f"conquer must accrue +{conquer} to the receiver only (got {delta})"
-    print(f"  a event hooks OK (_era_pts == rules.eras; rc→rc transfer += {conquer} to receiver civ {civ_only_to + 1} only)")
+    exp[dst] = pay
+    assert delta == exp, f"the transfer must pay +{pay} to the receiver only (got {delta})"
+    print(f"  a event hooks OK (moments == rules.eras; rc→rc transfer += {pay} to receiver civ {dst} only)")
+
+
+def era_edge(sim):
+    """Put every game on the Ancient era's last countdown tick: the next step
+    (turn 31) begins the Classical era."""
+    sim.turn = 30
+    sim.era_countdown[:] = 0
 
 
 def poke_boundary(rules, path):
-    """b. Age assignment at the darkT/goldenT edges + the window reset, driven
-    on age slot 0 (seat 0): it accrues nothing during a unit-less single step,
-    so the score forced right before the boundary is exactly what the boundary
-    reads."""
+    """b. Age assignment at the bars' edges as a game era begins, driven on
+    age slot 0 (seat 0): it accrues nothing during a unit-less single step,
+    so the score forced right before the era is exactly what it reads. The
+    score is the whole game's and stays; the next bars are fixed off it
+    (`ageBars`)."""
     sim = build(rules, path)
     sim.major_unit_alive[:] = False
-    dark, gold, elen = sim._era_dark, sim._era_gold, sim._era_len
-    # the bars are PER SEAT: base + cities at the boundary (the drift
-    # counters are zero on a fresh sim)
+    dark_b, gold_b = int(sim.dark_bar[0, 0]), int(sim.golden_bar[0, 0])
+    er0 = rules.eras
+    assert (dark_b, gold_b) == (int(er0["darkBase"]) + int(er0["eraShift"][0]),
+                                int(er0["goldenBase"]) + int(er0["eraShift"][0])), "the start bars ride the fixture"
     ncity = int(sim.city_alive[0, 0].long().sum())
-    dark_b, gold_b = dark + ncity, dark + ncity + (gold - dark)
-    sim.turn = elen - 1
+    era_edge(sim)
     snap = sim.snapshot()
-    # (score, expected age): the four threshold edges
+    # (score, expected age): the four bar edges
     cases = [(dark_b - 1, 0), (dark_b, 1), (gold_b - 1, 1), (gold_b, 2)]
+    er = rules.eras
     for score, exp_age in cases:
         sim.restore(snap)
-        sim.turn = elen - 1
+        era_edge(sim)
         sim.era_score[:] = 0
         sim.era_score[0, 0] = score
         sim.step()
-        assert int(sim.turn) % elen == 0, "the step must land on the boundary"
+        assert (int(sim.game_era[0]), int(sim.era_start[0])) == (1, 31), "the step must begin the next era"
         got = int(sim.civ_age[0, 0])
         assert got == exp_age, f"score {score} must map to age {exp_age} (got {got})"
-        # The window RESETS at the boundary, and NO flat payout follows it:
-        # dedications pay era score off EVENTS (dedicationEvent) or a golden
-        # standing bonus — never per turn. The fresh window must read 0.
-        assert int(sim.era_score[0, 0]) == 0, (
-            f"fresh window must be empty, got {int(sim.era_score[0, 0])}"
-        )
+        assert int(sim.era_score[0, 0]) == score, "the era score is the whole game's"
         # the drift's memory ticks with the age just entered
         assert int(sim.dark_ages[0, 0]) == (1 if exp_age == 0 else 0)
         assert int(sim.golden_ages[0, 0]) == (1 if exp_age == 2 else 0)
-    print(f"  b boundary OK (bars {dark_b}/{gold_b} over {ncity} cities: "
-          f"{dark_b-1}→Dark, {dark_b}→Normal, {gold_b-1}→Normal, {gold_b}→Golden; window reset)")
+        shift = (int(er["shiftPerCity"]) * max(0, ncity - 1) + int(er["shiftPastGolden"]) * int(sim.golden_ages[0, 0])
+                 + int(er["shiftPastDark"]) * int(sim.dark_ages[0, 0]) + int(er["eraShift"][1]))
+        want = [max(0, score + int(er["darkBase"]) + shift), max(0, score + int(er["goldenBase"]) + shift)]
+        assert [int(sim.dark_bar[0, 0]), int(sim.golden_bar[0, 0])] == want, "the next bars"
+    print(f"  b era OK (bars {dark_b}/{gold_b}: "
+          f"{dark_b-1}→Dark, {dark_b}→Normal, {gold_b-1}→Normal, {gold_b}→Golden; next bars fixed)")
 
 
 def poke_age_pressure(rules, path):
@@ -331,16 +341,15 @@ def poke_seat0_golden(rules, path):
     and its OWN-pressure term then scales ×1.5 vs Normal."""
     sim = build(rules, path)
     sim.major_unit_alive[:] = False
-    elen, gold = sim._era_len, sim._era_gold
-    gold_b = gold + int(sim.city_alive[0, 0].long().sum())  # the per-seat bar
-    sim.turn = elen - 1
+    gold_b = int(sim.golden_bar[0, 0])  # the per-seat bar
+    era_edge(sim)
     snap0 = sim.snapshot()
     sim.era_score[:] = 0
     sim.era_score[0, 0] = gold_b - 1
     sim.step()
     assert int(sim.civ_age[0, 0]) == 1, "goldenT-1 keeps seat 0 Normal"
     sim.restore(snap0)
-    sim.turn = elen - 1
+    era_edge(sim)
     sim.era_score[:] = 0
     sim.era_score[0, 0] = gold_b
     sim.step()
@@ -366,7 +375,7 @@ def poke_seat0_golden(rules, path):
             f"reconstruction must match engine at both ages (city {c})"
         )
         assert q(got_gold[c]) != q(got_norm[c]), f"Golden own pressure (+{ap[2]} a citizen) must move city {c} vs Normal"
-    print(f"  e seat-0 Golden OK (goldenT {gold} → civ_age[0]=2 reachable; own pressure +{ap[2]} a citizen reconstructed exactly)")
+    print(f"  e seat-0 Golden OK (golden bar {gold_b} → civ_age[0]=2 reachable; own pressure +{ap[2]} a citizen reconstructed exactly)")
 
 
 def poke_capital_immunity(rules, path):

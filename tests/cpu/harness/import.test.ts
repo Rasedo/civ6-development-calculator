@@ -11,7 +11,7 @@ import { gameHash } from '../../../cpu/harness/aliases';
 import { eraEvents, transitionChecks } from '../../../cpu/harness/checks';
 import { GW_HOLDERS, GWO_RELIC, GWO_WRITING, holderSlots } from '../../../cpu/data/greatWorks';
 import { GP_CITY_PERM, GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
-import { CONGRESS_RESOLUTIONS, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON } from '../../../cpu/data/seats';
+import { CONGRESS_RESOLUTIONS, MOMENT_PANTHEON_FIRST } from '../../../cpu/data/seats';
 import { PLACEABLE_DISTRICTS } from '../../../cpu/data/districts';
 import { settlerCost } from '../../../cpu/core/game';
 import { clearableFeatures } from '../../../world/features';
@@ -346,7 +346,7 @@ describe('the ages', () => {
   const at = (turn: number, eraScore: number, dark: number, golden: number, flags: Partial<DumpPlayer> = {}) =>
     record(turn, { players: [player(0, { eraScore, darkThreshold: dark, goldenThreshold: golden, ...flags }), ...record(turn).players.slice(1)] });
 
-  it('fold every era transition into the past ages and split the era score', () => {
+  it('fold every era transition into the past ages; the era score and the bars are the game\'s', () => {
     const h = newHistory();
     const recs = [at(1, 0, 8, 19), at(2, 5, 8, 19), at(3, 6, 12, 23, { darkAge: true }),
       at(4, 30, 43, 54, { goldenAge: true, heroic: true })];
@@ -354,7 +354,8 @@ describe('the ages', () => {
     expect(h.eraTurns).toEqual([3, 4]);
     const s = importTurn(recs[3], CAT, h).state.seats[0];
     expect([s.age, s.prevAge, s.darkAges, s.goldenAges]).toEqual([2, 0, 1, 1]);
-    expect([s.eraScorePast, s.eraScore]).toEqual([6, 24]);
+    expect([s.eraScore, s.darkBar, s.goldenBar]).toEqual([30, 43, 54]);
+    expect([h.gameEra, h.eraStartTurn, h.eraCountdown]).toEqual([2, 4, -1]);
   });
 });
 
@@ -365,16 +366,17 @@ describe('the era checks', () => {
   it('read a founded city and a pantheon off the pair', () => {
     const a = record(10);
     const b = record(11, { cities: [...record(11).cities, antium], players: [player(0, { pantheon: 0 }), ...record(11).players.slice(1)] });
-    expect(eraEvents(a, b, CAT).get(0)?.events).toEqual([['found ANTIUM', ERA_SCORE_FOUND], ['pantheon', ERA_SCORE_PANTHEON]]);
+    expect(eraEvents(a, b, CAT).get(0)?.events.map(([w]) => w)).toEqual(['found ANTIUM', 'pantheon']);
   });
 
   it('pay them through the engine and compare with the game', () => {
     const a = record(10);
     const b = record(11, {
       cities: [city({ food: 6, culture: 9 }), record(11).cities[1], antium],
-      players: [player(0, { pantheon: 0, eraScore: 3 + ERA_SCORE_FOUND + ERA_SCORE_PANTHEON }), ...record(11).players.slice(1)],
+      players: [player(0, { pantheon: 0, eraScore: 3 + MOMENT_PANTHEON_FIRST }), ...record(11).players.slice(1)],
     });
     const r = transitionChecks(a, b, CAT).find((x) => x.check === 'step.eraScore' && x.subject.startsWith('seat 0 '));
-    expect(r).toMatchObject({ ok: true, game: ERA_SCORE_FOUND + ERA_SCORE_PANTHEON, ours: ERA_SCORE_FOUND + ERA_SCORE_PANTHEON });
+    // a plain founding records no moment; the world's first pantheon pays its row
+    expect(r).toMatchObject({ ok: true, game: MOMENT_PANTHEON_FIRST, ours: MOMENT_PANTHEON_FIRST });
   });
 });

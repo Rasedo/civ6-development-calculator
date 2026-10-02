@@ -10,7 +10,7 @@ import { completeQueueItem } from '../../../cpu/core/production';
 import { routePlunderer, cityTradeYields } from '../../../cpu/core/trade';
 import { computeCityStats, seatTourism } from '../../../cpu/core/city';
 import { effectiveAdjacency } from '../../../cpu/core/yields';
-import { eraBoundary, goldenMoveBonus } from '../../../cpu/core/eras';
+import { enterEra, goldenMoveBonus } from '../../../cpu/core/eras';
 import {
   DEDICATIONS,
   DED_EVENT_SCORE,
@@ -30,7 +30,6 @@ import {
   AUTOMATON_URANIUM_PER_MINE,
   ERA_SCORE_GP,
   DEDICATION_ERAS,
-  ERA_LENGTH,
   DRACONES_DISCOVERY_SCORE,
   COINAGE_INTL_GOLD_PER_SPEC,
   GOLDEN_MOVE_BONUS,
@@ -259,8 +258,8 @@ describe('the four new dedications', () => {
     const state = makeState(makeMap(16, 16));
     state.seats.push(emptySeat(1));
     for (let era = 1; era <= 8; era++) {
-      state.turn = era * ERA_LENGTH;
-      eraBoundary(state);
+      state.gameEra = era - 1;
+      enterEra(state);
       const window = DEDICATION_ERAS[era];
       for (const seat of state.seats) {
         const picks = seat.dedicationPicks ?? [];
@@ -344,9 +343,9 @@ describe('the three late-era dedications', () => {
     const state = makeState(makeMap(20, 20));
     const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
     const atomic = 6;
-    state.turn = atomic * ERA_LENGTH;
+    state.gameEra = atomic - 1;
     seatOf(state, 0)!.eraScore = 100; // straight into a Golden age
-    eraBoundary(state);
+    enterEra(state);
     const picks = seatOf(state, 0)!.dedicationPicks ?? [];
     const boosted = seatOf(state, 0)!.research.boosted;
     for (const id of SKY_EUREKAS[atomic]) {
@@ -411,9 +410,9 @@ describe('the three late-era dedications', () => {
     state.unitsMode = true;
     const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
     const gdr = Object.keys(UNITS).find((u) => UNITS[u].gdr)!;
-    state.turn = 7 * ERA_LENGTH;
+    state.gameEra = 6;
     seatOf(state, 0)!.eraScore = 100;
-    eraBoundary(state);
+    enterEra(state);
     const picks = seatOf(state, 0)!.dedicationPicks ?? [];
     expect(state.units.some((u) => u.type === gdr && u.seat === 0)).toBe(picks.includes(DED_AUTOMATON));
 

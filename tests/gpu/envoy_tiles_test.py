@@ -81,7 +81,8 @@ def candidates(sim, s: int):
     tiles, tc, nbs, key0 = sim._seat_border_key(row, center)
     ok = ((tiles >= 0) & sim._seat_tile_unclaimed(tc)
           & sim._seat_tile_adj_city(row, cid, tc, nbs))
-    return tiles[B0], key0[B0], ok[B0], int(center[B0])
+    key = sim._seat_border_cost(row, center, tiles, tc, nbs, key0)
+    return tiles[B0], key[B0], ok[B0], int(center[B0])
 
 
 # ---------------------------------------------------------------------------
@@ -148,27 +149,50 @@ def test_slope(rules) -> None:
 
 def test_pick(rules) -> None:
     """Every plot the claim takes is the argmin of the SHARED border key, and
-    the key's clause order is `pickBorderTile`'s own sort."""
+    the key orders the candidates by `borderPlotCost`, then tile index."""
     sim = build(rules)
     s = a_minor(sim)
     row = sim._CITY_MINOR0 + s
     base_a = int(sim.city_acquired[B0, row, 0])
 
-    # --- the key's CLAUSE ORDER. key0 packs the TS sort tuple as
-    #     d*1e12 - res*1e9 - round(ySum*1000)*1e4 + tile, so the tuple is
-    #     recoverable and must sort the candidates identically.
+    # --- the key's ORDER against borderPlotCost recomputed here, term by
+    #     term, from the planes (the yield term read back from the key)
     tiles, key0, ok, centre = candidates(sim, s)
     sel = ok.nonzero(as_tuple=True)[0]
     assert len(sel) >= 4, "the minor has fewer than four free plots in reach"
     tt = tiles[sel]
-    d = sim.pair_dist[centre, tt].to(torch.float64)
-    res = (sim.res_priority * (~sim.res_stripped).long())[B0, tt].to(torch.float64)
-    y1000 = (d * 1e12 - res * 1e9 + tt.to(torch.float64) - key0[sel]) / 1e4
-    ts_order = sorted(range(len(sel)), key=lambda i: (
-        float(d[i]), -float(res[i]), -float(y1000[i]), int(tt[i])))
-    gpu_order = sorted(range(len(sel)), key=lambda i: float(key0[sel][i]))
+    P = rules.plot_influence
+    hid = sim._res_hidden(row)[B0]
+    live = sim._res_live()[B0]
+
+    def seen(t: int) -> bool:
+        return bool(live[t]) and not bool(hid[t])
+
+    def cost(t: int) -> int:
+        d = int(sim.pair_dist[centre, t])
+        c = d * P["distanceMultiplier"] * 2
+        if seen(t):
+            c += P["resourceCost"] if d <= 3 else 0
+        else:
+            c += P["waterCost"] * int(sim.water[B0, t]) + (P["ringCost"] if d > 3 else 0)
+        if int(sim.improvement[B0, t]) >= 0 or bool(sim.tile_goody[B0, t]):
+            c += P["improvementCost"]
+        c += P["nwCost"] * int(sim.nwonder[B0, t])
+        near = False
+        for n in sim.neigh[t].tolist():
+            if n < 0 or int(sim.tile_seat[B0, n]) >= 0:
+                continue
+            c -= int(seen(n)) + int(sim.nwonder[B0, n])
+            near |= bool(sim.nwonder[B0, n]) and int(sim.pair_dist[centre, n]) <= 3
+        return c - int(near)
+
+    k = key0[sel]
+    y_milli = (k - tt.to(torch.float64)) / 1e5 - torch.tensor([cost(int(t)) * 1000 for t in tt], dtype=torch.float64)
+    assert bool((y_milli <= 0).all()), "the yield term pays a plot's cost UP"
+    ts_order = sorted(range(len(sel)), key=lambda i: (cost(int(tt[i])) * 1000 + float(y_milli[i]), int(tt[i])))
+    gpu_order = sorted(range(len(sel)), key=lambda i: float(k[i]))
     assert [int(tt[i]) for i in ts_order] == [int(tt[i]) for i in gpu_order], (
-        "the packed key does not sort by dist asc, resource desc, yield desc, index asc")
+        "the key does not sort by borderPlotCost, then tile index")
 
     # --- the CLAIM ORDER, one plot at a time, against a python argmin that
     #     keeps its own masks: this is the loop's own bookkeeping under test

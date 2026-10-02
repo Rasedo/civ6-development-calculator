@@ -2077,10 +2077,10 @@ class SimMasks:
               & (self.road.gather(1, dcc).squeeze(1) | d_rr))
         step = torch.where(f_rr & d_rr,
                            torch.full_like(tm, self._railroad_mp),
-                           torch.full_like(tm, self._road_tier_mp[self.road_tier]))
+                           self._road_tier_mp[self.road_tier])
         terr = torch.where(rd, step - self._mp_scale, tm)
-        bridged = bool(self._road_tier_bridges[self.road_tier])
-        riv = torch.where(rd, torch.zeros_like(river3), river3) if bridged else river3
+        bridged = self._road_tier_bridges[self.road_tier]
+        riv = torch.where(rd & bridged, torch.zeros_like(river3), river3)
         if zeal is not None:
             riv = torch.where(zeal, torch.zeros_like(riv), riv)
         return terr, riv

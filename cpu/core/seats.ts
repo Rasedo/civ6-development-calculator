@@ -5,7 +5,7 @@ import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
 import { ENKIDU_WAR_CS, ENKIDU_ALLIED_WAR_DISCOUNT, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
 import { FORMAL_WAR_MIN_TURNS, WAR_KIND_SURPRISE } from '../data/warKinds';
 import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIANCE_MILITARY, ALLIANCE_REL2_THEO_CS, ALLIANCE_RELIGIOUS, SEAT_CAPS, VISIBILITY_MAX, VISIBILITY_TECH,
-  VISIBILITY_CS_PER_LEVEL , CIV_LEADERS } from '../data/seats';
+  VISIBILITY_CS_PER_LEVEL , CIV_LEADERS, AGE_START_BARS } from '../data/seats';
 import { GP_RESOURCE_REVEAL, gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
 import { RESOURCES } from '../../world/resources';
@@ -146,6 +146,7 @@ export function emptySeat(seat: number): Seat {
     gpp: {}, gpEarned: [],
     buildersTrained: 0, relicReserve: 0, bestMeleeCS: 0,
     projectsDone: [], spaceLy: -1, orbitalLasers: 0, stockpile: emptyStockpile(), camps: [], explored: [],
+    darkBar: AGE_START_BARS[0], goldenBar: AGE_START_BARS[1],
   };
 }
 

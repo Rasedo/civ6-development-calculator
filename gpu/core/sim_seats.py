@@ -1336,8 +1336,9 @@ class SimSeats:
         can6 = has6 & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price6 + reserve6) * 1000))
         return jj6, bb6, can6, price6, elig6
 
-    def _commit_golden_grants(self, era: int) -> None:
-        """The GOLDEN dedications that pay ONCE, where the face is committed.
+    def _commit_golden_grants(self, era: int, games: torch.Tensor) -> None:
+        """The GOLDEN dedications that pay ONCE, where the face is committed:
+        the games `games` [B] entering game era `era`.
 
         CIV6 (Sky and Stars): "Unlocks the Eurekas for Advanced Flight, Nuclear
         Fission, and Rocketry if in the Atomic Era" and the Information-era row
@@ -1346,13 +1347,13 @@ class SimSeats:
         techs = self._sky_eurekas[era] if 0 <= era < len(self._sky_eurekas) else []
         for row in range(self.n_majors):
             if techs:
-                sky = self._golden_ded(row, self._ded_sky)
+                sky = self._golden_ded(row, self._ded_sky) & games
                 if bool(sky.any()):
                     for t in techs:
                         self.civ_tech_boosted[:, row, t] = self.civ_tech_boosted[:, row, t] | (
                             sky & ~self.civ_techs[:, row, t])
             if self._gdr_idx >= 0:
-                auto = self._golden_ded(row, self._ded_automaton)
+                auto = self._golden_ded(row, self._ded_automaton) & games
                 if bool(auto.any()):
                     cap = self.civ_cap_tile[:, row]
                     self._spawn_unit(row, auto & (cap >= 0), cap.clamp(min=0),
@@ -1379,10 +1380,88 @@ class SimSeats:
             self._dedication_event(row, self._ded_sky,
                                    made & (self._b_req_district[bi] == self._aerodrome_didx))
 
-    def _game_era(self) -> int:
-        """`gameEraIndex`: the ERA_LENGTH timeline every seat's age turns on,
-        capped at the last era."""
-        return min(int(self.turn // self._era_len), self._era_count - 1)
+    def _game_era(self) -> torch.Tensor:
+        """`gameEraIndex`: [B] each game's game era, an ERAS index."""
+        return self.game_era
+
+    def _game_era_turn(self) -> None:
+        """`gameEraTurn` — right after the turn counter moves. Where no
+        countdown runs, one starts once the era's minimum less the countdown
+        has come and either its maximum less the countdown has too or at least
+        half the major rows stand in a later era (`_civ_era`); a running one
+        ticks; the games whose countdown runs out begin their next era."""
+        t = int(self.turn)
+        live = self.game_era < self._era_count - 1
+        may = live & (self.era_countdown < 0) & (t >= self.era_start + self._era_min - self._era_cd)
+        if bool(may.any()):
+            ahead = torch.zeros_like(self.game_era)
+            for row in range(self.n_majors):
+                ahead += (self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]) > self.game_era).long()
+            go = may & ((t >= self.era_start + self._era_max - self._era_cd) | (2 * ahead >= self.n_majors))
+            self.era_countdown.copy_(torch.where(go, torch.full_like(self.era_countdown, self._era_cd),
+                                                 self.era_countdown))
+        run = live & (self.era_countdown >= 0)
+        self.era_countdown.copy_(torch.where(run, self.era_countdown - 1, self.era_countdown))
+        adv = run & (self.era_countdown < 0)
+        if bool(adv.any()):
+            self._enter_era(adv)
+            self._era_inspirations(adv)
+
+    def _enter_era(self, adv: torch.Tensor) -> None:
+        """`enterEra` — the games `adv` [B] begin their next game era: its
+        index and first turn, the road tier it brings, and each major row's
+        Age (its whole-game score against the bars the era before fixed),
+        dedications and next bars (`ageBars`)."""
+        new = torch.where(adv, self.game_era + 1, self.game_era)
+        self.game_era.copy_(new)
+        self.era_start.copy_(torch.where(adv, torch.full_like(self.era_start, int(self.turn)), self.era_start))
+        self.era_countdown.copy_(torch.where(adv, torch.full_like(self.era_countdown, -1), self.era_countdown))
+        tier = torch.zeros_like(new)
+        for _i, _e in enumerate(self._road_tier_era):
+            tier = torch.where(new >= _e, torch.full_like(tier, _i), tier)
+        self.road_tier.copy_(torch.where(adv, torch.maximum(self.road_tier, tier), self.road_tier))
+        a2 = adv.unsqueeze(1)
+        sc = self.era_score
+        # The PREVIOUS age, the Heroic test's substrate. CLONED because
+        # civ_age is written IN PLACE below.
+        was = self.civ_age.clone()
+        now = torch.where(sc < self.dark_bar, torch.zeros_like(was),
+                          torch.where(sc >= self.golden_bar, torch.full_like(was, 2), torch.ones_like(was)))
+        now = torch.where(a2, now, was)
+        self.prev_age.copy_(torch.where(a2, was, self.prev_age))
+        self.civ_age.copy_(now)
+        self.dark_ages += (a2 & (now == 0)).long()
+        self.golden_ages += (a2 & (now == 2)).long()
+        self._eff_version += 1  # a new AGE is a new Dark-Age card pool
+        self.dedications.copy_(torch.where(
+            a2,
+            torch.where((was == 0) & (now == 2), torch.full_like(self.dedications, self._heroic_ded),
+                        torch.ones_like(self.dedications)),
+            self.dedications,
+        ))
+        # Each civ picks from the WINDOW its game era offers, round-robin
+        # over that window rather than over the whole catalog.
+        for era in sorted({int(x) for x in new[adv].tolist()}):
+            m = adv & (new == era)
+            _ew = min(era, len(self._ded_eras) - 1)
+            _wlen = self._ded_era_len[_ew]
+            for _c in range(self.n_majors):
+                for _k in range(self.ded_picks.shape[2]):
+                    old = self.ded_picks[:, _c, _k]
+                    if _wlen == 0:
+                        self.ded_picks[:, _c, _k] = torch.where(m, torch.full_like(old, -1), old)
+                        continue
+                    _take = self.dedications[:, _c] > _k
+                    _pick = self._ded_eras[_ew][(era + _c + _k) % _wlen]
+                    self.ded_picks[:, _c, _k] = torch.where(
+                        m, torch.where(_take, torch.full_like(old, _pick), torch.full_like(old, -1)), old)
+            self._commit_golden_grants(era, m)
+        nc = self.city_alive[:, :self.n_majors].long().sum(dim=2)
+        shift = (self._age_shift_city * (nc - 1).clamp(min=0) + self._age_shift_golden * self.golden_ages
+                 + self._age_shift_dark * self.dark_ages + self._age_era_shift[new].unsqueeze(1))
+        self.dark_bar.copy_(torch.where(a2, (sc + self._age_dark_base + shift).clamp(min=0), self.dark_bar))
+        self.golden_bar.copy_(torch.where(a2, (sc + self._age_gold_base + shift).clamp(min=0), self.golden_bar))
+        self._era_version += 1
 
     def _stamp_bldg_era(self, r: torch.Tensor, row: int, col: torch.Tensor, bi: torch.Tensor) -> None:
         """`stampBuildingEra` — games `r` [n], their city slots `col` [n] of
@@ -1393,14 +1472,14 @@ class SimSeats:
         k = self._bpe_col[bi]
         hit = k >= 0
         if bool(hit.any()):
-            self.city_bldg_era[r[hit], row, col[hit], k[hit]] = self._game_era()
+            self.city_bldg_era[r[hit], row, col[hit], k[hit]] = self.game_era[r[hit]]
 
     def _bldg_era_yields(self, row: int, sl, selb: torch.Tensor) -> torch.Tensor:
         """[B, n, 6] — `buildingEraYields`: what the standing rows `selb`
         [B, n, NB] carrying `yieldsPerEra` pay per game era since their stamp."""
         st = self.city_bldg_era[:, row, sl]                          # [B, n, NPE]
         on = selb[:, :, self._bpe_bidx] & (st >= 0)
-        k = torch.where(on, (self._game_era() - st).clamp(min=0), torch.zeros_like(st)).double()
+        k = torch.where(on, (self.game_era.reshape(-1, 1, 1) - st).clamp(min=0), torch.zeros_like(st)).double()
         return torch.einsum("bjp,pk->bjk", k, self._bpe_y)
 
     def _seat_buy_building(self, row: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
@@ -2006,8 +2085,8 @@ class SimSeats:
     def _seat_tile_buy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 3: the TILE-BUY candidate — ONE legality body for the wire
         driver's _buy_ctx and the TS driver's tripwire twin. Walks city slots in
-        order; the FIRST slot with a border candidate names the pick (best
-        _seat_border_key, the same key the culture claim uses), and an
+        order; the FIRST slot with a border candidate names the pick (the
+        lowest `_seat_border_cost`, the same key the culture claim uses), and an
         UNAFFORDABLE pick ABORTS the seat's tile buy outright rather than trying
         the next city — TS breaks out of the walk.
         Returns (slot [B], tile [B], cost [B] f64, ok [B])."""
@@ -2034,7 +2113,7 @@ class SimSeats:
             has = okt.any(dim=1)
             if not bool(has.any()):
                 continue
-            best = torch.where(okt, key0, self._inf_f).argmin(dim=1)
+            best = torch.where(okt, self._seat_border_cost(row, ctr, tiles, tc, nbs, key0), self._inf_f).argmin(dim=1)
             tgt = tiles.gather(1, best.unsqueeze(1)).squeeze(1)
             c = self._seat_tile_price(row, ctr.clamp(min=0), tgt.clamp(min=0))
             buy = has & self._afford(self.civ_treasury[:, row], c)
@@ -7609,21 +7688,21 @@ class SimSeats:
         cum = open_m.long().cumsum(dim=1)
         return (open_m & (cum == (k + 1).unsqueeze(1))).long().argmax(dim=1)
 
-    def _era_inspirations(self) -> None:
+    def _era_inspirations(self, adv: torch.Tensor) -> None:
         """CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
-        Inspiration from that era." Called at the era boundary, right after the
-        new age is committed, ascending row order. A row draws only where the
-        new era still holds a civic it has neither unlocked nor triggered, so
-        an unpayable row spends none of the shared stream. The granted
-        Inspiration pays Pen, Brush and Voice like a detected one."""
-        if self._suz_c_era < 0 or self.S == 0 or self._era_len <= 0:
+        Inspiration from that era." Called in the games `adv` [B] whose game
+        era just began, right after the new age is committed, ascending row
+        order. A row draws only where the new era still holds a civic it has
+        neither unlocked nor triggered, so an unpayable row spends none of the
+        shared stream. The granted Inspiration pays Pen, Brush and Voice like
+        a detected one."""
+        if self._suz_c_era < 0 or self.S == 0:
             return
-        era_i = min(int(self.turn // self._era_len), self._era_count - 1)
         ncv = min(self.civ_civic_boosted.shape[2], self._civic_era.numel())
-        want = (self._civic_era[:ncv] == era_i).reshape(1, -1)
+        want = self._civic_era[:ncv].reshape(1, -1) == self.game_era.reshape(-1, 1)
         for row in range(self.n_majors):
             open_m = want & ~self.civ_civics[:, row, :ncv] & ~self.civ_civic_boosted[:, row, :ncv]
-            hit = self._suz_effect(row, self._suz_c_era) & open_m.any(dim=1)
+            hit = self._suz_effect(row, self._suz_c_era) & open_m.any(dim=1) & adv
             rnd = self._next_random(hit)
             if not bool(hit.any()):
                 continue
@@ -10104,7 +10183,62 @@ class SimSeats:
         assert col < self.RC, "city slots exhausted — raise RC (this is true living capacity)"
         return col
 
-    def _transfer_city(self, b: int, src_row: int, src_col: int, dst_row: int, *, conquest: bool) -> bool:
+    def _founding_moments(self, row: int, rows: torch.Tensor, slot: torch.Tensor, s_idx: torch.Tensor) -> None:
+        """`foundingMoments` — the games `rows` [n] where major row `row` just
+        founded in `slot` at `s_idx` [n], its sight revealed: NEAR_OTHER_CIV_CITY
+        when another major row's city the row has explored stands within
+        range; NEW_CONTINENT when none of the row's other cities stands on the
+        centre's continent; the centre terrain's row."""
+        if row >= self.n_majors or rows.numel() == 0:
+            return
+        B, dev = self.B, self.device
+        sc = s_idx.clamp(min=0)
+
+        def pay(per: int, hit: torch.Tensor) -> None:
+            cnt = torch.zeros(B, dtype=torch.long, device=dev)
+            cnt[rows] = hit.long()
+            self._add_era_score(row, per, cnt)
+
+        near = torch.zeros(rows.numel(), dtype=torch.bool, device=dev)
+        for r in range(self.n_majors):
+            if r == row:
+                continue
+            ctr = self.city_center[rows, r].clamp(min=0)
+            d = self.pair_dist[sc.unsqueeze(1), ctr].to(torch.long)
+            hit = self.city_alive[rows, r] & (d <= self._moment_near_range)
+            if self.fog_of_war:
+                hit = hit & self.seat_explored[rows, row].gather(1, ctr)
+            near = near | hit.any(dim=1)
+        pay(self._moment_near_civ, near)
+        cont = self.tile_continent[rows, sc]
+        col = torch.arange(self.RC, device=dev).unsqueeze(0)
+        others = self.city_alive[rows, row] & (col != slot.unsqueeze(1))
+        ocont = self.tile_continent[rows.unsqueeze(1), self.city_center[rows, row].clamp(min=0)]
+        same = (others & (ocont == cont.unsqueeze(1))).any(dim=1)
+        pay(self._moment_new_continent, (cont >= 0) & others.any(dim=1) & ~same)
+        terr = self.terrain[rows, sc]
+        for t, v in self._moment_terrain:
+            pay(v, terr == t)
+
+    def _transfer_moments(self, b: int, src_row: int, dst_row: int, orig: int, founder: int,
+                          loyalty: bool, was_last: bool) -> None:
+        """`transferMoments` — game `b`'s city passing from `src_row` to major
+        row `dst_row`: TO_ORIGINAL_OWNER when `dst_row` founded it and its
+        loyalty did not carry it; from a major row, PLAYER_DEFEATED when it
+        was that row's last city, else FOREIGN_CAPITAL when it was that row's
+        original capital."""
+        hot = self._row_hot(b)
+        if founder == dst_row and not loyalty:
+            self._add_era_score(dst_row, self._moment_to_orig, hot)
+        if src_row >= self.n_majors:
+            return
+        if was_last:
+            self._add_era_score(dst_row, self._moment_defeated, hot)
+        elif orig == src_row:
+            self._add_era_score(dst_row, self._moment_foreign_cap, hot)
+
+    def _transfer_city(self, b: int, src_row: int, src_col: int, dst_row: int, *, conquest: bool,
+                       loyalty: bool) -> bool:
         """ONE `transferCity` for every pair of MAJOR seat rows — conquest and
         loyalty flip alike. Every transfer is the same one: a city leaves one
         row's list and joins another's.
@@ -10126,6 +10260,8 @@ class SimSeats:
         # its tile_seat value, which is how the territory scan finds its tiles.
         c_t = int(self.city_center[b, src_row, src_col])
         cid = int(self.city_id[b, src_row, src_col])
+        # the losing row held no other city: its last (the moments read it)
+        was_last = int(self.city_alive[b, src_row].sum()) <= 1
         # CONQUERING a city earns GRIEVANCES — accrued at the TOP like TS's, so
         # a raze at the cap earns them too, and the loser's LAST city pays the
         # whole world. A LOYALTY FLIP earns none: nobody declared anything.
@@ -10142,7 +10278,7 @@ class SimSeats:
             self._grievance_city_taken(
                 b, dst_row, src_row,
                 bool(self.city_alive[b, dst_row].sum() >= int(self.rules.seats["maxCities"])))
-            if int(self.city_alive[b, src_row].sum()) <= 1:
+            if was_last:
                 self._grievance_last_city(b, dst_row)
         # a Free City's own grants (`unit_free_city`) go when it leaves the
         # Free Cities, joined or captured, never to the taker (`transferCity`)
@@ -10249,7 +10385,7 @@ class SimSeats:
         self.city_alive[b, dst_row, col] = True
         # the Free Cities seat scores no era and explores nothing
         if dst_major:
-            self._add_era_score(dst_row, self._era_pts["conquer"], self._row_hot(b))
+            self._transfer_moments(b, src_row, dst_row, old_orig, old_founder, loyalty, was_last)
             self._reveal_around(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev), 3)
         self.city_is_cap[b, dst_row, col] = False  # a received city is never a capital (TS isCapital: false)
         self.city_orig_cap[b, dst_row, col] = old_orig  # ...but it is still whoever founded it
@@ -10517,21 +10653,50 @@ class SimSeats:
         # orphaned district from a razed city CAN be an unowned candidate, so
         # the district/wonder mask must zero the key here.
         y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc) * ((self.district.gather(1, tc) < 0) & (self.built_wonder.gather(1, tc) < 0)).to(torch.float64)
-        d = self.pair_dist[center.unsqueeze(1), tc].to(self.dtype)
-        key0 = (
-            d * 1e12
-            - (self.res_priority * (~self.res_stripped).long()).gather(1, tc).to(self.dtype) * 1e9
-            - torch.round(y_sum * 1000) * 1e4
-            + tiles.to(self.dtype)
-        )
+        # borderPlotCost's twin, every term but the neighbours' (they read
+        # the live owners, `_seat_border_cost`): distance, the seen resource
+        # or the water and ring terms, the improvement, the natural wonder
+        # and the yields — in milli-points, so the yield sum rounds once
+        P = self.rules.plot_influence
+        d = self.pair_dist[center.unsqueeze(1), tc].to(torch.long)
+        seen = (self._res_live() & ~self._res_hidden(row)).gather(1, tc)
+        near3 = d <= 3
+        cost = d * (P["distanceMultiplier"] * 2)
+        cost = cost + torch.where(
+            seen, torch.where(near3, P["resourceCost"], 0),
+            self.water.gather(1, tc).long() * P["waterCost"] + (~near3).long() * P["ringCost"])
+        camp = ((self.camp_tile.unsqueeze(1) == tc.unsqueeze(2)) & (self.camp_tile >= 0).unsqueeze(1)).any(dim=2)
+        imp = (self.improvement.gather(1, tc) >= 0) | self.tile_goody.gather(1, tc).bool()
+        cost = cost + torch.where(camp, P["ringCost"], torch.where(imp, P["improvementCost"], 0))
+        cost = cost + self.nwonder.gather(1, tc).long() * P["nwCost"]
+        key0 = cost.double() * 1000 + P["yieldPointCost"] * torch.round(y_sum * 1000)
         return tiles, tc, nbs, key0
+
+    def _seat_border_cost(self, row: int, center: torch.Tensor, tiles: torch.Tensor, tc: torch.Tensor,
+                          nbs: torch.Tensor, key0: torch.Tensor) -> torch.Tensor:
+        """[B, M] float64 — the pick key: `key0` plus borderPlotCost's
+        neighbour terms on the LIVE owners (-1 per unowned neighbour with a
+        seen resource, -1 per unowned neighbouring natural wonder, -1 once
+        more if such a wonder is within 3 rings of the centre), times 1e5,
+        plus the tile index: the lowest cost, then the lowest index."""
+        B = self.B
+        nv = nbs >= 0
+        nc = nbs.clamp(min=0).reshape(B, -1)
+        free = (self.tile_seat.gather(1, nc) < 0).reshape(nbs.shape) & nv
+        seen = (self._res_live() & ~self._res_hidden(row)).gather(1, nc).reshape(nbs.shape)
+        nw = self.nwonder.gather(1, nc).reshape(nbs.shape)
+        nd = self.pair_dist[center.view(B, 1, 1).expand_as(nbs).reshape(B, -1), nc].reshape(nbs.shape)
+        nb_term = ((free & seen).sum(dim=2) + (free & nw).sum(dim=2)
+                   + (free & nw & (nd <= 3)).any(dim=2).long())
+        return (key0 - nb_term.double() * 1000) * 1e5 + tiles.double()
 
     def _seat_border_growth(self, row: int, col: torch.Tensor, act: torch.Tensor, cul_c: torch.Tensor) -> None:
         """Cultural border growth for ONE city of seat row `row` — box += this
         city's culture, then consume against `_border_cost` using the shared
-        pick key (dist asc, resource priority desc, yield-sum desc, index asc;
-        radius 5; unclaimed tiles, with water, impassables and natural wonders
-        all claimable, like borderCandidates). `col` is the city's column, a
+        pick key (`_seat_border_cost`, borderPlotCost's twin: the lowest
+        cost, then the lowest index; radius 5; unclaimed tiles, with water,
+        impassables and natural wonders all claimable, like
+        borderCandidates). `col` is the city's column, a
         [B] tensor because row 0 walks its columns in a per-batch order.
 
         The two predicates are the ones TS names: `tileClaimed(t)` is
@@ -10586,7 +10751,7 @@ class SimSeats:
                 unowned = self._seat_tile_unclaimed(tc)
                 adj_own = self._seat_tile_adj_city(row, cid, tc, nbs)
             ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
-            key = torch.where(ok, key0, self._inf_f)
+            key = torch.where(ok, self._seat_border_cost(row, center, tiles, tc, nbs, key0), self._inf_f)
             best = key.argmin(dim=1)
             has_cand = ok.any(dim=1)
             claim = ready & has_cand
@@ -10689,13 +10854,13 @@ class SimSeats:
                               torch.full_like(colon_g, -1))
             colon_p = torch.where(colon_g >= 0, self._enh["colon"][_eh + 1], torch.zeros_like(colon_g))
         self.city_alive[rows, row, slot] = True
-        self._add_era_score(row, self._era_pts["found"], self._row_hot(rows))
         self.city_is_cap[rows, row, slot] = new_cap
         self.city_orig_cap[rows, row, slot] = torch.where(
             new_cap, torch.full_like(s_idx, row), torch.full_like(s_idx, -1))
         self.city_founder[rows, row, slot] = row
         self.civ_cap_tile[rows, row] = torch.where(new_cap, s_idx, self.civ_cap_tile[rows, row])
         self.city_center[rows, row, slot] = s_idx
+        self._founding_moments(row, rows, slot, s_idx)
         self.city_pop[rows, row, slot] = 1
         self._log_pop(rows, row, slot, "fd")
         self.city_growth[rows, row, slot] = 0
@@ -12991,7 +13156,7 @@ class SimSeats:
                         _aform[_b, u] = _tier
             for _b in fell.tolist():
                 _ctr_c = int(self.city_center[_b, int(hrow[_b]), int(slot[_b])])
-                self._transfer_city(_b, int(hrow[_b]), int(slot[_b]), int(a_seat[_b, u]), conquest=True)
+                self._transfer_city(_b, int(hrow[_b]), int(slot[_b]), int(a_seat[_b, u]), conquest=True, loyalty=False)
                 self._conquistador_convert(_b, int(a_seat[_b, u]), _ctr_c)
             return
         hr, sl = hrow[fell], slot[fell]

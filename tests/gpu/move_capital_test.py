@@ -136,9 +136,9 @@ def test_domination_follows(rules, path) -> None:
             hit[B0] = True
             sim._move_capital(0, hit, torch.full((sim.B,), new, dtype=torch.long))
         # row 1 takes row 0's OLD capital, and every other row's capital too
-        sim._transfer_city(B0, 0, old, 1, conquest=True)
+        sim._transfer_city(B0, 0, old, 1, conquest=True, loyalty=False)
         for r in range(2, sim.n_majors):
-            sim._transfer_city(B0, r, 0, 1, conquest=True)
+            sim._transfer_city(B0, r, 0, 1, conquest=True, loyalty=False)
         return int(sim._domination()[B0])
 
     assert holding_old_capital(move=False) == 1, "the old capital plus every other capital is domination"
