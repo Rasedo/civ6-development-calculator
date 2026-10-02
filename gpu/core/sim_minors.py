@@ -1748,6 +1748,13 @@ class SimMinors:
             cand_w = cand_w & self._wadj_plane(("cap", row), lambda: self._adj_capital(row))
         if int(wrow["needRel"]):
             cand_w = cand_w & self.civ_religion_done[:, row].unsqueeze(1)
+        if wrow["onFeat"]:
+            # the plot still carries one of the wonder's features
+            live = ~self.feat_stripped
+            on = torch.zeros_like(cand_w)
+            for f in wrow["onFeat"]:
+                on = on | (live & (self.feat_id == int(f)))
+            cand_w = cand_w & on
         return cand_w
 
     def _adj_district_with(self, di: int, bi: int) -> torch.Tensor:

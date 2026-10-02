@@ -1266,6 +1266,10 @@ export function buildRules() {
           : -1,
         adjCap: w.placement.adjacentCapital ? 1 : 0,
         needRel: w.placement.requiresReligion ? 1 : 0,
+        // the features the plot must still carry (`wonderTerrainOk`'s
+        // onFeature): a chop or a painted soil takes them off at run time,
+        // which the static `wok` mask cannot see
+        onFeat: (w.placement.onFeature ?? []).map((f) => featIdx.get(f) ?? -1),
         regionalAmenities: w.effects?.regionalAmenities ?? 0,
         cityAmenities: w.effects?.cityAmenities ?? 0,
         cityHousing: w.effects?.cityHousing ?? 0,

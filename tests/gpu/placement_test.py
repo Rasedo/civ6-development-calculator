@@ -72,6 +72,18 @@ def main() -> None:
             f"wonder {wi} was offered a tile its own ground rule refused")
     print("  2 live half OK (never widens the static bit, for any row)")
 
+    # a wonder that asks for a feature loses the plot once the feature goes
+    # (chopped, or painted over): `wonderTerrainOk` reads the live feature
+    wi_f = next((i for i in range(nW) if sim._wond_rows[i]["onFeat"]
+                 and bool(((sim.wok[0] >> i) & 1).any())), -1)
+    if wi_f >= 0:
+        t = int(((sim.wok[0] >> wi_f) & 1).bool().nonzero().flatten()[0])
+        assert bool(sim._wonder_cand(row, 0, wi_f, base)[0, t]), "the feature's plot was refused"
+        sim.feat_stripped[0, t] = True
+        assert not bool(sim._wonder_cand(row, 0, wi_f, base)[0, t]), "a stripped feature still took the wonder"
+        sim.feat_stripped[0, t] = False
+        print("  2b live feature OK (a stripped feature refuses its wonder)")
+
     # -- 3: the four LIVE clauses each bite ---------------------------------
     wi_db, r_db = wrow(sim, "adjDB")
     if wi_db >= 0:
