@@ -3,6 +3,9 @@ game drew (h3_roster.py), one summary line per record.
 
     python tools/civ6lab/h3_rostercheck.py runs/h3_session_<stamp>.jsonl [...] [--script Pangaea]
 
+Without --script the script is the probe config's (Continents for the plain
+natives probe).
+
 The full check.py output of each goes to .claude/scratchpad/h3chk_<tag>.txt.
 """
 from __future__ import annotations
@@ -17,6 +20,11 @@ HERE = pathlib.Path(__file__).parent
 ROOT = HERE.parent.parent
 sys.path.insert(0, str(HERE))
 from h3_roster import args as roster_args  # noqa: E402
+from h3_xp2copy import SCRIPTS as _SCRIPTS  # noqa: E402
+
+# a natives probe over a script other than Continents names it in its map
+# (civ6lab_mapprobe_natives_<script>.lua)
+SCRIPTS = {s.lower(): s for s in _SCRIPTS}
 
 
 def main() -> int:
@@ -30,8 +38,11 @@ def main() -> int:
             majors, minors = roster_args(rec)
             cmd = [sys.executable, str(ROOT / "tools/civ6map/check.py"), "--session", s, "--line", str(line),
                    "--majors", ",".join(majors), "--minors", ",".join(minors)]
-            if a.script:
-                cmd += ["--script", a.script]
+            script = a.script or SCRIPTS.get(json.loads((ROOT / rec["config"]).read_text(encoding="utf-8"))
+                                             .get("map", "").removeprefix("civ6lab_mapprobe_natives_")
+                                             .removesuffix(".lua"), "")
+            if script:
+                cmd += ["--script", script]
             r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
             out = r.stdout + r.stderr
             (ROOT / ".claude/scratchpad" / f"h3chk_{rec['tag']}.txt").write_text(out, encoding="utf-8")

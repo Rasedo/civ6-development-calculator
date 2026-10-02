@@ -82,7 +82,7 @@ def tb_position(host: str, port: int, map_seed: int) -> dict:
     lua = ("local o = {} for i = 1, 4 do o[i] = tostring(TerrainBuilder.GetRandomNumber(32768, 'civ6lab h3')) end "
            "print('D ' .. table.concat(o, ' ')) print('SYNC ' .. tostring(Game.GetRandomSeed())) "
            "local m = {} for _, k in ipairs({'world_age', 'sea_level', 'temperature', 'rainfall', 'resources', 'start', "
-           "'MAP_SIZE'}) do m[#m + 1] = k .. '=' .. tostring(MapConfiguration.GetValue(k)) end "
+           "'MAP_SIZE'}) do m[#m + 1] = k .. '=' .. tostring((MapConfiguration.GetValue(k))) end "
            "print('OPTS ' .. table.concat(m, ' '))")
     lines = t.run(GC, lua)
     t.close()

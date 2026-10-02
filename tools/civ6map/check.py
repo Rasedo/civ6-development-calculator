@@ -107,7 +107,8 @@ def session_setup(rec: dict) -> tuple[str, int, dict]:
     """the size, the city-state count and the map options the recorded game
     ran with (its config file and the options it read back)"""
     cfg = json.loads((ROOT / rec["config"]).read_text(encoding="utf-8"))
-    opts = {k: int(v) for k, v in (rec.get("map_options") or {}).items() if k != "MAP_SIZE"}
+    opts = {k: int(v) for k, v in (rec.get("map_options") or {}).items()
+            if k != "MAP_SIZE" and v.lstrip("-").isdigit()}
     return cfg["size"], int(cfg.get("city_states", 0)), opts
 
 

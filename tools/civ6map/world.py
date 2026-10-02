@@ -20,7 +20,6 @@ from .gameinfo import GameInfo
 
 OPEN_NATIVES = {
     "Map.GetContinentPlots": "the order of the plots it answers (plot order here)",
-    "StartPositioner": "the largest-landmass filter and ocean starts",
 }
 
 NE, E, SE, SW, W, NW = range(6)
@@ -79,6 +78,8 @@ class World:
         self.t_hills = [bool(r["Hills"]) for r in self.t_rows]
         self.t_mountain = [bool(r["Mountain"]) for r in self.t_rows]
         self.t_impassable = [bool(r["Impassable"]) for r in self.t_rows]
+        self.f_no_resource = [bool(r.get("NoResource")) for r in self.f_rows]
+        self.f_double_adj = [bool(r.get("DoubleAdjacentTerrainYield")) for r in self.f_rows]
         tix = {r["TerrainType"]: r["Index"] for r in self.t_rows}
         fix = {r["FeatureType"]: r["Index"] for r in self.f_rows}
         rix = {r["ResourceType"]: r["Index"] for r in self.r_rows}
@@ -116,7 +117,9 @@ class World:
     def plot_yield(self, i: int, y: int) -> int:
         """Plot:GetYield: nothing on an impassable plot (a mountain, Ice, an
         impassable natural wonder); else the terrain's yield (not on a
-        natural wonder's plot), the feature's and the resource's, and the
+        natural wonder's plot; doubled, once, next to a
+        DoubleAdjacentTerrainYield feature: Torres del Paine), the
+        feature's and the resource's, and the
         adjacency yields of every natural-wonder plot next to it (a
         multi-plot wonder's own plots included)"""
         if self.is_impassable(i):
@@ -124,6 +127,8 @@ class World:
         f = self.feature[i]
         nw = f >= 0 and bool(self.f_rows[f]["NaturalWonder"])
         v = 0 if nw else self.t_yield.get((self.terrain[i], y), 0)
+        if any(self.feature[n] >= 0 and self.f_double_adj[self.feature[n]] for n in self.neighbours(i)):
+            v *= 2
         if f >= 0:
             v += self.f_yield.get((f, y), 0)
         if self.resource[i] >= 0:
@@ -290,10 +295,12 @@ class World:
     def is_river(self, i):
         """a land plot with a river on one of its edges to another land plot
         (a river flag on an edge to water does not count: the game answers
-        IsRiver false on both sides of such an edge)"""
+        IsRiver false on both sides of such an edge); an edge on the map's
+        border counts (Tilted_Axis Small 1000: NE of river at (72, 0), its SW
+        edge off the map, makes (73, 0) find fresh water within 2)"""
         if self.is_water(i):
             return False
-        return any(on and (n := self.adj(i, d)) is not None and not self.is_water(n)
+        return any(on and ((n := self.adj(i, d)) is None or not self.is_water(n))
                    for d, on in enumerate(self.river_edges(i)))
 
     def is_natural_wonder(self, i):
@@ -487,7 +494,8 @@ class World:
         plot; has a feature not in the resource's ValidFeatures, or no feature
         and a terrain not in its ValidTerrains; NoRiver on a river plot or
         RequiresRiver off one; LakeEligible false on a lake; AdjacentToLand
-        with no land neighbour"""
+        with no land neighbour; a neighbour carrying a NoResource feature
+        (Torres del Paine)"""
         if r < 0:
             return True
         if self.resource[i] >= 0 or self.starting[i]:
@@ -507,6 +515,8 @@ class World:
             return False
         if row.get("AdjacentToLand") and not any(not self.is_water(n) for n in self.neighbours(i)):
             return False
+        if any(self.feature[n] >= 0 and self.f_no_resource[self.feature[n]] for n in self.neighbours(i)):
+            return False
         return True
 
     def adjacent_resource_count(self, i: int) -> int:
@@ -517,31 +527,37 @@ class World:
         """each river's plots: its setter calls in the order DoRiver made
         them, each adding the plot passed and then its partner across the edge
         (W of river: the E neighbour; NW: the SE neighbour; NE: the SW
-        neighbour), each plot once"""
+        neighbour), each plot once; a partner off the map's edge is a -1
+        entry, which breaks a run (Tilted_Axis Tiny 1000: a river leaving
+        the south edge, NE of (21, 0), floods nothing with 4 plots)"""
         partner = (E, SE, SW)
         out: dict[int, list[int]] = {}
         for rid, p, edge in self.river_order:
             lst = out.setdefault(rid, [])
             for q in (p, self.adj(p, partner[edge])):
-                if q is not None and q not in lst:
+                if q is None:
+                    lst.append(-1)
+                elif q not in lst:
                     lst.append(q)
         return out
 
-    def generate_floodplains(self, lo: int, hi: int) -> None:
-        """GenerateFloodplains: per river, from the mouth (the list's end)
-        towards the source, the first maximal run of at least `lo`
-        consecutive flat, featureless grassland, plains or desert plots; its
-        `hi` plots nearest the mouth take the floodplain of their terrain.
-        Every river is judged on the map as it stands before any floodplain
-        (the union of the runs)."""
+    def generate_floodplains(self, inland: bool, lo: int, hi: int) -> None:
+        """GenerateFloodplains(bRiversStartInland, lo, hi): per river, from
+        the list's end (rivers start inland: the end is the mouth) or, the
+        flag false or nil, from its start (InlandSea lays its rivers from the
+        coast; Tilted_Axis passes the unset global), the first maximal run of
+        at least `lo` consecutive flat, featureless grassland, plains or
+        desert plots; its `hi` plots nearest the walk's start take the
+        floodplain of their terrain. Every river is judged on the map as it
+        stands before any floodplain (the union of the runs)."""
         fp = {self.tix["TERRAIN_DESERT"]: self.fix["FEATURE_FLOODPLAINS"],
               self.tix["TERRAIN_GRASS"]: self.fix["FEATURE_FLOODPLAINS_GRASSLAND"],
               self.tix["TERRAIN_PLAINS"]: self.fix["FEATURE_FLOODPLAINS_PLAINS"]}
         take: dict[int, int] = {}
         for plots in self.river_plots().values():
             run: list[int] = []
-            for p in [*reversed(plots), None]:
-                if p is not None and self.terrain[p] in fp and self.feature[p] < 0:
+            for p in [*(reversed(plots) if inland else plots), None]:
+                if p is not None and p >= 0 and self.terrain[p] in fp and self.feature[p] < 0:
                     run.append(p)
                     continue
                 if len(run) >= lo:
@@ -666,10 +682,11 @@ class Starts:
     fertility descending (EASTL sort). A region's plots are its entry's
     plots inside its box, in plot order; TotalPlots every plot of the box.
 
-    Stood in and recorded in World.unspecified: the fourth argument of
-    DivideMapIntoMajorRegions (the largest landmass only; Continents passes
-    false) and the ocean starts (none: a roster without an ocean-start
-    leader never reads them)."""
+    DivideMapIntoMajorRegions' fourth argument (Terra passes true) gives
+    the civs to the entries on the landmass of the most land plots only;
+    the others wait for the minor division with the entries below the
+    major minimum. The ocean starts (an OceanStart leader, Kupe) are the
+    DLL's 0x890940 and 0x890d10 (h3_oceanfit.py)."""
 
     def __init__(self, world: "World"):
         self.w = world
@@ -678,6 +695,7 @@ class Starts:
         self.min_major = self.min_minor = 0
         self.minor_entries: list[Region] = []
         self.lmid: list[int] = []
+        self.ocean: list[int] = []
 
     # ------------------------------------------------------------ entries
     def landmass_ids(self) -> list[int]:
@@ -815,14 +833,21 @@ class Starts:
         the other entries of at least the minor minimum wait for the minor
         division"""
         self.w.rng.ledger.append(("native", "StartPositioner.DivideMapIntoMajorRegions", 0))
-        if largest_only:
-            self.w.unspecified.append("StartPositioner: DivideMapIntoMajorRegions' largest-landmass filter")
         self.min_major, self.min_minor = int(min_major), int(min_minor)
         fert = [self.w.plot_fertility(i) for i in range(self.w.N)]
         self.lmid = self.landmass_ids()
         ent = self.entries(fert, self.lmid)
-        self.minor_entries = [e for e in ent if e.fertility >= self.min_minor and not self.is_major(e)]
-        self.major = self.allocate([e for e in ent if self.is_major(e)], int(n), fert, self.lmid)
+        keep = lambda e: True  # noqa: E731
+        if largest_only:
+            # the majors only on the landmass of the most land plots
+            size: dict[int, int] = {}
+            for i in range(self.w.N):
+                if not self.w.is_water(i):
+                    size[self.lmid[i]] = size.get(self.lmid[i], 0) + 1
+            big = max(size, key=lambda k: size[k]) if size else None
+            keep = lambda e: e.landmass == big  # noqa: E731
+        self.minor_entries = [e for e in ent if e.fertility >= self.min_minor and not (self.is_major(e) and keep(e))]
+        self.major = self.allocate([e for e in ent if self.is_major(e) and keep(e)], int(n), fert, self.lmid)
 
     def DivideMapIntoMinorRegions(self, n):
         """the major division's minor entries, then a copy of every major
@@ -928,14 +953,83 @@ class Starts:
             return base
         return max(0, _tdiv((100 - pct) * base, 100))
 
-    def GetTotalOceanStartCandidates(self, water_map=None):
-        return 0
+    # ------------------------------------------------------------ ocean starts
+    # the DLL's radius (GameCore_XP2_Release.dll .data 0xF06164 = 3)
+    OCEAN_RADIUS = 3
 
-    def PlaceOceanStartCivs(self, *a):
-        return 0
+    def _open_ocean(self, i: int) -> bool:
+        return self.w.terrain[i] == self.w.tix["TERRAIN_OCEAN"] and self.w.feature[i] < 0
+
+    def _ocean_runs(self, r: int) -> list[int]:
+        """the plots, in index order, ending a run (index order, across rows)
+        of more than 2r Ocean plots with no feature"""
+        out, run = [], 0
+        for i in range(self.w.N):
+            if self._open_ocean(i):
+                run += 1
+                if run > 2 * r:
+                    out.append(i)
+            else:
+                run = 0
+        return out
+
+    def GetTotalOceanStartCandidates(self, water_map=None):
+        """0x890940: the plots ending a run longer than 2R, R the radius (a
+        water map: max(1, R - 1))"""
+        r = max(1, self.OCEAN_RADIUS - 1) if water_map else self.OCEAN_RADIUS
+        return len(self._ocean_runs(r))
+
+    def PlaceOceanStartCivs(self, water_map, n, major_starts):
+        """0x890d10, R the radius (a water map: max(1, R - 2)): the
+        candidates are the centres (index - R) of the plots ending a run
+        longer than 2R; from r = R down to 0 (while fewer than n are kept)
+        each candidate is kept, again, when every plot of the hex-space
+        offsets (dx, dy) in [-r, r] within range r (GetPlotXYWithRangeCheck)
+        is off the map or Ocean with no feature; with at least n kept, n
+        times: each kept plot scored by its least hex distance to the major
+        starts and the ocean starts so far, sorted by score descending
+        (EASTL sort), the first taken. Fewer than n kept places none."""
+        n = int(n)
+        r0 = max(1, self.OCEAN_RADIUS - 2) if water_map else self.OCEAN_RADIUS
+        cands = [i - r0 for i in self._ocean_runs(r0)]
+        kept: list[int] = []
+        r = r0
+        while r >= 0:
+            for c in cands:
+                x, y = self.w.xy(c)
+                ok = True
+                for dx in range(-r, r + 1):
+                    for dy in range(-r, r + 1):
+                        if (abs(dx) + abs(dy) if (dx >= 0) == (dy >= 0) else max(abs(dx), abs(dy))) > r:
+                            continue
+                        q, yy = x - (y >> 1) + dx, y + dy
+                        p = self.w.plot(q + (yy >> 1), yy)
+                        if p is not None and not self._open_ocean(p):
+                            ok = False
+                            break
+                    if not ok:
+                        break
+                if ok:
+                    kept.append(c)
+            r -= 1
+            if len(kept) >= n:
+                break
+        starts = [int(major_starts[k]) for k in range(1, len(major_starts) + 1)] if major_starts else []
+        self.ocean = []
+        if len(kept) < n:
+            return 0
+        while len(self.ocean) < n:
+            pairs = []
+            for b in kept:
+                bx, by = self.w.xy(b)
+                pairs.append((b, min((self.w.distance(bx, by, *self.w.xy(s)) for s in starts + self.ocean),
+                                     default=0x7FFFFFFF)))
+            eastl.sort(pairs, lambda u, v: u[1] > v[1])
+            self.ocean.append(pairs[0][0])
+        return len(self.ocean)
 
     def GetOceanStartTile(self, i):
-        return -1
+        return self.ocean[int(i)]
 
 
 def _tdiv(a: int, b: int) -> int:

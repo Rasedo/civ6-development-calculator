@@ -98,6 +98,148 @@ def strip_annotations(src: str) -> str:
     return "".join(out)
 
 
+KEYWORDS = {"and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local",
+            "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"}
+ARITH = {"+", "-", "*", "/", "%", "^", ".."}
+ORDER = {"<": "__hks_lt", "<=": "__hks_le", ">": "__hks_gt", ">=": "__hks_ge", "==": "__hks_eq", "~=": "__hks_ne"}
+# the comparisons as Havok Script answers them: a comparison of two numbers
+# with a NaN on either side is true, its negation false (live FrontEnd, n =
+# 0/0: n < 5, n <= 5, n > 5, n >= 5, 5 < n, 5 <= n, 5 > n, 5 >= n, n < n,
+# n == 5, 5 == n, n == n all true, n ~= 5 false; math.ceil(n) is n).
+# Tilted_Axis runs FeatureGenerator:AddFeaturesFromContinents with
+# iNumLandPlots 0, and the oasis gate ceil(0 * 100 / 0) <= max passes.
+NAN_COMPARES = r"""
+function __hks_lt(a, b) if a ~= a or b ~= b then return true end return a < b end
+function __hks_le(a, b) if a ~= a or b ~= b then return true end return a <= b end
+function __hks_gt(a, b) if a ~= a or b ~= b then return true end return a > b end
+function __hks_ge(a, b) if a ~= a or b ~= b then return true end return a >= b end
+function __hks_eq(a, b)
+  if a ~= a or b ~= b then return type(a) == "number" and type(b) == "number" end
+  return a == b
+end
+function __hks_ne(a, b) return not __hks_eq(a, b) end
+"""
+
+
+def nan_compares(src: str) -> str:
+    """every comparison (`<`, `<=`, `>`, `>=`, `==`, `~=`) between two
+    operands rewritten as a call of the NAN_COMPARES functions, the
+    operands' text kept; line numbers
+    kept. An operand is the arithmetic-level expression around the
+    operator: unary operators, primaries with their field, index and call
+    suffixes, joined by + - * / % ^ .."""
+    toks = list(_tokens(src))
+    txt = [src[s:e] for _, s, e in toks]
+    kind = [k for k, _, _ in toks]
+    match: dict[int, int] = {}
+    stack: list[int] = []
+    for k, t in enumerate(txt):
+        if kind[k] != "op":
+            continue
+        if t in "([{":
+            stack.append(k)
+        elif t in ")]}" and stack:
+            o = stack.pop()
+            match[o], match[k] = k, o
+
+    def ends_operand(k: int) -> bool:
+        if k < 0:
+            return False
+        t = txt[k]
+        if kind[k] in ("num", "str"):
+            return True
+        if kind[k] == "name":
+            return t not in KEYWORDS or t in ("nil", "true", "false")
+        return t in (")", "]", "}", "...")
+
+    def left(k: int) -> int | None:
+        """the first token of the operand ending at token k"""
+        while True:
+            if not ends_operand(k):
+                return None
+            # one postfix expression, read backwards
+            while True:
+                t = txt[k]
+                if kind[k] == "op" and t in (")", "]", "}"):
+                    if k not in match:
+                        return None
+                    k = match[k]
+                    if ends_operand(k - 1):   # a call's or an index's brackets
+                        k -= 1
+                        continue
+                    break
+                if kind[k] == "str" and ends_operand(k - 1) and kind[k - 1] != "str":
+                    k -= 1
+                    continue
+                if kind[k] == "name" and k >= 2 and txt[k - 1] in (".", ":") and ends_operand(k - 2):
+                    k -= 2
+                    continue
+                break
+            # unary operators
+            while k - 1 >= 0 and (txt[k - 1] in ("not", "#") or txt[k - 1] == "-" and not ends_operand(k - 2)):
+                k -= 1
+            if k - 1 >= 0 and kind[k - 1] == "op" and txt[k - 1] in ARITH:
+                k -= 2
+                continue
+            return k
+
+    def right(k: int) -> int | None:
+        """the last token of the operand starting at token k"""
+        n = len(toks)
+        while True:
+            while k < n and (txt[k] in ("not", "#", "-") and kind[k] != "str"):
+                k += 1
+            if k >= n:
+                return None
+            t = txt[k]
+            if kind[k] in ("num", "str") or kind[k] == "name" and (t not in KEYWORDS or t in ("nil", "true", "false")) \
+                    or t == "...":
+                pass
+            elif kind[k] == "op" and t in ("(", "{"):
+                if k not in match:
+                    return None
+                k = match[k]
+            else:
+                return None
+            while k + 1 < n:
+                nt = txt[k + 1]
+                if nt in (".", ":") and k + 2 < n and kind[k + 2] == "name":
+                    k += 2
+                elif kind[k + 1] == "op" and nt in ("(", "[", "{") and k + 1 in match:
+                    k = match[k + 1]
+                elif kind[k + 1] == "str":
+                    k += 1
+                else:
+                    break
+            if k + 1 < n and kind[k + 1] == "op" and txt[k + 1] in ARITH:
+                k += 2
+                continue
+            return k
+
+    ins: list[tuple[int, int, str]] = []   # (position, order, text)
+    rep: dict[int, str] = {}
+    for k, t in enumerate(txt):
+        if kind[k] != "op" or t not in ORDER:
+            continue
+        a, b = left(k - 1), right(k + 1)
+        if a is None or b is None:
+            continue
+        ins.append((toks[a][1], 0, ORDER[t] + "("))
+        ins.append((toks[b][2], 1, ")"))
+        rep[k] = ","
+    if not rep:
+        return src
+    edits = sorted([(p, o, s, None) for p, o, s in ins] +
+                   [(toks[k][1], 2, s, toks[k][2]) for k, s in rep.items()], key=lambda e: (e[0], -e[1]))
+    out, last = [], 0
+    for p, _o, s, end in edits:
+        out.append(src[last:p])
+        out.append(s)
+        last = p if end is None else end
+    out.append(src[last:])
+    return "".join(out)
+
+
 def table_order(keys: list[int]) -> list[int]:
     """the order Havok Script's pairs visits a table whose keys are the
     integers `keys`, inserted in ascending order into an empty table: Lua

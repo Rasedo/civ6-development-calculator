@@ -160,7 +160,33 @@ def shapes_dll(w: int, h: int) -> list[tuple[str, object]]:
     return out
 
 
-SETS = {"basic": shapes_basic, "multi": shapes_multi, "dll": shapes_dll}
+def shapes_fallback(w: int, h: int) -> list[tuple[str, object]]:
+    """StampContinents' first step when no land or mountain area exceeds T
+    = (L // N) // 3: many small islands (separate rectangles, two plots of
+    ocean between), equal or unequal, the largest land or mountain"""
+    def islands(dims, t_first=G):
+        rects, x, y = [], 3, 3
+        for k, (dw, dh) in enumerate(dims):
+            if x + dw >= w - 3:
+                x, y = 3, y + 5
+            rects.append(rect(x, x + dw, y, y + dh, t_first if k == 0 else G))
+            x += dw + 3
+        return union(*rects)
+
+    out = []
+    out.append(("fb_eq9_2x2", islands([(2, 2)] * 9)))
+    out.append(("fb_eq12_3x2", islands([(3, 2)] * 12)))
+    out.append(("fb_eq16_2x2", islands([(2, 2)] * 16)))
+    uneq = [(7, 1), (6, 1), (6, 1), (5, 1), (5, 1), (5, 1), (4, 1), (4, 1), (4, 1), (4, 1), (3, 1), (3, 1)]
+    out.append(("fb_uneq", islands(uneq)))
+    out.append(("fb_uneq_last", islands(list(reversed(uneq)))))
+    out.append(("fb_uneq_mtn", islands(uneq, M)))
+    out.append(("fb_big_3x3_2x2", islands([(3, 3)] + [(2, 2)] * 14)))
+    out.append(("fb_tall", islands([(1, 4)] * 10 + [(2, 3)])))
+    return out
+
+
+SETS = {"basic": shapes_basic, "multi": shapes_multi, "dll": shapes_dll, "fallback": shapes_fallback}
 
 
 def lua_rle(vals: list[int]) -> str:
@@ -194,7 +220,7 @@ def cmd_write(set_name: str) -> int:
         lines.append(f"STAMP_SHAPES[{w}] = {{")
         lines += entries
         lines.append("}")
-    (MOD / "Maps" / "civ6lab_stampshapes.lua").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (MOD / "Maps" / "civ6lab_stampshapes.lua").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print(f"{count} shapes over {len(SIZES)} widths -> {MOD / 'Maps' / 'civ6lab_stampshapes.lua'}")
     return 0
 

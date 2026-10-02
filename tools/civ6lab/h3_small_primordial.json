@@ -1,0 +1,16 @@
+{
+  "ruleset": "RULESET_EXPANSION_2",
+  "speed": "GAMESPEED_ONLINE",
+  "difficulty": "DIFFICULTY_PRINCE",
+  "map": "civ6lab_mapprobe_natives_primordial.lua",
+  "size": "MAPSIZE_SMALL",
+  "city_states": 9,
+  "realism": 2,
+  "start_era": "ERA_ANCIENT",
+  "max_turns": 500,
+  "all_ai": false,
+  "world_age": 2,
+  "sea_level": 2,
+  "temperature": 2,
+  "rainfall": 2
+}

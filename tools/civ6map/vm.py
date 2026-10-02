@@ -19,7 +19,7 @@ import lupa.lua51 as lua51
 
 from .fractal import Fractal
 from .gameinfo import INSTALL
-from .hks import strip_annotations, table_order
+from .hks import NAN_COMPARES, nan_compares, strip_annotations, table_order
 from .world import World
 
 LAYERS = [INSTALL / "Base/Assets/Maps", INSTALL / "Base/Assets/Maps/Utility",
@@ -253,6 +253,9 @@ class Api:
         self.log_print = log_print
         self.prints: list[str] = []
         self.included: list[str] = []
+        # the source dialect: Havok's annotations stripped; run(hks=True)
+        # adds Havok's NaN comparisons
+        self.dialect = strip_annotations
 
     # ------------------------------------------------------------ runtime
     def include(self, name):
@@ -260,7 +263,7 @@ class Api:
         self.included.append(str(f.relative_to(INSTALL)))
         src = f.read_text(encoding="utf-8", errors="replace").lstrip("﻿")
         chunk = self.lua.execute("return function(src, name) local f, e = loadstring(src, name) "
-                                 "if not f then error(e) end return f end")(strip_annotations(src), "@" + f.name)
+                                 "if not f then error(e) end return f end")(self.dialect(src), "@" + f.name)
         return chunk()
 
     def print(self, *args):
@@ -306,7 +309,16 @@ class Api:
         return self.w.plot(x, y)
 
     def Map_GetPlotByIndex(self, i):
-        return int(i) if i is not None and 0 <= i < self.w.N else None
+        """a nil index reads 0, as a native's integer argument does
+        (Tilted_Axis' second ice phase asks for the unset global i: the
+        game's AddIce lands on plot 0, 180 calls on Tiny 1000); index W * H
+        is plot 0 again (Primordial and Splintered_Fractal set plot index +
+        1, the last one W * H: the game's first AreaBuilder.Recalculate
+        counts plot 0 with the top right corner's terrain)"""
+        i = _int(i)
+        if i == self.w.N:
+            return 0
+        return i if 0 <= i < self.w.N else None
 
     def Map_GetPlotXY(self, x, y, dx, dy, r=None):
         """the plot (x + dx, y + dy); with a fifth argument (dx, dy) is a
@@ -339,11 +351,14 @@ class Api:
         d = _int(d)
         return None if i is None or not 0 <= d < 6 else self.w.adj(i, d)
 
-    def Map_GetPlotDistance(self, x1, y1, x2=None, y2=None):
+    def Map_GetPlotDistance(self, *a):
         """hex distance between (x1, y1) and (x2, y2), or with two arguments
-        between two plot indices (the start pickers' form)"""
-        if x2 is None and y2 is None:
-            return self.w.distance(*self.w.xy(_int(x1)), *self.w.xy(_int(y1)))
+        between two plot indices (the start pickers' form); the form goes by
+        the argument count, so four with the last two nil measure to (0, 0)
+        (Terra's island layers pass its unset g_xCenter, g_yCenter)"""
+        if len(a) == 2:
+            return self.w.distance(*self.w.xy(_int(a[0])), *self.w.xy(_int(a[1])))
+        x1, y1, x2, y2 = (list(a) + [None] * 4)[:4]
         return self.w.distance(_int(x1), _int(y1), _int(x2), _int(y2))
 
     def Map_GetMapSize(self):
@@ -409,7 +424,7 @@ class Api:
 
     def TB_GenerateFloodplains(self, inland, lo, hi):
         self._native("TerrainBuilder.GenerateFloodplains")
-        self.w.generate_floodplains(_int(lo), _int(hi))
+        self.w.generate_floodplains(bool(inland), _int(lo), _int(hi))
         self._facts("TerrainBuilder.GenerateFloodplains")
 
     def TB_AddIce(self, i, e):
@@ -738,7 +753,17 @@ def run(world: World, script: str, *, log_print: bool = False, hks: bool = True)
     lua.compile(PRELUDE)(api)
     if hks:
         lua.execute(HKS_SORT)
+        lua.execute(NAN_COMPARES)
+        api.dialect = lambda src: nan_compares(strip_annotations(src))
         lua.compile(HKS_PAIRS)(api)
     api.include(script)
+    init = lua.globals().GetMapInitData
+    if init is not None:
+        # the engine sizes the map from the script's GetMapInitData (the map
+        # size's Hash): its WrapX decides the wrap (InlandSea, Tilted_Axis: none)
+        d = init(world.size_row["Hash"])
+        if (d.Width, d.Height) != (world.W, world.H):
+            raise SystemExit(f"GetMapInitData {d.Width}x{d.Height} for a {world.W}x{world.H} map")
+        world.wrap_x = api.wrap_x = bool(d.WrapX)
     lua.globals().GenerateMap()
     return api

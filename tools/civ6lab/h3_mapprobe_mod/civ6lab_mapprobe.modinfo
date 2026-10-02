@@ -9,51 +9,95 @@
 	<InGameActions>
 		<ImportFiles id="civ6lab_mapprobe_files">
 			<File>Maps/civ6lab_mapprobe.lua</File>
-			<File>Maps/civ6lab_mapprobe_quiet.lua</File>
-			<File>Maps/civ6lab_mapprobe_natives.lua</File>
 			<File>Maps/civ6lab_mapprobe_exp.lua</File>
-			<File>Maps/civ6lab_mapprobe_stamp.lua</File>
 			<File>Maps/civ6lab_mapprobe_fert.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_continents_islands.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_fractal.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_inlandsea.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_island_plates.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_lakes.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_pangaea.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_primordial.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_seven_seas.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_shuffle.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_small_continents.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_splintered_fractal.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_terra.lua</File>
+			<File>Maps/civ6lab_mapprobe_natives_tilted_axis.lua</File>
+			<File>Maps/civ6lab_mapprobe_quiet.lua</File>
+			<File>Maps/civ6lab_mapprobe_stamp.lua</File>
 			<File>Maps/civ6lab_stampshapes.lua</File>
 			<File>Maps/civ6lab_xp2_assignstartingplots.lua</File>
 			<File>Maps/civ6lab_xp2_coastallowlands.lua</File>
 			<File>Maps/civ6lab_xp2_continents.lua</File>
+			<File>Maps/civ6lab_xp2_continents_islands.lua</File>
 			<File>Maps/civ6lab_xp2_featuregenerator.lua</File>
+			<File>Maps/civ6lab_xp2_fractal.lua</File>
+			<File>Maps/civ6lab_xp2_inlandsea.lua</File>
+			<File>Maps/civ6lab_xp2_island_plates.lua</File>
+			<File>Maps/civ6lab_xp2_lakes.lua</File>
 			<File>Maps/civ6lab_xp2_mapenums.lua</File>
 			<File>Maps/civ6lab_xp2_maputilities.lua</File>
 			<File>Maps/civ6lab_xp2_mountainscliffs.lua</File>
 			<File>Maps/civ6lab_xp2_naturalwondergenerator.lua</File>
+			<File>Maps/civ6lab_xp2_pangaea.lua</File>
+			<File>Maps/civ6lab_xp2_primordial.lua</File>
 			<File>Maps/civ6lab_xp2_resourcegenerator.lua</File>
 			<File>Maps/civ6lab_xp2_riverslakes.lua</File>
+			<File>Maps/civ6lab_xp2_seven_seas.lua</File>
+			<File>Maps/civ6lab_xp2_shuffle.lua</File>
+			<File>Maps/civ6lab_xp2_small_continents.lua</File>
+			<File>Maps/civ6lab_xp2_splintered_fractal.lua</File>
+			<File>Maps/civ6lab_xp2_terra.lua</File>
 			<File>Maps/civ6lab_xp2_terraingenerator.lua</File>
-			<File>Maps/civ6lab_xp2_pangaea.lua</File>
-			<File>Maps/civ6lab_xp2_fractal.lua</File>
-			<File>Maps/civ6lab_mapprobe_natives_pangaea.lua</File>
-			<File>Maps/civ6lab_mapprobe_natives_fractal.lua</File>
+			<File>Maps/civ6lab_xp2_tilted_axis.lua</File>
 		</ImportFiles>
 	</InGameActions>
 	<Files>
 		<File>Maps/civ6lab_mapprobe.lua</File>
-		<File>Maps/civ6lab_mapprobe_quiet.lua</File>
-		<File>Maps/civ6lab_mapprobe_natives.lua</File>
 		<File>Maps/civ6lab_mapprobe_exp.lua</File>
-		<File>Maps/civ6lab_mapprobe_stamp.lua</File>
 		<File>Maps/civ6lab_mapprobe_fert.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_continents_islands.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_fractal.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_inlandsea.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_island_plates.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_lakes.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_pangaea.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_primordial.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_seven_seas.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_shuffle.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_small_continents.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_splintered_fractal.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_terra.lua</File>
+		<File>Maps/civ6lab_mapprobe_natives_tilted_axis.lua</File>
+		<File>Maps/civ6lab_mapprobe_quiet.lua</File>
+		<File>Maps/civ6lab_mapprobe_stamp.lua</File>
 		<File>Maps/civ6lab_stampshapes.lua</File>
 		<File>Maps/civ6lab_xp2_assignstartingplots.lua</File>
 		<File>Maps/civ6lab_xp2_coastallowlands.lua</File>
 		<File>Maps/civ6lab_xp2_continents.lua</File>
+		<File>Maps/civ6lab_xp2_continents_islands.lua</File>
 		<File>Maps/civ6lab_xp2_featuregenerator.lua</File>
+		<File>Maps/civ6lab_xp2_fractal.lua</File>
+		<File>Maps/civ6lab_xp2_inlandsea.lua</File>
+		<File>Maps/civ6lab_xp2_island_plates.lua</File>
+		<File>Maps/civ6lab_xp2_lakes.lua</File>
 		<File>Maps/civ6lab_xp2_mapenums.lua</File>
 		<File>Maps/civ6lab_xp2_maputilities.lua</File>
 		<File>Maps/civ6lab_xp2_mountainscliffs.lua</File>
 		<File>Maps/civ6lab_xp2_naturalwondergenerator.lua</File>
+		<File>Maps/civ6lab_xp2_pangaea.lua</File>
+		<File>Maps/civ6lab_xp2_primordial.lua</File>
 		<File>Maps/civ6lab_xp2_resourcegenerator.lua</File>
 		<File>Maps/civ6lab_xp2_riverslakes.lua</File>
+		<File>Maps/civ6lab_xp2_seven_seas.lua</File>
+		<File>Maps/civ6lab_xp2_shuffle.lua</File>
+		<File>Maps/civ6lab_xp2_small_continents.lua</File>
+		<File>Maps/civ6lab_xp2_splintered_fractal.lua</File>
+		<File>Maps/civ6lab_xp2_terra.lua</File>
 		<File>Maps/civ6lab_xp2_terraingenerator.lua</File>
-		<File>Maps/civ6lab_xp2_pangaea.lua</File>
-		<File>Maps/civ6lab_xp2_fractal.lua</File>
-		<File>Maps/civ6lab_mapprobe_natives_pangaea.lua</File>
-		<File>Maps/civ6lab_mapprobe_natives_fractal.lua</File>
+		<File>Maps/civ6lab_xp2_tilted_axis.lua</File>
 	</Files>
 </Mod>

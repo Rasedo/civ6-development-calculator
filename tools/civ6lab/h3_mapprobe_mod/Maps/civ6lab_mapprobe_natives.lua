@@ -16,6 +16,7 @@
 --   mnw|<feature>|<indices>|<plots carrying it after>       SetMultiPlotFeatureType
 --   ciu|<continents in use>                  Map.GetContinentsInUse's answer
 --   sdiv|<args>|<GetNumMajorCivStarts>, splots|<i>|<indices>, sinfo|<i>|<k=v,...>, and m* for minors
+--   ocand|<waterMap>|<n>, oplace|<args>|<n placed>, otile|<i>|<plot index>   the ocean starts
 -- and at the end, on the finished map (the wrappers restored):
 --   plot|<name>|<hex bits or rle or list> (lake, coastal, fresh, river, impassable, area, yields)
 --   fert|<GetPlotFertility(i, -1) per plot>, fertw|<major>|<check>|<...>
@@ -394,6 +395,17 @@ POST["StartPositioner.GetPlotFertility"] = function(_st, res, i, major, check)
 	GPF.items[#GPF.items + 1] = tostring(i) .. ":" .. tostring(res[1]) .. ":" .. tostring(okb and base) .. ":" ..
 		tostring(okf and nochk)
 end
+-- the ocean starts: ocand|<waterMap>|<GetTotalOceanStartCandidates>,
+-- oplace|<args>|<PlaceOceanStartCivs>, otile|<i>|<GetOceanStartTile>
+POST["StartPositioner.GetTotalOceanStartCandidates"] = function(_st, res, ...)
+	X[#X + 1] = "ocand|" .. argstr(...) .. "|" .. tostring(res[1])
+end
+POST["StartPositioner.PlaceOceanStartCivs"] = function(_st, res, ...)
+	X[#X + 1] = "oplace|" .. argstr(...) .. "|" .. tostring(res[1])
+end
+POST["StartPositioner.GetOceanStartTile"] = function(_st, res, i)
+	X[#X + 1] = "otile|" .. tostring(i) .. "|" .. tostring(res[1])
+end
 POST["StartPositioner.MarkMajorRegionUsed"] = function(_st, _res, i)
 	gpfFlush()
 	X[#X + 1] = "mark|" .. tostring(i)
@@ -455,6 +467,8 @@ wrap(AreaBuilder, "AreaBuilder", "Calculate")
 wrap(StartPositioner, "StartPositioner", "DivideMapIntoMajorRegions")
 wrap(StartPositioner, "StartPositioner", "DivideMapIntoMinorRegions")
 wrap(StartPositioner, "StartPositioner", "PlaceOceanStartCivs")
+wrap(StartPositioner, "StartPositioner", "GetTotalOceanStartCandidates")
+wrap(StartPositioner, "StartPositioner", "GetOceanStartTile", true)
 wrap(StartPositioner, "StartPositioner", "GetMajorCivStartPlots", true)
 wrap(StartPositioner, "StartPositioner", "GetMajorCivStartInfo", true)
 wrap(StartPositioner, "StartPositioner", "GetMinorCivStartPlots", true)

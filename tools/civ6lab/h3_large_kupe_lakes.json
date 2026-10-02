@@ -1,0 +1,17 @@
+{
+  "ruleset": "RULESET_EXPANSION_2",
+  "speed": "GAMESPEED_ONLINE",
+  "difficulty": "DIFFICULTY_PRINCE",
+  "map": "civ6lab_mapprobe_natives_lakes.lua",
+  "size": "MAPSIZE_LARGE",
+  "city_states": 12,
+  "realism": 2,
+  "start_era": "ERA_ANCIENT",
+  "max_turns": 500,
+  "all_ai": false,
+  "leaders": ["LEADER_ROBERT_THE_BRUCE", "LEADER_KUPE", "LEADER_PHILIP_II", "LEADER_JADWIGA", "LEADER_GANDHI", "LEADER_GILGAMESH", "LEADER_PERICLES", "LEADER_TOMYRIS", "LEADER_SALADIN", "LEADER_MVEMBA"],
+  "world_age": 2,
+  "sea_level": 2,
+  "temperature": 2,
+  "rainfall": 2
+}
