@@ -478,6 +478,29 @@ class SimSpy:
         if mdef["certain"]:
             return
         self._spy_aftermath(row, b, v, out, hr, hc)
+        if post >= 0 and out >= self.M_CAPTURED:
+            self._reward_counterspy(b, post)
+
+    def _reward_counterspy(self, b: int, u: int) -> None:
+        """CIV6 (RewardCounterSpy, GameCore_XP2_Release.dll 0x52d420, called by
+        every mission's result handler once the intruder is captured or
+        killed, never by the escape): the pursuing counterspy is teleported to
+        the centre of the city whose plot it stands on (0x52bf50), which ends
+        its operation, and below `ESPIONAGE_MAX_LEVEL` it gains the experience
+        to its next level (0x55e460 / 0x55d990). A plot no city holds has no
+        centre to land on, and the teleport kills the spy instead
+        (`rewardCounterspy`)."""
+        tile = torch.full((self.B, 1), int(self.unit_tile[b, u]), dtype=torch.long, device=self.device)
+        hrow, hcol = self._spy_here(tile)
+        hr, hc = int(hrow[b, 0]), int(hcol[b, 0])
+        if hr < 0:
+            self.unit_alive[b, u] = False
+            return
+        self.unit_tile[b, u] = int(self.city_center[b, hr, hc])
+        self.unit_spy_mission[b, u] = self._spy_idle
+        self.unit_spy_target[b, u] = -1
+        self.unit_spy_turns[b, u] = 0
+        self._level_up_spy(b, u)
 
     def _resolve_minor_mission(self, row: int, b: int, v: int, m: int) -> None:
         """CIV6 (Fabricate Scandal): the one CITY-STATE mission. On success
@@ -563,18 +586,15 @@ class SimSpy:
             self.unit_spy_turns[b, v] = route["turns"]
             return
         if hr >= 0 and roll >= v_esc - self._spy_escape_capture_band:
-            self._spy_captured(row, b, v, hr, self._counterspy_pursuing(b, hr, hc, int(self.unit_tile[b, v])))
+            self._spy_captured(row, b, v, hr)
             return
         self.unit_alive[b, v] = False
 
-    def _spy_captured(self, row: int, b: int, v: int, hr: int, captor: int) -> None:
+    def _spy_captured(self, row: int, b: int, v: int, hr: int) -> None:
         """The catch — from the roll's own CAPTURED band or an escape's
-        (`spyCaptured`)."""
-        # CIV6 (Spies and Espionage): a spy "may gain levels from
-        # successful offensive operations, or capturing an enemy Spy" —
-        # the pursuing post (`_counterspy_pursuing`) is the one that earns it.
-        if captor >= 0:
-            self._level_up_spy(b, captor)
+        (`spyCaptured`). The capture itself (GameCore_XP2_Release.dll
+        0x529450) pays the counterspy nothing: its reward is
+        `_reward_counterspy`, the mission's own."""
         # CIV6: captured spies "are imprisoned, but not killed", and the
         # owner "can then attempt to trade with the civilization who
         # captured the Spy, securing their release" — at the level it
@@ -594,7 +614,7 @@ class SimSpy:
             self._spy_escape(row, b, v, hr, hc, cs=cs)
             return
         if out == self.M_CAPTURED and hr >= 0:
-            self._spy_captured(row, b, v, hr, self._counterspy_pursuing(b, hr, hc, int(self.unit_tile[b, v])))
+            self._spy_captured(row, b, v, hr)
             return
         self.unit_alive[b, v] = False
 

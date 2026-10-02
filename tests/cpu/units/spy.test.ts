@@ -592,10 +592,15 @@ describe('what a finished mission does', () => {
     expect(celled && killed).toBe(true);
   });
 
-  it('the counterspy that makes the catch earns the level', () => {
-    // CIV6 (Spies and Espionage): a spy "may gain levels from successful
-    // offensive operations, or capturing an enemy Spy".
-    for (let seed = 1; seed < 200; seed++) {
+  it('a mission ending captured or killed sends the post home a level up; an escape\'s catch does not', () => {
+    // RewardCounterSpy (GameCore_XP2_Release.dll 0x52d420), called by every
+    // mission's result handler on its CAPTURED and KILLED paths whenever a
+    // counterspy pursued: the post is teleported to its city's centre, its
+    // operation over, and gains the experience to its next level. The escape
+    // (0x52ce40) passes no counterspy to its capture or kill.
+    let rewarded = 0;
+    let stood = 0;
+    for (let seed = 1; seed < 400 && (rewarded < 3 || stood < 3); seed++) {
       const { state, theirs } = spyState();
       const hub = district(state, theirs, 'COMMERCIAL_HUB');
       // the post guards the district it stands on — the Hub the thief works from
@@ -604,13 +609,23 @@ describe('what a finished mission does', () => {
       const spy = spyAt(state, 0, theirs, hub);
       state.rngState = seed;
       run(state, spy, SPY_M_SIPHON_FUNDS);
-      if (state.units.some((u) => u.id === spy.id)) continue;
-      if (spyHeldWith(state, 0, theirs.seat) === 1) {
-        expect(guard.spyLevel).toBe(1);
-        return;
+      if (guard.spyMission === SPY_M_COUNTERSPY) {
+        // the post stands: no reward, wherever the thief went
+        expect(guard.tileIndex).toBe(hub);
+        expect(guard.spyLevel ?? 0).toBe(0);
+        if (!state.units.some((u) => u.id === spy.id)) stood++;
+        continue;
       }
+      expect(state.units.some((u) => u.id === spy.id)).toBe(false);
+      expect(guard.tileIndex).toBe(theirs.centerIndex);
+      expect(guard.spyMission).toBe(SPY_IDLE);
+      expect(guard.spyTurns).toBe(0);
+      expect(guard.spyLevel).toBe(1);
+      rewarded++;
     }
-    throw new Error('no seed landed the capture half of the split');
+    // both halves surface: a mission's own catch or kill, and a lost escape
+    expect(rewarded).toBeGreaterThanOrEqual(3);
+    expect(stood).toBeGreaterThanOrEqual(3);
   });
 
   it('the escape takes the fastest standing route home to the capital', () => {

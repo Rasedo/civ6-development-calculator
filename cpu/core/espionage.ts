@@ -529,7 +529,28 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     }
   }
   if (def.certain) return;
-  spyAftermath(state, unit, out, here.city.districts, here.seat.seat, here.city);
+  spyAftermath(state, unit, out, here.city.districts, here.seat.seat);
+  if (post && out >= MISSION_CAPTURED) rewardCounterspy(state, post);
+}
+
+/** CIV6 (RewardCounterSpy, GameCore_XP2_Release.dll 0x52d420, called by every
+ *  mission's result handler once the intruder is captured or killed, never by
+ *  the escape): the pursuing counterspy is teleported to the centre of the
+ *  city whose plot it stands on (0x52bf50), which ends its operation, and
+ *  below `ESPIONAGE_MAX_LEVEL` it gains the experience to its next level
+ *  (0x55e460 / 0x55d990). A plot no city holds has no centre to land on, and
+ *  the teleport kills the spy instead. */
+function rewardCounterspy(state: GameState, post: Unit): void {
+  const at = spyCityAt(state, post.tileIndex);
+  if (!at) {
+    disbandUnit(state, post.id);
+    return;
+  }
+  post.tileIndex = at.city.centerIndex;
+  post.spyMission = SPY_IDLE;
+  post.spyTarget = undefined;
+  post.spyTurns = 0;
+  levelUpSpy(state, post);
 }
 
 /**
@@ -576,8 +597,7 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
  * catch ends the career — and below that it is killed.
  */
 function spyEscape(state: GameState, unit: Unit,
-                   districts: { type: string; tileIndex: number }[], jailer: number,
-                   city?: City): void {
+                   districts: { type: string; tileIndex: number }[], jailer: number): void {
   const live = new Set<string>();
   for (const d of districts) {
     const dt = state.map.tiles[d.tileIndex];
@@ -603,7 +623,7 @@ function spyEscape(state: GameState, unit: Unit,
     return;
   }
   if (jailer >= 0 && r >= v - SPY_ESCAPE_CAPTURE_BAND) {
-    spyCaptured(state, unit, jailer, city && counterspyPursuing(state, jailer, city, unit.tileIndex));
+    spyCaptured(state, unit, jailer);
     return;
   }
   disbandUnit(state, unit.id);
@@ -625,12 +645,10 @@ function policeCover(state: GameState, offered: readonly (typeof SPY_ESCAPE_ROUT
   return offered[offered.length - 1];
 }
 
-/** The catch — from the roll's own CAPTURED band or an escape's. */
-function spyCaptured(state: GameState, unit: Unit, jailer: number, captor: Unit | undefined): void {
-  // CIV6 (Spies and Espionage): a spy "may gain levels from successful
-  // offensive operations, or capturing an enemy Spy" — the pursuing post
-  // (`counterspyPursuing`) is the one that earns it.
-  if (captor) levelUpSpy(state, captor);
+/** The catch — from the roll's own CAPTURED band or an escape's. The capture
+ *  itself (GameCore_XP2_Release.dll 0x529450) pays the counterspy nothing:
+ *  its reward is `rewardCounterspy`, the mission's own. */
+function spyCaptured(state: GameState, unit: Unit, jailer: number): void {
   // CIV6: captured spies "are imprisoned, but not killed", and the owner
   // "can then attempt to trade with the civilization who captured the Spy,
   // securing their release" — at the level it was caught at.
@@ -646,15 +664,14 @@ function spyCaptured(state: GameState, unit: Unit, jailer: number, captor: Unit 
  * the career like KILLED.
  */
 function spyAftermath(state: GameState, unit: Unit, out: number,
-                      districts: { type: string; tileIndex: number }[], jailer: number,
-                      city?: City): void {
+                      districts: { type: string; tileIndex: number }[], jailer: number): void {
   if (out === MISSION_SUCCESS_UNDETECTED || out === MISSION_FAIL_UNDETECTED) return;
   if (out === MISSION_SUCCESS_MUST_ESCAPE || out === MISSION_FAIL_MUST_ESCAPE) {
-    spyEscape(state, unit, districts, jailer, city);
+    spyEscape(state, unit, districts, jailer);
     return;
   }
   if (out === MISSION_CAPTURED && jailer >= 0) {
-    spyCaptured(state, unit, jailer, city && counterspyPursuing(state, jailer, city, unit.tileIndex));
+    spyCaptured(state, unit, jailer);
     return;
   }
   disbandUnit(state, unit.id);

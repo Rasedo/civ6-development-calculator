@@ -314,33 +314,57 @@ def main() -> None:
     assert int(ch[0]) >= 0 and bool(sim._type_anticav[int(ch[0])])
     assert int(sim._type_era[int(ch[0])]) <= int(sim._world_era()[0])
 
-    # -- 13: the counterspy that makes the catch earns the level -------------
-    # CIV6 (Spies and Espionage): a spy "may gain levels from successful
-    # offensive operations, or capturing an enemy Spy". Both odds are PINNED
-    # rather than rolled — the mission cannot succeed and the catch cannot
-    # miss — so the poke reads the award, not the dice.
-    _cap0 = sim._spy_escape_capture_band
-    _eb0 = sim._spy_escape_base
-    sim._spy_escape_base = 1000          # no 3d6 reaches the escape target...
-    sim._spy_escape_capture_band = 2000  # ...and every lost escape is the catch
-    # the post guards the district it stands on — the Zone the saboteur works from
-    w = spawn_spy(sim, row, iz)
+    # -- 13: RewardCounterSpy (GameCore_XP2_Release.dll 0x52d420) -----------
+    # A mission that ends with the intruder CAPTURED or KILLED sends the
+    # pursuing post to its city's centre — the operation over — a level up;
+    # a catch made by the ESCAPE pays the post nothing and leaves it standing.
+    # The bands are sought against the realised roll, the post's 3 + level
+    # already off it.
     guard = spawn_spy(sim, foe, iz)
-    sim.unit_spy_mission[0, guard] = sim._spy_m_counterspy
     sim.unit_spy_level[0, guard] = 0
+    for band, lvl in ((sim.M_CAPTURED, 1), (sim.M_KILLED, 2)):
+        # the post guards the district it stands on — the Zone the saboteur works from
+        sim.unit_tile[0, guard] = iz
+        sim.unit_spy_mission[0, guard] = sim._spy_m_counterspy
+        sim.unit_spy_turns[0, guard] = 5
+        w = spawn_spy(sim, row, iz)
+        sim._gen_ver += 1
+        order(sim, row, w, sim._A_SPY_MISSION + sim._spy_m_sabotage)
+        assert int(sim.unit_spy_mission[0, w]) == sim._spy_m_sabotage
+        for _ in range(int(sim.unit_spy_turns[0, w]) - 1):
+            sim._tick_spies(row)
+        g = sim._spy_counterspy_roll + sim._spy_counterspy_level_roll * int(sim.unit_spy_level[0, guard])
+        held = int(sim.seat_spy_held[0, row, foe].sum())
+        seek_band(sim, {band}, city_threshold(sim, row, w, sim._spy_m_sabotage, foe, theirs) + g)
+        sim._tick_spies(row)
+        assert not bool(sim.unit_alive[0, w]), f"band {band}: the intruder walked away"
+        assert int(sim.seat_spy_held[0, row, foe].sum()) == held + (band == sim.M_CAPTURED)
+        assert not bool(sim.city_bldg_pillaged[0, foe, theirs, wk]), "a FAILURE wrecked the Workshop"
+        assert bool(sim.unit_alive[0, guard])
+        assert int(sim.unit_tile[0, guard]) == ctr_t, f"band {band}: the post stayed on the Zone"
+        assert int(sim.unit_spy_mission[0, guard]) == sim._spy_idle, f"band {band}: the post stands"
+        assert int(sim.unit_spy_turns[0, guard]) == 0
+        assert int(sim.unit_spy_level[0, guard]) == lvl, f"band {band}: the post earned nothing"
+    # the escape's catch: every escape pinned lost and every loss the cell
+    _cap0, _eb0 = sim._spy_escape_capture_band, sim._spy_escape_base
+    sim._spy_escape_base = 1000
+    sim._spy_escape_capture_band = 2000
+    sim.unit_tile[0, guard] = iz
+    sim.unit_spy_mission[0, guard] = sim._spy_m_counterspy
+    w = spawn_spy(sim, row, iz)
     sim._gen_ver += 1
     order(sim, row, w, sim._A_SPY_MISSION + sim._spy_m_sabotage)
-    assert int(sim.unit_spy_mission[0, w]) == sim._spy_m_sabotage
     for _ in range(int(sim.unit_spy_turns[0, w]) - 1):
         sim._tick_spies(row)
-    # the roll is the measured 3d6: a seed whose roll must ESCAPE (the shut
-    # routes then hand the spy to the post) or is CAPTURED outright
-    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE, sim.M_CAPTURED},
-              city_threshold(sim, row, w, sim._spy_m_sabotage, foe, theirs))
+    g = sim._spy_counterspy_roll + sim._spy_counterspy_level_roll * int(sim.unit_spy_level[0, guard])
+    held = int(sim.seat_spy_held[0, row, foe].sum())
+    seek_band(sim, {sim.M_FAIL_MUST_ESCAPE}, city_threshold(sim, row, w, sim._spy_m_sabotage, foe, theirs) + g)
     sim._tick_spies(row)
-    assert not bool(sim.unit_alive[0, w]), "the pinned catch did not fire"
-    assert not bool(sim.city_bldg_pillaged[0, foe, theirs, wk]), "a pinned FAILURE wrecked the Workshop"
-    assert int(sim.unit_spy_level[0, guard]) == 1, "the captor earned nothing"
+    assert not bool(sim.unit_alive[0, w]) and int(sim.seat_spy_held[0, row, foe].sum()) == held + 1, \
+        "the pinned escape did not end in the cell"
+    assert int(sim.unit_tile[0, guard]) == iz and int(sim.unit_spy_mission[0, guard]) == sim._spy_m_counterspy, \
+        "an escape's catch took the post off"
+    assert int(sim.unit_spy_level[0, guard]) == 2, "an escape's catch paid the post"
     sim.unit_alive[0, guard] = False
     sim._spy_escape_capture_band = _cap0
     sim._spy_escape_base = _eb0
