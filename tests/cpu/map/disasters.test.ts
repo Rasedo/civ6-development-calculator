@@ -4,8 +4,10 @@ import { governorsOf } from '../../../cpu/core/governors';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize, TURN_LIMIT } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, sitePairWeight, floodRivers, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows } from '../../../cpu/core/disasters';
-import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_DURATION, FLOOD_WEIGHT } from '../../../cpu/data/disasters';
+import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, liveEventPlots } from '../../../cpu/core/disasters';
+import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_DURATION, FLOOD_WEIGHT, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION } from '../../../cpu/data/disasters';
+import { CLIMATE_PHASES } from '../../../cpu/data/climate';
+import { CIV_IDS } from '../../../cpu/data/seats';
 import { EVENT_OCC_SCALE, STANDARD_MAP_AREA, FIRST_TIME_OCCURRENCE_BOOST, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_CIV_KILL_P, ERUPTION_CIV_KILL_P } from '../../../cpu/data/disasters';
 import { NO_SEAT } from '../../../cpu/core/types';
 import { hexDistance } from '../../../world/hex';
@@ -23,7 +25,7 @@ import { transferCity, freeCitiesPhase } from '../../../cpu/core/phase';
 // their scorch back and wait on. It clears the event log to read the phase's.
 function stormFree(state: GameState, watched: Tile[]): boolean {
   const before = watched.map((t) => [t.pillaged, t.improvement, t.districtPillaged] as const);
-  const live = () => state.map.tiles.some((t) => (t.stormTurns ?? 0) > 0);
+  const live = () => (state.storms ?? []).length > 0;
   const raging = live();
   state.eventLog = [];
   disasterPhase(state);
@@ -407,6 +409,108 @@ describe('the flood reaches the whole river', () => {
   });
 });
 
+describe('the flood\'s row walk', () => {
+  /** draws spent by `f`, read off the stream's state */
+  const draws = (state: GameState, f: () => void): number => {
+    const before = state.rngState;
+    f();
+    const probe = { rngState: before } as GameState;
+    let n = 0;
+    while (probe.rngState !== state.rngState && n < 10000) {
+      nextRandom(probe);
+      n++;
+    }
+    return n;
+  };
+  /** a river of three Floodplains plots, one of each kind, unowned */
+  const river = () => {
+    const state = makeState(makeMap(16, 16));
+    state.unitsMode = true;
+    const a = tileAtCoords(state.map, 4, 4);
+    const b = neighborTile(state.map, a, 0)!;
+    const c = neighborTile(state.map, b, 0)!;
+    a.riverMask |= 1 << 0;
+    b.riverMask |= (1 << 3) | (1 << 0);
+    c.riverMask |= 1 << 3;
+    a.terrain = 'DESERT';
+    a.feature = 'FLOODPLAINS';
+    b.terrain = 'GRASSLAND';
+    b.feature = 'FLOODPLAINS_GRASSLAND';
+    c.terrain = 'PLAINS';
+    c.feature = 'FLOODPLAINS_PLAINS';
+    return { state, plots: [a, b, c] };
+  };
+
+  it('draws once per damage row per plot, then once per yield row per plot', () => {
+    for (let sev = 0; sev < 3; sev++) {
+      const { state, plots } = river();
+      const n = draws(state, () => floodRiver(state, plots[0], sev));
+      expect(n).toBe((FLOOD_DAMAGE_ROWS[sev].length + FLOOD_YIELD_ROWS[sev].length) * plots.length);
+      for (const t of plots) expect(t.floodCount).toBe(1);
+    }
+  });
+
+  it('a land unit on a plot takes one more draw per damage row that lands on it', () => {
+    const { state, plots } = river();
+    spawnUnit(state, 'WARRIOR', plots[1].index, 0);
+    const n = draws(state, () => floodRiver(state, plots[0], 2));
+    // UNIT_DAMAGE_LAND lands at 100 on the unit's plot
+    expect(n).toBe((FLOOD_DAMAGE_ROWS[2].length + FLOOD_YIELD_ROWS[2].length) * plots.length + 1);
+  });
+
+  it('Egypt\'s plots spend no damage draw; a shielded river skips the damage pass whole', () => {
+    const { state, plots } = river();
+    state.seats[0].civ = CIV_IDS.indexOf('EGYPT' as never);
+    for (const t of plots) setTileOwner(t, 0);
+    expect(draws(state, () => floodRiver(state, plots[0], 1))).toBe(FLOOD_YIELD_ROWS[1].length * plots.length);
+
+    const dam = river();
+    dam.plots[2].district = 'DAM';
+    dam.plots[2].districtComplete = true;
+    dam.plots[0].improvement = 'FARM';
+    setTileOwner(dam.plots[0], 0);
+    expect(draws(dam.state, () => floodRiver(dam.state, dam.plots[0], 2))).toBe(FLOOD_YIELD_ROWS[2].length * 3);
+    expect(dam.plots[0].pillaged).toBeFalsy();
+  });
+
+  it('no yield draw once the climate stops laying fertility down', () => {
+    const { state, plots } = river();
+    state.climateIdx = CLIMATE_PHASES.findIndex((p) => !p.fertility);
+    expect(state.climateIdx).toBeGreaterThanOrEqual(0);
+    expect(draws(state, () => floodRiver(state, plots[0], 1))).toBe(FLOOD_DAMAGE_ROWS[1].length * plots.length);
+  });
+
+  it('a yield row lands on its own Floodplains kind alone, at its Percentage, halved on a shielded river', () => {
+    // MODERATE carries Food rows alone: no plot ever gains Production
+    const rate = (shield: boolean) => {
+      const gained = [0, 0, 0];
+      let n = 0;
+      for (let i = 0; i < 4000; i++) {
+        const { state, plots } = river();
+        state.rngState = 7919 * (i + 1);
+        if (shield) {
+          plots[1].district = 'DAM';
+          plots[1].districtComplete = true;
+        }
+        floodRiver(state, plots[0], 0);
+        plots.forEach((t, k) => { gained[k] += t.fertility; });
+        for (const t of plots) expect(t.fertilityProd).toBe(0);
+        n++;
+      }
+      return gained.map((g) => g / n);
+    };
+    const pct = (f: string) => FLOOD_YIELD_ROWS[0].find((r) => r.feature === f)!.pct / 100;
+    const kinds = ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'];
+    const open = rate(false);
+    open.forEach((r, k) => expect(Math.abs(r - pct(kinds[k]))).toBeLessThan(0.03));
+    const shut = rate(true);
+    shut.forEach((r, k) => {
+      const want = Math.floor(((100 - FLOOD_MITIGATED_YIELD_REDUCTION) * pct(kinds[k]) * 100) / 100) / 100;
+      expect(Math.abs(r - want)).toBeLessThan(0.03);
+    });
+  }, 60000);
+});
+
 describe('the turn\'s one random event', () => {
   /** a sea holding two active volcanoes (their rings water, so no storm
    *  starts there), one river of two Grassland floodplains plus a lone one,
@@ -442,8 +546,8 @@ describe('the turn\'s one random event', () => {
   /** one phase with no storm left standing, so a drawn storm always lands
    *  and logs */
   const phase = (state: GameState) => {
+    state.storms = [];
     for (const t of state.map.tiles) {
-      t.stormTurns = 0;
       if (t.volcano) t.volcanoActive = true;
     }
     state.eventLog = [];
@@ -631,8 +735,8 @@ describe('the turn\'s one random event', () => {
     let at = 0;
     let other = 0;
     for (let i = 0; i < 3000; i++) {
+      state.storms = [];
       for (const t of state.map.tiles) {
-        t.stormTurns = 0;
         if (t.volcano) t.volcanoActive = t !== v;
       }
       state.eventLog = [];
@@ -694,6 +798,7 @@ describe('the turn\'s one random event', () => {
     const lengths = new Set<number>();
     for (let i = 0; i < 4000; i++) {
       for (const t of state.map.tiles) t.droughtTurns = 0;
+      state.droughts = [];
       state.eventLog = [];
       disasterPhase(state);
       if (!state.eventLog.some((e) => e.startsWith('Drought'))) continue;
@@ -702,17 +807,29 @@ describe('the turn\'s one random event', () => {
       expect(dry.length).toBeGreaterThan(0);
       expect(dry.length).toBeLessThanOrEqual(7);
       for (const t of dry) lengths.add(t.droughtTurns);
+      // its record keeps the footprint, centre first, and the row's turns
+      expect(state.droughts).toHaveLength(1);
+      const rec = state.droughts[0];
+      expect([...rec.plots].sort((x, y) => x - y)).toEqual(dry.map((t) => t.index));
+      expect(rec.left).toBe(dry[0].droughtTurns);
     }
     expect([...lengths].sort((x, y) => x - y)).toEqual([5, 10]);
   });
 
-  it('a drought starts anywhere on the map, each candidate weighing 1 + min(its distance to a live event, 15)', () => {
+  it('a drought starts anywhere on the map, each candidate weighing 1 + min(its distance to a live drought\'s last plot, 15)', () => {
     expect(DROUGHT_SPACING).toBe(15);
-    // a 24 x 24 grassland, no city; one plot under a live drought
+    // a 24 x 24 grassland, no city; a live drought whose footprint ends at
+    // `ev`, and a storm far off — under an event, yet no spacing
     const state = makeState(makeMap(24, 24));
+    const first = tileAtCoords(state.map, 2, 2);
     const ev = tileAtCoords(state.map, 3, 3);
+    first.droughtTurns = 5;
     ev.droughtTurns = 5;
-    const live = new Set([ev.index]);
+    state.droughts = [{ plots: [first.index, ev.index], left: 5 }];
+    const storm = tileAtCoords(state.map, 20, 20);
+    state.storms = [{ id: 1, event: 0, at: storm.index, left: 2, struck: [] }];
+    const live = new Set(liveEventPlots(state).map((t) => t.index));
+    expect(live.has(storm.index)).toBe(true);
     const none = new Set<number>();
     const cands = state.map.tiles.filter((t) => droughtCandidate(state.map, t, none, live));
     const w = (t: Tile) => 1 + Math.min(hexDistance(state.map, t.col, t.row, ev.col, ev.row), DROUGHT_SPACING);

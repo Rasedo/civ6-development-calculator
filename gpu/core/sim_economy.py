@@ -1245,6 +1245,8 @@ class SimEconomy:
         B, dev = self.B, self.device
         self._eff_version += 1
         self.drought.copy_((self.drought - 1).clamp(min=0))
+        self.drought_left.copy_((self.drought_left - 1).clamp(min=0))
+        self._compact_droughts()
         # CIV6: fallout lasts 10 turns from a Nuclear Device and 20 from a
         # Thermonuclear one, and the tile is clean when the timer expires.
         self.tile_fallout.copy_((self.tile_fallout - 1).clamp(min=0))
@@ -1276,39 +1278,52 @@ class SimEconomy:
         self._eff_version += 1
 
     def _storms_turn(self, live: torch.Tensor, strip: torch.Tensor) -> None:
-        """`stormsTurn` — the turn of each storm centred on `live` [B, T].
-        CIV6 (`RandomEvents`, Duration 3 / Movement 8): a storm lives three
-        turns — ENTRY (its footprint strikes the strike plot), then every
-        later turn the centre walks (`_storm_walk`), its footprint striking at
-        every step; on its LAST turn at the last-turn percent of the damage
-        rows' chances. The storms go in ascending centre index, the order
-        taken BEFORE any of them moves, so none walks twice in one turn."""
-        order = live.long().cumsum(dim=1) * live.long()
-        for k in range(1, int(order.max()) + 1):
-            at = order == k
-            hit_k = at.any(dim=1)
+        """`stormsTurn` — the turn of each storm record whose slot is in
+        `live` [B, S], in slot order (the order the storms began, the mask
+        taken BEFORE any of them moves). CIV6 (`RandomEvents`, Duration 3 /
+        Movement 8): a storm lives three turns — ENTRY (its footprint strikes
+        the strike plot), then every later turn the centre walks
+        (`_storm_walk`), its footprint striking at every step; on its LAST
+        turn at the last-turn percent of the damage rows' chances. Each record
+        ticks; one whose turns run out leaves the table (`_compact_storms`)."""
+        for k in range(live.shape[1]):
+            hit_k = live[:, k]
             if not bool(hit_k.any()):
-                break
-            centre = at.long().argmax(dim=1)
-            ev = self.storm_event.gather(1, centre.unsqueeze(1)).squeeze(1).clamp(min=0)
-            left = self.storm_left.gather(1, centre.unsqueeze(1)).squeeze(1)
-            age = self._st_duration[ev] - left  # 0 entry, 1.. the walking turns
+                continue
+            ev = self.storm_event[:, k].clamp(min=0)
+            age = self._st_duration[ev] - self.storm_left[:, k]  # 0 entry, 1.. the walking turns
             pct = torch.where(age + 1 >= self._st_duration[ev], self._st_last_pct, 100)
-            self._storm_turn(hit_k & (age == 0), centre, strip, pct)
+            self._storm_turn(hit_k & (age == 0), k, strip, pct)
             walk = hit_k & (age >= 1)
             if bool(walk.any()):
-                centre = self._storm_walk(walk, centre, ev, strip, pct)
-            # THIS storm's clock ticks before the next storm walks (TS's
-            # per-storm loop): a storm dissipating this turn frees its final
-            # tile for a later storm's walk in the same turn — seed 9222
-            # t181, a dust storm stepped onto where another had just died.
-            # A phase-end decrement over every tile kept that tile busy.
-            rows = hit_k.nonzero(as_tuple=True)[0]
-            c = centre[rows]
-            left_now = (self.storm_left[rows, c] - 1).clamp(min=0)
-            self.storm_left[rows, c] = left_now
-            self.storm_event[rows, c] = torch.where(
-                left_now > 0, self.storm_event[rows, c], torch.full_like(left_now, -1))
+                self._storm_walk(walk, k, strip, pct)
+            self.storm_left[:, k] = torch.where(hit_k, (self.storm_left[:, k] - 1).clamp(min=0),
+                                                self.storm_left[:, k])
+        self._compact_storms()
+
+    def _compact_storms(self) -> None:
+        """The storm table keeps its live records first, in the order they
+        began; an emptied slot holds no row, no centre, no serial and no
+        struck plot."""
+        live = self.storm_left > 0
+        order = torch.sort((~live).long(), dim=1, stable=True).indices
+        for t in (self.storm_event, self.storm_at, self.storm_left, self.storm_id):
+            t.copy_(t.gather(1, order))
+        self.storm_struck.copy_(self.storm_struck.gather(1, order.unsqueeze(2).expand_as(self.storm_struck)))
+        dead = ~live.gather(1, order)
+        self.storm_event[dead] = -1
+        self.storm_at[dead] = -1
+        self.storm_id[dead] = -1
+        self.storm_struck[dead] = False
+
+    def _compact_droughts(self) -> None:
+        """The drought table keeps its live records first, in the order they
+        began; an emptied slot holds no footprint."""
+        live = self.drought_left > 0
+        order = torch.sort((~live).long(), dim=1, stable=True).indices
+        self.drought_left.copy_(self.drought_left.gather(1, order))
+        self.drought_plots.copy_(self.drought_plots.gather(1, order.unsqueeze(2).expand_as(self.drought_plots)))
+        self.drought_plots[~live.gather(1, order)] = -1
 
     # ---- THE TURN'S ONE RANDOM EVENT ---------------------------------------
 
@@ -1622,10 +1637,20 @@ class SimEconomy:
 
     def _live_event_plots(self) -> torch.Tensor:
         """[B, T] `liveEventPlots` — every storm's centre, every plot under a
-        drought and every burning plot: the live events a drought keeps its
-        distance from."""
-        return ((self.storm_left > 0) | (self.drought > 0)
+        drought and every burning plot: where no drought may start."""
+        centre = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        b, k = (self.storm_left > 0).nonzero(as_tuple=True)
+        centre[b, self.storm_at[b, k]] = True
+        return (centre | (self.drought > 0)
                 | (self._fid_in(self._fire_burning_fid) & (self.fire_start >= 0)))
+
+    def _drought_ends(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """`droughtEnds` — each drought record's LAST footprint plot [B, D]
+        and whether the slot holds a live drought with a footprint [B, D]:
+        what a drought start keeps its distance from (0x28ce90)."""
+        n = (self.drought_plots >= 0).sum(dim=2)
+        end = self.drought_plots.gather(2, (n - 1).clamp(min=0).unsqueeze(2)).squeeze(2)
+        return end, (self.drought_left > 0) & (n > 0)
 
     def _drought_cands(self, live: torch.Tensor) -> torch.Tensor:
         """[B, T] `droughtCandidate` — the plots a drought may start on now:
@@ -1648,14 +1673,15 @@ class SimEconomy:
     def _drought_start(self, hit: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`droughtStart` — a drought's start plot where `hit` [B]: ONE
         weighted draw over every candidate plot (`_drought_cands`) in tile
-        order, each weighing 1 + min(its distance to the nearest live event
-        plot, the spacing). No candidate, no draw. Returns (got, tile)."""
+        order, each weighing 1 + min(its distance to the nearest live
+        drought's last footprint plot (`_drought_ends`), the spacing). No
+        candidate, no draw. Returns (got, tile)."""
         B, T, dev = self.B, self.T, self.device
-        live = self._live_event_plots()
-        cand = self._drought_cands(live) & hit.unsqueeze(1)
+        cand = self._drought_cands(self._live_event_plots()) & hit.unsqueeze(1)
+        end, ok = self._drought_ends()
         dist = torch.full((B, T), self._drought_spacing, dtype=torch.long, device=dev)
-        for b in (hit & live.any(dim=1)).nonzero(as_tuple=True)[0].tolist():
-            near = self.pair_dist[:, live[b]].long().min(dim=1).values
+        for b in (hit & ok.any(dim=1)).nonzero(as_tuple=True)[0].tolist():
+            near = self.pair_dist[:, end[b][ok[b]]].long().min(dim=1).values
             dist[b] = near.clamp(max=self._drought_spacing)
         w = torch.where(cand, 1 + dist, torch.zeros_like(dist))
         total = w.sum(dim=1)
@@ -1814,7 +1840,7 @@ class SimEconomy:
         if bool(hit.any()):
             # the flood tables are read for every game of the batch, so a game
             # whose row is another family's reads a clamped (unused) index
-            self._flood_river(hit, key.clamp(min=0), sev.clamp(min=0, max=self._flood_dmg_lo.numel() - 1))
+            self._flood_river(hit, key.clamp(min=0), sev.clamp(min=0, max=len(self._flood_damage) - 1))
 
         for r in range(len(self._eruption_weight)):
             hit = (fam == self._EV_ERUPTION) & (sev == r)
@@ -1851,14 +1877,19 @@ class SimEconomy:
             else:
                 got, tile = self._pick_static(hit, self._storm_lists[f])
             # a centre already under a storm takes no second one
-            busy = self.storm_left.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1) > 0
+            busy = ((self.storm_left > 0) & (self.storm_at == tile.unsqueeze(1))).any(dim=1)
             free = got & ~busy
             if bool(free.any()):
                 fr = free.nonzero(as_tuple=True)[0]
-                self.storm_event[fr, tile[fr]] = e
-                self.storm_left[fr, tile[fr]] = int(self._st_duration[e])
+                slot = (self.storm_left[fr] > 0).sum(dim=1)
+                if bool((slot >= self.storm_left.shape[1]).any()):
+                    raise AssertionError("the storm table is full: a storm outlived its Duration")
+                self.storm_event[fr, slot] = e
+                self.storm_at[fr, slot] = tile[fr]
+                self.storm_left[fr, slot] = int(self._st_duration[e])
                 self.storm_serial[fr] += 1
-                self.storm_id[fr, tile[fr]] = self.storm_serial[fr]
+                self.storm_id[fr, slot] = self.storm_serial[fr]
+                self.storm_struck[fr, slot] = False
 
         hit = fam == self._EV_DROUGHT
         if bool(hit.any()):
@@ -1877,14 +1908,28 @@ class SimEconomy:
         """`drought` — a drought of each game's severity `sev` [B] centred on
         `centre` [B] where `hit`: the footprint's plots in `STORM_DISC` order,
         water skipped, one slot at a time so each game's draws run in the TS
-        walk's order (`_drought_tile`)."""
+        walk's order (`_drought_tile`). Its record (`drought_left`,
+        `drought_plots`) keeps the footprint and the row's turns."""
         area = tiles_from_offsets(centre.clamp(min=0), self._storm_offs[: self._drought_hexes], self.W, self.H, self.wrap_x)
         turns, destroy_p = self._drought_duration[sev], self._drought_destroy_p[sev]
+        keep = torch.zeros_like(area, dtype=torch.bool)
         for j in range(area.shape[1]):
             t = area[:, j]
             tc = t.clamp(min=0)
             on = hit & (t >= 0) & ~self.water.gather(1, tc.unsqueeze(1)).squeeze(1)
+            keep[:, j] = on
             self._drought_tile(on, tc, turns, destroy_p, strip)
+        hr = hit.nonzero(as_tuple=True)[0]
+        if not hr.numel():
+            return
+        slot = (self.drought_left[hr] > 0).sum(dim=1)
+        if bool((slot >= self.drought_left.shape[1]).any()):
+            raise AssertionError("the drought table is full: a drought outlived its Duration")
+        # the footprint's land plots packed in disc order, -1 behind them
+        packed = torch.where(keep, area, torch.full_like(area, -1))
+        packed = packed.gather(1, torch.sort((~keep).long(), dim=1, stable=True).indices)
+        self.drought_plots[hr, slot] = packed[hr]
+        self.drought_left[hr, slot] = turns[hr]
 
     def _drought_tile(self, on: torch.Tensor, tile: torch.Tensor, turns: torch.Tensor,
                       destroy_p: torch.Tensor, strip: torch.Tensor) -> None:
@@ -1973,7 +2018,7 @@ class SimEconomy:
         install's order, for each neighbour the row reaches
         (`_eruption_reaches`), the plot's BONUS resource is lost — land or
         water, whoever owns it (`_drop_resource`) — and ONE draw at the row's
-        chance applies it (`_eruption_damage`). Then the SOIL: for each
+        chance applies it (`_event_damage`). Then the SOIL: for each
         `RandomEvent_Yields` row (Food, Production, Science, Culture, where the
         row carries one), for each neighbour on land the row reaches
         (`_soil_paintable`), ONE draw at its chance paints Volcanic Soil and
@@ -1997,7 +2042,7 @@ class SimEconomy:
                     br = bonus.nonzero(as_tuple=True)[0]
                     self._drop_resource(br, t[br])
                 r = self._next_random(on)
-                self._eruption_damage(on & (r < p), t, kind, row)
+                self._event_damage(on & (r < p), t, kind, self._er_dmg_lo[row], self._er_dmg_hi[row])
         for py, plane in ((self._er_paint_p, self.fertility), (self._er_prod_p, self.fertility_prod),
                           (self._er_sci_p, self.fertility_sci), (self._er_cul_p, self.fertility_cul)):
             p = py[row]
@@ -2017,21 +2062,22 @@ class SimEconomy:
                 self._paint_soil(lr[~soil], lt[~soil])
                 self._silt(plane, lr, lt)
 
-    def _eruption_damage(self, land: torch.Tensor, tile: torch.Tensor, kind: str, row: torch.Tensor) -> None:
-        """`eruptionDamage` — ONE landed eruption damage row `kind` on `tile`
-        [B] where `land`, through the shared applier: the improvement,
-        district, building and population rows need an OWNED plot, the unit
-        and city rows do not. UNIT_DAMAGE_LAND draws once per land unit on the
-        plot (`_unit_damage_draws`); CITY_GARRISON and CITY_WALLS draw their
-        band, MinHP..MaxHP inclusive, where a city centre stands."""
+    def _event_damage(self, land: torch.Tensor, tile: torch.Tensor, kind: str,
+                      lo: torch.Tensor, hi: torch.Tensor) -> None:
+        """`eventDamage` — ONE landed damage row `kind` of an eruption or a
+        flood on `tile` [B] where `land`, through the shared applier: the
+        improvement, district, building and population rows need an OWNED
+        plot, the unit and city rows do not. UNIT_DAMAGE_LAND draws once per
+        land unit on the plot (`_unit_damage_draws`); CITY_GARRISON and
+        CITY_WALLS draw the row's band `lo` + rand(`hi` - `lo`) [B] where a
+        city centre stands."""
         if not bool(land.any()):
             return
         owner = self.tile_seat.gather(1, tile.unsqueeze(1)).squeeze(1)
         owned = land & (owner >= 0)
         orow = owned.nonzero(as_tuple=True)[0]
         ot = tile[orow]
-        none = torch.full_like(row, -1)
-        lo, hi = self._er_dmg_lo[row], self._er_dmg_hi[row]
+        none = torch.full_like(tile, -1)
         if kind == "IMPROVEMENT_DESTROYED":
             self._destroy_improvement(orow, ot)
         elif kind == "IMPROVEMENT_PILLAGED":
@@ -2055,10 +2101,9 @@ class SimEconomy:
                 city = city & (self._centre_outer_hp(tile) > 0)
             r = self._next_random(city)
             dmg = lo + torch.floor(r * (hi - lo).double()).to(torch.long)
-            garrison = kind == "CITY_GARRISON"
-            self._hit_centre(city, tile, dmg, hp=garrison, walls=not garrison)
+            self._hit_centre(city, tile, dmg, walls=kind == "CITY_WALLS")
         else:
-            raise AssertionError(f"an eruption damage kind with no arm: {kind}")
+            raise AssertionError(f"a damage kind with no arm: {kind}")
 
     def _centre_held(self, tile: torch.Tensor) -> torch.Tensor:
         """[B] `cityAtIndex` — does a city centre of a city-list holder (a
@@ -2078,13 +2123,11 @@ class SimEconomy:
         oh = self.city_outer_hp[b, crow.clamp(max=self.city_outer_hp.shape[1] - 1), hcol]
         return torch.where(self._centre_held(tile), oh, torch.zeros_like(oh))
 
-    def _hit_centre(self, hurt: torch.Tensor, tile: torch.Tensor, dmg: torch.Tensor,
-                    hp: bool = True, walls: bool = True) -> None:
-        """`hitCityCentre` — CITY_GARRISON and CITY_WALLS: where `hurt` [B], a
-        CITY CENTRE on `tile` loses `dmg` HP (never below 1, `hp`) and, if it
-        has one, as much perimeter (`walls`) — `hitCityHp` / `hitCityWalls`.
-        Every holder of a city list: the majors and the Free Cities row
-        (`cityAtIndex`)."""
+    def _hit_centre(self, hurt: torch.Tensor, tile: torch.Tensor, dmg: torch.Tensor, walls: bool) -> None:
+        """`hitCityHp` / `hitCityWalls` — CITY_GARRISON, or CITY_WALLS where
+        `walls`: where `hurt` [B], a CITY CENTRE on `tile` loses `dmg` HP
+        (never below 1) or, if it has one, as much perimeter. Every holder of
+        a city list: the majors and the Free Cities row (`cityAtIndex`)."""
         if not bool(hurt.any()):
             return
         t1 = tile.unsqueeze(1)
@@ -2096,9 +2139,9 @@ class SimEconomy:
             return
         hrow = crow[cr]
         hcol = self.centre_slot_at.gather(1, t1).squeeze(1)[cr].clamp(min=0)
-        if hp:
+        if not walls:
             self.city_hp[cr, hrow, hcol] = (self.city_hp[cr, hrow, hcol] - dmg[cr]).clamp(min=1)
-        if walls:
+        else:
             oh = self.city_outer_hp[cr, hrow, hcol]
             self.city_outer_hp[cr, hrow, hcol] = torch.where(oh > 0, (oh - dmg[cr]).clamp(min=0), oh)
 
@@ -2219,25 +2262,24 @@ class SimEconomy:
                 if R < self.n_majors and getattr(self, "_aid_hit", None) is not None:
                     self._aid_hit[b, R] = True   # CIV6 (Aid Request trigger)
 
-    def _storm_walk(self, walk: torch.Tensor, centre: torch.Tensor, ev: torch.Tensor,
-                    strip: torch.Tensor, pct: torch.Tensor) -> torch.Tensor:
-        """`stormWalk` — `_st_movement` points a turn. Each step is ONE
-        weighted draw over the headings of the `PrevailingWinds` bands at the
-        centre's CURRENT latitude (`_wind_pool`) whose neighbour exists —
-        `pick` in [0, their sum) names the first heading whose cumulative
-        weight exceeds it, in the hex order E NE NW W SW SE — and the storm
-        moves there whatever the terrain: the step costs `_st_step_on` onto
-        the storm's own terrain (`storm_fam`, live: a drowned plot is none),
-        `_st_step_off` elsewhere, and the walk ends for the turn when the
-        drawn step costs more than is left; a plot holding another storm's
-        centre ends it too. Each step strikes the footprint at the new centre
-        (`_storm_turn` at `pct`). Returns the centre per game, unchanged where
-        `walk` is off."""
-        fam = self._st_family_t[ev.clamp(min=0)]
+    def _storm_walk(self, walk: torch.Tensor, k: int, strip: torch.Tensor, pct: torch.Tensor) -> None:
+        """`stormWalk` — the storm in slot `k` where `walk` [B]:
+        `_st_movement` points a turn. Each step is ONE weighted draw over the
+        headings of the `PrevailingWinds` bands at the centre's CURRENT
+        latitude (`_wind_pool`) whose neighbour exists — `pick` in [0, their
+        sum) names the first heading whose cumulative weight exceeds it, in
+        the hex order E NE NW W SW SE — and the storm moves there whatever the
+        terrain, another storm's centre included: the step costs `_st_step_on`
+        onto the storm's own terrain (`storm_fam`, live: a drowned plot is
+        none), `_st_step_off` elsewhere, and the walk ends for the turn when
+        the drawn step costs more than is left. Each step strikes the
+        footprint at the new centre (`_storm_turn` at `pct`)."""
+        fam = self._st_family_t[self.storm_event[:, k].clamp(min=0)]
         bidx = torch.arange(self.B, device=self.device)
-        left = torch.full_like(centre, self._st_movement)
+        left = torch.full_like(fam, self._st_movement)
         going = walk.clone()
         while bool(going.any()):
+            centre = self.storm_at[:, k].clamp(min=0)
             w = self._wind_pool[centre] * (self.neigh[centre] >= 0).long()  # [B, 6]
             total = w.sum(dim=1)
             going = going & (total > 0)
@@ -2248,40 +2290,32 @@ class SimEconomy:
             dc = dest.clamp(min=0)
             own = (self.storm_fam[bidx, dc] == fam) & ~self.tile_submerged[bidx, dc]
             cost = torch.where(own, self._st_step_on, self._st_step_off)
-            going = going & (dest >= 0) & (cost <= left) & (self.storm_left[bidx, dc] == 0)
+            going = going & (dest >= 0) & (cost <= left)
             if not bool(going.any()):
                 break
             left = torch.where(going, left - cost, left)
-            rows = going.nonzero(as_tuple=True)[0]
-            src, dst = centre[rows], dest[rows]
-            self.storm_event[rows, dst] = self.storm_event[rows, src]
-            self.storm_left[rows, dst] = self.storm_left[rows, src]
-            self.storm_id[rows, dst] = self.storm_id[rows, src]
-            self.storm_event[rows, src] = -1
-            self.storm_left[rows, src] = 0
-            centre = torch.where(going, dest, centre)
-            self._storm_turn(going, centre, strip, pct)
-        return centre
+            self.storm_at[:, k] = torch.where(going, dest, self.storm_at[:, k])
+            self._storm_turn(going, k, strip, pct)
 
-    def _storm_turn(self, hit: torch.Tensor, centre: torch.Tensor, strip: torch.Tensor,
-                    pct: torch.Tensor) -> None:
-        """`stormTurn` — ONE strike of one storm's footprint: the first
-        `hexes` slots of the canonical radius-2 disc (`STORM_DISC`,
-        `_storm_offs`) around its centre, an off-map slot simply absent, each
-        plot the storm has not struck yet (`storm_struck` against the centre's
-        `storm_id`), at `pct` [B] of the damage rows' chances."""
-        ev = self.storm_event.gather(1, centre.unsqueeze(1)).squeeze(1).clamp(min=0)
-        sid = self.storm_id.gather(1, centre.unsqueeze(1)).squeeze(1)
+    def _storm_turn(self, hit: torch.Tensor, k: int, strip: torch.Tensor, pct: torch.Tensor) -> None:
+        """`stormTurn` — ONE strike of the footprint of the storm in slot `k`
+        where `hit` [B]: the first `hexes` slots of the canonical radius-2 disc
+        (`STORM_DISC`, `_storm_offs`) around its centre, an off-map slot
+        simply absent, each plot the storm has not struck yet (its own
+        `storm_struck` row), at `pct` [B] of the damage rows' chances."""
+        ev = self.storm_event[:, k].clamp(min=0)
         hexes = self._st_hexes[ev]
-        area = tiles_from_offsets(centre, self._storm_offs, self.W, self.H, self.wrap_x)  # [B, 19]
+        area = tiles_from_offsets(self.storm_at[:, k].clamp(min=0), self._storm_offs,
+                                  self.W, self.H, self.wrap_x)  # [B, 19]
+        struck = self.storm_struck[:, k]
         for j in range(area.shape[1]):
             t = area[:, j].clamp(min=0)
             on = (hit & (hexes > j) & (area[:, j] >= 0)
-                  & (self.storm_struck.gather(1, t.unsqueeze(1)).squeeze(1) != sid))
+                  & ~struck.gather(1, t.unsqueeze(1)).squeeze(1))
             if not bool(on.any()):
                 continue
             rows = on.nonzero(as_tuple=True)[0]
-            self.storm_struck[rows, t[rows]] = sid[rows]
+            self.storm_struck[rows, k, t[rows]] = True
             self._storm_tile(on, t, ev, strip, pct)
 
     def _storm_spares(self, seat: torch.Tensor, ev: torch.Tensor) -> torch.Tensor:
@@ -2494,11 +2528,21 @@ class SimEconomy:
                     self._vacate(pool, gone_u, us[gone_u])
 
     def _flood_river(self, hit: torch.Tensor, tile: torch.Tensor, sev: torch.Tensor) -> None:
-        """`floodRiver` — CIV6 (Flood): "The level of the water rises, flooding
-        all Floodplains tiles found along the River, and then recedes on the
-        next turn." ONE severity for the whole flood (`sev` per game), then
-        every Floodplains tile the river reaches takes the effects at that
-        severity, in ascending tile order so the draw stream is the TS walk's."""
+        """`floodRiver` — a FLOOD of each game's severity `sev` [B] on the
+        river through `tile` where `hit` (0xa2f200: the damage pass 0xa2a4d0,
+        then the yields pass 0xa2ed80). Every Floodplains plot of the river
+        (a lone one floods alone), in ascending order, remembers the episode
+        (`tile_flood_ct`). A shielded river (`_river_shielded`) skips the
+        damage pass whole; otherwise, for each damage row of the severity in
+        the install's order (`_flood_damage`), for each plot: a plot whose
+        owner is immune (Egypt) takes no draw, any other ONE draw rand(100) <
+        Percentage applies the row through the shared applier
+        (`_event_damage`). Then, unless the climate has stopped laying
+        fertility down, for each yield row in order (`_flood_yields`), EVERY
+        plot draws once rand(100) < Percentage — on a shielded river
+        (100 - the mitigated reduction) x Percentage // 100 — and +1 of the
+        row's silt lands where the plot's live feature is the row's
+        Floodplains kind (`_silt`)."""
         B, dev = self.B, self.device
         if not bool(hit.any()):
             return
@@ -2511,15 +2555,45 @@ class SimEconomy:
         # a Floodplains tile carrying no river at all floods alone
         reach[torch.arange(B, device=dev), tc] |= hit
         shield = self._river_shielded(reach)
+        self.tile_flood_ct += reach.long()
+        # the river's plots in order: each step k's plot per game and whether
+        # the game's river has a k-th plot
         order = reach.long().cumsum(dim=1) * reach.long()  # 1-based rank, 0 off-reach
+        plots: list[tuple[torch.Tensor, torch.Tensor]] = []
         for k in range(1, int(order.max()) + 1):
             at = order == k
-            hit_k = at.any(dim=1)
-            if not bool(hit_k.any()):
-                break
-            tile_k = at.long().argmax(dim=1)
-            self._flood_tile(hit_k, torch.where(hit_k, tile_k, torch.full_like(tile_k, -1)),
-                             sev, shield)
+            plots.append((at.any(dim=1), at.long().argmax(dim=1)))
+        bidx = torch.arange(B, device=dev)
+        for s, rows in enumerate(self._flood_damage):
+            hs = hit & (sev == s) & ~shield
+            if not bool(hs.any()):
+                continue
+            for kind, pct, lo, hi in rows:
+                lo_t = torch.full((B,), lo, dtype=torch.long, device=dev)
+                hi_t = torch.full((B,), hi, dtype=torch.long, device=dev)
+                for on, t in plots:
+                    seat_at = self.tile_seat[bidx, t]
+                    go = hs & on & ~self._seat_plays(seat_at, "EGYPT")
+                    r = self._next_random(go)
+                    self._event_damage(go & (torch.floor(r * 100) < pct), t, kind, lo_t, hi_t)
+        live = self._fertility_live()
+        for s, rows in enumerate(self._flood_yields):
+            hs = hit & (sev == s) & live
+            if not bool(hs.any()):
+                continue
+            for plane, fid, pct in rows:
+                p = torch.where(shield, torch.full((B,), (100 - self._flood_mit_reduction) * pct // 100,
+                                                   dtype=torch.long, device=dev),
+                                torch.full((B,), pct, dtype=torch.long, device=dev))
+                silt = self.fertility if plane == 0 else self.fertility_prod
+                for on, t in plots:
+                    go = hs & on
+                    r = self._next_random(go)
+                    land = (go & (torch.floor(r * 100) < p) & (self.feat_id[bidx, t] == fid)
+                            & ~self.feat_stripped[bidx, t])
+                    lr = land.nonzero(as_tuple=True)[0]
+                    if lr.numel():
+                        self._silt(silt, lr, t[lr])
 
     def _river_shielded(self, reach: torch.Tensor) -> torch.Tensor:
         """[B] — CIV6 (Dam): "Prevents damage from Floods on this River", and
@@ -2535,85 +2609,6 @@ class SimEconomy:
             sh = sh | ((self.built_wonder >= 0) & self.built_wonder_complete
                        & self._wond_floodmit[self.built_wonder.clamp(min=0)])
         return (reach & sh).any(dim=1)
-
-    def _flood_tile(self, hit: torch.Tensor, tile: torch.Tensor, sev: torch.Tensor,
-                    mit: torch.Tensor) -> None:
-        """`floodTile` — ONE river flood on one Floodplains tile, at the
-        severity its whole flood carries.
-
-        CIV6: a flood "damages or destroys Districts, improvements, and units on
-        the Floodplains tiles near the River. This may also include a City
-        Center, in which case it loses some HP and Defenses... May kill some
-        Citizens in a nearby city... Can fertilize affected tiles." The severity
-        ladder decides every magnitude, and a shielded river cancels the damage
-        half while halving the fertility half.
-
-        SEVEN draws per tile, always, whatever the tile holds — the count
-        depends on the flood alone, so the two engines cannot slip apart on
-        what stood there.
-        """
-        B, dev = self.B, self.device
-        # the tile REMEMBERS each flood episode — the Great Bath's faith
-        # counts them (`Tile.floodCount`), mitigated floods included
-        _fr = hit.nonzero(as_tuple=True)[0]
-        self.tile_flood_ct[_fr, tile[_fr]] += 1
-        r_destroy = self._next_random(hit)
-        r_district = self._next_random(hit)
-        r_bldg_f = self._next_random(hit)
-        r_damage = self._next_random(hit)
-        r_civilian = self._next_random(hit)
-        r_pop = self._next_random(hit)
-        r_food = self._next_random(hit)
-        r_prod = self._next_random(hit)
-        if not bool(hit.any()):
-            return
-        tc = tile.clamp(min=0)
-        seat_at = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
-        # CIV6 (Iteru, TRAIT_AVOID_*_FLOOD): Egypt's ground takes no flood
-        # damage; the fertility half still lands.
-        raw = hit & ~mit & ~self._seat_plays(seat_at, "EGYPT")
-
-        # the improvement, district, building and population rows need an
-        # OWNED plot; the city and unit rows do not (the applier 0x336a50)
-        owned = raw & (seat_at >= 0)
-        rows = owned.nonzero(as_tuple=True)[0]
-        if rows.numel():
-            self._scorch(rows, tc[rows])
-            gone = rows[r_destroy[rows] < self._flood_destroy_p[sev[rows]]]
-            self._destroy_improvement(gone, tc[gone])
-            dist = rows[r_district[rows] < self._flood_district_p[sev[rows]]]
-            if dist.numel():
-                self._pillage_district(dist, tc[dist])
-            bld = rows[r_bldg_f[rows] < self._flood_bldg_p[sev[rows]]]
-            if bld.numel():
-                self._pillage_tile_buildings(bld, tc[bld])
-        lo, hi = self._flood_dmg_lo[sev], self._flood_dmg_hi[sev]
-        # CITY_GARRISON / CITY_WALLS: the plot's one band roll — a CITY CENTER
-        # on the floodplain loses HP and, if it has one, perimeter
-        dmg = lo + torch.floor(r_damage * (hi - lo + 1).double()).to(torch.long)
-        self._hit_centre(raw & (dmg > 0), tc, dmg)
-        # UNIT_DAMAGE_LAND, one draw per land unit on the plot, and the
-        # civilians' kill roll, through the shared applier
-        land = self._unit_damage_draws(raw & (hi > 0), tc, False, lo, hi)
-        self._strike_units(raw, tc, seat_at, land, None,
-                           raw & (r_civilian < self._flood_pop_p[sev]), torch.full_like(tc, -1))
-        # A CITIZEN of the tile's owning city, on its own roll. TS puts this
-        # beside the damage block, not inside it.
-        self._lose_citizen((owned & (r_pop < self._flood_pop_p[sev])).nonzero(as_tuple=True)[0], seat_at, tc)
-        # FERTILIZATION. Each yield is its own roll, so one flood may pay both.
-        # A mitigated river still silts, at half the rate.
-        col = self._flood_fert_col[self.terrain.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)]
-        half = torch.where(mit, torch.full((B,), 0.5, dtype=torch.float64, device=dev),
-                           torch.ones(B, dtype=torch.float64, device=dev))
-        live = self._fertility_live()
-        fr = (hit & live & (r_food < self._flood_fert_food[sev, col] * half)).nonzero(as_tuple=True)[0]
-        if fr.numel():
-            self._fertilize(fr, tc[fr])
-        pr2 = (hit & live & (r_prod < self._flood_fert_prod[sev, col] * half)).nonzero(as_tuple=True)[0]
-        if pr2.numel():
-            ok = self.fertilizable[pr2, tc[pr2]]
-            r2, t2 = pr2[ok], tc[pr2][ok]
-            self.fertility_prod[r2, t2] = (self.fertility_prod[r2, t2] + 1).clamp(max=3)
 
     def _building_cost_in(self, row: int, j: int, bi: torch.Tensor) -> torch.Tensor:
         """[B] — `buildingCostIn`: the catalog price for every row but the

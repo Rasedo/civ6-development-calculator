@@ -2794,15 +2794,37 @@ class SimInit:
         # — `STORM_UNIT_ROWS`, Divine Wind's hurricanes and Mother Russia's blizzards
         self._storm_unit_rows: list[tuple[int, int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _ds["stormUnitRows"]]  # type: ignore[misc]
-        self._flood_destroy_p = torch.tensor([float(x) for x in _ds["floodDestroyP"]], dtype=torch.float64, device=device)
-        self._flood_district_p = torch.tensor([float(x) for x in _ds["floodDistrictP"]], dtype=torch.float64, device=device)
-        self._flood_bldg_p = torch.tensor([float(x) for x in _ds["floodBldgP"]], dtype=torch.float64, device=device)
-        self._flood_pop_p = torch.tensor([float(x) for x in _ds["floodPopP"]], dtype=torch.float64, device=device)
-        self._flood_dmg_lo = torch.tensor([int(x) for x in _ds["floodDmgLo"]], dtype=torch.long, device=device)
-        self._flood_dmg_hi = torch.tensor([int(x) for x in _ds["floodDmgHi"]], dtype=torch.long, device=device)
-        self._flood_fert_food = torch.tensor(_ds["floodFertFood"], dtype=torch.float64, device=device)  # [3, 3]
-        self._flood_fert_prod = torch.tensor(_ds["floodFertProd"], dtype=torch.float64, device=device)  # [3, 3]
-        self._flood_fert_col = torch.tensor([int(x) for x in _ds["floodFertCol"]], dtype=torch.long, device=device)  # [nTerrain]
+        # THE FLOOD'S ROWS per severity, each in the install's order
+        # (`FLOOD_DAMAGE_ROWS`: DamageType, Percentage, MinHP, MaxHP;
+        # `FLOOD_YIELD_ROWS`: silt plane 0 Food / 1 Production, Floodplains
+        # feature id, Percentage) and the mitigated yield reduction
+        self._flood_damage: list[list[tuple[str, int, int, int]]] = [
+            [(str(r["kind"]), int(r["pct"]), int(r["lo"]), int(r["hi"])) for r in rows]
+            for rows in _ds["floodDamage"]]
+        self._flood_yields: list[list[tuple[int, int, int]]] = [
+            [(int(r["plane"]), int(r["fid"]), int(r["pct"])) for r in rows]
+            for rows in _ds["floodYields"]]
+        self._flood_mit_reduction = int(_ds["floodMitigatedYieldReduction"])
+        # THE LIVE STORMS (`GameState.storms`), a table of slots holding the
+        # records in the order they began, the live ones first: each one's
+        # `STORM_EVENTS` row (-1 an empty slot), centre plot, turns left (0 an
+        # empty slot), serial, and the plots its footprint has struck; and
+        # each game's last serial handed out (`GameState.stormSerial`). A
+        # storm lives its Duration and at most one begins a turn, so the
+        # longest Duration bounds the table.
+        n_storms = int(self._st_duration.max()) if self._st_duration.numel() else 1
+        self.storm_event = torch.full((self.B, n_storms), -1, dtype=torch.long, device=device)
+        self.storm_at = torch.full((self.B, n_storms), -1, dtype=torch.long, device=device)
+        self.storm_left = torch.zeros(self.B, n_storms, dtype=torch.long, device=device)
+        self.storm_id = torch.full((self.B, n_storms), -1, dtype=torch.long, device=device)
+        self.storm_struck = torch.zeros(self.B, n_storms, self.T, dtype=torch.bool, device=device)
+        self.storm_serial = torch.zeros(self.B, dtype=torch.long, device=device)
+        # THE LIVE DROUGHTS (`GameState.droughts`), the same slot table: each
+        # one's turns left (0 an empty slot) and its footprint's plots in disc
+        # order (-1 pads). The longest Duration bounds it as the storms'.
+        n_droughts = int(self._drought_duration.max()) if self._drought_duration.numel() else 1
+        self.drought_left = torch.zeros(self.B, n_droughts, dtype=torch.long, device=device)
+        self.drought_plots = torch.full((self.B, n_droughts, self._drought_hexes), -1, dtype=torch.long, device=device)
         # The outer-defense pool and the defensive Combat Strength by WALLS
         # TIER, plus the tech that grants the top tier outright.
         self._walls_tier_hp = torch.tensor([int(x) for x in rules.combat["wallsTierHp"]], dtype=torch.long, device=device)
@@ -4173,16 +4195,6 @@ class SimInit:
         # the random-event rows (a bit per `_event_rows` index) that have
         # fired on the site keyed on each plot (`Tile.eventFired`)
         self.tile_event_fired = torch.zeros(B, T, dtype=torch.long, device=dev)
-        # a STORM centred on the tile: its `STORM_EVENTS` row (-1 none) and the
-        # turns it has left (`Tile.stormEvent` / `Tile.stormTurns`)
-        self.storm_event = torch.full((B, T), -1, dtype=torch.long, device=dev)
-        self.storm_left = torch.zeros(B, T, dtype=torch.long, device=dev)
-        # the storm's serial, travelling with its record (`Tile.stormId`), the
-        # serial of the last storm that struck each plot (`Tile.stormStruck`)
-        # and each game's last serial handed out (`GameState.stormSerial`)
-        self.storm_id = torch.full((B, T), -1, dtype=torch.long, device=dev)
-        self.storm_struck = torch.full((B, T), -1, dtype=torch.long, device=dev)
-        self.storm_serial = torch.zeros(B, dtype=torch.long, device=dev)
         # the turn the FIRE a plot belongs to began, -1 none (`Tile.fireStart`),
         # and a METEOR SITE on the plot (`Tile.meteor`)
         self.fire_start = torch.full((B, T), -1, dtype=torch.long, device=dev)

@@ -415,6 +415,14 @@ const GAME: Record<string, Extractor> = {
   // the Free Cities seat's treasury: 0 until its first revolt makes the seat
   freeTreasury: (s) => [s.freeSeat?.treasury ?? 0],
   freeShortfall: (s) => [s.freeSeat?.goldShortfall ?? 0],
+  // the live storms in the order they began: the last serial, then per
+  // record its serial, row, centre, turns left, and its struck plots sorted
+  // behind their count
+  storms: (s) => [[s.stormSerial ?? 0, ...(s.storms ?? []).flatMap((r) =>
+    [r.id, r.event, r.at, r.left, r.struck.length, ...[...r.struck].sort((a, b) => a - b)])]],
+  // the live droughts in the order they began: per record its turns left,
+  // then its footprint behind its count
+  droughts: (s) => [(s.droughts ?? []).flatMap((r) => [r.left, r.plots.length, ...r.plots])],
 };
 
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {
@@ -858,10 +866,6 @@ const TILE: Record<string, Extractor> = {
   fertilitySci: overTiles((t) => t.fertilitySci ?? 0),
   fertilityCul: overTiles((t) => t.fertilityCul ?? 0),
   droughtTurns: overTiles((t) => t.droughtTurns),
-  stormEvent: overTiles((t) => ((t.stormTurns ?? 0) > 0 ? (t.stormEvent ?? -1) : -1)),
-  stormTurns: overTiles((t) => t.stormTurns ?? 0),
-  stormId: overTiles((t) => ((t.stormTurns ?? 0) > 0 ? (t.stormId ?? -1) : -1)),
-  stormStruck: overTiles((t) => t.stormStruck ?? -1),
   fireStart: overTiles((t) => t.fireStart ?? -1),
   featureId: overTiles((t) => (t.feature === null ? -1 : (FEAT_IDX_SC.get(t.feature) ?? -1))),
   lowland: overTiles((t) => t.lowland ?? 0),

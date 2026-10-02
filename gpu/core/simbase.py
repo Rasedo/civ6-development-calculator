@@ -1003,8 +1003,9 @@ _MUTABLE = [
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "fertility_sci", "fertility_cul",
     "tile_locked", "drought", "improvement", "pillaged", "district",
-    "storm_event", "storm_left",  # the STORM centred on a tile and the turns it has left
-    "storm_id", "storm_struck", "storm_serial",  # its serial, the last storm to strike a plot, the counter
+    "storm_event", "storm_at", "storm_left",  # the live STORM records: row, centre, turns left
+    "storm_id", "storm_struck", "storm_serial",  # each one's serial and struck plots, the counter
+    "drought_left", "drought_plots",  # the live DROUGHT records: turns left, footprint
     "fire_start",  # the turn a plot's FIRE began, -1 none
     "tile_meteor",  # METEOR SITES: laid by the draw, taken by the first unit in
     "tile_goody",  # TRIBAL VILLAGES: claimed and gone

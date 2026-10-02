@@ -80,10 +80,9 @@ def main() -> None:
     t = floodplain(sim)
     solo(sim, t)
 
-    # THE DRAW COUNT IS FIXED. Eight per REACHED tile, whatever stands on it —
-    # TS spends the same, so a bare floodplain and a built-up one cannot slide
-    # the two streams apart. The flood alone, so no other event of the turn
-    # moves the stream between the two runs.
+    # AN IMPROVEMENT SPENDS NO DRAW: one per damage row and one per yield row
+    # a plot, whatever improvement stands on it. The flood alone, so no other
+    # event of the turn moves the stream between the two runs.
     seed = int(sim.rng_state[0])
     sim.improvement[0, t] = -1
     flood(sim, t)
@@ -112,10 +111,10 @@ def main() -> None:
     assert destroyed < pillaged, "destruction was not the rarer half of the pillage column"
     print(f"  every one of {N} floods pillaged; {destroyed} took the improvement away")
 
-    # THE DAMAGE BANDS. 30-50 and 50-70 HP by severity; a Moderate flood pays
-    # nothing at all.
-    hurt = sim._flood_dmg_lo > 0
-    lo, hi = int(sim._flood_dmg_lo[hurt].min()), int(sim._flood_dmg_hi[hurt].max())
+    # THE DAMAGE BANDS. 30-50 and 50-70 HP by severity; a Moderate flood
+    # carries no unit row and pays nothing at all.
+    bands = [(lo_, hi_) for rows in sim._flood_damage for k, _p, lo_, hi_ in rows if k == "UNIT_DAMAGE_LAND"]
+    lo, hi = min(b[0] for b in bands), max(b[1] for b in bands)
     slot, pool = None, "major"
     for p in ("major", "barb"):
         live = getattr(sim, f"{p}_unit_alive")[0].nonzero().flatten()
@@ -201,14 +200,101 @@ def main() -> None:
     print("  the Bath shields its own river, and only its own")
 
     poke_river_reach()
-    print("FLOOD SEVERITY OK — the ladder, the bands, the two silts, the Bath and the reach")
+    poke_row_walk()
+    print("FLOOD SEVERITY OK — the ladder, the bands, the two silts, the Bath, the reach and the row walk")
+
+
+def spent_by_walk(sim, reach: list[int], sev: int, egypt: list[int]) -> int:
+    """The draws a flood of severity `sev` over the plots `reach` spends, read
+    off the board BEFORE it (0xa2a4d0 / 0xa2ed80): per damage row, per plot
+    not Egypt's, one draw, then one per land unit standing there for
+    UNIT_DAMAGE_LAND, one for CITY_GARRISON where a centre stands and one for
+    CITY_WALLS where its walls stand; per yield row one draw per plot. A
+    shielded river spends no damage draw, a world past fertility no yield
+    draw. Only rows that land for sure (Percentage 100) may carry the extra
+    draws for the count to be fixed."""
+    mask = torch.zeros(1, sim.T, dtype=torch.bool, device=sim.device)
+    mask[0, reach] = True
+    n = 0
+    if not bool(sim._river_shielded(mask)[0]):
+        for kind, pct, _lo, _hi in sim._flood_damage[sev]:
+            for t in reach:
+                if int(sim.tile_seat[0, t]) in egypt:
+                    continue
+                n += 1
+                if kind == "UNIT_DAMAGE_LAND":
+                    assert pct == 100
+                    n += int(int(sim.military_at[0, t]) >= 0) + int(int(sim.support_at[0, t]) >= 0)
+                tt = torch.tensor([t], dtype=torch.long, device=sim.device)
+                if kind == "CITY_GARRISON":
+                    assert pct == 100
+                    n += int(bool(sim._centre_held(tt)[0]))
+                if kind == "CITY_WALLS":
+                    assert pct == 100
+                    n += int(int(sim._centre_outer_hp(tt)[0]) > 0)
+    if bool(sim._fertility_live()[0]):
+        n += len(sim._flood_yields[sev]) * len(reach)
+    return n
+
+
+def poke_row_walk() -> None:
+    """g. THE ROW WALK (0xa2a4d0, then 0xa2ed80): Egypt's plots spend no damage
+    draw (the shielded river is the Bath poke above), and a yield row's +1 lands
+    on its own Floodplains kind alone."""
+    sim = build()
+    t = floodplain(sim)
+    solo(sim, t)
+    one = torch.ones(1, dtype=torch.bool, device=sim.device)
+    at = torch.tensor([t], dtype=torch.long, device=sim.device)
+    owner = int(sim.tile_seat[0, t])
+    civ0, lead0 = int(sim.row_civ[0, owner]), int(sim.row_leader[0, owner])
+    ci = sim._civ_ids.index("EGYPT")
+    for civ, lead, label in ((ci, sim._pair_civ.index(ci), "Egypt's"), (civ0, lead0, "another seat's")):
+        # the plot's owner plays Egypt, then its own civilization again
+        sim.row_civ[0, owner] = civ
+        sim.row_leader[0, owner] = lead
+        sim._eff_version += 1
+        sim._gen_ver += 1
+        sim._bldg_version += 1
+        egypt = [r for r in range(sim.n_majors) if bool(sim._seat_plays(torch.tensor([r]), "EGYPT")[0])]
+        assert (owner in egypt) == (civ == ci)
+        for sev in range(len(sim._flood_damage)):
+            want = spent_by_walk(sim, [t], sev, egypt)
+            seed = int(sim.rng_state[0])
+            sim._flood_river(one, at, torch.tensor([sev], dtype=torch.long, device=sim.device))
+            spent = 0
+            probe = int(sim.rng_state[0])
+            sim.rng_state[0] = seed
+            while int(sim.rng_state[0]) != probe and spent < 4096:
+                sim._next_random(one)
+                spent += 1
+            assert spent == want, f"{label} plot, severity {sev}: {spent} draws, not {want}"
+    # a yield row lands on its own kind alone: MODERATE carries Food rows only,
+    # so no flood of it ever silts Production
+    fid = int(sim.feat_id[0, t])
+    kinds = {f for rows in sim._flood_yields for _pl, f, _p in rows}
+    assert fid in kinds, "the floodplain's feature is no row's kind"
+    sim.fertility_prod[0, t] = 0
+    for _ in range(N):
+        sim._flood_river(one, at, torch.zeros(1, dtype=torch.long, device=sim.device))
+    assert int(sim.fertility_prod[0, t]) == 0, "a MODERATE flood silted Production"
+    # a row naming another kind never lands: the plot recast as no floodplain
+    # kind any row names gains nothing
+    sim.fertility[0, t] = 0
+    sim.feat_id[0, t] = max(kinds) + 1000
+    for _ in range(N):
+        sim._flood_river(one, at, torch.full((1,), 2, dtype=torch.long, device=sim.device))
+    assert int(sim.fertility[0, t]) == 0 and int(sim.fertility_prod[0, t]) == 0, \
+        "a yield row landed on a plot of another kind"
+    sim.feat_id[0, t] = fid
+    print("  g row walk OK — Egypt's plots spend no damage draw; a yield row keeps to its kind")
 
 
 def poke_river_reach() -> None:
     """f. CIV6 (Flood): "The level of the water rises, flooding all Floodplains
     tiles found along the River". One severity for the whole flood; every
     Floodplains tile of the struck river takes it, nothing off that river
-    does, and the draw stream is eight per tile."""
+    does, and the draw stream is the row walk's (`spent_by_walk`)."""
     rules = load_rules()
     best = None
     for p in fixture_paths():
@@ -243,13 +329,9 @@ def poke_river_reach() -> None:
     while int(sim.rng_state[0]) != int(probe[0]) and spent < 4096:
         sim._next_random(torch.ones(1, dtype=torch.bool, device=sim.device))
         spent += 1
-    # destroy, district, BUILDING, damage, civilian, population, and the two
-    # fertility yields — eight columns a tile, then one per land unit standing
-    # there (the unit-damage applier 0x3366a0); the severity is the turn's
-    # draw's, not the river's
-    units = sum(int(int(sim.military_at[0, t]) >= 0) + int(int(sim.support_at[0, t]) >= 0) for t in reach)
-    assert spent == 8 * n + units, f"a {n}-tile flood spent {spent} draws, not 8 x {n} + {units}"
     egypt = [s for s in range(sim.n_majors) if bool(sim._seat_plays(torch.tensor([s]), "EGYPT")[0])]
+    want = spent_by_walk(sim, reach, 2, egypt)
+    assert spent == want, f"a {n}-tile flood spent {spent} draws, not the row walk's {want}"
     for t in reach:
         owner = int(sim.tile_seat[0, t])
         if owner >= 0 and owner not in egypt:

@@ -223,7 +223,7 @@ export interface Tile {
   locked?: boolean;
   /** how many times a river flood has reached this tile — the Great Bath's
    *  "+1 Faith for every time a tile belonging to this city has been
-   *  Flooded" reads it. A flood counts once per episode (`floodTile`). */
+   *  Flooded" reads it. A flood counts once per episode (`floodRiver`). */
   floodCount?: number;
   /** CIV6 (Marina Raskova): a permanent "+1 air unit slots" on this
    *  district tile, written at the general's retirement. */
@@ -270,17 +270,6 @@ export interface Tile {
   fertilitySci?: number;
   fertilityCul?: number;
   droughtTurns: number;
-  /** CIV6 (`RandomEvents`, Duration 3): a STORM centred here — the
-   *  `STORM_EVENTS` row it is, and the turns it has left to apply its
-   *  footprint's effects. Absent or 0 turns = no storm. */
-  stormEvent?: number;
-  stormTurns?: number;
-  /** the storm centred here, by its serial (`GameState.stormSerial`); it
-   *  travels with the record. */
-  stormId?: number;
-  /** the serial of the last storm whose footprint struck this plot — a storm
-   *  strikes each plot once (`stormTurn`). */
-  stormStruck?: number;
   /** CIV6 (`RandomEvent_Yields`, the pack's fires): the turn the FIRE this
    *  plot belongs to began — the event's clock, which a plot the fire spreads
    *  to shares. The plot burns, is burnt at the fire's Turn 2 and regrows at

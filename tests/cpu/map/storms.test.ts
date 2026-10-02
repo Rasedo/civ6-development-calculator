@@ -9,7 +9,7 @@ import { hexDistance } from '../../../world/hex';
 import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, WIND_BAND_LO, WIND_BAND_HI, windLatitude, windWeights, STORM_MOVEMENT, STORM_LAST_TURN_PCT, RANDOM_EVENT_START_TURN, STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { tileYields } from '../../../cpu/core/yields';
-import type { GameState, Tile } from '../../../cpu/core/types';
+import type { GameState, StormRecord, Tile } from '../../../cpu/core/types';
 import type { StormEvent } from '../../../cpu/data/disasters';
 import { placeCityStateAt } from '../../../cpu/core/cityStates';
 
@@ -128,29 +128,26 @@ describe('the eight storms are the install\'s table', () => {
 
   it('the disaster phase spawns only the board\'s family, and it persists three turns', () => {
     const state = board(null, 'SNOW');
-    let first: Tile | undefined;
+    let first: StormRecord | undefined;
     for (let i = 0; i < 2000 && !first; i++) {
       disasterPhase(state);
-      first = state.map.tiles.find((t) => (t.stormTurns ?? 0) > 0);
+      first = state.storms?.[0];
     }
     expect(first).toBeDefined();
-    expect(STORM_EVENTS[first!.stormEvent!].family).toBe('BLIZZARD');
+    const rec = first!;
+    expect(STORM_EVENTS[rec.event].family).toBe('BLIZZARD');
     expect(state.eventLog.some((e) => e.startsWith('Storm: BLIZZARD'))).toBe(true);
-    // A blizzard is drawn every turn the board has snow; make the struck
-    // plot the ONLY snow left, so every later draw lands on it, finds it
-    // busy and forms nothing, and the one storm cannot walk off it.
-    for (const t of state.map.tiles) if (t !== first) t.terrain = 'COAST';
-    // the storm was applied once already (its spawn turn) and counts down
-    const live = () => state.map.tiles.filter((t) => (t.stormTurns ?? 0) > 0);
-    const ev0 = first!.stormEvent;
-    expect(first!.stormTurns).toBe(2);
+    // the storm was applied once already (its spawn turn) and counts down;
+    // its record leaves the list when its turns run out
+    const ev0 = rec.event;
+    expect(rec.left).toBe(2);
+    expect(rec.struck.length).toBeGreaterThan(0);
+    expect(rec.struck.length).toBeLessThanOrEqual(STORM_EVENTS[ev0].hexes);
     disasterPhase(state);
-    expect(live()).toHaveLength(1);
-    expect(live()[0].stormTurns).toBe(1);
-    expect(live()[0].stormEvent).toBe(ev0);
+    expect(state.storms!.find((s) => s.id === rec.id)?.left).toBe(1);
+    expect(rec.event).toBe(ev0);
     disasterPhase(state);
-    expect(live()).toHaveLength(0);
-    expect(state.map.tiles.every((t) => (t.stormEvent ?? -1) === -1)).toBe(true);
+    expect(state.storms!.some((s) => s.id === rec.id)).toBe(false);
     expect(state.eventLog.every((e) => !e.startsWith('Storm') || e.startsWith('Storm: BLIZZARD'))).toBe(true);
   });
 
@@ -163,22 +160,22 @@ describe('the eight storms are the install\'s table', () => {
     const state = board(null, 'SNOW');
     const idx = STORM_EVENTS.findIndex((e) => e.id === 'BLIZZARD_SIGNIFICANT');
     const start = tileAtCoords(state.map, 8, 8);
-    start.stormEvent = idx;
-    start.stormTurns = 2;
-    start.stormId = 7;
+    const rec: StormRecord = { id: 7, event: idx, at: start.index, left: 2, struck: [] };
+    state.storms = [rec];
     expect(windLatitude(8, 16)).toBe(0);
     const s0 = state.rngState;
-    const end = stormWalk(state, start, STORM_EVENTS[idx], false, 100);
-    const struck = state.map.tiles.filter((t) => t.stormStruck === 7).length;
+    stormWalk(state, rec, STORM_EVENTS[idx], false, 100);
+    const struck = rec.struck.length;
     expect(struck).toBeGreaterThan(0);
+    expect(new Set(rec.struck).size).toBe(struck);
     expect(draws(s0, state.rngState, 1000)).toBe(9 + 10 * struck);
-    expect([end.stormEvent, end.stormTurns, end.stormId]).toEqual([idx, 2, 7]);
-    expect([start.stormEvent, start.stormTurns]).toEqual([-1, 0]);
+    expect([rec.event, rec.left, rec.id]).toEqual([idx, 2, 7]);
+    const end = state.map.tiles[rec.at];
     const dist = hexDistance(state.map, start.col, start.row, end.col, end.row);
     expect(dist).toBeGreaterThanOrEqual(1);
     expect(dist).toBeLessThanOrEqual(8);
     expect(end.col).toBeLessThanOrEqual(start.col);
-    expect(state.map.tiles.filter((t) => (t.stormTurns ?? 0) > 0)).toHaveLength(1);
+    expect(state.storms).toHaveLength(1);
     // a hurricane on the one OCEAN tile of a grassland board steps onto the
     // land at 2 points a step: four steps, then a fifth draw it cannot pay
     const land = board(null, 'GRASSLAND');
@@ -186,28 +183,27 @@ describe('the eight storms are the install\'s table', () => {
     sea.terrain = 'OCEAN';
     sea.elevation = 'FLAT';
     const cat4 = STORM_EVENTS.findIndex((e) => e.id === 'HURRICANE_CAT_4');
-    sea.stormEvent = cat4;
-    sea.stormTurns = 2;
-    sea.stormId = 3;
+    const hur: StormRecord = { id: 3, event: cat4, at: sea.index, left: 2, struck: [] };
+    land.storms = [hur];
     const s1 = land.rngState;
-    const off = stormWalk(land, sea, STORM_EVENTS[cat4], false, 100);
-    expect(off).not.toBe(sea);
-    const struck1 = land.map.tiles.filter((t) => t.stormStruck === 3).length;
-    expect(draws(s1, land.rngState, 1000)).toBe(5 + 10 * struck1);
-    expect(off.stormEvent).toBe(cat4);
-    // another storm's centre on every neighbour ends the walk at its first draw
+    stormWalk(land, hur, STORM_EVENTS[cat4], false, 100);
+    expect(hur.at).not.toBe(sea.index);
+    expect(draws(s1, land.rngState, 1000)).toBe(5 + 10 * hur.struck.length);
+    expect(hur.event).toBe(cat4);
+    // another storm's centre on every neighbour blocks nothing: the walk
+    // steps onto them as onto any plot (Game_Climate's walk does not block)
     const snow = board(null, 'SNOW');
     const c = tileAtCoords(snow.map, 8, 8);
-    c.stormEvent = idx;
-    c.stormTurns = 2;
+    const walker: StormRecord = { id: 1, event: idx, at: c.index, left: 2, struck: [] };
+    snow.storms = [walker];
     for (let d = 0; d < 6; d++) {
       const n = tileAtCoords(snow.map, c.col + [1, 0, -1, -1, -1, 0][d], c.row + [0, -1, -1, 0, 1, 1][d]);
-      n.stormEvent = idx;
-      n.stormTurns = 1;
+      snow.storms.push({ id: 2 + d, event: idx, at: n.index, left: 1, struck: [] });
     }
     const s2 = snow.rngState;
-    expect(stormWalk(snow, c, STORM_EVENTS[idx], false, 100)).toBe(c);
-    expect(draws(s2, snow.rngState)).toBe(1);
+    stormWalk(snow, walker, STORM_EVENTS[idx], false, 100);
+    expect(walker.at).not.toBe(c.index);
+    expect(draws(s2, snow.rngState, 1000)).toBe(9 + 10 * walker.struck.length);
   });
 
   it('a storm strikes its strike plot on entry and every step after, each plot once, its last turn at half', () => {
@@ -215,21 +211,19 @@ describe('the eight storms are the install\'s table', () => {
     const state = board(null, 'SNOW');
     const idx = STORM_EVENTS.findIndex((e) => e.id === 'BLIZZARD_SIGNIFICANT');
     const c = tileAtCoords(state.map, 8, 8);
-    c.stormEvent = idx;
-    c.stormTurns = 3;
-    c.stormId = 1;
+    const rec: StormRecord = { id: 1, event: idx, at: c.index, left: 3, struck: [] };
+    state.storms = [rec];
     state.turn = 1;   // no event draw before the start turn
     const s0 = state.rngState;
     disasterPhase(state);
-    const first = state.map.tiles.filter((t) => t.stormStruck === 1).length;
+    const first = rec.struck.length;
     expect(first).toBe(STORM_EVENTS[idx].hexes);
     expect(draws(s0, state.rngState, 200)).toBe(10 * first);
     // a plot struck once is never struck again by the same storm
-    const struckAt = new Set(state.map.tiles.filter((t) => t.stormStruck === 1).map((t) => t.index));
     disasterPhase(state);
     disasterPhase(state);
-    expect(state.map.tiles.filter((t) => (t.stormTurns ?? 0) > 0)).toHaveLength(0);
-    for (const i of struckAt) expect(state.map.tiles[i].stormStruck).toBe(1);
+    expect(state.storms).toHaveLength(0);
+    expect(new Set(rec.struck).size).toBe(rec.struck.length);
     // the last turn halves every damage row's chance: a certain pillage row
     // lands half the time
     expect(STORM_LAST_TURN_PCT).toBe(50);

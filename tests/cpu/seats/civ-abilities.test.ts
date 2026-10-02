@@ -5,7 +5,7 @@ import { spawnUnit, refreshUnits, stepUnit, waterEnterable, navalHeal } from '..
 import { routeChainGold } from '../../../cpu/core/trade';
 import { tradeCourse, tradeReach } from '../../../cpu/core/tradePath';
 import { levyGoldCost, transferCity, seatPhase } from '../../../cpu/core/phase';
-import { floodTile } from '../../../cpu/core/disasters';
+import { floodRiver } from '../../../cpu/core/disasters';
 import { ITERU_RIVER_PROD_MULT } from '../../../cpu/data/civilizations';
 import { CIV_IDS } from '../../../cpu/data/seats';
 import { UNITS } from '../../../cpu/data/units';
@@ -112,7 +112,7 @@ describe('Iteru', () => {
       t.riverMask = 1;
       setTileOwner(t, 0);
       const u = spawnUnit(state, 'WARRIOR', t.index, 0)!;
-      floodTile(state, t, 2, false);
+      floodRiver(state, t, 2);
       return { hp: u.hp, count: t.floodCount ?? 0 };
     };
     const egypt = run('EGYPT');

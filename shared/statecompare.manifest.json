@@ -289,6 +289,35 @@
             "seat_shortfall"
           ],
           "note": "the Free Cities seat's last turn shortfall (`freeSeat.goldShortfall`), which its cities' bankruptcy amenities read; 0 before the first revolt makes the seat."
+        },
+        {
+          "name": "storms",
+          "compare": "exact",
+          "covers": [
+            "GameState.storms",
+            "GameState.stormSerial"
+          ],
+          "planes": [
+            "storm_event",
+            "storm_at",
+            "storm_left",
+            "storm_id",
+            "storm_struck",
+            "storm_serial"
+          ],
+          "note": "the last serial, then each live storm in the order it began: serial, STORM_EVENTS row, centre plot, turns left, and its struck plots sorted behind their count"
+        },
+        {
+          "name": "droughts",
+          "compare": "exact",
+          "covers": [
+            "GameState.droughts"
+          ],
+          "planes": [
+            "drought_left",
+            "drought_plots"
+          ],
+          "note": "each live drought in the order it began: turns left, then its footprint's plots in disc order behind their count"
         }
       ]
     },
@@ -2896,51 +2925,6 @@
           "planes": [
             "drought"
           ]
-        },
-        {
-          "name": "stormEvent",
-          "compare": "exact",
-          "covers": [
-            "Tile.stormEvent"
-          ],
-          "planes": [
-            "storm_event"
-          ],
-          "note": "the STORM_EVENTS row of the storm centred here, -1 when none is live"
-        },
-        {
-          "name": "stormTurns",
-          "compare": "exact",
-          "covers": [
-            "Tile.stormTurns"
-          ],
-          "planes": [
-            "storm_left"
-          ]
-        },
-        {
-          "name": "stormId",
-          "compare": "exact",
-          "covers": [
-            "Tile.stormId",
-            "GameState.stormSerial"
-          ],
-          "planes": [
-            "storm_id",
-            "storm_serial"
-          ],
-          "note": "the serial of the storm centred here, -1 when none is live"
-        },
-        {
-          "name": "stormStruck",
-          "compare": "exact",
-          "covers": [
-            "Tile.stormStruck"
-          ],
-          "planes": [
-            "storm_struck"
-          ],
-          "note": "the serial of the last storm whose footprint struck the plot, -1 none: a storm strikes a plot once"
         },
         {
           "name": "fireStart",

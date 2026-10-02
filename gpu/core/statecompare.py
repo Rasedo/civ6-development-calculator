@@ -271,7 +271,35 @@ GAME = {
     "iceAtStart": lambda sim, b, rows: [int(sim._ice_at_start[b])],
     "freeTreasury": lambda sim, b, rows: [float(sim.free_treasury[b])],
     "freeShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim.FREE_ROW])],
+    "storms": lambda sim, b, rows: [_storm_table(sim, b)],
+    "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
 }
+
+
+def _storm_table(sim, b: int) -> list[int]:
+    """The last serial, then each live storm record in slot order (the order
+    they began): serial, row, centre, turns left, its struck plots sorted
+    behind their count — TS's `storms` row."""
+    out = [int(sim.storm_serial[b])]
+    for k in range(sim.storm_left.shape[1]):
+        if int(sim.storm_left[b, k]) <= 0:
+            continue
+        struck = sim.storm_struck[b, k].nonzero(as_tuple=True)[0].tolist()
+        out += [int(sim.storm_id[b, k]), int(sim.storm_event[b, k]), int(sim.storm_at[b, k]),
+                int(sim.storm_left[b, k]), len(struck), *struck]
+    return out
+
+
+def _drought_table(sim, b: int) -> list[int]:
+    """Each live drought record in slot order: turns left, then its footprint
+    behind its count — TS's `droughts` row."""
+    out: list[int] = []
+    for k in range(sim.drought_left.shape[1]):
+        if int(sim.drought_left[b, k]) <= 0:
+            continue
+        plots = [int(t) for t in sim.drought_plots[b, k].tolist() if t >= 0]
+        out += [int(sim.drought_left[b, k]), len(plots), *plots]
+    return out
 
 
 def _gov_row(plane: str):
@@ -971,10 +999,6 @@ TILE = {
     "fertilitySci": _tile("fertility_sci"),
     "fertilityCul": _tile("fertility_cul"),
     "droughtTurns": _tile("drought"),
-    "stormEvent": _tile("storm_event"),
-    "stormTurns": _tile("storm_left"),
-    "stormId": lambda sim, b, rows: _np.where(sim.storm_left[b].numpy() > 0, sim.storm_id[b].numpy(), -1),
-    "stormStruck": _tile("storm_struck"),
     "fireStart": _tile("fire_start"),
     "featureId": lambda sim, b, rows: sim.feat_id[b].masked_fill(sim.feat_stripped[b], -1).numpy(),
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),

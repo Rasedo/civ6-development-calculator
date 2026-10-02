@@ -205,17 +205,22 @@ def main() -> int:
             break
     assert centre is not None
     for k, (ev, n) in enumerate(((TOR1, 1), (TOR2, 3), (CAT4, 7), (CAT5, 19))):
-        sim.storm_event[0, centre] = ev
-        sim.storm_id[0, centre] = 100 + k   # a fresh storm: nothing struck yet
+        sim.storm_event[0, 0] = ev
+        sim.storm_at[0, 0] = centre
+        sim.storm_id[0, 0] = 100 + k
+        sim.storm_struck[0, 0] = False   # a fresh storm: nothing struck yet
         s0 = int(sim.rng_state[0])
-        sim._storm_turn(hit, torch.tensor([centre]), torch.tensor([False]), torch.tensor([100]))
+        sim._storm_turn(hit, 0, torch.tensor([False]), torch.tensor([100]))
         assert draws(s0, int(sim.rng_state[0]), 260) == 10 * n, f"{ids[ev]} footprint"
+        assert int(sim.storm_struck[0, 0].sum()) == n
         # the same storm strikes no plot twice
         s0 = int(sim.rng_state[0])
-        sim._storm_turn(hit, torch.tensor([centre]), torch.tensor([False]), torch.tensor([100]))
+        sim._storm_turn(hit, 0, torch.tensor([False]), torch.tensor([100]))
         assert int(sim.rng_state[0]) == s0, f"{ids[ev]} struck a plot twice"
-    sim.storm_event[0, centre] = -1
-    sim.storm_id[0, centre] = -1
+    sim.storm_event[0, 0] = -1
+    sim.storm_at[0, 0] = -1
+    sim.storm_id[0, 0] = -1
+    sim.storm_struck[0, 0] = False
     print("  2 the draws OK — ten per tile, a footprint of 1 / 3 / 7 / 19 tiles")
 
     sea = free_tile(sim, True)
@@ -255,8 +260,10 @@ def main() -> int:
     sim2 = fresh(rules)
     sim2.disasters = True
     c = free_tile(sim2, False)
-    sim2.storm_event[0, c] = TOR1
-    sim2.storm_left[0, c] = 3
+    sim2.storm_event[0, 0] = TOR1
+    sim2.storm_at[0, 0] = c
+    sim2.storm_left[0, 0] = 3
+    sim2.storm_id[0, 0] = 1
     sim2._st_weight = [0.0] * len(sim2._st_weight)  # no second storm forms in this scene
     # the record MOVES with the walk on its second and third turns: follow it
     lefts, count = [], []
@@ -267,7 +274,9 @@ def main() -> int:
         lefts.append(int(sim2.storm_left[0, live[0]]) if live else 0)
     assert lefts == [2, 1, 0] and count == [1, 1, 0], (lefts, count)
     assert int((sim2.storm_event[0] >= 0).sum()) == 0, "an expired storm clears its event"
-    print("  6 persistence OK — a live storm counts down 3 -> 0, travels, and clears at 0")
+    assert int((sim2.storm_at[0] >= 0).sum()) == 0 and not bool(sim2.storm_struck[0].any()), \
+        "an expired storm leaves its slot empty"
+    print("  6 persistence OK — a live storm counts down 3 -> 0, travels, and leaves the table at 0")
     # a natural wonder keeps its row: silt that lands on one pays nothing,
     # food or production (tileYields early-returns above the fertility lines)
     sim3 = fresh(rules)
@@ -309,41 +318,50 @@ def main() -> int:
     # may name no neighbour at all, and then no step is drawn)
     sea = next(t for t in range(sim9.T) if bool(sim9.ocean_tile[0, t]) and all(n >= 0 for n in sim9.neigh[t].tolist())
                and int(sim9.military_at[0, t]) < 0 and int(sim9.embarked_at[0, t]) < 0)
-    sim9.storm_event[0, sea] = CAT4_
-    sim9.storm_left[0, sea] = 2
-    sim9.storm_id[0, sea] = 9
+    def seat_storm(k: int, at: int, left: int, sid: int) -> None:
+        sim9.storm_event[0, k] = CAT4_
+        sim9.storm_at[0, k] = at
+        sim9.storm_left[0, k] = left
+        sim9.storm_id[0, k] = sid
+        sim9.storm_struck[0, k] = False
+
+    seat_storm(0, sea, 2, 9)
     no = torch.tensor([False])
     full = torch.tensor([100])
-    s0 = int(sim9.rng_state[0])
-    end = int(sim9._storm_walk(torch.tensor([True]), torch.tensor([sea]), torch.tensor([CAT4_]), no, full)[0])
-    struck = int((sim9.storm_struck[0] == 9).sum())
+    seed = int(sim9.rng_state[0])
+    s0 = seed
+    sim9._storm_walk(torch.tensor([True]), 0, no, full)
+    end = int(sim9.storm_at[0, 0])
+    struck = int(sim9.storm_struck[0, 0].sum())
     spent = draws(s0, int(sim9.rng_state[0]), 2000)
-    # the step draws (one per step, and the one it cannot pay or blocks) and
-    # ten a newly struck plot (no unit stands in these footprints' way)
+    # the step draws (one per step, and the one it cannot pay) and ten a
+    # newly struck plot (no unit stands in these footprints' way)
     steps = spent - 10 * struck
     assert 1 <= steps <= 9, (spent, struck)
-    assert int(sim9.storm_event[0, end]) == CAT4_ and int(sim9.storm_left[0, end]) == 2, "the record did not travel with the centre"
-    assert int(sim9.storm_id[0, end]) == 9, "the serial did not travel with the centre"
-    assert end == sea or int(sim9.storm_event[0, sea]) == -1, "the record was duplicated"
+    assert end != sea, "the walk took no step"
+    assert int(sim9.storm_event[0, 0]) == CAT4_ and int(sim9.storm_left[0, 0]) == 2, "the record changed on its walk"
+    assert int(sim9.storm_id[0, 0]) == 9, "the serial did not stay with the record"
     assert int(sim9.pair_dist[sea, end]) <= 8
     assert int((sim9.storm_left[0] > 0).sum()) == 1
-    # every neighbour holding a live storm: one draw, no step
-    sim9.storm_event[0, end] = -1
-    sim9.storm_left[0, end] = 0
-    sim9.storm_event[0, sea] = CAT4_
-    sim9.storm_left[0, sea] = 2
-    for n in sim9.neigh[sea].tolist():
-        if n >= 0:
-            sim9.storm_event[0, n] = CAT4_
-            sim9.storm_left[0, n] = 1
-    s0 = int(sim9.rng_state[0])
-    end2 = int(sim9._storm_walk(torch.tensor([True]), torch.tensor([sea]), torch.tensor([CAT4_]), no, full)[0])
-    assert end2 == sea and draws(s0, int(sim9.rng_state[0])) == 1, "a blocked walk ends at its first draw"
+    # other storms' centres on the walker's neighbours block nothing: from the
+    # same stream the walk takes the same steps and the same draws
+    seat_storm(0, sea, 2, 9)
+    nbrs = [n for n in sim9.neigh[sea].tolist() if n >= 0]
+    for k in range(1, sim9.storm_left.shape[1]):
+        seat_storm(k, nbrs[k - 1], 1, 9 + k)
+    sim9.rng_state[0] = seed
+    sim9._storm_walk(torch.tensor([True]), 0, no, full)
+    assert int(sim9.storm_at[0, 0]) == end and draws(seed, int(sim9.rng_state[0]), 2000) == spent, \
+        "another storm's centre changed the walk"
     # a game with `walk` off draws nothing and keeps its centre
+    seat_storm(0, sea, 2, 9)
     s0 = int(sim9.rng_state[0])
-    end3 = int(sim9._storm_walk(torch.tensor([False]), torch.tensor([sea]), torch.tensor([CAT4_]), no, full)[0])
-    assert end3 == sea and int(sim9.rng_state[0]) == s0
-    print(f"  9 walk OK — {steps} step draws, {struck} plots struck once each, the record and its serial travel")
+    sim9._storm_walk(torch.tensor([False]), 0, no, full)
+    assert int(sim9.storm_at[0, 0]) == sea and int(sim9.rng_state[0]) == s0
+    for k in range(sim9.storm_left.shape[1]):
+        sim9.storm_left[0, k] = 0
+    sim9._compact_storms()
+    print(f"  9 walk OK — {steps} step draws, {struck} plots struck once each, other storms block nothing")
     # -- 10: THE TURN'S ONE RANDOM EVENT: at most one event a turn; each
     # (row, site) pair weighs its integer weight (tenths of
     # OccurrencesPerGame, a once-per-map row scaled by the map's area) over
@@ -369,8 +387,10 @@ def main() -> int:
     for _ in range(N):
         turn.clear()
         sim10.storm_left.zero_()
-        sim10.storm_event.fill_(-1)
+        sim10._compact_storms()
         sim10.drought.zero_()
+        sim10.drought_left.zero_()
+        sim10._compact_droughts()
         sim10.tile_meteor.zero_()
         s0 = int(sim10.rng_state[0])
         sim10._random_event(strip)
@@ -435,7 +455,7 @@ def main() -> int:
     assert s11._random_event_start_turn == 2
     s11.turn = 1
     s11.storm_left.zero_()
-    s11.storm_event.fill_(-1)
+    s11._compact_storms()
     # every volcano dormant: turn 1 draws the map's one volcano roll (and its
     # pick where it lands) and nothing more
     s11.volcano_active.zero_()
@@ -493,6 +513,8 @@ def main() -> int:
             r0 = int(s.rng_state[0])
             s._drought(one, torch.tensor([c]), torch.tensor([sev]), strip)
             assert draws(r0, int(s.rng_state[0])) == len(area), "one draw per land plot"
+            assert int(s.drought_left[0, 0]) == int(s._drought_duration[sev]), "the record keeps the row's turns"
+            assert s.drought_plots[0, 0, : len(area)].tolist() == area, "the record keeps the footprint in disc order"
             assert int(s.improvement[0, area[-1]]) == s.MINE and not bool(s.pillaged[0, area[-1]]), \
                 "a Mine is not the drought's"
             for t in area[:-1]:
@@ -554,18 +576,32 @@ def main() -> int:
 
     # 13 — THE DROUGHT'S START (`droughtStart`, GameCore_XP2 0x287e80): ONE
     # weighted draw over every candidate plot of the map, each weighing 1 +
-    # min(its distance to the nearest live event plot, the spacing 15); no
-    # city anchor
+    # min(its distance to the nearest live drought's LAST footprint plot, the
+    # spacing 15); no city anchor, and a storm's centre spaces nothing
     s13 = fresh(rules)
     assert s13._drought_spacing == 15
     s13.storm_left.zero_()
+    s13._compact_storms()
     s13.drought.zero_()
+    s13.drought_left.zero_()
+    s13._compact_droughts()
     cand0 = s13._drought_cands(s13._live_event_plots())[0]
     assert bool(cand0.any()), "the fixture holds no drought start"
-    # a live drought on a candidate's far side: the weights tilt away from it
+    # a live drought whose footprint ENDS on a candidate's far side: the
+    # weights tilt away from its last plot
     ev = int(cand0.nonzero().flatten()[0])
+    head = int(s13.neigh[ev][0])
     s13.drought[0, ev] = 5
+    s13.drought[0, head] = 5
+    s13.drought_left[0, 0] = 5
+    s13.drought_plots[0, 0, :2] = torch.tensor([head, ev])
+    # a storm far off: its centre is under an event, yet it spaces nothing
+    far = int(s13.pair_dist[ev].argmax())
+    s13.storm_event[0, 0] = 0
+    s13.storm_at[0, 0] = far
+    s13.storm_left[0, 0] = 2
     live13 = s13._live_event_plots()
+    assert bool(live13[0, far]), "a storm's centre is under a live event"
     cand = s13._drought_cands(live13)[0]
     assert not bool(cand[ev]), "a plot under a live event starts no drought"
     wts = (1 + s13.pair_dist[ev].long().clamp(max=15)) * cand.long()

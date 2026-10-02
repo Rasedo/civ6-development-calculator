@@ -300,7 +300,7 @@ def main() -> None:
     assert abs(rows_seen[0] / n - 4 / 6.5) < 0.03, f"GENTLE {rows_seen[0]}/{n} against 4/6.5"
     print(f"  5 Kilimanjaro OK — {rows_seen} over {n} draws against 4 / 2.5, over its ring")
 
-    # 6 — THE DAMAGE ROWS, plot by plot (`_eruption_damage`), the improvement rows on
+    # 6 — THE DAMAGE ROWS, plot by plot (`_event_damage`), the improvement rows on
     # OWNED plots only, the unit rows on any:
     # every open ring plot a Farm, all but one owned; a Warrior and a Builder
     # on an owned one, a Warrior and a bonus resource on the unowned one, a

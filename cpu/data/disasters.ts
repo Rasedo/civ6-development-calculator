@@ -2,13 +2,6 @@ import type { CivId, LeaderId } from './seats';
 import { srcConst, xml, type SrcMap } from './provenance';
 
 /**
- * RIVER FLOOD magnitudes, from the Gathering Storm Flood page's two tables.
- *
- * Severity runs Moderate, Major, 1000 Year. Every array below is indexed by
- * that, and every probability is the page's own percentage.
- */
-
-/**
  * THE TURN'S ONE RANDOM EVENT. CIV6 (`RandomEvent_Frequencies`,
  * REALISM_SETTING_MODERATE — OWNER RULING: this engine models MODERATE):
  * every event row carries an `OccurrencesPerGame`, and MEASURED in a natural
@@ -848,71 +841,95 @@ export const FIRE_APPEAL = srcConst('disasters.fireAppeal', -1, {
     xml('Features', `FeatureType=FEATURE_${f}`, 'Appeal')),
 });
 
-/** "Improvement — Pillaged: 100%; Destroyed: 50% / 80%". A flood always
- *  pillages; these are the chances it takes the improvement away entirely. */
-const floodPage = (what: string) => ({
-  pedia: `the GS Flood page's severity table (${what}), by severity Moderate / Major / 1000 Year`,
-});
-const floodDmg = (kind: string, col = 'Percentage') => [
-  xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_FLOOD_MODERATE&DamageType=${kind}`, col),
-  xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_FLOOD_MAJOR&DamageType=${kind}`, col),
-  xml('RandomEvent_Damages', `RandomEventType=RANDOM_EVENT_FLOOD_1000_YEAR&DamageType=${kind}`, col),
-];
-export const FLOOD_DESTROY_P = srcConst('disasters.floodDestroyP', [0, 0.5, 0.8] as const,
-  floodPage('Improvement — Destroyed: 0 / 50% / 80%'));
-/** "District — 0 / 50% / 80%". A damaged district takes its buildings dark
- *  with it, which is the page's "Building 100%" column. */
-export const FLOOD_DISTRICT_P = srcConst('disasters.floodDistrictP', [0, 0.5, 0.8] as const,
-  floodPage('District — 0 / 50% / 80%'));
-/** CIV6 (RandomEvent_Damages): BUILDING_PILLAGED is 100 on all three flood
- *  rows — including MODERATE, which carries no DISTRICT_PILLAGED row at all,
- *  so the two columns are plainly independent. */
-export const FLOOD_BLDG_P = srcConst('disasters.floodBldgP', [1, 1, 1] as const, {
-  derived: 'Percentage/100 of each flood row\'s BUILDING_PILLAGED damage row (100 on all three)',
-  inputs: floodDmg('BUILDING_PILLAGED'),
-});
-/** "Population" and "Civilians killed", which the page gives the same
- *  percentage at every severity. */
-export const FLOOD_POP_P = srcConst('disasters.floodPopP', [0, 0.15, 0.25] as const,
-  floodPage('Population / Civilians killed — 0 / 15% / 25%'));
-/** "Units" and "Garrison — 30-50 HP / 50-70 HP" (the rows' MinHP / MaxHP):
- *  the garrison's one roll reads both ends, each land unit's own draw
- *  MinHP + rand(MaxHP − MinHP) (the applier 0x3366a0). */
-export const FLOOD_DAMAGE_LO = srcConst('disasters.floodDmgLo', [0, 30, 50] as const,
-  floodPage('Units / Garrison — 30-50 HP / 50-70 HP, the low end'));
-export const FLOOD_DAMAGE_HI = srcConst('disasters.floodDmgHi', [0, 50, 70] as const,
-  floodPage('Units / Garrison — 30-50 HP / 50-70 HP, the high end'));
-
 /**
- * "Floods fertilize each type of Floodplains differently... Each expresses the
- * chance of a tile to gain +1 of the given yield, and note that a single tile
- * may gain BOTH yields from the same flood." Columns are Plains, Grassland,
- * Desert floodplains, in that order.
+ * THE FLOOD'S ROWS (`Expansion2_RandomEvents.xml`), per severity MODERATE /
+ * MAJOR / 1000_YEAR, each list in the install's XML order — the order the
+ * flood walks them (GameCore_XP2 0xa2a4d0 the damage, 0xa2ed80 the yields).
  */
-const fertRow = (y: string, sev: number, r: readonly number[]) =>
-  srcConst(`disasters.floodFert${y}.${sev}`, r, {
-    pedia: `the GS Flood page's fertilization table, ${y} row ${sev} (Moderate / Major / 1000 Year), `
-      + 'columns Plains, Grassland, Desert floodplains',
-  });
-export const FLOOD_FERT_FOOD = [
-  fertRow('Food', 0, [0.30, 0.15, 0.25]),
-  fertRow('Food', 1, [0.45, 0.25, 0.30]),
-  fertRow('Food', 2, [0.60, 0.40, 0.45]),
-] as const;
-export const FLOOD_FERT_PROD = [
-  fertRow('Prod', 0, [0, 0, 0]),
-  fertRow('Prod', 1, [0.10, 0.30, 0.15]),
-  fertRow('Prod', 2, [0.15, 0.40, 0.25]),
-] as const;
+const FLOOD_SEVS = ['MODERATE', 'MAJOR', '1000_YEAR'] as const;
+const floodEv = (sev: string) => `RandomEventType=RANDOM_EVENT_FLOOD_${sev}`;
 
-/** Which fertility column a floodplain's terrain reads. Real Civ 6 puts
- *  Floodplains on Plains, Grassland and Desert; this generator makes only the
- *  Desert kind, so the other two columns are shipped and unreached. */
-export function floodTerrainColumn(terrain: string): number {
-  if (terrain === 'PLAINS') return 0;
-  if (terrain === 'GRASSLAND') return 1;
-  return 2;
+/** One `RandomEvent_Damages` row of a flood: its DamageType, its Percentage
+ *  (the chance of the row's one draw per plot) and its MinHP / MaxHP band (0
+ *  where the row carries none). */
+export interface FloodDamageRow {
+  kind: 'IMPROVEMENT_DESTROYED' | 'IMPROVEMENT_PILLAGED' | 'DISTRICT_PILLAGED' | 'BUILDING_PILLAGED'
+    | 'POPULATION_LOSS' | 'UNIT_KILLED_CIVILIAN' | 'UNIT_DAMAGE_LAND' | 'CITY_GARRISON' | 'CITY_WALLS';
+  pct: number;
+  lo: number;
+  hi: number;
 }
+const floodDamageRows = (sev: typeof FLOOD_SEVS[number], rows: readonly FloodDamageRow[]): readonly FloodDamageRow[] => {
+  const at = (r: FloodDamageRow) => `${floodEv(sev)}&DamageType=${r.kind}`;
+  srcConst(`disasters.floodDamageKinds.${sev}`, rows.map((r) => r.kind), {
+    derived: `the RANDOM_EVENT_FLOOD_${sev} rows of RandomEvent_Damages in XML order (Expansion2_RandomEvents.xml)`,
+    inputs: rows.map((r) => xml('RandomEvent_Damages', at(r), 'DamageType', { expect: r.kind })),
+  });
+  srcConst(`disasters.floodDamagePct.${sev}`, rows.map((r) => r.pct), {
+    derived: `the Percentage of each RANDOM_EVENT_FLOOD_${sev} damage row, in XML order`,
+    inputs: rows.map((r) => xml('RandomEvent_Damages', at(r), 'Percentage', { expect: r.pct })),
+  });
+  srcConst(`disasters.floodDamageBand.${sev}`, rows.flatMap((r) => [r.lo, r.hi]), {
+    derived: `the MinHP / MaxHP of each RANDOM_EVENT_FLOOD_${sev} damage row, in XML order; a row carrying `
+      + 'no band reads the schema\'s 0 / 0',
+    inputs: rows.flatMap((r) => [xml('RandomEvent_Damages', at(r), 'MinHP', { expect: r.lo }),
+      xml('RandomEvent_Damages', at(r), 'MaxHP', { expect: r.hi })]),
+  });
+  return rows;
+};
+const dmg = (kind: FloodDamageRow['kind'], pct: number, lo = 0, hi = 0): FloodDamageRow => ({ kind, pct, lo, hi });
+export const FLOOD_DAMAGE_ROWS: readonly (readonly FloodDamageRow[])[] = [
+  floodDamageRows('MODERATE', [dmg('IMPROVEMENT_PILLAGED', 100), dmg('BUILDING_PILLAGED', 100)]),
+  floodDamageRows('MAJOR', [dmg('IMPROVEMENT_DESTROYED', 50), dmg('IMPROVEMENT_PILLAGED', 100),
+    dmg('DISTRICT_PILLAGED', 50), dmg('BUILDING_PILLAGED', 100), dmg('POPULATION_LOSS', 15),
+    dmg('UNIT_KILLED_CIVILIAN', 15), dmg('UNIT_DAMAGE_LAND', 100, 30, 50), dmg('CITY_GARRISON', 100, 30, 50),
+    dmg('CITY_WALLS', 100, 30, 50)]),
+  floodDamageRows('1000_YEAR', [dmg('IMPROVEMENT_DESTROYED', 80), dmg('IMPROVEMENT_PILLAGED', 100),
+    dmg('DISTRICT_PILLAGED', 80), dmg('BUILDING_PILLAGED', 100), dmg('POPULATION_LOSS', 25),
+    dmg('UNIT_KILLED_CIVILIAN', 25), dmg('UNIT_DAMAGE_LAND', 100, 50, 70), dmg('CITY_GARRISON', 100, 50, 70),
+    dmg('CITY_WALLS', 100, 50, 70)]),
+];
+
+/** One `RandomEvent_Yields` row of a flood: +1 of its yield (Food →
+ *  `fertility`, Production → `fertilityProd`) on a plot of its Floodplains
+ *  kind, at its Percentage. */
+export interface FloodYieldRow {
+  yield: 'YIELD_FOOD' | 'YIELD_PRODUCTION';
+  feature: 'FLOODPLAINS' | 'FLOODPLAINS_GRASSLAND' | 'FLOODPLAINS_PLAINS';
+  pct: number;
+}
+const floodYieldRows = (sev: typeof FLOOD_SEVS[number], rows: readonly FloodYieldRow[]): readonly FloodYieldRow[] => {
+  const at = (r: FloodYieldRow) => `${floodEv(sev)}&YieldType=${r.yield}&FeatureType=FEATURE_${r.feature}`;
+  srcConst(`disasters.floodYieldRows.${sev}`, rows.flatMap((r) => [r.yield, r.feature]), {
+    derived: `the RANDOM_EVENT_FLOOD_${sev} rows of RandomEvent_Yields in XML order, each its YieldType and `
+      + 'FeatureType (the FEATURE_ prefix dropped)',
+    inputs: rows.map((r) => xml('RandomEvent_Yields', at(r), 'FeatureType', { expect: `FEATURE_${r.feature}` })),
+  });
+  srcConst(`disasters.floodYieldPct.${sev}`, rows.map((r) => r.pct), {
+    derived: `the Percentage of each RANDOM_EVENT_FLOOD_${sev} yield row, in XML order`,
+    inputs: rows.map((r) => xml('RandomEvent_Yields', at(r), 'Percentage', { expect: r.pct })),
+  });
+  return rows;
+};
+const yld = (y: 'F' | 'P', feature: FloodYieldRow['feature'], pct: number): FloodYieldRow =>
+  ({ yield: y === 'F' ? 'YIELD_FOOD' : 'YIELD_PRODUCTION', feature, pct });
+export const FLOOD_YIELD_ROWS: readonly (readonly FloodYieldRow[])[] = [
+  floodYieldRows('MODERATE', [yld('F', 'FLOODPLAINS', 25), yld('F', 'FLOODPLAINS_GRASSLAND', 15),
+    yld('F', 'FLOODPLAINS_PLAINS', 30)]),
+  floodYieldRows('MAJOR', [yld('F', 'FLOODPLAINS', 30), yld('P', 'FLOODPLAINS', 15),
+    yld('F', 'FLOODPLAINS_GRASSLAND', 25), yld('P', 'FLOODPLAINS_GRASSLAND', 30),
+    yld('F', 'FLOODPLAINS_PLAINS', 45), yld('P', 'FLOODPLAINS_PLAINS', 10)]),
+  floodYieldRows('1000_YEAR', [yld('F', 'FLOODPLAINS', 45), yld('P', 'FLOODPLAINS', 25),
+    yld('F', 'FLOODPLAINS_GRASSLAND', 40), yld('P', 'FLOODPLAINS_GRASSLAND', 40),
+    yld('F', 'FLOODPLAINS_PLAINS', 60), yld('P', 'FLOODPLAINS_PLAINS', 15)]),
+];
+
+/** CIV6 (`RandomEvents.MitigatedYieldReduction`): on a mitigated river each
+ *  yield row's Percentage falls to (100 − this) × Percentage // 100. */
+export const FLOOD_MITIGATED_YIELD_REDUCTION = srcConst('disasters.floodMitigatedYieldReduction', 50, {
+  derived: 'the three flood rows\' RandomEvents.MitigatedYieldReduction (50 on each)',
+  inputs: FLOOD_SEVS.map((s) => xml('RandomEvents', floodEv(s), 'MitigatedYieldReduction', { expect: 50 })),
+});
 
 /**
  * THE NUCLEAR ACCIDENT, one row per severity MINOR / MAJOR / CATASTROPHIC

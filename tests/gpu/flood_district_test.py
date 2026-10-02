@@ -61,7 +61,7 @@ def main() -> None:
     hit = torch.zeros(sim.B, dtype=torch.bool)
     hit[0] = True
     at = torch.full((sim.B,), t, dtype=torch.long)
-    top = torch.full((sim.B,), len(sim._flood_district_p) - 1, dtype=torch.long)
+    top = torch.full((sim.B,), len(sim._flood_damage) - 1, dtype=torch.long)
     n = 0
     while not bool(sim.district_pillaged[0, t]) and n < 200:
         sim._flood_river(hit, at, top)

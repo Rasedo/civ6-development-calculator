@@ -306,9 +306,8 @@ def test_iteru_production(rules, path) -> None:
 
 
 def test_iteru_flood(rules, path) -> None:
-    lo = fresh(rules, path)._flood_dmg_lo
-    sev = int(lo.argmax())
-    assert int(lo[sev]) > 0, "no severity damages for sure"
+    rows = fresh(rules, path)._flood_damage
+    sev = max(i for i, r in enumerate(rows) if any(k == "UNIT_DAMAGE_LAND" and pct == 100 for k, pct, _lo, _hi in r))
     warrior, farm = UNITS.index("WARRIOR"), IMPS.index("FARM")
 
     def run(as_civ: str) -> tuple[int, int]:
@@ -324,8 +323,7 @@ def test_iteru_flood(rules, path) -> None:
         sim.improvement[B0, t] = farm
         sim.pillaged[B0, t] = False
         slot = place(sim, t, warrior, egypt)
-        sim._flood_tile(torch.tensor([True]), torch.tensor([t]), torch.tensor([sev]),
-                        torch.tensor([False]))
+        sim._flood_river(torch.tensor([True]), torch.tensor([t]), torch.tensor([sev]))
         return int(sim.major_unit_hp[B0, slot]), int(sim.improvement[B0, t])
 
     hp_e, imp_e = run("EGYPT")

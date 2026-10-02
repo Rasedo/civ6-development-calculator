@@ -343,6 +343,24 @@ export interface Emergency {
   members: number[];
 }
 
+/** A live STORM (Game_Climate m_aStorms): its serial, its `STORM_EVENTS` row,
+ *  the plot it is centred on, the turns it has left, and the plots its
+ *  footprint has struck — each struck once a storm. */
+export interface StormRecord {
+  id: number;
+  event: number;
+  at: number;
+  left: number;
+  struck: number[];
+}
+
+/** A live DROUGHT (Game_Climate m_aDroughts): its footprint's plots in
+ *  `STORM_DISC` order and the turns it has left. */
+export interface DroughtRecord {
+  plots: number[];
+  left: number;
+}
+
 export interface GameState {
   seats: Seat[];
   gameOver?: boolean;
@@ -425,8 +443,12 @@ export interface GameState {
   iceAtStart?: number;
   map: GameMap;
   turn: number;
-  /** the last storm serial handed out (`Tile.stormId`) */
+  /** the last storm serial handed out (`StormRecord.id`) */
   stormSerial?: number;
+  /** the live STORMS (Game_Climate m_aStorms), in the order they began */
+  storms?: StormRecord[];
+  /** the live DROUGHTS (Game_Climate m_aDroughts), in the order they began */
+  droughts?: DroughtRecord[];
   seatActions?: SeatActionLog;
   sandbox: boolean;
   /** Great-person ids recruited BY ANYONE, in claim order. Real Civ 6 great
