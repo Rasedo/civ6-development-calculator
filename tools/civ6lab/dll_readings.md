@@ -435,6 +435,17 @@ the climate component's turn (0x2d1f20's component, the one the district
 repair's FLOODED / CONTAMINATED reasons read). The engines' `endTurn` runs
 `disasterPhase` then `climateTurn`, the same order.
 
+## C-20 tail: the trade path's land and water tests — PARTLY READ
+
+IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's
+virtual +0x40 holds (a district stands there, unread), they read the plot
+info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4:
+land = bit 4 and not bit 1, water = bit 1 and not bit 4; a plot carrying
+both (or neither) is neither land nor water, so the 10000 switch cannot fire
+on it. Without a district: land = not water (0x834d0). Open: which of those
+bits a City Centre's, a Harbor's and a Canal's plot carry (who writes word
++0x14), and so whether the engines' "no switch at a centre" holds.
+
 ## DLL rules the engines contradict
 
 None known: every rule read above ships on both engines.
