@@ -82,6 +82,12 @@ export interface DumpPlayer {
   /** [type, assigned city owner, assigned city id, established, turns to
    *  establish, neutralized turns, promotion indices] per appointed governor */
   governors?: [number, number, number, Read<boolean>, Read<number>, Read<number>, number[]][];
+  /** [player, alliance type, alliance level] per alliance this player holds */
+  allies?: [number, Read<number>, Read<number>][];
+  /** the players this one has declared friendship with */
+  friends?: number[];
+  /** the dedications (CommemorationTypes indices) held for the current era */
+  commemorations?: Read<number[]>;
 }
 
 export interface DumpReligionInCity {
@@ -131,6 +137,8 @@ export interface DumpCity {
   /** [type, count] gold/faith price rows: [kind "B"|"U"|"D", index, cost, gold, faith] */
   buy: [string, number, Read<number>, Read<number>, Read<number>][];
   plotBuy: [number, number][];
+  /** the trade routes leaving the city, the game's route tables raw */
+  routes?: Read<Record<string, unknown>[]>;
   /** [buildingIndex, pillaged 0/1] */
   buildings: [number, number][];
   /** [type, x, y, complete, pillaged, defense, garrisonDamage, garrisonMax, outerDamage, outerMax] */
@@ -139,7 +147,32 @@ export interface DumpCity {
   /** [building, slot, great work index, GreatWorks row] per filled slot */
   greatWorks?: [number, number, number, Read<number>][];
   plots: number[];
-  queue: Read<Record<string, unknown>>[];
+  /** the build queue in order, each entry as `BuildQueue:GetAt` returns it */
+  queue: Read<DumpQueueEntry>[];
+  /** the production each queue entry has banked, parallel to `queue` */
+  queueProgress?: Read<number>[];
+}
+
+/** One build-queue entry: the row index of what it builds (one of the four
+ *  type keys) and, for a district or wonder, its plot. */
+export interface DumpQueueEntry {
+  BuildingType?: number;
+  UnitType?: number;
+  DistrictType?: number;
+  ProjectType?: number;
+  MilitaryFormationType?: number;
+  Location?: { x: number; y: number };
+  Directive?: number;
+}
+
+/** One World Congress resolution in the record's table: `Type` the
+ *  ResolutionType's hash, `ChosenLabel` "A" for the first outcome, and
+ *  `ChosenThing` the target's localisation key. */
+export interface DumpResolution {
+  Type: number;
+  ChosenLabel?: string;
+  ChosenThing?: string;
+  TargetType?: string;
 }
 
 export interface DumpUnit {
@@ -158,6 +191,8 @@ export interface DumpUnit {
   spreadCharges: Read<number>;
   religion: Read<number>;
   embarked: Read<boolean>;
+  /** the UnitPromotions indices the unit holds */
+  promotions?: number[];
 }
 
 export interface DumpReligion {
@@ -206,6 +241,12 @@ export interface Catalog {
   unitReplaces: [string, string][];
   leaderInherits: [string, string][];
   wonders: string[];
+  /** per GreatWorks row: [GreatWorkType, GreatWorkObjectType,
+   *  GreatPersonIndividualType, EraType], "" for an empty column */
+  greatWorks?: [string, string, string, string][];
+  unitPromotions?: string[];
+  commemorations?: string[];
+  alliances?: string[];
 }
 
 /** The plot at game (x, y) of a record: rows are y, plots x. */

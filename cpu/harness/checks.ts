@@ -17,14 +17,16 @@
  * moved (a purchase, a unit trained from the city, a capture, a missionary)
  * is skipped with the action as its reason, never guessed around; so is a
  * player whose turn start one of the records was read before (its pools
- * stand still across a pair and move twice across the next).
+ * stand still across a pair and move twice across the next). The era checks
+ * (`eraChecks`) pay the pair's era-score events through the engine's own
+ * era-score functions and run its era boundary where a new era begins.
  *
  * Every result names its subject and carries the state it was computed on;
  * `gaps` lists the importer's roster gaps that touch the subject, so the
  * report can separate a clean failure from one an unimported row explains.
  */
 import type { City, GameState, Tile } from '../core/types';
-import { computeCityStats, tileYieldsForCenter, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism } from '../core/city';
+import { computeCityStats, tileYieldsForCenter, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { cityDefenseStrength } from '../core/combat';
@@ -42,7 +44,15 @@ import type { DistrictId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type TurnRecord } from './record';
-import { engineRowOf, importTurn, type History, type Imported } from './import';
+import {
+  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, type History, type Imported,
+} from './import';
+import { addEraScore, buildingDedications, eraBoundary } from '../core/eras';
+import { citiesOf } from '../core/seats';
+import {
+  AGE_GOLDEN, AGE_PREV_STEP, ERA_DARK_T, ERA_GOLDEN_T, ERA_LENGTH, ERA_SCORE_CONQUER, ERA_SCORE_FOUND, ERA_SCORE_GP,
+  ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_WONDER,
+} from '../data/seats';
 
 export interface CheckResult {
   turn: number;
@@ -99,14 +109,6 @@ function cityPlotYields(state: GameState, city: City, t: Tile): number[] | null 
   for (const [x, l] of pins) x.locked = l;
   if (!one.workedTiles.includes(t.index)) return null;
   return YIELD_KEYS.map((k) => round3(one.breakdown.tiles[k] - none.breakdown.tiles[k]));
-}
-
-/** Has the World Congress a resolution in the record's table (a numbered
- *  entry beside its `Stage`)? */
-function congressSat(rec: TurnRecord): boolean {
-  const c = rec.congress;
-  if (Array.isArray(c)) return c.length > 0;
-  return !!c && typeof c === 'object' && Object.keys(c).some((k) => /^\d+$/.test(k));
 }
 
 /** the checks no plot of the city's feeds: a dropped row on one of its plots,
@@ -247,9 +249,9 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       num((c.districts[0] ?? [])[5] as number), cityDefenseStrength(state, city),
       { buildings: city.buildings, districts: city.districts.map((d) => d.type) });
 
-    // production costs and purchase prices; a World Congress in session
-    // may price them (its resolutions are in the record, not imported)
-    const buyGaps = congressSat(rec) ? [...gaps, 'congress:not imported'] : gaps;
+    // production costs and purchase prices; a standing World Congress
+    // resolution the importer could not carry may price them
+    const buyGaps = [...gaps, ...imp.congressGaps];
     const buyPush = (check: string, ok: boolean, game: unknown, ours: unknown, st?: Record<string, unknown>) =>
       out.push({ turn, check, subject, ok, game, ours, ...gapsFor(buyGaps, check), ...(ok || !st ? {} : { state: st }) });
     const unlocks = computeUnlocks(state, city.seat);
@@ -318,7 +320,9 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     out.push({ turn, check: 'seat.maintDistricts', subject, ok: d === num(p.maintDistricts), game: num(p.maintDistricts), ours: d, ...gaps });
     out.push({ turn, check: 'seat.maintUnits', subject, ok: u === num(p.maintUnits), game: num(p.maintUnits), ours: u, ...gaps,
       state: { units: state.units.filter((x) => x.seat === seat).map((x) => x.type) } });
-    const tour = seatTourism(state, seat);
+    // the game's reader answers the whole output, the religious half with it
+    // (runs/h1_duelw1103 t150: Rome's 8 is its Holy City's)
+    const tour = seatTourism(state, seat) + seatTourismReligious(state, seat);
     out.push({ turn, check: 'seat.tourism', subject, ok: near(tour, num(p.tourism), 0.5), game: num(p.tourism), ours: round3(tour), ...gaps });
   }
   return out;
@@ -540,6 +544,8 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     }
   }
 
+  out.push(...eraChecks(a, b, cat, late, history));
+
   // the game's own bookkeeping across the pair, which says where in its turn
   // the dump sits: a pool at t+1 is its turn-t value plus its turn-t rate
   for (const c of a.cities) {
@@ -553,3 +559,130 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   }
   return out;
 }
+
+/** What one player did between two records that the engine pays era score
+ *  for: each event as [what, the engine's moment value], and the buildings
+ *  it completed (the dedications' site). */
+export interface EraEvents {
+  events: [string, number][];
+  buildings: string[];
+}
+
+/**
+ * The era-score events the difference of two records shows, by game player:
+ * a city on a plot that held none (founded), a city whose owner changed
+ * (gained), a world wonder newly complete on the player's plot, a pantheon or
+ * religion newly held, a Great Person unit newly the player's, and every
+ * building a city of theirs holds at t+1 and did not at t.
+ */
+export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog): Map<number, EraEvents> {
+  const out = new Map<number, EraEvents>();
+  const of = (pid: number) => {
+    if (!out.has(pid)) out.set(pid, { events: [], buildings: [] });
+    return out.get(pid)!;
+  };
+  const W = b.head.W;
+  const centres = new Map(a.cities.map((c) => [c.y * W + c.x, c]));
+  for (const c of b.cities) {
+    const was = centres.get(c.y * W + c.x);
+    if (!was) of(c.owner).events.push([`found ${strip(c.name, 'LOC_CITY_NAME_')}`, ERA_SCORE_FOUND]);
+    else if (was.owner !== c.owner) of(c.owner).events.push([`gain ${strip(c.name, 'LOC_CITY_NAME_')}`, ERA_SCORE_CONQUER]);
+    else {
+      const had = new Set(was.buildings.map(([bi]) => bi));
+      for (const [bi] of c.buildings) {
+        if (had.has(bi) || cat.wonders.includes(cat.buildings[bi])) continue;
+        const id = engineRowOf(cat, 'building', bi);
+        if (id) of(c.owner).buildings.push(id);
+      }
+    }
+  }
+  for (let i = 0; i < W * b.head.H; i++) {
+    const p1 = plotAt(b, i);
+    const w = p1[P.wonder] as number;
+    if (typeof w !== 'number' || w < 0 || p1[P.wonderComplete] !== 1) continue;
+    const p0 = plotAt(a, i);
+    if (p0[P.wonder] === w && p0[P.wonderComplete] === 1) continue;
+    of(p1[P.owner] as number).events.push([`wonder ${strip(cat.buildings[w], 'BUILDING_')}`, ERA_SCORE_WONDER]);
+  }
+  for (const p1 of b.players) {
+    const p0 = a.players.find((q) => q.id === p1.id);
+    if (!p0) continue;
+    if (!(num(p0.pantheon) >= 0) && num(p1.pantheon) >= 0) of(p1.id).events.push(['pantheon', ERA_SCORE_PANTHEON]);
+    if (!(num(p0.religionCreated) >= 0) && num(p1.religionCreated) >= 0) of(p1.id).events.push(['religion', ERA_SCORE_RELIGION]);
+  }
+  const before = new Set(a.units.map((u) => `${u.owner}:${u.id}`));
+  for (const u of b.units) {
+    const name = cat.units[u.type] ?? '';
+    if (!before.has(`${u.owner}:${u.id}`) && name.startsWith('UNIT_GREAT_')) {
+      of(u.owner).events.push([`great person ${strip(name, 'UNIT_GREAT_')}`, ERA_SCORE_GP]);
+    }
+  }
+  return out;
+}
+
+/**
+ * THE ERA CHECKS. `step.eraScore`: each major's era-score change across the
+ * pair against what the engine's own era-score functions pay on the imported
+ * turn-t state for the events the difference shows (`addEraScore` per moment,
+ * `buildingDedications` per completed building). `era.age`: on the pair a new
+ * era begins across, the engine's era boundary (`eraBoundary`) run on the
+ * imported turn-t state against the age the game gave each major.
+ */
+function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>, history?: History): CheckResult[] {
+  const out: CheckResult[] = [];
+  const turn = a.turn;
+  const imp = importTurn(a, cat, history);
+  const state = imp.state;
+  const events = eraEvents(a, b, cat);
+  for (const p0 of a.players) {
+    if (!bool(p0.major)) continue;
+    const p1 = b.players.find((q) => q.id === p0.id);
+    const seat = imp.seatOfPlayer.get(p0.id)!;
+    const subject = `seat ${p0.id} ${String(p0.civ)}`;
+    if (!p1 || late.has(p0.id)) {
+      out.push({ turn, check: 'step.eraScore', subject, ok: true, skip: !p1 ? 'no t+1' : 'a turn start missing from a record' });
+      continue;
+    }
+    const s = state.seats[seat];
+    const was = s.eraScore ?? 0;
+    const ev = events.get(p0.id) ?? { events: [], buildings: [] };
+    for (const [, per] of ev.events) addEraScore(state, seat, per);
+    for (const id of ev.buildings) buildingDedications(state, seat, id);
+    const ours = (s.eraScore ?? 0) - was;
+    const game = num(p1.eraScore) - num(p0.eraScore);
+    // what era score reads of the imported seat: its leader (a civilization's
+    // own moments) and the buildings its cities hold
+    const gaps = [...new Set([...(s.civ < 0 ? ['leader'] : []),
+      ...[...imp.cityByKey].filter(([, c]) => c.seat === seat)
+        .flatMap(([k]) => [...(imp.cityGaps.get(k) ?? [])].filter((g) => g.startsWith('building:')))])];
+    out.push({ turn, check: 'step.eraScore', subject, ok: ours === game, game, ours,
+      ...(gaps.length ? { gaps } : {}),
+      ...(ours === game ? {} : { state: { events: ev.events.map(([w]) => w), buildings: ev.buildings } }) });
+  }
+  if (eraBegan(a, b)) {
+    const st = importTurn(a, cat, history).state;
+    const counts = new Map(st.seats.map((s) => [s.seat, { cities: citiesOf(st, s.seat).length,
+      score: s.eraScore ?? 0, golden: s.goldenAges ?? 0, dark: s.darkAges ?? 0 }]));
+    st.turn = (Math.floor(st.turn / ERA_LENGTH) + 1) * ERA_LENGTH;
+    eraBoundary(st);
+    for (const p1 of b.players) {
+      if (!bool(p1.major)) continue;
+      const seat = imp.seatOfPlayer.get(p1.id);
+      if (seat === undefined) continue;
+      const s = st.seats[seat];
+      const ours = s.age === AGE_GOLDEN ? (s.prevAge === 0 ? AGE_HEROIC : AGE_GOLDEN_ONLY) : s.age === 0 ? AGE_DARK : AGE_NORMAL;
+      const game = ageOf(p1);
+      const c = counts.get(seat)!;
+      const p0 = a.players.find((q) => q.id === p1.id);
+      const darkT = ERA_DARK_T + c.cities + AGE_PREV_STEP * (c.golden - c.dark);
+      out.push({ turn, check: 'era.age', subject: `seat ${p1.id} ${String(p1.civ)}`, ok: ours === game,
+        game: AGE_NAMES[game], ours: AGE_NAMES[ours],
+        ...(ours === game ? {} : { state: { windowScore: c.score, cities: c.cities, ourDark: darkT,
+          ourGolden: darkT + ERA_GOLDEN_T - ERA_DARK_T, gameScore: num(p0?.eraScore), gameDark: num(p0?.darkThreshold),
+          gameGolden: num(p0?.goldenThreshold), gameNextDark: num(p1.darkThreshold) } }) });
+    }
+  }
+  return out;
+}
+
+const AGE_NAMES = ['dark', 'normal', 'golden', 'heroic'];

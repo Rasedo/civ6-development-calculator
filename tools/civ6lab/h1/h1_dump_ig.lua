@@ -33,6 +33,11 @@ if ZCAT == 1 then
     for row in tbl() do out[row.Index + 1] = row[col] end
     return out
   end
+  -- a table only some rulesets carry: an empty list where the game lacks it
+  local function namesIf(tname, col)
+    local ok, out = pcall(function() return names(GameInfo[tname], col) end)
+    return ok and out or {}
+  end
   local function pairsOf(tbl, a, b)
     local out = {}
     for row in tbl() do
@@ -45,6 +50,18 @@ if ZCAT == 1 then
     for row in GameInfo.Buildings() do
       if row.IsWonder then out[#out + 1] = row.BuildingType end
     end
+    return out
+  end
+  -- per GreatWorks row: [type, object type, the person who makes it, era],
+  -- "" for a column the row leaves empty
+  local function greatWorkRows()
+    local out = {}
+    pcall(function()
+      for row in GameInfo.GreatWorks() do
+        out[row.Index + 1] = {row.GreatWorkType, row.GreatWorkObjectType,
+          row.GreatPersonIndividualType or "", row.EraType or ""}
+      end
+    end)
     return out
   end
   OUT({k = "cat",
@@ -66,11 +83,15 @@ if ZCAT == 1 then
     eras = names(GameInfo.Eras, "EraType"),
     governors = names(GameInfo.Governors, "GovernorType"),
     promotions = names(GameInfo.GovernorPromotions, "GovernorPromotionType"),
+    unitPromotions = namesIf("UnitPromotions", "UnitPromotionType"),
+    commemorations = namesIf("CommemorationTypes", "CommemorationType"),
+    alliances = namesIf("Alliances", "AllianceType"),
     buildingReplaces = pairsOf(GameInfo.BuildingReplaces, "CivUniqueBuildingType", "ReplacesBuildingType"),
     districtReplaces = pairsOf(GameInfo.DistrictReplaces, "CivUniqueDistrictType", "ReplacesDistrictType"),
     unitReplaces = pairsOf(GameInfo.UnitReplaces, "CivUniqueUnitType", "ReplacesUnitType"),
     leaderInherits = pairsOf(GameInfo.Leaders, "LeaderType", "InheritFrom"),
-    wonders = wonderNames()})
+    wonders = wonderNames(),
+    greatWorks = greatWorkRows()})
 end
 
 -- the map: per plot [terrain, feature, resource, resourceCount, improvement,
@@ -175,6 +196,22 @@ for _, p in ipairs(players) do
     end
   end
   rec.wars, rec.met = wars, met
+  -- [player, alliance type, alliance level] per alliance; the players this
+  -- one has declared friendship with
+  local allies, friends = {}, {}
+  for _, q in ipairs(players) do
+    if q ~= p then
+      local oka, a = pcall(function() return dip:HasAllied(q) end)
+      if oka and a then
+        allies[#allies + 1] = {q, P(function() return dip:GetAllianceType(q) end), P(function() return dip:GetAllianceLevel(q) end)}
+      end
+      local okf, f = pcall(function() return dip:HasDeclaredFriendship(q) end)
+      if okf and f then friends[#friends + 1] = q end
+    end
+  end
+  rec.allies, rec.friends = allies, friends
+  -- the dedications this player holds for the current era
+  rec.commemorations = P(function() return eras:GetPlayerActiveCommemorations(p) end)
   local tokens = {}
   local inf = pl:GetInfluence()
   for _, q in ipairs(players) do
@@ -278,10 +315,25 @@ for _, p in ipairs(players) do
       productionYield = P(function() return bq:GetProductionYield() end),
       queueSize = P(function() return bq:GetSize() end),
       governor = P(function() local gv = c:GetAssignedGovernor(); return gv and gv:GetType() or -1 end)}
-    local qs = {}
+    -- the queue, and beside it the production each entry has banked
+    local qs, qp = {}, {}
     local okq, qn = pcall(function() return bq:GetSize() end)
-    if okq and qn then for i = 0, qn - 1 do qs[#qs + 1] = P(function() return bq:GetAt(i) end) end end
+    if okq and qn then
+      for i = 0, qn - 1 do
+        local e = P(function() return bq:GetAt(i) end)
+        qs[#qs + 1] = e
+        qp[#qp + 1] = P(function()
+          if type(e) ~= "table" then return -1 end
+          if e.DistrictType ~= nil and e.DistrictType >= 0 then return bq:GetDistrictProgress(e.DistrictType) end
+          if e.ProjectType ~= nil and e.ProjectType >= 0 then return bq:GetProjectProgress(e.ProjectType) end
+          if e.UnitType ~= nil and e.UnitType >= 0 then return bq:GetUnitProgress(e.UnitType) end
+          if e.BuildingType ~= nil and e.BuildingType >= 0 then return bq:GetBuildingProgress(e.BuildingType) end
+          return -1
+        end)
+      end
+    end
     rec.queue = qs
+    rec.queueProgress = qp
     local bs, gws = {}, {}
     for row in GameInfo.Buildings() do
       local okh, has = pcall(function() return bl:HasBuilding(row.Index) end)
@@ -360,13 +412,27 @@ for _, p in ipairs(players) do
       end
     end
     rec.plotBuy = plotBuy
+    -- the trade routes leaving this city, as the game's route table gives them
+    rec.routes = P(function() return c:GetTrade():GetOutgoingRoutes() end)
     OUT(rec)
   end
 end
 
+-- the unit promotions each unit holds, by UnitPromotions index
+local function unitPromos(u)
+  local out = {}
+  local okx, xp = pcall(function() return u:GetExperience() end)
+  if not okx or not xp then return out end
+  for row in GameInfo.UnitPromotions() do
+    local okp, hp = pcall(function() return xp:HasPromotion(row.Index) end)
+    if okp and hp then out[#out + 1] = row.Index end
+  end
+  return out
+end
 for _, p in ipairs(players) do
   for _, u in Players[p]:GetUnits():Members() do
     OUT({k = "unit", owner = p, id = u:GetID(), type = u:GetType(), x = u:GetX(), y = u:GetY(),
+      promotions = unitPromos(u),
       damage = P(function() return u:GetDamage() end), moves = P(function() return u:GetMovesRemaining() end),
       maxMoves = P(function() return u:GetMaxMoves() end), xp = P(function() return u:GetExperience():GetExperiencePoints() end),
       level = P(function() return u:GetExperience():GetLevel() end),

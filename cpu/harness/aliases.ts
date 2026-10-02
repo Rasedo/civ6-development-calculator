@@ -18,6 +18,9 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { GOVERNORS, GOVERNOR_PROMOTIONS } from '../data/governors';
+import { GREAT_PEOPLE } from '../data/greatPeople';
+import { CONGRESS_RESOLUTIONS } from '../data/seats';
+import { PROJECTS } from '../data/projects';
 
 type Rows = Readonly<Record<string, { src?: Readonly<Record<string, Src>> }>>;
 
@@ -73,8 +76,22 @@ export function aliases(): Record<string, Map<string, string>> {
       'Beliefs', 'BeliefType'),
     governor: aliasesOf([byId(GOVERNORS)], 'Governors', 'GovernorType'),
     promotion: aliasesOf([byId(GOVERNOR_PROMOTIONS)], 'GovernorPromotions', 'GovernorPromotionType'),
+    person: aliasesOf([byId(Object.values(GREAT_PEOPLE).flat())], 'GreatPersonIndividuals', 'GreatPersonIndividualType'),
+    resolution: aliasesOf([byId(CONGRESS_RESOLUTIONS)], 'Resolutions', 'ResolutionType'),
+    project: aliasesOf([PROJECTS as Rows], 'Projects', 'ProjectType'),
   };
   return cache;
+}
+
+/** The game's row hash of a type name (`DB.MakeHash`): the string's CRC-32
+ *  without the final inversion, as a signed 32-bit integer. */
+export function gameHash(s: string): number {
+  let c = 0xffffffff;
+  for (const b of Buffer.from(s, 'utf8')) {
+    c ^= b;
+    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+  }
+  return c | 0;
 }
 
 /** The engine id for a game type of one kind: the catalog's own tag, or the

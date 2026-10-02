@@ -7,6 +7,14 @@ import { diffActions, stateChecks } from '../../../cpu/harness/checks';
 import type { Catalog, DumpCity, DumpPlayer, DumpUnit, TurnRecord } from '../../../cpu/harness/record';
 import { seatOfCityState } from '../../../cpu/core/seats';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../../../cpu/data/governors';
+import { gameHash } from '../../../cpu/harness/aliases';
+import { eraEvents, transitionChecks } from '../../../cpu/harness/checks';
+import { GW_HOLDERS, GWO_RELIC, GWO_WRITING, holderSlots } from '../../../cpu/data/greatWorks';
+import { GP_CITY_PERM, GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
+import { CONGRESS_RESOLUTIONS, ERA_SCORE_FOUND, ERA_SCORE_PANTHEON } from '../../../cpu/data/seats';
+import { PLACEABLE_DISTRICTS } from '../../../cpu/data/districts';
+import { settlerCost } from '../../../cpu/core/game';
+import { clearableFeatures } from '../../../world/features';
 
 const CAT: Catalog = {
   terrains: ['TERRAIN_GRASS', 'TERRAIN_GRASS_HILLS', 'TERRAIN_PLAINS', 'TERRAIN_COAST', 'TERRAIN_OCEAN', 'TERRAIN_DESERT_MOUNTAIN'],
@@ -14,16 +22,17 @@ const CAT: Catalog = {
   resources: ['RESOURCE_WHEAT', 'RESOURCE_NOT_IN_ENGINE'],
   improvements: ['IMPROVEMENT_FARM', 'IMPROVEMENT_GOODY_HUT', 'IMPROVEMENT_BARBARIAN_CAMP'],
   districts: ['DISTRICT_CITY_CENTER', 'DISTRICT_CAMPUS', 'DISTRICT_SEOWON'],
-  buildings: ['BUILDING_PALACE', 'BUILDING_MONUMENT', 'BUILDING_LIBRARY', 'BUILDING_MADRASA', 'BUILDING_PYRAMIDS', 'BUILDING_NOT_IN_ENGINE'],
+  buildings: ['BUILDING_PALACE', 'BUILDING_MONUMENT', 'BUILDING_LIBRARY', 'BUILDING_MADRASA', 'BUILDING_PYRAMIDS', 'BUILDING_NOT_IN_ENGINE',
+    'BUILDING_AMPHITHEATER', 'BUILDING_BANK'],
   units: ['UNIT_WARRIOR', 'UNIT_SWORDSMAN', 'UNIT_AZTEC_EAGLE_WARRIOR', 'UNIT_SETTLER'],
   techs: ['TECH_POTTERY', 'TECH_WRITING'],
   civics: ['CIVIC_CODE_OF_LAWS'],
   policies: ['POLICY_GOD_KING'],
   governments: ['GOVERNMENT_CHIEFDOM'],
   beliefs: [],
-  religions: [],
+  religions: ['RELIGION_TAOISM'],
   routes: ['ROUTE_ANCIENT_ROAD'],
-  projects: [],
+  projects: ['PROJECT_ENHANCE_DISTRICT_CAMPUS'],
   eras: ['ERA_ANCIENT'],
   governors: ['GOVERNOR_THE_MERCHANT'],
   promotions: ['GOVERNOR_PROMOTION_MERCHANT_LAND_ACQUISITION'],
@@ -32,6 +41,10 @@ const CAT: Catalog = {
   unitReplaces: [['UNIT_AZTEC_EAGLE_WARRIOR', 'UNIT_WARRIOR']],
   leaderInherits: [['LEADER_MINOR_CIV_GENEVA', 'LEADER_MINOR_CIV_SCIENTIFIC']],
   wonders: ['BUILDING_PYRAMIDS'],
+  greatWorks: [
+    ['GREATWORK_HOMER_1', 'GREATWORKOBJECT_WRITING', 'GREAT_PERSON_INDIVIDUAL_HOMER', ''],
+    ['GREATWORK_RELIC_1', 'GREATWORKOBJECT_RELIC', '', ''],
+  ],
 };
 
 const W = 6;
@@ -246,5 +259,122 @@ describe('the checks', () => {
     const acts = diffActions(a, b);
     expect(acts.unitsNew.map((u) => u.plot)).toEqual([9]);
     expect(acts.spreads).toEqual([{ owner: 0, religion: 3, plot: 8 }]);
+  });
+});
+
+const holder = (id: string) => GW_HOLDERS.findIndex((h) => h.id === id);
+
+describe('the great works', () => {
+  it('place each work in its holder slot with its object and maker', () => {
+    const rec = record(10, { cities: [city({ buildings: [[0, 0], [1, 0], [6, 0]],
+      greatWorks: [[6, 1, 7, 0], [0, 0, 8, 1]] }), record(10).cities[1]] });
+    const c = importTurn(rec, CAT).state.seats[0].cities[0];
+    expect(c.greatWorks).toEqual([
+      { slot: holderSlots(holder('PALACE'))[0], obj: GWO_RELIC, maker: -1, era: -1, seat: 0 },
+      { slot: holderSlots(holder('AMPHITHEATER'))[1], obj: GWO_WRITING,
+        maker: GREAT_PEOPLE.WRITER.findIndex((p) => p.id === 'GP_HOMER'), era: -1, seat: 0 },
+    ].sort((a, b) => a.slot - b.slot));
+  });
+
+  it('read a work in a Bank as the widening Giovanni de’ Medici left', () => {
+    const rec = record(10, { cities: [city({ buildings: [[0, 0], [7, 0]], greatWorks: [[7, 0, 9, 0]] }),
+      record(10).cities[1]] });
+    const c = importTurn(rec, CAT).state.seats[0].cities[0];
+    expect(c.greatWorks?.map((w) => w.slot)).toEqual([holderSlots(holder('BANK'))[0]]);
+    expect(c.gpPerm?.[GP_CITY_PERM.indexOf('bankGwSlots')]).toBe(2);
+  });
+});
+
+describe('the World Congress', () => {
+  it('hashes a type name as the game does', () => {
+    expect(gameHash('MAPSIZE_DUEL')).toBe(388991850);
+    expect(gameHash('WC_RES_WORLD_RELIGION')).toBe(-1311232414);
+  });
+
+  it('carries each resolution with its outcome and target, and names the one it cannot place', () => {
+    const rec = record(10, {
+      religions: [{ Religion: 0, Founder: 0, Beliefs: [] }],
+      congress: {
+        1: { Type: gameHash('WC_RES_WORLD_RELIGION'), ChosenLabel: 'A', ChosenThing: 'LOC_RELIGION_TAOISM' },
+        2: { Type: gameHash('WC_RES_URBAN_DEVELOPMENT'), ChosenLabel: 'Б', ChosenThing: 'LOC_DISTRICT_CAMPUS_NAME' },
+        3: { Type: gameHash('WC_RES_URBAN_DEVELOPMENT'), ChosenLabel: 'A', ChosenThing: 'LOC_DISTRICT_CITY_CENTER_NAME' },
+        4: { Type: gameHash('WC_RES_TRADE_TREATY'), ChosenLabel: 'A', ChosenThing: '1' },
+        5: { Type: gameHash('WC_RES_DEFORESTATION_TREATY'), ChosenLabel: 'A', ChosenThing: 'LOC_FEATURE_JUNGLE_NAME' },
+        6: { Type: gameHash('WC_RES_DIPLOVICTORY'), ChosenLabel: 'A', ChosenThing: '1' },
+        Stage: -2147483648,
+      },
+    });
+    const imp = importTurn(rec, CAT);
+    const res = (id: string) => CONGRESS_RESOLUTIONS.findIndex((r) => r.id === id);
+    expect(imp.state.congress).toEqual([
+      { res: res('WORLD_RELIGION'), outcome: 0, target: 0 },
+      { res: res('URBAN_DEVELOPMENT_TREATY'), outcome: 1, target: PLACEABLE_DISTRICTS.indexOf('CAMPUS') },
+      { res: res('TRADE_POLICY'), outcome: 0, target: 1 },
+      { res: res('DEFORESTATION_TREATY'), outcome: 0, target: clearableFeatures().indexOf('RAINFOREST') },
+    ]);
+    expect(imp.congressGaps).toEqual(['congress:URBAN_DEVELOPMENT_TREATY target LOC_DISTRICT_CITY_CENTER_NAME']);
+  });
+});
+
+describe('the build queue', () => {
+  const queue = [{ UnitType: 3 }, { BuildingType: 2 }, { DistrictType: 1, Location: { x: 4, y: 2 } },
+    { BuildingType: 4, Location: { x: 1, y: 2 } }, { ProjectType: 0 }];
+
+  it('carries each entry as the engine item, its progress where the record has it', () => {
+    const rec = record(10, { cities: [city({ queue, queueProgress: [5, 7, 'err:no reader', 0, 2] }), record(10).cities[1]] });
+    const imp = importTurn(rec, CAT);
+    const q = imp.state.seats[0].cities[0].queue;
+    expect(q.map((x) => [x.kind, x.progress])).toEqual([['settler', 5], ['building', 7], ['district', 0], ['wonder', 0], ['project', 2]]);
+    // the price the engine would lock queueing it into an empty queue
+    expect(q[0]).toMatchObject({ cost: settlerCost(importTurn(record(10), CAT).state, 0) });
+    expect(q[1]).toMatchObject({ building: 'LIBRARY' });
+    expect(q[2]).toMatchObject({ district: 'CAMPUS', tileIndex: 16 });
+    expect((q[2] as { cost: number }).cost).toBeGreaterThan(0);
+    expect(q[3]).toMatchObject({ wonder: 'PYRAMIDS', tileIndex: 13 });
+    expect(q[4]).toMatchObject({ project: 'RESEARCH_GRANTS' });
+    expect(imp.queueProgressRead).toBe(true);
+  });
+
+  it('stands every item at 0 when the record carries no progress', () => {
+    const imp = importTurn(record(10, { cities: [city({ queue }), record(10).cities[1]] }), CAT);
+    expect(imp.state.seats[0].cities[0].queue.every((x) => x.progress === 0)).toBe(true);
+    expect(imp.queueProgressRead).toBe(false);
+  });
+});
+
+describe('the ages', () => {
+  const at = (turn: number, eraScore: number, dark: number, golden: number, flags: Partial<DumpPlayer> = {}) =>
+    record(turn, { players: [player(0, { eraScore, darkThreshold: dark, goldenThreshold: golden, ...flags }), ...record(turn).players.slice(1)] });
+
+  it('fold every era transition into the past ages and split the era score', () => {
+    const h = newHistory();
+    const recs = [at(1, 0, 8, 19), at(2, 5, 8, 19), at(3, 6, 12, 23, { darkAge: true }),
+      at(4, 30, 43, 54, { goldenAge: true, heroic: true })];
+    for (const r of recs) advanceHistory(h, r, CAT);
+    expect(h.eraTurns).toEqual([3, 4]);
+    const s = importTurn(recs[3], CAT, h).state.seats[0];
+    expect([s.age, s.prevAge, s.darkAges, s.goldenAges]).toEqual([2, 0, 1, 1]);
+    expect([s.eraScorePast, s.eraScore]).toEqual([6, 24]);
+  });
+});
+
+describe('the era checks', () => {
+  const antium = city({ id: 65537, name: 'LOC_CITY_NAME_ANTIUM', x: 4, y: 2, capital: false, buildings: [],
+    districts: [[0, 4, 2, true, false, 10, 0, 200, 0, 0]], worked: [], plots: [16] });
+
+  it('read a founded city and a pantheon off the pair', () => {
+    const a = record(10);
+    const b = record(11, { cities: [...record(11).cities, antium], players: [player(0, { pantheon: 0 }), ...record(11).players.slice(1)] });
+    expect(eraEvents(a, b, CAT).get(0)?.events).toEqual([['found ANTIUM', ERA_SCORE_FOUND], ['pantheon', ERA_SCORE_PANTHEON]]);
+  });
+
+  it('pay them through the engine and compare with the game', () => {
+    const a = record(10);
+    const b = record(11, {
+      cities: [city({ food: 6, culture: 9 }), record(11).cities[1], antium],
+      players: [player(0, { pantheon: 0, eraScore: 3 + ERA_SCORE_FOUND + ERA_SCORE_PANTHEON }), ...record(11).players.slice(1)],
+    });
+    const r = transitionChecks(a, b, CAT).find((x) => x.check === 'step.eraScore' && x.subject.startsWith('seat 0 '));
+    expect(r).toMatchObject({ ok: true, game: ERA_SCORE_FOUND + ERA_SCORE_PANTHEON, ours: ERA_SCORE_FOUND + ERA_SCORE_PANTHEON });
   });
 });

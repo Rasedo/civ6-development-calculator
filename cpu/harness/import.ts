@@ -20,7 +20,9 @@
  *
  * A city's worked plots are pinned (`Tile.locked`) and its district slots
  * take the game's specialist counts (`City.specialistPref`), so the engine's
- * yield walk works what the game works. What a single turn does not say
+ * yield walk works what the game works. Its great works, its build queue and
+ * the World Congress's standing resolutions are carried as the record names
+ * them (`importGreatWorks`, `importQueue`, `importCongress`). What a single turn does not say
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
@@ -43,11 +45,27 @@ import { GOVERNMENTS, POLICIES } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_TYPES } from '../data/cityStates';
-import { FEATURES } from '../../world/features';
+import { FEATURES, clearableFeatures } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { neighborTile } from '../../world/hex';
-import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type TurnRecord } from './record';
-import { engineId } from './aliases';
+import { GP_CITY_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
+import {
+  GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
+  GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
+} from '../data/greatWorks';
+import { CONGRESS_RESOLUTIONS } from '../data/seats';
+import { PROJECTS, PROJECT_LIST } from '../data/projects';
+import { GOVERNORS } from '../data/governors';
+import { GOVERNMENT_LIST, POLICY_LIST } from '../data/policies';
+import { LUXURY_IDS } from '../../world/resources';
+import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
+import type { QueueItem } from '../core/types';
+import { projectCost, settlerCost } from '../core/game';
+import { builderCost, traderCost } from '../core/units';
+import { computeUnlocks } from '../core/effects';
+import { districtSiteCost } from '../core/phase';
+import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
+import { aliases, engineId, gameHash } from './aliases';
 
 export interface Imported {
   state: GameState;
@@ -77,6 +95,12 @@ export interface Imported {
   /** the gaps met importing each city (a building or district, its great
    *  works, the amenity ledgers the dump lacks), by `${gamePlayer}:${gameCityId}` */
   cityGaps: Map<string, Set<string>>;
+  /** the World Congress resolutions in the record the importer could not
+   *  carry into `GameState.congress` */
+  congressGaps: string[];
+  /** does the record carry the queues' banked production (`queueProgress`)?
+   *  Where it does not, every imported queue item stands at 0 */
+  queueProgressRead: boolean;
 }
 
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
@@ -282,10 +306,11 @@ function leaderRow(leader: string): number {
  * WHAT ONE TURN'S STATE DOES NOT SAY, read off the records before it: the
  * strongest melee unit each player has trained or bought (a city centre's
  * base, `Seat.bestMeleeCS`), how many plots each city has taken with culture
- * (`City.tilesAcquired`, what a border expansion costs) and the Builders
- * each player has gained. All three are reconstructed from diffs — a unit id
- * new at t+1, a culture box that fell — so a game recorded from its first
- * turn carries them; a city first
+ * (`City.tilesAcquired`, what a border expansion costs), the Builders
+ * each player has gained, and the age every closed era gave each player with
+ * the era score it began the current one on. All are reconstructed from
+ * diffs — a unit id new at t+1, a culture box that fell, age thresholds that
+ * moved — so a game recorded from its first turn carries them; a city first
  * seen after its founding turn is `unknownSince`, and a check reading its
  * count is skipped.
  */
@@ -303,11 +328,43 @@ export interface History {
    *  when its feature regrows (`RandomEvent_Yields` Turns 2 and 6) */
   fireFood: Map<number, number>;
   fireProd: Map<number, number>;
+  /** the age each era transition gave each player, in order (`AGE_DARK`,
+   *  `AGE_NORMAL`, `AGE_GOLDEN_ONLY`, `AGE_HEROIC`) */
+  ages: Map<number, number[]>;
+  /** each player's era score standing when the current era began */
+  eraStartScore: Map<number, number>;
+  /** the turns a new era began on: the first record whose age thresholds
+   *  moved for any major (the world's era is the game's, one for all) */
+  eraTurns: number[];
+}
+
+export const AGE_DARK = 0;
+export const AGE_NORMAL = 1;
+export const AGE_GOLDEN_ONLY = 2;
+export const AGE_HEROIC = 3;
+
+/** a record player's age, read off the game's three age flags */
+export function ageOf(p: DumpPlayer): number {
+  return bool(p.heroic) ? AGE_HEROIC : bool(p.goldenAge) ? AGE_GOLDEN_ONLY : bool(p.darkAge) ? AGE_DARK : AGE_NORMAL;
+}
+
+/** Did a new era begin between two records: has any major's pair of age
+ *  thresholds moved? */
+export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
+  for (const p1 of b.players) {
+    if (!bool(p1.major)) continue;
+    const p0 = a.players.find((q) => q.id === p1.id);
+    if (p0 && (num(p0.darkThreshold) !== num(p1.darkThreshold) || num(p0.goldenThreshold) !== num(p1.goldenThreshold))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(),
-    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map() };
+    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), ages: new Map(), eraStartScore: new Map(),
+    eraTurns: [] };
 }
 
 /** Fold one record into the history, in turn order. */
@@ -348,6 +405,19 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (now.startsWith('FEATURE_BURNT_')) h.fireFood.set(i, (h.fireFood.get(i) ?? 0) + 1);
       else if (was.startsWith('FEATURE_BURNT_') && (now === 'FEATURE_FOREST' || now === 'FEATURE_JUNGLE')) {
         h.fireProd.set(i, (h.fireProd.get(i) ?? 0) + 1);
+      }
+    }
+    // a new era: every major's age for it, and the score it began on (the
+    // score the record before it closed the last era with)
+    if (eraBegan(h.last, rec)) {
+      h.eraTurns.push(rec.turn);
+      for (const p of rec.players) {
+        if (!bool(p.major)) continue;
+        const list = h.ages.get(p.id) ?? [];
+        list.push(ageOf(p));
+        h.ages.set(p.id, list);
+        const was = h.last.players.find((q) => q.id === p.id);
+        h.eraStartScore.set(p.id, num(was?.eraScore) || 0);
       }
     }
   }
@@ -457,6 +527,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     ctx.scopeSeat = undefined;
     s.bestMeleeCS = history?.bestMelee.get(p.id) ?? 0;
     s.buildersTrained = history?.builders.get(p.id) ?? 0;
+    if (bool(p.major)) importAges(s, p, history);
   }
   for (const p of players) {
     const a = seatOfGame(p.id);
@@ -620,7 +691,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     // game's plots; the district slots take the game's specialist counts
     for (const q of c.worked) if (q !== center && !tiles[q].district) tiles[q].locked = true;
     if (city.isCapital) holder.capitalTile = center;
-    if (c.greatWorks?.length) gap(ctx, 'great-works', 'not imported');
+    importGreatWorks(ctx, c, city);
     if (num(c.governor) >= 0 && rec.players.find((q) => q.id === c.owner)?.governors === undefined) {
       gap(ctx, 'governor', 'not in the record');
     }
@@ -629,8 +700,6 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (num(c.amenityParts?.[13]) > 0) gap(ctx, 'war-weariness', 'not imported');
     if (num(c.amenityParts?.[14]) > 0) gap(ctx, 'bankruptcy', 'not imported');
   }
-
-  ctx.scopeCity = undefined;
 
   // the governors: each appointed one in its catalog slot, seated in the
   // engine city (or, Amani, the city-state) the game names
@@ -721,9 +790,20 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     state.units.push(unit);
   }
   state.nextUnitId = nextId;
+
+  // the World Congress, then the build queues: last, so the prices the
+  // engine locks at queueing read the whole imported state
+  const congressGaps = importCongress(rec, cat, state, religionSeat, seatOfGame);
+  // (a queued row the engine lacks is the game's gap, no city's: nothing a
+  // check reads comes from the queue)
+  let queueProgressRead = false;
+  for (const city of cityByKey.values()) {
+    if (importQueue(ctx, state, dumpOfCity.get(city)!, city)) queueProgressRead = true;
+  }
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
+    congressGaps, queueProgressRead,
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
   };
 }
@@ -779,12 +859,267 @@ function importPlayer(ctx: Ctx, p: DumpPlayer, s: GameState['seats'][number]): v
   s.faith = num(p.faith);
   s.diplomaticFavor = num(p.favor) || 0;
   s.envoysAvailable = num(p.tokens) || 0;
-  s.eraScore = num(p.eraScore) || 0;
-  s.age = bool(p.goldenAge) || bool(p.heroic) ? AGE_GOLDEN : bool(p.darkAge) ? 0 : 1;
   const pan = num(p.pantheon);
   if (pan >= 0) {
     const id = engineId('belief', cat.beliefs[pan], 'BELIEF_', PANTHEONS);
     if (id) s.religion.pantheon = id;
     else gap(ctx, 'pantheon', cat.beliefs[pan]);
+  }
+}
+
+/**
+ * A major's ages: the current one off the record's flags (a Heroic age is
+ * the engine's Golden code), the eras the history saw begin counted into
+ * `darkAges` / `goldenAges` with the one before the current as `prevAge`,
+ * and the game's whole-game era score split at the current era's start into
+ * `eraScorePast` and the current era's `eraScore`.
+ */
+function importAges(s: GameState['seats'][number], p: DumpPlayer, history?: History): void {
+  const engineAge = (a: number) => (a >= AGE_GOLDEN_ONLY ? AGE_GOLDEN : a === AGE_DARK ? 0 : 1);
+  s.age = engineAge(ageOf(p));
+  const ages = history?.ages.get(p.id) ?? [];
+  s.darkAges = ages.filter((a) => a === AGE_DARK).length;
+  s.goldenAges = ages.filter((a) => a >= AGE_GOLDEN_ONLY).length;
+  s.prevAge = ages.length >= 2 ? engineAge(ages[ages.length - 2]) : 1;
+  const total = num(p.eraScore) || 0;
+  const past = history?.eraStartScore.get(p.id) ?? 0;
+  s.eraScorePast = past;
+  s.eraScore = total - past;
+}
+
+const CLEARABLE = clearableFeatures();
+
+const GWO_BY_NAME: Record<string, number> = {
+  GREATWORKOBJECT_SCULPTURE: GWO_SCULPTURE, GREATWORKOBJECT_PORTRAIT: GWO_PORTRAIT,
+  GREATWORKOBJECT_LANDSCAPE: GWO_LANDSCAPE, GREATWORKOBJECT_RELIGIOUS: GWO_RELIGIOUS,
+  GREATWORKOBJECT_ARTIFACT: GWO_ARTIFACT, GREATWORKOBJECT_WRITING: GWO_WRITING,
+  GREATWORKOBJECT_MUSIC: GWO_MUSIC, GREATWORKOBJECT_RELIC: GWO_RELIC,
+};
+const PEOPLE = Object.fromEntries(Object.values(GREAT_PEOPLE).flat().map((p) => [p.id, p]));
+
+/**
+ * A city's great works: each filled slot the record names becomes a work in
+ * the engine layout position of its holder's slot (`holderSlots`), its
+ * object type and maker (the person's place in its class roster, -1 for a
+ * Relic or a find) from the GreatWorks row. A work in a Bank's slot means
+ * Giovanni de' Medici's widening stands in the city (`bankGwSlots`). The
+ * record names no creator player and no find's era, so a work's
+ * civilization is the city's seat and its era -1; a full holder of Artifacts,
+ * whose theming reads both, is the city's `great-work-origin` gap.
+ */
+function importGreatWorks(ctx: Ctx, c: DumpCity, city: City): void {
+  const works: GreatWork[] = [];
+  for (const [bi, s, , row] of c.greatWorks ?? []) {
+    const name = ctx.cat.buildings[bi];
+    const id = ctx.wonders.has(name) ? engineId('wonder', name, 'BUILDING_', BUILT_WONDERS)
+      : engineRowOf(ctx.cat, 'building', bi);
+    const h = GW_HOLDERS.findIndex((x) => x.id === id);
+    if (h < 0) {
+      gap(ctx, 'great-work-holder', name);
+      continue;
+    }
+    const pos = holderSlots(h)[s];
+    const gw = ctx.cat.greatWorks?.[num(row)];
+    if (pos === undefined || !gw) {
+      gap(ctx, 'great-work', gw ? `${name} slot ${s}` : 'no GreatWorks catalog');
+      continue;
+    }
+    const obj = GWO_BY_NAME[gw[1]];
+    if (obj === undefined) {
+      gap(ctx, 'great-work-object', gw[1]);
+      continue;
+    }
+    let maker = -1;
+    if (gw[2]) {
+      const pid = aliasOrPrefixed(gw[2]);
+      const person = pid ? PEOPLE[pid] : undefined;
+      if (person) maker = GREAT_PEOPLE[person.class].indexOf(person);
+      else gap(ctx, 'great-work-maker', gw[2]);
+    }
+    if (GW_HOLDERS[h].id === 'BANK') {
+      const perm = GP_CITY_PERM.indexOf('bankGwSlots');
+      const amount = GW_GP_EXTRA_SLOTS.find((r) => r.holder === 'BANK')!.amount;
+      city.gpPerm ??= GP_CITY_PERM.map(() => 0);
+      city.gpPerm[perm] = Math.max(city.gpPerm[perm] ?? 0, amount);
+    }
+    works.push({ slot: pos, obj, maker, era: -1, seat: city.seat });
+  }
+  // a full holder of Artifacts is themed by their eras and civilizations
+  for (const h of new Set(works.filter((w) => w.obj === GWO_ARTIFACT).map((w) => GW_LAYOUT[w.slot].holder))) {
+    const slots = holderSlots(h).filter((x) => GW_LAYOUT[x].extraRank < 0);
+    if (slots.every((x) => works.some((w) => w.slot === x))) gap(ctx, 'great-work-origin', GW_HOLDERS[h].id);
+  }
+  if (works.length) city.greatWorks = works.sort((a, b) => a.slot - b.slot);
+}
+
+/** a Great Person's engine id: the roster's own tag, or `GP_` + the
+ *  individual's name */
+function aliasOrPrefixed(individual: string): string | null {
+  const tagged = engineId('person', individual, 'GREAT_PERSON_INDIVIDUAL_', PEOPLE);
+  if (tagged) return tagged;
+  const bare = `GP_${strip(individual, 'GREAT_PERSON_INDIVIDUAL_')}`;
+  return bare in PEOPLE ? bare : null;
+}
+
+/**
+ * A city's build queue in order. What each entry builds is its row (the
+ * entry's one type key, a civilization's unique row read as the row it
+ * replaces), a district or wonder on the entry's plot; its progress is the
+ * record's `queueProgress` where the record carries it and 0 where it does
+ * not (`Imported.queueProgressRead`). The prices the engine locks at
+ * queueing (a district's, a project's, a Settler's, a Builder's or a
+ * Trader's) are the engine's own for the imported state.
+ */
+function importQueue(ctx: Ctx, state: GameState, c: DumpCity, city: City): boolean {
+  const s = seatOf(state, city.seat);
+  if (!s) return false;
+  const W = state.map.width;
+  let read = false;
+  let unlocks: ReturnType<typeof computeUnlocks> | null = null;
+  const queue: QueueItem[] = [];
+  c.queue.forEach((e, i) => {
+    if (typeof e !== 'object' || e === null) return;
+    const pr = num(c.queueProgress?.[i]);
+    if (Number.isFinite(pr) && pr >= 0) read = true;
+    const progress = Number.isFinite(pr) && pr >= 0 ? pr : 0;
+    const at = e.Location && e.Location.x >= 0 ? e.Location.y * W + e.Location.x : -1;
+    if (e.UnitType !== undefined) {
+      const id = engineRowOf(ctx.cat, 'unit', e.UnitType);
+      if (!id) return gap(ctx, 'queue-unit', ctx.cat.units[e.UnitType]);
+      if (id === 'SETTLER') queue.push({ kind: 'settler', progress, cost: settlerCost(state, city.seat) });
+      else {
+        const cost = id === 'BUILDER' ? builderCost(state, city.seat) : id === 'TRADER' ? traderCost(state, city.seat) : undefined;
+        const formation = num(e.MilitaryFormationType) > 0 ? num(e.MilitaryFormationType) : undefined;
+        queue.push({ kind: 'unit', unit: id, progress, ...(cost !== undefined ? { cost } : {}),
+          ...(formation !== undefined ? { formation } : {}) });
+      }
+    } else if (e.BuildingType !== undefined) {
+      const name = ctx.cat.buildings[e.BuildingType];
+      if (ctx.wonders.has(name)) {
+        const id = engineId('wonder', name, 'BUILDING_', BUILT_WONDERS);
+        if (!id || at < 0) return gap(ctx, 'queue-wonder', name);
+        queue.push({ kind: 'wonder', wonder: id, tileIndex: at, progress });
+      } else {
+        const id = engineRowOf(ctx.cat, 'building', e.BuildingType);
+        if (!id) return gap(ctx, 'queue-building', name);
+        queue.push({ kind: 'building', building: id, progress });
+      }
+    } else if (e.DistrictType !== undefined) {
+      const id = engineRowOf(ctx.cat, 'district', e.DistrictType) as DistrictId | null;
+      if (!id || at < 0) return gap(ctx, 'queue-district', ctx.cat.districts[e.DistrictType]);
+      unlocks ??= computeUnlocks(state, city.seat);
+      queue.push({ kind: 'district', district: id, tileIndex: at, progress, cost: districtSiteCost(state, s, id, unlocks) });
+    } else if (e.ProjectType !== undefined) {
+      const name = ctx.cat.projects[e.ProjectType] ?? '';
+      const id = engineId('project', name, 'PROJECT_', PROJECTS);
+      if (!id) return gap(ctx, 'queue-project', name);
+      queue.push({ kind: 'project', project: id, progress, cost: projectCost(state, city.seat, id, city) });
+    }
+  });
+  city.queue = queue;
+  return read;
+}
+
+/** a resolution's engine index by the game's ResolutionType hash */
+let RESOLUTION_BY_HASH: Map<number, number> | null = null;
+function resolutionByHash(): Map<number, number> {
+  if (RESOLUTION_BY_HASH) return RESOLUTION_BY_HASH;
+  const m = new Map<number, number>();
+  const types = aliases().resolution;
+  CONGRESS_RESOLUTIONS.forEach((r, i) => {
+    const named = [...types].filter(([, id]) => id === r.id).map(([t]) => t);
+    for (const t of named.length ? named : [`WC_RES_${r.id}`]) m.set(gameHash(t), i);
+  });
+  RESOLUTION_BY_HASH = m;
+  return m;
+}
+
+/**
+ * The World Congress's standing resolutions: each numbered entry of the
+ * record's table becomes `{ res, outcome, target }` — the resolution by its
+ * type's hash, outcome 0 for the entry's "A", the target its localisation key
+ * names in the engine's own target space for the resolution's kind. The
+ * Diplomatic Victory resolution stands outside the engine's table. Every
+ * entry the importer cannot place is returned as a gap.
+ */
+function importCongress(rec: TurnRecord, cat: Catalog, state: GameState, religionSeat: Map<number, number>,
+  seatOfGame: (pid: number) => number): string[] {
+  const table = rec.congress;
+  if (!table || typeof table !== 'object') return [];
+  const gaps: string[] = [];
+  const out: NonNullable<GameState['congress']> = [];
+  const dv = gameHash('WC_RES_DIPLOVICTORY');
+  for (const [k, v] of Object.entries(table as Record<string, unknown>)) {
+    if (!/^\d+$/.test(k) || !v || typeof v !== 'object') continue;
+    const e = v as DumpResolution;
+    if (e.Type === dv) continue;
+    const res = resolutionByHash().get(e.Type);
+    if (res === undefined) {
+      gaps.push(`congress:resolution ${e.Type}`);
+      continue;
+    }
+    if (typeof e.ChosenLabel !== 'string' || typeof e.ChosenThing !== 'string') {
+      gaps.push(`congress:${CONGRESS_RESOLUTIONS[res].id} undecided`);
+      continue;
+    }
+    const outcome = e.ChosenLabel === 'A' || e.ChosenLabel === 'А' ? 0 : 1;
+    const target = congressTarget(CONGRESS_RESOLUTIONS[res].target, e.ChosenThing, rec, cat, religionSeat, seatOfGame,
+      state.seats.length);
+    if (target < 0) {
+      gaps.push(`congress:${CONGRESS_RESOLUTIONS[res].id} target ${e.ChosenThing}`);
+      continue;
+    }
+    out.push({ res, outcome, target });
+  }
+  state.congress = out;
+  return gaps;
+}
+
+/** a resolution's target in the engine's target space for its kind, read off
+ *  the localisation key the game names it by; -1 where the engine has none */
+function congressTarget(kind: string, thing: string, rec: TurnRecord, cat: Catalog,
+  religionSeat: Map<number, number>, seatOfGame: (pid: number) => number, majors: number): number {
+  const core = strip(thing, 'LOC_').replace(/_NAME$/, '');
+  const after = (prefix: string) => (core.startsWith(prefix) ? core.slice(prefix.length) : '');
+  switch (kind) {
+    case 'district': {
+      const id = engineId('district', core, 'DISTRICT_', DISTRICTS);
+      return id ? PLACEABLE_DISTRICTS.indexOf(id as DistrictId) : -1;
+    }
+    case 'religion': return religionSeat.get(cat.religions.indexOf(core)) ?? -1;
+    case 'gpClass': return GP_CLASSES.indexOf(after('GREAT_PERSON_CLASS_') as never);
+    case 'luxury': return LUXURY_IDS.indexOf(after('RESOURCE_'));
+    case 'policy': {
+      const id = engineId('policy', core, 'POLICY_', POLICIES);
+      return id ? POLICY_LIST.findIndex((p) => p.id === id) : -1;
+    }
+    case 'government': {
+      const id = engineId('government', core, 'GOVERNMENT_', GOVERNMENTS);
+      return id ? GOVERNMENT_LIST.findIndex((g) => g.id === id) : -1;
+    }
+    case 'project': {
+      const id = engineId('project', core, 'PROJECT_', PROJECTS);
+      return id ? PROJECT_LIST.findIndex((p) => p.id === id) : -1;
+    }
+    case 'governor': {
+      const id = engineId('governor', core, 'GOVERNOR_', GOVERNOR_INDEX);
+      return id ? GOVERNORS.findIndex((g) => g.id === id) : -1;
+    }
+    case 'currency': return core === 'YIELD_GOLD' ? 0 : core === 'YIELD_FAITH' ? 1 : -1;
+    case 'seat': {
+      // a PlayerType target is the player id itself
+      const pid = /^\d+$/.test(thing) ? Number(thing) : -1;
+      const seat = rec.players.some((q) => q.id === pid) ? seatOfGame(pid) : NO_SEAT;
+      return seat >= 0 && seat < majors ? seat : -1;
+    }
+    case 'feature': {
+      const name = `FEATURE_${after('FEATURE_')}`;
+      return CLEARABLE.indexOf(FEATURE_ID[name] ?? strip(name, 'FEATURE_'));
+    }
+    case 'spyMission': {
+      const op = core.replace(/_DESCRIPTION$/, '');
+      return SPY_OFFENSIVE_MISSIONS.indexOf(SPY_MISSIONS.findIndex((m) => `UNITOPERATION_SPY_${m.id}` === op));
+    }
+    default: return -1;
   }
 }
