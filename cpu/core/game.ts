@@ -202,18 +202,16 @@ export function createGameFromMap(map: GameState['map'], rngInit: number): GameS
   };
 }
 
-/** The settler's price, rising with every city, live SETTLER unit and
- * queued one: the Units row's Cost 80 + CostProgressionParam1 30 per copy,
- * each through `scaleByGameSpeed` as every unit cost is (40 + 15·n online). */
+/** The settler's price, rising with every city and live SETTLER unit — a
+ * settler still in a queue raises nothing (the game's GetUnitCost, H-1 Duels
+ * 1103 / 1104: Ostia t157–178 paid 85 beside a queued settler): the Units
+ * row's Cost 80 + CostProgressionParam1 30 per copy, each through
+ * `scaleByGameSpeed` as every unit cost is (40 + 15·n online). */
 export function settlerCost(state: GameState, seat: number): number {
-  const queued = seatOf(state, seat)!.cities.reduce(
-    (n, c) => n + c.queue.filter((q) => q.kind === 'settler').length,
-    0,
-  );
   return (
     UNITS.SETTLER.cost +
     scaleByGameSpeed(SETTLER_COST_STEP) *
-      Math.max(0, seatOf(state, seat)!.cities.length - 1 + settlerCount(state, seat) + queued)
+      Math.max(0, seatOf(state, seat)!.cities.length - 1 + settlerCount(state, seat))
   );
 }
 

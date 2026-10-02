@@ -2332,17 +2332,12 @@ class SimSeats:
         q_mil = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) & (self._type_combat[q_ty] > 0) & self.city_alive[:, row]
         return live + q_mil.sum(dim=1)
 
-    def _settler_cost(self, n_cities: torch.Tensor, live: torch.Tensor,
-                      queued: torch.Tensor) -> torch.Tensor:
-        """settlerCost — the ONE transcription, for every seat and caller.
-
-        `settlerBase + settlerPerCity * max(0, cities - 1 + LIVE settlers +
-        QUEUED settlers)`. TS calls it afresh per commit, so the production walk
-        feeds its own RUNNING queued count (a settler queued at column j raises
-        the price for column j+1) while the buy ladder and the observation feed
-        a plain snapshot."""
+    def _settler_cost(self, n_cities: torch.Tensor, live: torch.Tensor) -> torch.Tensor:
+        """settlerCost — the ONE transcription, for every seat and caller:
+        `settlerBase + settlerPerCity * max(0, cities - 1 + LIVE settlers)`; a
+        settler still in a queue raises nothing."""
         return self.rules.settler_base + self.rules.settler_per_city * (
-            n_cities - 1 + live + queued
+            n_cities - 1 + live
         ).clamp(min=0).to(self.dtype)
 
     def _seat_settler_cost(self, row: int) -> torch.Tensor:
@@ -2350,11 +2345,7 @@ class SimSeats:
         read off the merged city block, then `_settler_cost`. Read by the buy
         ladder and by the observation, so what a seat PAYS and what its policy
         SEES cannot drift."""
-        alive_row = self.city_alive[:, row]
-        return self._settler_cost(
-            alive_row.sum(dim=1), self._seat_settlers(row),
-            (alive_row.unsqueeze(2) & (self.city_current[:, row] == self.SETTLER)).sum(dim=(1, 2)),
-        )
+        return self._settler_cost(self.city_alive[:, row].sum(dim=1), self._seat_settlers(row))
 
     def _seat_patronage_cost(self, row: int):
         """([B, nC] faith, [B, nC] gold) — the patronage price of each class's
@@ -2989,8 +2980,6 @@ class SimSeats:
         ext = self.seat_ext[:, row]
         alive_row = self.city_alive[:, row]
         n_cities = alive_row.sum(dim=1)
-        queued_s = (alive_row.unsqueeze(2)
-                    & (self.city_current[:, row] == self.SETTLER)).sum(dim=(1, 2))
         settlers_live = self._seat_settlers(row)
         nW_a = self._wond_n
         nP_a = len(self._proj_rows)
@@ -3028,10 +3017,9 @@ class SimSeats:
             is_s = act & (a == self.SETTLER) & (self.city_pop[:, row, j] >= rls.settler_pop_gate) \
                 & ~self._no_settlers(row)
             if bool(is_s.any()):
-                s_cost = self._settler_cost(n_cities, settlers_live, queued_s)
+                s_cost = self._settler_cost(n_cities, settlers_live)
                 self._q_push(row, j, is_s,
                              torch.full_like(a, self.SETTLER), s_cost)
-                queued_s = queued_s + is_s.long()
             is_u = act & (a >= self.UNIT_BASE) & (a < self.UNIT_BASE + self.NU)
             if bool(is_u.any()):
                 ui = (a - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)

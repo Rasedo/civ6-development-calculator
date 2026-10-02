@@ -38,11 +38,12 @@ describe('settlers', () => {
     a.population = 2;
     trainSettler();
     expect(a.queue[0]?.kind).toBe('settler');
-    expect(settlerCost(state, 0)).toBe(BASE + STEP); // a queued settler raises the next price
+    expect(settlerCost(state, 0)).toBe(BASE); // a queued settler raises nothing
     const prod = computeCityStats(state, a).total.production;
     const turns = Math.ceil(BASE / prod);
     for (let i = 0; i < turns; i++) endTurn(state);
     expect(settlerCount(state, 0)).toBe(1); // completion SPAWNED the unit at the city
+    expect(settlerCost(state, 0)).toBe(BASE + STEP); // the live settler raises the next price
 
     // walked to the site, FOUND consumes it
     const settler = state.units.find((u) => u.type === 'SETTLER')!;
