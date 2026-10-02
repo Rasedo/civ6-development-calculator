@@ -4,7 +4,7 @@ import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { nextRandom } from '../../../cpu/core/rand';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
-import { disasterPhase, stormWeights, eventRows, stormFootprint, stormTile, stormWalk } from '../../../cpu/core/disasters';
+import { disasterPhase, stormWeights, eventRows, stormFootprint, stormTile, stormWalk, stormStart, stormStartRadius } from '../../../cpu/core/disasters';
 import { hexDistance } from '../../../world/hex';
 import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, WIND_BAND_LO, WIND_BAND_HI, windLatitude, windWeights, STORM_MOVEMENT, STORM_LAST_TURN_PCT, RANDOM_EVENT_START_TURN, STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
 import { makeYieldCtx } from '../../../cpu/core/effects';
@@ -256,6 +256,35 @@ describe('the eight storms are the install\'s table', () => {
     };
     expect(Math.abs(draw(100) - fe.fertFood)).toBeLessThan(0.035);
     expect(Math.abs(draw(STORM_LAST_TURN_PCT) - half(fe.fertFood))).toBeLessThan(0.035);
+  });
+
+  it('a storm starts by one weighted draw: 1 + its distance to a live centre, a live centre allowed', () => {
+    // a tornado (Hexes 1, radius 0) on all-Grassland: every plot a candidate
+    const state = board(null);
+    const tor = STORM_EVENTS.find((e) => e.id === 'TORNADO_FAMILY')!;
+    expect(stormStartRadius(tor)).toBe(0);
+    const c = tileAtCoords(state.map, 8, 8);
+    const n = tileAtCoords(state.map, 9, 8);
+    state.storms = [{ id: 1, event: STORM_EVENTS.indexOf(tor), at: c.index, left: 2, struck: [] }];
+    const hits = new Map<number, number>();
+    const N = 40000;
+    for (let i = 0; i < N; i++) {
+      const t = stormStart(state, tor)!;
+      hits.set(t.index, (hits.get(t.index) ?? 0) + 1);
+    }
+    // the centre itself still weighs 1, its neighbour 2
+    expect(hits.get(c.index) ?? 0).toBeGreaterThan(0);
+    expect(Math.abs((hits.get(n.index) ?? 0) / (hits.get(c.index) ?? 1) - 2)).toBeLessThan(0.6);
+    // a Category 5 hurricane (Hexes 19, radius 2) needs a whole radius-2
+    // disc of Ocean: none on Grassland, the map's inner plots on an ocean
+    const cat5 = STORM_EVENTS.find((e) => e.id === 'HURRICANE_CAT_5')!;
+    expect(stormStartRadius(cat5)).toBe(2);
+    expect(stormStart(state, cat5)).toBeUndefined();
+    const sea = makeState(makeMap(16, 16, 'OCEAN'));
+    for (let i = 0; i < 200; i++) {
+      const t = stormStart(sea, cat5)!;
+      expect(t.col >= 2 && t.col <= 13 && t.row >= 2 && t.row <= 13).toBe(true);
+    }
   });
 
   it('the canonical disc is centre, ring 1, ring 2, each ring by tile index', () => {

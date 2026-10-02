@@ -124,6 +124,9 @@ export function droughtTerrain(t: { terrain: string; elevation: string }): boole
  *  start plot's weight in the map-wide pick is 1 + min(its distance to the
  *  nearest live event, this) (GameCore_XP2 0x287e80, `droughtStart`). */
 export const DROUGHT_SPACING = srcConst('disasters.droughtSpacing', 15, drought('DROUGHT_MAJOR', 'Spacing'));
+/** A storm row's `Spacing` (15 on every storm row): the distance past which
+ *  a live storm's centre no longer lowers a start plot's weight. */
+export const STORM_SPACING = srcConst('disasters.stormSpacing', 15, drought('HURRICANE_CAT_4', 'Spacing'));
 
 /** Dry ground for a drought's patch: its terrain above the sea and CIV6
  *  (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP) "Drought targets areas that

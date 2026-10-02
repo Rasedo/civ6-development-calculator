@@ -446,6 +446,17 @@ on it. Without a district: land = not water (0x834d0). Open: which of those
 bits a City Centre's, a Harbor's and a Canal's plot carry (who writes word
 +0x14), and so whether the engines' "no switch at a centre" holds.
 
+## C-49 tail: the storm's start plot — READ
+
+"Pick Storm Start Plot" 0x288250: every map plot scored by 0x2900c0 — valid
+(0x28aa00 over the radius the row's Hexes gives: >= 19 → 2, >= 3 → 1, else
+0) when each plot in it passes 0x28eab0 (its terrain in the row's
+RandomEvent_Terrains, an empty list passing all), weight valid × (Spacing +
+1), less (Spacing − d) when the nearest live storm's current plot (m_aStorms
++0x8b0, stride 0x68, the path's last plot; 0x28cfa0) lies d < Spacing away;
+ONE weighted draw. No test of a plot under another event: a storm may begin
+on a live storm's centre (weight 1). Every storm row's Spacing is 15.
+
 ## DLL rules the engines contradict
 
 None known: every rule read above ships on both engines.

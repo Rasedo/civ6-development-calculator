@@ -906,19 +906,10 @@ class SimEconomy:
             fell = take(br, r, torch.zeros_like(br), bd)
             self.citystate_repair_wait[br[fell], s] = True
 
-    def _pick_static(self, mask_hit: torch.Tensor, cand_list: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-        idx, cnt = cand_list
-        has = mask_hit & (cnt > 0)
-        r = self._next_random(has)
-        k = torch.floor(r * cnt.to(torch.float64)).to(torch.long)
-        tile = idx.gather(1, k.clamp(min=0, max=idx.shape[1] - 1).unsqueeze(1)).squeeze(1)
-        return has, tile
-
     def _pick_live(self, mask_hit: torch.Tensor, cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """`_pick_static` over a LIVE candidate mask [B, T]: the same draw and
-        the same k-th-candidate-in-tile-order arithmetic (`pick` over a
-        filtered tile list on TS), the candidate counted by cumsum instead of
-        a list built at load — for a set a mutable plane can shrink."""
+        """`pick` over a live candidate mask [B, T]: ONE draw naming the
+        k-th candidate in tile order (`pick` over a filtered tile list on
+        TS)."""
         cnt = cand.sum(dim=1)
         has = mask_hit & (cnt > 0)
         r = self._next_random(has)
@@ -1670,6 +1661,44 @@ class SimEconomy:
             out &= (n >= 0).unsqueeze(0) & dry[:, n.clamp(min=0)]
         return out
 
+    def _storm_cands(self, e: int) -> torch.Tensor:
+        """[B, T] storm row `e`'s start candidates (`stormStart`): plots whose
+        whole disc of the row's radius (`Hexes` 19 → 2, 3 or 7 → 1, 1 → 0)
+        lies on the map and on the storm's terrain."""
+        hexes = int(self._st_hexes[e])
+        rad = 2 if hexes >= 19 else 1 if hexes >= 3 else 0
+        n = 1 + 3 * rad * (rad + 1)
+        base = (self.storm_fam == int(self._st_family[e])) & ~self.tile_submerged     # [B, T]
+        fp = tiles_from_offsets(torch.arange(self.T, device=self.device), self._storm_offs[:n],
+                                self.W, self.H, self.wrap_x)
+        cand = base & (fp >= 0).all(dim=1).unsqueeze(0)
+        for k in range(1, n):
+            cand = cand & base[:, fp[:, k].clamp(min=0)]
+        return cand
+
+    def _storm_start(self, hit: torch.Tensor, e: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """`stormStart` — storm row `e`'s start plot where `hit` [B]: ONE
+        weighted draw over every plot in tile order whose whole disc of the
+        row's radius (`Hexes` 19 → 2, 3 or 7 → 1, 1 → 0) lies on the map and
+        on the storm's terrain, each weighing 1 + min(its distance to the
+        nearest live storm's centre, the spacing). A live centre is no bar.
+        No candidate, no draw. Returns (got, tile)."""
+        B, T, dev = self.B, self.T, self.device
+        cand = self._storm_cands(e) & hit.unsqueeze(1)
+        live = self.storm_left > 0
+        dist = torch.full((B, T), self._storm_spacing, dtype=torch.long, device=dev)
+        for b in (hit & live.any(dim=1)).nonzero(as_tuple=True)[0].tolist():
+            near = self.pair_dist[:, self.storm_at[b][live[b]]].long().min(dim=1).values
+            dist[b] = near.clamp(max=self._storm_spacing)
+        w = torch.where(cand, 1 + dist, torch.zeros_like(dist))
+        total = w.sum(dim=1)
+        got = hit & (total > 0)
+        rr = self._next_random(got)
+        at = torch.floor(rr * total.double()).long()
+        cum = w.cumsum(dim=1)
+        tile = (cand & (cum > at.unsqueeze(1))).long().argmax(dim=1)
+        return got, tile
+
     def _drought_start(self, hit: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`droughtStart` — a drought's start plot where `hit` [B]: ONE
         weighted draw over every candidate plot (`_drought_cands`) in tile
@@ -1759,10 +1788,6 @@ class SimEconomy:
         rows = self._event_rows()
         deg = self._warming_degrees()
         per_site = (self._EV_FLOOD, self._EV_ERUPTION, self._EV_ACCIDENT)
-        # `stormFamilyAt` is null on a SUBMERGED tile: while nothing has
-        # drowned the static per-family lists are the live sets; after a
-        # sea-level rise the pick reads the live mask
-        drowned = bool(self.tile_submerged.any())
         reactor = self._reactor_plane()
         acc_sites = [reactor >= g for g in self._accident_min_turn]
         wonder = [self._wonder_plots(f) for f in self._er_wonder_fid]
@@ -1871,14 +1896,8 @@ class SimEconomy:
             hit = (fam == self._EV_STORM) & (sev == e)
             if not bool(hit.any()):
                 continue
-            f = int(self._st_family[e])
-            if drowned:
-                got, tile = self._pick_live(hit, (self.storm_fam == f) & ~self.tile_submerged)
-            else:
-                got, tile = self._pick_static(hit, self._storm_lists[f])
-            # a centre already under a storm takes no second one
-            busy = ((self.storm_left > 0) & (self.storm_at == tile.unsqueeze(1))).any(dim=1)
-            free = got & ~busy
+            got, tile = self._storm_start(hit, e)
+            free = got
             if bool(free.any()):
                 fr = free.nonzero(as_tuple=True)[0]
                 slot = (self.storm_left[fr] > 0).sum(dim=1)

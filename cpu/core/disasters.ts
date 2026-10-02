@@ -3,7 +3,7 @@ import type { City, CityState, GameState, StormRecord, Tile } from './types';
 import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
-import { neighborTile, neighbors, tilesAtOffsets, hexDistance, DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW } from '../../world/hex';
+import { neighborTile, neighbors, tilesAtOffsets, tilesWithin, hexDistance, DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW } from '../../world/hex';
 import { hasRiver, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
@@ -27,12 +27,12 @@ import { unitDomain } from './units';
 import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, type FloodDamageRow, warmedWeight, RANDOM_EVENT_START_TURN } from '../data/disasters';
 import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_DURATION, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
-import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING } from '../data/disasters';
+import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING, STORM_SPACING } from '../data/disasters';
 import { TURN_LIMIT } from './game';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_SPREAD_CROSS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
-import { STORM_EVENTS, STORM_FAMILIES, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, windWeights, STORM_MOVEMENT, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, type StormEvent } from '../data/disasters';
+import { STORM_EVENTS, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, windWeights, STORM_MOVEMENT, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, type StormEvent } from '../data/disasters';
 import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
 
@@ -511,6 +511,49 @@ export function eventRows(degrees: number, area: number): EventRow[] {
   return rows;
 }
 
+/** The radius of the disc a storm row's start plot must hold on its own
+ *  terrain: `Hexes` 19 → 2, 3 or 7 → 1, 1 → 0 (0x288250). */
+export function stormStartRadius(ev: StormEvent): number {
+  return ev.hexes >= 19 ? 2 : ev.hexes >= 3 ? 1 : 0;
+}
+
+/**
+ * A storm's start plot ("Pick Storm Start Plot", GameCore_XP2 0x288250): ONE
+ * weighted draw over every map plot in ascending order whose whole disc of
+ * `stormStartRadius` lies on the map and on the storm's terrain
+ * (`stormFamilyAt`, the row's RandomEvent_Terrains; 0x28eab0), each weighing
+ * 1 + min(its hex distance to the nearest live storm's centre,
+ * `STORM_SPACING`) (0x2900c0). A live storm's centre is no bar. No
+ * candidate, no draw. `_storm_start` is the twin.
+ */
+export function stormStart(state: GameState, ev: StormEvent): Tile | undefined {
+  const map = state.map;
+  const r = stormStartRadius(ev);
+  const full = 1 + 3 * r * (r + 1);
+  const centres = (state.storms ?? []).filter((s) => s.left > 0).map((s) => map.tiles[s.at]);
+  const cands: Tile[] = [];
+  const weights: number[] = [];
+  let total = 0;
+  for (const t of map.tiles) {
+    if (stormFamilyAt(t) !== ev.family) continue;
+    const disc = tilesWithin(map, t.col, t.row, r);
+    if (disc.length !== full || disc.some((u) => stormFamilyAt(u) !== ev.family)) continue;
+    let d: number = STORM_SPACING;
+    for (const c of centres) d = Math.min(d, hexDistance(map, t.col, t.row, c.col, c.row));
+    cands.push(t);
+    weights.push(1 + d);
+    total += 1 + d;
+  }
+  if (total === 0) return undefined;
+  const at = Math.floor(nextRandom(state) * total);
+  let cum = 0;
+  for (let i = 0; i < cands.length; i++) {
+    cum += weights[i];
+    if (at < cum) return cands[i];
+  }
+  return cands[cands.length - 1];
+}
+
 /** A city whose reactor can melt down, and its seat. */
 interface ReactorSite {
   seat: number;
@@ -654,7 +697,6 @@ function volcanoRoll(state: GameState): void {
 interface EventSites {
   flood: FloodRiver[];
   eruption: Tile[][][];  // per ERUPTION_ROWS row, its sites, each a site's plots
-  storm: Tile[][];      // per family, the live start plots
   accident: ReactorSite[][];  // per severity
   meteor: Tile[];
   fire: Tile[][];       // per fire row, its live start plots
@@ -678,7 +720,6 @@ function eventSites(state: GameState): EventSites {
       const plots = map.tiles.filter((t) => t.feature === w);
       return plots.length ? [plots] : [];
     }),
-    storm: STORM_FAMILIES.map((f) => map.tiles.filter((t) => stormFamilyAt(t) === f)),
     accident: ACCIDENT_MIN_TURN.map((gate) => reactors.filter((r) => (r.city.reactorAge ?? 0) >= gate)),
     meteor: map.tiles.filter((t) => meteorCandidate(t, camps)),
     fire: FIRE_START_FEATURE.map((_f, row) => map.tiles.filter((t) => fireCandidate(t, row))),
@@ -766,9 +807,8 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
     }
     case 'storm': {
       const ev = STORM_EVENTS[row.sev];
-      const center = pick(state, sites.storm[STORM_FAMILIES.indexOf(ev.family)]);
-      // a centre already under a storm takes no second one
-      if (!center || (state.storms ?? []).some((s) => s.at === center.index)) return;
+      const center = stormStart(state, ev);
+      if (!center) return;
       state.stormSerial = (state.stormSerial ?? 0) + 1;
       (state.storms ??= []).push({ id: state.stormSerial, event: row.sev, at: center.index, left: ev.duration, struck: [] });
       log(state, `Storm: ${ev.id} at (${center.col}, ${center.row}) — ${ev.hexes} tiles for ${ev.duration} turns.`);

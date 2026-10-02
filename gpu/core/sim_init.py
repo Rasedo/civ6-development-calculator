@@ -1771,7 +1771,7 @@ class SimInit:
         self.storm_fam = torch.tensor([[t.get("sf", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.fertilizable = torch.tensor([[t.get("fz", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # the flood sites (`floodRivers`), each the plot its flood starts on, in
-        # draw order — `_pick_static`'s (idx, n) shape, -1 pads
+        # draw order, -1 pads
         n_fl = max(max((len(f["floodStarts"]) for f in fixtures), default=0), 1)
         _fl_idx = torch.full((B, n_fl), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
@@ -2718,6 +2718,7 @@ class SimInit:
         # a drought's start plot weighs 1 + min(its distance to a live event,
         # this) (`droughtStart`)
         self._drought_spacing = int(_ds["droughtSpacing"])
+        self._storm_spacing = int(_ds["stormSpacing"])
         # THE EIGHT ERUPTION ROWS (`ERUPTION_ROWS`: Eyjafjallajokull's two,
         # Kilimanjaro's two, Vesuvius's, then the volcano's three), one entry
         # per row: the per-plot Volcanic Soil chance and the
@@ -2997,15 +2998,6 @@ class SimInit:
         self._wadj_cache = None          # (_eff_version, {key: [B,T] wonder-adjacency plane})
         self._fx_row_cache = None        # (_eff_version, {channel: [B, n_majors]})
         self._hs_faith_cache = None      # (_eff_version, [B,T] Holy Site faith output)
-        # Static candidate lists for _pick_static: the k-th candidate in
-        # tile order, so a pick is one gather instead of a [B, T] cumsum.
-        def cand_list(cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-            n = cand.sum(dim=1)
-            width = max(int(n.max()), 1)
-            idx = torch.argsort((~cand).to(torch.int8), dim=1, stable=True)[:, :width]
-            return idx, n
-        # one start-tile list per storm family (`stormFamilyAt`)
-        self._storm_lists = [cand_list(self.storm_fam == f) for f in range(max(self._st_family) + 1)]
         # Yields sum the picked tiles sequentially to mirror the TS reduce. When
         # every value is a dyadic rational (integers and halves — true for all
         # shipped rules), every partial sum is exact in f64, so ANY summation

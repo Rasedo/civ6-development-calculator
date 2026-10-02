@@ -162,7 +162,6 @@ def main() -> int:
     assert len(offs) == 19 and offs[0] == [0, 0]
     ring = [max(abs(q), abs(r), abs(q + r)) for q, r in offs]
     assert ring == [0] + [1] * 6 + [2] * 12, ring
-    assert len(sim._storm_lists) == 4
     fam = sim.storm_fam[0]
     assert bool(((fam == 3) == sim.ocean_tile[0]).all()), "a hurricane starts on the OCEAN terrain alone"
     assert not bool((fam[sim.water[0] & ~sim.ocean_tile[0]] >= 0).any()), "shallow water hosts no storm"
@@ -410,7 +409,7 @@ def main() -> int:
             fired[k] += int(v)
         fired["empty"] += int(n_fired == 0)
     del sim10._flood_river, sim10._erupt, sim10._nuclear_accident, sim10._ignite
-    fams = {int(f) for f in range(len(sim10._storm_lists)) if int(sim10._storm_lists[f][1][0]) > 0}
+    storm_lands = [bool(sim10._storm_cands(e)[0].any()) for e in range(len(sim10._st_weight))]
     span = sim10._event_occ_scale * sim10._event_turns
     assert span == 2500
     has_dry = bool(sim10._drought_cands(sim10._live_event_plots())[0].any())
@@ -434,7 +433,7 @@ def main() -> int:
             n, lands = int((sim10._reactor_plane()[0] >= sim10._accident_min_turn[s]).sum()), True
         else:
             n = 1
-            lands = {sim10._EV_STORM: sim10._st_family[s] in fams, sim10._EV_DROUGHT: has_dry,
+            lands = {sim10._EV_STORM: storm_lands[s] if fam == sim10._EV_STORM else False, sim10._EV_DROUGHT: has_dry,
                      sim10._EV_METEOR: has_met, sim10._EV_FIRE: has_fire[s] if fam == sim10._EV_FIRE else False}[fam]
         # every pair already fired: no boost, the row weight per site
         mass = float(wt[0]) * n
