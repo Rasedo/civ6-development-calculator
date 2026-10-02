@@ -20,10 +20,17 @@ Two ways to pass the turns:
   back after each (`lab.advance`); at the target the seat simply holds its
   turn;
 * `--observer`, an all-AI game (`game.py new` with "all_ai": true): nothing
-  holds its turn, so it plays by itself — the watch logs each turn as the
-  counter moves and, at the target, pauses the game (`Automation.Pause`,
-  UNVERIFIED from the tuner; the pause's answer is printed) before anything
-  else is read.
+  holds its turn, so it plays by itself. The turn lock (`turn_lock.lua`,
+  `lab.lock`) holds it at the target's TurnBegin, so the end-of-run reads
+  land on the target turn; between, the watch logs each turn as the counter
+  moves and can miss one (the early Duel turns pass in ~0.4 s). `--step`
+  holds EVERY turn from the first one the lock holds after the start: the
+  readers read the held turn, the lock steps to the next, and no turn is
+  missed or read twice (`res["skips"]` lists any held turn that was not the
+  last one + 1). A save asked for under the lock is written when the turn is
+  let go and carries the held turn; the target's own save is let through by
+  stepping one turn past it before `--at-end`, so the game then stands held
+  at target + 1.
 While a turn stands still, `lab.wait_turn` reads what holds it (a blocker,
 an open session, a visible screen) and answers the cause at once, with the
 blind sweep only after 30 s with no named cause. A game that ENDS first (the
@@ -65,14 +72,6 @@ import lab  # noqa: E402
 
 HERE = pathlib.Path(__file__).parent
 IG = lab.IG
-
-LUA_HALT = """
-local ok, err = pcall(function() Automation.Pause(true) end)
-local okp, p = pcall(function() return Automation.IsPaused() end)
-print("pause " .. (ok and "requested" or ("err:" .. tostring(err)))
-  .. " paused " .. (okp and tostring(p) or ("err:" .. tostring(p)))
-  .. " at turn " .. Game.GetCurrentGameTurn())
-"""
 
 
 class Crash(RuntimeError):
@@ -119,6 +118,8 @@ def main(argv=None) -> int:
     p.add_argument("--save-every", type=int, default=25)
     p.add_argument("--tag", default="watch")
     p.add_argument("--observer", action="store_true", help="an all-AI game: it plays itself; the watch follows it")
+    p.add_argument("--step", action="store_true",
+                   help="with --observer: hold every turn with the turn lock, read it, step to the next")
     p.add_argument("--min-free-mb", type=float, default=2048.0)
     p.add_argument("--wait", type=float, default=600.0, help="seconds to allow one turn")
     p.add_argument("--lua", action="append", help="a per-turn reader (repeatable); its log is named after it")
@@ -167,12 +168,36 @@ def main(argv=None) -> int:
         res["wall_end"] = time.time()
         write_result()
         return 3
+    held = False  # the turn lock holds turn `last`
+    unsaved = False  # a save asked for under the lock, not yet written
+    if a.observer:
+        # a lock left standing (a watch that ended `stay`) is let go; a
+        # stepped watch then starts at the first turn the lock holds, an
+        # unstepped one aims the lock at its target
+        res.update(step=a.step, holds=0, skips=[])
+        try:
+            s = lab.lock(t, "read")
+            if s["id"] is not None:
+                log("    " + lab.lock(t, "release")["line"])
+            if a.step:
+                log("    " + lab.lock(t, "target", s["turn"] + 1)["line"])
+                t0 = lab.wait_hold(t, s["turn"] + 1, a.wait)["held"]
+                held = True
+                res["holds"] = 1
+            else:
+                log("    " + lab.lock(t, "target", t0 + a.turns)["line"])
+        except TunerError as e:
+            ended("crash", f"the turn lock: {e}")
+            res["wall_end"] = time.time()
+            write_result()
+            return 3
     target = t0 + a.turns
     res.update(start_turn=t0, target=target, turn=t0)
     write_result()
     lp = -1 if a.observer else lab.local_player(t)
     log(f"watching {a.host} from turn {t0} to {target}"
-        f" ({'observer' if a.observer else f'seat {lp}'}) -> {', '.join(r[0].name for r in readers)}")
+        f" ({'observer' if a.observer else f'seat {lp}'}{', stepped' if a.step else ''})"
+        f" -> {', '.join(r[0].name for r in readers)}")
     handles = [open(path, "a", encoding="utf-8") for path, _, _ in readers]
 
     def read() -> None:
@@ -193,15 +218,21 @@ def main(argv=None) -> int:
                     ended("target", f"turn {last}")
                     break
                 if a.stop_at is not None and time.time() >= a.stop_at:
-                    if a.observer:
-                        log("    " + t.run(IG, LUA_HALT)[-1])
                     ended("stop", "wall-clock budget")
                     break
                 if a.observer:
-                    tn = lab.wait_turn(t, last, -1, a.wait, log, one_more_turn=True)
-                    if tn >= target:
-                        # the game plays on by itself: stop it before any read
-                        log("    " + t.run(IG, LUA_HALT)[-1])
+                    if held:
+                        lab.lock(t, "step")  # aims at last + 1, then lets `last` go
+                        held = False
+                    tn = lab.wait_turn(t, last, -1, a.wait, log, one_more_turn=True, tick=0.05 if a.step else 0.25)
+                    if a.step or tn >= target:
+                        # read only once the lock holds the turn
+                        tn = lab.wait_hold(t, tn, a.wait)["held"]
+                        held = True
+                        res["holds"] += 1
+                        if a.step and tn != last + 1:
+                            res["skips"].append([last, tn])
+                            log(f"    SKIP: held {tn} after {last}")
                 else:
                     tn = lab.advance(t, "autoplay", lp, a.wait, log, one_more_turn=True)
                 last, fresh = tn, True
@@ -210,17 +241,23 @@ def main(argv=None) -> int:
                 res["turn"] = tn
                 write_result()
                 if a.save_every and tn % a.save_every == 0:
+                    # under the lock the save is written once the turn is
+                    # let go, and carries the held turn
                     log("    " + t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}"))[-1])
-                # the throughput record: wall clock and the box's free memory
-                # per turn, so configurations compare turn window for turn window
-                log(f"turn {tn} at {time.time():.1f} free_mb {free_mb():.0f}")
-                if free_mb() < a.min_free_mb:
-                    log(f"    free memory {free_mb():.0f} MB below {a.min_free_mb:.0f} — saving and stopping")
-                    if a.observer:
-                        log("    " + t.run(IG, LUA_HALT)[-1])
+                    unsaved = held
+                mb = free_mb()
+                if mb < a.min_free_mb:
+                    log(f"    free memory {mb:.0f} MB below {a.min_free_mb:.0f} — saving and stopping")
                     log("    " + t.run(IG, save.replace("SAVENAME", f"{a.tag}_t{tn}_oom"))[-1])
+                    unsaved = held
                     ended("stop", "free memory")
                     break
+                if held and tn < target:
+                    lab.lock(t, "step")  # aims at tn + 1, then lets tn go
+                    held = unsaved = False
+                # the throughput record: wall clock and the box's free memory
+                # per turn, so configurations compare turn window for turn window
+                log(f"turn {tn} at {time.time():.1f} free_mb {mb:.0f}")
             except lab.GameOver as e:
                 # a defeat, or a victory with no Just One More Turn to play
                 # through: the game has ended short of the target
@@ -259,6 +296,11 @@ def main(argv=None) -> int:
             fh.write("\n".join(t.run(IG, (HERE / "event_history.lua").read_text(encoding="utf-8"), timeout=120)))
         res["event_history"] = str(hist)
         log(f"event history -> {hist.name}")
+        if unsaved:
+            # a save asked for under the held last turn is written only once
+            # the turn is let go (an exit drops it): step one turn
+            lab.lock(t, "step")
+            log(f"    save of turn {last} let through; held again at {lab.wait_hold(t, last + 1, a.wait)['held']}")
         log(f"    at end ({a.at_end}): {game.finish(t, a.host, a.at_end)}")
     except TunerError as e:
         log(f"    after the end: {e}")

@@ -24,7 +24,8 @@ least `--min-free-mb` (the host waits, logging, until it is). The game is
 B+2k and B+2k+1 for the run's k-th game, otherwise both are drawn at random)
 or `game.py load --save`; `watch.py` plays it for `--turns` turns under the
 tag `<tag><host number>g<game>` with the readers given by `--lua` /
-`--state`; between games the watch exits to the main menu, and the last game
+`--state` (an observer game ends held at its target by the turn lock, and
+`--step` holds and reads every turn); between games the watch exits to the main menu, and the last game
 ends as `--at-end` says (`close` also closes an instance whose loop ended
 early).
 
@@ -46,7 +47,8 @@ by `kind`:
   wall start and end, start turn, turn reached, turns played, the end
   (`target`, `game_over`, `stop`, `crash`) and why, the reader logs, the
   event history, the host log, the reconnect count and the instance's
-  private memory after the game;
+  private memory after the game, and for an observer game the turn lock's
+  `step`, `holds` and `skips` (held turns that were not the last + 1);
 * `reconnect` — a tuner reconnect inside a watch; `crash` — a crashed game;
   `relaunch` — an instance closed and started again, and why (`crash`,
   `memcap`); `stop` — why a host's loop ended.
@@ -234,6 +236,8 @@ def host_loop(n: int, F: Fleet) -> None:
                     cmd += ["--stop-at", f"{F.deadline:.0f}"]
                 if not a.human:
                     cmd.append("--observer")
+                    if a.step:
+                        cmd.append("--step")
                 for lua in a.lua or []:
                     cmd += ["--lua", lua]
                 for state in a.state or []:
@@ -251,7 +255,8 @@ def host_loop(n: int, F: Fleet) -> None:
                 rec.update(wall_end=res.get("wall_end") or time.time(), start_turn=res.get("start_turn"),
                            target=res.get("target"), turn=res.get("turn"), end=res.get("end"), why=res.get("why"),
                            readers=res.get("readers", []), event_history=res.get("event_history"),
-                           reconnects=len(res.get("reconnects", [])), watch_exit=wrc)
+                           reconnects=len(res.get("reconnects", [])), watch_exit=wrc,
+                           step=res.get("step"), holds=res.get("holds"), skips=res.get("skips"))
                 if rec["end"] is None:
                     rec.update(end="crash", why=f"the watch ended with no end (exit {wrc})")
                 if rec["start_turn"] is not None and rec["turn"] is not None:
@@ -393,6 +398,8 @@ def main(argv=None) -> int:
     src.add_argument("--config", type=pathlib.Path, help="game.py new --config: a new game per round")
     src.add_argument("--save", help="game.py load: this named save per round")
     r.add_argument("--human", action="store_true", help="the games have a human seat (watch by Autoplay)")
+    r.add_argument("--step", action="store_true",
+                   help="observer games: watch.py --step (every turn held by the turn lock, read, stepped)")
     r.add_argument("--games", type=int, default=1, help="games per host (0: until the budget or the stop file)")
     r.add_argument("--turns", type=int, default=250)
     r.add_argument("--tag", default="obs")

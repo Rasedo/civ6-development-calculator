@@ -1,0 +1,20 @@
+    lock turn 4 target 5 held -1 id nil holds 0 seen -1 ev TurnBegin
+watching 127.0.0.4 from turn 5 to 20 (observer, stepped) -> h2h_sig_h2hsmall_20261002T082001Z.jsonl, h2h_igturn_h2hsmall_20261002T082001Z.jsonl
+turn 6 at 1790929207.8 free_mb 17996
+turn 7 at 1790929210.7 free_mb 17996
+turn 8 at 1790929216.0 free_mb 17980
+turn 9 at 1790929221.0 free_mb 17997
+turn 10 at 1790929226.1 free_mb 18005
+turn 11 at 1790929231.2 free_mb 17996
+turn 12 at 1790929236.5 free_mb 17996
+turn 13 at 1790929240.5 free_mb 18003
+turn 14 at 1790929244.5 free_mb 17970
+turn 15 at 1790929249.0 free_mb 17986
+turn 16 at 1790929252.4 free_mb 17991
+turn 17 at 1790929257.2 free_mb 17979
+turn 18 at 1790929262.1 free_mb 17796
+turn 19 at 1790929281.9 free_mb 17832
+turn 20 at 1790929301.5 free_mb 18032
+    end: target (turn 20)
+event history -> event_history_h2hsmall_20261002T082001Z.txt
+    at end (stay): left the game as it stands

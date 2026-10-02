@@ -1,0 +1,70 @@
+    lock turn 14 target 15 held -1 id nil holds 0 seen -1 ev TurnBegin
+watching 127.0.0.4 from turn 15 to 47 (observer, stepped) -> h2h_sig_h2hss_20261002T081701Z.jsonl, h2h_igturn_h2hss_20261002T081701Z.jsonl
+    save requested name=h2hss_t16 ok=true err=nil turn=16
+turn 16 at 1790929023.4 free_mb 17864
+    save requested name=h2hss_t17 ok=true err=nil turn=17
+turn 17 at 1790929024.4 free_mb 17868
+    save requested name=h2hss_t18 ok=true err=nil turn=18
+turn 18 at 1790929025.3 free_mb 17869
+    save requested name=h2hss_t19 ok=true err=nil turn=19
+turn 19 at 1790929026.2 free_mb 17870
+    save requested name=h2hss_t20 ok=true err=nil turn=20
+turn 20 at 1790929027.1 free_mb 17871
+    save requested name=h2hss_t21 ok=true err=nil turn=21
+turn 21 at 1790929028.1 free_mb 17872
+    save requested name=h2hss_t22 ok=true err=nil turn=22
+turn 22 at 1790929029.0 free_mb 17873
+    save requested name=h2hss_t23 ok=true err=nil turn=23
+turn 23 at 1790929029.9 free_mb 17875
+    save requested name=h2hss_t24 ok=true err=nil turn=24
+turn 24 at 1790929030.8 free_mb 17878
+    save requested name=h2hss_t25 ok=true err=nil turn=25
+turn 25 at 1790929031.8 free_mb 17878
+    save requested name=h2hss_t26 ok=true err=nil turn=26
+turn 26 at 1790929032.7 free_mb 17877
+    save requested name=h2hss_t27 ok=true err=nil turn=27
+turn 27 at 1790929033.6 free_mb 17878
+    save requested name=h2hss_t28 ok=true err=nil turn=28
+turn 28 at 1790929034.6 free_mb 17835
+    save requested name=h2hss_t29 ok=true err=nil turn=29
+turn 29 at 1790929035.5 free_mb 17818
+    save requested name=h2hss_t30 ok=true err=nil turn=30
+turn 30 at 1790929036.4 free_mb 17818
+    save requested name=h2hss_t31 ok=true err=nil turn=31
+turn 31 at 1790929037.4 free_mb 17818
+    save requested name=h2hss_t32 ok=true err=nil turn=32
+turn 32 at 1790929038.3 free_mb 17816
+    save requested name=h2hss_t33 ok=true err=nil turn=33
+turn 33 at 1790929039.2 free_mb 17809
+    save requested name=h2hss_t34 ok=true err=nil turn=34
+turn 34 at 1790929040.2 free_mb 17837
+    save requested name=h2hss_t35 ok=true err=nil turn=35
+turn 35 at 1790929041.2 free_mb 17846
+    save requested name=h2hss_t36 ok=true err=nil turn=36
+turn 36 at 1790929042.3 free_mb 17844
+    save requested name=h2hss_t37 ok=true err=nil turn=37
+turn 37 at 1790929043.3 free_mb 17860
+    save requested name=h2hss_t38 ok=true err=nil turn=38
+turn 38 at 1790929044.4 free_mb 17862
+    save requested name=h2hss_t39 ok=true err=nil turn=39
+turn 39 at 1790929045.5 free_mb 17862
+    save requested name=h2hss_t40 ok=true err=nil turn=40
+turn 40 at 1790929046.5 free_mb 17866
+    save requested name=h2hss_t41 ok=true err=nil turn=41
+turn 41 at 1790929047.4 free_mb 17868
+    save requested name=h2hss_t42 ok=true err=nil turn=42
+turn 42 at 1790929048.5 free_mb 17869
+    save requested name=h2hss_t43 ok=true err=nil turn=43
+turn 43 at 1790929049.5 free_mb 17864
+    save requested name=h2hss_t44 ok=true err=nil turn=44
+turn 44 at 1790929050.5 free_mb 17874
+    save requested name=h2hss_t45 ok=true err=nil turn=45
+turn 45 at 1790929051.5 free_mb 17862
+    save requested name=h2hss_t46 ok=true err=nil turn=46
+turn 46 at 1790929052.6 free_mb 17861
+    save requested name=h2hss_t47 ok=true err=nil turn=47
+turn 47 at 1790929053.5 free_mb 17861
+    end: target (turn 47)
+event history -> event_history_h2hss_20261002T081701Z.txt
+    save of turn 47 let through; held again at 48
+    at end (menu): left the game at turn 48

@@ -1,0 +1,60 @@
+[11:18:05] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\game.py --host 127.0.0.4 new --config C:\civ6-development-calculator\tools\civ6lab\c74s2_duel.json --map-seed 4301 --game-seed 4302
+    map options world_age=2(default) sea_level=2(default) temperature=2(default) rainfall=2(default) resources=2(default) start=2(default)
+    ruleset=ok
+    speed=ok
+    difficulty=ok
+    map=ok
+    size=ok
+    map_options=ok
+    city_states=ok
+    realism=ok
+    map_seed=ok
+    game_seed=ok
+    start_era=ok
+    turn_limit=ok
+    all_ai=ok
+    slots 1:1 2:1 slot0=4
+    readback ruleset=RULESET_EXPANSION_2 speed=-1649545904 handicap=-179952465 script=Continents.lua size=388991850 cs=3 realism=2 majors=3 map_seed=4301 game_seed=4302 world_age=2 sea_level=2 temperature=2 rainfall=2 resources=2 start=2 autostart=true
+    hosting
+in game {"turn": 11, "map_seed": 4301, "map_options": {"world_age": 2, "sea_level": 2, "temperature": 2, "rainfall": 2, "resources": 2, "start": 2}, "game_seed": 4302, "humans": 0, "minors": 4, "majors": {"1": "LEADER_LUDWIG", "2": "LEADER_PHILIP_II"}}
+[11:18:28] setup {"turn": 12, "map_seed": 4301, "map_options": {"world_age": 2, "sea_level": 2, "temperature": 2, "rainfall": 2, "resources": 2, "start": 2}, "game_seed": 4302, "humans": 0, "minors": 4, "majors": {"1": "LEADER_LUDWIG", "2": "LEADER_PHILIP_II"}}
+[11:18:28] $ C:\civ6-development-calculator\.venv\Scripts\python.exe C:\civ6-development-calculator\tools\civ6lab\watch.py --host 127.0.0.4 --turns 30 --tag h2hfleet4g0 --save-every 25 --min-free-mb 2048.0 --at-end menu --wait 600.0 --unreachable 300.0 --result C:\civ6-development-calculator\tools\civ6lab\runs\fleet_h2hfleet4_20261002T081759Z_result.json --observer --step --lua h2h_sig.lua --state GameCore_Tuner
+    lock turn 15 target 15 held -1 id nil holds 0 seen 15 ev TurnBegin
+watching 127.0.0.4 from turn 16 to 46 (observer, stepped) -> h2h_sig_h2hfleet4g0_20261002T081828Z.jsonl
+turn 17 at 1790929110.3 free_mb 18013
+turn 18 at 1790929111.0 free_mb 18015
+turn 19 at 1790929111.7 free_mb 18006
+turn 20 at 1790929112.3 free_mb 18007
+turn 21 at 1790929113.0 free_mb 18015
+turn 22 at 1790929113.8 free_mb 18014
+turn 23 at 1790929114.4 free_mb 18016
+turn 24 at 1790929115.1 free_mb 18015
+    save requested name=h2hfleet4g0_t25 ok=true err=nil turn=25
+turn 25 at 1790929115.8 free_mb 18018
+turn 26 at 1790929116.7 free_mb 18013
+turn 27 at 1790929117.4 free_mb 18013
+turn 28 at 1790929118.2 free_mb 18013
+turn 29 at 1790929119.0 free_mb 18015
+turn 30 at 1790929119.8 free_mb 18019
+turn 31 at 1790929120.6 free_mb 18022
+turn 32 at 1790929121.4 free_mb 18022
+turn 33 at 1790929122.2 free_mb 18021
+turn 34 at 1790929123.0 free_mb 18020
+turn 35 at 1790929123.8 free_mb 18012
+turn 36 at 1790929124.6 free_mb 17988
+turn 37 at 1790929125.3 free_mb 17988
+turn 38 at 1790929126.2 free_mb 17971
+turn 39 at 1790929126.9 free_mb 17970
+turn 40 at 1790929127.7 free_mb 17971
+turn 41 at 1790929128.5 free_mb 17974
+turn 42 at 1790929129.3 free_mb 17974
+turn 43 at 1790929130.0 free_mb 17973
+turn 44 at 1790929130.8 free_mb 17978
+turn 45 at 1790929131.6 free_mb 17977
+turn 46 at 1790929132.4 free_mb 17978
+    end: target (turn 46)
+event history -> event_history_h2hfleet4g0_20261002T081828Z.txt
+    at end (menu): left the game at turn 46
+[11:18:52] game 0 watch exit 0
+[11:18:52] game 0: target (turn 46) at turn 46
+[11:18:52] done: games done

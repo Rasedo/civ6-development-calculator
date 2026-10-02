@@ -90,11 +90,32 @@ game plays itself with `Game.GetLocalPlayer()` -1 and
 smoke test's way) is not enough — the host re-takes slot 0 (`SS_TAKEN`,
 human) when it hosts. The map places the ALIVE majors
 (`AssignStartingPlots` reads `PlayerManager.GetAliveMajorsCount`), so the
-observer slot changes no start. A Duel observer game runs ~4 s a turn early.
-`Automation.Pause(true)` does NOT pause it from the tuner (`IsPaused` reads
-false and the turns go on): readers taken at the target may see a later
-turn. `--map-seed` / `--game-seed` override a config's seeds and hold
-through the host (read back in the game).
+observer slot changes no start. A Duel observer game runs ~0.4 s a turn
+early, a Small one 5-15 s. `--map-seed` / `--game-seed` override a config's
+seeds and hold through the host (read back in the game); the same seeds
+replay the same game (the GameCore state and rand seed at turn 41 equal in
+three runs, one held once and two held every turn).
+
+**Holding an observer game: the turn lock.** `turn_lock.lua` (InGame;
+`lab.lock` / `lab.wait_hold` drive it) adds an `Events.TurnBegin` handler
+that, once the turn reaches its target, takes a reference on the event it is
+dispatching — `UI.ReferenceCurrentEvent()`, the "lock engine" the shipped
+popups use — and the game's turn processing waits until
+`UI.ReleaseEventID(id)`. No seat changes hands and the game plays exactly as
+unheld. Modes: `target` (hold at turn T or later), `step` (aim at the held
+turn + 1, release), `release`, `read`. While held, GameCore and InGame both
+read turn T and nothing moves (the state signature and rand seed equal over
+the hold, 32 of 32 and 30 s+); GameCore stands part-way into turn T (in a
+Duel seat 1 has played and seat 2's turn is open; on Small seat 2's), at
+the same point on every run of a seed. A save asked for under the lock is
+written once the turn is let go and carries the held turn (32 of 32); an
+exit drops it, and a free-running save carries the turn its save point is
+reached in (often T + 1). The handler lives in the game's InGame context: a
+new or loaded game installs it afresh on the first call. `game.LUA_EXIT`
+releases a held turn before it exits.
+
+    python tools/civ6lab/watch.py --host 127.0.0.4 --observer --step --turns 40 --tag obs4   # every turn held, read, stepped
+    python tools/civ6lab/fleet.py run --hosts 3 --config tools/civ6lab/obs_small.json --games 2 --turns 250 --step --tag obs
 
 **The fleet.** `fleet.py run` launches every instance at once
 (127.0.0.K..K+N-1: `--first-host` K, `--hosts` N), waits for all main menus
@@ -119,10 +140,17 @@ reads a manifest: games, turns, turns and games per hour, crashes, endings,
 per host and in all, and a `cs_analyze.py` command per `cs_watch` log.
 
 `watch.py`, `spy_loop.py` and `game.py bench` take `--at-end
-menu|close|stay` (default `menu`): at the target an observer game is asked
-to pause (see above), a human-seat game simply holds its turn, the event
-history is read, and the game exits to the menu, has its process closed, or
-stays. `watch.py --result <file>` rewrites one JSON object every turn (the
+menu|close|stay` (default `menu`): at the target an observer game is held
+by the turn lock (`watch.py`), a human-seat game simply holds its turn, the
+event history is read, and the game exits to the menu, has its process
+closed, or stays (an observer game stays held). `watch.py --observer`
+without `--step` reads each turn as the counter moves and can miss some (3
+of 20 early Duel turns missed, a read labelled 25 seeing 26); `--step` holds
+every turn (Duel: 40 turns 15 → 55, 0 skipped or doubled, GameCore and
+InGame readers equal on all 41 reads; +0.4-0.5 s a turn with two readers,
+0.84-0.96 s against 0.43 s free; on Small no cost measurable against the
+turn's own 5-16 s), and `fleet.py run --step` passes it on (the manifest's
+`game` line carries `step`, `holds`, `skips`). `watch.py --result <file>` rewrites one JSON object every turn (the
 turn reached, the end and why, the reader logs, the reconnects) — what the
 fleet's manifest is built from.
 
@@ -291,6 +319,9 @@ Nobody should type these again.
 | `SET_ESCAPE_ROUTE` for a socket-spawned spy whose roll ends CAPTURED or KILLED | InGame | **EXCEPTION_ACCESS_VIOLATION at 0xb0** — spawned spies lack whatever the capture path dereferences. Train and travel real spies |
 | `city:ChangeLoyalty(-10)` as a way to make a Free City | GameCore | moves the STOCK; pressure stays positive and the city recovers next turn. A CAPTURE is the route |
 | `UnitManager.RequestOperation(u, RANGE_ATTACK)` for a unit created this turn | InGame | target list empty even for a visible enemy one tile away; a melee `MOVE_TO` onto an enemy resolves only at turn processing |
+| `Automation.Pause(true)`, the local seat's `SetWantsPause(true)` as a hold of an observer game | both | `GameConfiguration.IsPaused()` stays false and the turns run on — use the turn lock (`turn_lock.lua`) |
+| `AutoplayManager.SetReturnAsPlayer(p)` + `SetTurns(n)` + `SetActive(true)` as a hold of an observer game | GameCore | it HOLDS (armed at 11 with n 3: held at 15; then `SetTurns(1)` steps exactly one turn) but seat p comes back HUMAN (`IsHuman()` true while held), which flips the install's `PLAYER_IS_HUMAN` / `PLAYER_IS_AI` requirement sets (`BARBARIAN_CAMP_GOLD_SCALING`, the `HIGH_DIFFICULTY_*` scalings) for that seat; `IsActive()` reads false right after `SetActive(true)` |
+| `PlayerManager.SetLocalPlayerAndObserver(p)` from `GameEvents.PlayerTurnStarted` (the `c16n_hook.lua` grab) as a hold of an observer game | GameCore | it HOLDS (seat 1 grabbed at 50, local and human, all its moves left) but the seat's AI never plays that turn, and only an Autoplay turn lets it go, leaving the seat human |
 
 ---
 
@@ -468,13 +499,15 @@ One line each; the detail and the evidence are in `reports/`.
 | the front end | `setup_probe.lua`, `setup_slots.lua`, `setup_decode.lua`, `turnlimit_probe.lua`, `turnlimit_setup.lua` |
 | diplomacy | `deal_probe.lua`, `deal_agreements.lua` |
 | session 1 | `sight_find.lua` + `sight_read.lua` (the sight matrix), `volcano_snap.lua` + `volcano_erupt.lua`, `cs_probe.lua`, `prod_state.lua`, `trade_probe.lua`, `unblock.lua` |
+| holding an observer game (H-2) | `turn_lock.lua` (the lock), `h2h_sig.lua` (a GameCore state signature), `h2h_igturn.lua` (an InGame turn reader), `h2h_saveturn.lua` (a save's turn from the save list's metadata), `h2h_surface.lua` (the pause / autoplay API listing), `h2h_grab.lua` (the seat-grab arm) |
 | API discovery | `dump_methods.lua`, `dump_globals.lua`, `dump_unit.lua`, `dump_buildqueue.lua`, `dump_citycmd.lua`, `catalog_probe.lua`, `param_grep.lua`, `unit_ops.lua`, `blocker_read.lua`, `find_coastal.lua`, `fuel_probe.lua`, `gdr_tech.lua`, `save_named.lua`, `load_named.lua` |
 
 ## Fits and batteries (`*.py`)
 
 | script | purpose |
 |---|---|
-| `watch.py`, `fleet.py` | play games forward with per-turn readers (`--lua` / `--state` pairs), one instance or a fleet |
+| `watch.py`, `fleet.py` | play games forward with per-turn readers (`--lua` / `--state` pairs), one instance or a fleet; `--step` holds every observer turn (`turn_lock.lua`) |
+| `h2h_step.py`, `h2h_fit.py`, `h2h_watchfit.py`, `h2h_savecheck.py`, `h2h_fresh.py`, `h2h_poll.py` | H-2: the turn lock measured — a single hold against a stepped run of the same seeds, a stepped watch's continuity and cost, when a held save reaches the disk, a fresh game, a turn / seat poll (SESSION5 §15) |
 | `cs_analyze.py` | a `cs_watch.lua` log per city-state: units, upgrades (paired through the install's `UnitUpgrades`; a minor's upgrade is free, `MINOR_CIV_GOLD_MILITARY_UPGRADE` 100%), builds, purchases, wars |
 | `rng_fit.py` | fits the LCG transition and the range fold against the recorded streams |
 | `combat_roll_fit.py` | fits damage against the known draw; `combat_clean.py`, `combat_endpoint.py`, `combat_roll_run.py` drive the shots |

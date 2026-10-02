@@ -1,0 +1,53 @@
+    lock turn 14 target 14 held -1 id nil holds 0 seen 14 ev TurnBegin
+watching 127.0.0.4 from turn 15 to 55 (observer, stepped) -> h2h_sig_h2hstep3_20261002T081155Z.jsonl, h2h_igturn_h2hstep3_20261002T081155Z.jsonl
+turn 16 at 1790928717.9 free_mb 18054
+turn 17 at 1790928718.6 free_mb 18055
+turn 18 at 1790928719.4 free_mb 18061
+turn 19 at 1790928720.1 free_mb 18050
+    save requested name=h2hstep3_t20 ok=true err=nil turn=20
+turn 20 at 1790928720.9 free_mb 18062
+turn 21 at 1790928721.8 free_mb 18073
+turn 22 at 1790928722.5 free_mb 18075
+turn 23 at 1790928723.3 free_mb 18075
+turn 24 at 1790928724.0 free_mb 18074
+    save requested name=h2hstep3_t25 ok=true err=nil turn=25
+turn 25 at 1790928724.8 free_mb 18074
+turn 26 at 1790928725.7 free_mb 18075
+turn 27 at 1790928726.6 free_mb 18076
+turn 28 at 1790928727.4 free_mb 18073
+turn 29 at 1790928728.3 free_mb 18071
+    save requested name=h2hstep3_t30 ok=true err=nil turn=30
+turn 30 at 1790928729.2 free_mb 18070
+turn 31 at 1790928730.1 free_mb 18067
+turn 32 at 1790928730.9 free_mb 18067
+turn 33 at 1790928731.8 free_mb 18066
+turn 34 at 1790928732.6 free_mb 18070
+    save requested name=h2hstep3_t35 ok=true err=nil turn=35
+turn 35 at 1790928733.6 free_mb 18072
+turn 36 at 1790928734.5 free_mb 18072
+turn 37 at 1790928735.3 free_mb 18070
+turn 38 at 1790928736.2 free_mb 18078
+turn 39 at 1790928737.1 free_mb 18087
+    save requested name=h2hstep3_t40 ok=true err=nil turn=40
+turn 40 at 1790928738.0 free_mb 18077
+turn 41 at 1790928739.0 free_mb 18068
+turn 42 at 1790928739.9 free_mb 18072
+turn 43 at 1790928740.8 free_mb 18071
+turn 44 at 1790928741.6 free_mb 18073
+    save requested name=h2hstep3_t45 ok=true err=nil turn=45
+turn 45 at 1790928742.6 free_mb 18074
+turn 46 at 1790928743.6 free_mb 18073
+turn 47 at 1790928744.5 free_mb 18074
+turn 48 at 1790928745.3 free_mb 18073
+turn 49 at 1790928746.2 free_mb 18073
+    save requested name=h2hstep3_t50 ok=true err=nil turn=50
+turn 50 at 1790928747.2 free_mb 18073
+turn 51 at 1790928748.2 free_mb 18074
+turn 52 at 1790928749.1 free_mb 18048
+turn 53 at 1790928750.0 free_mb 18045
+turn 54 at 1790928750.8 free_mb 18046
+    save requested name=h2hstep3_t55 ok=true err=nil turn=55
+turn 55 at 1790928751.7 free_mb 18050
+    end: target (turn 55)
+event history -> event_history_h2hstep3_20261002T081155Z.txt
+    at end (stay): left the game as it stands

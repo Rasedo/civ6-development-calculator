@@ -521,7 +521,9 @@ def close_instance(host: str) -> list[int]:
 
 
 AT_END = ("menu", "close", "stay")
-LUA_EXIT = ('pcall(function() Automation.Pause(false) end); '
+# a turn held by the turn lock (`turn_lock.lua`) is released first
+LUA_EXIT = ('if LAB_TURN_LOCK ~= nil then LAB_TURN_LOCK.target = -1; if LAB_TURN_LOCK.id ~= nil then '
+            'UI.ReleaseEventID(LAB_TURN_LOCK.id); LAB_TURN_LOCK.id = nil end end; '
             'print("left the game at turn " .. Game.GetCurrentGameTurn()); Events.ExitToMainMenu()')
 
 

@@ -474,7 +474,7 @@ def unstick(t: Tuner, lp: int) -> list[str]:
 def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None] = print,
               nudge: Callable[[], None] | None = None, session_lua: str | None = None,
               first: float = 5.0, poll: float = 3.0, blind: float = 30.0, ai_blockers: float = 15.0,
-              one_more_turn: bool = False) -> int:
+              one_more_turn: bool = False, tick: float = 0.25) -> int:
     """Wait for the turn counter to pass `t0` and return the new turn. A
     finished game raises `GameOver` — unless `one_more_turn` and the end
     screen offers Just One More Turn, which is then pressed and the game
@@ -486,7 +486,8 @@ def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None
     stood `ai_blockers` seconds (0 in the endturn mode, where no AI plays the
     seat). `nudge` (the endturn mode's end-turn request) runs after an answer
     and every 20 s. The blind sweep (`unstick`) runs only when `blind`
-    seconds pass with no cause answered."""
+    seconds pass with no cause answered. The counter is read every `tick`
+    seconds."""
     start = time.monotonic()
     deadline = start + wait
     looked = start + first - poll
@@ -496,7 +497,7 @@ def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None
     while time.monotonic() < deadline:
         # a short poll: the turn's own time is the AI's, and a coarse poll
         # adds up to its whole interval to every turn
-        time.sleep(0.25)
+        time.sleep(tick)
         try:
             tn = turn(t)
         except TunerLost:
@@ -585,6 +586,38 @@ def advance(t: Tuner, how: str, lp: int, wait: float, log: Callable[[str], None]
     end_turn()
     return wait_turn(t, t0, lp, wait, log, nudge=end_turn, session_lua=session_lua, one_more_turn=one_more_turn,
                      **{"first": 1.0, **waits, "ai_blockers": 0.0})
+
+
+# the turn lock (`turn_lock.lua`): an all-AI observer game plays by itself,
+# so a reader taken "at turn T" can see T+1. The lock holds the game's turn
+# processing at turn T's TurnBegin (UI.ReferenceCurrentEvent) until released.
+TURN_LOCK = (pathlib.Path(__file__).parent / "turn_lock.lua").read_text(encoding="utf-8")
+
+
+def lock(t: Tuner, mode: str, arg: int = 0, event: str = "TurnBegin", who: int = -1) -> dict:
+    """run the turn lock: `target` (hold at turn `arg` or later), `step`
+    (aim at the held turn + 1, release), `release` (no target, release) or
+    `read`; returns its state — `held` the last turn held, `id` the standing
+    reference (None when nothing is held). `event` / `who` take effect on
+    the first call in a game, which installs the handler."""
+    code = TURN_LOCK.replace("ZMODE", mode).replace("ZEV", event).replace("ZWHO", str(who))
+    ln = t.run(IG, code.replace("ZT", str(arg)))[-1]
+    w = ln.split()
+    return {"line": ln, "turn": int(w[2]), "target": int(w[4]), "held": int(w[6]),
+            "id": None if w[8] == "nil" else w[8], "holds": int(w[10]), "seen": int(w[12])}
+
+
+def wait_hold(t: Tuner, want: int, limit: float) -> dict:
+    """poll (bounded by `limit` seconds) until the lock holds turn `want` or
+    a later one, and return its state; `TurnStalled` when it does not"""
+    end = time.monotonic() + limit
+    while time.monotonic() < end:
+        if turn(t) >= want:
+            s = lock(t, "read")
+            if s["id"] is not None:
+                return s
+        time.sleep(0.05)
+    raise TurnStalled(f"the lock did not hold turn {want} within {limit}s")
 
 
 def parse_storms(lines: list[str]) -> list[dict]:

@@ -1,0 +1,40 @@
+    lock turn 14 target 34 held -1 id nil holds 0 seen -1 ev TurnBegin
+watching 127.0.0.4 from turn 14 to 34 (observer) -> h2h_sig_h2hend_20261002T081432Z.jsonl, h2h_igturn_h2hend_20261002T081432Z.jsonl
+    save requested name=h2hend_t15 ok=true err=nil turn=16
+turn 15 at 1790928873.9 free_mb 18089
+    save requested name=h2hend_t17 ok=true err=nil turn=17
+turn 17 at 1790928874.4 free_mb 18092
+    save requested name=h2hend_t18 ok=true err=nil turn=18
+turn 18 at 1790928875.0 free_mb 18093
+    save requested name=h2hend_t19 ok=true err=nil turn=20
+turn 19 at 1790928875.7 free_mb 18094
+    save requested name=h2hend_t21 ok=true err=nil turn=21
+turn 21 at 1790928876.3 free_mb 18097
+    save requested name=h2hend_t22 ok=true err=nil turn=22
+turn 22 at 1790928876.9 free_mb 18096
+    save requested name=h2hend_t23 ok=true err=nil turn=24
+turn 23 at 1790928877.4 free_mb 18098
+    save requested name=h2hend_t24 ok=true err=nil turn=25
+turn 24 at 1790928878.0 free_mb 18097
+    save requested name=h2hend_t25 ok=true err=nil turn=26
+turn 25 at 1790928878.6 free_mb 18089
+    save requested name=h2hend_t27 ok=true err=nil turn=27
+turn 27 at 1790928879.2 free_mb 18088
+    save requested name=h2hend_t28 ok=true err=nil turn=28
+turn 28 at 1790928879.7 free_mb 18085
+    save requested name=h2hend_t29 ok=true err=nil turn=29
+turn 29 at 1790928880.3 free_mb 18085
+    save requested name=h2hend_t30 ok=true err=nil turn=30
+turn 30 at 1790928880.9 free_mb 18083
+    save requested name=h2hend_t31 ok=true err=nil turn=31
+turn 31 at 1790928881.4 free_mb 18091
+    save requested name=h2hend_t32 ok=true err=nil turn=32
+turn 32 at 1790928882.0 free_mb 18085
+    save requested name=h2hend_t33 ok=true err=nil turn=33
+turn 33 at 1790928882.6 free_mb 18089
+    save requested name=h2hend_t34 ok=true err=nil turn=34
+turn 34 at 1790928883.2 free_mb 18085
+    end: target (turn 34)
+event history -> event_history_h2hend_20261002T081432Z.txt
+    save of turn 34 let through; held again at 35
+    at end (menu): left the game at turn 35
