@@ -827,9 +827,11 @@ describe('the turn\'s one random event', () => {
     ev.droughtTurns = 5;
     state.droughts = [{ plots: [first.index, ev.index], left: 5 }];
     const storm = tileAtCoords(state.map, 20, 20);
-    state.storms = [{ id: 1, event: 0, at: storm.index, left: 2, struck: [] }];
+    state.storms = [{ id: 1, event: 0, at: storm.index, left: 2, struck: [storm.index] }];
     const live = new Set(liveEventPlots(state).map((t) => t.index));
+    // a plot a live storm struck is under an event; a drought's is not
     expect(live.has(storm.index)).toBe(true);
+    expect(live.has(ev.index)).toBe(false);
     const none = new Set<number>();
     const cands = state.map.tiles.filter((t) => droughtCandidate(state.map, t, none, live));
     const w = (t: Tile) => 1 + Math.min(hexDistance(state.map, t.col, t.row, ev.col, ev.row), DROUGHT_SPACING);

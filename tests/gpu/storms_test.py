@@ -594,15 +594,17 @@ def main() -> int:
     s13.drought[0, head] = 5
     s13.drought_left[0, 0] = 5
     s13.drought_plots[0, 0, :2] = torch.tensor([head, ev])
-    # a storm far off: its centre is under an event, yet it spaces nothing
+    # a storm far off: the plot it struck is under an event, yet it spaces nothing
     far = int(s13.pair_dist[ev].argmax())
     s13.storm_event[0, 0] = 0
     s13.storm_at[0, 0] = far
     s13.storm_left[0, 0] = 2
+    s13.storm_struck[0, 0, far] = True
     live13 = s13._live_event_plots()
-    assert bool(live13[0, far]), "a storm's centre is under a live event"
+    assert bool(live13[0, far]), "a plot a live storm struck is under a live event"
     cand = s13._drought_cands(live13)[0]
-    assert not bool(cand[ev]), "a plot under a live event starts no drought"
+    # a drought's own plot is no bar (0x28de40 reads the storms alone)
+    assert bool(cand[ev]), "a drought's plot barred a new drought"
     wts = (1 + s13.pair_dist[ev].long().clamp(max=15)) * cand.long()
     near = cand & (s13.pair_dist[ev] <= 6)
     p_near = float(wts[near].sum()) / float(wts.sum())

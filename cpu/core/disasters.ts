@@ -582,12 +582,12 @@ function fireCandidate(t: Tile, row: number): boolean {
   return t.feature === FIRE_START_FEATURE[row] && !t.submerged;
 }
 
-/** The plots under a live event, where no drought may start: every storm's
- *  centre, every plot under a drought and every burning plot. */
+/** The plots under a live event, where no drought may start: every plot a
+ *  live storm has struck (GameCore_XP2 0x28de40 reads m_aStorms' struck
+ *  lists alone — a drought's or a fire's plot is no bar). */
 export function liveEventPlots(state: GameState): Tile[] {
-  const storms = new Set((state.storms ?? []).map((s) => s.at));
-  return state.map.tiles.filter((t) => storms.has(t.index) || t.droughtTurns > 0
-    || (t.fireStart !== undefined && FIRE_BURNING_FEATURE.includes(t.feature ?? '')));
+  const struck = new Set((state.storms ?? []).filter((s) => s.left > 0).flatMap((s) => s.struck));
+  return state.map.tiles.filter((t) => struck.has(t.index));
 }
 
 /** The plots a drought start keeps its distance from: each live drought at

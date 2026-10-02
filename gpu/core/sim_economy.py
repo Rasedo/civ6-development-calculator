@@ -1627,13 +1627,9 @@ class SimEconomy:
         self._eff_version += 1
 
     def _live_event_plots(self) -> torch.Tensor:
-        """[B, T] `liveEventPlots` — every storm's centre, every plot under a
-        drought and every burning plot: where no drought may start."""
-        centre = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-        b, k = (self.storm_left > 0).nonzero(as_tuple=True)
-        centre[b, self.storm_at[b, k]] = True
-        return (centre | (self.drought > 0)
-                | (self._fid_in(self._fire_burning_fid) & (self.fire_start >= 0)))
+        """[B, T] `liveEventPlots` — every plot a live storm has struck
+        (0x28de40): where no drought may start."""
+        return (self.storm_struck & (self.storm_left > 0).unsqueeze(2)).any(dim=1)
 
     def _drought_ends(self) -> tuple[torch.Tensor, torch.Tensor]:
         """`droughtEnds` — each drought record's LAST footprint plot [B, D]

@@ -457,6 +457,13 @@ RandomEvent_Terrains, an empty list passing all), weight valid × (Spacing +
 ONE weighted draw. No test of a plot under another event: a storm may begin
 on a live storm's centre (weight 1). Every storm row's Spacing is 15.
 
+## C-74 tail: "under an event" for a drought start — READ
+
+0x28de40 (the drought predicate's event test): true when the plot is in any
+live storm record's struck list (m_aStorms +0x8b0, stride 0x68, the vector at
++0x38..+0x40). Droughts' and fires' plots are not read. A burning plot fails
+the predicate anyway (it carries a feature).
+
 ## DLL rules the engines contradict
 
 None known: every rule read above ships on both engines.
