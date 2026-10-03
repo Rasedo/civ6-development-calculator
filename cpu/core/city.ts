@@ -1101,8 +1101,9 @@ function tourismOf(
 export function seatTourismReligious(state: GameState, seat: number): number {
   const cities = citiesOf(state, seat);
   let t = 0;
+  const km = congressGwMult(state);
   for (const c of cities) {
-    t += relicTourism(state, c) * wonderMult(state, [c], 'religiousTourismMult');
+    t += relicTourism(state, c, km) * wonderMult(state, [c], 'religiousTourismMult');
   }
   for (const g of state.seats) {
     const ht = g.religion.holyTile;

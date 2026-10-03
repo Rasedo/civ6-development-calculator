@@ -6793,7 +6793,7 @@ class SimSeats:
         if kind == 1:
             return int(self.civ_gpp.shape[2])
         if kind == 2:
-            return 3
+            return 8                       # Great Work object types
         if kind == 4:
             return 2                       # gold, faith
         if kind == 5:
@@ -6977,9 +6977,7 @@ class SimSeats:
             counts = self.civ_gpp[:, row].double()
         else:
             al = self.city_alive[:, row].long()
-            counts = torch.stack([
-                (self._gw_kind_count(row, k) * al).sum(dim=1) for k in range(3)
-            ], dim=1).double()
+            counts = (self._gw_counts_by_obj(row) * al.unsqueeze(2)).sum(dim=1).double()
         return a, self._argmax_low(counts)
 
     def _congress_buy(self, row: int, voter: torch.Tensor, want: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -7602,11 +7600,11 @@ class SimSeats:
         return torch.where(hit, term, torch.zeros_like(term))
 
     def _congress_gw_kmult(self) -> torch.Tensor:
-        """[B, 3] long — Heritage Organization tourism factors by Great Work
-        kind [writing, art, music]."""
+        """[B, 8] long — Heritage Organization tourism factors by Great Work
+        OBJECT type (`congressGwMult`)."""
         out, tgt = self._congress_by_id("HERITAGE_ORGANIZATION")
-        km = torch.ones(self.B, 3, dtype=torch.long, device=self.device)
-        for k in range(3):
+        km = torch.ones(self.B, 8, dtype=torch.long, device=self.device)
+        for k in range(8):
             hit = (out >= 0) & (tgt == k)
             km[:, k] = torch.where(
                 hit,

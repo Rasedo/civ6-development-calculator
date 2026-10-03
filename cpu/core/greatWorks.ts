@@ -232,7 +232,7 @@ export function greatWorkYields(state: GameState, city: WorkCity): { culture: nu
  * (Mary Leakey), the Congress multiplier by created kind, a themed holder
  * doubling its own.
  */
-export function greatWorkTourism(state: GameState, city: WorkCity, printing: boolean, kmult: readonly [number, number, number] = [1, 1, 1]): number {
+export function greatWorkTourism(state: GameState, city: WorkCity, printing: boolean, omult?: readonly number[]): number {
   const works = gwWorks(city);
   if (works.length === 0) return 0;
   const mult = gwSlotMults(state, city);
@@ -243,23 +243,22 @@ export function greatWorkTourism(state: GameState, city: WorkCity, printing: boo
   let t = 0;
   for (const w of works) {
     if (w.obj === GWO_RELIC) continue;
-    const kind = gwKindOf(w.obj);
     t += GWO_TOURISM[w.obj]! * (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1)
       * (w.obj === GWO_ARTIFACT ? artifact : 1) * scale[w.obj]!
-      * (kind >= 0 ? kmult[kind]! : 1) * mult[w.slot]!;
+      * (omult?.[w.obj] ?? 1) * mult[w.slot]!;
   }
   return t;
 }
 
 /** the RELIGIOUS half: what this city's Relics pay, a themed holder doubling
  *  its own; the holding city's wonder multiplier is the caller's */
-export function relicTourism(state: GameState, city: WorkCity): number {
+export function relicTourism(state: GameState, city: WorkCity, omult?: readonly number[]): number {
   const works = gwWorks(city);
   if (!works.some((w) => w.obj === GWO_RELIC)) return 0;
   const mult = gwSlotMults(state, city);
   let t = 0;
   for (const w of works) if (w.obj === GWO_RELIC) t += GWO_TOURISM[w.obj]! * mult[w.slot]!;
-  return t;
+  return t * (omult?.[GWO_RELIC] ?? 1);
 }
 
 /**

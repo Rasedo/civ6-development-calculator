@@ -469,7 +469,7 @@ export const DVP_PER_RESOLUTION = srcConst('eras.dvpPerResolution', 1,
 export const DIPLO_VICTORY_POINTS = srcConst('eras.diploVictoryPoints', 20,
   gp('DIPLOMATIC_VICTORY_POINTS_REQUIRED'));
 
-type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
+type CongressTargetKind = 'district' | 'gpClass' | 'gwObject' | 'seat'
   | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
   | 'building' | 'promoClass' | 'religion' | 'governor' | 'spyMission'
   | 'competition' | 'luxury';
@@ -477,7 +477,7 @@ type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
  *  rules is this array's index, so the GPU's `_congress_space` /
  *  `_congress_pref` switch on the same numbers. APPEND only. */
 export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
-  'district', 'gpClass', 'gwKind', 'seat',
+  'district', 'gpClass', 'gwObject', 'seat',
   'currency', 'policy', 'government', 'project', 'csType', 'feature',
   'building', 'promoClass', 'religion', 'governor', 'spyMission', 'competition',
   'luxury',
@@ -611,7 +611,7 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   { id: 'MIGRATION_TREATY', name: 'Migration Treaty', minEra: 4, maxEra: 99, target: 'seat' },
   // CIV6: "A: Great Works of this type generate +100% Tourism. / B: No
   // Tourism from Great Works of this type." (Modern+)
-  { id: 'HERITAGE_ORGANIZATION', name: 'Heritage Organization', minEra: 5, maxEra: 99, target: 'gwKind' },
+  { id: 'HERITAGE_ORGANIZATION', name: 'Heritage Organization', minEra: 5, maxEra: 99, target: 'gwObject' },
   // CIV6: "A: +100% cost when producing or purchasing military units using
   // this currency type. / B: -50% cost ...". The target is the CURRENCY, so
   // the multiplier rides the PURCHASE price in it; nothing in this model

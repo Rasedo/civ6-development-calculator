@@ -4911,20 +4911,19 @@ class SimEconomy:
                 _f = _sc.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)
                 base = base * _f // 100
         if km is not None:
-            kind = self._gw_obj_kind[oc]                                     # [B, RC, W]
-            kk = torch.cat([km, torch.ones(self.B, 1, dtype=torch.long, device=self.device)], dim=1)  # kind -1 -> column 3
-            kmul = kk.gather(1, torch.where(kind < 0, torch.full_like(kind, 3), kind).reshape(self.B, -1)).reshape_as(kind)
-            base = base * kmul
+            base = base * km.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)  # by object type
         return (base * self._gw_slot_mult(row)).sum(dim=2)
 
     def _gw_tourism_relic(self, row: int) -> torch.Tensor:
         """[B, RC] long — `relicTourism`: what the Relics pay, a themed holder
-        doubling its own; the holding city's wonder multiplier is the caller's."""
+        doubling its own, the Heritage Organization's Relic factor; the
+        holding city's wonder multiplier is the caller's."""
         obj = self.city_gw_obj[:, row]
         rel = obj == 7
         if not bool(rel.any()):
             return torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
-        return (self._gw_obj_tourism[7] * rel.long() * self._gw_slot_mult(row)).sum(dim=2)
+        t = (self._gw_obj_tourism[7] * rel.long() * self._gw_slot_mult(row)).sum(dim=2)
+        return t * self._congress_gw_kmult()[:, 7:8]
 
     def _relig_rows(self, x: torch.Tensor) -> torch.Tensor:
         """The city-block rows RELIGION walks: the majors, then the Free

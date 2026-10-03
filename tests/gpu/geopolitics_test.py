@@ -1304,9 +1304,9 @@ def main() -> None:
     assert float(s8._congress_growth(0)[0]) == 0.8 and float(s8._congress_growth(1)[0]) == 1.0
     assert float(s8._congress_loyalty(0)[0]) == s8._c_mig_loy and float(s8._congress_loyalty(1)[0]) == 0.0
     s8.congress_active[:, 0, :] = torch.tensor([3, 0, 1], dtype=torch.long)   # Heritage A on ART
-    assert s8._congress_gw_kmult()[0].tolist() == [1, 2, 1]
+    assert s8._congress_gw_kmult()[0].tolist() == [1, 2, 1, 1, 1, 1, 1, 1]  # per Great Work object type
     s8.congress_active[:, 0, :] = torch.tensor([3, 1, 2], dtype=torch.long)   # Heritage B on MUSIC
-    assert s8._congress_gw_kmult()[0].tolist() == [1, 1, 0]
+    assert s8._congress_gw_kmult()[0].tolist() == [1, 1, 0, 1, 1, 1, 1, 1]
     # the UDT ban empties the banned district's building columns in the mask
     s8.congress_active[:, 0, :] = torch.tensor([0, 1, 0], dtype=torch.long)   # UDT B on district 0
     s8._eff_version += 1

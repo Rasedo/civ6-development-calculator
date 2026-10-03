@@ -13,7 +13,8 @@ import { nextRandom } from './rand';
 import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { GP_CLASSES } from '../data/greatPeople';
-import { gwCountKind } from './greatWorks';
+import { gwCountsByObj } from './greatWorks';
+import { GWO_COUNT } from '../data/greatWorks';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -258,9 +259,9 @@ export function preference(state: GameState, res: number, seat: number,
       for (const s of state.seats) if (isCiv(s.seat)) top = Math.max(top, s.co2 ?? 0);
       return { outcome: (sx.co2 ?? 0) >= top ? 1 : 0, target: 0 };
     }
-    default: { // CONGRESS_HERITAGE
-      const counts = [0, 0, 0];
-      for (const city of sx.cities) for (let k = 0; k < 3; k++) counts[k]! += gwCountKind(city, k);
+    default: { // CONGRESS_HERITAGE: a Great Work OBJECT type (TargetKind GREATWORKOBJECT)
+      const counts = new Array<number>(GWO_COUNT).fill(0);
+      for (const city of sx.cities) gwCountsByObj(city).forEach((n, o) => { counts[o]! += n; });
       return { outcome: 0, target: argmaxLow(counts) };
     }
   }
@@ -332,7 +333,7 @@ export function targetSpaceSize(state: GameState, res: number): number {
   switch (CONGRESS_RESOLUTIONS[res].target) {
     case 'district': return PLACEABLE_DISTRICTS.length;
     case 'gpClass': return GP_CLASSES.length;
-    case 'gwKind': return 3;
+    case 'gwObject': return GWO_COUNT;
     case 'currency': return CONGRESS_CURRENCIES.length;
     case 'policy': return POLICY_LIST.length;
     case 'government': return GOVERNMENT_LIST.length;
@@ -609,9 +610,9 @@ export function congressLoyaltyDelta(state: GameState, seat: number): number {
 
 /** Heritage Organization tourism factors by Great Work kind
  * [writing, art, music]. */
-export function congressGwMult(state: GameState): [number, number, number] {
+export function congressGwMult(state: GameState): number[] {
   const e = congressEffect(state, CONGRESS_HERITAGE);
-  const m: [number, number, number] = [1, 1, 1];
+  const m = new Array<number>(GWO_COUNT).fill(1);
   if (e) m[e.target] = e.outcome === 0 ? CONGRESS_GW_MULT : 0;
   return m;
 }

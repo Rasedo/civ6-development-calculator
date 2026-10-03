@@ -154,9 +154,9 @@ describe('world congress', () => {
     ];
     expect(congressUdtProdDistrict(state)).toBe('CAMPUS');
     expect(congressUdtBlockedDistrict(state)).toBe(null);
-    expect(congressGwMult(state)).toEqual([1, 2, 1]);
+    expect(congressGwMult(state)).toEqual([1, 2, 1, 1, 1, 1, 1, 1]); // per Great Work object type
     state.congress = [{ res: CONGRESS_HERITAGE, outcome: 1, target: 2 }];
-    expect(congressGwMult(state)).toEqual([1, 1, 0]);
+    expect(congressGwMult(state)).toEqual([1, 1, 0, 1, 1, 1, 1, 1]);
   });
 
   it('the wonder DVP magnitudes are the sourced ones', () => {
