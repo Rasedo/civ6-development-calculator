@@ -425,12 +425,15 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       h.eventYields.set(i, [acc[0] + Math.max(0, f), acc[1] + Math.max(0, pr), acc[2] + Math.max(0, sc)]);
     };
     // the players whose own rows moved a plot's yields this turn: a pantheon,
-    // a technology, a civic, a card or a government
+    // a card or a government may reach any plot (`moved`); a technology or a
+    // civic only an improved or resource plot (`researched`)
     const moved = new Set<number>();
+    const researched = new Set<number>();
     for (const q of rec.players) {
       const q0 = h.last.players.find((x) => x.id === q.id);
-      if (!q0 || JSON.stringify([q.pantheon, q.techs, q.civics, q.policies, q.government])
-        !== JSON.stringify([q0.pantheon, q0.techs, q0.civics, q0.policies, q0.government])) moved.add(q.id);
+      if (!q0 || JSON.stringify([q.pantheon, q.policies, q.government])
+        !== JSON.stringify([q0.pantheon, q0.policies, q0.government])) moved.add(q.id);
+      if (!q0 || JSON.stringify([q.techs, q.civics]) !== JSON.stringify([q0.techs, q0.civics])) researched.add(q.id);
     }
     const same = (i: number, k: number) => plotAt(rec, i)[k] === plotAt(h.last!, i)[k];
     const still = (i: number) => same(i, P.feature) && same(i, P.resource) && same(i, P.improvement)
@@ -457,9 +460,9 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         // an unowned plot's yields are the viewing player's (a strategic it
         // has just revealed pays from that record on)
         const owner = plotAt(rec, i)[P.owner] as number;
-        const o = owner >= 0 ? owner
-          : (plotAt(rec, i)[P.resource] as number) >= 0 ? num(rec.head.localPlayer) : -1;
-        if (o >= 0 && moved.has(o)) continue;
+        const builtOn = (plotAt(rec, i)[P.resource] as number) >= 0 || (plotAt(rec, i)[P.improvement] as number) >= 0;
+        const o = owner >= 0 ? owner : builtOn ? num(rec.head.localPlayer) : -1;
+        if (o >= 0 && (moved.has(o) || (builtOn && researched.has(o)))) continue;
         if (nbr(i).some((n) => !still(n))) continue;
         const y = plotAt(rec, i)[P.yields] as number[];
         const y0 = plotAt(h.last, i)[P.yields] as number[];
