@@ -454,7 +454,11 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         // a plot whose yields rose with nothing about it, its neighbours or
         // its owner moving: a random event's draw
         if (!still(i) || (plotAt(rec, i)[P.district] as number) >= 0) continue;
-        const o = plotAt(rec, i)[P.owner] as number;
+        // an unowned plot's yields are the viewing player's (a strategic it
+        // has just revealed pays from that record on)
+        const owner = plotAt(rec, i)[P.owner] as number;
+        const o = owner >= 0 ? owner
+          : (plotAt(rec, i)[P.resource] as number) >= 0 ? num(rec.head.localPlayer) : -1;
         if (o >= 0 && moved.has(o)) continue;
         if (nbr(i).some((n) => !still(n))) continue;
         const y = plotAt(rec, i)[P.yields] as number[];
