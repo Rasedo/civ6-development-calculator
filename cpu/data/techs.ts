@@ -326,6 +326,8 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Technologies', 'TechnologyType=TECH_GUNPOWDER', 'EraType', { expect: 'ERA_RENAISSANCE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_GUNPOWDER', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the TechnologyPrereqs rows of TECH_GUNPOWDER, read as an AND-list', inputs: [xml('TechnologyPrereqs', 'Technology=TECH_GUNPOWDER&PrereqTech=TECH_APPRENTICESHIP', 'PrereqTech', { expect: 'TECH_APPRENTICESHIP' }), xml('TechnologyPrereqs', 'Technology=TECH_GUNPOWDER&PrereqTech=TECH_STIRRUPS', 'PrereqTech', { expect: 'TECH_STIRRUPS' }), xml('TechnologyPrereqs', 'Technology=TECH_GUNPOWDER&PrereqTech=TECH_MILITARY_ENGINEERING', 'PrereqTech', { expect: 'TECH_MILITARY_ENGINEERING' })] },
+    'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_GUNPOWDER', 'ImprovementType', { expect: 'IMPROVEMENT_QUARRY' }),
+    'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_GUNPOWDER', 'BonusYieldChange'),
   },
   METAL_CASTING: {
     era: xml('Technologies', 'TechnologyType=TECH_METAL_CASTING', 'EraType', { expect: 'ERA_RENAISSANCE' }),
@@ -499,6 +501,8 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Technologies', 'TechnologyType=TECH_SMART_MATERIALS', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_SMART_MATERIALS', 'Cost', { scale: GAME_SPEED }),
     prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_SMART_MATERIALS (its only published gate is the era); the deepest node this tree carries stands in' },
+    'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_MINE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_SMART_MATERIALS', 'ImprovementType', { expect: 'IMPROVEMENT_MINE' }),
+    'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_MINE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_SMART_MATERIALS', 'BonusYieldChange'),
   },
   ADVANCED_POWER_CELLS: {
     era: xml('Technologies', 'TechnologyType=TECH_ADVANCED_POWER_CELLS', 'EraType', { expect: 'ERA_FUTURE' }),
@@ -514,6 +518,8 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Technologies', 'TechnologyType=TECH_CYBERNETICS', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_CYBERNETICS', 'Cost', { scale: GAME_SPEED }),
     prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_CYBERNETICS (its only published gate is the era); the deepest node this tree carries stands in' },
+    'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_CYBERNETICS', 'ImprovementType', { expect: 'IMPROVEMENT_LUMBER_MILL' }),
+    'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_CYBERNETICS', 'BonusYieldChange'),
   },
   PREDICTIVE_SYSTEMS: {
     era: xml('Technologies', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS', 'EraType', { expect: 'ERA_FUTURE' }),
@@ -693,7 +699,10 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'MEDIEVAL_WALLS' },
     ]),
 
-    T('GUNPOWDER', 'Gunpowder', 'Renaissance', 600, ['APPRENTICESHIP', 'STIRRUPS', 'MILITARY_ENGINEERING']),
+    T('GUNPOWDER', 'Gunpowder', 'Renaissance', 600, ['APPRENTICESHIP', 'STIRRUPS', 'MILITARY_ENGINEERING'], [
+      // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 230)
+      { kind: 'improvementYields', improvement: 'QUARRY', yields: { production: 1 } },
+    ]),
     T('METAL_CASTING', 'Metal Casting', 'Renaissance', 730, ['GUNPOWDER']),
     T('CARTOGRAPHY', 'Cartography', 'Renaissance', 600, ['BUTTRESS'], [
       // CIV6 (Fishing Boats): "+2 Gold (requires Cartography)".
@@ -773,13 +782,19 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     // CIV6: the Future techs' only published gate is the Future ERA; the
     // deepest Information-era nodes stand in as prereqs.
     T('OFFWORLD_MISSION', 'Offworld Mission', 'Future', 2500, ['TELECOMMUNICATIONS', 'NUCLEAR_FUSION']),
-    T('SMART_MATERIALS', 'Smart Materials', 'Future', 2200, ['NANOTECHNOLOGY', 'ROBOTICS']),
+    T('SMART_MATERIALS', 'Smart Materials', 'Future', 2200, ['NANOTECHNOLOGY', 'ROBOTICS'], [
+      // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 226)
+      { kind: 'improvementYields', improvement: 'MINE', yields: { production: 1 } },
+    ]),
     T('ADVANCED_POWER_CELLS', 'Advanced Power Cells', 'Future', 2200, ['NUCLEAR_FUSION']),
     // The two Future nodes the GIANT DEATH ROBOT's other upgrades hang on.
     // Their published cost is "2200 or 2300", the same pair the two rows
     // above carry, and this catalog reads that pair as 2200 throughout.
     T('ADVANCED_AI', 'Advanced AI', 'Future', 2200, ['ROBOTICS']),
-    T('CYBERNETICS', 'Cybernetics', 'Future', 2200, ['ROBOTICS', 'NANOTECHNOLOGY']),
+    T('CYBERNETICS', 'Cybernetics', 'Future', 2200, ['ROBOTICS', 'NANOTECHNOLOGY'], [
+      // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 227)
+      { kind: 'improvementYields', improvement: 'LUMBER_MILL', yields: { production: 1 } },
+    ]),
     // CIV6 (Predictive Systems): Future era, 2200 Science, "Unlocks Offshore
     // Wind Farm improvement" and "+1 Production to Quarry, Oil Well, and Oil
     // Rig improvements" — the Oil Rig's share waits on an improvement this

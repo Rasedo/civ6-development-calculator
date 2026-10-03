@@ -132,6 +132,8 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_FEUDALISM&PrereqCivic=CIVIC_DEFENSIVE_TACTICS', 'PrereqCivic', { expect: 'CIVIC_DEFENSIVE_TACTICS' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_FEUDAL_CONTRACT', 'PrereqCivic', { expect: 'CIVIC_FEUDALISM' }),
     'effects.2.policy': xml('Policies', 'PolicyType=POLICY_SERFDOM', 'PrereqCivic', { expect: 'CIVIC_FEUDALISM' }),
+    'effects.3.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PLANTATION&YieldType=YIELD_FOOD&PrereqCivic=CIVIC_FEUDALISM', 'ImprovementType', { expect: 'IMPROVEMENT_PLANTATION' }),
+    'effects.3.yields.food': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PLANTATION&YieldType=YIELD_FOOD&PrereqCivic=CIVIC_FEUDALISM', 'BonusYieldChange'),
   },
   CIVIL_SERVICE: {
     era: xml('Civics', 'CivicType=CIVIC_CIVIL_SERVICE', 'EraType', { expect: 'ERA_MEDIEVAL' }),
@@ -291,6 +293,8 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_COLONIALISM', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
     cost: xml('Civics', 'CivicType=CIVIC_COLONIALISM', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_COLONIALISM&PrereqCivic=CIVIC_MERCANTILISM', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),
+    'effects.1.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_FISHING_BOATS&YieldType=YIELD_PRODUCTION&PrereqCivic=CIVIC_COLONIALISM', 'ImprovementType', { expect: 'IMPROVEMENT_FISHING_BOATS' }),
+    'effects.1.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_FISHING_BOATS&YieldType=YIELD_PRODUCTION&PrereqCivic=CIVIC_COLONIALISM', 'BonusYieldChange'),
   },
   CONSERVATION: {
     era: xml('Civics', 'CivicType=CIVIC_CONSERVATION', 'EraType', { expect: 'ERA_MODERN' }),
@@ -477,6 +481,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'farmAdjacency' },
       { kind: 'unlockPolicy', policy: 'FEUDAL_CONTRACT' },
       { kind: 'unlockPolicy', policy: 'SERFDOM' },
+      // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 224)
+      { kind: 'improvementYields', improvement: 'PLANTATION', yields: { food: 1 } },
     ]),
     C('CIVIL_SERVICE', 'Civil Service', 'Medieval', 300, ['DEFENSIVE_TACTICS', 'RECORDED_HISTORY'], []),
     C('GUILDS', 'Guilds', 'Medieval', 420, ['FEUDALISM', 'CIVIL_SERVICE'], [
@@ -580,6 +586,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('COLONIALISM', 'Colonialism', 'Industrial', 800, ['MERCANTILISM'], [
       { kind: 'unlockImprovement', improvement: 'ICE_HOCKEY_RINK' }, // CIV6 (Ice Hockey Rink): PrereqCivic
+      // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 225)
+      { kind: 'improvementYields', improvement: 'FISHING_BOATS', yields: { production: 1 } },
     ]),
     C('CONSERVATION', 'Conservation', 'Modern', 1540, ['NATURAL_HISTORY'], [
       { kind: 'unlockBuilding', building: 'SANCTUARY' },
