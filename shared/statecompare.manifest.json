@@ -162,7 +162,9 @@
           "covers": [
             "GameState.roadTier"
           ],
-          "planes": []
+          "planes": [
+            "road_tier"
+          ]
         },
         {
           "name": "gameEra",
@@ -172,7 +174,12 @@
             "GameState.eraStartTurn",
             "GameState.eraCountdown"
           ],
-          "planes": []
+          "planes": [
+            "game_era",
+            "era_start",
+            "era_countdown"
+          ],
+          "note": "the game era's clock: the era in force, the turn it began and the countdown to the next (-1 when none runs)"
         },
         {
           "name": "pantheonsClaimed",
