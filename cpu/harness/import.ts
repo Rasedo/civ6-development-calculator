@@ -333,6 +333,11 @@ export interface History {
    *  when its feature regrows (`RandomEvent_Yields` Turns 2 and 6) */
   fireFood: Map<number, number>;
   fireProd: Map<number, number>;
+  /** an eruption's fertility by plot, [Food, Production, Science]: what the
+   *  plot gained when it turned to Volcanic Soil — the game's own per-plot
+   *  draw off `RandomEvent_Yields`, read as the record's yields against the
+   *  record before, the feature the soil replaced given back */
+  soil: Map<number, [number, number, number]>;
   /** the age each era transition gave each player, in order (`AGE_DARK`,
    *  `AGE_NORMAL`, `AGE_GOLDEN_ONLY`, `AGE_HEROIC`) */
   ages: Map<number, number[]>;
@@ -377,7 +382,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(),
-    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), ages: new Map(),
+    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), soil: new Map(), ages: new Map(),
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
 }
 
@@ -416,6 +421,15 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const was = fwas(i);
       const now = fname(i);
       if (was === now) continue;
+      if (now === 'FEATURE_VOLCANIC_SOIL') {
+        const y = plotAt(rec, i)[P.yields] as number[];
+        const y0 = plotAt(h.last, i)[P.yields] as number[];
+        const lost = was ? FEATURES[FEATURE_ID[was] ?? strip(was, 'FEATURE_')]?.yields ?? {} : {};
+        const gain = (k: number, key: 'food' | 'production' | 'science') =>
+          Math.max(0, (y?.[k] ?? 0) - (y0?.[k] ?? 0) + ((lost as Partial<Record<string, number>>)[key] ?? 0));
+        const acc = h.soil.get(i) ?? [0, 0, 0];
+        h.soil.set(i, [acc[0] + gain(0, 'food'), acc[1] + gain(1, 'production'), acc[2] + gain(3, 'science')]);
+      }
       if (now.startsWith('FEATURE_BURNT_')) h.fireFood.set(i, (h.fireFood.get(i) ?? 0) + 1);
       else if (was.startsWith('FEATURE_BURNT_') && (now === 'FEATURE_FOREST' || now === 'FEATURE_JUNGLE')) {
         h.fireProd.set(i, (h.fireProd.get(i) ?? 0) + 1);
@@ -468,6 +482,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   ctx.scopeTile = undefined;
   for (const [i, n] of history?.fireFood ?? []) tiles[i].fertility = Math.min(FERTILITY_CAP, n);
   for (const [i, n] of history?.fireProd ?? []) tiles[i].fertilityProd = Math.min(FERTILITY_CAP, n);
+  for (const [i, [f, pr, sc]] of history?.soil ?? []) {
+    tiles[i].fertility = Math.min(FERTILITY_CAP, tiles[i].fertility + f);
+    tiles[i].fertilityProd = Math.min(FERTILITY_CAP, tiles[i].fertilityProd + pr);
+    if (sc) tiles[i].fertilitySci = Math.min(FERTILITY_CAP, (tiles[i].fertilitySci ?? 0) + sc);
+  }
   const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles };
   for (const t of tiles) {
     t.riverMask = edgeMask(map, rec, t, P.riverBits);
