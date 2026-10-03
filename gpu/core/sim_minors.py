@@ -1740,6 +1740,9 @@ class SimMinors:
             cand_w = cand_w & self._wadj_plane(("cap", row), lambda: self._adj_capital(row))
         if int(wrow["needRel"]):
             cand_w = cand_w & self.civ_religion_done[:, row].unsqueeze(1)
+        if self._wond_coastland[wi]:
+            # CIV6 `Coast` (Kilwa Kisiwani): land beside the sea, live
+            cand_w = cand_w & self.coastal_land
         if wrow["onFeat"]:
             # the plot still carries one of the wonder's features
             live = ~self.feat_stripped

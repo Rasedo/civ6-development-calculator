@@ -20,7 +20,7 @@ import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
 import { cityAppealResolver, governorBuildingYields, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
-import { completedWonders } from './wonders';
+import { completedWonders, seatWonderSum, seatWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
 import { PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SPECIALIST_YIELDS, SPECIALIST_TIERS, GW_PRINTING_TECH } from '../data/greatPeople';
@@ -32,7 +32,7 @@ import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIB
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES } from '../../world/features';
-import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
+import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
 import { warWearinessLosses } from './weariness';
@@ -705,11 +705,15 @@ export function empireGrowthMult(state: GameState, seat: number): number {
   return mult;
 }
 
-/** The flat amenities and housing a city's OWN complete wonders pay it. */
+/** The flat amenities and housing a city's OWN complete wonders pay it — a
+ *  regional wonder's amenities reach it through `regionalWondersReaching`. */
 function wonderCityFlat(state: GameState, city: City,
   key: 'cityAmenities' | 'cityHousing' | 'routesToCityScience' | 'domesticRoutesToCityFaith'): number {
   let n = 0;
-  for (const w of completedWonders(state, city)) n += w.def.effects?.[key] ?? 0;
+  for (const w of completedWonders(state, city)) {
+    if (key === 'cityAmenities' && w.def.effects?.regionalRange) continue;
+    n += w.def.effects?.[key] ?? 0;
+  }
   return n;
 }
 
@@ -751,21 +755,23 @@ function improvementAmenities(state: GameState, city: City): number {
   return n;
 }
 
-function wonderRegionalAmenities(state: GameState, city: City): number {
+/** The seat's complete REGIONAL wonders whose reach takes in this city's
+ *  centre, in catalog order. Measured from the WONDER TILE, not from the
+ *  city holding it, on the wonder's own RegionalRange: a Mexico City
+ *  suzerain extends the DISTRICT regional effects its Civilopedia line
+ *  names, which a wonder's aura is not. */
+function regionalWondersReaching(state: GameState, city: City) {
   const center = state.map.tiles[city.centerIndex];
-  let n = 0;
-  for (const c of citiesOf(state, city.seat)) {
-    for (const w of completedWonders(state, c)) {
-      const amt = w.def.effects?.regionalAmenities;
-      if (!amt) continue;
-      const t = state.map.tiles[w.tileIndex];
-      // Measured from the WONDER TILE, not from the city holding it, on the
-      // BASE reach. A Mexico City suzerain extends the DISTRICT regional
-      // effects its Civilopedia line names, which a wonder's aura is not.
-      if (hexDistance(state.map, t.col, t.row, center.col, center.row) <= REGIONAL_RANGE) n += amt;
-    }
-  }
-  return n;
+  return seatWonders(state, city.seat).filter((w) => {
+    const r = w.def.effects?.regionalRange;
+    if (!r) return false;
+    const t = state.map.tiles[w.tileIndex];
+    return hexDistance(state.map, t.col, t.row, center.col, center.row) <= r;
+  });
+}
+
+function wonderRegionalAmenities(state: GameState, city: City): number {
+  return regionalWondersReaching(state, city).reduce((n, w) => n + (w.def.effects?.cityAmenities ?? 0), 0);
 }
 
 /** CIV6 (Disinformation Campaign): "+3 Diplomatic Favor per turn for each
@@ -1289,8 +1295,11 @@ export function computeCityStats(
   const regional = regionalEffects(
     state, city, governorFlag(state, city, (e) => e.industryAllSources));
   addYields(buildings, regional.yields);
-  for (const w of wonders) {
+  for (const w of regionalWondersReaching(state, city)) {
     if (w.def.cityYields) addYields(buildings, w.def.cityYields);
+  }
+  for (const w of wonders) {
+    if (w.def.cityYields && !w.def.effects?.regionalRange) addYields(buildings, w.def.cityYields);
     // CIV6 (Great Bath): "+1 Faith for every time a tile belonging to this
     // city has been Flooded."
     if (w.def.effects?.faithPerFlood) {
@@ -1425,7 +1434,7 @@ export function computeCityStats(
   }
 
   const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing')
-    + gpCityPermOf(city, 'housing');
+    + seatWonderSum(state, city.seat, 'empireHousing') + gpCityPermOf(city, 'housing');
   // THE RANKING BASE — everything `luxuryAmenities` ranks cities on, and the
   // one split point both engines share. Named so the amenity log can print
   // it: a disagreement here is a different sum, a disagreement in `lux`
@@ -1538,11 +1547,13 @@ export function computeCityStats(
       if (r.yield === k && city.buildings.includes(r.building)) total[k] *= r.mult;
     }
   }
-  for (const w of wonders) {
-    const mult = w.def.effects?.cityYieldMult;
-    if (!mult) continue;
-    for (const k of Object.keys(mult) as YieldKey[]) {
-      total[k] *= mult[k] ?? 1;
+  // Each seat wonder in catalog order: its own city's multiplier where it
+  // stands here, then its empire-wide one.
+  for (const w of seatWonders(state, city.seat)) {
+    const mine = wonders.some((x) => x.idx === w.idx);
+    for (const mult of [mine ? w.def.effects?.cityYieldMult : undefined, w.def.effects?.empireYieldMult]) {
+      if (!mult) continue;
+      for (const k of Object.keys(mult) as YieldKey[]) total[k] *= mult[k] ?? 1;
     }
   }
   const maintenance = cityMaintenance(state, city);

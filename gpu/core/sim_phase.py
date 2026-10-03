@@ -1507,15 +1507,38 @@ class SimPhase:
                         newly = want & ~self.civ_techs[:, row, :nt] & ~self.civ_tech_boosted[:, row, :nt]
                         self.civ_tech_boosted[:, row, :nt] |= newly
                         self._dedication_event(row, 1, newly.sum(dim=1))
-                # CIV6 (Pyramids): "Grants a free Builder" — at the
-                # completing city.
-                if bool((self._wond_grant_unit >= 0).any()):
-                    gu = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-                    gu[wr] = self._wond_grant_unit[wi[wr]]
+                # CIV6 (Kilwa Kisiwani): envoys paid once, at completion.
+                if int(self._wond_grant_env.sum()) > 0:
+                    self.civ_envoys_avail[wr, row] += self._wond_grant_env[wi[wr]]
+                # CIV6 (Casa de Contratación, MODIFIER_PLAYER_ADJUST_GOVERNOR_POINTS)
+                if int(self._wond_gov_titles.sum()) > 0 and row < self.n_majors:
+                    self.civ_granted_titles[wr, row] += self._wond_gov_titles[wi[wr]]
+                # CIV6 (MODIFIER_SINGLE_CITY_GRANT_UNIT_IN_CITY: Pyramids'
+                # Builder, Statue of Zeus' army) — at the completing city,
+                # row by row and `count` of each, as TS spawns them.
+                if bool((self._wond_grant[:, :, 0] >= 0).any()):
                     ctr_w = self.city_center[bidx, row, col]
-                    for u_i in sorted(set(int(x) for x in gu[gu >= 0].tolist())):
-                        self._spawn_unit(row, made_w & (gu == u_i), ctr_w, u_i)
-                        self._gen_ver += 1
+                    for _k in range(self._wond_grant.shape[1]):
+                        gu = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                        gn = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                        gu[wr] = self._wond_grant[wi[wr], _k, 0]
+                        gn[wr] = self._wond_grant[wi[wr], _k, 1]
+                        for _c in range(int(gn.max())):
+                            for u_i in sorted(set(int(x) for x in gu[(gu >= 0) & (gn > _c)].tolist())):
+                                self._spawn_unit(row, made_w & (gu == u_i) & (gn > _c), ctr_w, u_i)
+                                self._gen_ver += 1
+                # CIV6 (Angkor Wat, MODIFIER_PLAYER_CITIES_ADD_POPULATION):
+                # every city the seat holds grows once.
+                if int(self._wond_popall.sum()) > 0:
+                    pa = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    pa[wr] = self._wond_popall[wi[wr]]
+                    grow = (pa > 0).unsqueeze(1) & self.city_alive[:, row]
+                    if bool(grow.any()):
+                        self.city_pop[:, row] = self.city_pop[:, row] + torch.where(
+                            grow, pa.unsqueeze(1), torch.zeros_like(pa).unsqueeze(1)).to(self.city_pop.dtype)
+                        _gb, _gc = grow.nonzero(as_tuple=True)
+                        self._log_pop(_gb, row, _gc, "wp")
+                        self._eff_version += 1
                 # CIV6 (Stonehenge): the free Great Prophet, with the
                 # Apostle fallback.
                 if bool(self._wond_grant_prophet.any()):

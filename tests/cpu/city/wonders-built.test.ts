@@ -32,6 +32,26 @@ describe('world wonders', () => {
     expect(canPlaceWonder(state, city, 'HANGING_GARDENS', dry.index, 0).ok).toBe(true);
   });
 
+  it('the Mountain, Lake, coast and unmodeled grounds', () => {
+    const { state, city } = sandboxCity();
+    const t = tileAtCoords(state.map, 9, 8);
+    expect(canPlaceWonder(state, city, 'MACHU_PICCHU', t.index, 0).ok).toBe(false);
+    t.elevation = 'MOUNTAIN';
+    expect(canPlaceWonder(state, city, 'MACHU_PICCHU', t.index, 0).ok).toBe(true);
+    expect(canPlaceWonder(state, city, 'ORSZAGHAZ', t.index, 0).ok).toBe(false);
+    const lake = tileAtCoords(state.map, 7, 8);
+    expect(canPlaceWonder(state, city, 'HUEY_TEOCALLI', lake.index, 0).ok).toBe(false);
+    lake.terrain = 'LAKE';
+    expect(canPlaceWonder(state, city, 'HUEY_TEOCALLI', lake.index, 0).ok).toBe(true);
+    const shore = tileAtCoords(state.map, 8, 9);
+    expect(canPlaceWonder(state, city, 'KILWA_KISIWANI', shore.index, 0).ok).toBe(false); // a lake is not the sea
+    for (const n of [tileAtCoords(state.map, 8, 10), tileAtCoords(state.map, 9, 10)]) n.terrain = 'COAST';
+    expect(canPlaceWonder(state, city, 'KILWA_KISIWANI', shore.index, 0).ok).toBe(true);
+    for (const id of ['PANAMA_CANAL', 'GOLDEN_GATE_BRIDGE']) {
+      expect(state.map.tiles.some((x) => canPlaceWonder(state, city, id, x.index, 0).ok)).toBe(false);
+    }
+  });
+
   it('takes floodplains for any wonder (Features_XP2.ValidWonderPlacement)', () => {
     const { state, city } = sandboxCity();
     const plain = tileAtCoords(state.map, 7, 8);

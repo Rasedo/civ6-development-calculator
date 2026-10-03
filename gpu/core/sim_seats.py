@@ -9341,28 +9341,45 @@ class SimSeats:
             compw, self._wond_grow.reshape(1, 1, -1).expand_as(compw).double(), torch.ones_like(compw, dtype=torch.float64)
         ).prod(dim=2).prod(dim=1)
 
-    def _wonder_regional_amenities(self, row: int, compw: torch.Tensor | None) -> torch.Tensor | None:
-        """[B, cols] f64 — wonderRegionalAmenities: every COMPLETE wonder held
-        by one of this seat's live cities pays its regionalAmenities to each
-        live city centre within regional_range of the WONDER TILE (TS measures
-        from the wonder, not from the city that holds it). No dedup — a wonder
-        is unique world-wide. Joins the TIER balance only; the luxury ranking's
-        baseHave is buildings + regional BUILDINGS (city.ts luxuryAmenities).
-        None when no reaching wonder stands."""
-        if compw is None or not bool((self._wond_regam > 0).any()):
+    def _wonder_regional_hits(self, row: int) -> torch.Tensor | None:
+        """[B, nW, cols] f64 — `regionalWondersReaching`: 1 where this seat's
+        COMPLETE regional wonder wi (RegionalRange > 0) reaches live city slot
+        c's centre, measured from the WONDER TILE on the wonder's own range
+        (TS measures from the wonder, not from the city that holds it). A
+        wonder is unique world-wide, so each is held by one slot at most.
+        None when no regional wonder stands."""
+        compw = self._completed_wonders(row)
+        if compw is None or not bool((self._wond_reg > 0).any()):
             return None
-        B, cols = self.B, compw.shape[1]
+        B, cols, nW = compw.shape
         alive = self.city_alive[:, row, :cols]
-        src = compw & alive.unsqueeze(2) & (self._wond_regam > 0).reshape(1, 1, -1)
+        src = compw & alive.unsqueeze(2) & (self._wond_reg > 0).reshape(1, 1, -1)
         if not bool(src.any()):
             return None
-        nW = compw.shape[2]
         st = self.city_wonder[:, row, :cols].clamp(min=0).reshape(B, cols * nW)  # source tiles
         ctr = self.city_center[:, row, :cols].clamp(min=0)  # [B, cols] receivers
-        dd = self.pair_dist[st.unsqueeze(2), ctr.unsqueeze(1)]  # [B, cols*nW, cols]
-        hit = src.reshape(B, cols * nW).unsqueeze(2) & (dd <= self._regional_range)
-        amt = self._wond_regam.reshape(1, 1, nW).expand(B, cols, nW).reshape(B, cols * nW, 1)
-        return (hit.double() * amt).sum(dim=1) * alive.double()
+        dd = self.pair_dist[st.unsqueeze(2), ctr.unsqueeze(1)].double()  # [B, cols*nW, cols]
+        reach = self._wond_reg.reshape(1, 1, nW).expand(B, cols, nW).reshape(B, cols * nW, 1)
+        hit = src.reshape(B, cols * nW).unsqueeze(2) & (dd <= reach) & alive.unsqueeze(1)
+        return hit.reshape(B, cols, nW, cols).any(dim=1).double()
+
+    def _wonder_regional_amenities(self, row: int) -> torch.Tensor | None:
+        """[B, cols] f64 — wonderRegionalAmenities: a regional wonder's
+        amenities at every city centre it reaches. Joins the TIER balance
+        only; the luxury ranking's baseHave is buildings + regional BUILDINGS
+        (city.ts luxuryAmenities)."""
+        hits = self._wonder_regional_hits(row)
+        if hits is None:
+            return None
+        return torch.einsum("bwc,w->bc", hits, self._wond_regam)
+
+    def _wonder_regional_yields(self, row: int) -> torch.Tensor | None:
+        """[B, cols, 6] f64 — a regional wonder's `cy` at every city centre it
+        reaches (Jebel Barkal's faith, the Colosseum's culture)."""
+        hits = self._wonder_regional_hits(row)
+        if hits is None:
+            return None
+        return torch.einsum("bwc,wy->bcy", hits, self._wond_cy_all - self._wond_cy)
 
     def _city_power_need(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """The `cityPower` twin — what each city of seat row `row` ASKS, what
@@ -9983,6 +10000,8 @@ class SimSeats:
         if bool((_wh != 0).any()):
             housing = housing + _wh.double().unsqueeze(1) * self._walls_level_all(row)[:, :cols].double()
         housing = housing + self._city_wonder_flat(row, self._wond_cityhouse)[:, :cols]
+        # CIV6 (Angkor Wat): housing in every city the seat holds
+        housing = housing + self._seat_wonder_sum(row, self._wond_emp_house).unsqueeze(1)
         housing = housing + self._gp_city_perm(row, "housing").double()
         if self.n_governors and row < self.n_majors:
             housing = housing + self._governor_house_amen(row)[0][:, :cols]
@@ -10117,7 +10136,7 @@ class SimSeats:
         # TIER balance after the grant — city.ts leaves them out of baseHave.
         if self.n_governors and row < self.n_majors:
             have = have + self._governor_house_amen(row)[1][:, :cols]
-        _wregam = self._wonder_regional_amenities(row, self._completed_wonders(row))
+        _wregam = self._wonder_regional_amenities(row)
         if _wregam is not None:
             have = have + _wregam
         have = have + self._city_wonder_flat(row, self._wond_cityamen)[:, :cols]

@@ -1,7 +1,7 @@
 
 import type { City, DistrictId, GameMap, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors, neighborTile } from '../../world/hex';
-import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
+import { isWater, isImpassable, isMountain, isCoastalLand, isCoastalWater, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
 import { riverReach } from './disasters';
@@ -982,12 +982,18 @@ export function wonderExists(state: GameState, wonderId: string): boolean {
  * it out of this one body and neither re-derives it.
  */
 export function wonderTerrainOk(def: BuiltWonderDef, tile: Tile, map: GameMap): boolean {
-  if (naturalWonderAt(tile) || isImpassable(tile)) return false;
   const p = def.placement;
-  if (p.onCoastalWater) {
+  if (p.unmodeled || naturalWonderAt(tile)) return false;
+  if (p.onMountain) {
+    // the one wonder ground that is impassable: a bare mountain
+    return isMountain(tile) && !isWater(tile) && (!tile.feature || !FEATURES[tile.feature]?.impassable);
+  }
+  if (isImpassable(tile)) return false;
+  if (p.onCoastalWater || p.onLake) {
     // CIV6: "on Coast adjacent to land", and every wonder that asks for it
-    // states "It cannot be built on a Lake" in the same breath.
-    if (tile.terrain !== 'COAST' || !isCoastalWater(map, tile)) return false;
+    // states "It cannot be built on a Lake" in the same breath; MustBeLake
+    // asks the lake instead.
+    if (tile.terrain !== (p.onLake ? 'LAKE' : 'COAST') || !isCoastalWater(map, tile)) return false;
   } else {
     if (isWater(tile)) return false;
     if (p.onFeature) {
@@ -1038,7 +1044,7 @@ export function canPlaceWonder(
   if (dist === 0 || dist > CITY_WORK_RADIUS) return no('Must be within 3 tiles of the city center.');
   if (tile.district || tile.builtWonder) return no('Tile already occupied.');
   if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
-  if (isImpassable(tile)) return no('Impassable terrain.');
+  if (isImpassable(tile) && !def.placement.onMountain) return no('Impassable terrain.');
   // CIV6 (the pack's fire features): neither Removable nor
   // `ValidWonderPlacement`
   if (fireFeature(tile.feature)) return no('A fire has burned here.');
@@ -1049,6 +1055,7 @@ export function canPlaceWonder(
 
   const p = def.placement;
   if (!wonderTerrainOk(def, tile, map)) return no(`${def.name} cannot stand on this ground.`);
+  if (p.coastalLand && !isCoastalLand(map, tile)) return no(`${def.name} must stand on the coast.`);
 
   const around = neighbors(map, tile);
   if (p.adjacentDistrict) {

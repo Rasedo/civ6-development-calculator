@@ -32,7 +32,7 @@ import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../dat
 import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER, MP_SCALE } from '../data/constants';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
 import { IMPROVEMENTS } from '../data/improvements';
-import { LUXURY_IDS, RESOURCE_IDS, TERRAIN_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, staticAdjRaw, featureAdjContribution, chopKeyCode, chopUnlockTech } from './catalog';
+import { LUXURY_IDS, RESOURCE_IDS, TERRAIN_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, wonderBit, staticAdjRaw, featureAdjContribution, chopKeyCode, chopUnlockTech } from './catalog';
 
 export function buildFixture(state: GameState, world: WorldFile): object {
   const map = state.map;
@@ -92,7 +92,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       frm: t.feature && FEATURES[t.feature].removable ? 1 : 0,
       rid: t.resource ? RESOURCE_IDS.indexOf(t.resource) : -1,
       terr: TERRAIN_IDS.indexOf(t.terrain),
-      wok: BUILT_WONDER_LIST.reduce((m2, w, i) => m2 | (wonderStaticOk(w, t, map) ? 1 << i : 0), 0),
+      wok: BUILT_WONDER_LIST.reduce((m2, w, i) => m2 + (wonderStaticOk(w, t, map) ? wonderBit(i) : 0), 0),
       pass: unitPassable(t) ? 1 : 0,
       wpass: isWater(t) && !isImpassable(t) ? 1 : 0,
       ocean: t.terrain === 'OCEAN' ? 1 : 0,

@@ -56,6 +56,12 @@ const RESOURCE_IDS = Object.keys(RESOURCES);
 const BUILT_WONDER_LIST = Object.values(BUILT_WONDERS);
 const wonderStaticOk = (w: (typeof BUILT_WONDER_LIST)[number], t: Tile, m: GameState['map']): boolean =>
   wonderTerrainOk(w, t, m);
+/** The `wok` bit of wonder row i, as arithmetic: JS `<<` is 32-bit, and the
+ *  mask is a JSON double, exact through bit 52 — 53 rows at most. */
+const wonderBit = (i: number): number => {
+  if (i > 52) throw new Error(`wonder row ${i} does not fit the 53-bit wok mask`);
+  return 2 ** i;
+};
 // the SELF source reads no neighbour at all, so it is never a per-tile
 // static count — the district's own row carries it.
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
@@ -110,4 +116,4 @@ function featureAdjContribution(tile: Tile, id: DistrictId, removable = true): n
   return sum;
 }
 
-export { LUXURY_IDS, chopKeyCode, chopUnlockTech, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, wonderStaticOk, staticAdjRaw, featureAdjContribution };
+export { LUXURY_IDS, chopKeyCode, chopUnlockTech, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, wonderStaticOk, wonderBit, staticAdjRaw, featureAdjContribution };

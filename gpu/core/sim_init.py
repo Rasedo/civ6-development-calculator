@@ -1443,20 +1443,39 @@ class SimInit:
         self.terrain =torch.tensor([[t["terr"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         if self._wond_n:
-            self._wond_cy = torch.tensor([w["cy"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
+            # the install's RegionalRange per wonder, 0 for none: a regional
+            # wonder's `cy` and amenities reach every same-seat city centre
+            # within it of the WONDER TILE (`regionalWondersReaching`) instead
+            # of its own city alone
+            self._wond_reg = torch.tensor([float(w["regRange"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            _local = (self._wond_reg == 0).double()
+            self._wond_cy_all = torch.tensor([w["cy"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
+            self._wond_cy = self._wond_cy_all * _local.unsqueeze(1)  # [nW, 6] the HOLDING city's share
             self._wond_mult = torch.tensor([w["mult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
+            self._wond_emp_mult = torch.tensor([w["empireMult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6] every city of the seat
             self._wond_grow = torch.tensor([w["growAll"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
-            # wonderRegionalAmenities — amenities a COMPLETE wonder pays to every
-            # same-seat city centre within regional_range (Colosseum 3). Reaches
+            _amen = torch.tensor([float(w["cityAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            # wonderRegionalAmenities — a regional wonder's amenities. Reaches
             # the tier balance only, never the luxury ranking's baseHave
             # (city.ts luxuryAmenities).
-            self._wond_regam = torch.tensor([float(w["regionalAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            self._wond_regam = _amen * (1.0 - _local)  # [nW]
             # ...and the ones a wonder pays only to the city that holds it.
-            self._wond_cityamen = torch.tensor([float(w["cityAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            self._wond_cityamen = _amen * _local  # [nW]
             self._wond_cityhouse = torch.tensor([float(w["cityHousing"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            self._wond_emp_house = torch.tensor([float(w["empireHousing"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] every city of the seat
+            self._wond_popall = torch.tensor([int(w["popAllCities"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] pop to every city at completion
+            self._wond_grant_env = torch.tensor([int(w["grantEnvoys"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] envoys at completion
+            self._wond_gov_titles = torch.tensor([int(w["governorTitles"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] governor titles at completion
+            # CIV6 `Coast`: land beside the sea, read live (`coastal_land`)
+            self._wond_coastland = [bool(int(w["coastLand"])) for w in self._wond_rows]
             self._wond_faithflood = torch.tensor([float(w["faithPerFlood"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
-            self._wond_grant_unit = torch.tensor([int(w["grantUnit"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] unit granted FREE at completion
+            # units granted FREE at completion: [nW, K, 2] (roster index, count)
+            # per grant row in the row's order, padded (-1, 0)
+            _gk = max([len(w["grantUnits"]) for w in self._wond_rows] + [1])
+            self._wond_grant = torch.tensor(
+                [[list(g) for g in w["grantUnits"]] + [[-1, 0]] * (_gk - len(w["grantUnits"])) for w in self._wond_rows],
+                dtype=torch.long, device=device)
             self._wond_bonusres_gold = torch.tensor([float(w["bonusResRouteGold"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] gold per bonus resource on outgoing routes
             self._wond_routes_sci = torch.tensor([float(w["routesToSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] science per route TO the city
             self._wond_routes_faithdom = torch.tensor([float(w["routesToFaithDom"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] faith per own DOMESTIC route to it

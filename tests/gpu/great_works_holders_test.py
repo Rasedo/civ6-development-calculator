@@ -80,8 +80,8 @@ def main() -> None:
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
 
     # --- the wire contract --------------------------------------------------
-    assert sim.GW_W == int(gw["w"]) == len(gw["slotHolder"]) == 39, (sim.GW_W, gw["w"])
-    assert sim.GW_H == len(gw["holders"]) == 16
+    assert sim.GW_W == int(gw["w"]) == len(gw["slotHolder"]), (sim.GW_W, gw["w"])
+    assert sim.GW_H == len(gw["holders"])
     assert ids[0] == "PALACE" and sim._gw_holder_bidx[0] == -2, "the Palace holder stands on the capital flag"
     for h, (b, w, is_w) in enumerate(zip(sim._gw_holder_bidx, sim._gw_holder_widx, sim._gw_holder_wonder)):
         if is_w:
@@ -159,7 +159,7 @@ def main() -> None:
     assert bool(s._gw_themed(0)[0, 0, H["MUSEUM"]]), "three sculptures by three makers theme the Art Museum"
     cul, _f = s._gw_yields(0)
     assert float(cul[0, 0]) == 3 * 3 * 2
-    km = torch.ones(s.B, 3, dtype=torch.long)
+    km = torch.ones(s.B, s._gw_obj_tourism.numel(), dtype=torch.long)  # per object type
     assert int(s._gw_tourism_general(0, None, km)[0, 0]) == 2 * 3 * 2, "the themed museum doubles its tourism too"
     # the Archaeological Museum: one era, three civilizations
     s = fresh(rules, path)

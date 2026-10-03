@@ -299,7 +299,7 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
 import { RESOURCES } from '../../world/resources';
 import type { Era } from '../data/techs';
-import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS } from './catalog';
+import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS, wonderBit } from './catalog';
 import { clearableFeatures, FEATURES, isFloodplains } from '../../world/features';
 import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION_ERAS, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
@@ -660,11 +660,12 @@ export function buildRules() {
     roadTierBridges: ROAD_TIER_BRIDGES.map((b) => (b ? 1 : 0)),
     roadTierEra: ROAD_TIER_ERA,
     railroadMp: RAILROAD_MP,
-    // CIV6 (Coastal Lowlands): the wonders whose placement asks for COASTAL
-    // WATER — the one `wok` clause a tile turning to sea can move, because
-    // every other one the exporter derives reads TERRAIN, which stays.
+    // CIV6 (Coastal Lowlands): the wonders whose placement asks for water
+    // BESIDE LAND (the coast's, the lake's) — the one `wok` clause a tile
+    // turning to sea can move, because every other one the exporter derives
+    // reads TERRAIN, which stays.
     wonderCoastalMask: BUILT_WONDER_LIST.reduce(
-      (m, w, i) => m | (w.placement.onCoastalWater ? 1 << i : 0), 0),
+      (m, w, i) => m + (w.placement.onCoastalWater || w.placement.onLake ? wonderBit(i) : 0), 0),
     // CIV6 (Railroad): the tech, and the stockpile slots one tile spends
     railroadTech: techIdx.get(RAILROAD_TECH) ?? -1,
     railroadCost: RAILROAD_COST.map(([id, n]: readonly [string, number]) => [STRATEGIC_IDS.indexOf(id), n]),
@@ -1330,12 +1331,22 @@ export function buildRules() {
         // onFeature): a chop or a painted soil takes them off at run time,
         // which the static `wok` mask cannot see
         onFeat: (w.placement.onFeature ?? []).map((f) => featIdx.get(f) ?? -1),
-        regionalAmenities: w.effects?.regionalAmenities ?? 0,
+        // the install's RegionalRange, 0 for none: `cy` and `cityAmenities`
+        // then reach every own city centre within it of the wonder tile
+        regRange: w.effects?.regionalRange ?? 0,
+        // CIV6 `Coast`: land beside the sea, read live off `coastal_land`
+        coastLand: w.placement.coastalLand ? 1 : 0,
         cityAmenities: w.effects?.cityAmenities ?? 0,
         cityHousing: w.effects?.cityHousing ?? 0,
+        empireHousing: w.effects?.empireHousing ?? 0,
+        empireMult: YIELD_KEYS.map((k) => w.effects?.empireYieldMult?.[k] ?? 1),
+        popAllCities: w.effects?.popAllCities ?? 0,
+        grantEnvoys: w.effects?.grantEnvoys ?? 0,
+        governorTitles: w.effects?.governorTitles ?? 0,
         faithPerFlood: w.effects?.faithPerFlood ?? 0,
         dvp: w.effects?.dvp ?? 0,
-        grantUnit: w.effects?.grantUnit ? Object.values(UNITS).findIndex((u) => u.id === w.effects!.grantUnit) : -1,
+        // [unit roster index, count] per grant row, in the row's order
+        grantUnits: (w.effects?.grantUnits ?? []).map((g) => [Object.values(UNITS).findIndex((u) => u.id === g.unit), g.count]),
         bonusResRouteGold: w.effects?.bonusResRouteGold ?? 0,
         routesToSci: w.effects?.routesToCityScience ?? 0,
         routesToFaithDom: w.effects?.domesticRoutesToCityFaith ?? 0,

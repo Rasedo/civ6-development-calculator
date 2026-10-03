@@ -6812,6 +6812,9 @@ class SimEconomy:
         _reg = self._seat_regional(row)
         if _reg is not None:
             bld_y = bld_y + _reg[0][:, sl]
+        _wreg_y = self._wonder_regional_yields(row)
+        if _wreg_y is not None:
+            bld_y = bld_y + _wreg_y[:, sl]
         if compw is not None and bool(compw.any()):
             bld_y = bld_y + compw.double() @ self._wond_cy
             # CIV6 (Great Bath): "+1 Faith for every time a tile belonging to
@@ -7069,17 +7072,23 @@ class SimEconomy:
             _has = self.city_bldg[:, row, sl, _bi]
             total[:, :, _yi] = total[:, :, _yi] * torch.where(
                 _on.unsqueeze(1) & _has, torch.full_like(alivef, _m), torch.ones_like(alivef))
-        if compw is not None and bool(compw.any()):
-            # Each wonder's cityYieldMult (Ruhr production, Big Ben gold) LAST
-            # of the three scalings, as an EXPLICIT ascending wonder-index
-            # product — the association `completedWonders` sorts its list into,
-            # so two multipliers on the SAME channel fold the same way on both
-            # engines.
+        _seatw = self._completed_wonders(row)
+        if _seatw is not None and bool(_seatw.any()):
+            # Each wonder's cityYieldMult (Ruhr production, Big Ben gold) where
+            # it stands in this city, then its empireYieldMult (Amundsen-Scott)
+            # wherever the seat holds it, LAST of the three scalings, as an
+            # EXPLICIT ascending wonder-index sequence of multiplications of the
+            # total — the order `seatWonders` sorts its list into and TS's
+            # `total[k] *=` walk, so two multipliers on the SAME channel round
+            # the same way on both engines.
+            _held = _seatw.any(dim=1)  # [B, nW]
             ones6 = torch.ones(1, 1, 6, dtype=F64, device=dev)
-            wmm = torch.ones(B, n, 6, dtype=F64, device=dev)
-            for wi in range(compw.shape[2]):
-                wmm = wmm * torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6), ones6)
-            total = total * wmm
+            for wi in range(_seatw.shape[2]):
+                if not bool(_held[:, wi].any()):
+                    continue
+                if compw is not None:
+                    total = total * torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6), ones6)
+                total = total * torch.where(_held[:, wi].reshape(B, 1, 1), self._wond_emp_mult[wi].reshape(1, 1, 6), ones6)
         # total.gold -= cityMaintenance. `maint` is the housing body's first
         # half handed in by a caller that needs its second half too (the
         # city-stats snapshot): the body reads nothing the walk writes, so

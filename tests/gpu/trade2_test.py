@@ -676,7 +676,7 @@ def main() -> None:
     # --- 15) the wonders' route terms: Great Zimbabwe, Sankore ---------------
     WROWS = rj["wonders"]["rows"]
     UIDS = [u["id"] for u in rj["units"]]
-    assert any(int(w.get("grantUnit", -1)) == UIDS.index("TRADER") for w in WROWS), \
+    assert any([UIDS.index("TRADER"), 1] in w["grantUnits"] for w in WROWS), \
         "no wonder grants a Trader (Colossus)"
     gz_wi = next(i for i, w in enumerate(WROWS) if w.get("bonusResRouteGold"))
     sk_wi = next(i for i, w in enumerate(WROWS) if w.get("routesToSci"))

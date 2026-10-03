@@ -65,7 +65,6 @@ describe('the great-work holder table', () => {
     const extra = EXTRA_SLOT_ROWS.reduce((n, r) => Math.max(n, r.amount), 0);
     const gp = GW_GP_EXTRA_SLOTS.reduce((n, r) => Math.max(n, r.amount), 0);
     expect(GW_LAYOUT_W).toBe(base + extra + gp);
-    expect(GW_LAYOUT_W).toBe(39);
     let last = -1;
     for (const s of GW_LAYOUT) { expect(s.holder).toBeGreaterThanOrEqual(last); last = s.holder; }
     expect(holderSlots(holder('PALACE')).length).toBe(1 + 4);

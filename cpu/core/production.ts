@@ -3,7 +3,7 @@ import { logPopWrite } from './difflog';
 import { repairBuilding, stampBuildingEra } from './yields';
 import { scoreProject } from './competition';
 import type { QueueItem } from './types';
-import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital, civOf } from './seats';
+import { citiesOf, seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital, civOf } from './seats';
 import { NO_SEAT } from '../../world/types';
 import type { Tile } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
@@ -326,8 +326,23 @@ export function completeQueueItem(
       // itself included — so the count is read AFTER this tile went complete.
       const envoys = completedWonders(state, city).reduce((n, w) => n + (w.def.effects?.envoysPerWonder ?? 0), 0);
       if (envoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + envoys;
-      // CIV6 (Pyramids): "Grants a free Builder" — at the completing city.
-      if (fx?.grantUnit) spawnUnit(state, fx.grantUnit, city.centerIndex, city.seat);
+      // CIV6 (Kilwa Kisiwani): envoys paid once, at completion.
+      if (fx?.grantEnvoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + fx.grantEnvoys;
+      // CIV6 (Casa de Contratación, MODIFIER_PLAYER_ADJUST_GOVERNOR_POINTS)
+      if (fx?.governorTitles) owner.grantedTitles += fx.governorTitles;
+      // CIV6 (MODIFIER_SINGLE_CITY_GRANT_UNIT_IN_CITY: Pyramids' Builder,
+      // Statue of Zeus' army) — at the completing city, row by row.
+      for (const g of fx?.grantUnits ?? []) {
+        for (let k = 0; k < g.count; k++) spawnUnit(state, g.unit, city.centerIndex, city.seat);
+      }
+      // CIV6 (Angkor Wat, MODIFIER_PLAYER_CITIES_ADD_POPULATION): every city
+      // the owner holds grows once.
+      if (fx?.popAllCities) {
+        for (const c of citiesOf(state, city.seat)) {
+          c.population += fx.popAllCities;
+          logPopWrite(state, c, 'wp');
+        }
+      }
       // CIV6 (Stonehenge): the free Great Prophet, with the Apostle fallback.
       if (fx?.grantProphet) grantFreeProphet(state, city.seat, city.centerIndex);
       // CIV6 (Oxford, Bolshoi): free technologies and civics, drawn at random

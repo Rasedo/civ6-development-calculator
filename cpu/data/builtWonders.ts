@@ -1,9 +1,9 @@
 /**
- * World wonders (base-game subset whose effects fit the modeled systems).
- * One per world; they occupy a tile like a district. EVERY ROW IS SOURCED:
- * cost, requiresTech/requiresCivic, the whole effect list and the PLACEMENT
- * clause come from the GS Civilopedia page for that wonder, fetched one by
- * one. `wonderTerrainOk` (core/rules.ts) reads the static half of the clause
+ * World wonders — every IsWonder row of the Gathering Storm install (53, the
+ * most the 53-bit `wok` mask holds). One per world; they occupy a tile like
+ * a district. EVERY ROW IS SOURCED: cost, requiresTech/requiresCivic, the
+ * effects and the PLACEMENT clause carry their install tags (`src`).
+ * `wonderTerrainOk` (core/rules.ts) reads the static half of the clause
  * and the exporter bakes it per tile into `wok`; everything that can change
  * during a game stays live in `canPlaceWonder` / `_wonder_cand`.
  *
@@ -55,16 +55,41 @@ export interface BuiltWonderDef {
     /** CIV6: "on Coast adjacent to land" — every wonder that asks for it
      *  also says "It cannot be built on a Lake", so this means COAST. */
     onCoastalWater?: boolean;
+    /** CIV6 MustBeLake + MustBeAdjacentLand: a LAKE tile beside land. */
+    onLake?: boolean;
+    /** Every Building_ValidTerrains row is a *_MOUNTAIN terrain: the wonder
+     *  stands ON a mountain, the one wonder ground that is impassable. */
+    onMountain?: boolean;
+    /** CIV6 `Coast`: LAND beside the sea. A live clause (`canPlaceWonder`,
+     *  `_wonder_cand`), never baked into `wok` — a rising sea makes coast. */
+    coastalLand?: boolean;
+    /** An install placement column neither engine models (`CanalWonder`,
+     *  `Bridge`): the wonder imports but no tile ever takes it. */
+    unmodeled?: string;
   };
+  /** Yields to the city that holds the wonder — to every city of the owner
+   *  within `effects.regionalRange` of the wonder tile where that is set. */
   cityYields?: Partial<Yields>;
   effects?: {
     growthAllMult?: number;
-    /** Amenities to every live city centre within REGIONAL_RANGE of the wonder. */
-    regionalAmenities?: number;
-    /** Amenities to the city that holds the wonder, and to no other. */
+    /** CIV6 `RegionalRange`: the wonder's `cityYields` and `cityAmenities`
+     *  reach every live city centre of the owner within this many tiles of
+     *  the WONDER TILE, its own city among them, instead of its city alone. */
+    regionalRange?: number;
+    /** Amenities to the city that holds the wonder (regional with `regionalRange`). */
     cityAmenities?: number;
     /** Housing to the city that holds the wonder. */
     cityHousing?: number;
+    /** Housing to every city the owner holds. */
+    empireHousing?: number;
+    /** Multiplies every yield named in every city the owner holds. */
+    empireYieldMult?: Partial<Yields>;
+    /** Population added once, at completion, to every city the owner holds. */
+    popAllCities?: number;
+    /** Envoys paid once, at completion. */
+    grantEnvoys?: number;
+    /** Governor titles paid once, at completion. */
+    governorTitles?: number;
     /** Yields added to matching tiles — the centre and the worked
      *  undistricted ones. `empire` widens the payer from the wonder's own
      *  city to every city the seat holds. */
@@ -98,9 +123,9 @@ export interface BuiltWonderDef {
     /** CIV6 (Oracle): "diminishes all Patronage Faith costs by 25%" —
      *  Faith only, never the Gold price. */
     patronageFaithPct?: number;
-    /** CIV6 (Pyramids): "Grants a free Builder" — the unit id spawned at
-     *  the completing city, free. */
-    grantUnit?: string;
+    /** CIV6 (MODIFIER_SINGLE_CITY_GRANT_UNIT_IN_CITY): units spawned free at
+     *  the completing city, row by row and `count` of each. */
+    grantUnits?: { unit: string; count: number }[];
     /** CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2 Gold
      *  for every Bonus resource within 3 tiles of the city and in this
      *  city's territory." */
@@ -207,7 +232,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresTech: 'MASONRY',
       placement: { terrains: ['DESERT'], flatOnly: true },
       cityYields: { culture: 2 },
-      effects: { buildCharges: 1, grantUnit: 'BUILDER' },
+      effects: { buildCharges: 1, grantUnits: [{ unit: 'BUILDER', count: 1 }] },
       description: '+2 culture, a free Builder; every Builder trained carries an extra build charge. Desert (floodplains allowed).',
       src: {
         code: { stylized: 'a display code, not a game constant' },
@@ -217,7 +242,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'cityYields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_PYRAMIDS&YieldType=YIELD_CULTURE', 'YieldChange'),
         'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_PYRAMIDS', 'TerrainType')] },
         'effects.buildCharges': xml('ModifierArguments', 'ModifierId=PYRAMID_ADJUST_BUILDER_CHARGES&Name=Amount', 'Value'),
-        'effects.grantUnit': xml('ModifierArguments', 'ModifierId=PYRAMID_GRANT_BUILDERS&Name=UnitType', 'Value', { expect: 'UNIT_BUILDER' }),
+        'effects.grantUnits.0.unit': xml('ModifierArguments', 'ModifierId=PYRAMID_GRANT_BUILDERS&Name=UnitType', 'Value', { expect: 'UNIT_BUILDER' }),
+        'effects.grantUnits.0.count': xml('ModifierArguments', 'ModifierId=PYRAMID_GRANT_BUILDERS&Name=Amount', 'Value'),
       },
     }),
     W({
@@ -290,8 +316,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresCivic: 'GAMES_AND_RECREATION',
       placement: { flatOnly: true, adjacentDistrict: 'ENTERTAINMENT_COMPLEX' },
       cityYields: { culture: 2 },
-      effects: { regionalAmenities: 2 },  // Buildings.xml Entertainment 2
-      description: '+2 culture; +2 amenities to cities within 6 tiles. Flat, adjacent to an Entertainment Complex.',
+      effects: { cityAmenities: 2, regionalRange: 6 },
+      description: '+2 culture and +2 amenities to each of your cities within 6 tiles. Flat, adjacent to an Entertainment Complex.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'Cost', { scale: GAME_SPEED }),
@@ -299,7 +325,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'cityYields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_COLOSSEUM&YieldType=YIELD_CULTURE', 'YieldChange'),
         'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_COLOSSEUM', 'TerrainType')] },
         'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'AdjacentDistrict', { expect: 'DISTRICT_ENTERTAINMENT_COMPLEX' }),
-        'effects.regionalAmenities': xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'Entertainment'),
+        'effects.cityAmenities': xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'Entertainment'),
+        'effects.regionalRange': xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'RegionalRange'),
       },
     }),
     W({
@@ -355,7 +382,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresTech: 'SHIPBUILDING',
       placement: { onCoastalWater: true, adjacentDistrict: 'HARBOR' },
       cityYields: { gold: 3 },
-      effects: { gpPoints: { ADMIRAL: 1 }, grantUnit: 'TRADER' },
+      effects: { gpPoints: { ADMIRAL: 1 }, grantUnits: [{ unit: 'TRADER', count: 1 }] },
       description: '+3 gold, +1 Admiral point per turn, +1 Trade Route capacity, and a free Trader. Coastal water adjacent to a Harbor.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
@@ -365,7 +392,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'effects.gpPoints.ADMIRAL': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_COLOSSUS&GreatPersonClassType=GREAT_PERSON_CLASS_ADMIRAL', 'PointsPerTurn'),
         'placement.onCoastalWater': { derived: 'true where the install row is Coast-only, MustNotBeLake and MustBeAdjacentLand', inputs: [xml('Buildings', 'BuildingType=BUILDING_COLOSSUS', 'MustNotBeLake'), xml('Buildings', 'BuildingType=BUILDING_COLOSSUS', 'MustBeAdjacentLand')] },
         'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_COLOSSUS', 'AdjacentDistrict', { expect: 'DISTRICT_HARBOR' }),
-        'effects.grantUnit': xml('ModifierArguments', 'ModifierId=COLOSSUS_GRANT_TRADER&Name=UnitType', 'Value', { expect: 'UNIT_TRADER' }),
+        'effects.grantUnits.0.unit': xml('ModifierArguments', 'ModifierId=COLOSSUS_GRANT_TRADER&Name=UnitType', 'Value', { expect: 'UNIT_TRADER' }),
+        'effects.grantUnits.0.count': xml('ModifierArguments', 'ModifierId=COLOSSUS_GRANT_TRADER&Name=Amount', 'Value'),
       },
     }),
     W({
@@ -769,6 +797,345 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'placement.hillsOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a HILLS terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_CRISTO_REDENTOR', 'TerrainType')] },
         'effects.resortTourismMult': { derived: 'ScalingFactor / 100', inputs: [xml('ModifierArguments', 'ModifierId=CRISTOREDENTOR_BEACHTOURISM&Name=ScalingFactor', 'Value')] },
         'effects.holyTourismShield': { derived: 'true where the install turns on always-full religious tourism', inputs: [xml('ModifierArguments', 'ModifierId=CRISTOREDENTOR_FULLRELIGIOUSTOURISM&Name=Enable', 'Value')] },
+      },
+    }),
+
+    W({
+      id: 'GREAT_LIGHTHOUSE', name: 'Great Lighthouse', code: 'GH', cost: 290,
+      requiresTech: 'CELESTIAL_NAVIGATION', placement: { onCoastalWater: true, adjacentDistrict: 'HARBOR' },
+      cityYields: { gold: 3 },
+      effects: { gpPoints: { ADMIRAL: 1 } },
+      description: '+3 gold and +1 Admiral point per turn. Coastal water adjacent to a Harbor.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE', 'PrereqTech', { expect: 'TECH_CELESTIAL_NAVIGATION' }),
+        'cityYields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE&YieldType=YIELD_GOLD', 'YieldChange'),
+        'effects.gpPoints.ADMIRAL': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE&GreatPersonClassType=GREAT_PERSON_CLASS_ADMIRAL', 'PointsPerTurn'),
+        'placement.onCoastalWater': { derived: 'true where the install row is Coast-only, MustNotBeLake and MustBeAdjacentLand', inputs: [xml('Buildings', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE', 'MustNotBeLake'), xml('Buildings', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE', 'MustBeAdjacentLand')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE', 'AdjacentDistrict', { expect: 'DISTRICT_HARBOR' }),
+      },
+    }),
+    W({
+      id: 'JEBEL_BARKAL', name: 'Jebel Barkal', code: 'JB', cost: 400,
+      requiresTech: 'IRON_WORKING', placement: { terrains: ['DESERT'], hillsOnly: true },
+      cityYields: { faith: 4 },
+      effects: { regionalRange: 6 },
+      description: '+4 faith to each of your cities within 6 tiles. Desert Hills.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_JEBEL_BARKAL', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_JEBEL_BARKAL', 'PrereqTech', { expect: 'TECH_IRON_WORKING' }),
+        'cityYields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_JEBEL_BARKAL&YieldType=YIELD_FAITH', 'YieldChange'),
+        'placement.terrains': { derived: 'the Building_ValidTerrains rows of this wonder, as engine terrain ids', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_JEBEL_BARKAL', 'TerrainType')] },
+        'placement.hillsOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a HILLS terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_JEBEL_BARKAL', 'TerrainType')] },
+        'effects.regionalRange': xml('Buildings', 'BuildingType=BUILDING_JEBEL_BARKAL', 'RegionalRange'),
+      },
+    }),
+    W({
+      id: 'STATUE_OF_ZEUS', name: 'Statue of Zeus', code: 'SZ', cost: 400,
+      requiresCivic: 'MILITARY_TRAINING', placement: { flatOnly: true, adjacentDistrict: 'ENCAMPMENT' },
+      cityYields: { gold: 3 },
+      effects: {
+        grantUnits: [{ unit: 'SPEARMAN', count: 3 }, { unit: 'ARCHER', count: 3 }, { unit: 'BATTERING_RAM', count: 1 }],
+      },
+      description: '+3 gold; 3 free Spearmen, 3 free Archers and a free Battering Ram. Flat land adjacent to an Encampment.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_STATUE_OF_ZEUS', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_STATUE_OF_ZEUS', 'PrereqCivic', { expect: 'CIVIC_MILITARY_TRAINING' }),
+        'cityYields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_STATUE_OF_ZEUS&YieldType=YIELD_GOLD', 'YieldChange'),
+        'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_STATUE_OF_ZEUS', 'TerrainType')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_STATUE_OF_ZEUS', 'AdjacentDistrict', { expect: 'DISTRICT_ENCAMPMENT' }),
+        'effects.grantUnits.0.unit': xml('ModifierArguments', 'ModifierId=STAUEZEUS_GRANT_SPEARMEN&Name=UnitType', 'Value', { expect: 'UNIT_SPEARMAN' }),
+        'effects.grantUnits.0.count': xml('ModifierArguments', 'ModifierId=STAUEZEUS_GRANT_SPEARMEN&Name=Amount', 'Value'),
+        'effects.grantUnits.1.unit': xml('ModifierArguments', 'ModifierId=STAUEZEUS_GRANT_ARCHERS&Name=UnitType', 'Value', { expect: 'UNIT_ARCHER' }),
+        'effects.grantUnits.1.count': xml('ModifierArguments', 'ModifierId=STAUEZEUS_GRANT_ARCHERS&Name=Amount', 'Value'),
+        'effects.grantUnits.2.unit': xml('ModifierArguments', 'ModifierId=STAUEZEUS_GRANT_BATTERINGRAM&Name=UnitType', 'Value', { expect: 'UNIT_BATTERING_RAM' }),
+        'effects.grantUnits.2.count': xml('ModifierArguments', 'ModifierId=STAUEZEUS_GRANT_BATTERINGRAM&Name=Amount', 'Value'),
+      },
+    }),
+    W({
+      id: 'TERRACOTTA_ARMY', name: 'Terracotta Army', code: 'TC', cost: 400,
+      requiresTech: 'CONSTRUCTION', placement: { terrains: ['GRASSLAND', 'PLAINS'], flatOnly: true, adjacentDistrict: 'ENCAMPMENT' },
+      effects: { gpPoints: { GENERAL: 1 } },
+      description: '+1 General point per turn. Flat Grassland or Plains adjacent to an Encampment.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_TERRACOTTA_ARMY', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_TERRACOTTA_ARMY', 'PrereqTech', { expect: 'TECH_CONSTRUCTION' }),
+        'effects.gpPoints.GENERAL': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_TERRACOTTA_ARMY&GreatPersonClassType=GREAT_PERSON_CLASS_GENERAL', 'PointsPerTurn'),
+        'placement.terrains': { derived: 'the Building_ValidTerrains rows of this wonder, as engine terrain ids', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_TERRACOTTA_ARMY', 'TerrainType')] },
+        'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_TERRACOTTA_ARMY', 'TerrainType')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_TERRACOTTA_ARMY', 'AdjacentDistrict', { expect: 'DISTRICT_ENCAMPMENT' }),
+      },
+    }),
+    W({
+      id: 'MACHU_PICCHU', name: 'Machu Picchu', code: 'MP', cost: 400,
+      requiresTech: 'ENGINEERING', placement: { onMountain: true },
+      cityYields: { gold: 4 },
+      description: '+4 gold. On a Mountain.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_MACHU_PICCHU', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_MACHU_PICCHU', 'PrereqTech', { expect: 'TECH_ENGINEERING' }),
+        'cityYields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_MACHU_PICCHU&YieldType=YIELD_GOLD', 'YieldChange'),
+        'placement.onMountain': { derived: 'true where every Building_ValidTerrains row of the wonder is a MOUNTAIN terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_MACHU_PICCHU', 'TerrainType')] },
+      },
+    }),
+    W({
+      id: 'MAHABODHI_TEMPLE', name: 'Mahabodhi Temple', code: 'MB', cost: 400,
+      requiresCivic: 'THEOLOGY', placement: { onFeature: ['WOODS'], adjacentDistrict: 'HOLY_SITE', requiresReligion: true },
+      cityYields: { faith: 4 },
+      effects: { grantUnits: [{ unit: 'APOSTLE', count: 2 }], dvp: 2 },
+      description: '+4 faith, 2 free Apostles and +2 Diplomatic Victory points. Woods adjacent to a Holy Site, once the seat has a religion.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_MAHABODHI_TEMPLE', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_MAHABODHI_TEMPLE', 'PrereqCivic', { expect: 'CIVIC_THEOLOGY' }),
+        'cityYields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_MAHABODHI_TEMPLE&YieldType=YIELD_FAITH', 'YieldChange'),
+        'placement.onFeature': { derived: 'the Building_RequiredFeatures rows of this wonder, as engine feature ids', inputs: [xml('Building_RequiredFeatures', 'BuildingType=BUILDING_MAHABODHI_TEMPLE', 'FeatureType')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_MAHABODHI_TEMPLE', 'AdjacentDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+        'placement.requiresReligion': xml('Buildings', 'BuildingType=BUILDING_MAHABODHI_TEMPLE', 'RequiresReligion'),
+        'effects.grantUnits.0.unit': xml('ModifierArguments', 'ModifierId=MAHABODHITEMPLE_APOSTLE&Name=UnitType', 'Value', { expect: 'UNIT_APOSTLE' }),
+        'effects.grantUnits.0.count': xml('ModifierArguments', 'ModifierId=MAHABODHITEMPLE_APOSTLE&Name=Amount', 'Value'),
+        'effects.dvp': xml('ModifierArguments', 'ModifierId=MAHABODHI_DIPLOVP&Name=Amount', 'Value'),
+      },
+    }),
+    W({
+      id: 'MEENAKSHI_TEMPLE', name: 'Meenakshi Temple', code: 'MT', cost: 710,
+      requiresCivic: 'CIVIL_SERVICE', placement: { adjacentDistrict: 'HOLY_SITE', requiresReligion: true },
+      cityYields: { faith: 3 },
+      description: '+3 faith. Adjacent to a Holy Site, once the seat has a religion.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_MEENAKSHI_TEMPLE', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_MEENAKSHI_TEMPLE', 'PrereqCivic', { expect: 'CIVIC_CIVIL_SERVICE' }),
+        'cityYields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_MEENAKSHI_TEMPLE&YieldType=YIELD_FAITH', 'YieldChange'),
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_MEENAKSHI_TEMPLE', 'AdjacentDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+        'placement.requiresReligion': xml('Buildings', 'BuildingType=BUILDING_MEENAKSHI_TEMPLE', 'RequiresReligion'),
+      },
+    }),
+    W({
+      id: 'KILWA_KISIWANI', name: 'Kilwa Kisiwani', code: 'KK', cost: 710,
+      requiresTech: 'MACHINERY', placement: { flatOnly: true, coastalLand: true },
+      effects: { grantEnvoys: 3 },
+      description: '3 envoys at completion. Flat land on the coast.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_KILWA_KISIWANI', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_KILWA_KISIWANI', 'PrereqTech', { expect: 'TECH_MACHINERY' }),
+        'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_KILWA_KISIWANI', 'TerrainType')] },
+        'placement.coastalLand': xml('Buildings', 'BuildingType=BUILDING_KILWA_KISIWANI', 'Coast'),
+        'effects.grantEnvoys': xml('ModifierArguments', 'ModifierId=KILWA_THREE_INFLUENCE_TOKENS&Name=Amount', 'Value'),
+      },
+    }),
+    W({
+      id: 'KOTOKU_IN', name: 'Kotoku-in', code: 'KI', cost: 710,
+      requiresCivic: 'DIVINE_RIGHT', placement: { adjacentDistrict: 'HOLY_SITE' },
+      effects: { cityYieldMult: { faith: 1.2 }, grantUnits: [{ unit: 'WARRIOR_MONK', count: 4 }] },
+      description: '+20% faith in this city and 4 free Warrior Monks. Adjacent to a Holy Site.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_KOTOKU_IN', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_KOTOKU_IN', 'PrereqCivic', { expect: 'CIVIC_DIVINE_RIGHT' }),
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_KOTOKU_IN', 'AdjacentDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+        'effects.cityYieldMult.faith': { derived: '1 + Amount/100 — the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=KOTOKU_ADDFAITHYIELD&Name=Amount', 'Value')] },
+        'effects.grantUnits.0.unit': xml('ModifierArguments', 'ModifierId=KOTOKU_GRANTMONKS&Name=UnitType', 'Value', { expect: 'UNIT_WARRIOR_MONK' }),
+        'effects.grantUnits.0.count': xml('ModifierArguments', 'ModifierId=KOTOKU_GRANTMONKS&Name=Amount', 'Value'),
+      },
+    }),
+    W({
+      id: 'CHICHEN_ITZA', name: 'Chichen Itza', code: 'CI', cost: 710,
+      requiresCivic: 'GUILDS', placement: { onFeature: ['RAINFOREST'] },
+      effects: { tileYields: [{ feature: 'RAINFOREST', yields: { culture: 2, production: 1 } }] },
+      description: "+2 culture and +1 production on this city's Rainforest tiles. On Rainforest.",
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_CHICHEN_ITZA', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_CHICHEN_ITZA', 'PrereqCivic', { expect: 'CIVIC_GUILDS' }),
+        'placement.onFeature': { derived: 'the Building_RequiredFeatures rows of this wonder, as engine feature ids', inputs: [xml('Building_RequiredFeatures', 'BuildingType=BUILDING_CHICHEN_ITZA', 'FeatureType')] },
+        'effects.tileYields.0.feature': xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_HAS_JUNGLE&Name=FeatureType', 'Value', { expect: 'FEATURE_JUNGLE' }),
+        'effects.tileYields.0.yields.culture': xml('ModifierArguments', 'ModifierId=CHICHEN_ITZA_JUNGLE_CULTURE_MODIFIER&Name=Amount', 'Value'),
+        'effects.tileYields.0.yields.production': xml('ModifierArguments', 'ModifierId=CHICHEN_ITZA_JUNGLE_PRODUCTION_MODIFIER&Name=Amount', 'Value'),
+      },
+    }),
+    W({
+      id: 'HUEY_TEOCALLI', name: 'Huey Teocalli', code: 'HT', cost: 710,
+      requiresTech: 'MILITARY_TACTICS', placement: { onLake: true },
+      effects: { tileYields: [{ terrain: 'LAKE', empire: true, yields: { food: 1, production: 1 } }] },
+      description: '+1 food and +1 production on every Lake tile in the empire. On a Lake beside land.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_HUEY_TEOCALLI', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_HUEY_TEOCALLI', 'PrereqTech', { expect: 'TECH_MILITARY_TACTICS' }),
+        'placement.onLake': { derived: 'true where the install row carries MustBeLake and MustBeAdjacentLand', inputs: [xml('Buildings', 'BuildingType=BUILDING_HUEY_TEOCALLI', 'MustBeLake'), xml('Buildings', 'BuildingType=BUILDING_HUEY_TEOCALLI', 'MustBeAdjacentLand')] },
+        'effects.tileYields.0.terrain': { derived: 'LAKE — the plot the requirement names is a lake', inputs: [xml('Requirements', 'RequirementId=REQUIRES_PLOT_IS_LAKE', 'RequirementType', { expect: 'REQUIREMENT_PLOT_IS_LAKE' })] },
+        'effects.tileYields.0.yields.food': xml('ModifierArguments', 'ModifierId=HUEY_LAKE_FOOD_MODIFIER&Name=Amount', 'Value'),
+        'effects.tileYields.0.yields.production': xml('ModifierArguments', 'ModifierId=HUEY_LAKE_PRODUCTION_MODIFIER&Name=Amount', 'Value'),
+      },
+    }),
+    W({
+      id: 'ANGKOR_WAT', name: 'Angkor Wat', code: 'AW', cost: 710,
+      requiresCivic: 'MEDIEVAL_FAIRES', placement: { adjacentDistrict: 'AQUEDUCT' },
+      cityYields: { faith: 2 },
+      effects: { empireHousing: 1, popAllCities: 1 },
+      description: '+2 faith; +1 housing in every city, and +1 population in every city at completion. Adjacent to an Aqueduct.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_ANGKOR_WAT', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_ANGKOR_WAT', 'PrereqCivic', { expect: 'CIVIC_MEDIEVAL_FAIRES' }),
+        'cityYields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_ANGKOR_WAT&YieldType=YIELD_FAITH', 'YieldChange'),
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_ANGKOR_WAT', 'AdjacentDistrict', { expect: 'DISTRICT_AQUEDUCT' }),
+        'effects.empireHousing': xml('ModifierArguments', 'ModifierId=ANGKORWAT_ADDHOUSING&Name=Amount', 'Value'),
+        'effects.popAllCities': xml('ModifierArguments', 'ModifierId=ANGKORWAT_ADDPOPULATION&Name=Amount', 'Value'),
+      },
+    }),
+    W({
+      id: 'CASA_DE_CONTRATACION', name: 'Casa de Contratación', code: 'CC', cost: 920,
+      requiresTech: 'CARTOGRAPHY', placement: { adjacentDistrict: 'GOVERNMENT_PLAZA' },
+      effects: { gpPoints: { MERCHANT: 3 }, governorTitles: 3 },
+      description: '+3 Merchant points per turn and 3 Governor titles at completion. Adjacent to a Government Plaza.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_CASA_DE_CONTRATACION', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_CASA_DE_CONTRATACION', 'PrereqTech', { expect: 'TECH_CARTOGRAPHY' }),
+        'effects.gpPoints.MERCHANT': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_CASA_DE_CONTRATACION&GreatPersonClassType=GREAT_PERSON_CLASS_MERCHANT', 'PointsPerTurn'),
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_CASA_DE_CONTRATACION', 'AdjacentDistrict', { expect: 'DISTRICT_GOVERNMENT' }),
+        'effects.governorTitles': xml('ModifierArguments', 'ModifierId=CONTRATACION_GOVERNOR_POINTS&Name=Delta', 'Value'),
+      },
+    }),
+    W({
+      id: 'TORRE_DE_BELEM', name: 'Torre de Belém', code: 'TB', cost: 920,
+      requiresCivic: 'MERCANTILISM', placement: { onCoastalWater: true, adjacentDistrict: 'HARBOR' },
+      cityYields: { gold: 5 },
+      effects: { gpPoints: { ADMIRAL: 1 } },
+      description: '+5 gold and +1 Admiral point per turn. Coastal water adjacent to a Harbor.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_TORRE_DE_BELEM', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_TORRE_DE_BELEM', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),
+        'cityYields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_TORRE_DE_BELEM&YieldType=YIELD_GOLD', 'YieldChange'),
+        'effects.gpPoints.ADMIRAL': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_TORRE_DE_BELEM&GreatPersonClassType=GREAT_PERSON_CLASS_ADMIRAL', 'PointsPerTurn'),
+        'placement.onCoastalWater': { derived: 'true where the install row is Coast-only, MustNotBeLake and MustBeAdjacentLand', inputs: [xml('Buildings', 'BuildingType=BUILDING_TORRE_DE_BELEM', 'MustNotBeLake'), xml('Buildings', 'BuildingType=BUILDING_TORRE_DE_BELEM', 'MustBeAdjacentLand')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_TORRE_DE_BELEM', 'AdjacentDistrict', { expect: 'DISTRICT_HARBOR' }),
+      },
+    }),
+    W({
+      id: 'ORSZAGHAZ', name: 'Országház', code: 'OH', cost: 920,
+      requiresTech: 'SANITATION', placement: { requiresRiver: true },
+      cityYields: { culture: 4 },
+      description: '+4 culture. On a river.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_ORSZAGHAZ', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_ORSZAGHAZ', 'PrereqTech', { expect: 'TECH_SANITATION' }),
+        'cityYields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_ORSZAGHAZ&YieldType=YIELD_CULTURE', 'YieldChange'),
+        'placement.requiresRiver': xml('Buildings', 'BuildingType=BUILDING_ORSZAGHAZ', 'RequiresRiver'),
+      },
+    }),
+    W({
+      id: 'PANAMA_CANAL', name: 'Panama Canal', code: 'PC', cost: 920,
+      requiresTech: 'STEAM_POWER', placement: { unmodeled: 'CanalWonder' },
+      cityYields: { gold: 10 },
+      description: '+10 gold. Its canal placement is not modeled, so no tile takes it.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_PANAMA_CANAL', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_PANAMA_CANAL', 'PrereqTech', { expect: 'TECH_STEAM_POWER' }),
+        'cityYields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_PANAMA_CANAL&YieldType=YIELD_GOLD', 'YieldChange'),
+        'placement.unmodeled': { derived: 'the name of the install placement column neither engine models', inputs: [xml('Buildings_XP2', 'BuildingType=BUILDING_PANAMA_CANAL', 'CanalWonder')] },
+      },
+    }),
+    W({
+      id: 'EIFFEL_TOWER', name: 'Eiffel Tower', code: 'EF', cost: 1620,
+      requiresTech: 'STEEL', placement: { flatOnly: true, adjacentDistrict: 'CITY_CENTER' },
+      description: 'No modeled payout. Flat land adjacent to the City Center.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_EIFFEL_TOWER', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_EIFFEL_TOWER', 'PrereqTech', { expect: 'TECH_STEEL' }),
+        'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_EIFFEL_TOWER', 'TerrainType')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_EIFFEL_TOWER', 'AdjacentDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
+      },
+    }),
+    W({
+      id: 'BROADWAY', name: 'Broadway', code: 'BW', cost: 1620,
+      requiresCivic: 'MASS_MEDIA', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
+      effects: { gpPoints: { WRITER: 3, MUSICIAN: 3 }, cityYieldMult: { culture: 1.2 } },
+      description: '+3 Writer and +3 Musician points per turn, +20% culture in this city, 1 Writing and 2 Music Great Work slots. Flat land adjacent to a Theater Square.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_BROADWAY', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_BROADWAY', 'PrereqCivic', { expect: 'CIVIC_MASS_MEDIA' }),
+        'effects.gpPoints.WRITER': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_BROADWAY&GreatPersonClassType=GREAT_PERSON_CLASS_WRITER', 'PointsPerTurn'),
+        'effects.gpPoints.MUSICIAN': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_BROADWAY&GreatPersonClassType=GREAT_PERSON_CLASS_MUSICIAN', 'PointsPerTurn'),
+        'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_BROADWAY', 'TerrainType')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_BROADWAY', 'AdjacentDistrict', { expect: 'DISTRICT_THEATER' }),
+        'effects.cityYieldMult.culture': { derived: '1 + Amount/100 — the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=BROADWAY_ADDCULTUREYIELD&Name=Amount', 'Value')] },
+      },
+    }),
+    W({
+      id: 'GOLDEN_GATE_BRIDGE', name: 'Golden Gate Bridge', code: 'GG', cost: 1620,
+      requiresTech: 'COMBUSTION', placement: { onCoastalWater: true, unmodeled: 'Bridge' },
+      effects: { cityAmenities: 3 },
+      description: '+3 amenities in this city. Its bridge placement is not modeled, so no tile takes it.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_GOLDEN_GATE_BRIDGE', 'Cost', { scale: GAME_SPEED }),
+        requiresTech: xml('Buildings', 'BuildingType=BUILDING_GOLDEN_GATE_BRIDGE', 'PrereqTech', { expect: 'TECH_COMBUSTION' }),
+        'effects.cityAmenities': xml('Buildings', 'BuildingType=BUILDING_GOLDEN_GATE_BRIDGE', 'Entertainment'),
+        'placement.onCoastalWater': { derived: 'true where the install row is Coast-only, MustNotBeLake and MustBeAdjacentLand', inputs: [xml('Buildings', 'BuildingType=BUILDING_GOLDEN_GATE_BRIDGE', 'MustNotBeLake'), xml('Buildings', 'BuildingType=BUILDING_GOLDEN_GATE_BRIDGE', 'MustBeAdjacentLand')] },
+        'placement.unmodeled': { derived: 'the name of the install placement column neither engine models', inputs: [xml('Buildings_XP2', 'BuildingType=BUILDING_GOLDEN_GATE_BRIDGE', 'Bridge')] },
+      },
+    }),
+    W({
+      id: 'AMUNDSEN_SCOTT_RESEARCH_STATION', name: 'Amundsen-Scott Research Station', code: 'AS', cost: 1620,
+      requiresCivic: 'COLD_WAR', placement: { terrains: ['SNOW'], adjacentDistrict: 'CAMPUS' },
+      effects: { gpPoints: { SCIENTIST: 5 }, empireYieldMult: { science: 1.2, production: 1.1 } },
+      description: '+5 Scientist points per turn; +20% science and +10% production in every city. Snow or Snow Hills adjacent to a Campus.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'PrereqCivic', { expect: 'CIVIC_COLD_WAR' }),
+        'effects.gpPoints.SCIENTIST': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION&GreatPersonClassType=GREAT_PERSON_CLASS_SCIENTIST', 'PointsPerTurn'),
+        'placement.terrains': { derived: 'the Building_ValidTerrains rows of this wonder, as engine terrain ids', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'TerrainType')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'AdjacentDistrict', { expect: 'DISTRICT_CAMPUS' }),
+        'effects.empireYieldMult.science': { derived: '1 + Amount/100 — the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=AMUNDSEN_ADDSCIENCEYIELD&Name=Amount', 'Value')] },
+        'effects.empireYieldMult.production': { derived: '1 + Amount/100 — the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=AMUNDSEN_ADDPRODUCTIONYIELD&Name=Amount', 'Value')] },
+      },
+    }),
+    W({
+      id: 'ESTADIO_DO_MARACANA', name: 'Estádio do Maracanã', code: 'EM', cost: 1740,
+      requiresCivic: 'PROFESSIONAL_SPORTS', placement: { flatOnly: true, adjacentDistrict: 'ENTERTAINMENT_COMPLEX' },
+      cityYields: { culture: 6 },
+      effects: { cityAmenities: 2, regionalRange: 100000 },
+      description: '+6 culture and +2 amenities in every one of your cities. Flat land adjacent to an Entertainment Complex.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_ESTADIO_DO_MARACANA', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_ESTADIO_DO_MARACANA', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),
+        'cityYields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_ESTADIO_DO_MARACANA&YieldType=YIELD_CULTURE', 'YieldChange'),
+        'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_ESTADIO_DO_MARACANA', 'TerrainType')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_ESTADIO_DO_MARACANA', 'AdjacentDistrict', { expect: 'DISTRICT_ENTERTAINMENT_COMPLEX' }),
+        'effects.cityAmenities': xml('Buildings', 'BuildingType=BUILDING_ESTADIO_DO_MARACANA', 'Entertainment'),
+        'effects.regionalRange': xml('Buildings', 'BuildingType=BUILDING_ESTADIO_DO_MARACANA', 'RegionalRange'),
+      },
+    }),
+    W({
+      id: 'SYDNEY_OPERA_HOUSE', name: 'Sydney Opera House', code: 'SO', cost: 1850,
+      requiresCivic: 'CULTURAL_HERITAGE', placement: { onCoastalWater: true, adjacentDistrict: 'HARBOR' },
+      cityYields: { culture: 8 },
+      effects: { gpPoints: { MUSICIAN: 5 } },
+      description: '+8 culture, +5 Musician points per turn, 3 Music Great Work slots. Coastal water adjacent to a Harbor.',
+      src: {
+        code: { stylized: 'a display code, not a game constant' },
+        cost: xml('Buildings', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE', 'Cost', { scale: GAME_SPEED }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE', 'PrereqCivic', { expect: 'CIVIC_CULTURAL_HERITAGE' }),
+        'cityYields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE&YieldType=YIELD_CULTURE', 'YieldChange'),
+        'effects.gpPoints.MUSICIAN': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE&GreatPersonClassType=GREAT_PERSON_CLASS_MUSICIAN', 'PointsPerTurn'),
+        'placement.onCoastalWater': { derived: 'true where the install row is Coast-only, MustNotBeLake and MustBeAdjacentLand', inputs: [xml('Buildings', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE', 'MustNotBeLake'), xml('Buildings', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE', 'MustBeAdjacentLand')] },
+        'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE', 'AdjacentDistrict', { expect: 'DISTRICT_HARBOR' }),
       },
     }),
   ].map((w) => [w.id, w]),

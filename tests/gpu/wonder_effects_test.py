@@ -88,12 +88,22 @@ def main() -> None:
     assert rows[liberty]["loyaltyAura"] == 6, "the Statue of Liberty reaches 6 tiles"
     assert rows[alhambra]["slots"] == [1, 0, 0, 0], "the Alhambra's slot is MILITARY"
     assert rows[bigben]["slots"] == [0, 1, 0, 0], "Big Ben's slot is ECONOMIC"
-    # ten wonders pay per-turn Great Person points, and no row is all-zero cy
-    # AND all-zero everything (a row with no effect at all would be a bug)
+    # seventeen wonders pay per-turn Great Person points; six key yields on a
+    # terrain or a feature
     gpp_rows = [i for i, r in enumerate(rows) if any(r["gpp"])]
-    assert len(gpp_rows) == 10, f"ten wonders pay per-turn GP points, found {len(gpp_rows)}"
+    assert len(gpp_rows) == 17, f"seventeen wonders pay per-turn GP points, found {len(gpp_rows)}"
     tiley_rows = [i for i, r in enumerate(rows) if r["tiley"]]
-    assert len(tiley_rows) == 4, f"four wonders key yields on terrain/feature, found {len(tiley_rows)}"
+    assert len(tiley_rows) == 6, f"six wonders key yields on terrain/feature, found {len(tiley_rows)}"
+    jebel = _find(rows, lambda r: r["regRange"] == 6 and r["cy"][5] == 4, "Jebel Barkal")
+    estadio = _find(rows, lambda r: r["regRange"] > 1000, "Estadio do Maracana")
+    angkor = _find(rows, lambda r: r["empireHousing"] > 0, "wonder paying housing in every city")
+    amundsen = _find(rows, lambda r: r["empireMult"] != [1, 1, 1, 1, 1, 1], "wonder multiplying every city's yields")
+    zeus = _find(rows, lambda r: len(r["grantUnits"]) == 3, "Statue of Zeus")
+    kilwa = _find(rows, lambda r: r["grantEnvoys"] > 0, "wonder paying envoys at completion")
+    casa = _find(rows, lambda r: r["governorTitles"] > 0, "wonder paying governor titles")
+    assert rows[estadio]["cityAmenities"] == 2 and rows[estadio]["cy"][4] == 6, "the Estadio's culture and amenities"
+    assert rows[angkor]["popAllCities"] == 1, "Angkor Wat grows every city once"
+    assert [g[1] for g in rows[zeus]["grantUnits"]] == [3, 3, 1], "3 Spearmen, 3 Archers, 1 Battering Ram"
     assert any(t["emp"] for t in rows[[i for i in tiley_rows if any(x["emp"] for x in rows[i]["tiley"])][0]]["tiley"]), \
         "Etemenanki's Marsh term is EMPIRE-wide"
     assert rows[ruhr]["impYYields"][1] == 1 and len(rows[ruhr]["impY"]) == 2, \
@@ -324,6 +334,60 @@ def main() -> None:
     assert not bool(got[~early].any()), "a later technology was boosted"
     assert not bool(got[int(early.nonzero()[0])]), "a researched technology took a eureka"
     print(f"  Great Library OK — {int(early.sum())} early technologies boosted, no later one")
+
+    # --- 16) the regional wonder pays every own city in reach, not one ------
+    s16 = build(rules, paths[0])
+    assert s16._wonder_regional_yields(0) is None, "no regional wonder stands"
+    plant(s16, 0, 0, jebel)
+    ry = s16._wonder_regional_yields(0)
+    assert ry is not None and float(ry[0, 0, 5]) == 4.0, "Jebel Barkal pays its own city +4 faith"
+    assert float((s16._city_wonder_flat(0, s16._wond_cy[:, 5]))[0, 0]) == 0.0, \
+        "and never a second time as a local yield"
+    plant(s16, 0, 0, estadio)
+    ra = s16._wonder_regional_amenities(0)
+    alive16 = s16.city_alive[0, 0]
+    assert bool((ra[0][alive16] == 2.0).all()), "the Estadio's amenities reach every live city"
+    assert s16._wonder_regional_yields(1) is None, "another seat collects none of it"
+    print("  regional OK — Jebel Barkal's faith once, the Estadio everywhere")
+
+    # --- 17) empire housing and the empire multiplier -----------------------
+    s17 = build(rules, paths[0])
+    h17 = s17._seat_housing(0)[1][0].clone()
+    plant(s17, 0, 0, angkor)
+    h17b = s17._seat_housing(0)[1][0]
+    live17 = s17.city_alive[0, 0]
+    assert bool(((h17b - h17)[live17] == 1.0).all()), "Angkor Wat pays +1 housing in every live city"
+    assert float(s17._seat_wonder_sum(0, s17._wond_emp_mult[:, 3])[0]) == 1.0, "no Amundsen-Scott yet"
+    plant(s17, 0, 0, amundsen)
+    assert float(s17._wond_emp_mult[amundsen, 3]) == 1.2 and float(s17._wond_emp_mult[amundsen, 1]) == 1.1
+    s17._seat_city_stats(0)  # the yield walk reads the multiplier — it must survive it
+    print("  empire housing / multiplier OK")
+
+    # --- 18) the completion payouts: units, envoys, titles, population ------
+    for wi, what in ((zeus, "units"), (kilwa, "envoys"), (casa, "titles"), (angkor, "pop")):
+        s18 = build(rules, paths[0])
+        units0 = int(s18.major_unit_alive[0].sum())
+        env0 = int(s18.civ_envoys_avail[0, 0])
+        tit0 = int(s18.civ_granted_titles[0, 0])
+        pop0 = s18.city_pop[0, 0].clone()
+        t18 = plant(s18, 0, 0, wi)
+        s18.built_wonder_complete[0, t18] = False
+        s18.city_current[:, 0, 0, 0] = s18.WONDER_BASE + wi
+        s18.city_progress[:, 0, 0, 0] = 10.0 ** 9
+        s18._seat_city_produce(
+            0, torch.zeros(s18.B, dtype=torch.long, device=s18.device),
+            torch.ones(s18.B, dtype=torch.bool, device=s18.device),
+            torch.zeros(s18.B, dtype=torch.float64, device=s18.device))
+        if what == "units":
+            assert int(s18.major_unit_alive[0].sum()) - units0 == 7, "the Statue of Zeus grants seven units"
+        elif what == "envoys":
+            assert int(s18.civ_envoys_avail[0, 0]) - env0 == 3, "Kilwa Kisiwani pays three envoys"
+        elif what == "titles":
+            assert int(s18.civ_granted_titles[0, 0]) - tit0 == 3, "the Casa pays three governor titles"
+        else:
+            d = (s18.city_pop[0, 0] - pop0)[s18.city_alive[0, 0]]
+            assert bool((d == 1).all()), "Angkor Wat grows every live city once"
+    print("  completion payouts OK — seven units, three envoys, three titles, +1 pop")
 
     print("WONDER EFFECTS OK")
 

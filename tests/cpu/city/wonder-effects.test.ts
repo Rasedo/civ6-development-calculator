@@ -48,7 +48,8 @@ describe('wonder effects, sourced', () => {
     expect(BUILT_WONDERS.HERMITAGE.effects?.gpPoints?.ARTIST).toBe(3);
     expect(BUILT_WONDERS.BOLSHOI_THEATRE.effects?.gpPoints).toEqual({ WRITER: 2, MUSICIAN: 2 });
     expect(BUILT_WONDERS.OXFORD_UNIVERSITY.effects?.cityYieldMult?.science).toBe(1.2);
-    expect(BUILT_WONDERS.COLOSSEUM.effects?.regionalAmenities).toBe(2);
+    expect(BUILT_WONDERS.COLOSSEUM.effects?.cityAmenities).toBe(2);
+    expect(BUILT_WONDERS.COLOSSEUM.effects?.regionalRange).toBe(6);
     expect(BUILT_WONDERS.POTALA_PALACE.cityYields).toEqual({ culture: 2, faith: 3 });
     expect(BUILT_WONDERS.UNIVERSITY_OF_SANKORE.cityYields?.science).toBe(3);
   });
@@ -276,5 +277,49 @@ describe('wonder effects, sourced', () => {
     for (const id of early.slice(1)) expect(seat.research.boosted).toContain(id);
     expect(seat.research.boosted).not.toContain(early[0]);
     for (const id of later) expect(seat.research.boosted).not.toContain(id);
+  });
+
+  it('a regional wonder pays every own city in reach once, and none beyond', () => {
+    // CIV6 RegionalRange 6: Jebel Barkal's +4 Faith reaches each of the
+    // owner's cities within 6 tiles of the wonder, its own city among them.
+    const { state, city } = oneCity();
+    foundCity(state, tileAtCoords(state.map, 13, 8).index, 0);
+    foundCity(state, tileAtCoords(state.map, 1, 1).index, 0);
+    const [near, far] = seatOf(state, 0)!.cities.slice(1);
+    const f0 = [city, near, far].map((c) => computeCityStats(state, c).breakdown.buildings.faith);
+    stand(state, city, 'JEBEL_BARKAL', 9, 8);
+    const f1 = [city, near, far].map((c) => computeCityStats(state, c).breakdown.buildings.faith);
+    expect(f1[0] - f0[0]).toBe(4);
+    expect(f1[1] - f0[1]).toBe(4);
+    expect(f1[2] - f0[2]).toBe(0);
+  });
+
+  it('Angkor Wat houses every city, and grows each once at completion', () => {
+    const { state, city } = oneCity();
+    foundCity(state, tileAtCoords(state.map, 2, 2).index, 0);
+    const other = seatOf(state, 0)!.cities[1];
+    const h0 = computeCityStats(state, other).housing;
+    const p0 = [city.population, other.population];
+    const wt = stand(state, city, 'ANGKOR_WAT', 9, 8);
+    state.map.tiles[wt].builtWonderComplete = false;
+    completeQueueItem(state, city, { kind: 'wonder', wonder: 'ANGKOR_WAT', tileIndex: wt, progress: 0 }, 0);
+    expect(computeCityStats(state, other).housing).toBe(h0 + 1);
+    expect([city.population, other.population]).toEqual([p0[0] + 1, p0[1] + 1]);
+  });
+
+  it('the completion grants: units row by row, envoys, governor titles', () => {
+    const { state, city } = oneCity();
+    const seat = seatOf(state, 0)!;
+    const units0 = state.units.length;
+    const env0 = seat.envoysAvailable ?? 0;
+    for (const id of ['STATUE_OF_ZEUS', 'KILWA_KISIWANI', 'CASA_DE_CONTRATACION']) {
+      const col = 9 + ['STATUE_OF_ZEUS', 'KILWA_KISIWANI', 'CASA_DE_CONTRATACION'].indexOf(id);
+      const wt = stand(state, city, id, col, 9);
+      state.map.tiles[wt].builtWonderComplete = false;
+      completeQueueItem(state, city, { kind: 'wonder', wonder: id, tileIndex: wt, progress: 0 }, 0);
+    }
+    expect(state.units.length - units0).toBe(7);
+    expect((seat.envoysAvailable ?? 0) - env0).toBe(3);
+    expect(seat.grantedTitles).toBe(3);
   });
 });

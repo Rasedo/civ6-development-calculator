@@ -218,6 +218,20 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
     'slots.1.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_BOLSHOI_THEATRE&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'NumSlots'),
     theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_BOLSHOI_THEATRE', 'BuildingType')] },
   },
+  BROADWAY: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_BROADWAY', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_WRITING', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_BROADWAY&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_BROADWAY&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'NumSlots'),
+    'slots.1.type': { derived: 'the engine slot code for the install GREATWORKSLOT_MUSIC', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_BROADWAY&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'GreatWorkSlotType')] },
+    'slots.1.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_BROADWAY&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_BROADWAY', 'BuildingType')] },
+  },
+  SYDNEY_OPERA_HOUSE: {
+    wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE', 'IsWonder')] },
+    'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_MUSIC', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'GreatWorkSlotType')] },
+    'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE&GreatWorkSlotType=GREATWORKSLOT_MUSIC', 'NumSlots'),
+    theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_SYDNEY_OPERA_HOUSE', 'BuildingType')] },
+  },
   OXFORD_UNIVERSITY: {
     wonder: { derived: 'true where the install row carries IsWonder; the schema gives the column no DEFAULT, so an absent cell is false', inputs: [xml('Buildings', 'BuildingType=BUILDING_OXFORD_UNIVERSITY', 'IsWonder')] },
     'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_WRITING', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_OXFORD_UNIVERSITY&GreatWorkSlotType=GREATWORKSLOT_WRITING', 'GreatWorkSlotType')] },
@@ -271,6 +285,8 @@ const RAW_GW_HOLDERS: readonly GreatWorkHolderDef[] = [
   { id: 'HERMITAGE', wonder: true, slots: [{ type: GWS_ART, count: 4 }], theme: GW_THEME_NONE },
   { id: 'ST_BASILS_CATHEDRAL', wonder: true, slots: [{ type: GWS_RELIC, count: 3 }], theme: GW_THEME_NONE },
   { id: 'APADANA', wonder: true, slots: [{ type: GWS_PALACE, count: 2 }], theme: GW_THEME_NONE },
+  { id: 'BROADWAY', wonder: true, slots: [{ type: GWS_WRITING, count: 1 }, { type: GWS_MUSIC, count: 2 }], theme: GW_THEME_NONE },
+  { id: 'SYDNEY_OPERA_HOUSE', wonder: true, slots: [{ type: GWS_MUSIC, count: 3 }], theme: GW_THEME_NONE },
   // declares no slot of its own; a Great Person opens its row (`GW_GP_EXTRA_SLOTS`)
   { id: 'BANK', wonder: false, slots: [{ type: GWS_PALACE, count: 0 }], theme: GW_THEME_NONE },
 ];

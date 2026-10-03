@@ -709,7 +709,7 @@ describe('trading posts', () => {
 });
 describe('wonder route terms', () => {
   it('Colossus grants a Trader at completion', () => {
-    expect(BUILT_WONDERS.COLOSSUS.effects?.grantUnit).toBe('TRADER');
+    expect(BUILT_WONDERS.COLOSSUS.effects?.grantUnits).toEqual([{ unit: 'TRADER', count: 1 }]);
   });
 
   // CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2 Gold for
