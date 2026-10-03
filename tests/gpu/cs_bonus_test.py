@@ -200,10 +200,12 @@ def test_building_pillage(rules, path) -> None:
           "(the remainder is the suzerain yield)")
 
 
-def test_stable_alternative(rules, path) -> None:
-    """CIV6 (R&F): the militaristic 3-envoy bonus keys BARRACKS OR STABLE —
-    a city holding only the STABLE half of the exclusive pair still
-    collects, and the 6-envoy tier lands on the ARMORY."""
+def test_militaristic_item_prod(rules, path) -> None:
+    """CIV6 (Leaders.xml MINOR_CIV_MILITARISTIC_PRODUCTION_FOR_CAPITAL,
+    Expansion1_Leaders.xml ..._FOR_BARRACKS_STABLE / _FOR_ARMORY): the
+    militaristic ladder is +2 Production toward UNITS — a Settler among them —
+    in the capital at 1 envoy, in a city with a Barracks OR Stable at 3 and an
+    Armory at 6, and never a city yield (`cityStateItemProduction`)."""
     sim = opened(rules, path, 6)
     PROD = 1
     sim._citystate_t1idx[0, 0, :] = -1
@@ -212,28 +214,44 @@ def test_stable_alternative(rules, path) -> None:
     sim._citystate_t2idx[0, 0, :] = -1
     sim._citystate_t2idx[0, 0, 0] = bidx("ARMORY")
     sim._citystate_yidx[0, 0] = PROD
+    sim._citystate_capamt[0, 0] = 0.0
+    sim._citystate_yield_ladder[0, 0] = False
+    sim._citystate_item_type[0, 0] = True
+    for _k, _v in (("building", False), ("wonder", False), ("district", False), ("unit", True), ("settler", True)):
+        sim._citystate_item_kind[_k][0, 0] = _v
     sim.citystate_alive[0, 0] = True
     sim.seat_citystate_met[0, 0, 0] = True
     sim.citystate_suz_code[0, 0] = -1  # keep the suzerain crossing out of the read
     if sim.S > 1:
         sim.citystate_alive[0, 1:] = False
     sim.city_bldg[0, 0, 0, bidx("STABLE")] = True
+    col = torch.zeros(1, dtype=torch.long)
+    unit = torch.full((1,), sim.UNIT_BASE, dtype=torch.long)
+    settler = torch.full((1,), sim.SETTLER, dtype=torch.long)
+    building = torch.full((1,), bidx("BARRACKS"), dtype=torch.long)
 
-    def prod0(envoys: int) -> float:
+    def at(envoys: int, cur: torch.Tensor) -> tuple[float, float]:
         sim.seat_citystate_envoys[0, 0, 0] = envoys
         sim._eff_version += 1
         total, _, _, _ = city_totals(sim, 0)
-        return float(total[0, 0, PROD])
+        return float(total[0, 0, PROD]), float(sim._cs_item_prod(0, col, cur)[0])
 
-    p1, p3 = prod0(1), prod0(3)
-    assert p3 > p1 + 1e-9, f"the STABLE did not carry the 3-envoy bonus ({p1}->{p3})"
-    p6 = prod0(6)
-    assert abs(p6 - p3) < 1e-9, f"6 envoys paid without an ARMORY ({p3}->{p6})"
+    sim.city_is_cap[0, 0, 0] = False
+    p0, f0 = at(0, unit)
+    p1, f1 = at(1, unit)
+    p3, f3 = at(3, unit)
+    p6, f6 = at(6, unit)
+    assert p0 == p1 == p3 == p6, f"the militaristic ladder paid a production YIELD ({p0}, {p1}, {p3}, {p6})"
+    assert (f0, f1, f3, f6) == (0.0, 0.0, 2.0, 2.0), f"toward-unit ladder off the capital {(f0, f1, f3, f6)}"
     sim.city_bldg[0, 0, 0, bidx("ARMORY")] = True
-    sim._eff_version += 1
-    p6b = prod0(6)
-    assert p6b > p6 + 1e-9, "the ARMORY did not collect the 6-envoy tier"
-    print(f"  militaristic pair OK: STABLE pays at 3 ({p1:.2f}->{p3:.2f}), ARMORY at 6 ({p6:.2f}->{p6b:.2f})")
+    assert at(6, unit)[1] == 4.0, "the ARMORY did not collect the 6-envoy step"
+    sim.city_is_cap[0, 0, 0] = True
+    assert at(6, unit)[1] == 6.0 and at(6, settler)[1] == 6.0, "the capital step missed a unit or a Settler"
+    assert at(6, building)[1] == 0.0, "the militaristic ladder paid toward a building"
+    sim.city_bldg_pillaged[0, 0, 0, bidx("ARMORY")] = True
+    assert at(6, unit)[1] == 4.0, "a pillaged ARMORY still counted"
+    print(f"  militaristic toward-units OK: no yield ({p0:.2f}), 0/0/2/2 off the capital, "
+          "+2 Armory, +2 capital, pillage-dark")
 
 
 def test_suzerain(rules, path) -> None:
@@ -414,7 +432,7 @@ def main() -> None:
     test_catalog(rules, p)
     test_building_bonus(rules, p)
     test_building_pillage(rules, p)
-    test_stable_alternative(rules, p)
+    test_militaristic_item_prod(rules, p)
     test_suzerain(rules, p)
     test_faith_class(rules, p)
     test_walls_faith_only(rules, p)

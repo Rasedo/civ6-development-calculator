@@ -925,7 +925,45 @@ class SimPhase:
                 _m2w = (_m2 & (_anyw[:, row].unsqueeze(1) | _anyw[:, : self.n_majors])).any(dim=1)
         pre["m2w"] = _m2w
         pre["warbuf"] = self._war_buff_prod_pct(row) if self._war_buff_rows else None
+        # whether any live Industrial / Militaristic city-state can pay this
+        # seat production toward items (only a major sends envoys)
+        pre["csi"] = (self.S > 0 and row < self.n_majors
+                      and bool((self.citystate_alive & self._citystate_item_type).any()))
         return pre
+
+    def _cs_item_prod(self, row: int, col: torch.Tensor, cur: torch.Tensor) -> torch.Tensor:
+        """`cityStateItemProduction`'s twin: [B] f64, the flat Production the
+        city at `col` puts toward its head `cur` off the seat's effective
+        envoys — per live production-type city-state whose kinds hold the
+        item, +amount in the capital at 1 envoy and in a city whose tier-1 /
+        tier-2 building of the type stands (not dark) at 3 / 6."""
+        bidx = self._bidx
+        env = self._envoys_here(row)
+        B = cur.shape[0]
+        nw = self._wonder_era.shape[0]
+        kinds = (
+            ("building", (cur >= 0) & (cur < self.NB)),
+            ("wonder", (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw)),
+            ("district", (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))),
+            ("unit", (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)),
+            ("settler", cur == self.SETTLER),
+        )
+        hit = torch.zeros_like(env, dtype=torch.bool)
+        for _k, _on in kinds:
+            hit = hit | (self._citystate_item_kind[_k] & _on.unsqueeze(1))
+        hit = hit & self.citystate_alive
+        stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(
+            self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])  # [B, NB]
+
+        def _holds(tidx: torch.Tensor) -> torch.Tensor:
+            g = stand.gather(1, tidx.clamp(min=0).reshape(B, -1)).reshape(tidx.shape)
+            return (g & (tidx >= 0)).any(dim=2)
+
+        cap = self.city_is_cap[bidx, row, col]
+        steps = ((env >= 1) & cap.unsqueeze(1)).double() \
+            + ((env >= 3) & _holds(self._citystate_t1idx)).double() \
+            + ((env >= 6) & _holds(self._citystate_t2idx)).double()
+        return (self._citystate_item_amt * steps * hit.double()).sum(dim=1)
 
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            prod: torch.Tensor, sci_turn: torch.Tensor | None = None,
@@ -1216,6 +1254,11 @@ class SimPhase:
         # A Great Person's permanent share joins the SAME additive sum.
         _add = _add + self._gp_prod_pct(row, cur).to(_add.dtype)
         _emall = _emall * (1 + _add)
+        # CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): a flat
+        # add toward the item, joining the city's Production before every
+        # percent above multiplies it
+        if pre["csi"]:
+            prod = prod + self._cs_item_prod(row, col, cur).to(prod.dtype)
         prod = prod * _emall
         # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
         # phase.ts spends the bank right after the production add.

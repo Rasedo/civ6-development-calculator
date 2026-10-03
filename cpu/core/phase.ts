@@ -26,7 +26,7 @@ import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, cityStateItemProduction, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS } from '../data/seats';
@@ -2955,7 +2955,10 @@ export function seatPhase(state: GameState): void {
         _bpct += warBuffPct;
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
-        q.progress += production * _em;
+        // CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): a flat
+        // add toward the item, joining the city's Production before every
+        // percent above multiplies it
+        q.progress += (production + cityStateItemProduction(state, civCity, q.kind)) * _em;
         // Pay in the bank right after the production add, so the field
         // written below is read back.
         if (civCity.productionBank) {

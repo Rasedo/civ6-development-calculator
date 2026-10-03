@@ -1,8 +1,10 @@
 /**
  * City-state definitions (base Civ 6 envoy system).
- * Envoy bonuses AS MODELED: 1 envoy = +2 type-yield in the capital; 3 envoys =
- * +2 in every city's matching district; 6 envoys = a further +2 per district.
- * Suzerain (3+ envoys, most among majors) adds a type-specific perk.
+ * Envoy bonuses AS MODELED: 1 envoy = the type's yield in the capital; 3 / 6
+ * envoys = +2 on every city's tier-1 / tier-2 building of the type. The
+ * Industrial and Militaristic ladders pay production toward items in the same
+ * three places instead (`CITY_STATE_ITEM_PROD`). Suzerain (3+ envoys, most
+ * among majors) adds a type-specific perk.
  *
  * SOURCING SWEEP. Verified against the Civilization wiki's
  * City-state / Suzerain pages. CORRECT: the SUZERAIN rule (most envoys AND at
@@ -16,7 +18,7 @@
  * `cityStateEnvoyBonuses`.
  */
 
-import type { CityStateType, DistrictId, YieldKey } from '../core/types';
+import type { CityStateType, DistrictId, QueueItem, YieldKey } from '../core/types';
 import type { PromoClass } from './promotions';
 import { type SrcMap, srcConst, xml } from './provenance';
 import { GAME_SPEED, speedTurns, speedTurnsSrc } from './constants';
@@ -288,12 +290,31 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
 
 export const ENVOY_COST = 100;
 export const INFLUENCE_PER_TURN = 3;
-/** What ONE envoy pays the capital, per type: the `MINOR_CIV_*_FOR_CAPITAL`
- *  rows' Amount (Leaders.xml) — Trade's Gold is 4, the rest 2. */
-export const CITY_STATE_CAPITAL_BONUS: Record<CityStateType, number> = {
-  scientific: 2, cultural: 2, trade: 4, industrial: 2, militaristic: 2, religious: 2,
+/** What ONE envoy pays the capital, per yield type: the `MINOR_CIV_*_YIELD_FOR
+ *  _CAPITAL` rows' Amount (Leaders.xml) — Trade's Gold is 4, the rest 2. The
+ *  two production types pay no yield (`CITY_STATE_ITEM_PROD`). */
+export const CITY_STATE_CAPITAL_BONUS: Partial<Record<CityStateType, number>> = {
+  scientific: 2, cultural: 2, trade: 4, religious: 2,
 };
 export const CITY_STATE_DISTRICT_BONUS = 2;
+
+/** The queue kinds a city-state's envoys pay PRODUCTION TOWARD, per type.
+ *  CIV6 (Leaders.xml, MINOR_CIV_INDUSTRIAL_{BUILDING,DISTRICT}_PRODUCTION_FOR
+ *  _CAPITAL: MODIFIER_PLAYER_CAPITAL_CITY_ADJUST_BUILDING_PRODUCTION /
+ *  _DISTRICT_PRODUCTION; MINOR_CIV_MILITARISTIC_PRODUCTION_FOR_CAPITAL:
+ *  _ADJUST_UNIT_PRODUCTION) at 1 envoy, and (Expansion1_Leaders.xml, loaded
+ *  by Gathering Storm) the MEDIUM / LARGE rows re-keyed to
+ *  MODIFIER_PLAYER_CITIES_ADJUST_{BUILDING,DISTRICT,UNIT}_PRODUCTION_CHANGE in
+ *  every city with the type's tier-1 / tier-2 building (BUILDING_IS_WORKSHOP
+ *  / _FACTORY, BUILDING_IS_BARRACKS_STABLE_MILITARITIC_CITY_STATE / _ARMORY).
+ *  The text reads "when producing wonders, buildings, and districts" and
+ *  "when producing units" — a Settler is a unit. None of it is a city yield. */
+export const CITY_STATE_ITEM_PROD: Partial<Record<CityStateType, readonly QueueItem['kind'][]>> = {
+  industrial: ['building', 'wonder', 'district'],
+  militaristic: ['unit', 'settler'],
+};
+/** Every one of those rows' Amount: +2 Production per step. */
+export const CITY_STATE_ITEM_PROD_AMOUNT = 2;
 export const SUZERAIN_ENVOYS = 3;
 export const QUEST_COOLDOWN = 12;
 export const QUEST_ENVOYS = 1;

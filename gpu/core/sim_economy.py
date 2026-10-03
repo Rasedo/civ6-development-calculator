@@ -6622,7 +6622,8 @@ class SimEconomy:
                 if fol_live:
                     bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", selbf, self._fol_tab_for("bldgY", row, sl))
             if self.S > 0 and row < self.n_majors:  # only a major sends envoys
-                env, acs, nB = self._envoys_here(row), self.citystate_alive.double(), selb.shape[2]
+                env, nB = self._envoys_here(row), selb.shape[2]
+                acs = (self.citystate_alive & self._citystate_yield_ladder).double()
                 csf = torch.zeros(B, nB * 6, dtype=F64, device=dev)
                 for _bar, _tidx in ((3, self._citystate_t1idx), (6, self._citystate_t2idx)):
                     _perk = (env >= _bar).double() * self._citystate_district_bonus * acs

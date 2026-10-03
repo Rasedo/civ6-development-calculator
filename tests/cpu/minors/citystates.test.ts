@@ -11,10 +11,10 @@ import { canFoundCity } from '../../../cpu/core/rules';
 import { seatPhase } from '../../../cpu/core/phase';
 import { borderCandidates, computeCityStats } from '../../../cpu/core/city';
 import { tilesWithin, hexDistance } from '../../../world/hex';
-import { assignEnvoy, cityStateEnvoyBonuses, envoyBonusDelta, envoysOf, isSuzerain, suzerainSciencePct } from '../../../cpu/core/cityStates';
+import { assignEnvoy, cityStateEnvoyBonuses, cityStateItemProduction, envoyBonusDelta, envoysOf, isSuzerain, suzerainSciencePct } from '../../../cpu/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../../../cpu/core/trade';
 import { ENVOY_COST, GENEVA_SCIENCE_PCT } from '../../../cpu/data/cityStates';
-import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
+import { emptyYields, type CityState, type CityStateType, type GameState } from '../../../cpu/core/types';
 
 function addCs(
   state: GameState,
@@ -265,17 +265,68 @@ describe('civ envoys and the suzerain contest', () => {
     expect(b1.buildingAdd.LIBRARY).toBeUndefined(); // 1 envoy: capital only
   });
 
-  // CIV6 (R&F): the militaristic tiers are the exclusive Barracks/Stable
-  // pair at 3 envoys (either member collects) and the ARMORY at 6.
-  it('the militaristic pair: Barracks OR Stable at 3 envoys, Armory at 6', () => {
+  // CIV6 (Leaders.xml / Expansion1_Leaders.xml): the Industrial and
+  // Militaristic ladders are ADJUST_*_PRODUCTION toward items, never a yield.
+  it('the production types pay no yield, on the capital or a building', () => {
     const state = makeState();
-    const cityState = addCs(state, 8, 8, { type: 'militaristic' });
-    cityState.envoys = { [1]: 6 };
-    const b = cityStateEnvoyBonuses(state, 1);
-    expect(b.buildingAdd.BARRACKS?.production).toBe(2);
-    expect(b.buildingAdd.STABLE?.production).toBe(2);
-    expect(b.buildingAdd.ARMORY?.production).toBe(2);
-    expect(b.buildingAdd.MILITARY_ACADEMY).toBeUndefined();
+    const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
+    city.buildings.push('BARRACKS', 'ARMORY');
+    const before = computeCityStats(state, city).total.production;
+    addCs(state, 8, 8, { type: 'militaristic', envoys: { [0]: 6 } });
+    addCs(state, 2, 9, { type: 'industrial', envoys: { [0]: 1 } });
+    const b = cityStateEnvoyBonuses(state, 0);
+    expect(b.capital).toEqual({});
+    expect(b.buildingAdd).toEqual({});
+    expect(computeCityStats(state, city).total.production).toBe(before);
+    expect(envoyBonusDelta(state, state.cityStates[1], 0)).toEqual(emptyYields());
+  });
+
+  it('Industrial: +2 toward wonders, buildings and districts in the capital, Workshop and Factory cities', () => {
+    const state = makeState();
+    const capital = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
+    const other = foundCity(state, tileAtCoords(state.map, 11, 5).index, 0).city!;
+    const cs = addCs(state, 8, 10, { type: 'industrial', envoys: { [0]: 1 } });
+    expect(capital.isCapital && !other.isCapital).toBe(true);
+    for (const k of ['building', 'wonder', 'district'] as const) expect(cityStateItemProduction(state, capital, k)).toBe(2);
+    for (const k of ['unit', 'settler', 'project'] as const) expect(cityStateItemProduction(state, capital, k)).toBe(0);
+    expect(cityStateItemProduction(state, other, 'building')).toBe(0);
+    other.buildings.push('WORKSHOP', 'FACTORY');
+    expect(cityStateItemProduction(state, other, 'building')).toBe(0); // 1 envoy: capital only
+    cs.envoys = { [0]: 3 };
+    expect(cityStateItemProduction(state, other, 'district')).toBe(2);
+    cs.envoys = { [0]: 6 };
+    expect(cityStateItemProduction(state, other, 'district')).toBe(4);
+    expect(cityStateItemProduction(state, capital, 'district')).toBe(2); // no Workshop there
+    expect(cityStateItemProduction(state, other, 'building')).toBe(4);
+    // two Industrial minors stack
+    addCs(state, 2, 10, { type: 'industrial', envoys: { [0]: 1 } });
+    expect(cityStateItemProduction(state, capital, 'wonder')).toBe(4);
+  });
+
+  it('Militaristic: +2 toward units (a Settler is one) in the capital, Barracks-or-Stable and Armory cities', () => {
+    const state = makeState();
+    const capital = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
+    const other = foundCity(state, tileAtCoords(state.map, 11, 5).index, 0).city!;
+    addCs(state, 8, 10, { type: 'militaristic', envoys: { [0]: 6 } });
+    expect(cityStateItemProduction(state, capital, 'unit')).toBe(2);
+    expect(cityStateItemProduction(state, capital, 'settler')).toBe(2);
+    expect(cityStateItemProduction(state, capital, 'building')).toBe(0);
+    other.buildings.push('STABLE');
+    expect(cityStateItemProduction(state, other, 'unit')).toBe(2);
+    other.buildings.push('ARMORY');
+    expect(cityStateItemProduction(state, other, 'unit')).toBe(4);
+    other.pillagedBuildings = ['ARMORY'];
+    expect(cityStateItemProduction(state, other, 'unit')).toBe(2); // a pillaged Armory does not count
+  });
+
+  it('the flat add joins the Production before the item percents', () => {
+    const state = makeState();
+    const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
+    addCs(state, 9, 9, { type: 'militaristic', envoys: { [0]: 1 } });
+    city.queue = [{ kind: 'unit', unit: 'WARRIOR', progress: 0, cost: 1000 }];
+    const made = computeCityStats(state, city).total.production;
+    seatPhase(state);
+    expect(city.queue[0].progress).toBeCloseTo(made + 2, 9);
   });
 });
 

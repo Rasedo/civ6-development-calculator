@@ -324,6 +324,17 @@ class SimInit:
         citystate_didx = rules.citystate["typeDistrictIdx"]  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] district each CS boosts at 3/6 envoys
         self._citystate_district_bonus = float(rules.citystate["districtBonus"])  # per-district amount at each of the 3-/6-envoy thresholds
+        # whether a city-state's ladder pays YIELDS, and the queue kinds a
+        # production type's ladder pays toward instead (`CITY_STATE_ITEM_PROD`)
+        _cst = self.citystate_type.clamp(min=0)
+        self._citystate_yield_ladder = torch.tensor(
+            [bool(x) for x in rules.citystate["yieldLadder"]], dtype=torch.bool, device=device)[_cst]  # [B, S]
+        _ik = rules.citystate["typeItemKinds"]
+        self._citystate_item_kind = {
+            k: torch.tensor([k in x for x in _ik], dtype=torch.bool, device=device)[_cst]  # [B, S]
+            for k in ("building", "wonder", "district", "unit", "settler")}
+        self._citystate_item_type = torch.tensor([len(x) > 0 for x in _ik], dtype=torch.bool, device=device)[_cst]  # [B, S]
+        self._citystate_item_amt = float(rules.citystate["itemProd"])
         # CIV6 (Rise and Fall): the 3-/6-envoy bonus lands on the type's
         # TIER-1 / TIER-2 building rows — either member of an exclusive pair
         # (a city holds at most one); -1 pads the narrower types. Constant,
