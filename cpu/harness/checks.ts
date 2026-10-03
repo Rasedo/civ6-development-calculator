@@ -488,7 +488,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const before = { pop: city.population, food: city.foodBox };
       const settlerOut = acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
         && tileDistance(state, u.plot, city.centerIndex) <= 1);
-      const growSkip = skipAll ?? (settlerOut ? 'a Settler left the city' : null);
+      // the turn's production lands before the city grows and claims, and
+      // the step here reads the city as the record left it
+      const built = !!next && (next.buildings.length !== c.buildings.length || next.districts.length !== c.districts.length);
+      const growSkip = skipAll ?? (settlerOut ? 'a Settler left the city' : built ? 'the city completed a building or district' : null);
       seatGrowth(city, st.effectiveFoodSurplus, st.growthNeeded, state.turn);
       if (growSkip || !next) out.push({ turn, check: 'step.growth', subject, ok: true, skip: growSkip ?? 'no t+1' });
       else {
@@ -505,7 +508,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const gainedOurs = state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id && !plotsBefore.has(t.index)).map((t) => t.index);
       const gainedGame = acts.plotsGained.get(k) ?? [];
       const bought = (acts.goldSpent.get(c.owner) ?? 0) > 0 && gainedGame.some((q) => !gainedOurs.includes(q));
-      const borderSkip = skipAll ?? (bought ? 'a plot may have been bought'
+      const borderSkip = skipAll ?? (built ? 'the city completed a building or district' : bought ? 'a plot may have been bought'
         : imp.tilesUnknown.has(city.centerIndex) ? 'expansions before the record'
         : held.has(c.owner) ? 'the seat banked no border culture' : null);
       if (borderSkip || !next) out.push({ turn, check: 'step.border', subject, ok: true, skip: borderSkip ?? 'no t+1' });
