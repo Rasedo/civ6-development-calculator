@@ -419,22 +419,48 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     }
     const fname = (i: number) => cat.features[plotAt(rec, i)[P.feature] as number] ?? '';
     const fwas = (i: number) => cat.features[plotAt(h.last!, i)[P.feature] as number] ?? '';
+    // signed: an event that lowers a plot for a while (a drought) is undone
+    // by its recovery
     const addEvent = (i: number, f: number, pr: number, sc: number) => {
-      if (f <= 0 && pr <= 0 && sc <= 0) return;
+      if (!f && !pr && !sc) return;
       const acc = h.eventYields.get(i) ?? [0, 0, 0];
-      h.eventYields.set(i, [acc[0] + Math.max(0, f), acc[1] + Math.max(0, pr), acc[2] + Math.max(0, sc)]);
+      h.eventYields.set(i, [acc[0] + f, acc[1] + pr, acc[2] + sc]);
     };
     // the players whose own rows moved a plot's yields this turn: a pantheon,
     // a card or a government may reach any plot (`moved`); a technology or a
     // civic only an improved or resource plot (`researched`)
     const moved = new Set<number>();
-    const researched = new Set<number>();
+    const gained = new Map<number, Set<string>>();
     for (const q of rec.players) {
       const q0 = h.last.players.find((x) => x.id === q.id);
       if (!q0 || JSON.stringify([q.pantheon, q.policies, q.government])
         !== JSON.stringify([q0.pantheon, q0.policies, q0.government])) moved.add(q.id);
-      if (!q0 || JSON.stringify([q.techs, q.civics]) !== JSON.stringify([q0.techs, q0.civics])) researched.add(q.id);
+      const got = new Set<string>();
+      for (const [bits, names, prefix] of [[q.techs, cat.techs, 'TECH_'], [q.civics, cat.civics, 'CIVIC_']] as const) {
+        const was = (q0 ? (prefix === 'TECH_' ? q0.techs : q0.civics) : '') ?? '';
+        for (let k = 0; k < (bits ?? '').length; k++) {
+          if (bits[k] === '1' && was[k] !== '1') got.add(strip(names[k] ?? '', prefix));
+        }
+      }
+      gained.set(q.id, got);
     }
+    // the research that moves a plot's yields: a resource's revealing
+    // technology, and the rows that pay an improvement more
+    const movesPlot = (i: number, got: Set<string>) => {
+      if (got.size === 0) return false;
+      const res = plotAt(rec, i)[P.resource] as number;
+      const rid = res >= 0 ? strip(cat.resources[res] ?? '', 'RESOURCE_') : '';
+      if (rid && RESOURCES[rid]?.revealTech && got.has(RESOURCES[rid].revealTech!)) return true;
+      const imp = plotAt(rec, i)[P.improvement] as number;
+      if (imp < 0) return false;
+      const iid = strip(cat.improvements[imp] ?? '', 'IMPROVEMENT_');
+      for (const r of got) {
+        const fx = TECHS[r]?.effects ?? CIVICS[r]?.effects ?? [];
+        if (fx.some((e) => (e.kind === 'improvementYields' && e.improvement === iid) || (e.kind === 'farmAdjacency' && iid === 'FARM'))) return true;
+      }
+      const ry = IMPROVEMENTS[iid as ImprovementId]?.researchYields ?? [];
+      return ry.some((y) => (y.tech && got.has(y.tech)) || (y.civic && got.has(y.civic)));
+    };
     const same = (i: number, k: number) => plotAt(rec, i)[k] === plotAt(h.last!, i)[k];
     const still = (i: number) => same(i, P.feature) && same(i, P.resource) && same(i, P.improvement)
       && same(i, P.improvementPillaged) && same(i, P.district) && same(i, P.wonder) && same(i, P.owner);
@@ -460,9 +486,9 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         // an unowned plot's yields are the viewing player's (a strategic it
         // has just revealed pays from that record on)
         const owner = plotAt(rec, i)[P.owner] as number;
-        const builtOn = (plotAt(rec, i)[P.resource] as number) >= 0 || (plotAt(rec, i)[P.improvement] as number) >= 0;
-        const o = owner >= 0 ? owner : builtOn ? num(rec.head.localPlayer) : -1;
-        if (o >= 0 && (moved.has(o) || (builtOn && researched.has(o)))) continue;
+        const o = owner >= 0 ? owner : num(rec.head.localPlayer);
+        if (owner >= 0 && moved.has(owner)) continue;
+        if (o >= 0 && movesPlot(i, gained.get(o) ?? new Set())) continue;
         if (nbr(i).some((n) => !still(n))) continue;
         const y = plotAt(rec, i)[P.yields] as number[];
         const y0 = plotAt(h.last, i)[P.yields] as number[];
@@ -531,9 +557,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   for (const [i, n] of history?.fireFood ?? []) tiles[i].fertility = Math.min(FERTILITY_CAP, n);
   for (const [i, n] of history?.fireProd ?? []) tiles[i].fertilityProd = Math.min(FERTILITY_CAP, n);
   for (const [i, [f, pr, sc]] of history?.eventYields ?? []) {
-    tiles[i].fertility = Math.min(FERTILITY_CAP, tiles[i].fertility + f);
-    tiles[i].fertilityProd = Math.min(FERTILITY_CAP, tiles[i].fertilityProd + pr);
-    if (sc) tiles[i].fertilitySci = Math.min(FERTILITY_CAP, (tiles[i].fertilitySci ?? 0) + sc);
+    tiles[i].fertility = Math.min(FERTILITY_CAP, tiles[i].fertility + Math.max(0, f));
+    tiles[i].fertilityProd = Math.min(FERTILITY_CAP, tiles[i].fertilityProd + Math.max(0, pr));
+    if (sc > 0) tiles[i].fertilitySci = Math.min(FERTILITY_CAP, (tiles[i].fertilitySci ?? 0) + sc);
   }
   const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles };
   for (const t of tiles) {
