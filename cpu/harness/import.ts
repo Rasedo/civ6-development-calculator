@@ -47,13 +47,14 @@ import { GOVERNMENTS, POLICIES } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_TYPES } from '../data/cityStates';
+import { PROMO_CLASSES } from '../data/promotions';
 import { FEATURES, clearableFeatures } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { neighborTile } from '../../world/hex';
 import { GP_CITY_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
-  GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
+  GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
 } from '../data/greatWorks';
 import { CONGRESS_RESOLUTIONS } from '../data/seats';
 import { PROJECTS, PROJECT_LIST } from '../data/projects';
@@ -1294,6 +1295,12 @@ function congressTarget(kind: string, thing: string, rec: TurnRecord, cat: Catal
       return id ? GOVERNORS.findIndex((g) => g.id === id) : -1;
     }
     case 'currency': return core === 'YIELD_GOLD' ? 0 : core === 'YIELD_FAITH' ? 1 : -1;
+    // LOC_MINOR_CIV_SCIENTIFIC_TRAIT_NAME → 'scientific'
+    case 'csType': return CITY_STATE_TYPES.indexOf(after('MINOR_CIV_').replace(/_TRAIT$/, '').toLowerCase() as never);
+    // LOC_GREAT_WORK_OBJECT_SCULPTURE_NAME → 'SCULPTURE'
+    case 'gwObject': return GWO_NAMES.indexOf(after('GREAT_WORK_OBJECT_') as never);
+    // LOC_PROMOTION_CLASS_MELEE_NAME → 'MELEE'
+    case 'promoClass': return PROMO_CLASSES.indexOf(after('PROMOTION_CLASS_') as never);
     case 'seat': {
       // a PlayerType target is the player id itself
       const pid = /^\d+$/.test(thing) ? Number(thing) : -1;
