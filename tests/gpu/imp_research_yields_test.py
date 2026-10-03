@@ -19,7 +19,7 @@ Proven here:
   * the raise is the ASKING SEAT's own research — a seat without the row is
     paid nothing on the identical tile;
   * a pillaged improvement is paid none of it;
-  * the river column pays only where a river runs, and stacks with Steel;
+  * the river column is the Ziggurat's and the Chateau's alone;
   * the Lumber Mill stands on Woods, and on Rainforest once Mercantilism is in.
 """
 
@@ -67,6 +67,12 @@ ROWS = [
     # catalog does not hold.
     ("QUARRY", "tech", "PREDICTIVE_SYSTEMS", {"production": 1}),
     ("OIL_WELL", "tech", "PREDICTIVE_SYSTEMS", {"production": 1}),
+    # CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 224-230)
+    ("QUARRY", "tech", "GUNPOWDER", {"production": 1}),
+    ("MINE", "tech", "SMART_MATERIALS", {"production": 1}),
+    ("LUMBER_MILL", "tech", "CYBERNETICS", {"production": 1}),
+    ("PLANTATION", "civic", "FEUDALISM", {"food": 1}),
+    ("FISHING_BOATS", "civic", "COLONIALISM", {"production": 1}),
 ]
 
 
@@ -161,10 +167,11 @@ def test_river_column(rules, path) -> None:
     # and so does the Chateau's "+2 Gold if on a tile containing a River edge"
     zg = IMPS.index("ZIGGURAT")
     ch = IMPS.index("CHATEAU")
+    # ...and Gathering Storm deletes the Lumber Mill's (Expansion2_RemoveData.xml)
     nz = sorted(sim._imp_river_y.nonzero().tolist())
-    assert nz == sorted([[lm, 1], [zg, 4], [ch, 2]]), f"the river column reads {nz}"
-    assert float(sim._imp_river_y[lm, 1]) == 1.0 and float(sim._imp_river_y[zg, 4]) == 1.0 \
-        and float(sim._imp_river_y[ch, 2]) == 2.0, "a river amount moved"
+    assert nz == sorted([[zg, 4], [ch, 2]]), f"the river column reads {nz}"
+    assert float(sim._imp_river_y[zg, 4]) == 1.0 and float(sim._imp_river_y[ch, 2]) == 2.0, \
+        "a river amount moved"
     wet = int((sim.tile_river[B0] & ~sim.water[B0] & (sim.district[B0] < 0)
                & (sim.centre_slot_at[B0] < 0)).nonzero()[0])
     dry = dry_land(sim)
@@ -172,15 +179,13 @@ def test_river_column(rules, path) -> None:
         sim.improvement[B0, t] = lm
         sim.pillaged[B0, t] = False
     sim._eff_version += 1
-    assert add_at(sim, ROW, wet)[1] == 1.0, "no river Production on a river tile"
-    assert add_at(sim, ROW, dry)[1] == 0.0, "river Production paid off a river"
+    assert add_at(sim, ROW, wet)[1] == add_at(sim, ROW, dry)[1] == 0.0, "a Lumber Mill was paid a river"
     research(sim, ROW, "tech", "STEEL")
-    assert add_at(sim, ROW, wet)[1] == 2.0, "Steel and the river do not stack"
-    assert add_at(sim, ROW, dry)[1] == 1.0
+    assert add_at(sim, ROW, wet)[1] == add_at(sim, ROW, dry)[1] == 1.0, "Steel paid unevenly"
     sim.pillaged[B0, wet] = True
     sim._eff_version += 1
-    assert add_at(sim, ROW, wet)[1] == 0.0, "a pillaged mill was paid its river"
-    print("  3 river column OK — only on a river, stacking with Steel, dark under pillage")
+    assert add_at(sim, ROW, wet)[1] == 0.0, "a pillaged mill was paid its research"
+    print("  3 river column OK — the Ziggurat and the Chateau only; the Lumber Mill pays no river")
 
 
 def test_lumber_ground(rules, path) -> None:

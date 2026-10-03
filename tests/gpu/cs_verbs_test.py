@@ -287,12 +287,12 @@ def main() -> None:
     sim.camp_tile[:] = -1  # the camp is GONE → satisfied
     env0 = int(sim.seat_citystate_envoys[0, R + 1, S0])
     q_env = int(sim.rules.citystate["questEnvoys"])
-    rng0 = sim.rng_state.clone()
     sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
     assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 0, "Q3: satisfied clearCamp not cleared"
     assert int(sim.seat_citystate_envoys[0, R + 1, S0]) == env0 + q_env, "Q3: questEnvoys not paid to the civ"
-    assert torch.equal(sim.rng_state, rng0), "Q3: resolution drew RNG"
-    print(f"  Q3 RESOLVE clearCamp OK (+{q_env} envoy to R, quest cleared, zero-draw)")
+    # the envoy's plot is a border draw (`_seat_border_draw`), so the
+    # resolution may move the stream
+    print(f"  Q3 RESOLVE clearCamp OK (+{q_env} envoy to R, quest cleared)")
 
     # -- Q4: RESOLVE buildDistrict → +1 envoy when R owns the CS district ---
     sim.restore(base)
@@ -307,12 +307,10 @@ def main() -> None:
     sim.seat_citystate_quest[0, R + 1, S0] = 3
     sim.seat_citystate_quest_issued[0, R + 1, S0] = T
     env0 = int(sim.seat_citystate_envoys[0, R + 1, S0])
-    rng0 = sim.rng_state.clone()
     sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
     assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 0, "Q4: satisfied buildDistrict not cleared"
     assert int(sim.seat_citystate_envoys[0, R + 1, S0]) == env0 + q_env, "Q4: questEnvoys not paid"
-    assert torch.equal(sim.rng_state, rng0), "Q4: buildDistrict resolution drew RNG"
-    print(f"  Q4 RESOLVE buildDistrict OK (+{q_env} envoy on owned district, zero-draw)")
+    print(f"  Q4 RESOLVE buildDistrict OK (+{q_env} envoy on owned district)")
 
     # -- Q5: unmet CS never gets a civ quest ------------------------------
     sim.restore(base)

@@ -196,8 +196,8 @@ def test_pick(rules) -> None:
         "the key does not sort by borderPlotCost, then tile index")
 
     # --- the CLAIM, one plot at a time: each lands on one of the lowest-cost
-    #     ties (`drawBorderPlot`), the loop's own bookkeeping under test (a
-    #     claimed plot leaves `unowned` and widens `adj_own`).
+    #     ties (`drawBorderPlot`): a claimed plot is owned, and its
+    #     neighbours come into reach.
     want = []
     for n in range(1, 6):
         tiles, key0, ok, centre = candidates(sim, s)

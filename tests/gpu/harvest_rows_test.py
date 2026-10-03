@@ -64,7 +64,7 @@ def test_catalog(rules, path) -> None:
     n = int(sim._res_harvest_y.numel())
     assert n == int(sim._res_harvest_amt.numel()) == int(sim._res_harvest_imp.numel())
     live = (sim._res_harvest_y >= 0).nonzero().flatten().tolist()
-    assert len(live) == 10, f"the install lists ten harvestable rows, wire has {len(live)}"
+    assert len(live) == 11, f"the install lists eleven harvestable rows (Maize the pack's), wire has {len(live)}"
     for r in live:
         amt = int(sim._res_harvest_amt[r])
         assert amt in (20, 40), f"resource {r} harvests {amt}, not the table 20/40"
