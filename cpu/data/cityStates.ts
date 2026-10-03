@@ -288,7 +288,11 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
 
 export const ENVOY_COST = 100;
 export const INFLUENCE_PER_TURN = 3;
-export const CITY_STATE_CAPITAL_BONUS = 2;
+/** What ONE envoy pays the capital, per type: the `MINOR_CIV_*_FOR_CAPITAL`
+ *  rows' Amount (Leaders.xml) — Trade's Gold is 4, the rest 2. */
+export const CITY_STATE_CAPITAL_BONUS: Record<CityStateType, number> = {
+  scientific: 2, cultural: 2, trade: 4, industrial: 2, militaristic: 2, religious: 2,
+};
 export const CITY_STATE_DISTRICT_BONUS = 2;
 export const SUZERAIN_ENVOYS = 3;
 export const QUEST_COOLDOWN = 12;

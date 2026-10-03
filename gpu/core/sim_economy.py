@@ -6765,7 +6765,7 @@ class SimEconomy:
             _env, _acs = self._envoys_here(row), self.citystate_alive
             b_cap = b_cap.scatter_add(
                 1, self._citystate_yidx,
-                ((_env >= 1) & _acs).double() * float(self.rules.citystate["capitalBonus"]))
+                ((_env >= 1) & _acs).double() * self._citystate_capamt)
         if has_bel:
             # Founder capital incomes — perF (per N followers of the founder
             # religion worldwide, fractional: `religionFollowers`) + perC (per

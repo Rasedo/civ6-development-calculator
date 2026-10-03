@@ -318,6 +318,9 @@ class SimInit:
         citystate_yidx = rules.citystate["typeYieldIdx"]
         self._cs_type_n = len(citystate_yidx)  # CITY_STATE_TYPES' width
         self._citystate_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
+        # what one envoy pays the capital, per city-state (by its type)
+        self._citystate_capamt = torch.tensor([float(x) for x in rules.citystate["capitalBonus"]], dtype=torch.float64,
+                                              device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
         citystate_didx = rules.citystate["typeDistrictIdx"]  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] district each CS boosts at 3/6 envoys
         self._citystate_district_bonus = float(rules.citystate["districtBonus"])  # per-district amount at each of the 3-/6-envoy thresholds

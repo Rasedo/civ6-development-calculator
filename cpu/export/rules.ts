@@ -861,7 +861,7 @@ export function buildRules() {
     cityState: {
       envoyCost: ENVOY_COST,
       influencePerTurn: INFLUENCE_PER_TURN,
-      capitalBonus: CITY_STATE_CAPITAL_BONUS,
+      capitalBonus: CITY_STATE_TYPES.map((t) => CITY_STATE_CAPITAL_BONUS[t]),
       questCooldown: QUEST_COOLDOWN,
       questEnvoys: QUEST_ENVOYS,
       questCampRadius: QUEST_CAMP_RADIUS,

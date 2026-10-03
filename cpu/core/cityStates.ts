@@ -330,7 +330,7 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
   for (const cityState of state.cityStates) {
     const mine = envoysHere(state, cityState, seat);
     const key = CITY_STATE_TYPE_YIELD[cityState.type];
-    if (mine >= 1) capital[key] = (capital[key] ?? 0) + CITY_STATE_CAPITAL_BONUS;
+    if (mine >= 1) capital[key] = (capital[key] ?? 0) + CITY_STATE_CAPITAL_BONUS[cityState.type];
     const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
     for (const [bar, blds] of [[3, tier1], [6, tier2]] as const) {
       if (mine < bar) continue;
@@ -372,7 +372,7 @@ export function envoyBonusDelta(state: GameState, cityState: CityState, seat: nu
   const key = CITY_STATE_TYPE_YIELD[cityState.type];
   const now = envoysHere(state, cityState, seat);
   const next = envoysWith(state, cityState, seat, envoysOf(cityState, seat) + 1);
-  if (now < 1 && next >= 1) delta[key] += CITY_STATE_CAPITAL_BONUS;
+  if (now < 1 && next >= 1) delta[key] += CITY_STATE_CAPITAL_BONUS[cityState.type];
   // a doubled posting can cross BOTH building tiers on one envoy
   const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
   for (const [bar, blds] of [[3, tier1], [6, tier2]] as const) {
