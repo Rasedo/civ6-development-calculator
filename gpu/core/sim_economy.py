@@ -6516,12 +6516,19 @@ class SimEconomy:
                         if _fa:
                             dist_y[:, :, _fy] = dist_y[:, :, _fy] + _flive * _fa
         # CIV6 (Nan Madol): "+2 Culture" from EVERY live district on or next to
-        # shallow water — every slot, not only the ones with an adjacency yield.
+        # shallow water — every INSTANCE, counted off the tile plane as
+        # `_dist_counts` does: a city may hold several Neighborhoods, and the
+        # one-tile-per-type registry keeps only one of them (9001 t246: a
+        # second Neighborhood's completion dropped the first's +2).
         if self._suz_c_water_cul >= 0 and row < self.n_majors:
             _nm = self._suz_effect(row, self._suz_c_water_cul)
             if bool(_nm.any()):
-                _wet = self.shallow_adj.gather(1, dflat).reshape_as(dreg)
-                _cnt = (dlive & _wet).sum(dim=2).double()
+                _cs = self.city_slot_at(row)
+                _wet = ((self.district >= 0) & self.district_complete & ~self.district_pillaged
+                        & (_cs >= 0) & self.shallow_adj)
+                _per = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+                _per.scatter_add_(1, _cs.clamp(min=0), _wet.double())
+                _cnt = _per[:, sl]
                 # the CITY CENTER is a district too, and it is the one this
                 # registry never encodes — TS carries it in `city.districts`
                 # from the founding, complete on its own tile.
