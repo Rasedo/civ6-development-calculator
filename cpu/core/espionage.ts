@@ -228,6 +228,11 @@ export function missionTurns(state: GameState, unit: Unit, m: number): number {
   if (SPY_MISSIONS[m]?.offensive && goldenDedication(state, unit.seat, DED_BODYGUARD)) {
     n = Math.max(1, Math.floor((n * BODYGUARD_OP_NUM) / BODYGUARD_OP_DEN));
   }
+  // CIV6 (Machiavellianism, EFFECT_ADJUST_UNIT_SPY_OFFENSIVE_OPERATION_TIME):
+  // "Spy operations take 25% less time" — the offensive ones, after the
+  // dedication's own cut
+  const policyCut = SPY_MISSIONS[m]?.offensive ? Math.min(100, getModifiers(state, unit.seat).spyOffenseTimeCutPct) : 0;
+  if (policyCut > 0) n = Math.max(1, Math.floor((n * (100 - policyCut)) / 100));
   // CIV6 (Linguist): "Time to complete all missions reduced by 25%" — every
   // mission, the defensive post included, and after the dedication's own cut.
   const cut = promoValue(unit, 'SPY_OP_SPEED');

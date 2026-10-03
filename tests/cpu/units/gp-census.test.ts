@@ -450,11 +450,11 @@ describe('the route clauses', () => {
     const theirs = secondCity(state, 1);
     state.seats[1].tradeRoutes = [{ from: theirs.id, toSeat: 0, toSeatCity: mine.id }];
     const hub = district(state, 'COMMERCIAL_HUB');
-    const in0 = cityTradeYields(state, mine, 0).gold;
-    const out0 = cityTradeYields(state, theirs, 0).gold;
+    const in0 = cityTradeYields(state, mine).gold;
+    const out0 = cityTradeYields(state, theirs).gold;
     expect(activateGreatPerson(state, stand(state, 'GP_ZHANG_QIAN', hub))).toBe(true);
-    expect(cityTradeYields(state, mine, 0).gold).toBe(in0 + 2);
-    expect(cityTradeYields(state, theirs, 0).gold).toBe(out0 + 2);
+    expect(cityTradeYields(state, mine).gold).toBe(in0 + 2);
+    expect(cityTradeYields(state, theirs).gold).toBe(out0 + 2);
   });
 
   it('Raja Todar Mal: +0.5 Gold per specialty district at a domestic destination; Rockefeller +2 per strategic kind improved there', () => {
@@ -464,15 +464,15 @@ describe('the route clauses', () => {
     const b = secondCity(state, 0);
     district(state, 'CAMPUS', b);
     seat.tradeRoutes = [{ from: a.id, to: b.id }];
-    const g0 = cityTradeYields(state, a, 0).gold;
+    const g0 = cityTradeYields(state, a).gold;
     addSeatPerm(seat, GP_ABILITY.GP_RAJA_TODAR_MAL.perm!);
-    expect(cityTradeYields(state, a, 0).gold).toBe(g0 + 0.5);
+    expect(cityTradeYields(state, a).gold).toBe(g0 + 0.5);
     addSeatPerm(seat, GP_ABILITY.GP_JOHN_ROCKEFELLER.perm!);
-    expect(cityTradeYields(state, a, 0).gold).toBe(g0 + 0.5);
+    expect(cityTradeYields(state, a).gold).toBe(g0 + 0.5);
     const iron = state.map.tiles[ownBare(state, 0, b)];
     Object.assign(iron, { resource: 'IRON', improvement: 'MINE' });
     seat.research.techs.push('BRONZE_WORKING');
-    expect(cityTradeYields(state, a, 0).gold).toBe(g0 + 0.5 + 2);
+    expect(cityTradeYields(state, a).gold).toBe(g0 + 0.5 + 2);
   });
 
   it('Ibn Fadlan: +2 Faith on every route to a city-state; Melitta Bentz the route Tourism', () => {
@@ -485,10 +485,10 @@ describe('the route clauses', () => {
     const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', spot.index);
     setMet(cs, 0);
     seat.tradeRoutes = [{ from: city.id, toCs: cs.id }];
-    const f0 = cityTradeYields(state, city, 0).faith;
+    const f0 = cityTradeYields(state, city).faith;
     const hub = district(state, 'COMMERCIAL_HUB');
     expect(activateGreatPerson(state, stand(state, 'GP_IBN_FADLAN', hub))).toBe(true);
-    expect(cityTradeYields(state, city, 0).faith).toBe(f0 + 2);
+    expect(cityTradeYields(state, city).faith).toBe(f0 + 2);
     expect(activateGreatPerson(state, stand(state, 'GP_MELITTA_BENTZ', hub))).toBe(true);
     expect(gpPermOf(seat, 'tourismRouteBonus')).toBe(25);
     expect(gpPermOf(seat, 'tradeCapacity')).toBe(2);

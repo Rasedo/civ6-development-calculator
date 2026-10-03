@@ -4529,7 +4529,7 @@ class SimMasks:
         ok = ok & self._afford(self.civ_treasury[:, row].unsqueeze(1), price)
         # the BANK: the new chassis' charge, and nothing when both rungs ask
         # for the same resource
-        slot, cost = self._type_res_slot[nc], self._type_res_cost[nc]
+        slot, cost = self._type_res_slot[nc], self._upgrade_res_cost(row, self._type_res_cost[nc])
         same = self._type_res_slot[utype.clamp(min=0)] == slot
         want = (slot >= 0) & (cost > 0) & ~same
         have = self.civ_stockpile[:, row].gather(1, slot.clamp(min=0).reshape(B, -1)) \

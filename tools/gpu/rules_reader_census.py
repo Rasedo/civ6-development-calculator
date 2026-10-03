@@ -88,6 +88,8 @@ ALLOWLIST: dict[str, str] = {
     "defenseCS": "TS reads it in improvementDefenseCS (cpu/data/improvements.ts:1500), called "
                  "from cpu/core/combat.ts:108 and :655; the GPU reads the wire's `defCs` "
                  "(gpu/core/sim_init.py:1855)",
+    "noLegacyCard": "TS reads it where the legacy cards are minted (cpu/data/policies.ts:1343): "
+                    "the card a government leaves behind is a POLICIES row, which both engines read",
     "worshipBuilding": "TS reads it in worshipBuildingOf (cpu/data/religion.ts:629), called from "
                        "cpu/core/rules.ts:888, cpu/core/game.ts:647 and cpu/core/buyCandidates.ts:349",
     "gpClasses": "TS reads it in gpClassesOf (cpu/data/projects.ts:468), called from "

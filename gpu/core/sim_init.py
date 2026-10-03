@@ -2417,11 +2417,31 @@ class SimInit:
             self._gov_rplun = torch.tensor([float(r["routePlunderPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_pillm = torch.tensor([float(r["pillageMult"]) for r in _govs], dtype=dtype, device=device)
             self._gov_faith_units = torch.tensor([bool(r["faithBuyLandUnits"]) for r in _govs], dtype=torch.bool, device=device)
-            self._gov_rgold = torch.tensor([float(r["routeGold"]) for r in _govs], dtype=dtype, device=device)
+            # the route channels, six yields each: every route, a route to another
+            # civilization's city, a route to a city-state
+            self._gov_ryield = torch.tensor([[float(x) for x in r["routeYield"]] for r in _govs], dtype=torch.float64, device=device)
+            self._gov_iryield = torch.tensor([[float(x) for x in r["intlRouteYield"]] for r in _govs], dtype=torch.float64, device=device)
+            self._gov_csryield = torch.tensor([[float(x) for x in r["csRouteYield"]] for r in _govs], dtype=torch.float64, device=device)
+            self._gov_seatsuz = torch.tensor([[float(x) for x in r["seatYieldPerSuzerain"]] for r in _govs], dtype=torch.float64, device=device)
+            self._gov_seatenv = torch.tensor([[float(x) for x in r["seatYieldPerEnvoy"]] for r in _govs], dtype=torch.float64, device=device)
+            self._gov_ysuz = torch.tensor([[float(x) for x in r["yieldPctPerSuzerain"]] for r in _govs], dtype=torch.float64, device=device)
+            self._gov_yspec = torch.tensor([[float(x) for x in r["yieldPerSpecialty"]] for r in _govs], dtype=torch.float64, device=device)
+            # Civil Prestige: [min titles, amenities, housing], min -1 = no row
+            self._gov_govtit = torch.tensor([[float(x) for x in r["governorTitles"]] for r in _govs], dtype=torch.float64, device=device)
+            # the per-building rows, kept as lists: (building, percent), (building,
+            # six yields), (percent, building) for the Space Race clause
+            self._gov_bprod_rows = [[(int(x[0]), float(x[1])) for x in r["buildingProdPct"] if int(x[0]) >= 0] for r in _govs]
+            self._gov_byield_rows = [[(int(x[0]), [float(y) for y in x[1:]]) for x in r["buildingYields"] if int(x[0]) >= 0] for r in _govs]
+            self._gov_spacep_rows = [[(float(x[0]), int(x[1])) for x in r["spaceProjectProd"] if int(x[1]) >= 0] for r in _govs]
+            # each great-work object type's tourism factor (x100 on the wire)
+            self._gov_gwscale = torch.tensor([[float(x) / 100.0 for x in r["gwTourismScale"]] for r in _govs], dtype=torch.float64, device=device)
+            self._gov_stockps = torch.tensor([[float(x) for x in r["stockpilePerSource"]] for r in _govs], dtype=torch.float64, device=device)
+            self._gov_upgold = torch.tensor([float(r["upgradeGoldDiscountPct"]) for r in _govs], dtype=torch.float64, device=device)
+            self._gov_upres = torch.tensor([float(r["upgradeResourceDiscountPct"]) for r in _govs], dtype=torch.float64, device=device)
+            self._gov_spycut = torch.tensor([float(r["spyOffenseTimeCutPct"]) for r in _govs], dtype=torch.float64, device=device)
             self._gov_infl = torch.tensor([float(r["influencePerTurn"]) for r in _govs], dtype=dtype, device=device)
             self._gov_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _govs], dtype=torch.bool, device=device)
             self._gov_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _govs], dtype=torch.bool, device=device)
-            self._gov_culsuz = torch.tensor([float(r["culturePerSuzerain"]) for r in _govs], dtype=dtype, device=device)
             self._gov_gpp = torch.tensor(
                 [[float(x) for x in r["gpp"]] for r in _govs],
                 dtype=torch.float64, device=device)
@@ -2454,10 +2474,16 @@ class SimInit:
                 + self._gov_wmdup.abs().sum()
                 + self._gov_vbarb.abs().sum() + self._gov_cdef.abs().sum()
                 + self._gov_crng.abs().sum() + (self._gov_rxp - 1).abs().sum()
-                + self._gov_rplun.abs().sum() + self._gov_rgold.abs().sum()
+                + self._gov_rplun.abs().sum() + self._gov_ryield.abs().sum() + self._gov_iryield.abs().sum()
+                + self._gov_csryield.abs().sum() + self._gov_seatsuz.abs().sum() + self._gov_seatenv.abs().sum()
+                + self._gov_ysuz.abs().sum() + self._gov_yspec.abs().sum() + (self._gov_govtit[:, 0] >= 0).sum()
+                + sum(len(x) for x in self._gov_bprod_rows) + sum(len(x) for x in self._gov_byield_rows)
+                + sum(len(x) for x in self._gov_spacep_rows) + (self._gov_gwscale - 1).abs().sum()
+                + self._gov_stockps.abs().sum() + self._gov_upgold.abs().sum() + self._gov_upres.abs().sum()
+                + self._gov_spycut.abs().sum()
                 + (self._gov_pillm - 1).abs().sum()
                 + self._gov_infl.abs().sum() + self._gov_envoy1.sum()
-                + self._gov_culsuz.abs().sum() + self._gov_gpp.abs().sum()
+                + self._gov_gpp.abs().sum()
                 + (self._gov_ucs_cs.abs() * ((self._gov_ucs_mask != 0) | self._gov_ucs_allc).double()).sum()
                 + self._gov_xppct.abs().sum()
                 + self._gov_wwcut.abs().sum() + (self._gov_gppmult - 1).abs().sum()
@@ -2513,12 +2539,32 @@ class SimInit:
             self._pol_rxp = torch.tensor([float(r["reconXpMult"]) for r in _pols], dtype=dtype, device=device)
             self._pol_rplun = torch.tensor([float(r["routePlunderPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_pillm = torch.tensor([float(r["pillageMult"]) for r in _pols], dtype=dtype, device=device)
-            self._pol_rgold = torch.tensor([float(r["routeGold"]) for r in _pols], dtype=dtype, device=device)
+            # the route channels, six yields each: every route, a route to another
+            # civilization's city, a route to a city-state
+            self._pol_ryield = torch.tensor([[float(x) for x in r["routeYield"]] for r in _pols], dtype=torch.float64, device=device)
+            self._pol_iryield = torch.tensor([[float(x) for x in r["intlRouteYield"]] for r in _pols], dtype=torch.float64, device=device)
+            self._pol_csryield = torch.tensor([[float(x) for x in r["csRouteYield"]] for r in _pols], dtype=torch.float64, device=device)
+            self._pol_seatsuz = torch.tensor([[float(x) for x in r["seatYieldPerSuzerain"]] for r in _pols], dtype=torch.float64, device=device)
+            self._pol_seatenv = torch.tensor([[float(x) for x in r["seatYieldPerEnvoy"]] for r in _pols], dtype=torch.float64, device=device)
+            self._pol_ysuz = torch.tensor([[float(x) for x in r["yieldPctPerSuzerain"]] for r in _pols], dtype=torch.float64, device=device)
+            self._pol_yspec = torch.tensor([[float(x) for x in r["yieldPerSpecialty"]] for r in _pols], dtype=torch.float64, device=device)
+            # Civil Prestige: [min titles, amenities, housing], min -1 = no row
+            self._pol_govtit = torch.tensor([[float(x) for x in r["governorTitles"]] for r in _pols], dtype=torch.float64, device=device)
+            # the per-building rows, kept as lists: (building, percent), (building,
+            # six yields), (percent, building) for the Space Race clause
+            self._pol_bprod_rows = [[(int(x[0]), float(x[1])) for x in r["buildingProdPct"] if int(x[0]) >= 0] for r in _pols]
+            self._pol_byield_rows = [[(int(x[0]), [float(y) for y in x[1:]]) for x in r["buildingYields"] if int(x[0]) >= 0] for r in _pols]
+            self._pol_spacep_rows = [[(float(x[0]), int(x[1])) for x in r["spaceProjectProd"] if int(x[1]) >= 0] for r in _pols]
+            # each great-work object type's tourism factor (x100 on the wire)
+            self._pol_gwscale = torch.tensor([[float(x) / 100.0 for x in r["gwTourismScale"]] for r in _pols], dtype=torch.float64, device=device)
+            self._pol_stockps = torch.tensor([[float(x) for x in r["stockpilePerSource"]] for r in _pols], dtype=torch.float64, device=device)
+            self._pol_upgold = torch.tensor([float(r["upgradeGoldDiscountPct"]) for r in _pols], dtype=torch.float64, device=device)
+            self._pol_upres = torch.tensor([float(r["upgradeResourceDiscountPct"]) for r in _pols], dtype=torch.float64, device=device)
+            self._pol_spycut = torch.tensor([float(r["spyOffenseTimeCutPct"]) for r in _pols], dtype=torch.float64, device=device)
             self._pol_infl = torch.tensor([float(r["influencePerTurn"]) for r in _pols], dtype=dtype, device=device)
             self._pol_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _pols], dtype=torch.bool, device=device)
             self._pol_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _pols], dtype=torch.bool, device=device)
             self._pol_tourroute = torch.tensor([int(r["tourismRouteBonus"]) for r in _pols], dtype=torch.long, device=device)
-            self._pol_culsuz = torch.tensor([float(r["culturePerSuzerain"]) for r in _pols], dtype=dtype, device=device)
             self._pol_gpp = torch.tensor(
                 [[float(x) for x in r["gpp"]] for r in _pols],
                 dtype=torch.float64, device=device)
@@ -2594,10 +2640,16 @@ class SimInit:
                 + self._pol_wmdup.abs().sum()
                 + self._pol_vbarb.abs().sum() + self._pol_cdef.abs().sum()
                 + self._pol_crng.abs().sum() + (self._pol_rxp - 1).abs().sum()
-                + self._pol_rplun.abs().sum() + self._pol_rgold.abs().sum()
+                + self._pol_rplun.abs().sum() + self._pol_ryield.abs().sum() + self._pol_iryield.abs().sum()
+                + self._pol_csryield.abs().sum() + self._pol_seatsuz.abs().sum() + self._pol_seatenv.abs().sum()
+                + self._pol_ysuz.abs().sum() + self._pol_yspec.abs().sum() + (self._pol_govtit[:, 0] >= 0).sum()
+                + sum(len(x) for x in self._pol_bprod_rows) + sum(len(x) for x in self._pol_byield_rows)
+                + sum(len(x) for x in self._pol_spacep_rows) + (self._pol_gwscale - 1).abs().sum()
+                + self._pol_stockps.abs().sum() + self._pol_upgold.abs().sum() + self._pol_upres.abs().sum()
+                + self._pol_spycut.abs().sum()
                 + (self._pol_pillm - 1).abs().sum()
                 + self._pol_infl.abs().sum() + self._pol_envoy1.sum()
-                + self._pol_culsuz.abs().sum() + self._pol_gpp.abs().sum()
+                + self._pol_gpp.abs().sum()
                 + (self._pol_ucs_cs.abs() * ((self._pol_ucs_mask != 0) | self._pol_ucs_allc).double()).sum()
                 + self._pol_xppct.abs().sum()
                 + self._pol_wwcut.abs().sum() + (self._pol_gppmult - 1).abs().sum()

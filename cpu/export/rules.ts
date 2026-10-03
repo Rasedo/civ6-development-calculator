@@ -30,7 +30,7 @@ import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DI
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, COLONIZE_PRESSURE_EXTRA, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, GWO_COUNT, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
+import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
 import { CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS, TRADER_GUARD_RADIUS, TRADE_WALK_EXPIRY_RAIL, ROUTE_PATH_WATER, ROUTE_PATH_RAIL, ROUTE_PATH_PORTAL, ROUTE_PATH_MAX_RATIO, ROUTE_PATH_DENOM } from '../core/trade';
 import { TRADE_BASE_RANGE, TRADE_LAND_REFUEL, TRADE_WATER_REFUEL, TRADE_DEST_REFUEL, TRADE_COST_STEP, TRADE_COST_SWITCH, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_WATER, TRADE_COST_LAND, TRADE_EMBARK_DISTRICTS, TRADE_DANGER_FEATURES } from '../core/tradePath';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
@@ -204,12 +204,38 @@ const effectRow = (fx: PolicyEffects) => ({
   routePlunderPct: fx.routePlunderPct ?? 0,
   pillageMult: fx.pillageMult ?? 1,
   faithBuyLandUnits: fx.faithBuyLandUnits ? 1 : 0,
-  routeGold: fx.routeGold ?? 0,
+  // the route channels, six yields each: every route, a route to another
+  // civilization's city, a route to a city-state
+  routeYield: YIELD_KEYS.map((k) => fx.routeYield?.[k] ?? 0),
+  intlRouteYield: YIELD_KEYS.map((k) => fx.intlRouteYield?.[k] ?? 0),
+  csRouteYield: YIELD_KEYS.map((k) => fx.csRouteYield?.[k] ?? 0),
+  // the seat's own yields per suzerainty and per envoy placed
+  seatYieldPerSuzerain: YIELD_KEYS.map((k) => fx.seatYieldPerSuzerain?.[k] ?? 0),
+  seatYieldPerEnvoy: YIELD_KEYS.map((k) => fx.seatYieldPerEnvoy?.[k] ?? 0),
+  // [min titles, amenities, housing]; min -1 = no row
+  governorTitles: fx.governorTitles
+    ? [fx.governorTitles.min, fx.governorTitles.amenities, fx.governorTitles.housing]
+    : [-1, 0, 0],
+  // [building index, percent] per named building
+  buildingProdPct: Object.entries(fx.buildingProdPct ?? {}).map(([b, n]) => [buildingIdx.get(b) ?? -3, n ?? 0]),
+  // [building index, the six yields] per named building
+  buildingYields: Object.entries(fx.buildingYields ?? {}).map(([b, y]) =>
+    [buildingIdx.get(b) ?? -3, ...YIELD_KEYS.map((k) => y?.[k] ?? 0)]),
+  // each great-work object type's tourism factor, x100, by object index
+  gwTourismScale: GWO_NAMES.map((o) => Math.round((fx.gwTourismScale?.[o] ?? 1) * 100)),
+  // extra units per improved source, by STRATEGIC_IDS slot
+  stockpilePerSource: STRATEGIC_IDS.map((r) => fx.stockpilePerSource?.[r] ?? 0),
+  upgradeGoldDiscountPct: fx.upgradeGoldDiscountPct ?? 0,
+  upgradeResourceDiscountPct: fx.upgradeResourceDiscountPct ?? 0,
+  // [percent, building index] per building that opens the clause
+  spaceProjectProd: (fx.spaceProjectProd?.buildings ?? []).map((b) => [fx.spaceProjectProd!.pct, buildingIdx.get(b) ?? -3]),
+  spyOffenseTimeCutPct: fx.spyOffenseTimeCutPct ?? 0,
+  yieldPerSpecialty: YIELD_KEYS.map((k) => fx.yieldPerSpecialty?.[k] ?? 0),
   influencePerTurn: fx.influencePerTurn ?? 0,
   firstEnvoyDouble: fx.firstEnvoyDouble ? 1 : 0,
   envoyDoubleDiffGov: fx.envoyDoubleDiffGov ? 1 : 0,
   tourismRouteBonus: fx.tourismRouteBonus ?? 0,
-  culturePerSuzerain: fx.culturePerSuzerain ?? 0,
+  yieldPctPerSuzerain: YIELD_KEYS.map((k) => fx.yieldPctPerSuzerain?.[k] ?? 0),
   // [promotion-class mask (CLASS_BIT bits), allCombat, cs]
   unitCombatCS: fx.unitCombatCS
     ? [(fx.unitCombatCS.classes ?? []).reduce((m, c) => m | (CLASS_BIT[c] ?? 0), 0),

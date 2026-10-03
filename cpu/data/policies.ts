@@ -19,6 +19,7 @@
 import type { DistrictId, GreatPersonClass, ImprovementId, Yields } from '../core/types';
 import type { UnitClass } from './units';
 import type { PromoClass } from './promotions';
+import type { GreatWorkObject } from './greatWorks';
 import { xml, type SrcMap } from './provenance';
 
 export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
@@ -97,8 +98,51 @@ export interface PolicyEffects {
   routePlunderPct?: number;
   /** CIV6 (Theocracy): "Can buy land combat units with Faith." */
   faithBuyLandUnits?: boolean;
-  /** gold added to every trade route this seat runs */
-  routeGold?: number;
+  /** yields added to every trade route this seat runs, at its origin
+   *  (EFFECT_ADJUST_TRADE_ROUTE_YIELD) */
+  routeYield?: Partial<Yields>;
+  /** yields added to each INTERNATIONAL route this seat runs to another
+   *  civilization's city (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL) */
+  intlRouteYield?: Partial<Yields>;
+  /** yields added to each route this seat runs to a city-state
+   *  (EFFECT_ADJUST_CITY_STATE_TRADE_ROUTE_FLAT_YIELD) */
+  csRouteYield?: Partial<Yields>;
+  /** the seat's own yields per city-state it is suzerain of — paid to the
+   *  player, not to a city (EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_TRIBUTARY) */
+  seatYieldPerSuzerain?: Partial<Yields>;
+  /** the seat's own yields per envoy it has placed at city-states
+   *  (EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN) */
+  seatYieldPerEnvoy?: Partial<Yields>;
+  /** CIV6 (Civil Prestige): amenities and housing in a city whose ESTABLISHED
+   *  governor holds at least `min` titles, its first included
+   *  (REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES) */
+  governorTitles?: { min: number; amenities: number; housing: number };
+  /** percent production toward the named buildings
+   *  (EFFECT_ADJUST_BUILDING_PRODUCTION) */
+  buildingProdPct?: Partial<Record<string, number>>;
+  /** yields the named buildings pay on top in every city
+   *  (EFFECT_ADJUST_BUILDING_YIELD_CHANGE) */
+  buildingYields?: Partial<Record<string, Partial<Yields>>>;
+  /** the tourism of each great-work OBJECT type, scaled — the install's
+   *  ScalingFactor over 100 (EFFECT_ADJUST_CITY_TOURISM) */
+  gwTourismScale?: Partial<Record<GreatWorkObject, number>>;
+  /** extra units a turn from each improved source of the named strategic
+   *  resource (EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER) */
+  stockpilePerSource?: Partial<Record<string, number>>;
+  /** percent off a unit upgrade's gold, and off its resources
+   *  (EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT /
+   *  EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_RESOURCE_COST_DISCOUNT) */
+  upgradeGoldDiscountPct?: number;
+  upgradeResourceDiscountPct?: number;
+  /** percent production toward Space Race projects in a city holding one of
+   *  the named buildings (EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION) */
+  spaceProjectProd?: { pct: number; buildings: string[] };
+  /** percent off the time of every OFFENSIVE spy operation
+   *  (EFFECT_ADJUST_UNIT_SPY_OFFENSIVE_OPERATION_TIME) */
+  spyOffenseTimeCutPct?: number;
+  /** yields per completed SPECIALTY district in every city
+   *  (EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT) */
+  yieldPerSpecialty?: Partial<Yields>;
   /** influence points per turn toward the next envoy */
   influencePerTurn?: number;
   /** the FIRST envoy sent to each city-state counts as two */
@@ -109,8 +153,9 @@ export interface PolicyEffects {
   /** extra international tourism percent toward a civ this seat has a trade
    *  route with, SUMMED with the standing route bonus */
   tourismRouteBonus?: number;
-  /** culture multiplier added per city-state this seat is suzerain of */
-  culturePerSuzerain?: number;
+  /** the fraction each yield gains per city-state this seat is suzerain of
+   *  (EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY) */
+  yieldPctPerSuzerain?: Partial<Yields>;
   /** flat Combat Strength by PROMOTION class (`UNIT_PROMO_CLASS`); `all`
    *  covers every combat unit instead */
   unitCombatCS?: { classes?: PromoClass[]; all?: boolean; cs: number };
@@ -435,7 +480,7 @@ const POLICY_SRC: Record<string, SrcMap> = {
   CARAVANSARIES: {
     kind: xml('Policies', 'PolicyType=POLICY_CARAVANSARIES', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
     obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_CARAVANSARIES', 'ObsoletePolicy')] },
-    'effects.routeGold': xml('ModifierArguments', 'ModifierId=CARAVANSARIES_TRADEROUTEGOLD&Name=Amount', 'Value'),
+    'effects.routeYield.gold': xml('ModifierArguments', 'ModifierId=CARAVANSARIES_TRADEROUTEGOLD&Name=Amount', 'Value'),
   },
   CORVEE: {
     kind: xml('Policies', 'PolicyType=POLICY_CORVEE', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
@@ -483,7 +528,7 @@ const POLICY_SRC: Record<string, SrcMap> = {
   },
   COLLECTIVE_ACTIVISM: {
     kind: xml('Policies', 'PolicyType=POLICY_COLLECTIVE_ACTIVISM', 'GovernmentSlotType', { expect: 'SLOT_DIPLOMATIC' }),
-    'effects.culturePerSuzerain': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=COLLECTIVEACTIVISM_CULTUREPERTRIBUTARY&Name=Amount', 'Value')] },
+    'effects.yieldPctPerSuzerain.culture': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=COLLECTIVEACTIVISM_CULTUREPERTRIBUTARY&Name=Amount', 'Value')] },
   },
   ONLINE_COMMUNITIES: {
     kind: xml('Policies', 'PolicyType=POLICY_ONLINE_COMMUNITIES', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
@@ -604,6 +649,102 @@ const POLICY_SRC: Record<string, SrcMap> = {
     'effects.yieldMult.science': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=DISINFORMATION_CAMPAIGN_SCIENCE_REDUCTION&Name=Amount', 'Value')] },
     'effects.yieldMult.culture': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=DISINFORMATION_CAMPAIGN_CULTURE_REDUCTION&Name=Amount', 'Value')] },
   },
+  CIVIL_PRESTIGE: {
+    kind: xml('Policies', 'PolicyType=POLICY_CIVIL_PRESTIGE', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    'effects.governorTitles.min': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_2_TITLE_GOVERNOR&Name=Amount', 'Value'),
+    'effects.governorTitles.amenities': xml('ModifierArguments', 'ModifierId=CIVILPRESTIGE_GOVAMENITY&Name=Amount', 'Value'),
+    'effects.governorTitles.housing': xml('ModifierArguments', 'ModifierId=CIVILPRESTIGE_GOVHOUSING&Name=Amount', 'Value'),
+  },
+  RAJ: {
+    kind: xml('Policies', 'PolicyType=POLICY_RAJ', 'GovernmentSlotType', { expect: 'SLOT_DIPLOMATIC' }),
+    'effects.seatYieldPerSuzerain.gold': xml('ModifierArguments', 'ModifierId=RAJ_GOLDPERTRIBUTARY&Name=Amount', 'Value'),
+    'effects.seatYieldPerSuzerain.faith': xml('ModifierArguments', 'ModifierId=RAJ_FAITHPERTRIBUTARY&Name=Amount', 'Value'),
+    'effects.seatYieldPerSuzerain.science': xml('ModifierArguments', 'ModifierId=RAJ_SCIENCEPERTRIBUTARY&Name=Amount', 'Value'),
+    'effects.seatYieldPerSuzerain.culture': xml('ModifierArguments', 'ModifierId=RAJ_CULTUREPERTRIBUTARY&Name=Amount', 'Value'),
+    'effects.csRouteYield.gold': xml('ModifierArguments', 'ModifierId=RAJ_CITY_TRADE_ROUTE_GOLD&Name=Amount', 'Value'),
+  },
+  SATELLITE_BROADCASTS: {
+    kind: xml('Policies', 'PolicyType=POLICY_SATELLITE_BROADCASTS', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    'effects.gwTourismScale.MUSIC': { derived: 'ScalingFactor/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=SATELLITEBROADCASTS_MUSICTOURISM&Name=ScalingFactor', 'Value')] },
+  },
+  MERCHANT_CONFEDERATION: {
+    kind: xml('Policies', 'PolicyType=POLICY_MERCHANT_CONFEDERATION', 'GovernmentSlotType', { expect: 'SLOT_DIPLOMATIC' }),
+    'effects.seatYieldPerEnvoy.gold': xml('ModifierArguments', 'ModifierId=MERCHANTCONFEDERATION_INFLUENCETOKENGOLD&Name=Amount', 'Value'),
+  },
+  FORCE_MODERNIZATION: {
+    kind: xml('Policies', 'PolicyType=POLICY_FORCE_MODERNIZATION', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.upgradeGoldDiscountPct': xml('ModifierArguments', 'ModifierId=PROFESSIONAL_ARMY_UNITUPGRADEDISCOUNT&Name=Amount', 'Value'),
+    'effects.upgradeResourceDiscountPct': xml('ModifierArguments', 'ModifierId=PROFESSIONAL_ARMY_UPGRADE_RESOURCE_DISCOUNT&Name=Amount', 'Value'),
+  },
+  INTERNATIONAL_SPACE_AGENCY: {
+    kind: xml('Policies', 'PolicyType=POLICY_INTERNATIONAL_SPACE_AGENCY', 'GovernmentSlotType', { expect: 'SLOT_DIPLOMATIC' }),
+    'effects.yieldPctPerSuzerain.science': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=INTERNATIONALSPACEAGENCY_SCIENCEPERTRIBUTARY&Name=Amount', 'Value')] },
+  },
+  ECOMMERCE: {
+    kind: xml('Policies', 'PolicyType=POLICY_ECOMMERCE', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    'effects.routeYield.production': xml('ModifierArguments', 'ModifierId=ECOMMERCE_TRADEROUTEPRODUCTION&Name=Amount', 'Value'),
+    'effects.routeYield.gold': xml('ModifierArguments', 'ModifierId=ECOMMERCE_TRADEROUTEGOLD&Name=Amount', 'Value'),
+  },
+  LIMES: {
+    kind: xml('Policies', 'PolicyType=POLICY_LIMES', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_LIMES', 'ObsoletePolicy'), xml('Policies', 'PolicyType=POLICY_LIGHTNING_WARFARE', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' })] },
+    'effects.buildingProdPct.ANCIENT_WALLS': xml('ModifierArguments', 'ModifierId=LIMES_WALLSPRODUCTION&Name=Amount', 'Value'),
+    'effects.buildingProdPct.MEDIEVAL_WALLS': xml('ModifierArguments', 'ModifierId=LIMES_CASTLEPRODUCTION&Name=Amount', 'Value'),
+    'effects.buildingProdPct.RENAISSANCE_WALLS': xml('ModifierArguments', 'ModifierId=LIMES_STARFORTPRODUCTION&Name=Amount', 'Value'),
+  },
+  HERITAGE_TOURISM: {
+    kind: xml('Policies', 'PolicyType=POLICY_HERITAGE_TOURISM', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    'effects.gwTourismScale.SCULPTURE': { derived: 'ScalingFactor/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=HERITAGE_SCULPTURETOURISM&Name=ScalingFactor', 'Value')] },
+    'effects.gwTourismScale.PORTRAIT': { derived: 'ScalingFactor/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=HERITAGE_PORTRAITTOURISM&Name=ScalingFactor', 'Value')] },
+    'effects.gwTourismScale.LANDSCAPE': { derived: 'ScalingFactor/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=HERITAGE_LANDSCAPETOURISM&Name=ScalingFactor', 'Value')] },
+    'effects.gwTourismScale.RELIGIOUS': { derived: 'ScalingFactor/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=HERITAGE_RELIGIOUSTOURISM&Name=ScalingFactor', 'Value')] },
+    'effects.gwTourismScale.ARTIFACT': { derived: 'ScalingFactor/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=HERITAGE_ARTIFACTTOURISM&Name=ScalingFactor', 'Value')] },
+  },
+  EXPROPRIATION: {
+    kind: xml('Policies', 'PolicyType=POLICY_EXPROPRIATION', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    'effects.prodBoost.classes': { derived: 'the UnitType argument of the install modifier this card attaches, as an engine class', inputs: [xml('ModifierArguments', 'ModifierId=EXPROPRIATION_SETTLERPRODUCTION&Name=UnitType', 'Value', { expect: 'UNIT_SETTLER' })] },
+    'effects.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=EXPROPRIATION_SETTLERPRODUCTION&Name=Amount', 'Value')] },
+    'effects.prodBoost.target': { derived: 'unit - the install attaches a unit-production modifier', inputs: [xml('Modifiers', 'ModifierId=EXPROPRIATION_SETTLERPRODUCTION', 'ModifierType', { expect: 'MODIFIER_PLAYER_UNITS_ADJUST_UNIT_PRODUCTION' })] },
+    'effects.prodBoost.eraMax': { derived: '-1: every era - the modifier names one unit type and no era', inputs: [xml('ModifierArguments', 'ModifierId=EXPROPRIATION_SETTLERPRODUCTION&Name=UnitType', 'Value')] },
+    'effects.tilePurchaseMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=EXPROPRIATION_PLOTPURCHASECOST&Name=Amount', 'Value')] },
+  },
+  MILITARY_RESEARCH: {
+    kind: xml('Policies', 'PolicyType=POLICY_MILITARY_RESEARCH', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_MILITARY_RESEARCH', 'ObsoletePolicy'), xml('Policies', 'PolicyType=POLICY_INTEGRATED_SPACE_CELL', 'PrereqCivic', { expect: 'CIVIC_SPACE_RACE' })] },
+    'effects.buildingYields.MILITARY_ACADEMY.science': xml('ModifierArguments', 'ModifierId=MILITARYRESEARCH_MILITARY_ACADEMY_SCIENCE_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.SEAPORT.science': xml('ModifierArguments', 'ModifierId=MILITARYRESEARCH_SEAPORT_SCIENCE_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.RENAISSANCE_WALLS.science': xml('ModifierArguments', 'ModifierId=MILITARYRESEARCH_RENAISSANCE_WALLS_SCIENCE_MODIFIER&Name=Amount', 'Value'),
+  },
+  EQUESTRIAN_ORDERS: {
+    kind: xml('Policies', 'PolicyType=POLICY_EQUESTRIAN_ORDERS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.stockpilePerSource.HORSES': xml('ModifierArguments', 'ModifierId=EQUESTRIAN_ORDERS_ADDITIONAL_HORSES_EXTRACTION&Name=Amount', 'Value'),
+    'effects.stockpilePerSource.IRON': xml('ModifierArguments', 'ModifierId=EQUESTRIAN_ORDERS_ADDITIONAL_IRON_EXTRACTION&Name=Amount', 'Value'),
+  },
+  TRIANGULAR_TRADE: {
+    kind: xml('Policies', 'PolicyType=POLICY_TRIANGULAR_TRADE', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_TRIANGULAR_TRADE', 'ObsoletePolicy'), xml('Policies', 'PolicyType=POLICY_ECOMMERCE', 'PrereqCivic', { expect: 'CIVIC_GLOBALIZATION' })] },
+    'effects.routeYield.gold': xml('ModifierArguments', 'ModifierId=TRIANGULARTRADE_TRADEROUTEGOLD&Name=Amount', 'Value'),
+    'effects.routeYield.faith': xml('ModifierArguments', 'ModifierId=TRIANGULARTRADE_TRADEROUTEFAITH&Name=Amount', 'Value'),
+  },
+  INTEGRATED_SPACE_CELL: {
+    kind: xml('Policies', 'PolicyType=POLICY_INTEGRATED_SPACE_CELL', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.spaceProjectProd.pct': xml('ModifierArguments', 'ModifierId=INTEGRATEDSPACECELL_SPACE_RACE_PROJECTS_PRODUCTION&Name=Amount', 'Value'),
+    'effects.spaceProjectProd.buildings': { derived: 'the BuildingType of each requirement in the modifier subject set CITY_HAS_MILITARY_ACADEMY_OR_SEAPORT (TEST_ANY)', inputs: [xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_MILITARY_ACADEMY&Name=BuildingType', 'Value', { expect: 'BUILDING_MILITARY_ACADEMY' }), xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_SEAPORT&Name=BuildingType', 'Value', { expect: 'BUILDING_SEAPORT' })] },
+  },
+  TRADE_CONFEDERATION: {
+    kind: xml('Policies', 'PolicyType=POLICY_TRADE_CONFEDERATION', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_TRADE_CONFEDERATION', 'ObsoletePolicy'), xml('Policies', 'PolicyType=POLICY_MARKET_ECONOMY', 'PrereqCivic', { expect: 'CIVIC_CAPITALISM' })] },
+    'effects.intlRouteYield.culture': xml('ModifierArguments', 'ModifierId=TRADECONFEDERATION_TRADEROUTECULTURE&Name=Amount', 'Value'),
+    'effects.intlRouteYield.science': xml('ModifierArguments', 'ModifierId=TRADECONFEDERATION_TRADEROUTESCIENCE&Name=Amount', 'Value'),
+  },
+  MACHIAVELLIANISM: {
+    kind: xml('Policies', 'PolicyType=POLICY_MACHIAVELLIANISM', 'GovernmentSlotType', { expect: 'SLOT_DIPLOMATIC' }),
+    'effects.prodBoost.classes': { derived: 'the UnitType argument of the install modifier this card attaches, as an engine class', inputs: [xml('ModifierArguments', 'ModifierId=MACHIAVELLIANISM_SPYPRODUCTION&Name=UnitType', 'Value', { expect: 'UNIT_SPY' })] },
+    'effects.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=MACHIAVELLIANISM_SPYPRODUCTION&Name=Amount', 'Value')] },
+    'effects.prodBoost.target': { derived: 'unit - the install attaches a unit-production modifier', inputs: [xml('Modifiers', 'ModifierId=MACHIAVELLIANISM_SPYPRODUCTION', 'ModifierType', { expect: 'MODIFIER_PLAYER_UNITS_ADJUST_UNIT_PRODUCTION' })] },
+    'effects.prodBoost.eraMax': { derived: '-1: every era - the modifier names one unit type and no era', inputs: [xml('ModifierArguments', 'ModifierId=MACHIAVELLIANISM_SPYPRODUCTION&Name=UnitType', 'Value')] },
+    'effects.spyOffenseTimeCutPct': xml('ModifierArguments', 'ModifierId=MACHIAVELLIANISM_OFFENSIVESPYTIME&Name=ReductionPercent', 'Value'),
+  },
 };
 
 export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
@@ -712,7 +853,7 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
       prodBoost: { target: 'unit', classes: ['builder'], eraMax: EVERY_ERA, pct: 0.3 },
     }),
     P('CARAVANSARIES', 'Caravansaries', 'economic', '+2 gold from all trade routes.', 'MERCANTILISM', {
-      routeGold: 2,
+      routeYield: { gold: 2 },
     }),
     P('MARITIME_INDUSTRIES', 'Maritime Industries', 'military', '+100% production toward Ancient and Classical era naval units.', 'EXPLORATION', {
       prodBoost: { target: 'unit', classes: ['naval'], eraMax: CLASSICAL, pct: 1 },
@@ -747,7 +888,7 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
       envoyDoubleDiffGov: true,
     }),
     P('COLLECTIVE_ACTIVISM', 'Collective Activism', 'diplomatic', '+5% culture per city-state this seat is suzerain of.', undefined, {
-      culturePerSuzerain: 0.05,
+      yieldPctPerSuzerain: { culture: 0.05 },
     }),
     P('ONLINE_COMMUNITIES', 'Online Communities', 'economic', '+50% tourism toward civs this seat has a trade route to.', undefined, {
       tourismRouteBonus: 50,
@@ -846,6 +987,76 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
       favorPerBuilding: { building: 'BROADCAST_CENTER', favor: 3 },
       yieldMult: { science: 0.9, culture: 0.9 },
     }),
+
+    // ---- the Rise and Fall / Gathering Storm cards, in the install's order
+    P('CIVIL_PRESTIGE', 'Civil Prestige', 'economic',
+      'Established Governors with at least 2 Promotions provide +1 Amenity and +2 Housing.', undefined, {
+      governorTitles: { min: 2, amenities: 1, housing: 2 },
+    }),
+    P('MERCHANT_CONFEDERATION', 'Merchant Confederation', 'diplomatic',
+      '+1 Gold from each of your Envoys at city-states.', undefined, {
+      seatYieldPerEnvoy: { gold: 1 },
+    }),
+    P('TRADE_CONFEDERATION', 'Trade Confederation', 'economic',
+      '+1 Culture and +1 Science from international Trade Routes.', 'CAPITALISM', {
+      intlRouteYield: { culture: 1, science: 1 },
+    }),
+    // CIV6 (Limes): the Tsikhe is the Star Fort's Georgian variant and rides
+    // its base row here, so LIMES_TSIKHEPRODUCTION is the Star Fort entry.
+    P('LIMES', 'Limes', 'military', '+100% Production toward defensive buildings.', 'IDEOLOGY', {
+      buildingProdPct: { ANCIENT_WALLS: 100, MEDIEVAL_WALLS: 100, RENAISSANCE_WALLS: 100 },
+    }),
+    P('EQUESTRIAN_ORDERS', 'Equestrian Orders', 'military',
+      'All improved Horses and Iron resources yield 1 additional resource per turn.', undefined, {
+      stockpilePerSource: { HORSES: 1, IRON: 1 },
+    }),
+    P('MACHIAVELLIANISM', 'Machiavellianism', 'diplomatic',
+      '+50% Production toward Spies. Offensive spy operations take 25% less time.', undefined, {
+      prodBoost: { target: 'unit', classes: ['spy'], eraMax: EVERY_ERA, pct: 0.5 },
+      spyOffenseTimeCutPct: 25,
+    }),
+    P('TRIANGULAR_TRADE', 'Triangular Trade', 'economic',
+      '+4 Gold and +1 Faith from all Trade Routes.', 'GLOBALIZATION', {
+      routeYield: { gold: 4, faith: 1 },
+    }),
+    P('RAJ', 'Raj', 'diplomatic',
+      '+2 Science, Culture, Faith and Gold from each city-state you are Suzerain of. Trade Routes to city-states receive +2 Gold.', undefined, {
+      seatYieldPerSuzerain: { science: 2, culture: 2, faith: 2, gold: 2 },
+      csRouteYield: { gold: 2 },
+    }),
+    P('EXPROPRIATION', 'Expropriation', 'economic',
+      '+50% Production toward Settlers. Plot purchase cost reduced by 20%.', undefined, {
+      prodBoost: { target: 'unit', classes: ['settler'], eraMax: EVERY_ERA, pct: 0.5 },
+      tilePurchaseMult: 0.8,
+    }),
+    P('MILITARY_RESEARCH', 'Military Research', 'military',
+      'Military Academies, Seaports and Renaissance Walls generate +2 Science.', 'SPACE_RACE', {
+      buildingYields: { MILITARY_ACADEMY: { science: 2 }, SEAPORT: { science: 2 }, RENAISSANCE_WALLS: { science: 2 } },
+    }),
+    P('FORCE_MODERNIZATION', 'Force Modernization', 'military',
+      '50% Gold and resource discount on all unit upgrades.', undefined, {
+      upgradeGoldDiscountPct: 50,
+      upgradeResourceDiscountPct: 50,
+    }),
+    P('HERITAGE_TOURISM', 'Heritage Tourism', 'economic',
+      '+100% Tourism from Great Works of Art and Artifacts.', undefined, {
+      gwTourismScale: { SCULPTURE: 2, PORTRAIT: 2, LANDSCAPE: 2, RELIGIOUS: 2, ARTIFACT: 2 },
+    }),
+    P('SATELLITE_BROADCASTS', 'Satellite Broadcasts', 'economic',
+      '+200% Tourism from Great Works of Music.', undefined, {
+      gwTourismScale: { MUSIC: 3 },
+    }),
+    P('INTEGRATED_SPACE_CELL', 'Integrated Space Cell', 'military',
+      '+15% Production toward Space Race projects if a city has either a Military Academy or a Seaport.', undefined, {
+      spaceProjectProd: { pct: 15, buildings: ['MILITARY_ACADEMY', 'SEAPORT'] },
+    }),
+    P('ECOMMERCE', 'Ecommerce', 'economic', '+2 Production and +5 Gold from all Trade Routes.', undefined, {
+      routeYield: { production: 2, gold: 5 },
+    }),
+    P('INTERNATIONAL_SPACE_AGENCY', 'International Space Agency', 'diplomatic',
+      '+5% Science per city-state you are the Suzerain of.', undefined, {
+      yieldPctPerSuzerain: { science: 0.05 },
+    }),
   ].map((p) => [p.id, { ...p, src: POLICY_SRC[p.id] }]),
 );
 
@@ -867,6 +1078,9 @@ export interface GovernmentDef {
    *  MODIFIER_PLAYER_GOVERNMENT_FLAT_BONUS rows, and Communism's science).
    *  Paid only while the seat is IN the government. Absent on the Chiefdom. */
   bonus?: PolicyEffects;
+  /** the install's row names no `PolicyToUnlock`: the government leaves no
+   *  legacy card behind */
+  noLegacyCard?: boolean;
   description: string;
 }
 
@@ -904,6 +1118,16 @@ const GOV_BONUS: Record<string, PolicyEffects> = {
   DEMOCRACY: { goldBuyDiscountPct: 15 },
   // COMMUNISM_SCIENCE: "+10% Science."
   COMMUNISM: { yieldMult: { science: 1.1 } },
+  // DIGITAL_DEMOCRACY_COMBAT_STRENGTH_PENALTY: "-3 Combat Strength for all
+  // units" — ABILITY_DIGITAL_DEMOCRACY_DEBUFF on the combat classes its
+  // TypeTags name, as PROMOTION classes (the carrier is not among them).
+  DIGITAL_DEMOCRACY: {
+    unitCombatCS: {
+      classes: ['RECON', 'MELEE', 'RANGED', 'SIEGE', 'HEAVY_CAV', 'LIGHT_CAV', 'ANTICAV',
+        'NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER', 'AIR_FIGHTER', 'AIR_BOMBER'],
+      cs: -3,
+    },
+  },
 };
 
 const M = 'military' as const;
@@ -981,6 +1205,15 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
     'bonus.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION&Name=Amount', 'Value')] },
     'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=FASCISM_ATTACK_BUFF&Name=Amount', 'Value'),
     'effects.wwCutPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
+  },
+  DIGITAL_DEMOCRACY: {
+    tier: xml('Governments', 'GovernmentType=GOVERNMENT_DIGITAL_DEMOCRACY', 'Tier', { expect: 'Tier4' }),
+    slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_DIGITAL_DEMOCRACY&GovernmentSlotType=SLOT_MILITARY', 'NumSlots'), xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_DIGITAL_DEMOCRACY&GovernmentSlotType=SLOT_DIPLOMATIC', 'NumSlots'), xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_DIGITAL_DEMOCRACY&GovernmentSlotType=SLOT_WILDCARD', 'NumSlots')] },
+    noLegacyCard: { derived: 'true where the install writes no PolicyToUnlock on the government row', inputs: [xml('Governments', 'GovernmentType=GOVERNMENT_DIGITAL_DEMOCRACY', 'PolicyToUnlock')] },
+    'effects.amenitiesAll': xml('ModifierArguments', 'ModifierId=DIGITAL_DEMOCRACY_CITY_AMENITIES&Name=Amount', 'Value'),
+    'effects.yieldPerSpecialty.culture': xml('ModifierArguments', 'ModifierId=DIGITAL_DEMOCRACY_DISTRICT_CULTURE&Name=Amount', 'Value'),
+    'bonus.unitCombatCS.classes': { derived: 'the promotion classes of the CLASS_* TypeTags of ABILITY_DIGITAL_DEMOCRACY_DEBUFF', inputs: [xml('TypeTags', 'Type=ABILITY_DIGITAL_DEMOCRACY_DEBUFF&Tag=CLASS_RECON', 'Tag'), xml('TypeTags', 'Type=ABILITY_DIGITAL_DEMOCRACY_DEBUFF&Tag=CLASS_AIRCRAFT', 'Tag')] },
+    'bonus.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=DIGITAL_DEMOCRACY_DEBUFF&Name=Amount', 'Value'),
   },
 };
 
@@ -1088,6 +1321,14 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
       { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 20 },
       '+5 combat strength for all units; -20% war weariness.'),
+    // CIV6 (GS) INHERENT: "+2 Amenities in all cities, and +2 Culture per
+    // Specialty District." Its flat bonus (`GOV_BONUS`) is the -3 Combat
+    // Strength. A tier-4 government names no PolicyToUnlock, so it leaves
+    // no legacy card.
+    { ...G('DIGITAL_DEMOCRACY', 'Digital Democracy', 4, [M, E, D, D, D, W, W, W, W, W],
+      { amenitiesAll: 2, yieldPerSpecialty: { culture: 2 } },
+      '+2 amenities in all cities and +2 culture per specialty district; -3 combat strength for all units.'),
+    noLegacyCard: true },
   ].map((g) => [g.id, { ...g, ...(GOV_BONUS[g.id] ? { bonus: GOV_BONUS[g.id] } : {}), src: GOVERNMENT_SRC[g.id] }]),
 );
 
@@ -1099,7 +1340,7 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
 // wire's card indices (which the World Congress' Policy Treaty names) keep
 // their positions.
 for (const g of Object.values(GOVERNMENTS)) {
-  if (g.tier === 0) continue; // the Chiefdom alone has no legacy bonus
+  if (g.tier === 0 || g.noLegacyCard) continue; // the Chiefdom has no legacy bonus
   POLICIES[`LEGACY_${g.id}`] = {
     id: `LEGACY_${g.id}`,
     name: `${g.name} Legacy`,

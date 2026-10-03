@@ -124,18 +124,18 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     completeDistrict(state, city, 'CAMPUS', 10, 9);
     completeDistrict(state, city, 'HOLY_SITE', 8, 9);
     seatOf(state, 0)!.tradeRoutes = [{ from: city.id, to: -1, toCs: kumasi.id, expiresTurn: state.turn + 100 }];
-    const withSuz = cityTradeYields(state, city, 0);
+    const withSuz = cityTradeYields(state, city);
     kumasi.envoys = {};
-    const without = cityTradeYields(state, city, 0);
+    const without = cityTradeYields(state, city);
     expect(withSuz.culture - without.culture).toBe(KUMASI_ROUTE_CULTURE * 2);
     expect(withSuz.gold - without.gold).toBe(KUMASI_ROUTE_GOLD * 2);
     // SOVEREIGNTY outcome A on Kumasi's TYPE doubles what the MINOR pays the
     // route, never Kumasi's own term (9170 t240: the GPU had scaled it)
     state.congress = [{ res: CONGRESS_SOVEREIGNTY, outcome: 0, target: CITY_STATE_TYPES.indexOf('cultural') }];
     kumasi.envoys = { 0: 3 };
-    const sovWith = cityTradeYields(state, city, 0);
+    const sovWith = cityTradeYields(state, city);
     kumasi.envoys = {};
-    const sovWithout = cityTradeYields(state, city, 0);
+    const sovWithout = cityTradeYields(state, city);
     expect(sovWith.culture - sovWithout.culture).toBe(KUMASI_ROUTE_CULTURE * 2);
     expect(sovWith.gold - sovWithout.gold).toBe(KUMASI_ROUTE_GOLD * 2);
     expect(sovWithout.gold).toBeGreaterThan(without.gold); // the minor's own yield IS doubled

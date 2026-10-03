@@ -40,21 +40,21 @@ describe('a route coming in is paid with no route going out', () => {
     expect(seatOf(state, 0)!.tradeRoutes ?? []).toEqual([]);
     routeIn(state, 1, 0, sender.id, host.id);
     expect(incomingIntlRoutes(state, host)).toBe(1);
-    expect(cityTradeYields(state, host, 0).culture).toBe(2);
+    expect(cityTradeYields(state, host).culture).toBe(2);
   });
 
   it('counts each foreign route once', () => {
     const { state, host, sender } = scene('WILHELMINA');
     routeIn(state, 1, 0, sender.id, host.id);
     routeIn(state, 1, 0, sender.id, host.id);
-    expect(cityTradeYields(state, host, 0).culture).toBe(4);
+    expect(cityTradeYields(state, host).culture).toBe(4);
   });
 
   it('pays a seat without the row nothing for the same route', () => {
     const { state, host, sender } = scene();
     routeIn(state, 1, 0, sender.id, host.id);
     expect(incomingIntlRoutes(state, host)).toBe(1);
-    expect(cityTradeYields(state, host, 0).culture).toBe(0);
+    expect(cityTradeYields(state, host).culture).toBe(0);
   });
 
   it('does not count her OWN route as incoming', () => {
@@ -68,7 +68,7 @@ describe('a route coming in is paid with no route going out', () => {
     // her own route DOES pay +2 — but through INTL_ROUTE_YIELD_ROWS, the
     // SENDING half of Radio Oranje, which is a different row from the one
     // under test here. The incoming row contributes nothing to an own route.
-    expect(cityTradeYields(w.state, w.host, 0).culture
-      - cityTradeYields(plain.state, plain.host, 0).culture).toBe(2);
+    expect(cityTradeYields(w.state, w.host).culture
+      - cityTradeYields(plain.state, plain.host).culture).toBe(2);
   });
 });

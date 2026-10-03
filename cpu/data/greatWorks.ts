@@ -36,6 +36,9 @@ export const GWO_COUNT = srcConst('greatWorks.GWO_COUNT', 8, {
   inputs: [xml('GreatWorkObjectTypes', 'GreatWorkObjectType=GREATWORKOBJECT_RELIC', 'Value')],
 });
 const GWO_ART = [GWO_SCULPTURE, GWO_PORTRAIT, GWO_LANDSCAPE, GWO_RELIGIOUS] as const;
+/** the object types by name, in `Value` order — the index a work's `obj` holds */
+export const GWO_NAMES = ['SCULPTURE', 'PORTRAIT', 'LANDSCAPE', 'RELIGIOUS', 'ARTIFACT', 'WRITING', 'MUSIC', 'RELIC'] as const;
+export type GreatWorkObject = (typeof GWO_NAMES)[number];
 
 /** GreatWorkSlotTypes. */
 const gws = (id: string, v: number) => srcConst(`greatWorks.GWS_${id}`, v, {

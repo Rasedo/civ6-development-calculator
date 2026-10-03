@@ -1,5 +1,5 @@
 
-import type { City, CityState, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit } from './types';
+import type { City, CityState, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit, YieldKey } from './types';
 import { logPopWrite } from './difflog';
 import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
@@ -24,6 +24,7 @@ import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, t
 import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
+import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, cityStateItemProduction, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
@@ -2644,13 +2645,21 @@ export function seatPhase(state: GameState): void {
     };
     // CIV6 (The Last Prophet): "+1 Science for each foreign city following
     // Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
+    // Then the seat's own per-city-state yields: (Raj) per suzerainty,
+    // (Merchant Confederation) per envoy placed — the player's, no city's.
     const foreignFollowers = (key: string, sum: number): number => {
-      const foreignRows = getModifiers(state, actor.seat).foreignFollowerYields;
-      if (!foreignRows.length) return sum;
-      const foreign = foreignFollowerCount(state, actor.seat);
-      for (const r of foreignRows) {
-        if (r.yield === key) sum += r.amount * Math.floor(foreign / Math.max(1, r.per));
+      const sm = getModifiers(state, actor.seat);
+      const foreignRows = sm.foreignFollowerYields;
+      if (foreignRows.length) {
+        const foreign = foreignFollowerCount(state, actor.seat);
+        for (const r of foreignRows) {
+          if (r.yield === key) sum += r.amount * Math.floor(foreign / Math.max(1, r.per));
+        }
       }
+      const perSuz = sm.seatYieldPerSuzerain[key as YieldKey] ?? 0;
+      if (perSuz) sum += perSuz * state.cityStates.filter((cs) => isSuzerain(state, cs, actor.seat)).length;
+      const perEnvoy = sm.seatYieldPerEnvoy[key as YieldKey] ?? 0;
+      if (perEnvoy) sum += perEnvoy * state.cityStates.reduce((n, cs) => n + envoysOf(cs, actor.seat), 0);
       return sum;
     };
     let yields = readYields();
@@ -2950,6 +2959,15 @@ export function seatPhase(state: GameState): void {
           _bpct += seatBuildingSum(state, actor.seat, 'conquestProdPct') / 100;
         }
         if (q.kind === 'unit' && unitIsMilitary(q.unit)) _bpct += milAllyWarPct;
+        // CIV6 (Integrated Space Cell, EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION):
+        // "+15% Production toward Space Race projects if a city has either a
+        // Military Academy or a Seaport" — a building standing, not dark
+        if (q.kind === 'project' && isSpaceProject(q.project) && seatMods.spaceProjectProd.length) {
+          const dark = darkBuildings(state.map, civCity);
+          for (const r of seatMods.spaceProjectProd) {
+            if (r.buildings.some((b) => civCity.buildings.includes(b) && !dark.has(b))) _bpct += r.pct / 100;
+          }
+        }
         // CIV6 (TRAIT_LIBERATION_WAR_PRODUCTION, YIELD_PRODUCTION Amount 100):
         // a percent on every item for the turns after the declaration
         _bpct += warBuffPct;

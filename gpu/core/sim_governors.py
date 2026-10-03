@@ -644,6 +644,16 @@ class SimGovernors:
             amen = amen + seated.double() * self._seat_building_sum(row, self._b_amen_gov).double().unsqueeze(1)
         if bool((self._b_house_gov != 0).any()):
             house = house + seated.double() * self._seat_building_sum(row, self._b_house_gov).double().unsqueeze(1)
+        # CIV6 (Civil Prestige, REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES):
+        # under an ESTABLISHED governor of at least `min` titles, its first
+        # included (`_governor_titles` is 0 where none is established)
+        _gt = self._gov_mods(row)[12]["govtit"] if row < self.n_majors else []
+        if _gt:
+            tit = self._governor_titles(row)
+            for _on, _mn, _am, _ho in _gt:
+                ok = (_on.unsqueeze(1) & (tit >= _mn) & (tit > 0)).double()
+                amen = amen + ok * _am
+                house = house + ok * _ho
         works = self._governor_flag(row, "waterWorks")
         if bool(works.any()):
             cnt = self._dist_counts(row)                                  # [B, RC, nD]

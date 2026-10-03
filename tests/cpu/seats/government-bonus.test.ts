@@ -36,7 +36,8 @@ describe('the flat government bonus', () => {
         continue;
       }
       expect(g.bonus, `${g.id} has no flat bonus`).toBeDefined();
-      const card = POLICY_LIST.find((p) => p.legacyOf === g.id)!;
+      const card = POLICY_LIST.find((p) => p.legacyOf === g.id);
+      if (!card) continue; // a tier-4 government leaves no legacy card
       for (const k of Object.keys(g.bonus!)) expect(card.effects, `${g.id}'s legacy card pays ${k}`).not.toHaveProperty(k);
     }
     expect(GOVERNMENTS.AUTOCRACY.bonus).toEqual({ prodBoost: { target: 'wonder', classes: [], eraMax: -1, pct: 0.1 } });

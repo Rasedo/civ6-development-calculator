@@ -194,7 +194,7 @@ describe('Radio Oranje', () => {
       for (let i = 0; i < foreign; i++) {
         state.seats[1].tradeRoutes!.push({ from: other.id, to: -1, toSeat: 0, toSeatCity: city.id, expires: 999 } as never);
       }
-      return cityTradeYields(state, city, 0).culture;
+      return cityTradeYields(state, city).culture;
     };
     expect(culture(leaderRow('WILHELMINA'), 0)).toBe(culture(PLAIN, 0));
     expect(culture(leaderRow('WILHELMINA'), 2)).toBe(culture(PLAIN, 2) + 4);

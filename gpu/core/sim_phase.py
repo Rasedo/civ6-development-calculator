@@ -893,6 +893,7 @@ class SimPhase:
             _v = _fxp[_k]
             fx[_k] = _v if bool((_v != 1).any()) else None
         pre["pb"] = _fxp["prod"]
+        pre["fxrows"] = {"bprod": _fxp["bprod"], "spacep": _fxp["spacep"]}
         _hk = None
         if self._suz_c_proj_prod >= 0 and row < self.n_majors and self._proj_rows:
             _hk = self._suz_effect(row, self._suz_c_proj_prod)[self._bidx]
@@ -1253,6 +1254,30 @@ class SimPhase:
             _add = _add + (pre["warbuf"].to(_add.dtype) / 100)[bidx]
         # A Great Person's permanent share joins the SAME additive sum.
         _add = _add + self._gp_prod_pct(row, cur).to(_add.dtype)
+        # CIV6 (Limes, EFFECT_ADJUST_BUILDING_PRODUCTION): percent toward the
+        # named buildings
+        for _bon, _bb, _bpc in pre["fxrows"]["bprod"]:
+            _add = _add + (_bon[bidx] & (cur == _bb)).to(_add.dtype) * (_bpc / 100)
+        # CIV6 (Integrated Space Cell, EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION):
+        # Space Race projects in a city holding one of the buildings, standing
+        # and not dark — the clause pays once whichever of them stands
+        _spr = pre["fxrows"]["spacep"]
+        if _spr and self._proj_rows:
+            _pi = cur - self.PROJECT_BASE
+            _spm = torch.tensor([i in set(self._space_proj_idx) for i in range(len(self._proj_rows))],
+                                dtype=torch.bool, device=self.device)
+            _isp = (_pi >= 0) & (_pi < len(self._proj_rows)) & _spm[
+                _pi.clamp(min=0, max=len(self._proj_rows) - 1)]
+            if bool(_isp.any()):
+                _stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(
+                    self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])
+                _seen: dict = {}
+                for _son, _spc, _sb in _spr:
+                    _key = (id(_son), _spc)
+                    _hit = _son[bidx] & _stand[:, _sb]
+                    _seen[_key] = (_spc, _seen[_key][1] | _hit) if _key in _seen else (_spc, _hit)
+                for _spc, _hit in _seen.values():
+                    _add = _add + (_isp & _hit).to(_add.dtype) * (_spc / 100)
         _emall = _emall * (1 + _add)
         # CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): a flat
         # add toward the item, joining the city's Production before every
@@ -1989,6 +2014,17 @@ class SimPhase:
                     continue
                 _n = torch.div(self._foreign_follower_count(row), max(1, _fp), rounding_mode="floor")
                 s = s + _fw.double() * _n.double() * _fa
+            # then the seat's own per-city-state yields: (Raj) per suzerainty,
+            # (Merchant Confederation) per envoy placed at a living minor
+            _sfx = self._gov_mods(row)[12]
+            _ps = _sfx["seatsuz"][:, k]
+            if bool((_ps != 0).any()):
+                s = s + _ps * self._suzerains_held(row)
+            _pe = _sfx["seatenv"][:, k]
+            if bool((_pe != 0).any()) and self.S > 0 and row < self.n_majors:
+                _placed = (self.seat_citystate_envoys[:, row, : self.S].double()
+                           * self.citystate_alive[:, : self.S].double()).sum(dim=1)
+                s = s + _pe * _placed
             return s
 
         total = self._seat_city_stats(row, record=False)[0]

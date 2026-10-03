@@ -91,11 +91,11 @@ describe("a city-state's route", () => {
   it("pays its city the destination's rows", () => {
     const { state, cs, near } = scene();
     spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat);
-    const before = cityTradeYields(state, minorCity(cs), 0);
+    const before = cityTradeYields(state, minorCity(cs));
     expect(sum(before)).toBe(0);
     minorTrade(state, cs);
     expect(cs.tradeRoutes![0].toCs).toBe(near.id);
-    expect(cityTradeYields(state, minorCity(cs), 0)).toEqual(cityStateRouteYields(near));
+    expect(cityTradeYields(state, minorCity(cs))).toEqual(cityStateRouteYields(near));
   });
 
   it('walks toward its destination and comes home with its Trader at the end of its term', () => {

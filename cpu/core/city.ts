@@ -1302,7 +1302,7 @@ export function computeCityStats(
   // (`GREAT_WORK_YIELD_ROWS`), per work of the row's object type held here
   for (const r of ctx.mods.greatWorkYields) buildings[r.yield] += r.amount * byObj[r.obj]!;
 
-  const trade = cityTradeYields(state, city, m.routeGold);
+  const trade = cityTradeYields(state, city);
 
   const citizens = emptyYields();
   citizens.science = city.population * CITIZEN_SCIENCE;
@@ -1328,6 +1328,12 @@ export function computeCityStats(
   }
   if (m.faithPerSpecialty) {
     bonuses.faith += m.faithPerSpecialty * completedDistrictCount(state, city, true);
+  }
+  // CIV6 (Digital Democracy, EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT): "+2
+  // Culture per Specialty District"
+  for (const k of Object.keys(m.yieldPerSpecialty) as YieldKey[]) {
+    const n = m.yieldPerSpecialty[k] ?? 0;
+    if (n) bonuses[k] += n * completedDistrictCount(state, city, true);
   }
   // CIV6 (Forestry Management): "This city receives +2 Gold for each
   // unimproved feature" — the tiles this city OWNS that still carry one.

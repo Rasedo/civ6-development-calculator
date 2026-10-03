@@ -32,7 +32,8 @@ import { GP_PERM, GP_UNIT_PROD_CLASSES } from '../data/greatPeople';
 import { unitIsMilitary } from './units';
 import { CLASS_BIT, classBitOf, UNIT_PROMO_CLASS } from '../data/promotions';
 import { isSpaceProject } from '../data/projects';
-import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityGovernorPromos, cityHasGovernor } from './governors';
+import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityGovernorPromos, cityGovernorTitles, cityHasGovernor } from './governors';
+import { GWO_NAMES, type GreatWorkObject } from '../data/greatWorks';
 import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
 import type { AdjacencyRule } from '../data/districts';
 export interface Unlocks {
@@ -369,13 +370,40 @@ export interface Modifiers {
   reconXpMult: number;
   pillageMult: number;
   routePlunderPct: number;
-  routeGold: number;
+  /** yields every trade route of this seat pays at its origin */
+  routeYield: Partial<Yields>;
+  /** yields each route to another civilization's city pays on top */
+  intlRouteYield: Partial<Yields>;
+  /** yields each route to a city-state pays on top */
+  csRouteYield: Partial<Yields>;
+  /** the seat's own yields per suzerainty and per envoy placed */
+  seatYieldPerSuzerain: Partial<Yields>;
+  seatYieldPerEnvoy: Partial<Yields>;
+  /** Civil Prestige's rows: amenities and housing under a governor of `min`
+   *  titles */
+  governorTitles: { min: number; amenities: number; housing: number }[];
+  /** percent production toward a named building, summed over the cards */
+  buildingProdPct: Partial<Record<string, number>>;
+  /** each great-work object type's tourism factor, by object index */
+  gwTourismScale: number[];
+  /** extra units a turn from each improved source of a strategic resource */
+  stockpilePerSource: Partial<Record<string, number>>;
+  /** percent off a unit upgrade's gold and its resources */
+  upgradeGoldDiscountPct: number;
+  upgradeResourceDiscountPct: number;
+  /** percent production toward Space Race projects in a city holding one of
+   *  the buildings */
+  spaceProjectProd: { pct: number; buildings: string[] }[];
+  /** percent off every offensive spy operation's time */
+  spyOffenseTimeCutPct: number;
+  /** yields per completed specialty district, in every city */
+  yieldPerSpecialty: Partial<Yields>;
   faithBuyLandUnits: boolean;
   influencePerTurn: number;
   firstEnvoyDouble: boolean;
   envoyDoubleDiffGov: boolean;
   tourismRouteBonus: number;
-  culturePerSuzerain: number;
+  yieldPctPerSuzerain: Partial<Yields>;
   unitCombatCS: { classMask: number; all: boolean; cs: number }[];
   xpPct: number;
   wwCutPct: number;
@@ -606,12 +634,25 @@ export function defaultModifiers(): Modifiers {
     pillageMult: 1,
     routePlunderPct: 0,
     faithBuyLandUnits: false,
-    routeGold: 0,
+    routeYield: {},
+    intlRouteYield: {},
+    csRouteYield: {},
+    seatYieldPerSuzerain: {},
+    seatYieldPerEnvoy: {},
+    governorTitles: [],
+    buildingProdPct: {},
+    gwTourismScale: GWO_NAMES.map(() => 1),
+    stockpilePerSource: {},
+    upgradeGoldDiscountPct: 0,
+    upgradeResourceDiscountPct: 0,
+    spaceProjectProd: [],
+    spyOffenseTimeCutPct: 0,
+    yieldPerSpecialty: {},
     influencePerTurn: 0,
     firstEnvoyDouble: false,
     envoyDoubleDiffGov: false,
     tourismRouteBonus: 0,
-    culturePerSuzerain: 0,
+    yieldPctPerSuzerain: {},
     unitCombatCS: [],
     xpPct: 0,
     wwCutPct: 0,
@@ -689,12 +730,35 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.pillageMult) mods.pillageMult *= fx.pillageMult;
   if (fx.routePlunderPct) mods.routePlunderPct += fx.routePlunderPct;
   if (fx.faithBuyLandUnits) mods.faithBuyLandUnits = true;
-  if (fx.routeGold) mods.routeGold += fx.routeGold;
+  addPartial(mods.routeYield, fx.routeYield);
+  addPartial(mods.intlRouteYield, fx.intlRouteYield);
+  addPartial(mods.csRouteYield, fx.csRouteYield);
+  addPartial(mods.seatYieldPerSuzerain, fx.seatYieldPerSuzerain);
+  addPartial(mods.seatYieldPerEnvoy, fx.seatYieldPerEnvoy);
+  if (fx.governorTitles) mods.governorTitles.push(fx.governorTitles);
+  for (const [b, n] of Object.entries(fx.buildingProdPct ?? {})) {
+    mods.buildingProdPct[b] = (mods.buildingProdPct[b] ?? 0) + (n ?? 0);
+  }
+  for (const [b, y] of Object.entries(fx.buildingYields ?? {})) {
+    addPartial((mods.buildingYieldAdd[b] ??= {}), y);
+  }
+  for (const [o, f] of Object.entries(fx.gwTourismScale ?? {})) {
+    const i = GWO_NAMES.indexOf(o as GreatWorkObject);
+    mods.gwTourismScale[i] *= f ?? 1;
+  }
+  for (const [r, n] of Object.entries(fx.stockpilePerSource ?? {})) {
+    mods.stockpilePerSource[r] = (mods.stockpilePerSource[r] ?? 0) + (n ?? 0);
+  }
+  if (fx.upgradeGoldDiscountPct) mods.upgradeGoldDiscountPct += fx.upgradeGoldDiscountPct;
+  if (fx.upgradeResourceDiscountPct) mods.upgradeResourceDiscountPct += fx.upgradeResourceDiscountPct;
+  if (fx.spaceProjectProd) mods.spaceProjectProd.push(fx.spaceProjectProd);
+  if (fx.spyOffenseTimeCutPct) mods.spyOffenseTimeCutPct += fx.spyOffenseTimeCutPct;
+  addPartial(mods.yieldPerSpecialty, fx.yieldPerSpecialty);
   if (fx.influencePerTurn) mods.influencePerTurn += fx.influencePerTurn;
   if (fx.firstEnvoyDouble) mods.firstEnvoyDouble = true;
   if (fx.envoyDoubleDiffGov) mods.envoyDoubleDiffGov = true;
   if (fx.tourismRouteBonus) mods.tourismRouteBonus += fx.tourismRouteBonus;
-  if (fx.culturePerSuzerain) mods.culturePerSuzerain += fx.culturePerSuzerain;
+  addPartial(mods.yieldPctPerSuzerain, fx.yieldPctPerSuzerain);
   if (fx.unitCombatCS) {
     let mask = 0;
     for (const c of fx.unitCombatCS.classes ?? []) mask |= CLASS_BIT[c] ?? 0;
@@ -1271,8 +1335,11 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
     // a suzerainty pays a YIELD by the head — `suzerainCount`'s Treaty
     // Organization weighting is what one pays in FAVOR, not here
     const suz = state.cityStates.filter((cs) => isSuzerain(state, cs, seat)).length;
-    if (mods.culturePerSuzerain && suz) {
-      mods.yieldMult.culture = (mods.yieldMult.culture ?? 1) * (1 + mods.culturePerSuzerain * suz);
+    if (suz) {
+      for (const k of Object.keys(mods.yieldPctPerSuzerain) as YieldKey[]) {
+        const f = mods.yieldPctPerSuzerain[k] ?? 0;
+        if (f) mods.yieldMult[k] = (mods.yieldMult[k] ?? 1) * (1 + f * suz);
+      }
     }
     // CIV6 (Surrounded by Glory): "+5% Culture per city-state you are the
     // Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
@@ -1304,6 +1371,9 @@ export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): 
     }
   }
   if (q.kind === 'project' && isSpaceProject(q.project)) pct += (gpPerm?.[GP_PERM.indexOf('spaceProdPct')] ?? 0) / 100;
+  // CIV6 (Limes, EFFECT_ADJUST_BUILDING_PRODUCTION): percent toward the named
+  // buildings
+  if (q.kind === 'building') pct += (mods.buildingProdPct[q.building] ?? 0) / 100;
   for (const b of mods.prodBoosts) {
     if (b.target === 'wonder') {
       if (q.kind !== 'wonder') continue;
@@ -1835,6 +1905,15 @@ export function withGovernor(state: GameState, base: Modifiers, city: City): Mod
   }
   m.amenitiesAll += seatBuildingSum(state, city.seat, 'amenitiesWithGovernor');
   m.housingAll += seatBuildingSum(state, city.seat, 'housingWithGovernor');
+  if (established && base.governorTitles.length) {
+    // CIV6 (Civil Prestige, REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES)
+    const titles = cityGovernorTitles(state, city);
+    for (const r of base.governorTitles) {
+      if (titles < r.min) continue;
+      m.amenitiesAll += r.amenities;
+      m.housingAll += r.housing;
+    }
+  }
   if (established) {
     for (const k of Object.keys(base.governorYieldMult) as YieldKey[]) {
       m.yieldMult[k] = (m.yieldMult[k] ?? 1) * (base.governorYieldMult[k] ?? 1);

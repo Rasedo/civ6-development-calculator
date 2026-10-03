@@ -756,4 +756,5 @@ export const GOV_INFLUENCE_TIER: Record<string, number> = {
   DEMOCRACY: 3,
   COMMUNISM: 3,
   FASCISM: 3,
+  DIGITAL_DEMOCRACY: 4,
 };

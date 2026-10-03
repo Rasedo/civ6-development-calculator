@@ -941,6 +941,7 @@ export const GOV_INTOLERANCE: Readonly<Record<string, number>> = {
   DEMOCRACY: srcConst('seats.GOV_INTOLERANCE.DEMOCRACY', 20, govTol('DEMOCRACY', -20)),
   COMMUNISM: srcConst('seats.GOV_INTOLERANCE.COMMUNISM', 20, govTol('COMMUNISM', -20)),
   FASCISM: srcConst('seats.GOV_INTOLERANCE.FASCISM', 20, govTol('FASCISM', -20)),
+  DIGITAL_DEMOCRACY: srcConst('seats.GOV_INTOLERANCE.DIGITAL_DEMOCRACY', 20, govTol('DIGITAL_DEMOCRACY', -20)),
 };
 export const TOURISM_GOV_MULT = srcConst('seats.tourismGovMult', 1,
   gp('TOURISM_CONFLICTING_GOVERNMENT_MULTIPLIER'));

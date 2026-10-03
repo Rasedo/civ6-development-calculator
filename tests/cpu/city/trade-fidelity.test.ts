@@ -138,7 +138,7 @@ describe('international route yields', () => {
     expect(canAddIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
     expect(addIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
 
-    const peaceYields = cityTradeYields(state, origin, 0);
+    const peaceYields = cityTradeYields(state, origin);
     expect(peaceYields.gold).toBe(3); // the centre row; the Campus pays science
     expect(peaceYields.science).toBe(1);
     expect(peaceYields.food).toBe(0);
@@ -148,7 +148,7 @@ describe('international route yields', () => {
     // income stops because the route is GONE.
     declareWar(state, 0, civ.seat);
     expect(state.seats[0].tradeRoutes!.length).toBe(0);
-    expect(cityTradeYields(state, origin, 0).gold).toBe(0);
+    expect(cityTradeYields(state, origin).gold).toBe(0);
   });
 
   it('the WAR COLUMN cancels the routes between the pair and recalls the Trader', () => {
@@ -614,7 +614,7 @@ describe('trading posts', () => {
     const civ = addCiv(state, 13, 10);
     civ.cities[0].buildings.push('MARKET');
     expect(addIntlTradeRoute(state, civ.cities[0].id, 0, pcity.id, civ.seat).ok).toBe(true);
-    const gold = () => cityTradeYields(state, civ.cities[0], 0).gold;
+    const gold = () => cityTradeYields(state, civ.cities[0]).gold;
     const bare = gold();
     expect(routePostGold(state, civ.seat, pcity.centerIndex)).toBe(0);
     stampTradingPost(civ, pcity.centerIndex);
@@ -675,11 +675,11 @@ describe('trading posts', () => {
     // no water, no rail, no portal: the path pays T alone — the passed
     // foreign city holding seat 0's post
     expect(routePathGold(state, 0, r, 0)).toBe(1);
-    const gold1 = cityTradeYields(state, origin, 0).gold;
+    const gold1 = cityTradeYields(state, origin).gold;
     // the rival's own post there pays seat 0 nothing
     stampTradingPost(civ, mid.centerIndex);
-    expect(cityTradeYields(state, origin, 0).gold).toBe(gold1);
-    // without seat 0's post the passed city pays nothing
+    expect(cityTradeYields(state, origin).gold).toBe(gold1);
+    // without seat 0's post the crossed city pays nothing
     seatOf(state, 0)!.tradingPosts = [];
     expect(routePathGold(state, 0, r, 0)).toBe(0);
   });
@@ -723,12 +723,12 @@ describe('wonder route terms', () => {
     origin.wonders.push({ id: 'GREAT_ZIMBABWE', tileIndex: wt.index });
     addTradeRoute(state, origin.id, dest.id, 0);
     expect(wonderRouteOriginGold(state, origin)).toBe(0);
-    const bare = cityTradeYields(state, origin, 0).gold;
+    const bare = cityTradeYields(state, origin).gold;
     tileAtCoords(state.map, 6, 7).resource = 'WHEAT';
     tileAtCoords(state.map, 7, 6).resource = 'DEER';
     tileAtCoords(state.map, 1, 1).resource = 'WHEAT'; // out of range AND territory
     expect(wonderRouteOriginGold(state, origin)).toBe(4);
-    expect(cityTradeYields(state, origin, 0).gold).toBe(bare + 4);
+    expect(cityTradeYields(state, origin).gold).toBe(bare + 4);
     // incomplete wonder: nothing
     wt.builtWonderComplete = false;
     expect(wonderRouteOriginGold(state, origin)).toBe(0);
@@ -753,12 +753,12 @@ describe('wonder route terms', () => {
     const civ = addCiv(state, 14, 10);
     civ.cities[0].buildings.push('MARKET');
     expect(addIntlTradeRoute(state, civ.cities[0].id, 0, dest.id, civ.seat).ok).toBe(true);
-    const withW = cityTradeYields(state, civ.cities[0], 0);
+    const withW = cityTradeYields(state, civ.cities[0]);
     const b2 = computeCityStats(state, dest).breakdown.bonuses;
     expect(b2.science - b0.science).toBe(4); // two routes to it now
     expect(b2.faith - b0.faith).toBe(1);     // only one is domestic
     dest.wonders = [];
-    const withoutW = cityTradeYields(state, civ.cities[0], 0);
+    const withoutW = cityTradeYields(state, civ.cities[0]);
     expect(withW.science - withoutW.science).toBe(1);
     expect(withW.gold - withoutW.gold).toBe(1);
   });
@@ -796,9 +796,9 @@ describe('the route path term (transportation efficiency)', () => {
     // the international leg pays it on top of the destination's rows (the
     // centre's 3 Gold is D)
     origin.buildings.push('MARKET');
-    const bare = cityTradeYields(state, origin, 0).gold;
+    const bare = cityTradeYields(state, origin).gold;
     expect(addIntlTradeRoute(state, origin.id, dest.seat, dest.id, 0).ok).toBe(true);
-    expect(cityTradeYields(state, origin, 0).gold - bare).toBe(3 + 3);
+    expect(cityTradeYields(state, origin).gold - bare).toBe(3 + 3);
   });
 
   it('pays 2 per water plot, and a course of one plot pays nothing', () => {

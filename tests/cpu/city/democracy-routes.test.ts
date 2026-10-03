@@ -46,20 +46,20 @@ describe("Democracy's ally and suzerain routes", () => {
   it('adds the flat yields only when the destination seat is an ALLY', () => {
     const { state } = scene();
     const city = seatOf(state, 0)!.cities[0];
-    const before = cityTradeYields(state, city, 0);
+    const before = cityTradeYields(state, city);
 
     // no alliance: the route pays what it always paid
-    expect(cityTradeYields(state, city, 0).food).toBe(before.food);
+    expect(cityTradeYields(state, city).food).toBe(before.food);
 
     setAllyTurnsWith(state, 0, 1, AGREEMENT_TURNS);
     setAllianceTypeWith(state, 0, 1, ALLIANCE_MILITARY);
-    const allied = cityTradeYields(state, city, 0);
+    const allied = cityTradeYields(state, city);
     // the ally clause alone is Democracy's; without the government it pays 0
     const govless = allied.food - before.food;
     expect(govless).toBe(0);
 
     adoptDemocracy(state);
-    const demo = cityTradeYields(state, city, 0);
+    const demo = cityTradeYields(state, city);
     expect(demo.food - before.food).toBe(DEM.allyRouteYield!.food);
     expect(demo.production - before.production).toBe(DEM.allyRouteYield!.production);
   });
@@ -74,7 +74,7 @@ describe("Democracy's ally and suzerain routes", () => {
     setAllianceTypeWith(state, 0, 1, ALLIANCE_MILITARY);
     expect(incomingAllyRouteYields(state, theirCity).food).toBe(0);
     adoptDemocracy(state);
-    const before = cityTradeYields(state, theirCity, 0);
+    const before = cityTradeYields(state, theirCity);
     expect(incomingAllyRouteYields(state, theirCity)).toEqual(expect.objectContaining(DEM.allyRouteYield));
     // ...and it lands in the receiver's own trade yields, food and production
     expect(before.food).toBeGreaterThanOrEqual(DEM.allyRouteYield!.food!);
@@ -96,17 +96,17 @@ describe("Democracy's ally and suzerain routes", () => {
     cs.envoys[0] = 3;
     resolveSuzerains(state);
     expect(incomingAllyRouteYields(state, city)).toEqual(expect.objectContaining(DEM.allyRouteYield));
-    expect(cityTradeYields(state, city, 0).food).toBeGreaterThanOrEqual(DEM.allyRouteYield!.food!);
+    expect(cityTradeYields(state, city).food).toBeGreaterThanOrEqual(DEM.allyRouteYield!.food!);
   });
 
   it('pays nothing on a route to a seat that is not an ally', () => {
     const { state } = scene();
     adoptDemocracy(state);
     const city = seatOf(state, 0)!.cities[0];
-    const noAlly = cityTradeYields(state, city, 0);
+    const noAlly = cityTradeYields(state, city);
     setAllyTurnsWith(state, 0, 1, AGREEMENT_TURNS);
     setAllianceTypeWith(state, 0, 1, ALLIANCE_MILITARY);
-    const allied = cityTradeYields(state, city, 0);
+    const allied = cityTradeYields(state, city);
     expect(allied.food - noAlly.food).toBe(DEM.allyRouteYield!.food);
   });
 });

@@ -3366,11 +3366,14 @@ class SimEconomy:
         # per-batch scalars that ADD, MULTIPLY or OR across the slotted cards.
         _z = torch.zeros(B, dtype=dt, device=dev)
         _o = torch.ones(B, dtype=dt, device=dev)
+        _z6 = torch.zeros(B, 6, dtype=torch.float64, device=dev)
+        _z64 = torch.zeros(B, dtype=torch.float64, device=dev)
+        _nst = self._gov_stockps.shape[1] if self._ngov else 0
         fx: dict = {
             "prod": [], "bcharge": _z.clone(), "mcut": _z.clone(), "vbarb": _z.clone(),
             "cdef": _z.clone(), "crng": _z.clone(), "rxp": _o.clone(), "rplun": _z.clone(),
             "pillm": _o.clone(),
-            "rgold": _z.clone(), "infl": _z.clone(),
+            "infl": _z.clone(),
             # Monarchy's envoy influence and the two purchase discounts
             # (`_gold_price` / `_faith_price`), the flat government bonuses
             "inflmult": _o.clone(), "goldbuydisc": _z.clone(),
@@ -3378,7 +3381,21 @@ class SimEconomy:
             "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
             "envoy2": torch.zeros(B, dtype=torch.bool, device=dev),
             "tourroute": torch.zeros(B, dtype=torch.long, device=dev),
-            "culsuz": _z.clone(),
+            # the six-yield channels: route yields (every route, international,
+            # city-state), the seat's own yields per suzerainty and per envoy,
+            # the fraction per suzerainty, the yields per specialty district
+            "ryield": _z6.clone(), "iryield": _z6.clone(), "csryield": _z6.clone(),
+            "seatsuz": _z6.clone(), "seatenv": _z6.clone(), "ysuz": _z6.clone(),
+            "yspec": _z6.clone(),
+            # Civil Prestige rows (active [B], min titles, amenities, housing),
+            # building production (active, building, percent), building yields
+            # (active, building, six yields), Space Race production (active,
+            # percent, building)
+            "govtit": [], "bprod": [], "byield": [], "spacep": [],
+            # each great-work object type's tourism factor
+            "gwscale": torch.ones(B, self._gw_obj_tourism.shape[0], dtype=torch.float64, device=dev),
+            "stockps": torch.zeros(B, _nst, dtype=torch.float64, device=dev),
+            "upgold": _z64.clone(), "upres": _z64.clone(), "spycut": _z64.clone(),
             "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
             "xppct": _z.clone(), "wwcut": _z.clone(), "wmdup": _z.clone(),
             "dch": _z.clone(), "dca": _z.clone(),
@@ -3440,8 +3457,8 @@ class SimEconomy:
             _gf = has_gov.to(dt)
             for _k, _t in (("bcharge", self._gov_bcharge), ("mcut", self._gov_mcut),
                            ("vbarb", self._gov_vbarb), ("cdef", self._gov_cdef),
-                           ("crng", self._gov_crng), ("rgold", self._gov_rgold),
-                           ("infl", self._gov_infl), ("culsuz", self._gov_culsuz),
+                           ("crng", self._gov_crng),
+                           ("infl", self._gov_infl),
                            ("xppct", self._gov_xppct),
                            ("wwcut", self._gov_wwcut), ("wmdup", self._gov_wmdup),
                            ("dch", self._gov_dc_house),
@@ -3460,6 +3477,21 @@ class SimEconomy:
             fx["envoy1"] = fx["envoy1"] | (has_gov & self._gov_envoy1[adopted])
             fx["envoy2"] = fx["envoy2"] | (has_gov & self._gov_envoy2[adopted])
             fx["gpp"] = fx["gpp"] + self._gov_gpp[adopted] * _gf.double().unsqueeze(1)
+            _gfd = _gf.double()
+            for _k, _t in (("ryield", self._gov_ryield), ("iryield", self._gov_iryield),
+                           ("csryield", self._gov_csryield), ("seatsuz", self._gov_seatsuz),
+                           ("seatenv", self._gov_seatenv), ("ysuz", self._gov_ysuz),
+                           ("yspec", self._gov_yspec), ("stockps", self._gov_stockps)):
+                fx[_k] = fx[_k] + _t[adopted] * _gfd.unsqueeze(1)
+            for _k, _t in (("upgold", self._gov_upgold), ("upres", self._gov_upres),
+                           ("spycut", self._gov_spycut)):
+                fx[_k] = fx[_k] + _t[adopted] * _gfd
+            fx["gwscale"] = fx["gwscale"] * torch.where(
+                has_gov.unsqueeze(1), self._gov_gwscale[adopted], torch.ones_like(fx["gwscale"]))
+            for _gi in range(self._ngov):
+                _gon = has_gov & (adopted == _gi)
+                self._fx_rows(fx, _gon, self._gov_govtit[_gi], self._gov_bprod_rows[_gi],
+                              self._gov_byield_rows[_gi], self._gov_spacep_rows[_gi])
             fx["ucst"] = fx["ucst"] + self._gov_ucs_by_type[adopted] * _gf.double().unsqueeze(1)
             for _gi in range(self._ngov):
                 if float(self._gov_prodb[_gi, 0]) >= 0:
@@ -3514,8 +3546,8 @@ class SimEconomy:
             if self._pol_fx_mag > 0:
                 for _k, _t in (("bcharge", self._pol_bcharge), ("mcut", self._pol_mcut),
                                ("vbarb", self._pol_vbarb), ("cdef", self._pol_cdef),
-                               ("crng", self._pol_crng), ("rgold", self._pol_rgold),
-                               ("infl", self._pol_infl), ("culsuz", self._pol_culsuz),
+                               ("crng", self._pol_crng),
+                               ("infl", self._pol_infl),
                                ("xppct", self._pol_xppct),
                                ("wwcut", self._pol_wwcut), ("wmdup", self._pol_wmdup),
                                ("dch", self._pol_dc_house),
@@ -3533,6 +3565,23 @@ class SimEconomy:
                 fx["envoy2"] = fx["envoy2"] | (cards & self._pol_envoy2.unsqueeze(0)).any(dim=1)
                 fx["tourroute"] = fx["tourroute"] + (cards.long() * self._pol_tourroute.unsqueeze(0)).sum(dim=1)
                 fx["gpp"] = fx["gpp"] + cards.double() @ self._pol_gpp
+                _cd = cards.double()
+                for _k, _t in (("ryield", self._pol_ryield), ("iryield", self._pol_iryield),
+                               ("csryield", self._pol_csryield), ("seatsuz", self._pol_seatsuz),
+                               ("seatenv", self._pol_seatenv), ("ysuz", self._pol_ysuz),
+                               ("yspec", self._pol_yspec), ("stockps", self._pol_stockps)):
+                    fx[_k] = fx[_k] + _cd @ _t
+                for _k, _t in (("upgold", self._pol_upgold), ("upres", self._pol_upres),
+                               ("spycut", self._pol_spycut)):
+                    fx[_k] = fx[_k] + _cd @ _t
+                fx["gwscale"] = fx["gwscale"] * torch.where(
+                    cards.unsqueeze(2), self._pol_gwscale.unsqueeze(0).expand(B, -1, -1),
+                    torch.ones(1, 1, 1, dtype=torch.float64, device=dev)).prod(dim=1)
+                for _pi in range(self._npol):
+                    _pon = cards[:, _pi]
+                    if bool(_pon.any()):
+                        self._fx_rows(fx, _pon, self._pol_govtit[_pi], self._pol_bprod_rows[_pi],
+                                      self._pol_byield_rows[_pi], self._pol_spacep_rows[_pi])
                 fx["ucst"] = fx["ucst"] + cards.double() @ self._pol_ucs_by_type
                 for _pi in range(self._npol):
                     if float(self._pol_prodb[_pi, 0]) >= 0:
@@ -3577,6 +3626,19 @@ class SimEconomy:
                             fx["bldgym"].append((_on, _r[0], _r[1], _r[2] / 1000.0))
         return (city_y, cap_y, hous_all, ymult, slotted, emult, tpmult,
                 amen_all, hid, nd, adjm, byb, fx)
+
+    @staticmethod
+    def _fx_rows(fx: dict, on: torch.Tensor, govtit: torch.Tensor, bprod: list, byield: list,
+                 spacep: list) -> None:
+        """one government's or card's ROW channels onto `fx`, active where `on`"""
+        if float(govtit[0]) >= 0:
+            fx["govtit"].append((on, int(govtit[0]), float(govtit[1]), float(govtit[2])))
+        for _b, _pct in bprod:
+            fx["bprod"].append((on, _b, _pct))
+        for _b, _y in byield:
+            fx["byield"].append((on, _b, _y))
+        for _pct, _b in spacep:
+            fx["spacep"].append((on, _pct, _b))
 
     def _cond_house_amen(self, hid, nd, spec_d):
         """The two district-conditional rules, for ANY seat.
@@ -4801,6 +4863,14 @@ class SimEconomy:
         _am = 100 + self._gp_perm(row, "artifactTourismPct").long()               # [B]
         if bool((_am != 100).any()):
             base = torch.where(obj == 4, base * _am.reshape(-1, 1, 1) // 100, base)  # 4 = GWO_ARTIFACT
+        # CIV6 (Heritage Tourism, Satellite Broadcasts): the seat's cards scale
+        # one object type's tourism (EFFECT_ADJUST_CITY_TOURISM's ScalingFactor)
+        if row < self.n_majors:
+            _gs = self._gov_mods(row)[12]["gwscale"]
+            if bool((_gs != 1).any()):
+                _sc = (_gs * 100).round().long()                                  # [B, 8]
+                _f = _sc.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)
+                base = base * _f // 100
         if km is not None:
             kind = self._gw_obj_kind[oc]                                     # [B, RC, W]
             kk = torch.cat([km, torch.ones(self.B, 1, dtype=torch.long, device=self.device)], dim=1)  # kind -1 -> column 3
@@ -6631,6 +6701,11 @@ class SimEconomy:
                         _bt = _tidx[:, :, _k]
                         csf.scatter_add_(1, _bt.clamp(min=0) * 6 + self._citystate_yidx, _perk * (_bt >= 0).double())
                 bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, csf.reshape(B, nB, 6))
+            # CIV6 (Military Research, EFFECT_ADJUST_BUILDING_YIELD_CHANGE): the
+            # seat's cards' add to the named buildings standing here
+            for _pbo, _pbb, _pby in self._gov_mods(row)[12]["byield"]:
+                bld_y = bld_y + (selbf[:, :, _pbb] * _pbo.double().unsqueeze(1)).unsqueeze(2) \
+                    * torch.tensor(_pby, dtype=F64, device=dev).reshape(1, 1, 6)
             if bool((selb & self._b_pow_y_any.reshape(1, 1, -1)).any()):
                 # GS POWER: the second half of a late building's yields, paid
                 # while its city meets its whole load.
@@ -6821,6 +6896,12 @@ class SimEconomy:
             _gb = self._governor_bonus(row, self.city_pop[:, row, :cols], _spec, _gpc)[:, sl] \
                 * alivef.unsqueeze(2)
             bon = bon + _gb
+        # CIV6 (Digital Democracy, EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT): "+2
+        # Culture per Specialty District"
+        _ysp = self._gov_mods(row)[12]["yspec"]
+        if bool((_ysp != 0).any()):
+            _spc = self._district_counts(row)[1][:, sl].double()
+            bon = bon + _ysp.double().unsqueeze(1) * _spc.unsqueeze(2) * alivef.unsqueeze(2)
 
         trade = zeros6
         _rt = self._seat_route_income(row)
@@ -6898,10 +6979,14 @@ class SimEconomy:
         # Organization does to its favor — `suzerainCount`'s weighting is
         # the favor's, and TS counts `isSuzerain` heads here
         _suz_n = self._suzerains_held(row)
-        _cz = self._gov_mods(row)[12]["culsuz"]
-        if bool((_cz != 0).any()):
+        # (Collective Activism, International Space Agency) a fraction of one
+        # yield per suzerainty
+        _cz = self._gov_mods(row)[12]["ysuz"]
+        if bool((_cz != 0).any()) and bool((_suz_n > 0).any()):
             gym = gym.clone()
-            gym[:, 4] = gym[:, 4] * (1 + _cz * _suz_n.to(gym.dtype))
+            for _yk in range(6):
+                if bool((_cz[:, _yk] != 0).any()):
+                    gym[:, _yk] = gym[:, _yk] * (1 + _cz[:, _yk].to(gym.dtype) * _suz_n.to(gym.dtype))
         # CIV6 (Surrounded by Glory): "+5% Culture per city-state you are
         # the Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
         for _yc, _yl, _yy, _yp in self._live_rows(row, self._yield_per_suzerain_rows):

@@ -95,12 +95,14 @@ def main() -> None:
         (BAST, "crng", 5.0, "BASTIONS +5 city ranged"),
         (["CODE_OF_LAWS", "DIVINE_RIGHT", "FEUDALISM", "COLONIALISM"], "bcharge", 2.0, "SERFDOM +2 build charges"),
         (["CODE_OF_LAWS", "STATE_WORKFORCE", "COLONIALISM"], "mcut", 1.0, "CONSCRIPTION -1 gold upkeep"),
-        (["CODE_OF_LAWS", "FOREIGN_TRADE", "COLONIALISM", "EXPLORATION"], "rgold", 2.0, "CARAVANSARIES +2 gold per route"),
+        (["CODE_OF_LAWS", "FOREIGN_TRADE", "COLONIALISM", "EXPLORATION"], "ryield:2", 2.0, "CARAVANSARIES +2 gold per route"),
         (["CODE_OF_LAWS", "SUFFRAGE", "POLITICAL_PHILOSOPHY"], "infl", 2.0, "CHARISMATIC_LEADER +2 influence"),
-        (["CODE_OF_LAWS", "DIVINE_RIGHT", "SOCIAL_MEDIA"], "culsuz", 0.05, "COLLECTIVE_ACTIVISM +5% culture per suzerainty"),
+        (["CODE_OF_LAWS", "DIVINE_RIGHT", "SOCIAL_MEDIA"], "ysuz:4", 0.05, "COLLECTIVE_ACTIVISM +5% culture per suzerainty"),
     ]
     for ids, key, want, why in CHECKS:
-        got = float(fx_of(ids)[12][key][0])
+        _k, _, _c = key.partition(":")
+        _v = fx_of(ids)[12][_k][0]
+        got = float(_v[int(_c)] if _c else _v)
         assert abs(got - want) < 1e-12, f"{why}: expected {want}, got {got}"
     print("  5 flat channels: " + ", ".join(k for _, k, _, _ in CHECKS))
 

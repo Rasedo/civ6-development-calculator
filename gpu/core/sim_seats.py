@@ -3994,11 +3994,27 @@ class SimSeats:
             return p * land.gather(1, t)
 
         raw = (price(new) - price(old)).clamp(min=0)
+        # CIV6 (Force Modernization, EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT)
+        off = self._gov_mods(row)[12]["upgold"].clamp(max=100.0).unsqueeze(1)
+        if bool((off > 0).any()):
+            raw = torch.where(off > 0, js_round(raw * (100.0 - off) / 100.0), raw)
         pct = torch.zeros(B, dtype=torch.float64, device=self.device)
         for _lc, _ll, _ld, _le, _lm, _lcs in self._live_rows(row, self._levy_rows):
             pct = torch.where(self._row_is(row, _lc, _ll), pct.clamp(min=float(_ld)), pct)
         disc = js_round(raw * (1.0 - pct.clamp(max=100.0).unsqueeze(1) / 100.0))
         return torch.where(levied.reshape(B, -1), disc, raw).reshape(shp)
+
+    def _upgrade_res_cost(self, row: int, cost: torch.Tensor) -> torch.Tensor:
+        """the new chassis' resource charge an UPGRADE draws, [B] or [B, N] —
+        CIV6 (Force Modernization,
+        EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_RESOURCE_COST_DISCOUNT) the seat's
+        percent off, rounded (`upgradeResourceCost`)."""
+        off = self._gov_mods(row)[12]["upres"].clamp(max=100.0)
+        if not bool((off > 0).any()):
+            return cost
+        off = off.reshape((self.B,) + (1,) * (cost.dim() - 1))
+        cut = js_round(cost.double() * (100.0 - off) / 100.0).to(cost.dtype)
+        return torch.where(off > 0, cut, cost)
 
     def _upgrade_units(self, row: int, hit: torch.Tensor, sc: torch.Tensor,
                        utp: torch.Tensor) -> None:
@@ -4021,7 +4037,7 @@ class SimSeats:
                               torch.ones_like(ok))
         price = self._upgrade_gold_cost(row, utp, nc, self.unit_levied.gather(1, sc.unsqueeze(1)).squeeze(1))
         ok = ok & self._afford(self.civ_treasury[:, row], price)
-        slot, cost = self._type_res_slot[nc], self._type_res_cost[nc]
+        slot, cost = self._type_res_slot[nc], self._upgrade_res_cost(row, self._type_res_cost[nc])
         want = (slot >= 0) & (cost > 0) & (self._type_res_slot[utp.clamp(min=0)] != slot)
         if self._n_strategic:
             stock = self.civ_stockpile[:, row]
@@ -5312,7 +5328,7 @@ class SimSeats:
         """[B] f64 — a PLAIN count of the minors this row is suzerain of. The
         Treaty Organization weighting in `_suzerain_count` is what a
         suzerainty pays in FAVOR; a yield clause counts heads, which is what
-        TS's `isSuzerain` filter does (`culturePerSuzerain`, Pericles)."""
+        TS's `isSuzerain` filter does (`yieldPctPerSuzerain`, Pericles, Raj)."""
         if row >= self.n_majors:
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         return self._suzerain_mask(row)[:, : self.S].double().sum(dim=1)
@@ -8572,9 +8588,14 @@ class SimSeats:
                 rk.scatter_add_(2, y.unsqueeze(2), v.unsqueeze(2))
             else:
                 rk[:, :, y] += v
-        _rg = self._gov_mods(row)[12]["rgold"]
+        # the seat's cards' yields on every route (Caravansaries, Triangular
+        # Trade, Ecommerce)
+        _fxr = self._gov_mods(row)[12]
+        _rg = _fxr["ryield"]
         if bool((_rg != 0).any()):
-            _rk_add(2, _rg.double().unsqueeze(1) * (act & has_from).double())
+            for _kc in range(6):
+                if bool((_rg[:, _kc] != 0).any()):
+                    _rk_add(_kc, _rg[:, _kc].unsqueeze(1) * (act & has_from).double())
         # domestic legs
         pays_d = act & (rr[:, :, 1] >= 0) & has_from & has_dest
         pd = pays_d.double()
@@ -8698,6 +8719,11 @@ class SimSeats:
             _fad = self._gp_perm(row, "csRouteFaith").double()
             if bool((_fad != 0).any()):
                 _rk_add(5, _fad.unsqueeze(1) * pays_c.double())
+            # CIV6 (Raj): the same modifier on a policy card
+            _csr = _fxr["csryield"]
+            if bool((_csr != 0).any()):
+                for _kc in range(6):
+                    _rk_add(_kc, _csr[:, _kc].unsqueeze(1) * pays_c.double())
             pg_c = self._route_post_gold(row, self.citystate_center[:, :S].gather(1, css))
             if bool((pg_c > 0).any()):
                 _rk_add(2, pg_c.double() * pays_c.double())
@@ -8815,6 +8841,11 @@ class SimSeats:
             _rk_add(2, gold_i * pays_i.double())
             for _yc in (0, 1, 3, 4, 5):
                 _rk_add(_yc, intl6[:, :, _yc] * pays_i.double())
+            # CIV6 (Trade Confederation, EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL)
+            _irr = _fxr["iryield"]
+            if bool((_irr != 0).any()):
+                for _kc in range(6):
+                    _rk_add(_kc, _irr[:, _kc].unsqueeze(1) * pays_i.double())
             # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows.
             # An INTERCONTINENTAL row pays only where the two ENDPOINTS sit
             # on different landmasses, and it ADDS to the plain row rather
@@ -9510,6 +9541,10 @@ class SimSeats:
                 for _sc, _sl, _sr, _st, _sa, _sp in self._live_rows(row, self._stockpile_rate_rows):
                     if _sr == rid and _sa:
                         per = per + self._row_is(row, _sc, _sl).long() * _sa
+                # CIV6 (Equestrian Orders, EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER):
+                # the seat's cards' extra per improved source
+                if row < self.n_majors:
+                    per = per + self._gov_mods(row)[12]["stockps"][:, k].round().long()
                 pt = here.long() * per.unsqueeze(1)  # [B, T] — each accruing tile's own rate
                 if self.n_governors:
                     # CIV6 (Defense Logistics): "Accumulating Strategic

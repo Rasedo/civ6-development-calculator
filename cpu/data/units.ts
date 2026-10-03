@@ -3674,7 +3674,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
  *  exported `cls` mask packs them in. `ranged` is the CLASS — a Quadrireme is
  *  naval and a Catapult is siege, and neither is reached by a card that says
  *  "ranged units", however loudly their ranged strength reads. */
-export const UNIT_CLASSES = ['melee', 'ranged', 'antiCavalry', 'cavalry', 'naval', 'recon', 'settler', 'builder'] as const;
+export const UNIT_CLASSES = ['melee', 'ranged', 'antiCavalry', 'cavalry', 'naval', 'recon', 'settler', 'builder', 'spy'] as const;
 export type UnitClass = (typeof UNIT_CLASSES)[number];
 
 /** CIV6 (EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT): the open terrains
@@ -3723,6 +3723,7 @@ export function unitHasClass(def: UnitDef, cls: UnitClass): boolean {
     case 'recon': return !!def.recon;
     case 'settler': return !!def.settler;
     case 'builder': return !!def.builder;
+    case 'spy': return !!def.spy;
   }
 }
 

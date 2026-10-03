@@ -77,7 +77,7 @@ describe('Qhapaq Ñan', () => {
       const n = ringOfMountains(state, from);
       expect(cityMountainCount(state, from)).toBe(n);
       state.seats[0].tradeRoutes = [{ from: from.id, to: to.id, turnsLeft: 20 } as never];
-      return cityTradeYields(state, from, 0).food;
+      return cityTradeYields(state, from).food;
     };
     expect(foodOf(leaderRow('PACHACUTI'))).toBe(foodOf(seatRow('AMERICA')) + 6);
   });

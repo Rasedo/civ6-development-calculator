@@ -30,8 +30,8 @@ describe('the legacy card roster', () => {
   it('is one Wildcard per government, carrying that government own bonus', () => {
     for (const g of Object.values(GOVERNMENTS)) {
       const card = POLICIES[`LEGACY_${g.id}`];
-      if (g.tier === 0) {
-        expect(card, 'the Chiefdom has no legacy bonus').toBeUndefined();
+      if (g.tier === 0 || g.noLegacyCard) {
+        expect(card, `${g.id} leaves no legacy card`).toBeUndefined();
         continue;
       }
       expect(card, `${g.id} has no legacy card`).toBeTruthy();
@@ -43,7 +43,7 @@ describe('the legacy card roster', () => {
 
   it('and no legacy card is unlocked by a civic', () => {
     const legacy = POLICY_LIST.filter((p) => p.legacyOf !== undefined);
-    expect(legacy.length).toBe(Object.values(GOVERNMENTS).filter((g) => g.tier > 0).length);
+    expect(legacy.length).toBe(Object.values(GOVERNMENTS).filter((g) => g.tier > 0 && !g.noLegacyCard).length);
     for (const p of legacy) expect(p.obsoleteCivic).toBeUndefined();
   });
 });

@@ -46,11 +46,11 @@ describe('Surplus Logistics', () => {
     const from = settleAt(state, tileAtCoords(state.map, 5, 5).index, 0);
     const to = settleAt(state, tileAtCoords(state.map, 9, 5).index, 0);
     seatOf(state, 0)!.tradeRoutes = [{ from: from.id, to: to.id }];
-    const before = cityTradeYields(state, from, 0).food;
+    const before = cityTradeYields(state, from).food;
     seat(state, to, GOVERNOR_INDEX.MAGNUS, P_SURPLUS);
-    expect(cityTradeYields(state, from, 0).food).toBe(before + 2);
+    expect(cityTradeYields(state, from).food).toBe(before + 2);
     // ...and the DESTINATION's own walk is untouched: it sends nothing here
-    expect(cityTradeYields(state, to, 0).food).toBe(0);
+    expect(cityTradeYields(state, to).food).toBe(0);
   });
 
   it('an unestablished governor pays nothing', () => {
@@ -59,9 +59,9 @@ describe('Surplus Logistics', () => {
     const to = settleAt(state, tileAtCoords(state.map, 9, 5).index, 0);
     seatOf(state, 0)!.tradeRoutes = [{ from: from.id, to: to.id }];
     const g = seat(state, to, GOVERNOR_INDEX.MAGNUS, P_SURPLUS);
-    const paid = cityTradeYields(state, from, 0).food;
+    const paid = cityTradeYields(state, from).food;
     g.establishTurns = 3;
-    expect(cityTradeYields(state, from, 0).food).toBe(paid - 2);
+    expect(cityTradeYields(state, from).food).toBe(paid - 2);
   });
 });
 

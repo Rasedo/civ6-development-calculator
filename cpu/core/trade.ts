@@ -750,7 +750,7 @@ export function routeYieldValue(state: GameState, owner: Seat, r: TradeRoute): n
     o = minorRouteOriginYields(state, owner, r);
   } else {
     const city = owner.cities.find((c) => c.id === r.from);
-    o = city ? routeOriginYields(state, city, r, getModifiers(state, owner.seat).routeGold) : null;
+    o = city ? routeOriginYields(state, city, r) : null;
   }
   const d = routeDestYields(state, owner.seat, r);
   const dSeat = r.toCs !== undefined ? NO_SEAT : (r.toSeat ?? owner.seat);
@@ -764,18 +764,20 @@ export function routeYieldValue(state: GameState, owner: Seat, r: TradeRoute): n
 }
 
 /** What ONE of a major's routes pays its ORIGIN city `city` (the route's
- *  `from`), before the seat's Letters of Marque cut: `routeGold` (the
- *  seat's Caravansaries row) and every per-route adder of the leg's kind.
+ *  `from`), before the seat's Letters of Marque cut: the seat's cards'
+ *  `routeYield` (Caravansaries, Triangular Trade, Ecommerce) and every
+ *  per-route adder of the leg's kind.
  *  `cityTradeYields` sums it over the city's routes; the plunder payout
  *  reads it for one route (`routeYieldValue`). */
-export function routeOriginYields(state: GameState, city: City, route: TradeRoute, routeGold: number): Yields {
+export function routeOriginYields(state: GameState, city: City, route: TradeRoute): Yields {
   const seat = city.seat;
   const out = emptyYields();
   const gpOwner = seatOf(state, seat);
   const gpStratGold = gpPermOf(gpOwner, 'strategicRouteGold');
-  const rowsHere = getModifiers(state, seat).routeImprovement;
+  const seatMods = getModifiers(state, seat);
+  const rowsHere = seatMods.routeImprovement;
   const originWonderGold = wonderRouteOriginGold(state, city);
-  out.gold += routeGold;
+  addYields(out, seatMods.routeYield);
   // the ORIGIN side of the same rows: this seat's route out, per named
   // improvement at its destination city
   if (rowsHere.length) {
@@ -802,6 +804,8 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       out.gold += routeLengthGold(state, seat, route);
       // CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
       out.faith += gpPermOf(gpOwner, 'csRouteFaith');
+      // CIV6 (Raj): the same modifier on a policy card
+      addYields(out, seatMods.csRouteYield);
       // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
       // provide +2 Culture and +1 Gold for every specialty district in the
       // ORIGIN city" — this city, whichever minor the route reaches.
@@ -818,6 +822,8 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
     const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
     if (civSeat && civCity) {
       addYields(out, routeYieldsInternational(state, city, civCity, seat));
+      // CIV6 (Trade Confederation, EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL)
+      addYields(out, seatMods.intlRouteYield);
       out.gold += routePathGold(state, seat, route, districtRouteYields(state, civCity, 'international').gold);
       // CIV6 (Religious Community): the ORIGIN's worship buildings, on this leg
       out.gold += religiousCommunityGold(state, seat, city);
@@ -903,9 +909,7 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
   return out;
 }
 
-/** `routeGold` is CARAVANSARIES' "+2 Gold from all Trade Routes" — the
- *  seat's own modifier, passed in because the yield walk already holds it. */
-export function cityTradeYields(state: GameState, city: City, routeGold: number): Yields {
+export function cityTradeYields(state: GameState, city: City): Yields {
   const seat = city.seat;
   const out = emptyYields();
   if (isCityStateSeat(seat)) {
@@ -946,7 +950,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
   }
   for (const route of seatOf(state, seat)?.tradeRoutes ?? []) {
     if (route.from !== city.id) continue;
-    addYields(out, routeOriginYields(state, city, route, routeGold));
+    addYields(out, routeOriginYields(state, city, route));
   }
   // CIV6 (Letters of Marque): "Trade Route yields -50%."
   const cut = getModifiers(state, seat).routeYieldMult;

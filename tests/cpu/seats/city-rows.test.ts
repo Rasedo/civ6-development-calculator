@@ -189,7 +189,7 @@ describe('Favorable Terms', () => {
     camp.resource = 'DEER';
     camp.improvement = 'CAMP';
     state.seats[0].tradeRoutes = [{ from: from.id, to: to.id, turnsLeft: 20 } as never];
-    const out = cityTradeYields(state, from, 0);
+    const out = cityTradeYields(state, from);
     expect(out.food).toBe(1 + 1); // routeYields' own food, plus the Camp
     // the destination side: another seat's route in pays this seat gold per Camp here
     const homeCamp = tileAtCoords(state.map, 3, 4);
@@ -199,8 +199,8 @@ describe('Favorable Terms', () => {
     state.seats[1].tradeRoutes = [{ from: 1, toSeat: 0, toSeatCity: from.id, turnsLeft: 20 } as never];
     // one foreign route in pays the origin per Camp HERE; the domestic route
     // this seat sent pays its own destination the same way
-    expect(cityTradeYields(state, from, 0).gold).toBe(1);
-    expect(cityTradeYields(state, to, 0).gold).toBe(1);
+    expect(cityTradeYields(state, from).gold).toBe(1);
+    expect(cityTradeYields(state, to).gold).toBe(1);
     const plain = sceneAs(seatRow('AMERICA'));
     const pf = settleAt(plain, tileAtCoords(plain.map, 3, 3).index, 0);
     const pt = settleAt(plain, tileAtCoords(plain.map, 9, 9).index, 0);
@@ -209,8 +209,8 @@ describe('Favorable Terms', () => {
     pc.resource = 'DEER';
     pc.improvement = 'CAMP';
     plain.seats[0].tradeRoutes = [{ from: pf.id, to: pt.id, turnsLeft: 20 } as never];
-    expect(cityTradeYields(plain, pf, 0).food).toBe(1);
-    expect(cityTradeYields(plain, pt, 0).gold).toBe(0);
+    expect(cityTradeYields(plain, pf).food).toBe(1);
+    expect(cityTradeYields(plain, pt).gold).toBe(0);
   });
 });
 

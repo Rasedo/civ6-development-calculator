@@ -53,10 +53,10 @@ describe("Mediterranean's Bride", () => {
     // the destination's own +2 per incoming route
     state.seats[1].tradeRoutes = [{ from: c1.id, toSeat: 0, toSeatCity: c0.id } as TradeRoute];
     expect(incomingIntlRoutes(state, c0)).toBe(1);
-    expect(cityTradeYields(state, c0, 0).gold).toBe(CLEOPATRA_INCOMING_ROUTE_GOLD);
-    expect(cityTradeYields(state, c1, 0).gold).toBe(cityTradeYields(state, c1, 0).gold); // Rome's own leg is the intl leg
+    expect(cityTradeYields(state, c0).gold).toBe(CLEOPATRA_INCOMING_ROUTE_GOLD);
+    expect(cityTradeYields(state, c1).gold).toBe(cityTradeYields(state, c1).gold); // Rome's own leg is the intl leg
     state.seats[0].civ = civ('NORWAY');
-    expect(cityTradeYields(state, c0, 0).gold).toBe(0);
+    expect(cityTradeYields(state, c0).gold).toBe(0);
   });
 
   it('doubles the trade alliance points', () => {

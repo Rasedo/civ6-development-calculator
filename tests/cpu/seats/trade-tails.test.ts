@@ -111,7 +111,7 @@ describe('the plunder payout', () => {
       t.districtComplete = true;
       b.districts.push({ type, tileIndex: t.index });
     }
-    const o = routeOriginYields(state, a, r, 0);
+    const o = routeOriginYields(state, a, r);
     expect([o.food, o.production, o.gold]).toEqual([5, 5, 0]);
     expect(routeYieldValue(state, owner, r)).toBe(20);
     expect(routePlunderGold(state, 1, owner, r, 0)).toBe(100);

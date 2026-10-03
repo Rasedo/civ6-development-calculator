@@ -188,12 +188,12 @@ describe('the empire-wide channels', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
     const m = getModifiers(state, 0);
-    expect(m.culturePerSuzerain).toBe(0);
-    expect(POLICIES.COLLECTIVE_ACTIVISM.effects.culturePerSuzerain).toBeCloseTo(0.05);
+    expect(m.yieldPctPerSuzerain).toEqual({});
+    expect(POLICIES.COLLECTIVE_ACTIVISM.effects.yieldPctPerSuzerain).toEqual({ culture: 0.05 });
   });
 
   it('CARAVANSARIES pays every route this seat runs, not the destination', () => {
-    expect(POLICIES.CARAVANSARIES.effects.routeGold).toBe(2);
+    expect(POLICIES.CARAVANSARIES.effects.routeYield).toEqual({ gold: 2 });
   });
 
   it('the four Great-Person cards each name ONE class', () => {
@@ -214,7 +214,7 @@ describe('the empire-wide channels', () => {
   });
 
   it('every government but the Chiefdom has a legacy card', () => {
-    const want = Object.values(GOVERNMENTS).filter((g) => g.tier > 0).map((g) => `LEGACY_${g.id}`);
+    const want = Object.values(GOVERNMENTS).filter((g) => g.tier > 0 && !g.noLegacyCard).map((g) => `LEGACY_${g.id}`);
     const got = POLICY_LIST.filter((p) => p.legacyOf !== undefined).map((p) => p.id);
     expect(got.sort()).toEqual(want.sort());
   });

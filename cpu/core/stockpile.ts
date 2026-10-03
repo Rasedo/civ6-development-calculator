@@ -84,6 +84,7 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   if (!s) return;
   const bk = bank(s);
   const rate = getModifiers(state, seat).stockpileRate;
+  const perSource = getModifiers(state, seat).stockpilePerSource;
   // CIV6 (Resources.PrereqTech): a strategic resource the seat cannot see
   // yet accrues nothing, whatever improvement stands on its tile
   const hidden = hiddenResourcesFor(state, seat);
@@ -103,6 +104,9 @@ export function accrueStockpiles(state: GameState, seat: number): void {
       if (r.resource !== undefined && r.resource === t.resource) add += r.amount ?? 0;
       if (r.terrain !== undefined && r.terrain === t.terrain) pct += r.pct ?? 0;
     }
+    // CIV6 (Equestrian Orders, EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER):
+    // "All improved Horses and Iron resources yield 1 additional resource"
+    add += perSource[t.resource] ?? 0;
     const per = STRATEGIC_PER_TURN[t.resource] + goldenMineBonus(state, seat, t.resource)
       + governorTileSum(state, t, (e) => e.stockpilePerTurn) + add;
     bk[k] += Math.floor((per * (100 + pct)) / 100);
@@ -245,7 +249,10 @@ export function upgradeGoldCost(
 ): number {
   const next = civUpgradeTarget(civOf(state, seat), unitType, leaderOf(state, seat));
   if (!next) return 0;
-  const raw = Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
+  // CIV6 (Force Modernization, EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT)
+  const off = Math.min(100, getModifiers(state, seat).upgradeGoldDiscountPct);
+  const full = Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
+  const raw = off ? Math.round(full * (100 - off) / 100) : full;
   if (!levied) return raw;
   // CIV6 (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
   // PERCENT): levied units upgrade at a 75% discount.
@@ -271,7 +278,10 @@ export function upgradeResourceCost(state: GameState, seat: number, unitType: st
   const next = civUpgradeTarget(civOf(state, seat), unitType, leaderOf(state, seat));
   if (!next) return undefined;
   const c = unitResourceCost(next);
-  return c && c.id !== UNITS[unitType]?.requiresResource ? c : undefined;
+  if (!c || c.id === UNITS[unitType]?.requiresResource) return undefined;
+  // CIV6 (Force Modernization, EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_RESOURCE_COST_DISCOUNT)
+  const off = Math.min(100, getModifiers(state, seat).upgradeResourceDiscountPct);
+  return off ? { id: c.id, n: Math.round(c.n * (100 - off) / 100) } : c;
 }
 
 export function canTrainWithStockpile(state: GameState, seat: number, unitType: string, formation = 0): boolean {

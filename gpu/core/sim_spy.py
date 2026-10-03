@@ -326,6 +326,11 @@ class SimSpy:
             cut = torch.div(n * self._bodyguard_num, self._bodyguard_den,
                             rounding_mode="floor").clamp(min=1)
             n = torch.where(self._golden_ded(row, self._ded_bodyguard), cut, n)
+            # CIV6 (Machiavellianism, EFFECT_ADJUST_UNIT_SPY_OFFENSIVE_OPERATION_TIME):
+            # the seat's cards' cut, after the dedication's own
+            if row < self.n_majors:
+                pc = self._gov_mods(row)[12]["spycut"].clamp(max=100.0).round().long()
+                n = torch.where(pc > 0, torch.div(n * (100 - pc), 100, rounding_mode="floor").clamp(min=1), n)
         if sc is not None:
             ty = self.unit_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
             sp = self._promo_val(ty, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1),

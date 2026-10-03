@@ -22,6 +22,7 @@ import { darkBuildings } from './yields';
 import { buildingVariantFor } from '../data/buildings';
 import { rowIsFor } from '../data/civilizations';
 import { civOf, leaderOf, seatOf } from './seats';
+import { getModifiers } from './effects';
 import {
   AUTO_THEME_ROWS, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GW_THEME_ART, GW_THEME_ARTIFACT,
   GWO_ARTIFACT, GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, THEMING_MULT, gwKindObjects, gwKindOf,
@@ -236,12 +237,15 @@ export function greatWorkTourism(state: GameState, city: WorkCity, printing: boo
   if (works.length === 0) return 0;
   const mult = gwSlotMults(state, city);
   const artifact = (100 + gpPermOf(seatOf(state, city.seat), 'artifactTourismPct')) / 100;
+  // CIV6 (Heritage Tourism, Satellite Broadcasts): the seat's cards scale one
+  // object type's tourism (EFFECT_ADJUST_CITY_TOURISM's ScalingFactor)
+  const scale = getModifiers(state, city.seat).gwTourismScale;
   let t = 0;
   for (const w of works) {
     if (w.obj === GWO_RELIC) continue;
     const kind = gwKindOf(w.obj);
     t += GWO_TOURISM[w.obj]! * (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1)
-      * (w.obj === GWO_ARTIFACT ? artifact : 1)
+      * (w.obj === GWO_ARTIFACT ? artifact : 1) * scale[w.obj]!
       * (kind >= 0 ? kmult[kind]! : 1) * mult[w.slot]!;
   }
   return t;
