@@ -6746,15 +6746,17 @@ class SimEconomy:
                 if fol_live:
                     bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", selbf, self._fol_tab_for("bldgY", row, sl))
             if self.S > 0 and row < self.n_majors:  # only a major sends envoys
+                # `cityStateEnvoyBonuses`' building rows: per envoy bar, the
+                # yield-type city-states reached, counted by type, times each
+                # type's building amounts, on the type's yield
                 env, nB = self._envoys_here(row), selb.shape[2]
-                acs = (self.citystate_alive & self._citystate_yield_ladder).double()
-                csf = torch.zeros(B, nB * 6, dtype=F64, device=dev)
-                for _bar, _tidx in ((3, self._citystate_t1idx), (6, self._citystate_t2idx)):
-                    _perk = (env >= _bar).double() * self._citystate_district_bonus * acs
-                    for _k in range(_tidx.shape[2]):
-                        _bt = _tidx[:, :, _k]
-                        csf.scatter_add_(1, _bt.clamp(min=0) * 6 + self._citystate_yidx, _perk * (_bt >= 0).double())
-                bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, csf.reshape(B, nB, 6))
+                ylad = self.citystate_alive & ~self._citystate_item_type
+                csf = torch.zeros(B, nB, 6, dtype=F64, device=dev)
+                for _e in self._cs_env_bars:
+                    _cnt = torch.einsum("bs,bst->bt", ((env >= _e) & ylad).double(), self._cs_type_onehot)
+                    csf.index_add_(2, self._cs_type_yidx,
+                                   (_cnt.unsqueeze(2) * self._cs_env_ybld[_e]).transpose(1, 2))
+                bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, csf)
             # CIV6 (Military Research, EFFECT_ADJUST_BUILDING_YIELD_CHANGE): the
             # seat's cards' add to the named buildings standing here
             for _pbo, _pbb, _pby in self._gov_mods(row)[12]["byield"]:
@@ -6895,10 +6897,12 @@ class SimEconomy:
         b_city = b_city + _gcity.double()
         b_cap = b_cap + _gcap.double()
         if self.S > 0 and row < self.n_majors:  # only a major sends envoys or holds a suzerain
-            _env, _acs = self._envoys_here(row), self.citystate_alive
-            b_cap = b_cap.scatter_add(
-                1, self._citystate_yidx,
-                ((_env >= 1) & _acs).double() * self._citystate_capamt)
+            # `cityStateEnvoyBonuses`' capital rows
+            _env = self._envoys_here(row)
+            _ylad = self.citystate_alive & ~self._citystate_item_type
+            for _e in self._cs_env_bars:
+                _cnt = torch.einsum("bs,bst->bt", ((_env >= _e) & _ylad).double(), self._cs_type_onehot)
+                b_cap = b_cap.index_add(1, self._cs_type_yidx, _cnt * self._cs_env_ycap[_e])
         if has_bel:
             # Founder capital incomes — perF (per N followers of the founder
             # religion worldwide, fractional: `religionFollowers`) + perC (per

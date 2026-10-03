@@ -318,35 +318,54 @@ class SimInit:
         citystate_yidx = rules.citystate["typeYieldIdx"]
         self._cs_type_n = len(citystate_yidx)  # CITY_STATE_TYPES' width
         self._citystate_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
-        # what one envoy pays the capital, per city-state (by its type)
-        self._citystate_capamt = torch.tensor([float(x) for x in rules.citystate["capitalBonus"]], dtype=torch.float64,
-                                              device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
         citystate_didx = rules.citystate["typeDistrictIdx"]  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
-        self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] district each CS boosts at 3/6 envoys
-        self._citystate_district_bonus = float(rules.citystate["districtBonus"])  # per-district amount at each of the 3-/6-envoy thresholds
-        # whether a city-state's ladder pays YIELDS, and the queue kinds a
-        # production type's ladder pays toward instead (`CITY_STATE_ITEM_PROD`)
+        self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] the type's own district
+        # the queue kinds a production type's ladder pays toward
+        # (`CITY_STATE_ITEM_PROD`); every other type pays its own yield
         _cst = self.citystate_type.clamp(min=0)
-        self._citystate_yield_ladder = torch.tensor(
-            [bool(x) for x in rules.citystate["yieldLadder"]], dtype=torch.bool, device=device)[_cst]  # [B, S]
         _ik = rules.citystate["typeItemKinds"]
         self._citystate_item_kind = {
             k: torch.tensor([k in x for x in _ik], dtype=torch.bool, device=device)[_cst]  # [B, S]
             for k in ("building", "wonder", "district", "unit", "settler")}
-        self._citystate_item_type = torch.tensor([len(x) > 0 for x in _ik], dtype=torch.bool, device=device)[_cst]  # [B, S]
-        self._citystate_item_amt = float(rules.citystate["itemProd"])
-        # CIV6 (Rise and Fall): the 3-/6-envoy bonus lands on the type's
-        # TIER-1 / TIER-2 building rows — either member of an exclusive pair
-        # (a city holds at most one); -1 pads the narrower types. Constant,
-        # derived from citystate_type.
-        _t1 = rules.citystate["typeT1Idx"]
-        _t2 = rules.citystate["typeT2Idx"]
-        _w1 = max(max((len(x) for x in _t1), default=1), 1)
-        _w2 = max(max((len(x) for x in _t2), default=1), 1)
-        _t1p = torch.tensor([list(x) + [-1] * (_w1 - len(x)) for x in _t1], dtype=torch.long, device=device)
-        _t2p = torch.tensor([list(x) + [-1] * (_w2 - len(x)) for x in _t2], dtype=torch.long, device=device)
-        self._citystate_t1idx = _t1p[self.citystate_type.clamp(min=0)]  # [B, S, w1]
-        self._citystate_t2idx = _t2p[self.citystate_type.clamp(min=0)]  # [B, S, w2]
+        _item_t = [len(x) > 0 for x in _ik]
+        self._citystate_item_type = torch.tensor(_item_t, dtype=torch.bool, device=device)[_cst]  # [B, S]
+        # THE ENVOY LADDER (`CITY_STATE_ENVOY_ROWS`), per distinct envoy bar,
+        # by city-state TYPE: a yield type's capital amount [T] and building
+        # amounts [T, NB] (each on the type's yield); a production type's
+        # capital amount [T] and its requirement groups — one entry per row,
+        # (type, amount, [building indices] any of which qualifies the city).
+        _nT = len(_ik)
+        _rows = rules.citystate["envoyRows"]
+        self._cs_env_bars = sorted({int(r["e"]) for r in _rows})
+        self._cs_env_ycap = {}
+        self._cs_env_ybld = {}
+        self._cs_env_pcap = {}
+        self._cs_env_pgrp = {}
+        for _e in self._cs_env_bars:
+            _ycap = torch.zeros(_nT, dtype=torch.float64, device=device)
+            _ybld = torch.zeros(_nT, len(rules.b_cost), dtype=torch.float64, device=device)
+            _pcap = torch.zeros(_nT, dtype=torch.float64, device=device)
+            _pgrp = []
+            for r in _rows:
+                if int(r["e"]) != _e:
+                    continue
+                _t, _a, _b = int(r["t"]), float(r["a"]), [int(x) for x in r["b"]]
+                if _item_t[_t]:
+                    if _b:
+                        _pgrp.append((_t, _a, torch.tensor(_b, dtype=torch.long, device=device)))
+                    else:
+                        _pcap[_t] += _a
+                elif _b:
+                    for _bi in _b:
+                        _ybld[_t, _bi] += _a
+                else:
+                    _ycap[_t] += _a
+            self._cs_env_ycap[_e], self._cs_env_ybld[_e] = _ycap, _ybld
+            self._cs_env_pcap[_e], self._cs_env_pgrp[_e] = _pcap, _pgrp
+        # [B, S, T] one-hot of each city-state's type, and [T] each type's
+        # yield index
+        self._cs_type_onehot = torch.nn.functional.one_hot(_cst, _nT).to(torch.float64)
+        self._cs_type_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)
         # Suzerain perks modeled as RULES — `effects` is the code order the
         # per-CS `suzCode` plane indexes; -1 = the perk is not in this build.
         _suz = rules.citystate["suz"]

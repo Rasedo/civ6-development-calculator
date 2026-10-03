@@ -1,26 +1,14 @@
 /**
- * City-state definitions (base Civ 6 envoy system).
- * Envoy bonuses AS MODELED: 1 envoy = the type's yield in the capital; 3 / 6
- * envoys = +2 on every city's tier-1 / tier-2 building of the type. The
- * Industrial and Militaristic ladders pay production toward items in the same
- * three places instead (`CITY_STATE_ITEM_PROD`). Suzerain (3+ envoys, most
- * among majors) adds a type-specific perk.
- *
- * SOURCING SWEEP. Verified against the Civilization wiki's
- * City-state / Suzerain pages. CORRECT: the SUZERAIN rule (most envoys AND at
- * least 3) and the 3-/6-envoy THRESHOLDS.
- *
- * The ENVOY LADDER is the real one: 1 envoy in the Capital, then the 3-/6-
- * envoy steps. The Civilopedia's own city-state pages still print the
- * vanilla "in every Campus district" wording, but Rise and Fall re-keyed
- * both steps to the district's BUILDING TIERS (tier 1 at 3 envoys, tier 2
- * at 6) — the CITY_STATE_TYPE_TIER1/TIER2 tables, live through
- * `cityStateEnvoyBonuses`.
+ * City-state definitions. The envoy ladder is `CITY_STATE_ENVOY_ROWS`: at 1,
+ * 3 and 6 envoys each type pays the capital and named buildings (a yield
+ * type) or production toward items (Industrial, Militaristic:
+ * `CITY_STATE_ITEM_PROD`). Suzerain (3+ envoys, most among majors) adds a
+ * type-specific perk.
  */
 
 import type { CityStateType, DistrictId, QueueItem, YieldKey } from '../core/types';
 import type { PromoClass } from './promotions';
-import { type SrcMap, srcConst, xml } from './provenance';
+import { type Src, type SrcMap, srcConst, xml } from './provenance';
 import { GAME_SPEED, speedTurns, speedTurnsSrc } from './constants';
 
 export const CITY_STATE_TYPES: CityStateType[] = [
@@ -48,26 +36,6 @@ export const CITY_STATE_TYPE_DISTRICT: Record<CityStateType, DistrictId> = {
   industrial: 'INDUSTRIAL_ZONE',
   militaristic: 'ENCAMPMENT',
   religious: 'HOLY_SITE',
-};
-
-// CIV6 (Rise and Fall): the 3-/6-envoy bonuses key to the type district's
-// TIER-1 / TIER-2 building. Either member of an exclusive pair carries the
-// bonus (a city holds at most one of the pair).
-export const CITY_STATE_TYPE_TIER1: Record<CityStateType, readonly string[]> = {
-  scientific: ['LIBRARY'],
-  cultural: ['AMPHITHEATER'],
-  trade: ['MARKET'],
-  industrial: ['WORKSHOP'],
-  militaristic: ['BARRACKS', 'STABLE'],
-  religious: ['SHRINE'],
-};
-export const CITY_STATE_TYPE_TIER2: Record<CityStateType, readonly string[]> = {
-  scientific: ['UNIVERSITY'],
-  cultural: ['MUSEUM', 'ARCHAEOLOGICAL_MUSEUM'],
-  trade: ['BANK'],
-  industrial: ['FACTORY'],
-  militaristic: ['ARMORY'],
-  religious: ['TEMPLE'],
 };
 
 /**
@@ -290,31 +258,155 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
 
 export const ENVOY_COST = 100;
 export const INFLUENCE_PER_TURN = 3;
-/** What ONE envoy pays the capital, per yield type: the `MINOR_CIV_*_YIELD_FOR
- *  _CAPITAL` rows' Amount (Leaders.xml) — Trade's Gold is 4, the rest 2. The
- *  two production types pay no yield (`CITY_STATE_ITEM_PROD`). */
-export const CITY_STATE_CAPITAL_BONUS: Partial<Record<CityStateType, number>> = {
-  scientific: 2, cultural: 2, trade: 4, religious: 2,
-};
-export const CITY_STATE_DISTRICT_BONUS = 2;
 
-/** The queue kinds a city-state's envoys pay PRODUCTION TOWARD, per type.
- *  CIV6 (Leaders.xml, MINOR_CIV_INDUSTRIAL_{BUILDING,DISTRICT}_PRODUCTION_FOR
- *  _CAPITAL: MODIFIER_PLAYER_CAPITAL_CITY_ADJUST_BUILDING_PRODUCTION /
- *  _DISTRICT_PRODUCTION; MINOR_CIV_MILITARISTIC_PRODUCTION_FOR_CAPITAL:
- *  _ADJUST_UNIT_PRODUCTION) at 1 envoy, and (Expansion1_Leaders.xml, loaded
- *  by Gathering Storm) the MEDIUM / LARGE rows re-keyed to
- *  MODIFIER_PLAYER_CITIES_ADJUST_{BUILDING,DISTRICT,UNIT}_PRODUCTION_CHANGE in
- *  every city with the type's tier-1 / tier-2 building (BUILDING_IS_WORKSHOP
- *  / _FACTORY, BUILDING_IS_BARRACKS_STABLE_MILITARITIC_CITY_STATE / _ARMORY).
- *  The text reads "when producing wonders, buildings, and districts" and
- *  "when producing units" — a Settler is a unit. None of it is a city yield. */
+/** The queue kinds a city-state's envoys pay PRODUCTION TOWARD, per type —
+ *  the Industrial rows' EFFECT_ADJUST_CITY_PRODUCTION_BUILDING / _DISTRICT and
+ *  the Militaristic rows' EFFECT_ADJUST_CITY_PRODUCTION_UNIT. The text reads
+ *  "when producing wonders, buildings, and districts" and "when producing
+ *  units" — a Settler is a unit. None of it is a city yield. */
 export const CITY_STATE_ITEM_PROD: Partial<Record<CityStateType, readonly QueueItem['kind'][]>> = {
   industrial: ['building', 'wonder', 'district'],
   militaristic: ['unit', 'settler'],
 };
-/** Every one of those rows' Amount: +2 Production per step. */
-export const CITY_STATE_ITEM_PROD_AMOUNT = 2;
+
+/**
+ * One rung of a city-state type's ENVOY LADDER: one install modifier the
+ * type's trait attaches to every major holding at least `envoys` envoys there
+ * (PLAYER_HAS_{SMALL,MEDIUM,LARGE}_INFLUENCE, MinimumTokens 1 / 3 / 6). Each
+ * city-state of the type pays its rows again.
+ *
+ * A YIELD type (Scientific, Cultural, Trade, Religious) pays its type's yield
+ * (`CITY_STATE_TYPE_YIELD`): an empty `buildings` is the capital row
+ * (MODIFIER_PLAYER_CAPITAL_CITY_ADJUST_CITY_YIELD_CHANGE), otherwise
+ * MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_YIELD_CHANGE on that one building in
+ * every city. A PRODUCTION type (`CITY_STATE_ITEM_PROD`) pays production toward
+ * its kinds: an empty `buildings` is the capital row, otherwise every city
+ * holding ANY of `buildings` (the modifier's SubjectRequirementSet) — two rows
+ * a city both qualifies for pay twice ("+4 if it has both these buildings").
+ */
+export interface EnvoyRow {
+  /** PROVENANCE, per column (cpu/data/provenance.ts). */
+  src?: SrcMap;
+  /** the TraitModifiers row that attaches the modifier */
+  id: string;
+  type: CityStateType;
+  envoys: number;
+  amount: number;
+  buildings: readonly string[];
+}
+
+type InfluenceTier = 'SMALL' | 'MEDIUM' | 'LARGE';
+const TIER_ENVOYS: Record<InfluenceTier, number> = { SMALL: 1, MEDIUM: 3, LARGE: 6 };
+const TRAIT: Record<CityStateType, string> = {
+  scientific: 'SCIENTIFIC', cultural: 'CULTURAL', trade: 'TRADE',
+  industrial: 'INDUSTRIAL', militaristic: 'MILITARISTIC', religious: 'RELIGIOUS',
+};
+
+function rungSrc(type: CityStateType, tier: InfluenceTier, attach: string, mod: string): Record<string, Src> {
+  return {
+    type: xml('TraitModifiers', `ModifierId=${attach}`, 'TraitType', { expect: `MINOR_CIV_${TRAIT[type]}_TRAIT` }),
+    envoys: xml('RequirementArguments', `RequirementId=REQUIRES_PLAYER_HAS_${tier}_INFLUENCE&Name=MinimumTokens`, 'Value'),
+    amount: xml('ModifierArguments', `ModifierId=${mod}&Name=Amount`, 'Value'),
+  };
+}
+
+/** a yield type's rung: `building` is [engine id, install id], none for the
+ *  capital row */
+function yieldRung(type: CityStateType, tier: InfluenceTier, attach: string, mod: string,
+  amount: number, building?: readonly [string, string]): EnvoyRow {
+  const src = rungSrc(type, tier, attach, mod);
+  if (building) {
+    src.buildings = { derived: 'the modifier\'s BuildingType, as an engine id', inputs: [
+      xml('ModifierArguments', `ModifierId=${mod}&Name=BuildingType`, 'Value', { expect: `BUILDING_${building[1]}` })] };
+  }
+  return { id: attach, type, envoys: TIER_ENVOYS[tier], amount, buildings: building ? [building[0]] : [], src };
+}
+
+/** a production type's rung: each building is [engine id, install id, the
+ *  RequirementId naming it in the modifier's requirement set]; none for the
+ *  capital row. An Industrial rung's DISTRICT twin modifier carries the same
+ *  Amount and the same requirement set. */
+function prodRung(type: CityStateType, tier: InfluenceTier, attach: string, mod: string,
+  amount: number, buildings: readonly (readonly [string, string, string])[] = []): EnvoyRow {
+  const src = rungSrc(type, tier, attach, mod);
+  if (buildings.length > 0) {
+    src.buildings = { derived: 'the BuildingType of each requirement in the modifier\'s SubjectRequirementSet, as engine ids',
+      inputs: buildings.map(([, inst, req]) => xml('RequirementArguments', `RequirementId=${req}&Name=BuildingType`, 'Value',
+        { expect: `BUILDING_${inst}` })) };
+  }
+  return { id: attach, type, envoys: TIER_ENVOYS[tier], amount, buildings: buildings.map(([b]) => b), src };
+}
+
+const SCI = 'MINOR_CIV_SCIENTIFIC_';
+const CUL = 'MINOR_CIV_CULTURAL_';
+const TRD = 'MINOR_CIV_TRADE_';
+const REL = 'MINOR_CIV_RELIGIOUS_';
+const MIL = 'MINOR_CIV_MILITARISTIC_';
+const IND = 'MINOR_CIV_INDUSTRIAL_';
+
+/** CIV6 (DLC/Ethiopia/Data/Ethiopia_Buildings.xml, which every Gathering Storm
+ *  game loads; Ethiopia_RemoveData.xml deletes the Leaders.xml /
+ *  Expansion1_Leaders.xml ladder it replaces). */
+export const CITY_STATE_ENVOY_ROWS: readonly EnvoyRow[] = [
+  yieldRung('scientific', 'SMALL', `${SCI}SMALL_INFLUENCE_CAPITAL`, `${SCI}YIELD_FOR_CAPITAL_ETHIOPIA`, 1),
+  yieldRung('scientific', 'SMALL', `${SCI}SMALL_INFLUENCE_ETHIOPIA`, `${SCI}YIELD_FOR_LIBRARY_ETHIOPIA`, 1, ['LIBRARY', 'LIBRARY']),
+  yieldRung('scientific', 'MEDIUM', `${SCI}MEDIUM_INFLUENCE_ETHIOPIA`, `${SCI}YIELD_FOR_CONSULATE`, 2, ['CONSULATE', 'CONSULATE']),
+  yieldRung('scientific', 'MEDIUM', `${SCI}MEDIUM_INFLUENCE_UNIVERSITY`, `${SCI}YIELD_FOR_UNIVERSITY_ETHIOPIA`, 2, ['UNIVERSITY', 'UNIVERSITY']),
+  yieldRung('scientific', 'LARGE', `${SCI}LARGE_INFLUENCE_ETHIOPIA`, `${SCI}YIELD_FOR_CHANCERY`, 3, ['CHANCERY', 'CHANCERY']),
+  yieldRung('scientific', 'LARGE', `${SCI}LARGE_INFLUENCE_RESEARCH_LAB`, `${SCI}YIELD_FOR_RESEARCH_LAB`, 3, ['RESEARCH_LAB', 'RESEARCH_LAB']),
+
+  yieldRung('cultural', 'SMALL', `${CUL}SMALL_INFLUENCE_CAPITAL`, `${CUL}YIELD_FOR_CAPITAL_ETHIOPIA`, 1),
+  yieldRung('cultural', 'SMALL', `${CUL}SMALL_INFLUENCE_ETHIOPIA`, `${CUL}YIELD_FOR_AMPHITHEATER_ETHIOPIA`, 1, ['AMPHITHEATER', 'AMPHITHEATER']),
+  yieldRung('cultural', 'MEDIUM', `${CUL}MEDIUM_INFLUENCE_ETHIOPIA`, `${CUL}YIELD_FOR_CONSULATE`, 2, ['CONSULATE', 'CONSULATE']),
+  yieldRung('cultural', 'MEDIUM', `${CUL}MEDIUM_INFLUENCE_MUSEUM_ART`, `${CUL}YIELD_FOR_MUSEUM_ART`, 2, ['MUSEUM', 'MUSEUM_ART']),
+  yieldRung('cultural', 'MEDIUM', `${CUL}MEDIUM_INFLUENCE_MUSEUM_ARTIFACT`, `${CUL}YIELD_FOR_MUSEUM_ARTIFACT`, 2, ['ARCHAEOLOGICAL_MUSEUM', 'MUSEUM_ARTIFACT']),
+  yieldRung('cultural', 'LARGE', `${CUL}LARGE_INFLUENCE_ETHIOPIA`, `${CUL}YIELD_FOR_CHANCERY`, 3, ['CHANCERY', 'CHANCERY']),
+  yieldRung('cultural', 'LARGE', `${CUL}LARGE_INFLUENCE_BROADCAST_CENTER`, `${CUL}YIELD_FOR_BROADCAST_CENTER`, 3, ['BROADCAST_CENTER', 'BROADCAST_CENTER']),
+
+  yieldRung('trade', 'SMALL', `${TRD}SMALL_INFLUENCE_CAPITAL`, `${TRD}YIELD_FOR_CAPITAL_ETHIOPIA`, 2),
+  yieldRung('trade', 'SMALL', `${TRD}SMALL_INFLUENCE_ETHIOPIA`, `${TRD}YIELD_FOR_MARKET_ETHIOPIA`, 2, ['MARKET', 'MARKET']),
+  yieldRung('trade', 'SMALL', `${TRD}SMALL_INFLUENCE_LIGHTHOUSE`, `${TRD}YIELD_FOR_LIGHTHOUSE_ETHIOPIA`, 2, ['LIGHTHOUSE', 'LIGHTHOUSE']),
+  yieldRung('trade', 'MEDIUM', `${TRD}MEDIUM_INFLUENCE_ETHIOPIA`, `${TRD}YIELD_FOR_CONSULATE`, 4, ['CONSULATE', 'CONSULATE']),
+  yieldRung('trade', 'MEDIUM', `${TRD}MEDIUM_INFLUENCE_BANK`, `${TRD}YIELD_FOR_BANK_ETHIOPIA`, 4, ['BANK', 'BANK']),
+  yieldRung('trade', 'MEDIUM', `${TRD}MEDIUM_INFLUENCE_SHIPYARD`, `${TRD}YIELD_FOR_SHIPYARD_ETHIOPIA`, 4, ['SHIPYARD', 'SHIPYARD']),
+  yieldRung('trade', 'LARGE', `${TRD}LARGE_INFLUENCE_ETHIOPIA`, `${TRD}YIELD_FOR_CHANCERY`, 6, ['CHANCERY', 'CHANCERY']),
+  yieldRung('trade', 'LARGE', `${TRD}LARGE_INFLUENCE_STOCK_EXCHANGE`, `${TRD}YIELD_FOR_STOCK_EXCHANGE`, 6, ['STOCK_EXCHANGE', 'STOCK_EXCHANGE']),
+  yieldRung('trade', 'LARGE', `${TRD}LARGE_INFLUENCE_SEAPORT`, `${TRD}YIELD_FOR_SEAPORT`, 6, ['SEAPORT', 'SEAPORT']),
+
+  yieldRung('religious', 'SMALL', `${REL}SMALL_INFLUENCE_CAPITAL`, `${REL}YIELD_FOR_CAPITAL_ETHIOPIA`, 1),
+  yieldRung('religious', 'SMALL', `${REL}SMALL_INFLUENCE_ETHIOPIA`, `${REL}YIELD_FOR_SHRINE_ETHIOPIA`, 1, ['SHRINE', 'SHRINE']),
+  yieldRung('religious', 'MEDIUM', `${REL}MEDIUM_INFLUENCE_ETHIOPIA`, `${REL}YIELD_FOR_CONSULATE`, 2, ['CONSULATE', 'CONSULATE']),
+  yieldRung('religious', 'MEDIUM', `${REL}MEDIUM_INFLUENCE_TEMPLE`, `${REL}YIELD_FOR_TEMPLE_ETHIOPIA`, 2, ['TEMPLE', 'TEMPLE']),
+  yieldRung('religious', 'LARGE', `${REL}LARGE_INFLUENCE_ETHIOPIA`, `${REL}YIELD_FOR_CHANCERY`, 3, ['CHANCERY', 'CHANCERY']),
+  ...(['CATHEDRAL', 'DAR_E_MEHR', 'GURDWARA', 'MEETING_HOUSE', 'MOSQUE', 'PAGODA', 'STUPA', 'SYNAGOGUE', 'WAT'] as const)
+    .map((b) => yieldRung('religious', 'LARGE', `${REL}LARGE_INFLUENCE_${b}`, `${REL}YIELD_FOR_${b}`, 3, [b, b])),
+
+  prodRung('militaristic', 'SMALL', `${MIL}SMALL_INFLUENCE_CAPITAL`, `${MIL}YIELD_FOR_CAPITAL_ETHIOPIA`, 1),
+  prodRung('militaristic', 'SMALL', `${MIL}SMALL_INFLUENCE_ETHIOPIA`, `${MIL}PRODUCTION_FOR_BARRACKS_STABLE_ETHIOPIA`, 1,
+    [['BARRACKS', 'BARRACKS', 'REQUIRES_CITY_HAS_BARRACKS_ETHIOPIA'], ['STABLE', 'STABLE', 'REQUIRES_CITY_HAS_STABLE_ETHIOPIA']]),
+  prodRung('militaristic', 'MEDIUM', `${MIL}MEDIUM_INFLUENCE_ETHIOPIA`, `${MIL}PRODUCTION_FOR_CONSULATE`, 2,
+    [['CONSULATE', 'CONSULATE', 'REQUIRES_CITY_HAS_CONSULATE']]),
+  prodRung('militaristic', 'MEDIUM', `${MIL}MEDIUM_INFLUENCE_ARMORY`, `${MIL}PRODUCTION_FOR_ARMORY_ETHIOPIA`, 2,
+    [['ARMORY', 'ARMORY', 'REQUIRES_CITY_HAS_ARMORY_ETHIOPIA']]),
+  prodRung('militaristic', 'LARGE', `${MIL}LARGE_INFLUENCE_ETHIOPIA`, `${MIL}PRODUCTION_FOR_CHANCERY`, 3,
+    [['CHANCERY', 'CHANCERY', 'REQUIRES_CITY_HAS_CHANCERY']]),
+  prodRung('militaristic', 'LARGE', `${MIL}LARGE_INFLUENCE_MILITARY_ACADEMY`, `${MIL}PRODUCTION_FOR_MILITARY_ACADEMY_ETHIOPIA`, 3,
+    [['MILITARY_ACADEMY', 'MILITARY_ACADEMY', 'REQUIRES_CITY_HAS_MILITARY_ACADEMY']]),
+
+  prodRung('industrial', 'SMALL', `${IND}SMALL_INFLUENCE_BONUS_BUILDING_CAPITAL`, `${IND}BUILDING_PRODUCTION_FOR_CAPITAL_ETHIOPIA`, 1),
+  prodRung('industrial', 'SMALL', `${IND}SMALL_INFLUENCE_ETHIOPIA_BUILDING`, `${IND}BUILDING_PRODUCTION_FOR_WORKSHOP_ETHIOPIA`, 1,
+    [['WORKSHOP', 'WORKSHOP', 'REQUIRES_CITY_HAS_WORKSHOP_ETHIOPIA']]),
+  prodRung('industrial', 'MEDIUM', `${IND}MEDIUM_INFLUENCE_ETHIOPIA_BUILDING`, `${IND}BUILDING_PRODUCTION_FOR_CONSULATE`, 2,
+    [['CONSULATE', 'CONSULATE', 'REQUIRES_CITY_HAS_CONSULATE']]),
+  prodRung('industrial', 'MEDIUM', `${IND}MEDIUM_INFLUENCE_FACTORY_BUILDING`, `${IND}BUILDING_PRODUCTION_FOR_FACTORY_ETHIOPIA`, 2,
+    [['FACTORY', 'FACTORY', 'REQUIRES_CITY_HAS_FACTORY_ETHIOPIA']]),
+  prodRung('industrial', 'LARGE', `${IND}LARGE_INFLUENCE_ETHIOPIA_BUILDING`, `${IND}BUILDING_PRODUCTION_FOR_CHANCERY`, 3,
+    [['CHANCERY', 'CHANCERY', 'REQUIRES_CITY_HAS_CHANCERY']]),
+  prodRung('industrial', 'LARGE', `${IND}LARGE_INFLUENCE_POWER_PLANT_BUILDING`, `${IND}BUILDING_PRODUCTION_FOR_POWER_PLANT_ETHIOPIA`, 3,
+    [['NUCLEAR_POWER_PLANT', 'POWER_PLANT', 'REQUIRES_CITY_HAS_POWER_PLANT_ETHIOPIA'],
+      ['COAL_POWER_PLANT', 'COAL_POWER_PLANT', 'REQUIRES_CITY_HAS_COAL_POWER_PLANT_ETHIOPIA'],
+      ['OIL_POWER_PLANT', 'FOSSIL_FUEL_POWER_PLANT', 'REQUIRES_CITY_HAS_FOSSIL_FUEL_POWER_PLANT_ETHIOPIA']]),
+];
 export const SUZERAIN_ENVOYS = 3;
 export const QUEST_COOLDOWN = 12;
 export const QUEST_ENVOYS = 1;

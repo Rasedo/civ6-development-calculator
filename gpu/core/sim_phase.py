@@ -936,8 +936,9 @@ class SimPhase:
         """`cityStateItemProduction`'s twin: [B] f64, the flat Production the
         city at `col` puts toward its head `cur` off the seat's effective
         envoys — per live production-type city-state whose kinds hold the
-        item, +amount in the capital at 1 envoy and in a city whose tier-1 /
-        tier-2 building of the type stands (not dark) at 3 / 6."""
+        item, every ladder row its envoys reach: the capital row in the
+        capital, a building row in a city holding any of its buildings
+        standing (not dark)."""
         bidx = self._bidx
         env = self._envoys_here(row)
         B = cur.shape[0]
@@ -956,15 +957,17 @@ class SimPhase:
         stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(
             self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])  # [B, NB]
 
-        def _holds(tidx: torch.Tensor) -> torch.Tensor:
-            g = stand.gather(1, tidx.clamp(min=0).reshape(B, -1)).reshape(tidx.shape)
-            return (g & (tidx >= 0)).any(dim=2)
-
-        cap = self.city_is_cap[bidx, row, col]
-        steps = ((env >= 1) & cap.unsqueeze(1)).double() \
-            + ((env >= 3) & _holds(self._citystate_t1idx)).double() \
-            + ((env >= 6) & _holds(self._citystate_t2idx)).double()
-        return (self._citystate_item_amt * steps * hit.double()).sum(dim=1)
+        cap = self.city_is_cap[bidx, row, col].double()      # [B]
+        tsel = self._cs_type_onehot                            # [B, S, T]
+        flat = torch.zeros(B, dtype=torch.float64, device=env.device)
+        for _e in self._cs_env_bars:
+            on = (hit & (env >= _e)).double()                  # [B, S]
+            # per type: the capital row, then each requirement group the city holds
+            amt = cap.unsqueeze(1) * self._cs_env_pcap[_e].unsqueeze(0)   # [B, T]
+            for _t, _a, _bs in self._cs_env_pgrp[_e]:
+                amt[:, _t] += _a * stand[:, _bs].any(dim=1).double()
+            flat = flat + torch.einsum("bs,bst,bt->b", on, tsel, amt)
+        return flat
 
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            prod: torch.Tensor, sci_turn: torch.Tensor | None = None,

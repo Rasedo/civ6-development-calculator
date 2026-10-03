@@ -36,7 +36,7 @@ import { STORM_EVENTS, STORM_UNIT_ROWS } from '../data/disasters';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { SPY_MISSIONS, SPY_ESCAPE_ROUTES } from '../data/espionage';
 import { PROMISES } from '../data/promises';
-import { CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS, CITY_STATE_ENVOY_ROWS } from '../data/cityStates';
 import { CIV_LEVELS } from '../data/civLevels';
 import { BOOSTS } from '../data/boosts';
 import { CONGRESS_RESOLUTIONS, EMERGENCIES } from '../data/seats';
@@ -109,6 +109,7 @@ const ROW_CATALOGS: Readonly<Record<string, Rows>> = {
   spyEscapeRoutes: SPY_ESCAPE_ROUTES,
   promises: PROMISES,
   cityStateSuzerain: CITY_STATE_SUZERAIN_BONUS,
+  cityStateEnvoy: CITY_STATE_ENVOY_ROWS,
   suzEffects: SUZ_EFFECTS,
   civLevels: CIV_LEVELS,
   boosts: BOOSTS,

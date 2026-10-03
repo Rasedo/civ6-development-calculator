@@ -359,7 +359,8 @@ def test_the_tier1_building_follows_the_district(rules, path) -> None:
     dv = int(sim._citystate_didx[B0, s])
     typ = int(sim.citystate_type[B0, s])
     t1 = next(r for r, k in enumerate(sim._mb_kind)
-              if k == "building" and int(sim._mb_item[r][typ]) == int(sim._citystate_t1idx[B0, s, 0]))
+              if k == "building" and int(sim._mb_item[r][typ]) >= 0
+              and int(sim._b_req_district[int(sim._mb_item[r][typ])]) == dv)
     bi = int(sim._mb_item[t1][typ])
     idle_builder(sim, s)
     plan(sim, s, [district_row(sim, rules), t1])
@@ -466,7 +467,8 @@ def test_the_production_rows(rules, path) -> None:
     grant_district_tech(sim, s, dv)
     typ = int(sim.citystate_type[B0, s])
     t1 = next(r for r, k in enumerate(sim._mb_kind)
-              if k == "building" and int(sim._mb_item[r][typ]) == int(sim._citystate_t1idx[B0, s, 0]))
+              if k == "building" and int(sim._mb_item[r][typ]) >= 0
+              and int(sim._b_req_district[int(sim._mb_item[r][typ])]) == dv)
     bi = int(sim._mb_item[t1][typ])
     grant_building_research(sim, s, bi)
     plan(sim, s, [walls_row(sim, rules), row_of(rules, "district", int(rules.citystate["typeDistrictIdx"][0])), t1])

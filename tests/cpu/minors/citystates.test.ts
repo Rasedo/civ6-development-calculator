@@ -11,10 +11,10 @@ import { canFoundCity } from '../../../cpu/core/rules';
 import { seatPhase } from '../../../cpu/core/phase';
 import { borderCandidates, computeCityStats } from '../../../cpu/core/city';
 import { tilesWithin, hexDistance } from '../../../world/hex';
-import { assignEnvoy, cityStateEnvoyBonuses, cityStateItemProduction, envoyBonusDelta, envoysOf, isSuzerain, suzerainSciencePct } from '../../../cpu/core/cityStates';
+import { assignEnvoy, cityStateEnvoyBonuses, cityStateItemProduction, envoysOf, isSuzerain, suzerainSciencePct } from '../../../cpu/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../../../cpu/core/trade';
 import { ENVOY_COST, GENEVA_SCIENCE_PCT } from '../../../cpu/data/cityStates';
-import { emptyYields, type CityState, type CityStateType, type GameState } from '../../../cpu/core/types';
+import { type CityState, type CityStateType, type GameState } from '../../../cpu/core/types';
 
 function addCs(
   state: GameState,
@@ -86,54 +86,37 @@ describe('city-state placement', () => {
 });
 
 describe('envoys', () => {
-  it('1 envoy boosts the capital; 3 boost matching districts; 3+ is suzerain', () => {
+  it('1 envoy boosts the capital and the Library; 3 the University; 3+ is suzerain', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     const cityState = addCs(state, 9, 9, { type: 'scientific' });
 
     // Bonuses ride the normal yield pipeline (amenity multipliers included),
-    // so assert a band rather than an exact +2.
+    // so assert a band rather than an exact +1.
     const before = computeCityStats(state, city).total.science;
     cityState.envoys = { [0]: 1 };
     const withOne = computeCityStats(state, city).total.science;
-    expect(withOne - before).toBeGreaterThanOrEqual(2);
-    expect(withOne - before).toBeLessThan(2.5);
+    expect(withOne - before).toBeGreaterThanOrEqual(1);
+    expect(withOne - before).toBeLessThan(1.5);
 
-    // The 3/6 tiers now land on the CAMPUS BUILDINGS — a completed
-    // Campus holding a Library (tier-1) collects the 3-envoy bonus, a
-    // University (tier-2) the 6-envoy bonus.
     const campusTile = tileAtCoords(state.map, 6, 5);
     campusTile.district = 'CAMPUS';
     campusTile.districtComplete = true;
     city.districts.push({ type: 'CAMPUS', tileIndex: campusTile.index });
-    city.buildings.push('LIBRARY', 'UNIVERSITY');
+    city.buildings.push('LIBRARY');
+    const libBase = computeCityStats(state, city).total.science;
+    cityState.envoys = {};
+    const libNone = computeCityStats(state, city).total.science;
+    expect(libBase - libNone).toBeGreaterThanOrEqual(2); // capital 1 + Library 1
+    expect(libBase - libNone).toBeLessThan(2.5);
+    cityState.envoys = { [0]: 1 };
+    city.buildings.push('UNIVERSITY');
     const campusBase = computeCityStats(state, city).total.science;
     cityState.envoys = { [0]: 3 };
     const withThree = computeCityStats(state, city).total.science;
     expect(withThree - campusBase).toBeGreaterThanOrEqual(2);
     expect(withThree - campusBase).toBeLessThan(2.5);
     expect(isSuzerain(state, cityState, 0)).toBe(true);
-    cityState.envoys = { [0]: 6 };
-    const withSix = computeCityStats(state, city).total.science;
-    expect(withSix - campusBase).toBeGreaterThanOrEqual(4);
-    expect(withSix - campusBase).toBeLessThan(5);
-  });
-
-  it('predicts the gain of the next envoy', () => {
-    const state = makeState();
-    const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
-    const cityState = addCs(state, 9, 9, { type: 'cultural' });
-    expect(envoyBonusDelta(state, cityState, 0).culture).toBe(2); // crossing 1
-    cityState.envoys = { [0]: 1 };
-    expect(envoyBonusDelta(state, cityState, 0).culture).toBe(0); // 2 crosses nothing
-    cityState.envoys = { [0]: 2 };
-    const theater = tileAtCoords(state.map, 6, 5);
-    theater.district = 'THEATER_SQUARE';
-    theater.districtComplete = true;
-    city.districts.push({ type: 'THEATER_SQUARE', tileIndex: theater.index });
-    // The 3-envoy tier keys to the cultural tier-1 building (AMPHITHEATER).
-    city.buildings.push('AMPHITHEATER');
-    expect(envoyBonusDelta(state, cityState, 0).culture).toBe(2); // crossing 3 with one Amphitheater
   });
 
   it('suzerainty of a trade city-state adds route capacity', () => {
@@ -172,10 +155,13 @@ describe('envoys', () => {
     addCs(state, 3, 3, { type: 'scientific', envoys: { [0]: 1 } });
     addCs(state, 9, 9, { type: 'religious', envoys: { [0]: 3 } });
     const bonuses = cityStateEnvoyBonuses(state, 0);
-    expect(bonuses.capital.science).toBe(2);
-    expect(bonuses.capital.faith).toBe(2);
-    // The 3-envoy tier lands on the religious tier-1 building (SHRINE).
-    expect(bonuses.buildingAdd.SHRINE?.faith).toBe(2);
+    expect(bonuses.capital.science).toBe(1);
+    expect(bonuses.buildingAdd.LIBRARY?.science).toBe(1);
+    expect(bonuses.capital.faith).toBe(1);
+    expect(bonuses.buildingAdd.SHRINE?.faith).toBe(1);
+    expect(bonuses.buildingAdd.TEMPLE?.faith).toBe(2);
+    expect(bonuses.buildingAdd.CONSULATE).toEqual({ faith: 2 });
+    expect(bonuses.buildingAdd.CATHEDRAL).toBeUndefined();
   });
 });
 
@@ -255,14 +241,16 @@ describe('civ envoys and the suzerain contest', () => {
     const cityState = addCs(state, 8, 8, { type: 'scientific' });
     cityState.envoys = { [1]: 6, [2]: 1 };
     const b0 = cityStateEnvoyBonuses(state, 1);
-    expect(b0.capital.science).toBe(2);
-    // At 6 envoys the 3-tier lands on the tier-1 building (LIBRARY) and
-    // the 6-tier on the tier-2 building (UNIVERSITY) — +2 each, separate keys.
-    expect(b0.buildingAdd.LIBRARY?.science).toBe(2);
+    expect(b0.capital.science).toBe(1);
+    expect(b0.buildingAdd.LIBRARY?.science).toBe(1);
     expect(b0.buildingAdd.UNIVERSITY?.science).toBe(2);
+    expect(b0.buildingAdd.CONSULATE?.science).toBe(2);
+    expect(b0.buildingAdd.RESEARCH_LAB?.science).toBe(3);
+    expect(b0.buildingAdd.CHANCERY?.science).toBe(3);
     const b1 = cityStateEnvoyBonuses(state, 2);
-    expect(b1.capital.science).toBe(2);
-    expect(b1.buildingAdd.LIBRARY).toBeUndefined(); // 1 envoy: capital only
+    expect(b1.capital.science).toBe(1);
+    expect(b1.buildingAdd.LIBRARY?.science).toBe(1);
+    expect(b1.buildingAdd.UNIVERSITY).toBeUndefined(); // 1 envoy: the capital and the Library
   });
 
   // CIV6 (Leaders.xml / Expansion1_Leaders.xml): the Industrial and
@@ -278,45 +266,46 @@ describe('civ envoys and the suzerain contest', () => {
     expect(b.capital).toEqual({});
     expect(b.buildingAdd).toEqual({});
     expect(computeCityStats(state, city).total.production).toBe(before);
-    expect(envoyBonusDelta(state, state.cityStates[1], 0)).toEqual(emptyYields());
   });
 
-  it('Industrial: +2 toward wonders, buildings and districts in the capital, Workshop and Factory cities', () => {
+  it('Industrial: production toward wonders, buildings and districts in the capital and the Workshop, Factory, Consulate cities', () => {
     const state = makeState();
     const capital = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     const other = foundCity(state, tileAtCoords(state.map, 11, 5).index, 0).city!;
     const cs = addCs(state, 8, 10, { type: 'industrial', envoys: { [0]: 1 } });
     expect(capital.isCapital && !other.isCapital).toBe(true);
-    for (const k of ['building', 'wonder', 'district'] as const) expect(cityStateItemProduction(state, capital, k)).toBe(2);
+    for (const k of ['building', 'wonder', 'district'] as const) expect(cityStateItemProduction(state, capital, k)).toBe(1);
     for (const k of ['unit', 'settler', 'project'] as const) expect(cityStateItemProduction(state, capital, k)).toBe(0);
     expect(cityStateItemProduction(state, other, 'building')).toBe(0);
     other.buildings.push('WORKSHOP', 'FACTORY');
-    expect(cityStateItemProduction(state, other, 'building')).toBe(0); // 1 envoy: capital only
+    expect(cityStateItemProduction(state, other, 'building')).toBe(1); // 1 envoy: the Workshop
     cs.envoys = { [0]: 3 };
-    expect(cityStateItemProduction(state, other, 'district')).toBe(2);
+    expect(cityStateItemProduction(state, other, 'district')).toBe(3); // Workshop 1 + Factory 2
+    other.buildings.push('CONSULATE');
+    expect(cityStateItemProduction(state, other, 'district')).toBe(5); // a Consulate beside the Factory pays again
     cs.envoys = { [0]: 6 };
-    expect(cityStateItemProduction(state, other, 'district')).toBe(4);
-    expect(cityStateItemProduction(state, capital, 'district')).toBe(2); // no Workshop there
-    expect(cityStateItemProduction(state, other, 'building')).toBe(4);
+    other.buildings.push('COAL_POWER_PLANT');
+    expect(cityStateItemProduction(state, other, 'building')).toBe(8);
+    expect(cityStateItemProduction(state, capital, 'district')).toBe(1); // none of the buildings there
     // two Industrial minors stack
     addCs(state, 2, 10, { type: 'industrial', envoys: { [0]: 1 } });
-    expect(cityStateItemProduction(state, capital, 'wonder')).toBe(4);
+    expect(cityStateItemProduction(state, capital, 'wonder')).toBe(2);
   });
 
-  it('Militaristic: +2 toward units (a Settler is one) in the capital, Barracks-or-Stable and Armory cities', () => {
+  it('Militaristic: production toward units (a Settler is one) in the capital, Barracks-or-Stable and Armory cities', () => {
     const state = makeState();
     const capital = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     const other = foundCity(state, tileAtCoords(state.map, 11, 5).index, 0).city!;
     addCs(state, 8, 10, { type: 'militaristic', envoys: { [0]: 6 } });
-    expect(cityStateItemProduction(state, capital, 'unit')).toBe(2);
-    expect(cityStateItemProduction(state, capital, 'settler')).toBe(2);
+    expect(cityStateItemProduction(state, capital, 'unit')).toBe(1);
+    expect(cityStateItemProduction(state, capital, 'settler')).toBe(1);
     expect(cityStateItemProduction(state, capital, 'building')).toBe(0);
     other.buildings.push('STABLE');
-    expect(cityStateItemProduction(state, other, 'unit')).toBe(2);
+    expect(cityStateItemProduction(state, other, 'unit')).toBe(1);
     other.buildings.push('ARMORY');
-    expect(cityStateItemProduction(state, other, 'unit')).toBe(4);
+    expect(cityStateItemProduction(state, other, 'unit')).toBe(3);
     other.pillagedBuildings = ['ARMORY'];
-    expect(cityStateItemProduction(state, other, 'unit')).toBe(2); // a pillaged Armory does not count
+    expect(cityStateItemProduction(state, other, 'unit')).toBe(1); // a pillaged Armory does not count
   });
 
   it('the flat add joins the Production before the item percents', () => {
@@ -326,7 +315,7 @@ describe('civ envoys and the suzerain contest', () => {
     city.queue = [{ kind: 'unit', unit: 'WARRIOR', progress: 0, cost: 1000 }];
     const made = computeCityStats(state, city).total.production;
     seatPhase(state);
-    expect(city.queue[0].progress).toBeCloseTo(made + 2, 9);
+    expect(city.queue[0].progress).toBeCloseTo(made + 1, 9);
   });
 });
 

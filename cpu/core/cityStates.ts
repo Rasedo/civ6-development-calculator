@@ -1,11 +1,10 @@
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, QueueItem, Yields } from './types';
-import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
+import { NO_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
 import { grievanceCityStateWar } from './grievance';
 import { congressSuzBonusBlocked } from './congress';
 import { minorGovernorEffects } from './governors';
-import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 // the border-growth pick and its claim: a minor's envoy plots are taken by
 // the city rule's OWN next-tile choice, never a second one
@@ -15,7 +14,7 @@ import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { CIV_LEVELS } from '../data/civLevels';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_TIER1, CITY_STATE_TYPE_TIER2, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_ITEM_PROD, CITY_STATE_ITEM_PROD_AMOUNT, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -322,38 +321,27 @@ export function cityStateTradeCapacityBonus(state: GameState, seat: number): num
 
 interface CsBonuses {
   capital: Partial<Yields>;
-  // Re-keyed to BUILDINGS (real Civ 6: CS bonuses land on the district's
-  // BUILDINGS, not the bare district). The 3-envoy tier keys to the type's
-  // tier-1 building, the 6-envoy tier to the tier-2 building. Consumed via
-  // mods.buildingYieldAdd (cityBuildingYields), inheriting its pillaged-dark
-  // and regional-skip treatment for free.
+  // the building rows, consumed via mods.buildingYieldAdd
+  // (cityBuildingYields), which skips a pillaged-dark building
   buildingAdd: Partial<Record<string, Partial<Yields>>>;
 }
 
-function cityStateTierBuildings(type: GameState['cityStates'][number]['type']): {
-  tier1: readonly string[];
-  tier2: readonly string[];
-} {
-  return { tier1: CITY_STATE_TYPE_TIER1[type], tier2: CITY_STATE_TYPE_TIER2[type] };
-}
-
-/** The city-state YIELD ladder; the production types pay through
- *  `cityStateItemProduction` instead. */
+/** The city-state YIELD ladder (`CITY_STATE_ENVOY_ROWS` of the yield types);
+ *  the production types pay through `cityStateItemProduction` instead. */
 export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses {
   const capital: Partial<Yields> = {};
   const buildingAdd: CsBonuses['buildingAdd'] = {};
   for (const cityState of state.cityStates) {
-    const amount = CITY_STATE_CAPITAL_BONUS[cityState.type];
-    if (amount === undefined) continue;
+    if (CITY_STATE_ITEM_PROD[cityState.type]) continue;
     const mine = envoysHere(state, cityState, seat);
+    if (mine < 1) continue;
     const key = CITY_STATE_TYPE_YIELD[cityState.type];
-    if (mine >= 1) capital[key] = (capital[key] ?? 0) + amount;
-    const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
-    for (const [bar, blds] of [[3, tier1], [6, tier2]] as const) {
-      if (mine < bar) continue;
-      for (const b of blds) {
+    for (const row of CITY_STATE_ENVOY_ROWS) {
+      if (row.type !== cityState.type || mine < row.envoys) continue;
+      if (row.buildings.length === 0) capital[key] = (capital[key] ?? 0) + row.amount;
+      for (const b of row.buildings) {
         const cur = (buildingAdd[b] ??= {});
-        cur[key] = (cur[key] ?? 0) + CITY_STATE_DISTRICT_BONUS;
+        cur[key] = (cur[key] ?? 0) + row.amount;
       }
     }
   }
@@ -362,8 +350,8 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
 
 /** CIV6 (`CITY_STATE_ITEM_PROD`): the flat Production a city puts toward an
  *  item of `kind` off the seat's Industrial / Militaristic envoys — per such
- *  city-state, +amount in the capital at 1 envoy, and in a city whose tier-1 /
- *  tier-2 building of the type is standing (not dark) at 3 / 6. */
+ *  city-state, every row its envoys reach: the capital row in the capital, a
+ *  building row in a city holding any of its buildings standing (not dark). */
 export function cityStateItemProduction(state: GameState, city: City, kind: QueueItem['kind']): number {
   let flat = 0;
   let dark: Set<string> | undefined;
@@ -371,14 +359,15 @@ export function cityStateItemProduction(state: GameState, city: City, kind: Queu
     if (!CITY_STATE_ITEM_PROD[cityState.type]?.includes(kind)) continue;
     const mine = envoysHere(state, cityState, city.seat);
     if (mine < 1) continue;
-    let steps = city.isCapital ? 1 : 0;
-    const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
-    for (const [bar, blds] of [[3, tier1], [6, tier2]] as const) {
-      if (mine < bar) continue;
+    for (const row of CITY_STATE_ENVOY_ROWS) {
+      if (row.type !== cityState.type || mine < row.envoys) continue;
+      if (row.buildings.length === 0) {
+        if (city.isCapital) flat += row.amount;
+        continue;
+      }
       dark ??= darkBuildings(state.map, city);
-      if (blds.some((b) => city.buildings.includes(b) && !dark!.has(b))) steps += 1;
+      if (row.buildings.some((b) => city.buildings.includes(b) && !dark!.has(b))) flat += row.amount;
     }
-    flat += CITY_STATE_ITEM_PROD_AMOUNT * steps;
   }
   return flat;
 }
@@ -405,27 +394,6 @@ export function suzerainLandPurchaseMult(state: GameState, seat: number, city: C
   let rows = 0;
   for (const any of NGAZARGAMU_BUILDINGS) if (any.some((b) => city.buildings.includes(b))) rows += 1;
   return Math.max(0, 1 - (NGAZARGAMU_PURCHASE_PCT / 100) * rows);
-}
-
-/** The YIELDS the next envoy here adds — none for a production type, whose
- *  ladder is production toward items. */
-export function envoyBonusDelta(state: GameState, cityState: CityState, seat: number): Yields {
-  const delta = emptyYields();
-  const amount = CITY_STATE_CAPITAL_BONUS[cityState.type];
-  if (amount === undefined) return delta;
-  const key = CITY_STATE_TYPE_YIELD[cityState.type];
-  const now = envoysHere(state, cityState, seat);
-  const next = envoysWith(state, cityState, seat, envoysOf(cityState, seat) + 1);
-  if (now < 1 && next >= 1) delta[key] += amount;
-  // a doubled posting can cross BOTH building tiers on one envoy
-  const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
-  for (const [bar, blds] of [[3, tier1], [6, tier2]] as const) {
-    if (now >= bar || next < bar) continue;
-    let count = 0;
-    for (const c of citiesOf(state, seat)) if (blds.some((b) => c.buildings.includes(b))) count += 1;
-    delta[key] += CITY_STATE_DISTRICT_BONUS * count;
-  }
-  return delta;
 }
 
 export function assignEnvoy(state: GameState, cityStateId: number, seat: number): RuleResult {
