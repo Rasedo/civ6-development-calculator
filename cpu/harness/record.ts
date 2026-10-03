@@ -46,6 +46,9 @@ export interface DumpPlayer {
   pantheon: Read<number>;
   religionCreated: Read<number>;
   holyCity?: Read<{ id: number; player: number }>;
+  /** The moments of the record's turn and the one before: [id, MomentType,
+   *  era score, turn]. Absent from records the dumper wrote before it read them. */
+  moments?: Read<[number, string, number, number][]>;
   scienceYield: Read<number>;
   researching: Read<number>;
   researchProgress?: Read<number>;

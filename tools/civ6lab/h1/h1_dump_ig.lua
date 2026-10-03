@@ -170,7 +170,18 @@ for _, p in ipairs(players) do
     tokens = P(function() return pl:GetInfluence():GetTokensToGive() end),
     suzerain = P(function() return pl:GetInfluence():GetSuzerain() end),
     influencePoints = P(function() return pl:GetInfluence():GetPointsEarned() end),
-    governorPoints = P(function() return pl:GetGovernors():GetGovernorPoints() end)}
+    governorPoints = P(function() return pl:GetGovernors():GetGovernorPoints() end),
+    -- the moments of this turn and the last: [id, MomentType, era score, turn]
+    moments = P(function()
+      local out = {}
+      for _, m in ipairs(Game.GetHistoryManager():GetAllMomentsData(p, 0)) do
+        if m.Turn >= turn - 1 then
+          local info = GameInfo.Moments[m.Type]
+          out[#out + 1] = {m.ID, info and info.MomentType or tostring(m.Type), m.EraScore or 0, m.Turn}
+        end
+      end
+      return out
+    end)}
   local ok, cur = pcall(function() return techs:GetResearchingTech() end)
   if ok and cur ~= nil and cur >= 0 then
     rec.researchProgress = P(function() return techs:GetResearchProgress(cur) end)

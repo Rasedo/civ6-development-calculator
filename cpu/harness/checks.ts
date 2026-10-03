@@ -681,9 +681,14 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
     const gaps = [...new Set([...(s.civ < 0 ? ['leader'] : []),
       ...[...imp.cityByKey].filter(([, c]) => c.seat === seat)
         .flatMap(([k]) => [...(imp.cityGaps.get(k) ?? [])].filter((g) => g.startsWith('building:')))])];
+    // the game's own moments across the pair, where the record carries them:
+    // [id, MomentType, era score, turn] rows t+1 holds and t does not
+    const seen = new Set((Array.isArray(p0.moments) ? p0.moments : []).map((m) => m[0]));
+    const moments = (Array.isArray(p1.moments) ? p1.moments : [])
+      .filter((m) => !seen.has(m[0])).map((m) => `${strip(m[1], 'MOMENT_')} ${m[2]}`);
     out.push({ turn, check: 'step.eraScore', subject, ok: ours === game, game, ours,
       ...(gaps.length ? { gaps } : {}),
-      ...(ours === game ? {} : { state: { events: ev.events.map(([w]) => w), buildings: ev.buildings } }) });
+      ...(ours === game ? {} : { state: { events: ev.events.map(([w]) => w), buildings: ev.buildings, ...(Array.isArray(p1.moments) ? { moments } : {}) } }) });
   }
   const began = eraBegan(a, b);
   if (history) {
