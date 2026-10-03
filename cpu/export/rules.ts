@@ -997,6 +997,8 @@ export function buildRules() {
       // 10 hexes".
       killSpreadRange: KILL_SPREAD_RANGE,
       rainforestFid: FEAT_IDS.indexOf('RAINFOREST'),
+      // gold an international route out of a city holding the feature pays
+      featIntlGold: FEAT_IDS.map((f) => FEATURES[f]?.cityIntlRouteGold ?? 0),
       // Great Works. The WRITER / ARTIST / MUSICIAN class indices by created
       // kind (0 WRITING / 1 ART / 2 MUSIC), the works each makes, PRINTING's
       // doubling of a Work of Writing's tourism, and each artist's works.

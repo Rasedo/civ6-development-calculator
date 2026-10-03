@@ -1640,6 +1640,7 @@ class SimInit:
         self._kill_spread_range = int(rr["killSpreadRange"])
         self._promo_xp_per_level = int(rr["promoXpPerLevel"])
         self._rainforest_fid = int(rr["rainforestFid"])
+        self._feat_intl_gold = torch.tensor([float(x) for x in rr["featIntlGold"]], dtype=torch.float64, device=device)
         self._gp_nc = int(self._gp_class_district.numel())
         # PERMANENT channels a spent Great Person leaves behind, the count of
         # charges actually spent (which is what a founded religion reads), and

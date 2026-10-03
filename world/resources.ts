@@ -74,6 +74,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
   FISH: { id: 'FISH', name: 'Fish', category: 'bonus', yields: { food: 1 }, improvement: 'FISHING_BOATS', terrains: ['COAST', 'LAKE'], elevations: FLAT, harvestAmount: 20, harvestYield: 'food' },
   CRABS: { id: 'CRABS', name: 'Crabs', category: 'bonus', yields: { gold: 2 }, improvement: 'FISHING_BOATS', terrains: ['COAST'], elevations: FLAT, harvestAmount: 40, harvestYield: 'gold' },
   COPPER: { id: 'COPPER', name: 'Copper', category: 'bonus', yields: { gold: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA'], elevations: HILLS, noFeature: true, harvestAmount: 40, harvestYield: 'gold' },
+  // CIV6 (GranColombia_Maya_Resources.xml): RESOURCE_MAIZE, a bonus resource
+  // of flat Grassland and Plains with no feature row, +2 Gold, worked by a
+  // Farm, harvested for 40 Gold.
+  MAIZE: { id: 'MAIZE', name: 'Maize', category: 'bonus', yields: { gold: 2 }, improvement: 'FARM', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true, harvestAmount: 40, harvestYield: 'gold' },
 
   HORSES: { id: 'HORSES', name: 'Horses', category: 'strategic', revealTech: 'ANIMAL_HUSBANDRY', yields: { food: 1, production: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   IRON: { id: 'IRON', name: 'Iron', category: 'strategic', revealTech: 'BRONZE_WORKING', yields: { science: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: HILLS, noFeature: true },

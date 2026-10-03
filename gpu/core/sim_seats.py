@@ -8755,6 +8755,15 @@ class SimSeats:
             # CIV6 (Mediterranean's Bride): "+4 Gold for Egypt" on its own
             # routes out; "+2 Food for them" on anyone's route in.
             gold_i = gold_i + self._cleo_intl_gold * self._row_leads(row, "CLEOPATRA").double().unsqueeze(1)
+            # CIV6 (Paititi): +4 Gold on an international route out of a city
+            # holding it — `cityFeatureIntlGold`, the largest over its plots
+            if bool((self._feat_intl_gold != 0).any()):
+                _fcs = self.city_slot_at(row)
+                _fg = (self._feat_intl_gold[self.feat_id.clamp(min=0)]
+                       * ((self.feat_id >= 0) & (_fcs >= 0)).double())
+                _fper = torch.zeros(B, self.RC, dtype=torch.float64, device=self.device)
+                _fper.scatter_reduce_(1, _fcs.clamp(min=0), _fg, reduce="amax")
+                gold_i = gold_i + _fper.gather(1, from_j)
             _cleo_d = self._leads_vec("CLEOPATRA").gather(1, dr)  # [B, K]
             # CIV6 (Reform the Coinage, Golden face): "International Trade
             # Routes provide +3 Gold per specialty district in the foreign

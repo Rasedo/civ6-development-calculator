@@ -5,6 +5,7 @@
  * city-state runs routes too, from its one city (`minorTrade`).
  */
 
+import { FEATURES } from '../../world/features';
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
 import { BUILDINGS } from '../data/buildings';
 import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isCityStateSeat, seatsAllied, setTileOwner, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent } from './seats';
@@ -494,6 +495,16 @@ export function routeYields(state: GameState, dest: City): Yields {
 export const CITY_STATE_ROUTE_GOLD = 3;
 export const CITY_STATE_ROUTE_SPEC = 1;
 
+/** the largest `cityIntlRouteGold` among the features on the city's plots */
+function cityFeatureIntlGold(state: GameState, city: City): number {
+  let g = 0;
+  for (const t of state.map.tiles) {
+    if (!t.feature || t.ownerSeat !== city.seat || t.ownerCity !== city.id) continue;
+    g = Math.max(g, FEATURES[t.feature]?.cityIntlRouteGold ?? 0);
+  }
+  return g;
+}
+
 /**
  * CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): `origin` is
  * REQUIRED because a row may be intercontinental, and that is a fact about
@@ -509,6 +520,8 @@ export function routeYieldsInternational(state: GameState, origin: City, dest: C
   // "+2 Food for them" on anyone's route in.
   if (leaderOf(state, seat) === 'CLEOPATRA') out.gold += CLEOPATRA_INTL_ROUTE_GOLD;
   if (leaderOf(state, dest.seat) === 'CLEOPATRA') out.food += CLEOPATRA_INCOMING_ROUTE_FOOD;
+  // CIV6 (Paititi): +4 Gold on an international route out of a city holding it
+  out.gold += cityFeatureIntlGold(state, origin);
   // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows
   addRouteRows(state, out, getModifiers(state, seat).intlRouteYields, origin, dest);
   return out;

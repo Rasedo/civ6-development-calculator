@@ -28,6 +28,11 @@ interface FeatureDef {
    *  CLASS_FLOODPLAINS): one of the three floodplains — the class a flood
    *  strikes and most floodplains rules name (`isFloodplains`). */
   floodplains?: boolean;
+  /** Gold every INTERNATIONAL trade route out of a city holding the feature
+   *  pays (MODIFIER_ALL_CITIES_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL on
+   *  a CITY_HAS_<feature> subject), once however many of its plots the city
+   *  holds. */
+  cityIntlRouteGold?: number;
 }
 
 /** The FLOODPLAINS CLASS: the desert, grassland and plains floodplains. A rule
@@ -191,4 +196,13 @@ Object.assign(FEATURES, {
 Object.assign(FEATURES, {
   FLOODPLAINS_GRASSLAND: { id: 'FLOODPLAINS_GRASSLAND', name: 'Floodplains (Grassland)', yields: {}, terrains: ['GRASSLAND'], allowHills: false, removable: false, floodplains: true },
   FLOODPLAINS_PLAINS: { id: 'FLOODPLAINS_PLAINS', name: 'Floodplains (Plains)', yields: {}, terrains: ['PLAINS'], allowHills: false, removable: false, floodplains: true },
+} satisfies Record<string, FeatureDef>);
+
+// PAITITI, appended after the floodplains. CIV6 (GranColombia_Maya_Features.xml):
+// a three-plot Impassable natural wonder, Appeal 2, paying every neighbouring
+// plot 3 Gold and 2 Culture (Feature_AdjacentYields), and PAITITI_GOLD_FROM_INTERNATIONAL_
+// TRADE_ROUTES: +4 Gold on every international route out of a city holding
+// it. The engines' map generator lays none; an imported world carries it.
+Object.assign(FEATURES, {
+  PAITITI: { id: 'PAITITI', name: 'Paititi', yields: {}, impassable: true, adjacentYields: { gold: 3, culture: 2 }, cityIntlRouteGold: 4, ...NW },
 } satisfies Record<string, FeatureDef>);
