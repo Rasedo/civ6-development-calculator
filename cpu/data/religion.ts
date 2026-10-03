@@ -203,9 +203,7 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       xml('ModifierArguments', 'ModifierId=RIVER_GODDESS_HOLY_SITE_HOUSING_MODIFIER&Name=Amount', 'Value'),
   },
   GODDESS_OF_FESTIVALS: {
-    // the install's clause is PLOT_HAS_PLANTATION, not "an improved luxury";
-    // only the AMOUNT is comparable, and `category` stays untagged.
-    'effects.improvementOnResource.yields.culture':
+    'effects.improvementYields.PLANTATION.culture':
       xml('ModifierArguments', 'ModifierId=GODDESS_OF_FESTIVALS_PLANTATION_CULTURE_MODIFIER&Name=Amount', 'Value'),
   },
   RELIGIOUS_IDOLS: {
@@ -434,8 +432,8 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
     B('RIVER_GODDESS', 'River Goddess', '+2 amenities and +2 housing in cities whose center is on a river.', {
       riverCity: { amenities: 2, housing: 2 },
     }),
-    B('GODDESS_OF_FESTIVALS', 'Goddess of Festivals', '+1 culture from improved luxury resources.', {
-      improvementOnResource: { category: 'luxury', yields: { culture: 1 } },
+    B('GODDESS_OF_FESTIVALS', 'Goddess of Festivals', '+1 culture from Plantations.', {
+      improvementYields: { PLANTATION: { culture: 1 } },
     }),
     B('RELIGIOUS_IDOLS', 'Religious Idols', '+2 faith from improved bonus resources.', {
       improvementOnResource: { category: 'bonus', yields: { faith: 2 } },
