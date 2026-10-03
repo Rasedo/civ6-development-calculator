@@ -81,7 +81,31 @@ def _quantise(v, scale: int) -> int:
     return int(math.floor(float(v) * scale + 0.5))
 
 
+def _chain(h: int, words) -> int:
+    """`_step` over `words` in order, inlined: every word must already be in
+    [0, 2^32), which `_words` guarantees."""
+    for x in words:
+        h = ((h ^ x) + 0x9E3779B9) & _MASK
+        h = ((h ^ (h >> 16)) * 0x85EBCA6B) & _MASK
+        h = ((h ^ (h >> 13)) * 0xC2B2AE35) & _MASK
+        h ^= h >> 16
+    return h
+
+
+def _words(out: list, values, scale: int) -> None:
+    """Append the words `_fold` steps over for one field value: its length,
+    then each quantised value's low and high 32-bit halves."""
+    seq = values if isinstance(values, (list, tuple)) else (values,)
+    out.append(len(seq))
+    for v in seq:
+        q = v if scale == 1 and type(v) is int else _quantise(v, scale)
+        out.append(q % _2_32)
+        out.append((q // _2_32) & _MASK)
+
+
 def _fold(h: int, values, scale: int) -> int:
+    """One field value folded `_step` by `_step` — the reference arithmetic
+    `_fold_ab_check` holds the word-list and numpy paths to."""
     seq = values if isinstance(values, (list, tuple)) else (values,)
     h = _step(h, len(seq))
     for v in seq:
@@ -188,6 +212,19 @@ def group_keys(sim, b: int, group: str, rows: list) -> list[int]:
 
 def _seat_row(sim, seat: int) -> int:
     return int(sim._seat_row[seat])
+
+
+def _batch_rows(sim, tag: str, c: int, fn) -> list:
+    """`fn(c)` — a WHOLE-BATCH tensor for seat row `c` — as nested lists,
+    derived once per `state_digest_all` (its memo, keyed by `tag` and the
+    row) rather than once per game; uncached outside it."""
+    memo = sim._dg_memo
+    if memo is None:
+        return fn(c).tolist()
+    key = (tag, c)
+    if key not in memo:
+        memo[key] = fn(c).tolist()
+    return memo[key]
 
 
 def _wars_of(sim, b: int, seat: int) -> list[int]:
@@ -624,14 +661,14 @@ SEAT = {
     "eraScore": _civ_scalar("era_score"),
     "darkBar": _civ_scalar("dark_bar"),
     "goldenBar": _civ_scalar("golden_bar"),
-    "score": lambda sim, b, rows: [[int(x) for x in sim.score_lines(c)[b].tolist()] for c in rows],
+    "score": lambda sim, b, rows: [[int(x) for x in _batch_rows(sim, "score", c, sim.score_lines)[b]] for c in rows],
     "age": _civ_scalar("civ_age"),
     "governmentsHeld": _civ_scalar("civ_gov_held"),
     "governmentChosen": _civ_scalar("civ_gov_chosen"),
     "governmentCivicTurn": _civ_scalar("civ_civic_turn"),
     "governmentAnarchyEnd": _civ_scalar("civ_gov_anarchy_end"),
     "policySlotsExtra": lambda sim, b, rows: [
-        [int(x) for x in sim._wonder_extra_slots(c)[b].tolist()] for c in rows],
+        [int(x) for x in _batch_rows(sim, "wslots", c, sim._wonder_extra_slots)[b]] for c in rows],
     "policiesSlotted": _civ_mask("civ_policies"),
     "prevAge": _civ_scalar("prev_age"),
     "darkAges": _civ_scalar("dark_ages"),
@@ -653,7 +690,7 @@ SEAT = {
     "projectsDone": lambda sim, b, rows: [sum(1 for x in sim.project_done[b, c].tolist() if x) for c in rows],
     "wmd": lambda sim, b, rows: [int(sim.civ_wmd[b, c].sum()) for c in rows],
     "spaceLy": _civ_scalar("space_ly"),
-    "laserSpeed": lambda sim, b, rows: [int(sim._laser_speed(c)[b]) for c in rows],
+    "laserSpeed": lambda sim, b, rows: [int(_batch_rows(sim, "laser", c, sim._laser_speed)[b]) for c in rows],
     "laserStations": lambda sim, b, rows: [
         int(sim.city_lasers[b, c, : sim.RC][sim.city_alive[b, c, : sim.RC]].sum()) for c in rows
     ],
@@ -709,6 +746,15 @@ def _citystate_plane(plane: str, minor: bool):
     return get
 
 
+def _governor_at_minor(sim, b, rows):
+    """Per city-state, per major seat: the first governor that seat has
+    appointed to it, -1 none."""
+    appointed = sim.civ_gov_appointed[b].tolist()
+    at = sim.civ_gov_minor[b].tolist()
+    return [[next((g for g in range(sim.n_governors) if appointed[c][g] and at[c][g] == s), -1)
+             for c in _civ_seats(sim)] for s in rows]
+
+
 def _csr(plane: str):
     def get(sim, b, rows):
         m = getattr(sim, plane)[b].tolist()
@@ -722,10 +768,7 @@ CITY_STATE = {
     "population": _citystate_plane("city_pop", True),
     "hp": _citystate_plane("city_hp", True),
     "envoys": _csr("seat_citystate_envoys"),
-    "governorAtMinor": lambda sim, b, rows: [
-        [next((g for g in range(sim.n_governors)
-               if bool(sim.civ_gov_appointed[b, c, g]) and int(sim.civ_gov_minor[b, c, g]) == s), -1)
-         for c in _civ_seats(sim)] for s in rows],
+    "governorAtMinor": lambda sim, b, rows: _governor_at_minor(sim, b, rows),
     "met": _csr("seat_citystate_met"),
     "questKind": _csr("seat_citystate_quest"),
     "questIssued": _csr("seat_citystate_quest_issued"),
@@ -1048,14 +1091,26 @@ def check_extractors(manifest: dict | None = None) -> None:
 
 
 def _mix32_np(h):
-    h = h & _MASK
-    h = ((h ^ (h >> 16)) * 0x85EBCA6B) & _MASK
-    h = ((h ^ (h >> 13)) * 0xC2B2AE35) & _MASK
-    return (h ^ (h >> 16)) & _MASK
+    """`_mix32` over a uint32 vector: numpy's uint32 arithmetic wraps mod
+    2^32, which is exactly the masking `_mix32` does. Returns a new vector."""
+    h = h ^ (h >> 16)
+    h *= 0x85EBCA6B
+    h ^= h >> 13
+    h *= 0xC2B2AE35
+    h ^= h >> 16
+    return h
 
 
 def _step_np(h, x):
-    return _mix32_np(((h & _MASK) ^ (x & _MASK)) + 0x9E3779B9)
+    """`_step` over uint32 vectors (`x` a uint32 vector or a word)."""
+    t = h ^ x
+    t += 0x9E3779B9
+    return _mix32_np(t)
+
+
+def _lo_hi(q):
+    """An int64 vector's words: (q mod 2^32, (q // 2^32) mod 2^32) as uint32."""
+    return q.astype(_np.uint32), (q >> 32).astype(_np.uint32)
 
 
 def _q_np(arr, scale: int):
@@ -1067,9 +1122,8 @@ def _q_np(arr, scale: int):
 
 def _chain_np(keys, cols):
     """The per-row hash chains in PARALLEL — the identical arithmetic on
-    int64 vectors (multiplication wraps mod 2^64; `& _MASK` right after makes
-    that exactly mod-2^32, which is all `_mix32` ever keeps). Returns the
-    {exact, milli} per-row hash vectors.
+    uint32 vectors, whose wrapping is the mod-2^32 `_mix32` keeps. Returns
+    the {exact, milli} per-row hash vectors (uint32).
 
     Scalar columns fold as one vector; a UNIFORM-length list column folds as
     `len` plus one vector per element position (every row's chain has the
@@ -1092,33 +1146,32 @@ def _chain_np(keys, cols):
         else:
             return None
     k = _np.asarray(keys, dtype=_np.int64)
-    seed = _step_np(_np.int64(0x811C9DC5), k % _2_32)
+    seed = _step_np(_np.full(len(k), 0x811C9DC5, dtype=_np.uint32), k.astype(_np.uint32))
     h = {"exact": seed.copy(), "milli": seed.copy()}
     for i, (cmp, kind, q) in enumerate(qs):
-        t = _step_np(h[cmp], _np.int64(i))
+        t = _step_np(h[cmp], _np.uint32(i))
         if kind == "vec":
             cols2d = q.reshape(len(k), -1) if q.ndim == 2 else q.reshape(len(k), 1)
-            t = _step_np(t, _np.int64(cols2d.shape[1]))  # _fold's len(seq)
+            t = _step_np(t, _np.uint32(cols2d.shape[1]))  # _fold's len(seq)
+            lo, hi = _lo_hi(cols2d)
             for j in range(cols2d.shape[1]):
-                qj = cols2d[:, j]
-                t = _step_np(t, qj % _2_32)
-                t = _step_np(t, (qj // _2_32) & _MASK)
+                t = _step_np(t, lo[:, j])
+                t = _step_np(t, hi[:, j])
         else:  # ragged: chain LENGTH differs per row — scalar per row
             t = t.copy()
             for r, seq in enumerate(q):
-                hr = int(t[r])
-                hr = _step(hr, len(seq))
+                w = [len(seq)]
                 for v in seq:
-                    hr = _step(hr, v % _2_32)
-                    hr = _step(hr, (v // _2_32) & _MASK)
-                t[r] = hr
+                    w.append(v % _2_32)
+                    w.append((v // _2_32) & _MASK)
+                t[r] = _chain(int(t[r]), w)
         h[cmp] = t
     return h
 
 
 def _acc_hex(h_seg) -> str:
-    a = int(h_seg.sum()) & _MASK
-    b = int(_mix32_np(h_seg ^ 0x5BF03635).sum()) & _MASK
+    a = int(h_seg.sum(dtype=_np.uint64)) & _MASK
+    b = int(_mix32_np(h_seg ^ 0x5BF03635).sum(dtype=_np.uint64)) & _MASK
     return f"{b:08x}{a:08x}"
 
 
@@ -1203,13 +1256,19 @@ def fold_rows(keys, cols) -> dict:
     if vec is not None:
         return vec
     accs = {"exact": _Acc(), "milli": _Acc()}
+    scales = [(cmp == "milli", 1000 if cmp == "milli" else 1, vals) for cmp, vals in cols]
     for r in range(len(keys)):
+        # a row's two chains as word lists: the column index, then `_fold`'s
+        # words, column by column into the chain its compare names
+        we: list = []
+        wm: list = []
+        for i, (milli, scale, vals) in enumerate(scales):
+            w = wm if milli else we
+            w.append(i)
+            _words(w, vals[r], scale)
         seed = _step(0x811C9DC5, keys[r] % _2_32)
-        h = {"exact": seed, "milli": seed}
-        for i, (cmp, vals) in enumerate(cols):
-            h[cmp] = _fold(_step(h[cmp], i), vals[r], 1000 if cmp == "milli" else 1)
-        accs["exact"].add(h["exact"])
-        accs["milli"].add(h["milli"])
+        accs["exact"].add(_chain(seed, we))
+        accs["milli"].add(_chain(seed, wm))
     return {"exact": accs["exact"].hex(), "milli": accs["milli"].hex()}
 
 

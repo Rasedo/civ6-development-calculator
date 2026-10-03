@@ -245,20 +245,44 @@ def decision_diff(path: str, g, t, b: int) -> str | None:
     return None if g == t else f"{path}: GPU {g!r} vs TS {t!r}"
 
 
+def vec_bits_equal(gobs: torch.Tensor, tobs: torch.Tensor) -> bool:
+    """The two RL vectors are the same float64 values bit for bit (signed
+    zeros and NaN payloads included) — the tensor the driver builds from
+    either one is then the same tensor."""
+    g, t = gobs.to(torch.float64).contiguous(), tobs.to(torch.float64).contiguous()
+    return g.shape == t.shape and bool(torch.equal(g.view(torch.int64), t.view(torch.int64)))
+
+
 def dual_decide(st, seats: list, decs: dict, geo_dec, msgs: list, roster: dict, classes: dict,
-                seeds: list) -> list[tuple[int, str]]:
-    """THE DUAL DECIDE. The driver decides again from the TS engine's own
-    observation — the per-seat groups, the diplomatic table, the RL vector
-    — and every decision must equal the one taken from the GPU's. Returns
-    (game, first difference) per game that differs."""
+                seeds: list, geo_obs: list, nobs: dict, vec_same: dict) -> list[tuple[int, str]]:
+    """THE DUAL DECIDE. Every decision taken from the GPU's observation must
+    equal the one the driver takes from the TS engine's own — the per-seat
+    groups, the diplomatic table, the RL vector. Returns (game, first
+    difference) per game that differs.
+
+    The driver is a pure function of (st, row, observation, roster, classes,
+    seeds). It runs only after every neutral group compared equal under
+    `neutral_diff`, which is type-strict, so where the TS observation holds
+    exactly the GPU's keys, its values `==` the GPU's (checked here, after the
+    GPU decide ran on them) and its RL vector is bit-identical (`vec_same`
+    [seat][game], from `vec_bits_equal`), the two inputs are one value and the
+    TS decide would return the GPU's decision: the decide runs again from the
+    TS observation for every seat (and the diplomatic table) where some game's
+    two inputs are not that one value."""
     reds: dict[int, str] = {}
-    geo_ts = drive.decide_geo(st, [m["geo"] for m in msgs], seeds)
-    for b in range(len(msgs)):
-        d = decision_diff("geo", geo_dec, geo_ts, b)
-        if d:
-            reds.setdefault(b, d)
+    geos_ts = [m["geo"] for m in msgs]
+    if any(g.keys() != t.keys() or g != t for g, t in zip(geo_obs, geos_ts)):
+        geo_ts = drive.decide_geo(st, geos_ts, seeds)
+        for b in range(len(msgs)):
+            d = decision_diff("geo", geo_dec, geo_ts, b)
+            if d:
+                reds.setdefault(b, d)
     for row in seats:
-        dec_ts = records.decide(st, row, [ts_seat_obs(m, row) for m in msgs], roster, classes, seeds=seeds)
+        tobs = [ts_seat_obs(m, row) for m in msgs]
+        if all(vec_same[row][b] and g.keys() == t.keys() and g == t
+               for b, (g, t) in enumerate(zip(nobs[row], tobs))):
+            continue
+        dec_ts = records.decide(st, row, tobs, roster, classes, seeds=seeds)
         for b in range(len(msgs)):
             if b in reds:
                 continue
@@ -444,6 +468,17 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             if line.startswith("@@"):
                 return json.loads(line[2:])
 
+    def release(b: int, ch, done: int) -> None:
+        """Release game `b`'s child after `done` completed turns: its
+        checkpoint first when one is due, then `go`."""
+        if ckpt_every and done % ckpt_every == 0:
+            assert ckpt_dir is not None
+            ch.stdin.write(json.dumps({"ckpt": str(ckpt_dir / f"b_seed{seeds[b]}_t{done}.json")}) + "\n")
+            ch.stdin.flush()
+            read_msg(ch)
+        ch.stdin.write(json.dumps({"go": 1}) + "\n")
+        ch.stdin.flush()
+
     bad = 0
     first: str | None = None
     world_checked = 0
@@ -479,30 +514,37 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     cp.enable()
                 elif t == cp_hi:
                     cp.disable()
+            # THE GPU'S OBSERVATIONS first, while the TS children render theirs
+            # (they were released before this side hashed its digest): the
+            # world group, the diplomatic table, and per seat the RL vector and
+            # THE NEUTRAL OBSERVATION the decide pass reads — taken here
+            # pre-decide: nothing between here and the decide mutates its
+            # inputs (the decide only STASHES).
+            _t = _pc()
+            world_g = neutral.world_obs(sim)
+            geo_obs = neutral.geo_obs(sim)
+            gobs_seat = {seat: env.observe(seat) for seat in seats}
+            nobs_seat = {seat: neutral.seat_obs(sim, seat, gobs_seat[seat]) for seat in seats}
+            prof["observe (GPU obs, buys, jobs)"] += _pc() - _t
             _t = _pc()
             msgs = [read_msg(ch) for ch in children]
             prof["wait_obs (TS children)"] += _pc() - _t
             _t = _pc()
-            # THE NEUTRAL OBSERVATION'S WORLD GROUP, emitted by both engines
-            # pre-decide and compared field by field
-            for b, (gw, msg) in enumerate(zip(neutral.world_obs(sim), msgs)):
+            # the world group, emitted by both engines pre-decide and compared
+            # field by field
+            for b, (gw, msg) in enumerate(zip(world_g, msgs)):
                 d = neutral_diff("world", gw, msg.get("world"))
                 if d:
                     flag(f"seed {seeds[b]} turn {t + 1}: NEUTRAL {d}")
                 world_checked += 1
             # ...and the diplomatic table, which the geo decide reads
-            geo_obs = neutral.geo_obs(sim)
             for b, (gg, msg) in enumerate(zip(geo_obs, msgs)):
                 d = neutral_diff("geo", gg, msg.get("geo"))
                 if d:
                     flag(f"seed {seeds[b]} turn {t + 1}: NEUTRAL {d}")
-            nobs_seat: dict = {}
+            vec_same: dict = {}
             for seat in seats:
-                gobs_all = env.observe(seat)
-                # THE NEUTRAL OBSERVATION the decide pass reads, taken here
-                # pre-decide: nothing between here and the decide mutates its
-                # inputs (the decide only STASHES).
-                nobs_seat[seat] = neutral.seat_obs(sim, seat, gobs_all)
+                gobs_all = gobs_seat[seat]
                 # ...and every per-seat group the TS child emitted for this seat
                 for b, msg in enumerate(msgs):
                     _reds, _n = neutral_seat_diffs(seat, nobs_seat[seat][b], msg)
@@ -514,9 +556,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                         for _ln in diff_pairs(sim._diff_events.get(b, []), msg.get("dl", [])):
                             print(_ln)
                     groups_checked += _n
+                vec_same[seat] = []
                 for b, msg in enumerate(msgs):
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
+                    vec_same[seat].append(vec_bits_equal(gobs, tobs))
                     diff = (gobs - tobs).abs()
                     ctx_lo = diff.shape[0] - ladder.CTX_SEAT
                     badm = torch.zeros_like(diff, dtype=torch.bool)
@@ -525,7 +569,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     if bool(badm.any()):
                         i = int(badm.nonzero(as_tuple=True)[0][0])
                         flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: OBS [{i}] {_field_name(i, sim.S, sim.n_majors - 1, sim.RC, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
-            prof["obs+targets compare (GPU obs, buys, jobs)"] += _pc() - _t
+            prof["obs compare"] += _pc() - _t
             if bad:
                 break
             _t = _pc()
@@ -534,7 +578,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             decs = {row: records.decide(st, row, nobs_seat[row], roster, classes, seeds=seeds) for row in seats}
             prof["decide (policy on GPU)"] += _pc() - _t
             _t = _pc()
-            for b, d in dual_decide(st, seats, decs, geo, msgs, roster, classes, seeds):
+            for b, d in dual_decide(st, seats, decs, geo, msgs, roster, classes, seeds,
+                                    geo_obs, nobs_seat, vec_same):
                 flag(f"seed {seeds[b]} turn {t + 1}: DUAL DECIDE {d}")
             prof["dual decide (policy on the TS observation)"] += _pc() - _t
             if bad:
@@ -555,6 +600,14 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             _t = _pc()
             trs = [read_msg(ch) for ch in children]  # barrier: every child's post-step digest
             prof["wait_digest (TS children)"] += _pc() - _t
+            # Every child is released BEFORE this side hashes, so it renders
+            # its next observation while the GPU digests and observes. The
+            # last turn has no next observation (the child exits on `go`), so
+            # it is released after the compare instead, a dump first.
+            early = t + 1 < turns
+            if early:
+                for b, ch in enumerate(children):
+                    release(b, ch, t + 1)
             # THE DIGEST IS THE GATE. On the FIRST disagreement the mismatching
             # groups are dumped keyed from both engines and diffed BY NAME;
             # later ones get one line each, capped so a persistent drift cannot
@@ -563,41 +616,37 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             gdigs = statecompare.state_digest_all(sim, sc_man)
             prof["state_digest (GPU extract)"] += _pc() - _t
             for b, ch in enumerate(children):
-                if True:
-                    gdig = gdigs[b]
-                    _t = _pc()
-                    bad_groups, reps = digest_diff(sc_man, gdig, trs[b].get("digest"))
-                    prof["digest_diff (compare)"] += _pc() - _t
-                    if bad_groups:
-                        for rep in reps:
-                            flag(f"seed {seeds[b]} turn {t + 1}: {rep}")
-                        if not dig_dumped:
-                            dig_dumped = True
-                            ch.stdin.write(json.dumps({"dump": bad_groups}) + "\n")
-                            ch.stdin.flush()
-                            dmp = read_msg(ch)
-                            for gname in bad_groups:
-                                print(f"seed {seeds[b]} turn {t + 1}: KEYED DIFF group {gname}:")
-                                for line in dump_diff(sc_man, gname,
-                                                      statecompare.group_dump(sim, b, gname, sc_man),
-                                                      dmp["dumps"][gname]):
-                                    print(line)
-                            if sim._log_combat_b == b:
-                                for ev in sim._combat_events[-16:]:
-                                    print(f"  CB-GPU {ev}")
-                                for ev in dmp.get("cb", []):
-                                    print(f"  CB-TS  {ev}")
-                            if sim._log_diff:
-                                for ln in diff_pairs(sim._diff_events.get(b, []),
-                                                     dmp.get("dl", [])):
-                                    print(ln)
-                if ckpt_every and (t + 1) % ckpt_every == 0:
-                    assert ckpt_dir is not None
-                    ch.stdin.write(json.dumps({"ckpt": str(ckpt_dir / f"b_seed{seeds[b]}_t{t + 1}.json")}) + "\n")
-                    ch.stdin.flush()
-                    read_msg(ch)
-                ch.stdin.write(json.dumps({"go": 1}) + "\n")
-                ch.stdin.flush()
+                gdig = gdigs[b]
+                _t = _pc()
+                bad_groups, reps = digest_diff(sc_man, gdig, trs[b].get("digest"))
+                prof["digest_diff (compare)"] += _pc() - _t
+                if bad_groups:
+                    for rep in reps:
+                        flag(f"seed {seeds[b]} turn {t + 1}: {rep}")
+                    if not dig_dumped:
+                        dig_dumped = True
+                        ch.stdin.write(json.dumps({"dump": bad_groups}) + "\n")
+                        ch.stdin.flush()
+                        if early:
+                            read_msg(ch)  # the next observation, sent before the dump was asked
+                        dmp = read_msg(ch)
+                        for gname in bad_groups:
+                            print(f"seed {seeds[b]} turn {t + 1}: KEYED DIFF group {gname}:")
+                            for line in dump_diff(sc_man, gname,
+                                                  statecompare.group_dump(sim, b, gname, sc_man),
+                                                  dmp["dumps"][gname]):
+                                print(line)
+                        if sim._log_combat_b == b:
+                            for ev in sim._combat_events[-16:]:
+                                print(f"  CB-GPU {ev}")
+                            for ev in dmp.get("cb", []):
+                                print(f"  CB-TS  {ev}")
+                        if sim._log_diff:
+                            for ln in diff_pairs(sim._diff_events.get(b, []),
+                                                 dmp.get("dl", [])):
+                                print(ln)
+                if not early:
+                    release(b, ch, t + 1)
             if ckpt_every and (t + 1) % ckpt_every == 0:
                 assert ckpt_dir is not None
                 torch.save({"seeds": seeds, "turn": t + 1, "snap": sim.snapshot()},
@@ -772,10 +821,12 @@ def main() -> None:
                 obs_bails += 1
         world_checked += 1
         obs_seat: dict = {}
+        vec_same: dict = {}
         for seat in seats:
             obs_seat[seat] = env.observe(seat)
             gobs = obs_seat[seat][0]
             tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
+            vec_same[seat] = [vec_bits_equal(gobs, tobs)]
             if gobs.shape[0] != tobs.shape[0]:
                 print(f"turn {t + 1} seat {seat}: WIDTH {int(tobs.shape[0])} (TS) vs {int(gobs.shape[0])} (GPU)")
                 child.kill()
@@ -809,7 +860,8 @@ def main() -> None:
             break
         geo = records.geo_decide_and_apply(sim, st, geo_obs, [args.seed])
         decs = {row: records.decide(st, row, nobs_seat[row], roster, classes, seeds=[args.seed]) for row in seats}
-        for _b, d in dual_decide(st, seats, decs, geo, [msg], roster, classes, [args.seed]):
+        for _b, d in dual_decide(st, seats, decs, geo, [msg], roster, classes, [args.seed],
+                                 geo_obs, nobs_seat, vec_same):
             rep = f"turn {t + 1}: DUAL DECIDE {d}"
             print(rep)
             if first_report is None:

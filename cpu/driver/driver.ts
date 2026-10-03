@@ -77,6 +77,19 @@ function trimByKind(lines: readonly string[], keep = 24): string[] {
 
 
 
+/** The reply to a `{dump}` control message: the keyed dumps of the named
+ *  groups, plus the combat and decomposition log tails when they are armed. */
+function dumpReply(state: GameState, groups: string[]): Record<string, unknown> {
+  const dumps: Record<string, unknown> = {};
+  for (const g of groups) dumps[g] = groupDump(state, g);
+  const cb = (globalThis as { __cbLog?: string[] }).__cbLog;
+  const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
+  const out: Record<string, unknown> = { dumps };
+  if (cb) out.cb = cb.slice(-16);
+  if (dl) out.dl = trimByKind(dl);
+  return out;
+}
+
 export async function runDriver(o: DriverOpts): Promise<void> {
   const { state, seed, turns: N_TURNS, cityMax: CITY_MAX, cityStateMax: CITY_STATE_MAX } = o;
   // THE MAJOR ROSTER WIDTH, read off THE ROSTER — never a scalar option
@@ -109,7 +122,17 @@ for (let t = 0; t < N_TURNS; t++) {
       t: state.turn, obs, world: worldObs(state), geo: geoObs(state), neutral: neutralSeats,
       ...(dlT ? { dl: trimByKind(dlT) } : {}),
     });
-    const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };
+    // the records — or first a `{dump}`: the orchestrator releases the turn
+    // before it has hashed its own side, so a digest red asks for the dump
+    // here, after this observation went out. Rendering the observation
+    // reads the state and moves nothing, so the dump is still the state the
+    // digest hashed.
+    let msg: { recs?: Record<string, unknown>; dump?: string[] };
+    for (;;) {
+      msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown>; dump?: string[] };
+      if (!msg.dump) break;
+      o.send(dumpReply(state, msg.dump));
+    }
     if (msg.recs && Object.keys(msg.recs).length) {
       const bySeat: Record<number, unknown> = {};
       for (const [sid, rec] of Object.entries(msg.recs)) {
@@ -167,14 +190,7 @@ for (let t = 0; t < N_TURNS; t++) {
       continue;
     }
     if (!ctl.dump) break;
-    const dumps: Record<string, unknown> = {};
-    for (const g of ctl.dump) dumps[g] = groupDump(state, g);
-    const cb = (globalThis as { __cbLog?: string[] }).__cbLog;
-    const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
-    const out: Record<string, unknown> = { dumps };
-    if (cb) out.cb = cb.slice(-16);
-    if (dl) out.dl = trimByKind(dl);
-    o.send(out);
+    o.send(dumpReply(state, ctl.dump));
   }
 }
 }

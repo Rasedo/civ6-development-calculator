@@ -305,14 +305,25 @@ def _nearest(st, plane: torch.Tensor, rows_all: torch.Tensor, tiles: torch.Tenso
     caller's own, built from the observation, and is consumed)."""
     T = st.T
     arangeT = torch.arange(T, device=out.device)
-    for n in _acting_slots(rows_all):
+    acting = _acting_slots(rows_all)
+    if not taken:
+        # no slot consumes the plane, so every acting slot's pick at once
+        if acting:
+            idx = torch.tensor(acting, dtype=torch.long, device=out.device)
+            d = st.pair_dist[tiles[:, idx].clamp(min=0)].to(torch.long)                   # [B, K, T]
+            key = torch.where(plane.unsqueeze(1), d * stride + arangeT, torch.full_like(d, 2 ** 40))
+            best = key.argmin(dim=2)
+            has = rows_all[:, idx] & plane.gather(1, best)
+            out[:, idx] = torch.where(has, best, out[:, idx])
+        return out
+    for n in acting:
         rows = rows_all[:, n]
         d = st.pair_dist[tiles[:, n].clamp(min=0)].to(torch.long)
         key = torch.where(plane, d * stride + arangeT, torch.full_like(d, 2 ** 40))
         best = key.argmin(dim=1)
         has = rows & plane.gather(1, best.unsqueeze(1)).squeeze(1)
         out[:, n] = torch.where(has, best, out[:, n])
-        if taken and bool(has.any()):
+        if bool(has.any()):
             _hr = has.nonzero(as_tuple=True)[0]
             plane[_hr, best[_hr]] = False
     return out
@@ -1556,16 +1567,15 @@ def plan_units(st, row: int, nobs: list, max_steps: int = 4) -> torch.Tensor:
         dest_all = torch.where((dest_all < 0) & (spread_t >= 0), spread_t, dest_all)
         dest_all = torch.where((dest_all < 0) & (settle_t >= 0), settle_t, dest_all)
         ok_all = moving & (dest_all >= 0)
-        for n in _acting_slots(ok_all):
-            dest = dest_all[:, n]
-            ok_rows = ok_all[:, n]
-            d_cur = st.pair_dist[cur[:, n].clamp(min=0), dest.clamp(min=0)].to(torch.long)
-            d_nb = st.pair_dist[nb_now[:, n].clamp(min=0), dest.clamp(min=0).unsqueeze(1)].to(torch.long)
-            closer = (nb_now[:, n] >= 0) & (d_nb < d_cur.unsqueeze(1))
-            key = torch.where(closer, d_nb * 8 + torch.arange(6, device=st.device), torch.full_like(d_nb, 10 ** 9))
-            best = key.argmin(dim=1)
-            has_step = closer.any(dim=1) & ok_rows
-            nxt[:, n] = torch.where(has_step, best, nxt[:, n])
+        # every slot's step at once: the neighbour strictly closer to its
+        # destination, the nearest first and the lowest direction on a tie
+        dest = dest_all.clamp(min=0)
+        d_cur = st.pair_dist[cur.clamp(min=0), dest].to(torch.long)                       # [B, N]
+        d_nb = st.pair_dist[nb_now.clamp(min=0), dest.unsqueeze(2)].to(torch.long)        # [B, N, 6]
+        closer = (nb_now >= 0) & (d_nb < d_cur.unsqueeze(2))
+        key = torch.where(closer, d_nb * 8 + torch.arange(6, device=st.device), torch.full_like(d_nb, 10 ** 9))
+        has_step = closer.any(dim=2) & ok_all
+        nxt = torch.where(has_step, key.argmin(dim=2), nxt)
         ranks.append(nxt)
         if not bool((nxt >= 0).any()):
             ranks.pop()
