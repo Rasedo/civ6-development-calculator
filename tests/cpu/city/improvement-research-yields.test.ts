@@ -72,9 +72,9 @@ describe('research raises an improvement own yields', () => {
   });
 });
 
-describe('the Lumber Mill on a river', () => {
-  it('pays its second Production only where a river runs', () => {
-    expect(IMPROVEMENTS.LUMBER_MILL.riverYields).toEqual({ production: 1 });
+describe('the river column', () => {
+  it('the Lumber Mill pays nothing for a river: Gathering Storm deletes the row', () => {
+    expect(IMPROVEMENTS.LUMBER_MILL.riverYields).toBeUndefined();
     const state = world();
     const dry = tileAtCoords(state.map, 6, 6);
     const wet = tileAtCoords(state.map, 7, 6);
@@ -83,20 +83,15 @@ describe('the Lumber Mill on a river', () => {
       t.improvement = 'LUMBER_MILL';
       t.riverMask = 0;
     }
-    const base = readAt(state, dry).production;
     wet.riverMask = 1;
-    expect(readAt(state, wet).production).toBe(base + 1);
-    expect(readAt(state, dry).production).toBe(base);
-    // ...and it stacks with Steel, which raises the row itself
-    grantTechs(state, 'STEEL');
-    expect(readAt(state, wet).production).toBe(base + 2);
+    expect(readAt(state, wet).production).toBe(readAt(state, dry).production);
   });
 
-  it('and no other improvement carries a river column', () => {
+  it('only the Ziggurat and the Chateau carry one', () => {
     const withRiver = Object.values(IMPROVEMENTS).filter((d) => d.riverYields);
-    // CIV6 (Ziggurat): "+1 Culture if next to River" rides the same column,
-    // and so does the Chateau's "+2 Gold if on a tile containing a River edge"
-    expect(withRiver.map((d) => d.id).sort()).toEqual(['CHATEAU', 'LUMBER_MILL', 'ZIGGURAT']);
+    // CIV6 (Ziggurat): "+1 Culture if next to River", and the Chateau's
+    // "+2 Gold if on a tile containing a River edge"
+    expect(withRiver.map((d) => d.id).sort()).toEqual(['CHATEAU', 'ZIGGURAT']);
   });
 });
 

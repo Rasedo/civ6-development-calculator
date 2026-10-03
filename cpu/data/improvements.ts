@@ -356,13 +356,13 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     plunder: { kind: 'gold', amount: 50 },
     // Improvement_YieldChanges (Expansion2_Improvements.xml): YIELD_PRODUCTION 2.
     yields: { production: 2 },
-    // CIV6 (Lumber Mill): "+1 Production if adjacent to River."
-    riverYields: { production: 1 },
+    // Gathering Storm deletes the base game's river +1
+    // (Expansion2_RemoveData.xml: LUMBER_MILL_RIVERADJACENCY_PRODUCTION).
     housing: 0,
     resourceOnly: false,
     features: ['WOODS', 'RAINFOREST'],
     featureCivics: { RAINFOREST: 'MERCANTILISM' },
-    description: 'Woods, or Rainforest from Mercantilism. +2 production, +1 more on a river.',
+    description: 'Woods, or Rainforest from Mercantilism. +2 production.',
     src: {
       features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_LUMBER_MILL (FEATURE_FOREST, FEATURE_JUNGLE), as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_LUMBER_MILL', 'FeatureType')] },
       'featureCivics.RAINFOREST': xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&FeatureType=FEATURE_JUNGLE', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),

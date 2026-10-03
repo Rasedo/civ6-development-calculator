@@ -118,12 +118,16 @@ const FEATURE_ID: Record<string, string> = {
 };
 /** the game's six river / cliff direction bits per plot: 1 = the plot lies NE
  *  of the edge (the edge is its SW side), 2 = NW of it (SE side), 4 = W of it
- *  (E side). The engine's directions (world/hex.ts): 0 E, 1 NE, 2 NW, 3 W,
- *  4 SW, 5 SE. */
-const OWN_EDGES: [number, number][] = [[4, 0], [2, 5], [1, 4]];
+ *  (E side). The game's y grows NORTH and a record's rows are y, so the
+ *  game's south is the engine's row - 1 — the engine's N directions
+ *  (world/hex.ts: 0 E, 1 NE, 2 NW, 3 W, 4 SW, 5 SE, NE = row - 1). The SW
+ *  side is the engine's NW, the SE side its NE (1103 t3: Xian's centre lies
+ *  beside a hill whose river runs along the hill's south, and is not fresh). */
+const OWN_EDGES: [number, number][] = [[4, 0], [2, 1], [1, 2]];
 /** the edges a neighbour's own bits carry, as [engine direction to the
- *  neighbour, the neighbour's bit] */
-const NEIGHBOUR_EDGES: [number, number][] = [[3, 4], [2, 2], [1, 1]];
+ *  neighbour, the neighbour's bit]: its E side is our W, its SE side our SW
+ *  (the neighbour lies game-NW, engine-SW), its SW side our SE */
+const NEIGHBOUR_EDGES: [number, number][] = [[3, 4], [4, 2], [5, 1]];
 
 interface Ctx {
   cat: Catalog;
