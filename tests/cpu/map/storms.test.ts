@@ -285,7 +285,7 @@ describe('the eight storms are the install\'s table', () => {
       const t = stormStart(sea, cat5)!;
       expect(t.col >= 2 && t.col <= 13 && t.row >= 2 && t.row <= 13).toBe(true);
     }
-  });
+  }, 30_000); // 40,000 whole-map draws: past the default 5 s on a loaded box
 
   it('the canonical disc is centre, ring 1, ring 2, each ring by tile index', () => {
     expect(STORM_DISC).toHaveLength(19);
