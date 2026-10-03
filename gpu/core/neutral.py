@@ -237,10 +237,8 @@ def _buy_ctx(sim, row: int) -> dict:
     jj = torch.where(has_b, jj, torch.full_like(jj, -1))
     bb = torch.where(has_b, bb, torch.full_like(bb, -1))
     price = torch.where(has_b, price, torch.zeros_like(price))
-    # `settlerCost` counts every settler on order, at any depth in any queue
-    _sq = (alive_row.unsqueeze(2) & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=(1, 2))
-    sett_base = (sim.rules.settler_base + sim.rules.settler_per_city
-                 * (n_cities - 1 + sim._seat_settlers(row) + _sq).clamp(min=0).double())
+    # `settlerCost`: the cities and the live settlers, never one in a queue
+    sett_base = sim._settler_cost(n_cities, sim._seat_settlers(row)).double()
     mon_g = sim._golden_ded(row, sim._ded_monumentality)
     # the 0.7 before the five-step floor, as the buy arm prices it
     _sb = sett_base * sim.rules.gold_purchase_mult
