@@ -262,7 +262,8 @@ def check_static(sim, st, twin) -> None:
         "joint_war_civic": sim._joint_war_civic, "embassy_cost": sim._embassy_cost,
         "delegation_cost": sim._deleg_cost, "deal_items": sim._deal_items, "comp_aid": sim._comp_aid,
         "deal_kind": {"GOLD": sim._deal_k_gold, "FAVOR": sim._deal_k_favor, "RESOURCE": sim._deal_k_res,
-                      "SPY": sim._deal_k_spy, "OPEN_BORDERS": sim._deal_k_borders, "JOINT_WAR": sim._deal_k_joint},
+                      "SPY": sim._deal_k_spy, "OPEN_BORDERS": sim._deal_k_borders, "JOINT_WAR": sim._deal_k_joint,
+                      "LUXURY": sim._deal_k_lux},
         "scaffold": [sim.districts_cat[di].get("id") for di, *_r in sim._scaffold],
     }
     for f, w in want.items():
@@ -300,6 +301,10 @@ def check_geo(sim, geos: list) -> Counter:
             assert g["favor"][r] == int(sim.civ_diplo_favor[b, r]), f"{where}: favor {r}"
             assert g["civics"][r] == [k for k in range(sim.civ_civics.shape[2]) if bool(sim.civ_civics[b, r, k])], f"{where}: civics {r}"
             assert g["stockpile"][r] == sim.civ_stockpile[b, r].tolist(), f"{where}: stockpile {r}"
+            held, spare = sim._lux_holdings(r)
+            assert g["luxuries"][r] == held[b].tolist(), f"{where}: luxuries {r}"
+            assert g["lux_spare"][r] == spare[b].tolist(), f"{where}: lux_spare {r}"
+            live["luxuries"] += sum(g["luxuries"][r])
             for k in range(3):
                 objs = sim._gw_kind_objs(k)
                 held = sum(int(o) in objs for j in range(sim.RC) if bool(sim.city_alive[b, r, j])

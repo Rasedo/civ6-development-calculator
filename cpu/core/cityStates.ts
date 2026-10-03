@@ -145,6 +145,18 @@ export function minorLuxuries(state: GameState, cityState: CityState): string[] 
   return [...out].sort();
 }
 
+/** CIV6 (LOC_CITY_STATES_SUZERAIN_DIPLOMATIC_BONUS): "Gain ownership of all
+ *  the city-state's resources." The ground seats of every city-state `seat`
+ *  is suzerain of: each improved, unpillaged resource on that ground pays the
+ *  suzerain a copy, and the city-state keeps its own. */
+export function suzerainMinorSeats(state: GameState, seat: number): Set<number> {
+  const out = new Set<number>();
+  for (const cityState of state.cityStates ?? []) {
+    if (isSuzerain(state, cityState, seat)) out.add(seatOfCityState(cityState.id));
+  }
+  return out;
+}
+
 export function hasMet(cityState: CityState, seat: number): boolean {
   return cityState.met.includes(seat);
 }

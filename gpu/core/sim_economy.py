@@ -14,6 +14,43 @@ class SimEconomy:
     #: key; this is the need multiplier, wide enough to clear any city id.
     _LUX_KEY_SCALE = float(1 << 20)
 
+    def _lux_holdings(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B, L] held, [B, L] spare) — per luxury, the copies this row holds
+        and the copies it can still trade (`luxuryHoldings`). SPARE: its own
+        improved, unpillaged plots, plus those of every city-state it is
+        suzerain of (CIV6: "Gain ownership of all the city-state's
+        resources"), less the copies its running deals send out. HELD: the
+        spare copies plus those running deals bring in."""
+        B, L = self.B, self._n_lux
+        spare = torch.zeros(B, L, dtype=torch.long, device=self.device)
+        held = torch.zeros_like(spare)
+        if L == 0:
+            return held, spare
+        mine = self.tile_seat == int(self._ROW_SEAT[row])
+        if self.S > 0 and row < self.n_majors:
+            suz = self._suzerain_mask(row)
+            for s in range(self.S):
+                if bool(suz[:, s].any()):
+                    mine = mine | ((self.tile_seat == 100 + s) & suz[:, s].unsqueeze(1))
+        improved = (self.lux_id >= 0) & mine & (self.improvement == self.lux_req) & ~self.pillaged
+        spare.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
+        if row < self.n_majors:
+            for o in range(self.n_majors):
+                if o == row:
+                    continue
+                for giver, taker, into, sign in ((row, o, spare, -1), (o, row, held, 1)):
+                    live = self.deal_term_left[:, giver, taker] > 0
+                    if not bool(live.any()):
+                        continue
+                    items = self.deal_term_item[:, giver, taker]
+                    for s in range(self._deal_items):
+                        kind, va = items[:, s, 0], items[:, s, 1]
+                        sel = live & (kind == self._deal_k_lux) & (va >= 0) & (va < L)
+                        if bool(sel.any()):
+                            into.scatter_add_(1, va.clamp(min=0, max=L - 1).unsqueeze(1),
+                                              (sel.long() * sign).unsqueeze(1))
+        return held + spare, spare
+
     def _luxury_amenities(self, row: int, amen_have: torch.Tensor, amen_need: torch.Tensor) -> torch.Tensor:
         B = self.B
         cols = self.RC
@@ -25,9 +62,11 @@ class SimEconomy:
         # a PILLAGED improvement gives no copy (`luxuryAmenities`)
         improved = ((self.lux_id >= 0) & (self.tile_seat == int(self._ROW_SEAT[row]))
                     & (self.improvement == self.lux_req) & ~self.pillaged)
-        counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
-        counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
-        own_copies = counts.clone()  # the seat's OWN improved copies, pre-Affluence
+        own_copies = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
+        own_copies.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
+        # every luxury the row holds a copy of — its own, its city-states',
+        # its deals' (`_lux_holdings`) — serves one full-reach round
+        counts = self._lux_holdings(row)[0].clamp(min=0)
         # CIV6 (Affluence): "While established in a city-state, provides a copy
         # of its Luxury resources to you." A minor improves nothing here, so the
         # copy is the ground's own resource; a copy of one already worked is no

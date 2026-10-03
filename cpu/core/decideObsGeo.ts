@@ -13,6 +13,18 @@ import { GW_KINDS } from '../data/greatWorks';
 import { DEAL_ITEMS } from '../data/seats';
 import { emptyStockpile } from '../data/constants';
 import { PROMISES } from '../data/promises';
+import { LUXURY_IDS } from '../../world/resources';
+import { luxuryHoldings } from './city';
+
+/** `luxuries` and `lux_spare`: per seat, per `LUXURY_IDS` row, the copies
+ *  `luxuryHoldings` counts held and spare. */
+function luxuryTables(state: GameState, ids: number[]): { luxuries: number[][]; lux_spare: number[][] } {
+  const rows = ids.map((s) => luxuryHoldings(state, s));
+  return {
+    luxuries: rows.map((h) => LUXURY_IDS.map((r) => h.held.get(r) ?? 0)),
+    lux_spare: rows.map((h) => LUXURY_IDS.map((r) => h.spare.get(r) ?? 0)),
+  };
+}
 
 /**
  * THE DIPLOMATIC TABLE (`geo`), TS side: one per game, by the field names of
@@ -37,6 +49,7 @@ export function geoObs(state: GameState): Record<string, unknown> {
     favor: seats.map((s) => Math.floor(s.diplomaticFavor ?? 0)),
     civics: ids.map((s) => civicIds.flatMap((id, i) => (isCivicComplete(state, id, s) ? [i] : []))),
     stockpile: seats.map((s) => [...(s.stockpile ?? emptyStockpile())]),
+    ...luxuryTables(state, ids),
     great_works: ids.map((s) => Array.from({ length: GW_KINDS }, (_x, k) =>
       citiesOf(state, s).reduce((n, city) => n + gwCountKind(city, k), 0))),
     comp_kind: c?.kind ?? -1,

@@ -1110,6 +1110,9 @@ def _deal_turn(st, geos: list, g: dict, off, acc, alive_row, rstr, prox, prox_ma
     k_gold = kd["GOLD"]
     stockpile = _geo_t(geos, "stockpile", dev)                         # [B, n, strategic]
     ns = stockpile.shape[2]
+    luxuries = _geo_t(geos, "luxuries", dev)                           # [B, n, luxury]
+    lux_spare = _geo_t(geos, "lux_spare", dev)
+    nl = luxuries.shape[2] if luxuries.dim() == 3 else 0
     war_min = st.war_min_turns
     war, dn = g["war"] > 0, g["denounce"] > 0
     treasury = g["treasury"]
@@ -1146,6 +1149,10 @@ def _deal_turn(st, geos: list, g: dict, off, acc, alive_row, rstr, prox, prox_ma
     def _item(kind: int, a=0, b=0):
         return (_lit(kind), _lit(a), _lit(b))
 
+    def _first(m: torch.Tensor) -> torch.Tensor:
+        """[B] the lowest column `m` [B, k] holds true in, 0 where none."""
+        return m.long().argmax(dim=1)
+
     for a in range(nrow):
         for b in range(nrow):
             if a == b:
@@ -1179,6 +1186,14 @@ def _deal_turn(st, geos: list, g: dict, off, acc, alive_row, rstr, prox, prox_ma
             # A PRISONER goes home for a price.
             _put(a, b, quiet & (spies_held[:, b, a] > 0),
                  [_item(kd["SPY"])], [_item(k_gold, DEAL_SPY_PRICE)])
+            # A LUXURY SWAP: a duplicate this seat can spare that the rival
+            # holds none of, for one of the rival's that this seat lacks —
+            # the lowest luxury row on each side
+            if nl > 0:
+                mine = (lux_spare[:, a] >= 2) & (luxuries[:, b] == 0)
+                theirs = (lux_spare[:, b] >= 2) & (luxuries[:, a] == 0)
+                _put(a, b, quiet & mine.any(dim=1) & theirs.any(dim=1),
+                     [_item(kd["LUXURY"], _first(mine))], [_item(kd["LUXURY"], _first(theirs))])
             # A STRATEGIC SURPLUS is a lot with a price on it.
             if ns > 0:
                 stock = stockpile[:, a]

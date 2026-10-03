@@ -148,6 +148,8 @@
     ["favor", "list", "per major seat: its diplomatic favor, floored"],
     ["civics", "table", "per major seat: the civic table indices it holds, ascending"],
     ["stockpile", "table", "per major seat: its stockpile of each strategic resource, in strategic table order"],
+    ["luxuries", "table", "per major seat: the copies of each luxury it holds (`luxuryHoldings` held), in luxury table order"],
+    ["lux_spare", "table", "per major seat: the copies of each luxury it can still trade (`luxuryHoldings` spare: its own and its city-states', less those out on deals), in luxury table order"],
     ["great_works", "table", "per major seat: the Great Works of each created kind (writing, art, music) its living cities hold"],
     ["comp_kind", "int", "the scored competition running now (the eras catalog `competitions` index), -1 none"],
     ["comp_target", "int", "the seat a triggered competition (the Aid Request) is held for, -1 none"],

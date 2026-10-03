@@ -208,7 +208,7 @@ def _static(rules, width: int, height: int, wrap_x: bool, n_majors: int, n_citys
         embassy_civic=int(rules.eras["embassyCivic"]), joint_war_civic=int(seats["jointWarCivic"]),
         embassy_cost=_whole(rules.eras["embassyCost"]), delegation_cost=_whole(rules.eras["delegationCost"]),
         deal_items=int(rules.eras["dealItems"]),
-        deal_kind={k: kinds.index(k) for k in ("GOLD", "FAVOR", "RESOURCE", "SPY", "OPEN_BORDERS", "JOINT_WAR")},
+        deal_kind={k: kinds.index(k) for k in ("GOLD", "FAVOR", "RESOURCE", "SPY", "OPEN_BORDERS", "JOINT_WAR", "LUXURY")},
         comp_aid=comps.index("AID_REQUEST") if "AID_REQUEST" in comps else -1,
         promise_cost=[_whole(p[0]) for p in rules.eras["promises"]],
         gov_tier=[int(g["tier"]) for g in rules.governments],
@@ -842,10 +842,13 @@ def geo_obs(sim) -> list:
     # accepted or expired bundle behind a zero clock, TS drops the offer
     ask = torch.where((sim.deal_offer_left[:, :n, :n] > 0).reshape(B, n, n, 1, 1),
                       sim.deal_offer_ask[:, :n, :n], torch.full_like(sim.deal_offer_ask[:, :n, :n], -1))
+    hold = [sim._lux_holdings(r) for r in range(n)]
     cols = {
         "alive": sim.civ_alive[:, :n].long(), "cities": alive.sum(dim=2),
         "strength": _as_long(sim._seat_strengths()), "treasury": _floored(sim.civ_treasury[:, :n]),
         "favor": _floored(sim.civ_diplo_favor[:, :n]), "stockpile": _as_long(sim.civ_stockpile[:, :n]),
+        "luxuries": torch.stack([h[0] for h in hold], dim=1),
+        "lux_spare": torch.stack([h[1] for h in hold], dim=1),
         "great_works": gw, "comp_kind": sim.comp_kind, "comp_target": sim.comp_target,
         "comp_member": sim.comp_member[:, :n].long(),
         "war": sim.war[:, :n, :n].long(), "war_turns": sim.war_turns[:, :n, :n],

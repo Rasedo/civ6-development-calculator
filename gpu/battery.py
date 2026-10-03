@@ -915,6 +915,8 @@ def _main() -> int:
                 ("robot", [py, "tests/gpu/robot_test.py"], 4),  # the Giant Death Robot chassis and its four Future-era upgrades
                 ("nuke", [py, "tests/gpu/nuke_test.py"], 4),  # the blast, the two carriers and the silo: no seed reaches Nuclear Fission
                 ("amani", [py, "tests/gpu/amani_test.py"], 4),  # the governor posted to a city-state, her envoys and Affluence
+                ("suzerain_resources", [py, "tests/gpu/suzerain_resources_test.py"], 4),  # a suzerained minor's improved luxury and strategic sources, the suzerain's copies
+                ("luxury_deal", [py, "tests/gpu/luxury_deal_test.py"], 4),  # one luxury copy for the deal's term, and who may still give one
                 ("gov_clauses", [py, "tests/gpu/gov_clauses_test.py"], 4),  # the five promotion clauses no seed reaches: no governed city ever holds one
                 ("geothermal", [py, "tests/gpu/geothermal_test.py"], 4),  # the map's new rows: no scripted seed places a Geothermal Plant or claims a Holy Site pantheon
                 ("imp_research", [py, "tests/gpu/imp_research_yields_test.py"], 4),  # the research raises on an improvement own yields, most of them past any lane's reach

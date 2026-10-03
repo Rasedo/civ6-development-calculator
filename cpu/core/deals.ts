@@ -18,10 +18,12 @@ import {
   DEAL_GREAT_WORK, DEAL_ITEMS, DEAL_ITEM_KINDS, DEAL_OPEN_BORDERS,
   ALLIANCE_QP_DEAL,
   DEAL_PERMANENT, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS,
-  DEAL_JOINT_WAR, JOINT_WAR_CIVIC,
+  DEAL_JOINT_WAR, DEAL_LUXURY, JOINT_WAR_CIVIC,
 } from '../data/seats';
 import { WAR_KIND_JOINT } from '../data/warKinds';
 import { STRATEGIC_IDS } from '../data/constants';
+import { LUXURY_IDS } from '../../world/resources';
+import { luxuryHoldings } from './city';
 import { CITY_MAX_HP } from '../data/units';
 import { GW_KINDS, type GreatWork } from '../data/greatWorks';
 import { SPY_UNIT } from '../data/espionage';
@@ -154,9 +156,12 @@ export function dealItemPayable(state: GameState, giver: number, receiver: numbe
     case DEAL_FAVOR:
       return a > 0 && (gs.diplomaticFavor ?? 0) >= a;
     case DEAL_RESOURCE:
-      // the strategic stockpile is the only resource here with a QUANTITY: a luxury is
-      // a boolean access gate, with nothing to hand over a lump of.
+      // a lump of the strategic stockpile; a luxury travels as a copy (DEAL_LUXURY)
       return a >= 0 && a < STRATEGIC_IDS.length && b > 0 && stockOf(state, giver, STRATEGIC_IDS[a]) >= b;
+    case DEAL_LUXURY:
+      // one copy the giver can still trade: its own or its city-states',
+      // not one already out on a deal, nor one a deal brought in
+      return a >= 0 && a < LUXURY_IDS.length && (luxuryHoldings(state, giver).spare.get(LUXURY_IDS[a]) ?? 0) >= 1;
     case DEAL_GREAT_WORK:
       if (a < 0 || a >= GW_KINDS) return false;
       const give = gwFrom(state, giver, a);
@@ -190,7 +195,9 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
       scoreGoldGift(state, giver, receiver, a);  // CIV6 (Aid Request, FromGold)
       break;
     case DEAL_GOLD_PER_TURN:
-      // The term pays it; accepting only starts the clock.
+    case DEAL_LUXURY:
+      // The term pays it (a luxury copy is held while the term runs);
+      // accepting only starts the clock.
       break;
     case DEAL_FAVOR:
       gs.diplomaticFavor = (gs.diplomaticFavor ?? 0) - a;
@@ -287,7 +294,8 @@ export function acceptDeal(state: GameState, from: number, to: number): boolean 
 
 /** Give back what a term was only lending. CIV6: "Resources and gold per turn
  *  ... are temporary, and once the deal has run its course you will get them
- *  back" — the payments stop, and a lump of resource goes home. */
+ *  back" — the payments stop, a lump of resource goes home, and a luxury
+ *  copy is back with its giver once the term is gone (`luxuryHoldings`). */
 function endTerm(state: GameState, from: number, to: number, term: DealTerm): void {
   for (const [kind, a, b] of term.items) {
     if (kind !== DEAL_RESOURCE) continue;

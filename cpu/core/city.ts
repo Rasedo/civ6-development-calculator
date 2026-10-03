@@ -27,10 +27,10 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, GW_PRINTING_TECH } from '../data/g
 import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from './greatWorks';
 import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
-import { suzerainEffect, minorCity, minorLuxuries } from './cityStates';
+import { suzerainEffect, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
-import { bankruptAmenities, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
-import { RESOURCES, resourceImprovement } from '../../world/resources';
+import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
+import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor } from './seats';
@@ -444,6 +444,40 @@ function govYieldBuildingCount(state: GameState, city: City): number {
   return n;
 }
 
+/**
+ * Per luxury, the copies `seat` holds and the copies it can still trade.
+ * SPARE: its own improved, unpillaged plots, plus those of every city-state
+ * it is suzerain of (CIV6: "Gain ownership of all the city-state's
+ * resources"), less the copies its running deals send out. HELD: the spare
+ * copies plus those running deals bring in — a copy received on a deal is not
+ * the receiver's to trade on. `_lux_holdings` is the twin.
+ */
+export function luxuryHoldings(state: GameState, seat: number): { held: Map<string, number>; spare: Map<string, number> } {
+  const spare = new Map<string, number>();
+  const add = (m: Map<string, number>, r: string, n: number): void => { m.set(r, (m.get(r) ?? 0) + n); };
+  const suz = suzerainMinorSeats(state, seat);
+  for (const t of state.map.tiles) {
+    if (!t.resource || RESOURCES[t.resource].category !== 'luxury') continue;
+    const owner = tileSeat(t);
+    if (owner !== seat && !suz.has(owner)) continue;
+    if (t.improvement === resourceImprovement(t) && !t.pillaged) add(spare, t.resource, 1);
+  }
+  const held = new Map<string, number>();
+  for (const [key, term] of Object.entries(state.dealTerms ?? {})) {
+    const [from, to] = key.split('>').map(Number);
+    if (from !== seat && to !== seat) continue;
+    for (const [kind, a] of term.items) {
+      if (kind !== DEAL_LUXURY) continue;
+      const r = LUXURY_IDS[a];
+      if (!r) continue;
+      if (from === seat) add(spare, r, -1);
+      else add(held, r, 1);
+    }
+  }
+  for (const [r, n] of spare) add(held, r, n);
+  return { held, spare };
+}
+
 export function luxuryAmenities(state: GameState, seat: number): Map<number, number> {
   // a city-state's one city is its `minorCity` view (its Seat's `cities` is
   // empty): an improved luxury on its ground serves it like any city's
@@ -460,17 +494,16 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   const banned = congressBannedLuxury(state);
   const dupLux = congressDuplicateLuxury(state);
   let dupCopies = 0;
-  const luxuries = new Set<string>();
   for (const t of state.map.tiles) {
     if (!t.resource || tileSeat(t) !== seat) continue;
-    const def = RESOURCES[t.resource];
     // CIV6: a PILLAGED improvement gives no copy (runs/h1_duelw1104 Diamonds
     // plot 628 t180-204: `GetResourceAmount` 1 -> 0, two cities -1 Amenity)
-    if (def.category === 'luxury' && t.improvement === resourceImprovement(t) && !t.pillaged && t.resource !== banned) {
-      luxuries.add(t.resource);
-      if (t.resource === dupLux) dupCopies++;
-    }
+    if (t.resource === dupLux && t.resource !== banned && t.improvement === resourceImprovement(t) && !t.pillaged) dupCopies++;
   }
+  // every luxury the seat holds a copy of — its own, its city-states', its
+  // deals' (`luxuryHoldings`) — serves one full-reach round
+  const luxuries = new Set<string>();
+  for (const [r, n] of luxuryHoldings(state, seat).held) if (n > 0 && r !== banned) luxuries.add(r);
   // CIV6 (Affluence): "While established in a city-state, provides a copy of
   // its Luxury resources to you." A copy of one already worked is no second
   // amenity, which the set answers by itself.

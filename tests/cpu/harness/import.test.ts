@@ -6,12 +6,14 @@ import { hexDistance } from '../../../world/hex';
 import { diffActions, stateChecks } from '../../../cpu/harness/checks';
 import type { Catalog, DumpCity, DumpPlayer, DumpUnit, TurnRecord } from '../../../cpu/harness/record';
 import { seatOfCityState } from '../../../cpu/core/seats';
+import { envoysHere } from '../../../cpu/core/cityStates';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../../../cpu/data/governors';
 import { gameHash } from '../../../cpu/harness/aliases';
 import { eraEvents, transitionChecks } from '../../../cpu/harness/checks';
 import { GW_HOLDERS, GWO_RELIC, GWO_WRITING, holderSlots } from '../../../cpu/data/greatWorks';
 import { GP_CITY_PERM, GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
-import { CONGRESS_RESOLUTIONS, MOMENT_PANTHEON_FIRST } from '../../../cpu/data/seats';
+import { CONGRESS_RESOLUTIONS, DEAL_LUXURY, DEAL_TURNS, MOMENT_PANTHEON_FIRST } from '../../../cpu/data/seats';
+import { LUXURY_IDS } from '../../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../../../cpu/data/districts';
 import { settlerCost } from '../../../cpu/core/game';
 import { clearableFeatures } from '../../../world/features';
@@ -19,8 +21,8 @@ import { clearableFeatures } from '../../../world/features';
 const CAT: Catalog = {
   terrains: ['TERRAIN_GRASS', 'TERRAIN_GRASS_HILLS', 'TERRAIN_PLAINS', 'TERRAIN_COAST', 'TERRAIN_OCEAN', 'TERRAIN_DESERT_MOUNTAIN'],
   features: ['FEATURE_FOREST', 'FEATURE_VOLCANO', 'FEATURE_NOT_IN_ENGINE'],
-  resources: ['RESOURCE_WHEAT', 'RESOURCE_NOT_IN_ENGINE'],
-  improvements: ['IMPROVEMENT_FARM', 'IMPROVEMENT_GOODY_HUT', 'IMPROVEMENT_BARBARIAN_CAMP'],
+  resources: ['RESOURCE_WHEAT', 'RESOURCE_NOT_IN_ENGINE', 'RESOURCE_WINE'],
+  improvements: ['IMPROVEMENT_FARM', 'IMPROVEMENT_GOODY_HUT', 'IMPROVEMENT_BARBARIAN_CAMP', 'IMPROVEMENT_PLANTATION'],
   districts: ['DISTRICT_CITY_CENTER', 'DISTRICT_CAMPUS', 'DISTRICT_SEOWON'],
   buildings: ['BUILDING_PALACE', 'BUILDING_MONUMENT', 'BUILDING_LIBRARY', 'BUILDING_MADRASA', 'BUILDING_PYRAMIDS', 'BUILDING_NOT_IN_ENGINE',
     'BUILDING_AMPHITHEATER', 'BUILDING_BANK'],
@@ -34,8 +36,8 @@ const CAT: Catalog = {
   routes: ['ROUTE_ANCIENT_ROAD'],
   projects: ['PROJECT_ENHANCE_DISTRICT_CAMPUS'],
   eras: ['ERA_ANCIENT'],
-  governors: ['GOVERNOR_THE_MERCHANT'],
-  promotions: ['GOVERNOR_PROMOTION_MERCHANT_LAND_ACQUISITION'],
+  governors: ['GOVERNOR_THE_MERCHANT', 'GOVERNOR_THE_AMBASSADOR'],
+  promotions: ['GOVERNOR_PROMOTION_MERCHANT_LAND_ACQUISITION', 'GOVERNOR_PROMOTION_MERCHANT_HARBORMASTER', 'GOVERNOR_PROMOTION_AMBASSADOR_MESSENGER'],
   buildingReplaces: [['BUILDING_MADRASA', 'BUILDING_UNIVERSITY'], ['BUILDING_NOT_IN_ENGINE', 'BUILDING_LIBRARY']],
   districtReplaces: [['DISTRICT_SEOWON', 'DISTRICT_CAMPUS']],
   unitReplaces: [['UNIT_AZTEC_EAGLE_WARRIOR', 'UNIT_WARRIOR']],
@@ -108,7 +110,7 @@ function record(turn: number, over: Partial<TurnRecord> = {}): TurnRecord {
     head: { W, H, wrapX: true, localPlayer: 0 },
     map,
     players: [
-      player(0, { governors: [[0, 0, 65536, true, 0, 0, [0]]] }),
+      player(0, { governors: [[0, 0, 65536, true, 0, 0, [0, 1]]] }),
       player(1, { leader: 'LEADER_NOT_IN_ROSTER', civ: 'CIVILIZATION_ELSEWHERE', wars: [0] }),
       player(2, { major: false, minor: true, leader: 'LEADER_MINOR_CIV_GENEVA', civ: 'CIVILIZATION_GENEVA', envoysReceived: [[0, 2]], suzerain: 0 }),
     ],
@@ -200,7 +202,8 @@ describe('importTurn', () => {
     expect(g.appointed).toBe(true);
     expect(g.cityId).toBe(imp.state.seats[0].cities[0].id);
     expect(g.establishTurns).toBe(0);
-    expect(g.promotions).toBe(1 << GOVERNOR_PROMOTION_INDEX.LAND_ACQUISITION);
+    // the default title is held implicitly: only the promotion taken sets a bit
+    expect(g.promotions).toBe(1 << GOVERNOR_PROMOTION_INDEX.HARBORMASTER);
   });
 
   it('maps a unique unit to the row it replaces', () => {
@@ -378,5 +381,46 @@ describe('the era checks', () => {
     const r = transitionChecks(a, b, CAT).find((x) => x.check === 'step.eraScore' && x.subject.startsWith('seat 0 '));
     // a plain founding records no moment; the world's first pantheon pays its row
     expect(r).toMatchObject({ ok: true, game: MOMENT_PANTHEON_FIRST, ours: MOMENT_PANTHEON_FIRST });
+  });
+});
+
+describe("a governor's envoys", () => {
+  it("come back out of the game's envoy count, which already holds them", () => {
+    // `GetTokensReceived` read 3 -> 5 the turn Amani established (runs/h1_duelw1105, Nalanda t63-67)
+    const r = record(10);
+    r.players = [
+      player(0, { governors: [[1, 2, 131072, true, 0, 0, [2]]] }), r.players[1],
+      player(2, { major: false, minor: true, leader: 'LEADER_MINOR_CIV_GENEVA', civ: 'CIVILIZATION_GENEVA', envoysReceived: [[0, 5]], suzerain: 0 }),
+    ];
+    const imp = importTurn(r, CAT);
+    const cs = imp.state.cityStates[0];
+    expect(imp.state.seats[0].governors![GOVERNOR_INDEX.AMANI].promotions).toBe(0);
+    expect(cs.envoys[0]).toBe(3);
+    expect(envoysHere(imp.state, cs, 0)).toBe(5);
+  });
+});
+
+describe('the luxuries that cross', () => {
+  /** seat 0 works two improved Wine plots (7 and 14); the players' luxury
+   *  rows are the record's [resource, held, exported] */
+  function wines(lux0: [number, number, number][], lux1: [number, number, number][]): TurnRecord {
+    const r = record(10);
+    r.map[1][1] = plot(0, { 2: 2, 3: 1, 4: 3, 6: 0, 19: 65536 });
+    r.map[2][2] = plot(0, { 2: 2, 3: 1, 4: 3, 6: 0, 19: 65536 });
+    r.players = [player(0, { luxuries: lux0 }), player(1, { luxuries: lux1 }), r.players[2]];
+    return r;
+  }
+
+  it('carries an export matched to an import as a running luxury deal', () => {
+    const imp = importTurn(wines([[2, 1, 1]], [[2, 1, 0]]), CAT);
+    expect(imp.state.dealTerms?.['0>1']).toEqual({ left: DEAL_TURNS, items: [[DEAL_LUXURY, LUXURY_IDS.indexOf('WINE'), 1]] });
+    expect([...imp.gaps.keys()].filter((k) => k.startsWith('luxury'))).toEqual([]);
+  });
+
+  it('leaves an import nobody exported as the seat gap', () => {
+    const imp = importTurn(wines([[2, 2, 0]], [[2, 1, 0]]), CAT);
+    expect(imp.state.dealTerms?.['0>1']).toBeUndefined();
+    expect(imp.seatGaps.get(1)?.has('luxury-imported:RESOURCE_WINE')).toBe(true);
+    expect(imp.seatGaps.get(0)?.has('luxury-imported:RESOURCE_WINE')).toBeFalsy();
   });
 });

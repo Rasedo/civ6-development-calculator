@@ -15,7 +15,8 @@ import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { governorSum, governorTileSum } from './governors';
 import { RESOURCES } from '../../world/resources';
-import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, hiddenResourcesFor } from './seats';
+import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
+import { suzerainMinorSeats } from './cityStates';
 import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
@@ -88,10 +89,19 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   // CIV6 (Resources.PrereqTech): a strategic resource the seat cannot see
   // yet accrues nothing, whatever improvement stands on its tile
   const hidden = hiddenResourcesFor(state, seat);
+  const suz = suzerainMinorSeats(state, seat);
   for (const t of state.map.tiles) {
     if (!t.resource || t.pillaged || hidden.has(t.resource)) continue;
     const k = strategicSlot(t.resource);
     if (k < 0 || t.improvement !== RESOURCES[t.resource]?.improvement) continue;
+    // CIV6 (LOC_CITY_STATES_SUZERAIN_DIPLOMATIC_BONUS): "Gain ownership of
+    // all the city-state's resources" — an improved source on a suzerained
+    // city-state's ground pays the suzerain the resource's own number, and
+    // none of the seat's own rate rows, which read the seat's own tiles
+    if (suz.has(tileSeat(t))) {
+      bk[k] += STRATEGIC_PER_TURN[t.resource];
+      continue;
+    }
     if (!tileOwnedByCiv(t, seat)) continue;
     // CIV6 (Defense Logistics): "Accumulating Strategic resources gain an
     // additional +1 per turn" — per accruing tile of the governed city.

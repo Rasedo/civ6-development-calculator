@@ -726,6 +726,7 @@ class SimInit:
         self._deal_k_spy = self._deal_kinds.index("SPY")
         self._deal_k_borders = self._deal_kinds.index("OPEN_BORDERS")
         self._deal_k_joint = self._deal_kinds.index("JOINT_WAR")
+        self._deal_k_lux = self._deal_kinds.index("LUXURY")
         self._comp_turns = int(_er2["competitionTurns"])
         self._comp_silver_pct = int(_er2["competitionSilverPct"])
         self._comp_bronze_pct = int(_er2["competitionBronzePct"])

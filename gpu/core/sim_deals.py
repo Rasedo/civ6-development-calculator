@@ -72,6 +72,15 @@ class SimDeals:
             ns = self.civ_stockpile.shape[2]
             have = self.civ_stockpile[:, giver].gather(1, va.clamp(min=0, max=ns - 1).unsqueeze(1)).squeeze(1)
             return (va >= 0) & (va < self._n_strategic) & (vb > 0) & (have >= vb)
+        if kind == self._deal_k_lux:
+            # one copy the giver can still trade: its own or its city-states',
+            # not one already out on a deal, nor one a deal brought in
+            nl = self._n_lux
+            if nl == 0:
+                return z
+            spare = self._lux_holdings(giver)[1]
+            have = spare.gather(1, va.clamp(min=0, max=nl - 1).unsqueeze(1)).squeeze(1)
+            return (va >= 0) & (va < nl) & (have >= 1)
         if kind == self._deal_k_gw:
             out = z.clone()
             for k in range(3):
@@ -135,8 +144,8 @@ class SimDeals:
             self.civ_treasury[:, giver] = self.civ_treasury[:, giver] - paid
             self.civ_treasury[:, taker] = self.civ_treasury[:, taker] + paid
             self._score_gold_gift(giver, taker, paid)   # CIV6 (Aid Request, FromGold)
-        elif kind == self._deal_k_gpt:
-            pass  # the term pays it; accepting only starts the clock
+        elif kind in (self._deal_k_gpt, self._deal_k_lux):
+            pass  # the term pays it (a luxury copy is held while it runs); accepting only starts the clock
         elif kind == self._deal_k_favor:
             paid = torch.where(ok, va, torch.zeros_like(va))
             self.civ_diplo_favor[:, giver] = self.civ_diplo_favor[:, giver] - paid
@@ -444,7 +453,8 @@ class SimDeals:
     def _deal_end_term(self, giver: int, taker: int, items: torch.Tensor, done: torch.Tensor) -> None:
         """CIV6: "Resources and gold per turn ... are temporary, and once the
         deal has run its course you will get them back" — the payments stop on
-        their own, and a lump of resource goes home. `endTerm`'s twin."""
+        their own, a lump of resource goes home, and a luxury copy is back
+        with its giver once the term's items clear. `endTerm`'s twin."""
         ns = self.civ_stockpile.shape[2]
         for s in range(self._deal_items):
             kind, va, vb = items[:, s, 0], items[:, s, 1], items[:, s, 2]

@@ -9558,6 +9558,21 @@ class SimSeats:
                     if _st >= 0 and _sp:
                         pct = pct + (self._row_is(row, _sc, _sl).unsqueeze(1) & (self.terrain == _st)).long() * _sp
                 bank[:, k] += ((pt * (100 + pct)) // 100).sum(dim=1)
+        # CIV6 (LOC_CITY_STATES_SUZERAIN_DIPLOMATIC_BONUS): "Gain ownership of
+        # all the city-state's resources" — an improved source on a suzerained
+        # city-state's ground pays the suzerain the resource's own number, and
+        # none of the row's own rate rows, which read the row's own tiles
+        if self.S > 0 and row < self.n_majors:
+            suz = self._suzerain_mask(row)
+            cs_ground = torch.zeros_like(owned)
+            for s in range(self.S):
+                if bool(suz[:, s].any()):
+                    cs_ground |= (self.tile_seat == 100 + s) & suz[:, s].unsqueeze(1)
+            if bool(cs_ground.any()):
+                cs_src = (cs_ground & ~self.pillaged & (self.improvement == self.res_imp)
+                          & ~self._res_hidden(row))
+                for k, (rid, rate) in enumerate(zip(self._strat_rid, self._strat_rate)):
+                    bank[:, k] += (cs_src & (self.res_id == rid)).sum(dim=1) * rate
         # CIV6 (Grand Bazaar, GRANDBAZAAR_ACCUMULATION_STRATEGICS Amount 1):
         # "Accumulate 1 extra Strategic resource for every different type of
         # Strategic resource this city has improved." The modifier is named for

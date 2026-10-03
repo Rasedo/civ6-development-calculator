@@ -29,11 +29,13 @@
 import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, ImprovementId, TerrainId, Tile, Unit } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, emptySeat, freeSeatOf, markCityCentre, seatOf, seatOfCityState, setTileOwner, setWar } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, seatOfCityState, setTileOwner, setWar } from '../core/seats';
+import { luxuryHoldings } from '../core/city';
 import { governorsOf } from '../core/governors';
+import { envoysWith } from '../core/cityStates';
 import { FERTILITY_CAP } from '../core/disasters';
-import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../data/governors';
-import { CIV_LEADERS } from '../data/seats';
+import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../data/governors';
+import { CIV_LEADERS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS } from '../data/seats';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
@@ -838,15 +840,19 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         gap(ctx, 'governor', gname);
         continue;
       }
+      // the game lists the governor's default title among its promotions; the
+      // engine holds it implicitly (`GOVERNOR_DEFAULT_PROMOTION`), so its bit
+      // stays clear
+      const gi = GOVERNOR_INDEX[id as keyof typeof GOVERNOR_INDEX];
       let promotions = 0;
       for (const pi of promos) {
         const pid = engineId('promotion', cat.promotions[pi], 'GOVERNOR_PROMOTION_', GOVERNOR_PROMOTION_INDEX);
-        if (pid) promotions |= 1 << GOVERNOR_PROMOTION_INDEX[pid];
-        else gap(ctx, 'governor-promotion', cat.promotions[pi]);
+        if (!pid) gap(ctx, 'governor-promotion', cat.promotions[pi]);
+        else if (GOVERNOR_PROMOTION_INDEX[pid] !== GOVERNOR_DEFAULT_PROMOTION[gi]) promotions |= 1 << GOVERNOR_PROMOTION_INDEX[pid];
       }
       const minor = minorOfPlayer.get(owner);
       const city = cityByKey.get(`${owner}:${cityId}`);
-      roster[GOVERNOR_INDEX[id as keyof typeof GOVERNOR_INDEX]] = {
+      roster[gi] = {
         appointed: true,
         cityId: city && city.seat === seat ? city.id : -1,
         minorId: minor ? minor.id : -1,
@@ -856,6 +862,23 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       };
     }
     ctx.scopeSeat = undefined;
+  }
+
+  // the game's `GetTokensReceived` counts an established governor's envoys
+  // (Amani's 2 arrive the turn she establishes and leave with her), which the
+  // engine adds on top of its store (`envoysWith`): the store is the count
+  // with the governor's share taken back out
+  for (const cs of minorOfPlayer.values()) {
+    for (const [k, read] of Object.entries(cs.envoys)) {
+      const seat = Number(k);
+      const base = envoysWith(state, cs, seat, 0);
+      const step = envoysWith(state, cs, seat, 1) - base;
+      if (base === 0 && step === 1) continue;
+      ctx.scopeSeat = seat;
+      if ((read - base) % step !== 0 || read < base) gap(ctx, 'envoys', cs.name);
+      else cs.envoys[seat] = (read - base) / step;
+      ctx.scopeSeat = undefined;
+    }
   }
 
   // a resource the engine lacks on an owned plot is its owner's gap too: a
@@ -870,22 +893,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     }
   }
 
-  // the luxuries a seat holds beyond its own improved plots came by a deal or
-  // a city-state, and those it exports left by one: the importer carries no
-  // deal, so both are the seat's gaps
-  for (const p of players) {
-    const seat = seatOfGame(p.id);
-    if (seat === NO_SEAT || !seatOf(state, seat)) continue;
-    ctx.scopeSeat = seat;
-    for (const [ri, held, exported] of p.luxuries ?? []) {
-      const rname = cat.resources[ri];
-      const id = strip(rname, 'RESOURCE_');
-      const own = tiles.filter((t) => t.ownerSeat === seat && t.resource === id && t.improvement && !t.pillaged).length;
-      if (held > own) gap(ctx, 'luxury-imported', rname);
-      if (exported > 0) gap(ctx, 'luxury-exported', rname);
-    }
-    ctx.scopeSeat = undefined;
-  }
+  importLuxuryDeals(ctx, state, players, cat, seatOfGame);
 
   // the units
   let nextId = 0;
@@ -1016,6 +1024,66 @@ const GWO_BY_NAME: Record<string, number> = {
   GREATWORKOBJECT_MUSIC: GWO_MUSIC, GREATWORKOBJECT_RELIC: GWO_RELIC,
 };
 const PEOPLE = Object.fromEntries(Object.values(GREAT_PEOPLE).flat().map((p) => [p.id, p]));
+
+/**
+ * The luxuries that cross between majors: per player and luxury the record
+ * reads [held, exported], and held = the engine's spare copies (own improved
+ * plots and its city-states', `luxuryHoldings`) + imported − exported, so
+ * imported = held + exported − spare. Each luxury's imports are matched to
+ * its exports, seat order on both sides, and every matched copy becomes one
+ * `DEAL_LUXURY` item on the running term from exporter to importer — the
+ * record names no partner and no turns left, so the term runs `DEAL_TURNS`.
+ * An unmatched import or export, a copy that will not fit the term's
+ * `DEAL_ITEMS`, and a copy the engine counts that the game does not hold are
+ * the seat's gaps.
+ */
+function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], cat: Catalog,
+                           seatOfGame: (pid: number) => number): void {
+  const flow = new Map<string, { seat: number; n: number }[][]>(); // resource -> [imports, exports]
+  const seen = new Set<string>();
+  const remember = (seat: number, rname: string, kind: string): void => {
+    ctx.scopeSeat = seat;
+    gap(ctx, kind, rname);
+    ctx.scopeSeat = undefined;
+  };
+  for (const p of players) {
+    const seat = seatOfGame(p.id);
+    if (seat === NO_SEAT || !seatOf(state, seat) || !isCiv(seat)) continue;
+    const spare = luxuryHoldings(state, seat).spare;
+    const rows = new Map<string, [number, number]>();
+    for (const [ri, held, exported] of p.luxuries ?? []) rows.set(cat.resources[ri], [held, exported]);
+    for (const [id, n] of spare) if (n > 0 && !rows.has(`RESOURCE_${id}`)) rows.set(`RESOURCE_${id}`, [0, 0]);
+    for (const [rname, [held, exported]] of rows) {
+      const id = strip(rname, 'RESOURCE_');
+      const imported = held + exported - (spare.get(id) ?? 0);
+      if (!LUXURY_IDS.includes(id) || imported < 0) {
+        remember(seat, rname, imported < 0 ? 'luxury-held' : 'luxury-imported');
+        continue;
+      }
+      if (!flow.has(id)) flow.set(id, [[], []]);
+      if (imported > 0) flow.get(id)![0].push({ seat, n: imported });
+      if (exported > 0) flow.get(id)![1].push({ seat, n: exported });
+      seen.add(id);
+    }
+  }
+  for (const id of [...seen].sort()) {
+    const [imports, exports] = flow.get(id)!;
+    for (const imp of imports) {
+      for (const exp of exports) {
+        while (imp.n > 0 && exp.n > 0 && exp.seat !== imp.seat) {
+          const terms = (state.dealTerms ??= {});
+          const term = (terms[grantKey(exp.seat, imp.seat)] ??= { left: DEAL_TURNS, items: [] });
+          if (term.items.length >= DEAL_ITEMS) break;
+          term.items.push([DEAL_LUXURY, LUXURY_IDS.indexOf(id), 1]);
+          imp.n -= 1;
+          exp.n -= 1;
+        }
+      }
+    }
+    for (const imp of imports) if (imp.n > 0) remember(imp.seat, `RESOURCE_${id}`, 'luxury-imported');
+    for (const exp of exports) if (exp.n > 0) remember(exp.seat, `RESOURCE_${id}`, 'luxury-exported');
+  }
+}
 
 /**
  * A city's great works: each filled slot the record names becomes a work in

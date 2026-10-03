@@ -1349,6 +1349,10 @@ export const DEAL_ITEM_KINDS = [
   /** CIV6 (DIPLOACTION_JOINT_WAR): an agreement — `a` is the TARGET row;
    *  accepting it declares the war for BOTH parties (`jointWarPayable`) */
   'JOINT_WAR',
+  /** one copy of a luxury resource for the deal's term — `a` is the
+   *  `LUXURY_IDS` index; the receiver holds it, the giver holds one fewer
+   *  (`luxuryHoldings`) */
+  'LUXURY',
 ] as const;
 export const DEAL_GOLD = DEAL_ITEM_KINDS.indexOf('GOLD');
 export const DEAL_GOLD_PER_TURN = DEAL_ITEM_KINDS.indexOf('GOLD_PER_TURN');
@@ -1359,6 +1363,7 @@ export const DEAL_CITY = DEAL_ITEM_KINDS.indexOf('CITY');
 export const DEAL_SPY = DEAL_ITEM_KINDS.indexOf('SPY');
 export const DEAL_OPEN_BORDERS = DEAL_ITEM_KINDS.indexOf('OPEN_BORDERS');
 export const DEAL_JOINT_WAR = DEAL_ITEM_KINDS.indexOf('JOINT_WAR');
+export const DEAL_LUXURY = DEAL_ITEM_KINDS.indexOf('LUXURY');
 
 /**
  * CIV6: "Sums of Gold, Great Works, Relics, Artifacts, and captured Spies are
@@ -1369,7 +1374,7 @@ export const DEAL_JOINT_WAR = DEAL_ITEM_KINDS.indexOf('JOINT_WAR');
  * agreement here does.
  */
 export const DEAL_PERMANENT: readonly boolean[] = DEAL_ITEM_KINDS.map(
-  (k) => k !== 'GOLD_PER_TURN' && k !== 'RESOURCE' && k !== 'OPEN_BORDERS');
+  (k) => k !== 'GOLD_PER_TURN' && k !== 'RESOURCE' && k !== 'OPEN_BORDERS' && k !== 'LUXURY');
 
 /** CIV6: "All Deals, Demands, and Promises last for 30 turns, at which point
  *  they need to be renewed" — the clock every other agreement runs on. */
