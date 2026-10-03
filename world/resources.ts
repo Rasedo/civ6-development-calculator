@@ -112,6 +112,20 @@ export const RESOURCES: Record<string, ResourceDef> = {
   // Resource_ValidFeatures Jungle and Forest; Expansion1_Improvements.xml
   // works it with Fishing Boats or a Mine (MustRemoveFeature false).
   AMBER: { id: 'AMBER', name: 'Amber', category: 'luxury', yields: { culture: 1 }, improvement: 'MINE', waterImprovement: 'FISHING_BOATS', terrains: ['COAST'], elevations: ANY, anyTerrainFeatures: ['WOODS', 'RAINFOREST'] },
+  // CIV6 (Resources.xml): Cocoa +3 Gold on Jungle, a Plantation; Coffee +1
+  // Culture on Grassland or Jungle, a Plantation; Gypsum +1 Gold +1 Production
+  // on Desert/Plains/Tundra Hills and flat Plains, a Quarry; Mercury +1 Science
+  // on Plains, a Mine. Expansion1_Resources.xml: Olives +1 Gold +1 Production
+  // on Grassland, a Plantation; Turtles +1 Science on Reef, Fishing Boats.
+  // GranColombia_Maya_Resources.xml: Honey +2 Food on Grassland or Plains, a
+  // Camp. Every row is RESOURCECLASS_LUXURY, Happiness 4.
+  COCOA: { id: 'COCOA', name: 'Cocoa', category: 'luxury', yields: { gold: 3 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, requiresFeature: ['RAINFOREST'] },
+  COFFEE: { id: 'COFFEE', name: 'Coffee', category: 'luxury', yields: { culture: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND'], elevations: FLAT, anyTerrainFeatures: ['RAINFOREST'] },
+  GYPSUM: { id: 'GYPSUM', name: 'Gypsum', category: 'luxury', yields: { gold: 1, production: 1 }, improvement: 'QUARRY', terrains: ['DESERT', 'PLAINS', 'TUNDRA'], elevations: HILLS, noFeature: true },
+  MERCURY: { id: 'MERCURY', name: 'Mercury', category: 'luxury', yields: { science: 1 }, improvement: 'MINE', terrains: ['PLAINS'], elevations: FLAT, noFeature: true },
+  OLIVES: { id: 'OLIVES', name: 'Olives', category: 'luxury', yields: { gold: 1, production: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND'], elevations: FLAT, noFeature: true },
+  TURTLES: { id: 'TURTLES', name: 'Turtles', category: 'luxury', yields: { science: 1 }, improvement: 'FISHING_BOATS', terrains: [], elevations: FLAT, anyTerrainFeatures: ['REEF'] },
+  HONEY: { id: 'HONEY', name: 'Honey', category: 'luxury', yields: { food: 2 }, improvement: 'CAMP', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
 };
 
 /** The improvement that works the resource on THIS plot: the row's water

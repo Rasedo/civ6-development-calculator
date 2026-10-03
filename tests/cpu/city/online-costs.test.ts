@@ -113,7 +113,7 @@ describe('the second wave of the harness findings', () => {
 
   it('Amber: a luxury on Coast or under Woods and Rainforest, Fishing Boats at sea and a Mine ashore', () => {
     expect(RESOURCES.AMBER).toMatchObject({ category: 'luxury', yields: { culture: 1 }, terrains: ['COAST'] });
-    expect(LUXURY_IDS[LUXURY_IDS.length - 1]).toBe('AMBER');
+    expect(LUXURY_IDS).toEqual(expect.arrayContaining(['AMBER', 'COCOA', 'COFFEE', 'GYPSUM', 'MERCURY', 'OLIVES', 'TURTLES', 'HONEY']));
     const map = makeMap();
     const sea = tileAtCoords(map, 2, 2);
     sea.terrain = 'COAST';
