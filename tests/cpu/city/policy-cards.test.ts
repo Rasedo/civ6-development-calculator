@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, grantCivics, standDistrict } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
-import { computeUnlocks, computeAdoption, defaultModifiers, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from '../../../cpu/core/effects';
+import { applyPolicyEffects, computeUnlocks, computeAdoption, defaultModifiers, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from '../../../cpu/core/effects';
 import { cityBuildingYields } from '../../../cpu/core/yields';
 import { cityDefenseStrength, cityStrikeStrength, barbarianCombatCS } from '../../../cpu/core/combat';
 import { GOVERNMENTS, POLICIES, POLICY_LIST } from '../../../cpu/data/policies';
 import { CIVICS } from '../../../cpu/data/civics';
 import { UNIT_ERA_INDEX, unitHasClass, UNITS } from '../../../cpu/data/units';
-import { spawnUnit } from '../../../cpu/core/units';
+import { garrisonOf, spawnUnit } from '../../../cpu/core/units';
 import { seatOf, BARB_SEAT } from '../../../cpu/core/seats';
 
 describe('the policy catalog', () => {
@@ -206,6 +206,30 @@ describe('the empire-wide channels', () => {
       expect(Object.keys(g)).toEqual([cls]);
       expect(Object.values(g)).toEqual([2]);
     }
+  });
+
+  it('RETAINERS and LIMITANEI pay on the garrison channels, and a garrison is the city’s own military unit', () => {
+    const m = defaultModifiers();
+    applyPolicyEffects(m, POLICIES.RETAINERS.effects);
+    applyPolicyEffects(m, POLICIES.LIMITANEI.effects);
+    expect([m.amenitiesWithGarrison, m.loyaltyWithGarrison]).toEqual([1, 2]);
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+    expect(garrisonOf(state, city)).toBeUndefined();
+    spawnUnit(state, 'BUILDER', city.centerIndex, 0);
+    expect(garrisonOf(state, city), 'a civilian garrisons nothing').toBeUndefined();
+    spawnUnit(state, 'WARRIOR', city.centerIndex, 0);
+    expect(garrisonOf(state, city)?.type).toBe('WARRIOR');
+  });
+
+  it('the per-building Great Person cards join the roster’s per-building rows', () => {
+    const m = defaultModifiers();
+    applyPolicyEffects(m, POLICIES.INVENTION.effects);
+    applyPolicyEffects(m, POLICIES.NOBEL_PRIZE.effects);
+    expect(m.gppFlat).toEqual({ ENGINEER: 4 });
+    expect(m.gppBuildings).toContainEqual({ building: 'WORKSHOP', cls: 'ENGINEER', amount: 2 });
+    expect(m.gppBuildings).toContainEqual({ building: 'NUCLEAR_POWER_PLANT', cls: 'ENGINEER', amount: 4 });
+    expect(m.gppBuildings.filter((r) => r.cls === 'SCIENTIST').map((r) => r.building)).toEqual(['UNIVERSITY', 'RESEARCH_LAB']);
   });
 
   it('every card carries a live effect set — none is inert', () => {

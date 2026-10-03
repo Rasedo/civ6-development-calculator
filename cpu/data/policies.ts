@@ -143,6 +143,15 @@ export interface PolicyEffects {
   /** yields per completed SPECIALTY district in every city
    *  (EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT) */
   yieldPerSpecialty?: Partial<Yields>;
+  /** amenities, and loyalty per turn, in a city one of the seat's own
+   *  military units garrisons (REQUIREMENT_CITY_HAS_GARRISON_UNIT) */
+  amenitiesWithGarrison?: number;
+  loyaltyWithGarrison?: number;
+  /** Great Person points of a class, per turn, in each city holding the named
+   *  building (MODIFIER_PLAYER_CITIES_ADJUST_GREAT_PERSON_POINT behind
+   *  REQUIREMENT_CITY_HAS_BUILDING) — paid where the roster's own
+   *  per-building rows are */
+  gppPerBuilding?: { building: string; cls: GreatPersonClass; amount: number }[];
   /** influence points per turn toward the next envoy */
   influencePerTurn?: number;
   /** the FIRST envoy sent to each city-state counts as two */
@@ -282,6 +291,7 @@ const DK = (id: string, name: string, firstEra: number, lastEra: number,
 const CLASSICAL = 1;
 const RENAISSANCE = 3;
 const INDUSTRIAL = 4;
+const MODERN = 5;
 const EVERY_ERA = -1;
 
 /** PROVENANCE (cpu/data/provenance.ts): where each column of a policy card row came from in
@@ -745,6 +755,157 @@ const POLICY_SRC: Record<string, SrcMap> = {
     'effects.prodBoost.eraMax': { derived: '-1: every era - the modifier names one unit type and no era', inputs: [xml('ModifierArguments', 'ModifierId=MACHIAVELLIANISM_SPYPRODUCTION&Name=UnitType', 'Value')] },
     'effects.spyOffenseTimeCutPct': xml('ModifierArguments', 'ModifierId=MACHIAVELLIANISM_OFFENSIVESPYTIME&Name=ReductionPercent', 'Value'),
   },
+  RETAINERS: {
+    kind: xml('Policies', 'PolicyType=POLICY_RETAINERS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_RETAINERS', 'ObsoletePolicy', { expect: 'POLICY_PROPAGANDA' }), xml('Policies', 'PolicyType=POLICY_PROPAGANDA', 'PrereqCivic', { expect: 'CIVIC_MASS_MEDIA' })] },
+    'effects.amenitiesWithGarrison': xml('ModifierArguments', 'ModifierId=RETAINERS_AMENITYBONUS&Name=Amount', 'Value'),
+  },
+  LIMITANEI: {
+    kind: xml('Policies', 'PolicyType=POLICY_LIMITANEI', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.loyaltyWithGarrison': xml('ModifierArguments', 'ModifierId=LIMITANEI_GARRISONIDENTITY&Name=Amount', 'Value'),
+  },
+  PROFESSIONAL_ARMY: {
+    kind: xml('Policies', 'PolicyType=POLICY_PROFESSIONAL_ARMY', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_PROFESSIONAL_ARMY', 'ObsoletePolicy', { expect: 'POLICY_FORCE_MODERNIZATION' }), xml('Policies', 'PolicyType=POLICY_FORCE_MODERNIZATION', 'PrereqCivic', { expect: 'CIVIC_URBANIZATION' })] },
+    'effects.upgradeGoldDiscountPct': xml('ModifierArguments', 'ModifierId=PROFESSIONAL_ARMY_UNITUPGRADEDISCOUNT&Name=Amount', 'Value'),
+  },
+  RETINUES: {
+    kind: xml('Policies', 'PolicyType=POLICY_RETINUES', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_RETINUES', 'ObsoletePolicy', { expect: 'POLICY_FORCE_MODERNIZATION' }), xml('Policies', 'PolicyType=POLICY_FORCE_MODERNIZATION', 'PrereqCivic', { expect: 'CIVIC_URBANIZATION' })] },
+    'effects.upgradeResourceDiscountPct': xml('ModifierArguments', 'ModifierId=PROFESSIONAL_ARMY_UPGRADE_RESOURCE_DISCOUNT&Name=Amount', 'Value'),
+  },
+  NAVIGATION: {
+    kind: xml('Policies', 'PolicyType=POLICY_NAVIGATION', 'GovernmentSlotType', { expect: 'SLOT_GREAT_PERSON' }),
+    'effects.gppFlat.ADMIRAL': xml('ModifierArguments', 'ModifierId=NAVIGATION_GREATADMIRALPOINTS&Name=Amount', 'Value'),
+  },
+  TRAVELING_MERCHANTS: {
+    kind: xml('Policies', 'PolicyType=POLICY_TRAVELING_MERCHANTS', 'GovernmentSlotType', { expect: 'SLOT_GREAT_PERSON' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_TRAVELING_MERCHANTS', 'ObsoletePolicy', { expect: 'POLICY_LAISSEZ_FAIRE' }), xml('Policies', 'PolicyType=POLICY_LAISSEZ_FAIRE', 'PrereqCivic', { expect: 'CIVIC_CAPITALISM' })] },
+    'effects.gppFlat.MERCHANT': xml('ModifierArguments', 'ModifierId=TRAVELINGMERCHANTS_GREATMERCHANTPOINTS&Name=Amount', 'Value'),
+  },
+  INVENTION: {
+    kind: xml('Policies', 'PolicyType=POLICY_INVENTION', 'GovernmentSlotType', { expect: 'SLOT_GREAT_PERSON' }),
+    'effects.gppFlat.ENGINEER': xml('ModifierArguments', 'ModifierId=INVENTION_GREATENGINEERPOINTS&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.amount': xml('ModifierArguments', 'ModifierId=INVENTION_ENGINEER_WORKSHOP&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.cls': xml('ModifierArguments', 'ModifierId=INVENTION_ENGINEER_WORKSHOP&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_ENGINEER' }),
+    'effects.gppPerBuilding.0.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_WORKSHOP&Name=BuildingType', 'Value', { expect: 'BUILDING_WORKSHOP' }),
+  },
+  FRESCOES: {
+    kind: xml('Policies', 'PolicyType=POLICY_FRESCOES', 'GovernmentSlotType', { expect: 'SLOT_GREAT_PERSON' }),
+    'effects.gppFlat.ARTIST': xml('ModifierArguments', 'ModifierId=FRESCOES_GREATARTISTPOINTS&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.amount': xml('ModifierArguments', 'ModifierId=FRESCOES_ARTIST_ARTMUSEUM&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.cls': xml('ModifierArguments', 'ModifierId=FRESCOES_ARTIST_ARTMUSEUM&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_ARTIST' }),
+    'effects.gppPerBuilding.0.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_MUSEUM_ART&Name=BuildingType', 'Value', { expect: 'BUILDING_MUSEUM_ART' }),
+  },
+  SYMPHONIES: {
+    kind: xml('Policies', 'PolicyType=POLICY_SYMPHONIES', 'GovernmentSlotType', { expect: 'SLOT_GREAT_PERSON' }),
+    'effects.gppFlat.MUSICIAN': xml('ModifierArguments', 'ModifierId=SYMPHONIES_GREATMUSICIANPOINTS&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.amount': xml('ModifierArguments', 'ModifierId=SYMPHONIES_MUSICIAN_BROADCASTCENTER&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.cls': xml('ModifierArguments', 'ModifierId=SYMPHONIES_MUSICIAN_BROADCASTCENTER&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_MUSICIAN' }),
+    'effects.gppPerBuilding.0.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_BROADCAST_CENTER&Name=BuildingType', 'Value', { expect: 'BUILDING_BROADCAST_CENTER' }),
+  },
+  LAISSEZ_FAIRE: {
+    kind: xml('Policies', 'PolicyType=POLICY_LAISSEZ_FAIRE', 'GovernmentSlotType', { expect: 'SLOT_GREAT_PERSON' }),
+    'effects.gppPerBuilding.0.amount': xml('ModifierArguments', 'ModifierId=LAISSEZFAIRE_MERCHANT_BANK&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.cls': xml('ModifierArguments', 'ModifierId=LAISSEZFAIRE_MERCHANT_BANK&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_MERCHANT' }),
+    'effects.gppPerBuilding.0.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_BANK&Name=BuildingType', 'Value', { expect: 'BUILDING_BANK' }),
+    'effects.gppPerBuilding.1.amount': xml('ModifierArguments', 'ModifierId=LAISSEZFAIRE_MERCHANT_STOCKEXCHANGE&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.1.cls': xml('ModifierArguments', 'ModifierId=LAISSEZFAIRE_MERCHANT_STOCKEXCHANGE&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_MERCHANT' }),
+    'effects.gppPerBuilding.1.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_STOCK_EXCHANGE&Name=BuildingType', 'Value', { expect: 'BUILDING_STOCK_EXCHANGE' }),
+    'effects.gppPerBuilding.2.amount': xml('ModifierArguments', 'ModifierId=LAISSEZFAIRE_ADMIRAL_SHIPYARD&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.2.cls': xml('ModifierArguments', 'ModifierId=LAISSEZFAIRE_ADMIRAL_SHIPYARD&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_ADMIRAL' }),
+    'effects.gppPerBuilding.2.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_SHIPYARD&Name=BuildingType', 'Value', { expect: 'BUILDING_SHIPYARD' }),
+    'effects.gppPerBuilding.3.amount': xml('ModifierArguments', 'ModifierId=LAISSEZFAIRE_ADMIRAL_SEAPORT&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.3.cls': xml('ModifierArguments', 'ModifierId=LAISSEZFAIRE_ADMIRAL_SEAPORT&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_ADMIRAL' }),
+    'effects.gppPerBuilding.3.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_SEAPORT&Name=BuildingType', 'Value', { expect: 'BUILDING_SEAPORT' }),
+  },
+  NOBEL_PRIZE: {
+    kind: xml('Policies', 'PolicyType=POLICY_NOBEL_PRIZE', 'GovernmentSlotType', { expect: 'SLOT_GREAT_PERSON' }),
+    'effects.gppPerBuilding.0.amount': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_SCIENTIST_UNIVERSITY&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.cls': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_SCIENTIST_UNIVERSITY&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_SCIENTIST' }),
+    'effects.gppPerBuilding.0.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_UNIVERSITY&Name=BuildingType', 'Value', { expect: 'BUILDING_UNIVERSITY' }),
+    'effects.gppPerBuilding.1.amount': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_SCIENTIST_RESEARCHLAB&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.1.cls': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_SCIENTIST_RESEARCHLAB&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_SCIENTIST' }),
+    'effects.gppPerBuilding.1.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_RESEARCH_LAB&Name=BuildingType', 'Value', { expect: 'BUILDING_RESEARCH_LAB' }),
+    'effects.gppPerBuilding.2.amount': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_ENGINEER_FACTORY&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.2.cls': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_ENGINEER_FACTORY&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_ENGINEER' }),
+    'effects.gppPerBuilding.2.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_FACTORY&Name=BuildingType', 'Value', { expect: 'BUILDING_FACTORY' }),
+    'effects.gppPerBuilding.3.amount': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_ENGINEER_POWERPLANT&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.3.cls': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_ENGINEER_POWERPLANT&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_ENGINEER' }),
+    'effects.gppPerBuilding.3.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_POWER_PLANT&Name=BuildingType', 'Value', { expect: 'BUILDING_POWER_PLANT' }),
+    'effects.gppPerBuilding.4.amount': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_ENGINEER_POWERPLANT&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.4.cls': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_ENGINEER_POWERPLANT&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_ENGINEER' }),
+    'effects.gppPerBuilding.4.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_COAL_POWER_PLANT&Name=BuildingType', 'Value', { expect: 'BUILDING_COAL_POWER_PLANT' }),
+    'effects.gppPerBuilding.5.amount': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_ENGINEER_POWERPLANT&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.5.cls': xml('ModifierArguments', 'ModifierId=SCIENCEFOUNDATION_ENGINEER_POWERPLANT&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_ENGINEER' }),
+    'effects.gppPerBuilding.5.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_FOSSIL_FUEL_POWER_PLANT&Name=BuildingType', 'Value', { expect: 'BUILDING_FOSSIL_FUEL_POWER_PLANT' }),
+  },
+  MILITARY_ORGANIZATION: {
+    kind: xml('Policies', 'PolicyType=POLICY_MILITARY_ORGANIZATION', 'GovernmentSlotType', { expect: 'SLOT_GREAT_PERSON' }),
+    'effects.gppPerBuilding.0.amount': xml('ModifierArguments', 'ModifierId=MILITARYORGANIZATION_GREATGENERAL_ARMORY&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.0.cls': xml('ModifierArguments', 'ModifierId=MILITARYORGANIZATION_GREATGENERAL_ARMORY&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_GENERAL' }),
+    'effects.gppPerBuilding.0.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_ARMORY&Name=BuildingType', 'Value', { expect: 'BUILDING_ARMORY' }),
+    'effects.gppPerBuilding.1.amount': xml('ModifierArguments', 'ModifierId=MILITARYORGANIZATION_GREATGENERAL_MILITARYACADEMY&Name=Amount', 'Value'),
+    'effects.gppPerBuilding.1.cls': xml('ModifierArguments', 'ModifierId=MILITARYORGANIZATION_GREATGENERAL_MILITARYACADEMY&Name=GreatPersonClassType', 'Value', { expect: 'GREAT_PERSON_CLASS_GENERAL' }),
+    'effects.gppPerBuilding.1.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_MILITARY_ACADEMY&Name=BuildingType', 'Value', { expect: 'BUILDING_MILITARY_ACADEMY' }),
+  },
+  DRILL_MANUALS: {
+    kind: xml('Policies', 'PolicyType=POLICY_DRILL_MANUALS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.stockpilePerSource.NITER': xml('ModifierArguments', 'ModifierId=DRILL_MANUALS_ADDITIONAL_NITER_EXTRACTION&Name=Amount', 'Value'),
+    'effects.stockpilePerSource.COAL': xml('ModifierArguments', 'ModifierId=DRILL_MANUALS_ADDITIONAL_COAL_EXTRACTION&Name=Amount', 'Value'),
+  },
+  RESOURCE_MANAGEMENT: {
+    kind: xml('Policies', 'PolicyType=POLICY_RESOURCE_MANAGEMENT', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.stockpilePerSource.ALUMINUM': xml('ModifierArguments', 'ModifierId=RESOURCE_MANAGEMENT_ADDITIONAL_ALUMINUM_EXTRACTION&Name=Amount', 'Value'),
+    'effects.stockpilePerSource.OIL': xml('ModifierArguments', 'ModifierId=RESOURCE_MANAGEMENT_ADDITIONAL_OIL_EXTRACTION&Name=Amount', 'Value'),
+  },
+  THIRD_ALTERNATIVE: {
+    kind: xml('Policies', 'PolicyType=POLICY_THIRD_ALTERNATIVE', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.buildingYields.MILITARY_ACADEMY.gold': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_MILITARY_ACADEMY_GOLD_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.MILITARY_ACADEMY.culture': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_MILITARY_ACADEMY_CULTURE_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.RESEARCH_LAB.gold': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_RESEARCH_LAB_GOLD_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.RESEARCH_LAB.culture': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_RESEARCH_LAB_CULTURE_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.NUCLEAR_POWER_PLANT.gold': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_POWER_PLANT_GOLD_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.NUCLEAR_POWER_PLANT.culture': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_POWER_PLANT_CULTURE_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.COAL_POWER_PLANT.gold': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_COAL_POWER_PLANT_GOLD_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.COAL_POWER_PLANT.culture': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_COAL_POWER_PLANT_CULTURE_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.OIL_POWER_PLANT.gold': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_FOSSIL_FUEL_POWER_PLANT_GOLD_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingYields.OIL_POWER_PLANT.culture': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_FOSSIL_FUEL_POWER_PLANT_CULTURE_MODIFIER&Name=Amount', 'Value'),
+  },
+  COLLECTIVIZATION: {
+    kind: xml('Policies', 'PolicyType=POLICY_COLLECTIVIZATION', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    'effects.domesticRouteYield.food': xml('ModifierArguments', 'ModifierId=COLLECTIVIZATION_INTERNAL_TRADE_FOOD&Name=Amount', 'Value'),
+    'effects.domesticRouteYield.production': xml('ModifierArguments', 'ModifierId=COLLECTIVIZATION_INTERNAL_TRADE_PRODUCTION&Name=Amount', 'Value'),
+  },
+  WISSELBANKEN: {
+    kind: xml('Policies', 'PolicyType=POLICY_WISSELBANKEN', 'GovernmentSlotType', { expect: 'SLOT_DIPLOMATIC' }),
+    'effects.allyRouteYield.food': xml('ModifierArguments', 'ModifierId=WISSELBANKEN_TRADEROUTEFOODFROMALLY&Name=Amount', 'Value'),
+    'effects.allyRouteYield.production': xml('ModifierArguments', 'ModifierId=WISSELBANKEN_TRADEROUTEPRODUCTIONFROMALLY&Name=Amount', 'Value'),
+    'effects.alliancePointsPerTurn': xml('ModifierArguments', 'ModifierId=WISSELBANKEN_ALLIANCEPOINTS&Name=Amount', 'Value'),
+  },
+  GRANDE_ARMEE: {
+    kind: xml('Policies', 'PolicyType=POLICY_GRANDE_ARMEE', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_GRANDE_ARMEE', 'ObsoletePolicy', { expect: 'POLICY_MILITARY_FIRST' }), xml('Policies', 'PolicyType=POLICY_MILITARY_FIRST', 'PrereqCivic', { expect: 'CIVIC_RAPID_DEPLOYMENT' })] },
+    'effects.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=GRANDEARMEE_MODERN_MELEE_PRODUCTION&Name=Amount', 'Value')] },
+    'effects.prodBoost.target': { derived: 'unit - the install attaches unit-production modifiers', inputs: [xml('Modifiers', 'ModifierId=GRANDEARMEE_MODERN_MELEE_PRODUCTION', 'ModifierType', { expect: 'MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION' })] },
+    'effects.prodBoost.classes': { derived: 'the UnitPromotionClass arguments of the install modifiers this card attaches, as engine classes', inputs: [xml('ModifierArguments', 'ModifierId=GRANDEARMEE_MODERN_MELEE_PRODUCTION&Name=UnitPromotionClass', 'Value')] },
+    'effects.prodBoost.eraMax': { derived: 'the ERA INDEX of the latest modifier era id the install names', inputs: [xml('ModifierArguments', 'ModifierId=GRANDEARMEE_MODERN_MELEE_PRODUCTION&Name=EraType', 'Value')] },
+  },
+  LIGHTNING_WARFARE: {
+    kind: xml('Policies', 'PolicyType=POLICY_LIGHTNING_WARFARE', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=LIGHTNINGWARFARE_MODERN_HEAVY_CAVALRY_PRODUCTION&Name=Amount', 'Value')] },
+    'effects.prodBoost.target': { derived: 'unit - the install attaches unit-production modifiers', inputs: [xml('Modifiers', 'ModifierId=LIGHTNINGWARFARE_MODERN_HEAVY_CAVALRY_PRODUCTION', 'ModifierType', { expect: 'MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION' })] },
+    'effects.prodBoost.classes': { derived: 'the UnitPromotionClass arguments of the install modifiers this card attaches, as engine classes', inputs: [xml('ModifierArguments', 'ModifierId=LIGHTNINGWARFARE_MODERN_HEAVY_CAVALRY_PRODUCTION&Name=UnitPromotionClass', 'Value')] },
+    'effects.prodBoost.eraMax': { derived: '-1: every era - the modifiers name each era from Ancient to Information', inputs: [xml('ModifierArguments', 'ModifierId=LIGHTNINGWARFARE_INFORMATION_HEAVY_CAVALRY_PRODUCTION&Name=EraType', 'Value', { expect: 'ERA_INFORMATION' })] },
+  },
+  PRESS_GANGS: {
+    kind: xml('Policies', 'PolicyType=POLICY_PRESS_GANGS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_PRESS_GANGS', 'ObsoletePolicy', { expect: 'POLICY_INTERNATIONAL_WATERS' }), xml('Policies', 'PolicyType=POLICY_INTERNATIONAL_WATERS', 'PrereqCivic', { expect: 'CIVIC_COLD_WAR' })] },
+    'effects.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=PRESSGANGS_INDUSTRIAL_NAVAL_MELEE_PRODUCTION&Name=Amount', 'Value')] },
+    'effects.prodBoost.target': { derived: 'unit - the install attaches unit-production modifiers', inputs: [xml('Modifiers', 'ModifierId=PRESSGANGS_INDUSTRIAL_NAVAL_MELEE_PRODUCTION', 'ModifierType', { expect: 'MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION' })] },
+    'effects.prodBoost.classes': { derived: 'the UnitPromotionClass arguments of the install modifiers this card attaches, as engine classes', inputs: [xml('ModifierArguments', 'ModifierId=PRESSGANGS_INDUSTRIAL_NAVAL_MELEE_PRODUCTION&Name=UnitPromotionClass', 'Value')] },
+    'effects.prodBoost.eraMax': { derived: 'the ERA INDEX of the latest modifier era id the install names', inputs: [xml('ModifierArguments', 'ModifierId=PRESSGANGS_INDUSTRIAL_NAVAL_MELEE_PRODUCTION&Name=EraType', 'Value')] },
+  },
 };
 
 export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
@@ -1056,6 +1217,112 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('INTERNATIONAL_SPACE_AGENCY', 'International Space Agency', 'diplomatic',
       '+5% Science per city-state you are the Suzerain of.', undefined, {
       yieldPctPerSuzerain: { science: 0.05 },
+    }),
+    P('RETAINERS', 'Retainers', 'military', '+1 Amenity in cities with a garrisoned unit.', 'MASS_MEDIA', {
+      amenitiesWithGarrison: 1,
+    }),
+    P('LIMITANEI', 'Limitanei', 'military', '+2 Loyalty per turn in cities with a garrisoned unit.', undefined, {
+      loyaltyWithGarrison: 2,
+    }),
+    P('PROFESSIONAL_ARMY', 'Professional Army', 'military', '50% Gold discount on all unit upgrades.', 'URBANIZATION', {
+      upgradeGoldDiscountPct: 50,
+    }),
+    P('RETINUES', 'Retinues', 'military', '50% resource discount on all unit upgrades.', 'URBANIZATION', {
+      upgradeResourceDiscountPct: 50,
+    }),
+    P('NAVIGATION', 'Navigation', 'wildcard', '+2 Great Admiral points per turn.', undefined, {
+      gppFlat: { ADMIRAL: 2 },
+    }),
+    P('TRAVELING_MERCHANTS', 'Traveling Merchants', 'wildcard', '+2 Great Merchant points per turn.', 'CAPITALISM', {
+      gppFlat: { MERCHANT: 2 },
+    }),
+    P('INVENTION', 'Invention', 'wildcard',
+      '+4 Great Engineer points per turn; +2 Great Engineer points for every Workshop.', undefined, {
+      gppFlat: { ENGINEER: 4 },
+      gppPerBuilding: [
+        { building: 'WORKSHOP', cls: 'ENGINEER', amount: 2 },
+      ],
+    }),
+    P('FRESCOES', 'Frescoes', 'wildcard',
+      '+2 Great Artist points per turn; +2 Great Artist points for every Art Museum.', undefined, {
+      gppFlat: { ARTIST: 2 },
+      gppPerBuilding: [
+        { building: 'MUSEUM', cls: 'ARTIST', amount: 2 },
+      ],
+    }),
+    P('SYMPHONIES', 'Symphonies', 'wildcard',
+      '+4 Great Musician points per turn; +4 Great Musician points for every Broadcast Center.', undefined, {
+      gppFlat: { MUSICIAN: 4 },
+      gppPerBuilding: [
+        { building: 'BROADCAST_CENTER', cls: 'MUSICIAN', amount: 4 },
+      ],
+    }),
+    P('LAISSEZ_FAIRE', 'Laissez-Faire', 'wildcard',
+      '+2 Great Merchant points for every Bank and +4 for every Stock Exchange; +2 Great Admiral points for every Shipyard and +4 for every Seaport.', undefined, {
+      gppPerBuilding: [
+        { building: 'BANK', cls: 'MERCHANT', amount: 2 },
+        { building: 'STOCK_EXCHANGE', cls: 'MERCHANT', amount: 4 },
+        { building: 'SHIPYARD', cls: 'ADMIRAL', amount: 2 },
+        { building: 'SEAPORT', cls: 'ADMIRAL', amount: 4 },
+      ],
+    }),
+    P('NOBEL_PRIZE', 'Nobel Prize', 'wildcard',
+      '+2 Great Scientist points for every University and +4 for every Research Lab; +2 Great Engineer points for every Factory and +4 for every Power Plant.', undefined, {
+      gppPerBuilding: [
+        { building: 'UNIVERSITY', cls: 'SCIENTIST', amount: 2 },
+        { building: 'RESEARCH_LAB', cls: 'SCIENTIST', amount: 4 },
+        { building: 'FACTORY', cls: 'ENGINEER', amount: 2 },
+        { building: 'NUCLEAR_POWER_PLANT', cls: 'ENGINEER', amount: 4 },
+        { building: 'COAL_POWER_PLANT', cls: 'ENGINEER', amount: 4 },
+        { building: 'OIL_POWER_PLANT', cls: 'ENGINEER', amount: 4 },
+      ],
+    }),
+    P('MILITARY_ORGANIZATION', 'Military Organization', 'wildcard',
+      '+2 Great General points for every Armory and +4 for every Military Academy.', undefined, {
+      gppPerBuilding: [
+        { building: 'ARMORY', cls: 'GENERAL', amount: 2 },
+        { building: 'MILITARY_ACADEMY', cls: 'GENERAL', amount: 4 },
+      ],
+    }),
+    P('DRILL_MANUALS', 'Drill Manuals', 'military',
+      'All improved Niter and Coal resources yield 1 additional resource per turn.', undefined, {
+      stockpilePerSource: { NITER: 1, COAL: 1 },
+    }),
+    P('RESOURCE_MANAGEMENT', 'Resource Management', 'military',
+      'All improved Aluminum and Oil resources yield 1 additional resource per turn.', undefined, {
+      stockpilePerSource: { ALUMINUM: 1, OIL: 1 },
+    }),
+    P('THIRD_ALTERNATIVE', 'Third Alternative', 'military',
+      'Military Academies, Research Labs and Power Plants generate +4 Gold and +2 Culture.', undefined, {
+      buildingYields: {
+        MILITARY_ACADEMY: { gold: 4, culture: 2 },
+        RESEARCH_LAB: { gold: 4, culture: 2 },
+        NUCLEAR_POWER_PLANT: { gold: 4, culture: 2 },
+        COAL_POWER_PLANT: { gold: 4, culture: 2 },
+        OIL_POWER_PLANT: { gold: 4, culture: 2 },
+      },
+    }),
+    P('COLLECTIVIZATION', 'Collectivization', 'economic',
+      '+4 Food and +2 Production from domestic Trade Routes.', undefined, {
+      domesticRouteYield: { food: 4, production: 2 },
+    }),
+    // CIV6 (Wisselbanken): the ORIGIN half of "+2 Food and +2 Production for
+    // both cities" on a route to an Ally or Suzerain's city
+    // (WISSELBANKEN_TRADEROUTE*FROM{ALLY,SUZERAIN}), Democracy's shape; one
+    // quarter-point of alliance a turn (WISSELBANKEN_ALLIANCEPOINTS).
+    P('WISSELBANKEN', 'Wisselbanken', 'diplomatic',
+      'Trade Routes to an Ally or Suzerain city provide +2 Food and +2 Production; alliances accrue a quarter-point faster.', undefined, {
+      allyRouteYield: { food: 2, production: 2 },
+      alliancePointsPerTurn: 1,
+    }),
+    P('GRANDE_ARMEE', 'Grande Armee', 'military', '+50% production toward Ancient through Modern melee, ranged and anti-cavalry.', 'RAPID_DEPLOYMENT', {
+      prodBoost: { target: 'unit', classes: ['melee', 'ranged', 'antiCavalry'], eraMax: MODERN, pct: 0.5 },
+    }),
+    P('LIGHTNING_WARFARE', 'Lightning Warfare', 'military', '+50% production toward heavy and light cavalry of every era.', undefined, {
+      prodBoost: { target: 'unit', classes: ['cavalry'], eraMax: EVERY_ERA, pct: 0.5 },
+    }),
+    P('PRESS_GANGS', 'Press Gangs', 'military', '+100% production toward Industrial-era and earlier naval units.', 'COLD_WAR', {
+      prodBoost: { target: 'unit', classes: ['naval'], eraMax: INDUSTRIAL, pct: 1 },
     }),
   ].map((p) => [p.id, { ...p, src: POLICY_SRC[p.id] }]),
 );

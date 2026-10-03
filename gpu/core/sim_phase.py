@@ -2335,6 +2335,11 @@ class SimPhase:
                         continue
                     nb_r = nb_r + (self.city_bldg[:, row, :, _gb]
                                    & self._row_is(row, _gc, _gl).unsqueeze(1)).double() * _ga
+                # the cards' rows of the same shape (Invention, Nobel Prize, ...)
+                for _pon, _pb, _pc, _pa in self._gov_mods(row)[12]["gppb"]:
+                    if _pc != cls:
+                        continue
+                    nb_r = nb_r + (self.city_bldg[:, row, :, _pb] & _pon.unsqueeze(1)).double() * _pa
                 # CIV6 (Bologna): "+1 Great Person point of their type" from a
                 # district holding a building — the TIER-1 building of this
                 # class's own district, one point however many it holds.

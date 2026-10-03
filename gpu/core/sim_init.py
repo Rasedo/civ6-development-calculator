@@ -2440,6 +2440,11 @@ class SimInit:
             self._gov_upgold = torch.tensor([float(r["upgradeGoldDiscountPct"]) for r in _govs], dtype=torch.float64, device=device)
             self._gov_upres = torch.tensor([float(r["upgradeResourceDiscountPct"]) for r in _govs], dtype=torch.float64, device=device)
             self._gov_spycut = torch.tensor([float(r["spyOffenseTimeCutPct"]) for r in _govs], dtype=torch.float64, device=device)
+            # amenities and loyalty in a garrisoned city; Great Person points per
+            # building (building, class, points)
+            self._gov_garamen = torch.tensor([float(r["amenitiesWithGarrison"]) for r in _govs], dtype=torch.float64, device=device)
+            self._gov_garloy = torch.tensor([float(r["loyaltyWithGarrison"]) for r in _govs], dtype=torch.float64, device=device)
+            self._gov_gppb_rows = [[(int(x[0]), int(x[1]), float(x[2])) for x in r["gppPerBuilding"] if int(x[0]) >= 0] for r in _govs]
             self._gov_infl = torch.tensor([float(r["influencePerTurn"]) for r in _govs], dtype=dtype, device=device)
             self._gov_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _govs], dtype=torch.bool, device=device)
             self._gov_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _govs], dtype=torch.bool, device=device)
@@ -2481,7 +2486,8 @@ class SimInit:
                 + sum(len(x) for x in self._gov_bprod_rows) + sum(len(x) for x in self._gov_byield_rows)
                 + sum(len(x) for x in self._gov_spacep_rows) + (self._gov_gwscale - 1).abs().sum()
                 + self._gov_stockps.abs().sum() + self._gov_upgold.abs().sum() + self._gov_upres.abs().sum()
-                + self._gov_spycut.abs().sum()
+                + self._gov_spycut.abs().sum() + self._gov_garamen.abs().sum() + self._gov_garloy.abs().sum()
+                + sum(len(x) for x in self._gov_gppb_rows)
                 + (self._gov_pillm - 1).abs().sum()
                 + self._gov_infl.abs().sum() + self._gov_envoy1.sum()
                 + self._gov_gpp.abs().sum()
@@ -2562,6 +2568,11 @@ class SimInit:
             self._pol_upgold = torch.tensor([float(r["upgradeGoldDiscountPct"]) for r in _pols], dtype=torch.float64, device=device)
             self._pol_upres = torch.tensor([float(r["upgradeResourceDiscountPct"]) for r in _pols], dtype=torch.float64, device=device)
             self._pol_spycut = torch.tensor([float(r["spyOffenseTimeCutPct"]) for r in _pols], dtype=torch.float64, device=device)
+            # amenities and loyalty in a garrisoned city; Great Person points per
+            # building (building, class, points)
+            self._pol_garamen = torch.tensor([float(r["amenitiesWithGarrison"]) for r in _pols], dtype=torch.float64, device=device)
+            self._pol_garloy = torch.tensor([float(r["loyaltyWithGarrison"]) for r in _pols], dtype=torch.float64, device=device)
+            self._pol_gppb_rows = [[(int(x[0]), int(x[1]), float(x[2])) for x in r["gppPerBuilding"] if int(x[0]) >= 0] for r in _pols]
             self._pol_infl = torch.tensor([float(r["influencePerTurn"]) for r in _pols], dtype=dtype, device=device)
             self._pol_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _pols], dtype=torch.bool, device=device)
             self._pol_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _pols], dtype=torch.bool, device=device)
@@ -2647,7 +2658,8 @@ class SimInit:
                 + sum(len(x) for x in self._pol_bprod_rows) + sum(len(x) for x in self._pol_byield_rows)
                 + sum(len(x) for x in self._pol_spacep_rows) + (self._pol_gwscale - 1).abs().sum()
                 + self._pol_stockps.abs().sum() + self._pol_upgold.abs().sum() + self._pol_upres.abs().sum()
-                + self._pol_spycut.abs().sum()
+                + self._pol_spycut.abs().sum() + self._pol_garamen.abs().sum() + self._pol_garloy.abs().sum()
+                + sum(len(x) for x in self._pol_gppb_rows)
                 + (self._pol_pillm - 1).abs().sum()
                 + self._pol_infl.abs().sum() + self._pol_envoy1.sum()
                 + self._pol_gpp.abs().sum()

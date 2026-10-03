@@ -6359,15 +6359,18 @@ class SimSeats:
             out = out + _dom.double() * _dw[bidx].double() * _da
         # CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): the roster's
         # rows for a garrisoned unit, the second only for a Corps or an Army
-        if self._garrison_loyalty_rows:
+        # and (Limitanei): "+2 Loyalty per turn in cities with a garrisoned unit"
+        _gl = self._gov_mods(row)[12]["garloy"].double()[bidx]
+        if self._garrison_loyalty_rows or bool((_gl != 0).any()):
             ctr = self.city_center[bidx, row, col].clamp(min=0)
-            gslot = self.military_at.gather(1, ctr.unsqueeze(1)).squeeze(1)
+            gslot = self.military_at[bidx, ctr]
             gar = (gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)
             form = self.unit_formation[bidx, gslot.clamp(min=0)] > 0
             for _lc, _ll, _la, _lf in self._live_rows(row, self._garrison_loyalty_rows):
                 _lw = self._row_is(row, _lc, _ll)[bidx]
                 hit = _lw & gar & (form if _lf else torch.ones_like(gar))
                 out = out + hit.double() * _la
+            out = out + gar.double() * _gl
         # CIV6 (Garrison Commander / Emissary): the two governor auras, and
         # (Automated Workforce): "-5 Loyalty per turn in your cities."
         if self.n_governors and row < self.n_majors:
@@ -10085,6 +10088,13 @@ class SimSeats:
         _, _cond_amen = self._cond_house_amen(_g_hid, _g_nd, _spec_d)
         have = have + _g_amen.unsqueeze(1) + _cond_amen
         have = have + (_all_d > 0).double() * _gm[12]["dca"].double().unsqueeze(1)
+        # CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
+        _ga = _gm[12]["garamen"]
+        if bool((_ga != 0).any()):
+            _gc = self.city_center[:, row, :cols]
+            _gsl = self.military_at.gather(1, _gc.clamp(min=0))
+            _gar = (_gc >= 0) & (_gsl >= 0) & (self.unit_seat.gather(1, _gsl.clamp(min=0)) == row)
+            have = have + _gar.double() * _ga.double().unsqueeze(1)
         # WONDER amenities (Colosseum's regional reach, Alhambra's and Great
         # Bath's local ones, Temple of Artemis' per-improvement count) join the
         # TIER balance after the grant — city.ts leaves them out of baseHave.

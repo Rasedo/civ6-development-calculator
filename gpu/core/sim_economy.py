@@ -3431,10 +3431,14 @@ class SimEconomy:
             # (active, building, six yields), Space Race production (active,
             # percent, building)
             "govtit": [], "bprod": [], "byield": [], "spacep": [],
+            # Great Person points per building (active, building, class, points)
+            "gppb": [],
             # each great-work object type's tourism factor
             "gwscale": torch.ones(B, self._gw_obj_tourism.shape[0], dtype=torch.float64, device=dev),
             "stockps": torch.zeros(B, _nst, dtype=torch.float64, device=dev),
             "upgold": _z64.clone(), "upres": _z64.clone(), "spycut": _z64.clone(),
+            # amenities and loyalty in a city with a garrisoned unit
+            "garamen": _z64.clone(), "garloy": _z64.clone(),
             "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
             "xppct": _z.clone(), "wwcut": _z.clone(), "wmdup": _z.clone(),
             "dch": _z.clone(), "dca": _z.clone(),
@@ -3523,14 +3527,16 @@ class SimEconomy:
                            ("yspec", self._gov_yspec), ("stockps", self._gov_stockps)):
                 fx[_k] = fx[_k] + _t[adopted] * _gfd.unsqueeze(1)
             for _k, _t in (("upgold", self._gov_upgold), ("upres", self._gov_upres),
-                           ("spycut", self._gov_spycut)):
+                           ("spycut", self._gov_spycut), ("garamen", self._gov_garamen),
+                           ("garloy", self._gov_garloy)):
                 fx[_k] = fx[_k] + _t[adopted] * _gfd
             fx["gwscale"] = fx["gwscale"] * torch.where(
                 has_gov.unsqueeze(1), self._gov_gwscale[adopted], torch.ones_like(fx["gwscale"]))
             for _gi in range(self._ngov):
                 _gon = has_gov & (adopted == _gi)
                 self._fx_rows(fx, _gon, self._gov_govtit[_gi], self._gov_bprod_rows[_gi],
-                              self._gov_byield_rows[_gi], self._gov_spacep_rows[_gi])
+                              self._gov_byield_rows[_gi], self._gov_spacep_rows[_gi],
+                              self._gov_gppb_rows[_gi])
             fx["ucst"] = fx["ucst"] + self._gov_ucs_by_type[adopted] * _gf.double().unsqueeze(1)
             for _gi in range(self._ngov):
                 if float(self._gov_prodb[_gi, 0]) >= 0:
@@ -3611,7 +3617,8 @@ class SimEconomy:
                                ("yspec", self._pol_yspec), ("stockps", self._pol_stockps)):
                     fx[_k] = fx[_k] + _cd @ _t
                 for _k, _t in (("upgold", self._pol_upgold), ("upres", self._pol_upres),
-                               ("spycut", self._pol_spycut)):
+                               ("spycut", self._pol_spycut), ("garamen", self._pol_garamen),
+                               ("garloy", self._pol_garloy)):
                     fx[_k] = fx[_k] + _cd @ _t
                 fx["gwscale"] = fx["gwscale"] * torch.where(
                     cards.unsqueeze(2), self._pol_gwscale.unsqueeze(0).expand(B, -1, -1),
@@ -3620,7 +3627,8 @@ class SimEconomy:
                     _pon = cards[:, _pi]
                     if bool(_pon.any()):
                         self._fx_rows(fx, _pon, self._pol_govtit[_pi], self._pol_bprod_rows[_pi],
-                                      self._pol_byield_rows[_pi], self._pol_spacep_rows[_pi])
+                                      self._pol_byield_rows[_pi], self._pol_spacep_rows[_pi],
+                                      self._pol_gppb_rows[_pi])
                 fx["ucst"] = fx["ucst"] + cards.double() @ self._pol_ucs_by_type
                 for _pi in range(self._npol):
                     if float(self._pol_prodb[_pi, 0]) >= 0:
@@ -3668,7 +3676,7 @@ class SimEconomy:
 
     @staticmethod
     def _fx_rows(fx: dict, on: torch.Tensor, govtit: torch.Tensor, bprod: list, byield: list,
-                 spacep: list) -> None:
+                 spacep: list, gppb: list) -> None:
         """one government's or card's ROW channels onto `fx`, active where `on`"""
         if float(govtit[0]) >= 0:
             fx["govtit"].append((on, int(govtit[0]), float(govtit[1]), float(govtit[2])))
@@ -3678,6 +3686,8 @@ class SimEconomy:
             fx["byield"].append((on, _b, _y))
         for _pct, _b in spacep:
             fx["spacep"].append((on, _pct, _b))
+        for _b, _c, _a in gppb:
+            fx["gppb"].append((on, _b, _c, _a))
 
     def _cond_house_amen(self, hid, nd, spec_d):
         """The two district-conditional rules, for ANY seat.

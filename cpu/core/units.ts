@@ -322,6 +322,12 @@ export function unitsAt(state: GameState, tileIndex: number): Unit[] {
   return state.units.filter((u) => u.tileIndex === tileIndex);
 }
 
+/** CIV6 (REQUIREMENT_CITY_HAS_GARRISON_UNIT): the city's own military unit
+ *  standing on its centre, if any. */
+export function garrisonOf(state: GameState, city: City): Unit | undefined {
+  return unitsAt(state, city.centerIndex).find((u) => u.seat === city.seat && unitDomain(u.type) === 'military');
+}
+
 /**
  * The STACKING slot a chassis holds. Four, not two: CIV6 bases an air unit
  * INSIDE a city centre, an Aerodrome or a carrier, where it neither blocks a

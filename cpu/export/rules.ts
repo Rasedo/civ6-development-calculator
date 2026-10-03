@@ -227,6 +227,10 @@ const effectRow = (fx: PolicyEffects) => ({
   stockpilePerSource: STRATEGIC_IDS.map((r) => fx.stockpilePerSource?.[r] ?? 0),
   upgradeGoldDiscountPct: fx.upgradeGoldDiscountPct ?? 0,
   upgradeResourceDiscountPct: fx.upgradeResourceDiscountPct ?? 0,
+  amenitiesWithGarrison: fx.amenitiesWithGarrison ?? 0,
+  loyaltyWithGarrison: fx.loyaltyWithGarrison ?? 0,
+  // [building index, Great Person class index, points] per building row
+  gppPerBuilding: (fx.gppPerBuilding ?? []).map((r) => [buildingIdx.get(r.building) ?? -3, GP_CLASSES.indexOf(r.cls), r.amount]),
   // [percent, building index] per building that opens the clause
   spaceProjectProd: (fx.spaceProjectProd?.buildings ?? []).map((b) => [fx.spaceProjectProd!.pct, buildingIdx.get(b) ?? -3]),
   spyOffenseTimeCutPct: fx.spyOffenseTimeCutPct ?? 0,

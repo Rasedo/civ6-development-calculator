@@ -36,6 +36,7 @@ import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, 
 import { hiddenResourcesFor } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
 import { warWearinessLosses } from './weariness';
+import { garrisonOf } from './units';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, gpCityPermOf, gpPermOf, gpTilePermOf } from '../data/greatPeople';
@@ -1433,6 +1434,8 @@ export function computeCityStats(
     wonderImprovementAmenities(state, city) +
     improvementWaterAmenities(state, city) +
     m.amenitiesAll +
+    // CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
+    (m.amenitiesWithGarrison && garrisonOf(state, city) ? m.amenitiesWithGarrison : 0) +
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0) +
     gpCityPermOf(city, 'amenities') +

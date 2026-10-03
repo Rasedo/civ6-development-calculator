@@ -61,7 +61,7 @@ import { logDistrictCost } from './difflog';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, adjacentPlotRowOk, adjacentPlotTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, garrisonOf } from './units';
 import { killUnit } from './combat';
 import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -570,15 +570,13 @@ export function standingLoyalty(state: GameState, city: City): number {
     }
     n += mods.domesticRouteLoyalty * domestic;
   }
-  if (mods.garrisonLoyalty.length) {
-    const garrison = unitsAt(state, city.centerIndex).find(
-      (u) => u.seat === city.seat && unitDomain(u.type) === 'military',
-    );
-    if (garrison) {
-      for (const r of mods.garrisonLoyalty) {
-        if (!r.formation || (garrison.formation ?? 0) > 0) n += r.amount;
-      }
+  const garrison = garrisonOf(state, city);
+  if (garrison) {
+    for (const r of mods.garrisonLoyalty) {
+      if (!r.formation || (garrison.formation ?? 0) > 0) n += r.amount;
     }
+    // CIV6 (Limitanei): "+2 Loyalty per turn in cities with a garrisoned unit"
+    n += mods.loyaltyWithGarrison;
   }
   // CIV6 (Automated Workforce): "-5 Loyalty per turn in your cities."
   return n + governorLoyaltyAura(state, city) + mods.loyaltyAll;

@@ -70,6 +70,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_EARLY_EMPIRE&PrereqCivic=CIVIC_FOREIGN_TRADE', 'PrereqCivic', { expect: 'CIVIC_FOREIGN_TRADE' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_LAND_SURVEYORS', 'PrereqCivic', { expect: 'CIVIC_EARLY_EMPIRE' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_COLONIZATION', 'PrereqCivic', { expect: 'CIVIC_EARLY_EMPIRE' }),
+    'effects.2.policy': xml('Policies', 'PolicyType=POLICY_LIMITANEI', 'PrereqCivic', { expect: 'CIVIC_EARLY_EMPIRE' }),
   },
   MYSTICISM: {
     era: xml('Civics', 'CivicType=CIVIC_MYSTICISM', 'EraType', { expect: 'ERA_ANCIENT' }),
@@ -125,6 +126,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Civics', 'CivicType=CIVIC_NAVAL_TRADITION', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_NAVAL_TRADITION&PrereqCivic=CIVIC_DEFENSIVE_TACTICS', 'PrereqCivic', { expect: 'CIVIC_DEFENSIVE_TACTICS' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_NAVAL_INFRASTRUCTURE', 'PrereqCivic', { expect: 'CIVIC_NAVAL_TRADITION' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_NAVIGATION', 'PrereqCivic', { expect: 'CIVIC_NAVAL_TRADITION' }),
   },
   FEUDALISM: {
     era: xml('Civics', 'CivicType=CIVIC_FEUDALISM', 'EraType', { expect: 'ERA_MEDIEVAL' }),
@@ -140,6 +142,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Civics', 'CivicType=CIVIC_CIVIL_SERVICE', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_CIVIL_SERVICE, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_CIVIL_SERVICE&PrereqCivic=CIVIC_DEFENSIVE_TACTICS', 'PrereqCivic', { expect: 'CIVIC_DEFENSIVE_TACTICS' }), xml('CivicPrereqs', 'Civic=CIVIC_CIVIL_SERVICE&PrereqCivic=CIVIC_RECORDED_HISTORY', 'PrereqCivic', { expect: 'CIVIC_RECORDED_HISTORY' })] },
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_CIVIL_PRESTIGE', 'PrereqCivic', { expect: 'CIVIC_CIVIL_SERVICE' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_RETAINERS', 'PrereqCivic', { expect: 'CIVIC_CIVIL_SERVICE' }),
   },
   GUILDS: {
     era: xml('Civics', 'CivicType=CIVIC_GUILDS', 'EraType', { expect: 'ERA_MEDIEVAL' }),
@@ -147,6 +150,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_GUILDS, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_GUILDS&PrereqCivic=CIVIC_FEUDALISM', 'PrereqCivic', { expect: 'CIVIC_FEUDALISM' }), xml('CivicPrereqs', 'Civic=CIVIC_GUILDS&PrereqCivic=CIVIC_CIVIL_SERVICE', 'PrereqCivic', { expect: 'CIVIC_CIVIL_SERVICE' })] },
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_TOWN_CHARTERS', 'PrereqCivic', { expect: 'CIVIC_GUILDS' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_CRAFTSMEN', 'PrereqCivic', { expect: 'CIVIC_GUILDS' }),
+    'effects.3.policy': xml('Policies', 'PolicyType=POLICY_TRAVELING_MERCHANTS', 'PrereqCivic', { expect: 'CIVIC_GUILDS' }),
   },
   MEDIEVAL_FAIRES: {
     era: xml('Civics', 'CivicType=CIVIC_MEDIEVAL_FAIRES', 'EraType', { expect: 'ERA_MEDIEVAL' }),
@@ -169,6 +173,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Civics', 'CivicType=CIVIC_EXPLORATION', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_EXPLORATION, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_EXPLORATION&PrereqCivic=CIVIC_MERCENARIES', 'PrereqCivic', { expect: 'CIVIC_MERCENARIES' }), xml('CivicPrereqs', 'Civic=CIVIC_EXPLORATION&PrereqCivic=CIVIC_MEDIEVAL_FAIRES', 'PrereqCivic', { expect: 'CIVIC_MEDIEVAL_FAIRES' })] },
     'effects.0.government': xml('Governments', 'GovernmentType=GOVERNMENT_MERCHANT_REPUBLIC', 'PrereqCivic', { expect: 'CIVIC_EXPLORATION' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_PRESS_GANGS', 'PrereqCivic', { expect: 'CIVIC_EXPLORATION' }),
   },
   REFORMED_CHURCH: {
     era: xml('Civics', 'CivicType=CIVIC_REFORMED_CHURCH', 'EraType', { expect: 'ERA_RENAISSANCE' }),
@@ -183,6 +188,8 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_HUMANISM, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_HUMANISM&PrereqCivic=CIVIC_MEDIEVAL_FAIRES', 'PrereqCivic', { expect: 'CIVIC_MEDIEVAL_FAIRES' }), xml('CivicPrereqs', 'Civic=CIVIC_HUMANISM&PrereqCivic=CIVIC_GUILDS', 'PrereqCivic', { expect: 'CIVIC_GUILDS' })] },
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_MUSEUM_ART', 'PrereqCivic', { expect: 'CIVIC_HUMANISM' }),
     'effects.1.building': xml('Buildings', 'BuildingType=BUILDING_MUSEUM_ARTIFACT', 'PrereqCivic', { expect: 'CIVIC_HUMANISM' }),
+    'effects.3.policy': xml('Policies', 'PolicyType=POLICY_INVENTION', 'PrereqCivic', { expect: 'CIVIC_HUMANISM' }),
+    'effects.4.policy': xml('Policies', 'PolicyType=POLICY_FRESCOES', 'PrereqCivic', { expect: 'CIVIC_HUMANISM' }),
   },
   ENLIGHTENMENT: {
     era: xml('Civics', 'CivicType=CIVIC_THE_ENLIGHTENMENT', 'EraType', { expect: 'ERA_RENAISSANCE' }),
@@ -203,6 +210,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_NATIONALISM', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
     cost: xml('Civics', 'CivicType=CIVIC_NATIONALISM', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_NATIONALISM&PrereqCivic=CIVIC_THE_ENLIGHTENMENT', 'PrereqCivic', { expect: 'CIVIC_THE_ENLIGHTENMENT' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_GRANDE_ARMEE', 'PrereqCivic', { expect: 'CIVIC_NATIONALISM' }),
   },
   NATURAL_HISTORY: {
     era: xml('Civics', 'CivicType=CIVIC_NATURAL_HISTORY', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
@@ -249,12 +257,14 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Civics', 'CivicType=CIVIC_CLASS_STRUGGLE', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_CLASS_STRUGGLE&PrereqCivic=CIVIC_IDEOLOGY', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
     'effects.0.government': xml('Governments', 'GovernmentType=GOVERNMENT_COMMUNISM', 'PrereqCivic', { expect: 'CIVIC_CLASS_STRUGGLE' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_COLLECTIVIZATION', 'PrereqCivic', { expect: 'CIVIC_CLASS_STRUGGLE' }),
   },
   TOTALITARIANISM: {
     era: xml('Civics', 'CivicType=CIVIC_TOTALITARIANISM', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Civics', 'CivicType=CIVIC_TOTALITARIANISM', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_TOTALITARIANISM&PrereqCivic=CIVIC_IDEOLOGY', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
     'effects.0.government': xml('Governments', 'GovernmentType=GOVERNMENT_FASCISM', 'PrereqCivic', { expect: 'CIVIC_TOTALITARIANISM' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_THIRD_ALTERNATIVE', 'PrereqCivic', { expect: 'CIVIC_TOTALITARIANISM' }),
   },
   MILITARY_TRAINING: {
     era: xml('Civics', 'CivicType=CIVIC_MILITARY_TRAINING', 'EraType', { expect: 'ERA_CLASSICAL' }),
@@ -275,6 +285,8 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Civics', 'CivicType=CIVIC_MERCENARIES', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_MERCENARIES, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_MERCENARIES&PrereqCivic=CIVIC_MILITARY_TRAINING', 'PrereqCivic', { expect: 'CIVIC_MILITARY_TRAINING' }), xml('CivicPrereqs', 'Civic=CIVIC_MERCENARIES&PrereqCivic=CIVIC_FEUDALISM', 'PrereqCivic', { expect: 'CIVIC_FEUDALISM' })] },
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_TRADE_CONFEDERATION', 'PrereqCivic', { expect: 'CIVIC_MERCENARIES' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_PROFESSIONAL_ARMY', 'PrereqCivic', { expect: 'CIVIC_MERCENARIES' }),
+    'effects.2.policy': xml('Policies', 'PolicyType=POLICY_RETINUES', 'PrereqCivic', { expect: 'CIVIC_MERCENARIES' }),
   },
   MERCANTILISM: {
     era: xml('Civics', 'CivicType=CIVIC_MERCANTILISM', 'EraType', { expect: 'ERA_RENAISSANCE' }),
@@ -284,6 +296,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_CAMP&YieldType=YIELD_PRODUCTION&PrereqCivic=CIVIC_MERCANTILISM', 'BonusYieldChange'),
     'effects.0.yields.food': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_CAMP&YieldType=YIELD_FOOD&PrereqCivic=CIVIC_MERCANTILISM', 'BonusYieldChange'),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_TRIANGULAR_TRADE', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),
+    'effects.2.policy': xml('Policies', 'PolicyType=POLICY_DRILL_MANUALS', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),
   },
   DIPLOMATIC_SERVICE: {
     era: xml('Civics', 'CivicType=CIVIC_DIPLOMATIC_SERVICE', 'EraType', { expect: 'ERA_RENAISSANCE' }),
@@ -291,12 +304,14 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_DIPLOMATIC_SERVICE&PrereqCivic=CIVIC_GUILDS', 'PrereqCivic', { expect: 'CIVIC_GUILDS' }),
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_CHANCERY', 'PrereqCivic', { expect: 'CIVIC_DIPLOMATIC_SERVICE' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_MACHIAVELLIANISM', 'PrereqCivic', { expect: 'CIVIC_DIPLOMATIC_SERVICE' }),
+    'effects.2.policy': xml('Policies', 'PolicyType=POLICY_WISSELBANKEN', 'PrereqCivic', { expect: 'CIVIC_DIPLOMATIC_SERVICE' }),
   },
   OPERA_AND_BALLET: {
     era: xml('Civics', 'CivicType=CIVIC_OPERA_BALLET', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
     cost: xml('Civics', 'CivicType=CIVIC_OPERA_BALLET', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_OPERA_BALLET&PrereqCivic=CIVIC_THE_ENLIGHTENMENT', 'PrereqCivic', { expect: 'CIVIC_THE_ENLIGHTENMENT' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_GRAND_OPERA', 'PrereqCivic', { expect: 'CIVIC_OPERA_BALLET' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_SYMPHONIES', 'PrereqCivic', { expect: 'CIVIC_OPERA_BALLET' }),
   },
   COLONIALISM: {
     era: xml('Civics', 'CivicType=CIVIC_COLONIALISM', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
@@ -311,6 +326,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Civics', 'CivicType=CIVIC_CONSERVATION', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_CONSERVATION&PrereqCivic=CIVIC_NATURAL_HISTORY', 'PrereqCivic', { expect: 'CIVIC_NATURAL_HISTORY' }),
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_SANCTUARY', 'PrereqCivic', { expect: 'CIVIC_CONSERVATION' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_RESOURCE_MANAGEMENT', 'PrereqCivic', { expect: 'CIVIC_CONSERVATION' }),
   },
   SCORCHED_EARTH: {
     era: xml('Civics', 'CivicType=CIVIC_SCORCHED_EARTH', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
@@ -318,6 +334,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_SCORCHED_EARTH&PrereqCivic=CIVIC_NATIONALISM', 'PrereqCivic', { expect: 'CIVIC_NATIONALISM' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_TOTAL_WAR', 'PrereqCivic', { expect: 'CIVIC_SCORCHED_EARTH' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_EXPROPRIATION', 'PrereqCivic', { expect: 'CIVIC_SCORCHED_EARTH' }),
+    'effects.2.policy': xml('Policies', 'PolicyType=POLICY_MILITARY_ORGANIZATION', 'PrereqCivic', { expect: 'CIVIC_SCORCHED_EARTH' }),
   },
   MOBILIZATION: {
     era: xml('Civics', 'CivicType=CIVIC_MOBILIZATION', 'EraType', { expect: 'ERA_MODERN' }),
@@ -331,17 +348,20 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_IDEOLOGY, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_IDEOLOGY&PrereqCivic=CIVIC_MASS_MEDIA', 'PrereqCivic', { expect: 'CIVIC_MASS_MEDIA' }), xml('CivicPrereqs', 'Civic=CIVIC_IDEOLOGY&PrereqCivic=CIVIC_MOBILIZATION', 'PrereqCivic', { expect: 'CIVIC_MOBILIZATION' })] },
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_ECONOMIC_UNION', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_FIVE_YEAR_PLAN', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
+    'effects.2.policy': xml('Policies', 'PolicyType=POLICY_LIGHTNING_WARFARE', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
   },
   NUCLEAR_PROGRAM: {
     era: xml('Civics', 'CivicType=CIVIC_NUCLEAR_PROGRAM', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Civics', 'CivicType=CIVIC_NUCLEAR_PROGRAM', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_NUCLEAR_PROGRAM&PrereqCivic=CIVIC_IDEOLOGY', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
+    'effects.0.policy': xml('Policies', 'PolicyType=POLICY_NOBEL_PRIZE', 'PrereqCivic', { expect: 'CIVIC_NUCLEAR_PROGRAM' }),
   },
   CAPITALISM: {
     era: xml('Civics', 'CivicType=CIVIC_CAPITALISM', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Civics', 'CivicType=CIVIC_CAPITALISM', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_CAPITALISM&PrereqCivic=CIVIC_MASS_MEDIA', 'PrereqCivic', { expect: 'CIVIC_MASS_MEDIA' }),
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_SHOPPING_MALL', 'PrereqCivic', { expect: 'CIVIC_CAPITALISM' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_LAISSEZ_FAIRE', 'PrereqCivic', { expect: 'CIVIC_CAPITALISM' }),
   },
   CULTURAL_HERITAGE: {
     era: xml('Civics', 'CivicType=CIVIC_CULTURAL_HERITAGE', 'EraType', { expect: 'ERA_ATOMIC' }),
@@ -485,6 +505,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('EARLY_EMPIRE', 'Early Empire', 'Ancient', 70, ['FOREIGN_TRADE'], [
       { kind: 'unlockPolicy', policy: 'LAND_SURVEYORS' },
       { kind: 'unlockPolicy', policy: 'COLONIZATION' },
+      { kind: 'unlockPolicy', policy: 'LIMITANEI' },
     ]),
     C('MYSTICISM', 'Mysticism', 'Ancient', 50, ['FOREIGN_TRADE'], [
       { kind: 'unlockDistrict', district: 'PRESERVE' },
@@ -522,6 +543,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('NAVAL_TRADITION', 'Naval Tradition', 'Medieval', 220, ['DEFENSIVE_TACTICS'], [
       { kind: 'unlockPolicy', policy: 'NAVAL_INFRASTRUCTURE' },
+      { kind: 'unlockPolicy', policy: 'NAVIGATION' },
     ]),
 
     C('FEUDALISM', 'Feudalism', 'Medieval', 300, ['DEFENSIVE_TACTICS'], [
@@ -533,11 +555,13 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('CIVIL_SERVICE', 'Civil Service', 'Medieval', 300, ['DEFENSIVE_TACTICS', 'RECORDED_HISTORY'], [
       { kind: 'unlockPolicy', policy: 'CIVIL_PRESTIGE' },
+      { kind: 'unlockPolicy', policy: 'RETAINERS' },
     ]),
     C('GUILDS', 'Guilds', 'Medieval', 420, ['FEUDALISM', 'CIVIL_SERVICE'], [
       { kind: 'unlockPolicy', policy: 'TOWN_CHARTERS' },
       { kind: 'unlockPolicy', policy: 'CRAFTSMEN' },
       { kind: 'unlockImprovement', improvement: 'POLDER' }, // CIV6 (Polder): PrereqCivic
+      { kind: 'unlockPolicy', policy: 'TRAVELING_MERCHANTS' },
     ]),
     C('MEDIEVAL_FAIRES', 'Medieval Faires', 'Medieval', 420, ['FEUDALISM'], [
       { kind: 'unlockPolicy', policy: 'AESTHETICS' },
@@ -552,6 +576,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
 
     C('EXPLORATION', 'Exploration', 'Renaissance', 440, ['MERCENARIES', 'MEDIEVAL_FAIRES'], [
       { kind: 'unlockGovernment', government: 'MERCHANT_REPUBLIC' },
+      { kind: 'unlockPolicy', policy: 'PRESS_GANGS' },
     ]),
     C('REFORMED_CHURCH', 'Reformed Church', 'Renaissance', 440, ['GUILDS', 'DIVINE_RIGHT'], [
       { kind: 'unlockGovernment', government: 'THEOCRACY' },
@@ -568,6 +593,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       // available", so the two engines disagreed — and it surfaced as a
       // treasury/culture divergence at t193, mentioning no museum anywhere.
       { kind: 'unlockBuilding', building: 'ARCHAEOLOGICAL_MUSEUM' },
+      { kind: 'unlockPolicy', policy: 'INVENTION' },
+      { kind: 'unlockPolicy', policy: 'FRESCOES' },
     ]),
     C('ENLIGHTENMENT', 'The Enlightenment', 'Renaissance', 720, ['HUMANISM', 'DIPLOMATIC_SERVICE'], [
       { kind: 'unlockPolicy', policy: 'RATIONALISM' },
@@ -582,6 +609,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('NATIONALISM', 'Nationalism', 'Industrial', 1010, ['ENLIGHTENMENT'], [
       { kind: 'unlockImprovement', improvement: 'OPEN_AIR_MUSEUM' }, // CIV6 (Open-Air Museum): PrereqCivic
+      { kind: 'unlockPolicy', policy: 'GRANDE_ARMEE' },
     ]),
     C('NATURAL_HISTORY', 'Natural History', 'Industrial', 1050, ['COLONIALISM'], [
       { kind: 'unlockBuilding', building: 'ZOO' },
@@ -610,9 +638,11 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('CLASS_STRUGGLE', 'Class Struggle', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'COMMUNISM' },
+      { kind: 'unlockPolicy', policy: 'COLLECTIVIZATION' },
     ]),
     C('TOTALITARIANISM', 'Totalitarianism', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'FASCISM' },
+      { kind: 'unlockPolicy', policy: 'THIRD_ALTERNATIVE' },
     ]),
 
     C('MILITARY_TRAINING', 'Military Training', 'Classical', 120, ['MILITARY_TRADITION', 'GAMES_AND_RECREATION'], [
@@ -626,6 +656,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
 
     C('MERCENARIES', 'Mercenaries', 'Medieval', 340, ['MILITARY_TRAINING', 'FEUDALISM'], [
       { kind: 'unlockPolicy', policy: 'TRADE_CONFEDERATION' },
+      { kind: 'unlockPolicy', policy: 'PROFESSIONAL_ARMY' },
+      { kind: 'unlockPolicy', policy: 'RETINUES' },
     ]),
 
     C('MERCANTILISM', 'Mercantilism', 'Renaissance', 720, ['HUMANISM'], [
@@ -633,14 +665,17 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       // (requires Mercantilism)".
       { kind: 'improvementYields', improvement: 'CAMP', yields: { production: 1, food: 1 } },
       { kind: 'unlockPolicy', policy: 'TRIANGULAR_TRADE' },
+      { kind: 'unlockPolicy', policy: 'DRILL_MANUALS' },
     ]),
     C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 600, ['GUILDS'], [
       { kind: 'unlockBuilding', building: 'CHANCERY' },
       { kind: 'unlockPolicy', policy: 'MACHIAVELLIANISM' },
+      { kind: 'unlockPolicy', policy: 'WISSELBANKEN' },
     ]),
 
     C('OPERA_AND_BALLET', 'Opera and Ballet', 'Industrial', 800, ['ENLIGHTENMENT'], [
       { kind: 'unlockPolicy', policy: 'GRAND_OPERA' },
+      { kind: 'unlockPolicy', policy: 'SYMPHONIES' },
     ]),
     C('COLONIALISM', 'Colonialism', 'Industrial', 800, ['MERCANTILISM'], [
       { kind: 'unlockImprovement', improvement: 'ICE_HOCKEY_RINK' }, // CIV6 (Ice Hockey Rink): PrereqCivic
@@ -650,11 +685,13 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('CONSERVATION', 'Conservation', 'Modern', 1540, ['NATURAL_HISTORY'], [
       { kind: 'unlockBuilding', building: 'SANCTUARY' },
+      { kind: 'unlockPolicy', policy: 'RESOURCE_MANAGEMENT' },
     ]),
 
     C('SCORCHED_EARTH', 'Scorched Earth', 'Industrial', 1210, ['NATIONALISM'], [
       { kind: 'unlockPolicy', policy: 'TOTAL_WAR' },
       { kind: 'unlockPolicy', policy: 'EXPROPRIATION' },
+      { kind: 'unlockPolicy', policy: 'MILITARY_ORGANIZATION' },
     ]),
     C('MOBILIZATION', 'Mobilization', 'Modern', 1540, ['URBANIZATION', 'SCORCHED_EARTH'], [
       { kind: 'unlockPolicy', policy: 'LEVEE_EN_MASSE' },
@@ -664,10 +701,14 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('IDEOLOGY', 'Ideology', 'Modern', 1640, ['MASS_MEDIA', 'MOBILIZATION'], [
       { kind: 'unlockPolicy', policy: 'ECONOMIC_UNION' },
       { kind: 'unlockPolicy', policy: 'FIVE_YEAR_PLAN' },
+      { kind: 'unlockPolicy', policy: 'LIGHTNING_WARFARE' },
     ]),
-    C('NUCLEAR_PROGRAM', 'Nuclear Program', 'Modern', 1715, ['IDEOLOGY']),
+    C('NUCLEAR_PROGRAM', 'Nuclear Program', 'Modern', 1715, ['IDEOLOGY'], [
+      { kind: 'unlockPolicy', policy: 'NOBEL_PRIZE' },
+    ]),
     C('CAPITALISM', 'Capitalism', 'Modern', 1580, ['MASS_MEDIA'], [
       { kind: 'unlockBuilding', building: 'SHOPPING_MALL' },
+      { kind: 'unlockPolicy', policy: 'LAISSEZ_FAIRE' },
     ]),
     C('CULTURAL_HERITAGE', 'Cultural Heritage', 'Atomic', 1955, ['CONSERVATION'], [
       { kind: 'unlockPolicy', policy: 'HERITAGE_TOURISM' },

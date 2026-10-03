@@ -158,6 +158,22 @@ def main() -> None:
     assert float(sim._barb_cs(barb, mine)[0]) == 0.0, "and a barbarian adopts no government"
     print(f"  7 upkeep {base} -> {cut}, barb CS {float(sim._barb_cs(mine, barb)[0])}")
 
+    # 8) The garrison and per-building Great Person channels load per card.
+    assert float(sim._pol_garamen[pol_i["RETAINERS"]]) == 1.0, "RETAINERS: +1 amenity with a garrison"
+    assert float(sim._pol_garloy[pol_i["LIMITANEI"]]) == 2.0, "LIMITANEI: +2 loyalty with a garrison"
+    b_i = {b["id"]: i for i, b in enumerate(rj["buildings"])}
+    gp_i = {c: i for i, c in enumerate(rj["greatPersonClasses"])} if "greatPersonClasses" in rj else None
+    inv = sim._pol_gppb_rows[pol_i["INVENTION"]]
+    assert len(inv) == 1 and inv[0][0] == b_i["WORKSHOP"] and inv[0][2] == 2.0, f"INVENTION: +2 per Workshop, got {inv}"
+    if gp_i is not None:
+        assert inv[0][1] == gp_i["ENGINEER"], "INVENTION pays the Engineer class"
+    assert len(sim._pol_gppb_rows[pol_i["NOBEL_PRIZE"]]) == 6, "NOBEL_PRIZE: six building rows"
+    fx = {"govtit": [], "bprod": [], "byield": [], "spacep": [], "gppb": []}
+    on = torch.ones(B, dtype=torch.bool)
+    sim._fx_rows(fx, on, sim._pol_govtit[pol_i["INVENTION"]], [], [], [], inv)
+    assert len(fx["gppb"]) == 1 and fx["gppb"][0][1:] == inv[0], "the row rides the bundle to the Great Person walk"
+    print(f"  8 garrison amenity/loyalty 1/2, INVENTION row {inv[0]}")
+
     print("POLICY CARDS OK")
 
 

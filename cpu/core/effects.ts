@@ -391,6 +391,10 @@ export interface Modifiers {
   /** percent off a unit upgrade's gold and its resources */
   upgradeGoldDiscountPct: number;
   upgradeResourceDiscountPct: number;
+  /** amenities and loyalty per turn in a city its seat's own military unit
+   *  garrisons (`garrisonOf`) */
+  amenitiesWithGarrison: number;
+  loyaltyWithGarrison: number;
   /** percent production toward Space Race projects in a city holding one of
    *  the buildings */
   spaceProjectProd: { pct: number; buildings: string[] }[];
@@ -645,6 +649,8 @@ export function defaultModifiers(): Modifiers {
     stockpilePerSource: {},
     upgradeGoldDiscountPct: 0,
     upgradeResourceDiscountPct: 0,
+    amenitiesWithGarrison: 0,
+    loyaltyWithGarrison: 0,
     spaceProjectProd: [],
     spyOffenseTimeCutPct: 0,
     yieldPerSpecialty: {},
@@ -751,6 +757,10 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   }
   if (fx.upgradeGoldDiscountPct) mods.upgradeGoldDiscountPct += fx.upgradeGoldDiscountPct;
   if (fx.upgradeResourceDiscountPct) mods.upgradeResourceDiscountPct += fx.upgradeResourceDiscountPct;
+  if (fx.amenitiesWithGarrison) mods.amenitiesWithGarrison += fx.amenitiesWithGarrison;
+  if (fx.loyaltyWithGarrison) mods.loyaltyWithGarrison += fx.loyaltyWithGarrison;
+  // the cards' per-building Great Person rows join the roster's
+  if (fx.gppPerBuilding?.length) mods.gppBuildings = [...mods.gppBuildings, ...fx.gppPerBuilding];
   if (fx.spaceProjectProd) mods.spaceProjectProd.push(fx.spaceProjectProd);
   if (fx.spyOffenseTimeCutPct) mods.spyOffenseTimeCutPct += fx.spyOffenseTimeCutPct;
   addPartial(mods.yieldPerSpecialty, fx.yieldPerSpecialty);
