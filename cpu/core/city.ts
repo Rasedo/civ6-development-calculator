@@ -885,7 +885,7 @@ function suzerainTourism(state: GameState, seat: number, owns: (t: Tile) => bool
 /** CIV6 (`Improvement_Tourism` TOURISMSOURCE_APPEAL): Tourism equal to the
  *  plot's Appeal, floored at 0, from every row that names it (the Seaside
  *  and Ski Resorts). CIV6 (CRISTOREDENTOR_BEACHTOURISM, ImprovementType
- *  IMPROVEMENT_BEACH_RESORT): `beachMult` scales the Seaside Resort's alone. */
+ *  IMPROVEMENT_BEACH_RESORT): the beach multiplier scales the Seaside Resort's alone. */
 function resortTourism(state: GameState, owns: (t: Tile) => boolean, beachMult: number): number {
   let t = 0;
   const camps = campTiles(state);

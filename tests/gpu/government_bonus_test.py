@@ -67,7 +67,7 @@ def test_the_wire(rules, path) -> None:
     assert abs(float(sim._gov_gppmult[g["CLASSICAL_REPUBLIC"]]) - 1.15) < 1e-12, "Classical Republic: +15% GPP"
     assert abs(float(sim._gov_ymult[g["COMMUNISM"], SCIENCE]) - 1.1) < 1e-12, "Communism: +10% science"
     leg = sim._pol_legacy >= 0
-    assert int(leg.sum()) == sim._ngov - 1, "one legacy card per government but the Chiefdom"
+    assert int(leg.sum()) == sim._ngov - 2, "one legacy card per government but the Chiefdom and Digital Democracy"
     assert not bool((sim._pol_prodb[leg, 0] >= 0).any()), "a legacy card carries a flat production bonus"
     for t in (sim._pol_inflmult, sim._pol_distprod):
         assert bool((t[leg] == 1).all()), "a legacy card carries a flat multiplier"

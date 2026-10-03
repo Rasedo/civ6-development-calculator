@@ -86,7 +86,11 @@ def slots(sim, row: int, wildcards: int, held: torch.Tensor | None = None) -> li
 def test_wire(rules, path) -> None:
     sim = fresh(rules, path)
     legacy = {POLS[i]: GOVS[int(g)] for i, g in enumerate(sim._pol_legacy.tolist()) if g >= 0}
-    want = {f"LEGACY_{g['id']}": g["id"] for g in RULES["governments"] if int(g["tier"]) > 0}
+    # every government past the Chiefdom whose install row unlocks a legacy
+    # card (Digital Democracy's names none)
+    want = {f"LEGACY_{g['id']}": g["id"] for g in RULES["governments"]
+            if int(g["tier"]) > 0 and f"LEGACY_{g['id']}" in POLS}
+    assert len(want) == len(GOVS) - 2, "the Chiefdom and Digital Democracy are the two without one"
     assert legacy == want, f"the wire carries {sorted(legacy)}, the catalog says {sorted(want)}"
     # ...and each one's effect columns ARE its government's own INHERENT
     # bonus: the government row also carries its GS flat bonus, in the

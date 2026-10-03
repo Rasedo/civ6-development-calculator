@@ -1179,8 +1179,8 @@ def main() -> None:
     assert s6._congress_dv_min == 5, "the DV resolution enters at MODERN (index 5)"
     assert len(s6._congress_res) == len(rules.eras["congressResolutions"]), (
         "the GPU catalog must carry every exported resolution row")
-    # CIV6: SoL +4 DVP, Potala +1 DVP + a diplomatic slot; FC's wildcard slot
-    assert int(s6._wond_dvp.sum()) == 5, "the two DVP wonders pay 4 and 1"
+    # CIV6: SoL +4 DVP, Mahabodhi +2, Potala +1 DVP + a diplomatic slot; FC's wildcard slot
+    assert int(s6._wond_dvp.sum()) == 7, "the three DVP wonders pay 4, 2 and 1"
     assert s6._wond_slots.sum(dim=0).tolist() == [1, 1, 1, 1],         "one wonder each adds a military, economic, diplomatic and wildcard slot" 
 
     # not a session turn -> nothing happens, favor untouched
