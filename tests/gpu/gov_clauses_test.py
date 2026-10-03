@@ -268,6 +268,7 @@ def test_patron_saint(rules, path) -> None:
     sim.major_unit_promo_offer[B0, slot] = 0
     sim.major_unit_xp[B0, slot] = sim._promo_xp_per_level
     sim.major_unit_level[B0, slot] = 1
+    sim.major_unit_mp[B0, slot] = 1   # a spent unit takes no promotion
     sim.civilian_at[B0, ctr] = slot + sim.POOL_LO["major"]
     sim.seat_ext[:, ROW] = True
 
