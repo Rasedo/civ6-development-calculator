@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics, standBuilding, standDistrict } from '../helpers';
 import { foundCity, canFoundReligion, adoptBeliefs, canEnhanceReligion, enhanceableClasses, buyWorshipBuilding, purchaseReligiousUnit, endTurn, beliefPicks, evangelizeOk, evangelizeBelief } from '../../../cpu/core/game';
-import { applySeatActionRecord, applySeatUnitOrders } from '../../../cpu/core/phase';
+import { applySeatActionRecord, applySeatUnitOrders, cityBorderGrowth } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
 import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
 import { maskCtx, unitMask } from '../../../cpu/core/unitMask';
@@ -17,7 +17,7 @@ import { SCORING_LINE_ITEMS } from '../../../cpu/data/scoring';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { computeCityStats } from '../../../cpu/core/city';
 import { tileYields } from '../../../cpu/core/yields';
-import { makeYieldCtx } from '../../../cpu/core/effects';
+import { getModifiers, makeYieldCtx } from '../../../cpu/core/effects';
 import { availableBuildings } from '../../../cpu/core/rules';
 import { tradeCapacity, addTradeRoute, routeYields, canAddTradeRoute, religiousCommunityGold } from '../../../cpu/core/trade';
 import { GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
@@ -42,16 +42,20 @@ describe('pantheons', () => {
     expect(tileYields(makeYieldCtx(state, 0), pasture).culture).toBe(1);
   });
 
-  it('Fertility Rites boosts growth; Religious Settlements cheapens borders', () => {
+  it('Fertility Rites boosts growth; Religious Settlements banks 15% more border culture', () => {
     const { state, city } = sandboxCity();
     const before = computeCityStats(state, city);
     seatOf(state, 0)!.religion.pantheon = 'FERTILITY_RITES';
     const after = computeCityStats(state, city);
     expect(after.effectiveFoodSurplus).toBeCloseTo(before.effectiveFoodSurplus * 1.1, 5);
 
+    // the price stands; the culture banked toward it grows
     seatOf(state, 0)!.religion.pantheon = 'RELIGIOUS_SETTLEMENTS';
-    const cheap = computeCityStats(state, city);
-    expect(cheap.border.cost).toBe(Math.round(before.border.cost * 0.85));
+    expect(computeCityStats(state, city).border.cost).toBe(before.border.cost);
+    expect(getModifiers(state, 0).borderExpansionPct).toBe(15);
+    city.cultureBox = 0;
+    cityBorderGrowth(state, city, 0, 2);
+    expect(city.cultureBox).toBeCloseTo(2.3, 9);
   });
 });
 

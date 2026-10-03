@@ -480,7 +480,8 @@ export function cultureAfterGrowth(state: GameState, city: City, popBefore: numb
 
 /**
  * CIV6 (City_Culture, the DLL's border turn 0x1a9bc0): the box banks the
- * culture — Land Acquisition's percent scales what is banked, not the price.
+ * culture — the border-expansion percents (Land Acquisition's, Religious
+ * Settlements') scale what is banked, never the price.
  * A box that covers the price pays it and takes at most ONE plot: the stored
  * `nextPlot` while still unowned, else a fresh draw, and nothing when nothing
  * is in reach (the price is spent all the same). Then, every turn, the city
@@ -493,10 +494,10 @@ export function cultureAfterGrowth(state: GameState, city: City, popBefore: numb
  * ENVOY channel instead (`CanAnnexTilesWithReceivedInfluence`).
  */
 export function cityBorderGrowth(state: GameState, city: City, seat: number, culture: number): void {
-  const pct = governorSum(state, city, (e) => e.borderExpansionPct);
+  const pct = governorSum(state, city, (e) => e.borderExpansionPct) + getModifiers(state, seat).borderExpansionPct;
   city.cultureBox += pct ? (culture * (100 + pct)) / 100 : culture;
   const frozen = congressBorderFrozen(state, seat) || !civLevelOf(seat).canAnnexTilesWithCulture;
-  const cost = Math.round(borderGrowthCost(city.tilesAcquired) * getModifiers(state, seat).borderCostMult);
+  const cost = borderGrowthCost(city.tilesAcquired);
   const ctx = makeYieldCtx(state, seat);
   if (!frozen && city.cultureBox >= cost) {
     city.cultureBox -= cost;

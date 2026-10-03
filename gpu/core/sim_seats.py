@@ -10727,12 +10727,17 @@ class SimSeats:
         culture (`CivilizationLevels`: a city-state, the Free Cities player)
         bank the culture and buy nothing, and still draw."""
         bidx = self._bidx
-        # CIV6 (Land Acquisition): +20% culture toward border expansion. A
-        # CITY-STATE's row appoints nobody, so the governor planes are asked
-        # only of a major.
+        # CIV6 (Land Acquisition, Religious Settlements): the border-expansion
+        # percents scale the culture banked. A CITY-STATE's row appoints
+        # nobody and holds no beliefs, so both are asked only of a major.
         _gpct = (self._governor_sum(row, "borderExpansionPct")[bidx, col].double()
                  if self.n_governors and row < self.n_majors
                  else torch.zeros(self.B, dtype=torch.float64, device=self.device))
+        if row < self.n_majors and self._seat_has_beliefs(row):
+            _bp = self._bel
+            _gpct = _gpct + (_bp["pan"]["borderPct"][self.civ_pantheon[:, row] + 1]
+                             + _bp["fol"]["borderPct"][self.civ_follower[:, row] + 1]
+                             + _bp["fou"]["borderPct"][self._eff_founder(row) + 1])
         cul = cul_c.double()
         cul = torch.where(_gpct != 0, cul * (100.0 + _gpct) / 100.0, cul)
         box = self.city_cbox[bidx, row, col]
@@ -10740,10 +10745,7 @@ class SimSeats:
         center = self.city_center[bidx, row, col]
         cid = self.city_id[bidx, row, col]
         if bool(self._row_annex_culture[row]):
-            # Religious Settlements — Math.round(base * borderCostMult)
-            _bmul = self._bel_mul("border", row) if self._seat_has_beliefs(row) else None
-            base = self._border_cost(self.city_acquired[bidx, row, col])
-            cost = js_round(base.double() * _bmul).to(base.dtype) if _bmul is not None else base
+            cost = self._border_cost(self.city_acquired[bidx, row, col])
             ready = act & ~self._congress_border_frozen(row) & (self.city_cbox[bidx, row, col] >= cost)
             if bool(ready.any()):
                 self.city_cbox[bidx, row, col] = torch.where(

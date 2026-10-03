@@ -1511,7 +1511,7 @@ export function computeCityStats(
   const growthNeeded = growthFoodNeeded(city.population);
   const turnsToGrow = effective > 0 ? Math.ceil((growthNeeded - city.foodBox) / effective) : null;
 
-  const borderCost = Math.round(borderGrowthCost(city.tilesAcquired) * m.borderCostMult);
+  const borderCost = borderGrowthCost(city.tilesAcquired);
   const nextTile = (city.nextPlot ?? -1) >= 0 ? city.nextPlot! : null;
   const borderTurns =
     nextTile !== null && total.culture > 0

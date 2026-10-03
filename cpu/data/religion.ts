@@ -30,7 +30,10 @@ export interface BeliefEffects {
   improvementYields?: Partial<Record<string, Partial<Yields>>>;
   featureYields?: Partial<Record<string, Partial<Yields>>>;
   improvementOnResource?: { category: ResourceCategory; yields: Partial<Yields> };
-  borderCostMult?: number;
+  /** MODIFIER_ALL_CITIES_CULTURE_BORDER_EXPANSION: the percent more culture
+   *  every city banks toward its borders (the DLL's border turn scales the
+   *  culture banked, never the price) */
+  borderExpansionPct?: number;
   growthMult?: number;
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
   workEthic?: boolean;
@@ -174,10 +177,8 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       xml('ModifierArguments', 'ModifierId=GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_PRODUCTION_MODIFIER&Name=Amount', 'Value'),
   },
   RELIGIOUS_SETTLEMENTS: {
-    'effects.borderCostMult': {
-      derived: '1 - Amount/100 — the install writes the DISCOUNT (15%), the catalog the multiplier',
-      inputs: [xml('ModifierArguments', 'ModifierId=RELIGIOUS_SETTLEMENTS_CULTUREBORDER&Name=Amount', 'Value')],
-    },
+    'effects.borderExpansionPct':
+      xml('ModifierArguments', 'ModifierId=RELIGIOUS_SETTLEMENTS_CULTUREBORDER&Name=Amount', 'Value'),
   },
   FERTILITY_RITES: {
     'effects.growthMult': {
@@ -421,8 +422,8 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
     B('GOD_OF_CRAFTSMEN', 'God of Craftsmen', '+1 production from improved strategic resources.', {
       improvementOnResource: { category: 'strategic', yields: { production: 1 } },
     }),
-    B('RELIGIOUS_SETTLEMENTS', 'Religious Settlements', 'Border expansion is 15% cheaper.', {
-      borderCostMult: 0.85,
+    B('RELIGIOUS_SETTLEMENTS', 'Religious Settlements', 'Border expansion rate is 15% faster.', {
+      borderExpansionPct: 15,
     }),
     B('FERTILITY_RITES', 'Fertility Rites', '+10% growth in all cities.', {
       growthMult: 1.1,

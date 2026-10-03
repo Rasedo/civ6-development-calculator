@@ -303,7 +303,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   bldgY: centerBuildings.map((b) => YIELD_KEYS.map((k) => def.effects.buildingYields?.[b.id]?.[k] ?? 0)),  // [NB, 6]
   bldgH: centerBuildings.map((b) => def.effects.buildingHousing?.[b.id] ?? 0),  // [NB]
   intlWorship: def.effects.intlRouteGoldPerWorship ?? 0,  // Religious Community (GS)
-  border: def.effects.borderCostMult ?? 1,
+  borderPct: def.effects.borderExpansionPct ?? 0,
   growth: def.effects.growthMult ?? 1,
   gpp: GP_CLASSES.map((c) => def.effects.gppFlat?.[c] ?? 0),
   we: def.effects.workEthic ? 1 : 0,

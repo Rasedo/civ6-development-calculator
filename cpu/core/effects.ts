@@ -345,7 +345,7 @@ export interface Modifiers {
    *  catalog row does not name. */
   districtAdjacencyAdd: Partial<Record<DistrictId, AdjacencyRule[]>>;
   improvementOnResource: { category: ResourceCategory; yields: Partial<Yields> }[];
-  borderCostMult: number;
+  borderExpansionPct: number;
   growthMult: number;
   gppFlat: Partial<Record<GreatPersonClass, number>>;
   workEthic: boolean;
@@ -584,7 +584,7 @@ export function defaultModifiers(): Modifiers {
     featureYields: {},
     districtAdjacencyAdd: {},
     improvementOnResource: [],
-    borderCostMult: 1,
+    borderExpansionPct: 0,
     growthMult: 1,
     gppFlat: {},
     workEthic: false,
@@ -1383,7 +1383,7 @@ function applyBeliefEffects(
     addPartial(cur, y);
   }
   if (fx.improvementOnResource) mods.improvementOnResource.push(fx.improvementOnResource);
-  if (fx.borderCostMult) mods.borderCostMult *= fx.borderCostMult;
+  if (fx.borderExpansionPct) mods.borderExpansionPct += fx.borderExpansionPct;
   if (fx.growthMult) mods.growthMult *= fx.growthMult;
   for (const [cls, n] of Object.entries(fx.gppFlat ?? {})) {
     const key = cls as GreatPersonClass;

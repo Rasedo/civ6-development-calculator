@@ -1271,7 +1271,7 @@ class SimInit:
                 # CIV6 (Religious Community, GS): gold per worship building on an
                 # international route out of a following ORIGIN city
                 "intlWorship": torch.tensor([0.0] + [float(x["intlWorship"]) for x in _rows], dtype=torch.float64, device=device),
-                "border": torch.tensor([1.0] + [x["border"] for x in _rows], dtype=torch.float64, device=device),
+                "borderPct": torch.tensor([0.0] + [float(x["borderPct"]) for x in _rows], dtype=torch.float64, device=device),
                 "growth": torch.tensor([1.0] + [x["growth"] for x in _rows], dtype=torch.float64, device=device),
                 "gpp": torch.tensor([[0] * _ng] + [x["gpp"] for x in _rows], dtype=torch.long, device=device),
                 "we": torch.tensor([0.0] + [float(x["we"]) for x in _rows], dtype=torch.float64, device=device),
