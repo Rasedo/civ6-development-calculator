@@ -66,6 +66,7 @@ class SimOrders:
         _pm = self._A_PROMOTE
         _cn = self._A_CONDEMN
         _hx = self._A_HERESY
+        _ghc = self._A_HEAL_RELIGIOUS
         _lq = self._A_INQUISITION
         _evc = self._A_EVANGELIZE
         _hn = self._A_HEATHEN
@@ -152,6 +153,7 @@ class SimOrders:
             ((_ab == _rtc) if _rtc >= 0 else _no).any(dim=0),                     # return to base
             (((_ab >= _prc) & (_ab < _prc + _asw)) if _prc >= 0 else _no).any(dim=0),  # priority target
             ((_ab == _evc) if _evc >= 0 else _no).any(dim=0),                     # evangelize a belief
+            ((_ab == _ghc) if _ghc >= 0 else _no).any(dim=0),                     # a Guru heals
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
@@ -160,7 +162,8 @@ class SimOrders:
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
          _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean, _rk_nuke,
-         _rk_harvest, _rk_wcharge, _rk_deploy, _rk_return, _rk_priority, _rk_evangel) = _tab
+         _rk_harvest, _rk_wcharge, _rk_deploy, _rk_return, _rk_priority, _rk_evangel,
+         _rk_guru) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -379,6 +382,24 @@ class SimOrders:
                             _cur * keep.to(_cur.dtype), 100, rounding_mode="floor")
                     self.unit_charges[hr, sc[hr]] -= 1
                     self.unit_mp[hr, sc[hr]] = 0
+
+            # THE GURU'S HEAL (`guruHeal`): each wounded friendly religious
+            # unit on the Guru's tile or the ring around it gains guruHeal, to
+            # full at most; the charge and the Guru's turn are spent
+            if _rk_guru[n] and _ghc >= 0 and self._guru_idx >= 0:
+                ghm = (act & u_moves & (a == _ghc) & (utp == self._guru_idx) & (u_charges > 0)
+                       & self._guru_heal_reach(row).gather(1, hc.unsqueeze(1)).squeeze(1))
+                if bool(ghm.any()):
+                    _ut = self.unit_tile
+                    _near = (_ut == hc.unsqueeze(1)) | (
+                        (_ut.unsqueeze(2) == nb.unsqueeze(1)) & (nb >= 0).unsqueeze(1)).any(dim=2)
+                    _heal = self._guru_wounded(row) & _near & ghm.unsqueeze(1)
+                    _cap = int(self.rules.combat["unitHp"])
+                    self.unit_hp.copy_(torch.where(
+                        _heal, (self.unit_hp + self._guru_heal).clamp(max=_cap), self.unit_hp))
+                    gr = ghm.nonzero(as_tuple=True)[0]
+                    self.unit_charges[gr, sc[gr]] -= 1
+                    self.unit_mp[gr, sc[gr]] = 0
 
             if _rk_inquis[n] and _lq >= 0 and self._apostle_idx >= 0:
                 lqm = (act & u_moves & (a == _lq) & (utp == self._apostle_idx)
@@ -1120,7 +1141,7 @@ class SimOrders:
                         self.improvement[_r, hc[_r]] = _k
                         self.pillaged[_r, hc[_r]] = False
                         did[_r] = True
-                # CIV6 (Mountain Tunnel, Qhapaq Ñan): "Can only be built on an
+                # CIV6 (Mountain Tunnel, Qhapaq Ñan, Ski Resort): "Can only be built on an
                 # adjacent Mountain tile" — the rows whose target is not the
                 # builder's own tile, so each gets its own write. The pick is
                 # the LOWEST-index adjacent bare mountain, `adjacentPlotTarget`'s
@@ -1134,16 +1155,7 @@ class SimOrders:
                     if not self._imp_adj_plot[_k] or self._A_IMP[_k] not in _acmd:
                         continue
                     _tnb = self.neigh[hc]                                   # [B, 6]
-                    _tnc = _tnb.clamp(min=0)
-                    # the TARGET answers the territory column (`territoryOk`)
-                    _tterr = own_tile.gather(1, _tnc)
-                    if self._imp_outside[_k]:
-                        _tterr = _tterr | (self.tile_seat.gather(1, _tnc) < 0)
-                    # neither row lists a feature (`featureOk`), so a natural
-                    # wonder's mountain and a volcano refuse it
-                    _tfeat = (((self.feat_id >= 0) & ~self.feat_stripped) | self.volcano_at).gather(1, _tnc)
-                    _tok = ((_tnb >= 0) & self.tile_mountain.gather(1, _tnc)
-                            & (self.improvement.gather(1, _tnc) < 0) & ~_tfeat & _tterr)
+                    _tok = (_tnb >= 0) & self._adj_plot_target_ok(_k, own_tile).gather(1, _tnb.clamp(min=0))
                     _tkey = torch.where(_tok, _tnb, torch.full_like(_tnb, 2 ** 30))
                     _tt = _tkey.min(dim=1).values
                     _tt = torch.where(_tt < 2 ** 30, _tt, torch.full_like(_tt, -1))
@@ -1918,10 +1930,17 @@ class SimOrders:
             if self.turn > cb["crossbowmanAfterTurn"]
             else self._barb_galley_idx
         )
+        # a HORSE camp's melee and ranged rungs — `barbCavalryType` and
+        # `barbCavalryRangedType`
         cav_type = (
             self._barb_knight_idx
             if self.turn > cb["crossbowmanAfterTurn"]
             else self._barb_horseman_idx
+            if self.turn > cb["spearmanAfterTurn"]
+            else self._barb_cav_first_idx
+        )
+        cav_ranged_type = (
+            ranged_type if self.turn > cb["spearmanAfterTurn"] else self._barb_cav_ranged_idx
         )
 
         any_city = self.city_alive[:, :self.n_majors].reshape(B, -1).any(dim=1)
@@ -2019,7 +2038,8 @@ class SimOrders:
             # consulted.
             _slot = (k + self.turn) % 3
             if _slot == 1:
-                self._spawn_barb(_raid, camp, ranged_type)
+                self._spawn_barb(_raid & horse, camp, cav_ranged_type)
+                self._spawn_barb(_raid & ~horse, camp, ranged_type)
             elif _slot == 2:
                 self._spawn_barb(_raid, camp, melee_type)
             else:

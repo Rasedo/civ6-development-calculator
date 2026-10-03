@@ -161,7 +161,7 @@ export function portalExit(map: GameMap, tile: Tile): number {
 
 /**
  * CIV6 (`Improvements_XP2.BuildOnAdjacentPlot`: the Mountain Tunnel, Qhapaq
- * Ñan): "Can only be built on an adjacent Mountain tile."
+ * Ñan, the Ski Resort): "Can only be built on an adjacent Mountain tile."
  *
  * The unit stands OFF the mountain and builds onto it — a row whose target is
  * not the builder's own tile. The action space carries no target, so the pick
@@ -176,13 +176,16 @@ export function adjacentPlotTarget(
   let best = -1;
   for (const n of neighbors(map, tile)) {
     if (!isMountain(n) || n.improvement) continue;
-    // neither row lists a feature, so a natural wonder's mountain and a
+    // no such row lists a feature, so a natural wonder's mountain and a
     // volcano refuse it
     if (!featureOk(def, n, null)) continue;
     // the TARGET answers the territory column, not the tile the builder
     // stands on — `CanBuildOutsideTerritory` reaches unowned mountains and
     // stops at another seat's border like every other row.
     if (!territoryOk(def, n, ownsTile)) continue;
+    // CIV6 (`SameAdjacentValid` false, the Ski Resort): the TARGET stands
+    // beside none of its own kind
+    if (def.noAdjacentSame && neighbors(map, n).some((m) => m.improvement === def.id)) continue;
     if (best < 0 || n.index < best) best = n.index;
   }
   return best;
@@ -190,7 +193,8 @@ export function adjacentPlotTarget(
 
 /**
  * May THIS seat's `unitType` lay the adjacent-plot row `def` right now? The
- * row's own unit (the Military Engineer's Tunnel, the Builder's Qhapaq Ñan),
+ * row's own unit (the Military Engineer's Tunnel, the Builder's Qhapaq Ñan
+ * and Ski Resort),
  * its unlock, and a leader's row its leader alone (CIV6, a TRAIT_LEADER_*
  * `TraitType`: "unique to Pachacuti").
  */

@@ -48,10 +48,9 @@ function order(state: GameState, u: { id: number }, action: number) {
 
 describe('the Offshore Wind Farm', () => {
   it('has a BUILD column, appended after every earlier row', () => {
-    expect(IMPROVEMENT_IDS[IMPROVEMENT_IDS.length - 1]).toBe('OFFSHORE_WIND_FARM');
     expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_ROAD')).toBe(37);
-    expect(A.BUILD_OFFSHORE_WIND_FARM).toBe(buildColumnOf(IMPROVEMENT_IDS.indexOf('OFFSHORE_WIND_FARM')));
-    expect(A.BUILD_OFFSHORE_WIND_FARM).toBe(A.PILLAGE - 1);
+    expect(IMPROVEMENT_IDS.indexOf('OFFSHORE_WIND_FARM')).toBe(38);
+    expect(A.BUILD_OFFSHORE_WIND_FARM).toBe(buildColumnOf(38));
   });
 
   it('stands on Coast or Lake with no resource and no feature, once Predictive Systems is in', () => {

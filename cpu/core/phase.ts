@@ -63,7 +63,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, garrisonOf } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost, spreadReligiousPressure } from './game';
+import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -89,6 +89,7 @@ const A_ESCORT = unitActionIndex(IMPROVEMENT_IDS).ESCORT;
 const A_BREAK_ESCORT = unitActionIndex(IMPROVEMENT_IDS).BREAK_ESCORT;
 const A_PROMOTE = unitActionIndex(IMPROVEMENT_IDS).PROMOTE_0;
 const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN;
+const A_HEAL_RELIGIOUS = unitActionIndex(IMPROVEMENT_IDS).HEAL_RELIGIOUS;
 const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
 const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION;
 const A_EVANGELIZE = unitActionIndex(IMPROVEMENT_IDS).EVANGELIZE_BELIEF;
@@ -1792,6 +1793,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         removeHeresy(state, unit);
         return;
       }
+      if (a === A_HEAL_RELIGIOUS) {
+        guruHeal(state, unit);
+        return;
+      }
       if (a === A_LAUNCH_INQUISITION) {
         launchInquisition(state, unit, actor);
         return;
@@ -2067,7 +2072,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const ii = a < 18 ? a - 13 : DEDICATED_IMPROVEMENTS + (a - 18);
           const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
           const un = computeUnlocks(state, actor.seat);
-          // CIV6 (Mountain Tunnel, Qhapaq Ñan): the rows whose target is not
+          // CIV6 (Mountain Tunnel, Qhapaq Ñan, Ski Resort): the rows whose target is not
           // the builder's own tile — "Can only be built on an adjacent
           // Mountain tile". The unit stands off the mountain, so the
           // legality and the write both move to `adjacentPlotTarget`.
@@ -3232,9 +3237,9 @@ export function seatPhase(state: GameState): void {
         const civCityF = actor.cities.find((c) => c.centerIndex === centre);
         if (!civCityF) continue;
         if (fk === 4) buyWorshipBuilding(state, civCityF.id, actor.seat);
-        else if ((fk === 5 || fk === 6 || fk === 11 || fk === 14) && !boughtRelig) {
+        else if ((fk === 5 || fk === 6 || fk === 11 || fk === 14 || fk === 18) && !boughtRelig) {
           const rt = fk === 5 ? 'MISSIONARY' : fk === 6 ? 'APOSTLE'
-            : fk === 11 ? 'INQUISITOR' : 'WARRIOR_MONK';
+            : fk === 11 ? 'INQUISITOR' : fk === 18 ? 'GURU' : 'WARRIOR_MONK';
           boughtRelig = purchaseReligiousUnit(state, civCityF.id, rt, actor.seat).ok;
         } else if ((fk === 8 || fk === 9) && !boughtCivilian) {
           // kinds 8/9 — the Monumentality faith-civilian (8 builder, 9 settler)

@@ -206,3 +206,20 @@ Object.assign(FEATURES, {
 Object.assign(FEATURES, {
   PAITITI: { id: 'PAITITI', name: 'Paititi', yields: {}, impassable: true, adjacentYields: { gold: 3, culture: 2 }, cityIntlRouteGold: 4, ...NW },
 } satisfies Record<string, FeatureDef>);
+
+// GOBUSTAN and the BERMUDA TRIANGLE, appended after Paititi. Neither is
+// Impassable, so a city works their plots. CIV6 (Expansion2_Features.xml):
+// FEATURE_GOBUSTAN, three plots of Plains, Feature_YieldChanges Culture 3 and
+// Production 1 (the plot's whole yields — the game's plots read 1P 3C,
+// runs/h1_duelw1105), Appeal 2, MovementChange 1 (`terrainMp`),
+// DefenseModifier 3 (`featureDefense`), SightThroughModifier 1. CIV6
+// (GranColombia_Maya_Features.xml): FEATURE_BERMUDA_TRIANGLE, three plots of
+// Ocean, no Feature_YieldChanges row, Feature_AdjacentYields Science 5 — its
+// own plots, each beside the other two, read 10 Science (runs/h1_duelw1105).
+// Its MODIFIER_UNIT_TELEPORT and ABILITY_MYSTERIOUS_CURRENTS are not
+// modelled. The engines' map generator lays neither; an imported world
+// carries them.
+Object.assign(FEATURES, {
+  GOBUSTAN: { id: 'GOBUSTAN', name: 'Gobustan', yields: { culture: 3, production: 1 }, ...NW },
+  BERMUDA_TRIANGLE: { id: 'BERMUDA_TRIANGLE', name: 'Bermuda Triangle', yields: {}, adjacentYields: { science: 5 }, ...NW },
+} satisfies Record<string, FeatureDef>);

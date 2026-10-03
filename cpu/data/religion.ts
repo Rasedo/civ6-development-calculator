@@ -780,6 +780,13 @@ export const THEO_PRESSURE_SWING = 250;
  *  territory and "at least 3 charges", and consumes the unit. */
 export const LAUNCH_INQUISITION_CHARGES = 3;
 export const INQUISITOR_CAP = 2;
+/** the driver's ceiling on a seat's live Gurus, as APOSTLE_CAP is on its
+ *  Apostles — no install row caps either */
+export const GURU_CAP = 1;
+/** CIV6 (GlobalParameters COMBAT_HEAL_RELIGIOUS_CHARGE 40): what one Guru heal
+ *  charge restores to each friendly religious unit it reaches. */
+export const GURU_HEAL = srcConst('religion.guruHeal', 40,
+  xml('GlobalParameters', 'Name=COMBAT_HEAL_RELIGIOUS_CHARGE', 'Value'));
 /** CIV6 (Inquisitor): "+35 Religious Strength when in friendly territory". */
 export const INQUISITOR_HOME_STRENGTH = 35;
 /** CIV6 (GS): an Inquisitor's Remove Heresy leaves "only 75% presence of other

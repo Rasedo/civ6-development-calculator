@@ -302,7 +302,7 @@ def buy_record_fields(b: int, buy, worship, relig, levy, monu=None, nat=None, cl
         _c = _centre(int(worship[b]))
         if _c is not None:
             bf.append([4, _c])
-    if relig is not None and int(relig[0][b]) in (5, 6, 11, 14):
+    if relig is not None and int(relig[0][b]) in (5, 6, 11, 14, 18):
         _c = _centre(int(relig[1][b]))
         if _c is not None:
             bf.append([int(relig[0][b]), _c])
@@ -401,7 +401,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
             ucls = (_full(_fc), _full(_ent[2]))
         elif _fk == 4:
             worship = _full(_fc)
-        elif _fk in (5, 6, 11, 14):
+        elif _fk in (5, 6, 11, 14, 18):
             relig = (_full(_fk), _full(_fc))
         elif _fk in (8, 9):
             monu = (_full(_fk), _full(_fc))

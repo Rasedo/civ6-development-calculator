@@ -65,7 +65,10 @@ export type FeatureId =
   | 'EYJAFJALLAJOKULL'
   | 'VESUVIUS'
   | 'FLOODPLAINS_GRASSLAND'
-  | 'FLOODPLAINS_PLAINS';
+  | 'FLOODPLAINS_PLAINS'
+  | 'PAITITI'
+  | 'GOBUSTAN'
+  | 'BERMUDA_TRIANGLE';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 
@@ -111,7 +114,8 @@ export type ImprovementId =
   | 'STEPWELL'
   | 'FISHERY'
   | 'CITY_PARK'
-  | 'MOUNTAIN_ROAD';
+  | 'MOUNTAIN_ROAD'
+  | 'SKI_RESORT';
 
 export type DistrictId =
   | 'CITY_CENTER'

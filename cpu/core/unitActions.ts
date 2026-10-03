@@ -12,7 +12,9 @@ export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL'
   // ...and Pachacuti's LEADER improvement after those
   'MOUNTAIN_ROAD',
   // ...and the Offshore Wind Farm after that
-  'OFFSHORE_WIND_FARM'];
+  'OFFSHORE_WIND_FARM',
+  // ...and the Ski Resort after that
+  'SKI_RESORT'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 
@@ -159,6 +161,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // OWN tile — one column, no direction. Appended last, like every verb since
   // FOUND_CITY.
   names.push('CONDEMN');
+  // THE GURU'S HEAL: a charge heals the Guru and the friendly religious units
+  // around it (`guruHeal`). One column, no target. Appended last, like every
+  // verb since FOUND_CITY.
+  names.push('HEAL_RELIGIOUS');
   return names;
 }
 

@@ -30,7 +30,7 @@ import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, COMPETITIONS } from '../data/seats';
 import { foundingMoments, religionMoment, gameEraTurn, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, CITY_MAX_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
+import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
 import { competitionOf } from './competition';
@@ -44,7 +44,7 @@ import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { nextRandom } from './rand';
-import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
 import { srcConst, xml } from '../data/provenance';
@@ -878,6 +878,35 @@ export function removeHeresy(state: GameState, unit: Unit): RuleResult {
   return { ok: true };
 }
 
+/** the wounded religious units a Guru's heal reaches: CIV6 (Guru) "itself and
+ *  all adjacent friendly religious units" — its own seat's, the tile it
+ *  stands on and the ring around it. */
+export function guruHealTargets(state: GameState, unit: Unit): Unit[] {
+  const at = state.map.tiles[unit.tileIndex];
+  const mine = unitSeat(unit);
+  return state.units.filter((u) => {
+    if (unitSeat(u) !== mine || u.hp >= UNIT_HP || (UNITS[u.type]?.religiousStrength ?? 0) <= 0) return false;
+    const t = state.map.tiles[u.tileIndex];
+    return hexDistance(state.map, at.col, at.row, t.col, t.row) <= 1;
+  });
+}
+
+/**
+ * CIV6 (Guru): "May use a charge to heal itself and all adjacent friendly
+ * religious units" — each by COMBAT_HEAL_RELIGIOUS_CHARGE (`GURU_HEAL`), to
+ * full at most. The charge and the Guru's turn are spent.
+ */
+export function guruHeal(state: GameState, unit: Unit): RuleResult {
+  if (unit.type !== 'GURU') return { ok: false, reason: 'Not a Guru.' };
+  if ((unit.charges ?? 0) <= 0) return { ok: false, reason: 'No charges left.' };
+  const hurt = guruHealTargets(state, unit);
+  if (hurt.length === 0) return { ok: false, reason: 'No wounded religious unit in reach.' };
+  for (const u of hurt) u.hp = Math.min(UNIT_HP, u.hp + GURU_HEAL);
+  unit.charges = (unit.charges ?? 0) - 1;
+  unit.movesLeft = 0;
+  return { ok: true };
+}
+
 /** every barbarian unit in the ring around `here`, in NEIGHBOUR-RING order. */
 export function adjacentBarbarians(state: GameState, here: Tile): Unit[] {
   const got: Unit[] = [];
@@ -957,7 +986,7 @@ function offerApostlePromotions(state: GameState, unit: Unit, seat: number): voi
 export function purchaseReligiousUnit(
   state: GameState,
   cityId: number,
-  unitType: 'MISSIONARY' | 'APOSTLE' | 'INQUISITOR' | 'WARRIOR_MONK',
+  unitType: 'MISSIONARY' | 'APOSTLE' | 'INQUISITOR' | 'GURU' | 'WARRIOR_MONK',
   seat: number,
 ): RuleResult {
   const buyer = seatOf(state, seat);
@@ -976,7 +1005,7 @@ export function purchaseReligiousUnit(
     return { ok: false, reason: 'No Inquisition has been launched.' };
   }
   const cap = unitType === 'MISSIONARY' ? MISSIONARY_CAP
-    : unitType === 'APOSTLE' ? APOSTLE_CAP : INQUISITOR_CAP;
+    : unitType === 'APOSTLE' ? APOSTLE_CAP : unitType === 'GURU' ? GURU_CAP : INQUISITOR_CAP;
   const live = state.units.filter((u) => u.seat === seat && u.type === unitType).length;
   if (live >= cap) return { ok: false, reason: `${unitType} cap reached.` };
   const eb = buyer.religion.enhancer ? ENHANCER_BELIEFS[buyer.religion.enhancer]?.effects : undefined;
@@ -1006,6 +1035,8 @@ export function purchaseReligiousUnit(
   const u = spawnUnit(state, unitType, city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
+  // the Guru's charges heal: neither the Exodus nor a Mosque adds to them
+  if (unitType === 'GURU') return { ok: true };
   if (unitType === 'MISSIONARY' && eb?.missionaryChargeBonus) u.charges = (u.charges ?? 0) + eb.missionaryChargeBonus;
   if (unitType === 'APOSTLE') {
     offerApostlePromotions(state, u, seat);

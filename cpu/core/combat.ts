@@ -39,6 +39,7 @@ import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
 import { isExplored, revealAround, unexploredByAll } from './fog';
+import { srcConst, xml } from '../data/provenance';
 import { wipeConstruction } from './production';
 import {
   XP_BARB_VETERAN, XP_CITY_ATTACK, XP_CITY_DEFEND, XP_CITY_FELLED,
@@ -100,6 +101,8 @@ export function featureDefense(feature: string | null | undefined): number {
   if (feature === 'WOODS' || feature === 'RAINFOREST' || fireFeature(feature)) return 3;
   if (feature === 'MARSH' || isFloodplains(feature)) return -2;
   if (feature === 'REEF') return 3;
+  // CIV6 (Expansion2_Features.xml): FEATURE_GOBUSTAN DefenseModifier 3
+  if (feature === 'GOBUSTAN') return 3;
   return 0;
 }
 
@@ -3026,18 +3029,32 @@ function barbNavalType(turn: number): string {
 }
 
 /**
- * The barbarian CAVALRY ladder — what a HORSE camp fields.
- * CIV 6: "cavalry outposts spawn when they have a horse resource within 6
- * tiles ... and will employ mounted units in their assaults". HORSEMAN, then
- * KNIGHT past the same era turn.
+ * The barbarian CAVALRY ladder — what a HORSE camp fields as its melee.
+ * CIV6 (Barbarians.xml TRIBE_CAVALRY): a camp with Horses within
+ * ResourceRange (`BARB_HORSE_RANGE`), MeleeTag CLASS_LIGHT_CAVALRY. The
+ * barbarians' own BARBARIAN_HORSEMAN through the melee ladder's first era,
+ * then HORSEMAN, then KNIGHT past the crossbow turn.
  */
 function barbCavalryType(turn: number): string {
-  return turn > 120 ? 'KNIGHT' : 'HORSEMAN';
+  return turn > 120 ? 'KNIGHT' : turn > 60 ? 'HORSEMAN' : 'BARBARIAN_HORSEMAN';
 }
 
-export const BARB_HORSE_RANGE = 6;
+/**
+ * What a HORSE camp fields in the raid rotation's RANGED slot. CIV6
+ * (Barbarians.xml TRIBE_CAVALRY): RangedTag CLASS_MOBILE_RANGED — the
+ * barbarians' own BARBARIAN_HORSE_ARCHER through the melee ladder's first
+ * era, the shared ranged ladder after it.
+ */
+function barbCavalryRangedType(turn: number): string {
+  return turn > 60 ? barbRangedType(turn) : 'BARBARIAN_HORSE_ARCHER';
+}
 
-/** CIV 6: a camp is a HORSE camp when a Horses resource sits within 6 tiles. */
+/** CIV6 (Barbarians.xml TRIBE_CAVALRY): RequiredResource RESOURCE_HORSES
+ *  within ResourceRange 3. */
+export const BARB_HORSE_RANGE = srcConst('combat.barbHorseRange', 3,
+  xml('BarbarianTribes', 'TribeType=TRIBE_CAVALRY', 'ResourceRange'));
+
+/** a camp is a HORSE camp when a Horses resource sits within BARB_HORSE_RANGE. */
 function campNearHorses(state: GameState, campIdx: number): boolean {
   const camp = state.map.tiles[campIdx];
   return tilesWithin(state.map, camp.col, camp.row, BARB_HORSE_RANGE)
@@ -3106,7 +3123,7 @@ export function barbarianPhase(state: GameState): void {
       // neighbouring camps do not move in lockstep.
       const slot = (campNo + state.turn) % 3;
       if (slot === 1) {
-        spawnUnit(state, barbRangedType(state.turn), campIdx, BARB_SEAT);
+        spawnUnit(state, horseCamp ? barbCavalryRangedType(state.turn) : barbRangedType(state.turn), campIdx, BARB_SEAT);
       } else if (slot === 2) {
         spawnUnit(state, barbMeleeType(state.turn), campIdx, BARB_SEAT);
       } else if (water) {

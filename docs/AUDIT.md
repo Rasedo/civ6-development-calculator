@@ -42,7 +42,8 @@ re-adds them.
 | B-86 the emergency combat terms' reach | 1 | the lost Nuclear emergency's -1, raising a Military emergency (LAB) |
 | B-89 fire on a religious unit | 1 | a second gun's burst, ships, the gun's XP vs a Fighter (LAB) |
 | B-91 a religion's beliefs | 1 | Cross-Cultural Dialogue read live (LAB) |
-| **B. Fidelity vs real Civ 6** | **6** | |
+| B-92 the H-1 roster rows' tails | 1 | the Bermuda Triangle's currents and stop (BUILD), its teleport and the Guru heal's turn and offer (LAB) |
+| **B. Fidelity vs real Civ 6** | **7** | |
 | C-2 diplomatic agreements | 1 | the kept promise's end past 26 turns, the broken multiple on Don't Spy (LAB) |
 | C-16 the spy's second half | 1 | the level base, the police's guess, the counterspy's escape term (LAB) |
 | C-20 the route's transportation efficiency | 1 | a centre's and a Canal's land/water class (DLL), the sweep's plot-by-plot score (LAB) |
@@ -54,7 +55,7 @@ re-adds them.
 | C-93 the turn's order | 1 | tourism's banking, the victory and turn-limit checks, the turn-opening Great Person draw (LAB) |
 | C-94 the harness's first findings | 3 | the uncatalogued policy cards and two governments, the game era's readers and the other moments (BUILD); late district prices, Fishing Boats, the religious 2's source, pressure and loyalty residuals, the garrison pick, the map script's continents, Mercenary Companies' yield, Cocoa, China's fourth Tobacco (LAB) |
 | **C. Absent systems** | **12** | |
-| **OPEN, TOTAL** | **18** | |
+| **OPEN, TOTAL** | **19** | |
 
 ## The question ledger — owner asks
 
@@ -111,6 +112,11 @@ commit.
   An Apostle's Evangelize Belief (`EVANGELIZE_BELIEF`) consumes it and earns the next belief (`beliefsEarned`, `RELIGION_INITIAL_BELIEFS` 2 at founding); the nine Founder and nine Enhancer beliefs ship (Lay Ministry, Sacred Places, Missionary Zeal, Monastic Isolation, Holy Waters built; Holy Waters heals any seat's religious units of any religion, `runs/b91s4_holywaters_20260926T131351Z.jsonl`); a founder belief's "cities following" counts every city in the world whose majority follows the religion, foreign majors', the Free Cities' and city-states' (`citiesFollowing` / `_cities_following`, `runs/b91s2_follow_lab4_t150_20260926T1320Z.jsonl`); Religious Colonization starts a city its founder founds with its citizen following the founder's majority religion on 200 of it (`colonizePressure`, `runs/b91s3_colonization_20260926T130735Z.jsonl`); the Dar-e Mehr pays +1 Faith per game era since it was built (`City.buildingEras` / `city_bldg_era`). A seat holds one Great Prophet (`MaxPlayerInstances` 1); the Dar-e Mehr's era Faith counts toward religious healing; the GPU checks a unit's moves for every religious verb as TS does.
   Colonization founds at 200·ceil(pop/2) + 2 (`colonizeFoundingPressure`, `COLONIZE_PRESSURE_EXTRA`; `runs/b91c_colonization.jsonl` 5 of 5). World Church pays Amount / PerXItems per follower of the founder's religion anywhere, unfloored, each city's `followersOf` share counted, majority or not (`religionFollowers` / `_religion_followers`, `applyBeliefEffects`' `perFollowers`; `runs/b91w_worldchurch.jsonl`).
   - LAB: Cross-Cultural Dialogue shares World Church's rows and rule, not read live.
+- **B-92. THE H-1 ROSTER ROWS' TAILS.** Weight 1.
+  Shipped on both engines, rows the H-1 importer met in Duel 1105–1107 (`runs/h1_duelw1105_*`): the Ski Resort (`IMPROVEMENTS.SKI_RESORT`: a Builder's adjacent-plot build onto an owned mountain after Professional Sports, never beside another, unworked, 1 Amenity to its city, Tourism equal to its plot's Appeal; `adjacentPlotTarget` / `_adj_plot_target_ok`, `improvementAmenities` / `_improvement_amenities`, `resortTourism`, `workableTiles` / `_work_ground`); Gobustan (1 Production 3 Culture, MovementChange 1, DefenseModifier 3, SightThroughModifier 1) and the Bermuda Triangle (Feature_AdjacentYields 5 Science, its own plots reading 10) in `world/features.ts`, laid only by an imported world; the barbarians' own BARBARIAN_HORSEMAN and BARBARIAN_HORSE_ARCHER fielded by a cavalry camp (Horses within TRIBE_CAVALRY's ResourceRange 3) through the first era (`barbCavalryType`, `barbCavalryRangedType`); the Guru (`UNITS.GURU`, faith kind 18 behind a Temple, `GURU_CAP`; `HEAL_RELIGIOUS`: a charge heals itself and the adjacent friendly religious units COMBAT_HEAL_RELIGIOUS_CHARGE 40 each, `guruHeal` / the `_rk_guru` arm). REACHED by `tests/cpu/map/ski-resort.test.ts`, `tests/cpu/map/gobustan-bermuda.test.ts`, `tests/cpu/units/guru.test.ts`, `tests/cpu/units/barbarians.test.ts` and the `ski_resort`, `guru` and `barb_camps` lanes.
+  - BUILD: the Bermuda Triangle's ABILITY_MYSTERIOUS_CURRENTS (BERMUDA_TRIANGLE_UNITS_GRANT_ABILITY: a naval melee, ranged, raider or carrier unit that enters it gains MYSTERIOUS_CURRENTS_MOVEMENT +1 Movement for good) and `Feature_UnitMovements` AllowPassthrough false (a unit entering it stops) — a per-unit ability flag on both engines.
+  - LAB: BERMUDA_TRIANGLE_TELEPORT (MODIFIER_UNIT_TELEPORT, Repeatable): where the entering unit lands — no install row names the destination.
+  - LAB: whether the Guru's heal ends its turn (the engines spend it) and whether the game offers it with nothing wounded in reach (the engines do not).
 ## C. Absent systems — the blockers, and the gaps waiting on them
 
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 1.

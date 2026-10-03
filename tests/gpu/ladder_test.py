@@ -421,12 +421,14 @@ def main() -> None:
     kinds = ladder.pick_purchase(can_b, sett, unit, tile)
     assert kinds.tolist() == [0, 1, 2, 3, -1], f"purchase priority broken: {kinds.tolist()}"
     # faith policy: worship is independent; ONE religious unit, the missionary
-    # saturating before the apostle.
+    # saturating before the apostle, the guru last.
     w_ok, rk = ladder.pick_faith(torch.tensor([True, False, False, False, False]),
                                  torch.tensor([True, True, False, False, False]),
                                  torch.tensor([True, True, True, False, False]),
-                                 torch.tensor([True, True, True, True, False]))
-    assert rk.tolist() == [5, 5, 6, 11, -1], f"faith relig priority broken: {rk.tolist()}"
+                                 torch.tensor([True, True, True, True, False]),
+                                 torch.tensor([False, False, False, False, False]),
+                                 torch.tensor([True, True, True, True, True]))
+    assert rk.tolist() == [5, 5, 6, 11, 18], f"faith relig priority broken: {rk.tolist()}"
     assert w_ok.tolist() == [True, False, False, False, False], "worship must pass through untouched"
     # the driver ctx reads the engines' ONE legality bodies, per-row.
     from core import neutral
@@ -434,7 +436,7 @@ def main() -> None:
     assert len(nobs) == s.B, "the observation is one dict per game"
     want = [f for f, _k in neutral.SEAT_GROUPS["buy"]]
     assert all(list(o["buy"]) == want for o in nobs), "every game carries the whole buy group"
-    print("  l purchase priority OK (building > settler > unit > tile; faith m>a>q; per-game buy obs)")
+    print("  l purchase priority OK (building > settler > unit > tile; faith m>a>q>k>g; per-game buy obs)")
 
     print("LADDER CONTRACT OK")
 

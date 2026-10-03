@@ -5930,12 +5930,18 @@ class SimEconomy:
                 wt = torch.div(wt * (100 + wonder_pct.reshape(-1, 1)), 100,
                                rounding_mode="floor")
             t = t + (wt * w_live.long()).sum(dim=1)
-        if self.SEASIDE >= 0:
-            live = (self.improvement == self.SEASIDE) & ~self.pillaged & own
-            if bool(live.any()):
-                # CIV6 (Cristo Redentor): the resort multiplier is the SEAT's.
-                sm = resort_mult.long() if resort_mult is not None else torch.ones(self.B, dtype=torch.long, device=self.device)
-                t = t + (self._tile_appeal().clamp(min=0) * live.long()).sum(dim=1) * sm
+        # CIV6 (`Improvement_Tourism` TOURISMSOURCE_APPEAL): Tourism equal to
+        # the plot's Appeal, floored at 0, from every row that names it — the
+        # `resortTourism` twin. CIV6 (CRISTOREDENTOR_BEACHTOURISM): the
+        # SEAT's multiplier scales the Seaside Resort's alone.
+        for _k in self._imp_tour_appeal:
+            live = (self.improvement == _k) & ~self.pillaged & own
+            if not bool(live.any()):
+                continue
+            ta = (self._tile_appeal().clamp(min=0) * live.long()).sum(dim=1)
+            if _k == self.SEASIDE and resort_mult is not None:
+                ta = ta * resort_mult.long()
+            t = t + ta
         # CIV6: a National Park pays "Tourism equal to the total Appeal of all
         # the tiles included in it" — NOT floored, so an ugly neighbour can
         # take a park's payout negative.

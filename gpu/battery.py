@@ -876,6 +876,8 @@ def _main() -> int:
                 ("shared_vision", [py, "tests/gpu/shared_vision_test.py"], 6),  # an alliance shares what it sees
                 ("mountain_tunnel", [py, "tests/gpu/mountain_tunnel_test.py"], 7),  # the portal on a mountain range
                 ("qhapaq_nan", [py, "tests/gpu/qhapaq_nan_test.py"], 4),  # Pachacuti's portal: the leader gate, the adjacent build, one network with the Tunnel
+                ("ski_resort", [py, "tests/gpu/ski_resort_test.py"], 4),
+                ("guru", [py, "tests/gpu/guru_test.py"], 4),  # the Temple's faith buy, the heal of itself and its ring, the cap  # the adjacent build on an owned mountain, never beside its kind; the Amenity, the Appeal's Tourism, unworked
                 ("trade_tails", [py, "tests/gpu/trade_tails_test.py"], 4),  # the escort's reach of 4, the admirals' hull-only percentage, a Trader through a portal
                 ("governor_power", [py, "tests/gpu/governor_power_test.py"], 4),  # Industrialist and Renewable Subsidizer: no governed city of a seed holds either
                 ("levied_upgrade", [py, "tests/gpu/levied_upgrade_test.py"], 6),  # the levy mark and its 75% discount

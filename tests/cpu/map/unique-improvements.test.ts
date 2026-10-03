@@ -67,7 +67,9 @@ describe('the unique improvement catalog', () => {
     expect(IMPROVEMENT_IDS.indexOf('MOUNTAIN_ROAD')).toBe(37);
     // ...and the Offshore Wind Farm after it
     expect(IMPROVEMENT_IDS.indexOf('OFFSHORE_WIND_FARM')).toBe(38);
-    expect(IMPROVEMENT_IDS.length).toBe(39);
+    // ...and the Ski Resort after that
+    expect(IMPROVEMENT_IDS.indexOf('SKI_RESORT')).toBe(39);
+    expect(IMPROVEMENT_IDS.length).toBe(40);
   });
 
   it('gives one civilization at most one unique improvement', () => {

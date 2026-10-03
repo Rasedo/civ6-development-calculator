@@ -243,6 +243,8 @@ export function terrainMp(tile: Tile, mover?: { promos?: number; type: string })
   // the pack's burning and burnt Woods and Rainforest (`MovementChange` 1):
   // not Woods or Jungle, so no Ranger or chassis waives them
   else if (fireFeature(tile.feature)) cost += MP_SCALE;
+  // CIV6 (Expansion2_Features.xml): FEATURE_GOBUSTAN MovementChange 1
+  else if (tile.feature === 'GOBUSTAN') cost += MP_SCALE;
   return cost;
 }
 

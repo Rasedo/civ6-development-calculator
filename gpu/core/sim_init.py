@@ -1343,6 +1343,9 @@ class SimInit:
         self._apostle_cap = int(_bl["apostleCap"])
         self._inquisitor_idx = int(_bl["inquisitorIdx"])
         self._inquisitor_cap = int(_bl["inquisitorCap"])
+        self._guru_idx = int(_bl["guruIdx"])
+        self._guru_cap = int(_bl["guruCap"])
+        self._guru_heal = int(_bl["guruHeal"])
         self._monk_idx = int(_bl["warriorMonkIdx"])
         self._monk_follower = int(_bl["warriorMonkFollower"])
         self._inquisitor_home_strength = int(_bl["inquisitorHomeStrength"])
@@ -1867,6 +1870,7 @@ class SimInit:
         self._A_PROMOTE = self._act["PROMOTE_0"]  # the level-up head
         self._A_CONDEMN = self._act["CONDEMN"]  # vs the religious unit on the own tile
         self._A_HERESY = self._act["REMOVE_HERESY"]
+        self._A_HEAL_RELIGIOUS = self._act["HEAL_RELIGIOUS"]   # the Guru heals the religious units around it
         self._A_INQUISITION = self._act["LAUNCH_INQUISITION"]
         self._A_EVANGELIZE = self._act["EVANGELIZE_BELIEF"]   # the Apostle earns its religion a belief
         self._A_HEATHEN = self._act["CONVERT_HEATHEN"]
@@ -1947,7 +1951,7 @@ class SimInit:
             + (1 if self._A_UNESCORT >= 0 else 0) \
             + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc \
             + self._air_deploy_cols + (1 if self._A_RETURN >= 0 else 0) + _ptc \
-            + (1 if self._A_EVANGELIZE >= 0 else 0)
+            + (1 if self._A_EVANGELIZE >= 0 else 0) + (1 if self._A_HEAL_RELIGIOUS >= 0 else 0)
         assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
         self._A_CHOP = self._act["CHOP"]
         self._A_REPAIR = self._act["REPAIR"]
@@ -2115,9 +2119,18 @@ class SimInit:
         self._imp_gov_promo = [int(r["govPromo"]) for r in imp["rows"]]
         self._imp_gov_yield = [r["govY"] for r in imp["rows"]]
         self._imp_gov_yield_any = any(g is not None for g in self._imp_gov_yield)
-        # amenities the row pays its city for standing beside water
+        # amenities the row pays its city, per instance: unconditionally
+        # (`amen`) and for standing beside water (`watAmen`)
+        self._imp_amenity = [int(r["amen"]) for r in imp["rows"]]
         self._imp_water_amenity = [int(r["watAmen"]) for r in imp["rows"]]
-        self._imp_water_amenity_any = any(a > 0 for a in self._imp_water_amenity)
+        self._imp_amenity_any = any(a > 0 for a in self._imp_amenity + self._imp_water_amenity)
+        # the rows whose Tourism is their plot's Appeal (TOURISMSOURCE_APPEAL)
+        self._imp_tour_appeal = [k for k, r in enumerate(imp["rows"]) if int(r["tourAppeal"])]
+        # `Workable` false: no citizen works the plot, indexed by improvement
+        # + 1 so a bare plot (-1) reads slot 0, workable
+        self._imp_unwork = torch.tensor(
+            [False] + [bool(r["unwork"]) for r in imp["rows"]], dtype=torch.bool, device=device)
+        self._imp_unwork_any = bool(self._imp_unwork.any())
         self.res_imp = torch.tensor(
             [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
         )
@@ -3472,7 +3485,7 @@ class SimInit:
         self._dmg_min = int(cb["dmgMin"])
         self._dmg_max = int(cb["dmgMax"])
         # The BARBARIAN ladder maps a ladder POSITION (0..3 melee, 4/5 ranged,
-        # 6 scout, 7/8 naval) to a ROSTER index. barb_unit_type holds that roster index,
+        # 6 scout, 7/8 naval, 9/10 cavalry, 11/12 the barbarians' own cavalry) to a ROSTER index. barb_unit_type holds that roster index,
         # exactly like major_unit_type and major_unit_type, so combat / moves / ranged strength /
         # ranged range / naval all come from the one roster table. The exporter
         # is the source of truth for the ladder's contents.
@@ -3486,9 +3499,11 @@ class SimInit:
         _bn = rules.combat["barbNavalTypes"] or []
         self._barb_galley_idx = int(_bn[0]) if len(_bn) > 0 else -1
         self._barb_quad_idx = int(_bn[1]) if len(_bn) > 1 else -1
-        _bc = rules.combat["barbCavalryTypes"] or []
-        self._barb_horseman_idx = int(_bc[0]) if len(_bc) > 0 else -1
-        self._barb_knight_idx = int(_bc[1]) if len(_bc) > 1 else -1
+        # a HORSE camp's melee rungs (BARBARIAN_HORSEMAN, HORSEMAN, KNIGHT) and
+        # its first-era ranged rung (BARBARIAN_HORSE_ARCHER), ladder positions
+        _bc = [int(x) for x in rules.combat["barbCavalryTypes"]]
+        self._barb_cav_first_idx, self._barb_horseman_idx, self._barb_knight_idx = _bc
+        self._barb_cav_ranged_idx = int(rules.combat["barbCavalryRanged"])
         self._barb_horse_res = int(rules.combat["barbHorseRes"])
         self._barb_horse_range = int(rules.combat["barbHorseRange"])
         # EMBARK: the Classical embarked pool, the rungs that raise it, the

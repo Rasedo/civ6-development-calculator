@@ -91,6 +91,17 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     // its roster row — the one runtime add that reaches this arm.
     const near = ctx.preserve?.get(tile.index);
     if (near) addYields(out, near);
+    // CIV6 (Feature_AdjacentYields): a PASSABLE wonder's plot takes what its
+    // wonder neighbours pay their ring — the Bermuda Triangle's plots, each
+    // beside the other two, read 10 Science (runs/h1_duelw1105); an
+    // Impassable wonder's plot reads nothing (Paititi's, runs/h1_duelw1103).
+    if (!FEATURES[nw]?.impassable) {
+      for (const n of neighbors(ctx.map, tile)) {
+        const wf = naturalWonderAt(n);
+        const adj = wf ? FEATURES[wf]?.adjacentYields : undefined;
+        if (adj) addYields(out, adj);
+      }
+    }
     return out;
   }
   if (isMountain(tile)) {

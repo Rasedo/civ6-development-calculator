@@ -239,6 +239,15 @@ export interface ImprovementDef {
    * per instance, not per city — when its tile touches water.
    */
   amenityAdjacentWater?: number;
+  /** CIV6 (MODIFIER_CITY_OWNER_ADJUST_IMPROVEMENT_AMENITY): amenities this
+   *  row pays the city that owns its plot — per instance, unconditionally. */
+  amenity?: number;
+  /** CIV6 (`Improvement_Tourism` TOURISMSOURCE_APPEAL, ScalingFactor 100):
+   *  Tourism equal to its plot's Appeal, floored at 0 (`resortTourism`). */
+  tourismFromAppeal?: boolean;
+  /** CIV6 (`Improvements.Workable` = false): no citizen works its plot, a
+   *  mountain Mit'a opens included (`workableTiles`). */
+  unworkable?: boolean;
 }
 
 /** the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
@@ -477,8 +486,10 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     yields: {}, // dynamic: gold = tile appeal (see seasideResortGold)
     housing: 0,
     resourceOnly: false,
+    tourismFromAppeal: true,
     description: 'Flat coastal grassland/plains/desert with Breathtaking appeal. Gold equal to the tile appeal.',
     src: {
+      tourismFromAppeal: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_BEACH_RESORT', 'TourismSource', { expect: 'TOURISMSOURCE_APPEAL' }),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_BEACH_RESORT', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_BEACH_RESORT', 'PlunderAmount'),
       housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_BEACH_RESORT', 'Housing'),
@@ -1616,6 +1627,43 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'riverYields.culture': xml('ModifierArguments', 'ModifierId=ZIGGURAT_RIVERADJACENCY_CULTURE&Name=Amount', 'Value'),
       tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_ZIGGURAT', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
       tourismTech: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_ZIGGURAT', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
+    },
+  },
+  // CIV6 (Ski Resort, Expansion2_Improvements.xml): "Provides +4 Tourism.
+  // Provides an Amenity. Can only be built on a Mountain. Cannot be built
+  // adjacent to another Ski Resort. Cannot be pillaged, worked or removed."
+  // PrereqCivic CIVIC_PROFESSIONAL_SPORTS, `Improvement_ValidBuildUnits`
+  // UNIT_BUILDER, the five mountain terrains, BuildOnAdjacentPlot,
+  // DisasterResistant, SameAdjacentValid false, Workable false, NO_PLUNDER,
+  // no CanBuildOutsideTerritory. SKI_RESORT_AMENITY pays the owning city 1
+  // Amenity; its Tourism is the plot's Appeal (the text's 4 is a mountain's).
+  SKI_RESORT: {
+    id: 'SKI_RESORT',
+    name: 'Ski Resort',
+    code: 'Sk',
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    elevations: ['MOUNTAIN'],
+    noAdjacentSame: true,
+    noPillage: true,
+    disasterResistant: true,
+    adjacentPlot: true,
+    unworkable: true,
+    amenity: 1,
+    tourismFromAppeal: true,
+    description: 'Builder only, on an owned mountain, built from an adjacent tile; never beside another. +1 Amenity to its city and Tourism equal to its Appeal. Cannot be pillaged, worked or removed.',
+    src: {
+      housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'Housing'),
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'ResourceType')] },
+      elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_SKI_RESORT', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'TerrainType')] },
+      noAdjacentSame: xml('Improvements', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'SameAdjacentValid', { expect: false }),
+      noPillage: xml('Improvements', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'PlunderType', { expect: 'NO_PLUNDER' }),
+      disasterResistant: xml('Improvements_XP2', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'DisasterResistant', { expect: true }),
+      adjacentPlot: xml('Improvements_XP2', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'BuildOnAdjacentPlot', { expect: true }),
+      unworkable: xml('Improvements', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'Workable', { expect: false }),
+      amenity: xml('ModifierArguments', 'ModifierId=SKI_RESORT_AMENITY&Name=Amount', 'Value'),
+      tourismFromAppeal: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'TourismSource', { expect: 'TOURISMSOURCE_APPEAL' }),
     },
   },
 };

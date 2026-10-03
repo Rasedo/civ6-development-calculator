@@ -2,7 +2,7 @@
 
     python tests/gpu/barb_camps_test.py
 
-CIV 6: an outpost with Horses within 6 tiles is a cavalry outpost, one with a
+CIV6 (TRIBE_CAVALRY ResourceRange 3): an outpost with Horses within 3 tiles is a cavalry outpost, one with a
 reachable coast a pirate camp, everything else a land camp — and "regardless of
 position every outpost will spawn melee and ranged units". The raid therefore
 ROTATES class / ranged / melee.
@@ -100,7 +100,10 @@ def main() -> None:
     # One camp, and no room for another: every spawn below is THIS camp's.
     sim.max_camps = torch.ones_like(sim.n_camps) if torch.is_tensor(sim.max_camps) else 1
     lad = sim._barb_ladder.tolist()
-    melee, ranged, horseman = lad[0], lad[4], lad[9]
+    # the first era: a cavalry outpost fields the barbarians' own Horseman and
+    # Horse Archer (`barbCavalryType`, `barbCavalryRangedType`)
+    melee, horseman, horse_archer = lad[0], lad[11], lad[12]
+    assert sim.turn <= sim.rules.combat["spearmanAfterTurn"], "the scene starts past the first era"
     tile = inland_tile(sim)
 
     # REGARRISON: an empty camp fills on its own LAND ladder.
@@ -111,7 +114,7 @@ def main() -> None:
     print("  an empty camp regarrisons on its own land ladder")
 
     # THE RAID ROTATES. campNo 0, so the slot is the turn alone.
-    want = {0: horseman, 1: ranged, 2: melee}
+    want = {0: horseman, 1: horse_archer, 2: melee}
     for slot, expect in want.items():
         sim.turn = (sim.turn // 3) * 3 + slot
         camp_at(sim, tile, horses=True)
@@ -119,6 +122,17 @@ def main() -> None:
         got = spawned_type(sim)
         assert got == expect, f"turn%3=={slot}: raided with roster type {got}, expected {expect}"
     print("  the raid rotates CLASS, ranged, melee — every camp fields all three")
+
+    # PAST THE FIRST ERA a cavalry outpost fields the Horseman, and the shared
+    # ranged ladder in its ranged slot
+    base = (int(sim.rules.combat["spearmanAfterTurn"]) // 3 + 1) * 3
+    for slot, expect in {0: lad[9], 1: lad[4]}.items():
+        sim.turn = base + slot
+        camp_at(sim, tile, horses=True)
+        garrison(sim, tile)
+        got = spawned_type(sim)
+        assert got == expect, f"turn {sim.turn}: raided with roster type {got}, expected {expect}"
+    print("  past the first era a cavalry outpost raids with the Horseman and the Archer")
 
     # THE RAID REACHES THE FREE CITIES: `isTerritorial` counts FREE_SEAT ground,
     # so a Free City's Campus two flat steps away is the nearest job and the

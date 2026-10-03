@@ -844,10 +844,28 @@ class SimMasks:
         oc = occ.clamp(min=0)
         t = self.unit_type.gather(1, oc)
         for i in (self._missionary_idx, self._apostle_idx,
-                  self._inquisitor_idx):
+                  self._inquisitor_idx, self._guru_idx):
             if i >= 0:
                 rel = rel | (t == i)
         return torch.where((occ >= 0) & rel, occ, torch.full_like(occ, -1))
+
+    def _guru_wounded(self, row: int) -> torch.Tensor:
+        """[B, U] — `guruHealTargets`' unit test: a live religious unit of
+        seat `row` below full health, by merged slot."""
+        cap = int(self.rules.combat["unitHp"])
+        return (self.unit_alive & (self.unit_seat == row) & (self.unit_hp < cap)
+                & (self._rel_strength[self.unit_type.clamp(min=0)] > 0))
+
+    def _guru_heal_reach(self, row: int) -> torch.Tensor:
+        """[B, T] — would a Guru of seat `row` standing here reach a wounded
+        friendly religious unit? CIV6 (Guru): "itself and all adjacent
+        friendly religious units" — the tile and the ring around it."""
+        hurt = self._guru_wounded(row)
+        n = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        n.scatter_add_(1, self.unit_tile.clamp(min=0), hurt.long())
+        here = n > 0
+        nb = self.neigh
+        return here | (here[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).any(dim=2)
 
     def _promo_offer_mask(self, sc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """[B, N, PCOL] `promoReady && promoAvailable` — the columns a unit may
@@ -1142,16 +1160,39 @@ class SimMasks:
         key = (self.row_civ if civ >= 0 else self.row_leader).gather(1, r).reshape(seat.shape)
         return (seat >= 0) & (seat < NM) & (key == (civ if civ >= 0 else leader))
 
+    def _adj_plot_target_ok(self, k: int, own_tile: torch.Tensor) -> torch.Tensor:
+        """[B, T] — may adjacent-plot row `k` be laid ON this plot from a
+        neighbour (`adjacentPlotTarget`'s per-plot test)? A bare mountain; no
+        such row lists a feature (`featureOk`), so a natural wonder's mountain
+        and a volcano refuse it; the TARGET carries the territory column, not
+        the tile the unit stands on — `outside` reaches UNOWNED mountains and
+        stops at another seat's border; and a `SameAdjacentValid` false row
+        (the Ski Resort) stands beside none of its own kind."""
+        feat = ((self.feat_id >= 0) & ~self.feat_stripped) | self.volcano_at
+        terr = own_tile
+        if self._imp_outside[k]:
+            terr = terr | (self.tile_seat < 0)
+        ok = self.tile_mountain & (self.improvement < 0) & ~feat & terr
+        if self._imp_no_adj_same[k]:
+            nb = self.neigh
+            same = ((self.improvement[:, nb.clamp(min=0)] == k) & (nb >= 0).unsqueeze(0)).any(dim=2)
+            ok = ok & ~same
+        return ok
+
     def _work_ground(self, row: int) -> torch.Tensor:
         """[B, T] — where a citizen of this row may stand: the exporter's
         `work_ok` plane, widened by the roster's own row. CIV6 (Mit'a):
         "Citizens may work Mountain tiles" — a MOUNTAIN and nothing else the
-        impassable plane refuses (an ice sheet stays unworkable)."""
+        impassable plane refuses (an ice sheet stays unworkable). CIV6
+        (`Improvements.Workable` false): the Ski Resort's mountain is
+        nobody's to work."""
         out = self.work_ok
         for _wc, _wl in self._live_rows(row, self._work_mountain_rows):
             _ww = self._row_is(row, _wc, _wl)
             if bool(_ww.any()):
                 out = out | (_ww.unsqueeze(1) & self.tile_mountain & (self.feat_id < 0))
+        if self._imp_unwork_any:
+            out = out & ~self._imp_unwork[self.improvement + 1]
         return out
 
     def _form_civic_ok(self, row: int, tier: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -3712,30 +3753,15 @@ class SimMasks:
                 elif self._imp_uniq[_k] >= 0:
                     _ok = here_ok & self._uniq_improvement_ok(row, _k).gather(1, tc)
                 elif self._imp_adj_plot[_k]:
-                    # CIV6 (Mountain Tunnel, Qhapaq Ñan): "Can only be built on
+                    # CIV6 (Mountain Tunnel, Qhapaq Ñan, Ski Resort): "Can only be built on
                     # an adjacent Mountain tile" — the unit stands OFF the
                     # mountain, so the ground rule is about a NEIGHBOUR, not
                     # this tile. The applier writes the lowest-index bare
                     # adjacent mountain (`adjacentPlotTarget`'s twin); the row's
                     # own unit, unlock and leader are `adjacentPlotRowOk`'s.
                     _tnb = self.neigh[tc.reshape(-1)].reshape(tc.shape + (6,))
-                    _tnc = _tnb.clamp(min=0)
-                    _tflat = _tnc.reshape(B, -1)
-                    # the TARGET carries the territory column, not the tile
-                    # the engineer stands on: `outside` reaches UNOWNED
-                    # mountains and stops at another seat's border.
-                    _tterr = own_tile.gather(1, _tflat).reshape(_tnb.shape)
-                    if self._imp_outside[_k]:
-                        _tterr = _tterr | (
-                            self.tile_seat.gather(1, _tflat).reshape(_tnb.shape) < 0)
-                    # neither row lists a feature (`featureOk`), so a natural
-                    # wonder's mountain and a volcano refuse it
-                    _tfeat = (((self.feat_id >= 0) & ~self.feat_stripped) | self.volcano_at).gather(
-                        1, _tflat).reshape(_tnb.shape)
-                    _tmt = (self.tile_mountain.gather(1, _tflat).reshape(_tnb.shape)
-                            & (self.improvement.gather(1, _tflat).reshape(_tnb.shape) < 0)
-                            & ~_tfeat
-                            & _tterr
+                    _tflat = _tnb.clamp(min=0).reshape(B, -1)
+                    _tmt = (self._adj_plot_target_ok(_k, own_tile).gather(1, _tflat).reshape(_tnb.shape)
                             & (_tnb >= 0))
                     _uc = int(self._imp_unlock_civic[_k])
                     if _uc >= 0:
@@ -3951,6 +3977,16 @@ class SimMasks:
         elif self._A_HERESY >= 0:
             _rh = [torch.zeros(B, N, 1, dtype=torch.bool, device=dev)]
 
+        # HEAL_RELIGIOUS: a Guru with a charge and a wounded friendly religious
+        # unit within one step, itself included (`guruHealTargets`)
+        _gh: list[torch.Tensor] = []
+        if self._A_HEAL_RELIGIOUS >= 0:
+            _ghok = torch.zeros(B, N, dtype=torch.bool, device=dev)
+            if self._guru_idx >= 0:
+                _ghok = (present & (utype == self._guru_idx) & (u_charges > 0)
+                         & self._guru_heal_reach(row).gather(1, tc))
+            _gh = [_ghok.unsqueeze(2)]
+
         _li: list[torch.Tensor] = []
         if self._A_INQUISITION >= 0:
             _ok = torch.zeros(B, N, dtype=torch.bool, device=dev)
@@ -4159,7 +4195,7 @@ class SimMasks:
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
             + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc + _pt + _dp + _rtb + _prt + _evg
-            + _cd,
+            + _cd + _gh,
             dim=2,
         )
         if N < _NFULL:

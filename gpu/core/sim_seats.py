@@ -2167,6 +2167,7 @@ class SimSeats:
         a_ok, a_j = no.clone(), neg.clone()
         q_ok, q_j = no.clone(), neg.clone()
         k_ok, k_j = no.clone(), neg.clone()
+        g_ok, g_j = no.clone(), neg.clone()
         if self._monk_idx >= 0:
             elig_k = self._seat_monk_city_ok(row)
             if bool(elig_k.any()):
@@ -2181,7 +2182,7 @@ class SimSeats:
             w_ok = active & self._afford(self.civ_faith[:, row], self._faith_price(row, self._worship_cost_of(row))) & elig_w.any(dim=1) & ~self._congress_holy_blocked()
             w_j = torch.where(w_ok, elig_w.long().argmax(dim=1), w_j)
         if self._hs_idx < 0 or not bool(self.civ_religion_done[:, row].any()):
-            return w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j, k_ok, k_j
+            return w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j, k_ok, k_j, g_ok, g_j
         founded = active & self.civ_religion_done[:, row]
         elig_s = self._seat_religious_city_ok(row)
         elig_t = self._seat_religious_city_ok(row, temple=True)
@@ -2204,7 +2205,13 @@ class SimSeats:
             q_ok = (founded & self.civ_inquisition[:, row] & (n_q < self._inquisitor_cap)
                     & self._afford(self.civ_faith[:, row], qcost) & elig_t.any(dim=1))
             q_j = torch.where(q_ok, first_t, q_j)
-        return w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j, k_ok, k_j
+        # kind 18 — the Guru, a Temple's like the Apostle
+        if self._guru_idx >= 0:
+            n_g = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._guru_idx)).sum(dim=1)
+            gcost = self._faith_price(row, self._unit_faith_cost(row, self._guru_idx))
+            g_ok = founded & (n_g < self._guru_cap) & self._afford(self.civ_faith[:, row], gcost) & elig_t.any(dim=1)
+            g_j = torch.where(g_ok, first_t, g_j)
+        return w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j, k_ok, k_j, g_ok, g_j
 
     def _faith_buyable_class(self, row: int) -> torch.Tensor:
         """[B, NB] bool — `faithBuyableClass`: the buildings this seat row may
@@ -2808,6 +2815,16 @@ class SimSeats:
                     landed_q = self._spawn_unit(row, buy_q, at_r, self._inquisitor_idx,
                                                 charges=self._type_charges[self._inquisitor_idx].expand(B) + exo_chg)
                     self.civ_faith[:, row] = torch.where(landed_q, self.civ_faith[:, row] - qcost, self.civ_faith[:, row])
+            if self._guru_idx >= 0:
+                # the Guru's charges heal: neither the Exodus nor a Mosque
+                # adds to them
+                n_live_g = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._guru_idx)).sum(dim=1)
+                gcost = self._faith_price(row, self._unit_faith_cost(row, self._guru_idx))
+                buy_g = (base_t & (rel_kind == 18) & ~bought_relig & (n_live_g < self._guru_cap)
+                         & self._afford(self.civ_faith[:, row], gcost))
+                if bool(buy_g.any()):
+                    landed_g = self._spawn_unit(row, buy_g, at_r, self._guru_idx)
+                    self.civ_faith[:, row] = torch.where(landed_g, self.civ_faith[:, row] - gcost, self.civ_faith[:, row])
             if self._monk_idx >= 0:
                 # the WARRIOR MONK asks nothing of the BUYER's religion, only
                 # of the city's majority one, so it reads its own base.
@@ -9262,32 +9279,32 @@ class SimSeats:
             z = z + (near & ok.unsqueeze(1)).sum(dim=2).double() * has.double()
         return z
 
-    def _improvement_water_amenities(self, row: int) -> torch.Tensor:
-        """[B, RC] f64 — `improvementWaterAmenities`: what this seat's own
-        improvements pay their city for standing beside water. CIV6
-        (CITY_PARK_WATER_AMENITY,
+    def _improvement_amenities(self, row: int) -> torch.Tensor:
+        """[B, RC] f64 — `improvementAmenities`: what this seat's own
+        improvements pay their city in amenities, PER INSTANCE. CIV6
+        (SKI_RESORT_AMENITY, MODIFIER_CITY_OWNER_ADJUST_IMPROVEMENT_AMENITY):
+        `_imp_amenity`, always. CIV6 (CITY_PARK_WATER_AMENITY,
         MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY behind
-        ADJACENT_TO_WATER_REQUIREMENTS) — PER INSTANCE, so a second City
-        Park beside water pays a second amenity.
-
-        "Beside water" is the requirement set's TEST_ANY: a river edge of its
+        ADJACENT_TO_WATER_REQUIREMENTS): `_imp_water_amenity`, for standing
+        beside water — the requirement set's TEST_ANY: a river edge of its
         own, or any water neighbour. The neighbour test reads `self.water`,
         which a drowned tile joins."""
         z = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
-        if not self._imp_water_amenity_any:
+        if not self._imp_amenity_any:
             return z
         nb = self.neigh
         nbc = nb.clamp(min=0)
         wet = self.tile_river | (self.water[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
         sl = self.city_slot_at(row)                                   # [B, T]
-        live = (self.improvement >= 0) & ~self.pillaged & (sl >= 0) & wet
-        for k, amt in enumerate(self._imp_water_amenity):
-            if amt <= 0:
+        live = (self.improvement >= 0) & ~self.pillaged & (sl >= 0)
+        for k, (amt, wamt) in enumerate(zip(self._imp_amenity, self._imp_water_amenity)):
+            if amt <= 0 and wamt <= 0:
                 continue
             here = live & (self.improvement == k)
             if not bool(here.any()):
                 continue
-            z = z.scatter_add(1, sl.clamp(min=0), here.double() * float(amt))
+            pay = here.double() * float(amt) + (here & wet).double() * float(wamt)
+            z = z.scatter_add(1, sl.clamp(min=0), pay)
         return z
 
     def _wonder_improvement_yields(self, row: int) -> torch.Tensor | None:
@@ -10105,7 +10122,7 @@ class SimSeats:
             have = have + _wregam
         have = have + self._city_wonder_flat(row, self._wond_cityamen)[:, :cols]
         have = have + self._wonder_improvement_amenities(row)
-        have = have + self._improvement_water_amenities(row)
+        have = have + self._improvement_amenities(row)
         extra = None
         if self._seat_has_beliefs(row):
             ctr = self.city_center[:, row, :cols].clamp(min=0)

@@ -575,6 +575,10 @@ def _seat_unit_orders(st, seat: int, nobs: list):
     A_HX = st.col("REMOVE_HERESY")
     if _live(A_HX):
         orders0 = torch.where(present & um[:, :, A_HX], torch.full_like(orders0, A_HX), orders0)
+    A_HR = st.col("HEAL_RELIGIOUS")
+    if _live(A_HR):
+        # a Guru with a wounded friendly religious unit in reach heals it
+        orders0 = torch.where(present & um[:, :, A_HR], torch.full_like(orders0, A_HR), orders0)
     A_CN = st.col("CONDEMN")
     if _live(A_CN):
         orders0 = torch.where(present & um[:, :, A_CN], torch.full_like(orders0, A_CN), orders0)
@@ -691,9 +695,12 @@ def _seat_unit_orders(st, seat: int, nobs: list):
         # THE PORTAL RULE: one turn in ten (by seat) a Builder on its job lays
         # a Qhapaq Ñan onto a bare mountain beside it first, where one is legal
         # — the row's one driver, at a rate that leaves the charges for the
-        # job's own improvement.
+        # job's own improvement. THE SKI RULE: another turn in ten, a Ski
+        # Resort onto a mountain beside it, the same way.
         _qn = st.col("BUILD_MOUNTAIN_ROAD")
+        _sk = st.col("BUILD_SKI_RESORT")
         bcols = [c for c in ([_qn] if _qn >= 0 and (turn + seat) % 10 == 0 else [])
+                 + ([_sk] if _sk >= 0 and (turn + seat) % 10 == 5 else [])
                  + ([c for c in (st.col("FINISH_DISTRICT"),) if c >= 0]
                              + [c for c in (st.col("HARVEST"),) if c >= 0]
                              + [c for c in (st.col("WONDER_CHARGE"),) if c >= 0]
@@ -901,13 +908,14 @@ def _decide_buys(bctx: dict):
     buy_b = torch.where(buy_kind == 5, bctx["dist_g_row"], buy_b)
     worship_ok, relig_kind = ladder.pick_faith(
         bctx["worship_ok"], bctx["missionary_ok"], bctx["apostle_ok"], bctx["inquisitor_ok"],
-        bctx["monk_ok"])
+        bctx["monk_ok"], bctx["guru_ok"])
     neg_w = torch.full_like(bctx["worship_city"], -1)
     relig_c = torch.where(
         relig_kind == 5, bctx["missionary_city"],
         torch.where(relig_kind == 6, bctx["apostle_city"],
                     torch.where(relig_kind == 11, bctx["inquisitor_city"],
-                                torch.where(relig_kind == 14, bctx["monk_city"], neg_w))))
+                                torch.where(relig_kind == 14, bctx["monk_city"],
+                                            torch.where(relig_kind == 18, bctx["guru_city"], neg_w)))))
     monu_kind = ladder.pick_monu(bctx["monu_builder_ok"], bctx["monu_settler_ok"])
     monu_c = torch.where(monu_kind >= 0, bctx["spawn_city"], torch.full_like(bctx["spawn_city"], -1))
     nat_ok, nat_c = bctx["nat_ok"], bctx["nat_city"]

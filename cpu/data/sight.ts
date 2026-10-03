@@ -13,9 +13,10 @@
  * serves both. CIV6 (Features.xml, all layers): FEATURE_FOREST 1 (this
  * engine's WOODS), FEATURE_JUNGLE 1 (RAINFOREST); of the natural wonders this
  * engine fields, ULURU 1, TORRES_DEL_PAINE 2, KILIMANJARO 2, YOSEMITE 2,
- * EVEREST 2, EYJAFJALLAJOKULL 2 (`VikingsLandmarks_Features.xml`), VESUVIUS 2
- * (`Expansion2_Features.xml`) — Crater Lake, the Dead Sea, Galapagos, the Barrier Reef, the
- * Pantanal, Dover and the Eye of the Sahara carry no column at all.
+ * EVEREST 2, EYJAFJALLAJOKULL 2 (`VikingsLandmarks_Features.xml`), VESUVIUS 2 and
+ * GOBUSTAN 1 (`Expansion2_Features.xml`) — Crater Lake, the Dead Sea, Galapagos, the Barrier
+ * Reef, the Pantanal, Dover, the Eye of the Sahara, Paititi and the Bermuda Triangle carry no
+ * column at all.
  */
 import { srcConst, xml } from './provenance';
 
@@ -45,6 +46,7 @@ export const FEATURE_SIGHT_THROUGH: Readonly<Record<string, number>> = {
   // the Gathering Storm volcano wonders
   EYJAFJALLAJOKULL: srcConst('improvements.featSightThrough.EYJAFJALLAJOKULL', 2, feat('FEATURE_EYJAFJALLAJOKULL')),
   VESUVIUS: srcConst('improvements.featSightThrough.VESUVIUS', 2, feat('FEATURE_VESUVIUS')),
+  GOBUSTAN: srcConst('improvements.featSightThrough.GOBUSTAN', 1, feat('FEATURE_GOBUSTAN')),
 };
 
 /** the farthest any chassis looks — the reach of the static line table both

@@ -169,7 +169,9 @@ export function workableTiles(state: GameState, city: City): Tile[] {
       // every worked tile of a city contaminated by hand, the citizens stayed,
       // the yields and the food surplus were unchanged); fallout hurts the
       // units standing in it and nothing else
-      (!isImpassable(t) || (mtnOk && isMountain(t) && !t.feature)),
+      (!isImpassable(t) || (mtnOk && isMountain(t) && !t.feature))
+      // CIV6 (`Improvements.Workable` false): the Ski Resort's mountain
+      && !(t.improvement && IMPROVEMENTS[t.improvement as ImprovementId]?.unworkable),
   );
 }
 
@@ -727,24 +729,24 @@ function wonderImprovementAmenities(state: GameState, city: City): number {
 }
 
 /**
- * CIV6 (CITY_PARK_WATER_AMENITY,
- * MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY behind
- * ADJACENT_TO_WATER_REQUIREMENTS): what the city's own improvements pay it
- * for standing beside water. PER INSTANCE — the modifier is
- * SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY, one payment per improvement, so a
- * second City Park beside water pays a second amenity.
- *
- * "Beside water" reads the RING, so a drowned neighbour counts as the sea it
- * now is, and a river edge counts as well — the requirement set is a
- * TEST_ANY over coast, river and lake.
+ * What the city's own improvements pay it in amenities, PER INSTANCE — both
+ * modifiers adjust the improvement's own amenity, one payment per
+ * improvement. CIV6 (SKI_RESORT_AMENITY,
+ * MODIFIER_CITY_OWNER_ADJUST_IMPROVEMENT_AMENITY): `amenity`, always.
+ * CIV6 (CITY_PARK_WATER_AMENITY, MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY
+ * behind ADJACENT_TO_WATER_REQUIREMENTS): `amenityAdjacentWater`, for
+ * standing beside water — the RING, so a drowned neighbour counts as the sea
+ * it now is, and a river edge counts as well (a TEST_ANY over coast, river
+ * and lake).
  */
-function improvementWaterAmenities(state: GameState, city: City): number {
+function improvementAmenities(state: GameState, city: City): number {
   let n = 0;
   for (const t of state.map.tiles) {
     if (!t.improvement || t.pillaged || !tileBelongsTo(t, city)) continue;
-    const amt = IMPROVEMENTS[t.improvement as ImprovementId]?.amenityAdjacentWater ?? 0;
-    if (!amt) continue;
-    if (hasRiver(t) || neighbors(state.map, t).some((nb) => isWater(nb))) n += amt;
+    const def = IMPROVEMENTS[t.improvement as ImprovementId];
+    n += def?.amenity ?? 0;
+    const wet = def?.amenityAdjacentWater ?? 0;
+    if (wet && (hasRiver(t) || neighbors(state.map, t).some((nb) => isWater(nb)))) n += wet;
   }
   return n;
 }
@@ -874,13 +876,18 @@ function suzerainTourism(state: GameState, seat: number, owns: (t: Tile) => bool
   return t;
 }
 
-function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
+/** CIV6 (`Improvement_Tourism` TOURISMSOURCE_APPEAL): Tourism equal to the
+ *  plot's Appeal, floored at 0, from every row that names it (the Seaside
+ *  and Ski Resorts). CIV6 (CRISTOREDENTOR_BEACHTOURISM, ImprovementType
+ *  IMPROVEMENT_BEACH_RESORT): `beachMult` scales the Seaside Resort's alone. */
+function resortTourism(state: GameState, owns: (t: Tile) => boolean, beachMult: number): number {
   let t = 0;
   const camps = campTiles(state);
   const gpa = cityAppealResolver(state);
   for (const tile of state.map.tiles) {
-    if (tile.improvement !== 'SEASIDE_RESORT' || tile.pillaged || !owns(tile)) continue;
-    t += Math.max(0, tileAppeal(state.map, tile, camps, gpa));
+    if (!tile.improvement || tile.pillaged || !owns(tile)) continue;
+    if (!IMPROVEMENTS[tile.improvement as ImprovementId]?.tourismFromAppeal) continue;
+    t += Math.max(0, tileAppeal(state.map, tile, camps, gpa)) * (tile.improvement === 'SEASIDE_RESORT' ? beachMult : 1);
   }
   return t;
 }
@@ -1087,7 +1094,7 @@ function tourismOf(
   const golden = goldenDedication(state, seat, DED_WISH);
   const parkMult = golden ? WISH_PARK_TOURISM_MULT : 1;
   return t + suzerainTourism(state, seat, owns) + gpDistrictTourism(state, seat, cities) + buildingTourism(state, seat, cities)
-    + resortTourism(state, owns) * wonderMult(state, allCities, 'resortTourismMult')
+    + resortTourism(state, owns, wonderMult(state, allCities, 'resortTourismMult'))
     + parkTourism(state, owns) * parkMult
     + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null,
                     getModifiers(state, seat).wonderTourismPct);
@@ -1432,7 +1439,7 @@ export function computeCityStats(
     wonderRegionalAmenities(state, city) +
     wonderCityFlat(state, city, 'cityAmenities') +
     wonderImprovementAmenities(state, city) +
-    improvementWaterAmenities(state, city) +
+    improvementAmenities(state, city) +
     m.amenitiesAll +
     // CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
     (m.amenitiesWithGarrison && garrisonOf(state, city) ? m.amenitiesWithGarrison : 0) +

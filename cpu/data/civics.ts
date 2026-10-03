@@ -244,6 +244,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_PROFESSIONAL_SPORTS&PrereqCivic=CIVIC_IDEOLOGY', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_STADIUM', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),
     'effects.1.building': xml('Buildings', 'BuildingType=BUILDING_AQUATICS_CENTER', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),
+    'effects.2.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),
   },
   SUFFRAGE: {
     era: xml('Civics', 'CivicType=CIVIC_SUFFRAGE', 'EraType', { expect: 'ERA_MODERN' }),
@@ -631,6 +632,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('PROFESSIONAL_SPORTS', 'Professional Sports', 'Atomic', 2185, ['IDEOLOGY'], [
       { kind: 'unlockBuilding', building: 'STADIUM' },
       { kind: 'unlockBuilding', building: 'AQUATICS_CENTER' },
+      { kind: 'unlockImprovement', improvement: 'SKI_RESORT' }, // CIV6 (Ski Resort): PrereqCivic
     ]),
     C('SUFFRAGE', 'Suffrage', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'DEMOCRACY' },

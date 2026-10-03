@@ -22,7 +22,7 @@ import { goldenDedication, monumentalityBuyMult } from './eras';
 import { builderCost, goldBuyableUnits, purchaseSpotBlocked, trainableUnits } from './units';
 import { hasMet, isSuzerain } from './cityStates';
 import { pickBorderTile } from './city';
-import { MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
+import { MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, ENHANCER_BELIEFS } from '../data/religion';
 import { availableBuildings, buildingCompletable, goldPurchasableBuildings, worshipOffered } from './rules';
 import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from './effects';
 import { congressUdtBlockedDistrict } from './congress';
@@ -111,6 +111,7 @@ export interface BuyContext {
   missionary_ok: boolean; missionary_city: number;
   apostle_ok: boolean; apostle_city: number;
   inquisitor_ok: boolean; inquisitor_city: number;
+  guru_ok: boolean; guru_city: number;
   monk_ok: boolean; monk_city: number;
   levy_ok: boolean; levy_cs: number;
   nat_ok: boolean; nat_city: number;
@@ -301,6 +302,7 @@ export function buyContext(state: GameState, seat: number): BuyContext {
     monu_builder_ok: false, monu_settler_ok: false, spawn_city: -1,
     worship_ok: false, worship_city: -1, missionary_ok: false, missionary_city: -1,
     apostle_ok: false, apostle_city: -1, inquisitor_ok: false, inquisitor_city: -1,
+    guru_ok: false, guru_city: -1,
     monk_ok: false, monk_city: -1, levy_ok: false, levy_cs: -1,
     nat_ok: false, nat_city: -1, band_ok: false, band_city: -1,
     cls_ok: false, cls_city: -1, cls_bldg: -1, ucls_ok: false, ucls_city: -1, ucls_unit: -1,
@@ -353,8 +355,8 @@ export function buyContext(state: GameState, seat: number): BuyContext {
     out.worship_ok = true;
     out.worship_city = wCity.centerIndex;
   }
-  // kinds 5, 6, 11 — the founded religion's units. A Shrine sells the
-  // Missionary; the Apostle and the Inquisitor need a Temple on top; every
+  // kinds 5, 6, 11, 18 — the founded religion's units. A Shrine sells the
+  // Missionary; the Apostle, the Inquisitor and the Guru need a Temple on top; every
   // unit tier sells only in a city with a majority religion.
   if (actor.religion.founded) {
     const follows = (c: City) => (c.followedReligion ?? -1) >= 0;
@@ -376,6 +378,11 @@ export function buyContext(state: GameState, seat: number): BuyContext {
       && goldAffordable(faith, price('INQUISITOR'))) {
       out.inquisitor_ok = true;
       out.inquisitor_city = templeCity.centerIndex;
+    }
+    // kind 18 — the Guru, a Temple's like the Apostle
+    if (templeCity && liveUnits(state, seat, 'GURU') < GURU_CAP && goldAffordable(faith, price('GURU'))) {
+      out.guru_ok = true;
+      out.guru_city = templeCity.centerIndex;
     }
   }
   // kind 14, the Warrior Monk — the CITY's majority religion carries the

@@ -22,6 +22,8 @@
       ["apostle_city", "city", "the city that trains it"],
       ["inquisitor_ok", "bool", "a faith inquisitor buy is open"],
       ["inquisitor_city", "city", "the city that trains it"],
+      ["guru_ok", "bool", "a faith guru buy is open"],
+      ["guru_city", "city", "the city that trains it"],
       ["monk_ok", "bool", "a faith warrior monk buy is open"],
       ["monk_city", "city", "the city that trains it"],
       ["levy_ok", "bool", "a levy is open and the seat is at war with a major"],

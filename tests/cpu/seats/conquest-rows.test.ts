@@ -75,7 +75,7 @@ describe('the wire', () => {
     // PROMOTION_CLASS_RANGED in the install and carries no tag
     const light = Object.values(UNITS).filter((u) => isLightCavalry(u)).map((u) => u.id).sort();
     expect(light).toEqual([
-      'BLACK_ARMY', 'CAVALRY', 'COSSACK', 'COURSER', 'HELICOPTER', 'HORSEMAN', 'HUSZAR',
+      'BARBARIAN_HORSEMAN', 'BLACK_ARMY', 'CAVALRY', 'COSSACK', 'COURSER', 'HELICOPTER', 'HORSEMAN', 'HUSZAR',
       'MALON_RAIDER', 'MOUNTIE',
     ]);
     // the ranged-cavalry Keshig is PROMOTION_CLASS_RANGED in the install and

@@ -27,7 +27,7 @@ import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { KILL_SPREAD_RANGE } from '../data/promotions';
 import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_WORKS_PER_PERSON, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, COLONIZE_PRESSURE_EXTRA, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, COLONIZE_PRESSURE_EXTRA, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
@@ -1227,6 +1227,10 @@ export function buildRules() {
       theoHolyGround: THEO_HOLY_GROUND_STRENGTH,
       theoHolyCity: THEO_HOLY_CITY_STRENGTH,
       inquisitorIdx: Object.values(UNITS).findIndex((u) => u.id === 'INQUISITOR'),
+      // the Guru: its live cap, and what one heal charge restores
+      guruIdx: Object.values(UNITS).findIndex((u) => u.id === 'GURU'),
+      guruCap: GURU_CAP,
+      guruHeal: GURU_HEAL,
       // CIV6 (Warrior Monk): bought with Faith only, "in a city that has a
       // majority religion with the Warrior Monks Follower Belief and a Holy
       // Site with a Temple". The belief is the CITY's, so the GPU needs its
@@ -1750,13 +1754,20 @@ export function buildRules() {
         'QUADRIREME',
         'HORSEMAN',
         'KNIGHT',
+        'BARBARIAN_HORSEMAN',
+        'BARBARIAN_HORSE_ARCHER',
       ].map((id) => {
         const i = Object.keys(UNITS).indexOf(id);
         if (i < 0) throw new Error(`barbLadder: ${id} is not in the unit roster`);
         return i;
       }),
       barbNavalTypes: [7, 8], // ladder POSITIONS: GALLEY, then QUADRIREME past crossbowmanAfterTurn
-      barbCavalryTypes: [9, 10], // ladder POSITIONS: HORSEMAN, then KNIGHT past the same turn
+      // ladder POSITIONS of a HORSE camp's melee: BARBARIAN_HORSEMAN, HORSEMAN
+      // past spearmanAfterTurn, KNIGHT past crossbowmanAfterTurn
+      barbCavalryTypes: [11, 9, 10],
+      // ladder POSITION of a HORSE camp's ranged slot through spearmanAfterTurn
+      // (BARBARIAN_HORSE_ARCHER); the shared ranged ladder after it
+      barbCavalryRanged: 12,
       barbHorseRes: RESOURCE_IDS.indexOf('HORSES'), // a camp with this within barbHorseRange is a CAVALRY outpost
       barbHorseRange: BARB_HORSE_RANGE,
       campClearReward: 50,
@@ -2323,6 +2334,12 @@ export function buildRules() {
             : null,
           // amenities the row pays its city for standing beside water
           watAmen: def.amenityAdjacentWater ?? 0,
+          // amenities the row pays its city unconditionally, per instance
+          amen: def.amenity ?? 0,
+          // Tourism equal to the plot's Appeal (TOURISMSOURCE_APPEAL)
+          tourAppeal: def.tourismFromAppeal ? 1 : 0,
+          // `Workable` false: no citizen works the plot
+          unwork: def.unworkable ? 1 : 0,
           // [promotion, Power] the row supplies its city on top while the
           // owning city's governor holds the promotion; [-1, 0] for none
           govPow: def.governorPower

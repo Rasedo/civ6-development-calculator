@@ -403,10 +403,10 @@ def pick_purchase(can_building: torch.Tensor, settler_ok: torch.Tensor, unit_ok:
 
 def pick_faith(worship_ok: torch.Tensor, missionary_ok: torch.Tensor,
                apostle_ok: torch.Tensor, inquisitor_ok: torch.Tensor,
-               monk_ok: torch.Tensor | None = None):
+               monk_ok: torch.Tensor, guru_ok: torch.Tensor):
     relig = torch.full(worship_ok.shape, -1, dtype=torch.long, device=worship_ok.device)
-    if monk_ok is not None:
-        relig = torch.where(monk_ok, torch.full_like(relig, 14), relig)
+    relig = torch.where(guru_ok, torch.full_like(relig, 18), relig)
+    relig = torch.where(monk_ok, torch.full_like(relig, 14), relig)
     relig = torch.where(inquisitor_ok, torch.full_like(relig, 11), relig)
     relig = torch.where(apostle_ok, torch.full_like(relig, 6), relig)
     relig = torch.where(missionary_ok, torch.full_like(relig, 5), relig)

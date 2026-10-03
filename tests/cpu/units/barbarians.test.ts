@@ -6,7 +6,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import type { GameState } from '../../../cpu/core/types';
 
 // CIV 6 classes a barbarian outpost by WHERE IT STANDS: a reachable coast makes
-// it a pirate camp, a Horses resource within 6 tiles a cavalry outpost, and
+// it a pirate camp, a Horses resource within 3 tiles (TRIBE_CAVALRY ResourceRange) a cavalry outpost, and
 // everything else a land camp — while "regardless of position every outpost
 // will spawn melee and ranged units".
 
@@ -35,7 +35,7 @@ describe('barbarian camp classes', () => {
     expect(nextSpawn(plain.state)).toBe('WARRIOR');
 
     const horse = campAt(6, 6, { horses: true });
-    expect(nextSpawn(horse.state)).toBe('HORSEMAN');
+    expect(nextSpawn(horse.state)).toBe('BARBARIAN_HORSEMAN');
   });
 
   it('the raid rotates CLASS, then ranged, then melee — every camp fields both', () => {
@@ -47,9 +47,21 @@ describe('barbarian camp classes', () => {
       spawnUnit(state, 'WARRIOR', camp, BARB_SEAT); // a garrison, so the camp RAIDS
       seen[turn] = nextSpawn(state);
     }
-    expect(seen[0]).toBe('HORSEMAN'); // the camp's CLASS
-    expect(seen[1]).toBe('ARCHER');   // ranged, whatever the class
-    expect(seen[2]).toBe('WARRIOR');  // melee, whatever the class
+    expect(seen[0]).toBe('BARBARIAN_HORSEMAN');     // the camp's CLASS
+    expect(seen[1]).toBe('BARBARIAN_HORSE_ARCHER'); // the cavalry tribe's ranged
+    expect(seen[2]).toBe('WARRIOR');                // melee, whatever the class
+  });
+
+  it("a cavalry outpost's own cavalry gives way to the shared ladders past the first era", () => {
+    const seen: Record<number, string> = {};
+    for (const turn of [63, 64]) {
+      const { state, camp } = campAt(6, 6, { horses: true });
+      state.turn = turn; // > 60: HORSEMAN, and the shared ranged ladder
+      spawnUnit(state, 'WARRIOR', camp, BARB_SEAT);
+      seen[turn] = nextSpawn(state);
+    }
+    expect(seen[63]).toBe('HORSEMAN'); // 63 % 3 === 0 -> the class slot
+    expect(seen[64]).toBe('ARCHER');   // 64 % 3 === 1 -> the ranged slot
   });
 
   it('a land camp raids melee where a cavalry outpost raids mounted', () => {

@@ -200,10 +200,11 @@ export interface UnitDef {
    * CIV6 magnitudes, exact: Apostle 110, Missionary 100, Inquisitor 70.
    */
   religiousStrength?: number;
-  /** spawn-ONLY chassis (GENERAL/ADMIRAL) — never trainable,
-   * gold-purchasable, or faith-buyable; the only birth path is the
-   * Great-General/Admiral claim (applyGreatPersonEffect + the mirror).
-   * trainableUnits filters it out on every seat, exactly like faithOnly. */
+  /** spawn-ONLY chassis — never trainable, gold-purchasable, or
+   * faith-buyable. GENERAL/ADMIRAL are born of the Great-General/Admiral
+   * claim (applyGreatPersonEffect + the mirror), the barbarians' own cavalry
+   * of a camp. trainableUnits filters it out on every seat, exactly like
+   * faithOnly. */
   spawnOnly?: boolean;
   settler?: boolean;
   /** the route-servicing civilian (TRADER) — spent by the route verb, walks
@@ -3665,6 +3666,86 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         requiresTech: xml('Units', 'UnitType=UNIT_SCYTHIAN_HORSE_ARCHER', 'PrereqTech', { expect: 'TECH_HORSEBACK_RIDING' }),
         upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_SCYTHIAN_HORSE_ARCHER', 'UpgradeUnit', { expect: 'UNIT_CROSSBOWMAN' }),
         uniqueTo: xml('CivilizationTraits', 'TraitType=TRAIT_CIVILIZATION_UNIT_SCYTHIAN_HORSE_ARCHER', 'CivilizationType', { expect: 'CIVILIZATION_SCYTHIA' }),
+      },
+    }),
+    // THE BARBARIANS' OWN CAVALRY, appended last. CIV6 (Units.xml): both carry
+    // TraitType TRAIT_BARBARIAN_BUT_SHOWS_UP_IN_PEDIA, a trait no civilization
+    // holds, so a camp alone fields them (`barbCavalryType`,
+    // `barbCavalryRangedType`). The Horseman is CLASS_LIGHT_CAVALRY with no
+    // PrereqTech and no StrategicResource; the Horse Archer CLASS_RANGED_CAVALRY
+    // and CLASS_MOBILE_RANGED, ZoneOfControl false.
+    U({
+      id: 'BARBARIAN_HORSEMAN',
+      name: 'Barbarian Horseman',
+      cost: 40,
+      maintenance: 1,
+      moves: 3,
+      combat: 20,
+      cavalry: true,
+      cavalryTag: 'light',
+      spawnOnly: true,
+      description: 'A barbarian cavalry camp\'s light cavalry.',
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSEMAN', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSEMAN', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSEMAN', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSEMAN', 'Combat'),
+        cavalry: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSEMAN', 'PromotionClass', { expect: 'PROMOTION_CLASS_LIGHT_CAVALRY' }),
+        cavalryTag: xml('TypeTags', 'Type=UNIT_BARBARIAN_HORSEMAN&Tag=CLASS_LIGHT_CAVALRY', 'Tag', { expect: 'CLASS_LIGHT_CAVALRY' }),
+        spawnOnly: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSEMAN', 'TraitType', { expect: 'TRAIT_BARBARIAN_BUT_SHOWS_UP_IN_PEDIA' }),
+      },
+    }),
+    U({
+      id: 'BARBARIAN_HORSE_ARCHER',
+      name: 'Barbarian Horse Archer',
+      cost: 35,
+      maintenance: 1,
+      moves: 3,
+      combat: 10,
+      ranged: { strength: 15, range: 1 },
+      cavalry: true, // CLASS_RANGED_CAVALRY — no light/heavy tag
+      exertsNoZoc: true,
+      spawnOnly: true,
+      description: 'A barbarian cavalry camp\'s ranged cavalry.',
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSE_ARCHER', 'Cost', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSE_ARCHER', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSE_ARCHER', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSE_ARCHER', 'Combat'),
+        'ranged.strength': xml('Units', 'UnitType=UNIT_BARBARIAN_HORSE_ARCHER', 'RangedCombat'),
+        'ranged.range': xml('Units', 'UnitType=UNIT_BARBARIAN_HORSE_ARCHER', 'Range'),
+        cavalry: xml('TypeTags', 'Type=UNIT_BARBARIAN_HORSE_ARCHER&Tag=CLASS_RANGED_CAVALRY', 'Tag', { expect: 'CLASS_RANGED_CAVALRY' }),
+        exertsNoZoc: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSE_ARCHER', 'ZoneOfControl', { expect: false }),
+        spawnOnly: xml('Units', 'UnitType=UNIT_BARBARIAN_HORSE_ARCHER', 'TraitType', { expect: 'TRAIT_BARBARIAN_BUT_SHOWS_UP_IN_PEDIA' }),
+      },
+    }),
+    // THE GURU, appended last. CIV6 (Units.xml): faith-only, a Temple
+    // (Unit_BuildingPrereqs), ReligiousStrength 90, 4 Movement and three
+    // ReligiousHealCharges — its `charges`, spent by HEAL_RELIGIOUS (`guruHeal`):
+    // "May use a charge to heal itself and all adjacent friendly religious
+    // units. May not initiate theological combat with units of other Religions
+    // (but can defend)."
+    U({
+      id: 'GURU',
+      name: 'Guru',
+      cost: 120, // Units.xml Cost; faith-only, priced by `unitFaithCost`
+      costStep: 12, // Units.xml CostProgressionParam1
+      maintenance: 0,
+      moves: 4,
+      combat: 0,
+      charges: 3,
+      faithOnly: true,
+      religiousStrength: 90,
+      description: 'Heals itself and the adjacent friendly religious units, and defends in theological combat (faith purchase only).',
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_GURU', 'Cost', { scale: GAME_SPEED }),
+        costStep: xml('Units', 'UnitType=UNIT_GURU', 'CostProgressionParam1', { scale: GAME_SPEED }),
+        maintenance: xml('Units', 'UnitType=UNIT_GURU', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_GURU', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_GURU', 'Combat'),
+        charges: xml('Units', 'UnitType=UNIT_GURU', 'ReligiousHealCharges'),
+        faithOnly: xml('Units', 'UnitType=UNIT_GURU', 'PurchaseYield', { expect: 'YIELD_FAITH' }),
+        religiousStrength: xml('Units', 'UnitType=UNIT_GURU', 'ReligiousStrength'),
       },
     }),
   ].map((u) => [u.id, u]),

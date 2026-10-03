@@ -46,7 +46,7 @@ import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { stockOf } from './stockpile';
 import { harvestGrant } from './economy';
 import { seatBuildingSum } from './city';
-import { engineerFinishCity, evangelizeOk, projectBoostCity, wonderChargeCity, wonderChargePct } from './game';
+import { engineerFinishCity, evangelizeOk, guruHealTargets, projectBoostCity, wonderChargeCity, wonderChargePct } from './game';
 import { gpActivateOk } from './gpAbility';
 import { isSpy, missionOffered, spyDestinations, spyIdle } from './espionage';
 import { gpSiteKey } from './targetSites';
@@ -71,6 +71,7 @@ const A_EXCAVATE = col('EXCAVATE');
 const A_PARK = col('PARK');
 const A_PROMOTE = col('PROMOTE_0');
 const A_CONDEMN = col('CONDEMN');
+const A_HEAL_RELIGIOUS = col('HEAL_RELIGIOUS');
 const A_REMOVE_HERESY = col('REMOVE_HERESY');
 const A_LAUNCH_INQUISITION = col('LAUNCH_INQUISITION');
 const A_EVANGELIZE = col('EVANGELIZE_BELIEF');
@@ -351,7 +352,7 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
       if (i >= 0) out.add(buildColumnOf(i));
     }
   }
-  // THE ADJACENT-PLOT rows (the Engineer's Tunnel, Pachacuti's Qhapaq Ñan):
+  // THE ADJACENT-PLOT rows (the Engineer's Tunnel, Pachacuti's Qhapaq Ñan, the Ski Resort):
   // the row's own unit with a charge, its unlock and leader, and a bare
   // mountain beside it (`adjacentPlotTarget`).
   if ((engineer || builder) && charges > 0) {
@@ -424,6 +425,9 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   if (u.type === 'INQUISITOR' && charges > 0 && ctx.centre.has(here.index) && tileSeat(here) === seat) {
     out.add(A_REMOVE_HERESY);
   }
+  // HEAL_RELIGIOUS: a Guru with a charge and a wounded friendly religious
+  // unit within one step, itself included.
+  if (u.type === 'GURU' && charges > 0 && guruHealTargets(state, u).length > 0) out.add(A_HEAL_RELIGIOUS);
   // LAUNCH_INQUISITION
   if (u.type === 'APOSTLE' && charges >= LAUNCH_INQUISITION_CHARGES && tileSeat(here) === seat
       && !actor?.religion.inquisition) out.add(A_LAUNCH_INQUISITION);
@@ -558,7 +562,7 @@ function wreckable(ctx: MaskCtx, t: Tile): boolean {
 /** the religious unit on a tile: the civilian occupant, else the passenger */
 function religiousAt(ctx: MaskCtx, t: number): Unit | undefined {
   const o = ctx.occ.civilian.get(t) ?? ctx.occ.embarked.get(t);
-  return o && (o.type === 'MISSIONARY' || o.type === 'APOSTLE' || o.type === 'INQUISITOR') ? o : undefined;
+  return o && (o.type === 'MISSIONARY' || o.type === 'APOSTLE' || o.type === 'INQUISITOR' || o.type === 'GURU') ? o : undefined;
 }
 
 /** one row of the `units` group */
