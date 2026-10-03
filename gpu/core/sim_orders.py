@@ -237,7 +237,10 @@ class SimOrders:
                     self._occ_clear(_r, hc[_r], sc[_r])
 
             if _rk_promote[n] and _pm >= 0:
-                pmv = act & (a >= _pm) & (a < _pm + _pcol)
+                # a spent unit takes no promotion: TS returns before any verb
+                # at `movesLeft` 0 (9248 t250: a Corps host, spent by its own
+                # form-up, promoted here only)
+                pmv = act & u_moves & (a >= _pm) & (a < _pm + _pcol)
                 if bool(pmv.any()):
                     pk_c = (a - _pm).clamp(min=0, max=_pcol - 1)
                     okp = pmv & self._promo_offer_mask(
