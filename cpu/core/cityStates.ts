@@ -9,7 +9,7 @@ import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 // the border-growth pick and its claim: a minor's envoy plots are taken by
 // the city rule's OWN next-tile choice, never a second one
-import { pickBorderTile, acquireTile } from './city';
+import { drawBorderPlot, acquireTile } from './city';
 import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { CIV_LEVELS } from '../data/civLevels';
@@ -179,18 +179,17 @@ export function addEnvoys(state: GameState, cityState: CityState, seat: number, 
  * the lab did not reach — an envoy REMOVED (a spy's Fabricate Scandal) takes
  * no ground back, and buys nothing new until the count passes its own mark.
  *
- * WHICH plot is the city rule's own next-tile pick (`pickBorderTile`: nearest
- * first, then resource priority, then yield sum, then tile index), including
- * its refusals — a plot another player already holds is not taken, and a plot
- * with no owned neighbour inside the border radius is out of reach. The
- * GAME's choice rule is unmeasured.
+ * WHICH plot is the city rule's own draw (`drawBorderPlot`, the DLL's
+ * acquire-N loop 0x1a8a30: one draw per plot), including its refusals — a
+ * plot another player already holds is not taken, and a plot with no owned
+ * neighbour inside the border radius is out of reach.
  */
 export function envoyTiles(state: GameState, cityState: CityState): void {
   if (!CIV_LEVELS.CITY_STATE.canAnnexTilesWithReceivedInfluence) return;
   const city = minorCity(cityState);
   let want = envoysReceived(cityState) - city.tilesAcquired;
   while (want > 0) {
-    const next = pickBorderTile(state, city);
+    const next = drawBorderPlot(state, city);
     if (next === null) break; // the border rule's own refusal: nothing free is in reach
     acquireTile(state, city, next);
     want -= 1;
@@ -553,6 +552,7 @@ export function minorCity(cityState: CityState): City {
     foodBox: cityState.foodBox ?? 0,
     cultureBox: cityState.cultureBox ?? 0,
     tilesAcquired: cityState.tilesAcquired ?? 0,
+    nextPlot: cityState.nextPlot,
     focus: 'balanced',
     queue: [],
     isCapital: false,

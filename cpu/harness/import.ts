@@ -663,6 +663,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.population = c.pop;
       minor.foodBox = num(c.food);
       minor.cultureBox = num(c.culture);
+      minor.nextPlot = num(c.nextPlot);
       minor.tilesAcquired = history?.cultureTaken.get(center) ?? 0;
       minor.hp = hp;
       minor.outerHp = outerHp;
@@ -691,6 +692,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       foodBox: num(c.food),
       cultureBox: num(c.culture),
       tilesAcquired: history?.cultureTaken.get(center) ?? 0,
+      nextPlot: num(c.nextPlot),
       focus: 'balanced',
       queue: [],
       isCapital: bool(c.capital),

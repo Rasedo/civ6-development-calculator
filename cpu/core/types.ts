@@ -78,6 +78,10 @@ export interface City {
   amenityTier?: number;
   cultureBox: number;
   tilesAcquired: number;
+  /** CIV6 (City_Culture): the plot this city's culture claims next — drawn
+   *  at the end of every border turn (`drawBorderPlot`); absent or -1 before
+   *  its first, or with nothing in reach. */
+  nextPlot?: number;
   /** The seat this city was FOUNDED as the capital of; -1 for every other
    * city. It does NOT move with the Palace — a relocated capital is a new
    * capital, not an original one — so `origCapitalSeat !== seat` is exactly
@@ -918,6 +922,7 @@ export interface CityState extends Seat {
   foodBox?: number;
   cultureBox?: number;
   tilesAcquired?: number;
+  nextPlot?: number;
   /** The per-seat quest, keyed by ABSOLUTE SEAT. The kind is the first
    *  satisfiable option in a fixed order, no RNG. */
   seatQuest?: (CityStateQuest | null)[];

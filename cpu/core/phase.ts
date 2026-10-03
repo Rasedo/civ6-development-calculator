@@ -47,7 +47,7 @@ import { PANTHEONS, PANTHEON_FAITH_COST } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
-import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum, swapTileOk } from './city';
+import { computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, seatBuildingSum, swapTileOk } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
@@ -112,7 +112,7 @@ import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { pantheonMoment, transferMoments, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, goldenDedication } from './eras';
@@ -478,28 +478,33 @@ export function cultureAfterGrowth(state: GameState, city: City, popBefore: numb
   return computeCityStats(state, city).total.culture;
 }
 
+/**
+ * CIV6 (City_Culture, the DLL's border turn 0x1a9bc0): the box banks the
+ * culture — Land Acquisition's percent scales what is banked, not the price.
+ * A box that covers the price pays it and takes at most ONE plot: the stored
+ * `nextPlot` while still unowned, else a fresh draw, and nothing when nothing
+ * is in reach (the price is spent all the same). Then, every turn, the city
+ * draws and stores its next plot (`drawBorderPlot`).
+ *
+ * CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is TRUE for a full
+ * civ and FALSE for every other class of player — a city-state, the Free
+ * Cities player and a barbarian tribe all bank the culture and buy nothing
+ * with it, yet still draw their next plot. A minor takes ground through the
+ * ENVOY channel instead (`CanAnnexTilesWithReceivedInfluence`).
+ */
 export function cityBorderGrowth(state: GameState, city: City, seat: number, culture: number): void {
-  city.cultureBox += culture;
-  // CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is TRUE for a
-  // full civ and FALSE for every other class of player — a city-state, the
-  // Free Cities player and a barbarian tribe all bank the culture and buy
-  // nothing with it. A minor takes ground through the ENVOY channel instead
-  // (`CanAnnexTilesWithReceivedInfluence`), which is a different rule.
+  const pct = governorSum(state, city, (e) => e.borderExpansionPct);
+  city.cultureBox += pct ? (culture * (100 + pct)) / 100 : culture;
   const frozen = congressBorderFrozen(state, seat) || !civLevelOf(seat).canAnnexTilesWithCulture;
-  const cost = () =>
-    Math.round(
-      (borderGrowthCost(city.tilesAcquired) * getModifiers(state, seat).borderCostMult * 100) /
-        (100 + governorSum(state, city, (e) => e.borderExpansionPct)),
-    );
-  while (!frozen && city.cultureBox >= cost()) {
-    const next = pickBorderTile(state, city, makeYieldCtx(state, seat));
-    if (next === null) {
-      city.cultureBox = Math.min(city.cultureBox, cost());
-      break;
-    }
-    city.cultureBox -= cost();
-    acquireTile(state, city, next);
+  const cost = Math.round(borderGrowthCost(city.tilesAcquired) * getModifiers(state, seat).borderCostMult);
+  const ctx = makeYieldCtx(state, seat);
+  if (!frozen && city.cultureBox >= cost) {
+    city.cultureBox -= cost;
+    const stored = city.nextPlot ?? -1;
+    const plot = stored >= 0 && !tileClaimed(state.map.tiles[stored]) ? stored : drawBorderPlot(state, city, ctx);
+    if (plot !== null) acquireTile(state, city, plot);
   }
+  city.nextPlot = drawBorderPlot(state, city, ctx) ?? -1;
 }
 
 /** CIV6 (Monument): "+1 Loyalty", and (Government Plaza) "+8 Loyalty to this

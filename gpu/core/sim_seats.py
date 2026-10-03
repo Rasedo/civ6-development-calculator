@@ -2086,7 +2086,7 @@ class SimSeats:
         """Buy-kind 3: the TILE-BUY candidate — ONE legality body for the wire
         driver's _buy_ctx and the TS driver's tripwire twin. Walks city slots in
         order; the FIRST slot with a border candidate names the pick (the
-        lowest `_seat_border_cost`, the same key the culture claim uses), and an
+        lowest `_seat_border_cost`, then the lowest index: `pickBorderTile`), and an
         UNAFFORDABLE pick ABORTS the seat's tile buy outright rather than trying
         the next city — TS breaks out of the walk.
         Returns (slot [B], tile [B], cost [B] f64, ok [B])."""
@@ -2113,7 +2113,8 @@ class SimSeats:
             has = okt.any(dim=1)
             if not bool(has.any()):
                 continue
-            best = torch.where(okt, self._seat_border_cost(row, ctr, tiles, tc, nbs, key0), self._inf_f).argmin(dim=1)
+            best = torch.where(okt, self._seat_border_cost(row, ctr, tiles, tc, nbs, key0) * 1e5 + tiles.double(),
+                               self._inf_f).argmin(dim=1)
             tgt = tiles.gather(1, best.unsqueeze(1)).squeeze(1)
             c = self._seat_tile_price(row, ctr.clamp(min=0), tgt.clamp(min=0))
             buy = has & self._afford(self.civ_treasury[:, row], c)
@@ -10124,6 +10125,7 @@ class SimSeats:
         self.city_pop[b, row, col] = 0
         self.city_growth[b, row, col] = 0
         self.city_cbox[b, row, col] = 0
+        self.city_next_plot[b, row, col] = -1
         self.city_acquired[b, row, col] = 0
         self.city_loyalty[b, row, col] = 100.0
         self.city_hp[b, row, col] = int(self.rules.combat["cityMaxHp"])
@@ -10428,6 +10430,7 @@ class SimSeats:
         self._log_pop(b, dst_row, col, "tr")
         self.city_growth[b, dst_row, col] = 0  # the transfer resets foodBox...
         self.city_cbox[b, dst_row, col] = 0  # ...and cultureBox
+        self.city_next_plot[b, dst_row, col] = -1
         self.city_acquired[b, dst_row, col] = old_acq
         self.city_loyalty[b, dst_row, col] = 100.0 if conquest else self._loyalty_after_cultural
         self.city_hp[b, dst_row, col] = half_hp if conquest else old_hp
@@ -10674,11 +10677,10 @@ class SimSeats:
 
     def _seat_border_cost(self, row: int, center: torch.Tensor, tiles: torch.Tensor, tc: torch.Tensor,
                           nbs: torch.Tensor, key0: torch.Tensor) -> torch.Tensor:
-        """[B, M] float64 — the pick key: `key0` plus borderPlotCost's
+        """[B, M] float64 — borderPlotCost in milli-points: `key0` plus the
         neighbour terms on the LIVE owners (-1 per unowned neighbour with a
         seen resource, -1 per unowned neighbouring natural wonder, -1 once
-        more if such a wonder is within 3 rings of the centre), times 1e5,
-        plus the tile index: the lowest cost, then the lowest index."""
+        more if such a wonder is within 3 rings of the centre)."""
         B = self.B
         nv = nbs >= 0
         nc = nbs.clamp(min=0).reshape(B, -1)
@@ -10688,99 +10690,86 @@ class SimSeats:
         nd = self.pair_dist[center.view(B, 1, 1).expand_as(nbs).reshape(B, -1), nc].reshape(nbs.shape)
         nb_term = ((free & seen).sum(dim=2) + (free & nw).sum(dim=2)
                    + (free & nw & (nd <= 3)).any(dim=2).long())
-        return (key0 - nb_term.double() * 1000) * 1e5 + tiles.double()
+        return key0 - nb_term.double() * 1000
+
+    def _seat_border_draw(self, row: int, center: torch.Tensor, cid: torch.Tensor,
+                          mask: torch.Tensor) -> torch.Tensor:
+        """[B] long — `drawBorderPlot`'s twin: ONE draw among the lowest-cost
+        candidates in tile-index order, for every game in `mask` with any;
+        -1, and no draw, where nothing is in reach (or outside `mask`)."""
+        out = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        if not bool(mask.any()):
+            return out
+        tiles, tc, nbs, key0 = self._seat_border_key(row, center)
+        ok = (tiles >= 0) & self._seat_tile_unclaimed(tc) & self._seat_tile_adj_city(row, cid, tc, nbs)
+        cost = torch.where(ok, self._seat_border_cost(row, center, tiles, tc, nbs, key0), self._inf_f)
+        tie = ok & (cost == cost.min(dim=1, keepdim=True).values)
+        n = tie.sum(dim=1)
+        has = mask & (n > 0)
+        r = self._next_random(has)
+        k = torch.floor(r * n.to(torch.float64)).to(torch.long)
+        tk = torch.where(tie, tiles, torch.full_like(tiles, 1 << 40))
+        rank = ((tk.unsqueeze(1) < tk.unsqueeze(2)) & tie.unsqueeze(1)).sum(dim=2)
+        pick = (tie & (rank == k.unsqueeze(1))).long().argmax(dim=1)
+        return torch.where(has, tiles.gather(1, pick.unsqueeze(1)).squeeze(1), out)
 
     def _seat_border_growth(self, row: int, col: torch.Tensor, act: torch.Tensor, cul_c: torch.Tensor) -> None:
-        """Cultural border growth for ONE city of seat row `row` — box += this
-        city's culture, then consume against `_border_cost` using the shared
-        pick key (`_seat_border_cost`, borderPlotCost's twin: the lowest
-        cost, then the lowest index; radius 5; unclaimed tiles, with water,
-        impassables and natural wonders all claimable, like
-        borderCandidates). `col` is the city's column, a
-        [B] tensor because row 0 walks its columns in a per-batch order.
+        """`cityBorderGrowth`'s twin for ONE city of row `row` (the DLL's
+        border turn): the box banks the culture, Land Acquisition's percent
+        scaling it; a box that covers `_border_cost` pays it and takes at most
+        ONE plot — the stored `city_next_plot` while unowned, else a fresh
+        `_seat_border_draw`, nothing when nothing is in reach (the price spent
+        all the same); then every acting city draws and stores its next plot.
+        `col` is the city's column, a [B] tensor because row 0 walks its
+        columns in a per-batch order.
 
-        The two predicates are the ones TS names: `tileClaimed(t)` is
-        `tileSeat(t) !== NO_SEAT`, and the adjacency test is `tileBelongsTo(n,
-        city)` — the same (tileSeat, tileCity) pair the work window uses, so a
-        city cannot claim across a sibling's frontier."""
+        BORDER CONTROL outcome B and a class of player that cannot annex with
+        culture (`CivilizationLevels`: a city-state, the Free Cities player)
+        bank the culture and buy nothing, and still draw."""
         bidx = self._bidx
-        box = self.city_cbox[bidx, row, col]
-        self.city_cbox[bidx, row, col] = torch.where(act, box + cul_c.to(box.dtype), box)
-        center = self.city_center[bidx, row, col]
-        cid = self.city_id[bidx, row, col]
-        # Religious Settlements — Math.round(base * borderCostMult), the
-        # city.ts form. Without beliefs the mult is 1 and js_round of the
-        # integral base curve is exact, so the expression is unchanged.
-        _bmul = self._bel_mul("border", row) if self._seat_has_beliefs(row) else None
-        # CIV6 (Land Acquisition): +20% culture toward border expansion —
-        # the governor divides the cost the way the city.ts twin does. A
-        # CITY-STATE's row reaches this body too and appoints nobody,
-        # so the governor planes are asked only of a major, exactly as every
-        # other governor term here is; TS is safe by construction, because a
-        # minor's city carries id -1 and `governorSum` finds nothing on it.
+        # CIV6 (Land Acquisition): +20% culture toward border expansion. A
+        # CITY-STATE's row appoints nobody, so the governor planes are asked
+        # only of a major.
         _gpct = (self._governor_sum(row, "borderExpansionPct")[bidx, col].double()
                  if self.n_governors and row < self.n_majors
                  else torch.zeros(self.B, dtype=torch.float64, device=self.device))
-
-        def _cost() -> torch.Tensor:
+        cul = cul_c.double()
+        cul = torch.where(_gpct != 0, cul * (100.0 + _gpct) / 100.0, cul)
+        box = self.city_cbox[bidx, row, col]
+        self.city_cbox[bidx, row, col] = torch.where(act, box + cul.to(box.dtype), box)
+        center = self.city_center[bidx, row, col]
+        cid = self.city_id[bidx, row, col]
+        if bool(self._row_annex_culture[row]):
+            # Religious Settlements — Math.round(base * borderCostMult)
+            _bmul = self._bel_mul("border", row) if self._seat_has_beliefs(row) else None
             base = self._border_cost(self.city_acquired[bidx, row, col])
-            eff = base.double() * (100.0 / (100.0 + _gpct))
-            if _bmul is not None:
-                eff = eff * _bmul
-            return js_round(eff).to(base.dtype)
-
-        # BORDER CONTROL outcome B: the box still fills, nothing is bought.
-        # CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is TRUE only
-        # for a full civ, so a city-state, the Free Cities player and a
-        # barbarian tribe all bank the culture and buy nothing — the same
-        # shape, at the same spend.
-        act = act & ~self._congress_border_frozen(row)
-        if not bool(self._row_annex_culture[row]):
-            return
-        if not bool((act & (self.city_cbox[bidx, row, col] >= _cost())).any()):
-            return
-        tiles, tc, nbs, key0 = self._seat_border_key(row, center)
-        unowned = None
-        adj_own = None
-        for _ in range(64):  # the TS while-loop: multiple claims per turn, escalating cost
-            cost = _cost()
-            ready = act & (self.city_cbox[bidx, row, col] >= cost)
-            if not bool(ready.any()):
-                return
-            if unowned is None:
-                unowned = self._seat_tile_unclaimed(tc)
-                adj_own = self._seat_tile_adj_city(row, cid, tc, nbs)
-            ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
-            key = torch.where(ok, self._seat_border_cost(row, center, tiles, tc, nbs, key0), self._inf_f)
-            best = key.argmin(dim=1)
-            has_cand = ok.any(dim=1)
-            claim = ready & has_cand
-            if bool(claim.any()):
-                rows = claim.nonzero(as_tuple=True)[0]
-                spot = tiles[rows, best[rows]]
-                self.tile_seat[rows, spot] = int(self._ROW_SEAT[row])  # setTileOwner's two halves:
-                self.tile_city[rows, spot] = cid[rows]  # the seat and the city id
-                self._tile_owner_ver += 1
-                # acquireTile's revealAround(seat, tile, 1). MAJOR rows only:
-                # `revealAround` returns early for anyone else, because
-                # "nothing reads a city-state's or the barbarians' fog".
-                if row < self.n_majors:
-                    self._reveal_around(rows, row, spot, 1)
-                # A claim widens a LATER city's workable candidates, so every
-                # walk that already ran this turn is stale.
-                self._claim_version += 1
-                self.city_acquired[rows, row, col[rows]] += 1
-                self.city_cbox[rows, row, col[rows]] -= cost[rows]
-                unowned[rows, best[rows]] = False
-                nb_s = self.neigh[spot]  # [n, 6]
-                adj_hit = ((tiles[rows].unsqueeze(2) == nb_s.unsqueeze(1)) & (nb_s >= 0).unsqueeze(1)).any(dim=2)  # [n, M]
-                adj_own[rows] = adj_own[rows] | adj_hit
-            capped = ready & ~has_cand
-            if bool(capped.any()):
-                cb = self.city_cbox[bidx, row, col]
-                self.city_cbox[bidx, row, col] = torch.where(capped, torch.minimum(cb, cost), cb)
-            if not bool(claim.any()):
-                return
+            cost = js_round(base.double() * _bmul).to(base.dtype) if _bmul is not None else base
+            ready = act & ~self._congress_border_frozen(row) & (self.city_cbox[bidx, row, col] >= cost)
+            if bool(ready.any()):
+                self.city_cbox[bidx, row, col] = torch.where(
+                    ready, self.city_cbox[bidx, row, col] - cost.to(box.dtype), self.city_cbox[bidx, row, col])
+                stored = self.city_next_plot[bidx, row, col]
+                keep = ready & (stored >= 0) & (self.tile_seat.gather(1, stored.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)
+                fresh = self._seat_border_draw(row, center, cid, ready & ~keep)
+                spot_all = torch.where(keep, stored, fresh)
+                claim = ready & (spot_all >= 0)
+                if bool(claim.any()):
+                    rows = claim.nonzero(as_tuple=True)[0]
+                    spot = spot_all[rows]
+                    self.tile_seat[rows, spot] = int(self._ROW_SEAT[row])  # setTileOwner's two halves:
+                    self.tile_city[rows, spot] = cid[rows]  # the seat and the city id
+                    self._tile_owner_ver += 1
+                    # acquireTile's revealAround(seat, tile, 1). MAJOR rows only:
+                    # `revealAround` returns early for anyone else, because
+                    # "nothing reads a city-state's or the barbarians' fog".
+                    if row < self.n_majors:
+                        self._reveal_around(rows, row, spot, 1)
+                    # A claim widens a LATER city's workable candidates, so every
+                    # walk that already ran this turn is stale.
+                    self._claim_version += 1
+                    self.city_acquired[rows, row, col[rows]] += 1
+        nxt = self._seat_border_draw(row, center, cid, act)
+        self.city_next_plot[bidx, row, col] = torch.where(act, nxt, self.city_next_plot[bidx, row, col])
 
     def _found_city_at(self, row: int, want: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
         """FOUND a city for seat row `row` at `tile` [B] where `want` — the
@@ -10865,6 +10854,7 @@ class SimSeats:
         self._log_pop(rows, row, slot, "fd")
         self.city_growth[rows, row, slot] = 0
         self.city_cbox[rows, row, slot] = 0
+        self.city_next_plot[rows, row, slot] = -1
         # A NEWLY FOUNDED city starts with NO religion. `city_pressure` and
         # `city_followed` are indexed by SLOT and the per-turn block only zeroes
         # slots that are NOT alive, so a slot handed straight from a dead city to

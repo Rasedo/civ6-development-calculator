@@ -744,6 +744,7 @@ CITY_STATE = {
     "minorPop": lambda sim, b, rows: [int(sim.citystate_pop[b, s]) for s in rows],
     "minorFoodBox": lambda sim, b, rows: [float(sim.city_growth[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorCultureBox": lambda sim, b, rows: [float(sim.city_cbox[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
+    "minorNextPlot": lambda sim, b, rows: [int(sim.city_next_plot[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorTilesAcquired": lambda sim, b, rows: [int(sim.city_acquired[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorFaith": lambda sim, b, rows: [float(sim.citystate_faith[b, s]) for s in rows],
     "minorBuildingsPillaged": lambda sim, b, rows: [
@@ -863,6 +864,7 @@ CITY = {
     "amenityTier": _cty("city_amen_tier"),
     "foodBox": _cty("city_growth"),
     "cultureBox": _cty("city_cbox"),
+    "nextPlot": _cty("city_next_plot"),
     "tilesAcquired": _cty("city_acquired"),
     "origCapitalSeat": _cty("city_orig_cap"),
     "founderSeat": _cty("city_founder"),

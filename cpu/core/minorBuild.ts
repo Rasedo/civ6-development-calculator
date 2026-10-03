@@ -184,6 +184,7 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
   cityState.population = city.population;
   cityState.foodBox = city.foodBox;
   cityState.cultureBox = city.cultureBox;
+  cityState.nextPlot = city.nextPlot;
   cityState.tilesAcquired = city.tilesAcquired;
 }
 

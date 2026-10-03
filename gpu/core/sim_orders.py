@@ -1653,6 +1653,7 @@ class SimOrders:
             # with them.
             self.city_growth[b, row, col] = 0
             self.city_cbox[b, row, col] = 0
+            self.city_next_plot[b, row, col] = -1
             self.city_acquired[b, row, col] = 0
             # the minor's perimeter carries over as it stands; one at its FULL
             # pool (TS: `outerHp` unset) stands full at the new owner's tier,

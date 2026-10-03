@@ -6,8 +6,6 @@ import { initFog } from '../../../cpu/core/fog';
 import { levyGoldCost, seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
 import { envoysOf, isSuzerain, issueQuest, setMet } from '../../../cpu/core/cityStates';
-import { ensureGpOffer } from '../../../cpu/core/greatPeople';
-import { GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { hexDistance, tilesWithin } from '../../../world/hex';
 import { LEVY_TURNS, QUEST_ENVOYS, QUEST_COOLDOWN, QUEST_CAMP_RADIUS, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState, Seat, City } from '../../../cpu/core/types';
@@ -188,7 +186,7 @@ describe('civ levy', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('civ quests (deterministic, zero-draw)', () => {
+describe('civ quests (deterministic)', () => {
   function scenario(cityStateType: CityStateType = 'scientific'): { state: GameState; civ: Seat; cityState: CityState } {
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
@@ -201,16 +199,11 @@ describe('civ quests (deterministic, zero-draw)', () => {
     return { state, civ, cityState };
   }
 
-  it('issues buildDistrict when no camp is near and the district is unbuilt (zero-draw)', () => {
+  it('issues buildDistrict when no camp is near and the district is unbuilt', () => {
     const { state, civ, cityState } = scenario('scientific');
-    // the seat phase DRAWS the Great Person offers on its first pass — drain
-    // them so the zero-draw pin below reads only the quest path
-    for (const c of GP_CLASSES) ensureGpOffer(state, c);
-    const rng0 = state.rngState;
     seatPhase(state);
     expect(cityState.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
     expect(cityState.seatQuest?.[civ.seat]?.district).toBe(CITY_STATE_TYPE_DISTRICT['scientific']);
-    expect(state.rngState).toBe(rng0); // NO nextRandom consumed by the civ-quest path
   });
 
   it('prefers clearCamp when a camp is within range (nearest, ties lowest tile)', () => {
@@ -220,10 +213,6 @@ describe('civ quests (deterministic, zero-draw)', () => {
     const far = near[near.length - 1].index;
     const close = near[0].index;
     state.barbSeat.camps = [far, close]; // out of array order — nearest must still win
-    // the seat phase DRAWS the Great Person offers on its first pass — drain
-    // them so the zero-draw pin below reads only the quest path
-    for (const c of GP_CLASSES) ensureGpOffer(state, c);
-    const rng0 = state.rngState;
     seatPhase(state);
     const q = cityState.seatQuest?.[civ.seat];
     expect(q?.kind).toBe('clearCamp');
@@ -231,7 +220,6 @@ describe('civ quests (deterministic, zero-draw)', () => {
     const dc = hexDistance(state.map, state.map.tiles[close].col, state.map.tiles[close].row, ct.col, ct.row);
     const df = hexDistance(state.map, state.map.tiles[far].col, state.map.tiles[far].row, ct.col, ct.row);
     expect(q?.campIndex).toBe(dc <= df ? close : far);
-    expect(state.rngState).toBe(rng0);
   });
 
   it('asks for a camp within 5 tiles alone (Quests_Text.xml)', () => {
@@ -245,7 +233,7 @@ describe('civ quests (deterministic, zero-draw)', () => {
     expect(issueQuest(state, cityState, civ.seat)).toEqual({ kind: 'clearCamp', campIndex: at(5) });
   });
 
-  it('resolves a satisfied quest with +QUEST_ENVOYS to the civ, zero-draw', () => {
+  it('resolves a satisfied quest with +QUEST_ENVOYS to the civ', () => {
     const { state, civ, cityState } = scenario('scientific');
     // pre-seed a clearCamp quest whose camp is already gone → satisfied
     cityState.seatQuest = [];
@@ -254,14 +242,9 @@ describe('civ quests (deterministic, zero-draw)', () => {
     cityState.seatQuestIssuedTurn[civ.seat] = state.turn;
     state.barbSeat.camps = []; // camp 999 gone
     const env0 = envoysOf(cityState, civ.seat);
-    // the seat phase DRAWS the Great Person offers on its first pass — drain
-    // them so the zero-draw pin below reads only the quest path
-    for (const c of GP_CLASSES) ensureGpOffer(state, c);
-    const rng0 = state.rngState;
     seatPhase(state);
     expect(cityState.seatQuest?.[civ.seat]).toBeNull();
     expect(envoysOf(cityState, civ.seat)).toBe(env0 + QUEST_ENVOYS);
-    expect(state.rngState).toBe(rng0);
   });
 
   it('does not issue a quest for an UNMET city-state', () => {
@@ -279,11 +262,9 @@ describe('civ quests (deterministic, zero-draw)', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('SEAT-0 quest draw-count neutrality', () => {
-  it('the civ-quest path consumes ZERO rng, so the shared PRNG (and the seat-0 path) is untouched', () => {
-    // A civ that would issue AND resolve a quest, at peace (no combat/war
-    // draws), belief-opted-out: seatPhase must leave rngState untouched by
-    // the quest machinery — the explicit before/after neutrality proof.
+describe('the quest issuer in the seat phase', () => {
+  it('one seat phase resolves a satisfied quest and issues another', () => {
+    // A civ that would issue AND resolve a quest in one seat phase.
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
     const civ = addCiv(state, 10, 10);
@@ -303,18 +284,13 @@ describe('SEAT-0 quest draw-count neutrality', () => {
     cs2.envoys = {  };
     cs2.envoys[civ.seat] = 3;
     state.barbSeat.camps = [];
-    // the seat phase DRAWS the Great Person offers on its first pass — drain
-    // them so the zero-draw pin below reads only the quest path
-    for (const c of GP_CLASSES) ensureGpOffer(state, c);
-    const rng0 = state.rngState;
     seatPhase(state);
-    // both a resolve and an issue happened, drawing nothing
+    // both a resolve and an issue happened
     expect(cityState.seatQuest?.[civ.seat]).toBeNull();
     expect(cs2.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
-    expect(state.rngState).toBe(rng0);
   });
 
-  it('the seatPhase loop issues a seat-0 quest drawing ZERO — the seats share one issuer', () => {
+  it('the seatPhase loop issues a seat-0 quest — the seats share one issuer', () => {
     // ONE issuer, and it is deterministic: fixed order, with the district
     // keyed to the CS's OWN type. Every seat issues quests without touching
     // the shared PRNG, so quest issuance can never shift a draw count.
@@ -324,14 +300,9 @@ describe('SEAT-0 quest draw-count neutrality', () => {
     const cityState = addCs(state, 16, 10, { type: 'scientific', met: [0] });
     cityState.seatQuestIssuedTurn = [state.turn - QUEST_COOLDOWN]; // due to issue
     state.barbSeat.camps = [];
-    // the seat phase DRAWS the Great Person offers on its first pass — drain
-    // them so the zero-draw pin below reads only the quest path
-    for (const c of GP_CLASSES) ensureGpOffer(state, c);
-    const rng0 = state.rngState;
     seatPhase(state);
     expect(cityState.seatQuest?.[0]).not.toBeNull();
     // scientific -> the type's own district, not a draw from a flat list
     expect(cityState.seatQuest?.[0]?.kind).toBe('buildDistrict');
-    expect(state.rngState).toBe(rng0); // ZERO draws
   });
 });

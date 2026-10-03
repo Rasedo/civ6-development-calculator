@@ -16,7 +16,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { addEnvoys, isSuzerain, placeCityStateAt, suzerainOf } from '../../../cpu/core/cityStates';
 import { minorPhase } from '../../../cpu/core/minorBuild';
-import { pickBorderTile, borderCandidates } from '../../../cpu/core/city';
+import { borderBestPlots, borderCandidates } from '../../../cpu/core/city';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { CIV_LEVELS } from '../../../cpu/data/civLevels';
 import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
@@ -121,13 +121,13 @@ describe('the border rule keeps its own refusals', () => {
     expect(plots(state, cs)).toBe(10);
   });
 
-  it('claims the pick the city rule itself names, plot by plot', () => {
+  it('claims one of the lowest-cost plots of the city rule, plot by plot', () => {
     const { state, cs } = scene();
     for (let n = 0; n < 5; n += 1) {
-      const want = pickBorderTile(state, minorCity(cs));
-      expect(want).not.toBeNull();
+      const ties = borderBestPlots(state, minorCity(cs));
+      expect(ties.length).toBeGreaterThan(0);
       addEnvoys(state, cs, 0, 1);
-      expect(tileSeat(state.map.tiles[want!])).toBe(cs.seat);
+      expect(ties.filter((i) => tileSeat(state.map.tiles[i]) === cs.seat)).toHaveLength(1);
     }
   });
 

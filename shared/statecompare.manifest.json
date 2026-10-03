@@ -1718,6 +1718,17 @@
           "note": "the minor city's culture box, which buys its next tile"
         },
         {
+          "name": "minorNextPlot",
+          "compare": "exact",
+          "covers": [
+            "CityState.nextPlot"
+          ],
+          "planes": [
+            "city_next_plot"
+          ],
+          "note": "the plot the minor city's border draw stored"
+        },
+        {
           "name": "minorTilesAcquired",
           "compare": "exact",
           "covers": [
@@ -2083,6 +2094,16 @@
           ],
           "planes": [
             "city_cbox"
+          ]
+        },
+        {
+          "name": "nextPlot",
+          "compare": "exact",
+          "covers": [
+            "City.nextPlot"
+          ],
+          "planes": [
+            "city_next_plot"
           ]
         },
         {

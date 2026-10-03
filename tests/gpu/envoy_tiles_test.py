@@ -81,7 +81,7 @@ def candidates(sim, s: int):
     tiles, tc, nbs, key0 = sim._seat_border_key(row, center)
     ok = ((tiles >= 0) & sim._seat_tile_unclaimed(tc)
           & sim._seat_tile_adj_city(row, cid, tc, nbs))
-    key = sim._seat_border_cost(row, center, tiles, tc, nbs, key0)
+    key = sim._seat_border_cost(row, center, tiles, tc, nbs, key0) * 1e5 + tiles.double()
     return tiles[B0], key[B0], ok[B0], int(center[B0])
 
 
@@ -148,8 +148,9 @@ def test_slope(rules) -> None:
 
 
 def test_pick(rules) -> None:
-    """Every plot the claim takes is the argmin of the SHARED border key, and
-    the key orders the candidates by `borderPlotCost`, then tile index."""
+    """Every plot the claim takes is one of the SHARED key's lowest-cost
+    ties, and the key orders the candidates by `borderPlotCost`, then tile
+    index."""
     sim = build(rules)
     s = a_minor(sim)
     row = sim._CITY_MINOR0 + s
@@ -194,23 +195,24 @@ def test_pick(rules) -> None:
     assert [int(tt[i]) for i in ts_order] == [int(tt[i]) for i in gpu_order], (
         "the key does not sort by borderPlotCost, then tile index")
 
-    # --- the CLAIM ORDER, one plot at a time, against a python argmin that
-    #     keeps its own masks: this is the loop's own bookkeeping under test
-    #     (a claimed plot leaves `unowned` and widens `adj_own`).
-    want = [int(tt[i]) for i in gpu_order][:1]
+    # --- the CLAIM, one plot at a time: each lands on one of the lowest-cost
+    #     ties (`drawBorderPlot`), the loop's own bookkeeping under test (a
+    #     claimed plot leaves `unowned` and widens `adj_own`).
+    want = []
     for n in range(1, 6):
         tiles, key0, ok, centre = candidates(sim, s)
         sel = ok.nonzero(as_tuple=True)[0]
         assert len(sel) > 0, "nothing in reach"
-        pick = int(tiles[sel][int(key0[sel].argmin())])
+        cost = torch.floor(key0[sel] / 1e5)
+        ties = set(int(t) for t in tiles[sel][cost == cost.min()])
         set_envoys(sim, s, base_a + n)
         sim._minor_envoy_tiles()
-        assert int(sim.tile_seat[B0, pick]) == 100 + s, (
-            f"claim {n} did not take the key's argmin {pick}")
-        assert int(sim.tile_city[B0, pick]) == -1, "a minor's plot carries no city id"
-        want.append(pick)
-    assert len(set(want[1:])) == 5, "the claim took one plot twice"
-    print(f"  3 pick OK — five claims, each the border key's own argmin {want[1:]}")
+        got = [t for t in ties if int(sim.tile_seat[B0, t]) == 100 + s]
+        assert len(got) == 1, f"claim {n} took none of the lowest-cost ties {sorted(ties)}"
+        assert int(sim.tile_city[B0, got[0]]) == -1, "a minor's plot carries no city id"
+        want.append(got[0])
+    assert len(set(want)) == 5, "the claim took one plot twice"
+    print(f"  3 pick OK — five claims, each among the border key's lowest-cost ties {want}")
 
 
 def test_refusals(rules) -> None:

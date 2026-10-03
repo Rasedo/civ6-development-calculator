@@ -89,6 +89,8 @@ class SimInit:
             ("acquired", torch.long, 0, None),
             ("growth", dtype, 0, None),
             ("cbox", dtype, 0, None),
+            # the plot the culture claims next (`City.nextPlot`), -1 none
+            ("next_plot", torch.long, -1, None),
             ("current", torch.long, -1, self.QD),
             ("progress", dtype, 0, self.QD),
             ("cost", dtype, 0, self.QD),

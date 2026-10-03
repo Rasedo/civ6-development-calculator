@@ -400,11 +400,10 @@ class SimMinors:
         did not reach: an envoy REMOVED (a spy's Fabricate Scandal) takes no
         ground back and buys nothing new until the count passes its own mark.
 
-        WHICH plot is `_seat_border_key`, the culture claim's own pick and its
-        own refusals, clause for clause with `pickBorderTile` — the lowest
-        `borderPlotCost`, then the lowest tile index; a plot another player
-        holds is not taken and a plot with no owned neighbour is out of
-        reach.
+        WHICH plot is `_seat_border_draw`, the culture claim's own draw and
+        its own refusals, clause for clause with `drawBorderPlot` (the DLL's
+        acquire-N loop: one draw per plot); a plot another player holds is
+        not taken and a plot with no owned neighbour is out of reach.
         """
         if self.S == 0:
             return
@@ -422,19 +421,14 @@ class SimMinors:
                 continue
             center = self.city_center[bidx, row, col]
             cid = self.city_id[bidx, row, col]
-            tiles, tc, nbs, key0 = self._seat_border_key(row, center)
-            unowned = self._seat_tile_unclaimed(tc)
-            adj_own = self._seat_tile_adj_city(row, cid, tc, nbs)
             for _ in range(int(want.max())):  # the TS while-loop, one plot at a time
                 ready = want > 0
-                ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
-                claim = ready & ok.any(dim=1)
+                spot_all = self._seat_border_draw(row, center, cid, ready)
+                claim = ready & (spot_all >= 0)
                 if not bool(claim.any()):
                     break
-                key = torch.where(ok, self._seat_border_cost(row, center, tiles, tc, nbs, key0), self._inf_f)
-                best = key.argmin(dim=1)
                 rows = claim.nonzero(as_tuple=True)[0]
-                spot = tiles[rows, best[rows]]
+                spot = spot_all[rows]
                 self.tile_seat[rows, spot] = int(self._ROW_SEAT[row])  # setTileOwner's two halves:
                 self.tile_city[rows, spot] = cid[rows]  # the seat and the city id
                 self._tile_owner_ver += 1
@@ -444,10 +438,8 @@ class SimMinors:
                 self._claim_version += 1
                 self.city_acquired[rows, row, col[rows]] += 1
                 want = want - claim.long()
-                unowned[rows, best[rows]] = False
-                nb_s = self.neigh[spot]  # [n, 6]
-                adj_hit = ((tiles[rows].unsqueeze(2) == nb_s.unsqueeze(1)) & (nb_s >= 0).unsqueeze(1)).any(dim=2)  # [n, M]
-                adj_own[rows] = adj_own[rows] | adj_hit
+                # a game whose draw found nothing stops, as TS breaks
+                want = torch.where(ready & ~claim, torch.zeros_like(want), want)
 
     def _minor_research(self, s: int) -> torch.Tensor:
         """The cheapest available row completes (table order on a price tie),

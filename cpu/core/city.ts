@@ -12,6 +12,7 @@ export const WONDER_TOURISM_BASE = 2;
 import { cityTradeYields } from './trade';
 import { hasRiver, isWater, naturalWonderAt } from '../../world/query';
 import { revealAround } from './fog';
+import { nextRandom } from './rand';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, buildingVariantFor, effectiveBuilding, isGovYieldBuilding } from '../data/buildings';
@@ -604,9 +605,17 @@ export function borderBestPlots(state: GameState, city: City, ctx?: YieldCtx): n
   return out;
 }
 
-/** The tile culture growth would claim next: the first of `borderBestPlots`. */
+/** The first of `borderBestPlots`: the plot a gold purchase offers. */
 export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): number | null {
   return borderBestPlots(state, city, ctx)[0] ?? null;
+}
+
+/** CIV6 (the "GetNextBuyablePlot picker"): ONE draw among `borderBestPlots`,
+ *  even a single one; null, and no draw, with nothing in reach. */
+export function drawBorderPlot(state: GameState, city: City, ctx?: YieldCtx): number | null {
+  const ties = borderBestPlots(state, city, ctx);
+  if (ties.length === 0) return null;
+  return ties[Math.floor(nextRandom(state) * ties.length)];
 }
 
 /** A plot joins the city: its owner, and the seat's sight of it. A purchase
@@ -1502,11 +1511,8 @@ export function computeCityStats(
   const growthNeeded = growthFoodNeeded(city.population);
   const turnsToGrow = effective > 0 ? Math.ceil((growthNeeded - city.foodBox) / effective) : null;
 
-  const borderCost = Math.round(
-    (borderGrowthCost(city.tilesAcquired) * m.borderCostMult * 100) /
-      (100 + governorSum(state, city, (e) => e.borderExpansionPct)),
-  );
-  const nextTile = pickBorderTile(state, city, ctx);
+  const borderCost = Math.round(borderGrowthCost(city.tilesAcquired) * m.borderCostMult);
+  const nextTile = (city.nextPlot ?? -1) >= 0 ? city.nextPlot! : null;
   const borderTurns =
     nextTile !== null && total.culture > 0
       ? Math.max(0, Math.ceil((borderCost - city.cultureBox) / total.culture))
