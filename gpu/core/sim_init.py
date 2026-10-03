@@ -800,7 +800,6 @@ class SimInit:
         self._era_cd = int(_er["countdown"])
         self._era_count = int(_er["count"])
         # the Moments the engines pay (`foundingMoments` and its neighbours)
-        self._era_gp = int(_er["gp"])
         self._moment_terrain = [(int(t), int(v)) for t, v in _er["momentTerrain"]]
         self._moment_new_continent = int(_er["momentNewContinent"])
         self._moment_near_civ = int(_er["momentNearCivCity"])
@@ -815,6 +814,7 @@ class SimInit:
         self._moment_defeated = int(_er["momentPlayerDefeated"])
         self._moment_to_orig = int(_er["momentToOriginalOwner"])
         self._era_moment_min = int(_er["momentMin"])
+        self._init_moments(_er["moments"], B, device)
         # Per-seat Age (0 Dark / 1 Normal / 2 Golden), assigned at each era
         # boundary from the just-ended window's score; era 0 is all Normal (the
         # TS civAges default — nothing exported at t0). _MUTABLE. _age_pressure
@@ -4323,6 +4323,45 @@ class SimInit:
         self._envoys_all_cache = self._suz_all_cache = None
         self._congress_slot_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
+
+    def _init_moments(self, m: dict, B: int, device) -> None:
+        """The event moments' rows and THE ONCE MOMENTS (cpu/core/moments.ts):
+        each key's [plain, first in the world] pay, what holds it, and the two
+        record planes — the keys each major row has recorded (`moments`) and
+        the keys anyone has, with the city-states' research eras
+        (`momentsWorld`). The first suzerain of city-state slot s is key
+        `_mk_suz0 + s`."""
+        self._mom = m
+        self._mk_suz0 = int(m["suzerainKey0"])
+        K = self._mk_suz0 + max(self.S, 1)
+        self._mk_n = K
+        pay = [list(p) for p in m["keyPay"]] + [[0, int(m["suzerainPay"])]] * max(self.S, 1)
+        self._mk_plain = torch.tensor([p[0] for p in pay], dtype=torch.long, device=device)
+        self._mk_world = torch.tensor([p[1] for p in pay], dtype=torch.long, device=device)
+        self.moment_seen = torch.zeros(B, self.n_majors, K, dtype=torch.bool, device=device)
+        self.moment_world = torch.zeros(B, K, dtype=torch.bool, device=device)
+        self._mk_tech_era = torch.tensor(m["techEraKey"], dtype=torch.long, device=device)
+        self._mk_civic_era = torch.tensor(m["civicEraKey"], dtype=torch.long, device=device)
+        self._mk_size = [(int(p), int(k)) for p, k in zip(m["citySizePop"], m["citySizeKey"])]
+        self._mk_gov_tier = torch.tensor(m["govTierKey"], dtype=torch.long, device=device)
+        uk = m["unitKeys"]
+        w = max(max((len(x) for x in uk), default=1), 1)
+        self._mk_unit = torch.tensor([list(x) + [-1] * (w - len(x)) for x in uk] or [[-1]], dtype=torch.long, device=device)
+        self._mk_civ_bldg = [tuple(int(v) for v in r) for r in m["civBuildingKeys"] if int(r[1]) >= 0]
+        self._mk_civ_dist = [tuple(int(v) for v in r) for r in m["civDistrictKeys"] if int(r[1]) >= 0]
+        self._mk_hood_d = int(m["neighborhoodDistrict"])
+        self._mk_hood = int(m["neighborhoodKey"])
+        self._mk_imp = torch.tensor(m["improvementKey"] or [-1], dtype=torch.long, device=device)
+        self._mk_beliefs = int(m["maxBeliefsKey"])
+        self._mk_governors = int(m["governorsAllKey"])
+        self._mk_posts = int(m["tradingPostAllKey"])
+        self._mk_found = torch.tensor(m["wonderFoundKey"] or [-1], dtype=torch.long, device=device)
+        self._mk_near_nw = torch.tensor(m["nearWonderKey"] or [-1], dtype=torch.long, device=device)
+        self._mk_near_flood = int(m["nearFloodKey"])
+        self._mk_near_volcano = int(m["nearVolcanoKey"])
+        self._mk_largest = int(m["largestKey"])
+        self._mom_near_range = int(m["nearRange"])
+        self._mom_largest_margin = int(m["largestMargin"])
 
     def register_alias(self, name: str, recompute) -> None:
         self._aliases[name] = recompute

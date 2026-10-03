@@ -182,6 +182,17 @@
           "note": "the game era's clock: the era in force, the turn it began and the countdown to the next (-1 when none runs)"
         },
         {
+          "name": "momentsWorld",
+          "compare": "exact",
+          "covers": [
+            "GameState.momentsWorld"
+          ],
+          "planes": [
+            "moment_world"
+          ],
+          "note": "the once-moment keys any player has recorded, and the city-states' research eras"
+        },
+        {
           "name": "pantheonsClaimed",
           "compare": "exact",
           "covers": [
@@ -954,6 +965,16 @@
           ],
           "planes": [
             "golden_ages"
+          ]
+        },
+        {
+          "name": "moments",
+          "compare": "exact",
+          "covers": [
+            "Seat.moments"
+          ],
+          "planes": [
+            "moment_seen"
           ]
         },
         {

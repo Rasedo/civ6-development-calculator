@@ -109,6 +109,7 @@ class SimStep:
         if self.n_majors > 1 and self._civ_city_reg_check:
             self._check_rc_registry_invariant()
 
+        self._record_moments()
         self._game_era_turn()
         # THE EXOPLANET FLIGHT — CIV6: 1 light-year/turn plus one per laser
         # station standing behind it, and the win fires on ARRIVAL, not launch.

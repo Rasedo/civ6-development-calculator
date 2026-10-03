@@ -312,11 +312,22 @@ export const WW_WMD_LAUNCHED = srcConst('nuclear.wwLaunched', 10,
  * major: FOREIGN_CAPITAL when it was that major's original capital,
  * PLAYER_DEFEATED when it was that major's last city; a city back with the
  * major that founded it, other than by its loyalty, TO_ORIGINAL_OWNER
- * (0x3088a0). A Great Person: GREAT_PERSON_CREATED_GAME_ERA and _PAST_ERA
- * both pay 1.
+ * (0x3088a0). A Great Person: GREAT_PERSON_CREATED_PAST_ERA when the
+ * person's era is before the game era, else GAME_ERA (0x3142a0); one
+ * patronized with Faith or Gold that paid more than half the points instead
+ * records PATRONAGE_FAITH_OVER_HALF / _GOLD_OVER_HALF (the rows' text).
+ * Recording (0x3004e0) pays nothing while the game era is before a row's
+ * MinimumGameEra or past its MaximumGameEra (`MOMENT_GOODY_MAX_ERA`,
+ * `MOMENT_CAMP_MAX_ERA`); a game starts in the Ancient era, which no row's
+ * ObsoleteEra reaches.
  */
 const moment = (id: string, v: number) =>
   srcConst(`eras.moment.${id}`, v, xml('Moments', `MomentType=MOMENT_${id}`, 'EraScore'));
+/** a Moments row's era bound, as an ERAS index */
+const momentEra = (id: string, col: 'MinimumGameEra' | 'MaximumGameEra', era: string, v: number) =>
+  srcConst(`eras.moment.${id}.${col}`, v, xml('Moments', `MomentType=MOMENT_${id}`, col, { expect: era }));
+/** a moment's magnitude its row's own text states */
+const momentText = (name: string, v: number, text: string) => srcConst(`eras.moment.${name}`, v, { pedia: text });
 export const MOMENT_ON_DESERT = moment('CITY_BUILT_ON_DESERT', 1);
 export const MOMENT_ON_SNOW = moment('CITY_BUILT_ON_SNOW', 1);
 export const MOMENT_ON_TUNDRA = moment('CITY_BUILT_ON_TUNDRA', 1);
@@ -333,7 +344,92 @@ export const MOMENT_WONDER_PAST_ERA = moment('BUILDING_CONSTRUCTED_PAST_ERA_WOND
 export const MOMENT_FOREIGN_CAPITAL = moment('CITY_TRANSFERRED_FOREIGN_CAPITAL', 4);
 export const MOMENT_PLAYER_DEFEATED = moment('CITY_TRANSFERRED_PLAYER_DEFEATED', 5);
 export const MOMENT_TO_ORIGINAL_OWNER = moment('CITY_TRANSFERRED_TO_ORIGINAL_OWNER', 2);
-export const ERA_SCORE_GP = moment('GREAT_PERSON_CREATED_GAME_ERA', 1);
+export const MOMENT_GP_GAME_ERA = moment('GREAT_PERSON_CREATED_GAME_ERA', 1);
+export const MOMENT_GP_PAST_ERA = moment('GREAT_PERSON_CREATED_PAST_ERA', 1);
+export const MOMENT_GP_FAITH_HALF = moment('GREAT_PERSON_CREATED_PATRONAGE_FAITH_OVER_HALF', 3);
+export const MOMENT_GP_GOLD_HALF = moment('GREAT_PERSON_CREATED_PATRONAGE_GOLD_OVER_HALF', 3);
+/** the founding's once-a-game rows (0x306b40, `foundingMoments`) */
+export const MOMENT_NEAR_WONDER = moment('CITY_BUILT_NEAR_NATURAL_WONDER', 3);
+export const MOMENT_NEAR_FLOOD = moment('CITY_BUILT_NEAR_FLOODABLE_RIVER', 1);
+export const MOMENT_NEAR_VOLCANO = moment('CITY_BUILT_NEAR_VOLCANO', 1);
+export const MOMENT_LARGEST = moment('CITY_BUILT_BECAME_LARGEST_CIV_BY_MARGIN', 3);
+/** CIV6 (the rows' text): "within 2 tiles of a natural wonder" / "of a river
+ *  that could flood" / "of a volcano that could erupt" */
+export const MOMENT_NEAR_RANGE = srcConst('eras.momentNearRange', 2,
+  { lab: 'C-94', note: 'GameCore_XP2 0x306b40: natural wonder, floodable river and volcano within 2 (tools/civ6lab/dll_readings.md); the rows\' text says "within 2 tiles"' });
+/** CIV6 (LARGEST_CIV_BY_MARGIN): "at least 3 more cities than its next
+ *  biggest rival" */
+export const MOMENT_LARGEST_MARGIN = srcConst('eras.momentLargestMargin', 3,
+  { lab: 'C-94', note: 'GameCore_XP2 0x306b40: cities - 3 >= every other major\'s (tools/civ6lab/dll_readings.md)' });
+/** CIV6 (GOODY_HUT_TRIGGERED): "A Tribal Village was contacted", paid while
+ *  the game era is the Ancient */
+export const MOMENT_GOODY = moment('GOODY_HUT_TRIGGERED', 1);
+export const MOMENT_GOODY_MAX_ERA = momentEra('GOODY_HUT_TRIGGERED', 'MaximumGameEra', 'ERA_ANCIENT', 0);
+/** CIV6 (BARBARIAN_CAMP_DESTROYED): a camp "leveled to the ground by a
+ *  unit"; NEAR_YOUR_CITY "within 6 tiles of one of your cities"; both paid
+ *  through the Medieval game era */
+export const MOMENT_CAMP = moment('BARBARIAN_CAMP_DESTROYED', 2);
+export const MOMENT_CAMP_NEAR = moment('BARBARIAN_CAMP_DESTROYED_NEAR_YOUR_CITY', 3);
+export const MOMENT_CAMP_MAX_ERA = momentEra('BARBARIAN_CAMP_DESTROYED', 'MaximumGameEra', 'ERA_MEDIEVAL', 2);
+export const MOMENT_CAMP_NEAR_RANGE = momentText('campNearRange', 6,
+  'LOC_MOMENT_BARBARIAN_CAMP_DESTROYED_NEAR_YOUR_CITY_DESCRIPTION: "A hostile barbarian camp within 6 tiles of one of your cities was destroyed by a unit."');
+/** CIV6 (PLAYER_EARNED_DIPLOMATIC_VICTORY_POINT): "You have won the
+ *  Diplomatic Victory resolution and earned Victory Points." */
+export const MOMENT_DIPLO_VP = moment('PLAYER_EARNED_DIPLOMATIC_VICTORY_POINT', 2);
+/**
+ * THE ONCE MOMENTS (`MOMENT_KEYS`, cpu/core/moments.ts): what a player
+ * records the first time it holds something, as [plain, first in the world]
+ * — the FIRST_IN_WORLD row when no player has recorded it yet, else the
+ * plain row; a moment with only one row pays it either way, and one with
+ * only a FIRST_IN_WORLD row pays nothing after the first.
+ */
+export const MOMENT_TECH_ERA = [moment('TECH_RESEARCHED_IN_ERA_FIRST', 1),
+  moment('TECH_RESEARCHED_IN_ERA_FIRST_IN_WORLD', 2)] as const;
+export const MOMENT_CIVIC_ERA = [moment('CIVIC_CULTURVATED_IN_ERA_FIRST', 1),
+  moment('CIVIC_CULTURVATED_IN_ERA_FIRST_IN_WORLD', 2)] as const;
+/** CIV6 (CITY_SIZE_*): "A city has reached 10 / 15 / 20 / 25 Population for
+ *  the first time" — SMALL, MEDIUM, LARGE, EXTRA_LARGE */
+export const MOMENT_CITY_SIZES = (['SMALL', 'MEDIUM', 'LARGE', 'EXTRA_LARGE'] as const).map((k, i) => ({
+  pop: momentText(`citySize.${k}`, [10, 15, 20, 25][i],
+    `LOC_MOMENT_CITY_SIZE_${k}_FIRST_DESCRIPTION: "A city has reached ${[10, 15, 20, 25][i]} Population for the first time in your civilization."`),
+  pay: [moment(`CITY_SIZE_${k}_FIRST`, 1), moment(`CITY_SIZE_${k}_FIRST_IN_WORLD`, 2)] as const,
+}));
+/** CIV6 (GOVERNMENT_ENACTED_TIER_n): "adopts its first Tier n Government",
+ *  by the government's `tier` */
+export const MOMENT_GOV_TIERS = [1, 2, 3, 4].map((t) =>
+  [moment(`GOVERNMENT_ENACTED_TIER_${t}_FIRST`, 2), moment(`GOVERNMENT_ENACTED_TIER_${t}_FIRST_IN_WORLD`, 3)] as const);
+/** "You own your first seafaring unit" / "flying unit" */
+export const MOMENT_UNIT_SEA = [moment('UNIT_CREATED_FIRST_DOMAIN_SEA', 2),
+  moment('UNIT_CREATED_FIRST_DOMAIN_SEA_IN_WORLD', 3)] as const;
+export const MOMENT_UNIT_AIR = [moment('UNIT_CREATED_FIRST_DOMAIN_AIR', 3),
+  moment('UNIT_CREATED_FIRST_DOMAIN_AIR_IN_WORLD', 5)] as const;
+/** "You own your first unit that uses this strategic resource" */
+export const MOMENT_UNIT_STRATEGIC = [moment('UNIT_CREATED_FIRST_REQUIRING_STRATEGIC', 1),
+  moment('UNIT_CREATED_FIRST_REQUIRING_STRATEGIC_IN_WORLD', 2)] as const;
+/** "You have trained this unique unit / completed this unique building,
+ *  district, tile improvement for the first time" */
+export const MOMENT_UNIQUE_UNIT = moment('UNIT_CREATED_FIRST_UNIQUE', 4);
+export const MOMENT_UNIQUE_BUILDING = moment('BUILDING_CONSTRUCTED_FIRST_UNIQUE', 4);
+export const MOMENT_UNIQUE_DISTRICT = moment('DISTRICT_CONSTRUCTED_FIRST_UNIQUE', 4);
+export const MOMENT_UNIQUE_IMPROVEMENT = moment('IMPROVEMENT_CONSTRUCTED_FIRST_UNIQUE', 4);
+export const MOMENT_NEIGHBORHOOD = [moment('DISTRICT_CONSTRUCTED_NEIGHBORHOOD_FIRST', 2),
+  moment('DISTRICT_CONSTRUCTED_NEIGHBORHOOD_FIRST_IN_WORLD', 3)] as const;
+export const MOMENT_SEASIDE_RESORT = [moment('IMPROVEMENT_CONSTRUCTED_SEASIDE_RESORT_FIRST', 2),
+  moment('IMPROVEMENT_CONSTRUCTED_SEASIDE_RESORT_FIRST_IN_WORLD', 3)] as const;
+/** "Your Religion has added its final Belief and is now complete" */
+export const MOMENT_MAX_BELIEFS = [moment('BELIEF_ADDED_MAX_BELIEFS_REACHED', 3),
+  moment('BELIEF_ADDED_MAX_BELIEFS_REACHED_FIRST_IN_WORLD', 4)] as const;
+/** "You have appointed all available Governors" */
+export const MOMENT_GOVERNORS_ALL = moment('GOVERNOR_ALL_APPOINTED_FIRST', 1);
+/** "You have established a Trading Post in all civilizations" */
+export const MOMENT_TRADING_POST_ALL = [moment('TRADING_POST_CONSTRUCTED_IN_EVERY_CIV', 3),
+  moment('TRADING_POST_CONSTRUCTED_IN_EVERY_CIV_FIRST_IN_WORLD', 5)] as const;
+/** "Your civilization discovers this natural wonder for the first time" */
+export const MOMENT_FIND_WONDER = [moment('FIND_NATURAL_WONDER', 1),
+  moment('FIND_NATURAL_WONDER_FIRST_IN_WORLD', 3)] as const;
+/** "You have become the first Suzerain of this city-state" — the row has no
+ *  plain twin */
+export const MOMENT_FIRST_SUZERAIN = moment('PLAYER_GAVE_ENVOY_BECAME_SUZERAIN_FIRST_IN_WORLD', 2);
 /** CIV6 (Taj Mahal): the wonder pays only for moments "usually worth 2 or
  *  more Era Score", so the threshold is a rule, not a tuning knob. */
 export const ERA_SCORE_MOMENT_MIN = srcConst('eras.momentMin', 2,

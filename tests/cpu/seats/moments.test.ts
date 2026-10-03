@@ -2,8 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { deriveContinents } from '../../../world/query';
-import { pantheonMoment, religionMoment, transferMoments, wonderMoment } from '../../../cpu/core/eras';
+import { campMoment, goodyMoment, greatPersonMoment, pantheonMoment, religionMoment, transferMoments, wonderMoment } from '../../../cpu/core/eras';
+import { CITY_SIZE_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, recordMoments } from '../../../cpu/core/moments';
+import { ERAS, TECHS } from '../../../cpu/data/techs';
 import {
+  MOMENT_GP_PAST_ERA, MOMENT_GP_FAITH_HALF, MOMENT_GOODY, MOMENT_CAMP, MOMENT_CAMP_NEAR, MOMENT_TECH_ERA,
+  MOMENT_CITY_SIZES, MOMENT_NEAR_FLOOD,
   MOMENT_FOREIGN_CAPITAL, MOMENT_NEAR_CIV_CITY, MOMENT_NEW_CONTINENT, MOMENT_ON_DESERT, MOMENT_PANTHEON,
   MOMENT_PANTHEON_FIRST, MOMENT_PLAYER_DEFEATED, MOMENT_RELIGION, MOMENT_RELIGION_FIRST, MOMENT_TO_ORIGINAL_OWNER,
   MOMENT_WONDER_GAME_ERA, MOMENT_WONDER_PAST_ERA,
@@ -82,5 +86,67 @@ describe('the other moments', () => {
     expect(score(state, 0)).toBe(MOMENT_PLAYER_DEFEATED + MOMENT_FOREIGN_CAPITAL + MOMENT_TO_ORIGINAL_OWNER);
     transferMoments(state, 1, 0, { founderSeat: 0, origCapitalSeat: -1 }, true, false);
     expect(score(state, 0)).toBe(MOMENT_PLAYER_DEFEATED + MOMENT_FOREIGN_CAPITAL + MOMENT_TO_ORIGINAL_OWNER); // by loyalty: none
+  });
+
+  it('a Great Person: PAST_ERA before the game era, a patronage over half its own row', () => {
+    const state = makeState(makeMap(20, 12));
+    state.gameEra = 3;
+    greatPersonMoment(state, 0, 1, null);
+    expect(score(state, 0)).toBe(MOMENT_GP_PAST_ERA);
+    greatPersonMoment(state, 0, 3, 'faith');
+    expect(score(state, 0)).toBe(MOMENT_GP_PAST_ERA + MOMENT_GP_FAITH_HALF);
+  });
+
+  it('a village pays through the Ancient game era; a camp near a city its NEAR row through the Medieval', () => {
+    const state = makeState(makeMap(20, 12));
+    settleAt(state, tileAtCoords(state.map, 3, 5).index);
+    goodyMoment(state, 0);
+    campMoment(state, 0, tileAtCoords(state.map, 9, 5).index);
+    expect(score(state, 0)).toBe(MOMENT_GOODY + MOMENT_CAMP_NEAR);
+    state.gameEra = 1;
+    goodyMoment(state, 0);
+    campMoment(state, 0, tileAtCoords(state.map, 15, 5).index);
+    expect(score(state, 0)).toBe(MOMENT_GOODY + MOMENT_CAMP_NEAR + MOMENT_CAMP);
+    state.gameEra = 3;
+    campMoment(state, 0, tileAtCoords(state.map, 15, 5).index);
+    expect(score(state, 0)).toBe(MOMENT_GOODY + MOMENT_CAMP_NEAR + MOMENT_CAMP);
+  });
+});
+
+describe('the once moments', () => {
+  it('the first holder pays FIRST_IN_WORLD, the next the plain row, nobody twice', () => {
+    const state = makeState(makeMap(20, 12));
+    state.seats.push(emptySeat(1));
+    const classical = Object.values(TECHS).find((t) => t.era === ERAS[1])!.id;
+    seatOf(state, 0)!.research.techs.push(classical);
+    seatOf(state, 1)!.research.techs.push(classical);
+    recordMoments(state);
+    expect([score(state, 0), score(state, 1)]).toEqual([MOMENT_TECH_ERA[1], MOMENT_TECH_ERA[0]]);
+    recordMoments(state);
+    expect([score(state, 0), score(state, 1)]).toEqual([MOMENT_TECH_ERA[1], MOMENT_TECH_ERA[0]]);
+    expect(seatOf(state, 0)!.moments).toEqual([TECH_ERA_KEY[1]]);
+  });
+
+  it('an Ancient tech records nothing; a city of 10 pays CITY_SIZE_SMALL', () => {
+    const state = makeState(makeMap(20, 12));
+    seatOf(state, 0)!.research.techs.push(Object.values(TECHS).find((t) => t.era === ERAS[0])!.id);
+    settleAt(state, tileAtCoords(state.map, 3, 5).index);
+    recordMoments(state);
+    expect(score(state, 0)).toBe(0);
+    seatOf(state, 0)!.cities[0].population = MOMENT_CITY_SIZES[0].pop;
+    recordMoments(state);
+    expect(score(state, 0)).toBe(MOMENT_CITY_SIZES[0].pay[1]);
+    expect(seatOf(state, 0)!.moments).toEqual([CITY_SIZE_KEY[0]]);
+  });
+
+  it('a founding within range of Floodplains records NEAR_FLOODABLE_RIVER once a game', () => {
+    const state = makeState(makeMap(20, 12));
+    tileAtCoords(state.map, 5, 5).feature = 'FLOODPLAINS';
+    settleAt(state, tileAtCoords(state.map, 3, 5).index);
+    expect(score(state, 0)).toBe(MOMENT_NEAR_FLOOD);
+    tileAtCoords(state.map, 12, 5).feature = 'FLOODPLAINS';
+    settleAt(state, tileAtCoords(state.map, 12, 6).index);
+    expect(score(state, 0)).toBe(MOMENT_NEAR_FLOOD);
+    expect(seatOf(state, 0)!.moments).toEqual([NEAR_FLOOD_KEY]);
   });
 });

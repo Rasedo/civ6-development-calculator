@@ -391,6 +391,7 @@ const GAME: Record<string, Extractor> = {
   lastSessionTurn: (s) => [s.lastSessionTurn ?? -1],
   roadTier: (s) => [s.roadTier ?? 0],
   gameEra: (s) => [[s.gameEra ?? 0, s.eraStartTurn ?? 1, s.eraCountdown ?? -1]],
+  momentsWorld: (s) => [[...(s.momentsWorld ?? [])]],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],
   // one flat row: each class's claimed list behind its LENGTH (the lists
@@ -559,6 +560,7 @@ const SEAT: Record<string, Extractor> = {
   prevAge: overSeats((s) => s.prevAge ?? 1),
   darkAges: overSeats((s) => s.darkAges ?? 0),
   goldenAges: overSeats((s) => s.goldenAges ?? 0),
+  moments: overSeats((s) => [...(s.moments ?? [])]),
   dedications: overSeats((s) => s.dedications ?? 1),
   dedicationPicks: overSeats((s) => [...(s.dedicationPicks ?? [])].sort((a, b) => a - b)),
   capitalTile: overSeats((s) => s.capitalTile ?? -1),

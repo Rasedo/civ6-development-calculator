@@ -49,11 +49,13 @@ import {
   type History, type Imported,
 } from './import';
 import {
-  ERA_BEGINS, addEraScore, buildingDedications, enterEra, eraCountdownStep, foundingMoments, pantheonMoment,
-  religionMoment, transferMoments, wonderMoment,
+  ERA_BEGINS, buildingDedications, campMoment, diploVictoryMoment, enterEra, eraCountdownStep, foundingKeys,
+  foundingMoments, greatPersonMoment, pantheonMoment, religionMoment, transferMoments, wonderMoment,
 } from '../core/eras';
+import { LARGEST_KEY, momentKeyId, momentKeysHeld, recordMoment, researchKeys } from '../core/moments';
 import { citiesOf, isCiv } from '../core/seats';
-import { AGE_GOLDEN, ERA_SCORE_GP } from '../data/seats';
+import { AGE_GOLDEN } from '../data/seats';
+import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { engineId } from './aliases';
 
@@ -635,11 +637,69 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog): Map<numbe
   const before = new Set(a.units.map((u) => `${u.owner}:${u.id}`));
   for (const u of b.units) {
     const name = cat.units[u.type] ?? '';
+    // the record names no individual: the person is read as of the game era
     if (!before.has(`${u.owner}:${u.id}`) && name.startsWith('UNIT_GREAT_')) {
-      of(u.owner).events.push([`great person ${strip(name, 'UNIT_GREAT_')}`, (st, seat) => addEraScore(st, seat, ERA_SCORE_GP)]);
+      of(u.owner).events.push([`great person ${strip(name, 'UNIT_GREAT_')}`,
+        (st, seat) => greatPersonMoment(st, seat, st.gameEra ?? 0, null)]);
     }
   }
+  // a barbarian camp gone from its plot: the major whose unit stands there
+  // at t+1 destroyed it
+  const campIdx = cat.improvements.indexOf('IMPROVEMENT_BARBARIAN_CAMP');
+  for (let i = 0; campIdx >= 0 && i < W * b.head.H; i++) {
+    if (plotAt(a, i)[P.improvement] !== campIdx || plotAt(b, i)[P.improvement] === campIdx) continue;
+    const by = b.units.find((u) => u.y * W + u.x === i && b.players.some((p) => p.id === u.owner && bool(p.major)));
+    if (by) of(by.owner).events.push([`camp ${i}`, (st, seat) => campMoment(st, seat, i)]);
+  }
+  // the Diplomatic Victory resolution a new session passed for its target
+  for (const r of Object.values(b.congress ?? {})) {
+    if (typeof r !== 'object' || !r || !r.IsNew) continue;
+    if (r.ChosenOption !== 'LOC_WORLD_CONGRESS_ADD_DIPLOVICTORY_DESC') continue;
+    const pid = Number(r.ChosenThing);
+    if (Number.isFinite(pid)) of(pid).events.push(['diplomatic victory points', diploVictoryMoment]);
+  }
   return out;
+}
+
+/**
+ * The once moments of an imported state: each major records, unpaid, the
+ * keys the history carries for its player, every key it holds now, and the
+ * near-a-feature founding keys of each city it founded; the city-states'
+ * research eras join the world's (`recordMoments`).
+ */
+export function seedMoments(state: GameState, imp: Imported, history?: History): void {
+  const world = new Set<number>(history?.momentsWorld ?? []);
+  for (const [pid, seat] of imp.seatOfPlayer) {
+    const s = seatOf(state, seat);
+    if (!s || !isCiv(seat) || !('cities' in s)) continue;
+    const ks = new Set([...(history?.moments.get(pid) ?? []), ...momentKeysHeld(state, seat)]);
+    for (const c of s.cities) {
+      if ((c.founderSeat ?? seat) !== seat) continue;
+      for (const k of foundingKeys(state, seat, c.centerIndex)) if (k !== LARGEST_KEY) ks.add(k);
+    }
+    s.moments = [...ks].sort((x, y) => x - y);
+    for (const k of ks) world.add(k);
+  }
+  for (const c of state.cityStates) researchKeys(c.research.techs, c.research.civics, world);
+  state.momentsWorld = [...world].sort((x, y) => x - y);
+}
+
+/** the Moments rows the engines record (each one's `eras.moment.*` source) */
+const RECORDED_MOMENTS = new Set(SRC_REGISTRY.filter((r) => r.name.startsWith('eras.moment.') && 'xml' in r.src
+  && r.src.col === 'EraScore').map((r) => (r.src as { where: string }).where.replace('MomentType=', '')));
+/** what the record cannot show of a recorded moment: no plot's revealed
+ *  state, no village, no Trading Post, no patronage's purse */
+const RECORD_BLIND_MOMENTS = new Set([
+  'MOMENT_FIND_NATURAL_WONDER', 'MOMENT_FIND_NATURAL_WONDER_FIRST_IN_WORLD', 'MOMENT_GOODY_HUT_TRIGGERED',
+  'MOMENT_TRADING_POST_CONSTRUCTED_IN_EVERY_CIV', 'MOMENT_TRADING_POST_CONSTRUCTED_IN_EVERY_CIV_FIRST_IN_WORLD',
+  'MOMENT_GREAT_PERSON_CREATED_PATRONAGE_FAITH_OVER_HALF', 'MOMENT_GREAT_PERSON_CREATED_PATRONAGE_GOLD_OVER_HALF',
+]);
+
+/** the gaps a pair's own moments leave the comparison: a paying row the
+ *  engines do not record, or one the record cannot show */
+function momentGaps(moments: readonly [number, string, number, number][]): string[] {
+  return moments.filter((m) => m[2] !== 0 && (!RECORDED_MOMENTS.has(m[1]) || RECORD_BLIND_MOMENTS.has(m[1])))
+    .map((m) => `moment:${strip(m[1], 'MOMENT_')}`);
 }
 
 /**
@@ -660,6 +720,8 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
   const imp = importTurn(a, cat, history);
   const state = imp.state;
   const events = eraEvents(a, b, cat);
+  const ib = importTurn(b, cat, history);
+  seedMoments(state, imp, history);
   for (const p0 of a.players) {
     if (!bool(p0.major)) continue;
     const p1 = b.players.find((q) => q.id === p0.id);
@@ -674,21 +736,54 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
     const ev = events.get(p0.id) ?? { events: [], buildings: [] };
     for (const [, pay] of ev.events) pay(state, seat);
     for (const id of ev.buildings) buildingDedications(state, seat, id);
+    // the once moments: every key the seat holds at t+1 and had not
+    // recorded, and the founding keys of each city it founded across the pair
+    // as t+1 counts its cities
+    const seatB = ib.seatOfPlayer.get(p0.id);
+    const held = new Set(seatB === undefined ? [] : momentKeysHeld(ib.state, seatB));
+    for (const c of seatB === undefined ? [] : citiesOf(ib.state, seatB)) {
+      if (!state.seats.some((x) => x.cities.some((q) => q.centerIndex === c.centerIndex))
+        && !state.cityStates.some((x) => x.centerIndex === c.centerIndex)) {
+        for (const k of foundingKeys(ib.state, seatB!, c.centerIndex)) held.add(k);
+      }
+    }
+    const once = [...held].sort((x, y) => x - y).filter((k) => !(s.moments ?? []).includes(k));
+    for (const k of once) recordMoment(state, seat, k);
     const ours = (s.eraScore ?? 0) - was;
     const game = num(p1.eraScore) - num(p0.eraScore);
-    // what era score reads of the imported seat: its leader (a civilization's
-    // own moments) and the buildings its cities hold
-    const gaps = [...new Set([...(s.civ < 0 ? ['leader'] : []),
-      ...[...imp.cityByKey].filter(([, c]) => c.seat === seat)
-        .flatMap(([k]) => [...(imp.cityGaps.get(k) ?? [])].filter((g) => g.startsWith('building:')))])];
     // the game's own moments across the pair, where the record carries them:
     // [id, MomentType, era score, turn] rows t+1 holds and t does not
     const seen = new Set((Array.isArray(p0.moments) ? p0.moments : []).map((m) => m[0]));
-    const moments = (Array.isArray(p1.moments) ? p1.moments : [])
-      .filter((m) => !seen.has(m[0])).map((m) => `${strip(m[1], 'MOMENT_')} ${m[2]}`);
+    const fresh = (Array.isArray(p1.moments) ? p1.moments : []).filter((m) => !seen.has(m[0]));
+    const moments = fresh.map((m) => `${strip(m[1], 'MOMENT_')} ${m[2]}`);
+    // what era score reads of the imported seat: its leader (a civilization's
+    // own moments), the buildings its cities hold, and the pair's moments the
+    // engines do not record or the record cannot show
+    const gaps = [...new Set([...(s.civ < 0 ? ['leader'] : []),
+      ...[...imp.cityByKey].filter(([, c]) => c.seat === seat)
+        .flatMap(([k]) => [...(imp.cityGaps.get(k) ?? [])].filter((g) => g.startsWith('building:'))),
+      ...momentGaps(fresh),
+      // a natural wonder's moment over a map whose wonder the importer dropped
+      ...(fresh.some((m) => m[1].includes('NATURAL_WONDER'))
+        ? [...imp.gaps.keys()].filter((g) => g.startsWith('feature:')) : [])])];
     out.push({ turn, check: 'step.eraScore', subject, ok: ours === game, game, ours,
       ...(gaps.length ? { gaps } : {}),
-      ...(ours === game ? {} : { state: { events: ev.events.map(([w]) => w), buildings: ev.buildings, ...(Array.isArray(p1.moments) ? { moments } : {}) } }) });
+      ...(ours === game ? {} : { state: { events: ev.events.map(([w]) => w), once: once.map((k) => momentKeyId(k)),
+        buildings: ev.buildings, ...(Array.isArray(p1.moments) ? { moments } : {}) } }) });
+  }
+  // what the next pair starts from: each major's recorded keys, and those
+  // it holds at t+1 (a pair skipped records them unpaid)
+  if (history) {
+    const world = new Set(state.momentsWorld ?? []);
+    for (const p0 of a.players) {
+      const seat = imp.seatOfPlayer.get(p0.id);
+      const seatB = ib.seatOfPlayer.get(p0.id);
+      if (!bool(p0.major) || seat === undefined || seatB === undefined) continue;
+      const ks = new Set([...(state.seats[seat]?.moments ?? []), ...momentKeysHeld(ib.state, seatB)]);
+      history.moments.set(p0.id, [...ks].sort((x, y) => x - y));
+      for (const k of ks) world.add(k);
+    }
+    history.momentsWorld = [...world].sort((x, y) => x - y);
   }
   const began = eraBegan(a, b);
   if (history) {
@@ -701,7 +796,6 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
     }
   }
   if (began) {
-    const ib = importTurn(b, cat, history);
     const st = ib.state;
     for (const p0 of a.players) {
       if (!bool(p0.major)) continue;

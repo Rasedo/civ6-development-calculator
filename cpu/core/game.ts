@@ -29,6 +29,7 @@ import { seatWonderFlag } from './wonders';
 import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, COMPETITIONS } from '../data/seats';
+import { recordMoments } from './moments';
 import { foundingMoments, religionMoment, gameEraTurn, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
@@ -1405,6 +1406,7 @@ export function endTurn(state: GameState): void {
   state.turn += 1;
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
+  recordMoments(state);
   if (gameEraTurn(state)) eraInspirations(state);
   // THE EXOPLANET FLIGHT — CIV6: the craft covers 1 light-year/turn plus one
   // per completed laser station, and the win fires on ARRIVAL, not launch.

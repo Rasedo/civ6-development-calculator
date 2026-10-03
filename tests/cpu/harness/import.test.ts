@@ -31,7 +31,7 @@ const CAT: Catalog = {
   civics: ['CIVIC_CODE_OF_LAWS'],
   policies: ['POLICY_GOD_KING'],
   governments: ['GOVERNMENT_CHIEFDOM'],
-  beliefs: [],
+  beliefs: ['BELIEF_GOD_OF_THE_FORGE'],
   religions: ['RELIGION_TAOISM'],
   routes: ['ROUTE_ANCIENT_ROAD'],
   projects: ['PROJECT_ENHANCE_DISTRICT_CAMPUS'],

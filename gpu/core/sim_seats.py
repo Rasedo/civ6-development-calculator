@@ -2497,8 +2497,12 @@ class SimSeats:
                 self.civ_treasury[:, row] = torch.where(ok, self.civ_treasury[:, row] - price, self.civ_treasury[:, row])
             else:
                 self.civ_faith[:, row] = torch.where(ok, self.civ_faith[:, row] - price, self.civ_faith[:, row])
+            # the purse paid for the points the seat lacked: more than half
+            # the price records the patronage moment
+            _pr = self.gp_price[:, c].double()
+            over = 2 * (_pr - self.civ_gpp[:, row, c].double()) > _pr
             self.civ_gpp[:, row, c] = torch.where(ok, torch.zeros_like(self.civ_gpp[:, row, c]), self.civ_gpp[:, row, c])
-            self._gp_claim(row, ok, c)
+            self._gp_claim(row, ok, c, over, gold)
             done = done | ok
         return done
 
@@ -6542,6 +6546,9 @@ class SimSeats:
             one[b] = True
             self._draw_and_pay_goody(one, b, srow, t,
                                      None if slot is None else int(slot[b]))
+            # `goodyMoment`: through the Ancient game era
+            if int(self.game_era[b]) <= int(self._mom["goodyMaxEra"]):
+                self._add_era_score(srow, int(self._mom["goody"]), one.long())
 
     def _meteor_grant_type(self, row: int) -> torch.Tensor:
         """[B] long `meteorGrantUnit` — the Heavy Cavalry "more powerful than
@@ -7393,6 +7400,8 @@ class SimSeats:
         for row in range(nrow):
             hit = m & (weight > 0).any(dim=1) & (win_t == row)
             self.civ_diplo_points[:, row] = self.civ_diplo_points[:, row] + torch.where(hit, delta, torch.zeros_like(delta))
+            # `diploVictoryMoment`: the points earned
+            self._add_era_score(row, int(self._mom["diploVp"]), (hit & (win_out == 0)).long())
 
     def _congress_slot(self, r: int) -> tuple[torch.Tensor, torch.Tensor]:
         """(outcome, target) [B] of standing resolution `r` — catalog order:
@@ -10324,6 +10333,25 @@ class SimSeats:
         terr = self.terrain[rows, sc]
         for t, v in self._moment_terrain:
             pay(v, terr == t)
+        # the once-a-game rows: the largest civilization by the margin; each
+        # natural wonder, a floodable river's plot and a volcano within range
+        keys = torch.zeros(B, self._mk_n, dtype=torch.bool, device=dev)
+        mine = self.city_alive[rows, row].sum(dim=1)
+        # ("than its next biggest rival": a rival there must be)
+        largest = torch.full((rows.numel(),), self.n_majors > 1, dtype=torch.bool, device=dev)
+        for r in range(self.n_majors):
+            if r != row:
+                largest = largest & (mine - self._mom_largest_margin >= self.city_alive[rows, r].sum(dim=1))
+        keys[rows, self._mk_largest] = largest
+        near = self.pair_dist[sc].to(torch.long) <= self._mom_near_range  # [n, T]
+        keys[rows, self._mk_near_flood] = (near & self.floodplain[rows]).any(dim=1)
+        keys[rows, self._mk_near_volcano] = (near & self.volcano_at[rows]).any(dim=1)
+        nk = self._mk_near_nw[self.feat_id[rows].clamp(min=0)]
+        nk = torch.where(near & self.nwonder[rows], nk, torch.full_like(nk, -1))
+        sub = torch.zeros(rows.numel(), self._mk_n, dtype=torch.long, device=dev)
+        sub.scatter_add_(1, nk.clamp(min=0), (nk >= 0).long())
+        keys[rows] = keys[rows] | (sub > 0)
+        self._moment_record(row, keys)
 
     def _transfer_moments(self, b: int, src_row: int, dst_row: int, orig: int, founder: int,
                           loyalty: bool, was_last: bool) -> None:
@@ -10341,6 +10369,103 @@ class SimSeats:
             self._add_era_score(dst_row, self._moment_defeated, hot)
         elif orig == src_row:
             self._add_era_score(dst_row, self._moment_foreign_cap, hot)
+
+    def _moment_record(self, row: int, keys: torch.Tensor) -> None:
+        """`recordMoment` — major row `row` records every key in `keys`
+        [B, K] it has not: each pays its first-in-the-world value where no one
+        recorded it, else its plain one (`_add_era_score`'s rule per moment)."""
+        new = keys & ~self.moment_seen[:, row]
+        if not bool(new.any()):
+            return
+        pay = torch.where(self.moment_world, self._mk_plain.unsqueeze(0), self._mk_world.unsqueeze(0))
+        n = new.long()
+        self.era_score[:, row] = self.era_score[:, row] + (n * pay).sum(dim=1)
+        if self._wond_n and int(self._wond_erascore.sum()) > 0:
+            big = (n * (pay >= self._era_moment_min).long()).sum(dim=1)
+            self.era_score[:, row] = self.era_score[:, row] + big * self._seat_wonder_sum(row, self._wond_erascore)
+        self.moment_seen[:, row] = self.moment_seen[:, row] | new
+        self.moment_world.copy_(self.moment_world | new)
+
+    def _moment_scatter(self, held: torch.Tensor, keys: torch.Tensor) -> None:
+        """Mark in `held` [B, K] every key of `keys` [B, ...] (-1 none)."""
+        k = keys.reshape(self.B, -1)
+        hit = torch.zeros(held.shape, dtype=torch.long, device=self.device)
+        hit.scatter_add_(1, k.clamp(min=0), (k >= 0).long())
+        held |= hit > 0
+
+    def _moment_research(self, held: torch.Tensor, techs: torch.Tensor, civics: torch.Tensor) -> None:
+        """The tech / civic era keys a research record [B, NT] / [B, NC] holds."""
+        nt = min(techs.shape[1], self._tech_era.numel())
+        nc = min(civics.shape[1], self._civic_era.numel())
+        tk = self._mk_tech_era[self._tech_era[:nt]].unsqueeze(0).expand(self.B, -1)
+        self._moment_scatter(held, torch.where(techs[:, :nt], tk, torch.full_like(tk, -1)))
+        ck = self._mk_civic_era[self._civic_era[:nc]].unsqueeze(0).expand(self.B, -1)
+        self._moment_scatter(held, torch.where(civics[:, :nc], ck, torch.full_like(ck, -1)))
+
+    def _moment_held(self, row: int) -> torch.Tensor:
+        """`momentKeysHeld` — [B, K] every swept key major row `row` holds."""
+        B, dev = self.B, self.device
+        held = torch.zeros(B, self._mk_n, dtype=torch.bool, device=dev)
+        self._moment_research(held, self.civ_techs[:, row], self.civ_civics[:, row])
+        alive = self.city_alive[:, row]
+        for p, k in self._mk_size:
+            held[:, k] |= (alive & (self.city_pop[:, row] >= p)).any(dim=1)
+        civ = self.row_civ[:, row]
+        for c, bi, k in self._mk_civ_bldg:
+            held[:, k] |= (civ == c) & (alive & self.city_bldg[:, row, :, bi]).any(dim=1)
+        own = self.tile_seat == row
+        done = own & self.district_complete
+        for c, di, k in self._mk_civ_dist:
+            held[:, k] |= (civ == c) & (done & (self.district == di)).any(dim=1)
+        if self._mk_hood_d >= 0:
+            held[:, self._mk_hood] |= (done & (self.district == self._mk_hood_d)).any(dim=1)
+        if self._ngov:
+            ch = self.civ_gov_chosen[:, row]
+            tier = torch.where(ch >= 0, self._gov_tier[ch.clamp(min=0)], torch.zeros_like(ch))
+            self._moment_scatter(held, self._mk_gov_tier[tier].unsqueeze(1))
+        ua = self.major_unit_alive & (self.major_unit_seat == row)
+        uk = self._mk_unit[self.major_unit_type.clamp(min=0)]
+        self._moment_scatter(held, torch.where(ua.unsqueeze(2), uk, torch.full_like(uk, -1)))
+        imp = self.improvement
+        ik = self._mk_imp[imp.clamp(min=0)]
+        self._moment_scatter(held, torch.where(own & (imp >= 0), ik, torch.full_like(ik, -1)))
+        seen = self.nwonder
+        if self.fog_of_war:
+            seen = seen & self.seat_explored[:, row]
+        fk = self._mk_found[self.feat_id.clamp(min=0)]
+        self._moment_scatter(held, torch.where(seen, fk, torch.full_like(fk, -1)))
+        held[:, self._mk_beliefs] |= (self.civ_religion_done[:, row] & (self.civ_follower[:, row] >= 0)
+                                      & (self.civ_founder[:, row] >= 0) & (self.civ_worship[:, row] >= 0)
+                                      & (self.civ_enhancer[:, row] >= 0))
+        if self.civ_gov_appointed.shape[2] > 0:
+            held[:, self._mk_governors] |= self.civ_gov_appointed[:, row].all(dim=1)
+        any_other = torch.zeros(B, dtype=torch.bool, device=dev)
+        every = torch.ones(B, dtype=torch.bool, device=dev)
+        for o in range(self.n_majors):
+            if o == row:
+                continue
+            oa = self.city_alive[:, o]
+            live = oa.any(dim=1)
+            post = (oa & self.trading_post[:, row].gather(1, self.city_center[:, o].clamp(min=0))).any(dim=1)
+            any_other = any_other | live
+            every = every & (~live | post)
+        held[:, self._mk_posts] |= any_other & every
+        if self.S > 0:
+            s0 = self._mk_suz0
+            held[:, s0:s0 + self.S] |= self.citystate_alive[:, :self.S] & (self.citystate_suzerain[:, :self.S] == row)
+        return held
+
+    def _record_moments(self) -> None:
+        """`recordMoments` — the turn's once moments: every major row in order
+        records the keys it holds, then the city-states' research eras join
+        the world's."""
+        for row in range(self.n_majors):
+            self._moment_record(row, self._moment_held(row))
+        cs = torch.zeros(self.B, self._mk_n, dtype=torch.bool, device=self.device)
+        for s in range(self.S):
+            self._moment_research(cs, self.citystate_techs[:, s] & self.citystate_alive[:, s:s + 1],
+                                  self.citystate_civics[:, s] & self.citystate_alive[:, s:s + 1])
+        self.moment_world.copy_(self.moment_world | cs)
 
     def _transfer_city(self, b: int, src_row: int, src_col: int, dst_row: int, *, conquest: bool,
                        loyalty: bool) -> bool:

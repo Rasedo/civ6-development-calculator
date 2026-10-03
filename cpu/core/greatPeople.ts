@@ -7,9 +7,9 @@ import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TECHS } from '../data/techs';
-import { ALLIANCE_C2_GPP, ALLIANCE_CULTURAL, DED_SKY, ERA_SCORE_GP } from '../data/seats';
+import { ALLIANCE_C2_GPP, ALLIANCE_CULTURAL, DED_SKY } from '../data/seats';
 import { completedWonders, seatWonders } from './wonders';
-import { addEraScore, dedicationEvent, goldenProphetPoints, worldEraIndex } from './eras';
+import { dedicationEvent, goldenProphetPoints, greatPersonMoment, worldEraIndex } from './eras';
 import { governorMult } from './governors';
 import { getModifiers } from './effects';
 import { computeCityStats } from './city';
@@ -148,7 +148,11 @@ export function patronizeGreatPerson(state: GameState, seat: number, clsIdx: num
   if ((state.gpPassedBy?.[clsIdx] ?? -1) === seat) return { ok: false };
   if (gold) owner.treasury = (owner.treasury ?? 0) - cost;
   else owner.faith -= cost;
-  owner.gpp[cls] = recruit(state, seat, cls); // patronage keeps the refund too
+  // the purse paid for the points the seat lacked: more than half the price
+  // records the patronage moment
+  const price = state.gpPrice?.[clsIdx] ?? 0;
+  const over = 2 * (price - (owner.gpp[cls] ?? 0)) > price;
+  owner.gpp[cls] = recruit(state, seat, cls, over ? currency : null); // patronage keeps the refund too
   return { ok: true };
 }
 
@@ -257,7 +261,8 @@ function gpSpawnTile(state: GameState, seat: number, cls: GreatPersonClass): num
  *  banks: `advanceGreatPeople` holds the class's points in a local it
  *  writes back at the end of the turn, so a store written here would be
  *  overwritten and the refund lost (`GP_REFUND_ROWS`). */
-function recruit(state: GameState, seat: number, cls: GreatPersonClass): number {
+function recruit(state: GameState, seat: number, cls: GreatPersonClass,
+  patron: 'faith' | 'gold' | null = null): number {
   const owner = seatOf(state, seat);
   const at = gpOffer(state, cls);
   const person = at >= 0 ? GREAT_PEOPLE[cls][at] : undefined;
@@ -288,7 +293,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): number 
   // the claim ends the pass: the NEXT person starts with nobody locked out
   if (state.gpPassedBy) state.gpPassedBy[GP_CLASSES.indexOf(cls)] = -1;
   owner.gpEarned.push(person.id); // ...and recorded as this seat's recruit
-  addEraScore(state, seat, ERA_SCORE_GP);
+  greatPersonMoment(state, seat, person.era, patron);
   // CIV6 (Sky and Stars): "+1 Era Score each time a Great Person is Earned."
   dedicationEvent(state, seat, DED_SKY);
   state.eventLog.push(`${owner.name} claimed ${person.name}.`);

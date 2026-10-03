@@ -12,8 +12,16 @@ import { BUILDINGS, BUILDING_ERA_INDEX, buildingVariantFor } from '../data/build
 import { GW_HOLDERS } from '../data/greatWorks';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { ROAD_TIER_ERA } from '../data/constants';
-import { hexDistance } from '../../world/hex';
+import { hexDistance, tilesWithin } from '../../world/hex';
+import { naturalWonderAt } from '../../world/query';
 import { isExplored } from './fog';
+import { isFloodplains } from '../../world/features';
+import { recordMoment, LARGEST_KEY, NEAR_WONDER_KEY, NEAR_FLOOD_KEY, NEAR_VOLCANO_KEY } from './moments';
+import {
+  MOMENT_LARGEST_MARGIN, MOMENT_NEAR_RANGE, MOMENT_GP_GAME_ERA, MOMENT_GP_PAST_ERA, MOMENT_GP_FAITH_HALF,
+  MOMENT_GP_GOLD_HALF, MOMENT_GOODY, MOMENT_GOODY_MAX_ERA, MOMENT_CAMP, MOMENT_CAMP_NEAR, MOMENT_CAMP_MAX_ERA,
+  MOMENT_CAMP_NEAR_RANGE, MOMENT_DIPLO_VP,
+} from '../data/seats';
 import {
   MOMENT_ON_DESERT, MOMENT_ON_SNOW, MOMENT_ON_TUNDRA, MOMENT_NEW_CONTINENT, MOMENT_NEAR_CIV_CITY, MOMENT_NEAR_CIV_RANGE,
   MOMENT_PANTHEON, MOMENT_PANTHEON_FIRST, MOMENT_RELIGION, MOMENT_RELIGION_FIRST, MOMENT_WONDER_GAME_ERA,
@@ -70,7 +78,31 @@ export function foundingMoments(state: GameState, seat: number, centre: number):
   const terrain = tile.terrain === 'DESERT' ? MOMENT_ON_DESERT : tile.terrain === 'SNOW' ? MOMENT_ON_SNOW
     : tile.terrain === 'TUNDRA' ? MOMENT_ON_TUNDRA : 0;
   if (terrain > 0) addEraScore(state, seat, terrain);
+  for (const k of foundingKeys(state, seat, centre)) recordMoment(state, seat, k);
 }
+
+/** The once-a-game keys a city of major `seat` at `centre` holds, ascending:
+ *  the largest civilization by MOMENT_LARGEST_MARGIN cities ("than its next
+ *  biggest rival": a rival there must be); each natural wonder, a Floodplains
+ *  plot (a river's that could flood: H-1 Duel 1108 paid Mediolanum's
+ *  Floodplains at 1, not Aquileia's floodplain-less river plots) and a
+ *  volcano within MOMENT_NEAR_RANGE. */
+export function foundingKeys(state: GameState, seat: number, centre: number): number[] {
+  const map = state.map;
+  const tile = map.tiles[centre];
+  const out = new Set<number>();
+  const mine = citiesOf(state, seat).length;
+  const rivals = state.seats.filter((sx) => sx.seat !== seat && isCiv(sx.seat));
+  if (rivals.length > 0 && rivals.every((sx) => mine - MOMENT_LARGEST_MARGIN >= sx.cities.length)) out.add(LARGEST_KEY);
+  for (const t of tilesWithin(map, tile.col, tile.row, MOMENT_NEAR_RANGE)) {
+    const nw = naturalWonderAt(t);
+    if (nw && NEAR_WONDER_KEY[nw] !== undefined) out.add(NEAR_WONDER_KEY[nw]);
+    if (isFloodplains(t.feature)) out.add(NEAR_FLOOD_KEY);
+    if (t.volcano) out.add(NEAR_VOLCANO_KEY);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 
 /** The pantheon or religion `seat` just founded: the FIRST_IN_WORLD moment
  *  when no other major holds one, else the plain one. */
@@ -87,6 +119,38 @@ export function religionMoment(state: GameState, seat: number): void {
  *  moment when that era is the game era or later, else PAST_ERA. */
 export function wonderMoment(state: GameState, seat: number, era: number): void {
   addEraScore(state, seat, era >= (state.gameEra ?? 0) ? MOMENT_WONDER_GAME_ERA : MOMENT_WONDER_PAST_ERA);
+}
+
+/** A Great Person of ERAS index `era` recruited by `seat`: PATRONAGE_*_OVER_HALF
+ *  when `patron` names the purse that paid more than half its points, else
+ *  PAST_ERA when its era is before the game era, else GAME_ERA. */
+export function greatPersonMoment(state: GameState, seat: number, era: number, patron: 'faith' | 'gold' | null): void {
+  addEraScore(state, seat, patron === 'faith' ? MOMENT_GP_FAITH_HALF : patron === 'gold' ? MOMENT_GP_GOLD_HALF
+    : era < (state.gameEra ?? 0) ? MOMENT_GP_PAST_ERA : MOMENT_GP_GAME_ERA);
+}
+
+/** A tribal village a major `seat` contacted, through the Ancient game era. */
+export function goodyMoment(state: GameState, seat: number): void {
+  if (isCiv(seat) && (state.gameEra ?? 0) <= MOMENT_GOODY_MAX_ERA) addEraScore(state, seat, MOMENT_GOODY);
+}
+
+/** A barbarian camp at `tileIndex` a unit of major `seat` destroyed, through
+ *  the Medieval game era: NEAR_YOUR_CITY when one of the seat's cities stands
+ *  within MOMENT_CAMP_NEAR_RANGE, else the plain row. */
+export function campMoment(state: GameState, seat: number, tileIndex: number): void {
+  if (!isCiv(seat) || (state.gameEra ?? 0) > MOMENT_CAMP_MAX_ERA) return;
+  const map = state.map;
+  const t = map.tiles[tileIndex];
+  const near = citiesOf(state, seat).some((c) => {
+    const ct = map.tiles[c.centerIndex];
+    return hexDistance(map, t.col, t.row, ct.col, ct.row) <= MOMENT_CAMP_NEAR_RANGE;
+  });
+  addEraScore(state, seat, near ? MOMENT_CAMP_NEAR : MOMENT_CAMP);
+}
+
+/** The Diplomatic Victory resolution's points earned by major `seat`. */
+export function diploVictoryMoment(state: GameState, seat: number): void {
+  if (isCiv(seat)) addEraScore(state, seat, MOMENT_DIPLO_VP);
 }
 
 /** A city passing from `fromSeat` to major `toSeat`: TO_ORIGINAL_OWNER when

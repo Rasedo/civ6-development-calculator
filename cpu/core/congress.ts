@@ -48,6 +48,7 @@ import { SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import { GOVERNOR_NEUTRALIZE_TURNS } from '../data/governors';
 import { neutralizeGovernor } from './governors';
 import { startCompetition } from './competition';
+import { diploVictoryMoment } from './eras';
 import { PROMO_CLASSES, UNIT_PROMO_CLASS } from '../data/promotions';
 
 const CLEARABLE_FEATURES = clearableFeatures();
@@ -463,6 +464,7 @@ function runDvResolution(state: GameState, recorded: readonly (CongressVote | nu
   settle(state, votes, spent, win);
   const t = state.seats[win.target];
   t.diplomaticPoints = (t.diplomaticPoints ?? 0) + (win.outcome === 0 ? CONGRESS_DV_DELTA : -CONGRESS_DV_DELTA);
+  if (win.outcome === 0) diploVictoryMoment(state, t.seat);
 }
 
 /** One Regular Session: the ANNOUNCED slate (CIV6 — a random draw among

@@ -28,7 +28,7 @@ import {
   SKY_ALUMINUM_PER_TURN,
   AUTOMATON_URANIUM_PER_TURN,
   AUTOMATON_URANIUM_PER_MINE,
-  ERA_SCORE_GP,
+  MOMENT_GP_GAME_ERA,
   DEDICATION_ERAS,
   DRACONES_DISCOVERY_SCORE,
   COINAGE_INTL_GOLD_PER_SPEC,
@@ -333,7 +333,7 @@ describe('the three late-era dedications', () => {
     seatOf(state, 0)!.gpp.SCIENTIST = gpOfferCost(state, 'SCIENTIST');
     advanceGreatPeople(state, 0);
     expect(seatOf(state, 0)!.gpEarned.length).toBe(1);
-    expect(seatOf(state, 0)!.eraScore).toBe(ERA_SCORE_GP + DED_EVENT_SCORE[DED_SKY]);
+    expect(seatOf(state, 0)!.eraScore).toBe(MOMENT_GP_GAME_ERA + DED_EVENT_SCORE[DED_SKY]);
   });
 
   it('Sky and Stars, Golden face: the era\'s Eurekas land, and Aluminum mines pay +2', () => {

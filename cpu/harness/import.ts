@@ -355,6 +355,10 @@ export interface History {
   gameEra: number;
   eraStartTurn: number;
   eraCountdown: number;
+  /** the once-moment keys each player has recorded by the engine's rule
+   *  across the pairs so far, and the world's (`eraChecks`) */
+  moments: Map<number, number[]>;
+  momentsWorld: number[];
 }
 
 export const AGE_DARK = 0;
@@ -387,7 +391,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(),
-    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), ages: new Map(),
+    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
 }
 

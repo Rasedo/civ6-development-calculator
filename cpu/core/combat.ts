@@ -63,7 +63,7 @@ import { inGeneralAura, GENERAL_AURA_CS, generalAuraMP } from './aura'; // the s
 // init, which is what makes that safe.
 import { gdrHas, unitFullMoves, waterWalks, grantedMoves } from './units';
 import { warWearinessBattle, warWearinessLaunch } from './weariness';
-import { unitKillEvent } from './eras';
+import { unitKillEvent, campMoment } from './eras';
 
 import { gpPermOf } from '../data/greatPeople';
 const ok: RuleResult = { ok: true };
@@ -78,6 +78,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   const camp = state.barbSeat.camps.indexOf(tileIndex);
   if (camp < 0) return;
   state.barbSeat.camps.splice(camp, 1);
+  campMoment(state, unit.seat, tileIndex);
   // the outpost was the BARBARIANS' — theirs is the civilization buried here
   markAntiquitySite(state, tileIndex, BARB_SEAT);
   const clearer = seatOf(state, unit.seat);

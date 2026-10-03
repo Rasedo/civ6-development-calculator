@@ -3356,6 +3356,15 @@ class SimMasks:
             self._eff_version += 1  # a cleared outpost lifts its neighbours' appeal
             _s = int(seat[b])
             if 0 <= _s < self.n_majors:
+                # `campMoment`: through the Medieval game era, NEAR_YOUR_CITY
+                # with one of the seat's cities in range
+                if int(self.game_era[b]) <= int(self._mom["campMaxEra"]):
+                    _ca = self.city_alive[b, _s]
+                    _cd = self.pair_dist[int(tile[b]), self.city_center[b, _s].clamp(min=0)].to(torch.long)
+                    _near = bool((_ca & (_cd <= int(self._mom["campNearRange"]))).any())
+                    _one = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    _one[b] = 1
+                    self._add_era_score(_s, int(self._mom["campNear" if _near else "camp"]), _one)
                 self.civ_treasury[b, _s] += float(reward)
                 # CIV6 (Epic Quest): "Receive a Tribal Village reward each time
                 # you capture a barbarian outpost" — a civilization's trait,

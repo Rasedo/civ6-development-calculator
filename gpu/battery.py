@@ -720,13 +720,16 @@ def _main() -> int:
                 serve_cmd += ["--ckpt-every", HUNT_CKPT_EVERY]
             if HUNT_RESUME:
                 serve_cmd += ["--resume", HUNT_RESUME]
-            if "--profile" in sys.argv:
-                # the gate's own turn-loop split (TS-children wait / GPU step /
-                # digest) — a hunt-mode measurement, never a battery verdict
-                serve_cmd += ["--profile"]
-            if _argval("--cprofile"):
-                # ...and its function-level attribution over a turn window
-                serve_cmd += ["--cprofile", _argval("--cprofile")]
+        if HUNT and "--profile" in sys.argv:
+            # the gate's own turn-loop split (TS-children wait / GPU step /
+            # digest) — a hunt-mode measurement, never a battery verdict
+            serve_cmd += ["--profile"]
+        if HUNT and _argval("--cprofile"):
+            # ...and its function-level attribution over a turn window, the
+            # raw pstats kept where --cprofile-out names
+            serve_cmd += ["--cprofile", _argval("--cprofile")]
+            if _argval("--cprofile-out"):
+                serve_cmd += ["--cprofile-out", _argval("--cprofile-out")]
         serve_cmd += ["--seeds"]
         _shards = [("serve_" + "abcdefghijklmnop"[i], serve_cmd + [",".join(map(str, _groups[i]))], 1)
                    for i in range(_k)]

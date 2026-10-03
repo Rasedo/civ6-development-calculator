@@ -46,7 +46,7 @@ import {
   promoValue, promoValueFor, stepAttacksLeft, XP_PER_LEVEL,
 } from './promotions';
 import { logXpWrite, logPopWrite, logStockWrite } from './difflog';
-import { dedicationEvent, goldenMoveBonus } from './eras';
+import { dedicationEvent, goldenMoveBonus, goodyMoment } from './eras';
 import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
@@ -2073,6 +2073,7 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
   if (!tile.goodyHut || !owner || !isCiv(unit.seat)) return;
   tile.goodyHut = false;
   drawAndPayGoody(state, unit, tile);
+  goodyMoment(state, unit.seat);
 }
 
 /** A promotion class's GENERIC line — its units no civilization owns, from

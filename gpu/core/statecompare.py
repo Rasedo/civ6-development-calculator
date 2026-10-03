@@ -258,6 +258,7 @@ GAME = {
     "lastSessionTurn": lambda sim, b, rows: [int(sim.last_session_turn[b])],
     "roadTier": lambda sim, b, rows: [int(sim.road_tier[b])],
     "gameEra": lambda sim, b, rows: [[int(sim.game_era[b]), int(sim.era_start[b]), int(sim.era_countdown[b])]],
+    "momentsWorld": lambda sim, b, rows: [[k for k, x in enumerate(sim.moment_world[b].tolist()) if x]],
     "pantheonsClaimed": lambda sim, b, rows: [int(sim.pantheon_claimed_n[b])],
     # the four religion classes' claim masks, summed: TS keeps one list
     "beliefsClaimed": lambda sim, b, rows: [sum(int(m[b, :n].sum()) for m, _ids, n in sim._bel_pools())],
@@ -635,6 +636,7 @@ SEAT = {
     "prevAge": _civ_scalar("prev_age"),
     "darkAges": _civ_scalar("dark_ages"),
     "goldenAges": _civ_scalar("golden_ages"),
+    "moments": lambda sim, b, rows: [[k for k, x in enumerate(sim.moment_seen[b, c].tolist()) if x] for c in rows],
     "dedications": _civ_scalar("dedications"),
     "dedicationPicks": lambda sim, b, rows: [sorted(int(x) for x in sim.ded_picks[b, c].tolist() if x >= 0) for c in rows],
     "capitalTile": _capital_tile,

@@ -2548,7 +2548,8 @@ class SimPhase:
             self._spawn_unit(row, apo, centre, self._apostle_idx)
             self._gen_ver += 1
 
-    def _gp_claim(self, row: int, hit: torch.Tensor, cls: int) -> None:
+    def _gp_claim(self, row: int, hit: torch.Tensor, cls: int, patron: torch.Tensor | None = None,
+                  gold: bool = False) -> None:
         """The CLAIM shared by the seat-phase race and patronage (the
         `recruit` twin): mark the person claimed, retire the offer, pay era
         score and the dedication, and stand the person up as a UNIT — in the
@@ -2583,7 +2584,14 @@ class SimPhase:
         for _fc, _fl, _fa in self._live_rows(row, self._gp_favor_rows):
             _fw = hit & self._row_is(row, _fc, _fl)
             self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + _fw.to(self.civ_diplo_favor.dtype) * _fa
-        self._add_era_score(row, self._era_gp, hit.long())  # per GP earned
+        # `greatPersonMoment`: a patronage over half its points, else PAST_ERA
+        # when the person's era is before the game era, else GAME_ERA
+        _past = self._gp_era[cls, at_c] < self.game_era
+        _half = patron if patron is not None else torch.zeros_like(hit)
+        _m = self._mom
+        self._add_era_score(row, int(_m["gpGoldHalf" if gold else "gpFaithHalf"]), (hit & _half).long())
+        self._add_era_score(row, int(_m["gpPastEra"]), (hit & ~_half & _past).long())
+        self._add_era_score(row, int(_m["gpGameEra"]), (hit & ~_half & ~_past).long())
         # CIV6 (Sky and Stars): "+1 Era Score each time a Great
         # Person is Earned."
         self._dedication_event(row, self._ded_sky, hit)

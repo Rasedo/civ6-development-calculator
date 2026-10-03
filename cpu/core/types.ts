@@ -377,6 +377,9 @@ export interface GameState {
   gameEra?: number;
   eraStartTurn?: number;
   eraCountdown?: number;
+  /** the once-moment keys any player has recorded, and the city-states'
+   *  research eras (`recordMoments`), ascending */
+  momentsWorld?: number[];
   congressSessions?: number;
   /** the ANNOUNCED slate for the next Regular Session: resolution indices
    *  drawn at the previous session's close (-1 = empty slot). */
@@ -732,6 +735,8 @@ export interface Seat {
   gpEarned: string[];
   /** the era score this seat has earned over the whole game */
   eraScore?: number;
+  /** the once-moment keys this seat has recorded (`recordMoment`), ascending */
+  moments?: number[];
   /** the Age bars the current game era fixed as it began (`ageBars`): a
    *  score below `darkBar` at the next era's start is a Dark age, one at or
    *  above `goldenBar` a Golden one. */
