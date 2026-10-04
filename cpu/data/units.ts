@@ -1238,7 +1238,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'PIKE_AND_SHOT',
       name: 'Pike and Shot',
       cost: 250,
-      maintenance: 3,  // Units.xml Maintenance (Expansion1_Expansion2.xml)
+      maintenance: 4,
       moves: 2,
       combat: 55,
       antiCavalry: true,

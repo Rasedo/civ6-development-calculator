@@ -393,6 +393,8 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
     const def = effectiveBuilding(civOf(state, city.seat), id);
     if (dark.has(id)) continue; // in a pillaged district, or pillaged itself
     if (def?.housing) total += def.housing;
+    // CIV6 (LIGHTHOUSE_COASTAL_CITY_HOUSING): more while the centre is coastal
+    if (def?.coastalHousing && isCoastalLand(map, center)) total += def.coastalHousing;
     // CIV6 (Kupe's Voyage): "The Palace receives +3 Housing"
     if (def?.autoCapital) for (const r of m.capital) total += r.palaceHousing ?? 0;
     const beliefHousing = m.buildingHousingAdd[id];

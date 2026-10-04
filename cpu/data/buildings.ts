@@ -124,6 +124,9 @@ export interface BuildingDef {
   exclusiveWith?: string[];
   yields?: Partial<Yields>;
   housing?: number;
+  /** Housing the building adds while its city's centre is beside the coast
+   *  (MODIFIER_CITY_OWNER_ADJUST_BUILDING_HOUSING under PLOT_IS_ADJACENT_TO_COAST). */
+  coastalHousing?: number;
   amenities?: number;
   regional?: boolean;
   /**
@@ -659,8 +662,9 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
   // Amount 1 under PLOT_HAS_COAST_REQUIREMENTS) — the `special` below, paid
   // per WORKED Coast/Lake tile in city.ts, so the row itself carries no flat
   // yield.
-  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, housing: 1, special: 'LIGHTHOUSE', maintenance: 0,
+  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, housing: 1, coastalHousing: 2, special: 'LIGHTHOUSE', maintenance: 0,
     src: {
+      coastalHousing: xml('ModifierArguments', 'ModifierId=LIGHTHOUSE_COASTAL_CITY_HOUSING&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'Maintenance'),

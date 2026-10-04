@@ -30,7 +30,7 @@ import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, 
 import { addEnvoys, allianceSuzInfluence, cityStateById, cityStateItemProduction, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
-import { FREE_CITY_PAIR_CLASS } from '../data/seats';
+import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING } from '../data/seats';
 import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -580,7 +580,17 @@ export function standingLoyalty(state: GameState, city: City): number {
     n += mods.loyaltyWithGarrison;
   }
   // CIV6 (Automated Workforce): "-5 Loyalty per turn in your cities."
-  return n + governorLoyaltyAura(state, city) + mods.loyaltyAll;
+  return n + governorLoyaltyAura(state, city) + mods.loyaltyAll + religionLoyalty(state, city);
+}
+
+/** CIV6 (IDENTITY_PER_TURN_FROM_RELIGION_MATCHING_FOUNDED /
+ *  _MISMATCHING_FOUNDED): a city whose owner founded a religion takes the
+ *  matching term while it follows that religion, the mismatching one while it
+ *  follows another, nothing while it follows none. */
+export function religionLoyalty(state: GameState, city: City): number {
+  const g = city.followedReligion ?? -1;
+  if (g < 0 || !seatOf(state, city.seat)?.religion?.founded) return 0;
+  return g === city.seat ? LOYALTY_RELIGION_MATCHING : LOYALTY_RELIGION_MISMATCHING;
 }
 
 /** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors." The

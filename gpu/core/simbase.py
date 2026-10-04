@@ -323,6 +323,7 @@ class Rules:
     b_buy_cost: torch.Tensor  # [NB] the purchase base, the untruncated scaled cost (`buyCost`)
     b_yields: torch.Tensor  # [NB, 6]
     b_housing: torch.Tensor
+    b_coastal_housing: torch.Tensor  # [NB] housing while the centre is coastal (the Lighthouse's)
     b_amenities: torch.Tensor
     b_maintenance: torch.Tensor
     b_river: torch.Tensor  # bool
@@ -552,6 +553,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_buy_cost=torch.tensor([b["buyCost"] for b in B], dtype=torch.float64),
         b_yields=torch.tensor([b["yields"] for b in B], dtype=torch.float64),
         b_housing=torch.tensor([b["housing"] for b in B], dtype=torch.float64),
+        b_coastal_housing=torch.tensor([b["coastalHousing"] for b in B], dtype=torch.float64),
         b_amenities=torch.tensor([b["amenities"] for b in B], dtype=torch.float64),
         b_maintenance=torch.tensor([b["maintenance"] for b in B], dtype=torch.float64),
         b_river=torch.tensor([b["river"] for b in B], dtype=torch.bool),

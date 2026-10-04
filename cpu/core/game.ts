@@ -639,9 +639,13 @@ function unitIsLandDomain(unitType: string): boolean {
 export function unitPurchaseCost(state: GameState, unitType: string, seat: number, city?: City): number {
   const base = unitType === 'BUILDER' ? builderCost(state, seat) : unitType === 'TRADER' ? traderCost(state, seat) : UNITS[unitType]?.cost ?? 0;
   const m = unitType === 'BUILDER' ? monumentalityBuyMult(state, seat) : 1;
-  // Mercenary Companies names a CURRENCY and moves the price of a MILITARY
-  // unit bought with it.
-  const merc = (UNITS[unitType]?.combat ?? 0) > 0 ? congressUnitBuyMult(state, CONGRESS_CUR_GOLD) : 1;
+  // Mercenary Companies names a CURRENCY and moves the price of every unit of
+  // a military formation bought with it, the SUPPORT chassis with the combat
+  // ones (runs/h1_duelw1105 t222, Gold: the Siege Tower, the Military
+  // Engineer, the Drone, the Supply Convoy and the Anti-Air Gun at half with
+  // every combat unit; the Builder, Settler, Trader, Spy and Naturalist not)
+  const def = UNITS[unitType];
+  const merc = (def?.combat ?? 0) > 0 || def?.support ? congressUnitBuyMult(state, CONGRESS_CUR_GOLD) : 1;
   // CIV6 (Ngazargamu): 20% off per Encampment building in the BUYING city
   const suz = city && unitIsLandDomain(unitType) ? suzerainLandPurchaseMult(state, seat, city) : 1;
   return base * GOLD_PURCHASE_MULT * m * merc * suz * landUnitPriceMult(state, seat, unitType);

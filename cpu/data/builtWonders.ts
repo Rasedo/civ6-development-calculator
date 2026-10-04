@@ -1091,13 +1091,13 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'AMUNDSEN_SCOTT_RESEARCH_STATION', name: 'Amundsen-Scott Research Station', code: 'AS', cost: 1620,
-      requiresCivic: 'COLD_WAR', placement: { terrains: ['SNOW'], adjacentDistrict: 'CAMPUS' },
+      requiresCivic: 'RAPID_DEPLOYMENT', placement: { terrains: ['SNOW'], adjacentDistrict: 'CAMPUS' },
       effects: { gpPoints: { SCIENTIST: 5 }, empireYieldMult: { science: 1.2, production: 1.1 } },
       description: '+5 Scientist points per turn; +20% science and +10% production in every city. Snow or Snow Hills adjacent to a Campus.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'Cost', { scale: GAME_SPEED }),
-        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'PrereqCivic', { expect: 'CIVIC_COLD_WAR' }),
+        requiresCivic: xml('Buildings', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'PrereqCivic', { expect: 'CIVIC_RAPID_DEPLOYMENT' }),
         'effects.gpPoints.SCIENTIST': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION&GreatPersonClassType=GREAT_PERSON_CLASS_SCIENTIST', 'PointsPerTurn'),
         'placement.terrains': { derived: 'the Building_ValidTerrains rows of this wonder, as engine terrain ids', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'TerrainType')] },
         'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_AMUNDSEN_SCOTT_RESEARCH_STATION', 'AdjacentDistrict', { expect: 'DISTRICT_CAMPUS' }),

@@ -138,9 +138,15 @@ def data_files() -> list[pathlib.Path]:
     """the install's data files in LOAD ORDER: the base game's data directory
     (no manifest exists for it; alphabetical), then every content pack's
     database actions as its .modinfo orders them under this ruleset —
-    Expansion2 first (it re-ships the Expansion1 content itself; Expansion1's
-    own actions are gated on a game core this ruleset does not use), then
-    the other packs alphabetically, actions by LoadOrder, files by Priority.
+    Expansion1 first (its .modinfo names Expansion2 under ReverseReferences:
+    Expansion2 loads after it, so Expansion2_Buildings.xml's Update of the
+    Amundsen-Scott row Expansion1_Buildings_Major.xml inserts takes, and
+    Expansion1_Expansion2.xml's Update of the Pike and Shot finds no row yet
+    and the row Expansion2 re-ships keeps Maintenance 4 — the 1 Gold every
+    Pike and Shot added to its owner's unit upkeep, runs/h1_duelw1105 and
+    h1_duelw1108), then Expansion2 (it re-ships the Expansion1 content
+    itself), then the other packs alphabetically, actions by LoadOrder,
+    files by Priority.
     Alphabetical order inside a pack was WRONG: Expansion2_RemoveData.xml
     sorted between Civics and Technologies and deleted the civic boosts the
     content files had just added (agent B, 2026-09-14)."""
@@ -148,7 +154,8 @@ def data_files() -> list[pathlib.Path]:
     out = [f for f in out if not SKIP_FILE.search(f.name)]
     dlc = INSTALL / "DLC"
     packs = [p for p in sorted(dlc.iterdir()) if p.is_dir() and list(p.glob("*.modinfo"))]
-    ranked = [p for p in packs if p.name == "Expansion2"] + [p for p in packs if p.name != "Expansion2"]
+    lead = ("Expansion1", "Expansion2")
+    ranked = [p for n in lead for p in packs if p.name == n] + [p for p in packs if p.name not in lead]
     acts = []
     for rank, p in enumerate(ranked):
         acts += modinfo_files(p, rank)

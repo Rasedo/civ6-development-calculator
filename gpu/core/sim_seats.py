@@ -4023,7 +4023,7 @@ class SimSeats:
                            levied: torch.Tensor) -> torch.Tensor:
         """[B, ...] f64 — `upgradeGoldCost`: the gap between the two chassis'
         own gold purchase prices (`unitPurchaseCost` — Mercenary Companies on a
-        military chassis, Flower Power on a land one), never below 0. CIV6
+        combat or support chassis, Flower Power on a land one), never below 0. CIV6
         (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
         PERCENT): a LEVIED unit upgrades at the row's discount. `utp` and `nc`
         are the old and new chassis, shaped [B] or [B, N]."""
@@ -4036,7 +4036,7 @@ class SimSeats:
 
         def price(t: torch.Tensor) -> torch.Tensor:
             p = self._type_cost[t].double() * self.rules.gold_purchase_mult
-            p = torch.where(self._type_combat[t] > 0, p * merc, p)
+            p = torch.where((self._type_combat[t] > 0) | self._type_support[t], p * merc, p)
             return p * land.gather(1, t)
 
         raw = (price(new) - price(old)).clamp(min=0)
@@ -6463,6 +6463,15 @@ class SimSeats:
         if self._governor_loyalty_rows:
             out = out + self._roster_loyalty_aura(row)[bidx, col]
         out = out + self._gov_mods(row)[12]["loyall"].double()[bidx]
+        # CIV6 (IDENTITY_PER_TURN_FROM_RELIGION_MATCHING_FOUNDED /
+        # _MISMATCHING_FOUNDED): the city of a seat that founded a religion,
+        # following it or another (`religionLoyalty`)
+        if row < self.n_majors:
+            fol = self.city_followed[bidx, row, col]
+            founded = self.civ_religion_done[bidx, row]
+            match, mismatch = self._religion_loyalty
+            term = mismatch + (match - mismatch) * (fol == row).double()
+            out = out + (founded & (fol >= 0)).double() * term
         return out
 
     def _roster_loyalty_aura(self, row: int) -> torch.Tensor:
@@ -10082,6 +10091,10 @@ class SimSeats:
             water = wh
         selb_h = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols])
         housing = water + torch.einsum("bjn,bn->bj", selb_h.double(), self._b_cols(row)["housing"])
+        # CIV6 (LIGHTHOUSE_COASTAL_CITY_HOUSING): more while the centre is coastal
+        coast_c = (self.coastal_land & ~self.water).gather(1, ctr)
+        housing = housing + coast_c.double() * torch.einsum(
+            "bjn,n->bj", selb_h.double(), self.rules_dev.b_coastal_housing.double())
         housing = housing + self._palace_housing * is_cap_a
         # CIV6 (Kupe's Voyage): "The Palace receives +3 Housing" (`CAPITAL_ROWS`)
         for _cc, _cl, _cpop, _ch, _ca, _cy in self._live_rows(row, self._capital_rows):

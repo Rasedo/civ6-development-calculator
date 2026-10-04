@@ -107,6 +107,17 @@ export const LOYALTY_RANGE = 9;
  *  makes for itself each turn, where a city-state makes 20. */
 export const FREE_CITY_LOYALTY_PER_TURN = srcConst('seats.freeCityLoyaltyPerTurn', 10,
   gp('IDENTITY_PER_TURN_FROM_FREE_CITIES'));
+/** CIV6 (IDENTITY_PER_TURN_FROM_RELIGION_MATCHING_FOUNDED 3 /
+ *  _MISMATCHING_FOUNDED -3): the loyalty a city of a seat that founded a
+ *  religion takes each turn for following it, and for following another. A
+ *  city following none, or of a seat that founded none, takes neither
+ *  (runs/h1_duelw1105, h1_duelw1106, h1_duelw1108: every Chinese city's
+ *  "Other" term rose 3 the turn China's religion took it, and every Roman
+ *  city's held still when the same religion took it). */
+export const LOYALTY_RELIGION_MATCHING = srcConst('seats.loyaltyReligionMatching', 3,
+  gp('IDENTITY_PER_TURN_FROM_RELIGION_MATCHING_FOUNDED'));
+export const LOYALTY_RELIGION_MISMATCHING = srcConst('seats.loyaltyReligionMismatching', -3,
+  gp('IDENTITY_PER_TURN_FROM_RELIGION_MISMATCHING_FOUNDED'));
 /** CIV6 (LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY 100): what a city
  *  starts at after a loyalty transfer — the revolt into a Free City and the
  *  Free City's later joining alike. */
@@ -1103,6 +1114,15 @@ export const ENLIGHTENMENT_CIVIC = srcConst('seats.enlightenmentCidx', 'ENLIGHTE
  * system.
  */
 export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS', 'TO_ARMS', 'HIC_SUNT_DRACONES', 'REFORM_THE_COINAGE', 'HEARTBEAT_OF_STEAM', 'WISH_YOU_WERE_HERE', 'SKY_AND_STARS', 'BODYGUARD_OF_LIES', 'AUTOMATON_WARFARE'] as const;
+/** The install's CommemorationType for each `DEDICATIONS` entry, in its
+ *  order: the type whose CommemorationModifiers rows carry the dedication's
+ *  bonus (Expansion1_Moments.xml: COMMEMORATION_INFRASTRUCTURE_GA_PURCHASE_CIVILIAN
+ *  is Monumentality's, COMMEMORATION_SCIENTIFIC_GA_BOOSTS Free Inquiry's, ...;
+ *  Expansion2_Moments.xml: COMMEMORATION_AUTOMATON). */
+export const DEDICATION_COMMEMORATIONS: readonly string[] = ['COMMEMORATION_INFRASTRUCTURE', 'COMMEMORATION_SCIENTIFIC',
+  'COMMEMORATION_CULTURAL', 'COMMEMORATION_RELIGIOUS', 'COMMEMORATION_MILITARY', 'COMMEMORATION_EXPLORATION',
+  'COMMEMORATION_ECONOMIC', 'COMMEMORATION_INDUSTRIAL', 'COMMEMORATION_TOURISM', 'COMMEMORATION_AERONAUTICAL',
+  'COMMEMORATION_ESPIONAGE', 'COMMEMORATION_AUTOMATON'];
 export const DED_MONUMENTALITY = 0;
 export const DED_FREE_INQUIRY = 1;
 export const DED_PEN_BRUSH_AND_VOICE = 2;

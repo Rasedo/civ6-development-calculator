@@ -4205,6 +4205,7 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["majorityFounder"]]  # type: ignore[misc]
         # CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES, LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY)
         self._free_city_loyalty = float(rules.seats["freeCityLoyaltyPerTurn"])
+        self._religion_loyalty = [float(x) for x in rules.seats["loyaltyReligion"]]
         self._loyalty_after_cultural = float(rules.seats["loyaltyAfterCulturalTransfer"])
         # the Free Cities player's own strength floor, and the units it is
         # granted (`FREE_CITY_*`, measured in the live game): the former

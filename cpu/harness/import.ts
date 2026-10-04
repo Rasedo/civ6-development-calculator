@@ -35,7 +35,7 @@ import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
 import { FERTILITY_CAP } from '../core/disasters';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
-import { CIV_LEADERS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS } from '../data/seats';
+import { CIV_LEADERS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS } from '../data/seats';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
@@ -347,6 +347,9 @@ export interface History {
    *  plot gained with nothing else about it or its owner moving (a flood, a
    *  storm, a blizzard) */
   eventYields: Map<number, [number, number, number]>;
+  /** each plot's yields at the last record it stood bare (no improvement,
+   *  district, wonder or resource), keyed by its feature and owner then */
+  bare: Map<number, { key: string; y: number[] }>;
   /** each player's district-discount count (`Seat.discountDistricts`): the
    *  specialty districts it had completed at the record before its research
    *  last moved — the count the game took when the technology or civic
@@ -400,7 +403,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(),
-    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
+    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
 }
 
@@ -507,6 +510,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const ry = IMPROVEMENTS[iid as ImprovementId]?.researchYields ?? [];
       return ry.some((y) => (y.tech && got.has(y.tech)) || (y.civic && got.has(y.civic)));
     };
+    const preserve = cat.districts.indexOf('DISTRICT_PRESERVE');
     const same = (i: number, k: number) => plotAt(rec, i)[k] === plotAt(h.last!, i)[k];
     const still = (i: number) => same(i, P.feature) && same(i, P.resource) && same(i, P.improvement)
       && same(i, P.improvementPillaged) && same(i, P.district) && same(i, P.wonder) && same(i, P.owner);
@@ -526,6 +530,25 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const was = fwas(i);
       const now = fname(i);
       if (was === now) {
+        // an improvement gone with nothing else about the plot moving (a
+        // flood's wash): its draw is what the bare plot reads above the bare
+        // plot of the last record that held no improvement on the same
+        // ground (runs/h1_duelw1105, plot 583: a Farm 3 Food at t34, washed at
+        // t43 to 3 Food 1 Production where the bare plot read 2 and 0); a
+        // resource plot is left out, its reading moved by research too
+        const bareKey = `${plotAt(rec, i)[P.feature]}|${plotAt(rec, i)[P.owner]}`;
+        const y1 = plotAt(rec, i)[P.yields] as number[];
+        const bare = (plotAt(rec, i)[P.improvement] as number) < 0 && (plotAt(rec, i)[P.district] as number) < 0
+          && (plotAt(rec, i)[P.wonder] as number) < 0 && (plotAt(rec, i)[P.resource] as number) < 0 && Array.isArray(y1);
+        if (bare && (plotAt(h.last, i)[P.improvement] as number) >= 0 && same(i, P.owner) && same(i, P.resource)
+          && same(i, P.district)) {
+          const b = h.bare.get(i);
+          const owner = plotAt(rec, i)[P.owner] as number;
+          if (b && b.key === bareKey && !(owner >= 0 && moved.has(owner))) {
+            addEvent(i, Math.max(0, y1[0] - b.y[0]), Math.max(0, y1[1] - b.y[1]), Math.max(0, y1[3] - b.y[3]));
+          }
+        }
+        if (bare) h.bare.set(i, { key: bareKey, y: [...y1] });
         // a plot whose yields rose with nothing about it, its neighbours or
         // its owner moving: a random event's draw
         if (!still(i) || (plotAt(rec, i)[P.district] as number) >= 0) continue;
@@ -536,10 +559,13 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         if (owner >= 0 && moved.has(owner)) continue;
         if (o >= 0 && movesPlot(i, gained.get(o) ?? new Set())) continue;
         // a neighbour moving may move an improved plot's yields (an adjacency);
-        // an unimproved plot's reach no neighbour's row except through its
-        // own appeal (the flood that washed away the farms beside plot 540 of
-        // runs/h1_duelw1105 at t15 silted it +1 Food +1 Production)
-        if ((plotAt(rec, i)[P.improvement] as number) >= 0 ? nbr(i).some((n) => !still(n)) : !same(i, P.appeal)) continue;
+        // an unimproved plot's reach no neighbour's row except a Preserve's
+        // Grove through the plot's own appeal (the flood that washed away the
+        // farms beside plot 540 of runs/h1_duelw1105 at t15 silted it +1 Food
+        // +1 Production; the storm that pillaged the Salt mine beside plot 473
+        // at t120 moved its appeal and left it +1 Food)
+        if ((plotAt(rec, i)[P.improvement] as number) >= 0 ? nbr(i).some((n) => !still(n))
+          : !same(i, P.appeal) && preserve >= 0 && nbr(i).some((n) => (plotAt(rec, n)[P.district] as number) === preserve)) continue;
         const y = plotAt(rec, i)[P.yields] as number[];
         const y0 = plotAt(h.last, i)[P.yields] as number[];
         if (!y || !y0) continue;
@@ -721,6 +747,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (!s) continue;
     ctx.scopeSeat = seat;
     importPlayer(ctx, p, s);
+    if (bool(p.major)) importAges(ctx, s, p, history);
     ctx.scopeSeat = undefined;
     s.bestMeleeCS = history?.bestMelee.get(p.id) ?? 0;
     // the copies a price progression counts are the game's own, read off its
@@ -744,7 +771,6 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       s.unitsAcquired ??= {};
       s.unitsAcquired[id] = n;
     }
-    if (bool(p.major)) importAges(s, p, history);
   }
   for (const p of players) {
     const a = seatOfGame(p.id);
@@ -1101,11 +1127,21 @@ function importPlayer(ctx: Ctx, p: DumpPlayer, s: GameState['seats'][number]): v
  * A major's ages: the current one off the record's flags (a Heroic age is
  * the engine's Golden code), the eras the history saw begin counted into
  * `darkAges` / `goldenAges` with the one before the current as `prevAge`;
- * the game's whole-game era score and its two age bars.
+ * the game's whole-game era score and its two age bars; the dedications it
+ * holds for the era, by their CommemorationType.
  */
-function importAges(s: GameState['seats'][number], p: DumpPlayer, history?: History): void {
+function importAges(ctx: Ctx, s: GameState['seats'][number], p: DumpPlayer, history?: History): void {
   const engineAge = (a: number) => (a >= AGE_GOLDEN_ONLY ? AGE_GOLDEN : a === AGE_DARK ? 0 : 1);
   s.age = engineAge(ageOf(p));
+  const held = Array.isArray(p.commemorations) ? p.commemorations : [];
+  s.dedicationPicks = [];
+  for (const k of held) {
+    const name = ctx.cat.commemorations?.[k] ?? `commemoration ${k}`;
+    const d = DEDICATION_COMMEMORATIONS.indexOf(name);
+    if (d >= 0) s.dedicationPicks.push(d);
+    else gap(ctx, 'commemoration', name);
+  }
+  s.dedications = s.dedicationPicks.length;
   const ages = history?.ages.get(p.id) ?? [];
   s.darkAges = ages.filter((a) => a === AGE_DARK).length;
   s.goldenAges = ages.filter((a) => a >= AGE_GOLDEN_ONLY).length;
