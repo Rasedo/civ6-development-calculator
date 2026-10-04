@@ -1263,18 +1263,54 @@ def fold_rows(keys, cols) -> dict:
     accs = {"exact": _Acc(), "milli": _Acc()}
     scales = [(cmp == "milli", 1000 if cmp == "milli" else 1, vals) for cmp, vals in cols]
     for r in range(len(keys)):
+        seed = _step(0x811C9DC5, keys[r] % _2_32)
+        he = hm = seed
+        first = 0
+        # a long LEAD column (the seat's explored plane) folds off the row
+        # seed alone, so its chain is looked up by its value
+        if scales:
+            milli0, scale0, vals0 = scales[0]
+            v0 = vals0[r]
+            if scale0 == 1 and isinstance(v0, list) and len(v0) >= _LEAD_MEMO_MIN:
+                h0 = _lead_chain(seed, scale0, v0)
+                if milli0:
+                    hm = h0
+                else:
+                    he = h0
+                first = 1
         # a row's two chains as word lists: the column index, then `_fold`'s
         # words, column by column into the chain its compare names
         we: list = []
         wm: list = []
-        for i, (milli, scale, vals) in enumerate(scales):
+        for i in range(first, len(scales)):
+            milli, scale, vals = scales[i]
             w = wm if milli else we
             w.append(i)
             _words(w, vals[r], scale)
-        seed = _step(0x811C9DC5, keys[r] % _2_32)
-        accs["exact"].add(_chain(seed, we))
-        accs["milli"].add(_chain(seed, wm))
+        accs["exact"].add(_chain(he, we))
+        accs["milli"].add(_chain(hm, wm))
     return {"exact": accs["exact"].hex(), "milli": accs["milli"].hex()}
+
+
+# the lead column's chain by (row seed, value) on an EXACT column: a function
+# of those two alone, so a value seen again answers without the walk. At
+# scale 1 elements that compare equal quantise to the same word (a bool, an
+# int and an integral float alike), so a tuple key is the value's own words.
+_LEAD_MEMO_MIN = 64
+_LEAD_MEMO: dict = {}
+
+
+def _lead_chain(seed: int, scale: int, values: list) -> int:
+    key = (seed, scale, tuple(values))
+    h = _LEAD_MEMO.get(key)
+    if h is None:
+        w: list = [0]
+        _words(w, values, scale)
+        h = _chain(seed, w)
+        if len(_LEAD_MEMO) >= 4096:
+            _LEAD_MEMO.clear()
+        _LEAD_MEMO[key] = h
+    return h
 
 
 def state_digest(sim, b: int, manifest: dict | None = None, include_gaps: bool = False) -> dict:

@@ -301,11 +301,31 @@ class SimSeats:
                 _g = _g & self.civ_civics[:, row, _rv_p]
             _p_seat.append(_g)
             _p_city.append(_city_arm)
+        # ...and each row's DISTRICT half for every city of the row at once —
+        # the row's district complete and clean in the city (the CITY CENTER
+        # channel: the city alive), folded with the seat half; None where the
+        # row's district is outside the registry, which offers no column
+        _p_base: list[torch.Tensor | None] = []
+        for pi_m, prow_m in enumerate(self._proj_rows):
+            d_im = int(prow_m["d"])
+            if int(prow_m["cc"]):
+                okp_all = self.city_alive[:, row]
+            elif d_im < 0 or d_im >= self.city_dist_tile.shape[3]:
+                _p_base.append(None)
+                continue
+            else:
+                regp_all = self.city_dist_tile[:, row, :, d_im]
+                regc_all = regp_all.clamp(min=0)
+                okp_all = ((regp_all >= 0)
+                           & self.district_complete.gather(1, regc_all)
+                           & ~self._fallout().gather(1, regc_all))
+            _p_base.append(okp_all & _p_seat[pi_m].unsqueeze(1))
         prod_cols = []
+        room_l = room.any(dim=0).tolist()
         for j in range(self.RC):
             # A city already building something offers no column at all: the
             # queue is one deep, so there is nothing to stack behind the head.
-            if not bool(room[:, j].any()):
+            if not room_l[j]:
                 prod_cols.append(dead_col[:, :self.PROD_W])
                 continue
             ok_b = bld_q[:, j]
@@ -360,24 +380,16 @@ class SimSeats:
             # The CITY CENTER channel changes only how the district is found —
             # every gate below it applies there too.
             ok_p = torch.zeros(B, max(nP_m, 0), dtype=torch.bool, device=dev)
-            for pi_m, prow_m in enumerate(self._proj_rows):
-                d_im = int(prow_m["d"])
-                if int(prow_m["cc"]):
-                    # the one district every city already has, so there is no
-                    # registry entry to look up
-                    okp_m = self.city_alive[:, row, j]
-                elif d_im < 0 or d_im >= self.city_dist_tile.shape[3]:
+            for pi_m in range(nP_m):
+                # the district half and the SEAT half of the chain — the
+                # unique-civilization gate, the one-time step, the laser and
+                # WMD arms and the civic — folded once for the row
+                # (`_p_base`), because none of them names anything but the
+                # city's own district. `&` is associative, so the fold is the
+                # same column.
+                if _p_base[pi_m] is None:
                     continue
-                else:
-                    regp_m = self.city_dist_tile[:, row, j, d_im]
-                    okp_m = ((regp_m >= 0)
-                             & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
-                             & ~self._fallout().gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1))
-                # the SEAT half of the chain — the unique-civilization gate, the
-                # one-time step, the laser and WMD arms and the civic — folded
-                # once for the row (`_p_seat`), because none of them names the
-                # city. `&` is associative, so the fold is the same column.
-                okp_m = okp_m & _p_seat[pi_m]
+                okp_m = _p_base[pi_m][:, j]
                 # ...and the CITY half, whichever ONE arm of the chain this row
                 # takes (`_p_city`, the same if/elif ladder decided once).
                 _pc = _p_city[pi_m]
@@ -810,10 +822,13 @@ class SimSeats:
         `civic_ok` is the per-kind civic term, target-free, when the caller
         already holds it for this row."""
         cols = []
+        held: dict = {}   # the denouncement age test, once per distinct age
         for k, (_civic, dturns, cond, _p0, _p1, _p2) in enumerate(self._war_kinds):
             ok = self._war_kind_civic_ok(row, k) if civic_ok is None else civic_ok[k]
             if dturns >= 0:
-                ok = ok & self._war_denounce_held(row, tgt, dturns)
+                if dturns not in held:
+                    held[dturns] = self._war_denounce_held(row, tgt, dturns)
+                ok = ok & held[dturns]
             cols.append(ok & self._war_condition(row, tgt, cond))
         return torch.stack(cols, dim=1)
 
@@ -1916,7 +1931,9 @@ class SimSeats:
                      & self.city_alive[:, row].unsqueeze(2))
             for b, pct in self._levy_discount_rows:
                 n = stand[:, :, b].long().sum(dim=1)
-                for k in range(self.RC):
+                # one truncating cut per standing copy: no game holds more
+                # than the widest count
+                for k in range(int(n.max())):
                     cost = torch.where(n > k, torch.div(cost * (100 - pct), 100, rounding_mode="floor"), cost)
         return cost.double()
 
@@ -4404,26 +4421,37 @@ class SimSeats:
         `tiles` would advance by 20%, -1 where none (`engineerFinishCity`). A
         district's charge is spent ON the site it is being dug at, which is
         `city_qtile`; the Flood Barrier is a building, so its charge is spent
-        at the city centre."""
+        at the city centre. The lowest column whose site it is answers."""
         B, N = tiles.shape
-        out = torch.full((B, N), -1, dtype=torch.long, device=self.device)
         if self._eng_idx < 0 or not self._eng_finish_slots:
-            return out
-        cur = self._q_head(row)                                      # [B, RC]
-        alive = self.city_alive[:, row]
-        for j in range(self.RC):
-            live = alive[:, j]
-            if not bool(live.any()):
-                continue
-            want = torch.zeros(B, dtype=torch.bool, device=self.device)
-            for s in self._eng_finish_slots:
-                want = want | (cur[:, j] == self.DISTRICT_BASE + s)
-            at = torch.where(want, self.city_qtile[:, row, j, 0], torch.full_like(want, -1, dtype=torch.long))
-            if self._barrier_bidx >= 0:
-                at = torch.where(cur[:, j] == self._barrier_bidx, self.city_center[:, row, j], at)
-            hit = live.unsqueeze(1) & (at >= 0).unsqueeze(1) & (tiles == at.unsqueeze(1))
-            out = torch.where(hit & (out < 0), torch.full_like(out, j), out)
-        return out
+            return torch.full((B, N), -1, dtype=torch.long, device=self.device)
+        return self._first_site_col(self._eng_finish_sites(row), tiles)
+
+    def _eng_finish_sites(self, row: int) -> torch.Tensor:
+        """[B, RC] — each live city's tile a charge would advance it at
+        (`_eng_finish_slot`), -1 where its head takes no charge."""
+        RC = self.RC
+        cur = self._q_head(row)[:, :RC]
+        want = torch.zeros_like(cur, dtype=torch.bool)
+        for s in self._eng_finish_slots:
+            want = want | (cur == self.DISTRICT_BASE + s)
+        at = torch.where(want, self.city_qtile[:, row, :RC, 0], torch.full_like(cur, -1))
+        if self._barrier_bidx >= 0:
+            at = torch.where(cur == self._barrier_bidx, self.city_center[:, row, :RC], at)
+        return torch.where(self.city_alive[:, row, :RC] & (at >= 0), at, torch.full_like(at, -1))
+
+    def _first_site_col(self, sites: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """[B, N] — the lowest city column whose site (`sites` [B, RC], -1
+        none) is each of `tiles`, -1 where none is."""
+        hit = (tiles.unsqueeze(2) == sites.unsqueeze(1)) & (sites >= 0).unsqueeze(1)   # [B, N, RC]
+        return torch.where(hit.any(dim=2), hit.long().argmax(dim=2),
+                           torch.full(tiles.shape, -1, dtype=torch.long, device=self.device))
+
+    def _site_plane(self, sites: torch.Tensor) -> torch.Tensor:
+        """[B, T] — every tile some city's site (`sites` [B, RC], -1 none) is."""
+        acc = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        acc.scatter_add_(1, sites.clamp(min=0), (sites >= 0).long())
+        return acc > 0
 
     def _wonder_charge_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
         """[B, N] — the CITY COLUMN whose queued WONDER a Builder standing at
@@ -4433,36 +4461,31 @@ class SimSeats:
 
         The charge goes into the wonder itself, so the plot is the wonder's
         own site from the city registry, and only the queue HEAD accrues on
-        either engine."""
+        either engine. The lowest column whose site it is answers."""
         B, N = tiles.shape
-        out = torch.full((B, N), -1, dtype=torch.long, device=self.device)
         if self._builder_idx < 0 or not self._wonder_charge_rows:
-            return out
-        cur = self._q_head(row)                                      # [B, RC]
-        alive = self.city_alive[:, row]
+            return torch.full((B, N), -1, dtype=torch.long, device=self.device)
+        return self._first_site_col(self._wonder_charge_sites(row), tiles)
+
+    def _wonder_charge_sites(self, row: int) -> torch.Tensor:
+        """[B, RC] — each live city's queued wonder's site a charge would pay
+        into (`_wonder_charge_slot`), -1 where its head is no wonder in the
+        row's era band."""
+        RC = self.RC
+        cur = self._q_head(row)[:, :RC]
         nw = self._wonder_era.shape[0]
-        bidx = torch.arange(B, device=self.device)
-        for j in range(self.RC):
-            live = alive[:, j]
-            if not bool(live.any()):
+        wid = (cur - self.WONDER_BASE).clamp(min=0, max=max(nw - 1, 0))
+        isw = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw)
+        band = torch.zeros_like(isw)
+        for _c, _l, _s, _e, _p in self._live_rows(row, self._wonder_charge_rows):
+            if _s < 0 or _e < 0 or _p <= 0:
                 continue
-            wid = (cur[:, j] - self.WONDER_BASE).clamp(min=0, max=max(nw - 1, 0))
-            isw = (cur[:, j] >= self.WONDER_BASE) & (cur[:, j] < self.WONDER_BASE + nw)
-            band = torch.zeros(B, dtype=torch.bool, device=self.device)
-            for _c, _l, _s, _e, _p in self._live_rows(row, self._wonder_charge_rows):
-                if _s < 0 or _e < 0 or _p <= 0:
-                    continue
-                band = band | (self._row_is(row, _c, _l)
-                               & (self._wonder_era[wid] >= _s)
-                               & (self._wonder_era[wid] <= _e))
-            want = live & isw & band
-            # `wid` is a [B] tensor, so the batch axis must be an arange: a
-            # bare `[:, row, j, wid]` is advanced indexing and answers [B, B]
-            at = torch.where(want, self.city_wonder[bidx, row, j, wid],
-                             torch.full_like(wid, -1))
-            hit = (at >= 0).unsqueeze(1) & (tiles == at.unsqueeze(1))
-            out = torch.where(hit & (out < 0), torch.full_like(out, j), out)
-        return out
+            band = band | (self._row_is(row, _c, _l).unsqueeze(1)
+                           & (self._wonder_era[wid] >= _s)
+                           & (self._wonder_era[wid] <= _e))
+        want = self.city_alive[:, row, :RC] & isw & band
+        site = self.city_wonder[:, row, :RC].gather(2, wid.unsqueeze(2)).squeeze(2)
+        return torch.where(want & (site >= 0), site, torch.full_like(site, -1))
 
     def _wonder_charge_pct(self, row: int, cols: torch.Tensor, rows: torch.Tensor) -> torch.Tensor:
         """[n] float — the percentage a charge buys at each (rows[i], cols[i])
@@ -4486,8 +4509,9 @@ class SimSeats:
     def _wonder_charge_at(self, row: int) -> torch.Tensor:
         """[B, T] — every tile `_wonder_charge_slot` would answer for, as a
         tile plane for the mask column."""
-        span = torch.arange(self.T, device=self.device).reshape(1, -1).expand(self.B, self.T)
-        return self._wonder_charge_slot(row, span) >= 0
+        if self._builder_idx < 0 or not self._wonder_charge_rows:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        return self._site_plane(self._wonder_charge_sites(row))
 
     def _project_boost_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
         """[B, N] — the CITY COLUMN whose DISTRICT PROJECT a Builder standing at
@@ -4512,10 +4536,11 @@ class SimSeats:
         town = self.tile_city.gather(1, tc)
         cur = self._q_head(row)
         alive = self.city_alive[:, row]
+        alive_l = alive.any(dim=0).tolist()
         for j in range(self.RC):
-            live = alive[:, j]
-            if not bool(live.any()):
+            if not alive_l[j]:
                 continue
+            live = alive[:, j]
             pi = cur[:, j] - self.PROJECT_BASE
             isp = live & (pi >= 0) & (pi < nP)
             if not bool(isp.any()):
@@ -4529,8 +4554,9 @@ class SimSeats:
     def _eng_finish_at(self, row: int) -> torch.Tensor:
         """[B, T] — every tile `_eng_finish_slot` would answer for, as a tile
         plane for the mask column."""
-        span = torch.arange(self.T, device=self.device).reshape(1, -1).expand(self.B, self.T)
-        return self._eng_finish_slot(row, span) >= 0
+        if self._eng_idx < 0 or not self._eng_finish_slots:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        return self._site_plane(self._eng_finish_sites(row))
 
     def _seat_engineer_job_mask(self, row: int, techs: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] — the tiles a Military Engineer of seat row `row` would have
@@ -8052,12 +8078,13 @@ class SimSeats:
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on = (nb >= 0).unsqueeze(0)
+        # the improvements standing live anywhere, read once: a rule of one
+        # standing nowhere pays nothing
+        standing = set(torch.unique(self.improvement[live]).tolist())
         for k, rules in enumerate(self._imp_adj):
-            if not rules:
+            if not rules or k not in standing:
                 continue
             here = live & (self.improvement == k)
-            if not bool(here.any()):
-                continue
             for r in rules:
                 # a rule may WAIT on a civic of its own (Terrace_MedievalAdjacency)
                 rc = int(r["rc"])
@@ -8314,6 +8341,18 @@ class SimSeats:
         the COUNT, each tile under its OWN complete/pillage state."""
         nD = self._d_maint.shape[0]
         sl = self.city_slot_at(row)  # [B, T]
+        # cached per (row, gate) while the slot map is the same object and the
+        # three district planes are unwritten; callers only read the answer
+        planes = (self.district, self.district_complete, self.district_pillaged)
+        ent = self._distcnt_cache.get((row, pillage_gate))
+        if ent is not None and ent[0] is sl and simbase.stamp_holds(ent[1], planes):
+            return ent[2]
+        out = self._dist_counts_read(row, pillage_gate, sl, nD)
+        self._distcnt_cache[(row, pillage_gate)] = (sl, simbase.plane_stamp(planes), out)
+        return out
+
+    def _dist_counts_read(self, row: int, pillage_gate: bool, sl: torch.Tensor, nD: int) -> torch.Tensor:
+        """`_dist_counts` computed over the slot map `sl`."""
         ok = (self.district >= 0) & self.district_complete & (sl >= 0)
         if pillage_gate:
             ok = ok & ~self.district_pillaged
@@ -8374,25 +8413,24 @@ class SimSeats:
         out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
         i0 = self.improvement.clamp(min=0)
         live = (self.improvement >= 0) & ~self.pillaged
+        # the improvements standing live anywhere, read once: a row of one
+        # standing nowhere pays nothing
+        standing = set(torch.unique(self.improvement[live]).tolist())
         # CIV6 (`YieldFromAppeal`): floored, and never negative.
         if self._imp_appeal_y_any:
             ap = self._tile_appeal().clamp(min=0).double()
             for k, (yi, pct) in enumerate(self._imp_appeal_y):
-                if yi < 0:
+                if yi < 0 or k not in standing:
                     continue
                 here = live & (self.improvement == k)
-                if not bool(here.any()):
-                    continue
                 out[:, :, yi] = out[:, :, yi] + torch.floor(ap * pct / 100.0).to(self.dtype) * here.to(self.dtype)
         # CIV6 (`Improvement_BonusYieldChanges`)
         if self._imp_res_y_any:
             tv, cv = self._seat_techs(row), self._seat_civics(row)
             for k, rows_k in enumerate(self._imp_res_y):
-                if not rows_k:
+                if not rows_k or k not in standing:
                     continue
                 here = live & (self.improvement == k)
-                if not bool(here.any()):
-                    continue
                 for _t, _c, _y in rows_k:
                     has = (tv[:, _t] if _t >= 0 else (cv[:, _c] if _c >= 0
                            else torch.zeros(B, dtype=torch.bool, device=dev)))
@@ -8408,11 +8446,9 @@ class SimSeats:
             _sl = self.city_slot_at(row)                              # [B, T]
             _slc = _sl.clamp(min=0)
             for k, gy in enumerate(self._imp_gov_yield):
-                if gy is None:
+                if gy is None or k not in standing:
                     continue
                 here = live & (self.improvement == k)
-                if not bool(here.any()):
-                    continue
                 _held = self._governor_mask(row)[:, :, int(gy["promo"])]   # [B, RC]
                 _on = here & (_sl >= 0) & torch.gather(_held, 1, _slc)
                 if not bool(_on.any()):
@@ -8429,11 +8465,9 @@ class SimSeats:
         if self._imp_terr_kind_any:
             kinds = self._founded_terrains(row)                       # [B, nTerr] bool
             for k, tk in enumerate(self._imp_terr_kind_y):
-                if tk is None:
+                if tk is None or k not in standing:
                     continue
                 here = live & (self.improvement == k)
-                if not bool(here.any()):
-                    continue
                 terrs, y = tk
                 n = torch.zeros(B, dtype=self.dtype, device=dev)
                 for t in terrs:
@@ -8647,8 +8681,9 @@ class SimSeats:
         # domestic legs
         pays_d = act & (rr[:, :, 1] >= 0) & has_from & has_dest
         pd = pays_d.double()
-        for _yc in range(6):
-            _rk_add(_yc, dom6[:, :, _yc].gather(1, dest_j) * pd)
+        # all six columns in one add: each element takes the one term it
+        # took column by column
+        rk += dom6.gather(1, dest_j.unsqueeze(2).expand(-1, -1, 6)) * pd.unsqueeze(2)
         # the PATH TERM's inputs per paying leg (`routePathGold`), filled by
         # each leg kind below: D, the Gold the destination's own rows pay
         _p_d = dom6[:, :, 2].gather(1, dest_j) * pd
@@ -9144,6 +9179,17 @@ class SimSeats:
         z = torch.zeros_like(dom)
         return torch.where(alive, allc, z), torch.where(alive, dom, z)
 
+    def _any_district_pillaged(self) -> bool:
+        """Does any plot of any game carry a pillaged district — read once
+        per write of `district_pillaged` (its in-place write counter)."""
+        planes = (self.district_pillaged,)
+        ent = self._dpill_any_cache
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
+        out = bool(self.district_pillaged.any())
+        self._dpill_any_cache = (simbase.plane_stamp(planes), out)
+        return out
+
     def _bldg_dark(self, dt_reg: torch.Tensor, bldg_pil: torch.Tensor | None = None) -> torch.Tensor:
         """Given a city district-tile registry [..., nD] (tile per district type,
         -1 = none) and the city's own per-building pillage flags [..., NB]
@@ -9155,7 +9201,12 @@ class SimSeats:
         a tile window) is the faithful input on every row. This is the "does
         this building pay" question, district included; `_building_pillaged`
         is the building's own flag alone (`buildingPillaged`)."""
-        if dt_reg.shape[-1] == 0:
+        if dt_reg.shape[-1] == 0 or not self._any_district_pillaged():
+            # no district stands pillaged anywhere: only the buildings' own
+            # flags can darken one
+            if bldg_pil is not None and bldg_pil.shape[:-1] == dt_reg.shape[:-1] \
+                    and bldg_pil.dtype == torch.bool:
+                return bldg_pil.clone()
             out = torch.zeros(*dt_reg.shape[:-1], self.NB, dtype=torch.bool, device=self.device)
         else:
             B0 = dt_reg.shape[0]
@@ -9822,10 +9873,15 @@ class SimSeats:
             _gp_rng = self._gp_tile_perm("regionalRange")
             _gp_prod = self._gp_tile_perm("regionalProduction")
             _gp_amen = self._gp_tile_perm("regionalAmenities")
-        for n in self._reg_bidx:
-            own_n = self.city_bldg[:, row, :cols, n] & alive
-            if not bool(own_n.any()):
+        # which regional buildings any of the row's live cities holds, in
+        # one read
+        own_all = (self.city_bldg[:, row, :cols][:, :, self._reg_bidx]
+                   & alive.unsqueeze(2))                                 # [B, cols, R]
+        own_any = own_all.any(dim=1).any(dim=0).tolist()
+        for _ri, n in enumerate(self._reg_bidx):
+            if not own_any[_ri]:
                 continue
+            own_n = own_all[:, :, _ri]
             st = dt_all[:, :, int(self._b_req_district[n])]
             stc = st.clamp(min=0)
             ok = own_n & (st >= 0) & self.district_complete.gather(1, stc) & ~self.district_pillaged.gather(1, stc)
@@ -9915,7 +9971,21 @@ class SimSeats:
         off the TILE PLANE and its single registry entry subtracted back out;
         TS walks `city.districts`, which lists every one. A repeatable type is
         never specialty (asserted at load), so the specialty twin stays a
-        registry read."""
+        registry read.
+
+        Cached per row under the write counters of the planes it reads;
+        callers only read what it hands back."""
+        planes = (self.city_dist_tile, self.district_complete, self.district, self.tile_seat,
+                  self.tile_city, self.city_id, self.city_alive)
+        ent = self._dcount_cache.get(row)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
+        out = self._district_counts_read(row)
+        self._dcount_cache[row] = (simbase.plane_stamp(planes), out)
+        return out
+
+    def _district_counts_read(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """`_district_counts` computed."""
         cols = self.RC
         reg = self.city_dist_tile[:, row, :cols]
         comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
@@ -10002,14 +10072,20 @@ class SimSeats:
         housing = housing + torch.einsum(
             "bjn,n->bj",
             (dlive & ~self._is_repeatable.reshape(1, 1, -1)).double(), self._d_housing.double())
-        for _di, _tab in ([(self._nbhd_didx, self._nbhd_housing)] if self._nbhd_didx >= 0 else []) \
-                + [(i, self._preserve_housing) for i in self._appeal_house_idx] \
-                + [(i, None) for i in self._rep_house_idx]:
-            if _di < 0:
+        _house_rows = ([(self._nbhd_didx, self._nbhd_housing)] if self._nbhd_didx >= 0 else []) \
+            + [(i, self._preserve_housing) for i in self._appeal_house_idx] \
+            + [(i, None) for i in self._rep_house_idx]
+        _standing_d: set = set()
+        if _house_rows:
+            # the district types standing complete and lit on this seat's
+            # plots, read once: a type standing nowhere houses nobody
+            _own_d = (self.district >= 0) & self.district_complete & ~self.district_pillaged \
+                & (self.tile_seat == int(self._ROW_SEAT[row]))
+            _standing_d = set(torch.unique(self.district[_own_d]).tolist())
+        for _di, _tab in _house_rows:
+            if _di < 0 or _di not in _standing_d:
                 continue
             ok_d = (self.district == _di) & self.district_complete & ~self.district_pillaged & (self.tile_seat == int(self._ROW_SEAT[row]))
-            if not bool(ok_d.any()):
-                continue
             ids = self.city_id[:, row, :cols]  # [B, cols] persistent ids
             hit = ok_d.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)  # [B, T, cols]
             if _tab is None:
@@ -10469,12 +10545,16 @@ class SimSeats:
         for p, k in self._mk_size:
             held[:, k] |= (alive & (self.city_pop[:, row] >= p)).any(dim=1)
         civ = self.row_civ[:, row]
+        # a civilization no game plays at this row holds none of its own keys
+        played = set(civ.tolist())
         for c, bi, k in self._mk_civ_bldg:
-            held[:, k] |= (civ == c) & (alive & self.city_bldg[:, row, :, bi]).any(dim=1)
+            if c in played:
+                held[:, k] |= (civ == c) & (alive & self.city_bldg[:, row, :, bi]).any(dim=1)
         own = self.tile_seat == row
         done = own & self.district_complete
         for c, di, k in self._mk_civ_dist:
-            held[:, k] |= (civ == c) & (done & (self.district == di)).any(dim=1)
+            if c in played:
+                held[:, k] |= (civ == c) & (done & (self.district == di)).any(dim=1)
         if self._mk_hood_d >= 0:
             held[:, self._mk_hood] |= (done & (self.district == self._mk_hood_d)).any(dim=1)
         if self._ngov:
@@ -12244,10 +12324,10 @@ class SimSeats:
         # the int acting seat cannot answer differently.
         B, N = self.B, self.HOST_N
         tbl = self._hostile_table()
-        bi = torch.where(b_plane >= 0, b_plane, torch.full_like(b_plane, N - 1))
+        bi = torch.where(b_plane >= 0, b_plane, N - 1)
         if torch.is_tensor(a_seat):
             a = a_seat.reshape(B, 1)
-            ai = torch.where(a >= 0, a, torch.full_like(a, N - 1))
+            ai = torch.where(a >= 0, a, N - 1)
             return tbl.reshape(B, -1).gather(
                 1, (ai * N + bi.reshape(B, -1))).reshape(b_plane.shape)
         # An INT acting seat is the common case (the walkers probe on behalf of

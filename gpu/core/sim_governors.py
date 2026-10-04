@@ -218,14 +218,16 @@ class SimGovernors:
         each rebuilt this table — n_majors x 2 x n_governors scans — for an
         answer that moves only when an envoy is sent or Amani moves. Callers
         never write into the returned tensor."""
-        env = self.seat_citystate_envoys[:, : self.n_majors].to(torch.long)
-        if self.S == 0 or self.n_governors == 0 or not bool((self.civ_gov_minor >= 0).any()):
-            return env
         planes = (self.seat_citystate_envoys, self.civ_gov_minor, self.civ_gov_appointed,
                   self.civ_gov_establish, self.civ_gov_promos)
         ent = self._envoys_all_cache
-        if ent is not None and simbase.stamp_holds(ent[2], planes):
+        # an entry is only ever stored with a governor posted at a minor, so
+        # while every plane it read still holds, so does that
+        if self.S and self.n_governors and ent is not None and simbase.stamp_holds(ent[2], planes):
             return ent[1]
+        env = self.seat_citystate_envoys[:, : self.n_majors].to(torch.long)
+        if self.S == 0 or self.n_governors == 0 or not bool((self.civ_gov_minor >= 0).any()):
+            return env
         ins = (env,) + planes[1:]
         if ent is not None and all(torch.equal(a, b) for a, b in zip(ent[0], ins)):
             self._envoys_all_cache = (ent[0], ent[1], simbase.plane_stamp(planes))
@@ -673,6 +675,17 @@ class SimGovernors:
             house = house + works.double() * h
             amen = amen + works.double() * a
         return house, amen
+
+    def _governor_adj_live(self, di: int) -> bool:
+        """Does any promotion's `adjacencyMult` column move district type
+        `di` off 1 — read once per write of the column."""
+        col = self._gpromo.get("adjacencyMult")
+        if col is None or di >= col.shape[1]:
+            return False
+        ent = self._gadj_live_cache
+        if ent is None or not simbase.stamp_holds(ent[0], (col,)):
+            ent = self._gadj_live_cache = (simbase.plane_stamp((col,)), (col != 1).any(dim=0).tolist())
+        return bool(ent[1][di])
 
     def _governor_tile_adj(self, row: int, di: int) -> torch.Tensor:
         """[B, T] f64 — the adjacency multiplier the governor of each tile's

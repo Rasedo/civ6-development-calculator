@@ -217,6 +217,22 @@ class SimMasks:
 
 
     def _next_random(self, mask: torch.Tensor) -> torch.Tensor:
+        """One mulberry32 draw per game: [B] f64 in [0, 1); the stream moves
+        only in the games of `mask`. The batch is a handful of games, so a
+        [B] mask draws on the host — the same 32-bit integer arithmetic
+        (every product masked to its low 32 bits, which the int64 tensor
+        path's wrap also keeps) and the same correctly rounded division."""
+        if mask.shape == self.rng_state.shape and mask.dim() == 1:
+            outs: list = []
+            new: list = []
+            for s, mk in zip(self.rng_state.tolist(), mask.tolist()):
+                a = (s + 0x6D2B79F5) & M32
+                t = ((a ^ (a >> 15)) * (1 | a)) & M32
+                t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
+                outs.append(float((t ^ (t >> 14)) & M32) / 4294967296.0)
+                new.append(a if mk else s)
+            self.rng_state.copy_(torch.tensor(new, dtype=self.rng_state.dtype, device=self.device))
+            return torch.tensor(outs, dtype=torch.float64, device=self.device)
         a = (self.rng_state + 0x6D2B79F5) & M32
         t = ((a ^ (a >> 15)) * (1 | a)) & M32
         t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
@@ -597,10 +613,15 @@ class SimMasks:
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         # CIV6 (Hwacha, ABILITY_NO_MOVE_AND_SHOOT): the same gate, on a chassis
         # that carries no Bombard Strength.
-        return (((self._type_bombard[typ] <= 0) & ~self._type_no_move_shoot[typ])
-                | ~self._spent_mp(pre)
-                | self._promo_pool_flag(pre, "SIEGE_MOVE_SHOOT")
-                | (self._full_mp(pre) > self._mp_scale * self._type_moves[typ]))
+        out = (self._type_bombard[typ] <= 0) & ~self._type_no_move_shoot[typ]
+        # each later clause is read only while some slot still waits on it:
+        # an OR that every slot already passes cannot change
+        if bool(out.all()):
+            return out
+        out = out | ~self._spent_mp(pre) | self._promo_pool_flag(pre, "SIEGE_MOVE_SHOOT")
+        if bool(out.all()):
+            return out
+        return out | (self._full_mp(pre) > self._mp_scale * self._type_moves[typ])
 
     def _siege_assist(self, seat: torch.Tensor, type_idx: torch.Tensor,
                       tile: torch.Tensor, tier: torch.Tensor) -> torch.Tensor:
@@ -707,19 +728,35 @@ class SimMasks:
         if k < 0:
             return torch.zeros_like(promos)
         rd = self.rules_dev
-        cls = rd.u_promo_class[utype.clamp(min=0)].reshape(-1)
         cols = torch.arange(rd.promo_cols, device=self.device)
         held = (promos.reshape(-1).unsqueeze(1) >> cols) & 1
-        v = (held * rd.promo_col_val[k][cls.clamp(min=0)]).sum(dim=1)
-        return torch.where(cls >= 0, v, torch.zeros_like(v)).reshape(promos.shape)
+        tab = self._promo_type_table("promo_col_val", k)
+        v = (held * tab[utype.clamp(min=0).reshape(-1)]).sum(dim=1)
+        return v.reshape(promos.shape)
 
     def _promo_flag(self, utype: torch.Tensor, promos: torch.Tensor, kind: str) -> torch.Tensor:
         k = self._pk.get(kind, -1)
         if k < 0:
             return torch.zeros_like(promos, dtype=torch.bool)
+        return (promos & self._promo_type_table("promo_flag_bits", k)[utype.clamp(min=0)]) != 0
+
+    def _promo_type_table(self, name: str, k: int) -> torch.Tensor:
+        """The catalog fold `name` (`promo_flag_bits` or `promo_col_val`) of
+        kind `k` read per UNIT TYPE through the type's promotion class, zero
+        for a chassis with no class — the two lookups `_promo_flag` and
+        `_promo_val` make for every unit, made once per type. Cached under
+        the write counters of the two catalog planes it reads."""
         rd = self.rules_dev
-        cls = rd.u_promo_class[utype.clamp(min=0)]
-        return ((promos & rd.promo_flag_bits[k][cls.clamp(min=0)]) != 0) & (cls >= 0)
+        src = (rd.u_promo_class, getattr(rd, name))
+        ent = self._promo_tab_cache.get((name, k))
+        if ent is not None and simbase.stamp_holds(ent[0], src):
+            return ent[1]
+        cls = rd.u_promo_class
+        tab = getattr(rd, name)[k][cls.clamp(min=0)]
+        live = (cls >= 0).reshape((-1,) + (1,) * (tab.dim() - 1))
+        tab = torch.where(live, tab, torch.zeros_like(tab))
+        self._promo_tab_cache[(name, k)] = (simbase.plane_stamp(src), tab)
+        return tab
 
     def _promo_val_for(self, utype: torch.Tensor, promos: torch.Tensor, kind: str,
                        bit: torch.Tensor) -> torch.Tensor:
@@ -2221,12 +2258,12 @@ class SimMasks:
         if self._encamp_didx < 0:
             return torch.zeros_like(tiles, dtype=torch.bool)
         t = tiles.clamp(min=0)
-        live = (
-            (self.district.gather(1, t) == self._encamp_didx)
-            & self.district_complete.gather(1, t)
-            & ~self.district_pillaged.gather(1, t)
-            & (self.encamp_hp.gather(1, t) > 0)
-        )
+        # `_encamp_live` read once per write of the planes it reads
+        planes = (self.district, self.district_complete, self.district_pillaged, self.encamp_hp)
+        ent = self._encamp_live_cache
+        if ent is None or not simbase.stamp_holds(ent[0], planes):
+            ent = self._encamp_live_cache = (simbase.plane_stamp(planes), self._encamp_live())
+        live = ent[1].gather(1, t)
         if not torch.is_tensor(seat) and seat == BARB_SEAT:
             return live
         return live & self._seats_hostile(seat, self.tile_seat.gather(1, t))
@@ -2346,24 +2383,16 @@ class SimMasks:
         `is_civilian` / `is_naval` an int, a bool or a [B] tensor.
         """
         tc = tiles.clamp(min=0)
-        mil_slot = self.military_at.gather(1, tc)
-        civ_slot = self.civilian_at.gather(1, tc)
-        sup_slot = self.support_at.gather(1, tc)
-        emb_slot = self.embarked_at.gather(1, tc)
-
-        neg = torch.full_like(tc, -1)
-        mil_seat = torch.where(
-            mil_slot >= 0, self.unit_seat.gather(1, mil_slot.clamp(min=0)), neg
+        # the four occupancy planes read at once: [B, 4, N] slots, then the
+        # seat of whoever holds each (-1 where nobody does)
+        occ = torch.stack((self.military_at, self.civilian_at, self.support_at, self.embarked_at), dim=1)
+        slots = occ.gather(2, tc.unsqueeze(1).expand(-1, 4, -1))
+        seats = torch.where(
+            slots >= 0,
+            self.unit_seat.gather(1, slots.clamp(min=0).reshape(slots.shape[0], -1)).reshape(slots.shape),
+            -1,
         )
-        civ_seat = torch.where(
-            civ_slot >= 0, self.unit_seat.gather(1, civ_slot.clamp(min=0)), neg
-        )
-        sup_seat = torch.where(
-            sup_slot >= 0, self.unit_seat.gather(1, sup_slot.clamp(min=0)), neg
-        )
-        emb_seat = torch.where(
-            emb_slot >= 0, self.unit_seat.gather(1, emb_slot.clamp(min=0)), neg
-        )
+        mil_seat, civ_seat, sup_seat, emb_seat = seats.unbind(1)
 
         def _flag(v):
             if torch.is_tensor(v):
@@ -3253,8 +3282,16 @@ class SimMasks:
         return _may & legal
 
     def _golden_ded_table(self, kind: int) -> torch.Tensor:
-        """[B, n_majors] bool — which civs are in a GOLDEN age holding `kind`."""
-        return (self.civ_age == 2) & (self.ded_picks == kind).any(dim=2)
+        """[B, n_majors] bool — which civs are in a GOLDEN age holding `kind`.
+        Cached per kind under the write counters of the two planes it reads;
+        callers only read what it hands back."""
+        planes = (self.civ_age, self.ded_picks)
+        ent = self._golden_ded_cache.get(kind)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
+        out = (self.civ_age == 2) & (self.ded_picks == kind).any(dim=2)
+        self._golden_ded_cache[kind] = (simbase.plane_stamp(planes), out)
+        return out
 
     def _golden_move_mp(self, pre: str) -> torch.Tensor:
         """[B, U] — the `goldenMoveBonus` twin.
@@ -3303,7 +3340,7 @@ class SimMasks:
             return tab.gather(1, civ.clamp(min=0).unsqueeze(1)).squeeze(1)
         if civ >= self.n_majors:  # a minor's or the Free row's city keeps no age
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        return tab[:, civ]
+        return tab[:, civ].clone()  # the table is cached: hand back a copy, never a view
 
     def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None,
                           waive: torch.Tensor | None = None) -> torch.Tensor:
@@ -4140,13 +4177,14 @@ class SimMasks:
             _himp = torch.where(_rid >= 0, self._res_harvest_imp[_ridc], torch.full_like(_rid, -1))
             # the improvement's own unlock, the way the BUILD columns test it
             _nimp = int(self._imp_unlock.numel())
-            _unl = torch.ones(B, _nimp, dtype=torch.bool, device=dev)
-            for _k in range(_nimp):
-                _ut, _uc = int(self._imp_unlock[_k]), int(self._imp_unlock_civic[_k])
-                if _ut >= 0:
-                    _unl[:, _k] = techs[:, _ut]
-                elif _uc >= 0:
-                    _unl[:, _k] = civics[:, _uc]
+            # every improvement's unlock in one read: its tech where it names
+            # one, else its civic, else open
+            _iut = self._imp_unlock
+            _iuc = torch.tensor(self._imp_unlock_civic, dtype=torch.long, device=dev)
+            _unl = torch.where(
+                (_iut >= 0).unsqueeze(0), techs[:, _iut.clamp(min=0)],
+                torch.where((_iuc >= 0).unsqueeze(0), civics[:, _iuc.clamp(min=0)],
+                            torch.ones(B, _nimp, dtype=torch.bool, device=dev)))
             _has_imp = (_himp >= 0) & _unl.gather(1, _himp.clamp(min=0, max=max(_nimp - 1, 0)))
             _hv = [(present
                     & ((utype == self._builder_idx) if self._builder_idx >= 0 else torch.zeros_like(present))

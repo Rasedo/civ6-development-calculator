@@ -1007,7 +1007,19 @@ class SimEconomy:
 
     def _flood_level(self) -> torch.Tensor:
         """[B] — the lowland bands the sea has already taken, which is what the
-        Flood Barrier prices itself against (`floodLevel`)."""
+        Flood Barrier prices itself against (`floodLevel`). Cached under the
+        write counters of the climate phase and its band tables; callers only
+        read it."""
+        planes = (self.climate_idx, self._cl_flood, self._cl_submerge)
+        ent = self._flood_level_cache
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
+        out = self._flood_level_read()
+        self._flood_level_cache = (simbase.plane_stamp(planes), out)
+        return out
+
+    def _flood_level_read(self) -> torch.Tensor:
+        """`_flood_level` computed."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for p in range(len(self._cl_ice_melt)):
             at = self.climate_idx >= p
@@ -1514,8 +1526,17 @@ class SimEconomy:
     def _fire_plots(self) -> torch.Tensor:
         """[B, T] — a plot a fire is burning or has left burnt: no city,
         district or wonder is placed on it (`fireFeature`), and its Woods'
-        Appeal gives way to the fire's."""
-        return self._fire_feat[self.feat_id.clamp(min=0)] & (self.feat_id >= 0) & ~self.feat_stripped
+        Appeal gives way to the fire's.
+
+        Cached under the in-place write counters of the three planes it
+        reads; callers only read what it hands back."""
+        planes = (self._fire_feat, self.feat_id, self.feat_stripped)
+        ent = self._fire_cache
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
+        out = self._fire_feat[self.feat_id.clamp(min=0)] & (self.feat_id >= 0) & ~self.feat_stripped
+        self._fire_cache = (simbase.plane_stamp(planes), out)
+        return out
 
     def _fid_in(self, fids: list[int]) -> torch.Tensor:
         """[B, T] — a live plot of one of the features `fids`."""
@@ -2705,9 +2726,15 @@ class SimEconomy:
         bi = cur.clamp(min=0, max=self.NB - 1)
         base = self._b_cols(row)["cost"].unsqueeze(1).expand(
             self.B, self.RC, self.NB).gather(2, bi)
+        # (the barrier's lowland price is read only where some queue holds
+        # one: every other entry keeps `base`, and a non-building entry the
+        # clamp lands on the barrier's index is masked off below)
         if self._barrier_bidx >= 0:
-            base = torch.where(bi == self._barrier_bidx,
-                               self._flood_barrier_cost(row).unsqueeze(2).double(), base)
+            if bool((cur == self._barrier_bidx).any()):
+                base = torch.where(bi == self._barrier_bidx,
+                                   self._flood_barrier_cost(row).unsqueeze(2).double(), base)
+            else:
+                base = base.to(torch.float64)   # the dtype the f64 price would have promoted it to
         # a queued REPAIR keeps its repair price while the building stands pillaged
         pil = self.city_bldg_pillaged[:, row].gather(2, bi)
         base = torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
@@ -3496,14 +3523,20 @@ class SimEconomy:
         amen_all = amen_all + self._gov_amen[adopted] * has_gov.to(dt)
         _neg0 = torch.full((B,), -1, dtype=torch.long, device=dev)
         _z0 = torch.zeros(B, dtype=dt, device=dev)
-        hid.append((torch.where(has_gov, self._gov_hid_min[adopted], _neg0),
-                    torch.where(has_gov, self._gov_hid_house[adopted], _z0)))
-        nd.append((torch.where(has_gov, self._gov_nd_min[adopted], _neg0),
-                   torch.where(has_gov, self._gov_nd_house[adopted], _z0),
-                   torch.where(has_gov, self._gov_nd_amen[adopted], _z0)))
+        # a row with no minimum in any game pays nothing on the applier
+        # (`_cond_house_amen` asks `min >= 0`), so it is not listed
+        _g_mins = torch.stack([torch.where(has_gov, self._gov_hid_min[adopted], _neg0),
+                               torch.where(has_gov, self._gov_nd_min[adopted], _neg0),
+                               torch.where(has_gov, self._gov_ais_min[adopted], _neg0)])
+        _g_live = (_g_mins >= 0).any(dim=1).tolist()
+        if _g_live[0]:
+            hid.append((_g_mins[0], torch.where(has_gov, self._gov_hid_house[adopted], _z0)))
+        if _g_live[1]:
+            nd.append((_g_mins[1], torch.where(has_gov, self._gov_nd_house[adopted], _z0),
+                       torch.where(has_gov, self._gov_nd_amen[adopted], _z0)))
         # amenitiesIfSpecialty rides the same applier as an amenity-only row
-        nd.append((torch.where(has_gov, self._gov_ais_min[adopted], _neg0), _z0,
-                   torch.where(has_gov, self._gov_ais_amen[adopted], _z0)))
+        if _g_live[2]:
+            nd.append((_g_mins[2], _z0, torch.where(has_gov, self._gov_ais_amen[adopted], _z0)))
         hous_all = hous_all + self._gov_housing[adopted] * has_gov.to(dt)
         ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
         fx["govymul"] = torch.where(has_gov.unsqueeze(1), self._gov_gov_ymult[adopted], fx["govymul"])
@@ -3514,8 +3547,11 @@ class SimEconomy:
         tpmult = torch.where(has_gov, self._gov_tpmult[adopted], tpmult)
         adjm = adjm * torch.where(has_gov.unsqueeze(1), self._gov_adj_mult[adopted],
                                   torch.ones_like(adjm))
+        # a government no game holds boosts nothing (the walk skips it), so
+        # only the adopted ones are listed
+        _gov_on = set(adopted[has_gov].tolist())
         for _gi in range(self._ngov):
-            if float(self._gov_byb[_gi, 0]) >= 0:
+            if _gi in _gov_on and float(self._gov_byb[_gi, 0]) >= 0:
                 byb.append((has_gov & (adopted == _gi), self._gov_byb[_gi]))
         if self._gov_fx_mag > 0:
             _gf = has_gov.to(dt)
@@ -3559,8 +3595,10 @@ class SimEconomy:
                               self._gov_byield_rows[_gi], self._gov_spacep_rows[_gi],
                               self._gov_gppb_rows[_gi])
             fx["ucst"] = fx["ucst"] + self._gov_ucs_by_type[adopted] * _gf.double().unsqueeze(1)
+            # a production row no game holds adds nothing to the additive
+            # percent sum, so only the adopted ones are listed
             for _gi in range(self._ngov):
-                if float(self._gov_prodb[_gi, 0]) >= 0:
+                if _gi in _gov_on and float(self._gov_prodb[_gi, 0]) >= 0:
                     _r = self._gov_prodb[_gi]
                     fx["prod"].append((has_gov & (adopted == _gi), int(_r[0]), int(_r[1]),
                                        int(_r[2]), float(_r[3])))
@@ -3576,6 +3614,8 @@ class SimEconomy:
                            & has_gov.unsqueeze(1))
             # a LEGACY card is an ordinary row: its government's inherent bonus
             cards = slotted
+            # which cards any game slots, read once for every per-card walk
+            _card_on = cards.any(dim=0).tolist()
             fx["milpol"] = (cards & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
             sd = cards.to(dt)
             city_y = city_y + sd @ self._pol_city_y
@@ -3583,16 +3623,21 @@ class SimEconomy:
             hous_all = hous_all + sd @ self._pol_housing
             amen_all = amen_all + sd @ self._pol_amen
             for _pi in range(self._npol):
-                _on = cards[:, _pi]
-                if not bool(_on.any()):
+                if not _card_on[_pi]:
                     continue
+                _on = cards[:, _pi]
                 _neg = torch.full((B,), -1, dtype=torch.long, device=dev)
                 _z = torch.zeros(B, dtype=dt, device=dev)
-                hid.append((torch.where(_on, self._pol_hid_min[_pi].expand(B), _neg),
-                            torch.where(_on, self._pol_hid_house[_pi].expand(B), _z)))
-                nd.append((torch.where(_on, self._pol_nd_min[_pi].expand(B), _neg),
-                           torch.where(_on, self._pol_nd_house[_pi].expand(B), _z),
-                           torch.where(_on, self._pol_nd_amen[_pi].expand(B), _z)))
+                # a card whose row carries no minimum pays nothing on the
+                # applier (`_cond_house_amen` asks `min >= 0`), so it is
+                # not listed
+                if int(self._pol_hid_min[_pi]) >= 0:
+                    hid.append((torch.where(_on, self._pol_hid_min[_pi].expand(B), _neg),
+                                torch.where(_on, self._pol_hid_house[_pi].expand(B), _z)))
+                if int(self._pol_nd_min[_pi]) >= 0:
+                    nd.append((torch.where(_on, self._pol_nd_min[_pi].expand(B), _neg),
+                               torch.where(_on, self._pol_nd_house[_pi].expand(B), _z),
+                               torch.where(_on, self._pol_nd_amen[_pi].expand(B), _z)))
                 if int(self._pol_ais_min[_pi]) >= 0:
                     # amenitiesIfSpecialty (Liberalism): an amenity-only row on
                     # the same specialty-count applier
@@ -3603,8 +3648,10 @@ class SimEconomy:
             adjm = adjm * torch.where(
                 cards.unsqueeze(2), self._pol_adj_mult.unsqueeze(0).expand(B, -1, -1),
                 torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
+            # a row no game slots boosts nothing (the walk skips it), so only
+            # the slotted ones are listed
             for _pi in range(self._npol):
-                if float(self._pol_byb[_pi, 0]) >= 0:
+                if _card_on[_pi] and float(self._pol_byb[_pi, 0]) >= 0:
                     byb.append((cards[:, _pi], self._pol_byb[_pi]))
             ymult = ymult * torch.where(
                 cards.unsqueeze(2), self._pol_ymult.unsqueeze(0).expand(B, -1, -1),
@@ -3645,14 +3692,15 @@ class SimEconomy:
                     cards.unsqueeze(2), self._pol_gwscale.unsqueeze(0).expand(B, -1, -1),
                     torch.ones(1, 1, 1, dtype=torch.float64, device=dev)).prod(dim=1)
                 for _pi in range(self._npol):
-                    _pon = cards[:, _pi]
-                    if bool(_pon.any()):
+                    if _card_on[_pi]:
+                        _pon = cards[:, _pi]
                         self._fx_rows(fx, _pon, self._pol_govtit[_pi], self._pol_bprod_rows[_pi],
                                       self._pol_byield_rows[_pi], self._pol_spacep_rows[_pi],
                                       self._pol_gppb_rows[_pi])
                 fx["ucst"] = fx["ucst"] + cards.double() @ self._pol_ucs_by_type
+                # ...and only the slotted cards'
                 for _pi in range(self._npol):
-                    if float(self._pol_prodb[_pi, 0]) >= 0:
+                    if _card_on[_pi] and float(self._pol_prodb[_pi, 0]) >= 0:
                         _r = self._pol_prodb[_pi]
                         fx["prod"].append((cards[:, _pi], int(_r[0]), int(_r[1]),
                                            int(_r[2]), float(_r[3])))
@@ -3679,9 +3727,9 @@ class SimEconomy:
                     torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
                 fx["govpercit"] = fx["govpercit"] + sd @ self._pol_gov_percit
                 for _pi in range(self._npol):
-                    _on = cards[:, _pi]
-                    if not bool(_on.any()):
+                    if not _card_on[_pi]:
                         continue
+                    _on = cards[:, _pi]
                     if int(self._pol_favor_b[_pi]) >= 0:
                         fx["favorb"].append((_on, int(self._pol_favor_b[_pi]), float(self._pol_favor_n[_pi])))
                     if int(self._pol_era_cs_min[_pi]) >= 0:
@@ -4406,10 +4454,10 @@ class SimEconomy:
             base = _var
         mult = self._gov_mods(row)[10][:, di].unsqueeze(1)
         out = base * mult
-        gmul = None
-        if self.n_governors and row < self.n_majors:
-            gmul = self._governor_tile_adj(row, di).to(out.dtype)
-            out = out * gmul
+        # a promotion column that doubles nothing for this type multiplies
+        # every tile by 1.0, which leaves each value bit for bit
+        if self.n_governors and row < self.n_majors and self._governor_adj_live(di):
+            out = out * self._governor_tile_adj(row, di).to(out.dtype)
         return out
 
     def _district_elig_site(self, row: int, j: int) -> torch.Tensor:
@@ -4577,7 +4625,21 @@ class SimEconomy:
         cities: a building held (the Palace by the capital flag), a wonder
         COMPLETE. A seat whose unique copy of the building declares no
         slots (the Marae) holds none there. Pillage is not asked here — a
-        pillaged holder keeps and pays its works."""
+        pillaged holder keeps and pays its works.
+
+        Cached per row under the write counters of the planes it reads;
+        callers only read what it hands back."""
+        planes = (self.city_bldg, self.city_wonder, self.built_wonder_complete,
+                  self.city_is_cap, self.row_civ)
+        ent = self._gw_present_cache.get(row)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
+        out = self._gw_holder_present_read(row)
+        self._gw_present_cache[row] = (simbase.plane_stamp(planes), out)
+        return out
+
+    def _gw_holder_present_read(self, row: int) -> torch.Tensor:
+        """`_gw_holder_present` computed."""
         out = torch.zeros(self.B, self.RC, self.GW_H, dtype=torch.bool, device=self.device)
         bl = self.city_bldg[:, row]
         for h in range(self.GW_H):
@@ -4601,10 +4663,12 @@ class SimEconomy:
         nothing new (`workContext`'s `open`)."""
         out = present.clone()
         dark = self._bldg_dark(self.city_dist_tile[:, row], self.city_bldg_pillaged[:, row])
-        for h in range(self.GW_H):
-            bi = self._gw_holder_bidx[h]
-            if bi >= 0:
-                out[:, :, h] = present[:, :, h] & ~dark[:, :, bi]
+        # every building holder at once: its column ANDed with its building
+        # standing lit
+        hs = [h for h in range(self.GW_H) if self._gw_holder_bidx[h] >= 0]
+        if hs:
+            bis = [int(self._gw_holder_bidx[h]) for h in hs]
+            out[:, :, hs] = present[:, :, hs] & ~dark[:, :, bis]
         return out
 
     def _gw_seat_extra(self, row: int) -> torch.Tensor:
@@ -4753,7 +4817,8 @@ class SimEconomy:
 
     def _gw_counts_by_obj(self, row: int) -> torch.Tensor:
         """[B, RC, 8] long — `gwCountsByObj`."""
-        return torch.stack([(self.city_gw_obj[:, row] == o).long().sum(dim=2) for o in range(8)], dim=2)
+        objs = torch.arange(8, device=self.device)
+        return (self.city_gw_obj[:, row].unsqueeze(3) == objs).long().sum(dim=2)
 
     def _gw_last_of_kind_all(self, kind: int) -> torch.Tensor:
         """[B, ROWS, RC] long — `gwLastOfKind`: the HIGHEST slot holding a work
@@ -4908,10 +4973,22 @@ class SimEconomy:
 
     def _gw_slot_mult(self, row: int) -> torch.Tensor:
         """[B, RC, W] long — what each slot's holder theming multiplies its
-        work by (`gwSlotMults`)."""
+        work by (`gwSlotMults`).
+
+        Cached per row under the write counters of every plane the theming
+        reads — the works, the holders, the seat's roster rows and its
+        Great Person widening; callers only read what it hands back."""
+        planes = (self.city_gw_obj, self.city_gw_era, self.city_gw_maker, self.city_gw_seat,
+                  self.city_bldg, self.city_wonder, self.built_wonder_complete, self.city_is_cap,
+                  self.city_gp_perm, self.row_civ, self.row_leader)
+        ent = self._gw_mult_cache.get(row)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
         themed = self._gw_themed(row)[:, :, self._gw_slot_holder]
-        return torch.where(themed, torch.full_like(themed, self._gw_theming_mult, dtype=torch.long),
-                           torch.ones_like(themed, dtype=torch.long))
+        out = torch.where(themed, torch.full_like(themed, self._gw_theming_mult, dtype=torch.long),
+                          torch.ones_like(themed, dtype=torch.long))
+        self._gw_mult_cache[row] = (simbase.plane_stamp(planes), out)
+        return out
 
     def _gw_yields(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, RC] culture, [B, RC] faith) double — `greatWorkYields`: the
@@ -5503,16 +5580,23 @@ class SimEconomy:
         out = torch.zeros_like(typ, dtype=torch.bool)
         if not self._res_unit_pairs:
             return out
-        provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged
-        rows = torch.arange(self.n_majors, device=self.device).reshape(1, -1, 1)
-        mine = self.tile_seat.unsqueeze(1) == rows                     # [B, majors, T]
-        # CIV6: no access to a resource the seat cannot see yet
-        mine = mine & ~torch.stack([self._res_hidden(r) for r in range(self.n_majors)], dim=1)
+        maj = (seat >= 0) & (seat < self.n_majors)
+        # the chassis a major fields anywhere, read once: a pair whose unit
+        # nobody fields starves nobody
+        fielded = set(torch.unique(typ[maj]).tolist())
+        provides = mine = None
         acc: dict[int, torch.Tensor] = {}
         for u_idx, res_idx in self._res_unit_pairs:
-            want = (typ == u_idx) & (seat >= 0) & (seat < self.n_majors)
-            if not bool(want.any()):
+            if u_idx not in fielded:
                 continue
+            want = (typ == u_idx) & maj
+            if mine is None:
+                provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged
+                rows = torch.arange(self.n_majors, device=self.device).reshape(1, -1, 1)
+                mine = self.tile_seat.unsqueeze(1) == rows                     # [B, majors, T]
+                # CIV6: no access to a resource the seat cannot see yet
+                mine = mine & ~torch.stack([self._res_hidden(r) for r in range(self.n_majors)], dim=1)
+            assert provides is not None
             if res_idx not in acc:
                 acc[res_idx] = (mine & (provides & (self.res_id == res_idx)).unsqueeze(1)).any(dim=2)
             has = acc[res_idx].gather(1, seat.clamp(min=0, max=self.n_majors - 1))
@@ -5829,14 +5913,17 @@ class SimEconomy:
         none of these."""
         return torch.ones_like(promos) + self._promo_val(utype, promos, "EXTRA_ATTACK")
 
-    def _attacks_per_turn(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
+    def _attacks_per_turn(self, utype: torch.Tensor, promos: torch.Tensor,
+                          after: torch.Tensor | None = None) -> torch.Tensor:
         """`attacksPerTurn`, in `promos`' shape. CIV6 (Expert Marksman): "+1
         additional attack per turn if unit has not moved", whose own note reads
         it as "the unit cannot make the additional attack if it moves AFTER
-        making its first attack. It can still move BEFORE it attacks"."""
+        making its first attack. It can still move BEFORE it attacks".
+        `after` is `_attacks_after_moving` of the same units, when the caller
+        already holds it."""
         # CIV6 (Warak'aq, ABILITY_EXPERT_MARKSMAN): the still-bonus, written on
         # the chassis instead of on a promotion.
-        return (self._attacks_after_moving(utype, promos)
+        return ((self._attacks_after_moving(utype, promos) if after is None else after)
                 + self._promo_val(utype, promos, "EXTRA_ATTACK_STILL")
                 + self._type_extra_attack[utype.clamp(min=0, max=self.NU - 1)].long())
 
@@ -5844,8 +5931,9 @@ class SimEconomy:
                            left: torch.Tensor) -> torch.Tensor:
         """`stepAttacksLeft` — what a step leaves of the attack budget:
         everything, until the unit has struck once."""
-        made = self._attacks_per_turn(utype, promos) - left
-        keep = (self._attacks_after_moving(utype, promos) - made).clamp(min=0)
+        after = self._attacks_after_moving(utype, promos)
+        made = self._attacks_per_turn(utype, promos, after) - left
+        keep = (after - made).clamp(min=0)
         return torch.where(made > 0, torch.minimum(left, keep), left)
 
     def _full_attacks(self, pre: str) -> torch.Tensor:
@@ -6631,9 +6719,11 @@ class SimEconomy:
             if dl_any[di]:
                 adjv = self._district_adj_seat(row, di).gather(1, t_d.clamp(min=0)).double()  # (memoised)
                 add = torch.where(dlive[:, :, di], adjv, torch.zeros_like(adjv))
+                dist_y[:, :, yc] = dist_y[:, :, yc] + add
             else:
+                # nothing to add: the bucket starts at +0.0 and never holds
+                # -0.0, so adding +0.0 would leave it bit for bit
                 add = torch.zeros(B, n, dtype=F64, device=dev)
-            dist_y[:, :, yc] = dist_y[:, :, yc] + add
             if self._log_diff:
                 # the PRE-FLOOR sum at the same tile+type key TS prints, from
                 # the WALK where the tile is known — the type-only helper
@@ -7131,8 +7221,9 @@ class SimEconomy:
             # the same way on both engines.
             _held = _seatw.any(dim=1)  # [B, nW]
             ones6 = torch.ones(1, 1, 6, dtype=F64, device=dev)
+            _held_any = _held.any(dim=0).tolist()
             for wi in range(_seatw.shape[2]):
-                if not bool(_held[:, wi].any()):
+                if not _held_any[wi]:
                     continue
                 if compw is not None:
                     total = total * torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6), ones6)

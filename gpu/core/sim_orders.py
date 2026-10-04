@@ -17,6 +17,19 @@ class SimOrders:
             self.unit_alive[d, sc[d]] = False
             self._occ_clear(d, hc[d], sc[d])
 
+    def _unit_arm_matrix(self, ab: torch.Tensor, key: tuple, arms) -> torch.Tensor:
+        """[hi + 2, arms] f64 0/1 — which applier arm each action code from -1
+        through `ab`'s highest belongs to (row r is code r - 1): `arms(codes)`
+        evaluated once over a code vector, kept while `key` (every constant
+        the arm conditions read) holds and the codes fit."""
+        hi = int(ab.max())
+        ent = self._arm_mat_cache
+        if ent is None or ent[0] != key or ent[1] < hi:
+            width = max(hi, len(self._act_names) - 1)
+            codes = torch.arange(-1, width + 1, device=self.device)
+            ent = self._arm_mat_cache = (key, width, torch.stack(arms(codes), dim=1).to(torch.float64))
+        return ent[2][: hi + 2]
+
     def _apply_seat_unit_actions(self, row: int, actions: torch.Tensor,
                                  seq_k: int = 0) -> None:
         B, dev = self.B, self.device
@@ -56,7 +69,6 @@ class SimOrders:
         # pass is moves-only by construction) and collapses the per-rank
         # guard-sync storm into this ONE sync.
         _ab = torch.where(_cmd, actions[:, :_n], torch.full_like(actions[:, :_n], -1))
-        _no = torch.zeros_like(_cmd)
         _fc = self._A_FOUND
         _sn = self._A_SNIPE
         _sn3 = self._A_SNIPE3
@@ -111,50 +123,63 @@ class SimOrders:
             _ic.append(self._A_REPAIR)
         if self._A_REMOVE_IMP >= 0:
             _ic.append(self._A_REMOVE_IMP)
-        _tab = torch.stack([
-            _held.any(dim=0),
-            _cmd.any(dim=0),
-            ((_ab >= 0) & (_ab < 6)).any(dim=0),                                # move
-            ((_ab >= 6) & (_ab < 12)).any(dim=0),                               # attack
-            ((_ab == _fc) if _fc >= 0 else _no).any(dim=0),                     # found
-            (((_ab >= _sn) & (_ab < _sn + 12))
-             | ((_ab >= _sn3) & (_ab < _sn3 + 18))).any(dim=0),  # snipe
-            ((_ab == self._A_CHOP) if self._A_CHOP >= 0 else _no).any(dim=0),
-            (torch.isin(_ab, torch.tensor(_ic, dtype=_ab.dtype, device=dev)) if _ic else _no).any(dim=0),
-            ((_ab == self._A_PILLAGE) if self._act_names and self._A_PILLAGE > 0 else _no).any(dim=0),
-            (((_ab >= _sp) & (_ab < _sp + 7)) if _sp >= 0 else _no).any(dim=0),  # spread
-            ((_ab == _xc) if _xc >= 0 else _no).any(dim=0),                     # excavate
-            ((_ab == _pk) if _pk >= 0 else _no).any(dim=0),                     # park
-            (((_ab >= _pm) & (_ab < _pm + _pcol)) if _pm >= 0 else _no).any(dim=0),  # promote
-            ((_ab == _cn) if _cn >= 0 else _no).any(dim=0),                     # condemn
-            ((_ab == _hx) if _hx >= 0 else _no).any(dim=0),                     # remove heresy
-            ((_ab == _lq) if _lq >= 0 else _no).any(dim=0),                     # launch inquisition
-            ((_ab == _hn) if _hn >= 0 else _no).any(dim=0),                      # convert heathen
-            ((_ab == _ug) if _ug >= 0 else _no).any(dim=0),                      # upgrade
-            (((_ab >= _ar) & (_ab < _ar + _asw)) if _ar >= 0 else _no).any(dim=0),   # air strike
-            (((_ab >= _rbc) & (_ab < _rbc + _rbw)) if _rbc >= 0 else _no).any(dim=0),  # rebase
-            (((_ab >= _stc) & (_ab < _stc + _stw)) if _stc >= 0 else _no).any(dim=0),  # spy travel
-            (((_ab >= _smc) & (_ab < _smc + _smw)) if _smc >= 0 else _no).any(dim=0),  # spy mission
-            ((_ab == _rdc) if _rdc >= 0 else _no).any(dim=0),                    # build road
-            ((_ab == _fnc) if _fnc >= 0 else _no).any(dim=0),                    # finish district
-            ((_ab == _gpc) if _gpc >= 0 else _no).any(dim=0),  # activate a great person
-            ((_ab == _pfc) if _pfc >= 0 else _no).any(dim=0),   # perform a concert
-            ((_ab == _bpc) if _bpc >= 0 else _no).any(dim=0),   # pay a district project
-            (((_ab >= _fuc) & (_ab < _fuc + 6)) if _fuc >= 0 else _no).any(dim=0),  # form up
-            ((_ab == _ecc) if _ecc >= 0 else _no).any(dim=0),   # join an escort
-            ((_ab == _uec) if _uec >= 0 else _no).any(dim=0),   # and leave it
-            (((_ab >= _apc) & (_ab < _apc + _asw)) if _apc >= 0 else _no).any(dim=0),  # air pillage
-            ((_ab == _rrc) if _rrc >= 0 else _no).any(dim=0),                     # lay a railroad
-            ((_ab == _cfc) if _cfc >= 0 else _no).any(dim=0),                     # clean fallout
-            (((_ab >= _nkc) & (_ab < _nkc + _nkw)) if _nkc >= 0 else _no).any(dim=0),  # a nuclear strike
-            ((_ab == _hvc) if _hvc >= 0 else _no).any(dim=0),                     # harvest a resource
-            ((_ab == _wcc) if _wcc >= 0 else _no).any(dim=0),                     # a charge into a wonder
-            (((_ab >= _dpc) & (_ab < _dpc + _dpw)) if _dpc >= 0 else _no).any(dim=0),  # deploy on patrol
-            ((_ab == _rtc) if _rtc >= 0 else _no).any(dim=0),                     # return to base
-            (((_ab >= _prc) & (_ab < _prc + _asw)) if _prc >= 0 else _no).any(dim=0),  # priority target
-            ((_ab == _evc) if _evc >= 0 else _no).any(dim=0),                     # evangelize a belief
-            ((_ab == _ghc) if _ghc >= 0 else _no).any(dim=0),                     # a Guru heals
-        ]).tolist()
+        # Each ARM's action codes as one membership matrix over the codes
+        # the block holds (`_unit_arm_matrix`, the arm conditions below
+        # evaluated on every code once), so which arms fire at which rank
+        # is one scatter of the block's codes and one product.
+        def _arms(c: torch.Tensor) -> list:
+            _no = torch.zeros_like(c, dtype=torch.bool)
+            return [
+                ((c >= 0) & (c < 6)),                                # move
+                ((c >= 6) & (c < 12)),                               # attack
+                ((c == _fc) if _fc >= 0 else _no),                     # found
+                (((c >= _sn) & (c < _sn + 12))
+                 | ((c >= _sn3) & (c < _sn3 + 18))),  # snipe
+                ((c == self._A_CHOP) if self._A_CHOP >= 0 else _no),
+                (torch.isin(c, torch.tensor(_ic, dtype=c.dtype, device=dev)) if _ic else _no),
+                ((c == self._A_PILLAGE) if self._act_names and self._A_PILLAGE > 0 else _no),
+                (((c >= _sp) & (c < _sp + 7)) if _sp >= 0 else _no),  # spread
+                ((c == _xc) if _xc >= 0 else _no),                     # excavate
+                ((c == _pk) if _pk >= 0 else _no),                     # park
+                (((c >= _pm) & (c < _pm + _pcol)) if _pm >= 0 else _no),  # promote
+                ((c == _cn) if _cn >= 0 else _no),                     # condemn
+                ((c == _hx) if _hx >= 0 else _no),                     # remove heresy
+                ((c == _lq) if _lq >= 0 else _no),                     # launch inquisition
+                ((c == _hn) if _hn >= 0 else _no),                      # convert heathen
+                ((c == _ug) if _ug >= 0 else _no),                      # upgrade
+                (((c >= _ar) & (c < _ar + _asw)) if _ar >= 0 else _no),   # air strike
+                (((c >= _rbc) & (c < _rbc + _rbw)) if _rbc >= 0 else _no),  # rebase
+                (((c >= _stc) & (c < _stc + _stw)) if _stc >= 0 else _no),  # spy travel
+                (((c >= _smc) & (c < _smc + _smw)) if _smc >= 0 else _no),  # spy mission
+                ((c == _rdc) if _rdc >= 0 else _no),                    # build road
+                ((c == _fnc) if _fnc >= 0 else _no),                    # finish district
+                ((c == _gpc) if _gpc >= 0 else _no),  # activate a great person
+                ((c == _pfc) if _pfc >= 0 else _no),   # perform a concert
+                ((c == _bpc) if _bpc >= 0 else _no),   # pay a district project
+                (((c >= _fuc) & (c < _fuc + 6)) if _fuc >= 0 else _no),  # form up
+                ((c == _ecc) if _ecc >= 0 else _no),   # join an escort
+                ((c == _uec) if _uec >= 0 else _no),   # and leave it
+                (((c >= _apc) & (c < _apc + _asw)) if _apc >= 0 else _no),  # air pillage
+                ((c == _rrc) if _rrc >= 0 else _no),                     # lay a railroad
+                ((c == _cfc) if _cfc >= 0 else _no),                     # clean fallout
+                (((c >= _nkc) & (c < _nkc + _nkw)) if _nkc >= 0 else _no),  # a nuclear strike
+                ((c == _hvc) if _hvc >= 0 else _no),                     # harvest a resource
+                ((c == _wcc) if _wcc >= 0 else _no),                     # a charge into a wonder
+                (((c >= _dpc) & (c < _dpc + _dpw)) if _dpc >= 0 else _no),  # deploy on patrol
+                ((c == _rtc) if _rtc >= 0 else _no),                     # return to base
+                (((c >= _prc) & (c < _prc + _asw)) if _prc >= 0 else _no),  # priority target
+                ((c == _evc) if _evc >= 0 else _no),                     # evangelize a belief
+                ((c == _ghc) if _ghc >= 0 else _no),                     # a Guru heals
+            ]
+        _arm_key = (_fc, _sn, _sn3, self._A_CHOP, tuple(_ic), bool(self._act_names), self._A_PILLAGE,
+                    _sp, _xc, _pk, _pm, _pcol, _cn, _hx, _lq, _hn, _ug, _ar, _asw, _rbc, _rbw,
+                    _stc, _stw, _smc, _smw, _rdc, _fnc, _gpc, _pfc, _bpc, _fuc, _ecc, _uec,
+                    _apc, _rrc, _cfc, _nkc, _nkw, _hvc, _wcc, _dpc, _dpw, _rtc, _prc, _evc, _ghc)
+        _amat = self._unit_arm_matrix(_ab, _arm_key, _arms)              # [codes, arms]
+        _pres = torch.zeros(_amat.shape[0], _n, dtype=torch.float64, device=dev)
+        _pres.scatter_(0, _ab.long() + 1, 1.0)                            # row r: code r - 1
+        _tab = torch.cat([torch.stack([_held.any(dim=0), _cmd.any(dim=0)]),
+                          (_amat.t() @ _pres) > 0], dim=0).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
          _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
@@ -171,23 +196,24 @@ class SimOrders:
                 continue
             slot = smap[:, n]
             sc = slot.clamp(min=0)
-            present = (slot >= 0) & ctl & self.unit_alive.gather(1, sc.unsqueeze(1)).squeeze(1)
+            sc1 = sc.unsqueeze(1)
+            present = (slot >= 0) & ctl & self.unit_alive.gather(1, sc1).squeeze(1)
             a = actions[:, n].to(torch.long)
             act = present & (a >= 0) & (a != 12)
             if not bool(act.any()):
                 continue
             own_tile = self.tile_seat == row   # live at THIS rank (see the head)
-            here = self.unit_tile.gather(1, sc.unsqueeze(1)).squeeze(1)
+            here = self.unit_tile.gather(1, sc1).squeeze(1)
             hc = here.clamp(min=0)
-            utp = self.unit_type.gather(1, sc.unsqueeze(1)).squeeze(1)
+            utp = self.unit_type.gather(1, sc1).squeeze(1)
             ut = utp.clamp(min=0, max=self.NU - 1)
             is_civ = self._type_civilian[utp.clamp(min=0)]
-            u_emb = self.unit_emb.gather(1, sc.unsqueeze(1)).squeeze(1)
-            u_charges = self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1)
+            u_emb = self.unit_emb.gather(1, sc1).squeeze(1)
+            u_charges = self.unit_charges.gather(1, sc1).squeeze(1)
             # a SPENT unit takes no verb (TS returns before any verb when
             # `movesLeft` is 0); the verbs below that read no moves of their
             # own gate on it here
-            u_moves = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1) > 0
+            u_moves = self.unit_mp.gather(1, sc1).squeeze(1) > 0
             nb = self.neigh[hc]
 
             if _rk_found[n] and self._settler_idx >= 0:

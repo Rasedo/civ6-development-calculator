@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
+from . import simbase
 
 
 class SimMinors:
@@ -1719,13 +1720,26 @@ class SimMinors:
             d[key] = v
         return v
 
+    def _wonder_site_plane(self, wi: int) -> torch.Tensor:
+        """[B, T] — wonder `wi`'s terrain bit off the baked `wok` mask, less
+        every fire's plot: the half of `_wonder_cand` that names no city.
+        Cached under the write counters of the planes it reads."""
+        planes = (self.wok, self._fire_feat, self.feat_id, self.feat_stripped)
+        ent = self._wsite_cache
+        if ent is None or not simbase.stamp_holds(ent[0], planes):
+            ent = self._wsite_cache = (simbase.plane_stamp(planes), {})
+        out = ent[1].get(wi)
+        if out is None:
+            out = ent[1][wi] = ((self.wok >> wi) & 1).bool() & ~self._fire_plots()
+        return out
+
     def _wonder_cand(self, row: int, j: int, wi: int, base_ok: torch.Tensor) -> torch.Tensor:
         """`canPlaceWonder`'s live half. The terrain half rides the static
         `wok` bitmask the exporter baked out of `wonderTerrainOk`, so nothing
         here re-derives ground."""
         wrow = self._wond_rows[wi]
         # ...and `canPlaceWonder` refuses a fire's plot (`fireFeature`)
-        cand_w = base_ok & ((self.wok >> wi) & 1).bool() & ~self._fire_plots()
+        cand_w = base_ok & self._wonder_site_plane(wi)
         adjD = int(wrow["adjD"])
         adjDB = int(wrow["adjDB"])
         if adjD == -2:

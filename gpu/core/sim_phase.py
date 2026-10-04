@@ -964,8 +964,13 @@ class SimPhase:
             on = (hit & (env >= _e)).double()                  # [B, S]
             # per type: the capital row, then each requirement group the city holds
             amt = cap.unsqueeze(1) * self._cs_env_pcap[_e].unsqueeze(0)   # [B, T]
-            for _t, _a, _bs in self._cs_env_pgrp[_e]:
-                amt[:, _t] += _a * stand[:, _bs].any(dim=1).double()
+            _pm = self._cs_env_pmat[_e]
+            if _pm is not None:
+                # every amount whole, so the groups sum exactly in one product
+                amt = amt + ((stand.double() @ _pm[0]) > 0).double() @ _pm[1]
+            else:
+                for _t, _a, _bs in self._cs_env_pgrp[_e]:
+                    amt[:, _t] += _a * stand[:, _bs].any(dim=1).double()
             flat = flat + torch.einsum("bs,bst,bt->b", on, tsel, amt)
         return flat
 

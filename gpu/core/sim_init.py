@@ -341,6 +341,7 @@ class SimInit:
         self._cs_env_ybld = {}
         self._cs_env_pcap = {}
         self._cs_env_pgrp = {}
+        self._cs_env_pmat = {}
         for _e in self._cs_env_bars:
             _ycap = torch.zeros(_nT, dtype=torch.float64, device=device)
             _ybld = torch.zeros(_nT, len(rules.b_cost), dtype=torch.float64, device=device)
@@ -362,6 +363,21 @@ class SimInit:
                     _ycap[_t] += _a
             self._cs_env_ycap[_e], self._cs_env_ybld[_e] = _ycap, _ybld
             self._cs_env_pcap[_e], self._cs_env_pgrp[_e] = _pcap, _pgrp
+            # the requirement groups as two matrices — which buildings
+            # qualify each group [G, NB] and what each pays its type [G, T]
+            # — wherever every amount is a whole number, so the groups' sum
+            # is exact in any order (`_cs_item_prod`); None keeps the walk
+            _whole = all(float(a).is_integer() for _t, a, _b in _pgrp) \
+                and bool((_pcap == _pcap.round()).all())
+            if _pgrp and _whole:
+                _gm = torch.zeros(len(_pgrp), len(rules.b_cost), dtype=torch.float64, device=device)
+                _ga = torch.zeros(len(_pgrp), _nT, dtype=torch.float64, device=device)
+                for _g, (_t, _a, _b) in enumerate(_pgrp):
+                    _gm[_g, _b] = 1.0
+                    _ga[_g, _t] = _a
+                self._cs_env_pmat[_e] = (_gm.t().contiguous(), _ga)
+            else:
+                self._cs_env_pmat[_e] = None
         # [B, S, T] one-hot of each city-state's type, and [T] each type's
         # yield index
         self._cs_type_onehot = torch.nn.functional.one_hot(_cst, _nT).to(torch.float64)
@@ -3162,6 +3178,19 @@ class SimInit:
         self._gov_cat_version = 0
         self._dadj_cache = None          # (_eff_version, {di: floored [B,T] adjacency})
         self._wadj_cache = None          # (_eff_version, {key: [B,T] wonder-adjacency plane})
+        self._fire_cache = None          # (plane stamp, [B,T]) — `_fire_plots`
+        self._gw_present_cache: dict = {}  # row -> (plane stamp, [B,RC,H]) — `_gw_holder_present`
+        self._gw_mult_cache: dict = {}     # row -> (plane stamp, [B,RC,W]) — `_gw_slot_mult`
+        self._dpill_any_cache = None       # (plane stamp, bool) — `_any_district_pillaged`
+        self._encamp_live_cache = None     # (plane stamp, [B,T]) — `_encamp_block`
+        self._flood_level_cache = None     # (plane stamp, [B]) — `_flood_level`
+        self._dcount_cache: dict = {}      # row -> (plane stamp, (all, specialty)) — `_district_counts`
+        self._golden_ded_cache: dict = {}  # kind -> (plane stamp, [B, n_majors]) — `_golden_ded_table`
+        self._arm_mat_cache = None         # (arm constants, widest code, [codes, arms]) — `_unit_arm_matrix`
+        self._gadj_live_cache = None       # (plane stamp, [types] bool) — `_governor_adj_live`
+        self._distcnt_cache: dict = {}     # (row, gate) -> (slot map, plane stamp, [B,RC,nD]) — `_dist_counts`
+        self._promo_tab_cache: dict = {}   # (fold, kind) -> (plane stamp, per-type table) — `_promo_type_table`
+        self._wsite_cache = None         # (plane stamp, {wi: [B,T]}) — `_wonder_cand`'s static half
         self._fx_row_cache = None        # (_eff_version, {channel: [B, n_majors]})
         self._hs_faith_cache = None      # (_eff_version, [B,T] Holy Site faith output)
         # Yields sum the picked tiles sequentially to mirror the TS reduce. When

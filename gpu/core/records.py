@@ -231,7 +231,7 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
     if _w is not None and war_kind is not None and int(war_kind[b]) >= 0:
         rec["warKind"] = int(war_kind[b])  # the WAR_KINDS code the declaration takes
     if policies is not None:
-        rec["policies"] = [i for i in range(int(policies.shape[1])) if bool(policies[b, i])]
+        rec["policies"] = policies[b].nonzero(as_tuple=True)[0].tolist()
     rec.update(buy_record_fields(b, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist))
     if route is not None and int(route[0][b]) >= 0:
         rec["route"] = [int(route[0][b]), int(route[1][b])]
