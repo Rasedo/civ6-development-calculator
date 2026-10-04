@@ -722,6 +722,16 @@ export function completedDistrictCount(state: GameState, city: City, specialtyOn
   }).length;
 }
 
+/** REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS' count: the city's finished,
+ *  unpillaged specialty districts (a city whose one Holy Site lies pillaged
+ *  takes no Classical Republic housing). */
+export function liveSpecialtyCount(state: GameState, city: City): number {
+  return city.districts.filter((d) => {
+    const t = state.map.tiles[d.tileIndex];
+    return d.type !== 'CITY_CENTER' && t.districtComplete && !t.districtPillaged && DISTRICTS[d.type].countsTowardLimit;
+  }).length;
+}
+
 /** `allIndustry` is Vertical Integration, passed in because the governor read
  *  lives a module above this one. */
 export function regionalEffects(

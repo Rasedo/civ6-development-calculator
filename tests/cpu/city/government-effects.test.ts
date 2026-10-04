@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { seededGame, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { defaultModifiers, getModifiers, governmentUnitCS, governmentXpPct, prodBoostPct } from '../../../cpu/core/effects';
 import { computeHousing, computeCityStats } from '../../../cpu/core/city';
-import { completedDistrictCount } from '../../../cpu/core/yields';
+import { liveSpecialtyCount } from '../../../cpu/core/yields';
 import { awardCityXp, awardDefenseXp } from '../../../cpu/core/combat';
 import { cityXp } from '../../../cpu/core/promotions';
 import { warWearinessBattle, wwGet } from '../../../cpu/core/weariness';
@@ -46,7 +46,7 @@ describe('the sourced government rows', () => {
     expect(GOVERNMENTS.OLIGARCHY.effects).toEqual(
       { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 } });
     expect(GOVERNMENTS.CLASSICAL_REPUBLIC.effects).toEqual(
-      { cityWithDistrict: { housing: 1, amenities: 1 } });
+      { housingIfDistricts: { min: 1, housing: 1 }, amenitiesIfSpecialty: { min: 1, amenities: 1 } });
     expect(GOVERNMENTS.MONARCHY.effects).toEqual({ housingPerWallLevel: 1 });
     expect(GOVERNMENTS.MERCHANT_REPUBLIC.effects).toEqual({ governorYieldMult: { gold: 1.1 } });
     expect(GOVERNMENTS.THEOCRACY.effects).toEqual(
@@ -152,39 +152,43 @@ describe('FASCISM wwCutPct — "War Weariness reduced by 20%"', () => {
   });
 });
 
-describe('CLASSICAL REPUBLIC — the ANY-district gate and the GPP factor', () => {
+describe('CLASSICAL REPUBLIC — the specialty-district gate and the GPP factor', () => {
   function plant(state: GameState, city: City, type: DistrictId, col: number, row: number, complete = true) {
     const t = tileAtCoords(state.map, col, row);
     t.district = type;
     t.districtComplete = complete;
     setTileOwner(t, city.seat, city.id);
     city.districts.push({ type, tileIndex: t.index });
+    return t;
   }
 
-  it('a NON-SPECIALTY district opens the housing and amenity grant', () => {
+  it('a specialty district opens the housing and amenity grant; a canal does not', () => {
     borrowingRow(GOVERNMENTS.CLASSICAL_REPUBLIC.effects, () => {
       const state = makeState();
       adopt(state);
       const city = settleAt(state, tileAtCoords(state.map, 5, 5).index);
       const h0 = computeHousing(state, city);
       const a0 = computeCityStats(state, city).amenities.have;
-      // CANAL counts toward no specialty limit — the old specialty-gated
-      // row would have paid nothing here
       plant(state, city, 'CANAL', 6, 5);
-      expect(completedDistrictCount(state, city, true)).toBe(0);
-      expect(completedDistrictCount(state, city, false)).toBe(1);
+      expect(computeHousing(state, city)).toBe(h0);
+      plant(state, city, 'CAMPUS', 4, 5);
+      expect(liveSpecialtyCount(state, city)).toBe(1);
       expect(computeHousing(state, city)).toBe(h0 + 1);
       expect(computeCityStats(state, city).amenities.have).toBe(a0 + 1);
     });
   });
 
-  it('an INCOMPLETE district pays nothing', () => {
+  it('an incomplete or pillaged specialty district pays nothing', () => {
     borrowingRow(GOVERNMENTS.CLASSICAL_REPUBLIC.effects, () => {
       const state = makeState();
       adopt(state);
       const city = settleAt(state, tileAtCoords(state.map, 5, 5).index);
       const h0 = computeHousing(state, city);
-      plant(state, city, 'CANAL', 6, 5, false);
+      plant(state, city, 'CAMPUS', 6, 5, false);
+      expect(computeHousing(state, city)).toBe(h0);
+      const t = plant(state, city, 'HOLY_SITE', 4, 5);
+      t.districtPillaged = true;
+      expect(liveSpecialtyCount(state, city)).toBe(0);
       expect(computeHousing(state, city)).toBe(h0);
     });
   });

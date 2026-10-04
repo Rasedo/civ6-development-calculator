@@ -30,7 +30,7 @@ import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, 
 import { addEnvoys, allianceSuzInfluence, cityStateById, cityStateItemProduction, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
-import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING } from '../data/seats';
+import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
@@ -113,7 +113,7 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { pantheonMoment, transferMoments, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
-import { cityAppealResolver, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
+import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
@@ -595,7 +595,8 @@ export function religionLoyalty(state: GameState, city: City): number {
 
 /** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors." The
  *  building stands in ONE city; the clause reaches every city its SEAT holds,
- *  so it is summed over the seat and paid to whichever city has no governor. */
+ *  so it is summed over the seat and paid to whichever city has no ESTABLISHED
+ *  governor (1104 Taiyuan's "Other" rises 2 the turn Reyna establishes). */
 export function ungovernedLoyalty(state: GameState, seat: number): number {
   return seatBuildingSum(state, seat, 'loyaltyWithoutGovernor');
 }
@@ -617,8 +618,11 @@ function wonderLoyaltyAura(state: GameState, city: City): boolean {
  * Apply a turn of loyalty to `city` (called from endTurn with the stats it
  * already computed). Returns true when the city has hit 0 and must flip.
  */
-export function applyLoyalty(state: GameState, city: City, amenityTierName: string, hasGovernor = false): boolean {
-  const govBonus = hasGovernor ? GOVERNOR_LOYALTY : ungovernedLoyalty(state, city.seat);
+export function applyLoyalty(state: GameState, city: City, amenityTierName: string, hasGovernor = false,
+  starving = false): boolean {
+  const govBonus = (hasGovernor ? GOVERNOR_LOYALTY : 0)
+    + (cityGovernorEstablished(state, city) ? 0 : ungovernedLoyalty(state, city.seat))
+    + (starving ? LOYALTY_STARVATION : 0);
   if (!cityHolders(state).some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
   // CIV6 (Mediterranean Colonies): "Coastal cities founded by Phoenicia and
   // located on the same continent as the Phoenician Capital are 100% Loyal."
@@ -3043,7 +3047,7 @@ export function seatPhase(state: GameState): void {
       const popBefore = civCity.population;
       seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
       cityBorderGrowth(state, civCity, actor.seat, cultureAfterGrowth(state, civCity, popBefore, stats));
-      if (applyLoyalty(state, civCity, stats.amenities.tier.name, rGovIds.has(civCity.id))) {
+      if (applyLoyalty(state, civCity, stats.amenities.tier.name, rGovIds.has(civCity.id), stats.foodSurplus < 0)) {
         civCityDefectors.push(civCity);
       }
       cityStrikes(state, civCity, cityStrikeStrength(state, civCity));

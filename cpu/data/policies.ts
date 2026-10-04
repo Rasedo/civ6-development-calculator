@@ -174,8 +174,6 @@ export interface PolicyEffects {
   wwCutPct?: number;
   /** multiplies every per-turn Great Person point source */
   gppMult?: number;
-  /** housing and amenities in every city with ANY completed district */
-  cityWithDistrict?: { housing: number; amenities: number };
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
   /** CIV6 (Monarchy): housing per LEVEL of the city's walls. */
   housingPerWallLevel?: number;
@@ -1428,8 +1426,10 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC', 'Tier', { expect: 'Tier1' }),
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot (the Classical Republic has NO military row — none in the install, none here)', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC&GovernmentSlotType=SLOT_ECONOMIC', 'NumSlots'), xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC&GovernmentSlotType=SLOT_MILITARY', 'NumSlots', { absent: true })] },
     'bonus.gppMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_GREAT_PEOPLE&Name=Amount', 'Value')] },
-    'effects.cityWithDistrict.housing': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_HOUSING&Name=Amount', 'Value'),
-    'effects.cityWithDistrict.amenities': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_AMENITY&Name=Amount', 'Value'),
+    'effects.housingIfDistricts.min': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_1_SPECIALTY_DISTRICT&Name=Amount', 'Value'),
+    'effects.housingIfDistricts.housing': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_HOUSING&Name=Amount', 'Value'),
+    'effects.amenitiesIfSpecialty.min': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_1_SPECIALTY_DISTRICT&Name=Amount', 'Value'),
+    'effects.amenitiesIfSpecialty.amenities': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_AMENITY&Name=Amount', 'Value'),
   },
   MONARCHY: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_MONARCHY', 'Tier', { expect: 'Tier2' }),
@@ -1498,8 +1498,10 @@ const LEGACY_SRC: Record<string, SrcMap> = {
   },
   CLASSICAL_REPUBLIC: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_CLASSICAL_REPUBLIC', 'PolicyToUnlock', { expect: 'POLICY_GOV_CLASSICAL_REPUBLIC' }),
-    'effects.cityWithDistrict.housing': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_HOUSING&Name=Amount', 'Value'),
-    'effects.cityWithDistrict.amenities': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_AMENITY&Name=Amount', 'Value'),
+    'effects.housingIfDistricts.min': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_1_SPECIALTY_DISTRICT&Name=Amount', 'Value'),
+    'effects.housingIfDistricts.housing': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_HOUSING&Name=Amount', 'Value'),
+    'effects.amenitiesIfSpecialty.min': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_1_SPECIALTY_DISTRICT&Name=Amount', 'Value'),
+    'effects.amenitiesIfSpecialty.amenities': xml('ModifierArguments', 'ModifierId=CLASSICAL_REPUBLIC_AMENITY&Name=Amount', 'Value'),
   },
   MONARCHY: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_MONARCHY', 'PolicyToUnlock', { expect: 'POLICY_GOV_MONARCHY' }),
@@ -1547,13 +1549,11 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W],
       { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 } },
       '+4 combat strength for melee and anti-cavalry units.'),
-    // CIV6 (GS) INHERENT: "All cities with a district receive +1 Housing
-    // and +1 Amenity." ANY completed district -- the specialty-gated
-    // channels are the CARDS' shape (Insulae, Medina Quarter), not this
-    // row's.
+    // CIV6 (GS) INHERENT: +1 Housing and +1 Amenity in every city with a
+    // specialty district (CITY_HAS_1_SPECIALTY_DISTRICT), the cards' shape.
     G('CLASSICAL_REPUBLIC', 'Classical Republic', 1, [E, E, D, W],
-      { cityWithDistrict: { housing: 1, amenities: 1 } },
-      '+1 housing and +1 amenity in every city with a district.'),
+      { housingIfDistricts: { min: 1, housing: 1 }, amenitiesIfSpecialty: { min: 1, amenities: 1 } },
+      '+1 housing and +1 amenity in every city with a specialty district.'),
     // CIV6 (GS) INHERENT: "+1 Housing per level of Walls." `wallsLevel`
     // answers it — the level BUILT, where `wallsTier` is the DEFENCE tier
     // Urban Defenses raises with no wall standing.

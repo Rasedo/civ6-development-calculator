@@ -358,8 +358,7 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
       'ModifierId=GARRISON_COMMANDER_ADJUST_CITY_COMBAT_BONUS&Name=Amount', 'Value'),
     'effects.loyaltyToOwn.loyalty': xml('ModifierArguments',
       'ModifierId=PRESTIGE_IDENTITY_PRESSURE_TO_DOMESTIC_CITIES&Name=Amount', 'Value'),
-    'effects.loyaltyToOwn.range': { pedia: 'the published promotion text ("within 9 tiles"); the install\'s '
-      + 'MODIFIER_GOVERNOR_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius and no GlobalParameter names one' },
+    'effects.loyaltyToOwn.range': { lab: 'C-94', note: 'EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE reaches 10 tiles, the governed city included: 1,059 city-turns of the Garrison Commander, every one at distance 0-10 paid +4 and every one at 11-18 nothing, runs/h1_duelw1103-1108' },
   },
   DEFENSE_LOGISTICS: {
     'effects.noSiege': xml('ModifierArguments',
@@ -385,8 +384,7 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
   EMISSARY: {
     'effects.loyaltyToForeign.loyalty': xml('ModifierArguments',
       'ModifierId=EMISSARY_IDENTITY_PRESSURE_TO_FOREIGN_CITIES&Name=Amount', 'Value'),
-    'effects.loyaltyToForeign.range': { pedia: 'the published promotion text ("within 9 tiles"); the install\'s '
-      + 'MODIFIER_GOVERNOR_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius' },
+    'effects.loyaltyToForeign.range': { lab: 'C-94', note: 'EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE reaches 10 tiles, the governed city included: 1,059 city-turns of the Garrison Commander, every one at distance 0-10 paid +4 and every one at 11-18 nothing, runs/h1_duelw1103-1108' },
   },
   AFFLUENCE: {
     'effects.minorLuxuries': xml('Modifiers', 'ModifierId=AFFLUENCE_COPY_LUXURIES_FOR_IMPORT', 'ModifierType',
@@ -612,7 +610,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { cityDefense: 5 }),
   G('GARRISON_COMMANDER', 'VICTOR', 1, 'Garrison Commander',
     "Units defending within the city's territory get +5 Combat Strength. Your other cities within 9 tiles gain +4 Loyalty per turn towards your civilization.",
-    { territoryCS: 5, loyaltyToOwn: { range: 9, loyalty: 4 } }),
+    { territoryCS: 5, loyaltyToOwn: { range: 10, loyalty: 4 } }),
   G('DEFENSE_LOGISTICS', 'VICTOR', 1, 'Defense Logistics',
     'City cannot be put under siege. Accumulating Strategic resources gain an additional +1 per turn.',
     { noSiege: true, stockpilePerTurn: 1 }),
@@ -632,7 +630,7 @@ export const GOVERNOR_PROMOTIONS: readonly GovernorPromotionDef[] = [
     { envoysAtMinor: 2 }),
   G('EMISSARY', 'AMANI', 1, 'Emissary',
     'Other cities within 9 tiles and not owned by you lose 2 Loyalty per turn.',
-    { loyaltyToForeign: { range: 9, loyalty: 2 } }),
+    { loyaltyToForeign: { range: 10, loyalty: 2 } }),
   G('AFFLUENCE', 'AMANI', 1, 'Affluence',
     'While established in a city-state, provides a copy of its Luxury resources to you.',
     { minorLuxuries: true }),

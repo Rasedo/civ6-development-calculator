@@ -114,6 +114,10 @@ export const FREE_CITY_LOYALTY_PER_TURN = srcConst('seats.freeCityLoyaltyPerTurn
  *  (runs/h1_duelw1105, h1_duelw1106, h1_duelw1108: every Chinese city's
  *  "Other" term rose 3 the turn China's religion took it, and every Roman
  *  city's held still when the same religion took it). */
+/** CIV6 (IDENTITY_PER_TURN_FROM_STARVATION): a city whose food falls short
+ *  of its citizens' (1108 Taiyuan's "Other" 3 / -1 as its surplus swings
+ *  1 / -4, t150-250) */
+export const LOYALTY_STARVATION = srcConst('seats.loyaltyStarvation', -4, gp('IDENTITY_PER_TURN_FROM_STARVATION'));
 export const LOYALTY_RELIGION_MATCHING = srcConst('seats.loyaltyReligionMatching', 3,
   gp('IDENTITY_PER_TURN_FROM_RELIGION_MATCHING_FOUNDED'));
 export const LOYALTY_RELIGION_MISMATCHING = srcConst('seats.loyaltyReligionMismatching', -3,

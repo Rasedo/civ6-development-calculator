@@ -6479,13 +6479,12 @@ class SimSeats:
         "All cities within 9 tiles of a city with your Governor gain +4 Loyalty
         per turn towards your civilization" — the seat's OWN cities gain it and
         a foreign one loses it, the shape `governorLoyaltyAura` already pays
-        for the Garrison Commander. Never paid to the governed city itself."""
+        for the Garrison Commander, the governed city in its own reach."""
         B, RC, dev = self.B, self.RC, self.device
         out = torch.zeros(B, RC, dtype=torch.float64, device=dev)
         if not self._governor_loyalty_rows or not self.n_governors:
             return out
         here = self.city_center[:, row].clamp(min=0)  # [B, RC]
-        ids = self.city_id[:, row]
         for src in range(self.n_majors):
             rows = [r for r in self._governor_loyalty_rows if bool(self._row_is(src, r[0], r[1]).count_nonzero())]
             if not rows:
@@ -6495,9 +6494,8 @@ class SimSeats:
                 continue
             src_ctr = self.city_center[:, src].clamp(min=0)         # [B, RC]
             d = self.pair_dist[here.unsqueeze(2), src_ctr.unsqueeze(1)]  # [B, RC, RC]
-            same = (ids.unsqueeze(2) == self.city_id[:, src].unsqueeze(1)) if src == row else                 torch.zeros_like(d, dtype=torch.bool)
             live = (est.unsqueeze(1) & self.city_alive[:, src].unsqueeze(1)
-                    & self.city_alive[:, row].unsqueeze(2) & ~same)
+                    & self.city_alive[:, row].unsqueeze(2))
             for _lc, _ll, _amt, _rng in rows:
                 # each row by ITS OWN carrier: reading `rows[0]`'s for all of
                 # them aims every later row at the first one's civilization
@@ -9416,9 +9414,18 @@ class SimSeats:
         measured from the WONDER TILE like every other wonder aura."""
         cols = self.RC
         z = torch.zeros(self.B, cols, dtype=torch.float64, device=self.device)
-        if not self._wond_n or not self._wond_amen_imp:
+        if not self._wond_n or not (self._wond_amen_imp or self._wond_amen_lake):
             return z
         wreg = self.city_wonder[:, row, :cols]  # [B, cols, nW] tile per wonder
+        # +1 per Lake tile within the reach, the wonder's own plot included
+        for _wi, _rng in self._wond_amen_lake:
+            wt = wreg[:, :, _wi]
+            has = (wt >= 0) & self.built_wonder_complete.gather(1, wt.clamp(min=0))
+            if not bool(has.count_nonzero()):
+                continue
+            near = self.pair_dist[wt.clamp(min=0)] <= _rng  # [B, cols, T]
+            lake = (self.terrain == self._terr_lake).unsqueeze(1)
+            z = z + (near & lake).sum(dim=2).double() * has.double()
         for _wi, _imps, _rng in self._wond_amen_imp:
             wt = wreg[:, :, _wi]
             has = (wt >= 0) & self.built_wonder_complete.gather(1, wt.clamp(min=0))
@@ -10017,6 +10024,16 @@ class SimSeats:
         self._dcount_cache[row] = (simbase.plane_stamp(planes), out)
         return out
 
+    def _live_specialty_counts(self, row: int) -> torch.Tensor:
+        """[B, cols] liveSpecialtyCount — REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS'
+        count: the city's finished, unpillaged specialty districts. A
+        specialty type is never repeatable, so the registry read is whole."""
+        reg = self.city_dist_tile[:, row, :self.RC]
+        flat = reg.clamp(min=0).reshape(self.B, -1)
+        live = (reg >= 0) & self.district_complete.gather(1, flat).reshape_as(reg) \
+            & ~self.district_pillaged.gather(1, flat).reshape_as(reg)
+        return (live & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
+
     def _district_counts_read(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """`_district_counts` computed."""
         cols = self.RC
@@ -10146,12 +10163,10 @@ class SimSeats:
             housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab_for("bldgH", row))
         if self._seat_has_beliefs(row):
             housing = housing + self._bel_add("river", row)[:, 1].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
-        # +catalog housing per owned improvement within the work radius
-        # (pillaged or not — computeHousing does not gate on pillaged,
-        # unlike yields). The tile must belong to THIS CITY, not merely to
-        # this seat: Civ 6 pays the improvement's housing to the city whose
-        # culture borders contain the tile, and a tile lies inside exactly
-        # one. https://civilization.fandom.com/wiki/Housing_(Civ6)
+        # +catalog housing per owned, unpillaged improvement within the work
+        # radius. The tile must belong to THIS CITY, not merely to this seat:
+        # Civ 6 pays the improvement's housing to the city whose culture
+        # borders contain the tile, and a tile lies inside exactly one.
         win = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H, self.wrap_x).reshape(B, cols, -1)
         wf = win.clamp(min=0).reshape(B, -1)
         imp_w = self.improvement.gather(1, wf).reshape_as(win)
@@ -10160,6 +10175,7 @@ class SimSeats:
             & (self.tile_seat.gather(1, wf).reshape_as(win) == int(self._ROW_SEAT[row]))
             & (self.tile_city.gather(1, wf).reshape_as(win) == self.city_id[:, row, :cols].unsqueeze(2))
             & (imp_w >= 0)
+            & ~self.pillaged.gather(1, wf).reshape_as(win)
         )
         # the Housing / TilesRequired shares sum over the city and pay WHOLE
         # housing, the floor of the city's sum (`computeHousing`)
@@ -10174,12 +10190,7 @@ class SimSeats:
             housing = housing + (got & own).double().sum(dim=2)
         gm = self._gov_mods(row)
         housing = housing + gm[2].double().unsqueeze(1)
-        _all_d, spec_d = self._district_counts(row)
-        housing = housing + self._cond_house_amen(gm[8], gm[9], spec_d)[0]
-        # CIV6 (Classical Republic): "All cities with a district receive
-        # +1 Housing and +1 Amenity" — ANY completed district, where the
-        # specialty-gated card rules ask for more.
-        housing = housing + (_all_d > 0).double() * gm[12]["dch"].double().unsqueeze(1)
+        housing = housing + self._cond_house_amen(gm[8], gm[9], self._live_specialty_counts(row))[0]
         # CIV6 (Monarchy): "+1 Housing per level of Walls" — the level
         # BUILT, so a city with no wall standing is paid nothing however
         # far its tech ran.
@@ -10296,10 +10307,8 @@ class SimSeats:
                            * _rw.unsqueeze(1).double() * _ra)
         _gm = self._gov_mods(row)
         _g_amen, _g_hid, _g_nd = _gm[7], _gm[8], _gm[9]
-        _all_d, _spec_d = self._district_counts(row)
-        _, _cond_amen = self._cond_house_amen(_g_hid, _g_nd, _spec_d)
+        _, _cond_amen = self._cond_house_amen(_g_hid, _g_nd, self._live_specialty_counts(row))
         have = have + _g_amen.unsqueeze(1) + _cond_amen
-        have = have + (_all_d > 0).double() * _gm[12]["dca"].double().unsqueeze(1)
         # CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
         _ga = _gm[12]["garamen"]
         if bool(_ga.count_nonzero()):
@@ -10327,7 +10336,7 @@ class SimSeats:
             zen = self._fol_tab_for("zen", row)  # [B, cols, 2] = min, amenities
             zmin, zamt = zen[:, :, 0], zen[:, :, 1]
             if bool(zamt.count_nonzero()):
-                _spec = self._district_counts(row)[1].double()
+                _spec = self._live_specialty_counts(row).double()
                 _z = torch.where(_spec >= zmin, zamt, torch.zeros_like(_spec))
                 extra = _z if extra is None else extra + _z
         if extra is not None:

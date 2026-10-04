@@ -415,7 +415,6 @@ export interface Modifiers {
   xpPct: number;
   wwCutPct: number;
   gppMult: number;
-  cityWithDistrict: { housing: number; amenities: number }[];
   housingPerWallLevel: number;
   theologyCS: number;
   yieldsPerGovBuilding: number;
@@ -666,7 +665,6 @@ export function defaultModifiers(): Modifiers {
     xpPct: 0,
     wwCutPct: 0,
     gppMult: 1,
-    cityWithDistrict: [],
     housingPerWallLevel: 0,
     theologyCS: 0,
     yieldsPerGovBuilding: 0,
@@ -780,7 +778,6 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.xpPct) mods.xpPct += fx.xpPct;
   if (fx.wwCutPct) mods.wwCutPct += fx.wwCutPct;
   if (fx.gppMult) mods.gppMult *= fx.gppMult;
-  if (fx.cityWithDistrict) mods.cityWithDistrict.push(fx.cityWithDistrict);
   if (fx.housingPerWallLevel) mods.housingPerWallLevel += fx.housingPerWallLevel;
   if (fx.theologyCS) mods.theologyCS += fx.theologyCS;
   if (fx.yieldsPerGovBuilding) mods.yieldsPerGovBuilding += fx.yieldsPerGovBuilding;
@@ -1909,10 +1906,11 @@ export function followerBeliefForReligion(state: GameState, g: number): BeliefDe
 /**
  * The city's own view of its seat modifiers, with its GOVERNOR folded in.
  * CIV6 (Governor): the abilities apply only once the governor is
- * ESTABLISHED, while the seat channels that merely ask for "cities with
- * Governors" — the Audience Chamber's amenities and housing, Theocracy's and
- * Communism's per-citizen yields — read the seating alone. Merchant
- * Republic's gold names the ESTABLISHED governor and gets it.
+ * ESTABLISHED, and so do the Audience Chamber's amenities and housing
+ * (REQUIREMENT_CITY_HAS_GOVERNOR: 1104 Taiyuan's +4 Housing and +2 Amenities
+ * open the turn Reyna establishes, t153, five turns after her seating).
+ * Theocracy's and Communism's per-citizen yields read the seating alone.
+ * Merchant Republic's gold names the ESTABLISHED governor and gets it.
  */
 export function withGovernor(state: GameState, base: Modifiers, city: City): Modifiers {
   const seated = cityHasGovernor(state, city);
@@ -1929,8 +1927,10 @@ export function withGovernor(state: GameState, base: Modifiers, city: City): Mod
   for (const k of Object.keys(base.governorPerCitizen) as YieldKey[]) {
     m.perCitizen[k] = (m.perCitizen[k] ?? 0) + (base.governorPerCitizen[k] ?? 0);
   }
-  m.amenitiesAll += seatBuildingSum(state, city.seat, 'amenitiesWithGovernor');
-  m.housingAll += seatBuildingSum(state, city.seat, 'housingWithGovernor');
+  if (established) {
+    m.amenitiesAll += seatBuildingSum(state, city.seat, 'amenitiesWithGovernor');
+    m.housingAll += seatBuildingSum(state, city.seat, 'housingWithGovernor');
+  }
   if (established && base.governorTitles.length) {
     // CIV6 (Civil Prestige, REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES)
     const titles = cityGovernorTitles(state, city);

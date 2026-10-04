@@ -795,6 +795,8 @@ class SimInit:
         self._congress_feat = [int(x) for x in _er2["congressFeatures"]]
         # the terrains a building's Coast plot clause pays on
         self._coast_plot_terr = [int(x) for x in _er2["coastPlotTerrains"]]
+        # the Lake terrain index (a wonder's per-Lake-tile amenity)
+        self._terr_lake = int(_er2["lakeTerrain"])
         self._loyalty_max = float(rules.seats["loyaltyMax"])
         self._special_cost = float(_er2["specialSessionCost"])
         self._special_gap = int(_er2["specialSessionGap"])
@@ -1539,6 +1541,9 @@ class SimInit:
             # and the reach, per wonder.
             self._wond_amen_imp = [(wi, list(w["amenImp"]), int(w["amenImpRange"]))
                                    for wi, w in enumerate(self._wond_rows) if w["amenImp"]]
+            # Amenity-per-Lake-tile (Huey Teocalli): the reach, per wonder
+            self._wond_amen_lake = [(wi, int(w["amenLakeRange"]))
+                                    for wi, w in enumerate(self._wond_rows) if int(w["amenLakeRange"]) >= 0]
             # Ruhr Valley: the improvements the HOLDING city is paid a yield
             # for, and that yield [6], per wonder that names any.
             self._wond_imp_yield = [
@@ -2527,9 +2532,6 @@ class SimInit:
             self._gov_xppct = torch.tensor([float(r["xpPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_wwcut = torch.tensor([float(r["wwCutPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_gppmult = torch.tensor([float(r["gppMult"]) for r in _govs], dtype=torch.float64, device=device)
-            _gdc = [r["cityWithDistrict"] for r in _govs]
-            self._gov_dc_house = torch.tensor([float(x[0]) for x in _gdc], dtype=dtype, device=device)
-            self._gov_dc_amen = torch.tensor([float(x[1]) for x in _gdc], dtype=dtype, device=device)
             self._gov_wallhouse = torch.tensor([float(r["housingPerWallLevel"]) for r in _govs], dtype=dtype, device=device)
             self._gov_theocs = torch.tensor([float(r["theologyCS"]) for r in _govs], dtype=dtype, device=device)
             self._gov_govbldy = torch.tensor([float(r["yieldsPerGovBuilding"]) for r in _govs], dtype=dtype, device=device)
@@ -2559,7 +2561,6 @@ class SimInit:
                 + (self._gov_ucs_cs.abs() * ((self._gov_ucs_mask != 0) | self._gov_ucs_allc).double()).sum()
                 + self._gov_xppct.abs().sum()
                 + self._gov_wwcut.abs().sum() + (self._gov_gppmult - 1).abs().sum()
-                + self._gov_dc_house.abs().sum() + self._gov_dc_amen.abs().sum()
                 + self._gov_wallhouse.abs().sum() + self._gov_theocs.abs().sum()
                 + self._gov_govbldy.abs().sum()
                 + (self._gov_distprod - 1).abs().sum() + (self._gov_inflmult - 1).abs().sum()
@@ -2697,9 +2698,6 @@ class SimInit:
             self._pol_xppct = torch.tensor([float(r["xpPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_wwcut = torch.tensor([float(r["wwCutPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_gppmult = torch.tensor([float(r["gppMult"]) for r in _pols], dtype=torch.float64, device=device)
-            _pdc = [r["cityWithDistrict"] for r in _pols]
-            self._pol_dc_house = torch.tensor([float(x[0]) for x in _pdc], dtype=dtype, device=device)
-            self._pol_dc_amen = torch.tensor([float(x[1]) for x in _pdc], dtype=dtype, device=device)
             self._pol_wallhouse = torch.tensor([float(r["housingPerWallLevel"]) for r in _pols], dtype=dtype, device=device)
             self._pol_theocs = torch.tensor([float(r["theologyCS"]) for r in _pols], dtype=dtype, device=device)
             self._pol_govbldy = torch.tensor([float(r["yieldsPerGovBuilding"]) for r in _pols], dtype=dtype, device=device)
@@ -2731,7 +2729,6 @@ class SimInit:
                 + (self._pol_ucs_cs.abs() * ((self._pol_ucs_mask != 0) | self._pol_ucs_allc).double()).sum()
                 + self._pol_xppct.abs().sum()
                 + self._pol_wwcut.abs().sum() + (self._pol_gppmult - 1).abs().sum()
-                + self._pol_dc_house.abs().sum() + self._pol_dc_amen.abs().sum()
                 + self._pol_wallhouse.abs().sum() + self._pol_theocs.abs().sum()
                 + self._pol_govbldy.abs().sum()
                 + (self._pol_distprod - 1).abs().sum() + (self._pol_inflmult - 1).abs().sum()
@@ -4215,6 +4212,7 @@ class SimInit:
         # CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES, LOYALTY_AFTER_TRANSFERRED_BY_CULTURAL_IDENTITY)
         self._free_city_loyalty = float(rules.seats["freeCityLoyaltyPerTurn"])
         self._religion_loyalty = [float(x) for x in rules.seats["loyaltyReligion"]]
+        self._starve_loyalty = float(rules.seats["loyaltyStarvation"])
         self._loyalty_after_cultural = float(rules.seats["loyaltyAfterCulturalTransfer"])
         # the Free Cities player's own strength floor, and the units it is
         # granted (`FREE_CITY_*`, measured in the live game): the former

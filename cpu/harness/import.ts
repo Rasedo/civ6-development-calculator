@@ -105,6 +105,9 @@ export interface Imported {
   /** the World Congress resolutions in the record the importer could not
    *  carry into `GameState.congress` */
   congressGaps: string[];
+  /** the resolutions in force for a seat's cities (`GameState.congress` as
+   *  that seat reads it this record) */
+  congressOf: (seat: number) => NonNullable<GameState['congress']>;
   /** does the record carry the queues' banked production (`queueProgress`)?
    *  Where it does not, every imported queue item stands at 0 */
   queueProgressRead: boolean;
@@ -333,6 +336,8 @@ function leaderRow(leader: string): number {
 export interface History {
   firstTurn: number;
   last: TurnRecord | null;
+  /** the World Congress table the record before the current one showed */
+  congressBefore?: unknown;
   bestMelee: Map<number, number>;
   /** units a major holds levied from a city-state, by `owner:id`, with the
    *  city-state's player id: a city-state's unit gone at t+1 beside a new
@@ -689,6 +694,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       }
     }
   }
+  h.congressBefore = h.last ? h.last.congress : rec.congress;
   h.last = rec;
 }
 
@@ -917,6 +923,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const cities = [...rec.cities].sort((a, b) => a.owner - b.owner || a.id - b.id);
   for (const c of cities) {
     ctx.scopeCity = `${c.owner}:${c.id}`;
+    // the record carries no National Park plots: a city its parks reach
+    // (GetAmenitiesFromNationalParks) reads with the park missing
+    if (num(c.amenityParts?.[6] ?? 0) > 0) gap(ctx, 'national-park', 'unrecorded');
     const seat = seatOfGame(c.owner);
     const center = c.y * W + c.x;
     const pillaged: string[] = [];
@@ -1150,7 +1159,20 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
 
   // the World Congress, then the build queues: last, so the prices the
   // engine locks at queueing read the whole imported state
-  const congressGaps = importCongress(rec, cat, state, religionSeat, seatOfGame);
+  // A session's resolutions reach a player's cities on that player's turn:
+  // a seat that has not played yet this turn (a player after the record's
+  // active one) still reads the table the record before showed (1104 China's
+  // Cocoa Luxury Policy, shown at t142, pays from t143 and the next session,
+  // shown at t162, leaves it paying through t162; 1107 Rome, the active
+  // seat, reads each session the turn it shows)
+  const now = importCongress(rec.congress, rec, cat, state, religionSeat, seatOfGame);
+  const before = history?.congressBefore !== undefined
+    ? importCongress(history.congressBefore, rec, cat, state, religionSeat, seatOfGame) : now;
+  const active = rec.players.find((p) => bool(p.turnActive));
+  const congressOf = (seat: number): NonNullable<GameState['congress']> =>
+    active !== undefined && (playerOfSeat.get(seat) ?? Infinity) <= active.id ? now.list : before.list;
+  state.congress = now.list;
+  const congressGaps = [...new Set([...now.gaps, ...before.gaps])];
   // (a queued row the engine lacks is the game's gap, no city's: nothing a
   // check reads comes from the queue)
   let queueProgressRead = false;
@@ -1161,7 +1183,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
-    congressGaps, queueProgressRead, readBack,
+    congressGaps, congressOf, queueProgressRead, readBack,
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
   };
 }
@@ -1530,16 +1552,15 @@ function resolutionByHash(): Map<number, number> {
 
 /**
  * The World Congress's standing resolutions: each numbered entry of the
- * record's table becomes `{ res, outcome, target }` — the resolution by its
+ * table becomes `{ res, outcome, target }` — the resolution by its
  * type's hash, outcome 0 for the entry's "A", the target its localisation key
  * names in the engine's own target space for the resolution's kind. The
  * Diplomatic Victory resolution stands outside the engine's table. Every
  * entry the importer cannot place is returned as a gap.
  */
-function importCongress(rec: TurnRecord, cat: Catalog, state: GameState, religionSeat: Map<number, number>,
-  seatOfGame: (pid: number) => number): string[] {
-  const table = rec.congress;
-  if (!table || typeof table !== 'object') return [];
+function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: GameState, religionSeat: Map<number, number>,
+  seatOfGame: (pid: number) => number): { list: NonNullable<GameState['congress']>; gaps: string[] } {
+  if (!table || typeof table !== 'object') return { list: [], gaps: [] };
   const gaps: string[] = [];
   const out: NonNullable<GameState['congress']> = [];
   const dv = gameHash('WC_RES_DIPLOVICTORY');
@@ -1565,8 +1586,7 @@ function importCongress(rec: TurnRecord, cat: Catalog, state: GameState, religio
     }
     out.push({ res, outcome, target });
   }
-  state.congress = out;
-  return gaps;
+  return { list: out, gaps };
 }
 
 /** a resolution's target in the engine's target space for its kind, read off

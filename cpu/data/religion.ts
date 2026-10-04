@@ -38,10 +38,8 @@ export interface BeliefEffects {
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
   workEthic?: boolean;
   buildingYields?: Partial<Record<string, Partial<Yields>>>;
-  /** NO BELIEF CARRIES THIS since RELIGIOUS_COMMUNITY took its Gathering
-   *  Storm clause (the pre-GS housing modifiers exist in Beliefs.xml and are
-   *  attached to nothing). The reader (cpu/core/effects.ts) and the wire
-   *  column stay: they read a FIELD. */
+  /** housing a named building pays in a city following the religion
+   *  (Feed the World's Shrine and Temple) */
   buildingHousing?: Partial<Record<string, number>>;
   /** CIV6 (Religious Community, GS): Gold on INTERNATIONAL Trade Routes
    *  from a city following the religion, once per Holy Site / Shrine /
@@ -263,6 +261,10 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       xml('ModifierArguments', 'ModifierId=FEED_THE_WORLD_SHRINE_FOOD3_MODIFIER&Name=Amount', 'Value'),
     'effects.buildingYields.TEMPLE.food':
       xml('ModifierArguments', 'ModifierId=FEED_THE_WORLD_TEMPLE_FOOD3_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingHousing.SHRINE':
+      xml('ModifierArguments', 'ModifierId=FEED_THE_WORLD_SHRINE_HOUSING_MODIFIER&Name=Amount', 'Value'),
+    'effects.buildingHousing.TEMPLE':
+      xml('ModifierArguments', 'ModifierId=FEED_THE_WORLD_TEMPLE_HOUSING_MODIFIER&Name=Amount', 'Value'),
   },
   RELIGIOUS_COMMUNITY: {
     'effects.intlRouteGoldPerWorship':
@@ -466,8 +468,9 @@ export const FOLLOWER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('WORK_ETHIC', 'Work Ethic', 'Holy Site adjacency bonus also provides production.', {
       workEthic: true,
     }),
-    B('FEED_THE_WORLD', 'Feed the World', 'Shrines +3 food, Temples +3 food.', {
+    B('FEED_THE_WORLD', 'Feed the World', 'Shrines and Temples +3 food and +2 housing.', {
       buildingYields: { SHRINE: { food: 3 }, TEMPLE: { food: 3 } },
+      buildingHousing: { SHRINE: 2, TEMPLE: 2 },
     }),
     B('CHORAL_MUSIC', 'Choral Music', 'Shrines +2 culture, Temples +4 culture.', {
       buildingYields: { SHRINE: { culture: 2 }, TEMPLE: { culture: 4 } },

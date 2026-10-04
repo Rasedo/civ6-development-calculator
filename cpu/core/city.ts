@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type CityState, type DistrictId, type GameState, type Seat, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
-import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount } from './yields';
+import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount, liveSpecialtyCount } from './yields';
 import { seatGovernment, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -44,6 +44,8 @@ import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, gpCityPerm
 export interface CityStats {
   city: City;
   housing: number;
+  /** the housing by the game's parts, `HOUSING_PARTS` order */
+  housingParts: number[];
   amenities: { have: number; needed: number; balance: number; tier: AmenityTier };
   workedTiles: number[];
   breakdown: {
@@ -454,7 +456,17 @@ export function cityYieldCtx(state: GameState, city: City, mods?: Modifiers): Yi
     withFollowerBelief(state, base, followerReligionsForCity(base, city)), city));
 }
 
+/** The city's housing in the game's own breakdown, the order of its growth
+ *  getters: water (with the Aqueduct), buildings (with wonders), districts,
+ *  improvements, civics (policies, governments, governors, traits), great
+ *  people, starting era. */
+export const HOUSING_PARTS = ['water', 'buildings', 'districts', 'improvements', 'civics', 'greatPeople', 'startingEra'] as const;
+
 export function computeHousing(state: GameState, city: City, mods?: Modifiers): number {
+  return housingParts(state, city, mods).reduce((a, b) => a + b, 0);
+}
+
+export function housingParts(state: GameState, city: City, mods?: Modifiers): number[] {
   const m = mods ?? getModifiers(state, city.seat);
   const map = state.map;
   const center = map.tiles[city.centerIndex];
@@ -473,71 +485,69 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   );
   if (hasAqueduct) {
     water = fresh ? water + AQUEDUCT_FRESH_BONUS : Math.max(water, AQUEDUCT_NO_FRESH_TOTAL);
-    // CIV6 (Bath): its Districts row adds "Housing 2" on top of the water
-    water += civVariantOf(state, city.seat, DISTRICTS.AQUEDUCT.civVariants)?.housing ?? 0;
   }
 
   const dark = darkBuildings(map, city);
   const camps = campTiles(state);
   const gpa = cityAppealResolver(state);
-  let total = water;
+  // CIV6 (Bath): its Districts row adds "Housing 2" on top of the water,
+  // a district part of the breakdown
+  let districts = hasAqueduct ? civVariantOf(state, city.seat, DISTRICTS.AQUEDUCT.civVariants)?.housing ?? 0 : 0;
   for (const d of city.districts) {
     const dt = map.tiles[d.tileIndex];
     if (!dt.districtComplete || dt.districtPillaged) continue; // a pillaged district's housing is dark
     const ddef = DISTRICTS[d.type];
     if (d.type === 'NEIGHBORHOOD') {
-      total += appealTier(tileAppeal(map, dt, camps, gpa)).housing;
+      districts += appealTier(tileAppeal(map, dt, camps, gpa)).housing;
     } else if (ddef.appealHousing) {
-      total += PRESERVE_APPEAL_HOUSING[appealBand(tileAppeal(map, dt, camps, gpa))];
+      districts += PRESERVE_APPEAL_HOUSING[appealBand(tileAppeal(map, dt, camps, gpa))];
     } else {
-      total += ddef.housing;
+      districts += ddef.housing;
     }
   }
+  let buildings = wonderCityFlat(state, city, 'cityHousing') + seatWonderSum(state, city.seat, 'empireHousing');
   for (const id of city.buildings) {
     const def = effectiveBuilding(civOf(state, city.seat), id);
     if (dark.has(id)) continue; // in a pillaged district, or pillaged itself
-    if (def?.housing) total += def.housing;
+    if (def?.housing) buildings += def.housing;
     // CIV6 (LIGHTHOUSE_COASTAL_CITY_HOUSING): more while the centre is coastal
-    if (def?.coastalHousing && isCoastalLand(map, center)) total += def.coastalHousing;
+    if (def?.coastalHousing && isCoastalLand(map, center)) buildings += def.coastalHousing;
     // CIV6 (Kupe's Voyage): "The Palace receives +3 Housing"
-    if (def?.autoCapital) for (const r of m.capital) total += r.palaceHousing ?? 0;
+    if (def?.autoCapital) for (const r of m.capital) buildings += r.palaceHousing ?? 0;
     const beliefHousing = m.buildingHousingAdd[id];
-    if (beliefHousing) total += beliefHousing;
+    if (beliefHousing) buildings += beliefHousing;
   }
-  if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
+  let civics = 0;
+  if (m.riverCity && hasRiver(center)) civics += m.riverCity.housing;
   // CIV6: the improvements' Housing / TilesRequired shares sum over the city
   // and pay WHOLE housing — `GetHousingFromImprovements` is the floor of the
   // city's sum, 1,366 of 1,366 cities where a per-kind floor would differ
   // (one Farm and one Pasture pay 1; runs/h1_duelw1103 / 1104).
   let impHousing = 0;
+  let impCivic = 0;
   for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
-    if (!tileBelongsTo(t, city) || !t.improvement) continue;
+    // a pillaged improvement houses nobody
+    if (!tileBelongsTo(t, city) || !t.improvement || t.pillaged) continue;
     const idef = IMPROVEMENTS[t.improvement as ImprovementId];
     impHousing += idef.housing;
-    if (idef.housingCivic && m.impUpgrades.has(idef.housingCivic)) total += 1;
+    if (idef.housingCivic && m.impUpgrades.has(idef.housingCivic)) impCivic += 1;
   }
-  total += Math.floor(impHousing);
+  const improvements = Math.floor(impHousing) + impCivic;
 
-  total += m.housingAll;
-  /* CIV6 (Insulae / Medina Quarter): "+1/+2 Housing in all cities with at
-   * least 2/3 specialty districts." */
-  const specialtyCount = completedDistrictCount(state, city, true);
+  civics += m.housingAll;
+  /* CIV6 (Classical Republic / Insulae / Medina Quarter / New Deal):
+   * housing in every city with at least 1/2/3/3 specialty districts. */
+  const specialtyCount = liveSpecialtyCount(state, city);
   for (const rule of m.housingIfDistricts) {
-    if (specialtyCount >= rule.min) total += rule.housing;
+    if (specialtyCount >= rule.min) civics += rule.housing;
   }
   for (const rule of m.newDeal) {
-    if (specialtyCount >= rule.min) total += rule.housing;
-  }
-  /* CIV6 (Classical Republic): "All cities with a district receive +1
-   * Housing and +1 Amenity" — ANY completed district, where the
-   * specialty-gated rules above ask for more. */
-  if (m.cityWithDistrict.length && completedDistrictCount(state, city, false) >= 1) {
-    for (const rule of m.cityWithDistrict) total += rule.housing;
+    if (specialtyCount >= rule.min) civics += rule.housing;
   }
   /* CIV6 (Monarchy): "+1 Housing per level of Walls" — the level BUILT, so a
    * city with no wall standing is paid nothing however far its tech ran. */
-  if (m.housingPerWallLevel) total += m.housingPerWallLevel * wallsLevel(city);
-  return total;
+  if (m.housingPerWallLevel) civics += m.housingPerWallLevel * wallsLevel(city);
+  return [water, buildings, districts, improvements, civics, gpCityPermOf(city, 'housing'), 0];
 }
 
 /** CIV6 (Autocracy): how many government buildings STAND in this city — the
@@ -627,15 +637,12 @@ function nonLuxuryAmenities(
   // CIV6 (GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE): every city of a seat
   // whose last upkeep fell short loses amenities to bankruptcy
   have -= bankruptAmenities(seatOf(state, city.seat)?.goldShortfall ?? 0);
-  const specialtyCount = completedDistrictCount(state, city, true);
+  const specialtyCount = liveSpecialtyCount(state, city);
   for (const rule of m.amenitiesIfSpecialty) {
     if (specialtyCount >= rule.min) have += rule.amenities;
   }
   for (const rule of m.newDeal) {
     if (specialtyCount >= rule.min) have += rule.amenities;
-  }
-  if (m.cityWithDistrict.length && completedDistrictCount(state, city, false) >= 1) {
-    for (const rule of m.cityWithDistrict) have += rule.amenities;
   }
   return { have, ww };
 }
@@ -665,22 +672,18 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
 
   // CIV6 (Luxury Policy): "A: +1 Amenity on duplicates of a Resource. /
   // B: This Luxury resource grants no Amenities." B silences the named
-  // luxury outright; A pays one extra full-reach round per OWN copy — an
-  // improved plot or a Great Person's grant — beyond the first.
+  // luxury outright; A pays one extra full-reach round per copy the seat
+  // holds beyond the first — its own, its city-states', its Great Persons',
+  // its deals' (1104 China's six Cocoa, four of them its own plots, pay five
+  // extra rounds, t143-162).
   const banned = congressBannedLuxury(state);
   const dupLux = congressDuplicateLuxury(state);
-  let dupCopies = dupLux && dupLux !== banned
-    ? seatOf(state, seat)?.gpLuxCopies?.[LUXURY_IDS.indexOf(dupLux)] ?? 0 : 0;
-  for (const t of state.map.tiles) {
-    if (!t.resource || tileSeat(t) !== seat) continue;
-    // CIV6: a PILLAGED improvement gives no copy (runs/h1_duelw1104 Diamonds
-    // plot 628 t180-204: `GetResourceAmount` 1 -> 0, two cities -1 Amenity)
-    if (t.resource === dupLux && t.resource !== banned && t.improvement === resourceImprovement(t) && !t.pillaged) dupCopies++;
-  }
+  const held = luxuryHoldings(state, seat).held;
+  const dupCopies = dupLux && dupLux !== banned ? Math.max(0, held.get(dupLux) ?? 0) : 0;
   // every luxury the seat holds a copy of — its own, its city-states', its
   // deals' (`luxuryHoldings`) — serves one full-reach round
   const luxuries = new Set<string>();
-  for (const [r, n] of luxuryHoldings(state, seat).held) if (n > 0 && r !== banned) luxuries.add(r);
+  for (const [r, n] of held) if (n > 0 && r !== banned) luxuries.add(r);
   // CIV6 (Affluence): "While established in a city-state, provides a copy of
   // its Luxury resources to you." A copy of one already worked is no second
   // amenity, which the set answers by itself.
@@ -719,9 +722,8 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
       if (RESOURCES[t.resource]?.category === 'bonus') bonusLux.add(t.resource);
     }
   }
-  // the duplicated luxury's copies serve first: all of them while the seat
-  // holds it, the duplicates alone when its first copy is traded away
-  const dupRounds = dupCopies > 1 ? (dupLux !== null && luxuries.has(dupLux) ? dupCopies : dupCopies - 1) : 0;
+  // the duplicated luxury's copies serve first, all of them
+  const dupRounds = dupCopies > 1 ? dupCopies : 0;
   const reach = [
     ...new Array<number>(luxuries.size + Math.max(0, dupCopies - 1)).fill(LUXURY_AMENITY_CITIES),
     ...(seatOf(state, seat)?.gpLuxuries ?? []),
@@ -907,6 +909,11 @@ function wonderCityFlat(state: GameState, city: City,
 function wonderImprovementAmenities(state: GameState, city: City): number {
   let n = 0;
   for (const w of completedWonders(state, city)) {
+    const lake = w.def.effects?.amenityPerLake;
+    if (lake) {
+      const t = state.map.tiles[w.tileIndex];
+      for (const near of tilesWithin(state.map, t.col, t.row, lake.range)) if (near.terrain === 'LAKE') n += 1;
+    }
     const rule = w.def.effects?.amenityPerImprovement;
     if (!rule) continue;
     const t = state.map.tiles[w.tileIndex];
@@ -1226,6 +1233,21 @@ export function seatTourism(
   return tourismOf(state, s, cities, cities, (tile: Tile) => tileOwnedByCiv(tile, seat), govCityIds);
 }
 
+/** One city's share of its seat's tourism, both halves: what its works,
+ *  districts, buildings and plots make, its relics and a Holy City it holds
+ *  (the game's per-city GetTourism). */
+export function cityTourism(state: GameState, city: City): number {
+  const s = seatOf(state, city.seat);
+  if (!s) return 0;
+  const km = congressGwMult(state);
+  let t = tourismOf(state, s, [city], citiesOf(state, city.seat), (tile: Tile) => tileBelongsTo(tile, city))
+    + relicTourism(state, city, km) * wonderMult(state, [city], 'religiousTourismMult');
+  for (const g of state.seats) {
+    if (g.religion.founded && g.religion.holyTile === city.centerIndex) t += HOLY_CITY_TOURISM;
+  }
+  return t;
+}
+
 /** CIV6 (Film Studio, FILMSTUDIO_ENHANCEDLATETOURISM): the EXTRA a seat
  *  sends to each civilization in the Modern era or later — `pct` of the
  *  tourism each city holding the row makes on its own (its works, its
@@ -1538,8 +1560,8 @@ export function computeCityStats(
     bonuses.faith += perDom * dom;
   }
 
-  const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing')
-    + seatWonderSum(state, city.seat, 'empireHousing') + gpCityPermOf(city, 'housing');
+  const hParts = housingParts(state, city, m);
+  const housing = hParts.reduce((a, b) => a + b, 0);
   // THE RANKING BASE — everything `luxuryAmenities` ranks cities on, and the
   // one split point both engines share. Named so the amenity log can print
   // it: a disagreement here is a different sum, a disagreement in `lux`
@@ -1651,6 +1673,7 @@ export function computeCityStats(
   return {
     city,
     housing,
+    housingParts: hParts,
     amenities: { have, needed, balance, tier },
     workedTiles: worked,
     breakdown: { tiles, districts, buildings, citizens, bonuses, trade },

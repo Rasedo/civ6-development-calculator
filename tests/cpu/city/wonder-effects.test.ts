@@ -97,9 +97,8 @@ describe('wonder effects, sourced', () => {
     const { state, city } = oneCity();
     const before = computeHousing(state, city);
     stand(state, city, 'GREAT_BATH', 9, 8);
-    // computeHousing is the water/district/building half; the wonder term
-    // joins in computeCityStats, which is what a citizen actually sees.
-    expect(computeHousing(state, city)).toBe(before);
+    // the wonder's housing is a buildings part of the city's own housing
+    expect(computeHousing(state, city)).toBe(before + 3);
     expect(computeCityStats(state, city).housing).toBe(before + 3);
     const amen = computeCityStats(state, city).amenities.have;
     foundCity(state, tileAtCoords(state.map, 2, 2).index, 0);

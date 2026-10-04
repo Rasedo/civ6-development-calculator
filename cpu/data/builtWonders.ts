@@ -103,6 +103,11 @@ export interface BuiltWonderDef {
     /** +1 amenity to the holding city per matching improvement within
      *  `range` tiles of the WONDER (Temple of Artemis). */
     amenityPerImprovement?: { improvements: ImprovementId[]; range: number };
+    /** +1 amenity from entertainment to the holding city per Lake tile
+     *  within `range` tiles of the WONDER, its own plot included (Huey
+     *  Teocalli, MODIFIER_SINGLE_CITY_ADJUST_LAKE_ENTERTAINMENT, which
+     *  carries no Amount). */
+    amenityPerLake?: { range: number };
     /** CIV6 (Great Bath, GREATBATH_FLOODFAITH): faith on each Floodplains
      *  plot of the city per flood that plot has taken (`Tile.floodCount`),
      *  a plot yield (`cityPlotBonus`). */
@@ -964,8 +969,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     W({
       id: 'HUEY_TEOCALLI', name: 'Huey Teocalli', code: 'HT', cost: 710,
       requiresTech: 'MILITARY_TACTICS', placement: { onLake: true },
-      effects: { tileYields: [{ terrain: 'LAKE', empire: true, yields: { food: 1, production: 1 } }] },
-      description: '+1 food and +1 production on every Lake tile in the empire. On a Lake beside land.',
+      effects: { tileYields: [{ terrain: 'LAKE', empire: true, yields: { food: 1, production: 1 } }], amenityPerLake: { range: 1 } },
+      description: '+1 food and +1 production on every Lake tile in the empire; +1 amenity per Lake tile at the wonder. On a Lake beside land.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_HUEY_TEOCALLI', 'Cost', { scale: GAME_SPEED }),
@@ -974,6 +979,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'effects.tileYields.0.terrain': { derived: 'LAKE — the plot the requirement names is a lake', inputs: [xml('Requirements', 'RequirementId=REQUIRES_PLOT_IS_LAKE', 'RequirementType', { expect: 'REQUIREMENT_PLOT_IS_LAKE' })] },
         'effects.tileYields.0.yields.food': xml('ModifierArguments', 'ModifierId=HUEY_LAKE_FOOD_MODIFIER&Name=Amount', 'Value'),
         'effects.tileYields.0.yields.production': xml('ModifierArguments', 'ModifierId=HUEY_LAKE_PRODUCTION_MODIFIER&Name=Amount', 'Value'),
+        'effects.amenityPerLake.range': { lab: 'C-94', note: 'runs/h1_duelw1106 Rome t140: Entertainment 2 -> 5 the turn Huey Teocalli stands, on a three-tile lake (its own plot and two beside it)' },
       },
     }),
     W({

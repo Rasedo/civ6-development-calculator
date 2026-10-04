@@ -416,17 +416,16 @@ export function governorTileFlag(state: GameState, tile: Tile, pick: (e: Governo
 }
 
 /**
- * CIV6 (Garrison Commander): "Your other cities within 9 tiles gain +4 Loyalty
- * per turn towards your civilization"; (Emissary): "Other cities within 9
- * tiles and not owned by you lose 2 Loyalty per turn." Both are measured from
- * the GOVERNED city's centre and neither pays the governed city itself.
+ * CIV6 (Garrison Commander): "+4 Loyalty per turn towards your civilization"
+ * to your cities in reach; (Emissary): "-2 Loyalty per turn" to the cities in
+ * reach not owned by you. Both are measured from the GOVERNED city's centre,
+ * which is in its own reach (EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE).
  */
 export function governorLoyaltyAura(state: GameState, city: City): number {
   const here = state.map.tiles[city.centerIndex];
   let n = 0;
   for (const s of state.seats) {
     for (const c of s.cities) {
-      if (c.id === city.id && c.seat === city.seat) continue;
       const own = c.seat === city.seat;
       for (const e of cityGovernorEffects(state, c)) {
         const aura = own ? e.loyaltyToOwn : e.loyaltyToForeign;
@@ -438,16 +437,15 @@ export function governorLoyaltyAura(state: GameState, city: City): number {
     }
   }
   // CIV6 (Toqui, EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE, OncePerCity):
-  // "All cities within 9 tiles of a city with your Governor gain +4 Loyalty
-  // per turn towards your civilization" — ONCE per city however many governed
-  // cities of that seat stand in reach, positive toward its own and negative
-  // against a foreign one.
+  // "All cities ... of a city with your Governor gain +4 Loyalty per turn
+  // towards your civilization" — ONCE per city however many governed cities
+  // of that seat stand in reach (the governed city itself among them),
+  // positive toward its own and negative against a foreign one.
   for (const s of state.seats) {
     const rows = getModifiers(state, s.seat).governorLoyaltyRows;
     if (!rows.length) continue;
     for (const r of rows) {
       const near = s.cities.some((c) => {
-        if (c.id === city.id && c.seat === city.seat) return false;
         if (!cityGovernorEffects(state, c).length) return false;
         const t = state.map.tiles[c.centerIndex];
         return hexDistance(state.map, here.col, here.row, t.col, t.row) <= r.range;

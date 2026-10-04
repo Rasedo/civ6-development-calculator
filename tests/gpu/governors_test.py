@@ -124,7 +124,7 @@ def apply_loyalty_row(sim, tier, row: int = 0) -> None:
         if not bool(act.any()):
             continue
         jc = torch.full((sim.B,), j, dtype=torch.long)
-        flip[:, j] = sim._seat_city_loyalty(row, jc, act, tier[:, j], gov[:, j])
+        flip[:, j] = sim._seat_city_loyalty(row, jc, act, tier[:, j], gov[:, j], torch.zeros_like(act))
     sim._seat_loyalty_flips(row, flip)
 
 

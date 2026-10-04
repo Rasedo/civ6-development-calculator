@@ -63,16 +63,10 @@ class SimEconomy:
         if self._n_lux == 0:
             return out
         alive = self.city_alive[:, row, :cols]
-        # a PILLAGED improvement gives no copy (`luxuryAmenities`)
-        improved = ((self.lux_id >= 0) & (self.tile_seat == int(self._ROW_SEAT[row]))
-                    & (self.improvement == self.lux_req) & ~self.pillaged)
-        own_copies = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
-        own_copies.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
-        if row < self.n_majors:
-            own_copies += self.civ_gp_lux_copies[:, row, :self._n_lux]
         # every luxury the row holds a copy of — its own, its city-states',
         # its deals' (`_lux_holdings`) — serves one full-reach round
-        counts = self._lux_holdings(row)[0].clamp(min=0)
+        held = self._lux_holdings(row)[0].clamp(min=0)
+        counts = held.clone()
         # CIV6 (Affluence): "While established in a city-state, provides a copy
         # of its Luxury resources to you." A minor improves nothing here, so the
         # copy is the ground's own resource; a copy of one already worked is no
@@ -88,10 +82,9 @@ class SimEconomy:
         # CIV6 (Luxury Policy): "A: +1 Amenity on duplicates of a Resource. /
         # B: This Luxury resource grants no Amenities." B silences the named
         # luxury outright (the Affluence copies with it); A pays one extra
-        # full-reach round per OWN copy — an improved plot or a Great
-        # Person's grant — beyond the first. The duplicated luxury's copies
-        # serve FIRST (`dup_seg` rounds): all of them while the row holds it,
-        # the duplicates alone when its first copy is traded away.
+        # full-reach round per copy the row holds beyond the first. The
+        # duplicated luxury's copies serve FIRST (`dup_seg` rounds), all of
+        # them.
         lp_out, lp_tgt = self._congress_by_id("LUXURY_POLICY")
         dup = torch.zeros(B, dtype=torch.long, device=self.device)
         dup_seg = dup
@@ -100,9 +93,9 @@ class SimEconomy:
             ban = lp_out == 1
             counts[ban, t0[ban]] = 0
             dup = torch.where(lp_out == 0,
-                              (own_copies.gather(1, t0.unsqueeze(1)).squeeze(1) - 1).clamp(min=0),
+                              (held.gather(1, t0.unsqueeze(1)).squeeze(1) - 1).clamp(min=0),
                               dup)
-            dup_seg = torch.where(dup > 0, dup + (counts.gather(1, t0.unsqueeze(1)).squeeze(1) > 0).long(), dup)
+            dup_seg = torch.where(dup > 0, dup + 1, dup)
         rounds = (counts > 0).long().sum(dim=1) + dup
         # CIV6 (John Spilsbury and the three after him): an INVENTED luxury
         # serves cities exactly like a worked one, and its own row says how
@@ -3517,7 +3510,6 @@ class SimEconomy:
             "garamen": _z64.clone(), "garloy": _z64.clone(),
             "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
             "xppct": _z.clone(), "wwcut": _z.clone(), "wmdup": _z.clone(),
-            "dch": _z.clone(), "dca": _z.clone(),
             "gppmult": torch.ones(B, dtype=torch.float64, device=dev),
             # CIV6 (Thermopylae): how many MILITARY policies stand slotted
             "milpol": torch.zeros(B, dtype=torch.long, device=dev),
@@ -3589,8 +3581,7 @@ class SimEconomy:
                            ("infl", self._gov_infl),
                            ("xppct", self._gov_xppct),
                            ("wwcut", self._gov_wwcut), ("wmdup", self._gov_wmdup),
-                           ("dch", self._gov_dc_house),
-                           ("dca", self._gov_dc_amen), ("wallhouse", self._gov_wallhouse),
+                           ("wallhouse", self._gov_wallhouse),
                            ("theocs", self._gov_theocs), ("govbldy", self._gov_govbldy)):
                 fx[_k] = fx[_k] + _t.take(adopted) * _gf
             fx["rxp"] = fx["rxp"] * torch.where(has_gov, self._gov_rxp.take(adopted), _o)
@@ -3691,8 +3682,7 @@ class SimEconomy:
                                ("infl", self._pol_infl),
                                ("xppct", self._pol_xppct),
                                ("wwcut", self._pol_wwcut), ("wmdup", self._pol_wmdup),
-                               ("dch", self._pol_dc_house),
-                               ("dca", self._pol_dc_amen), ("wallhouse", self._pol_wallhouse),
+                               ("wallhouse", self._pol_wallhouse),
                                ("theocs", self._pol_theocs), ("govbldy", self._pol_govbldy)):
                     fx[_k] = fx[_k] + sd @ _t
                 _ones_p = torch.ones(B, self._npol, dtype=dt, device=dev)

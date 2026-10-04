@@ -252,7 +252,7 @@ class SimPhase:
             cul_c = torch.where(cact, self._culture_after_growth(row, j, pop0, total[:, j, 4]),
                                 torch.zeros_like(total[:, j, 4]))
             self._seat_border_growth(row, jc, cact, cul_c)
-            flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j], loy_pre)
+            flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j], eff[:, j] < 0, loy_pre)
             self._city_strikes(row, jc, cact)
 
         self._seat_loyalty_flips(row, flip)
@@ -501,6 +501,11 @@ class SimPhase:
             # CATALOG fact; the sum itself stays live in the walk, because a
             # column ahead of this one may have just finished the building
             "nogov_on": bool(self._b_loy_no_gov.count_nonzero()),
+            # [B, RC] — the city slots whose governor is ESTABLISHED: the
+            # Audience Chamber's clause spares only those (the walk moves no
+            # establishment)
+            "est": (self._governor_established(row) if row < nrow
+                    else torch.zeros(B, self.RC, dtype=torch.bool, device=dev)),
             "z": torch.zeros(B, dtype=F, device=dev),
         }
 
@@ -521,7 +526,7 @@ class SimPhase:
         return torch.where(own > foreign, mag, -mag)
 
     def _seat_city_loyalty(self, row: int, col: torch.Tensor, act: torch.Tensor,
-                           tier: torch.Tensor, gov: torch.Tensor,
+                           tier: torch.Tensor, gov: torch.Tensor, starve: torch.Tensor,
                            pre: dict | None = None) -> torch.Tensor:
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
@@ -555,7 +560,10 @@ class SimPhase:
         press = self._pressure_term(own, foreign)
         delta = (press
                  + self._loyalty_amenity.take(tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)).double()
-                 + torch.where(gov, torch.full_like(loy_gov, self._gov_loy), loy_gov)
+                 + gov.to(F) * self._gov_loy
+                 + torch.where(pre["est"].gather(1, col.unsqueeze(1)).squeeze(1), pre["z"], loy_gov)
+                 # CIV6 (IDENTITY_PER_TURN_FROM_STARVATION): food short of the citizens'
+                 + starve.to(F) * self._starve_loyalty
                  + pre["cong"]
                  + self._standing_loyalty(row, bidx, col)
                  + pre["emg"].gather(1, col.unsqueeze(1)).squeeze(1)

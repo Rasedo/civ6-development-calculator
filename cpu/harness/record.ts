@@ -29,6 +29,8 @@ export type PlotRow = (number | string | number[])[];
 export interface DumpPlayer {
   id: number;
   major: Read<boolean>;
+  /** is it this player's turn in the record */
+  turnActive?: Read<boolean>;
   minor: Read<boolean>;
   barb: Read<boolean>;
   free: Read<boolean>;
@@ -125,6 +127,8 @@ export interface DumpCity {
   amenityParts: Read<number>[];
   culture: Read<number>;
   cultureYield: Read<number>;
+  /** the city's tourism a turn (`GetTourism`) */
+  tourism?: Read<number>;
   nextPlot: Read<number>;
   nextPlotCost: Read<number>;
   turnsToExpand: Read<number>;

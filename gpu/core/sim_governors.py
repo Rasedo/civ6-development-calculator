@@ -547,11 +547,10 @@ class SimGovernors:
         self.major_unit_promo_bonus[rows, slot] = n[rows, col[rows].clamp(min=0, max=self.RC - 1)].long()
 
     def _governor_loyalty_aura(self, row: int) -> torch.Tensor:
-        """[B, RC] f64 — CIV6 (Garrison Commander): "Your other cities within 9
-        tiles gain +4 Loyalty per turn towards your civilization"; (Emissary):
-        "Other cities within 9 tiles and not owned by you lose 2 Loyalty per
-        turn." Both are measured from the GOVERNED city's centre and neither
-        pays the governed city itself."""
+        """[B, RC] f64 — `governorLoyaltyAura`: (Garrison Commander) +4 Loyalty
+        a turn to the row's cities in reach, (Emissary) -2 to the cities in
+        reach it does not own, both measured from the GOVERNED city's centre,
+        which is in its own reach."""
         B, RC, dev = self.B, self.RC, self.device
         out = torch.zeros(B, RC, dtype=torch.float64, device=dev)
         if self.n_gov_promos == 0:
@@ -577,10 +576,6 @@ class SimGovernors:
             there = self.city_center[:, src].clamp(min=0)      # [B, RC]
             d = self.pair_dist[here.unsqueeze(2), there.unsqueeze(1)].double()  # [B, RC, RC]
             hit = live.unsqueeze(1) & (d <= reach.unsqueeze(1))
-            if same:
-                # a city never pays itself
-                eye = torch.eye(RC, dtype=torch.bool, device=dev).unsqueeze(0)
-                hit = hit & ~eye
             sign = 1.0 if same else -1.0
             out = out + sign * (hit.double() * pay.unsqueeze(1)).sum(dim=2)
         return torch.where(alive, out, torch.zeros_like(out))
@@ -637,15 +632,15 @@ class SimGovernors:
     def _governor_house_amen(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, RC], [B, RC]) f64 — CIV6 (Water Works): housing per
         Neighborhood/Aqueduct and amenities per Canal/Dam, and (Audience
-        Chamber): "+2 Amenities and +4 Housing in Cities with Governors"."""
+        Chamber): "+2 Amenities and +4 Housing in Cities with Governors" —
+        an ESTABLISHED one (`withGovernor`)."""
         B, RC, dev = self.B, self.RC, self.device
         house = torch.zeros(B, RC, dtype=torch.float64, device=dev)
         amen = torch.zeros(B, RC, dtype=torch.float64, device=dev)
-        seated = self._governor_at(row) >= 0
-        if bool(self._b_amen_gov.count_nonzero()):
-            amen = amen + seated.double() * self._seat_building_sum(row, self._b_amen_gov).double().unsqueeze(1)
-        if bool(self._b_house_gov.count_nonzero()):
-            house = house + seated.double() * self._seat_building_sum(row, self._b_house_gov).double().unsqueeze(1)
+        if bool(self._b_amen_gov.count_nonzero()) or bool(self._b_house_gov.count_nonzero()):
+            est = self._governor_established(row).double()
+            amen = amen + est * self._seat_building_sum(row, self._b_amen_gov).double().unsqueeze(1)
+            house = house + est * self._seat_building_sum(row, self._b_house_gov).double().unsqueeze(1)
         # CIV6 (Civil Prestige, REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES):
         # under an ESTABLISHED governor of at least `min` titles, its first
         # included (`_governor_titles` is 0 where none is established)

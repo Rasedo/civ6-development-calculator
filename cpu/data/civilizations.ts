@@ -388,7 +388,7 @@ const GOVERNOR_YIELD_SRC: readonly (SrcMap | undefined)[] = [
 ];
 const GOVERNOR_LOYALTY_SRC: readonly (SrcMap | undefined)[] = [
   { amount: ma('TOQUI_DOMESTIC_LOYALTY'),
-    range: { pedia: 'the published Toqui text ("within 9 tiles"); MODIFIER_PLAYER_GOVERNORS_ADJUST_GOVERNOR_IDENTITY_PRESSURE carries no radius' } },
+    range: { lab: 'C-94', note: 'EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE reaches 10 tiles, the governed city included: 1,059 city-turns of the Garrison Commander, every one at distance 0-10 paid +4 and every one at 11-18 nothing, runs/h1_duelw1103-1108' } },
 ];
 const GARRISON_LOYALTY_SRC: readonly (SrcMap | undefined)[] = [
   { amount: ma('TRAIT_ISIBONGO_GARRISONIDENTITY'), formation: mreq('TRAIT_ISIBONGO_GARRISONIDENTITY', 'CITY_HAS_GARRISON_UNIT_REQUIERMENT') },
@@ -1410,7 +1410,7 @@ export interface GovernorLoyaltyRow {
   range: number;
 }
 export const GOVERNOR_LOYALTY_ROWS: readonly GovernorLoyaltyRow[] = withSrc([
-  { civ: 'MAPUCHE', amount: 4, range: 9 },
+  { civ: 'MAPUCHE', amount: 4, range: 10 },
 ], GOVERNOR_LOYALTY_SRC);
 
 /** CIV6 (Isibongo, EFFECT_ADJUST_CITY_IDENTITY_PER_TURN): "Cities with a

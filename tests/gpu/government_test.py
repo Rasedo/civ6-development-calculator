@@ -30,7 +30,7 @@ from warmup import opened, warm_base
 # version the rows are keyed on. `slot` keys a SECOND base for the one sim
 # that stays live across the others: `sim` is still read at steps 6, 9 and
 # 10, so it cannot share an object with the scenes built in between.
-_CAT = ("_gov_ucs_by_type", "_gov_dc_house", "_gov_dc_amen")
+_CAT = ("_gov_ucs_by_type", "_gov_hid_min", "_gov_hid_house", "_gov_ais_min", "_gov_ais_amen")
 
 
 def build(rules, path, slot: int = 0) -> BatchSim:
@@ -243,8 +243,8 @@ def main() -> None:
     assert not bool((sim._type_melee & sim._type_anticav).any()), "no unit type is melee AND antiCavalry"
     assert float(sim._gov_wwcut[fas]) == 20.0, "FASCISM war weariness -20% (FASCISM_WAR_WEARINESS Amount 20)"
     cr = gov_idx["CLASSICAL_REPUBLIC"]
-    assert float(sim._gov_dc_house[cr]) == 1.0 and float(sim._gov_dc_amen[cr]) == 1.0, "CLASSICAL_REPUBLIC +1/+1 in cities with ANY district"
-    assert int(sim._gov_hid_min[cr]) == -1, "CLASSICAL_REPUBLIC no longer rides the SPECIALTY channel"
+    assert int(sim._gov_hid_min[cr]) == 1 and float(sim._gov_hid_house[cr]) == 1.0, "CLASSICAL_REPUBLIC +1 housing at 1 specialty district"
+    assert int(sim._gov_ais_min[cr]) == 1 and float(sim._gov_ais_amen[cr]) == 1.0, "CLASSICAL_REPUBLIC +1 amenity at 1 specialty district"
     assert float(sim._gov_housing[gov_idx["MONARCHY"]]) == 0.0, "MONARCHY's unsourced flat housing stays deleted"
     # The GS flat bonus rides the government row (tests/gpu/government_bonus_test.py
     # pins each one); Theocracy's faith-bought land units are not in it.
@@ -284,33 +284,40 @@ def main() -> None:
     for uid, want in (("WARRIOR", 4), ("SPEARMAN", 4), ("GALLEY", 4), ("ARCHER", 0), ("SETTLER", 0)):
         assert ucs(simc, uid, s0) == want, f"OLIGARCHY-row _gov_unit_cs {uid}: want {want}"
 
-    # 12) The ANY-district walk arms, borrowed onto the adopted row: one
-    #     completed CANAL (no housing or amenity of its own) opens exactly
-    #     the granted point, and a districtless city reads nothing.
-    canal_i = next(i for i, d in enumerate(simc.districts_cat) if d.get("id") == "CANAL")
+    # 12) The specialty-district walk arms, borrowed onto the adopted row:
+    #     one completed, unpillaged CAMPUS (no housing of its own) opens
+    #     exactly the granted point; a districtless city, and the same
+    #     Campus pillaged, read nothing.
+    campus_i = next(i for i, d in enumerate(simc.districts_cat) if d.get("id") == "CAMPUS")
     h0 = simc._seat_housing(0)[1].clone()
     ctr = int(simc.city_center[0, 0, 0])
-    simc._gov_dc_house[fas] = 1.0
+    simc._gov_hid_min[fas] = 1
+    simc._gov_hid_house[fas] = 1.0
     simc._eff_version += 1
     simc._gov_cat_version += 1
     h_no_district = simc._seat_housing(0)[1]
     assert float((h_no_district - h0).abs().sum()) == 0.0, "the grant pays NOTHING to a districtless city"
-    simc.city_dist_tile[0, 0, 0, canal_i] = ctr + 1
+    simc.city_dist_tile[0, 0, 0, campus_i] = ctr + 1
     simc.district_complete[0, ctr + 1] = True
     h1 = simc._seat_housing(0)[1]
-    assert float(h1[0, 0] - h0[0, 0]) == 1.0, "one completed CANAL opens exactly the +1 housing grant"
-    simc._gov_dc_amen[fas] = -30.0
+    assert float(h1[0, 0] - h0[0, 0]) == 1.0, "one completed CAMPUS opens exactly the +1 housing grant"
+    simc.district_pillaged[0, ctr + 1] = True
+    h2 = simc._seat_housing(0)[1]
+    assert float(h2[0, 0] - h0[0, 0]) == 0.0, "a pillaged CAMPUS opens nothing"
+    simc.district_pillaged[0, ctr + 1] = False
+    simc._gov_ais_min[fas] = 1
+    simc._gov_ais_amen[fas] = -30.0
     simc._eff_version += 1
     simc._gov_cat_version += 1
     t_lo = simc._seat_amenity(0)[0]
-    simc._gov_dc_amen[fas] = 30.0
+    simc._gov_ais_amen[fas] = 30.0
     simc._eff_version += 1
     simc._gov_cat_version += 1
     t_hi = simc._seat_amenity(0)[0]
     # the tier INDEX ranks best-first, so more amenities is a SMALLER index
     assert int(t_hi[0, 0]) < int(t_lo[0, 0]), "the amenity grant reaches the tier balance of the districted city"
 
-    print("government_test OK — adoption, slot fill incl. wildcard overflow, influence tier, card slotting + the two inert cards + MEDIEVAL_FAIRES inspiration + the sourced rows (unit CS by promotion class, xp/weariness/GPP factors, the any-district grant)")
+    print("government_test OK — adoption, slot fill incl. wildcard overflow, influence tier, card slotting + the two inert cards + MEDIEVAL_FAIRES inspiration + the sourced rows (unit CS by promotion class, xp/weariness/GPP factors, the specialty-district grant)")
 
 
 if __name__ == "__main__":

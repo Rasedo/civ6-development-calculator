@@ -26,7 +26,7 @@
  * report can separate a clean failure from one an unimported row explains.
  */
 import type { City, CityState, GameState } from '../core/types';
-import { borderBestPlots, cityCentreYields, cityPlotBonus, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
+import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
@@ -104,8 +104,13 @@ function cityGaps(imp: Imported, c: DumpCity): string[] {
 const PLOT_BLIND = new Set(['buy.buildingCost', 'buy.buildingGold', 'buy.unitCost', 'buy.unitGold',
   'buy.districtCost', 'buy.plotGold', 'city.defense', 'city.growthThreshold', 'step.pressure']);
 
+/** the checks an unrecorded National Park moves: its amenities and the tier
+ *  and loyalty they set, its tourism */
+const PARK_READERS = new Set(['city.amenities', 'city.amenityTier', 'city.loyaltyPerTurn', 'city.tourism', 'seat.tourism']);
+
 function gapsFor(gaps: string[], check: string): { gaps?: string[] } {
-  const g = PLOT_BLIND.has(check) ? gaps.filter((x) => !x.startsWith('plot ') && !x.startsWith('resource:')) : gaps;
+  let g = PLOT_BLIND.has(check) ? gaps.filter((x) => !x.startsWith('plot ') && !x.startsWith('resource:')) : gaps;
+  if (!PARK_READERS.has(check)) g = g.filter((x) => !x.startsWith('national-park:'));
   return g.length ? { gaps: g } : {};
 }
 
@@ -134,6 +139,9 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
   const out: CheckResult[] = [];
   const state = imp.state;
   const turn = rec.turn;
+  // every reader takes the congress the game holds now, but a city's
+  // amenities stand as its seat's last turn left them (`congressOf`)
+  const congressNow = state.congress;
 
   // every plot's yields: an owned plot on its owner's context, an unowned one
   // on the base context with the resources the LOCAL player cannot see hidden
@@ -204,13 +212,22 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const occ = YIELD_KEYS.map((k) => oc[k]);
     const back = imp.readBack.get(city.centerIndex);
     push('city.centreYields', occ.every((v, i) => back?.has(i) || near(v, centre[i])), centre, occ);
+    if (c.tourism !== undefined) {
+      const tour = cityTourism(state, city);
+      push('city.tourism', near(tour, num(c.tourism), 0.5), num(c.tourism), round3(tour),
+        { buildings: city.buildings, wonders: city.wonders.map((w) => w.id), works: (city.greatWorks ?? []).length });
+    }
     push('city.housing', near(stats.housing, num(c.housing)), num(c.housing), stats.housing,
-      { parts: c.housingParts, pop: city.population });
-    push('city.amenities', stats.amenities.have === num(c.amenities) && stats.amenities.needed === num(c.amenitiesNeeded),
-      [num(c.amenities), num(c.amenitiesNeeded)], [stats.amenities.have, stats.amenities.needed], { parts: c.amenityParts });
+      { parts: c.housingParts, ourParts: stats.housingParts, pop: city.population });
+    state.congress = imp.congressOf(city.seat);
+    const standing = computeCityStats(state, city).amenities;
+    const standingLux = luxuryAmenities(state, city.seat).get(city.id) ?? 0;
+    state.congress = congressNow;
+    push('city.amenities', standing.have === num(c.amenities) && standing.needed === num(c.amenitiesNeeded),
+      [num(c.amenities), num(c.amenitiesNeeded)], [standing.have, standing.needed], { parts: c.amenityParts, ourLux: standingLux });
     const tierGame = 6 - num(c.happiness);
-    push('city.amenityTier', amenityTierIndex(stats.amenities.tier.name) === tierGame,
-      AMENITY_TIERS[tierGame]?.name, stats.amenities.tier.name);
+    push('city.amenityTier', amenityTierIndex(standing.tier.name) === tierGame,
+      AMENITY_TIERS[tierGame]?.name, standing.tier.name);
     push('city.growthThreshold', near(growthFoodNeeded(city.population), num(c.growthThreshold)),
       num(c.growthThreshold), growthFoodNeeded(city.population), { pop: city.population });
     push('city.foodSurplus', near(stats.foodSurplus, num(c.foodSurplus), 0.05), num(c.foodSurplus),
@@ -231,14 +248,16 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       // the whole per-turn change the turn step applies (the governor's term
       // and the seat's terms beside the city's own), read off a city held at
       // mid loyalty so no bound clips it
-      const stats = computeCityStats(state, city);
+      // the city's standing amenity tier beside the congress the game holds
+      // now (1107 t242: China's cities read the new session's loyalty terms
+      // beside their old amenities)
       const was = city.loyalty;
       city.loyalty = LOYALTY_MAX / 2;
-      applyLoyalty(state, city, stats.amenities.tier.name, num(c.governor) >= 0);
+      applyLoyalty(state, city, standing.tier.name, num(c.governor) >= 0, stats.foodSurplus < 0);
       const ours = city.loyalty - LOYALTY_MAX / 2;
       city.loyalty = was;
       push('city.loyaltyPerTurn', near(ours, gameLpt, 0.05), gameLpt, round3(ours),
-        { breakdown: c.loyaltyBreakdown, tier: stats.amenities.tier.name });
+        { breakdown: c.loyaltyBreakdown, tier: standing.tier.name });
     }
     push('city.defense', cityDefenseStrength(state, city) === num((c.districts[0] ?? [])[5] as number),
       num((c.districts[0] ?? [])[5] as number), cityDefenseStrength(state, city),
@@ -351,12 +370,12 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const subject = `seat ${pid} ${String(p.civ)}`;
     const sg = [...(state.seats[seat].civ < 0 ? ['leader'] : []), ...(imp.seatGaps.get(seat) ?? [])];
     for (const [key, c] of imp.cityByKey) if (c.seat === seat) for (const g of imp.cityGaps.get(key) ?? []) sg.push(g);
-    const gaps = sg.length ? { gaps: [...new Set(sg)] } : {};
+    const gaps = gapsFor([...new Set(sg)], 'seat.maint');
     // a Flood Barrier's upkeep is priced off its city's Coastal Lowland plots,
     // which the record does not carry
     const barrier = state.seats[seat].cities.some((c) => c.buildings.some((id) => BUILDINGS[id]?.floodBarrier));
     const bok = b === num(p.maintBuildings);
-    const bgaps = !bok && barrier ? { gaps: [...new Set([...sg, 'coastal lowland'])] } : gaps;
+    const bgaps = !bok && barrier ? { gaps: [...(gaps.gaps ?? []), 'coastal lowland'] } : gaps;
     out.push({ turn, check: 'seat.maintBuildings', subject, ok: bok, game: num(p.maintBuildings), ours: b, ...bgaps });
     out.push({ turn, check: 'seat.maintDistricts', subject, ok: d === num(p.maintDistricts), game: num(p.maintDistricts), ours: d, ...gaps });
     out.push({ turn, check: 'seat.maintUnits', subject, ok: u === num(p.maintUnits), game: num(p.maintUnits), ours: u, ...gaps,
@@ -364,7 +383,8 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     // the game's reader answers the whole output, the religious half with it
     // (runs/h1_duelw1103 t150: Rome's 8 is its Holy City's)
     const tour = seatTourism(state, seat) + seatTourismReligious(state, seat);
-    out.push({ turn, check: 'seat.tourism', subject, ok: near(tour, num(p.tourism), 0.5), game: num(p.tourism), ours: round3(tour), ...gaps });
+    out.push({ turn, check: 'seat.tourism', subject, ok: near(tour, num(p.tourism), 0.5), game: num(p.tourism), ours: round3(tour),
+      ...gapsFor([...new Set(sg)], 'seat.tourism') });
   }
   return out;
 }
@@ -586,7 +606,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       // loyalty
       const loyBefore = city.loyalty;
       const hasGov = num(c.governor) >= 0;
-      applyLoyalty(state, city, st.amenities.tier.name, hasGov);
+      applyLoyalty(state, city, st.amenities.tier.name, hasGov, st.foodSurplus < 0);
       const loySkip = skipAll ?? (acts.governorChanged.has(k) ? 'governor changed' : null);
       if (loySkip || !next) out.push({ turn, check: 'step.loyalty', subject, ok: true, skip: loySkip ?? 'no t+1' });
       else {
