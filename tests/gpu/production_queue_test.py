@@ -18,7 +18,7 @@ Proven here:
   * the head accrues, and a completion banks its overflow because nothing
     waits behind it;
   * a city already building is offered NO item column at all;
-  * a building on order is not offered twice;
+  * a building on order is not offered twice, the memoised list included;
   * `_q_drop` empties the head.
 """
 
@@ -144,15 +144,16 @@ def test_a_queued_building_is_not_offered_twice(rules, path) -> None:
     open_b = sim._seat_buildable(ROW)[B0, j].nonzero().flatten().tolist()
     assert open_b, "this city may build nothing at all — the poke proves nothing"
     b = open_b[0]
+    # no version bump after a queue write: a production pick bumps none, and
+    # the purchase that follows it in the same turn reads the list memoised
+    # above — the memo has to see the queue move by itself
     load_queue(sim, j, [b], costs=[10_000])
-    sim._eff_version += 1
     assert not bool(sim._seat_buildable(ROW)[B0, j, b]), \
         f"building {b} was offered while it stood at the head"
     load_queue(sim, j, [open_b[-1], b] if len(open_b) > 1 else [b, b], costs=[10_000, 10_000])
-    sim._eff_version += 1
     assert not bool(sim._seat_buildable(ROW)[B0, j, b]), \
         f"building {b} was offered while it WAITED at slot 1 — a head test cannot see it"
-    print("  6 duplicates OK — a building on order anywhere is not offered again")
+    print("  6 duplicates OK — a building on order anywhere is not offered again, memo or not")
 
 
 def test_a_drop_empties_the_head(rules, path) -> None:

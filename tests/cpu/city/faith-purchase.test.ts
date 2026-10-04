@@ -76,6 +76,24 @@ describe("Valletta's class purchase", () => {
     expect(purchaseBuildingWithFaith(state, city.id, 'MONUMENT', 0).ok).toBe(false);
   });
 
+  it('sells what the gold buy sells: a queued building banks its hammers, a repair never sells', () => {
+    const { state, city } = oneCity();
+    suzerainOfValletta(state);
+    const seat = seatOf(state, 0)!;
+    seat.faith = 5000;
+    // CIV6: a building in the queue sells, the entry is invalidated and its
+    // progress banks
+    city.queue = [{ kind: 'building', building: 'MONUMENT', progress: 7 }];
+    const bank0 = city.productionBank ?? 0;
+    expect(purchaseBuildingWithFaith(state, city.id, 'MONUMENT', 0).ok).toBe(true);
+    expect(city.queue).toEqual([]);
+    expect(city.productionBank).toBe(bank0 + 7);
+    // CIV6: a pillaged building is repaired from the queue alone
+    city.pillagedBuildings = ['MONUMENT'];
+    expect(purchaseBuildingWithFaith(state, city.id, 'MONUMENT', 0).ok).toBe(false);
+    expect(city.buildings.filter((b) => b === 'MONUMENT')).toHaveLength(1);
+  });
+
   it('the three walls "can only be bought with Faith" while the suzerain holds', () => {
     const { state, city } = oneCity();
     const seat = seatOf(state, 0)!;

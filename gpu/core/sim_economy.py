@@ -2765,7 +2765,7 @@ class SimEconomy:
     def _reprice_live(self, row: int) -> None:
         self.city_cost[:, row].copy_(self._live_building_cost(row))
 
-    def _seat_buildable(self, row: int, complete: bool = False, gold: bool = False) -> torch.Tensor:
+    def _seat_buildable(self, row: int, complete: bool = False, purchase: bool = False) -> torch.Tensor:
         """[B, RC, NB] buildings seat row `row`'s cities may QUEUE now —
         `availableBuildings`, which is seat-generic in TS and so has ONE body
         for every row here.
@@ -2777,22 +2777,27 @@ class SimEconomy:
 
         A WORSHIP building is offered only in a city whose majority religion's
         Worship belief names it (`_worship_offered`) or that holds it
-        pillaged, and never on the gold reading.
+        pillaged, and never on the purchase reading.
 
         `queued` is TS's queued SET: a building anywhere in the city's queue is
         already on order, and TS offers neither it nor a prerequisite it would
         satisfy twice — the whole queue, not merely the item being worked.
 
-        `gold=True` is the GOLD-purchase reading: real Civ 6 sells a building
-        that sits in the queue, the item being WORKED included — the entry is
-        invalidated and its progress banks — so the queue term drops, and an
+        `purchase=True` is the PURCHASE reading (`purchasableBuildings`), the
+        gold buy's and the faith class buy's: real Civ 6 sells a building that
+        sits in the queue, the item being WORKED included — the entry is
+        invalidated and its progress banks — so the queue term drops, an
         exclusion fires off built rows alone, `city.buildings` like the
-        prerequisite term.
+        prerequisite term, and no repair is sold.
+
+        The memo holds while `_eff_version` and the QUEUE plane are both
+        unmoved: a queue write bumps no version, and the seat's production
+        pick lands between a purchase candidate and the purchase it names.
         """
-        key = (row, complete, gold)
+        key = (row, complete, purchase)
         hit = self._bld_cache.get(key)
-        if hit is not None and hit[0] == self._eff_version:
-            return hit[1]
+        if hit is not None and hit[0] == self._eff_version and simbase.stamp_holds(hit[1], (self.city_current,)):
+            return hit[2]
         rd = self.rules_dev
         B, C, NB, dev = self.B, self.RC, self.NB, self.device
         ones_nb = torch.ones(B, NB, dtype=torch.bool, device=dev)
@@ -2816,7 +2821,7 @@ class SimEconomy:
             _qopen = (self.civ_techs[:, row, _qt] if _qt >= 0 else self.civ_civics[:, row, _qv])
             unlocked[:, _qb] = torch.where(_qw, _qopen, unlocked[:, _qb])
         cur = self.city_current[:, row]  # [B, C, QD]; layout: [0, NB) IS the building range
-        _qsrc = cur[:, :, :0] if gold else cur
+        _qsrc = cur[:, :, :0] if purchase else cur
         queued = (torch.nn.functional.one_hot(_qsrc.clamp(min=0, max=NB - 1), NB).bool()
                   & ((_qsrc >= 0) & (_qsrc < NB)).unsqueeze(3)).any(dim=2)
         # hasRiver at each centre, read off the static tile plane (a dead
@@ -2824,12 +2829,12 @@ class SimEconomy:
         river_c = self.tile_river.gather(1, self.city_center[:, row].clamp(min=0))  # [B, C]
         # a HELD building standing PILLAGED is buildable again — that is its
         # REPAIR, on its own column at `_building_cost_in`'s repair price;
-        # the gold arm never sells one (CIV6 repairs from the queue alone)
-        held = have if gold else (have & ~self.city_bldg_pillaged[:, row])
+        # a purchase never sells one (CIV6 repairs from the queue alone)
+        held = have if purchase else (have & ~self.city_bldg_pillaged[:, row])
         # a worship building where the city's majority religion names it, or
-        # the repair of one it holds pillaged; never on the gold reading
+        # the repair of one it holds pillaged; never on the purchase reading
         own_w = torch.zeros(B, C, NB, dtype=torch.bool, device=dev)
-        if not gold:
+        if not purchase:
             _wb = self._worship_offered(row)
             own_w = (((torch.arange(NB, device=dev).reshape(1, 1, -1) == _wb.unsqueeze(2)) & (_wb >= 0).unsqueeze(2))
                      | have)
@@ -2866,7 +2871,7 @@ class SimEconomy:
             # either list. Any one listed prerequisite opens a building; any
             # one listed exclusive sibling closes it.
             req_src = have if complete else hq
-            _exq = have if gold else hq
+            _exq = have if purchase else hq
             prereq_ok = ((req_src[:, :, self._b_req_idx] & self._b_req_ok).any(dim=3) | self._b_req_none) \
                 & ~(_exq[:, :, self._b_excl_idx] & self._b_excl_ok).any(dim=3)
             base = base & district_ok & prereq_ok
@@ -2883,7 +2888,7 @@ class SimEconomy:
         if bool((_eb >= 0).count_nonzero()):
             _bidx = torch.arange(NB, device=dev).reshape(1, 1, -1)
             base = base & ~((_eb >= 0).reshape(B, 1, 1) & (_bidx == _eb.reshape(B, 1, 1)))
-        self._bld_cache[key] = (self._eff_version, base)
+        self._bld_cache[key] = (self._eff_version, simbase.plane_stamp((self.city_current,)), base)
         return base
 
     def _naval_capable(self, row: int) -> torch.Tensor:

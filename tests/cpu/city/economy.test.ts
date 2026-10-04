@@ -8,7 +8,7 @@ import { PEACE_GOLD_COST } from '../../../cpu/data/seats';
 import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount, purchaseSpotBlocked } from '../../../cpu/core/units';
 import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
 import { PROJECTS, projectYieldLump, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
-import { goldPurchasableBuildings } from '../../../cpu/core/rules';
+import { purchasableBuildings } from '../../../cpu/core/rules';
 import { purchaseStep } from '../../../cpu/core/effects';   // every price is floored to a multiple of five (measured)
 import { gameProgressPct } from '../../../cpu/data/constants';
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
@@ -63,7 +63,7 @@ describe('gold & faith purchases', () => {
     commitProduction(state, 0, city, { kind: 'building', building: 'MONUMENT', progress: 0 });
     city.queue[0]!.progress = 7;
     expect(city.queue[0]?.kind).toBe('building');
-    expect(goldPurchasableBuildings(state, city).map((b) => b.id)).toContain('MONUMENT');
+    expect(purchasableBuildings(state, city).map((b) => b.id)).toContain('MONUMENT');
 
     const bank = city.productionBank ?? 0;
     s.treasury = buildingPurchaseCost(state, 0, 'MONUMENT') + PEACE_GOLD_COST(0);

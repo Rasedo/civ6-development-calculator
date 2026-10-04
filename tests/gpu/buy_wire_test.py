@@ -120,7 +120,7 @@ def case_building(sim, base, row: int, mon: int) -> None:
     sim.city_progress[0, row, jq, 0] = 7.0
     sim._eff_version += 1
     assert int(sim.city_current[0, row, jq, 0]) == mon, "the queue did not take the row"
-    assert bool(sim._seat_buildable(row, True, gold=True)[0, jq, mon]), (
+    assert bool(sim._seat_buildable(row, True, purchase=True)[0, jq, mon]), (
         f"row {row}: the item under production was refused to the gold arm")
     bank0 = float(sim.city_prod_bank[0, row, jq])
     sim._stash_buy(row, buy=(t1(0), t1(jq), t1(mon)))
@@ -437,7 +437,7 @@ def case_worship(sim, base, row: int) -> None:
     assert int(sim._worship_bidx_of(row)[0]) == wj, f"row {row}: the Worship belief names another building"
     # the belief puts it on the PRODUCTION list, never on the gold one
     assert bool(sim._seat_buildable(row)[0, j, wj]), f"row {row}: the Worship belief's building must be queueable"
-    assert not bool(sim._seat_buildable(row, gold=True)[0, j, wj]), f"row {row}: worship must never gold-buy"
+    assert not bool(sim._seat_buildable(row, purchase=True)[0, j, wj]), f"row {row}: worship must never gold-buy"
     assert bool(sim._worship_city_ok(row)[0, j]), (
         f"row {row}: worship must be buyable once its Temple and Holy Site stand"
     )

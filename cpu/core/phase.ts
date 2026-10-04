@@ -42,7 +42,7 @@ import { prodLayout } from './prodLayout';   // ONE column layout, shared with t
 import { CIVICS } from '../data/civics';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, UNIT_TYPE_IDX, UNIT_ERA_INDEX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
-import { availableBuildings, buildingCompletable, buildingCostIn, goldPurchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
+import { availableBuildings, buildingCompletable, buildingCostIn, purchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { PANTHEONS, PANTHEON_FAITH_COST } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
@@ -1085,7 +1085,7 @@ export function buySeatBuilding(state: GameState, actor: Seat, civCity: City, id
   const def = BUILDINGS[id];
   if (!def || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)
       || def.noPurchase || wallsGoldBlocked(state, actor.seat, def.id)) return false;
-  if (!goldPurchasableBuildings(state, civCity).some((b) => b.id === def.id)
+  if (!purchasableBuildings(state, civCity).some((b) => b.id === def.id)
       || !buildingCompletable(state, civCity, def.id)) return false;
   const price = goldPrice(state, actor.seat, buildingPurchaseCost(state, actor.seat, def.id));
   const reserve = PEACE_GOLD_COST(0);

@@ -241,7 +241,7 @@ def main() -> None:
     assert prod_dark < prod_lit, f"the yield walk still pays the pillaged Workshop ({prod_lit} -> {prod_dark})"
     # the REPAIR: the building's own column, at a quarter of the price, from the queue alone
     assert bool(sim._seat_buildable(foe)[B0, theirs, wk]), "the pillaged Workshop is not offered for repair"
-    assert not bool(sim._seat_buildable(foe, gold=True)[B0, theirs, wk]), "the gold arm sells a repair"
+    assert not bool(sim._seat_buildable(foe, purchase=True)[B0, theirs, wk]), "the gold arm sells a repair"
     full = float(sim.rules_dev.b_cost[wk])
     pct = float(sim.rules.pillage_building_repair_pct)
     want = round(full * pct / 100.0)

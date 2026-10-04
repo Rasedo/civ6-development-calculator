@@ -7,7 +7,7 @@ import { GWO_RELIC } from '../data/greatWorks';
 import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { claimTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
-import { canFoundCity, availableBuildings, buildingCompletable, worshipOffered, type RuleResult } from './rules';
+import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuildings, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
@@ -715,7 +715,7 @@ export function purchaseBuildingWithFaith(state: GameState, cityId: number, buil
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
   if (!faithBuyableClass(state, seat, buildingId)) return { ok: false, reason: 'Not a faith-buyable building.' };
-  if (!availableBuildings(state, city).some((b) => b.id === buildingId)) {
+  if (!purchasableBuildings(state, city).some((b) => b.id === buildingId)) {
     return { ok: false, reason: 'Building not available in this city.' };
   }
   if (!buildingCompletable(state, city, buildingId)) {

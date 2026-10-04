@@ -301,13 +301,30 @@ def test_faith_class(rules, path) -> None:
     rq = int(sim._b_req_district[bi])
     assert rq == -1 or rq == sim._encamp_didx,         f"the candidate named {BUILDING_IDS[bi]}, which is neither a City Center nor an Encampment row"
 
+    # CIV6: a building in the queue sells (`purchasableBuildings`) — put the
+    # candidate on order, and it is still the candidate
+    jc = int(j[0])
+    sim.city_current[0, row, jc] = -1
+    sim.city_current[0, row, jc, 0] = bi
+    sim.city_progress[0, row, jc, 0] = 7.0
+    bank0 = float(sim.city_prod_bank[0, row, jc])
+    ok, j, b = sim._seat_class_buy_candidate(row, held)
+    assert bool(ok[0]) and int(b[0]) == bi and int(j[0]) == jc, "a queued building stopped selling for faith"
+
     # the FAITH price, and the write
     price = float(sim._class_faith_cost(row, b)[0])
     assert abs(price - float(sim.rules_dev.b_cost[bi]) * sim.rules.faith_purchase_mult) < 1e-9,         "the class purchase is not priced at the faith rate"
-    f0, jc = float(sim.civ_faith[0, row]), int(j[0])
+    f0 = float(sim.civ_faith[0, row])
     sim._seat_buy_building_faith(row, ok, j, b, sim._class_faith_cost(row, b))
     assert bool(sim.city_bldg[0, row, jc, bi]), "the faith-bought building did not land in the city"
     assert abs(float(sim.civ_faith[0, row]) - (f0 - price)) < 1e-9, "the faith was not spent"
+    assert int(sim.city_current[0, row, jc, 0]) == -1, "the bought building stayed on order"
+    assert abs(float(sim.city_prod_bank[0, row, jc]) - (bank0 + 7.0)) < 1e-9, "the queued hammers did not bank"
+    # CIV6: a pillaged building is repaired from the queue alone
+    sim.city_bldg_pillaged[0, row, jc, bi] = True
+    sim._eff_version += 1
+    assert not bool(sim._seat_buildable(row, True, purchase=True)[0, jc, bi]), "a repair sells for faith"
+    sim.city_bldg_pillaged[0, row, jc, bi] = False
 
     # CIV6 (Leaders.xml, MINOR_CIV_VALLETTA_PURCHASE_CHEAPER_{WALLS,CASTLE,
     # STAR}_BONUS): ADJUST_BUILDING_PURCHASE_COST Amount 50 — the three walls

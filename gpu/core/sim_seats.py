@@ -1314,14 +1314,14 @@ class SimSeats:
         Returns (jj, bb, can, price, elig): the cheapest completable building
         anywhere in the seat (argmin of (cost*1024 + bIdx)*32 + citySlot) and
         whether the treasury clears price + the peace-gold RESERVE (a POLICY
-        war chest, not a rule). Legality is `_seat_buildable`'s gold reading —
-        availableBuildings + buildingCompletable, with the queue term relaxed
-        to the item being WORKED, the way the TS replay arm reads it.
+        war chest, not a rule). Legality is `_seat_buildable`'s purchase
+        reading — `purchasableBuildings` + buildingCompletable, the way the TS
+        replay arm reads it.
         The affordability test is milli-quantised via js_round to match TS."""
         B, dev = self.B, self.device
         rdv6 = self.rules_dev
         NB6 = rdv6.b_cost.shape[0]
-        elig6 = self._seat_buildable(row, True, gold=True) & (active.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)
+        elig6 = self._seat_buildable(row, True, purchase=True) & (active.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)
         # CIV6 (Medieval and Renaissance Walls): "Cannot be purchased with
         # Gold" — and no walls tier is buildable at all while the perimeter
         # this city already has is damaged.
@@ -1498,6 +1498,17 @@ class SimSeats:
         k = torch.where(on, (self.game_era.reshape(-1, 1, 1) - st).clamp(min=0), torch.zeros_like(st)).double()
         return torch.einsum("bjp,pk->bjk", k, self._bpe_y)
 
+    def _drop_bought_building(self, row: int, ok: torch.Tensor, jj: torch.Tensor, bb: torch.Tensor) -> None:
+        """`dropQueuedBuilding` — CIV6: hammers never burn, so a queued copy
+        of a building just bought is INVALIDATED: its progress banks and the
+        entry closes up. Every building purchase ends here."""
+        rows = ok.nonzero(as_tuple=True)[0]
+        col = jj[rows]
+        gone = self.city_current[rows, row, col] == bb[rows].unsqueeze(1)
+        if bool(gone.count_nonzero()):
+            self.city_prod_bank[rows, row, col] += (self.city_progress[rows, row, col] * gone).sum(dim=1)
+            self._q_drop(rows, row, col, gone)
+
     def _seat_buy_building(self, row: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
         rows6 = can6.nonzero(as_tuple=True)[0]
         self.city_bldg[rows6, row, jj6[rows6], bb6[rows6]] = True
@@ -1512,6 +1523,7 @@ class SimSeats:
                 self.city_outer_hp[wm6, row, jj6[wm6]] = _wf6
                 self._fit_encamp_outer(wm6, row, jj6[wm6], _wf6)
         self.civ_treasury[:, row] = torch.where(can6, self.civ_treasury[:, row] - price6, self.civ_treasury[:, row])
+        self._drop_bought_building(row, can6, jj6, bb6)
 
     def _seat_buy_building_faith(self, row: int, ok: torch.Tensor, jj: torch.Tensor, bb: torch.Tensor, price: torch.Tensor) -> None:
         """The class purchase's write — the gold buy's twin, paid out of faith."""
@@ -1528,6 +1540,7 @@ class SimSeats:
                 self.city_outer_hp[wm, row, jj[wm]] = _wf
                 self._fit_encamp_outer(wm, row, jj[wm], _wf)
         self.civ_faith[:, row] = torch.where(ok, self.civ_faith[:, row] - price, self.civ_faith[:, row])
+        self._drop_bought_building(row, ok, jj, bb)
 
     def _civ_idx(self, civ: str) -> int:
         return self._civ_ids.index(civ) if civ in self._civ_ids else -1
@@ -2261,8 +2274,8 @@ class SimSeats:
     def _seat_class_buy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 12: Valletta's class purchase. CIV6 (its suzerain): "City
         Center buildings and Encampment district buildings can be bought with
-        Faith." Same legality body as the gold buy — `_seat_buildable` is
-        the TS gold buy's (`buySeatBuilding`) list + buildingCompletable pair — and
+        Faith." Same legality body as the gold buy — `_seat_buildable`'s
+        purchase reading is `purchasableBuildings` + buildingCompletable — and
         the same cheapest-first key, priced in FAITH. Returns (ok [B],
         slot [B], building [B])."""
         B, dev = self.B, self.device
@@ -2274,7 +2287,7 @@ class SimSeats:
             return no, neg, neg.clone()
         rdv = self.rules_dev
         NB = rdv.b_cost.shape[0]
-        elig = self._seat_buildable(row, True) & (held.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)             & cls_b.unsqueeze(1)
+        elig = self._seat_buildable(row, True, purchase=True) & (held.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)             & cls_b.unsqueeze(1)
         if self._walls_rows:
             elig = elig & (self._walls_build_ok(row).unsqueeze(2) | (self._b_walls.reshape(1, 1, -1) == 0))
         _bcf = self._b_cols(row)["buyCost"]                            # [B, NB]
@@ -2688,17 +2701,6 @@ class SimSeats:
                     & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price + reserve) * 1000))
                 if bool(ok.count_nonzero()):
                     self._seat_buy_building(row, ok, jc, bc, price)
-                    # CIV6: hammers never burn — a queued copy of the bought
-                    # building is INVALIDATED: its progress banks and the
-                    # entry closes up, `dropQueuedBuilding`'s splice.
-                    rows0 = ok.nonzero(as_tuple=True)[0]
-                    colq = jc[rows0]
-                    curq = self.city_current[rows0, row, colq]
-                    gone0 = curq == bc[rows0].unsqueeze(1)
-                    if bool(gone0.count_nonzero()):
-                        prog0 = self.city_progress[rows0, row, colq]
-                        self.city_prod_bank[rows0, row, colq] += (prog0 * gone0).sum(dim=1)
-                        self._q_drop(rows0, row, colq, gone0)
                     bought = bought | ok
         # Kind 1: the SETTLER buy is a UNIT purchase. It spawns at the capital
         # (else the first alive city), which must have the pop to pay — WHERE
@@ -2790,15 +2792,7 @@ class SimSeats:
                     self._bldg_version += 1
                     self._eff_version += 1
                     self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._faith_price(row, self._worship_cost_of(row)).to(self.civ_faith.dtype), self.civ_faith[:, row])
-                    # CIV6: a queued copy of the bought building is
-                    # INVALIDATED — its progress banks and the entry closes
-                    # up, `dropQueuedBuilding`'s splice
-                    cur_w = self.city_current[rows_w, row, col_w]
-                    gone_w = cur_w == wb[rows_w].unsqueeze(1)
-                    if bool(gone_w.count_nonzero()):
-                        prog_w = self.city_progress[rows_w, row, col_w]
-                        self.city_prod_bank[rows_w, row, col_w] += (prog_w * gone_w).sum(dim=1)
-                        self._q_drop(rows_w, row, col_w, gone_w)
+                    self._drop_bought_building(row, buy_w, jw, wb)
         rel_kind, rel_j = self._driven_buy_relig.pop(row) if row in self._driven_buy_relig else (None, None)
         if rel_kind is not None and rel_j is not None:
             rel_city = self._seat_religious_city_ok(row)
@@ -2955,7 +2949,7 @@ class SimSeats:
             jc = cj.clamp(min=0, max=self.RC - 1)
             bc = cb.clamp(min=0, max=self.NB - 1)
             cls_b = self._faith_buyable_class(row)[bidx, bc]
-            legal_c = self._seat_buildable(row, True)[bidx, jc, bc] & cls_b & self.city_alive[bidx, row, jc]
+            legal_c = self._seat_buildable(row, True, purchase=True)[bidx, jc, bc] & cls_b & self.city_alive[bidx, row, jc]
             if self._walls_rows:
                 legal_c = legal_c & (self._walls_build_ok(row)[bidx, jc] | (self._b_walls.take(bc) == 0))
             price_c = self._faith_price(row, self._class_faith_cost(row, bc))

@@ -23,7 +23,7 @@ import { builderCost, goldBuyableUnits, purchaseSpotBlocked, trainableUnits } fr
 import { hasMet, isSuzerain } from './cityStates';
 import { pickBorderTile } from './city';
 import { MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, ENHANCER_BELIEFS } from '../data/religion';
-import { availableBuildings, buildingCompletable, goldPurchasableBuildings, worshipOffered } from './rules';
+import { buildingCompletable, purchasableBuildings, worshipOffered } from './rules';
 import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from './effects';
 import { congressUdtBlockedDistrict } from './congress';
 import { districtSiteCost, districtSiteLegal, levyGoldCost, minorArmy } from './phase';
@@ -158,7 +158,7 @@ function cheapestBuilding(
  *  layout row 0 in the first city at that row's price, with `can` false —
  *  the GPU observation's value for an empty candidate set. */
 export function goldBuildingCandidate(state: GameState, actor: Seat): { city: number; bldg: number; can: boolean; price: number } {
-  const best = cheapestBuilding(state, actor, (city) => goldPurchasableBuildings(state, city).filter((def) =>
+  const best = cheapestBuilding(state, actor, (city) => purchasableBuildings(state, city).filter((def) =>
     !def.worship && !def.noPurchase && !wallsGoldBlocked(state, actor.seat, def.id)
     && buildingCompletable(state, city, def.id)));
   if (!best) return { city: -1, bldg: -1, can: false, price: 0 };
@@ -169,10 +169,10 @@ export function goldBuildingCandidate(state: GameState, actor: Seat): { city: nu
 
 /** Valletta's (and the Songs of the Jeli's) FAITH class buy —
  *  `purchaseBuildingWithFaith`'s checks: a faith-buyable class row on the
- *  city's list, completable, the cheapest one affordable in faith. */
+ *  city's purchase list, completable, the cheapest one affordable in faith. */
 export function faithClassCandidate(state: GameState, actor: Seat): { ok: boolean; city: number; bldg: number } {
   const none = { ok: false, city: -1, bldg: -1 };
-  const best = cheapestBuilding(state, actor, (city) => availableBuildings(state, city).filter((def) =>
+  const best = cheapestBuilding(state, actor, (city) => purchasableBuildings(state, city).filter((def) =>
     faithBuyableClass(state, actor.seat, def.id) && buildingCompletable(state, city, def.id)));
   if (!best) return none;
   const cost = faithPrice(state, actor.seat, buildingFaithCost(state, actor.seat, best.id));

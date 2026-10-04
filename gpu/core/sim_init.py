@@ -4287,7 +4287,7 @@ class SimInit:
         self._fadjq_cache = None
         self._appeal_cache = None
         self._rcy_cache = None
-        self._bld_cache: dict = {}  # (row, complete) -> (_eff_version, mask); one entry per seat row
+        self._bld_cache: dict = {}  # (row, complete, purchase) -> (_eff_version, queue-plane stamp, mask)
         # The WIRE's spending intents, parked between decide-time and the
         # gold block's phase position. Keyed by ABSOLUTE seat row — every row
         # stashes through apply_seat_actions (`_stash_buy`), and

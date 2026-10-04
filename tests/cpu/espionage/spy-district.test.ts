@@ -24,7 +24,7 @@ import {
   SPY_COUNTERSPY_ROLL, SPY_COUNTERSPY_LEVEL_ROLL, SPY_TRAVELLING,
 } from '../../../cpu/data/espionage';
 import { buildingPillaged, cityBuildingYields, darkBuildings } from '../../../cpu/core/yields';
-import { availableBuildings, goldPurchasableBuildings, buildingCostIn } from '../../../cpu/core/rules';
+import { availableBuildings, purchasableBuildings, buildingCostIn } from '../../../cpu/core/rules';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -262,7 +262,7 @@ describe('Sabotage Production pillages the buildings', () => {
     // THE REPAIR: the building's own column, at PILLAGE_BUILDING_REPAIR_PERCENT
     // of its price, from the queue alone
     expect(availableBuildings(state, theirs).some((b) => b.id === 'WORKSHOP')).toBe(true);
-    expect(goldPurchasableBuildings(state, theirs).some((b) => b.id === 'WORKSHOP')).toBe(false);
+    expect(purchasableBuildings(state, theirs).some((b) => b.id === 'WORKSHOP')).toBe(false);
     const price = buildingCostIn(state, theirs, 'WORKSHOP');
     expect(price).toBe(Math.round((BUILDINGS.WORKSHOP.cost * PILLAGE_BUILDING_REPAIR_PERCENT) / 100));
     const item: QueueItem = { kind: 'building', building: 'WORKSHOP', progress: price };

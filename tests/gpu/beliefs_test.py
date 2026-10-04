@@ -229,7 +229,7 @@ def test_worship_building(rules, path) -> None:
     buildable = sim._seat_buildable(ROW)[B0, j]
     assert bool(buildable[wat]), "the Worship belief's building is not on the production list"
     assert not any(bool(buildable[b]) for b in others), "another worship building is on the list"
-    assert not bool(sim._seat_buildable(ROW, gold=True)[B0, j, wat]), "a worship building sells for gold"
+    assert not bool(sim._seat_buildable(ROW, purchase=True)[B0, j, wat]), "a worship building sells for gold"
     # on the queue with progress; the faith buy takes it off and banks it
     code = torch.full((1,), wat, dtype=torch.long)
     sim._q_push(ROW, j, ONES, code, torch.full((1,), 114.0, dtype=sim.city_progress.dtype))

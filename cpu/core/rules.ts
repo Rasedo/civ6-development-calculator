@@ -859,13 +859,16 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   return buildableBuildings(state, city, false);
 }
 
-/** The GOLD-purchase list — `availableBuildings` with the QUEUE term dropped
- * altogether and an exclusion firing off built rows alone; worship rows never
- * sell for Gold. CIV6: a building in the queue sells, the item being WORKED
+/** The PURCHASE list — what the gold buy and the faith class buy (Valletta's
+ * suzerain, the Songs of the Jeli) may sell: `availableBuildings` with the
+ * QUEUE term dropped altogether and an exclusion firing off built rows alone,
+ * and no repair. CIV6: a building in the queue sells, the item being WORKED
  * included — the entry is invalidated (`dropQueuedBuilding`) and its progress
- * banks. Pair with `buildingCompletable`, exactly as the purchase appliers
- * do. */
-export function goldPurchasableBuildings(state: GameState, city: City): BuildingDef[] {
+ * banks; a pillaged building is repaired from the queue alone. Worship rows
+ * are not on it: they are faith-bought through their own arm
+ * (`buyWorshipBuilding`). Pair with `buildingCompletable`, exactly as the
+ * purchase appliers do. */
+export function purchasableBuildings(state: GameState, city: City): BuildingDef[] {
   return buildableBuildings(state, city, true);
 }
 
@@ -881,7 +884,7 @@ export function worshipOffered(state: GameState, city: City): string | undefined
   return rel < 0 ? undefined : worshipBuildingOf(seatOf(state, rel)?.religion.worship);
 }
 
-function buildableBuildings(state: GameState, city: City, gold: boolean): BuildingDef[] {
+function buildableBuildings(state: GameState, city: City, purchase: boolean): BuildingDef[] {
   const map = state.map;
   const unlocks = gates(state, city.seat);
   // CIV6: "Production cannot be applied to anything in tiles containing
@@ -890,7 +893,7 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
   const placed = new Set(
     city.districts.filter((d) => !irradiated(map.tiles[d.tileIndex])).map((d) => d.type),
   );
-  const queuedSrc = gold ? [] : city.queue;
+  const queuedSrc = purchase ? [] : city.queue;
   const queued = new Set(
     queuedSrc.filter((q) => q.kind === 'building').map((q) => (q.kind === 'building' ? q.building : '')),
   );
@@ -906,14 +909,14 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
     if (type === blockedD) continue;
     for (const def of buildingsForDistrict(type)) {
       // a HELD building standing PILLAGED is buildable again — that is its
-      // REPAIR, on its own column at `buildingCostIn`'s repair price; the gold
-      // arm never sells one (CIV6 repairs from the queue alone)
-      if ((have.has(def.id) && (gold || !buildingPillaged(city, def.id))) || queued.has(def.id)) continue;
+      // REPAIR, on its own column at `buildingCostIn`'s repair price; a
+      // purchase never sells one (CIV6 repairs from the queue alone)
+      if ((have.has(def.id) && (purchase || !buildingPillaged(city, def.id))) || queued.has(def.id)) continue;
       if (def.worship) {
-        // built (or faith-bought, never gold-bought) where the city's
+        // built (or faith-bought through its own arm) where the city's
         // majority religion names it (`worshipOffered`); a held one standing
         // pillaged is its repair
-        if (gold) continue;
+        if (purchase) continue;
         if (!have.has(def.id) && worshipOffered(state, city) !== def.id) continue;
       } else if (unlocks && RESEARCH_GATED_BUILDINGS.has(def.id) && !unlocks.buildings.has(def.id)) {
         // the research gate holds only rows some tech or civic GRANTS: a
@@ -923,7 +926,7 @@ function buildableBuildings(state: GameState, city: City, gold: boolean): Buildi
         continue;
       }
       if (def.requiresAny && !def.requiresAny.some((r) => have.has(r) || queued.has(r))) continue;
-      if (def.exclusiveWith?.some((x) => have.has(x) || (!gold && queued.has(x)))) continue;
+      if (def.exclusiveWith?.some((x) => have.has(x) || (!purchase && queued.has(x)))) continue;
       // CIV6: a government building "requires a Tier 2 government (Merchant
       // Republic, Monarchy, or Theocracy)" — the tier of what the seat is
       // running NOW, so a revolution can take an unbuilt row back off the list.
