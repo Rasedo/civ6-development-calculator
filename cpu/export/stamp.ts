@@ -21,7 +21,8 @@ export function exportStamp(params: unknown): string {
   const h = createHash('sha256');
   for (const f of files) {
     h.update(relative(ROOT, f).split(sep).join('/'));
-    h.update(readFileSync(f));
+    // the stamp names the source, not the line endings a tool saved it with
+    h.update(readFileSync(f, 'utf8').replace(/\r\n/g, '\n'));
   }
   h.update(JSON.stringify(params));
   return h.digest('hex');

@@ -1,0 +1,5 @@
+# Every text file is stored and checked out with LF, whatever wrote it:
+# a tool that saves CRLF (Python text mode, PowerShell, an editor) leaves
+# no diff. Binary files are detected and left alone.
+* text=auto eol=lf
+*.ps1 text eol=crlf
