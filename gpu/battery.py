@@ -1030,15 +1030,14 @@ def _main() -> int:
         print(f"{name:<14} {dt:6.1f}s  {'ok' if rc == 0 else 'SKIP' if rc == -1 else 'BAIL' if rc == -3 else 'TIMEOUT' if rc == -4 else 'FAIL'}")
     serial = sum(dt for _, dt, _ in results)
     print(f"\nwall {wall:.0f}s (serial-equivalent {serial:.0f}s, {serial / max(wall, 1):.1f}x)")
-    # WHICH lane is the wall. The serve shards take one lane each (the first
-    # behind vitest) and the pokes share a pool, so the wall is stage 0 plus
+    # WHICH lane is the wall. The serve shards take one lane each and the
+    # pokes share a pool, so the wall is stage 0 plus
     # whichever of those two finishes last. A wall that moves without either
     # of them moving is the harness; a wall that moves with one of them names
     # its own suspect.
     if _serve_names and _poke_names:
         _t = {n: dt for n, dt, _ in results}
-        _srv = max([_t.get(_serve_names[0], 0.0) + _t.get("vitest", 0.0)]
-                   + [_t.get(n, 0.0) for n in _serve_names[1:]])
+        _srv = max(_t.get(n, 0.0) for n in _serve_names)
         _pk = [_t.get(n, 0.0) for n in _poke_names]
         _pool = max(sum(_pk) / max(1, _pokes), max(_pk, default=0.0))
         _s0 = _s0_wall
