@@ -438,6 +438,19 @@ def never_caught(rows: list) -> set[str]:
     return seen - red
 
 
+def pin_shard(name: str, p: subprocess.Popen) -> None:
+    """Serve shard i owns physical core i — its two logical CPUs, 2i and
+    2i+1 — so no two shards share a core's hyperthreads; its TS children
+    inherit the mask and run beside it. Every other lane floats."""
+    if os.name != "nt" or not name.startswith("serve_") or len(name) != 7:
+        return
+    i = ord(name[6]) - ord("a")
+    if not 0 <= i < (os.cpu_count() or 0) // 2:
+        return
+    import ctypes
+    ctypes.windll.kernel32.SetProcessAffinityMask(int(p._handle), ctypes.c_size_t(3 << (2 * i)))
+
+
 def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
         cap: float = LANE_CAP) -> None:
     env = os.environ.copy()
@@ -449,6 +462,7 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True,
         cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8", errors="replace",
     )
+    pin_shard(name, p)
     out, err = "", ""
     while True:
         try:
