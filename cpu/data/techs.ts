@@ -41,9 +41,12 @@ export type ResearchEffect =
   | { kind: 'hillFarms' }
   | { kind: 'unlockGovernment'; government: string }
   | { kind: 'unlockPolicy'; policy: string }
-  /** a ONE-OFF paid at completion (Global Warming Mitigation: "Awards 3
-   *  Envoys / Awards 1 Diplomatic Victory point"). */
-  | { kind: 'award'; envoys?: number; dvp?: number };
+  /** a ONE-OFF paid at EVERY completion (Global Warming Mitigation: "Awards
+   *  3 Envoys / Awards 1 Diplomatic Victory point"; Future Civic: "1
+   *  Governor title and 50 Diplomatic Favor each time it is completed";
+   *  Future Tech: "+5% Production towards city projects each time" — a
+   *  standing percent the seat banks, `Seat.researchProjectPct`). */
+  | { kind: 'award'; envoys?: number; dvp?: number; favor?: number; titles?: number; projectPct?: number };
 
 export interface TechDef {
   id: string;
@@ -52,6 +55,9 @@ export interface TechDef {
   cost: number;
   prereqs: string[];
   effects: ResearchEffect[];
+  /** CIV6 (`Repeatable`): the row stays researchable once complete, and each
+   *  completion pays its award again. */
+  repeatable?: boolean;
   /** PROVENANCE, per column — see TECH_SRC below. */
   src?: SrcMap;
 }
@@ -523,6 +529,20 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_CYBERNETICS', 'ImprovementType', { expect: 'IMPROVEMENT_LUMBER_MILL' }),
     'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_CYBERNETICS', 'BonusYieldChange'),
   },
+  SEASTEADS: {
+    era: xml('Technologies', 'TechnologyType=TECH_SEASTEADS', 'EraType', { expect: 'ERA_FUTURE' }),
+    cost: xml('Technologies', 'TechnologyType=TECH_SEASTEADS', 'Cost', { scale: GAME_SPEED }),
+    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_SEASTEADS (Technologies_XP2 RandomPrereqs); the deepest node this tree carries stands in' },
+    'effects.0.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'PrereqTech', { expect: 'TECH_SEASTEADS' }),
+    'effects.1.dvp': xml('ModifierArguments', 'ModifierId=TECH_SEASTEADS_DIPLOVP&Name=Amount', 'Value'),
+  },
+  FUTURE_TECH: {
+    era: xml('Technologies', 'TechnologyType=TECH_FUTURE_TECH', 'EraType', { expect: 'ERA_FUTURE' }),
+    cost: xml('Technologies', 'TechnologyType=TECH_FUTURE_TECH', 'Cost', { scale: GAME_SPEED }),
+    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_FUTURE_TECH (Expansion2 deletes the base row and its prereqs; Technologies_XP2 RandomPrereqs); every other Future tech this tree carries stands in' },
+    repeatable: xml('Technologies', 'TechnologyType=TECH_FUTURE_TECH', 'Repeatable', { expect: true }),
+    'effects.0.projectPct': xml('ModifierArguments', 'ModifierId=FUTURE_TECH_PROJECT_PRODUCTION&Name=Amount', 'Value'),
+  },
   PREDICTIVE_SYSTEMS: {
     era: xml('Technologies', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS', 'Cost', { scale: GAME_SPEED }),
@@ -806,5 +826,19 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'improvementYields', improvement: 'QUARRY', yields: { production: 1 } },
       { kind: 'improvementYields', improvement: 'OIL_WELL', yields: { production: 1 } },
     ]),
+    // CIV6 (Seasteads): Future era, "Awards 1 Diplomatic Victory point", and
+    // the Seastead improvement's PrereqTech.
+    T('SEASTEADS', 'Seasteads', 'Future', 2200, ['NANOTECHNOLOGY'], [
+      { kind: 'unlockImprovement', improvement: 'SEASTEAD' },
+      { kind: 'award', dvp: 1 },
+    ]),
+    // CIV6 (Future Tech): "Can be completed multiple times ... Also grants
+    // all of your cities +5% Production towards city projects each time it
+    // is completed." It closes the tree, so every other Future tech stands
+    // in as its prereq.
+    { ...T('FUTURE_TECH', 'Future Tech', 'Future', 2600,
+      ['OFFWORLD_MISSION', 'SMART_MATERIALS', 'ADVANCED_POWER_CELLS', 'ADVANCED_AI', 'CYBERNETICS', 'PREDICTIVE_SYSTEMS', 'SEASTEADS'], [
+        { kind: 'award', projectPct: 5 },
+      ]), repeatable: true },
   ].map((t) => [t.id, t]),
 );

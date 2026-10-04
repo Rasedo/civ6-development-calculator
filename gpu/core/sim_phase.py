@@ -886,6 +886,8 @@ class SimPhase:
         pre["stm"] = self._golden_ded(row, self._ded_steam)
         pre["stm_on"] = bool(pre["stm"].count_nonzero())
         pre["cp"] = self._congress_udt()[0]
+        pre["eg"] = self._congress_energy_boosted()
+        pre["merc"] = self._congress_unit_cost_mult(self._cur_prod)
         # the two arms of `_prod_mult_rows`, split once: the building/district
         # half above the unit half, each in the table's own order
         brows, urows = [], []
@@ -1048,9 +1050,13 @@ class SimPhase:
         # towards buildings in this district." The x2 is exact in f64, so the
         # multiplier order against VETERANCY cannot re-associate anything.
         _cp = pre["cp"]
-        _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp >= 0) \
+        _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp != self.UDT_NONE) \
             & (self._b_req_district.take(cur.clamp(min=0, max=self.NB - 1)) == _cp)
         _emall = torch.where(_bldg_i, _emall * self._c_prod_mult, _emall)
+        # CIV6 (Global Energy Treaty, outcome B): +100% Production toward the
+        # named power plant.
+        _eg = pre["eg"]
+        _emall = torch.where((_eg >= 0) & (cur == _eg), _emall * self._c_energy_prod_mult, _emall)
         # CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows —
         # a named building or every building of a district
         # a named building, every building of a district, EVERY building, or a
@@ -1115,6 +1121,11 @@ class SimPhase:
             _land = _is_unit & ~self.unit_naval[_ut] & (self._type_air[_ut] == 0) \
                 & (_ut != self._band_idx)
             _emall = torch.where(_land, _emall / _lc, _emall)
+        # (Mercenary Companies on Production): every unit of a military
+        # formation, the support chassis with the combat ones
+        _mc = pre["merc"].to(_emall.dtype)
+        _merc_u = _is_unit & ((self._type_combat[_ut] > 0) | self._type_support[_ut])
+        _emall = torch.where(_merc_u, _emall / _mc, _emall)
         # CIV6 (Automated Workforce): "+20% Production towards city
         # projects."
         if _fx["projprod"] is not None and self._proj_rows:
@@ -1144,13 +1155,20 @@ class SimPhase:
                 _gpct = self._governor_vec(row, "projectProdPct")[bidx, col]      # [B, nP]
                 _gpct = _gpct.gather(1, _gpi.clamp(min=0, max=_nP - 1).unsqueeze(1)).squeeze(1)
                 _emall = torch.where(_gon, _emall * (1.0 + _gpct / 100.0).to(_emall.dtype), _emall)
-        # CIV6 (Hong Kong): "+20% Production towards city projects" — last of
-        # the three project factors, the order TS composes them in.
+        # CIV6 (Hong Kong): "+20% Production towards city projects" — third of
+        # the four project factors, the order TS composes them in.
         _hk = pre["hk"]
         if _hk is not None:
             _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
             _emall = torch.where(_proj_i & _hk,
                                  _emall * (1.0 + self._suz_proj_pct / 100.0), _emall)
+        # CIV6 (Future Tech): "+5% Production towards city projects each time
+        # it is completed" — the percent the seat has banked
+        if self._proj_rows and row < self.n_majors:
+            _rp = self.civ_research_project_pct[bidx, row]
+            if bool(_rp.count_nonzero()):
+                _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
+                _emall = torch.where(_proj_i, _emall * (1.0 + _rp.to(_emall.dtype) / 100.0), _emall)
         # CIV6 (Founder of Carthage): "+50% Production toward districts in the
         # city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
         if pre["plaza"]:
@@ -1977,6 +1995,23 @@ class SimPhase:
             self.civ_tourism_to[:, row, o] += torch.where(active, add_g, zero)
             self.civ_tourism_rel_to[:, row, o] += torch.where(active, add_r, zero)
 
+    def _research_award(self, row: int, fin: torch.Tensor, cur: torch.Tensor, is_civic: bool) -> None:
+        """`researchAward` — what a completed tech or civic pays at EVERY
+        completion: envoys and Diplomatic Victory points (Global Warming
+        Mitigation, Seasteads), Diplomatic Favor and a Governor title (Future
+        Civic), the project-production percent the seat banks (Future Tech).
+        `fin` [B] the games completing `cur` [B] this pass."""
+        rdv = self.rules_dev
+        pre = "c" if is_civic else "t"
+        at = cur.clamp(min=0)
+        for col, plane in (("env", self.civ_envoys_avail), ("dvp", self.civ_diplo_points),
+                           ("favor", self.civ_diplo_favor), ("titles", self.civ_granted_titles),
+                           ("projpct", self.civ_research_project_pct)):
+            amt = getattr(rdv, f"{pre}_award_{col}")
+            if not int(amt.sum()):
+                continue
+            plane[:, row] += torch.where(fin, amt.gather(0, at), torch.zeros_like(cur)).to(plane.dtype)
+
     def _seat_economy(self, row: int, active: torch.Tensor, cact_all: torch.Tensor,
                       cact_any_l: list, gov: torch.Tensor) -> torch.Tensor:
         """The seat's ECONOMY, for seat row `row` — ONE body every seat runs,
@@ -2126,9 +2161,7 @@ class SimPhase:
             self._urban_defenses_fit(row, fin & (curt == self._urban_def_tech))
             # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
             # Diplomatic Victory point" — once, at completion.
-            if int(rdv.t_award_env.sum()) or int(rdv.t_award_dvp.sum()):
-                self.civ_envoys_avail[:, row] += torch.where(fin, rdv.t_award_env.gather(0, curt.clamp(min=0)), torch.zeros_like(curt))
-                self.civ_diplo_points[:, row] += torch.where(fin, rdv.t_award_dvp.gather(0, curt.clamp(min=0)), torch.zeros_like(curt))
+            self._research_award(row, fin, curt, False)
             self.civ_tech_prog[:, row] = torch.where(fin, self.civ_tech_prog[:, row] - cost_t, self.civ_tech_prog[:, row])
             # A finished tech holds no parked science — its slot was emptied
             # when it became current — but clear it anyway, so the partition
@@ -2136,7 +2169,7 @@ class SimPhase:
             # pool and belongs to whatever the next record picks.
             self.civ_tech_retain[rows, row, curt[rows]] = 0
             self.civ_cur_tech[:, row] = torch.where(fin, torch.full_like(curt, -1), self.civ_cur_tech[:, row])
-        no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t).any(dim=1)
+        no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t, self._t_repeat).any(dim=1)
         self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
 
         # GOLD, off the cities as the technologies left them; then the upkeep
@@ -2255,9 +2288,7 @@ class SimPhase:
             self._eff_version += 1
             # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
             # Diplomatic Victory point" — once, at completion.
-            if int(rdv.c_award_env.sum()) or int(rdv.c_award_dvp.sum()):
-                self.civ_envoys_avail[:, row] += torch.where(fin, rdv.c_award_env.gather(0, curc.clamp(min=0)), torch.zeros_like(curc))
-                self.civ_diplo_points[:, row] += torch.where(fin, rdv.c_award_dvp.gather(0, curc.clamp(min=0)), torch.zeros_like(curc))
+            self._research_award(row, fin, curc, True)
             self.civ_civic_prog[:, row] = torch.where(fin, self.civ_civic_prog[:, row] - cost_c, self.civ_civic_prog[:, row])
             self.civ_civic_retain[rows, row, curc[rows]] = 0
             self.civ_cur_civic[:, row] = torch.where(fin, torch.full_like(curc, -1), self.civ_cur_civic[:, row])
@@ -2282,7 +2313,7 @@ class SimPhase:
         if bool(_disc_at.count_nonzero()):
             self.civ_discount_districts[:, row] = torch.where(
                 _disc_at, self._completed_specialty(row), self.civ_discount_districts[:, row])
-        no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
+        no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c, self._c_repeat).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
 
         # FAITH, off the cities as the civics left them.

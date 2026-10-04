@@ -799,7 +799,9 @@ export function gdrJump(state: GameState, unit: { type: string; seat: number } |
  *  CIV6 (Heavy Chariot / Maryannu Chariot Archer / War-Cart) "+N Movement if
  *  starting in Desert, Plains, Grassland, or Tundra" — flat ground;
  *  (Berserker Movement) "+2 Movement if this unit starts in enemy
- *  territory"; (Longship Movement) "+1 Movement while in coastal waters". */
+ *  territory"; (Longship Movement) "+1 Movement while in coastal waters";
+ *  (Logistics) "+1 Movement if starting turn in friendly territory" — the
+ *  seat's own ground, every unit of a civilization. */
 export function startTileMoves(state: GameState, unit: { type: string; seat: number; tileIndex?: number }): number {
   const def = UNITS[unit.type];
   if (!def || unit.tileIndex === undefined) return 0;
@@ -811,6 +813,7 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
     if (owner >= 0 && owner !== unit.seat && civsAtWar(state, unit.seat, owner)) m += def.enemyTerritoryMoves;
   }
   if (def.coastMoves && tile.terrain === 'COAST') m += def.coastMoves;
+  if (isCiv(unit.seat) && tileSeat(tile) === unit.seat) m += getModifiers(state, unit.seat).homeStartMoves;
   return m;
 }
 

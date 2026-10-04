@@ -36,7 +36,7 @@ import { POLICY_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
 import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
-import { TECHS } from '../data/techs';
+import { TECHS, type ResearchEffect } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { prodLayout } from './prodLayout';   // ONE column layout, shared with the exporter
 import { CIVICS } from '../data/civics';
@@ -52,7 +52,7 @@ import { computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acq
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
-import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, congressSessionDue, congressVoter } from './congress';
+import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressEnergyProdMult, congressUdtProdDistrict, congressSessionDue, congressVoter } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, EMERGENCY_NUCLEAR, emergencies, emergencyLoyalty, emergencyName, emergencyPressureCut, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { irradiated, wmdUpkeep } from './nuclear';
@@ -63,7 +63,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, garrisonOf } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, completedSpecialtyDistricts, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitPurchaseCost, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
+import { adoptBeliefs, unitProdCostMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, completedSpecialtyDistricts, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitPurchaseCost, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -2433,6 +2433,22 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
   settlePromises(state, promiseAsks, promiseKeeps);
 }
 
+/** What a completed tech or civic pays at EVERY completion: CIV6 (Global
+ *  Warming Mitigation) "Awards 3 Envoys / Awards 1 Diplomatic Victory
+ *  point"; (Seasteads) 1 Diplomatic Victory point; (Future Civic) "1
+ *  Governor title and 50 Diplomatic Favor each time it is completed";
+ *  (Future Tech) "+5% Production towards city projects each time". */
+function researchAward(actor: Seat, effects: readonly ResearchEffect[]): void {
+  for (const fx of effects) {
+    if (fx.kind !== 'award') continue;
+    if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
+    if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
+    if (fx.favor) actor.diplomaticFavor = (actor.diplomaticFavor ?? 0) + fx.favor;
+    if (fx.titles) actor.grantedTitles = (actor.grantedTitles ?? 0) + fx.titles;
+    if (fx.projectPct) actor.researchProjectPct = (actor.researchProjectPct ?? 0) + fx.projectPct;
+  }
+}
+
 export function seatPhase(state: GameState): void {
 
   // Seat units get their movement in this phase (like barbarians).
@@ -2720,15 +2736,8 @@ export function seatPhase(state: GameState): void {
     while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech)) {
       rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech);
       if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
-      for (const fx of TECHS[rsr.tech].effects) {
-        // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
-        // Diplomatic Victory point" — once, at completion.
-        if (fx.kind === 'award') {
-          if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
-          if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
-        }
-      }
-      rsr.techs.push(rsr.tech);
+      researchAward(actor, TECHS[rsr.tech].effects);
+      if (!rsr.techs.includes(rsr.tech)) rsr.techs.push(rsr.tech);
       // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
       // technology. The SPAWN waits for the upkeep charge below — a unit
       // granted this turn starts paying next turn, and the GPU's grant sits on
@@ -2805,15 +2814,8 @@ export function seatPhase(state: GameState): void {
     let civicDone = false;
     while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic)) {
       rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic);
-      for (const fx of CIVICS[rsr.civic].effects) {
-        // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
-        // Diplomatic Victory point" — once, at completion.
-        if (fx.kind === 'award') {
-          if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
-          if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
-        }
-      }
-      rsr.civics.push(rsr.civic);
+      researchAward(actor, CIVICS[rsr.civic].effects);
+      if (!rsr.civics.includes(rsr.civic)) rsr.civics.push(rsr.civic);
       delete rsr.civicRetained[rsr.civic];
       actor.government.civicTurn = state.turn;
       rsr.civic = null;
@@ -2911,6 +2913,9 @@ export function seatPhase(state: GameState): void {
         // towards buildings in this district."
         const _udtD = congressUdtProdDistrict(state);
         if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
+        // CIV6 (Global Energy Treaty, outcome B): +100% Production toward the
+        // named power plant.
+        if (q.kind === 'building') _em *= congressEnergyProdMult(state, q.building);
         // CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows
         // CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
         // the seat's home continent — its original capital's landmass
@@ -2922,10 +2927,11 @@ export function seatPhase(state: GameState): void {
         // CIV6 (Zoning Commissioner): "+20% Production towards constructing
         // Districts in the city".
         // CIV6 (Letters of Marque): "Naval Raiders: +100% Production";
-        // (Flower Power): land units other than Rock Bands cost double, which
-        // this model pays as a slower fill rather than a moved queue cost.
+        // (Flower Power, Mercenary Companies on Production): a unit cost
+        // multiplier, which this model pays as a slower fill rather than a
+        // moved queue cost.
         if (q.kind === 'unit' && UNITS[q.unit]?.raider) _em *= seatMods.navalRaiderProdMult;
-        if (q.kind === 'unit') _em /= landUnitPriceMult(state, civCity.seat, q.unit);
+        if (q.kind === 'unit') _em /= unitProdCostMult(state, civCity.seat, q.unit);
         // CIV6 (Thunderbolt of the North): "+50% Production toward all naval
         // melee units."
         if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
@@ -2947,7 +2953,9 @@ export function seatPhase(state: GameState): void {
         // CIV6 (Space Initiative, Arms Race Proponent): +30% toward the named
         // projects in the governor's city; (Hong Kong): "+20% Production
         // towards city projects"
-        if (q.kind === 'project') _em *= (1 + governorSum(state, civCity, (e) => e.projectProdPct?.[q.project]) / 100) * seatMods.projectProdMult * suzerainProjectMult(state, civCity.seat);
+        // (Future Tech): "+5% Production towards city projects each time it
+        // is completed" — the percent the seat has banked
+        if (q.kind === 'project') _em *= (1 + governorSum(state, civCity, (e) => e.projectProdPct?.[q.project]) / 100) * seatMods.projectProdMult * suzerainProjectMult(state, civCity.seat) * (1 + (seatOf(state, civCity.seat)?.researchProjectPct ?? 0) / 100);
         // CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
         // toward Medieval, Renaissance, and Industrial era wonders" — an ERA
         // BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)

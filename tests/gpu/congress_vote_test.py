@@ -182,11 +182,15 @@ def main() -> None:
         assert i >= 0, f"{name} is not in the catalog"
         sim2.congress_active[:, 0] = torch.tensor([i, outcome, target])
 
-    stand("MERCENARY_COMPANIES", 0, 0)
-    assert float(sim2._congress_unit_buy_mult(0)[0]) == sim2._c_plus100
-    assert float(sim2._congress_unit_buy_mult(1)[0]) == 1.0
-    stand("MERCENARY_COMPANIES", 1, 1)
-    assert float(sim2._congress_unit_buy_mult(1)[0]) == sim2._c_minus50
+    g, f, p = sim2._cur_gold, sim2._cur_faith, sim2._cur_prod
+    stand("MERCENARY_COMPANIES", 0, g)
+    assert float(sim2._congress_unit_cost_mult(g)[0]) == sim2._c_plus100
+    assert float(sim2._congress_unit_cost_mult(f)[0]) == 1.0
+    stand("MERCENARY_COMPANIES", 1, f)
+    assert float(sim2._congress_unit_cost_mult(f)[0]) == sim2._c_minus50
+    stand("MERCENARY_COMPANIES", 1, p)
+    assert float(sim2._congress_unit_cost_mult(p)[0]) == sim2._c_minus50
+    assert float(sim2._congress_unit_cost_mult(g)[0]) == 1.0
 
     stand("TRADE_POLICY", 0, 1)
     ds = torch.tensor([[1, 0, -1]], dtype=torch.long)
@@ -377,35 +381,26 @@ def main() -> None:
     assert int(out9[0]) == 0 and int(tgt9[0]) == t0, "the AI line missed its own woods"
     print("  the Deforestation Treaty bans and pays on the FEATURE its target names")
 
-    # --- 10. the Urban Development Treaty counts every district INSTANCE ----
-    # CIV6 (Districts.OnePerCity false): a city holds more than one Canal, Dam
-    # or Neighborhood, and the free vote names the type the seat holds the
-    # most COMPLETE copies of — two Canals in one city outvote one Campus,
-    # though the one-tile-per-type registry holds a single Canal address.
+    # --- 10. the Urban Development Treaty's targets are the install's -------
+    # WorldCongress.lua (WC_Validate_UrbanDevelopment) offers the City Center
+    # first: every living city's centre is one copy, so the free vote names it,
+    # and a standing treaty on it reaches the centre's buildings (their own
+    # -1 `_b_req_district`) while a specialty target reaches its registry row.
     simU = build()
     ud = simU._congress_at["URBAN_DEVELOPMENT_TREATY"]
-    canal, campus = simU._canal_didx, 0
-    assert canal > campus, "the Canal must sit after the Campus for the tie rule to matter"
     row = 0
-    j = int(simU.city_alive[0, row].long().argmax())
-    simU.district[0, simU.tile_seat[0] == row] = -1
-    simU.district_complete[0, simU.tile_seat[0] == row] = False
-    simU.city_dist_tile[0, row] = -1
-    ctr = int(simU.city_center[0, row, j])
-    plots = [t for t in (simU.city_slot_at(row)[0] == j).nonzero(as_tuple=True)[0].tolist() if t != ctr]
-    assert len(plots) >= 3, f"city {j} owns {len(plots)} plots besides its centre"
-    for t, di in ((plots[0], campus), (plots[1], canal), (plots[2], canal)):
-        simU.district[0, t] = di
-        simU.district_complete[0, t] = True
-    simU.city_dist_tile[0, row, j, campus] = plots[0]
-    simU.city_dist_tile[0, row, j, canal] = plots[1]
+    assert simU._udt_didx[0] == -1, "the City Center is the first target"
     outU, tgtU = simU._congress_pref(ud, row)
-    assert (int(outU[0]), int(tgtU[0])) == (0, canal), (
-        f"two Canals against one Campus voted {(int(outU[0]), int(tgtU[0]))}, wanted {(0, canal)}")
-    # ...and only a COMPLETE copy counts
-    simU.district_complete[0, plots[2]] = False
-    assert int(simU._congress_pref(ud, row)[1][0]) == campus, "an unfinished Canal broke the tie"
-    print("  the Urban Development Treaty counts two Canals in one city twice")
+    assert (int(outU[0]), int(tgtU[0])) == (0, 0), (
+        f"a seat with a city voted {(int(outU[0]), int(tgtU[0]))}, wanted the City Center")
+    t_campus = next(t for t, di in enumerate(simU._udt_didx) if di == 0)
+    simU.congress_active[:] = -1
+    assert int(simU._congress_udt()[0][0]) == simU.UDT_NONE
+    simU.congress_active[:, 0] = torch.tensor([ud, 0, 0])
+    assert int(simU._congress_udt()[0][0]) == -1, "A on the City Center names its buildings"
+    simU.congress_active[:, 0] = torch.tensor([ud, 1, t_campus])
+    assert int(simU._congress_udt()[1][0]) == 0, "B on the Campus names its registry row"
+    print("  the Urban Development Treaty names the City Center and the install's districts")
 
     # --- PUBLIC RELATIONS, MILITARY ADVISORY, WORLD RELIGION ----------------
     pr = sim._congress_at["PUBLIC_RELATIONS"]

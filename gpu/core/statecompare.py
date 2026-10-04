@@ -632,6 +632,7 @@ SEAT = {
     "influencePoints": _civ_scalar("civ_influence"),
     "envoysAvailable": _civ_scalar("civ_envoys_avail"),
     "grantedTitles": _civ_scalar("civ_granted_titles"),
+    "researchProjectPct": _civ_scalar("civ_research_project_pct"),
     "buildersTrained": _civ_scalar("civ_builders_trained"),
     "settlersTrained": _civ_scalar("civ_settlers_trained"),
     "discountDistricts": _civ_scalar("civ_discount_districts"),

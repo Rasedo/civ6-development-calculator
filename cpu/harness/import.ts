@@ -39,7 +39,7 @@ import { envoysWith } from '../core/cityStates';
 import { FERTILITY_CAP } from '../core/disasters';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS } from '../data/seats';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
@@ -61,7 +61,8 @@ import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
   GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
 } from '../data/greatWorks';
-import { CONGRESS_RESOLUTIONS } from '../data/seats';
+import { CONGRESS_RESOLUTIONS, UDT_DISTRICTS } from '../data/seats';
+import { CONGRESS_CURRENCIES } from '../core/congress';
 import { PROJECTS, PROJECT_LIST } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
 import { GOVERNMENT_LIST, POLICY_LIST } from '../data/policies';
@@ -1719,6 +1720,11 @@ function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: Ga
   return { list: out, gaps };
 }
 
+/** the install's promotion classes this engine names shorter */
+const PROMO_CLASS_ABBREV: Record<string, string> = {
+  ANTI_CAVALRY: 'ANTICAV', LIGHT_CAVALRY: 'LIGHT_CAV', HEAVY_CAVALRY: 'HEAVY_CAV',
+};
+
 /** a resolution's target in the engine's target space for its kind, read off
  *  the localisation key the game names it by; -1 where the engine has none */
 function congressTarget(kind: string, thing: string, rec: TurnRecord, cat: Catalog,
@@ -1728,7 +1734,13 @@ function congressTarget(kind: string, thing: string, rec: TurnRecord, cat: Catal
   switch (kind) {
     case 'district': {
       const id = engineId('district', core, 'DISTRICT_', DISTRICTS);
-      return id ? PLACEABLE_DISTRICTS.indexOf(id as DistrictId) : -1;
+      return id ? UDT_DISTRICTS.indexOf(id as DistrictId) : -1;
+    }
+    // LOC_BUILDING_POWER_PLANT_EXPANSION2_NAME: the row's Name as Expansion2
+    // renames it
+    case 'building': {
+      const id = engineId('building', core.replace(/_EXPANSION2$/, ''), 'BUILDING_', BUILDINGS);
+      return id ? POWER_PLANT_IDS.indexOf(id) : -1;
     }
     case 'religion': return religionSeat.get(cat.religions.indexOf(core)) ?? -1;
     case 'gpClass': return GP_CLASSES.indexOf(after('GREAT_PERSON_CLASS_') as never);
@@ -1749,13 +1761,16 @@ function congressTarget(kind: string, thing: string, rec: TurnRecord, cat: Catal
       const id = engineId('governor', core, 'GOVERNOR_', GOVERNOR_INDEX);
       return id ? GOVERNORS.findIndex((g) => g.id === id) : -1;
     }
-    case 'currency': return core === 'YIELD_GOLD' ? 0 : core === 'YIELD_FAITH' ? 1 : -1;
+    case 'currency': return CONGRESS_CURRENCIES.indexOf(after('YIELD_').toLowerCase() as never);
     // LOC_MINOR_CIV_SCIENTIFIC_TRAIT_NAME → 'scientific'
     case 'csType': return CITY_STATE_TYPES.indexOf(after('MINOR_CIV_').replace(/_TRAIT$/, '').toLowerCase() as never);
     // LOC_GREAT_WORK_OBJECT_SCULPTURE_NAME → 'SCULPTURE'
     case 'gwObject': return GWO_NAMES.indexOf(after('GREAT_WORK_OBJECT_') as never);
-    // LOC_PROMOTION_CLASS_MELEE_NAME → 'MELEE'
-    case 'promoClass': return PROMO_CLASSES.indexOf(after('PROMOTION_CLASS_') as never);
+    // LOC_PROMOTION_CLASS_HEAVY_CAVALRY_NAME → 'HEAVY_CAV'
+    case 'promoClass': {
+      const cls = after('PROMOTION_CLASS_');
+      return PROMO_CLASSES.indexOf((PROMO_CLASS_ABBREV[cls] ?? cls) as never);
+    }
     case 'seat': {
       // a PlayerType target is the player id itself
       const pid = /^\d+$/.test(thing) ? Number(thing) : -1;

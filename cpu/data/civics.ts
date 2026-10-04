@@ -10,6 +10,9 @@ export interface CivicDef {
   cost: number;
   prereqs: string[];
   effects: ResearchEffect[];
+  /** CIV6 (`Repeatable`): the row stays researchable once complete, and each
+   *  completion pays its award again. */
+  repeatable?: boolean;
   /** PROVENANCE, per column — see CIVIC_SRC below. */
   src?: SrcMap;
 }
@@ -300,6 +303,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.0.yields.food': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_CAMP&YieldType=YIELD_FOOD&PrereqCivic=CIVIC_MERCANTILISM', 'BonusYieldChange'),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_TRIANGULAR_TRADE', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),
     'effects.2.policy': xml('Policies', 'PolicyType=POLICY_DRILL_MANUALS', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),
+    'effects.3.policy': xml('Policies', 'PolicyType=POLICY_LOGISTICS', 'PrereqCivic', { expect: 'CIVIC_MERCANTILISM' }),
   },
   DIPLOMATIC_SERVICE: {
     era: xml('Civics', 'CivicType=CIVIC_DIPLOMATIC_SERVICE', 'EraType', { expect: 'ERA_RENAISSANCE' }),
@@ -391,6 +395,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Civics', 'CivicType=CIVIC_RAPID_DEPLOYMENT', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_RAPID_DEPLOYMENT&PrereqCivic=CIVIC_COLD_WAR', 'PrereqCivic', { expect: 'CIVIC_COLD_WAR' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_MILITARY_FIRST', 'PrereqCivic', { expect: 'CIVIC_RAPID_DEPLOYMENT' }),
+    'effects.1.policy': xml('Policies', 'PolicyType=POLICY_AFTER_ACTION_REPORTS', 'PrereqCivic', { expect: 'CIVIC_RAPID_DEPLOYMENT' }),
   },
   ENVIRONMENTALISM: {
     era: xml('Civics', 'CivicType=CIVIC_ENVIRONMENTALISM', 'EraType', { expect: 'ERA_INFORMATION' }),
@@ -460,6 +465,14 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: { stylized: 'the install writes no CivicPrereqs row for CIVIC_GLOBAL_WARMING_MITIGATION (its only published gate is the era); the deepest node this tree carries stands in' },
     'effects.0.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_THREE_INFLUENCE_TOKENS&Name=Amount', 'Value'),
     'effects.0.dvp': xml('ModifierArguments', 'ModifierId=CIVIC_MITIGATION_GRANT_DIPLOVP&Name=Amount', 'Value'),
+  },
+  FUTURE_CIVIC: {
+    era: xml('Civics', 'CivicType=CIVIC_FUTURE_CIVIC', 'EraType', { expect: 'ERA_FUTURE' }),
+    cost: xml('Civics', 'CivicType=CIVIC_FUTURE_CIVIC', 'Cost', { scale: GAME_SPEED }),
+    prereqs: { stylized: 'Civics_XP2 RandomPrereqs replaces the base CivicPrereqs rows of CIVIC_FUTURE_CIVIC; every other Future civic this tree carries stands in' },
+    repeatable: xml('Civics', 'CivicType=CIVIC_FUTURE_CIVIC', 'Repeatable', { expect: true }),
+    'effects.0.favor': xml('ModifierArguments', 'ModifierId=CIVIC_GRANT_FAVOR&Name=Amount', 'Value'),
+    'effects.0.titles': xml('ModifierArguments', 'ModifierId=CIVIC_GRANT_PLAYER_GOVERNOR_POINTS&Name=Delta', 'Value'),
   },
 };
 
@@ -670,6 +683,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'improvementYields', improvement: 'CAMP', yields: { production: 1, food: 1 } },
       { kind: 'unlockPolicy', policy: 'TRIANGULAR_TRADE' },
       { kind: 'unlockPolicy', policy: 'DRILL_MANUALS' },
+      { kind: 'unlockPolicy', policy: 'LOGISTICS' },
     ]),
     C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 600, ['GUILDS'], [
       { kind: 'unlockBuilding', building: 'CHANCERY' },
@@ -728,6 +742,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('RAPID_DEPLOYMENT', 'Rapid Deployment', 'Atomic', 2415, ['COLD_WAR'], [
       { kind: 'unlockPolicy', policy: 'MILITARY_FIRST' },
+      { kind: 'unlockPolicy', policy: 'AFTER_ACTION_REPORTS' },
     ]),
     C('ENVIRONMENTALISM', 'Environmentalism', 'Information', 2880, ['CULTURAL_HERITAGE', 'RAPID_DEPLOYMENT']),
 
@@ -768,5 +783,12 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       // CIV6: "Awards 3 Envoys. Awards 1 Diplomatic Victory point."
       { kind: 'award', envoys: 3, dvp: 1 },
     ]),
+    // CIV6 (Future Civic): "Can be completed multiple times ... Also awards 1
+    // Governor title and 50 Diplomatic Favor each time it is completed." It
+    // closes the tree, so every other Future civic stands in as its prereq.
+    { ...C('FUTURE_CIVIC', 'Future Civic', 'Future', 3500,
+      ['INFORMATION_WARFARE', 'SMART_POWER_DOCTRINE', 'EXODUS_IMPERATIVE', 'CULTURAL_HEGEMONY', 'GLOBAL_WARMING_MITIGATION'], [
+        { kind: 'award', favor: 50, titles: 1 },
+      ]), repeatable: true },
   ].map((c) => [c.id, c]),
 );

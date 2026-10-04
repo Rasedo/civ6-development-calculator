@@ -221,6 +221,9 @@ export interface PolicyEffects {
   /** Letters of Marque: the Naval Raider class's production and movement. */
   navalRaiderProdMult?: number;
   navalRaiderMoves?: number;
+  /** Logistics: Movement a unit gains for STARTING its turn in its own
+   *  territory. */
+  homeStartMoves?: number;
   /** Cyber Warfare: grievances against you never decay. */
   grievanceNoDecay?: boolean;
   /** Automated Workforce: production toward city PROJECTS. */
@@ -591,6 +594,14 @@ const POLICY_SRC: Record<string, SrcMap> = {
     'effects.domesticRouteYield.food': xml('ModifierArguments', 'ModifierId=ISOLATIONISM_DOMESTIC_TRADE_ROUTE_FODD&Name=Amount', 'Value'),
     'effects.domesticRouteYield.production': xml('ModifierArguments', 'ModifierId=ISOLATIONISM_DOMESTIC_TRADE_ROUTE_PRODUCTION&Name=Amount', 'Value'),
     'effects.noSettlers': { derived: 'true where the install disables the Settler build (a disable modifier carries no Amount — its UnitType argument is the whole clause)', inputs: [xml('ModifierArguments', 'ModifierId=ISOLATIONISM_DISABLE_BUILD_SETTLER&Name=UnitType', 'Value', { expect: 'UNIT_SETTLER' })] },
+  },
+  LOGISTICS: {
+    kind: xml('Policies', 'PolicyType=POLICY_LOGISTICS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.homeStartMoves': xml('ModifierArguments', 'ModifierId=LOGISTICS_FRIENDLYTERRITORYMOVEMENTBONUS&Name=Amount', 'Value'),
+  },
+  AFTER_ACTION_REPORTS: {
+    kind: xml('Policies', 'PolicyType=POLICY_AFTER_ACTION_REPORTS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.xpPct': xml('ModifierArguments', 'ModifierId=AFTERACTIONREPORTS_EXPERIENCE&Name=Amount', 'Value'),
   },
   LETTERS_OF_MARQUE: {
     'dark.firstEra': { pedia: 'the GS Civilopedia dark-age availability window; the install carries no era columns on a Dark Age policy row' },
@@ -1321,6 +1332,17 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     }),
     P('PRESS_GANGS', 'Press Gangs', 'military', '+100% production toward Industrial-era and earlier naval units.', 'COLD_WAR', {
       prodBoost: { target: 'unit', classes: ['naval'], eraMax: INDUSTRIAL, pct: 1 },
+    }),
+    // CIV6 (Logistics, MODIFIER_PLAYER_UNITS_ADJUST_FRIENDLY_TERRITORY_START_MOVEMENT):
+    // "+1 Movement if starting turn in friendly territory" — the seat's own
+    // ground, as every other "friendly territory" clause here reads it.
+    P('LOGISTICS', 'Logistics', 'military', '+1 Movement if starting turn in friendly territory.', undefined, {
+      homeStartMoves: 1,
+    }),
+    // CIV6 (After Action Reports, MODIFIER_PLAYER_UNITS_ADJUST_UNIT_EXPERIENCE_MODIFIER):
+    // the install's Amount is 50 (its text says 25%).
+    P('AFTER_ACTION_REPORTS', 'After Action Reports', 'military', 'All units gain +50% combat experience.', undefined, {
+      xpPct: 50,
     }),
   ].map((p) => [p.id, { ...p, src: POLICY_SRC[p.id] }]),
 );

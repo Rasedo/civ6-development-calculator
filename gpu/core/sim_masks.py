@@ -13,10 +13,10 @@ class SimMasks:
         # Civ 6 lets a seat switch research at any moment, and `availableTechsIn`
         # never consults the current selection either, so "switch research" is
         # a move every seat can make.
-        return self._available_mask(self.civ_techs[:, row], self._prereq_t)
+        return self._available_mask(self.civ_techs[:, row], self._prereq_t, self._t_repeat)
 
     def _seat_civic_mask(self, row: int) -> torch.Tensor:
-        return self._available_mask(self.civ_civics[:, row], self._prereq_c)
+        return self._available_mask(self.civ_civics[:, row], self._prereq_c, self._c_repeat)
 
     def _seat_envoy_mask(self, row: int) -> torch.Tensor:
         return (self.citystate_alive & self.seat_citystate_met[:, row]

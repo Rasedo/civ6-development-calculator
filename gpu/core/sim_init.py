@@ -504,6 +504,8 @@ class SimInit:
             ("civic_prog", dtype, 0), ("cur_civic", torch.long, -1),
             ("cur_tech", torch.long, -1), ("diplo_favor", torch.long, 0),
             ("diplo_points", torch.long, 0), ("envoys_avail", torch.long, 0),
+            # the project production percent research completions banked
+            ("research_project_pct", torch.long, 0),
             ("influence", dtype, 0), ("tech_prog", dtype, 0),
             ("treasury", dtype, 0),
             # LIFETIME raw carbon. Signed: Carbon Recapture takes it below 0.
@@ -735,7 +737,15 @@ class SimInit:
         self._congress_vstep = int(_er2["congressVoteStep"])
         self._c_prod_mult = float(_er2["congressProdMult"])
         self._c_plus100 = float(_er2["congressPlus100"])
-        self._c_energy_discount = float(_er2["congressEnergyDiscount"])
+        self._c_energy_prod_mult = float(_er2["congressEnergyProdMult"])
+        # the Urban Development Treaty's targets as district REGISTRY indices,
+        # -1 the City Center (a building's own -1 `_b_req_district`)
+        self._udt_didx = [int(x) for x in _er2["udtDistricts"]]
+        # Mercenary Companies' targets: the yields a unit is paid in
+        _cur = [str(x) for x in _er2["congressCurrencies"]]
+        self._cur_n = len(_cur)
+        self._cur_prod, self._cur_gold, self._cur_faith = (
+            _cur.index("production"), _cur.index("gold"), _cur.index("faith"))
         self._c_minus50 = float(_er2["congressMinus50"])
         self._c_trade_gold = float(_er2["congressTradeGold"])
         self._c_trade_cap = int(_er2["congressTradeCapacity"])
@@ -2565,6 +2575,8 @@ class SimInit:
                 + (self._gov_distprod - 1).abs().sum() + (self._gov_inflmult - 1).abs().sum()
                 + self._gov_goldbuy.abs().sum() + self._gov_faithbuy.abs().sum())
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
+        # Logistics' start-of-turn Movement: read only where some card carries it
+        self._pol_home_moves_any = False
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)
             self._pol_unlock_civic = torch.tensor([int(p["unlockCivic"]) for p in _pols], dtype=torch.long, device=device)
@@ -2665,6 +2677,8 @@ class SimInit:
             self._pol_relig_home = torch.tensor([float(r["religiousCsHome"]) for r in _pols], dtype=dtype, device=device)
             self._pol_raider_prod = torch.tensor([float(r["navalRaiderProdMult"]) for r in _pols], dtype=dtype, device=device)
             self._pol_raider_moves = torch.tensor([int(r["navalRaiderMoves"]) for r in _pols], dtype=torch.long, device=device)
+            self._pol_home_moves = torch.tensor([int(r["homeStartMoves"]) for r in _pols], dtype=torch.long, device=device)
+            self._pol_home_moves_any = bool(self._pol_home_moves.count_nonzero())
             self._pol_griev_hold = torch.tensor([bool(r["grievanceNoDecay"]) for r in _pols], dtype=torch.bool, device=device)
             self._pol_proj_prod = torch.tensor([float(r["projectProdMult"]) for r in _pols], dtype=dtype, device=device)
             self._pol_loyalty_all = torch.tensor([float(r["loyaltyAll"]) for r in _pols], dtype=dtype, device=device)
@@ -4260,6 +4274,8 @@ class SimInit:
 
         self._prereq_t = self._prereq_matrix(rules.t_prereqs, NT).to(device)
         self._prereq_c = self._prereq_matrix(rules.c_prereqs, NC).to(device)
+        self._t_repeat = rules.t_repeat.to(device)
+        self._c_repeat = rules.c_repeat.to(device)
         self._arangeT = torch.arange(T, device=device)
         self._arangeT_f = self._arangeT.to(dtype)
         # The two halves of a TILE-ORDER argmin key, [B, T]: the tile index

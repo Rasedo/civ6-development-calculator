@@ -33,7 +33,7 @@ import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { minorCity } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
-import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
+import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCostMult, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
@@ -322,8 +322,12 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       } else if (kind === 'U') {
         const id = engineRowOf(cat, 'unit', idx);
         if (!id) continue;
-        const prod = id === 'SETTLER' ? settlerCost(state, city.seat) : id === 'BUILDER' ? builderCost(state, city.seat)
-          : id === 'TRADER' ? traderCost(state, city.seat) : unitStepCost(id, unitsAcquired(state, city.seat, id));
+        // a trained unit's cost moves with the seat's unit cost multipliers
+        // (Flower Power, Mercenary Companies on Production); a Settler is no
+        // unit item
+        const prod = id === 'SETTLER' ? settlerCost(state, city.seat)
+          : (id === 'BUILDER' ? builderCost(state, city.seat) : id === 'TRADER' ? traderCost(state, city.seat)
+            : unitStepCost(id, unitsAcquired(state, city.seat, id))) * unitProdCostMult(state, city.seat, id);
         buyPush(`buy.unitCost`, near(prod, num(cost), 0.5), num(cost), prod, { unit: id });
         // a chassis bought with Faith alone has no gold purchase to price: the
         // faith-only rows and every progressive one (PurchaseYield YIELD_FAITH,

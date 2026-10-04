@@ -441,8 +441,14 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     yields: { food: 1 },
     housing: 0.5,
     resourceOnly: true,
-    description: 'Sea resources (fish, crabs, pearls, whales).',
+    // Improvement_Adjacencies -> Fishingboats_Seastead_Production: +1
+    // Production per adjacent Seastead
+    adjacency: [{ improvement: 'SEASTEAD', per: 1, yields: { production: 1 } }],
+    description: 'Sea resources (fish, crabs, pearls, whales). +1 production per adjacent Seastead.',
     src: {
+      'adjacency.0.improvement': xml('Adjacency_YieldChanges', 'ID=Fishingboats_Seastead_Production', 'AdjacentImprovement', { expect: 'IMPROVEMENT_SEASTEAD' }),
+      'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=Fishingboats_Seastead_Production', 'TilesRequired'),
+      'adjacency.0.yields.production': xml('Adjacency_YieldChanges', 'ID=Fishingboats_Seastead_Production', 'YieldChange'),
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_FISHING_BOATS', 'PlunderType', { expect: 'PLUNDER_HEAL' }),
       'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_FISHING_BOATS', 'PlunderAmount'),
       'yields.food': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_FISHING_BOATS&YieldType=YIELD_FOOD', 'YieldChange'),
@@ -1664,6 +1670,48 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       unworkable: xml('Improvements', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'Workable', { expect: false }),
       amenity: xml('ModifierArguments', 'ModifierId=SKI_RESORT_AMENITY&Name=Amount', 'Value'),
       tourismFromAppeal: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'TourismSource', { expect: 'TOURISMSOURCE_APPEAL' }),
+    },
+  },
+  // CIV6 (Seastead, Expansion2_Improvements.xml): "+2 Food. +1 Production for
+  // each adjacent Fishing Boats. Fishing Boats receive +1 Production for
+  // each adjacent Seastead. +1 Culture and Tourism for every adjacent Reef.
+  // +2 Housing. Must be built on Coast, Lake or Ocean terrain. Cannot be
+  // placed adjacent to another Seastead." PrereqTech TECH_SEASTEADS, built by
+  // the Builder, DOMAIN_SEA, PLUNDER_HEAL 50; its Tourism is its Culture
+  // (TOURISMSOURCE_CULTURE), with no tech gate.
+  SEASTEAD: {
+    id: 'SEASTEAD',
+    name: 'Seastead',
+    code: 'Ss',
+    plunder: { kind: 'heal', amount: 50 },
+    yields: { food: 2 },
+    housing: 2,
+    resourceOnly: false,
+    waterOnly: true,
+    terrains: ['COAST', 'LAKE', 'OCEAN'],
+    noAdjacentSame: true,
+    adjacency: [
+      { improvement: 'FISHING_BOATS', per: 1, yields: { production: 1 } },
+      { features: ['REEF'], per: 1, yields: { culture: 1 } },
+    ],
+    tourismFrom: 'culture',
+    description: 'Coast, Lake or Ocean, never beside another. +2 food, +2 housing, +1 production per adjacent Fishing Boats, +1 culture and tourism per adjacent Reef.',
+    src: {
+      'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'PlunderType', { expect: 'PLUNDER_HEAL' }),
+      'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'PlunderAmount'),
+      'yields.food': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_SEASTEAD&YieldType=YIELD_FOOD', 'YieldChange'),
+      housing: { derived: 'Housing / TilesRequired — the install writes the CLUSTER total', inputs: [xml('Improvements', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'Housing'), xml('Improvements', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'TilesRequired')] },
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'ResourceType')] },
+      waterOnly: xml('Improvements', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'Domain', { expect: 'DOMAIN_SEA' }),
+      terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_SEASTEAD (TERRAIN_COAST is the engine\'s Coast and Lake), as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_SEASTEAD&TerrainType=TERRAIN_COAST', 'TerrainType'), xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_SEASTEAD&TerrainType=TERRAIN_OCEAN', 'TerrainType')] },
+      noAdjacentSame: xml('Improvements', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'SameAdjacentValid', { expect: false }),
+      'adjacency.0.improvement': xml('Adjacency_YieldChanges', 'ID=Seastead_Fishingboats_Production', 'AdjacentImprovement', { expect: 'IMPROVEMENT_FISHING_BOATS' }),
+      'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=Seastead_Fishingboats_Production', 'TilesRequired'),
+      'adjacency.0.yields.production': xml('Adjacency_YieldChanges', 'ID=Seastead_Fishingboats_Production', 'YieldChange'),
+      'adjacency.1.features': xml('Adjacency_YieldChanges', 'ID=Seastead_Reef_Culture', 'AdjacentFeature', { expect: 'FEATURE_REEF' }),
+      'adjacency.1.per': xml('Adjacency_YieldChanges', 'ID=Seastead_Reef_Culture', 'TilesRequired'),
+      'adjacency.1.yields.culture': xml('Adjacency_YieldChanges', 'ID=Seastead_Reef_Culture', 'YieldChange'),
+      tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
     },
   },
 };

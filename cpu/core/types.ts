@@ -638,6 +638,10 @@ export interface Seat {
   co2Turn?: number;
   diplomaticFavor: number;
   diplomaticPoints: number;
+  /** the percent of Production toward city projects this seat's research
+   *  completions have banked — CIV6 (Future Tech): "+5% ... each time it is
+   *  completed". */
+  researchProjectPct?: number;
   /** THIS TURN's World Congress ballot, as the record left it. Written inside
    * seatPhase and consumed by `worldCongress` at the turn tail, which clears
    * every seat's whether a session fires or not — an intent is for one turn. */

@@ -1065,7 +1065,8 @@ function wonderTourism(
  * CIV6: the Batey "provides Tourism after researching Flight" and the
  * Colossal Heads "provide Tourism from Faith after researching Flight" — in
  * both cases equal to the improvement's own output of the named yield, which
- * is what the tile walk already computes.
+ * is what the tile walk already computes. A row with no tech gate (the
+ * Seastead's Culture) pays from the start.
  */
 function suzerainTourism(state: GameState, seat: number, owns: (t: Tile) => boolean): number {
   const techs = seatOf(state, seat)?.research.techs ?? [];
@@ -1074,7 +1075,7 @@ function suzerainTourism(state: GameState, seat: number, owns: (t: Tile) => bool
   for (const tile of state.map.tiles) {
     if (!tile.improvement || tile.pillaged || !owns(tile)) continue;
     const def = IMPROVEMENTS[tile.improvement as ImprovementId];
-    if (!def.tourismFrom || !def.tourismTech || !techs.includes(def.tourismTech)) continue;
+    if (!def.tourismFrom || (def.tourismTech && !techs.includes(def.tourismTech))) continue;
     const base = def.yields[def.tourismFrom] ?? 0;
     t += base + (improvementAdjacency(ctx, tile, def.id)[def.tourismFrom] ?? 0);
   }

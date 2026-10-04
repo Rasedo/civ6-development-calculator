@@ -46,11 +46,11 @@ function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic'
     const next = open[Math.floor(nextRandom(state) * open.length)];
     if (kind === 'tech') {
       if (next.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, owner.seat);
-      rsr.techs.push(next.id);
+      if (!rsr.techs.includes(next.id)) rsr.techs.push(next.id);
       delete rsr.techRetained[next.id];
       if (rsr.tech === next.id) rsr.tech = null;
     } else {
-      rsr.civics.push(next.id);
+      if (!rsr.civics.includes(next.id)) rsr.civics.push(next.id);
       delete rsr.civicRetained[next.id];
       owner.government.civicTurn = state.turn;
       if (rsr.civic === next.id) rsr.civic = null;

@@ -1040,12 +1040,12 @@ class SimSeats:
         if tech is not None:
             t_act = tech.to(torch.long)
             ok = active & ext & (t_act >= 0) \
-                & self._available_mask(self.civ_techs[:, row], self._prereq_t).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+                & self._available_mask(self.civ_techs[:, row], self._prereq_t, self._t_repeat).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
             self._select_research(row, t_act, ok)
         if civic is not None:
             c_act = civic.to(torch.long)
             ok = active & ext & (c_act >= 0) \
-                & self._available_mask(self.civ_civics[:, row], self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+                & self._available_mask(self.civ_civics[:, row], self._prereq_c, self._c_repeat).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
             self._select_research(row, c_act, ok, is_civic=True)
         if envoys is not None and self.S > 0:
             e_seq = envoys.to(torch.long)
@@ -2075,7 +2075,7 @@ class SimSeats:
             mil[:, self._scout_idx] = False
         # MERCENARY COMPANIES moves the GOLD price of a MILITARY unit, and
         # every column offered here is one.
-        merc = self._congress_unit_buy_mult(0).unsqueeze(1)
+        merc = self._congress_unit_cost_mult(self._cur_gold).unsqueeze(1)
         # CIV6 (Ngazargamu): the BUYING city's Encampment buildings discount a
         # land unit's gold price. Every column offered here is a land unit.
         _ngz = self._suz_land_buy_mult(row).gather(
@@ -2756,7 +2756,7 @@ class SimSeats:
                         pick_ty, init_xp=xp_u, init_mp=self._train_mp_bonus(_bl_g, pick_ty, row))
                     self._raise_best_melee(row, landed_u, pick_ty)
                     price_u =self._gold_price(row, self._type_cost.gather(0, pick_ty).double() * mult
-                                               * self._congress_unit_buy_mult(0)
+                                               * self._congress_unit_cost_mult(self._cur_gold)
                                                * self._suz_land_buy_mult(row).gather(1, spawn_slot.unsqueeze(1)).squeeze(1)
                                                * self._land_unit_price_mult(row).gather(1, pick_ty.unsqueeze(1)).squeeze(1))
                     self.civ_treasury[:, row] = torch.where(landed_u, self.civ_treasury[:, row] - price_u, self.civ_treasury[:, row])
@@ -4030,7 +4030,7 @@ class SimSeats:
         shp = utp.shape
         old = utp.clamp(min=0).reshape(B, -1)
         new = nc.clamp(min=0).reshape(B, -1)
-        merc = self._congress_unit_buy_mult(0).unsqueeze(1)
+        merc = self._congress_unit_cost_mult(self._cur_gold).unsqueeze(1)
         land = self._land_unit_price_mult(row)
 
         def price(t: torch.Tensor) -> torch.Tensor:
@@ -6908,13 +6908,13 @@ class SimSeats:
         """How many TARGETS a resolution of this kind offers — the
         `targetSpaceSize` twin, keyed by CONGRESS_TARGET_KINDS' index."""
         if kind == 0:
-            return int(self.city_dist_tile.shape[3])
+            return len(self._udt_didx)
         if kind == 1:
             return int(self.civ_gpp.shape[2])
         if kind == 2:
             return 8                       # Great Work object types
         if kind == 4:
-            return 2                       # gold, faith
+            return self._cur_n             # production, gold, faith
         if kind == 5:
             return max(1, self._npol)
         if kind == 6:
@@ -6965,7 +6965,7 @@ class SimSeats:
             # A RAISES the price, so self-interest votes B on the currency this
             # seat actually buys with — the one it holds the most of.
             faith = self.civ_faith[:, row].double() > self.civ_treasury[:, row].double()
-            return a + 1, faith.long()
+            return a + 1, torch.where(faith, a + self._cur_faith, a + self._cur_gold)
         if name == "TRADE_POLICY":
             # A pays the NAMED seat's cities for every route in and widens its
             # capacity, so a seat names itself.
@@ -6978,12 +6978,12 @@ class SimSeats:
             want = torch.where(unap.any(dim=1), unap.long().argmax(dim=1), a)
             return a, want
         if name == "GLOBAL_ENERGY_TREATY":
-            # A is the discount, so a seat names the plant type it already
-            # runs most of; with none built it names the first row.
+            # B is the production boost, so a seat votes B on the plant type it
+            # already runs most of; with none built it names the first row.
             counts = torch.zeros(B, max(1, len(self._plant_bidx)), dtype=torch.float64, device=dev)
             for t, bi in enumerate(self._plant_bidx):
                 counts[:, t] = self.city_bldg[:, row, :, bi].sum(dim=1).double()
-            return a, self._argmax_low(counts)
+            return a + 1, self._argmax_low(counts)
         if name == "POLICY_TREATY":
             slotted = self._seat_slotted(row)
             first = slotted.long().cumsum(dim=1) == 1
@@ -7081,11 +7081,12 @@ class SimSeats:
         if kind == 3:
             return a, me
         if kind == 0:
-            # every COMPLETE district INSTANCE, pillaged or not: a Canal,
-            # Dam or Neighborhood repeats within one city (OnePerCity false)
-            # and each copy counts, which the one-tile-per-type registry
-            # cannot say
-            counts = self._dist_counts(row, pillage_gate=False).sum(dim=1).double()
+            # every COMPLETE district INSTANCE of the treaty's targets,
+            # pillaged or not, and every living city's centre
+            reg = self._dist_counts(row, pillage_gate=False).sum(dim=1).double()
+            counts = torch.zeros(B, len(self._udt_didx), dtype=torch.float64, device=dev)
+            for t, di in enumerate(self._udt_didx):
+                counts[:, t] = (self.city_alive[:, row].sum(dim=1).double() if di < 0 else reg[:, di])
         elif kind == 1:
             counts = self.civ_gpp[:, row].double()
         else:
@@ -7533,9 +7534,10 @@ class SimSeats:
         fac = torch.where(out == 0, torch.full_like(one, a), torch.full_like(one, b))
         return torch.where(hit, fac, one)
 
-    def _congress_unit_buy_mult(self, currency: int) -> torch.Tensor:
-        """[B] f64 — MERCENARY COMPANIES on a MILITARY unit's price in this
-        currency: x2 (A), x0.5 (B), 1 otherwise."""
+    def _congress_unit_cost_mult(self, currency: int) -> torch.Tensor:
+        """[B] f64 — MERCENARY COMPANIES on what a MILITARY unit costs in this
+        yield (its production cost or a purchase price): x2 (A), x0.5 (B), 1
+        otherwise (`congressUnitCostMult`)."""
         out, tgt = self._congress_by_id("MERCENARY_COMPANIES")
         return self._congress_two_faced(
             "MERCENARY_COMPANIES", (out >= 0) & (tgt == currency),
@@ -7656,34 +7658,42 @@ class SimSeats:
             "PUBLIC_WORKS_PROGRAM", (out >= 0) & (tgt == project),
             self._c_plus100, self._c_minus50)
 
+    UDT_NONE = -2
+
     def _congress_udt(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """[B] x2 — (district idx whose buildings take +100% production,
-        district idx where buildings are banned); -1 where not standing."""
+        """[B] x2 — (district registry idx whose buildings take +100%
+        production, idx where buildings are banned); -1 is the City Center
+        (its buildings' own `_b_req_district`), UDT_NONE where not standing."""
         out, tgt = self._congress_by_id("URBAN_DEVELOPMENT_TREATY")
-        return (torch.where(out == 0, tgt, torch.full_like(tgt, -1)),
-                torch.where(out == 1, tgt, torch.full_like(tgt, -1)))
+        none = torch.full_like(tgt, self.UDT_NONE)
+        d = none.clone()
+        for t, di in enumerate(self._udt_didx):
+            d = torch.where(tgt == t, torch.full_like(d, di), d)
+        return (torch.where(out == 0, d, none), torch.where(out == 1, d, none))
 
     def _congress_energy_blocked(self) -> torch.Tensor:
-        """[B] — CIV6 (Global Energy Treaty, outcome B): the BUILDING index
-        "buildings of this type cannot be created by any player" names, -1
-        where the treaty is not standing that way (`congressEnergyBlocked`).
-        """
-        out, tgt = self._congress_by_id("GLOBAL_ENERGY_TREATY")
-        want = torch.full_like(tgt, -1)
-        for t, b in enumerate(self._plant_bidx):
-            want = torch.where(tgt == t, torch.full_like(want, b), want)
-        return torch.where(out == 1, want, torch.full_like(want, -1))
-
-    def _congress_energy_discount(self) -> torch.Tensor:
-        """[B] — CIV6 (Global Energy Treaty, outcome A): "50% discount on the
-        production of buildings of this type", 1 elsewhere. The BUILDING index
-        it names rides alongside (`congressEnergyDiscount`).
+        """[B] — CIV6 (Global Energy Treaty, outcome A,
+        WC_RES_BUILDING_PRODUCTION_BAN): the BUILDING index whose production is
+        banned for every player, -1 where the treaty is not standing that way
+        (`congressEnergyBlocked`).
         """
         out, tgt = self._congress_by_id("GLOBAL_ENERGY_TREATY")
         want = torch.full_like(tgt, -1)
         for t, b in enumerate(self._plant_bidx):
             want = torch.where(tgt == t, torch.full_like(want, b), want)
         return torch.where(out == 0, want, torch.full_like(want, -1))
+
+    def _congress_energy_boosted(self) -> torch.Tensor:
+        """[B] — CIV6 (Global Energy Treaty, outcome B,
+        WC_RES_BUILDING_PRODUCTION_BUFF): the BUILDING index that takes +100%
+        Production, -1 where the treaty is not standing that way
+        (`congressEnergyProdMult`).
+        """
+        out, tgt = self._congress_by_id("GLOBAL_ENERGY_TREATY")
+        want = torch.full_like(tgt, -1)
+        for t, b in enumerate(self._plant_bidx):
+            want = torch.where(tgt == t, torch.full_like(want, b), want)
+        return torch.where(out == 1, want, torch.full_like(want, -1))
 
     def _congress_gpp_factor(self, cls: int) -> torch.Tensor:
         """[B] f64 — the Patronage factor for GP class `cls`: x2 (A), x0 (B)
@@ -7787,7 +7797,7 @@ class SimSeats:
                     continue
                 done = self.civ_civics[:, row] if is_civic else self.civ_techs[:, row]
                 pre = self._prereq_c if is_civic else self._prereq_t
-                avail = self._available_mask(done, pre)
+                avail = self._available_mask(done, pre, self._c_repeat if is_civic else self._t_repeat)
                 hit = want & avail.any(dim=1)
                 rnd = self._next_random(hit)
                 if not bool(hit.count_nonzero()):

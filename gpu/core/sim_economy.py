@@ -647,9 +647,14 @@ class SimEconomy:
         thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")
         return (U > 0) & (D >= U) & (n < thresh)
 
-    def _available_mask(self, done: torch.Tensor, prereq: torch.Tensor) -> torch.Tensor:
+    def _available_mask(self, done: torch.Tensor, prereq: torch.Tensor,
+                        repeat: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, N] — the rows not yet complete, or REPEATABLE (`repeat`, a seat's
+        research: `availableTechsIn`), whose every prereq is complete. A
+        minor's research passes none (`cheapestAvailable`)."""
         missing = (prereq.unsqueeze(0) & ~done.unsqueeze(1)).any(dim=2)
-        return ~done & ~missing
+        fresh = ~done if repeat is None else (~done | repeat.unsqueeze(0))
+        return fresh & ~missing
 
     def _eff_cost(self, cost: torch.Tensor, boosted: torch.Tensor, row: int, is_civic: bool = False) -> torch.Tensor:
         """The BOOSTED cost of every item, for seat row `row`. The row is
@@ -2720,8 +2725,7 @@ class SimEconomy:
     def _building_cost_in(self, row: int, j: int, bi: torch.Tensor) -> torch.Tensor:
         """[B] — `buildingCostIn`: the catalog price for every row but the
         FLOOD BARRIER, whose own is its city's lowland tiles and the sea
-        level, then the Global Energy Treaty's discount on the plant it
-        names."""
+        level."""
         base = self._b_cols(row)["cost"].gather(1, bi.unsqueeze(1)).squeeze(1)
         if self._barrier_bidx >= 0:
             base = torch.where(bi == self._barrier_bidx,
@@ -2729,19 +2733,16 @@ class SimEconomy:
         # CIV6 (PILLAGE_BUILDING_REPAIR_PERCENT 25): a building standing
         # pillaged is REPAIRED for that share of its price
         pil = self.city_bldg_pillaged[:, row, j].gather(1, bi.unsqueeze(1)).squeeze(1)
-        base = torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
-        disc = self._congress_energy_discount()
-        return torch.where((disc >= 0) & (bi == disc),
-                           js_round(base * self._c_energy_discount), base)
+        return torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
 
     def _live_building_cost(self, row: int) -> torch.Tensor:
         """[B, RC, QD] — `buildingCostIn` for every BUILDING standing in this
         row's queues, and the stored price wherever an entry is not a building.
         TS locks no building price at all: it re-reads `buildingCostIn` at every
         completion check and again for its digest, so a price that can MOVE
-        while the item WAITS — the Flood Barrier's lowland formula, the Global
-        Energy Treaty's discount — has to be followed here rather than locked
-        at queue, and it has to be followed for a deeper entry too."""
+        while the item WAITS — the Flood Barrier's lowland formula, a repair —
+        has to be followed here rather than locked at queue, and it has to be
+        followed for a deeper entry too."""
         cur = self.city_current[:, row]                       # [B, RC, QD]
         bi = cur.clamp(min=0, max=self.NB - 1)
         base = self._b_cols(row)["cost"].unsqueeze(1).expand(
@@ -2757,10 +2758,7 @@ class SimEconomy:
                 base = base.to(torch.float64)   # the dtype the f64 price would have promoted it to
         # a queued REPAIR keeps its repair price while the building stands pillaged
         pil = self.city_bldg_pillaged[:, row].gather(2, bi)
-        base = torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
-        disc = self._congress_energy_discount().reshape(-1, 1, 1)
-        live = torch.where((disc >= 0) & (bi == disc),
-                           js_round(base * self._c_energy_discount), base)
+        live = torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
         return torch.where((cur >= 0) & (cur < self.NB),
                            live.to(self.city_cost.dtype), self.city_cost[:, row])
 
@@ -2848,7 +2846,7 @@ class SimEconomy:
         # CIV6 (Urban Development Treaty, outcome B): "No buildings can be
         # created in this district." New picks only — in-flight items finish.
         _pu, _bl = self._congress_udt()
-        _blk = (_bl >= 0).unsqueeze(1) & (self._b_req_district.unsqueeze(0) == _bl.unsqueeze(1))
+        _blk = (_bl != self.UDT_NONE).unsqueeze(1) & (self._b_req_district.unsqueeze(0) == _bl.unsqueeze(1))
         base = base & ~_blk.unsqueeze(1)
         # CIV6: a government building "requires a Tier 2 government (Merchant
         # Republic, Monarchy, or Theocracy)" — the tier of what the seat runs
@@ -3531,6 +3529,7 @@ class SimEconomy:
             "healhome": torch.zeros(B, dtype=torch.bool, device=dev),
             "relighome": _z.clone(),
             "raiderprod": _o.clone(), "raidermove": torch.zeros(B, dtype=torch.long, device=dev),
+            "homemove": torch.zeros(B, dtype=torch.long, device=dev),
             "grievhold": torch.zeros(B, dtype=torch.bool, device=dev),
             "projprod": _o.clone(), "loyall": _z.clone(),
             "favorb": [], "noenvoy": torch.zeros(B, dtype=torch.bool, device=dev),
@@ -3743,6 +3742,7 @@ class SimEconomy:
                                ("grievhold", self._pol_griev_hold), ("noenvoy", self._pol_no_envoy)):
                     fx[_k] = fx[_k] | (cards & _t.unsqueeze(0)).any(dim=1)
                 fx["raidermove"] = fx["raidermove"] + (cards.long() * self._pol_raider_moves.unsqueeze(0)).sum(dim=1)
+                fx["homemove"] = fx["homemove"] + (cards.long() * self._pol_home_moves.unsqueeze(0)).sum(dim=1)
                 fx["allyroute"] = fx["allyroute"] + sd @ self._pol_ally_route
                 fx["allypts"] = fx["allypts"] + (cards.long() * self._pol_ally_pts.unsqueeze(0)).sum(dim=1)
                 fx["goldbuydisc"] = fx["goldbuydisc"] + sd @ self._pol_goldbuy
@@ -5922,8 +5922,10 @@ class SimEconomy:
         Chariot Archer / War-Cart) "+N Movement if starting in Desert, Plains,
         Grassland, or Tundra" — flat ground; (Berserker Movement) "+2 Movement
         if this unit starts in enemy territory"; (Longship Movement) "+1
-        Movement while in coastal waters". The barbarian pool trains no
-        unique, and the Heavy Chariot's term reads the same for every pool."""
+        Movement while in coastal waters"; (Logistics) "+1 Movement if
+        starting turn in friendly territory" — a civilization's unit on its
+        seat's own ground. The barbarian pool trains no unique, and the Heavy
+        Chariot's term reads the same for every pool."""
         tile = getattr(self, f"{pre}_unit_tile").clamp(min=0)
         out = torch.zeros_like(typ)
         terr = self.terrain.gather(1, tile)
@@ -5940,6 +5942,12 @@ class SimEconomy:
             out = out + self._type_enemy_mp.take(typ) * enemy.long()
         if bool((self._type_coast_mp > 0).count_nonzero()):
             out = out + self._type_coast_mp.take(typ) * (terr == self._coast_terr).long()
+        if pre == "major" and self._pol_home_moves_any:
+            seat = getattr(self, f"{pre}_unit_seat")
+            civ = (seat >= 0) & (seat < self.n_majors)
+            hm = self._fx_by_row("homemove").gather(1, seat.clamp(min=0, max=self.n_majors - 1))
+            home = civ & (self.tile_seat.gather(1, tile) == seat)
+            out = out + hm * home.long()
         return out
 
     def _attacks_after_moving(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:

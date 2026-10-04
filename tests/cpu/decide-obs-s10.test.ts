@@ -9,7 +9,7 @@ import { foundCity } from '../../cpu/core/game';
 import { emptySeat } from '../../cpu/core/seats';
 import { seatGroups } from '../../cpu/core/decideObs';
 import { SEAT_GROUPS } from '../../cpu/core/decideObsSeat';
-import { congressSessionDue, specialSessionDue } from '../../cpu/core/congress';
+import { congressSessionDue, specialSessionDue, CONGRESS_CUR_FAITH } from '../../cpu/core/congress';
 import { EMG_CALLED } from '../../cpu/core/emergency';
 import { GP_CLASSES, GREAT_PEOPLE } from '../../cpu/data/greatPeople';
 import { BELIEF_CATALOGS } from '../../cpu/data/religion';
@@ -135,7 +135,7 @@ describe('seat scalar groups', () => {
     expect(g.slate).toEqual([CONGRESS_MIGRATION, CONGRESS_MERCENARY]);
     // Migration: A on yourself; Mercenary Companies: B on the currency held most
     expect(g.pref_outcome).toEqual([0, 1]);
-    expect(g.pref_target).toEqual([1, 1]);
+    expect(g.pref_target).toEqual([1, CONGRESS_CUR_FAITH]);
     expect(g.dv).toBe(true);
     expect(g.leader).toBe(1);
     // before the first announcement the slate is empty: nothing to prefer

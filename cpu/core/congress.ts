@@ -11,7 +11,6 @@
  */
 import { nextRandom } from './rand';
 import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
-import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { GP_CLASSES } from '../data/greatPeople';
 import { gwCountsByObj } from './greatWorks';
 import { GWO_COUNT } from '../data/greatWorks';
@@ -33,7 +32,7 @@ import {
   CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_DEFORESTATION,
   CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD,
   CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
-  CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_DISCOUNT,
+  CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_PROD_MULT, UDT_DISTRICTS,
   CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION,
   CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL, CONGRESS_LUXURY_POLICY,
   CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
@@ -55,10 +54,12 @@ const CLEARABLE_FEATURES = clearableFeatures();
 
 interface Vote { seat: number; outcome: number; target: number; weight: number }
 
-/** Mercenary Companies names a CURRENCY, in this order on both engines. */
-const CONGRESS_CURRENCIES = ['gold', 'faith'] as const;
-export const CONGRESS_CUR_GOLD = 0;
-export const CONGRESS_CUR_FAITH = 1;
+/** Mercenary Companies names the YIELD a unit is paid in, in the order
+ *  WorldCongress.lua's WC_Validate_YieldBan offers them, on both engines. */
+export const CONGRESS_CURRENCIES = ['production', 'gold', 'faith'] as const;
+export const CONGRESS_CUR_PRODUCTION = 0;
+export const CONGRESS_CUR_GOLD = 1;
+export const CONGRESS_CUR_FAITH = 2;
 
 /**
  * What a VOTER knows that this module deliberately cannot look up. Adoption
@@ -119,11 +120,13 @@ export function preference(state: GameState, res: number, seat: number,
   const sx = state.seats[seat];
   switch (res) {
     case CONGRESS_UDT: {
-      const counts = PLACEABLE_DISTRICTS.map(() => 0);
+      // the district this seat holds the most complete copies of; every
+      // city's centre is one
+      const counts = UDT_DISTRICTS.map(() => 0);
       for (const city of sx.cities) {
         for (const d of city.districts) {
-          const i = PLACEABLE_DISTRICTS.indexOf(d.type);
-          if (i >= 0 && state.map.tiles[d.tileIndex].districtComplete) counts[i]++;
+          const i = UDT_DISTRICTS.indexOf(d.type);
+          if (i >= 0 && (d.type === 'CITY_CENTER' || state.map.tiles[d.tileIndex].districtComplete)) counts[i]++;
         }
       }
       return { outcome: 0, target: argmaxLow(counts) };
@@ -227,15 +230,15 @@ export function preference(state: GameState, res: number, seat: number,
       return { outcome: 0, target: argmaxLow(counts) };
     }
     case CONGRESS_GLOBAL_ENERGY: {
-      // A is the discount, so a seat names the plant type it already runs
-      // most of; with none built it names the first row.
+      // B is the production boost, so a seat votes B on the plant type it
+      // already runs most of; with none built it names the first row.
       const counts = POWER_PLANT_IDS.map(() => 0);
       for (const city of sx.cities) {
         for (let i = 0; i < POWER_PLANT_IDS.length; i++) {
           if (city.buildings.includes(POWER_PLANT_IDS[i])) counts[i]++;
         }
       }
-      return { outcome: 0, target: argmaxLow(counts) };
+      return { outcome: 1, target: argmaxLow(counts) };
     }
     case CONGRESS_DEFORESTATION: {
       // A pays gold for clearing the named feature, so a seat names whichever
@@ -328,7 +331,7 @@ function settle(state: GameState, votes: readonly Vote[], spent: readonly number
 
 export function targetSpaceSize(state: GameState, res: number): number {
   switch (CONGRESS_RESOLUTIONS[res].target) {
-    case 'district': return PLACEABLE_DISTRICTS.length;
+    case 'district': return UDT_DISTRICTS.length;
     case 'gpClass': return GP_CLASSES.length;
     case 'gwObject': return GWO_COUNT;
     case 'currency': return CONGRESS_CURRENCIES.length;
@@ -521,14 +524,14 @@ export function congressDuplicateLuxury(state: GameState): string | null {
  * +100% production; null when not standing. */
 export function congressUdtProdDistrict(state: GameState): DistrictId | null {
   const e = congressEffect(state, CONGRESS_UDT);
-  return e && e.outcome === 0 ? PLACEABLE_DISTRICTS[e.target] ?? null : null;
+  return e && e.outcome === 0 ? UDT_DISTRICTS[e.target] ?? null : null;
 }
 
 /** Urban Development Treaty outcome B: the district whose buildings cannot
  * be created; null when not standing. */
 export function congressUdtBlockedDistrict(state: GameState): DistrictId | null {
   const e = congressEffect(state, CONGRESS_UDT);
-  return e && e.outcome === 1 ? PLACEABLE_DISTRICTS[e.target] ?? null : null;
+  return e && e.outcome === 1 ? UDT_DISTRICTS[e.target] ?? null : null;
 }
 
 /** CIV6 (Espionage Pact, outcome A): "All Spies function +2 levels higher for
@@ -615,9 +618,10 @@ export function congressGwMult(state: GameState): number[] {
   return m;
 }
 
-/** Mercenary Companies: the multiplier on a MILITARY unit's purchase price in
- *  `currency` (CONGRESS_CUR_GOLD / CONGRESS_CUR_FAITH). */
-export function congressUnitBuyMult(state: GameState, currency: number): number {
+/** Mercenary Companies: the multiplier on what a MILITARY unit costs in
+ *  `currency` — its production cost (CONGRESS_CUR_PRODUCTION) or its purchase
+ *  price (CONGRESS_CUR_GOLD / CONGRESS_CUR_FAITH). */
+export function congressUnitCostMult(state: GameState, currency: number): number {
   const e = congressEffect(state, CONGRESS_MERCENARY);
   if (!e || e.target !== currency) return 1;
   return e.outcome === 0 ? CONGRESS_PLUS_100 : CONGRESS_MINUS_50;
@@ -715,19 +719,20 @@ export function congressProjectMult(state: GameState, project: number): number {
   return e.outcome === 0 ? CONGRESS_PLUS_100 : CONGRESS_MINUS_50;
 }
 
-/** CIV6 (Global Energy Treaty, outcome A): "50% discount on the production
- *  of buildings of this type" — 1 where the treaty does not name this row. */
-export function congressEnergyDiscount(state: GameState, buildingId: string): number {
+/** CIV6 (Global Energy Treaty, outcome B, WC_RES_BUILDING_PRODUCTION_BUFF):
+ *  the production multiplier toward buildings of the named type — 1 where
+ *  the treaty does not name this row. */
+export function congressEnergyProdMult(state: GameState, buildingId: string): number {
   const e = congressEffect(state, CONGRESS_GLOBAL_ENERGY);
-  if (!e || e.outcome !== 0 || POWER_PLANT_IDS[e.target] !== buildingId) return 1;
-  return CONGRESS_ENERGY_DISCOUNT;
+  if (!e || e.outcome !== 1 || POWER_PLANT_IDS[e.target] !== buildingId) return 1;
+  return CONGRESS_ENERGY_PROD_MULT;
 }
 
-/** Outcome B: the plant "buildings of this type cannot be created by any
- *  player" names; null when the treaty is not standing that way. */
+/** Outcome A (WC_RES_BUILDING_PRODUCTION_BAN): the plant whose production is
+ *  banned for every player; null when the treaty is not standing that way. */
 export function congressEnergyBlocked(state: GameState): string | null {
   const e = congressEffect(state, CONGRESS_GLOBAL_ENERGY);
-  return e && e.outcome === 1 ? POWER_PLANT_IDS[e.target] ?? null : null;
+  return e && e.outcome === 0 ? POWER_PLANT_IDS[e.target] ?? null : null;
 }
 
 /** The Deforestation Treaty's standing outcome on a feature, or -1. */

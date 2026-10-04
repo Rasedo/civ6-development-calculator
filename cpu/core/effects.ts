@@ -155,15 +155,17 @@ export function isCivicComplete(state: GameState, id: string, seat: number): boo
   return seatOf(state, seat)!.research.civics.includes(id);
 }
 
+/** the rows a seat may research now: not yet complete, or REPEATABLE (Future
+ *  Tech, Future Civic), with every prereq complete */
 export function availableTechsIn(research: ResearchState): TechDef[] {
   return Object.values(TECHS).filter(
-    (t) => !research.techs.includes(t.id) && t.prereqs.every((p) => research.techs.includes(p)),
+    (t) => (t.repeatable || !research.techs.includes(t.id)) && t.prereqs.every((p) => research.techs.includes(p)),
   );
 }
 
 export function availableCivicsIn(research: ResearchState): CivicDef[] {
   return Object.values(CIVICS).filter(
-    (c) => !research.civics.includes(c.id) && c.prereqs.every((p) => research.civics.includes(p)),
+    (c) => (c.repeatable || !research.civics.includes(c.id)) && c.prereqs.every((p) => research.civics.includes(p)),
   );
 }
 
@@ -442,6 +444,7 @@ export interface Modifiers {
   religiousCsHome: number;
   navalRaiderProdMult: number;
   navalRaiderMoves: number;
+  homeStartMoves: number;
   grievanceNoDecay: boolean;
   projectProdMult: number;
   /** production toward districts (Merchant Republic's flat bonus). */
@@ -684,6 +687,7 @@ export function defaultModifiers(): Modifiers {
     religiousCsHome: 0,
     navalRaiderProdMult: 1,
     navalRaiderMoves: 0,
+    homeStartMoves: 0,
     grievanceNoDecay: false,
     projectProdMult: 1,
     districtProdMult: 1,
@@ -804,6 +808,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.religiousCsHome) mods.religiousCsHome += fx.religiousCsHome;
   if (fx.navalRaiderProdMult) mods.navalRaiderProdMult *= fx.navalRaiderProdMult;
   if (fx.navalRaiderMoves) mods.navalRaiderMoves += fx.navalRaiderMoves;
+  if (fx.homeStartMoves) mods.homeStartMoves += fx.homeStartMoves;
   if (fx.grievanceNoDecay) mods.grievanceNoDecay = true;
   if (fx.projectProdMult) mods.projectProdMult *= fx.projectProdMult;
   if (fx.districtProdMult) mods.districtProdMult *= fx.districtProdMult;

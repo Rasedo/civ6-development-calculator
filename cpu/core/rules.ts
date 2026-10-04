@@ -5,7 +5,7 @@ import { isWater, isImpassable, isMountain, isCoastalLand, isCoastalWater, hasRi
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
 import { riverReach } from './disasters';
-import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, congressUdtBlockedDistrict } from './congress';
+import { congressChopBanned, congressEnergyBlocked, congressUdtBlockedDistrict } from './congress';
 import { tileAppeal, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { IMPROVEMENTS, type ImprovementDef, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
@@ -838,8 +838,7 @@ export function buildingCostIn(state: GameState, city: City, id: string): number
   const full = def.floodBarrier ? floodBarrierCost(state, city) : def.cost;
   // CIV6 (PILLAGE_BUILDING_REPAIR_PERCENT 25): a building standing pillaged
   // is REPAIRED for that share of its price
-  const base = buildingPillaged(city, id) ? Math.round((full * PILLAGE_BUILDING_REPAIR_PERCENT) / 100) : full;
-  return Math.round(base * congressEnergyDiscount(state, id));
+  return buildingPillaged(city, id) ? Math.round((full * PILLAGE_BUILDING_REPAIR_PERCENT) / 100) : full;
 }
 
 /** building ids some tech or civic unlocks — the rows `computeUnlocks` can ever grant */

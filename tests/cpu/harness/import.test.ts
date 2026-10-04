@@ -12,9 +12,8 @@ import { gameHash } from '../../../cpu/harness/aliases';
 import { eraEvents, transitionChecks } from '../../../cpu/harness/checks';
 import { GW_HOLDERS, GWO_RELIC, GWO_WRITING, holderSlots } from '../../../cpu/data/greatWorks';
 import { GP_CITY_PERM, GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
-import { CONGRESS_RESOLUTIONS, DEAL_LUXURY, DEAL_TURNS, MOMENT_PANTHEON_FIRST } from '../../../cpu/data/seats';
+import { CONGRESS_RESOLUTIONS, DEAL_LUXURY, UDT_DISTRICTS, DEAL_TURNS, MOMENT_PANTHEON_FIRST } from '../../../cpu/data/seats';
 import { LUXURY_IDS } from '../../../world/resources';
-import { PLACEABLE_DISTRICTS } from '../../../cpu/data/districts';
 import { settlerCost } from '../../../cpu/core/game';
 import { clearableFeatures } from '../../../world/features';
 
@@ -294,7 +293,7 @@ describe('the World Congress', () => {
     expect(gameHash('WC_RES_WORLD_RELIGION')).toBe(-1311232414);
   });
 
-  it('carries each resolution with its outcome and target, and names the one it cannot place', () => {
+  it('carries each resolution with its outcome and target', () => {
     const rec = record(10, {
       religions: [{ Religion: 0, Founder: 0, Beliefs: [] }],
       congress: {
@@ -311,11 +310,12 @@ describe('the World Congress', () => {
     const res = (id: string) => CONGRESS_RESOLUTIONS.findIndex((r) => r.id === id);
     expect(imp.state.congress).toEqual([
       { res: res('WORLD_RELIGION'), outcome: 0, target: 0 },
-      { res: res('URBAN_DEVELOPMENT_TREATY'), outcome: 1, target: PLACEABLE_DISTRICTS.indexOf('CAMPUS') },
+      { res: res('URBAN_DEVELOPMENT_TREATY'), outcome: 1, target: UDT_DISTRICTS.indexOf('CAMPUS') },
+      { res: res('URBAN_DEVELOPMENT_TREATY'), outcome: 0, target: UDT_DISTRICTS.indexOf('CITY_CENTER') },
       { res: res('TRADE_POLICY'), outcome: 0, target: 1 },
       { res: res('DEFORESTATION_TREATY'), outcome: 0, target: clearableFeatures().indexOf('RAINFOREST') },
     ]);
-    expect(imp.congressGaps).toEqual(['congress:URBAN_DEVELOPMENT_TREATY target LOC_DISTRICT_CITY_CENTER_NAME']);
+    expect(imp.congressGaps).toEqual([]);
   });
 });
 

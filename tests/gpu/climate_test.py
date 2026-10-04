@@ -392,16 +392,17 @@ def main() -> int:
     assert res >= 0, "the treaty is on the wire"
     assert s11._congress_space(int(rj["eras"]["congressResolutions"][res]["t"])) == len(s11._plant_bidx)
     plant = s11._plant_bidx[0]
-    s11.congress_active[b, 0] = torch.tensor([res, 0, 0])   # outcome A: discount
-    assert int(s11._congress_energy_discount()[b]) == plant
+    s11.congress_active[b, 0] = torch.tensor([res, 1, 0])   # outcome B: +100% production
+    assert int(s11._congress_energy_boosted()[b]) == plant
     assert int(s11._congress_energy_blocked()[b]) == -1
     bi11 = torch.full((s11.B,), plant, dtype=torch.long)
     full = float(rules.b_cost[plant])
-    assert int(s11._building_cost_in(row, 0, bi11)[b]) == round(full * 0.5), (
-        "CIV6: '50% discount on the production of buildings of this type'")
-    s11.congress_active[b, 0, 1] = 1   # outcome B: the ban
+    assert int(s11._building_cost_in(row, 0, bi11)[b]) == round(full), (
+        "the production boost leaves the price alone")
+    s11.congress_active[b, 0, 1] = 0   # outcome A: the ban
     s11._eff_version += 1
     assert int(s11._congress_energy_blocked()[b]) == plant
+    assert int(s11._congress_energy_boosted()[b]) == -1
     s11.civ_techs[:, row, :] = True
     s11._eff_version += 1
     assert not bool(s11._seat_buildable(row)[b, :, plant].any()), (
@@ -410,7 +411,7 @@ def main() -> int:
 
     # --- 12) a building's price is never LOCKED ---------------------------
     # TS holds no `q.cost` for a building: `buildingCostIn` is re-read at every
-    # completion check and again for the digest, so both movers have to be
+    # completion check and again for the digest, so a mover has to be
     # followed here rather than frozen at queue.
     s12 = settle_all(fresh(rules, paths[0]))
     col12 = int(s12._city_lowland_count(row)[b].argmax())
@@ -420,26 +421,11 @@ def main() -> int:
     s12.climate_idx[b] = 1
     s12._reprice_live(row)
     assert int(s12.city_cost[b, row, col12, 0]) == s12._barrier_per_tile * n12 * 2, "the sea moved the price"
-
-    plant = s12._plant_bidx[0]
-    col13 = next(c for c in range(s12.RC)
-                 if c != col12 and bool(s12.city_alive[b, row, c])) if bool(
-        s12.city_alive[b, row].sum() > 1) else col12
-    s12.city_current[b, row, col13, 0] = plant
-    full = float(rules.b_cost[plant])
-    s12.city_cost[b, row, col13, 0] = full
-    res12 = next(i for i, r in enumerate(rj["eras"]["congressResolutions"])
-                 if r["id"] == "GLOBAL_ENERGY_TREATY")
-    s12.congress_active[b, 0] = torch.tensor([res12, 0, 0])
-    s12._eff_version += 1
-    s12._reprice_live(row)
-    assert int(s12.city_cost[b, row, col13, 0]) == round(full * 0.5), (
-        "the treaty's discount moved the price")
     # and the digest reads the same live number the plane now holds
     from core.statecompare import EXTRACTORS  # noqa: PLC0415
-    live = EXTRACTORS["city"]["queueCost"](s12, b, [(row, col13)])
-    assert int(live[0][0]) == round(full * 0.5)   # the extractor answers per QUEUE SLOT
-    print("  12 live building price OK (the sea and the treaty both move it)")
+    live = EXTRACTORS["city"]["queueCost"](s12, b, [(row, col12)])
+    assert int(live[0][0]) == s12._barrier_per_tile * n12 * 2   # the extractor answers per QUEUE SLOT
+    print("  12 live building price OK (the sea moves it)")
 
     print("BATTERY OK climate")
     return 0

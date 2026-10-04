@@ -4,8 +4,8 @@ import { seatOf } from '../../../cpu/core/seats';
 import { endTurn, unitPurchaseCost } from '../../../cpu/core/game';
 import { seatPhase, worldCongress } from '../../../cpu/core/phase';
 import { seededGame } from '../helpers';
-import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION } from '../../../cpu/data/seats';
-import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitBuyMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
+import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION, UDT_DISTRICTS } from '../../../cpu/data/seats';
+import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitCostMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
 import { cityTradeYields, congressCancelBannedIntl, routeOriginYields } from '../../../cpu/core/trade';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
@@ -145,11 +145,12 @@ describe('world congress', () => {
     expect(congressGrowthMult(state, 1)).toBe(1);
     expect(congressLoyaltyDelta(state, 0)).toBe(5);
     expect(congressLoyaltyDelta(state, 1)).toBe(0);
-    state.congress = [{ res: CONGRESS_UDT, outcome: 1, target: 0 }]; // CAMPUS banned
+    const campus = UDT_DISTRICTS.indexOf('CAMPUS');
+    state.congress = [{ res: CONGRESS_UDT, outcome: 1, target: campus }];
     expect(congressUdtBlockedDistrict(state)).toBe('CAMPUS');
     expect(congressUdtProdDistrict(state)).toBe(null);
     state.congress = [
-      { res: CONGRESS_UDT, outcome: 0, target: 0 },
+      { res: CONGRESS_UDT, outcome: 0, target: campus },
       { res: CONGRESS_HERITAGE, outcome: 0, target: 1 },
     ];
     expect(congressUdtProdDistrict(state)).toBe('CAMPUS');
@@ -227,11 +228,11 @@ describe('world congress: the wider slate', () => {
   it('Mercenary Companies prices military purchases in the named currency', () => {
     const state = newGame(1);
     state.congress = [{ res: CONGRESS_MERCENARY, outcome: 0, target: CONGRESS_CUR_GOLD }];
-    expect(congressUnitBuyMult(state, CONGRESS_CUR_GOLD)).toBe(2);
-    expect(congressUnitBuyMult(state, CONGRESS_CUR_FAITH)).toBe(1);
+    expect(congressUnitCostMult(state, CONGRESS_CUR_GOLD)).toBe(2);
+    expect(congressUnitCostMult(state, CONGRESS_CUR_FAITH)).toBe(1);
     state.congress = [{ res: CONGRESS_MERCENARY, outcome: 1, target: CONGRESS_CUR_FAITH }];
-    expect(congressUnitBuyMult(state, CONGRESS_CUR_FAITH)).toBe(0.5);
-    expect(congressUnitBuyMult(state, CONGRESS_CUR_GOLD)).toBe(1);
+    expect(congressUnitCostMult(state, CONGRESS_CUR_FAITH)).toBe(0.5);
+    expect(congressUnitCostMult(state, CONGRESS_CUR_GOLD)).toBe(1);
   });
 
   it('the Mercenary price reaches the unit BUY applier, not just the helper', () => {

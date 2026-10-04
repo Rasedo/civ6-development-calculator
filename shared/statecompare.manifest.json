@@ -591,12 +591,23 @@
         {
           "name": "grantedTitles",
           "compare": "exact",
-          "why": "governor titles a TRIBAL VILLAGE granted outright — nothing derives them, so they are stored",
+          "why": "governor titles granted outright (a TRIBAL VILLAGE, each Future Civic) — nothing derives them, so they are stored",
           "covers": [
             "Seat.grantedTitles"
           ],
           "planes": [
             "civ_granted_titles"
+          ]
+        },
+        {
+          "name": "researchProjectPct",
+          "compare": "exact",
+          "why": "the project production percent Future Tech completions banked — a repeatable row's count lives nowhere else",
+          "covers": [
+            "Seat.researchProjectPct"
+          ],
+          "planes": [
+            "civ_research_project_pct"
           ]
         },
         {

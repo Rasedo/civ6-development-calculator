@@ -21,7 +21,7 @@ import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { minorCity, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
 import { minorPhase } from './minorBuild';
 import { seatPhase, freeCitiesPhase, healCities, worldCongress, nextCityName } from './phase';
-import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
+import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitCostMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_PRODUCTION } from './congress';
 import { settleIncursion, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
 import { commitProduction } from './seatTurn';
@@ -617,6 +617,23 @@ export function unitsAcquired(state: GameState, seat: number, unitType: string):
   return seatOf(state, seat)?.unitsAcquired?.[unitType] ?? 0;
 }
 
+/** The units Mercenary Companies prices: every unit of a military
+ *  formation, the SUPPORT chassis with the combat ones. */
+export function mercenaryUnit(unitType: string): boolean {
+  const def = UNITS[unitType];
+  return (def?.combat ?? 0) > 0 || !!def?.support;
+}
+
+/** What a unit's PRODUCTION cost is multiplied by for this seat now: Flower
+ *  Power's land-unit surcharge and Mercenary Companies on Production
+ *  (runs/h1_duelw1106 t62-81, outcome B: the Swordsman 45 -> 23 and the
+ *  Battering Ram 32 -> 16, the Builder, Settler and Trader unmoved). The
+ *  production step pays it as a slower fill. */
+export function unitProdCostMult(state: GameState, seat: number, unitType: string): number {
+  const merc = mercenaryUnit(unitType) ? congressUnitCostMult(state, CONGRESS_CUR_PRODUCTION) : 1;
+  return landUnitPriceMult(state, seat, unitType) * merc;
+}
+
 /** CIV6 (Flower Power): "The cost of producing and purchasing land units
  *  other than Rock Bands is increased by +100%." */
 export function landUnitPriceMult(state: GameState, seat: number, unitType: string): number {
@@ -644,8 +661,7 @@ export function unitPurchaseCost(state: GameState, unitType: string, seat: numbe
   // ones (runs/h1_duelw1105 t222, Gold: the Siege Tower, the Military
   // Engineer, the Drone, the Supply Convoy and the Anti-Air Gun at half with
   // every combat unit; the Builder, Settler, Trader, Spy and Naturalist not)
-  const def = UNITS[unitType];
-  const merc = (def?.combat ?? 0) > 0 || def?.support ? congressUnitBuyMult(state, CONGRESS_CUR_GOLD) : 1;
+  const merc = mercenaryUnit(unitType) ? congressUnitCostMult(state, CONGRESS_CUR_GOLD) : 1;
   // CIV6 (Ngazargamu): 20% off per Encampment building in the BUYING city
   const suz = city && unitIsLandDomain(unitType) ? suzerainLandPurchaseMult(state, seat, city) : 1;
   return base * GOLD_PURCHASE_MULT * m * merc * suz * landUnitPriceMult(state, seat, unitType);

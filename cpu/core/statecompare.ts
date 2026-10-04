@@ -479,6 +479,7 @@ const SEAT: Record<string, Extractor> = {
   influencePoints: overSeats((s) => s.influencePoints),
   envoysAvailable: overSeats((s) => s.envoysAvailable),
   grantedTitles: overSeats((s) => s.grantedTitles),
+  researchProjectPct: overSeats((s) => s.researchProjectPct ?? 0),
   buildersTrained: overSeats((s) => s.buildersTrained),
   settlersTrained: overSeats((s) => s.settlersTrained ?? 0),
   discountDistricts: overSeats((s) => s.discountDistricts ?? 0),

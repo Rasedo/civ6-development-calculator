@@ -1,3 +1,4 @@
+import type { DistrictId } from '../core/types';
 import type { GpPermKey } from './greatPeople';
 import { srcConst, xml, type SrcMap } from './provenance';
 import { speedTurns, speedTurnsSrc } from './constants';
@@ -711,7 +712,8 @@ const CONGRESS_SRC: Record<string, SrcMap> = {
  */
 const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6: "A: +100% Production towards buildings in this district. /
-  // B: No buildings can be created in this district." (through Modern)
+  // B: No buildings can be created in this district." (through Modern) The
+  // target space is UDT_DISTRICTS.
   { id: 'URBAN_DEVELOPMENT_TREATY', name: 'Urban Development Treaty', minEra: 0, maxEra: 5, target: 'district' },
   // CIV6: "A: +100% points towards Great People of this class. / B: No
   // points earned towards Great People of this class" — B zeroes EVERY
@@ -723,10 +725,11 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6: "A: Great Works of this type generate +100% Tourism. / B: No
   // Tourism from Great Works of this type." (Modern+)
   { id: 'HERITAGE_ORGANIZATION', name: 'Heritage Organization', minEra: 5, maxEra: 99, target: 'gwObject' },
-  // CIV6: "A: +100% cost when producing or purchasing military units using
-  // this currency type. / B: -50% cost ...". The target is the CURRENCY, so
-  // the multiplier rides the PURCHASE price in it; nothing in this model
-  // produces a unit in a currency.
+  // CIV6: "A: Producing, or purchasing military units using the chosen
+  // currency type, is +100% of the cost / B: ... -50% of the cost." The
+  // target is the YIELD units are paid in — Production, Gold or Faith
+  // (WorldCongress.lua, WC_Validate_YieldBan) — so the multiplier rides the
+  // production cost on Production and the purchase price on a currency.
   { id: 'MERCENARY_COMPANIES', name: 'Mercenary Companies', minEra: 0, maxEra: 99, target: 'currency' },
   // CIV6: "A: Each Trade Route sent to target player provides +4 Gold to the
   // sender. This player receives +1 Trade Route capacity. / B: All active
@@ -759,10 +762,12 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // player." (Atomic through Information) The target space is the CLEARABLE
   // features — the rows carrying a chopYield, in catalog order.
   { id: 'DEFORESTATION_TREATY', name: 'Deforestation Treaty', minEra: 6, maxEra: 7, target: 'feature' },
-  // CIV6: "A: 50% discount on the production of buildings of this type. /
-  // B: Buildings of this type cannot be created by any player." (Modern+)
-  // The target space is the POWER PLANTS — the buildings the climate arc is
-  // about, in catalog order.
+  // CIV6 (Expansion2_Congress.xml, ResolutionEffects): WhichEffect 1 (A) is
+  // WC_RES_BUILDING_PRODUCTION_BAN, "Ban the production of buildings of this
+  // type"; WhichEffect 2 (B) is WC_RES_BUILDING_PRODUCTION_BUFF, +100%
+  // Production toward them (runs/h1_duelw1106 t222-241: A on the Fossil Fuel
+  // Power Plant takes it off Xian's list). (Modern+) The target space is the
+  // POWER PLANTS (WC_Validate_PowerBuilding), in catalog order.
   { id: 'GLOBAL_ENERGY_TREATY', name: 'Global Energy Treaty', minEra: 5, maxEra: 99, target: 'building' },
   // CIV6: "A: Target player generates 100% more Grievances, and other players
   // generate 100% more Grievances against this player. / B: Target player
@@ -813,6 +818,15 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
 export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] =
   RAW_CONGRESS_RESOLUTIONS.map((r) => ({ ...r, src: CONGRESS_SRC[r.id] }));
 
+/** The Urban Development Treaty's target space: the districts
+ *  WorldCongress.lua's WC_Validate_UrbanDevelopment offers, in its order —
+ *  the City Center first. */
+export const UDT_DISTRICTS: readonly DistrictId[] = [
+  'CITY_CENTER', 'HOLY_SITE', 'CAMPUS', 'ENCAMPMENT', 'HARBOR', 'AERODROME',
+  'COMMERCIAL_HUB', 'ENTERTAINMENT_COMPLEX', 'THEATER_SQUARE', 'INDUSTRIAL_ZONE',
+  'GOVERNMENT_PLAZA', 'WATER_PARK', 'DIPLOMATIC_QUARTER', 'PRESERVE',
+];
+
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
 export const CONGRESS_MIGRATION = 2;
@@ -853,10 +867,10 @@ export const CONGRESS_WORLD_RELIGION_RS = srcConst('eras.congressWorldReligionRs
   modArg('WC_RES_RELIGIOUS_UNITS_STRENGTH'));
 export const CONGRESS_WORLD_RELIGION_FAVOR = srcConst('eras.congressWorldReligionFavor', 25,
   modArg('ANYONE_CONDEMNS_FOR_FAVOR'));
-/** CIV6 (Global Energy Treaty, outcome A): "50% discount on the production
- *  of buildings of this type." */
-export const CONGRESS_ENERGY_DISCOUNT = srcConst('eras.congressEnergyDiscount', 0.5,
-  { derived: 'the Global Energy Treaty outcome-A 50% production discount as a COST fraction; the install writes the same effect as a +100% production buff', inputs: [modArg('WC_RES_BUILDING_PRODUCTION_BUFF')] });
+/** CIV6 (Global Energy Treaty, outcome B): the production multiplier toward
+ *  the named power plant. */
+export const CONGRESS_ENERGY_PROD_MULT = srcConst('eras.congressEnergyProdMult', 2,
+  { derived: '1 + Amount/100 — the Global Energy Treaty outcome-B +100% production toward the named building', inputs: [modArg('WC_RES_BUILDING_PRODUCTION_BUFF')] });
 /** The always-3rd Diplomatic Victory resolution enters at Modern. */
 export const CONGRESS_DV_MIN_ERA = srcConst('eras.congressDvMinEra', 5,
   xml('Resolutions', 'ResolutionType=WC_RES_DIPLOVICTORY', 'EarliestEra', { expect: 'ERA_MODERN', note: '5 is this engine\'s Modern era index' }));
