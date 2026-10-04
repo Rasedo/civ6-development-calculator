@@ -328,7 +328,6 @@ class Rules:
     b_maintenance: torch.Tensor
     b_river: torch.Tensor  # bool
     b_farmbonus: torch.Tensor  # bool — Water Mill: farm-improved BONUS resources gain +1 food
-    b_coastfood: torch.Tensor  # bool — Lighthouse: +1 food on every Coast/Lake tile the city works
     buildings: list  # the raw building catalog rows, in wire order (a building's INDEX is its action code)
     b_variants: list  # per building: the unique building standing in for the row — its column overrides and its own clauses
     b_maxloy_culture: torch.Tensor  # bool — Monument: +1 culture while the city sits at max loyalty
@@ -558,7 +557,6 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_maintenance=torch.tensor([b["maintenance"] for b in B], dtype=torch.float64),
         b_river=torch.tensor([b["river"] for b in B], dtype=torch.bool),
         b_farmbonus=torch.tensor([b["farmBonusFood"] for b in B], dtype=torch.bool),
-        b_coastfood=torch.tensor([b["coastFood"] for b in B], dtype=torch.bool),
         buildings=list(B),
         b_variants=[list(b["variants"]) for b in B],
         b_maxloy_culture=torch.tensor([b["cultureAtMaxLoyalty"] for b in B], dtype=torch.bool),

@@ -510,18 +510,6 @@ class SimGovernors:
             out = out + torch.where(beside, per.long(), torch.zeros_like(out))
         return out
 
-    def _governor_feature_gold(self, row: int) -> torch.Tensor:
-        """[B, RC] f64 — CIV6 (Forestry Management): "This city receives +2
-        Gold for each unimproved feature", counted over the tiles it OWNS."""
-        per = self._governor_sum(row, "goldPerFeature")
-        if not bool(per.count_nonzero()):
-            return per
-        slot = self.city_slot_at(row)
-        live = self._unimproved_feature() & (slot >= 0)
-        cnt = torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
-        cnt.scatter_add_(1, slot.clamp(min=0), live.long())
-        return per * cnt.double()
-
     def _governor_pass_route_gold(self, row: int) -> torch.Tensor:
         """[B, RC] f64 — CIV6 (Land Acquisition): "+3 Gold per turn from each
         foreign Trade Route passing through the city" — a foreign route passes
@@ -614,7 +602,7 @@ class SimGovernors:
         out = out + (self._governor_vec(row, "perCitizen")
                      + gov_percit.double().unsqueeze(1) * seated) * pop.double().unsqueeze(2)
         out[:, :, 5] = out[:, :, 5] + self._governor_sum(row, "faithPerSpecialty") * spec.double()
-        out[:, :, 2] = out[:, :, 2] + self._governor_feature_gold(row) + self._governor_pass_route_gold(row)
+        out[:, :, 2] = out[:, :, 2] + self._governor_pass_route_gold(row)
         return out + self._governor_building_yields(row)
 
     def _governor_building_yields(self, row: int) -> torch.Tensor:

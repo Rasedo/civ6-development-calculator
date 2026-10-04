@@ -5,7 +5,8 @@ import { foundCity } from '../../../cpu/core/game';
 import { seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { ERAS, TECHS } from '../../../cpu/data/techs';
 import { completeQueueItem } from '../../../cpu/core/production';
-import { computeCityStats, computeHousing, seatTourism, seatTourismReligious } from '../../../cpu/core/city';
+import { cityPlotBonus, computeCityStats, computeHousing, seatTourism, seatTourismReligious } from '../../../cpu/core/city';
+import { emptyYields } from '../../../cpu/core/types';
 import { greatPersonPointsPerTurn, patronizeGreatPerson } from '../../../cpu/core/greatPeople';
 import { GREAT_PEOPLE, GP_CLASSES, gpChargesOf } from '../../../cpu/data/greatPeople';
 import { spawnUnit } from '../../../cpu/core/units';
@@ -104,6 +105,27 @@ describe('wonder effects, sourced', () => {
     foundCity(state, tileAtCoords(state.map, 2, 2).index, 0);
     const other = seatOf(state, 0)!.cities[1];
     expect(computeCityStats(state, other).amenities.have).toBeLessThan(amen);
+  });
+
+  // CIV6 (GREATBATH_FLOODFAITH): the recorded games read the faith on each
+  // Floodplains plot of the city, per flood that plot has taken
+  it('the Great Bath pays Faith on each Floodplains plot per flood it took', () => {
+    const { state, city } = oneCity();
+    const fp = tileAtCoords(state.map, 7, 8);
+    const dry = tileAtCoords(state.map, 9, 9);
+    fp.feature = 'FLOODPLAINS_GRASSLAND';
+    fp.floodCount = 3;
+    dry.feature = null;
+    dry.floodCount = 2;
+    const faith = (t: typeof fp) => {
+      const y = emptyYields();
+      cityPlotBonus(state, city)(t, false, y);
+      return y.faith;
+    };
+    expect(faith(fp)).toBe(0);
+    stand(state, city, 'GREAT_BATH', 8, 7);
+    expect(faith(fp)).toBe(3);
+    expect(faith(dry)).toBe(0);
   });
 
   it('policy slots are counted by KIND', () => {

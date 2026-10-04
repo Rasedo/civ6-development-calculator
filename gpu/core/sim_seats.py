@@ -7912,16 +7912,18 @@ class SimSeats:
         return g
 
     def _rcy_food_plane(self, row: int, g: dict) -> torch.Tensor:
-        """[B, T] tile food for seat row `row`. The farm-adjacency tier is the
-        row's own (its civics/techs), and tileYields adds it INSIDE the
-        improvement block — ahead of fertility and the drought floor — so the
-        tier goes onto the pre-tail base and the tail is taken again."""
+        """[B, T] tile food for seat row `row`. The Farm adjacency row is the
+        row's own (its civics/techs): `food` per whole group of `per` adjacent
+        Farms. tileYields adds it INSIDE the improvement block — ahead of
+        fertility and the drought floor — so it goes onto the pre-tail base and
+        the tail is taken again."""
         if row in g["f_r"]:
             return g["f_r"][row]
         f_plane = g["f_base"]
-        tier = self._farmadj_tier(self._seat_civics(row), self._seat_techs(row))
-        if bool((tier > 0).count_nonzero()):
-            adj = self._farmadj_qual().to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
+        per, food = self._farmadj_row(self._seat_civics(row), self._seat_techs(row))
+        if bool((per > 0).count_nonzero()):
+            groups = torch.div(self._farmadj_count(), per.clamp(min=1).unsqueeze(1), rounding_mode="floor")
+            adj = (groups * food.unsqueeze(1) * (per > 0).long().unsqueeze(1)).to(self.dtype)
             f_plane = self._food_tail(self._food_base() + adj)
         g["f_r"][row] = f_plane
         return f_plane

@@ -7,7 +7,8 @@ import { regionalEffects } from '../../../cpu/core/yields';
 import { cityTradeYields } from '../../../cpu/core/trade';
 import { disasterPhase } from '../../../cpu/core/disasters';
 import { RANDOM_EVENT_START_TURN } from '../../../cpu/data/disasters';
-import { computeCityStats } from '../../../cpu/core/city';
+import { cityPlotBonus, computeCityStats } from '../../../cpu/core/city';
+import { emptyYields } from '../../../cpu/core/types';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { purchaseReligiousUnit } from '../../../cpu/core/game';
 import { takePromotion, promoReady, promoAvailable, unitPromoRows, xpToNextLevel } from '../../../cpu/core/promotions';
@@ -177,22 +178,32 @@ describe('Forestry Management', () => {
     return { state, city, woods };
   }
 
-  it('pays +2 Gold for each unimproved feature the city owns', () => {
+  // CIV6 (FORESTRY_MANAGEMENT_FEATURE_NO_IMPROVEMENT_GOLD): a CITY PLOT
+  // yield (EFFECT_ADJUST_PLOT_YIELD) — the plot pays it, a worked one in the walk
+  it('pays +2 Gold on each plot of the city carrying an unimproved feature', () => {
     const { state, city, woods } = woodedCity();
-    const before = computeCityStats(state, city).breakdown.bonuses.gold;
+    const plotGold = (t: (typeof woods)[number]) => {
+      const y = emptyYields();
+      cityPlotBonus(state, city)(t, false, y);
+      return y.gold;
+    };
+    expect(plotGold(woods[0])).toBe(0);
     seat(state, city, GOVERNOR_INDEX.REYNA, P_FORESTRY);
-    expect(computeCityStats(state, city).breakdown.bonuses.gold).toBe(before + 2 * woods.length);
+    expect(plotGold(woods[0])).toBe(2);
+    expect(plotGold(tileAtCoords(state.map, 9, 8))).toBe(0); // no feature
     // an IMPROVED feature stops counting
     woods[0].improvement = 'LUMBER_MILL';
-    expect(computeCityStats(state, city).breakdown.bonuses.gold).toBe(before + 2 * (woods.length - 1));
+    expect(plotGold(woods[0])).toBe(0);
   });
 
-  it('a feature outside the borders pays nothing', () => {
-    const { state, city } = woodedCity();
+  it('the walk pays it on the worked plots alone', () => {
+    const { state, city, woods } = woodedCity();
+    city.population = 1;
+    for (const t of state.map.tiles) t.locked = undefined;
+    woods[1].locked = true;
+    const before = computeCityStats(state, city).breakdown.tiles.gold;
     seat(state, city, GOVERNOR_INDEX.REYNA, P_FORESTRY);
-    const paid = computeCityStats(state, city).breakdown.bonuses.gold;
-    tileAtCoords(state.map, 14, 2).feature = 'WOODS'; // unowned
-    expect(computeCityStats(state, city).breakdown.bonuses.gold).toBe(paid);
+    expect(computeCityStats(state, city).breakdown.tiles.gold).toBe(before + 2);
   });
 
   it('lifts the Appeal of the city\'s tiles next to an unimproved feature', () => {

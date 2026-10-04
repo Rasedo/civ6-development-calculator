@@ -44,7 +44,7 @@ describe('the sea-resource clause reads only a resource the seat can see', () =>
     const around = neighbors(state.map, state.map.tiles[city.centerIndex]);
     for (const t of around) t.resource = 'OIL'; // revealed at Refining
     const worked = () => computeCityStats(state, city).workedTiles.filter((i) => state.map.tiles[i].resource !== null).length;
-    expect(buildingCoastYields(state, { ...city, buildings: ['AQUARIUM'] })).toEqual({ science: 1 });
+    expect(buildingCoastYields(state, city.seat, ['AQUARIUM'])).toEqual({ science: 1 });
     expect(worked()).toBeGreaterThan(0);
     expect(clause(state, city, 'AQUARIUM', 'science')).toBe(0);
     grantTechs(state, 'REFINING');

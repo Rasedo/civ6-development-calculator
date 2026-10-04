@@ -68,9 +68,14 @@ def main() -> None:
     assert bool(rd.b_maxloy_culture[mon]), "the Monument lost its max-loyalty clause"
     assert float(rd.b_loyalty[mon]) == 1.0, "the Monument's +1 Loyalty is not in the catalog"
     assert float(rd.b_yields[mon][4]) == 1.0, "the Monument still pays the VANILLA +2 culture"
-    assert bool(rd.b_coastfood[lh]), "the Lighthouse lost its coast-tile food"
-    assert not bool(rd.b_coastfood[mon]) and not bool(rd.b_maxloy_culture[lh]), "the flags crossed rows"
-    assert sim._coast_food_terr, "no terrain carries the Lighthouse food"
+    coast = {bi: y6 for bi, y6, _ in sim._b_coast_plot}
+    assert lh in coast and float(coast[lh][0]) == 1.0, "the Lighthouse lost its coast-tile food"
+    assert mon not in coast and not bool(rd.b_maxloy_culture[lh]), "the flags crossed rows"
+    sy, sp = bidx("SHIPYARD"), bidx("SEAPORT")
+    unimp = {bi: un for bi, _, un in sim._b_coast_plot}
+    assert float(coast[sy][1]) == 1.0 and unimp[sy], "the Shipyard lost its unimproved-coast production"
+    assert float(coast[sp][2]) == 2.0 and not unimp[sp], "the Seaport lost its coast gold"
+    assert sim._coast_plot_terr, "no terrain carries the Lighthouse food"
     print("  the three flags ride the wire, on the rows that own them")
 
     # --- the Monument's loyalty, and its conditional culture ---------------
@@ -104,7 +109,7 @@ def main() -> None:
     ctr = int(sim2.city_center[0, row, col])
     ring = [int(t) for t in sim2.neigh[ctr] if int(t) >= 0]
     assert len(ring) >= 2, "the centre has no ring"
-    wet = sim2._coast_food_terr[0]
+    wet = sim2._coast_plot_terr[0]
     for t in ring[:2]:
         sim2.terrain[0, t] = wet
         sim2.tile_seat[0, t] = row
@@ -126,7 +131,7 @@ def main() -> None:
 
     # a LANDLOCKED Lighthouse pays only its row
     sim3 = build()
-    dry = [t for t in range(sim3.T) if int(sim3.terrain[0, t]) not in sim3._coast_food_terr]
+    dry = [t for t in range(sim3.T) if int(sim3.terrain[0, t]) not in sim3._coast_plot_terr]
     assert dry
     for t in [int(x) for x in sim3.neigh[int(sim3.city_center[0, row, col])] if int(x) >= 0]:
         sim3.terrain[0, t] = sim3.terrain[0, dry[0]]

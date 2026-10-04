@@ -2,7 +2,9 @@
 
     python tests/gpu/watermill_test.py
 
-The Civilopedia rule: "Bonus resources improved by Farms gain +1 Food each."
+CIV6 (WATERMILL_ADDRICEFOOD, WATERMILL_ADDWHEATYIELD, WATERMILL_ADDMAIZEYIELD):
++1 Food on every plot of the city carrying Rice, Wheat or Maize — the bonus
+resources a Farm improves — whether a Farm stands on it or not.
 
 Gate coverage for this mechanic is thin — few cities hold a Water Mill and few
 eligible tiles are owned — so scripted parity agreeing is weak evidence rather
@@ -14,7 +16,8 @@ It asserts the three things the implementation can plausibly get wrong:
   b. it is gated on the BUILDING (no Water Mill -> no bonus), so it cannot be
      an unconditional farm bonus wearing the building's name;
   c. it is gated on the RESOURCE being a farm-improved BONUS resource, not on
-     the tile merely carrying a Farm.
+     the tile merely carrying a Farm;
+  d. an UNFARMED plot carrying the resource is paid too.
 """
 
 from __future__ import annotations
@@ -72,7 +75,13 @@ def main() -> None:
     body = own0 & (sim.district[0] < 0) & (sim.built_wonder[0] < 0) & sim.work_ok[0]
     n_elig = int(body.sum())
     assert n_elig > 0, "city 0 owns no plain workable tiles to convert"
+    # a real farm-improved bonus resource's id, so the tile carries a LIVE one
+    farmed = (sim.res_cat[0] == 1) & (sim.res_imp[0] == sim.FARM) & (sim.res_id[0] >= 0)
+    assert bool(farmed.any()), "the fixture holds no farm-improved bonus resource"
+    rid = int(sim.res_id[0][farmed.nonzero()[0, 0]])
     sim.improvement[0][body] = sim.FARM
+    sim.res_id[0][body] = rid
+    sim.res_stripped[0][body] = False
     sim.res_cat[0][body] = 1  # bonus category
     sim.res_imp[0][body] = sim.FARM
     sim._eff_version += 1
@@ -89,7 +98,10 @@ def main() -> None:
     # base food (+1). Read the base from the rules rather than hardcoding it, so
     # a re-source of the building's yields cannot silently invalidate the lane.
     base_food = float(sim.rules_dev.b_yields[wm][0])
-    worked = min(int(sim.city_pop[0, 0, c0]), n_elig)  # the center is never eligible (it carries no improvement)
+    worked = min(int(sim.city_pop[0, 0, c0]), n_elig)
+    # the centre is paid too when it carries such a resource of its own
+    ctr = int(sim.city_center[0, 0, c0])
+    worked += int(bool(sim._res_live()[0, ctr]) and int(sim.res_cat[0, ctr]) == 1 and int(sim.res_imp[0, ctr]) == sim.FARM)
     assert abs(delta - (worked + base_food)) < 1e-9, (
         f"Water Mill food delta {delta} != worked eligible tiles {worked} + its own base food "
         f"{base_food} (pop {int(sim.city_pop[0, 0, c0])}, eligible owned {n_elig})"
@@ -98,8 +110,21 @@ def main() -> None:
     assert abs(got1 - base1) < 1e-12, (
         f"control city moved by {got1 - base1} — the bonus is not gated on the BUILDING"
     )
-    print(f"  a Water Mill +1 food/tile OK (+{delta:.0f} = {worked} worked eligible tiles + {base_food:.0f} base)")
+    print(f"  a Water Mill +1 food/tile OK (+{delta:.0f} = {worked} eligible plots worked or the centre + {base_food:.0f} base)")
     print("  b building-gated OK (control city without the Water Mill unchanged)")
+
+    # (d) the Farm is not the gate: lift every Farm and the resource still pays
+    sim.improvement[0][body] = -1
+    sim._eff_version += 1
+    bare_on = food_of(sim, c0)
+    sim.city_bldg[0, 0, c0, wm] = False
+    sim._eff_version += 1
+    bare_off = food_of(sim, c0)
+    sim.city_bldg[0, 0, c0, wm] = True
+    sim.improvement[0][body] = sim.FARM
+    sim._eff_version += 1
+    assert bare_on - bare_off > base_food, "an unfarmed Wheat/Rice/Maize plot went unpaid"
+    print(f"  d unfarmed plots paid OK (+{bare_on - bare_off - base_food:.0f} over the row)")
 
     # (c) resource-gated: keep the Farms, drop the bonus-resource identity.
     sim.res_cat[0][body] = 0
@@ -111,7 +136,7 @@ def main() -> None:
     )
     print("  c resource-gated OK (plain Farms with no bonus resource get nothing)")
 
-    print("watermill_test OK — Water Mill: +1 food per farm-improved bonus resource, building- and resource-gated")
+    print("watermill_test OK — Water Mill: +1 food per Rice/Wheat/Maize plot, building- and resource-gated, farmed or not")
 
 
 if __name__ == "__main__":

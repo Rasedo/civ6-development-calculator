@@ -22,7 +22,7 @@ Proven here:
     regional line stacks with it;
   * `_env_immune` stops both the scorch and the flood's district pillage, and
     only on the governed city's own ground;
-  * the gold counts the unimproved features the city OWNS and the appeal lifts
+  * the gold pays the worked plots carrying an unimproved feature and the appeal lifts
     only the tiles STANDING BESIDE one;
   * the bank lands on a unit bought in the governed city and is spent by its
     first promotion, re-arming it exactly once.
@@ -201,11 +201,19 @@ def test_forestry_management(rules, path) -> None:
         sim.improvement[B0, t] = -1
     sim._eff_version += 1
     n = int(sim._unimproved_feature()[B0].sum())
-    before_gold = float(sim._governor_feature_gold(ROW)[B0, 0])
-    assert before_gold == 0.0
+    # a PLOT yield: the worked plots carrying a live feature (and the centre)
+    # pay it, through the walk's tile bucket
+    amen = sim._seat_amenity(ROW)[2]
+    before_gold = float(sim._seat_city_walk(ROW, amen_yf=amen)[B0, 0, 2])
     seat_gov(sim, ROW, P)
-    assert float(sim._governor_feature_gold(ROW)[B0, 0]) == gold * len(
-        [t for t in mine if bool(sim._unimproved_feature()[B0, t])])
+    pick: list = []
+    after_gold = float(sim._seat_city_walk(ROW, amen_yf=sim._seat_amenity(ROW)[2], pick=pick)[B0, 0, 2])
+    uf = sim._unimproved_feature()[B0]
+    worked = [int(t) for t in pick[0][B0, 0] if int(t) >= 0]
+    paid = sum(1 for t in worked if bool(uf[t])) + int(bool(uf[int(sim.city_center[B0, ROW, 0])]))
+    assert paid > 0, "no worked plot carries a live feature"
+    assert abs((after_gold - before_gold) - gold * paid) < 1e-9, (
+        f"the governor paid {after_gold - before_gold}, not {gold} on {paid} worked feature plots")
     sim.improvement[B0, mine[0]] = 0
     sim._eff_version += 1
     assert int(sim._unimproved_feature()[B0].sum()) == n - 1, "an improved feature still counts"
@@ -231,7 +239,7 @@ def test_forestry_management(rules, path) -> None:
     sim.civ_gov_promos[B0, ROW, int(sim._gpromo_gov[P])] = 0
     sim._eff_version += 1
     assert int(sim._tile_appeal()[B0, beside[0]]) == lifted - int(appeal)
-    print(f"  4 Forestry Management OK — {gold}/feature owned, +{appeal} Appeal beside one")
+    print(f"  4 Forestry Management OK — {gold} on each worked feature plot, +{appeal} Appeal beside one")
 
 
 def test_patron_saint(rules, path) -> None:

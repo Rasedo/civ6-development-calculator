@@ -6308,7 +6308,7 @@ class SimEconomy:
         subtracts `appeal_feat` via feat_stripped. The rest is live: a
         COMPLETED built wonder +1, each district's own `_appeal_adj` column,
         each improvement's own `_imp_appeal_adj` column, a pillaged tile -1,
-        and a BARBARIAN OUTPOST -1. Version-cached like _farmadj_qual — every
+        and a BARBARIAN OUTPOST -1. Version-cached like _farmadj_count — every
         contributing write bumps _eff_version, camps included — and when the
         version moves, the body answers through the read-set memo
         `_appeal_memo`, so a bump for a write it never read keeps the plane."""
@@ -6357,24 +6357,33 @@ class SimEconomy:
         out = out + self._gp_appeal_plane().long() + self._gov_appeal_plane()
         return (torch.where(self.appeal_over > -999, self.appeal_over, out),)
 
-    def _farmadj_qual(self) -> torch.Tensor:
+    def _farmadj_count(self) -> torch.Tensor:
+        """[B, T] long — on a live Farm, the Farms beside it (a pillaged one
+        counts); 0 elsewhere."""
         if self._fadjq_cache is not None and self._fadjq_cache[0] == self._eff_version:
             return self._fadjq_cache[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         farm_imp = self.improvement == self.FARM  # pillaged neighbors still count
         adj = farm_imp[:, nbc] & (nb >= 0).unsqueeze(0)  # [B, T, 6]
-        out = (self.improvement == self.FARM) & ~self.pillaged & (adj.sum(dim=2) >= 2)
+        live = (self.improvement == self.FARM) & ~self.pillaged
+        out = torch.where(live, adj.sum(dim=2), torch.zeros_like(live, dtype=torch.long))
         self._fadjq_cache = (self._eff_version, out)
         return out
 
-    def _farmadj_tier(self, civics: torch.Tensor, techs: torch.Tensor) -> torch.Tensor:
-        tier = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        if self._farmadj_civic >= 0:
-            tier = tier + civics[:, self._farmadj_civic].long()
-        if self._farmadj_tech >= 0:
-            tier = tier + techs[:, self._farmadj_tech].long()
-        return tier
+    def _farmadj_row(self, civics: torch.Tensor, techs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """([B] per, [B] food) — the Farm adjacency row the research holds:
+        the tech's (Mechanized) where held, else the civic's (Medieval); per 0
+        where neither."""
+        per = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        food = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for (ri, rp, rf), held in ((self._farmadj_civic, civics), (self._farmadj_tech, techs)):
+            if ri < 0:
+                continue
+            h = held[:, ri] & ((per == 0) | (per > rp))
+            per = torch.where(h, torch.full_like(per, rp), per)
+            food = torch.where(h, torch.full_like(food, rf), food)
+        return per, food
 
     def _work_window(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """(tiles, valid) [B, RC, M] — every plot inside each city's work
@@ -6638,7 +6647,7 @@ class SimEconomy:
         compw = self._completed_wonders(row)
         if compw is not None:
             compw = compw[:, sl]
-        # WONDER TILE YIELDS (`wonderTileBonus`) — a wonder naming a TERRAIN or
+        # WONDER TILE YIELDS (`cityPlotBonus`) — a wonder naming a TERRAIN or
         # FEATURE pays its yields on the city's own tiles; `emp` widens the
         # payer to every city the seat holds. POST-selection like TS (the score
         # ranks without it). The CENTRE always counts, a worked DISTRICT tile
@@ -6668,35 +6677,49 @@ class SimEconomy:
                 for _k in range(6):
                     if float(_y[_k]) != 0.0:
                         tiles_y[:, :, _k] = tiles_y[:, :, _k] + float(_y[_k]) * nq
-        wm = bldg[:, :, rd.b_farmbonus]
+        # the building rows below pay only from a LIT building (`darkBuildings`):
+        # a pillaged Lighthouse feeds no Coast plot
+        lit = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, sl])
+        wm = lit[:, :, rd.b_farmbonus]
         if wm.numel() and bool(wm.count_nonzero()):
-            elig = (
-                (self.improvement.gather(1, stf) == self.FARM)
-                & (self.res_cat.gather(1, stf) == 1)  # bonus category
-                & (self.res_imp.gather(1, stf) == self.FARM)  # ...whose improvement IS the farm
-            ).reshape(B, n, M) & take
-            tiles_y[:, :, 0] = tiles_y[:, :, 0] + (elig & wm.any(dim=2).unsqueeze(2)).sum(dim=2).double()
-        # CIV6 (Lighthouse): "+1 Food in Coast and Lake tiles controlled by the
-        # city" — the TILE pays it, so only a worked one materializes.
-        lh = bldg[:, :, rd.b_coastfood]
-        if lh.numel() and bool(lh.count_nonzero()) and self._coast_food_terr:
+            # CIV6 (WATERMILL_ADDRICEFOOD, _ADDWHEATYIELD, _ADDMAIZEYIELD): a
+            # plot carrying a bonus resource a Farm improves, farmed or not —
+            # worked or the centre
+            _wq = self._res_live() & (self.res_cat == 1) & (self.res_imp == self.FARM)
+            elig = _wq.gather(1, stf).reshape(B, n, M) & take
+            _wh = wm.any(dim=2)
+            tiles_y[:, :, 0] = (tiles_y[:, :, 0] + (elig & _wh.unsqueeze(2)).sum(dim=2).double()
+                                + (_wq.gather(1, ctr) & _wh).double())
+        # CIV6 (Lighthouse, Shipyard, Seaport; `coastPlotYields`): a row's
+        # yields on every Coast/Lake plot of the city, the Shipyard's only
+        # where nothing is built — the PLOT pays it, so only a worked one (or
+        # the centre) materializes.
+        _cp_live = [(bi, y6, un) for bi, y6, un in self._b_coast_plot if bool(lit[:, :, bi].count_nonzero())]
+        if _cp_live and self._coast_plot_terr:
             tw = self.terrain.gather(1, stf).reshape(B, n, M)
             tc = self.terrain.gather(1, ctr)
             wet_w = torch.zeros_like(tw, dtype=torch.bool)
             wet_c = torch.zeros_like(tc, dtype=torch.bool)
-            for _t in self._coast_food_terr:
+            for _t in self._coast_plot_terr:
                 wet_w = wet_w | (tw == _t)
                 wet_c = wet_c | (tc == _t)
-            has_lh = lh.any(dim=2)
-            tiles_y[:, :, 0] = (tiles_y[:, :, 0]
-                                + ((wet_w & take) & has_lh.unsqueeze(2)).sum(dim=2).double()
-                                + (wet_c & has_lh).double())
+            bare_w = self.improvement.gather(1, stf).reshape(B, n, M) < 0
+            bare_c = self.improvement.gather(1, ctr) < 0
+            for _cbi, _cy6, _cun in _cp_live:
+                _has = lit[:, :, _cbi]
+                _qw = wet_w & take & _has.unsqueeze(2)
+                _qc = wet_c & _has
+                if _cun:
+                    _qw = _qw & bare_w
+                    _qc = _qc & bare_c
+                _nq = _qw.sum(dim=2).double() + _qc.double()
+                tiles_y = tiles_y + _nq.unsqueeze(2) * _cy6.double().view(1, 1, 6)
         # CIV6 (Stave Church, Aquarium): "+1 Production / Science to each
         # coastal resource tile in this city" — a Coast tile carrying a
         # resource, worked or the centre, the Lighthouse's way
         # (`buildingCoastYields`). A base row's clause pays every seat.
         for _bi, _civ, _y6 in self._b_coast:
-            sv = bldg[:, :, _bi]
+            sv = lit[:, :, _bi]
             if _civ is not None:
                 _pm = self._row_plays_idx(row, _civ)
                 if not bool(_pm.count_nonzero()):
@@ -6718,7 +6741,7 @@ class SimEconomy:
         # CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): "+1 Science to each Reef
         # tile in this city" — a plot yield, worked or the centre, the same way.
         for _pbi, _pfid, _py6 in self._b_feat_plot:
-            _psv = bldg[:, :, _pbi]
+            _psv = lit[:, :, _pbi]
             if not (_psv.numel() and bool(_psv.count_nonzero())):
                 continue
             _pfw = (self.feat_id.gather(1, stf) == _pfid) & ~self.feat_stripped.gather(1, stf)
@@ -6733,7 +6756,7 @@ class SimEconomy:
             _mpm = self._row_plays_idx(row, _mciv)
             if not bool(_mpm.count_nonzero()):
                 continue
-            _msv = bldg[:, :, _mbi] & _mpm.reshape(-1, *([1] * (bldg.dim() - 2)))
+            _msv = lit[:, :, _mbi] & _mpm.reshape(-1, *([1] * (bldg.dim() - 2)))
             if not (_msv.numel() and bool(_msv.count_nonzero())):
                 continue
             _fw = self.feat_id.gather(1, stf).reshape(B, n, M)
@@ -6745,6 +6768,25 @@ class SimEconomy:
             _nw = (_okw & take & _msv.unsqueeze(2)).sum(dim=2).double()
             _nc = (_okc & _msv).double()
             tiles_y = tiles_y + (_nw + _nc).unsqueeze(2) * _my6.double().view(1, 1, 6)
+        # CIV6 (Forestry Management, FORESTRY_MANAGEMENT_FEATURE_NO_IMPROVEMENT_GOLD):
+        # the city's governor pays Gold on a plot carrying a feature and no
+        # improvement — a PLOT yield, so a worked plot (or the centre).
+        _fg = self._governor_sum(row, "goldPerFeature")[:, sl] if self.n_governors and row < self.n_majors else None
+        if _fg is not None and bool(_fg.count_nonzero()):
+            _uf = self._unimproved_feature()
+            _fnw = (_uf.gather(1, stf).reshape(B, n, M) & take).sum(dim=2).double()
+            _fnc = _uf.gather(1, ctr).double()
+            tiles_y[:, :, 2] = tiles_y[:, :, 2] + _fg * (_fnw + _fnc)
+        # CIV6 (Great Bath, GREATBATH_FLOODFAITH): Faith on a Floodplains plot
+        # per flood that plot has taken — a PLOT yield, worked or the centre.
+        if compw is not None and bool(self._wond_faithflood.count_nonzero()):
+            _ffw = compw.double() @ self._wond_faithflood  # [B, n]
+            if bool(_ffw.count_nonzero()):
+                _ffid = self.feat_id
+                _ffp = (_ffid >= 0) & ~self.feat_stripped & self._fp_feat[_ffid.clamp(min=0)]
+                _ffc = torch.where(_ffp, self.tile_flood_ct, torch.zeros_like(self.tile_flood_ct)).double()
+                _ffn = (_ffc.gather(1, stf).reshape(B, n, M) * takef).sum(dim=2) + _ffc.gather(1, ctr)
+                tiles_y[:, :, 5] = tiles_y[:, :, 5] + _ffw * _ffn
 
         # ================= bucket 2: DISTRICTS ==============================
         # THE DISTRICT REGISTRY IS THE ONE READ, on every seat row: TS walks
@@ -7002,17 +7044,6 @@ class SimEconomy:
             bld_y = bld_y + _wreg_y[:, sl]
         if compw is not None and bool(compw.count_nonzero()):
             bld_y = bld_y + compw.double() @ self._wond_cy
-            # CIV6 (Great Bath): "+1 Faith for every time a tile belonging to
-            # this city has been Flooded."
-            if bool(self._wond_faithflood.count_nonzero()):
-                _ffw = compw.double() @ self._wond_faithflood  # [B, cols]
-                if bool(_ffw.count_nonzero()):
-                    _sl = self.city_slot_at(row)
-                    _fc = torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
-                    _fc.scatter_add_(1, _sl.clamp(min=0),
-                                     torch.where(_sl >= 0, self.tile_flood_ct,
-                                                 torch.zeros_like(self.tile_flood_ct)))
-                    bld_y[:, :, 5] = bld_y[:, :, 5] + _ffw * _fc[:, :bld_y.shape[1]].double()
             # CIV6 (University of Sankore): "+2 Science for every Trade Route
             # to this city. Domestic Trade Routes give an additional +1 Faith
             # to this city."

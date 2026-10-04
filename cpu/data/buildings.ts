@@ -132,11 +132,15 @@ export interface BuildingDef {
   /**
    * WATER_MILL: city center must touch a river.
    * SHIPYARD: production equal to the Harbor's gold adjacency bonus.
-   * LIGHTHOUSE: +1 food on every Coast and Lake tile the city works.
    * MONUMENT: +1 culture while the city sits at maximum loyalty.
    * COAL_PLANT: production equal to the Industrial Zone's own adjacency.
    */
-  special?: 'WATER_MILL' | 'SHIPYARD' | 'LIGHTHOUSE' | 'MONUMENT' | 'COAL_PLANT';
+  special?: 'WATER_MILL' | 'SHIPYARD' | 'MONUMENT' | 'COAL_PLANT';
+  /** CIV6 (MODIFIER_CITY_PLOT_YIELDS_ADJUST_PLOT_YIELD under
+   *  PLOT_HAS_COAST_REQUIREMENTS): yields on every Coast plot of the city —
+   *  the install's TERRAIN_COAST, which is this engine's COAST and LAKE.
+   *  `unimproved` adds REQUIRES_PLOT_HAS_NO_IMPROVEMENT (the Shipyard's). */
+  coastPlotYields?: { yields: Partial<Yields>; unimproved?: boolean };
   /** A power plant's fuel and its published conversion rate (Power per unit
    *  of the resource burned). */
   fuel?: string;
@@ -659,11 +663,12 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
 
   // CIV6: the install writes the Lighthouse NO Building_YieldChanges row at
   // all. Its Food is the LIGHTHOUSE_COAST_FOOD plot modifier (YIELD_FOOD
-  // Amount 1 under PLOT_HAS_COAST_REQUIREMENTS) — the `special` below, paid
-  // per WORKED Coast/Lake tile in city.ts, so the row itself carries no flat
-  // yield.
-  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, housing: 1, coastalHousing: 2, special: 'LIGHTHOUSE', maintenance: 0,
+  // Amount 1 under PLOT_HAS_COAST_REQUIREMENTS) — `coastPlotYields`, so the
+  // row itself carries no flat yield.
+  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, housing: 1, coastalHousing: 2, maintenance: 0,
+    coastPlotYields: { yields: { food: 1 } },
     src: {
+      'coastPlotYields.yields.food': xml('ModifierArguments', 'ModifierId=LIGHTHOUSE_COAST_FOOD&Name=Amount', 'Value'),
       coastalHousing: xml('ModifierArguments', 'ModifierId=LIGHTHOUSE_COASTAL_CITY_HOUSING&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
@@ -676,7 +681,9 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
     },
   },
   { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER'],
+    coastPlotYields: { yields: { production: 1 }, unimproved: true },
     src: {
+      'coastPlotYields.yields.production': xml('ModifierArguments', 'ModifierId=SHIPYARD_UNIMPROVED_COAST_PRODUCTION&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_SHIPYARD', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_SHIPYARD', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_SHIPYARD', 'Maintenance'),
@@ -686,7 +693,9 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
     },
   },
   { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 440, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, housing: 1, maintenance: 0, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER'],
+    coastPlotYields: { yields: { gold: 2 } },
     src: {
+      'coastPlotYields.yields.gold': xml('ModifierArguments', 'ModifierId=SEAPORT_COAST_GOLD&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_SEAPORT', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_SEAPORT', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_SEAPORT', 'Maintenance'),

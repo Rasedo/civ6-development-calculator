@@ -173,9 +173,12 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
         if (rule.category === cat) addYields(out, rule.yields);
       }
     }
-    if (imp === 'FARM' && ctx.mods.farmAdjTier > 0) {
+    // CIV6 (Farms_MedievalAdjacency TilesRequired 2, Farms_MechanizedAdjacency
+    // TilesRequired 1): Food per whole group of adjacent Farms
+    const fa = ctx.mods.farmAdj;
+    if (imp === 'FARM' && fa) {
       const adjFarms = neighbors(ctx.map, tile).filter((n) => n.improvement === 'FARM').length;
-      if (adjFarms >= 2) out.food += ctx.mods.farmAdjTier;
+      out.food += fa.food * Math.floor(adjFarms / fa.per);
     }
     addYields(out, improvementAdjacency(ctx, tile, imp));
     const idef = IMPROVEMENTS[imp];

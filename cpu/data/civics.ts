@@ -132,6 +132,8 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_FEUDALISM', 'EraType', { expect: 'ERA_MEDIEVAL' }),
     cost: xml('Civics', 'CivicType=CIVIC_FEUDALISM', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_FEUDALISM&PrereqCivic=CIVIC_DEFENSIVE_TACTICS', 'PrereqCivic', { expect: 'CIVIC_DEFENSIVE_TACTICS' }),
+    'effects.0.per': xml('Adjacency_YieldChanges', 'ID=Farms_MedievalAdjacency', 'TilesRequired'),
+    'effects.0.food': xml('Adjacency_YieldChanges', 'ID=Farms_MedievalAdjacency', 'YieldChange'),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_FEUDAL_CONTRACT', 'PrereqCivic', { expect: 'CIVIC_FEUDALISM' }),
     'effects.2.policy': xml('Policies', 'PolicyType=POLICY_SERFDOM', 'PrereqCivic', { expect: 'CIVIC_FEUDALISM' }),
     'effects.3.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_PLANTATION&YieldType=YIELD_FOOD&PrereqCivic=CIVIC_FEUDALISM', 'ImprovementType', { expect: 'IMPROVEMENT_PLANTATION' }),
@@ -548,7 +550,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
 
     C('FEUDALISM', 'Feudalism', 'Medieval', 300, ['DEFENSIVE_TACTICS'], [
-      { kind: 'farmAdjacency' },
+      { kind: 'farmAdjacency', per: 2, food: 1 },
       { kind: 'unlockPolicy', policy: 'FEUDAL_CONTRACT' },
       { kind: 'unlockPolicy', policy: 'SERFDOM' },
       // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 224)

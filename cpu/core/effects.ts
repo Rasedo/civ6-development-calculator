@@ -177,7 +177,10 @@ export function availableCivics(state: GameState, seat: number): CivicDef[] {
 
 export interface Modifiers {
   improvementYields: Partial<Record<ImprovementId, Partial<Yields>>>;
-  farmAdjTier: number;
+  /** CIV6 (Farms_MedievalAdjacency, Farms_MechanizedAdjacency): a Farm's Food
+   *  per `per` adjacent Farms — the row the seat's research holds, the
+   *  Mechanized one obsoleting the Medieval. Null before either. */
+  farmAdj: { per: number; food: number } | null;
   /** the civics a suzerain improvement's adjacency rule may name. */
   impUpgrades: Set<string>;
   /** the TECHS the same rules may name (`upgradeTech`, `researchYields`).
@@ -596,7 +599,7 @@ export function defaultModifiers(): Modifiers {
     spyPromos: 0,
     cultureBombs: [],
     districtUnits: [],
-    farmAdjTier: 0,
+    farmAdj: null,
     impUpgrades: new Set<string>(),
     impUpgradeTechs: new Set<string>(),
     hillFarms: false,
@@ -835,7 +838,7 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
       const cur = (mods.improvementYields[fx.improvement] ??= {});
       addPartial(cur, fx.yields);
     } else if (fx.kind === 'farmAdjacency') {
-      mods.farmAdjTier += 1;
+      if (!mods.farmAdj || fx.per < mods.farmAdj.per) mods.farmAdj = { per: fx.per, food: fx.food };
     } else if (fx.kind === 'hillFarms') {
       mods.hillFarms = true;
     }

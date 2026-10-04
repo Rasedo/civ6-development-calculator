@@ -86,10 +86,10 @@ describe('the Stave Church (Norway, replaces the Temple)', () => {
     for (const t of neighbors(state.map, center)) t.resource = 'FISH';
     city.buildings.push('SHRINE', 'TEMPLE');
     city.population = 3;
-    expect(buildingCoastYields(state, city)).toBeNull();
+    expect(buildingCoastYields(state, city.seat, city.buildings)).toBeNull();
     const before = computeCityStats(state, city);
     state.seats[0].civ = 2;
-    expect(buildingCoastYields(state, city)).toEqual({ production: 1 });
+    expect(buildingCoastYields(state, city.seat, city.buildings)).toEqual({ production: 1 });
     const after = computeCityStats(state, city);
     const paid = after.workedTiles.filter((i) => state.map.tiles[i].terrain === 'COAST' && state.map.tiles[i].resource !== null).length;
     expect(paid).toBeGreaterThan(0);

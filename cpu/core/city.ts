@@ -31,7 +31,7 @@ import { suzerainEffect, minorCity, minorLuxuries, suzerainMinorSeats } from './
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
-import { FEATURES } from '../../world/features';
+import { FEATURES, isFloodplains } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
@@ -321,12 +321,12 @@ export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
 }
 
 /** CIV6 (Marae): the yields a civilization's unique building pays on every
- *  tile of the city carrying a PASSABLE feature, summed over the buildings the
- *  city holds. A natural wonder is a feature, so a passable one is paid. */
-function buildingVariantFeatureYields(state: GameState, city: City): Partial<Yields> | null {
+ *  tile of the city carrying a PASSABLE feature, summed over the buildings
+ *  given. A natural wonder is a feature, so a passable one is paid. */
+function buildingVariantFeatureYields(state: GameState, seat: number, buildings: readonly string[]): Partial<Yields> | null {
   let out: Partial<Yields> | null = null;
-  const civ = civOf(state, city.seat);
-  for (const id of city.buildings) {
+  const civ = civOf(state, seat);
+  for (const id of buildings) {
     const y = buildingVariantFor(civ, id)?.featureTileYields;
     if (!y) continue;
     out = out ?? {};
@@ -336,19 +336,122 @@ function buildingVariantFeatureYields(state: GameState, city: City): Partial<Yie
 }
 
 /** CIV6 (STAVE_CHURCH_SEA_RESOURCE_REQUIREMENTS — the Stave Church's
- *  production, the Aquarium's science): the yields the city's buildings pay
+ *  production, the Aquarium's science): the yields the buildings given pay
  *  on every Coast tile of the city carrying a resource its owner can see,
  *  summed over a base row's clause and a unique row's. */
-export function buildingCoastYields(state: GameState, city: City): Partial<Yields> | null {
+export function buildingCoastYields(state: GameState, seat: number, buildings: readonly string[]): Partial<Yields> | null {
   let out: Partial<Yields> | null = null;
-  for (const id of city.buildings) {
-    for (const y of [BUILDINGS[id]?.coastResourceYields, civVariantOf(state, city.seat, BUILDINGS[id]?.civVariants)?.coastResourceYields]) {
+  for (const id of buildings) {
+    for (const y of [BUILDINGS[id]?.coastResourceYields, civVariantOf(state, seat, BUILDINGS[id]?.civVariants)?.coastResourceYields]) {
       if (!y) continue;
       out = out ?? {};
       for (const k of Object.keys(y) as (keyof Yields)[]) out[k] = (out[k] ?? 0) + (y[k] ?? 0);
     }
   }
   return out;
+}
+
+/**
+ * THE CITY'S PLOT YIELDS (COLLECTION_CITY_PLOT_YIELDS): what the city's own
+ * buildings and wonders pay on a plot of the city, on top of `tileYields`.
+ * The walk adds it for the centre and each worked plot, after the pick — the
+ * tile score ranks without it.
+ *
+ * - a wonder naming a TERRAIN or FEATURE pays on the city's own tiles;
+ *   `empire` widens the payer to every city the seat holds (Etemenanki's
+ *   Marsh). The centre counts and a districted tile does not.
+ * - CIV6 (Great Bath, GREATBATH_FLOODFAITH): Faith on a Floodplains plot per
+ *   flood that plot has taken — the recorded games read it on the city's
+ *   Floodplains plots alone, each with its own river's count.
+ *
+ * The building rows below pay only from a building that stands lit
+ * (`darkBuildings`): a pillaged Lighthouse feeds no Coast plot.
+ * - CIV6 (Water Mill; WATERMILL_ADDRICEFOOD, _ADDWHEATYIELD, _ADDMAIZEYIELD):
+ *   +1 Food on a plot carrying a bonus resource a Farm improves (Rice, Wheat,
+ *   Maize), farmed or not.
+ * - CIV6 (Lighthouse, Shipyard, Seaport; `coastPlotYields`): yields on every
+ *   Coast plot, the Shipyard's only where nothing is built.
+ * - CIV6 (Stave Church, Aquarium; REQUIRES_PLOT_HAS_VISIBLE_RESOURCE): a Coast
+ *   tile carrying a resource the city's owner can SEE.
+ * - CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): every tile of one feature.
+ * - CIV6 (Marae): every tile with a passable feature or natural wonder.
+ * - CIV6 (Forestry Management, FORESTRY_MANAGEMENT_FEATURE_NO_IMPROVEMENT_GOLD
+ *   under PLOT_HAS_ANY_FEATURE_NO_IMPROVEMENTS): the city's governor pays a
+ *   plot that carries a feature and no improvement.
+ *
+ * A plot under an impassable feature (Ice) yields nothing, so none of these
+ * reach it.
+ */
+export function cityPlotBonus(state: GameState, city: City): (t: Tile, isCenter: boolean, out: Yields) => void {
+  const tileRules: NonNullable<NonNullable<BuiltWonderDef['effects']>['tileYields']> = [];
+  let faithPerFlood = 0;
+  for (const w of completedWonders(state, city)) {
+    for (const r of w.def.effects?.tileYields ?? []) tileRules.push(r);
+    faithPerFlood += w.def.effects?.faithPerFlood ?? 0;
+  }
+  for (const c of citiesOf(state, city.seat)) {
+    if (c.id === city.id) continue;
+    for (const w of completedWonders(state, c)) {
+      for (const r of w.def.effects?.tileYields ?? []) if (r.empire) tileRules.push(r);
+    }
+  }
+  const dark = darkBuildings(state.map, city);
+  const lit = city.buildings.filter((id) => !dark.has(id));
+  const hasWaterMill = lit.includes('WATER_MILL');
+  const coastRows = lit.flatMap((id) => BUILDINGS[id]?.coastPlotYields ?? []);
+  const coastResY = buildingCoastYields(state, city.seat, lit);
+  const featPlotY = lit.flatMap((id) => BUILDINGS[id]?.plotFeatureYields ?? []);
+  const hiddenRes = hiddenResourcesFor(state, city.seat);
+  const featTileY = buildingVariantFeatureYields(state, city.seat, lit);
+  const goldPerFeature = governorSum(state, city, (e) => e.goldPerFeature);
+  return (t, isCenter, out) => {
+    if (t.feature !== null && FEATURES[t.feature]?.impassable) return;
+    if (tileRules.length && !(t.district && !isCenter)) {
+      for (const r of tileRules) {
+        if (r.terrain && t.terrain !== r.terrain) continue;
+        if (r.feature && t.feature !== r.feature) continue;
+        if (r.excludeFeature && t.feature === r.excludeFeature) continue;
+        addYields(out, r.yields);
+      }
+    }
+    if (faithPerFlood && isFloodplains(t.feature)) out.faith += faithPerFlood * (t.floodCount ?? 0);
+    if (hasWaterMill && t.resource) {
+      const r = RESOURCES[t.resource];
+      if (r?.category === 'bonus' && r.improvement === 'FARM') out.food += 1;
+    }
+    if (t.terrain === 'COAST' || t.terrain === 'LAKE') {
+      for (const r of coastRows) if (!r.unimproved || t.improvement === null) addYields(out, r.yields);
+    }
+    if (coastResY && t.terrain === 'COAST' && t.resource !== null && !hiddenRes.has(t.resource)) addYields(out, coastResY);
+    for (const f of featPlotY) if (t.feature === f.feature) addYields(out, f.yields);
+    if (featTileY && t.feature !== null) addYields(out, featTileY);
+    if (goldPerFeature && t.feature !== null && t.improvement === null) out.gold += goldPerFeature;
+  };
+}
+
+/** What the city's centre plot yields: `tileYieldsForCenter`, the
+ *  roster's centre rows per adjacent tile of the named terrain (CIV6,
+ *  EFFECT_TERRAIN_ADJACENCY, `CENTER_ADJ_ROWS`), and the city's plot yields
+ *  (`cityPlotBonus`). */
+export function cityCentreYields(
+  state: GameState, city: City, ctx: YieldCtx = cityYieldCtx(state, city),
+  plotBonus = cityPlotBonus(state, city),
+): Yields {
+  const center = state.map.tiles[city.centerIndex];
+  const out = tileYieldsForCenter(ctx, center);
+  for (const r of ctx.mods.centerAdj) {
+    out[r.yield] += r.amount * neighbors(state.map, center).filter((n) => n.terrain === r.terrain).length;
+  }
+  plotBonus(center, true, out);
+  return out;
+}
+
+/** The yield context the city's walk reads its plots on: the seat's
+ *  modifiers with the city's followed religion's beliefs and its governor. */
+export function cityYieldCtx(state: GameState, city: City, mods?: Modifiers): YieldCtx {
+  const base = mods ?? getModifiers(state, city.seat);
+  return makeYieldCtx(state, city.seat, withGovernor(state,
+    withFollowerBelief(state, base, followerReligionsForCity(base, city)), city));
 }
 
 export function computeHousing(state: GameState, city: City, mods?: Modifiers): number {
@@ -1254,20 +1357,7 @@ export function computeCityStats(
     withFollowerBelief(state, base, followerReligionsForCity(base, city)), city);
   const ctx = makeYieldCtx(state, city.seat, m);
   const map = state.map;
-  const center = map.tiles[city.centerIndex];
   const wonders = completedWonders(state, city);
-  // CIV6: a wonder that names a TERRAIN or FEATURE pays its yields on the
-  // city's own tiles; `empire` widens the payer to every city the seat holds
-  // (Etemenanki's Marsh). The centre counts — it is a worked tile — and a
-  // districted tile does not, since its terrain yields are dark anyway.
-  const tileRules: NonNullable<NonNullable<BuiltWonderDef['effects']>['tileYields']> = [];
-  for (const w of wonders) for (const r of w.def.effects?.tileYields ?? []) tileRules.push(r);
-  for (const c of citiesOf(state, city.seat)) {
-    if (c.id === city.id) continue;
-    for (const w of completedWonders(state, c)) {
-      for (const r of w.def.effects?.tileYields ?? []) if (r.empire) tileRules.push(r);
-    }
-  }
 
   const specialists = effectiveSpecialists(state, city);
   let specialistTotal = 0;
@@ -1281,61 +1371,11 @@ export function computeCityStats(
   if (record) city.workedTiles = worked;
 
   const tiles = emptyYields();
-  addYields(tiles, tileYieldsForCenter(ctx, center));
-  // CIV6 (EFFECT_TERRAIN_ADJACENCY): the roster's centre rows, per adjacent
-  // tile of the named terrain (`CENTER_ADJ_ROWS`)
-  for (const r of ctx.mods.centerAdj) {
-    tiles[r.yield] += r.amount * neighbors(state.map, center).filter((n) => n.terrain === r.terrain).length;
-  }
-  const wonderTileBonus = (t: Tile, isCenter: boolean) => {
-    if (!tileRules.length || (t.district && !isCenter)) return;
-    for (const r of tileRules) {
-      if (r.terrain && t.terrain !== r.terrain) continue;
-      if (r.feature && t.feature !== r.feature) continue;
-      if (r.excludeFeature && t.feature === r.excludeFeature) continue;
-      addYields(tiles, r.yields);
-    }
-  };
-  const hasWaterMill = city.buildings.includes('WATER_MILL');
-  const waterMillBonus = (t: Tile) => {
-    if (!hasWaterMill || t.improvement !== 'FARM' || !t.resource) return;
-    const r = RESOURCES[t.resource];
-    if (r?.category === 'bonus' && r.improvement === 'FARM') tiles.food += 1;
-  };
-  // CIV6 (Lighthouse): "+1 Food in Coast and Lake tiles controlled by the
-  // city" — the tile pays it, so only a WORKED one materializes.
-  const hasLighthouse = city.buildings.includes('LIGHTHOUSE');
-  const lighthouseBonus = (t: Tile) => {
-    if (hasLighthouse && (t.terrain === 'COAST' || t.terrain === 'LAKE')) tiles.food += 1;
-    // CIV6 (Stave Church, Aquarium; REQUIRES_PLOT_HAS_VISIBLE_RESOURCE): "+1
-    // Production / Science to each coastal resource tile in this city" — a
-    // Coast tile carrying a resource the city's owner can SEE, the same way.
-    if (coastResY && t.terrain === 'COAST' && t.resource !== null && !hiddenRes.has(t.resource)) addYields(tiles, coastResY);
-    // CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): "+1 Science to each Reef
-    // tile in this city" — a plot yield, the same way.
-    for (const f of featPlotY) if (t.feature === f.feature) addYields(tiles, f.yields);
-  };
-  const coastResY = buildingCoastYields(state, city);
-  const featPlotY = city.buildings.flatMap((id) => BUILDINGS[id]?.plotFeatureYields ?? []);
-  const hiddenRes = hiddenResourcesFor(state, city.seat);
-  // CIV6 (Marae): "+1 Culture and Faith to all of this city's tiles with a
-  // passable feature or natural wonder" — a plot yield, so only a WORKED tile
-  // materializes it, exactly as the Lighthouse's Food does.
-  const featTileY = buildingVariantFeatureYields(state, city);
-  const featureTileBonus = (t: Tile) => {
-    if (!featTileY || t.feature === null || FEATURES[t.feature]?.impassable) return;
-    addYields(tiles, featTileY);
-  };
-  wonderTileBonus(center, true);
-  waterMillBonus(center);
-  lighthouseBonus(center);
-  featureTileBonus(center);
+  const plotBonus = cityPlotBonus(state, city);
+  addYields(tiles, cityCentreYields(state, city, ctx, plotBonus));
   for (const i of worked) {
     addYields(tiles, tileYields(ctx, map.tiles[i]));
-    wonderTileBonus(map.tiles[i], false);
-    waterMillBonus(map.tiles[i]);
-    lighthouseBonus(map.tiles[i]);
-    featureTileBonus(map.tiles[i]);
+    plotBonus(map.tiles[i], false, tiles);
   }
 
   const districts = cityDistrictYields(ctx, city);
@@ -1382,13 +1422,6 @@ export function computeCityStats(
   }
   for (const w of wonders) {
     if (w.def.cityYields && !w.def.effects?.regionalRange) addYields(buildings, w.def.cityYields);
-    // CIV6 (Great Bath): "+1 Faith for every time a tile belonging to this
-    // city has been Flooded."
-    if (w.def.effects?.faithPerFlood) {
-      let floods = 0;
-      for (const t of state.map.tiles) if (tileBelongsTo(t, city)) floods += t.floodCount ?? 0;
-      buildings.faith += w.def.effects.faithPerFlood * floods;
-    }
     // CIV6 (Ruhr Valley): "+1 Production for each Mine and Quarry in this
     // city" — the improvements on the tiles this city OWNS, a pillaged one
     // producing nothing.
@@ -1467,16 +1500,6 @@ export function computeCityStats(
   for (const k of Object.keys(m.yieldPerSpecialty) as YieldKey[]) {
     const n = m.yieldPerSpecialty[k] ?? 0;
     if (n) bonuses[k] += n * completedDistrictCount(state, city, true);
-  }
-  // CIV6 (Forestry Management): "This city receives +2 Gold for each
-  // unimproved feature" — the tiles this city OWNS that still carry one.
-  const perFeature = governorSum(state, city, (e) => e.goldPerFeature);
-  if (perFeature) {
-    let n = 0;
-    for (const t of map.tiles) {
-      if (tileBelongsTo(t, city) && t.feature && !t.improvement) n += 1;
-    }
-    bonuses.gold += perFeature * n;
   }
   // CIV6 (Land Acquisition): "+3 Gold per turn from each foreign Trade
   // Route passing through the city" — a foreign route whose stored course

@@ -429,6 +429,15 @@ for (const [id, def] of Object.entries(BOOSTS)) {
   if (row) boostRows.push({ target, idx, ...row });
 }
 
+/** [research index, per, food] — the one row of a research list carrying a
+ *  `farmAdjacency` effect, [-1, 0, 0] where none does. */
+const farmAdjRow = (rows: readonly { effects?: readonly ResearchEffect[] }[]): [number, number, number] => {
+  for (let i = 0; i < rows.length; i++) {
+    for (const e of rows[i].effects ?? []) if (e.kind === 'farmAdjacency') return [i, e.per, e.food];
+  }
+  return [-1, 0, 0];
+};
+
 /** [row, improvement, yield] — what each research row adds to an
  *  improvement's own yields, the `improvementYields` effect summed. */
 const researchImpYields = (rows: readonly { effects: readonly ResearchEffect[] }[]) =>
@@ -905,8 +914,8 @@ export function buildRules() {
       // The Deforestation Treaty's target space, as FEATURE-CATALOG indices:
       // a target `k` on the wire is the tile feature `congressFeatures[k]`.
       congressFeatures: clearableFeatures().map((f) => featIdx.get(f) ?? -1),
-      // the terrains the Lighthouse pays its food on, as TERRAIN_IDS indices
-      coastFoodTerrains: ['COAST', 'LAKE'].map((t) => TERRAIN_IDS.indexOf(t)),
+      // the terrains a `coastPlotYields` row pays on, as TERRAIN_IDS indices
+      coastPlotTerrains: ['COAST', 'LAKE'].map((t) => TERRAIN_IDS.indexOf(t)),
       congressDvMinEra: CONGRESS_DV_MIN_ERA, congressDvDelta: CONGRESS_DV_DELTA, congressVoteStep: CONGRESS_VOTE_STEP, congressProdMult: CONGRESS_PROD_MULT, congressGppMult: CONGRESS_GPP_MULT, congressGrowthA: CONGRESS_GROWTH_A, congressGrowthB: CONGRESS_GROWTH_B, congressMigLoyalty: CONGRESS_MIG_LOYALTY, congressGwMult: CONGRESS_GW_MULT, congressPlus100: CONGRESS_PLUS_100, congressMinus50: CONGRESS_MINUS_50, congressTradeGold: CONGRESS_TRADE_GOLD, congressTradeCapacity: CONGRESS_TRADE_CAPACITY, congressPolicyFavor: CONGRESS_POLICY_FAVOR, congressIdeologySlots: CONGRESS_IDEOLOGY_SLOTS, congressEnergyDiscount: CONGRESS_ENERGY_DISCOUNT, congressPrMultA: CONGRESS_PR_MULT_A, congressPrMultB: CONGRESS_PR_MULT_B, congressAdvisoryCs: CONGRESS_ADVISORY_CS, congressPactLevels: CONGRESS_PACT_LEVELS, visibilityMax: VISIBILITY_MAX, visibilityCsPerLevel: VISIBILITY_CS_PER_LEVEL, visibilityTech: Object.keys(TECHS).indexOf(VISIBILITY_TECH), delegationCost: DELEGATION_COST, embassyCost: EMBASSY_COST, embassyCivic: civicIdx.get(EMBASSY_CIVIC) ?? -1, dealItems: DEAL_ITEMS, dealTurns: DEAL_TURNS, dealOfferTurns: DEAL_OFFER_TURNS, promises: PROMISES.map((p) => [p.favorCost, p.refusal, p.incursion]), promiseTurns: PROMISE_TURNS, promiseBrokenGrievance: PROMISE_BROKEN_GRIEVANCE, promiseBrokenMult: PROMISE_BROKEN_MULT, settlePromiseReach: SETTLE_PROMISE_REACH, retributionTurns: RETRIBUTION_TURNS,competitionTurns: COMPETITION_TURNS, competitionSilverPct: COMPETITION_SILVER_PCT, competitionBronzePct: COMPETITION_BRONZE_PCT, competitions: COMPETITIONS.map((c) => ({ id: c.id, triggered: c.triggered ? 1 : 0, scored: c.scored.map((r) => scoreRow(r)), gold: c.goldPoints, silver: c.silverFavor, bronze: c.bronzeFavor, goldGpp: c.goldGpp ?? 0, silverBoosts: c.silverBoosts ?? 0, bronzeBoosts: c.bronzeBoosts ?? 0, boostLo: c.boostEras ? ERAS.indexOf(c.boostEras[0] as Era) : -1, boostHi: c.boostEras ? ERAS.indexOf(c.boostEras[1] as Era) : -1, goldPerm: GP_PERM.map((k) => c.goldPerm?.[k] ?? 0), silverPerm: GP_PERM.map((k) => c.silverPerm?.[k] ?? 0), bronzePerm: GP_PERM.map((k) => c.bronzePerm?.[k] ?? 0) })), dealItemKinds: [...DEAL_ITEM_KINDS], dealPermanent: [...DEAL_PERMANENT], congressWorldReligionRs: CONGRESS_WORLD_RELIGION_RS, congressWorldReligionFavor: CONGRESS_WORLD_RELIGION_FAVOR, cultureBombRange: CULTURE_BOMB_RANGE, favorOccupiedCapital: FAVOR_OCCUPIED_CAPITAL, preserveHousing: PRESERVE_APPEAL_HOUSING,
       // EMERGENCIES: the catalog (id + the turn limit) and every magnitude
       emergencies: EMERGENCIES.map((e) => ({ id: e.id, turns: e.turns })),
@@ -2465,8 +2474,9 @@ export function buildRules() {
       // already names for itself.
       engineerFinishFraction: ENGINEER_FINISH_FRACTION,
       hillFarmsCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'hillFarms')),
-      farmAdjCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'farmAdjacency')),
-      farmAdjTech: techList.findIndex((t) => (t.effects ?? []).some((e) => e.kind === 'farmAdjacency')),
+      // the two Farm adjacency rows: [research index, per, food]
+      farmAdjCivic: farmAdjRow(civicList),
+      farmAdjTech: farmAdjRow(techList),
       mineUnlockTech: techList.findIndex((t) =>
         t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'MINE'),
       ),
@@ -2638,7 +2648,9 @@ export function buildRules() {
       maintenance: b.maintenance,
       river: b.special === 'WATER_MILL',
       farmBonusFood: b.special === 'WATER_MILL',
-      coastFood: b.special === 'LIGHTHOUSE',
+      // the row's Coast plot clause (`coastPlotYields`)
+      coastPlotY: YIELD_KEYS.map((k) => b.coastPlotYields?.yields[k] ?? 0),
+      coastPlotUnimproved: b.coastPlotYields?.unimproved ? 1 : 0,
       cultureAtMaxLoyalty: b.special === 'MONUMENT',
       loyalty: b.loyalty ?? 0,
       unlockTech: buildingUnlockTech.get(b.id) ?? -1,

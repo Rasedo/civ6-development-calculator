@@ -25,18 +25,19 @@
  * `gaps` lists the importer's roster gaps that touch the subject, so the
  * report can separate a clean failure from one an unimported row explains.
  */
-import type { City, GameState, Tile } from '../core/types';
-import { borderBestPlots, computeCityStats, tileYieldsForCenter, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
+import type { City, CityState, GameState } from '../core/types';
+import { borderBestPlots, cityCentreYields, cityPlotBonus, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
+import { minorCity } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
 import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { monumentalityBuyMult } from '../core/eras';
-import { FREE_SEAT, hiddenResourcesFor, seatOf } from '../core/seats';
+import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf } from '../core/seats';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
 import { LOYALTY_MAX } from '../data/seats';
 import { UNITS } from '../data/units';
@@ -96,25 +97,6 @@ function cityGaps(imp: Imported, c: DumpCity): string[] {
   }
   for (const q of c.plots) for (const x of imp.tileGaps.get(q) ?? []) out.push(`plot ${q} ${x}`);
   return [...new Set(out)];
-}
-
-/**
- * What the city's own walk pays for one plot: the city worked by one citizen
- * pinned to the plot, less the city worked by none (the centre alone), in
- * the walk's `tiles` column. Null where the walk will not work the plot.
- * The plots' pins are restored after.
- */
-function cityPlotYields(state: GameState, city: City, t: Tile): number[] | null {
-  const pins = state.map.tiles.filter((x) => x.ownerSeat === city.seat && x.ownerCity === city.id)
-    .map((x) => [x, x.locked] as const);
-  for (const [x] of pins) x.locked = undefined;
-  t.locked = true;
-  const solo = { ...city, population: 1, specialistPref: undefined };
-  const one = computeCityStats(state, solo);
-  const none = computeCityStats(state, { ...solo, population: 0 });
-  for (const [x, l] of pins) x.locked = l;
-  if (!one.workedTiles.includes(t.index)) return null;
-  return YIELD_KEYS.map((k) => round3(one.breakdown.tiles[k] - none.breakdown.tiles[k]));
 }
 
 /** the checks no plot of the city's feeds: a dropped row on one of its plots,
@@ -178,17 +160,21 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       ctx = ctxBySeat.get(t.ownerSeat)!;
     }
     const subject = `plot ${t.index} (${t.col},${t.row})`;
-    let oy = YIELD_KEYS.map((k) => tileYields(ctx, t)[k]);
-    let ok = oy.every((v, i) => near(v, gy[i]));
-    // a building or wonder of the owning city may pay this plot (the
-    // Lighthouse's Food, the Water Mill's): the engine pays those in the
-    // city's walk, so the plot is read there, worked alone
-    const owner = !ok && t.ownerCity >= 0 ? state.seats[t.ownerSeat]?.cities.find((c) => c.id === t.ownerCity) : undefined;
-    const walked = owner ? cityPlotYields(state, owner, t) : null;
-    if (walked) {
-      oy = walked;
-      ok = oy.every((v, i) => near(v, gy[i]));
+    // a plot of a city reads on the city's own context, with what the city's
+    // buildings and wonders pay it (the Lighthouse's Food, the Water Mill's);
+    // a city-state's ground is its one city's
+    const minor = isCityStateSeat(t.ownerSeat) ? seatOf(state, t.ownerSeat) as CityState | undefined : undefined;
+    const owner = minor ? minorCity(minor)
+      : t.ownerCity >= 0 ? state.seats[t.ownerSeat]?.cities.find((c) => c.id === t.ownerCity) : undefined;
+    let y = tileYields(ctx, t);
+    if (owner) {
+      y = tileYields(cityYieldCtx(state, owner), t);
+      cityPlotBonus(state, owner)(t, false, y);
     }
+    const oy = YIELD_KEYS.map((k) => round3(y[k]));
+    // a column the importer read back from this very record is no test
+    const back = imp.readBack.get(t.index);
+    const ok = oy.every((v, i) => back?.has(i) || near(v, gy[i]));
     const pg = ok ? [] : plotGaps(imp, t);
     out.push({
       turn, check: 'plot.yields', subject, ok, game: gy, ours: oy, ...(pg.length ? { gaps: pg } : {}),
@@ -214,9 +200,10 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     };
     push('city.yields', oy.every((v, i) => near(v, gy[i], 0.05)), gy, oy, cityState);
     const centre = plotAt(rec, city.centerIndex)[P.yields] as number[];
-    const oc = tileYieldsForCenter(makeYieldCtx(state, city.seat), state.map.tiles[city.centerIndex]);
+    const oc = cityCentreYields(state, city);
     const occ = YIELD_KEYS.map((k) => oc[k]);
-    push('city.centreYields', occ.every((v, i) => near(v, centre[i])), centre, occ);
+    const back = imp.readBack.get(city.centerIndex);
+    push('city.centreYields', occ.every((v, i) => back?.has(i) || near(v, centre[i])), centre, occ);
     push('city.housing', near(stats.housing, num(c.housing)), num(c.housing), stats.housing,
       { parts: c.housingParts, pop: city.population });
     push('city.amenities', stats.amenities.have === num(c.amenities) && stats.amenities.needed === num(c.amenitiesNeeded),

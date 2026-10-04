@@ -26,11 +26,12 @@
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
-import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, TerrainId, Tile, Unit } from '../core/types';
+import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, TerrainId, Tile, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, seatOfCityState, setTileOwner, setWar } from '../core/seats';
-import { luxuryHoldings } from '../core/city';
+import { BARB_SEAT, FREE_SEAT, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
+import { cityCentreYields, cityPlotBonus, cityYieldCtx, luxuryHoldings } from '../core/city';
+import { tileYields } from '../core/yields';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
 import { FERTILITY_CAP } from '../core/disasters';
@@ -49,10 +50,11 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP
 import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES } from '../data/cityStates';
 import { PROMO_CLASSES } from '../data/promotions';
-import { FEATURES, clearableFeatures } from '../../world/features';
+import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { hexDistance, neighborTile } from '../../world/hex';
-import { GP_CITY_PERM, GP_CLASSES, GREAT_PEOPLE, gpEffectOf } from '../data/greatPeople';
+import { YIELD_KEYS } from '../../world/types';
+import { GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_RESOURCE_REVEAL, GREAT_PEOPLE, gpEffectOf } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
   GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
@@ -106,6 +108,11 @@ export interface Imported {
   /** does the record carry the queues' banked production (`queueProgress`)?
    *  Where it does not, every imported queue item stands at 0 */
   queueProgressRead: boolean;
+  /** the yield columns (YIELD_KEYS order) of each plot the importer read
+   *  back from the record to set hidden state — a Great Bath plot's Faith
+   *  gives its flood count (`importFloodCounts`). A read-back column cannot
+   *  disagree, so the plot checks leave it out */
+  readBack: Map<number, Set<number>>;
 }
 
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
@@ -338,6 +345,11 @@ export interface History {
   /** Great People each player has spent, by class: a Great Person unit of
    *  the player's at t gone at t+1 */
   gpSpent: Map<number, Map<GreatPersonClass, number>>;
+  /** the resources each player SEES ahead of their revealing technology
+   *  (`GP_RESOURCE_REVEAL`, James Young's Oil): the record names no Great
+   *  Person, but a plot the player reads paying the resource's yield without
+   *  the technology is the grant, latched */
+  revealed: Map<number, Set<string>>;
   /** centre plots of cities already standing at the first record past turn 1 */
   unknownSince: Set<number>;
   /** a fire's fertility by plot: +1 Food when it turns burnt, +1 Production
@@ -406,7 +418,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(),
+  return { firstTurn: -1, last: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
 }
@@ -445,6 +457,30 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     const def = id ? UNITS[id] : undefined;
     return def && def.combat > 0 && unitDomain(id!) === 'military' ? def.combat + (FORMATION_CS[formation] ?? 0) : 0;
   };
+  // a resource a player reads paying its yield without the revealing
+  // technology: the grant (`GP_RESOURCE_REVEAL`). An unowned plot is the
+  // local player's reading.
+  const newlyRevealed = new Map<number, Set<string>>();
+  for (const { resource } of GP_RESOURCE_REVEAL) {
+    const def = RESOURCES[resource];
+    const ri = cat.resources.indexOf(`RESOURCE_${resource}`);
+    const tech = cat.techs.indexOf(`TECH_${def?.revealTech}`);
+    if (!def || ri < 0 || tech < 0) continue;
+    for (let i = 0; i < W * rec.head.H; i++) {
+      const p = plotAt(rec, i);
+      if (p[P.resource] !== ri || (p[P.improvement] as number) >= 0) continue;
+      const y = p[P.yields] as number[];
+      if (!Array.isArray(y) || YIELD_KEYS.some((k, j) => (def.yields[k] ?? 0) > 0 && y[j] < (def.yields[k] ?? 0))) continue;
+      const owner = p[P.owner] as number;
+      const pid = owner >= 0 ? owner : num(rec.head.localPlayer);
+      const pl = rec.players.find((q) => q.id === pid);
+      if (!pl || (pl.techs ?? '')[tech] === '1' || h.revealed.get(pid)?.has(resource)) continue;
+      if (!h.revealed.has(pid)) h.revealed.set(pid, new Set());
+      h.revealed.get(pid)!.add(resource);
+      if (!newlyRevealed.has(pid)) newlyRevealed.set(pid, new Set());
+      newlyRevealed.get(pid)!.add(resource);
+    }
+  }
   if (h.last === null) {
     h.firstTurn = rec.turn;
     if (rec.turn > 1) for (const c of rec.cities) h.unknownSince.add(c.y * W + c.x);
@@ -526,7 +562,25 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const ry = IMPROVEMENTS[iid as ImprovementId]?.researchYields ?? [];
       return ry.some((y) => (y.tech && got.has(y.tech)) || (y.civic && got.has(y.civic)));
     };
+    // the plots of a city where a building that pays plots (`cityPlotBonus`)
+    // moved this turn: built, sold, pillaged or repaired
+    const cityMoved = new Set<number>();
+    const bwas = new Map(h.last.cities.map((c) => [`${c.owner}:${c.id}`, c.buildings]));
+    const pays = new Map<number, boolean>();
+    const paysAt = (bi: number) => {
+      if (!pays.has(bi)) pays.set(bi, paysPlots(cat, bi));
+      return pays.get(bi)!;
+    };
+    for (const c of rec.cities) {
+      const was = new Set((bwas.get(`${c.owner}:${c.id}`) ?? []).map((b) => JSON.stringify(b)));
+      const now = new Set(c.buildings.map((b) => JSON.stringify(b)));
+      const diff = [...c.buildings.filter((b) => !was.has(JSON.stringify(b))),
+        ...(bwas.get(`${c.owner}:${c.id}`) ?? []).filter((b) => !now.has(JSON.stringify(b)))];
+      if (!diff.some((b) => paysAt(b[0] as number))) continue;
+      for (const q of c.plots) cityMoved.add(q);
+    }
     const preserve = cat.districts.indexOf('DISTRICT_PRESERVE');
+    const centre = cat.districts.indexOf('DISTRICT_CITY_CENTER');
     const same = (i: number, k: number) => plotAt(rec, i)[k] === plotAt(h.last!, i)[k];
     const still = (i: number) => same(i, P.feature) && same(i, P.resource) && same(i, P.improvement)
       && same(i, P.improvementPillaged) && same(i, P.district) && same(i, P.wonder) && same(i, P.owner);
@@ -557,7 +611,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         const bare = (plotAt(rec, i)[P.improvement] as number) < 0 && (plotAt(rec, i)[P.district] as number) < 0
           && (plotAt(rec, i)[P.wonder] as number) < 0 && (plotAt(rec, i)[P.resource] as number) < 0 && Array.isArray(y1);
         if (bare && (plotAt(h.last, i)[P.improvement] as number) >= 0 && same(i, P.owner) && same(i, P.resource)
-          && same(i, P.district)) {
+          && same(i, P.district) && !cityMoved.has(i)) {
           const b = h.bare.get(i);
           const owner = plotAt(rec, i)[P.owner] as number;
           if (b && b.key === bareKey && !(owner >= 0 && moved.has(owner))) {
@@ -567,13 +621,18 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         if (bare) h.bare.set(i, { key: bareKey, y: [...y1] });
         // a plot whose yields rose with nothing about it, its neighbours or
         // its owner moving: a random event's draw
-        if (!still(i) || (plotAt(rec, i)[P.district] as number) >= 0) continue;
+        // a district's plot yields nothing but the city centre's, which a
+        // flood silts like any other plot
+        const dist = plotAt(rec, i)[P.district] as number;
+        if (!still(i) || (dist >= 0 && dist !== centre) || cityMoved.has(i)) continue;
         // an unowned plot's yields are the viewing player's (a strategic it
         // has just revealed pays from that record on)
         const owner = plotAt(rec, i)[P.owner] as number;
         const o = owner >= 0 ? owner : num(rec.head.localPlayer);
         if (owner >= 0 && moved.has(owner)) continue;
         if (o >= 0 && movesPlot(i, gained.get(o) ?? new Set())) continue;
+        const res = plotAt(rec, i)[P.resource] as number;
+        if (o >= 0 && res >= 0 && newlyRevealed.get(o)?.has(strip(cat.resources[res] ?? '', 'RESOURCE_'))) continue;
         // a neighbour moving may move an improved plot's yields (an adjacency);
         // an unimproved plot's reach no neighbour's row except a Preserve's
         // Grove through the plot's own appeal (the flood that washed away the
@@ -631,6 +690,23 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     }
   }
   h.last = rec;
+}
+
+/** Does the building row `bi` of the record pay its city's plots
+ *  (`cityPlotBonus`): a wonder naming a terrain or feature, or paying per
+ *  flood; a building's Coast, feature or Coast resource clause, the Water
+ *  Mill's, or a unique row's own. */
+function paysPlots(cat: Catalog, bi: number): boolean {
+  const name = cat.buildings[bi];
+  if (cat.wonders.includes(name)) {
+    const id = engineId('wonder', name, 'BUILDING_', BUILT_WONDERS);
+    const fx = id ? BUILT_WONDERS[id]?.effects : undefined;
+    return !!(fx?.tileYields?.length || fx?.faithPerFlood);
+  }
+  const id = engineRowOf(cat, 'building', bi);
+  const b = id ? BUILDINGS[id] : undefined;
+  return !!b && !!(b.coastPlotYields || b.plotFeatureYields || b.coastResourceYields || b.special === 'WATER_MILL'
+    || b.civVariants?.some((v) => v.featureTileYields || v.coastResourceYields));
 }
 
 /** the 1s of a research bit string */
@@ -705,6 +781,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (row < 0) gap(ctx, 'leader', String(p.leader));
     seat.civ = row;
     seat.name = String(p.civ);
+    for (const r of GP_RESOURCE_REVEAL) {
+      if (history?.revealed.get(p.id)?.has(r.resource)) (seat.gpPerm ??= GP_PERM.map(() => 0))[GP_PERM.indexOf(r.perm)] = 1;
+    }
     state.seats.push(seat);
     seatOfPlayer.set(p.id, i);
     playerOfSeat.set(i, p.id);
@@ -1078,12 +1157,49 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   for (const city of cityByKey.values()) {
     if (importQueue(ctx, state, dumpOfCity.get(city)!, city)) queueProgressRead = true;
   }
+  const readBack = importFloodCounts(rec, state, cityByKey.values());
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
-    congressGaps, queueProgressRead,
+    congressGaps, queueProgressRead, readBack,
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
   };
+}
+
+/**
+ * The floods each Floodplains plot of a Great Bath city has taken. The
+ * record names no flood, but the Bath pays its Floodplains plots Faith per
+ * flood (`cityPlotBonus`), so in such a city the plot's recorded Faith above
+ * what the plot pays with no flood counted IS its count. Elsewhere the count
+ * pays nothing and stays 0. Returns the plots whose Faith column was read
+ * back (`Imported.readBack`).
+ */
+function importFloodCounts(rec: TurnRecord, state: GameState, cities: Iterable<City>): Map<number, Set<number>> {
+  const faith = YIELD_KEYS.indexOf('faith');
+  const readBack = new Map<number, Set<number>>();
+  for (const city of cities) {
+    let per = 0;
+    for (const w of city.wonders) per += BUILT_WONDERS[w.id]?.effects?.faithPerFlood ?? 0;
+    if (!per) continue;
+    const ctx = cityYieldCtx(state, city);
+    const bonus = cityPlotBonus(state, city);
+    for (const t of state.map.tiles) {
+      const isCentre = t.index === city.centerIndex;
+      if (!tileBelongsTo(t, city) || !isFloodplains(t.feature) || (t.district && !isCentre) || t.builtWonder) continue;
+      const read = (plotAt(rec, t.index)[P.yields] as number[] | undefined)?.[faith];
+      if (read === undefined) continue;
+      t.floodCount = 0;
+      let y: Yields;
+      if (isCentre) y = cityCentreYields(state, city, ctx, bonus);
+      else {
+        y = tileYields(ctx, t);
+        bonus(t, false, y);
+      }
+      t.floodCount = Math.max(0, Math.round((read - y.faith) / per));
+      readBack.set(t.index, new Set([faith]));
+    }
+  }
+  return readBack;
 }
 
 function bitsToIds(bits: string, names: string[], kind: string, prefix: string, known: object, ctx: Ctx): string[] {

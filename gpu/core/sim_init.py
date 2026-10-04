@@ -793,8 +793,8 @@ class SimInit:
         self._special_slot = 3  # the special session's slot in the vote head
         # a Deforestation Treaty target `k` is the tile feature `_congress_feat[k]`
         self._congress_feat = [int(x) for x in _er2["congressFeatures"]]
-        # the terrains the Lighthouse pays its food on
-        self._coast_food_terr = [int(x) for x in _er2["coastFoodTerrains"]]
+        # the terrains a building's Coast plot clause pays on
+        self._coast_plot_terr = [int(x) for x in _er2["coastPlotTerrains"]]
         self._loyalty_max = float(rules.seats["loyaltyMax"])
         self._special_cost = float(_er2["specialSessionCost"])
         self._special_gap = int(_er2["specialSessionGap"])
@@ -2028,8 +2028,10 @@ class SimInit:
         self._eng_idx = int(imp["engineerIdx"])
         self._eng_finish_frac = float(imp["engineerFinishFraction"])
         self._hillfarms_civic = int(imp["hillFarmsCivic"])
-        self._farmadj_civic = int(imp["farmAdjCivic"])  # GS: Feudalism farm-adjacency +1 food
-        self._farmadj_tech = int(imp["farmAdjTech"])    # GS: Replaceable Parts +1 more
+        # the Farm adjacency rows (Farms_MedievalAdjacency on a civic,
+        # Farms_MechanizedAdjacency on a tech, which obsoletes it): (index, per, food)
+        self._farmadj_civic = tuple(int(x) for x in imp["farmAdjCivic"])
+        self._farmadj_tech = tuple(int(x) for x in imp["farmAdjTech"])
         self._mine_unlock_tech = int(imp["mineUnlockTech"])       # MINING
         self._lumber_unlock_tech = int(imp["lumberUnlockTech"])   # CONSTRUCTION
         # the Lumber Mill's features that wait on a civic (Rainforest,
@@ -3451,6 +3453,13 @@ class SimInit:
             for bi, b in enumerate(rules.buildings) if any(float(x) for x in b["coastResY"])] + [
             (bi, int(v["civ"]), torch.tensor([float(x) for x in v["coastResY"]], dtype=dtype, device=device))
             for bi, vs in enumerate(rules.b_variants) for v in vs if any(float(x) for x in v["coastResY"])]
+        # CIV6 (Lighthouse, Shipyard, Seaport; `coastPlotYields`): a row's
+        # yields on every Coast/Lake plot of its city — (building, y6, only
+        # where the plot holds no improvement).
+        self._b_coast_plot: list[tuple[int, torch.Tensor, bool]] = [
+            (bi, torch.tensor([float(x) for x in b["coastPlotY"]], dtype=dtype, device=device),
+             bool(int(b["coastPlotUnimproved"])))
+            for bi, b in enumerate(rules.buildings) if any(float(x) for x in b["coastPlotY"])]
         # CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): a base row's yields on
         # every tile of its city carrying one feature — (building, feature, y6).
         self._b_feat_plot: list[tuple[int, int, torch.Tensor]] = [

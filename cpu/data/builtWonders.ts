@@ -103,8 +103,9 @@ export interface BuiltWonderDef {
     /** +1 amenity to the holding city per matching improvement within
      *  `range` tiles of the WONDER (Temple of Artemis). */
     amenityPerImprovement?: { improvements: ImprovementId[]; range: number };
-    /** CIV6 (Great Bath): faith "for every time a tile belonging to this
-     *  city has been Flooded" — reads `Tile.floodCount`. */
+    /** CIV6 (Great Bath, GREATBATH_FLOODFAITH): faith on each Floodplains
+     *  plot of the city per flood that plot has taken (`Tile.floodCount`),
+     *  a plot yield (`cityPlotBonus`). */
     faithPerFlood?: number;
     /** CIV6 (Ruhr Valley): "+1 Production for each Mine and Quarry in this
      *  city" — yields the HOLDING city gains per matching unpillaged
@@ -525,7 +526,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'GREAT_BATH', name: 'Great Bath', code: 'GT', cost: 180,
       requiresTech: 'POTTERY', placement: { onFeature: ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
       effects: { cityHousing: 3, cityAmenities: 1, floodMitigation: true, faithPerFlood: 1 },
-      description: '+3 housing, +1 amenity, +1 faith per flood the city has taken, and floods along its river do no damage.',
+      description: '+3 housing, +1 amenity, +1 faith on each Floodplains plot per flood it has taken, and floods along its river do no damage.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_GREAT_BATH', 'Cost', { scale: GAME_SPEED }),
