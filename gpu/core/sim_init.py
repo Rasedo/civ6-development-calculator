@@ -3135,6 +3135,16 @@ class SimInit:
         self._trade_reach_memo: dict = {}
         # (row, record) -> (the recorded reads, the result) — `_seat_city_stats`
         self._stats_memo: dict = {}
+        # row -> (the recorded reads, the result) — `_border_planes`
+        self._border_memo: dict = {}
+        # row -> (plane stamp, answer) — `_res_hidden`
+        self._res_hidden_cache: dict = {}
+        # row -> (turn, plane stamp, answer) — `_adopted_gov`
+        self._adopted_gov_cache: dict = {}
+        self._world_era_cache = None  # (plane stamp, answer) — `_world_era`
+        self._boost_tab_cache = None  # `rules.boosts` grouped — `_boost_tables`
+        self._compw_cache: dict = {}  # row -> (plane stamp, answer) — `_completed_wonders`
+        self._bstand_cache: dict = {}  # row -> (plane stamp, standing mask) — `_seat_building_sum`
         self._suz_rows_cache = None  # ((turn, _eff_version), {code: [B, n_majors] bool})
         self._congress_slot_cache = None  # (congress_active clone, {r: (outcome, target)})
         # statecompare's per-digest memo: set by state_digest_all around one
@@ -3203,6 +3213,11 @@ class SimInit:
         self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
         self._b_excl_buildings = rules.b_excl_buildings  # exclusive-sibling index lists
         self._b_has_reqs = bool((self._b_req_district >= 0).any()) or any(len(r) > 0 for r in self._b_req_buildings) or any(len(r) > 0 for r in self._b_excl_buildings)
+        # ...the same two lists as padded [NB, K] index tables, so one gather
+        # answers every building's prerequisite (`_seat_buildable`)
+        self._b_req_idx, self._b_req_ok = pad_index_lists(self._b_req_buildings, device)
+        self._b_excl_idx, self._b_excl_ok = pad_index_lists(self._b_excl_buildings, device)
+        self._b_req_none = ~self._b_req_ok.any(dim=1)  # [NB] a building with no prerequisite
         # Regional buildings (Factory/Power Plant/Zoo/Stadium) leave every LOCAL
         # yield/amenity sum; the regional channel delivers them to all same-seat
         # city centers within regional_range of the source district.
@@ -3682,6 +3697,12 @@ class SimInit:
         self._type_res_cost = torch.tensor([int(u["resCost"]) for u in ru], dtype=torch.long, device=device)
         self._res_slot_units = [(i, int(u["resSlot"]), int(u["resCost"]))
                                 for i, u in enumerate(ru) if int(u["resSlot"]) >= 0]
+        # ...as (unit, slot, charge) vectors — each unit charges one slot, so
+        # one gather tests them all
+        self._res_slot_vecs = (
+            torch.tensor([u for u, _, _ in self._res_slot_units], dtype=torch.long, device=device),
+            torch.tensor([s for _, s, _ in self._res_slot_units], dtype=torch.long, device=device),
+            torch.tensor([c for _, _, c in self._res_slot_units], dtype=torch.float64, device=device))
         # GS: a FUEL unit bills its resource EVERY turn it lives.
         self._type_res_upkeep = torch.tensor([int(u["resUpkeep"]) for u in ru], dtype=torch.long, device=device)
         self._upkeep_units = [(i, int(u["resSlot"]), int(u["resUpkeep"]))
@@ -3836,6 +3857,10 @@ class SimInit:
         self._py_amt = _col(3, dtype)
         self._py_terr, self._py_hills, self._py_imp, self._py_feat = _col(4, torch.long), _col(5, torch.long), _col(6, torch.long), _col(7, torch.long)
         self._py_anyimp, self._py_civic, self._py_mtn, self._py_era = _col(8, torch.long), _col(9, torch.long), _col(10, torch.long), _col(11, torch.long)
+        # the same rows as python ints, one tuple per row, for the plot walks
+        self._py_rows = list(zip(*(t.tolist() for t in (
+            self._py_civ, self._py_leader, self._py_civic, self._py_era, self._py_terr, self._py_hills,
+            self._py_imp, self._py_feat, self._py_mtn, self._py_anyimp, self._py_yield))))
         # the roster's other data families (`PROD_MULT_ROWS`, `DISTRICT_ADJ_ROWS`,
         # `INTL_ROUTE_YIELD_ROWS`, `ROUTE_CAPACITY_ROWS`): python lists of
         # tuples, each site reads the columns it needs
@@ -4302,6 +4327,9 @@ class SimInit:
                     self.unit_next[b] += 1
 
         self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
+        # Built outside inference mode, so the planes born above keep their
+        # version counters; everything after runs inside it.
+        simbase.enter_inference()
 
     def reset(self) -> None:
         for k, v in self._pristine.items():

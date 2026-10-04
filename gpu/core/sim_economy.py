@@ -2802,20 +2802,16 @@ class SimEconomy:
             if complete:
                 has_d = has_d & self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape(B, C, NB)
             district_ok = (rq < 0).reshape(1, 1, NB) | has_d
-            prereq_ok = torch.ones(B, C, NB, dtype=torch.bool, device=dev)
             hq = have | queued  # availableBuildings counts what is ON ORDER too
             # A PURCHASE must satisfy availableBuildings AND buildingCompletable,
             # and the latter reads `city.buildings` alone — so the conjunction
             # wants a BUILT prerequisite, while an exclusion still fires off
-            # either list.
+            # either list. Any one listed prerequisite opens a building; any
+            # one listed exclusive sibling closes it.
             req_src = have if complete else hq
-            for nb, reqs in enumerate(self._b_req_buildings):
-                if reqs:
-                    prereq_ok[:, :, nb] = req_src[:, :, reqs].any(dim=2)
             _exq = have if gold else hq
-            for nb, excl in enumerate(self._b_excl_buildings):
-                if excl:
-                    prereq_ok[:, :, nb] &= ~_exq[:, :, excl].any(dim=2)
+            prereq_ok = ((req_src[:, :, self._b_req_idx] & self._b_req_ok).any(dim=3) | self._b_req_none) \
+                & ~(_exq[:, :, self._b_excl_idx] & self._b_excl_ok).any(dim=3)
             base = base & district_ok & prereq_ok
         if self._barrier_bidx >= 0:
             # CIV6 (Flood Barrier): "Must be built in a city with one or more
@@ -3097,7 +3093,20 @@ class SimEconomy:
         is IN: none in Anarchy (`_in_anarchy`: position 0, has-one false,
         what a seat with no government unlocked reads), else the one its
         record chose (`civ_gov_chosen`), else the newest its civics unlock. A
-        city-state never records one. `seatGovernment`'s twin."""
+        city-state never records one. `seatGovernment`'s twin.
+
+        Memoised per row under the turn and the write counters of the planes
+        it reads (`simbase.plane_stamp`); callers never write into the
+        answer."""
+        planes = (self.civ_civics, self.citystate_civics, self.civ_gov_chosen, self.civ_gov_anarchy_end)
+        ent = self._adopted_gov_cache.get(row)
+        if ent is not None and ent[0] == self.turn and simbase.stamp_holds(ent[1], planes):
+            return ent[2]
+        out = self._adopted_gov_of(row)
+        self._adopted_gov_cache[row] = (self.turn, simbase.plane_stamp(planes), out)
+        return out
+
+    def _adopted_gov_of(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         newest, has = self._newest_gov(self._seat_civics(row))
         if row >= self.n_majors:
             return newest, has
@@ -4253,7 +4262,19 @@ class SimEconomy:
         had a minor working Horses it could not yet see), and the Free row's
         none (it holds no research). A Great Person's reveal
         (`_gp_resource_reveal`, James Young's Oil) shows one before its
-        technology."""
+        technology.
+
+        Memoised per row under the write counters of the planes it reads
+        (`simbase.plane_stamp`); callers never write into the answer."""
+        planes = (self.res_id, self.res_stripped, self.civ_techs, self.citystate_techs, self.civ_gp_perm)
+        ent = self._res_hidden_cache.get(row)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
+        out = self._res_hidden_of(row)
+        self._res_hidden_cache[row] = (simbase.plane_stamp(planes), out)
+        return out
+
+    def _res_hidden_of(self, row: int) -> torch.Tensor:
         rt = self._res_reveal_tech[self.res_id.clamp(min=0)]
         gated = (rt >= 0) & self._res_live()
         if not bool(gated.any()):
@@ -5888,10 +5909,16 @@ class SimEconomy:
 
     def _world_era(self) -> torch.Tensor:
         """[B] — the `worldEraIndex` twin: the furthest era any major has
-        reached. -1 before anyone finishes anything."""
+        reached. -1 before anyone finishes anything. Memoised under the two
+        planes' write counters; callers never write into the answer."""
+        planes = (self.civ_techs, self.civ_civics)
+        ent = self._world_era_cache
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
         we = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         for r in range(self.n_majors):
             we = torch.maximum(we, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]))
+        self._world_era_cache = (simbase.plane_stamp(planes), we)
         return we
 
     def _tourism_of(self, gw_tour: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None, gw_mult: torch.Tensor | None = None, wonder_pct: torch.Tensor | None = None) -> torch.Tensor:
@@ -6582,13 +6609,18 @@ class SimEconomy:
         hs_adj = None
         fi_adj = None
         st_adj = None
+        # a type no walked city holds live adds its zeros without the plane
+        dl_any = dlive.any(dim=1).any(dim=0).tolist() if dlive.shape[-1] else []
         for di, dd in enumerate(self.districts_cat):
             yc = int(dd["adjYield"])
             if yc < 0:
                 continue
             t_d = dreg[:, :, di]  # [B, n] this city's tile of type di (-1 none)
-            adjv = self._district_adj_seat(row, di).gather(1, t_d.clamp(min=0)).double()  # (memoised)
-            add = torch.where(dlive[:, :, di], adjv, torch.zeros_like(adjv))
+            if dl_any[di]:
+                adjv = self._district_adj_seat(row, di).gather(1, t_d.clamp(min=0)).double()  # (memoised)
+                add = torch.where(dlive[:, :, di], adjv, torch.zeros_like(adjv))
+            else:
+                add = torch.zeros(B, n, dtype=F64, device=dev)
             dist_y[:, :, yc] = dist_y[:, :, yc] + add
             if self._log_diff:
                 # the PRE-FLOOR sum at the same tile+type key TS prints, from
@@ -7123,28 +7155,14 @@ class SimEconomy:
         used.
 
         MEMOISED per row on the read set of the last computation
-        (`simbase.record_reads`): a read taken again while every plane and
+        (`simbase.memo_read`): a read taken again while every plane and
         counter it read still holds returns that computation's result. The
         computation writes nothing; a `record` read stores the pick and the
         tier from the result, hit or miss. CIV6_STATS_MEMO_CHECK=1 recomputes
         on every hit and asserts."""
-        ent = self._stats_memo.get(row)
-        if ent is not None and not self._log_diff and simbase.reads_hold(self.__dict__, ent[0]):
-            out = tuple(t.clone() for t in ent[1])
-            if simbase.STATS_MEMO_CHECK:
-                fresh = self._seat_city_stats_read(row)
-                assert all(torch.equal(simbase._bits(a), simbase._bits(b)) for a, b in zip(fresh, out)), \
-                    f"city-stats memo stale: row {row} turn {self.turn}"
-        elif self._log_diff:
-            out = self._seat_city_stats_read(row)
-        else:
-            out, reads = simbase.record_reads(self, self._seat_city_stats_read, row,
-                                              may_set=("_tiebreak_key_dtype",))
-            if reads is None:
-                self._stats_memo.pop(row, None)
-            else:
-                self._stats_memo[row] = (reads, tuple(t.clone() for t in out))
-        total, eff, need, tier_idx, worked = out
+        total, eff, need, tier_idx, worked = simbase.memo_read(
+            self, self._stats_memo, row, self._seat_city_stats_read, row,
+            may_set=("_tiebreak_key_dtype",))
         if record:
             # ONLY where a city is ALIVE. A slot with no city — or one a
             # founding later this turn is about to fill — carries the -1 the
@@ -7320,7 +7338,7 @@ class SimEconomy:
         u_vec, r_vec = self._res_pair_vecs
         hit = (provides.unsqueeze(1) & (self.res_id.unsqueeze(1) == r_vec.reshape(1, -1, 1))).any(dim=2)
         out[:, u_vec] = hit
-        if row >= 0:
-            for u_idx, slot, cost in self._res_slot_units:
-                out[:, u_idx] = out[:, u_idx] & (self.civ_stockpile[:, row, slot] >= cost)
+        if row >= 0 and self._res_slot_units:
+            su, ss, sc = self._res_slot_vecs
+            out[:, su] = out[:, su] & (self.civ_stockpile[:, row][:, ss] >= sc)
         return out

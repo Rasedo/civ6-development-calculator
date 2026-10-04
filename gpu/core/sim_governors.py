@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import torch
 
+from . import simbase
 from .simbase import js_round
 
 
@@ -220,12 +221,17 @@ class SimGovernors:
         env = self.seat_citystate_envoys[:, : self.n_majors].to(torch.long)
         if self.S == 0 or self.n_governors == 0 or not bool((self.civ_gov_minor >= 0).any()):
             return env
-        ins = (env, self.civ_gov_minor, self.civ_gov_appointed, self.civ_gov_establish, self.civ_gov_promos)
+        planes = (self.seat_citystate_envoys, self.civ_gov_minor, self.civ_gov_appointed,
+                  self.civ_gov_establish, self.civ_gov_promos)
         ent = self._envoys_all_cache
+        if ent is not None and simbase.stamp_holds(ent[2], planes):
+            return ent[1]
+        ins = (env,) + planes[1:]
         if ent is not None and all(torch.equal(a, b) for a, b in zip(ent[0], ins)):
+            self._envoys_all_cache = (ent[0], ent[1], simbase.plane_stamp(planes))
             return ent[1]
         out = torch.stack([self._envoys_here_one(r) for r in range(self.n_majors)], dim=1)
-        self._envoys_all_cache = (tuple(x.clone() for x in ins), out)
+        self._envoys_all_cache = (tuple(x.clone() for x in ins), out, simbase.plane_stamp(planes))
         return out
 
     def _governor_post_minor(self, row: int, live: torch.Tensor) -> None:
@@ -394,15 +400,20 @@ class SimGovernors:
         and a city's death rewrites city_alive / city_id from many sites. The
         driven shard called this 300 times a turn (every ability channel of
         every city-stats pass) for an answer that changes a few times a game.
+        Ahead of the value test, the seven whole planes' write counters: while
+        none of them was rebound or written, the slices cannot have moved.
         Callers never write into the returned tensor."""
         dev, NP, RC = self.device, self.n_gov_promos, self.RC
         if NP == 0:
             return torch.zeros(self.B, RC, NP, dtype=torch.bool, device=dev)
-        ins = (self.civ_gov_appointed[:, row], self.civ_gov_out[:, row],
-               self.civ_gov_city[:, row], self.civ_gov_establish[:, row],
-               self.civ_gov_promos[:, row], self.city_alive[:, row], self.city_id[:, row])
+        planes = (self.civ_gov_appointed, self.civ_gov_out, self.civ_gov_city, self.civ_gov_establish,
+                  self.civ_gov_promos, self.city_alive, self.city_id)
         ent = self._gov_mask_cache.get(row)
+        if ent is not None and simbase.stamp_holds(ent[2], planes):
+            return ent[1]
+        ins = tuple(p[:, row] for p in planes)
         if ent is not None and all(torch.equal(a, b) for a, b in zip(ent[0], ins)):
+            self._gov_mask_cache[row] = (ent[0], ent[1], simbase.plane_stamp(planes))
             return ent[1]
         at = self._governor_at(row)
         est = self._governor_established(row, at)
@@ -412,7 +423,7 @@ class SimGovernors:
         base = self._gov_base_promo[at.clamp(min=0)]                   # [B, RC]
         out = out | (pidx == base.unsqueeze(2))
         out = out & est.unsqueeze(2)
-        self._gov_mask_cache[row] = (tuple(x.clone() for x in ins), out)
+        self._gov_mask_cache[row] = (tuple(x.clone() for x in ins), out, simbase.plane_stamp(planes))
         return out
 
     def _governor_sum(self, row: int, channel: str) -> torch.Tensor:

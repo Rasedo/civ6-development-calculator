@@ -18,6 +18,7 @@ engine, float32 on CUDA for throughput.
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 import os
@@ -1048,7 +1049,9 @@ _MUTABLE = [
 # A tensor read holds while it is the same object at the same version counter
 # (every in-place write moves it), or else while its bits equal the copy taken
 # when the entry was stored — so a write that stores what was already there,
-# or a plane rebuilt to the same values, keeps the entry. A scalar holds while
+# or a plane rebuilt to the same values, keeps the entry. A tensor born under
+# inference mode keeps no version counter (`write_count`), so its read is
+# always answered by the bits. A scalar holds while
 # it compares equal and is of the same type; any other object while it is the
 # same object. The derived caches (`*_cache`, `*_memo`, `*_stamp`) are not
 # recorded: each is checked against a key it computes from reads that ARE
@@ -1063,27 +1066,93 @@ _MEMO_SCALARS = (int, float, bool, str, type(None), torch.dtype, torch.device)
 _MEMO_DERIVED = ("_cache", "_memo", "_stamp")
 _TRACKING: dict[type, type] = {}
 _ABSENT = object()
+_FRESH = itertools.count(-1, -1)
+
+
+def write_count(t: torch.Tensor):
+    """`t`'s in-place write counter, or None for a tensor born under
+    inference mode, which keeps none."""
+    return None if t.is_inference() else t._version
+
+
+def write_stamp(t: torch.Tensor) -> int:
+    """`write_count` for a cache key: a tensor that keeps no counter answers
+    a number never answered before, so the key never matches."""
+    return next(_FRESH) if t.is_inference() else t._version
+
+
+def plane_stamp(ts: tuple) -> tuple | None:
+    """Each plane with its in-place write counter: `stamp_holds` answers True
+    later only while every one of them is the same object, unwritten. None
+    when one keeps no counter (`write_count`)."""
+    out = []
+    for t in ts:
+        if t.is_inference():
+            return None
+        out.append((t, t._version))
+    return tuple(out)
+
+
+def stamp_holds(st: tuple | None, ts: tuple) -> bool:
+    if st is None or len(st) != len(ts):
+        return False
+    for (a, v), t in zip(st, ts):
+        if a is not t or a._version != v:
+            return False
+    return True
+
+
+def pad_index_lists(lists: list, device) -> tuple[torch.Tensor, torch.Tensor]:
+    """A ragged list of index lists as ([N, K] long, [N, K] bool): row i holds
+    `lists[i]` padded with index 0, and the mask marks the real entries."""
+    k = max([len(r) for r in lists] + [1])
+    idx = torch.zeros(len(lists), k, dtype=torch.long, device=device)
+    ok = torch.zeros(len(lists), k, dtype=torch.bool, device=device)
+    for i, r in enumerate(lists):
+        if r:
+            idx[i, : len(r)] = torch.tensor(r, dtype=torch.long, device=device)
+            ok[i, : len(r)] = True
+    return idx, ok
+
+
+_INFERENCE: list = []
+
+
+def enter_inference() -> None:
+    """Put this thread under torch.inference_mode for good. No engine tensor
+    ever needs autograd, and the mode drops autograd's and the view/version
+    bookkeeping from every op's dispatch; a dispatch-bound engine pays that on
+    every op. Tensors born under it keep no version counter (`write_count`)."""
+    if not torch.is_inference_mode_enabled():
+        cm = torch.inference_mode()
+        cm.__enter__()
+        _INFERENCE.append(cm)
+
+
+# the recording in progress: (reads, seen, writes) — `seen` every name looked
+# up so far, instance attribute or not, so a second lookup costs one set test
+_REC: list = []
 
 
 def _tracking_class(cls: type) -> type:
     t = _TRACKING.get(cls)
     if t is None:
-        def __getattribute__(self, name):
-            v = object.__getattribute__(self, name)
-            d = object.__getattribute__(self, "__dict__")
-            if name in d and not name.endswith(_MEMO_DERIVED):
-                reads = d["_memo_reads"]
-                if name not in reads:
+        def __getattribute__(self, name, _oga=object.__getattribute__, _rec=_REC):
+            v = _oga(self, name)
+            top = _rec[0]
+            if name not in top[1]:
+                top[1].add(name)
+                if name in _oga(self, "__dict__") and not name.endswith(_MEMO_DERIVED):
                     if isinstance(v, torch.Tensor):
-                        reads[name] = (0, v, v._version)
+                        top[0][name] = (0, v, write_count(v))
                     elif isinstance(v, _MEMO_SCALARS):
-                        reads[name] = (1, v, None)
+                        top[0][name] = (1, v, None)
                     else:
-                        reads[name] = (2, v, None)
+                        top[0][name] = (2, v, None)
             return v
 
-        def __setattr__(self, name, v):
-            object.__getattribute__(self, "__dict__")["_memo_writes"].add(name)
+        def __setattr__(self, name, v, _rec=_REC):
+            _rec[0][2].add(name)
             object.__setattr__(self, name, v)
 
         t = _TRACKING[cls] = type(cls.__name__, (cls,),
@@ -1106,16 +1175,17 @@ def record_reads(obj, fn, *args, may_set: tuple[str, ...] = ()):
     it set an attribute other than a derived cache or `may_set`, or wrote into
     a tensor it read, or it ran inside another recorded call."""
     d = obj.__dict__
-    if "_memo_reads" in d:
+    if _REC:
         return fn(*args), None
-    d["_memo_reads"], d["_memo_writes"] = {}, set()
+    reads, writes = {}, set()
+    _REC.append((reads, set(), writes))
     cls = type(obj)
     object.__setattr__(obj, "__class__", _tracking_class(cls))
     try:
         out = fn(*args)
     finally:
         object.__setattr__(obj, "__class__", cls)
-        reads, writes = d.pop("_memo_reads"), d.pop("_memo_writes")
+        _REC.clear()
     if any(not w.endswith(_MEMO_DERIVED) and w not in may_set for w in writes):
         return out, None
     # one copy per plane per version, shared by every entry that read it
@@ -1123,15 +1193,39 @@ def record_reads(obj, fn, *args, may_set: tuple[str, ...] = ()):
     ents = []
     for name, (k, ref, ver) in reads.items():
         if k == 0:
-            if d.get(name, _ABSENT) is not ref or ref._version != ver:
+            if d.get(name, _ABSENT) is not ref or (ver is not None and ref._version != ver):
                 return out, None
             sh = shadow.get(name)
-            if sh is None or sh[0] is not ref or sh[1] != ref._version:
-                sh = shadow[name] = (ref, ref._version, ref.clone())
-            ents.append([name, 0, ref, ref._version, sh[2]])
+            if sh is None or sh[0] is not ref or ver is None or sh[1] != ver:
+                sh = shadow[name] = (ref, ver, ref.clone())
+            ents.append([name, 0, ref, ver, sh[2]])
         else:
             ents.append([name, k, ref, None, None])
     return out, ents
+
+
+def memo_read(obj, store: dict, key, fn, *args, may_set: tuple[str, ...] = ()) -> tuple:
+    """`fn(*args)` — a reader returning a tuple of tensors — through the
+    read-set memo `store` (a derived cache on `obj`), entry `key`: a hit hands
+    back clones of the stored result. Under `_log_diff` it runs plain.
+    STATS_MEMO_CHECK recomputes on every hit and asserts."""
+    d = obj.__dict__
+    if d.get("_log_diff"):
+        return fn(*args)
+    ent = store.get(key)
+    if ent is not None and reads_hold(d, ent[0]):
+        out = tuple(t.clone() for t in ent[1])
+        if STATS_MEMO_CHECK:
+            fresh = fn(*args)
+            assert all(torch.equal(_bits(a), _bits(b)) for a, b in zip(fresh, out)), \
+                f"read-set memo stale: {getattr(fn, '__name__', fn)} {key!r}"
+        return out
+    out, reads = record_reads(obj, fn, *args, may_set=may_set)
+    if reads is None:
+        store.pop(key, None)
+    else:
+        store[key] = (reads, tuple(t.clone() for t in out))
+    return out
 
 
 def reads_hold(d: dict, ents: list) -> bool:
@@ -1140,13 +1234,13 @@ def reads_hold(d: dict, ents: list) -> bool:
         cur = d.get(e[0], _ABSENT)
         k = e[1]
         if k == 0:
-            if cur is e[2] and cur._version == e[3]:
+            if cur is e[2] and e[3] is not None and cur._version == e[3]:
                 continue
             c = e[4]
             if not (isinstance(cur, torch.Tensor) and cur.dtype == c.dtype and cur.shape == c.shape
                     and torch.equal(_bits(cur), _bits(c))):
                 return False
-            e[2], e[3] = cur, cur._version
+            e[2], e[3] = cur, write_count(cur)
         elif k == 1:
             if type(cur) is not type(e[2]) or cur != e[2]:
                 return False

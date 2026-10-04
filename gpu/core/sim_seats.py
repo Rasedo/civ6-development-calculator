@@ -250,8 +250,9 @@ class SimSeats:
         res_f = []
         for _fk in (1, 2):
             _m = torch.ones(self.B, self.NU, dtype=torch.bool, device=self.device)
-            for _ui, _sl, _c in self._res_slot_units:
-                _m[:, _ui] = self.civ_stockpile[:, row, _sl] >= _c * self._form_res_mult[_fk]
+            if self._res_slot_units:
+                _su, _ss, _sc = self._res_slot_vecs
+                _m[:, _su] = self.civ_stockpile[:, row][:, _ss] >= _sc * self._form_res_mult[_fk]
             res_f.append(_m)
         w_okc: list[torch.Tensor | None] = []
         if nW_m:
@@ -1629,14 +1630,16 @@ class SimSeats:
         `_gen_ver`: `row_civ` / `row_leader` are map generation, written by the
         fixture loader and never by the engine, and the one thing that rewrites
         them — a test re-seating a row — writes them in place, which moves
-        `Tensor._version` (a host-side int: reading it syncs nothing).
+        `Tensor._version` (a host-side int: reading it syncs nothing; a plane
+        born under inference mode keeps none, and `write_stamp` then never
+        matches).
         `_gen_ver` counts UNIT generations, bumping on every unit born, killed,
         captured or converted, so keying the memo on it would rebuild every
         table many times a turn and cost more than the loops it replaces.
         `restore()` clears the dict too, for a base whose planes are swapped
         for clones wholesale (the poke lanes' `_STATIC` restore)."""
         rc, rl = self.row_civ, self.row_leader
-        stamp = (id(rc), rc._version, id(rl), rl._version)
+        stamp = (id(rc), simbase.write_stamp(rc), id(rl), simbase.write_stamp(rl))
         if self._live_rows_stamp != stamp:
             self._live_rows_stamp = stamp
             self._live_rows_cache.clear()
@@ -5115,7 +5118,7 @@ class SimSeats:
         in-place write counter — the memo stamp of `_dominant_religion` and,
         while a MAJORITY_FOUNDER row plays, of the belief memos too."""
         cf, ca = self.city_followed, self.city_alive
-        return (id(cf), cf._version, id(ca), ca._version)
+        return (id(cf), simbase.write_stamp(cf), id(ca), simbase.write_stamp(ca))
 
     def _dominant_rows(self, alive: torch.Tensor, fol: torch.Tensor) -> torch.Tensor:
         """[B, R] — the religion MORE THAN HALF of each row's cities follow, -1
@@ -5294,10 +5297,15 @@ class SimSeats:
         if memo:
             # the per-row `_suzerain_mask` readers (a dozen per seat turn)
             # land here with no table of their own: fingerprint on the table
-            # and the alive plane, compared by value
+            # and the alive plane, compared by value — the same two objects,
+            # both unwritten, need no comparing
             env = self._envoys_here_all()
             ent = self._suz_all_cache
+            ins = (env, self.citystate_alive)
+            if ent is not None and simbase.stamp_holds(ent[3], ins):
+                return ent[2]
             if ent is not None and torch.equal(ent[0], env) and torch.equal(ent[1], self.citystate_alive):
+                self._suz_all_cache = ent[:3] + (simbase.plane_stamp(ins),)
                 return ent[2]
         NM = self.n_majors
         # strict[b, r, o, s]: row r out-envoys row o at minor s; the diagonal
@@ -5307,7 +5315,8 @@ class SimSeats:
         beats = (strict | eye).all(dim=2)
         out = (env >= suz_min) & self.citystate_alive.unsqueeze(1) & beats
         if memo:
-            self._suz_all_cache = (env.clone(), self.citystate_alive.clone(), out)
+            self._suz_all_cache = (env.clone(), self.citystate_alive.clone(), out,
+                                   simbase.plane_stamp((env, self.citystate_alive)))
         return out
 
     def _suzerain_mask(self, row: int) -> torch.Tensor:
@@ -6296,9 +6305,18 @@ class SimSeats:
         """[B] — weight `w` [NB] summed over every building this seat holds
         whose district is not dark: the shape of every empire-wide building
         term (spy capacity, influence, diplomatic favor), which pays from the
-        one city that built it to the whole seat. `seatBuildingSum`'s twin."""
-        reg = self.city_dist_tile[:, row]  # [B, RC, nD]
-        stand = self.city_bldg[:, row] & ~self._bldg_dark(reg, self.city_bldg_pillaged[:, row]) & self.city_alive[:, row].unsqueeze(2)
+        one city that built it to the whole seat. `seatBuildingSum`'s twin.
+        The standing mask is memoised per row under its planes' write
+        counters."""
+        planes = (self.city_dist_tile, self.city_bldg, self.city_bldg_pillaged, self.city_alive,
+                  self.district_complete, self.district_pillaged)
+        ent = self._bstand_cache.get(row)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            stand = ent[1]
+        else:
+            reg = self.city_dist_tile[:, row]  # [B, RC, nD]
+            stand = self.city_bldg[:, row] & ~self._bldg_dark(reg, self.city_bldg_pillaged[:, row]) & self.city_alive[:, row].unsqueeze(2)
+            self._bstand_cache[row] = (simbase.plane_stamp(planes), stand)
         return torch.einsum("bjn,n->b", stand.to(w.dtype), w)
 
     def _city_terrain_count(self, row: int, plane: torch.Tensor) -> torch.Tensor:
@@ -8118,7 +8136,7 @@ class SimSeats:
         mutation sites. All consumers read-only."""
         # ...and the row's TECHS: a revealed resource starts paying its yield
         # (`_res_hidden`); the plane's version counter is the stamp
-        key = (row, self._eff_version, self._bel_stamp(), self.civ_techs._version)
+        key = (row, self._eff_version, self._bel_stamp(), simbase.write_stamp(self.civ_techs))
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
         suz = self._imp_adjacency(row)
@@ -8213,10 +8231,14 @@ class SimSeats:
         hills = self.hills.bool()
         era = self._world_era()
         out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
-        for k in range(int(self._py_civ.numel())):
-            c, ld = int(self._py_civ[k]), int(self._py_leader[k])
+        # a row whose civilization / leader no game plays here pays nothing
+        civs, leads = set(civ.tolist()), set(lead.tolist())
+        for k, (c, ld, cv, er, tr, hl, im, ft, mtn, anyimp, yk) in enumerate(self._py_rows):
+            if mtn:
+                continue  # a mountain row rides `_mountain_yield_plane`
+            if (c not in civs) if c >= 0 else (ld not in leads):
+                continue
             who = (civ == c) if c >= 0 else (lead == ld)
-            cv, er = int(self._py_civic[k]), int(self._py_era[k])
             if cv >= 0:
                 who = who & self._seat_civics(row)[:, cv]
             if er >= 0:
@@ -8224,20 +8246,17 @@ class SimSeats:
             if not bool(who.any()):
                 continue
             m = who.unsqueeze(1).expand(B, T)
-            tr, hl, im, ft = int(self._py_terr[k]), int(self._py_hills[k]), int(self._py_imp[k]), int(self._py_feat[k])
             if tr >= 0:
                 m = m & (self.terrain == tr)
             if hl >= 0:
                 m = m & (hills == bool(hl))
-            if int(self._py_mtn[k]):
-                continue  # a mountain row rides `_mountain_yield_plane`
             if ft >= 0:
                 m = m & feat_live & (self.feat_id == ft)
             if im >= 0:
                 m = m & imp_live & (self.improvement == im)
-            if int(self._py_anyimp[k]):
+            if anyimp:
                 m = m & imp_live
-            out[:, :, int(self._py_yield[k])] += m.to(self.dtype) * self._py_amt[k]
+            out[:, :, yk] += m.to(self.dtype) * self._py_amt[k]
         return out
 
     def _mountain_yield_plane(self, row: int) -> torch.Tensor | None:
@@ -8252,12 +8271,13 @@ class SimSeats:
         era = self._world_era()
         imp_live = (self.improvement >= 0) & ~self.pillaged
         out = None
-        for k in range(int(self._py_civ.numel())):
-            if not int(self._py_mtn[k]):
+        civs, leads = set(civ.tolist()), set(lead.tolist())
+        for k, (c, ld, cv, er, _tr, _hl, im, _ft, mtn, anyimp, yk) in enumerate(self._py_rows):
+            if not mtn:
                 continue
-            c, ld = int(self._py_civ[k]), int(self._py_leader[k])
+            if (c not in civs) if c >= 0 else (ld not in leads):
+                continue
             who = (civ == c) if c >= 0 else (lead == ld)
-            cv, er = int(self._py_civic[k]), int(self._py_era[k])
             if cv >= 0:
                 who = who & self._seat_civics(row)[:, cv]
             if er >= 0:
@@ -8265,14 +8285,13 @@ class SimSeats:
             if not bool(who.any()):
                 continue
             m = who.unsqueeze(1) & self.tile_mountain
-            im = int(self._py_imp[k])
             if im >= 0:
                 m = m & imp_live & (self.improvement == im)
-            if int(self._py_anyimp[k]):
+            if anyimp:
                 m = m & imp_live
             if out is None:
                 out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
-            out[:, :, int(self._py_yield[k])] += m.to(self.dtype) * self._py_amt[k]
+            out[:, :, yk] += m.to(self.dtype) * self._py_amt[k]
         for _tc, _tl, _ti, _ty, _ta in self._live_rows(row, self._terrain_adj_yield_rows):
             _tw = self._row_is(row, _tc, _tl)
             if not bool(_tw.any()):
@@ -9171,11 +9190,20 @@ class SimSeats:
         return out
 
     def _completed_wonders(self, row: int) -> torch.Tensor | None:
+        """[B, RC, nW] — the wonders each city of the row holds COMPLETE.
+        Memoised per row under the two planes' write counters; callers never
+        write into the answer."""
         if not self._wond_n:
             return None
+        planes = (self.city_wonder, self.built_wonder_complete)
+        ent = self._compw_cache.get(row)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
         cols = self.RC
         reg = self.city_wonder[:, row, :cols]
-        return (reg >= 0) & self.built_wonder_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
+        out = (reg >= 0) & self.built_wonder_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
+        self._compw_cache[row] = (simbase.plane_stamp(planes), out)
+        return out
 
     def _wonder_extra_slots(self, row: int) -> torch.Tensor | None:
         """[B, 4] long — the policy slots this seat holds beyond its
@@ -10038,14 +10066,14 @@ class SimSeats:
         is_cap = self.city_is_cap[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
         _bc = self._b_cols(row)
-        selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :cols]) & ~_bc["regional"].unsqueeze(1)
-        have = torch.einsum("bjn,bn->bj", selb.to(torch.float64), _bc["amenities"])
         # THE VARIANT AMENITY CLAUSES pay the city that HOLDS the row, whether
         # or not that row is REGIONAL: the Thermal Bath's Geothermal Amenities
         # name "this city" and the Zoo it replaces is regional, so reading them
         # off `selb` (which drops every regional row) paid nobody.
         _held = self.city_bldg[:, row, :cols] & ~self._bldg_dark(
             dreg, self.city_bldg_pillaged[:, row, :cols])
+        selb = _held & ~_bc["regional"].unsqueeze(1)
+        have = torch.einsum("bjn,bn->bj", selb.to(torch.float64), _bc["amenities"])
         # CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES): more while its city's
         # border holds a tile of one feature.
         for (_abi, _aciv), (_afeat, _aamt) in self._bvar_amen_feat.items():
@@ -10070,15 +10098,16 @@ class SimSeats:
         # CIV6 (Entertainment Complex, Water Park): "+1 Amenity from
         # entertainment to parent city" — the DISTRICT's own, before any
         # building, and dark while it is pillaged.
+        _dcnt = self._dist_counts(row)
         have = have + torch.einsum("bjn,n->bj",
-                                   self._dist_counts(row)[:, :cols].double(),
+                                   _dcnt[:, :cols].double(),
                                    self._d_amenity.double())
         # CIV6 (Bath): "Entertainment 1" — the unique district's own flat Amenity
         for _di, _vs in self._d_variants.items():
             for _v in _vs:
                 if float(_v["amenities"]):
                     _pm = self._row_plays_idx(row, int(_v["civ"])).double().unsqueeze(1)
-                    have = have + self._dist_counts(row)[:, :cols, _di].double() * float(_v["amenities"]) * _pm
+                    have = have + _dcnt[:, :cols, _di].double() * float(_v["amenities"]) * _pm
         # CIV6: an Aqueduct beside a Geothermal Fissure provides 1 Amenity —
         # per adjacent tile, and dark while the district stands pillaged.
         if self._d_amen_adj_any:
@@ -10852,11 +10881,11 @@ class SimSeats:
             self._claim_version += 1
             self._eff_version += 1
 
-    def _seat_border_key(self, row: int, center: torch.Tensor):
-        B = self.B
-        tiles = tiles_from_offsets(center, self._off5, self.W, self.H, self.wrap_x)
-        tc = tiles.clamp(min=0)
-        nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)
+    def _border_planes(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """The CENTRE-free half of `_seat_border_key`, per plot: ([B, T] f64
+        the yield sum a plot scores — tileYields' ZERO on a paved tile, so an
+        orphaned district from a razed city zeroes its key — and [B, T] bool
+        the resource this row sees there)."""
         g = self._rcy_globals()
         f_plane = self._rcy_food_plane(row, g)
         p_plane = g["p_plane"]
@@ -10880,17 +10909,26 @@ class SimSeats:
             f_plane = f_plane - hidY[:, :, 0]
             p_plane = p_plane - hidY[:, :, 1]
             y_oth = y_oth - hidY[:, :, 2:].sum(dim=2)
-        # tileYields returns ZERO for a paved tile (yields.ts:37), and an
-        # orphaned district from a razed city CAN be an unowned candidate, so
-        # the district/wonder mask must zero the key here.
-        y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc) * ((self.district.gather(1, tc) < 0) & (self.built_wonder.gather(1, tc) < 0)).to(torch.float64)
+        y_sum = ((f_plane.double() + p_plane.double() + y_oth.double())
+                 * ((self.district < 0) & (self.built_wonder < 0)).to(torch.float64))
+        return y_sum, self._res_live() & ~self._res_hidden(row)
+
+    def _seat_border_key(self, row: int, center: torch.Tensor):
+        B = self.B
+        tiles = tiles_from_offsets(center, self._off5, self.W, self.H, self.wrap_x)
+        tc = tiles.clamp(min=0)
+        nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)
+        # the plot planes, memoised per row on their read set: a seat's
+        # cities ask them one after another, between claims
+        y_plane, seen_plane = simbase.memo_read(self, self._border_memo, row, self._border_planes, row)
+        y_sum = y_plane.gather(1, tc)
         # borderPlotCost's twin, every term but the neighbours' (they read
         # the live owners, `_seat_border_cost`): distance, the seen resource
         # or the water and ring terms, the improvement, the natural wonder
         # and the yields — in milli-points, so the yield sum rounds once
         P = self.rules.plot_influence
         d = self.pair_dist[center.unsqueeze(1), tc].to(torch.long)
-        seen = (self._res_live() & ~self._res_hidden(row)).gather(1, tc)
+        seen = seen_plane.gather(1, tc)
         near3 = d <= 3
         cost = d * (P["distanceMultiplier"] * 2)
         cost = cost + torch.where(
@@ -12140,11 +12178,14 @@ class SimSeats:
 
         Cached on an INPUT FINGERPRINT — a CLONE of `self.war`, compared with
         `torch.equal` — because `sync_war` writes the matrix in place, so a
-        held reference would compare equal to itself forever, and no version
-        counter tracks a declaration."""
+        held reference would compare equal to itself forever. Ahead of it the
+        matrix's own write counter: unwritten, it cannot have moved."""
         w = self.war
         c = getattr(self, "_host_tbl_cache", None)
+        if c is not None and simbase.stamp_holds(c[2], (w,)):
+            return c[1]
         if c is not None and torch.equal(c[0], w):
+            self._host_tbl_cache = (c[0], c[1], simbase.plane_stamp((w,)))
             return c[1]
         dev, N = self.device, self.HOST_N
         ar = torch.arange(N, device=dev)
@@ -12157,7 +12198,7 @@ class SimSeats:
         not_same = ~torch.eye(N, dtype=torch.bool, device=dev)
         tbl = ((ar != N - 1) & not_same
                & (a_f | b_f | (a_b ^ b_b) | (~a_b & ~b_b & wr)))
-        self._host_tbl_cache = (w.clone(), tbl)
+        self._host_tbl_cache = (w.clone(), tbl, simbase.plane_stamp((w,)))
         return tbl
 
     def _seats_hostile(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:

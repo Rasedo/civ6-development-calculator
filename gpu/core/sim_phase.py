@@ -2333,8 +2333,13 @@ class SimPhase:
         # the city" — a PER-CITY factor over everything the city generates.
         gm = (self._gov_chan(row, "mult", "gppMult") if self.n_governors
               else torch.ones(B, self.RC, dtype=torch.float64, device=dev))
+        # the catalog's per-class facts, read to python once for the loop (a
+        # claim below may move the seat's channels, so those stay per class)
+        _cls_dist = self._gp_class_district.tolist()
+        _suz_bi = ([[int(x) for x in r if int(x) >= 0] for r in self._suz_gpp_bldg.tolist()]
+                   if self._suz_c_dist_gpp >= 0 and row < self.n_majors else [])
         for cls in range(self._gp_nc):
-            d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
+            d_cls = int(_cls_dist[cls])
             comp_c = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
             if d_cls >= 0:
                 reg_c = self.city_dist_tile[:, row, :, d_cls]  # [B, cols]
@@ -2370,8 +2375,8 @@ class SimPhase:
                 # district holding a building — the TIER-1 building of this
                 # class's own district, one point however many it holds.
                 bol = torch.zeros(B, self.RC, dtype=torch.float64, device=dev)
-                if self._suz_c_dist_gpp >= 0 and row < self.n_majors and cls < self._suz_gpp_bldg.shape[0]:
-                    _bi = [int(x) for x in self._suz_gpp_bldg[cls].tolist() if int(x) >= 0]
+                if cls < len(_suz_bi):
+                    _bi = _suz_bi[cls]
                     if _bi:
                         _bon = self._suz_effect(row, self._suz_c_dist_gpp)
                         bol = (self.city_bldg[:, row, :, _bi].any(dim=2)
