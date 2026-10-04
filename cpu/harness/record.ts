@@ -136,6 +136,8 @@ export interface DumpCity {
   loyaltyBreakdown?: Read<Record<string, number>[]>;
   majorityReligion: Read<number>;
   religions: Read<DumpReligionInCity[]>;
+  /** what the city presses on each city in range a turn (`GetPressureFromCity`) */
+  pressureOut?: Read<number>;
   governor: Read<number>;
   /** [type, count] gold/faith price rows: [kind "B"|"U"|"D", index, cost, gold, faith] */
   buy: [string, number, Read<number>, Read<number>, Read<number>][];

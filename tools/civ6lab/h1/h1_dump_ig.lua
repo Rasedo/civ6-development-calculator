@@ -321,7 +321,8 @@ for _, p in ipairs(players) do
       loyaltyBreakdown = P(function() return idn:GetIdentitySourcesBreakdown() end),
       majorityReligion = P(function() return rel:GetMajorityReligion() end),
       religions = P(function() return rel:GetReligionsInCity() end),
-      totalPressure = P(function() return rel:GetTotalPressureOnCity() end),
+      -- what this city presses on each city in range a turn (the banner's outward reader)
+      pressureOut = P(function() return rel:GetPressureFromCity() end),
       currentProduction = P(function() return bq:GetCurrentProductionTypeHash() end),
       productionYield = P(function() return bq:GetProductionYield() end),
       queueSize = P(function() return bq:GetSize() end),

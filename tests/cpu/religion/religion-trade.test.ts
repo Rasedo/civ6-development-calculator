@@ -376,7 +376,6 @@ describe('religious pressure spread', () => {
       city.followedReligion = seat;
     }
     seatOf(state, 0)!.tradeRoutes = [{ from: a.id, toSeat: 1, toSeatCity: b.id, expiresTurn: state.turn + 100 }];
-    const step = HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN; // each Holy City presses ITSELF
     const delta = (city: City, g: number, run: () => void) => {
       const before = city.religionPressure?.[g] ?? 0;
       run();
@@ -390,8 +389,8 @@ describe('religious pressure spread', () => {
     state.turn = 11;
     expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(1);
     expect(delta(a, 1, () => spreadReligiousPressure(state, 0))).toBe(0);
-    // each Holy City's own step rides beside it
-    expect(delta(a, 0, () => spreadReligiousPressure(state, 0))).toBe(step);
+    // a Holy City takes none of its own step
+    expect(delta(a, 0, () => spreadReligiousPressure(state, 0))).toBe(0);
     // India: +100% on the OWNER's routes — 2 down, 1 back, on an odd turn too
     state.seats[0].civ = CIV_LEADERS.findIndex((l) => l.civ === 'INDIA');
     expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(2);
@@ -415,12 +414,12 @@ describe('religious pressure spread', () => {
     expect(near.followedReligion ?? null).toBeNull(); // nothing pressed it yet: the Holy City presses from the turn AFTER it follows
     expect(far.followedReligion ?? null).toBeNull(); // out of range — no pressure
 
-    // The Holy City presses x4 a turn, itself included; the near city converts
+    // The Holy City presses x4 a turn, never itself; the near city converts
     // once that holds more than half of its total against its atheism
     // baseline (50 per citizen), and the far city never hears of it.
     const p = cap.religionPressure![0];
     endTurn(state);
-    expect(cap.religionPressure![0]).toBe(p + HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
+    expect(cap.religionPressure![0]).toBe(p);
     expect(near.religionPressure![0]).toBe(HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
     // the city grows meanwhile, so its baseline is read each turn
     let guard = 0;

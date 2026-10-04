@@ -40,7 +40,7 @@ import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, walls
 import { seatGrowth } from './seatTurn';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, centreStrength } from './combat';
-import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
+import { districtScaledBase, goldAffordable, projectCost, repairAvailable, spreadReligiousPressure } from './game';
 import { computeCityStats } from './city';
 import { minorCity, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, type Unlocks } from './effects';
@@ -82,7 +82,8 @@ function minorDistrictSite(state: GameState, cityState: CityState, district: Dis
  *  (tools/civ6lab/turn_order_civ6.md): its economy (`minorEconomy`) and the
  *  research that completes on it, then its city — the plan, the Production
  *  its city makes now, then growth and borders on the city as it stands
- *  after that (`minorGrowth`) — then its actions: a research completion's
+ *  after that (`minorGrowth`), and its religious pressure out
+ *  (`spreadReligiousPressure`) — then its actions: a research completion's
  *  upgrades, its purchases, its Builders' work, its routes' walk and a free
  *  Trader's route, its city's ranged strikes (the majors' own body fired
  *  from the minor's centre strength), and last its army's walk. */
@@ -96,6 +97,7 @@ export function minorPhase(state: GameState): void {
     minorPlan(state, cityState);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     minorGrowth(state, cityState);
+    spreadReligiousPressure(state, cityState.seat);
     minorUpgrades(state, cityState, gained);
     minorPurchases(state, cityState);
     minorBuilders(state, cityState);

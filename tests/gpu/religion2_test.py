@@ -548,11 +548,12 @@ def poke_free_city_pressure(rules, rj, path):
     sim._spread_religious_pressure(g, every)
     assert int(sim.city_followed[0, F, 0]) == g, "the free row never followed"
 
-    # ...and then it is a SOURCE: a second major city beside it takes the free
-    # row's own x1 step, with the Holy City silenced so nothing else can pay.
+    # ...and then it is a SOURCE: a second major city on the Holy City's tile
+    # takes the free row's own x1 step, with the Holy City silenced so
+    # nothing else can pay.
     S2 = 1
     sim.city_alive[0, g, S2] = True
-    sim.city_center[0, g, S2] = C
+    sim.city_center[0, g, S2] = A
     sim.city_pressure[0, g, S2] = 0
     sim.city_followed[0, g, S2] = -1
     sim.city_alive[0, g, 0] = False          # silence the Holy City
@@ -565,6 +566,73 @@ def poke_free_city_pressure(rules, rj, path):
     assert int(sim.holy_tile.shape[1]) == sim.n_majors, "religions are keyed by MAJOR row"
     assert int(sim.city_pressure.shape[3]) == sim.n_majors, "the pressure plane's last axis is RELIGIONS"
     print(f"  6b the free row takes pressure ({step}) and presses back ({lone}) OK")
+
+
+def poke_pressure_sources(rules, rj, path):
+    """6c. WHAT A CITY PRESSES, AND WHO TAKES IT — tests/cpu/religion/
+    pressure-sources.test.ts's twin: the Holy City x4 with its Holy Site
+    beside it (never x8); a pillaged Holy Site x2 elsewhere; no city takes its
+    own; a city-state's city takes pressure and, following what its pressure
+    row holds, presses on its own turn."""
+    sim = build(rules, path)
+    assert bool(sim.citystate_alive[0, :sim.S].any()), "the fixture holds no living city-state"
+    g, F = 1, sim.FREE_ROW
+    m0 = sim._CITY_MINOR0 + next(s for s in range(sim.S) if bool(sim.citystate_alive[0, s]))
+    HS = sim._hs_idx
+    per = int(sim._pressure_per_turn)
+    every = torch.ones(sim.B, dtype=torch.bool)
+    sim.holy_tile[0] = -1
+    sim.city_pressure[0] = 0
+    sim.city_followed[0] = -1
+    tiles = free_tiles(sim, 600)
+    C = tiles[0]
+    near = [t for t in tiles[1:] if 0 < int(sim.pair_dist[C, t]) <= 4]
+    A, Bt, Mt, H1, H2 = near[:5]
+    # the receiver: a Free City at C, following nothing
+    sim.city_alive[0, F, 0] = True
+    sim.city_center[0, F, 0] = C
+    sim.city_pop[0, F, 0] = 1
+    # the Holy City at A with a completed Holy Site
+    sim.holy_tile[0, g] = A
+    sim.city_alive[0, g, 0] = True
+    sim.city_center[0, g, 0] = A
+    sim.city_pop[0, g, 0] = 3
+    sim.city_followed[0, g, 0] = g
+    sim.city_dist_tile[0, g, 0, HS] = H1
+    sim.district_complete[0, H1] = True
+    sim._spread_religious_pressure(g, every)
+    assert int(sim.city_pressure[0, F, 0, g]) == int(sim._holy_city_mult) * per, "the Holy City's Holy Site stacked"
+    assert int(sim.city_pressure[0, g, 0, g]) == 0, "the Holy City took its own pressure"
+    # a second city with a PILLAGED Holy Site presses x2, the Holy City silenced
+    sim.city_alive[0, g, 0] = False
+    sim.city_alive[0, g, 1] = True
+    sim.city_center[0, g, 1] = Bt
+    sim.city_pop[0, g, 1] = 3
+    sim.city_followed[0, g, 1] = g
+    sim.city_dist_tile[0, g, 1, HS] = H2
+    sim.district_complete[0, H2] = True
+    sim.district_pillaged[0, H2] = True
+    before = int(sim.city_pressure[0, F, 0, g])
+    sim._spread_religious_pressure(g, every)
+    assert int(sim.city_pressure[0, F, 0, g]) - before == int(sim._holy_site_mult) * per, "a pillaged Holy Site lost its x2"
+    # the city-state's city: it takes the Holy City's step...
+    sim.city_alive[0, g, 1] = False
+    sim.city_alive[0, g, 0] = True
+    sim.city_followed[0, g, 0] = g   # a dead slot's follow was cleared
+    sim.city_center[0, m0, 0] = Mt
+    sim.city_pop[0, m0, 0] = 2
+    sim.city_pressure[0, m0, 0] = 0
+    sim._spread_religious_pressure(g, every)
+    assert int(sim.city_pressure[0, m0, 0, g]) == int(sim._holy_city_mult) * per, "the city-state took no pressure"
+    # ...and, following once its row holds the majority, presses on its own turn
+    sim.city_pressure[0, m0, 0, g] = 500
+    sim.city_alive[0, g, 0] = False
+    before = int(sim.city_pressure[0, F, 0, g])
+    sim._spread_religious_pressure(m0, every)
+    assert int(sim.city_pressure[0, F, 0, g]) - before == per, "the city-state pressed nobody"
+    assert int(sim.city_pressure[0, m0, 0, g]) == 500, "the city-state took its own pressure"
+    assert int(sim.city_followed[0, m0, 0]) == -1, "a minor's follow is never stored"
+    print("  6c pressure sources OK (x4 unstacked, pillaged x2, none of its own, the city-state in the walk)")
 
 
 def poke_combat_cs(rules, rj, path):
@@ -990,6 +1058,7 @@ def main() -> None:
     poke_missionary_spread(rules, rj, path)
     poke_presr(rules, rj, path)
     poke_free_city_pressure(rules, rj, path)
+    poke_pressure_sources(rules, rj, path)
     poke_combat_cs(rules, rj, path)
     poke_religious_community(rules, rj, path)
     poke_victor_direct(rules, rj, path)

@@ -106,10 +106,10 @@ def spread_delta(sim, turn: int):
 def main() -> int:
     sim = build()
     play(sim, ROW, None)
-    hc = int(sim._holy_city_mult) * int(sim._pressure_per_turn)  # each city presses ITSELF at the Holy City step
+    # a city takes none of its own pressure: the route's terms alone land
     da, db = spread_delta(sim, 10)
-    assert db[0] == 1 and db[1] == hc, f"even turn: B took {db} (want +1 of religion 0 from the route, its own {hc})"
-    assert da[1] == 1 and da[0] == hc, f"even turn: A took {da} (want the half-point of religion 1 back, its own {hc})"
+    assert db[0] == 1 and db[1] == 0, f"even turn: B took {db} (want +1 of religion 0 from the route, none of its own)"
+    assert da[1] == 1 and da[0] == 0, f"even turn: A took {da} (want the half-point of religion 1 back, none of its own)"
     print("  1 even turn OK — the destination takes 1, the origin takes the half-point back")
 
     da, db = spread_delta(sim, 11)

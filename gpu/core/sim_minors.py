@@ -13,7 +13,8 @@ class SimMinors:
         # adjacency across the border: its levied army home when due, the loss
         # its army shows, its grid; its economy and the research it completes;
         # its city — the plan, the item its Production goes to now, then growth
-        # and borders on the city as it stands after that; then its actions —
+        # and borders on the city as it stands after that, and its religious
+        # pressure out; then its actions —
         # the upgrades a completion triggers, its purchases, its Builders'
         # work, its trade routes, its city's ranged strikes (the majors' own
         # body, `cityStrikes`), its army's walk; and the army it ends the turn
@@ -34,6 +35,7 @@ class SimMinors:
             self._minor_plan(s)
             self._minor_build(s, self._minor_production(s))
             self._minor_growth(s)
+            self._spread_religious_pressure(self._CITY_MINOR0 + s, alive)
             self._minor_upgrades(s, gained)
             self._minor_purchases(s)
             self._minor_builders(s)

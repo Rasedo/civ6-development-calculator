@@ -182,15 +182,15 @@ def main() -> None:
     before = int(sim.city_pressure[0, tgt_row, tcol, 0])
     sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
     with_s = int(sim.city_pressure[0, tgt_row, tcol, 0]) - before
-    # under Jerusalem the Holy-Site city presses at the HOLY CITY's step, its
-    # Holy Site's x2 on top (the two multipliers stack)
-    assert with_s == int(sim._holy_city_mult) * int(sim._holy_site_mult) * per, with_s
-    # pillage darkens the site: a plain following city, at the plain step
+    # under Jerusalem the Holy-Site city presses at the HOLY CITY's step, in
+    # place of its Holy Site's x2 (the two never stack)
+    assert with_s == int(sim._holy_city_mult) * per, with_s
+    # a pillaged Holy Site still stands: the same step
     sim.district_pillaged[0, hs_t] = True
     sim._eff_version += 1
     before = int(sim.city_pressure[0, tgt_row, tcol, 0])
     sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
-    assert int(sim.city_pressure[0, tgt_row, tcol, 0]) - before == per
+    assert int(sim.city_pressure[0, tgt_row, tcol, 0]) - before == int(sim._holy_city_mult) * per
     sim.district_pillaged[0, hs_t] = False
     drop(sim)
     before = int(sim.city_pressure[0, tgt_row, tcol, 0])

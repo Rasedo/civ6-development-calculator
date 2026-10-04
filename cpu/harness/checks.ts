@@ -32,11 +32,11 @@ import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, un
 import { cityDefenseStrength } from '../core/combat';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
-import { buildingPurchaseCost, settlerCost, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost, unitStepCost, unitsAcquired } from '../core/game';
+import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost, unitStepCost, unitsAcquired } from '../core/game';
 import { buildingCostIn } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { monumentalityBuyMult } from '../core/eras';
-import { civOf, hiddenResourcesFor, seatOf } from '../core/seats';
+import { FREE_SEAT, civOf, hiddenResourcesFor, seatOf } from '../core/seats';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
 import { LOYALTY_MAX } from '../data/seats';
 import { UNITS } from '../data/units';
@@ -255,6 +255,12 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     push('city.defense', cityDefenseStrength(state, city) === num((c.districts[0] ?? [])[5] as number),
       num((c.districts[0] ?? [])[5] as number), cityDefenseStrength(state, city),
       { buildings: city.buildings, districts: city.districts.map((d) => d.type) });
+    // what a following city presses on each city in range a turn
+    if (c.pressureOut !== undefined && (city.followedReligion ?? -1) >= 0) {
+      const ours = pressureFromCity(state, city, city.followedReligion!);
+      push('city.pressureOut', near(ours, num(c.pressureOut)), num(c.pressureOut), ours,
+        { districts: city.districts.map((d) => d.type), wonders: city.wonders.map((w) => w.id), governor: num(c.governor) });
+    }
 
     // production costs and purchase prices; a standing World Congress
     // resolution the importer could not carry may price them
@@ -460,6 +466,31 @@ function bordersHeld(a: TurnRecord, b: TurnRecord): Set<number> {
   return new Set([...moving].filter(([, m]) => !m).map(([o]) => o));
 }
 
+/**
+ * The record's live trade routes onto the spread's own import, each on its
+ * owner's `tradeRoutes` (a major's from its city, a city-state's from its one
+ * city, id -1), so the spread carries their religion both ways. The spread's
+ * state alone: the routes' yields are not read off it.
+ */
+function spreadRoutes(imp: Imported, rec: TurnRecord): void {
+  for (const c of rec.cities) {
+    for (const r of (Array.isArray(c.routes) ? c.routes : []) as Record<string, number>[]) {
+      const origin = imp.cityByKey.get(`${r.OriginCityPlayer}:${r.OriginCityID}`);
+      const minorOwner = imp.minorOfPlayer.get(r.OriginCityPlayer);
+      const owner = minorOwner ?? (origin && isCiv(origin.seat) ? seatOf(imp.state, origin.seat) : undefined);
+      if (!owner) continue;
+      const from = minorOwner ? -1 : origin!.id;
+      const dest = imp.cityByKey.get(`${r.DestinationCityPlayer}:${r.DestinationCityID}`);
+      const minor = imp.minorOfPlayer.get(r.DestinationCityPlayer);
+      const route = minor ? { from, toCs: minor.id }
+        : !dest ? null
+        : dest.seat === owner.seat ? { from, to: dest.id }
+        : { from, toSeat: dest.seat, toSeatCity: dest.id };
+      if (route) (owner.tradeRoutes ??= []).push(route);
+    }
+  }
+}
+
 export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, history?: History,
   prev?: TurnRecord): CheckResult[] {
   const out: CheckResult[] = [];
@@ -472,12 +503,16 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   const after = new Map(b.cities.map((c) => [`${c.owner}:${c.id}`, c]));
   const settlerIdx = cat.units.indexOf('UNIT_SETTLER');
 
-  // the religious spread first, on the untouched turn-t state: every seat's
-  // sources, as the engine's turn runs them
+  // the religious spread first, on the untouched turn-t state: every player's
+  // sources in the turn's order — the majors, the city-states, the Free Cities
   const pressBefore = new Map<City, number[]>();
   for (const { city } of citiesOfImport(imp)) pressBefore.set(city, [...(city.religionPressure ?? [])]);
-  const spreadState: GameState = importTurn(a, cat, history).state;
+  const spreadImp = importTurn(a, cat, history);
+  const spreadState: GameState = spreadImp.state;
+  spreadRoutes(spreadImp, a);
   for (const s of spreadState.seats) spreadReligiousPressure(spreadState, s.seat);
+  for (const cs of spreadState.cityStates ?? []) spreadReligiousPressure(spreadState, cs.seat);
+  spreadReligiousPressure(spreadState, FREE_SEAT);
   const spreadCities = new Map<string, City>();
   for (const s of spreadState.seats) for (const c of s.cities) spreadCities.set(`${s.seat}:${c.id}`, c);
 

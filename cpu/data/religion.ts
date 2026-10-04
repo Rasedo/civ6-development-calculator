@@ -652,15 +652,17 @@ export const PANTHEON_FAITH_COST = 25;
  * religion's radius (per-religion range in spreadReligiousPressure). */
 export const RELIGION_PRESSURE_RANGE = 10;
 export const JUST_WAR_RANGE = 3;
-/** CIV6: what one following city presses per turn —
- * RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE 1 at
+/** CIV6: what one following city presses per turn on every OTHER city in
+ * range — RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE 1 at
  * RELIGION_SPREAD_STRENGTH_MULTIPLIER 200 (percent), 2: the game's own reads,
- * a following city in range pressing 2 a turn online (runs/h1_duelw1104
- * Guangzhou 26 and Shenyang 24 exact). The Holy City presses
- * RELIGION_SPREAD_HOLY_CITY_PRESSURE_MULTIPLIER 4 of it and a city with a
- * Holy Site RELIGION_SPREAD_HOLY_SITE_PRESSURE_MULTIPLIER 2, and the two
- * STACK (Chengdu, a Holy City with a Holy Site, 16). A city presses itself
- * too, which is how a Holy City keeps its faith with no neighbour. */
+ * a plain following city pressing 2 a turn online. The Holy City presses
+ * RELIGION_SPREAD_HOLY_CITY_PRESSURE_MULTIPLIER 4 of it; any other city with
+ * a Holy Site (pillaged or not) or a wonder that AllowsHolyCity (Stonehenge)
+ * RELIGION_SPREAD_HOLY_SITE_PRESSURE_MULTIPLIER 2; the two never stack, and
+ * the Bishop's doubling multiplies either. A city takes none of its own
+ * pressure (runs/h1_duelw1103..1108: the Holy City 8, with a Bishop 16, a
+ * Holy Site in it or not; a Holy Site, a pillaged one, a Stonehenge or a
+ * Bishop city 4; a lone Holy City +0 a turn). */
 export const RELIGION_PRESSURE_PER_TURN = srcConst('religion.pressurePerTurn', 2, {
   derived: 'RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE x RELIGION_SPREAD_STRENGTH_MULTIPLIER / 100',
   inputs: [xml('GlobalParameters', 'Name=RELIGION_SPREAD_ADJACENT_PER_TURN_PRESSURE', 'Value'),
