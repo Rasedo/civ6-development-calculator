@@ -378,8 +378,13 @@ class SimMinors:
         self._seat_border_growth(row, col, act,
                                  self._culture_after_growth(row, 0, pop0, total[:, 0, 4]) * act.double())
 
-    def _minor_envoy_tiles(self) -> None:
-        """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`.
+    def _minor_envoy_tiles(self, games: torch.Tensor) -> None:
+        """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`,
+        walked over every minor of the games in `games` ([B] bool), the games
+        whose envoy write just landed (`addEnvoys`' `receiveEnvoyTiles`). A
+        game with no write claims nothing: a minor whose last draw found
+        nothing in reach keeps its pending count until its OWN game next adds
+        an envoy.
 
         CIV6 (`CivilizationLevels.CanAnnexTilesWithReceivedInfluence`): TRUE
         for CITY_STATE and FALSE for a full civ, the Free Cities player and a
@@ -416,7 +421,7 @@ class SimMinors:
                 continue
             # a dead minor receives nothing; a negative difference (a removal)
             # claims nothing and gives nothing back
-            want = (env[:, s] - self.city_acquired[bidx, row, col]) * self.citystate_alive[:, s].long()
+            want = (env[:, s] - self.city_acquired[bidx, row, col]) * (self.citystate_alive[:, s] & games).long()
             if not bool((want > 0).any()):
                 continue
             center = self.city_center[bidx, row, col]

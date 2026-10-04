@@ -24,6 +24,8 @@ verb is a major's), so these scenes are the whole GPU-side evidence:
      descending, tile index ascending
   4. the refusals: a plot a major already holds is never taken, and a removed
      envoy takes no ground back
+  5. the games: in a batch of two, the claim lands only in the game whose
+     envoy write landed (`addEnvoys` runs inside one game)
 """
 
 from __future__ import annotations
@@ -60,8 +62,13 @@ def a_minor(sim) -> int:
     return s
 
 
-def plots(sim, s: int) -> int:
-    return int((sim.tile_seat[B0] == 100 + s).sum())
+def plots(sim, s: int, b: int = B0) -> int:
+    return int((sim.tile_seat[b] == 100 + s).sum())
+
+
+def every(sim) -> torch.Tensor:
+    """The claim's game mask with every game's envoy write landed."""
+    return torch.ones(sim.B, dtype=torch.bool, device=sim.device)
 
 
 def set_envoys(sim, s: int, n: int) -> None:
@@ -109,23 +116,23 @@ def test_slope(rules) -> None:
     base_p, base_a = plots(sim, s), int(sim.city_acquired[B0, row, 0])
 
     set_envoys(sim, s, base_a + 3)
-    sim._minor_envoy_tiles()
+    sim._minor_envoy_tiles(every(sim))
     assert plots(sim, s) == base_p + 3, f"0 -> 3 envoys took {plots(sim, s) - base_p} plots"
     assert int(sim.city_acquired[B0, row, 0]) == base_a + 3, "the ledger did not follow"
 
     set_envoys(sim, s, base_a + 4)
-    sim._minor_envoy_tiles()
+    sim._minor_envoy_tiles(every(sim))
     assert plots(sim, s) == base_p + 4, "3 -> 4 envoys took more or less than one plot"
 
     # idempotent: the count, not a delta — a second call with no new envoy
     # claims nothing
-    sim._minor_envoy_tiles()
+    sim._minor_envoy_tiles(every(sim))
     assert plots(sim, s) == base_p + 4, "the claim fired twice on one envoy"
 
     # no cap through sixteen, and the suzerain contest changes no slope
     suz_min = int(sim.rules.citystate.get("suzerainEnvoys", 3))
     set_envoys(sim, s, base_a + 16)
-    sim._minor_envoy_tiles()
+    sim._minor_envoy_tiles(every(sim))
     sim._cs_resolve_suzerain()
     assert plots(sim, s) == base_p + 16, f"sixteen envoys took {plots(sim, s) - base_p} plots"
     assert int(sim.citystate_suzerain[B0, s]) == 0, "sixteen envoys from one seat hold no suzerainty"
@@ -140,7 +147,7 @@ def test_slope(rules) -> None:
     sim2.seat_citystate_envoys[B0, 0, s2] = half
     sim2.seat_citystate_envoys[B0, min(1, sim2.n_majors - 1), s2] = (b_a + 4) - half
     sim2._cs_resolve_suzerain()
-    sim2._minor_envoy_tiles()
+    sim2._minor_envoy_tiles(every(sim2))
     assert plots(sim2, s2) == b_p + 4, "a split record pays a different slope"
     if sim2.n_majors > 1 and half * 2 == b_a + 4 and half >= suz_min:
         assert int(sim2.citystate_suzerain[B0, s2]) == -1, "a tie left a suzerain"
@@ -206,7 +213,7 @@ def test_pick(rules) -> None:
         cost = torch.floor(key0[sel] / 1e5)
         ties = set(int(t) for t in tiles[sel][cost == cost.min()])
         set_envoys(sim, s, base_a + n)
-        sim._minor_envoy_tiles()
+        sim._minor_envoy_tiles(every(sim))
         got = [t for t in ties if int(sim.tile_seat[B0, t]) == 100 + s]
         assert len(got) == 1, f"claim {n} took none of the lowest-cost ties {sorted(ties)}"
         assert int(sim.tile_city[B0, got[0]]) == -1, "a minor's plot carries no city id"
@@ -233,7 +240,7 @@ def test_refusals(rules) -> None:
     sim._tile_owner_ver += 1
     sim._claim_version += 1
     set_envoys(sim, s, base_a + 4)
-    sim._minor_envoy_tiles()
+    sim._minor_envoy_tiles(every(sim))
     for t in taken:
         assert int(sim.tile_seat[B0, t]) == int(sim._ROW_SEAT[0]), f"plot {t} was taken off a major"
     assert plots(sim, s) == base_p + 4, "the refused plots cost the minor its ground"
@@ -245,21 +252,47 @@ def test_refusals(rules) -> None:
     row2 = sim2._CITY_MINOR0 + s2
     p0, a0 = plots(sim2, s2), int(sim2.city_acquired[B0, row2, 0])
     set_envoys(sim2, s2, a0 + 4)
-    sim2._minor_envoy_tiles()
+    sim2._minor_envoy_tiles(every(sim2))
     assert plots(sim2, s2) == p0 + 4
     set_envoys(sim2, s2, a0 + 1)          # a spy's Fabricate Scandal
-    sim2._minor_envoy_tiles()
+    sim2._minor_envoy_tiles(every(sim2))
     assert plots(sim2, s2) == p0 + 4, "a removed envoy took ground back"
     set_envoys(sim2, s2, a0 + 5)          # one past the mark
-    sim2._minor_envoy_tiles()
+    sim2._minor_envoy_tiles(every(sim2))
     assert plots(sim2, s2) == p0 + 5, "the count past its mark bought no plot"
 
     # a DEAD minor receives nothing
     sim2.citystate_alive[B0, s2] = False
     set_envoys(sim2, s2, a0 + 9)
-    sim2._minor_envoy_tiles()
+    sim2._minor_envoy_tiles(every(sim2))
     assert plots(sim2, s2) == p0 + 5, "a dead minor claimed ground"
     print("  4 refusals OK — a major's plot, a removed envoy and a dead minor all take nothing")
+
+
+def test_games(rules) -> None:
+    """The claim runs in the games whose envoy write landed and nowhere else:
+    TS calls `receiveEnvoyTiles` from `addEnvoys` inside ONE game, so a minor
+    whose count is ahead of its ledger in a game with no write claims nothing
+    until its own game next adds an envoy. Two identical games, both pending."""
+    from core import BatchSim, load_fixture
+    from warmup import settle_all
+    path = fixture_paths()[0]
+    sim = settle_all(BatchSim([load_fixture(path)] * 2, rules, device="cpu", dtype=torch.float64), 3)
+    s = a_minor(sim)
+    row = sim._CITY_MINOR0 + s
+    p0 = [plots(sim, s, b) for b in range(2)]
+    a0 = [int(sim.city_acquired[b, row, 0]) for b in range(2)]
+    for b in range(2):
+        sim.seat_citystate_envoys[b, :, s] = 0
+        sim.seat_citystate_envoys[b, 0, s] = a0[b] + 2
+    sim._minor_envoy_tiles(torch.tensor([True, False]))
+    assert plots(sim, s, 0) == p0[0] + 2, "the landed game claimed nothing"
+    assert plots(sim, s, 1) == p0[1], "a game with no envoy write claimed ground"
+    assert int(sim.city_acquired[1, row, 0]) == a0[1], "a game with no envoy write moved its ledger"
+    sim._minor_envoy_tiles(torch.tensor([False, True]))
+    assert plots(sim, s, 0) == p0[0] + 2, "the first game claimed twice"
+    assert plots(sim, s, 1) == p0[1] + 2, "the second game's own write claimed nothing"
+    print("  5 games OK — the claim lands only in the games whose envoy write landed")
 
 
 def main() -> None:
@@ -269,6 +302,7 @@ def main() -> None:
     test_slope(rules)
     test_pick(rules)
     test_refusals(rules)
+    test_games(rules)
     print("BATTERY OK envoy_tiles")
 
 

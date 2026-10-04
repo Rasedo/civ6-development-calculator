@@ -479,7 +479,7 @@ class SimGp:
                 self._cs_resolve_suzerain()
                 # the granted envoys are RECEIVED influence like any other —
                 # `activateGreatPerson`'s seize (cpu/core/gpAbility.ts) makes the same call
-                self._minor_envoy_tiles()
+                self._minor_envoy_tiles(_ok)
         _gpp = col("gppAll")
         if bool((_gpp != 0).any()):
             self.civ_gpp[:, row] = self.civ_gpp[:, row] + _gpp.unsqueeze(1)
