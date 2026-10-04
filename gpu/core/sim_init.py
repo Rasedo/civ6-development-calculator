@@ -3151,6 +3151,8 @@ class SimInit:
         self._stats_memo: dict = {}
         # row -> (the recorded reads, the result) — `_border_planes`
         self._border_memo: dict = {}
+        # ...and `_gov_mods`' inputs, per row (`_gov_mod_inputs`)
+        self._gov_in_memo: dict = {}
         # row -> (plane stamp, answer) — `_res_hidden`
         self._res_hidden_cache: dict = {}
         # row -> (turn, plane stamp, answer) — `_adopted_gov`
@@ -3170,19 +3172,22 @@ class SimInit:
         self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
         self._bel_add_memo = None        # (_bel_stamp(), {(fn,key,r): tensor})
         self._dom_rel_memo = None        # (_rel_stamp(), [B, n_majors]) — `_dominant_religion`
-        self._gov_pol_cache = None       # {row: (ver, civ, slots, dark, era, mods)}
+        self._gov_pol_cache = None       # {row: (ver, civ, slots, dark, era, held, pols, mods, chosen)}
         # `_gov_mods` memoises an answer the government CATALOG feeds, and
         # the catalog is written once at load. Anything that rewrites a
         # `_gov_*` or `_pol_*` row after that must move this counter, or the
         # memo keeps answering off the row it replaced.
         self._gov_cat_version = 0
-        self._dadj_cache = None          # (_eff_version, {di: floored [B,T] adjacency})
+        self._dadj_cache = None          # (_eff_version, {("var", di, civ): floored [B,T] adjacency}) — `_variant_adj_floor`
         self._wadj_cache = None          # (_eff_version, {key: [B,T] wonder-adjacency plane})
         self._fire_cache = None          # (plane stamp, [B,T]) — `_fire_plots`
         self._gw_present_cache: dict = {}  # row -> (plane stamp, [B,RC,H]) — `_gw_holder_present`
         self._gw_mult_cache: dict = {}     # row -> (plane stamp, [B,RC,W]) — `_gw_slot_mult`
         self._dpill_any_cache = None       # (plane stamp, bool) — `_any_district_pillaged`
-        self._encamp_live_cache = None     # (plane stamp, [B,T]) — `_encamp_block`
+        self._rep_pil_cache = None         # (plane stamp, [B,T], bool) — `_rep_pillaged`
+        self._sight_thru_cache: dict = {}  # see-through flag -> (plane stamp, heights, [B,T]) — `_sight_through_plane`
+        self._imp_ground_cache: dict = {}  # improvement -> (plane stamp, Appeal plane, [B,T]) — `_imp_ground_ok`
+        self._encamp_live_cache = None     # (plane stamp, [B,T], any live) — `_encamp_block`
         self._flood_level_cache = None     # (plane stamp, [B]) — `_flood_level`
         self._dcount_cache: dict = {}      # row -> (plane stamp, (all, specialty)) — `_district_counts`
         self._golden_ded_cache: dict = {}  # kind -> (plane stamp, [B, n_majors]) — `_golden_ded_table`
@@ -3406,6 +3411,7 @@ class SimInit:
             * (self._b_req_district >= 0).double().unsqueeze(1)
         )  # [NB, nD] building -> its district column
         self._pk = {n: i for i, n in enumerate(rules.promo_kinds)}
+        self._promo_col_ar = torch.arange(rules.promo_cols, device=device)  # the bit of each PROMOTE column
         self._promo_offer_n = int(rules.promo_offer_draw)
         # the two promo classes the ZOC exert test names — CIV6 (Zone of
         # Control): "Ranged and Bombard class units do not exert ZOC"
@@ -4266,10 +4272,17 @@ class SimInit:
             torch.where(_cell_row < self.n_majors, _cell_row, 100 + _cell_row - self.n_majors)) * 2048
         self._bidx = torch.arange(B, device=device)
         self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
+        # (plane stamp, [B,T]) — the neighbour counts `_adj_district_count`,
+        # `_adj_center_count`, `_adj_harbor_count` (and its district index),
+        # and per type `_adj_dtype_complete`
         self._adjd_cache = None
         self._adjc_cache = None
         self._adjh_cache = None
-        self._adjt_cache = None
+        self._adjt_cache: dict = {}
+        self._adj_src_cache: dict = {}   # src -> (plane stamp, (feature, terrain), [B,T]) — `_adj_src_count`
+        # (base|bel, ...) -> (the recorded reads, the result) — the floored
+        # district adjacency (`_district_adj_floor`, `_district_adj_belief_floor`)
+        self._dadj_memo: dict = {}
         self._fadjq_cache = None
         self._appeal_cache = None
         self._rcy_cache = None
@@ -4369,7 +4382,6 @@ class SimInit:
         self._fbase_cache = None
         self._food_cache = None
         self._nprod_cache = None
-        self._adjd_cache = self._adjc_cache = self._adjh_cache = self._adjt_cache = None
         self._dadj_cache = None
         self._fx_row_cache = None
         self._fadjq_cache = self._rcy_cache = self._bsum_row_cache = None
@@ -4673,7 +4685,6 @@ class SimInit:
         self._fbase_cache = None
         self._food_cache = None
         self._nprod_cache = None
-        self._adjd_cache = self._adjc_cache = self._adjh_cache = self._adjt_cache = None
         self._dadj_cache = None
         self._fx_row_cache = None
         self._fadjq_cache = self._rcy_cache = self._bsum_row_cache = None

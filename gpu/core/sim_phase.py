@@ -411,7 +411,7 @@ class SimPhase:
         Callers never write into the returned tensor — the same object is
         handed to every city."""
         m = self._governor_mask(row)
-        cache = self.__dict__.get("_gov_chan_cache")
+        cache = getattr(self, "_gov_chan_cache", None)
         if cache is None:
             cache = self._gov_chan_cache = {}
         key = (row, kind, channel)
@@ -954,6 +954,10 @@ class SimPhase:
         for _k, _on in kinds:
             hit = hit | (self._citystate_item_kind[_k] & _on.unsqueeze(1))
         hit = hit & self.citystate_alive
+        if not bool((hit & (env >= min(self._cs_env_bars, default=0))).any()):
+            # no live city-state of the item's kind sees an envoy bar reached:
+            # every term below multiplies a zero
+            return torch.zeros(B, dtype=torch.float64, device=env.device)
         stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(
             self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])  # [B, NB]
 

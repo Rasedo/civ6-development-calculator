@@ -908,11 +908,32 @@ def tiles_within_offsets(radius: int) -> torch.Tensor:
     return _OFFSETS_CACHE[radius]
 
 
+_WINDOW_TABLES: dict = {}
+
+
 def tiles_from_offsets(centers: torch.Tensor, offsets: torch.Tensor, width: int, height: int,
                        wrap_x: bool) -> torch.Tensor:
-    """[N, M] the plot at each axial offset from each centre (`tilesAtOffsets`),
-    -1 off the map. On a wrapping map columns wrap, and where the map is
-    narrow enough for two offsets to name one plot the later one is -1."""
+    """[N, M] the plot at each axial offset from each centre [N]
+    (`tilesAtOffsets`), -1 off the map. On a wrapping map columns wrap, and
+    where the map is narrow enough for two offsets to name one plot the later
+    one is -1.
+
+    Each window depends on its own centre alone, so it is read off a table of
+    every centre in [-T, 2T) (`_offset_windows` at each), built once per
+    offset set and map and kept while the offsets are the same object,
+    unwritten; a centre outside that range is an index error."""
+    T = width * height
+    key = (id(offsets), width, height, wrap_x)
+    ent = _WINDOW_TABLES.get(key)
+    if ent is None or not stamp_holds(ent[0], (offsets,)):
+        tab = _offset_windows(torch.arange(-T, 2 * T, device=offsets.device), offsets, width, height, wrap_x)
+        ent = _WINDOW_TABLES[key] = (plane_stamp((offsets,)), tab)
+    return ent[1][centers + T]
+
+
+def _offset_windows(centers: torch.Tensor, offsets: torch.Tensor, width: int, height: int,
+                    wrap_x: bool) -> torch.Tensor:
+    """`tiles_from_offsets` computed: the window of each centre [N]."""
     col = centers % width
     row = torch.div(centers, width, rounding_mode="floor")
     q = col - ((row - (row & 1)) >> 1)
@@ -1129,34 +1150,56 @@ def enter_inference() -> None:
         _INFERENCE.append(cm)
 
 
-# the recording in progress: (reads, seen, writes) — `seen` every name looked
-# up so far, instance attribute or not, so a second lookup costs one set test
+# the recordings in progress, outermost first, one per nested recorded call:
+# each (reads, writes, held) — `held` the entries the instance dict held when
+# the call began, moved out of it for the call. The outermost `held` is the
+# whole dict; an inner one, what the enclosing calls had read or written so
+# far. A name's first read in a call misses the dict, is found in the
+# innermost `held` that has it, and is recorded by every call from that one
+# in — the ones that had not read it yet.
 _REC: list = []
+# the recorded instance's dict and class, while a recording runs
+_REC_OBJ: list = []
+# every name a class (or a base) defines: an instance attribute shadowing one
+# stays in the dict through a recording, or the class's value would answer
+_CLASS_NAMES: dict[type, frozenset] = {}
 
 
 def _tracking_class(cls: type) -> type:
+    """`cls` with the recording's two hooks. The recording moves the instance
+    dict's entries out, so the first read of an instance attribute misses
+    the dict and reaches `__getattr__`, which records it and moves it back:
+    every later read of it is a plain lookup."""
     t = _TRACKING.get(cls)
     if t is None:
-        def __getattribute__(self, name, _oga=object.__getattribute__, _rec=_REC):
-            v = _oga(self, name)
-            top = _rec[0]
-            if name not in top[1]:
-                top[1].add(name)
-                if name in _oga(self, "__dict__") and not name.endswith(_MEMO_DERIVED):
-                    if isinstance(v, torch.Tensor):
-                        top[0][name] = (0, v, write_count(v))
-                    elif isinstance(v, _MEMO_SCALARS):
-                        top[0][name] = (1, v, None)
-                    else:
-                        top[0][name] = (2, v, None)
+        def __getattr__(self, name, _rec=_REC, _obj=_REC_OBJ):
+            k = len(_rec) - 1
+            v = _rec[k][2].get(name, _ABSENT)
+            while v is _ABSENT:
+                k -= 1
+                if k < 0:
+                    raise AttributeError(name)
+                v = _rec[k][2].get(name, _ABSENT)
+            _obj[0][name] = v
+            if not name.endswith(_MEMO_DERIVED):
+                if isinstance(v, torch.Tensor):
+                    e = (0, v, write_count(v))
+                elif isinstance(v, _MEMO_SCALARS):
+                    e = (1, v, None)
+                else:
+                    e = (2, v, None)
+                for j in range(k, len(_rec)):
+                    _rec[j][0][name] = e
             return v
 
         def __setattr__(self, name, v, _rec=_REC):
-            _rec[0][2].add(name)
+            for layer in _rec:
+                layer[1].add(name)
             object.__setattr__(self, name, v)
 
+        _CLASS_NAMES[cls] = frozenset(n for c in cls.__mro__ for n in c.__dict__)
         t = _TRACKING[cls] = type(cls.__name__, (cls,),
-                                  {"__getattribute__": __getattribute__, "__setattr__": __setattr__})
+                                  {"__getattr__": __getattr__, "__setattr__": __setattr__})
     return t
 
 
@@ -1173,23 +1216,48 @@ def record_reads(obj, fn, *args, may_set: tuple[str, ...] = ()):
     """Run `fn(*args)` (a method bound to `obj`) with `obj`'s reads recorded.
     Returns (result, reads) — `reads` None when the call cannot be memoised:
     it set an attribute other than a derived cache or `may_set`, or wrote into
-    a tensor it read, or it ran inside another recorded call."""
+    a tensor it read. A call inside another recorded call is recorded too,
+    and what it reads joins the enclosing calls' reads."""
     d = obj.__dict__
-    if _REC:
-        return fn(*args), None
-    reads, writes = {}, set()
-    _REC.append((reads, set(), writes))
-    cls = type(obj)
-    object.__setattr__(obj, "__class__", _tracking_class(cls))
+    outer = not _REC
+    if outer:
+        cls = type(obj)
+        tcls = _tracking_class(cls)
+        _REC_OBJ[:] = [d, cls]
+    else:
+        assert _REC_OBJ[0] is d, "a recording runs on one instance at a time"
+    reads, writes, held = {}, set(), dict(d)
+    d.clear()
+    # an instance attribute standing over a class one (a poke's patched
+    # method) stays in the dict, where the plain lookup finds it before the
+    # class's, and is recorded as read up front
+    for name in _CLASS_NAMES[_REC_OBJ[1]].intersection(held):
+        v = d[name] = held[name]
+        if not name.endswith(_MEMO_DERIVED):
+            reads[name] = ((0, v, write_count(v)) if isinstance(v, torch.Tensor)
+                           else (1, v, None) if isinstance(v, _MEMO_SCALARS) else (2, v, None))
+    _REC.append((reads, writes, held))
+    if outer:
+        object.__setattr__(obj, "__class__", tcls)
     try:
         out = fn(*args)
     finally:
-        object.__setattr__(obj, "__class__", cls)
-        _REC.clear()
+        _REC.pop()
+        if outer:
+            object.__setattr__(obj, "__class__", _REC_OBJ[1])
+            _REC_OBJ.clear()
+        # back in the original order: the held entries, then what the call
+        # read back (the same objects) or wrote over them, then what it added
+        now = dict(d)
+        d.clear()
+        d.update(held)
+        d.update(now)
     if any(not w.endswith(_MEMO_DERIVED) and w not in may_set for w in writes):
         return out, None
     # one copy per plane per version, shared by every entry that read it
-    shadow = d.setdefault("_memo_shadow_cache", {})
+    shadow = getattr(obj, "_memo_shadow_cache", None)
+    if shadow is None:
+        shadow = obj._memo_shadow_cache = {}
     ents = []
     for name, (k, ref, ver) in reads.items():
         if k == 0:
@@ -1208,9 +1276,11 @@ def memo_read(obj, store: dict, key, fn, *args, may_set: tuple[str, ...] = ()) -
     """`fn(*args)` — a reader returning a tuple of tensors — through the
     read-set memo `store` (a derived cache on `obj`), entry `key`: a hit hands
     back clones of the stored result. Under `_log_diff` it runs plain.
-    STATS_MEMO_CHECK recomputes on every hit and asserts."""
-    d = obj.__dict__
-    if d.get("_log_diff"):
+    STATS_MEMO_CHECK recomputes on every hit and asserts. Inside a recorded
+    call the entry's reads are taken through the recording, so on a hit they
+    join the enclosing calls' reads."""
+    d = obj.__dict__ if not _REC else _RecView(obj)
+    if d.get("_log_diff", None):
         return fn(*args)
     ent = store.get(key)
     if ent is not None and reads_hold(d, ent[0]):
@@ -1228,8 +1298,21 @@ def memo_read(obj, store: dict, key, fn, *args, may_set: tuple[str, ...] = ()) -
     return out
 
 
-def reads_hold(d: dict, ents: list) -> bool:
-    """Do the recorded reads `ents` still hold on the instance dict `d`?"""
+class _RecView:
+    """The recorded instance's attributes as `dict.get` answers them, each
+    read through the recording."""
+    __slots__ = ("obj",)
+
+    def __init__(self, obj):
+        self.obj = obj
+
+    def get(self, name, default):
+        return getattr(self.obj, name, default)
+
+
+def reads_hold(d, ents: list) -> bool:
+    """Do the recorded reads `ents` still hold on the instance dict `d` (or a
+    `_RecView` of it)?"""
     for e in ents:
         cur = d.get(e[0], _ABSENT)
         k = e[1]

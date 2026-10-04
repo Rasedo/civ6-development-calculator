@@ -1646,7 +1646,7 @@ class SimSeats:
         fixture loader and never by the engine, and the one thing that rewrites
         them — a test re-seating a row — writes them in place, which moves
         `Tensor._version` (a host-side int: reading it syncs nothing; a plane
-        born under inference mode keeps none, and `write_stamp` then never
+        born under inference mode keeps none, and the stamp then never
         matches).
         `_gen_ver` counts UNIT generations, bumping on every unit born, killed,
         captured or converted, so keying the memo on it would rebuild every
@@ -1654,9 +1654,12 @@ class SimSeats:
         `restore()` clears the dict too, for a base whose planes are swapped
         for clones wholesale (the poke lanes' `_STATIC` restore)."""
         rc, rl = self.row_civ, self.row_leader
-        stamp = (id(rc), simbase.write_stamp(rc), id(rl), simbase.write_stamp(rl))
-        if self._live_rows_stamp != stamp:
-            self._live_rows_stamp = stamp
+        st = self._live_rows_stamp
+        # the stamp holds the two planes themselves; one that keeps no counter
+        # leaves it empty, so the next call rebuilds
+        if not (st and st[0] is rc and st[2] is rl and st[1] == rc._version and st[3] == rl._version):
+            self._live_rows_stamp = (() if rc.is_inference() or rl.is_inference()
+                                     else (rc, rc._version, rl, rl._version))
             self._live_rows_cache.clear()
         key = (row, id(table))
         hit = self._live_rows_cache.get(key)
@@ -4284,7 +4287,22 @@ class SimSeats:
         """[B, T] — does improvement `k`'s own catalog clause allow this tile?
         The terrain, elevation, feature and neighbour rules each row states for
         itself, which `validImprovementsIn` asks of its suzerain rows and of
-        the Military Engineer's alike."""
+        the Military Engineer's alike. Kept per improvement under the write
+        counters of the planes it reads and the Appeal plane object it read;
+        callers never write into the answer."""
+        planes = (self.feat_id, self.feat_stripped, self.terrain, self.hills, self.volcano_at,
+                  self.improvement, self.res_priority, self.res_stripped, self.water, self.passable,
+                  self.neigh)
+        ap = self._tile_appeal() if self._imp_min_appeal[k] >= 0 else None
+        ent = self._imp_ground_cache.get(k)
+        if ent is not None and ent[1] is ap and simbase.stamp_holds(ent[0], planes):
+            return ent[2]
+        ok = self._imp_ground_compute(k)
+        self._imp_ground_cache[k] = (simbase.plane_stamp(planes), ap, ok)
+        return ok
+
+    def _imp_ground_compute(self, k: int) -> torch.Tensor:
+        """`_imp_ground_ok` computed."""
         B, dev = self.B, self.device
         ok = torch.ones(B, self.T, dtype=torch.bool, device=dev)
         _rf = self._imp_req_feat[k]
@@ -9226,11 +9244,17 @@ class SimSeats:
         one tile per type; `pillagedDistrictTypes` walks `city.districts`, every
         instance, so one pillaged Neighborhood darkens the Food Market whichever
         tile the registry names. The city is the registry tile's own (seat,
-        city id)."""
-        rep_p = (self.district >= 0) & self.district_complete & self.district_pillaged \
-            & self._is_repeatable[self.district.clamp(min=0)]  # [B, T]
+        city id). The [B, T] pillaged-instance plane, and whether it holds any,
+        are kept under the write counters of the four planes they read."""
+        planes = (self.district, self.district_complete, self.district_pillaged, self._is_repeatable)
+        ent = self._rep_pil_cache
+        if ent is None or not simbase.stamp_holds(ent[0], planes):
+            _rp = (self.district >= 0) & self.district_complete & self.district_pillaged \
+                & self._is_repeatable[self.district.clamp(min=0)]  # [B, T]
+            ent = self._rep_pil_cache = (simbase.plane_stamp(planes), _rp, bool(_rp.any()))
+        rep_p = ent[1]
         out = torch.zeros(dt_reg.shape, dtype=torch.bool, device=self.device)
-        if not bool(rep_p.any()):
+        if not ent[2]:
             return out
         nD = dt_reg.shape[-1]
         big = 1 << 20
@@ -12334,8 +12358,10 @@ class SimSeats:
         # one seat): one row of the table, with no [B, 1] fill and no advanced
         # index.
         ia = int(a_seat)
-        return tbl[:, ia if ia >= 0 else N - 1].gather(
-            1, bi.reshape(B, -1)).reshape(b_plane.shape)
+        row = tbl[:, ia if ia >= 0 else N - 1]
+        if bi.dim() == 2 and bi.shape[0] == B:
+            return row.gather(1, bi)
+        return row.gather(1, bi.reshape(B, -1)).reshape(b_plane.shape)
 
     def _step_verb(
         self,

@@ -3053,53 +3053,58 @@ class SimEconomy:
         adjacency source. Counts every MAJOR city centre (centre_slot_at —
         those carry tile.district='CITY_CENTER' in TS) and every completed
         specialty district (self.district). No owner filter, mirroring
-        matchesAdjacency('DISTRICT')."""
-        if self._adjd_cache is not None and self._adjd_cache[0] == self._eff_version:
-            return self._adjd_cache[1]
+        matchesAdjacency('DISTRICT'). This and its three siblings below are
+        kept under the write counters of the planes they read; callers never
+        write into the answer."""
+        planes = (self.centre_slot_at, self.district, self.district_complete, self.neigh)
+        ent = self._adjd_cache
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
         is_d = ((self.centre_slot_at[:, nbc] >= 0) | ((self.district[:, nbc] >= 0) & self.district_complete[:, nbc])) & on_map
         out = is_d.sum(dim=2)
-        self._adjd_cache = (self._eff_version, out)
+        self._adjd_cache = (simbase.plane_stamp(planes), out)
         return out
 
     def _adj_center_count(self) -> torch.Tensor:
-        if self._adjc_cache is not None and self._adjc_cache[0] == self._eff_version:
-            return self._adjc_cache[1]
+        planes = (self.centre_slot_at, self.neigh)
+        ent = self._adjc_cache
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
         is_c = (self.centre_slot_at[:, nbc] >= 0) & on_map
         out = is_c.sum(dim=2)
-        self._adjc_cache = (self._eff_version, out)
+        self._adjc_cache = (simbase.plane_stamp(planes), out)
         return out
 
     def _adj_harbor_count(self) -> torch.Tensor:
         if self._harbor_idx < 0:
             return torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
-        if self._adjh_cache is not None and self._adjh_cache[0] == self._eff_version:
-            return self._adjh_cache[1]
+        planes = (self.district, self.district_complete, self.neigh)
+        ent = self._adjh_cache
+        if ent is not None and ent[1] == self._harbor_idx and simbase.stamp_holds(ent[0], planes):
+            return ent[2]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
         is_h = (self.district[:, nbc] == self._harbor_idx) & self.district_complete[:, nbc] & on_map
         out = is_h.sum(dim=2)
-        self._adjh_cache = (self._eff_version, out)
+        self._adjh_cache = (simbase.plane_stamp(planes), self._harbor_idx, out)
         return out
 
     def _adj_dtype_complete(self, di: int) -> torch.Tensor:
-        # memoised on _eff_version like its count siblings above — it reads the
-        # same district/district_complete planes, whose every writer bumps the key
-        if self._adjt_cache is None or self._adjt_cache[0] != self._eff_version:
-            self._adjt_cache = (self._eff_version, {})
-        d = self._adjt_cache[1]
-        v = d.get(di)
-        if v is None:
-            nb = self.neigh
-            nbc = nb.clamp(min=0)
-            v = ((self.district[:, nbc] == di) & self.district_complete[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
-            d[di] = v
+        planes = (self.district, self.district_complete, self.neigh)
+        ent = self._adjt_cache.get(di)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        v = ((self.district[:, nbc] == di) & self.district_complete[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
+        self._adjt_cache[di] = (simbase.plane_stamp(planes), v)
         return v
 
     def _adj_res_live(self, ri: int) -> torch.Tensor:
@@ -3782,21 +3787,39 @@ class SimEconomy:
     def _gov_mods(self, row: int):
         """The seat's government + policy channels, memoised twice over.
 
-        `_eff_version` is the cheap gate; when it moves, the four INPUTS are
-        re-derived (under a millisecond) and the standing answer kept if they
-        match, because `_gov_policy_mods` reads nothing else BUT the catalog.
-        A building completing anywhere moves the version many times a turn and
-        changes none of them. `_gov_cat_version` carries the catalog half of
-        that key — the four inputs cannot speak for a row that was rewritten
-        underneath them."""
+        `_eff_version` is the cheap gate; when it moves, the INPUTS
+        (`_gov_mod_inputs`, through their own read-set memo `_gov_in_memo`)
+        are read again and the standing answer kept if they match, because
+        `_gov_policy_mods` reads nothing else BUT the catalog. A building
+        completing anywhere moves the version many times a turn and changes
+        none of them. `_gov_cat_version` carries the catalog half of that key
+        — the inputs cannot speak for a row that was rewritten underneath
+        them."""
         if self._gov_pol_cache is None:
             self._gov_pol_cache = {}
         ver = (self._eff_version, self._gov_cat_version)
         ent = self._gov_pol_cache.get(row)
         if ent is not None and ent[0] == ver:
             return ent[7]
-        # `_seat_civics` hands back a VIEW of the live plane; a key that is not
-        # a copy compares equal to itself forever and freezes the answer.
+        civ, slots, dark, era, held, pols, chosen = simbase.memo_read(
+            self, self._gov_in_memo, row, self._gov_mod_inputs, row)
+        if ent is not None and ent[0][1] == self._gov_cat_version \
+                and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
+                and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
+                and torch.equal(ent[5], held) and torch.equal(ent[6], pols) \
+                and torch.equal(ent[8], chosen):
+            val = ent[7]
+        else:
+            val = self._gov_policy_mods(civ, slots, dark, era, held, row=row)
+        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, pols, val, chosen)
+        return val
+
+    def _gov_mod_inputs(self, row: int) -> tuple[torch.Tensor, ...]:
+        """`_gov_mods`' inputs for seat row `row`, each a copy, never a view
+        of a live plane (a key that is a view compares equal to itself forever
+        and freezes the answer): (civics, extra slots, dark age, era, legacy
+        held, the cards chosen, the government chosen — read -2 in Anarchy,
+        empty on a minor's row)."""
         civ = self._seat_civics(row).clone()
         slots = self._wonder_extra_slots(row)
         # a MINOR's city adopts the government its own civics reach and slots
@@ -3808,22 +3831,11 @@ class SimEconomy:
         era = self._civ_era(self._seat_techs(row), civ)
         held = self.civ_gov_held[:, row].clone() if major else torch.zeros(
             (self.B,) + tuple(self.civ_gov_held.shape[2:]), dtype=self.civ_gov_held.dtype, device=self.device)
-        # ...and the STORE: the cards the seat chose are an input now, and a
-        # key that is a view of the live plane would freeze the first answer —
-        # as is the government it chose, read -2 in Anarchy
         pols = self._seat_policies(row).clone()
         chosen = torch.where(self._in_anarchy(row), torch.full_like(self.civ_gov_chosen[:, row], -2),
-                             self.civ_gov_chosen[:, row]) if major else None
-        if ent is not None and ent[0][1] == self._gov_cat_version \
-                and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
-                and torch.equal(ent[3], dark) and torch.equal(ent[4], era) \
-                and torch.equal(ent[5], held) and torch.equal(ent[6], pols) \
-                and (chosen is None or torch.equal(ent[8], chosen)):
-            val = ent[7]
-        else:
-            val = self._gov_policy_mods(civ, slots, dark, era, held, row=row)
-        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, held, pols, val, chosen)
-        return val
+                             self.civ_gov_chosen[:, row]) if major \
+            else torch.zeros(0, dtype=self.civ_gov_chosen.dtype, device=self.device)
+        return civ, slots, dark, era, held, pols, chosen
 
     def _purchase_step(self, price: torch.Tensor) -> torch.Tensor:
         """CIV6 (PURCHASE_DIVISOR 5, measured live — lab 2 scene G): every gold
@@ -4099,28 +4111,29 @@ class SimEconomy:
     def _adj_src_count(self, src: int) -> torch.Tensor:
         """[B, T] — how many NEIGHBOURS answer adjacency source `src`, for the
         sources that name a FEATURE or a TERRAIN. Read off the live map, so a
-        chopped Rainforest stops counting the turn it goes."""
-        key = ("adjsrc", src)
-        if self._dadj_cache is None or self._dadj_cache[0] != self._eff_version:
-            self._dadj_cache = (self._eff_version, {})
-        hit = self._dadj_cache[1].get(key)
-        if hit is None:
-            fid = self._adj_src_feat[src] if src < len(self._adj_src_feat) else -1
-            tid = self._adj_src_terr[src] if src < len(self._adj_src_terr) else -1
-            # CIV6 (Sea Level Rise): a submerged tile "becomes a coastal water
-            # tile", so it lends the SEA's sources and none of the ground's.
-            # Both engines keep the feature and terrain UNDERNEATH on purpose,
-            # so the mask is here at the READ, where `ringTerrain` /
-            # `ringFeature` put it on TS.
-            if fid >= 0:
-                on = (self.feat_id == fid) & ~self.feat_stripped & ~self.tile_submerged
-            elif tid >= 0:
-                on = (self.terrain == tid).expand(self.B, self.T) & ~self.tile_submerged
-            else:
-                on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-            nb = self.neigh
-            hit = ((on[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)).to(self.dtype)
-            self._dadj_cache[1][key] = hit
+        chopped Rainforest stops counting the turn it goes. Kept per source
+        under the write counters of the planes it reads (and the source's
+        feature and terrain); callers never write into the answer."""
+        fid = self._adj_src_feat[src] if src < len(self._adj_src_feat) else -1
+        tid = self._adj_src_terr[src] if src < len(self._adj_src_terr) else -1
+        planes = (self.feat_id, self.feat_stripped, self.tile_submerged, self.terrain, self.neigh)
+        ent = self._adj_src_cache.get(src)
+        if ent is not None and ent[1] == (fid, tid) and simbase.stamp_holds(ent[0], planes):
+            return ent[2]
+        # CIV6 (Sea Level Rise): a submerged tile "becomes a coastal water
+        # tile", so it lends the SEA's sources and none of the ground's.
+        # Both engines keep the feature and terrain UNDERNEATH on purpose,
+        # so the mask is here at the READ, where `ringTerrain` /
+        # `ringFeature` put it on TS.
+        if fid >= 0:
+            on = (self.feat_id == fid) & ~self.feat_stripped & ~self.tile_submerged
+        elif tid >= 0:
+            on = (self.terrain == tid).expand(self.B, self.T) & ~self.tile_submerged
+        else:
+            on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        nb = self.neigh
+        hit = ((on[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)).to(self.dtype)
+        self._adj_src_cache[src] = (simbase.plane_stamp(planes), (fid, tid), hit)
         return hit
 
     def _belief_adj(self, row: int, di: int) -> torch.Tensor | None:
@@ -4225,30 +4238,24 @@ class SimEconomy:
         return raw
 
     def _district_adj_floor(self, di: int) -> torch.Tensor:
-        if self._dadj_cache is None or self._dadj_cache[0] != self._eff_version:
-            self._dadj_cache = (self._eff_version, {})
-        d = self._dadj_cache[1]
-        v = d.get(di)
-        if v is None:
-            _cnt = self._adj_district_count()
-            v = torch.floor(self._district_adj_raw(di, _cnt.to(self.dtype)))
-            d[di] = v
-        return v
+        """[B, T] — the floored adjacency a district of type `di` would take
+        at each plot, through the read-set memo `_dadj_memo`."""
+        return simbase.memo_read(self, self._dadj_memo, ("base", di), self._district_adj_floor_read, di)[0]
+
+    def _district_adj_floor_read(self, di: int) -> tuple[torch.Tensor]:
+        return (torch.floor(self._district_adj_raw(di, self._adj_district_count().to(self.dtype))),)
 
     def _district_adj_belief_floor(self, row: int, di: int) -> torch.Tensor:
         """`_district_adj_floor` for a district type some belief pays extra
         adjacency on — the belief's sources join the SUM, so the floor closes
         over them, and the result is this seat's alone."""
-        key = ("bel", self._bel_stamp(), row, di)
-        if self._dadj_cache is None or self._dadj_cache[0] != self._eff_version:
-            self._dadj_cache = (self._eff_version, {})
-        v = self._dadj_cache[1].get(key)
-        if v is None:
-            raw = self._district_adj_raw(di, self._adj_district_count().to(self.dtype))
-            bel = self._belief_adj(row, di)
-            v = torch.floor(raw if bel is None else raw + bel)
-            self._dadj_cache[1][key] = v
-        return v
+        return simbase.memo_read(self, self._dadj_memo, ("bel", row, di),
+                                 self._district_adj_belief_floor_read, row, di)[0]
+
+    def _district_adj_belief_floor_read(self, row: int, di: int) -> tuple[torch.Tensor]:
+        raw = self._district_adj_raw(di, self._adj_district_count().to(self.dtype))
+        bel = self._belief_adj(row, di)
+        return (torch.floor(raw if bel is None else raw + bel),)
 
     def _variant_adj_floor(self, row: int, di: int) -> torch.Tensor | None:
         """[B, T] — a UNIQUE district's OWN adjacency, floored, or None where
@@ -5930,9 +5937,15 @@ class SimEconomy:
     def _step_attacks_left(self, utype: torch.Tensor, promos: torch.Tensor,
                            left: torch.Tensor) -> torch.Tensor:
         """`stepAttacksLeft` — what a step leaves of the attack budget:
-        everything, until the unit has struck once."""
+        everything, until the unit has struck once. What is kept is `left`
+        less the still-only attacks (`after - made`), so with none of those
+        anywhere the budget is `left` as it stands."""
+        still = (self._promo_val(utype, promos, "EXTRA_ATTACK_STILL")
+                 + self._type_extra_attack[utype.clamp(min=0, max=self.NU - 1)].long())
+        if not bool((still != 0).any()):
+            return left
         after = self._attacks_after_moving(utype, promos)
-        made = self._attacks_per_turn(utype, promos, after) - left
+        made = after + still - left
         keep = (after - made).clamp(min=0)
         return torch.where(made > 0, torch.minimum(left, keep), left)
 

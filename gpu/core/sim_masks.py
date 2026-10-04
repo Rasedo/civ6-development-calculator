@@ -713,8 +713,7 @@ class SimMasks:
         kinds = rd.promo_kind[clsc]
         vs = rd.promo_v[clsc]
         masks = rd.promo_mask[clsc]
-        cols = torch.arange(rd.promo_cols, device=self.device)
-        held = ((promos.unsqueeze(1) >> cols.unsqueeze(0)) & 1) > 0  # [B, PCOL]
+        held = ((promos.unsqueeze(1) >> self._promo_col_ar.unsqueeze(0)) & 1) > 0  # [B, PCOL]
         live = (held & (cls >= 0).unsqueeze(1)).unsqueeze(2).expand_as(kinds)
         return kinds, vs, masks, live
 
@@ -727,9 +726,7 @@ class SimMasks:
         k = self._pk.get(kind, -1)
         if k < 0:
             return torch.zeros_like(promos)
-        rd = self.rules_dev
-        cols = torch.arange(rd.promo_cols, device=self.device)
-        held = (promos.reshape(-1).unsqueeze(1) >> cols) & 1
+        held = (promos.reshape(-1).unsqueeze(1) >> self._promo_col_ar) & 1
         tab = self._promo_type_table("promo_col_val", k)
         v = (held * tab[utype.clamp(min=0).reshape(-1)]).sum(dim=1)
         return v.reshape(promos.shape)
@@ -785,9 +782,8 @@ class SimMasks:
             return ones
         rd = self.rules_dev
         cls = rd.u_promo_class[utype.clamp(min=0)].reshape(-1)
-        cols = torch.arange(rd.promo_cols, device=self.device)
         cm = rd.promo_col_max[k][cls.clamp(min=0)]
-        held = (((promos.reshape(-1).unsqueeze(1) >> cols) & 1) > 0) & (cls >= 0).unsqueeze(1)
+        held = (((promos.reshape(-1).unsqueeze(1) >> self._promo_col_ar) & 1) > 0) & (cls >= 0).unsqueeze(1)
         best = torch.where(held, cm, torch.zeros_like(cm)).amax(dim=1)
         return torch.maximum(best.reshape(promos.shape), ones)
 
@@ -2159,17 +2155,17 @@ class SimMasks:
         The pair returned is (what the step costs BEYOND a plain point, river)
         — the caller adds the plain point itself."""
         dc = dest.clamp(min=0)
-        tm = self.tmove.gather(1, dc.unsqueeze(1)).squeeze(1)
+        d1 = dc.unsqueeze(1)
+        tm = self.tmove.gather(1, d1).squeeze(1)
         # CIV6 (Polder, `MovementChange="2"`): an improvement may make its own
         # tile dearer to enter than the step under it. `tmove` is the cost
         # BEYOND a plain point, so the row's WHOLE cost joins the same way.
         if self._imp_move_cost_any:
-            _mi = self.improvement.gather(1, dc.unsqueeze(1)).squeeze(1)
-            _mp = self.pillaged.gather(1, dc.unsqueeze(1)).squeeze(1)
+            _mi = self.improvement.gather(1, d1).squeeze(1)
+            _mp = self.pillaged.gather(1, d1).squeeze(1)
             _mc = self._imp_move_cost[_mi.clamp(min=0)] * ((_mi >= 0) & ~_mp).long()
             tm = torch.where(_mc > 0, (_mc - 1) * self._mp_scale, tm)
         if utype is not None and promos is not None:
-            d1 = dc.unsqueeze(1)
             # CIV6 (Khevsureti, Ngao Mbeba): the same waiver, written on the
             # CHASSIS instead of on a promotion.
             _ut0 = utype.clamp(min=0, max=self.NU - 1)
@@ -2188,12 +2184,12 @@ class SimMasks:
         if utype is not None and useat is not None and self._enh_zeal_any:
             zeal = self._religious_zeal(utype, useat)
             tm = torch.where(zeal, torch.zeros_like(tm), tm)
-        fc, dcc = frm.clamp(min=0).unsqueeze(1), dest.clamp(min=0).unsqueeze(1)
-        f_rr = self.railroad.gather(1, fc).squeeze(1)
-        d_rr = self.railroad.gather(1, dcc).squeeze(1)
-        rd = ((self.road.gather(1, fc).squeeze(1) | f_rr)
-              & (self.road.gather(1, dcc).squeeze(1) | d_rr))
-        step = torch.where(f_rr & d_rr,
+        # both ends at once, [B, 2]: a route-to-route step has a route at
+        # each end, a rail step a railroad at each
+        ends = torch.stack((frm.clamp(min=0), dc), dim=1)
+        rr = self.railroad.gather(1, ends)
+        rd = (self.road.gather(1, ends) | rr).all(dim=1)
+        step = torch.where(rr.all(dim=1),
                            torch.full_like(tm, self._railroad_mp),
                            self._road_tier_mp[self.road_tier])
         terr = torch.where(rd, step - self._mp_scale, tm)
@@ -2257,12 +2253,16 @@ class SimMasks:
         plane is thousands, so this is the form every prober wants."""
         if self._encamp_didx < 0:
             return torch.zeros_like(tiles, dtype=torch.bool)
-        t = tiles.clamp(min=0)
-        # `_encamp_live` read once per write of the planes it reads
+        # `_encamp_live` read once per write of the planes it reads, with
+        # whether any Encampment stands live at all
         planes = (self.district, self.district_complete, self.district_pillaged, self.encamp_hp)
         ent = self._encamp_live_cache
         if ent is None or not simbase.stamp_holds(ent[0], planes):
-            ent = self._encamp_live_cache = (simbase.plane_stamp(planes), self._encamp_live())
+            _live = self._encamp_live()
+            ent = self._encamp_live_cache = (simbase.plane_stamp(planes), _live, bool(_live.any()))
+        if not ent[2]:
+            return torch.zeros_like(tiles, dtype=torch.bool)
+        t = tiles.clamp(min=0)
         live = ent[1].gather(1, t)
         if not torch.is_tensor(seat) and seat == BARB_SEAT:
             return live
@@ -2383,16 +2383,16 @@ class SimMasks:
         `is_civilian` / `is_naval` an int, a bool or a [B] tensor.
         """
         tc = tiles.clamp(min=0)
-        # the four occupancy planes read at once: [B, 4, N] slots, then the
-        # seat of whoever holds each (-1 where nobody does)
-        occ = torch.stack((self.military_at, self.civilian_at, self.support_at, self.embarked_at), dim=1)
-        slots = occ.gather(2, tc.unsqueeze(1).expand(-1, 4, -1))
+        # the four occupancy planes read at the tiles: [B, 4, N] slots in
+        # (military, civilian, support, embarked) order, then the seat of
+        # whoever holds each (-1 where nobody does)
+        slots = torch.stack((self.military_at.gather(1, tc), self.civilian_at.gather(1, tc),
+                             self.support_at.gather(1, tc), self.embarked_at.gather(1, tc)), dim=1)
         seats = torch.where(
             slots >= 0,
             self.unit_seat.gather(1, slots.clamp(min=0).reshape(slots.shape[0], -1)).reshape(slots.shape),
             -1,
         )
-        mil_seat, civ_seat, sup_seat, emb_seat = seats.unbind(1)
 
         def _flag(v):
             if torch.is_tensor(v):
@@ -2400,16 +2400,19 @@ class SimMasks:
             return torch.full((1, 1), bool(v), dtype=torch.bool, device=tc.device)
 
         sup_b = _flag(is_support)
+        civ_f = _flag(is_civilian)
         # `is_civilian` is the NONCOMBAT flag every caller already computes, so
         # a SUPPORT mover arrives with both set; the civilian arm takes the
         # ones that are not support, exactly as `_occ_set` splits the planes.
-        civ_b = _flag(is_civilian) & ~sup_b
+        civ_b = civ_f & ~sup_b
         emb_b = self.water.gather(1, tc) & ~_flag(is_naval)
-        mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | (~civ_b & ~sup_b & ~emb_b))
-        civ_blocks = (civ_seat >= 0) & ((civ_seat != seat) | (civ_b & ~emb_b))
-        sup_blocks = (sup_seat >= 0) & ((sup_seat != seat) | (sup_b & ~emb_b))
-        emb_blocks = (emb_seat >= 0) & ((emb_seat != seat) | emb_b)
-        return mil_blocks | civ_blocks | sup_blocks | emb_blocks
+        dry = ~emb_b
+        # per class, whether an OWN unit there blocks the mover: the class it
+        # would stand in (`~civ_b & ~sup_b` is `~(civ_f | sup_b)`)
+        same = torch.stack(torch.broadcast_tensors(~(civ_f | sup_b) & dry, civ_b & dry, sup_b & dry, emb_b),
+                           dim=1)
+        own = seat.reshape(-1, 1, 1) if torch.is_tensor(seat) else seat
+        return ((seats >= 0) & ((seats != own) | same)).any(dim=1)
 
     def _first_free_spot(self, at_tile: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None, utype: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
@@ -2638,7 +2641,19 @@ class SimMasks:
     def _sight_through_plane(self, see_through: bool) -> torch.Tensor:
         """[B, T] long — `sightThrough`: the height a tile puts in the way of a
         look across it, its elevation's plus its feature's; `see_through`
-        (Sentry) drops the feature half."""
+        (Sentry) drops the feature half. Kept per flag under the write
+        counters of the planes it reads; callers never write into it."""
+        planes = (self.hills, self.tile_mountain, self.feat_id, self.feat_stripped, self._feat_sight_through)
+        hs = (self._sight_hills, self._sight_mountain)
+        ent = self._sight_thru_cache.get(see_through)
+        if ent is not None and ent[1] == hs and simbase.stamp_holds(ent[0], planes):
+            return ent[2]
+        out = self._sight_through_compute(see_through)
+        self._sight_thru_cache[see_through] = (simbase.plane_stamp(planes), hs, out)
+        return out
+
+    def _sight_through_compute(self, see_through: bool) -> torch.Tensor:
+        """`_sight_through_plane` computed."""
         out = self.hills.long() * self._sight_hills + self.tile_mountain.long() * self._sight_mountain
         if not see_through:
             # the LIVE feature: `feat_id` keeps a chopped tile's old id and

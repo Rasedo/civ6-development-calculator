@@ -193,6 +193,12 @@ class SimGp:
         building — `prodBoostPct`'s Great-Person half, which stacks ADDITIVELY
         with the cards exactly as CIV6 stacks production modifiers."""
         _sh = (self.B,) + (1,) * (cur.dim() - 1)  # one city column or a whole row
+        # every share below is a channel of this row's permanents times a 0/1
+        # mask: with none of them held, each term is +0.0
+        _ks = [self._gp_perm_names.index(n) for n in ("militaryProdPct", "spaceProdPct")
+               if n in self._gp_perm_names] + [_pk for _pk, _pc in self._gp_unit_prod_classes]
+        if row >= self.n_majors or not _ks or not bool((self.civ_gp_perm[:, row, _ks] != 0).any()):
+            return torch.zeros(cur.shape, dtype=torch.float64, device=self.device)
         up = self._gp_perm(row, "militaryProdPct").double().reshape(_sh) / 100.0
         spp = self._gp_perm(row, "spaceProdPct").double().reshape(_sh) / 100.0
         # CIV6 (Eisenhower, MODIFIER_PLAYER_CITIES_ADJUST_MILITARY_UNITS_PRODUCTION):

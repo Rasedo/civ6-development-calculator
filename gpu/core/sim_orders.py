@@ -776,12 +776,12 @@ class SimOrders:
                 # ONE enterable-water plane for both readers: a HULL floats
                 # over it and through a Canal's passage, and an embarked LAND
                 # unit takes the same water without the passage.
-                _water = _wet & (~self.ocean_tile.gather(1, _tc1).squeeze(1) | cart)
+                _open = ~self.ocean_tile.gather(1, _tc1).squeeze(1) | cart
+                _water = _wet & _open
                 # CIV6 (Leif Erikson): the HULL's ocean gate widens, the embarked
                 # land unit's does not — read live, a spend at an earlier rank
                 # opens the ocean for this one
-                _hull = (_wet & (~self.ocean_tile.gather(1, _tc1).squeeze(1) | cart
-                                 | (self._gp_perm(row, "navalOcean") > 0))) | _canal
+                _hull = (_wet & (_open | (self._gp_perm(row, "navalOcean") > 0))) | _canal
                 ship = (techs[:, self._shipbuilding_tech] if self._shipbuilding_tech >= 0
                         else torch.zeros(B, dtype=torch.bool, device=dev))
                 any_war = self.war[:, row].any(dim=1)
