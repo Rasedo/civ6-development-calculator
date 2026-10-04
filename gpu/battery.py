@@ -311,11 +311,10 @@ def seed_costs(rows: list) -> dict[int, float]:
     return {s: float(rel[col[s]]) * pace for s in seeds}
 
 
-def plan_shards(seeds: list[int], k: int, head_s: float) -> tuple[list[list[int]], str]:
+def plan_shards(seeds: list[int], k: int) -> tuple[list[list[int]], str]:
     """The seeds of each of `k` serve shards, and why. With every seed's cost
     recorded (`seed_costs`) the seeds are dealt heaviest first, each to the
-    lightest shard with room, shard sizes as the contiguous split's; the
-    first shard starts `head_s` behind (vitest runs ahead of it in its lane).
+    lightest shard with room, shard sizes as the contiguous split's.
     Without that history, the contiguous split of the sorted seeds."""
     cut = [round(i * len(seeds) / k) for i in range(k + 1)]
     contiguous = [seeds[cut[i]:cut[i + 1]] for i in range(k)]
@@ -323,7 +322,7 @@ def plan_shards(seeds: list[int], k: int, head_s: float) -> tuple[list[list[int]
     if not costs or any(s not in costs for s in seeds):
         return contiguous, "contiguous split (no recorded cost for every seed)"
     sizes = [len(g) for g in contiguous]
-    load = [head_s] + [0.0] * (k - 1)
+    load = [0.0] * k
     groups: list[list[int]] = [[] for _ in range(k)]
     for s in sorted(seeds, key=lambda s: (-costs[s], s)):
         i = min((i for i in range(k) if len(groups[i]) < sizes[i]), key=lambda i: (load[i], i))
@@ -734,7 +733,7 @@ def _main() -> int:
         if HUNT:
             _groups = [_seeds]
         else:
-            _groups, _why_shards = plan_shards(_seeds, _k, lane_cost().get("vitest", 0.0))
+            _groups, _why_shards = plan_shards(_seeds, _k)
             print(f"shards: {_why_shards}", flush=True)
         serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns",
                      str(int(HUNT_TURNS)) if HUNT and HUNT_TURNS else "250"]
@@ -761,11 +760,12 @@ def _main() -> int:
         if HUNT:
             print(f"lanes: {_shards[0][0]} alone (hunt: no vitest, no pokes)", flush=True)
         else:
-            print("lanes (parallel): vitest+" + _shards[0][0] + " | "
-                  + " | ".join(s[0] for s in _shards[1:]) + " | gpu pokes", flush=True)
+            print("lanes (parallel): vitest | " + " | ".join(s[0] for s in _shards) + " | gpu pokes", flush=True)
+        # vitest is its own lane beside the shards: in front of one it made
+        # that shard's lane the battery's wall
         lanes = [
-            [("vitest", vitest, 8), _shards[0]],
-            *[[sh] for sh in _shards[1:]],
+            [("vitest", vitest, 8)],
+            *[[sh] for sh in _shards],
             [
                 ("buy_wire", [py, "tests/gpu/buy_wire_test.py"], 4),
                 ("applier_live_ownership", [py, "tests/gpu/applier_live_ownership_test.py"], 4),
