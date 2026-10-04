@@ -664,6 +664,9 @@ export interface Seat {
   /** INVENTED LUXURIES a Great Merchant made, each entry the number of cities
    *  that copy serves the way a worked luxury resource does. */
   gpLuxuries?: number[];
+  /** copies of map luxuries a Great Person granted (Colaeus, Magellan), by
+   *  `LUXURY_IDS` row — the seat's own, counted with its improved copies. */
+  gpLuxCopies?: number[];
   /** permanent per-seat adders a Great Person left behind, by `GP_PERM`
    *  position. */
   gpPerm?: number[];

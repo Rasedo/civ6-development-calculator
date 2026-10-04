@@ -38,6 +38,7 @@
 imports this.
  */
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
+import { LUXURY_IDS } from '../../world/resources';
 import { wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -593,6 +594,7 @@ const SEAT: Record<string, Extractor> = {
     (s.gpEarned ?? []).filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length)),
   gpPerm: overSeats((s) => GP_PERM.map((_k: string, i: number) => s.gpPerm?.[i] ?? 0)),
   gpLuxuries: overSeats((s) => [...(s.gpLuxuries ?? [])]),
+  gpLuxCopies: overSeats((s) => LUXURY_IDS.map((_r, i) => s.gpLuxCopies?.[i] ?? 0)),
   beliefPantheon: overSeats((s) => idx(PANTHEON_IDX, s.religion.pantheon)),
   beliefFollower: overSeats((s) => idx(FOLLOWER_IDX, s.religion.follower)),
   beliefFounder: overSeats((s) => idx(FOUNDER_IDX, s.religion.founder)),

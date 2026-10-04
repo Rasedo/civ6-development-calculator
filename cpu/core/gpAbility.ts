@@ -10,7 +10,7 @@ import { dropQueuedBuilding } from './production';
 import type { Tile } from '../../world/types';
 import { neighbors } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
-import { RESOURCES } from '../../world/resources';
+import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { cityAtTile, citiesOf, civOf, civsAtWar, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat } from './seats';
 import { captureCityStateFor } from './combat';
 import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
@@ -392,6 +392,12 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     // pair has to separate is a whole-turn offset from a double grant.
     const dlG = (globalThis as { __diffLog?: string[] }).__diffLog;
     if (dlG) dlG.push(`g:${unit.seat} t${state.turn} n${inv.length}`);
+  }
+  // CIV6 (Colaeus, Magellan): "free copy of the Luxury resource on this tile"
+  const plotLux = tile.resource ? LUXURY_IDS.indexOf(tile.resource) : -1;
+  if (fx.plotLuxury && plotLux >= 0) {
+    const copies = (owner.gpLuxCopies ??= LUXURY_IDS.map(() => 0));
+    copies[plotLux] += fx.plotLuxury;
   }
   // CIV6 (Sun Tzu): ONE Work of Writing (GREATWORK_SUN_TZU), the general's own
   if (fx.greatWorkKind !== undefined && city) {

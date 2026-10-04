@@ -26,7 +26,7 @@
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
-import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, ImprovementId, TerrainId, Tile, Unit } from '../core/types';
+import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, TerrainId, Tile, Unit } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, seatOfCityState, setTileOwner, setWar } from '../core/seats';
@@ -51,7 +51,7 @@ import { PROMO_CLASSES } from '../data/promotions';
 import { FEATURES, clearableFeatures } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { neighborTile } from '../../world/hex';
-import { GP_CITY_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
+import { GP_CITY_PERM, GP_CLASSES, GREAT_PEOPLE, gpEffectOf } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
   GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
@@ -330,6 +330,9 @@ export interface History {
   cultureTaken: Map<number, number>;
   /** Builders each player has gained: a Builder id new at t+1 */
   builders: Map<number, number>;
+  /** Great People each player has spent, by class: a Great Person unit of
+   *  the player's at t gone at t+1 */
+  gpSpent: Map<number, Map<GreatPersonClass, number>>;
   /** centre plots of cities already standing at the first record past turn 1 */
   unknownSince: Set<number>;
   /** a fire's fertility by plot: +1 Food when it turns burnt, +1 Production
@@ -390,7 +393,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(),
+  return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(),
     unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
 }
@@ -415,6 +418,14 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const cs = melee(u.type);
       if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
       if (u.type === builder) h.builders.set(u.owner, (h.builders.get(u.owner) ?? 0) + 1);
+    }
+    const now = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
+    for (const u of h.last.units) {
+      const cls = strip(cat.units[u.type] ?? '', 'UNIT_GREAT_') as GreatPersonClass;
+      if (now.has(`${u.owner}:${u.id}`) || !GP_CLASSES.includes(cls)) continue;
+      const spent = h.gpSpent.get(u.owner) ?? new Map<GreatPersonClass, number>();
+      spent.set(cls, (spent.get(cls) ?? 0) + 1);
+      h.gpSpent.set(u.owner, spent);
     }
     const before = new Map(h.last.cities.map((c) => [c.y * W + c.x, c]));
     for (const c of rec.cities) {
@@ -898,7 +909,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     }
   }
 
-  importLuxuryDeals(ctx, state, players, cat, seatOfGame);
+  importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
 
   // the units
   let nextId = 0;
@@ -1041,9 +1052,26 @@ const PEOPLE = Object.fromEntries(Object.values(GREAT_PEOPLE).flat().map((p) => 
  * An unmatched import or export, a copy that will not fit the term's
  * `DEAL_ITEMS`, and a copy the engine counts that the game does not hold are
  * the seat's gaps.
+ *
+ * An import no export matches is a Great Person's grant of that luxury
+ * (Colaeus, Magellan: `plotLuxury`) when the history saw the seat spend a
+ * person of a class holding one — at most one grant per such person in the
+ * roster and per person of the class spent. The record names neither the
+ * person nor the plot (the unit moves and spends within one turn), so the
+ * spent class is the evidence; with no history, every unmatched import stays
+ * a gap.
  */
 function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], cat: Catalog,
-                           seatOfGame: (pid: number) => number): void {
+                           seatOfGame: (pid: number) => number, history?: History): void {
+  const grants = new Map<number, number>(); // seat -> copies a spent person may have granted
+  for (const [pid, spent] of history?.gpSpent ?? []) {
+    let n = 0;
+    for (const [cls, k] of spent) {
+      const amounts = GREAT_PEOPLE[cls].map((p) => gpEffectOf(p).plotLuxury ?? 0).filter((a) => a > 0);
+      n += amounts.slice(0, k).reduce((a, b) => a + b, 0);
+    }
+    if (n > 0) grants.set(seatOfGame(pid), n);
+  }
   const flow = new Map<string, { seat: number; n: number }[][]>(); // resource -> [imports, exports]
   const seen = new Set<string>();
   const remember = (seat: number, rname: string, kind: string): void => {
@@ -1085,7 +1113,15 @@ function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], ca
         }
       }
     }
-    for (const imp of imports) if (imp.n > 0) remember(imp.seat, `RESOURCE_${id}`, 'luxury-imported');
+    for (const imp of imports) {
+      const seat = seatOf(state, imp.seat)!;
+      while (imp.n > 0 && (grants.get(imp.seat) ?? 0) > 0) {
+        (seat.gpLuxCopies ??= LUXURY_IDS.map(() => 0))[LUXURY_IDS.indexOf(id)] += 1;
+        grants.set(imp.seat, grants.get(imp.seat)! - 1);
+        imp.n -= 1;
+      }
+      if (imp.n > 0) remember(imp.seat, `RESOURCE_${id}`, 'luxury-imported');
+    }
     for (const exp of exports) if (exp.n > 0) remember(exp.seat, `RESOURCE_${id}`, 'luxury-exported');
   }
 }

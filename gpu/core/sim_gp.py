@@ -434,7 +434,7 @@ class SimGp:
                 _r = _sm.nonzero(as_tuple=True)[0]
                 self.city_progress[_r, row, cc[_r], 0] += _space[_r].to(self.city_progress.dtype)
         self._gp_per_adjacent(row, m, cls, at, hc)
-        self._gp_luxuries(row, m, cls, at)
+        self._gp_luxuries(row, m, cls, at, hc)
         # CIV6 (Sun Tzu): ONE Work of Writing (GREATWORK_SUN_TZU), the general's own
         _gwk = self._gp_fx(cls, at, "greatWorkKind").long()
         _km = has_city & (_gwk >= 0) & ~wrote
@@ -762,9 +762,17 @@ class SimGp:
         self.civ_treasury[:, row] = self.civ_treasury[:, row] + amount * (y == 2).to(torch.float64)
         self.civ_faith[:, row] = self.civ_faith[:, row] + amount * (y == 3).to(torch.float64)
 
-    def _gp_luxuries(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor) -> None:
-        """CIV6 (John Spilsbury and the three after him): an INVENTED luxury
-        serves cities exactly like a worked one, and the row says how many."""
+    def _gp_luxuries(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor,
+                     hc: torch.Tensor) -> None:
+        """CIV6 (Colaeus, Magellan): "free copy of the Luxury resource on this
+        tile" — a copy of THAT resource, the row's own. CIV6 (John Spilsbury
+        and the three after him): an INVENTED luxury serves cities exactly
+        like a worked one, and the row says how many."""
+        if self._n_lux > 0:
+            lux = self.lux_id.gather(1, hc.clamp(min=0).unsqueeze(1)).squeeze(1)
+            pn = self._gp_fx(cls, at, "plotLuxury").long() * (m & (lux >= 0)).long()
+            if bool((pn > 0).any()):
+                self.civ_gp_lux_copies[:, row].scatter_add_(1, lux.clamp(min=0).unsqueeze(1), pn.unsqueeze(1))
         n = self._gp_fx(cls, at, "luxuryCopies").long() * m.long()
         if not bool((n > 0).any()):
             return

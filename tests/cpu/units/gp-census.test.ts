@@ -8,7 +8,7 @@ import {
 } from '../../../cpu/data/greatPeople';
 import { activateGreatPerson, addSeatPerm, gpActivateOk } from '../../../cpu/core/gpAbility';
 import { gpSiteKey, gpSiteTiles } from '../../../cpu/core/targetSites';
-import { computeCityStats } from '../../../cpu/core/city';
+import { computeCityStats, luxuryHoldings } from '../../../cpu/core/city';
 import { regionalEffects } from '../../../cpu/core/yields';
 import { accrueStockpiles, stockOf } from '../../../cpu/core/stockpile';
 import { getModifiers, prodBoostPct } from '../../../cpu/core/effects';
@@ -180,7 +180,7 @@ describe('the sites', () => {
     expect(gpActivateOk(state, stand(state, 'GP_TRUNG_TRAC', district(state, 'ENCAMPMENT')))).toBe(true);
   });
 
-  it('Magellan: any tile carrying a luxury, owned or not; one copy and 300 Gold (ScaleByGameSpeed)', () => {
+  it('Magellan: any tile carrying a luxury, owned or not; a copy of THAT luxury and 300 Gold (ScaleByGameSpeed)', () => {
     const state = newGame();
     const seat = state.seats[0];
     const lux = state.map.tiles.find((t) => tileSeat(t) < 0 && !isWater(t) && !isImpassable(t) && free(state, t.index))!;
@@ -188,10 +188,11 @@ describe('the sites', () => {
     const u = stand(state, 'GP_FERDINAND_MAGELLAN', lux.index);
     expect(gpActivateOk(state, u)).toBe(true);
     const gold0 = seat.treasury;
-    const n0 = seat.gpLuxuries?.length ?? 0;
+    const silk0 = luxuryHoldings(state, seat.seat).spare.get('SILK') ?? 0;
     expect(activateGreatPerson(state, u)).toBe(true);
     expect(seat.treasury).toBe(gold0 + scaleByGameSpeed(300));
-    expect(seat.gpLuxuries?.length).toBe(n0 + 1);
+    expect(luxuryHoldings(state, seat.seat).spare.get('SILK')).toBe(silk0 + 1);
+    expect(seat.gpLuxuries ?? []).toEqual([]);
     expect(gpCityPermOf(seat.cities[0], 'loyalty')).toBe(0);
   });
 

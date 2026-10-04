@@ -485,6 +485,7 @@ function gpFxRow(p: GreatPersonDef): number[] {
     perAdjHere: fx.perAdjacent?.here ? 1 : 0,
     luxuryCopies: fx.luxuryCopies ?? 0,
     luxuryAmenities: fx.luxuryAmenities ?? 0,
+    plotLuxury: fx.plotLuxury ?? 0,
     greatWorkKind: fx.greatWorkKind ?? -1,
     gppAll: fx.gppAll ?? 0,
     artifactScience: fx.artifactScience ?? 0,

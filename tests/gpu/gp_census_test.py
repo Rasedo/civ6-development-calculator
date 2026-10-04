@@ -166,7 +166,7 @@ def test_sites(rules, path, R) -> None:
     assert p.site_ok(c, a, p.put_district("HARBOR"))
     print("  2 Harbor OK — the admirals naming one wait for it")
 
-    mag = p.person({p.fx("luxuryCopies"): 1.0, p.fx("gold"): float(sim.rules.scale_by_game_speed(
+    mag = p.person({p.fx("plotLuxury"): 1.0, p.fx("gold"): float(sim.rules.scale_by_game_speed(
         torch.tensor([300.0], dtype=torch.float64))[0])})
     taken = set(sim.unit_tile[B0][sim.unit_alive[B0]].tolist())
     wild = next(t for t in range(sim.T) if int(sim.tile_seat[B0, t]) < 0 and bool(sim.passable[B0, t])
@@ -176,10 +176,13 @@ def test_sites(rules, path, R) -> None:
     assert p.site_ok(*mag, wild), "a luxury on no one's ground is Magellan's site"
     gold0 = float(sim.civ_treasury[B0, ROW])
     n0 = int(sim.civ_gp_lux_n[B0, ROW])
+    spare0 = int(sim._lux_holdings(ROW)[1][B0, 0])
     p.spend(*mag, wild)
     assert float(sim.civ_treasury[B0, ROW]) == gold0 + float(sim._gp_effects[mag[0], mag[1], p.fx("gold")])
-    assert int(sim.civ_gp_lux_n[B0, ROW]) == n0 + 1
-    print("  3 Magellan OK — a luxury tile owned or not, one copy, the scaled 300 Gold")
+    assert int(sim.civ_gp_lux_copies[B0, ROW, 0]) == 1, "a copy of the plot's own luxury"
+    assert int(sim._lux_holdings(ROW)[1][B0, 0]) == spare0 + 1, "the copy is spare, tradeable"
+    assert int(sim.civ_gp_lux_n[B0, ROW]) == n0, "no invented luxury"
+    print("  3 Magellan OK — a luxury tile owned or not, a copy of that luxury, the scaled 300 Gold")
 
     joan = p.person({p.fx("grantRelic"): 1.0})
     assert int(sim._gp_site[joan]) == 9

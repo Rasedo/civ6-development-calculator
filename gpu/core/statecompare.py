@@ -712,6 +712,9 @@ SEAT = {
     "gpLuxuries": lambda sim, b, rows: [
         [int(x) for x in sim.civ_gp_lux[b, c, : int(sim.civ_gp_lux_n[b, c])].tolist()] for c in rows
     ],
+    "gpLuxCopies": lambda sim, b, rows: [
+        [int(x) for x in sim.civ_gp_lux_copies[b, c, : sim._n_lux].tolist()] for c in rows
+    ],
     "beliefPantheon": _civ_scalar("civ_pantheon"),
     "beliefFollower": _civ_scalar("civ_follower"),
     "beliefFounder": _civ_scalar("civ_founder"),

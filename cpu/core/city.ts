@@ -451,7 +451,8 @@ function govYieldBuildingCount(state: GameState, city: City): number {
  * Per luxury, the copies `seat` holds and the copies it can still trade.
  * SPARE: its own improved, unpillaged plots, plus those of every city-state
  * it is suzerain of (CIV6: "Gain ownership of all the city-state's
- * resources"), less the copies its running deals send out. HELD: the spare
+ * resources"), plus the copies a Great Person granted it (`gpLuxCopies`),
+ * less the copies its running deals send out. HELD: the spare
  * copies plus those running deals bring in — a copy received on a deal is not
  * the receiver's to trade on. `_lux_holdings` is the twin.
  */
@@ -465,6 +466,8 @@ export function luxuryHoldings(state: GameState, seat: number): { held: Map<stri
     if (owner !== seat && !suz.has(owner)) continue;
     if (t.improvement === resourceImprovement(t) && !t.pillaged) add(spare, t.resource, 1);
   }
+  const granted = seatOf(state, seat)?.gpLuxCopies ?? [];
+  granted.forEach((n, i) => { if (n > 0) add(spare, LUXURY_IDS[i]!, n); });
   const held = new Map<string, number>();
   for (const [key, term] of Object.entries(state.dealTerms ?? {})) {
     const [from, to] = key.split('>').map(Number);
@@ -492,11 +495,12 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
 
   // CIV6 (Luxury Policy): "A: +1 Amenity on duplicates of a Resource. /
   // B: This Luxury resource grants no Amenities." B silences the named
-  // luxury outright; A pays one extra full-reach round per OWN improved
-  // copy beyond the first.
+  // luxury outright; A pays one extra full-reach round per OWN copy — an
+  // improved plot or a Great Person's grant — beyond the first.
   const banned = congressBannedLuxury(state);
   const dupLux = congressDuplicateLuxury(state);
-  let dupCopies = 0;
+  let dupCopies = dupLux && dupLux !== banned
+    ? seatOf(state, seat)?.gpLuxCopies?.[LUXURY_IDS.indexOf(dupLux)] ?? 0 : 0;
   for (const t of state.map.tiles) {
     if (!t.resource || tileSeat(t) !== seat) continue;
     // CIV6: a PILLAGED improvement gives no copy (runs/h1_duelw1104 Diamonds

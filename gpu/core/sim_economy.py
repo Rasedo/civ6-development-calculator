@@ -19,7 +19,8 @@ class SimEconomy:
         and the copies it can still trade (`luxuryHoldings`). SPARE: its own
         improved, unpillaged plots, plus those of every city-state it is
         suzerain of (CIV6: "Gain ownership of all the city-state's
-        resources"), less the copies its running deals send out. HELD: the
+        resources"), plus the copies a Great Person granted it
+        (`civ_gp_lux_copies`), less the copies its running deals send out. HELD: the
         spare copies plus those running deals bring in."""
         B, L = self.B, self._n_lux
         spare = torch.zeros(B, L, dtype=torch.long, device=self.device)
@@ -35,6 +36,7 @@ class SimEconomy:
         improved = (self.lux_id >= 0) & mine & (self.improvement == self.lux_req) & ~self.pillaged
         spare.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
         if row < self.n_majors:
+            spare += self.civ_gp_lux_copies[:, row, :L]
             for o in range(self.n_majors):
                 if o == row:
                     continue
@@ -64,6 +66,8 @@ class SimEconomy:
                     & (self.improvement == self.lux_req) & ~self.pillaged)
         own_copies = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
         own_copies.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
+        if row < self.n_majors:
+            own_copies += self.civ_gp_lux_copies[:, row, :self._n_lux]
         # every luxury the row holds a copy of — its own, its city-states',
         # its deals' (`_lux_holdings`) — serves one full-reach round
         counts = self._lux_holdings(row)[0].clamp(min=0)
@@ -82,7 +86,8 @@ class SimEconomy:
         # CIV6 (Luxury Policy): "A: +1 Amenity on duplicates of a Resource. /
         # B: This Luxury resource grants no Amenities." B silences the named
         # luxury outright (the Affluence copies with it); A pays one extra
-        # full-reach round per OWN improved copy beyond the first.
+        # full-reach round per OWN copy — an improved plot or a Great
+        # Person's grant — beyond the first.
         lp_out, lp_tgt = self._congress_by_id("LUXURY_POLICY")
         dup = torch.zeros(B, dtype=torch.long, device=self.device)
         if bool((lp_out >= 0).any()):

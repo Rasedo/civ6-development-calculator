@@ -1,7 +1,7 @@
 
 import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';
 import { srcConst, xml, type SrcMap } from './provenance';
-import { GAME_SPEED, LUXURY_AMENITY_CITIES, scaleByGameSpeed } from './constants';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
 import { GW_GP_EXTRA_SLOTS, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
 import { PLACEABLE_DISTRICTS } from './districts';
 
@@ -828,6 +828,10 @@ export interface GpEffect {
    *  `luxuryAmenities` cities the way a worked luxury resource does. */
   luxuryCopies?: number;
   luxuryAmenities?: number;
+  /** CIV6 (MODIFIER_PLAYER_GRANT_FREE_RESOURCE_FROM_UNIT_PLOT): copies of the
+   *  luxury resource on the activating plot, the seat's own for good — held,
+   *  tradeable, and an amenity source exactly as an improved copy is. */
+  plotLuxury?: number;
   /** a Great Work of this kind, made on the spot. */
   greatWorkKind?: number;
   /** Great Person points toward EVERY class at once. */
@@ -884,6 +888,7 @@ export const GP_FX = [
   'formation', 'formationNaval', 'wonderBuyout',
   'absorbCityState', 'convertBarbarians', 'unitEachDistrict',
   'governorTitles', 'cityUnitIdx', 'unitBestClass', 'unitMpBonus', 'grantRelic',
+  'plotLuxury',
 ] as const;
 
 /** what a `perAdjacent` clause counts, in the wire's own order. */
@@ -1079,8 +1084,13 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   // city's district adjacency as Tourism.
   GP_KENZO_TANGE: { site: 'anywhere', cityPerm: { adjTourism: 1 } },
 
-  // ---- MERCHANT: gold, envoys, trade capacity and invented luxuries ----
-  GP_COLAEUS: { site: 'luxury', faith: gpScaled('GP_COLAEUS_FAITH', 'GREATPERSON_FAITH_SMALL', 100), luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
+  // ---- MERCHANT: gold, envoys, trade capacity and luxuries ----
+  // CIV6 (Colaeus, GREATPERSON_GRANT_PLOT_RESOURCE): "Grants your Capital 1
+  // free copy of the Luxury resource on this tile."
+  GP_COLAEUS: {
+    site: 'luxury', faith: gpScaled('GP_COLAEUS_FAITH', 'GREATPERSON_FAITH_SMALL', 100),
+    plotLuxury: gpArg('GP_COLAEUS_PLOT_LUXURY', 'GREATPERSON_GRANT_PLOT_RESOURCE', 1),
+  },
   GP_MARCUS_LICINIUS_CRASSUS: { site: 'adjacentOwn', charges: 3, gold: gpScaled('GP_CRASSUS_GOLD', 'GREATPERSON_GOLD_TINY', 60) },
   GP_ZHANG_QIAN: { perm: { tradeCapacity: 1 }, cityPerm: { foreignRouteGold: GP_FOREIGN_ROUTE_GOLD } },
   GP_IBN_FADLAN: {
@@ -1174,7 +1184,8 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   // CIV6 (GS): "Grants 1 free copy of the Luxury resource on this tile to
   // your Capital city. Gain 300 Gold (on Standard speed)."
   GP_FERDINAND_MAGELLAN: {
-    site: 'luxury', luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES,
+    site: 'luxury',
+    plotLuxury: gpArg('GP_MAGELLAN_PLOT_LUXURY', 'GREATPERSON_FERDINAND_MAGELLAN_GRANT_PLOT_RESOURCE', 1),
     gold: gpScaled('GP_MAGELLAN_GOLD', 'GREATPERSON_FERDINAND_MAGELLAN_ACTIVE', 300),
   },
   // CIV6 (Ching Shih, GREATPERSON_CHING_SHIH_ACTIVE): "Gain 500 Gold (on
