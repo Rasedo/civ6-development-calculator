@@ -2401,6 +2401,15 @@ class SimInit:
         def _src_amt(d, src):
             return float(next((a["amount"] for a in d["adjacency"] if int(a["src"]) == src), 0.0))
         self._dyn_district = torch.tensor([_src_amt(d, 7) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent completed district (src 7)
+        # the rows whose share per neighbour is a fraction (TilesRequired over
+        # 1) on a feature or a terrain: no static plane carries them (the
+        # export's `liveFloored`), and `_district_adj_raw` floors each one's
+        # live count on its own
+        def _feat_or_terr(src):
+            return src < len(self._adj_src_feat) and (self._adj_src_feat[src] >= 0 or self._adj_src_terr[src] >= 0)
+        self._d_live_adj = [[(int(a["src"]), float(a["amount"])) for a in d["adjacency"]
+                             if not float(a["amount"]).is_integer() and _feat_or_terr(int(a["src"]))]
+                            for d in self.districts_cat]
         self._dyn_bwonder = torch.tensor([_src_amt(d, 5) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent COMPLETED world wonder (matchesAdjacency BUILT_WONDER)
         self._dyn_center = torch.tensor([_src_amt(d, 8) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent center
         self._dyn_harbor = torch.tensor([_src_amt(d, 9) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent Harbor
@@ -4453,6 +4462,8 @@ class SimInit:
         self._mk_near_flood = int(m["nearFloodKey"])
         self._mk_near_volcano = int(m["nearVolcanoKey"])
         self._mk_largest = int(m["largestKey"])
+        # [district, the adjacency its row names, key] (`districtMoment`)
+        self._mk_high_adj = [(int(d), int(a), int(k)) for d, a, k in m["highAdjacency"] if int(d) >= 0 and int(k) >= 0]
         self._mom_near_range = int(m["nearRange"])
         self._mom_largest_margin = int(m["largestMargin"])
 

@@ -146,9 +146,10 @@ describe('power', () => {
 
   it("the Coal Power Plant banks its Industrial Zone's adjacency as LOCAL production", () => {
     const { state, city, iz } = industrialCity();
-    // a Mine next door: +1 Industrial Zone adjacency
-    const mine = tileAtCoords(state.map, 9, 7);
-    mine.improvement = 'MINE';
+    // two Mines next door: +1 Industrial Zone adjacency (one per two Mines;
+    // the centre's half alone pays nothing)
+    tileAtCoords(state.map, 9, 7).improvement = 'MINE';
+    tileAtCoords(state.map, 10, 8).improvement = 'MINE';
     const before = computeCityStats(state, city).breakdown.buildings.production;
     city.buildings.push('COAL_POWER_PLANT');
     lit(state, city);

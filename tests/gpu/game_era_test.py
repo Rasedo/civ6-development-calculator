@@ -12,6 +12,8 @@ twins, `_game_era_turn` / `_enter_era`, per game.
      the shifts, as `ageBars` composes them.
   4. A founding's moments (`foundingMoments`): the centre terrain's row, in
      the founding's game alone.
+  5. A Campus's high starting adjacency (`districtMoment`): once, where its
+     adjacency reaches its row's bonus.
 """
 
 from __future__ import annotations
@@ -122,6 +124,33 @@ def test_moments(rules, path) -> None:
     print(f"  4 moments OK: a desert founding +{want} in its game alone")
 
 
+def test_high_adjacency(rules, path) -> None:
+    """5. `districtMoment`: a Campus completed where its adjacency reaches its
+    row's bonus records the high-adjacency moment, in that game alone and
+    once; one a point short records nothing."""
+    sim = build(rules, path)
+    row, j = 0, 0
+    di, need, key = next((d, a, k) for d, a, k in sim._mk_high_adj
+                         if sim.districts_cat[d]["id"] == "CAMPUS")
+    t = int((~sim.water[0]).nonzero(as_tuple=True)[0][0])
+    sim.district[:, t] = di
+    sim.d_static_adj[0, t, di] = float(need)
+    sim.d_static_adj[1, t, di] = float(need - 1)
+    sim.city_alive[:, row, j] = True
+    col = torch.tensor([j, j])
+    dtile = torch.tensor([t, t])
+    made = torch.tensor([True, True])
+    before = sim.era_score[:, row].clone()
+    sim._district_completed(row, col, dtile, made)
+    got = (sim.era_score[:, row] - before).tolist()
+    pay = int(sim._mk_plain[key])
+    assert got == [pay, 0], f"the Campus at {need} / {need - 1} paid {got}, want [{pay}, 0]"
+    again = sim.era_score[:, row].clone()
+    sim._district_completed(row, col, dtile, made)
+    assert sim.era_score[:, row].tolist() == again.tolist(), "the high-adjacency moment paid twice"
+    print(f"  5 high adjacency OK: a Campus at {need} pays +{pay} once, one at {need - 1} nothing")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -132,6 +161,7 @@ def main() -> None:
     test_half_ahead(rules, p)
     test_bars(rules, p)
     test_moments(rules, p)
+    test_high_adjacency(rules, p)
     print("GAME_ERA OK")
 
 

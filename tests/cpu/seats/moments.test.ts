@@ -3,11 +3,12 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { deriveContinents } from '../../../world/query';
 import { campMoment, goodyMoment, greatPersonMoment, pantheonMoment, religionMoment, transferMoments, wonderMoment } from '../../../cpu/core/eras';
-import { CITY_SIZE_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, recordMoments } from '../../../cpu/core/moments';
+import { CITY_SIZE_KEY, HIGH_ADJACENCY_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, districtMoment, recordMoments } from '../../../cpu/core/moments';
+import { districtAdjacency } from '../../../cpu/core/yields';
 import { ERAS, TECHS } from '../../../cpu/data/techs';
 import {
   MOMENT_GP_PAST_ERA, MOMENT_GP_FAITH_HALF, MOMENT_GOODY, MOMENT_CAMP, MOMENT_CAMP_NEAR, MOMENT_TECH_ERA,
-  MOMENT_CITY_SIZES, MOMENT_NEAR_FLOOD,
+  MOMENT_CITY_SIZES, MOMENT_NEAR_FLOOD, MOMENT_HIGH_ADJACENCY,
   MOMENT_FOREIGN_CAPITAL, MOMENT_NEAR_CIV_CITY, MOMENT_NEW_CONTINENT, MOMENT_ON_DESERT, MOMENT_PANTHEON,
   MOMENT_PANTHEON_FIRST, MOMENT_PLAYER_DEFEATED, MOMENT_RELIGION, MOMENT_RELIGION_FIRST, MOMENT_TO_ORIGINAL_OWNER,
   MOMENT_WONDER_GAME_ERA, MOMENT_WONDER_PAST_ERA,
@@ -148,5 +149,27 @@ describe('the once moments', () => {
     settleAt(state, tileAtCoords(state.map, 12, 6).index);
     expect(score(state, 0)).toBe(MOMENT_NEAR_FLOOD);
     expect(seatOf(state, 0)!.moments).toEqual([NEAR_FLOOD_KEY]);
+  });
+});
+
+describe('a district\'s high starting adjacency', () => {
+  it('each adjacency row pays whole on its own; a Campus at its row\'s bonus records the moment, once', () => {
+    const state = makeState(makeMap(20, 12));
+    const city = settleAt(state, tileAtCoords(state.map, 3, 5).index);
+    const campus = tileAtCoords(state.map, 4, 5);
+    tileAtCoords(state.map, 5, 5).elevation = 'MOUNTAIN';
+    for (const [c, r] of [[5, 4], [4, 4], [4, 6]]) tileAtCoords(state.map, c, r).feature = 'RAINFOREST';
+    // a Mountain 1, three Rainforests 1 (one per two), the centre 0 (half a
+    // district row): 2, not the pooled 3
+    expect(districtAdjacency(state.map, campus, 'CAMPUS')).toBe(2);
+    districtMoment(state, 0, city, campus.index, 'CAMPUS');
+    expect(score(state, 0)).toBe(0);
+    tileAtCoords(state.map, 5, 6).elevation = 'MOUNTAIN';
+    districtMoment(state, 0, city, campus.index, 'CAMPUS');
+    const pay = MOMENT_HIGH_ADJACENCY.find((r) => r.district === 'CAMPUS')!.pay;
+    expect(score(state, 0)).toBe(pay);
+    expect(seatOf(state, 0)!.moments).toContain(HIGH_ADJACENCY_KEY.CAMPUS);
+    districtMoment(state, 0, city, campus.index, 'CAMPUS');
+    expect(score(state, 0)).toBe(pay);
   });
 });

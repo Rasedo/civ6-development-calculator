@@ -1776,6 +1776,20 @@ class SimPhase:
         mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         mon[dr] = True
         self._dedication_event(row, 0, mon)
+        # CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): `districtMoment` — a
+        # major's first district of a type whose adjacency where it completed
+        # reaches its row's bonus
+        if row < self.n_majors:
+            for _hd, _hmin, _hk in self._mk_high_adj:
+                _hw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _hw[dr] = self.district[dr, dt] == _hd
+                _hw = _hw & ~self.moment_seen[:, row, _hk]
+                if not bool(_hw.count_nonzero()):
+                    continue
+                _hadj = self._district_adj_seat(row, _hd).gather(1, dtile.clamp(min=0).unsqueeze(1)).squeeze(1)
+                _hkeys = torch.zeros(self.B, self._mk_n, dtype=torch.bool, device=self.device)
+                _hkeys[:, _hk] = _hw & (_hadj >= _hmin)
+                self._moment_record(row, _hkeys)
         enc = self.district[dr, dt] == self._encamp_didx
         self.encamp_hp[dr, dt] = torch.where(enc, torch.full_like(dt, self._encamp_hp_max), self.encamp_hp[dr, dt])
         # its OWN perimeter arrives at whatever tier the city's walls

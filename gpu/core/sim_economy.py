@@ -4178,15 +4178,15 @@ class SimEconomy:
 
     def _belief_adj(self, row: int, di: int) -> torch.Tensor | None:
         """[B, T] — the adjacency this seat's BELIEFS hand district `di`, or
-        None where they hand it none. It joins the sum INSIDE the floor,
-        exactly where `districtAdjacency`'s `extra` list does."""
+        None where they hand it none: each source's pay floored on its own,
+        exactly as `districtAdjacency` floors each `extra` rule."""
         srcs = self._bel_adj_srcs.get(di) if row < self.n_majors else None
         if not srcs:
             return None
         tab = self._bel_add("distAdj", row)[:, di]  # [B, nSrc]
         out = None
         for src in srcs:
-            add = tab[:, src].to(self.dtype).unsqueeze(1) * self._adj_src_count(src)
+            add = torch.floor(tab[:, src].to(self.dtype).unsqueeze(1) * self._adj_src_count(src))
             out = add if out is None else out + add
         return out
 
@@ -4221,13 +4221,21 @@ class SimEconomy:
         return self._adj_feat_count(self._woods_feat)
 
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
-        raw = self.d_static_adj[:, :, di] + self._dyn_district[di] * adjc
+        """[B, T] — `districtAdjacency`: every adjacency row's pay, each
+        floored on its own (CIV6 `Adjacency_YieldChanges`: YieldChange per
+        TilesRequired neighbours, whole). The static plane carries the whole
+        rows; a row whose share per neighbour is a fraction is counted live
+        (`_d_live_adj`)."""
+        fl = torch.floor
+        raw = self.d_static_adj[:, :, di] + fl(self._dyn_district[di] * adjc)
+        for _src, _amt in self._d_live_adj[di]:
+            raw = raw + fl(_amt * self._adj_source_plane(_src))
         # CIV6 (Stave Church): "Holy Site districts get an additional standard
         # adjacency bonus from Woods" — where the owning city holds the
         # unique building (`buildingVariantAdjacency`).
         for _bi, _civ, _vdi, _src, _amt in self._bvar_adj:
             if _vdi == di:
-                raw = raw + _amt * self._bvar_bldg_plane(_bi, _civ).to(self.dtype) * self._adj_woods_count().to(self.dtype)
+                raw = raw + self._bvar_bldg_plane(_bi, _civ).to(self.dtype) * fl(_amt * self._adj_woods_count().to(self.dtype))
         # CIV6 (Meiji Restoration): "+1 standard adjacency bonus to all
         # districts from adjacent districts" — the roster's district rows,
         # on the tiles a matching seat owns (`DISTRICT_ADJ_ROWS`)
@@ -4242,29 +4250,29 @@ class SimEconomy:
                     _rsource = self._adj_feat_count(self._rainforest_fid).to(self.dtype)
                 else:
                     _rsource = adjc
-                raw = raw + _ramt * self._who_tile_plane(_rc, _rl).to(self.dtype) * _rsource
+                raw = raw + self._who_tile_plane(_rc, _rl).to(self.dtype) * fl(_ramt * _rsource)
         if float(self._dyn_bwonder[di]) != 0:
             nbw = self.neigh
             nbwc = nbw.clamp(min=0)
             cntw = ((self.built_wonder[:, nbwc] >= 0) & self.built_wonder_complete[:, nbwc] & (nbw >= 0).unsqueeze(0)).sum(dim=2)
-            raw = raw + self._dyn_bwonder[di] * cntw.to(self.dtype)
+            raw = raw + fl(self._dyn_bwonder[di] * cntw.to(self.dtype))
         if float(self._dyn_center[di]) != 0:
-            raw = raw + self._dyn_center[di] * self._adj_center_count().to(self.dtype)
+            raw = raw + fl(self._dyn_center[di] * self._adj_center_count().to(self.dtype))
         if float(self._dyn_harbor[di]) != 0:
-            raw = raw + self._dyn_harbor[di] * self._adj_harbor_count().to(self.dtype)
+            raw = raw + fl(self._dyn_harbor[di] * self._adj_harbor_count().to(self.dtype))
         if float(self._dyn_mine[di]) != 0 or float(self._dyn_quarry[di]) != 0 or float(self._dyn_aqueduct[di]) != 0:
             nb = self.neigh
             nbc = nb.clamp(min=0)
             on_map = (nb >= 0).unsqueeze(0)
             if float(self._dyn_mine[di]) != 0:
                 cnt = ((self.improvement[:, nbc] == self._mine_iidx) & on_map).sum(dim=2)
-                raw = raw + self._dyn_mine[di] * cnt.to(self.dtype)
+                raw = raw + fl(self._dyn_mine[di] * cnt.to(self.dtype))
             if float(self._dyn_quarry[di]) != 0:
                 cnt = ((self.improvement[:, nbc] == self._quarry_iidx) & on_map).sum(dim=2)
-                raw = raw + self._dyn_quarry[di] * cnt.to(self.dtype)
+                raw = raw + fl(self._dyn_quarry[di] * cnt.to(self.dtype))
             if float(self._dyn_aqueduct[di]) != 0 and self._aqueduct_idx >= 0:
                 cnt = ((self.district[:, nbc] == self._aqueduct_idx) & self.district_complete[:, nbc] & on_map).sum(dim=2)
-                raw = raw + self._dyn_aqueduct[di] * cnt.to(self.dtype)
+                raw = raw + fl(self._dyn_aqueduct[di] * cnt.to(self.dtype))
         for _amt, _src in ((self._dyn_dam, self._dam_didx),
                            (self._dyn_canal, self._canal_didx),
                            (self._dyn_govplaza, self._govplaza_didx)):
@@ -4274,7 +4282,7 @@ class SimEconomy:
             nbc = nb.clamp(min=0)
             cnt = ((self.district[:, nbc] == _src) & self.district_complete[:, nbc]
                    & (nb >= 0).unsqueeze(0)).sum(dim=2)
-            raw = raw + _amt[di] * cnt.to(self.dtype)
+            raw = raw + fl(_amt[di] * cnt.to(self.dtype))
         return raw
 
     def _district_adj_floor(self, di: int) -> torch.Tensor:
@@ -4325,8 +4333,8 @@ class SimEconomy:
                     _per.append((self._adj_src_names[src]
                                  if src < len(self._adj_src_names) else str(src),
                                  amt, _pl))
-                    acc = acc + amt * _pl
-                v = torch.floor(acc)
+                    acc = acc + torch.floor(amt * _pl)
+                v = acc
                 if self._log_diff:
                     _nm3 = self.districts_cat[di]['id']
                     for _b in range(self.B):

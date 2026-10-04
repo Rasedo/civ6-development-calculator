@@ -414,6 +414,23 @@ export const MOMENT_CITY_SIZES = (['SMALL', 'MEDIUM', 'LARGE', 'EXTRA_LARGE'] as
  *  by the government's `tier` */
 export const MOMENT_GOV_TIERS = [1, 2, 3, 4].map((t) =>
   [moment(`GOVERNMENT_ENACTED_TIER_${t}_FIRST`, 2), moment(`GOVERNMENT_ENACTED_TIER_${t}_FIRST_IN_WORLD`, 3)] as const);
+/** CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): "You have completed your
+ *  civilization's first Campus with a starting adjacency bonus of 3 Science
+ *  or higher" — by district, the bonus its row's text names and the row's
+ *  pay (one row: the same pay first in the world or not) */
+export const MOMENT_HIGH_ADJACENCY = ([
+  ['CAMPUS', 'CAMPUS', 'Campus', 3, 'Science'],
+  ['COMMERCIAL_HUB', 'COMMERCIAL_HUB', 'Commercial Hub', 4, 'Gold'],
+  ['HARBOR', 'HARBOR', 'Harbor', 4, 'Gold'],
+  ['HOLY_SITE', 'HOLY_SITE', 'Holy Site', 3, 'Faith'],
+  ['INDUSTRIAL_ZONE', 'INDUSTRIAL_ZONE', 'Industrial Zone', 4, 'Production'],
+  ['THEATER_SQUARE', 'THEATER_SQUARE', 'Theater Square', 3, 'Culture'],
+] as const).map(([district, row, name, min, y]) => ({
+  district,
+  min: momentText(`highAdjacency.${row}`, min,
+    `LOC_MOMENT_DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_${row}_DESCRIPTION: "You have completed your civilization's first ${name} with a starting adjacency bonus of ${min} ${y} or higher."`),
+  pay: moment(`DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_${row}`, 3),
+}));
 /** "You own your first seafaring unit" / "flying unit" */
 export const MOMENT_UNIT_SEA = [moment('UNIT_CREATED_FIRST_DOMAIN_SEA', 2),
   moment('UNIT_CREATED_FIRST_DOMAIN_SEA_IN_WORLD', 3)] as const;

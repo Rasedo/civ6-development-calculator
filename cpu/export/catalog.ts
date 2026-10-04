@@ -6,7 +6,7 @@ import { hasRiver, isWater, naturalWonderAt } from '../../world/query';
 import { type DistrictId, type GameState, type Tile } from '../core/types';
 import { BUILDINGS } from '../data/buildings';
 import { centerBuildingIds } from '../core/prodLayout';
-import { DISTRICTS, type AdjacencySource } from '../data/districts';
+import { DISTRICTS, type AdjacencyRule, type AdjacencySource } from '../data/districts';
 import { FEATURES } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { TECHS } from '../data/techs'; // era scale
@@ -69,36 +69,50 @@ const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'GEOTHERMAL_FISSURE', 'TUNDRA', 'DESERT', 'PAMUKKALE',
 ]);
 
-function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number {
+/** does neighbour `n` answer static source `src` */
+function staticMatch(src: AdjacencySource, n: Tile): boolean {
+  return src === 'MOUNTAIN' ? n.elevation === 'MOUNTAIN' && !naturalWonderAt(n)
+    : src === 'RAINFOREST' ? n.feature === 'RAINFOREST'
+    : src === 'WOODS' ? n.feature === 'WOODS'
+    : src === 'REEF' ? n.feature === 'REEF'
+    : src === 'NATURAL_WONDER' ? naturalWonderAt(n) !== null
+    : src === 'SEA_RESOURCE' ? isWater(n) && n.resource !== null
+    : src === 'GEOTHERMAL_FISSURE' ? n.feature === 'GEOTHERMAL_FISSURE'
+    : src === 'TUNDRA' ? n.terrain === 'TUNDRA'
+    : src === 'DESERT' ? n.terrain === 'DESERT'
+    : src === 'PAMUKKALE' ? n.feature === 'PAMUKKALE'
+    : false;
+}
+
+/** a rule whose share per neighbour is a fraction (TilesRequired over 1):
+ *  each engine floors its own count live (`districtAdjacency`), so no static
+ *  plane carries it — only a feature's or a terrain's, which the GPU counts */
+function liveFloored(rule: AdjacencyRule): boolean {
+  if (Number.isInteger(rule.amount)) return false;
+  if (STATIC_ADJ_SRC.has(rule.source) && !FEAT_IDS.includes(rule.source as never) && !TERRAIN_IDS.includes(rule.source)) {
+    throw new Error(`a fractional ${rule.source} adjacency the GPU cannot count live`);
+  }
+  return true;
+}
+
+/** the static rules' whole pay at a plot (`live`: the live-floored rules'
+ *  instead, each floored on its own) */
+function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId, live = false): number {
   const def = DISTRICTS[id];
   if (!def.adjacencyYield) return 0;
   let sum = 0;
   const around = neighbors(map, tile);
   for (const rule of def.adjacency) {
-    if (!STATIC_ADJ_SRC.has(rule.source)) continue;
-    if (rule.source === 'RIVER') {
-      if (hasRiver(tile)) sum += rule.amount;
-      continue;
-    }
-    for (const n of around) {
-      const m =
-        rule.source === 'MOUNTAIN' ? n.elevation === 'MOUNTAIN' && !naturalWonderAt(n)
-        : rule.source === 'RAINFOREST' ? n.feature === 'RAINFOREST'
-        : rule.source === 'WOODS' ? n.feature === 'WOODS'
-        : rule.source === 'REEF' ? n.feature === 'REEF'
-        : rule.source === 'NATURAL_WONDER' ? naturalWonderAt(n) !== null
-        : rule.source === 'SEA_RESOURCE' ? isWater(n) && n.resource !== null
-        : rule.source === 'GEOTHERMAL_FISSURE' ? n.feature === 'GEOTHERMAL_FISSURE'
-        : rule.source === 'TUNDRA' ? n.terrain === 'TUNDRA'
-        : rule.source === 'DESERT' ? n.terrain === 'DESERT'
-        : rule.source === 'PAMUKKALE' ? n.feature === 'PAMUKKALE'
-        : false;
-      if (m) sum += rule.amount;
-    }
+    if (!STATIC_ADJ_SRC.has(rule.source) || liveFloored(rule) !== live) continue;
+    const n = rule.source === 'RIVER' ? (hasRiver(tile) ? 1 : 0) : around.filter((nb) => staticMatch(rule.source, nb)).length;
+    sum += Math.floor(n * rule.amount);
   }
   return sum;
 }
 
+/** what a plot's feature lends a neighbouring district of `id` through the
+ *  static rules (`removable`: the removable feature's, else the one a pave
+ *  alone takes) */
 function featureAdjContribution(tile: Tile, id: DistrictId, removable = true): number {
   const f = tile.feature;
   if (!f || FEATURES[f].removable !== removable) return 0;
@@ -106,12 +120,9 @@ function featureAdjContribution(tile: Tile, id: DistrictId, removable = true): n
   if (!def.adjacencyYield) return 0;
   let sum = 0;
   for (const rule of def.adjacency) {
-    const m =
-      rule.source === 'RAINFOREST' ? f === 'RAINFOREST'
-      : rule.source === 'WOODS' ? f === 'WOODS'
-      : rule.source === 'REEF' ? f === 'REEF'
-      : rule.source === 'GEOTHERMAL_FISSURE' ? f === 'GEOTHERMAL_FISSURE'
-      : false;
+    if (liveFloored(rule)) continue;
+    const m = (rule.source === 'RAINFOREST' || rule.source === 'WOODS' || rule.source === 'REEF'
+      || rule.source === 'GEOTHERMAL_FISSURE') && f === rule.source;
     if (m) sum += rule.amount;
   }
   return sum;

@@ -46,18 +46,19 @@ import { BUILDINGS } from '../data/buildings';
 import type { DistrictId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
-import { P, bool, num, plotAt, type Catalog, type DumpCity, type TurnRecord } from './record';
+import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type TurnRecord } from './record';
 import {
   AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras,
   type History, type Imported,
 } from './import';
 import {
   ERA_BEGINS, buildingDedications, campMoment, diploVictoryMoment, enterEra, eraCountdownStep, foundingKeys,
-  foundingMoments, greatPersonMoment, pantheonMoment, religionMoment, transferMoments, wonderMoment,
+  dedicationEvent, foundingMoments, goodyMoment, greatPersonMoment, pantheonMoment, religionMoment, transferMoments,
+  wonderMoment,
 } from '../core/eras';
-import { LARGEST_KEY, momentKeyId, momentKeysHeld, recordMoment, researchKeys } from '../core/moments';
+import { LARGEST_KEY, districtMoment, momentKeyId, momentKeysHeld, recordMoment, researchKeys } from '../core/moments';
 import { citiesOf, isCiv } from '../core/seats';
-import { AGE_GOLDEN } from '../data/seats';
+import { AGE_GOLDEN, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { engineId } from './aliases';
@@ -245,9 +246,15 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       push('city.borderCost', near(stats.border.cost, num(c.nextPlotCost)), num(c.nextPlotCost), stats.border.cost,
         { tilesAcquired: city.tilesAcquired, plots: c.plots.length });
     }
-    // the game draws its next plot among the lowest-cost ties
-    const ties = borderBestPlots(state, city);
-    push('city.nextPlot', ties.includes(num(c.nextPlot)), num(c.nextPlot), ties);
+    // the game draws its next plot among the lowest-cost ties at its culture
+    // step, and holds none (-1) from a founding or a plot gained otherwise
+    // (bought) until that step; else -1 is no plot left to claim
+    if (num(c.nextPlot) < 0 && imp.nextPlotUnheld.has(city.centerIndex)) {
+      out.push({ turn, check: 'city.nextPlot', subject, ok: true, skip: 'no next plot held' });
+    } else {
+      const ties = borderBestPlots(state, city);
+      push('city.nextPlot', num(c.nextPlot) < 0 ? ties.length === 0 : ties.includes(num(c.nextPlot)), num(c.nextPlot), ties);
+    }
     // loyalty
     const gameLpt = num(c.loyaltyPerTurn);
     if (bool(c.capital)) out.push({ turn, check: 'city.loyaltyPerTurn', subject, ok: true, skip: 'capital' });
@@ -447,6 +454,9 @@ export interface Actions {
   built: Map<string, number>;
   /** seats whose gold fell below what their income would leave */
   goldSpent: Map<number, number>;
+  /** cities whose population moved across the pair while the food box ran
+   *  on (a village's citizen; a citizen lost with no Settler and no famine) */
+  popOutsideBox: Set<string>;
   /** cities whose governor changed */
   governorChanged: Set<string>;
   /** players whose turn start had not run when the later record was read */
@@ -480,6 +490,7 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
   const plotsGained = new Map<string, number[]>();
   const built = new Map<string, number>();
   const governorChanged = new Set<string>();
+  const popOutsideBox = new Set<string>();
   for (const [k, c1] of after) {
     const c0 = before.get(k);
     if (!c0) continue;
@@ -489,6 +500,7 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     const nb = c1.buildings.length - c0.buildings.length + c1.districts.length - c0.districts.length;
     if (nb !== 0) built.set(k, nb);
     if (num(c0.governor) !== num(c1.governor)) governorChanged.add(k);
+    if (c1.pop !== c0.pop && num(c1.food) >= num(c0.food)) popOutsideBox.add(k);
   }
   const goldSpent = new Map<number, number>();
   for (const p1 of b.players) {
@@ -497,7 +509,8 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     const expected = num(p0.gold) + num(p0.goldYield);
     if (num(p1.gold) < expected - 0.5) goldSpent.set(p1.id, expected - num(p1.gold));
   }
-  return { cityChanged, unitsNew, spreads, plotsGained, built, goldSpent, governorChanged, notStarted: notStarted(a, b) };
+  return { cityChanged, unitsNew, spreads, plotsGained, built, goldSpent, governorChanged, popOutsideBox,
+    notStarted: notStarted(a, b) };
 }
 
 /**
@@ -540,6 +553,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   const out: CheckResult[] = [];
   const turn = a.turn;
   const acts = diffActions(a, b);
+  const villagers = new Set(villagesEntered(a, b, cat).values());
   const late = new Set([...acts.notStarted, ...(prev ? notStarted(prev, a) : [])]);
   const held = bordersHeld(a, b);
   const imp = importTurn(a, cat, history);
@@ -587,7 +601,9 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       // the turn's production lands before the city grows and claims, and
       // the step here reads the city as the record left it
       const built = !!next && (next.buildings.length !== c.buildings.length || next.districts.length !== c.districts.length);
-      const growSkip = skipAll ?? (settlerOut ? 'a Settler left the city' : built ? 'the city completed a building or district' : null);
+      const outside = acts.popOutsideBox.has(k) ? 'a citizen came or went outside the food box' : null;
+      const growSkip = skipAll ?? (settlerOut ? 'a Settler left the city' : built ? 'the city completed a building or district'
+        : outside);
       seatGrowth(city, st.effectiveFoodSurplus, st.growthNeeded, state.turn);
       if (growSkip || !next) out.push({ turn, check: 'step.growth', subject, ok: true, skip: growSkip ?? 'no t+1' });
       else {
@@ -605,6 +621,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const gainedGame = acts.plotsGained.get(k) ?? [];
       const bought = (acts.goldSpent.get(c.owner) ?? 0) > 0 && gainedGame.some((q) => !gainedOurs.includes(q));
       const borderSkip = skipAll ?? (built ? 'the city completed a building or district' : bought ? 'a plot may have been bought'
+        // the culture banks after the turn's production (a Settler's citizen
+        // gone) and reads a village's citizen given in the turn
+        : settlerOut && !!next && next.pop < c.pop ? 'a Settler left the city'
+        : outside && !!next && next.pop > c.pop && villagers.has(c.owner) ? 'a village gave the city a citizen'
         : imp.tilesUnknown.has(city.centerIndex) ? 'expansions before the record'
         : held.has(c.owner) ? 'the seat banked no border culture' : null);
       if (borderSkip || !next) out.push({ turn, check: 'step.border', subject, ok: true, skip: borderSkip ?? 'no t+1' });
@@ -648,7 +668,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     }
   }
 
-  out.push(...eraChecks(a, b, cat, late, history));
+  out.push(...eraChecks(a, b, cat, late, history, prev));
 
   // the game's own bookkeeping across the pair, which says where in its turn
   // the dump sits: a pool at t+1 is its turn-t value plus its turn-t rate
@@ -664,9 +684,6 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   return out;
 }
 
-/** What one player did between two records that the engine pays era score
- *  for: each event as [what, the engine's moment value], and the buildings
- *  it completed (the dedications' site). */
 /** an era event: its label and what it pays, through the engine's own
  *  moment function, to a seat of the imported turn-t state */
 export type EraPay = (state: GameState, seat: number) => void;
@@ -677,13 +694,62 @@ export interface EraEvents {
 }
 
 /**
+ * The tribal villages gone from their plots across the pair, each with the
+ * major that entered it: the one whose unit stands nearest the plot, within
+ * the moves that unit has (it may have moved on with the moves it had left)
+ * — a unit at t+1, or one lost across the pair where t saw it. A village no
+ * major's unit could have reached went to someone else.
+ */
+function villagesEntered(a: TurnRecord, b: TurnRecord, cat: Catalog): Map<number, number> {
+  const out = new Map<number, number>();
+  const hutIdx = cat.improvements.indexOf('IMPROVEMENT_GOODY_HUT');
+  if (hutIdx < 0) return out;
+  const W = b.head.W;
+  const shape = { width: W, height: b.head.H, wrapX: bool(b.head.wrapX) };
+  const isMajor = (owner: number) => b.players.some((p) => p.id === owner && bool(p.major));
+  const living = new Set(b.units.map((u) => `${u.owner}:${u.id}`));
+  const majorUnits = [...b.units, ...a.units.filter((u) => !living.has(`${u.owner}:${u.id}`))]
+    .filter((u) => isMajor(u.owner));
+  for (let i = 0; i < W * b.head.H; i++) {
+    if (plotAt(a, i)[P.improvement] !== hutIdx || plotAt(b, i)[P.improvement] === hutIdx) continue;
+    let by: number | undefined;
+    let best = Infinity;
+    for (const u of majorUnits) {
+      const d = hexDistance(shape, i % W, Math.floor(i / W), u.x, u.y);
+      if (d < best && d <= num(u.maxMoves)) [best, by] = [d, u.owner];
+    }
+    if (by !== undefined) out.set(i, by);
+  }
+  return out;
+}
+
+/** has the player met every other major of t+1 there, and not every other
+ *  major of t at t */
+function metAllAcross(a: TurnRecord, b: TurnRecord, p0: DumpPlayer, p1: DumpPlayer): boolean {
+  const all = (r: TurnRecord, p: DumpPlayer) => {
+    const met = new Set(Array.isArray(p.met) ? p.met : []);
+    return r.players.every((q) => q.id === p.id || !bool(q.major) || met.has(q.id));
+  };
+  return all(b, p1) && !all(a, p0);
+}
+
+/** does the player hold boost `k` (a catalog index) at t+1 and not at t */
+function boostedAcross(p0: DumpPlayer, p1: DumpPlayer, field: 'techBoosts' | 'civicBoosts', k: number): boolean {
+  return k >= 0 && String(p1[field] ?? '')[k] === '1' && String(p0[field] ?? '')[k] !== '1';
+}
+
+/**
  * The era-score events the difference of two records shows, by game player:
  * a city on a plot that held none (founded), a city whose owner changed
- * (gained), a world wonder newly complete on the player's plot, a pantheon or
- * religion newly held, a Great Person unit newly the player's, and every
- * building a city of theirs holds at t+1 and did not at t.
+ * (gained), a world wonder newly complete on the player's plot (the local
+ * player's over the pair after the one that shows it), a pantheon or
+ * religion newly held, a Great Person unit newly the player's, a barbarian
+ * camp or tribal village gone from its plot, each Eureka and Inspiration
+ * newly triggered (the dedications they pay), each district newly complete,
+ * and every building a city of
+ * theirs holds at t+1 and did not at t.
  */
-export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog): Map<number, EraEvents> {
+export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: TurnRecord): Map<number, EraEvents> {
   const out = new Map<number, EraEvents>();
   const of = (pid: number) => {
     if (!out.has(pid)) out.set(pid, { events: [], buildings: [] });
@@ -704,6 +770,18 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog): Map<numbe
         if (from && city && isCiv(from.seat)) transferMoments(st, from.seat, seat, city, false, last);
       }]);
     } else {
+      // a district complete at t+1 that t saw incomplete or not at all
+      const done = new Set(was.districts.filter((d) => d[3] === true).map((d) => `${d[1]},${d[2]}`));
+      for (const d of c.districts) {
+        if (d[3] !== true || done.has(`${d[1]},${d[2]}`)) continue;
+        const type = engineRowOf(cat, 'district', d[0] as number) as DistrictId | null;
+        const tile = (d[2] as number) * W + (d[1] as number);
+        if (!type) continue;
+        of(c.owner).events.push([`district ${type}`, (st, seat) => {
+          const city = st.seats[seat]?.cities.find((q) => q.centerIndex === k);
+          if (city) districtMoment(st, seat, city, tile, type);
+        }]);
+      }
       const had = new Set(was.buildings.map(([bi]) => bi));
       for (const [bi] of c.buildings) {
         if (had.has(bi) || cat.wonders.includes(cat.buildings[bi])) continue;
@@ -712,12 +790,23 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog): Map<numbe
       }
     }
   }
+  // a world wonder newly complete on a plot; the local player's moment lands
+  // in the record after the one its plot shows complete in, so its wonder
+  // pays over the pair after (the record before's)
+  const local = num(b.head.localPlayer);
+  const completed = (x: TurnRecord, y: TurnRecord, i: number): number => {
+    const p1 = plotAt(y, i);
+    const w = p1[P.wonder] as number;
+    if (typeof w !== 'number' || w < 0 || p1[P.wonderComplete] !== 1) return -1;
+    const p0 = plotAt(x, i);
+    return p0[P.wonder] === w && p0[P.wonderComplete] === 1 ? -1 : w;
+  };
   for (let i = 0; i < W * b.head.H; i++) {
     const p1 = plotAt(b, i);
-    const w = p1[P.wonder] as number;
-    if (typeof w !== 'number' || w < 0 || p1[P.wonderComplete] !== 1) continue;
-    const p0 = plotAt(a, i);
-    if (p0[P.wonder] === w && p0[P.wonderComplete] === 1) continue;
+    const now = (p1[P.owner] as number) === local ? -1 : completed(a, b, i);
+    const was = prev && (plotAt(a, i)[P.owner] as number) === local ? completed(prev, a, i) : -1;
+    const w = now >= 0 ? now : was;
+    if (w < 0) continue;
     const wid = engineId('wonder', cat.buildings[w], 'BUILDING_', BUILT_WONDERS);
     of(p1[P.owner] as number).events.push([`wonder ${strip(cat.buildings[w], 'BUILDING_')}`,
       (st, seat) => wonderMoment(st, seat, wid ? WONDER_ERA_INDEX[wid] ?? 0 : 0)]);
@@ -728,14 +817,25 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog): Map<numbe
     if (!(num(p0.pantheon) >= 0) && num(p1.pantheon) >= 0) of(p1.id).events.push(['pantheon', pantheonMoment]);
     if (!(num(p0.religionCreated) >= 0) && num(p1.religionCreated) >= 0) of(p1.id).events.push(['religion', religionMoment]);
   }
+  // a Great Person newly the player's: a Great Person unit new at t+1, or a
+  // class's points spent across the pair (one claimed and activated before
+  // t+1 shows its unit); the record names no individual, so the person is
+  // read as of the game era
+  const gp = (st: GameState, seat: number) => greatPersonMoment(st, seat, st.gameEra ?? 0, null);
   const before = new Set(a.units.map((u) => `${u.owner}:${u.id}`));
+  const gpUnits = new Map<number, number>();
   for (const u of b.units) {
     const name = cat.units[u.type] ?? '';
-    // the record names no individual: the person is read as of the game era
     if (!before.has(`${u.owner}:${u.id}`) && name.startsWith('UNIT_GREAT_')) {
-      of(u.owner).events.push([`great person ${strip(name, 'UNIT_GREAT_')}`,
-        (st, seat) => greatPersonMoment(st, seat, st.gameEra ?? 0, null)]);
+      of(u.owner).events.push([`great person ${strip(name, 'UNIT_GREAT_')}`, gp]);
+      gpUnits.set(u.owner, (gpUnits.get(u.owner) ?? 0) + 1);
     }
+  }
+  for (const p1 of b.players) {
+    const p0 = a.players.find((q) => q.id === p1.id);
+    if (!p0 || !bool(p1.major) || !Array.isArray(p0.gpp) || !Array.isArray(p1.gpp)) continue;
+    const spent = p1.gpp.filter((v, k) => num(v) < num(p0.gpp[k])).length;
+    for (let n = gpUnits.get(p1.id) ?? 0; n < spent; n++) of(p1.id).events.push(['great person (points spent)', gp]);
   }
   // a barbarian camp gone from its plot: the major whose unit stands there
   // at t+1 destroyed it
@@ -744,6 +844,20 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog): Map<numbe
     if (plotAt(a, i)[P.improvement] !== campIdx || plotAt(b, i)[P.improvement] === campIdx) continue;
     const by = b.units.find((u) => u.y * W + u.x === i && b.players.some((p) => p.id === u.owner && bool(p.major)));
     if (by) of(by.owner).events.push([`camp ${i}`, (st, seat) => campMoment(st, seat, i)]);
+  }
+  for (const [i, by] of villagesEntered(a, b, cat)) of(by).events.push([`village ${i}`, goodyMoment]);
+  // each Eureka and Inspiration the player newly holds
+  for (const p1 of b.players) {
+    const p0 = a.players.find((q) => q.id === p1.id);
+    if (!p0 || !bool(p1.major)) continue;
+    for (const [field, names, kind] of [['techBoosts', cat.techs, DED_FREE_INQUIRY],
+      ['civicBoosts', cat.civics, DED_PEN_BRUSH_AND_VOICE]] as const) {
+      for (let k = 0; k < String(p1[field] ?? '').length; k++) {
+        if (!boostedAcross(p0, p1, field, k)) continue;
+        of(p1.id).events.push([`boost ${strip(names[k] ?? String(k), field === 'techBoosts' ? 'TECH_' : 'CIVIC_')}`,
+          (st, seat) => dedicationEvent(st, seat, kind)]);
+      }
+    }
   }
   // the Diplomatic Victory resolution a new session passed for its target
   for (const r of Object.values(b.congress ?? {})) {
@@ -782,9 +896,9 @@ export function seedMoments(state: GameState, imp: Imported, history?: History):
 const RECORDED_MOMENTS = new Set(SRC_REGISTRY.filter((r) => r.name.startsWith('eras.moment.') && 'xml' in r.src
   && r.src.col === 'EraScore').map((r) => (r.src as { where: string }).where.replace('MomentType=', '')));
 /** what the record cannot show of a recorded moment: no plot's revealed
- *  state, no village, no Trading Post, no patronage's purse */
+ *  state, no Trading Post, no patronage's purse */
 const RECORD_BLIND_MOMENTS = new Set([
-  'MOMENT_FIND_NATURAL_WONDER', 'MOMENT_FIND_NATURAL_WONDER_FIRST_IN_WORLD', 'MOMENT_GOODY_HUT_TRIGGERED',
+  'MOMENT_FIND_NATURAL_WONDER', 'MOMENT_FIND_NATURAL_WONDER_FIRST_IN_WORLD',
   'MOMENT_TRADING_POST_CONSTRUCTED_IN_EVERY_CIV', 'MOMENT_TRADING_POST_CONSTRUCTED_IN_EVERY_CIV_FIRST_IN_WORLD',
   'MOMENT_GREAT_PERSON_CREATED_PATRONAGE_FAITH_OVER_HALF', 'MOMENT_GREAT_PERSON_CREATED_PATRONAGE_GOLD_OVER_HALF',
 ]);
@@ -808,12 +922,13 @@ function momentGaps(moments: readonly [number, string, number, number][]): strin
  * bars (the game judges the score and counts the cities its turn ended
  * with) against the age the game gave each major and the bars it fixed.
  */
-function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>, history?: History): CheckResult[] {
+function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>, history?: History,
+  prev?: TurnRecord): CheckResult[] {
   const out: CheckResult[] = [];
   const turn = a.turn;
   const imp = importTurn(a, cat, history);
   const state = imp.state;
-  const events = eraEvents(a, b, cat);
+  const events = eraEvents(a, b, cat, prev);
   const ib = importTurn(b, cat, history);
   seedMoments(state, imp, history);
   for (const p0 of a.players) {
@@ -826,6 +941,14 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
       continue;
     }
     const s = state.seats[seat];
+    const seatB = ib.seatOfPlayer.get(p0.id);
+    // dedications first held at t+1 were chosen across the pair (an era
+    // begun) and pay for its events
+    const picksB = seatB === undefined ? [] : ib.state.seats[seatB].dedicationPicks ?? [];
+    if (!(s.dedicationPicks ?? []).length && picksB.length) {
+      s.dedicationPicks = [...picksB];
+      s.dedications = picksB.length;
+    }
     const was = s.eraScore ?? 0;
     const ev = events.get(p0.id) ?? { events: [], buildings: [] };
     for (const [, pay] of ev.events) pay(state, seat);
@@ -833,7 +956,6 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
     // the once moments: every key the seat holds at t+1 and had not
     // recorded, and the founding keys of each city it founded across the pair
     // as t+1 counts its cities
-    const seatB = ib.seatOfPlayer.get(p0.id);
     const held = new Set(seatB === undefined ? [] : momentKeysHeld(ib.state, seatB));
     for (const c of seatB === undefined ? [] : citiesOf(ib.state, seatB)) {
       if (!state.seats.some((x) => x.cities.some((q) => q.centerIndex === c.centerIndex))
@@ -851,15 +973,26 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
     const fresh = (Array.isArray(p1.moments) ? p1.moments : []).filter((m) => !seen.has(m[0]));
     const moments = fresh.map((m) => `${strip(m[1], 'MOMENT_')} ${m[2]}`);
     // what era score reads of the imported seat: its leader (a civilization's
-    // own moments), the buildings its cities hold, and the pair's moments the
-    // engines do not record or the record cannot show
+    // own moments), the dedications it holds, the buildings its cities hold,
+    // and the pair's moments the engines do not record or the record cannot show
     const gaps = [...new Set([...(s.civ < 0 ? ['leader'] : []),
+      ...[...(imp.seatGaps.get(seat) ?? []), ...(seatB === undefined ? [] : ib.seatGaps.get(seatB) ?? [])]
+        .filter((g) => g.startsWith('commemoration:')),
+      // the player has met every living major by t+1 and had not at t: the
+      // engines hold no contact between majors (PLAYER_MET_ALL_MAJORS)
+      ...(metAllAcross(a, b, p0, p1) ? ['moment:PLAYER_MET_ALL_MAJORS'] : []),
+      // a record without dedications past the Ancient era (which offers none)
+      ...(!Array.isArray(p0.commemorations) && (state.gameEra ?? 0) > 0 ? ['commemorations'] : []),
       ...[...imp.cityByKey].filter(([, c]) => c.seat === seat)
         .flatMap(([k]) => [...(imp.cityGaps.get(k) ?? [])].filter((g) => g.startsWith('building:'))),
       ...momentGaps(fresh),
       // a natural wonder's moment over a map whose wonder the importer dropped
       ...(fresh.some((m) => m[1].includes('NATURAL_WONDER'))
-        ? [...imp.gaps.keys()].filter((g) => g.startsWith('feature:')) : [])])];
+        ? [...imp.gaps.keys()].filter((g) => g.startsWith('feature:')) : []),
+      // a record without moments: the Astrology Eureka (BOOST_TRIGGER_FIND_NATURAL_WONDER)
+      // says a natural wonder was found, the record not which
+      ...(!Array.isArray(p1.moments) && boostedAcross(p0, p1, 'techBoosts', cat.techs.indexOf('TECH_ASTROLOGY'))
+        ? ['moment:FIND_NATURAL_WONDER'] : [])])];
     out.push({ turn, check: 'step.eraScore', subject, ok: ours === game, game, ours,
       ...(gaps.length ? { gaps } : {}),
       ...(ours === game ? {} : { state: { events: ev.events.map(([w]) => w), once: once.map((k) => momentKeyId(k)),

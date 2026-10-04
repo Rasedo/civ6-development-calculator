@@ -37,6 +37,7 @@ Covered:
 
 from __future__ import annotations
 
+import math
 import json
 import sys
 from pathlib import Path
@@ -108,20 +109,25 @@ def poke_iz_ec_adjacency(rules, rj, path):
     # a tile with no adjacent completed districts and >=2 free on-map neighbours
     adjc = sim._adj_district_count().to(sim.dtype)
     t = -1
-    for cand in free_tiles(sim, 60, need_neighbors=2):
+    for cand in free_tiles(sim, 60, need_neighbors=3):
         if float(adjc[0, cand]) == 0.0:
             t = cand
             break
-    assert t >= 0, "no district-isolated tile with two free neighbours"
+    assert t >= 0, "no district-isolated tile with three free neighbours"
     nb = [int(x) for x in sim.neigh[t].tolist() if x >= 0 and int(sim.improvement[0, int(x)]) < 0]
-    n_mine, n_quarry = nb[0], nb[1]
+    n_mine, n_mine2, n_quarry = nb[0], nb[1], nb[2]
 
     base = float(sim._district_adj_raw(IZ, sim._adj_district_count().to(sim.dtype))[0, t])
-    # add a MINE neighbour -> IZ raw grows by exactly _dyn_mine[IZ]
+    # MINE neighbours -> IZ raw grows by the row's WHOLE pay: floor(n * _dyn_mine[IZ])
     sim.improvement[0, n_mine] = MINE
+    one = float(sim._district_adj_raw(IZ, sim._adj_district_count().to(sim.dtype))[0, t])
+    assert abs((one - base) - math.floor(float(sim._dyn_mine[IZ]))) < 1e-9, (
+        f"IZ mine-adjacency: one Mine paid {one - base}, not floor({float(sim._dyn_mine[IZ])})"
+    )
+    sim.improvement[0, n_mine2] = MINE
     after_mine = float(sim._district_adj_raw(IZ, sim._adj_district_count().to(sim.dtype))[0, t])
-    assert abs((after_mine - base) - float(sim._dyn_mine[IZ])) < 1e-9, (
-        f"IZ mine-adjacency channel dead: delta {after_mine - base} != _dyn_mine {float(sim._dyn_mine[IZ])}"
+    assert abs((after_mine - base) - math.floor(2 * float(sim._dyn_mine[IZ]))) < 1e-9, (
+        f"IZ mine-adjacency channel dead: delta {after_mine - base} != floor(2 * _dyn_mine {float(sim._dyn_mine[IZ])})"
     )
     assert float(sim._dyn_mine[IZ]) > 0, "IZ mine source must be catalog-live"
     # add a QUARRY neighbour -> grows by _dyn_quarry[IZ] on top
@@ -130,6 +136,21 @@ def poke_iz_ec_adjacency(rules, rj, path):
     assert abs((after_quarry - after_mine) - float(sim._dyn_quarry[IZ])) < 1e-9, (
         f"IZ quarry-adjacency channel dead: delta {after_quarry - after_mine} != _dyn_quarry {float(sim._dyn_quarry[IZ])}"
     )
+
+    # Campus Rainforest (a row sharing 1 per 2 neighbours): counted live and
+    # floored on its own — one Rainforest pays nothing, three pay 1
+    CAMPUS = didx(rj, "CAMPUS")
+    assert any(abs(a - 0.5) < 1e-9 for _s, a in sim._d_live_adj[CAMPUS]), "the Campus Rainforest row is not live-floored"
+    rf = [x for x in nb if x not in (n_mine, n_mine2, n_quarry)] + [n_mine, n_mine2, n_quarry]
+    for x in rf:
+        sim.feat_id[0, x] = -1
+    c0 = float(sim._district_adj_raw(CAMPUS, sim._adj_district_count().to(sim.dtype))[0, t])
+    sim.feat_id[0, rf[0]] = sim._rainforest_fid
+    c1 = float(sim._district_adj_raw(CAMPUS, sim._adj_district_count().to(sim.dtype))[0, t])
+    sim.feat_id[0, rf[1]] = sim._rainforest_fid
+    sim.feat_id[0, rf[2]] = sim._rainforest_fid
+    c3 = float(sim._district_adj_raw(CAMPUS, sim._adj_district_count().to(sim.dtype))[0, t])
+    assert (c1 - c0, c3 - c0) == (0.0, 1.0), f"Campus Rainforests paid {c1 - c0} / {c3 - c0}, want 0 / 1"
 
     # Entertainment Complex has NO adjacency source: raw is identically 0
     # everywhere (even next to the mine/quarry we just planted, and next to any

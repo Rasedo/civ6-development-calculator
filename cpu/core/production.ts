@@ -23,6 +23,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
 import { buildingDedications, dedicationEvent, wonderMoment } from './eras';
+import { districtMoment } from './moments';
 import { spawnUnit, bestTrainableNaval } from './units';
 import { grantFreeProphet } from './greatPeople';
 import { gpPermOf } from '../data/greatPeople';
@@ -248,6 +249,7 @@ export function completeQueueItem(
       const dt = state.map.tiles[item.tileIndex];
       dt.districtComplete = true;
       if (dt.district !== 'CITY_CENTER') dedicationEvent(state, city.seat, DED_MONUMENTALITY);
+      if (dt.district) districtMoment(state, city.seat, city, dt.index, dt.district);
       if (dt.district === 'ENCAMPMENT') {
         dt.encampHp = ENCAMPMENT_HP;
         // its OWN perimeter arrives at whatever tier the city's walls

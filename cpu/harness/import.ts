@@ -97,6 +97,8 @@ export interface Imported {
   religionSeat: Map<number, number>;
   /** cities whose culture-expansion count the history cannot know */
   tilesUnknown: Set<number>;
+  /** cities the game holds no next plot for (`History.nextPlotUnheld`) */
+  nextPlotUnheld: Set<number>;
   /** the gaps met importing each seat (its research, government, policies,
    *  pantheon, its religion's beliefs) and each plot (a feature, resource or
    *  improvement dropped) */
@@ -363,6 +365,11 @@ export interface History {
   revealed: Map<number, Set<string>>;
   /** centre plots of cities already standing at the first record past turn 1 */
   unknownSince: Set<number>;
+  /** centre plots of the last record's cities that the record before did not
+   *  hold or that gained a plot without their culture box paying for it (a
+   *  founding, a purchase): the game holds no next plot for them until its
+   *  next culture step */
+  nextPlotUnheld: Set<number>;
   /** a fire's fertility by plot: +1 Food when it turns burnt, +1 Production
    *  when its feature regrows (`RandomEvent_Yields` Turns 2 and 6) */
   fireFood: Map<number, number>;
@@ -450,7 +457,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
-    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
+    unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), posts: new Map() };
 }
 
@@ -542,12 +549,19 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       h.gpSpent.set(u.owner, spent);
     }
     const before = new Map(h.last.cities.map((c) => [c.y * W + c.x, c]));
+    h.nextPlotUnheld.clear();
     for (const c of rec.cities) {
-      const b = before.get(c.y * W + c.x);
-      if (!b || b.owner !== c.owner) continue;
-      // the box fell: culture paid for a plot
       const k = c.y * W + c.x;
-      if (num(c.culture) < num(b.culture) - 0.01) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
+      const b = before.get(k);
+      if (!b || b.owner !== c.owner) {
+        h.nextPlotUnheld.add(k);
+        continue;
+      }
+      // the box fell: culture paid for a plot
+      const paid = num(c.culture) < num(b.culture) - 0.01;
+      if (paid) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
+      // a box pays for one plot; any more came another way
+      if (c.plots.length - b.plots.length > (paid ? 1 : 0)) h.nextPlotUnheld.add(k);
     }
     const fname = (i: number) => cat.features[plotAt(rec, i)[P.feature] as number] ?? '';
     const fwas = (i: number) => cat.features[plotAt(h.last!, i)[P.feature] as number] ?? '';
@@ -1234,6 +1248,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
     congressGaps, congressOf, queueProgressRead, readBack, routes,
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
+    nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
   };
 }
 

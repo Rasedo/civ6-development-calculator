@@ -308,8 +308,13 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
 
 /**
  * Base adjacency bonus a district of `type` gets (or would get) on `tile`,
- * in the district's adjacency yield. Result floored like Civ 6 (policy
- * multipliers are applied on top of this by the city computation).
+ * in the district's adjacency yield (policy multipliers are applied on top
+ * of this by the city computation). CIV6 (`Adjacency_YieldChanges`): each
+ * row pays its YieldChange per TilesRequired neighbours, WHOLE — the catalog
+ * carries the share per neighbour (0.5 for TilesRequired 2), so each rule's
+ * pay is floored on its own and shares of different rows never pool (H-1:
+ * 1104 Xian's Campus beside a Mountain, three Rainforests and its centre
+ * pays 2, 1106 Handan's beside two Mountains, a Rainforest and its centre 2).
  */
 export function districtAdjacency(
   map: GameState['map'], tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = [],
@@ -324,30 +329,20 @@ export function districtAdjacency(
   const _parts: string[] = [];
   const around = neighbors(map, tile);
   for (const rule of [...rows, ...extra]) {
-    let _n = 0;
-    if (rule.source === 'RIVER') _n = hasRiver(tile) ? 1 : 0;
-    else if (rule.source === 'SELF') _n = 1;
-    else for (const n of around) if (matchesAdjacency(rule, n)) _n += 1;
-    if (_n) _parts.push(`${rule.source}x${_n}@${rule.amount}`);
+    // the river runs through the plot itself; CIV6 (Seowon): a FLAT bonus
+    // that reads no neighbour at all
+    let n = 0;
+    if (rule.source === 'RIVER') n = hasRiver(tile) ? 1 : 0;
+    else if (rule.source === 'SELF') n = 1;
+    else for (const nb of around) if (matchesAdjacency(rule, nb)) n += 1;
+    if (n) _parts.push(`${rule.source}x${n}@${rule.amount}`);
+    sum += Math.floor(n * rule.amount);
   }
-  for (const rule of [...rows, ...extra]) {
-    if (rule.source === 'RIVER') {
-      if (hasRiver(tile)) sum += rule.amount;
-      continue;
-    }
-    // CIV6 (Seowon): a FLAT bonus that reads no neighbour at all.
-    if (rule.source === 'SELF') { sum += rule.amount; continue; }
-    for (const n of around) {
-      if (matchesAdjacency(rule, n)) sum += rule.amount;
-    }
-  }
-  // the PRE-FLOOR sum, keyed on the tile and the type — the two names both
-  // engines share. A floor hides which source differs: 1.5 and 2.0 both look
-  // like "one apart" once floored.
+  // the sum, keyed on the tile and the type — the two names both engines share
   const _dlr = (globalThis as { __diffLog?: string[] }).__diffLog;
   if (_dlr) _dlr.push(`ds:${tile.index}:${type} raw${sum.toFixed(3)}`
     + ` [${_parts.join(',')}]`);
-  return Math.floor(sum);
+  return sum;
 }
 
 export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {

@@ -159,10 +159,12 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.builtWonder &&
         t.feature !== 'OASIS' && !t.district ? 1 : 0,
       dadj: PLACEABLE_DISTRICTS.map((id) => {
+        // the whole rules' pay; the live-floored rules' joins it on the engine
         const raw = staticAdjRaw(map, t, id);
+        const live = staticAdjRaw(map, t, id, true);
         const adjDynamic = neighbors(map, t).some((n) => n.district !== null && n.districtComplete);
-        if (!adjDynamic && Math.floor(raw) !== districtAdjacency(map, t, id)) {
-          throw new Error(`dadj mismatch @${t.index} ${id}: floor(${raw}) != ${districtAdjacency(map, t, id)}`);
+        if (!adjDynamic && raw + live !== districtAdjacency(map, t, id)) {
+          throw new Error(`dadj mismatch @${t.index} ${id}: ${raw} + ${live} != ${districtAdjacency(map, t, id)}`);
         }
         return raw;
       }),

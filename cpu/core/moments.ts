@@ -14,12 +14,16 @@
  *
  * The founding's once-a-game moments (near a natural wonder, a floodable
  * river or a volcano; the largest civilization by a margin) ride the same
- * keys from `foundingMoments`. `_moment_*` on the GPU is the twin.
+ * keys from `foundingMoments`, and a specialty district's high starting
+ * adjacency rides them from `districtMoment` as the district completes.
+ * `_moment_*` on the GPU is the twin.
  */
-import type { GameState } from './types';
+import type { City, DistrictId, GameState } from './types';
 import { addEraScore } from './eras';
 import { isCiv, seatOf } from './seats';
 import { isExplored } from './fog';
+import { makeYieldCtx } from './effects';
+import { buildingVariantAdjacency, effectiveAdjacency } from './yields';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { UNITS } from '../data/units';
@@ -36,7 +40,7 @@ import {
   MOMENT_UNIT_STRATEGIC, MOMENT_UNIQUE_UNIT, MOMENT_UNIQUE_BUILDING, MOMENT_UNIQUE_DISTRICT,
   MOMENT_UNIQUE_IMPROVEMENT, MOMENT_NEIGHBORHOOD, MOMENT_SEASIDE_RESORT, MOMENT_MAX_BELIEFS,
   MOMENT_GOVERNORS_ALL, MOMENT_TRADING_POST_ALL, MOMENT_FIND_WONDER, MOMENT_FIRST_SUZERAIN,
-  MOMENT_NEAR_WONDER, MOMENT_NEAR_FLOOD, MOMENT_NEAR_VOLCANO, MOMENT_LARGEST,
+  MOMENT_NEAR_WONDER, MOMENT_NEAR_FLOOD, MOMENT_NEAR_VOLCANO, MOMENT_LARGEST, MOMENT_HIGH_ADJACENCY,
 } from '../data/seats';
 
 type Pay = readonly [number, number];
@@ -97,6 +101,10 @@ export const NEAR_WONDER_KEY: Record<string, number> = Object.fromEntries(
 export const NEAR_FLOOD_KEY = add('NEAR_FLOOD', one(MOMENT_NEAR_FLOOD));
 export const NEAR_VOLCANO_KEY = add('NEAR_VOLCANO', one(MOMENT_NEAR_VOLCANO));
 export const LARGEST_KEY = add('LARGEST', one(MOMENT_LARGEST));
+/** a specialty district completed with the starting adjacency its row names
+ *  (`districtMoment`), by district */
+export const HIGH_ADJACENCY_KEY: Partial<Record<DistrictId, number>> = Object.fromEntries(
+  MOMENT_HIGH_ADJACENCY.map((r) => [r.district, add(`HIGH_ADJACENCY:${r.district}`, one(r.pay))]));
 /** the keys past the table: the first suzerain of city-state `id` is key
  *  `SUZERAIN_KEY0 + id` */
 export const SUZERAIN_KEY0 = MOMENT_KEYS.length;
@@ -128,6 +136,19 @@ export function recordMoment(state: GameState, seat: number, k: number): void {
   if (pay > 0) addEraScore(state, seat, pay);
   insertSorted(seen, k);
   insertSorted(world, k);
+}
+
+/** CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): major `seat` records the
+ *  district of `type` its `city` completed on `tileIndex` when the
+ *  adjacency it pays there reaches its row's bonus — the seat's first such
+ *  district of the type. */
+export function districtMoment(state: GameState, seat: number, city: City, tileIndex: number, type: DistrictId): void {
+  const k = HIGH_ADJACENCY_KEY[type];
+  if (k === undefined || !isCiv(seat) || (seatOf(state, seat)?.moments ?? []).includes(k)) return;
+  const row = MOMENT_HIGH_ADJACENCY.find((r) => r.district === type)!;
+  const ctx = makeYieldCtx(state, seat);
+  const adj = effectiveAdjacency(ctx, state.map.tiles[tileIndex], type, buildingVariantAdjacency(ctx.mods.civ, city, type));
+  if (adj >= row.min) recordMoment(state, seat, k);
 }
 
 /** the tech / civic era keys a research record holds, into `out` */
