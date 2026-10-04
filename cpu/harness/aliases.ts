@@ -24,11 +24,11 @@ import { PROJECTS } from '../data/projects';
 
 type Rows = Readonly<Record<string, { src?: Readonly<Record<string, Src>> }>>;
 
-function walk(src: unknown, out: { xml: string; where: string }[]): void {
+function walk(src: unknown, out: { xml: string; where: string; derived: boolean }[], derived = false): void {
   if (!src || typeof src !== 'object') return;
   const s = src as { xml?: string; where?: string; inputs?: unknown[] };
-  if (typeof s.xml === 'string' && typeof s.where === 'string') out.push({ xml: s.xml, where: s.where });
-  if (Array.isArray(s.inputs)) for (const x of s.inputs) walk(x, out);
+  if (typeof s.xml === 'string' && typeof s.where === 'string') out.push({ xml: s.xml, where: s.where, derived });
+  if (Array.isArray(s.inputs)) for (const x of s.inputs) walk(x, out, true);
 }
 
 function aliasesOf(rows: Rows[], table: string, key: string): Map<string, string> {
@@ -36,11 +36,15 @@ function aliasesOf(rows: Rows[], table: string, key: string): Map<string, string
   const prefix = `${key}=`;
   for (const catalog of rows) {
     for (const [id, row] of Object.entries(catalog)) {
-      const found: { xml: string; where: string }[] = [];
+      const found: { xml: string; where: string; derived: boolean }[] = [];
       for (const s of Object.values(row.src ?? {})) walk(s, found);
+      // a row that reads its own table directly names its type there; a
+      // derived input on the same table is then a read of ANOTHER row (Triangular
+      // Trade's obsolete civic is Ecommerce's PrereqCivic) and casts no vote
+      const direct = found.some((f) => f.xml === table && !f.derived);
       const votes = new Map<string, number>();
       for (const f of found) {
-        if (f.xml !== table) continue;
+        if (f.xml !== table || (direct && f.derived)) continue;
         const part = f.where.split('&').find((w) => w.startsWith(prefix));
         if (!part) continue;
         const type = part.slice(prefix.length);

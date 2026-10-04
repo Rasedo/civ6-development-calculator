@@ -259,6 +259,8 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
       return feature === 'REEF';
     case 'GEOTHERMAL_FISSURE':
       return feature === 'GEOTHERMAL_FISSURE';
+    case 'PAMUKKALE':
+      return feature === 'PAMUKKALE';
     case 'TUNDRA':
       return terrain === 'TUNDRA';
     case 'DESERT':

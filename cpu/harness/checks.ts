@@ -36,6 +36,7 @@ import { seatGrowth } from '../core/seatTurn';
 import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
+import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
 import { monumentalityBuyMult } from '../core/eras';
 import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf } from '../core/seats';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
@@ -386,6 +387,33 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     out.push({ turn, check: 'seat.tourism', subject, ok: near(tour, num(p.tourism), 0.5), game: num(p.tourism), ours: round3(tour),
       ...gapsFor([...new Set(sg)], 'seat.tourism') });
   }
+
+  // each live trade route: what it pays its origin and its destination, each
+  // after its seat's Letters of Marque cut
+  const cityName = (pid: unknown, id: unknown) =>
+    strip(rec.cities.find((c) => c.owner === pid && c.id === id)?.name ?? '?', 'LOC_CITY_NAME_');
+  const amounts = (rows: unknown) => YIELD_KEYS.map((_, i) =>
+    num((rows as { Amount: number; YieldIndex: number }[] | undefined)?.find((x) => x.YieldIndex === i)?.Amount));
+  for (const { owner, route, game } of imp.routes) {
+    const subject = `route ${cityName(game.OriginCityPlayer, game.OriginCityID)} -> ${cityName(game.DestinationCityPlayer, game.DestinationCityID)}`;
+    const s = seatOf(state, owner)!;
+    const origin = isCityStateSeat(owner) ? minorRouteOriginYields(state, s, route)
+      : (() => {
+        const c = s.cities.find((x) => x.id === route.from);
+        return c ? routeOriginYields(state, c, route) : null;
+      })();
+    const go = amounts(game.OriginYields);
+    const cut = origin ? routeYieldCut(state, owner, origin) : null;
+    const oo = cut ? YIELD_KEYS.map((k) => round3(cut[k])) : null;
+    const st = { course: route.course?.length ?? 0, posts: s.tradingPosts ?? [] };
+    out.push({ turn, check: 'route.originYields', subject, ok: !!oo && oo.every((v, i) => near(v, go[i], 0.05)), game: go, ours: oo, state: st });
+    const dSeat = route.toCs !== undefined ? -1 : (route.toSeat ?? owner);
+    const dy = routeDestYields(state, owner, route);
+    const dcut = dSeat >= 0 ? routeYieldCut(state, dSeat, dy) : dy;
+    const od = YIELD_KEYS.map((k) => round3(dcut[k]));
+    const gd = amounts(game.DestinationYields);
+    out.push({ turn, check: 'route.destYields', subject, ok: od.every((v, i) => near(v, gd[i], 0.05)), game: gd, ours: od });
+  }
   return out;
 }
 
@@ -497,31 +525,6 @@ function bordersHeld(a: TurnRecord, b: TurnRecord): Set<number> {
   return new Set([...moving].filter(([, m]) => !m).map(([o]) => o));
 }
 
-/**
- * The record's live trade routes onto the spread's own import, each on its
- * owner's `tradeRoutes` (a major's from its city, a city-state's from its one
- * city, id -1), so the spread carries their religion both ways. The spread's
- * state alone: the routes' yields are not read off it.
- */
-function spreadRoutes(imp: Imported, rec: TurnRecord): void {
-  for (const c of rec.cities) {
-    for (const r of (Array.isArray(c.routes) ? c.routes : []) as Record<string, number>[]) {
-      const origin = imp.cityByKey.get(`${r.OriginCityPlayer}:${r.OriginCityID}`);
-      const minorOwner = imp.minorOfPlayer.get(r.OriginCityPlayer);
-      const owner = minorOwner ?? (origin && isCiv(origin.seat) ? seatOf(imp.state, origin.seat) : undefined);
-      if (!owner) continue;
-      const from = minorOwner ? -1 : origin!.id;
-      const dest = imp.cityByKey.get(`${r.DestinationCityPlayer}:${r.DestinationCityID}`);
-      const minor = imp.minorOfPlayer.get(r.DestinationCityPlayer);
-      const route = minor ? { from, toCs: minor.id }
-        : !dest ? null
-        : dest.seat === owner.seat ? { from, to: dest.id }
-        : { from, toSeat: dest.seat, toSeatCity: dest.id };
-      if (route) (owner.tradeRoutes ??= []).push(route);
-    }
-  }
-}
-
 export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, history?: History,
   prev?: TurnRecord): CheckResult[] {
   const out: CheckResult[] = [];
@@ -538,9 +541,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   // sources in the turn's order — the majors, the city-states, the Free Cities
   const pressBefore = new Map<City, number[]>();
   for (const { city } of citiesOfImport(imp)) pressBefore.set(city, [...(city.religionPressure ?? [])]);
-  const spreadImp = importTurn(a, cat, history);
-  const spreadState: GameState = spreadImp.state;
-  spreadRoutes(spreadImp, a);
+  const spreadState: GameState = importTurn(a, cat, history).state;
   for (const s of spreadState.seats) spreadReligiousPressure(spreadState, s.seat);
   for (const cs of spreadState.cityStates ?? []) spreadReligiousPressure(spreadState, cs.seat);
   spreadReligiousPressure(spreadState, FREE_SEAT);

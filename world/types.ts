@@ -68,7 +68,13 @@ export type FeatureId =
   | 'FLOODPLAINS_PLAINS'
   | 'PAITITI'
   | 'GOBUSTAN'
-  | 'BERMUDA_TRIANGLE';
+  | 'BERMUDA_TRIANGLE'
+  | 'PIOPIOTAHI'
+  | 'TSINGY'
+  | 'DEVILS_TOWER'
+  | 'GIANTS_CAUSEWAY'
+  | 'LAKE_RETBA'
+  | 'PAMUKKALE';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 

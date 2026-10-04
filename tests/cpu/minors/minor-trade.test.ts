@@ -67,7 +67,7 @@ describe("a city-state's route", () => {
     const pick = minorRouteCandidate(state, cs)!;
     const toNear = sum(minorRouteYields(state, { from: -1, to: -1, toCs: near.id })!);
     const toCap = sum(minorRouteYields(state, { from: -1, to: -1, toSeat: 0, toSeatCity: cap.id })!);
-    expect(toNear).toBe(sum(cityStateRouteYields(near)));
+    expect(toNear).toBe(sum(cityStateRouteYields(state, near)));
     if (toNear >= toCap) expect(pick.toCs).toBe(near.id);
     else expect(pick.toSeatCity).toBe(cap.id);
     expect(pick.toCs).not.toBe(far.id);
@@ -95,7 +95,7 @@ describe("a city-state's route", () => {
     expect(sum(before)).toBe(0);
     minorTrade(state, cs);
     expect(cs.tradeRoutes![0].toCs).toBe(near.id);
-    expect(cityTradeYields(state, minorCity(cs))).toEqual(cityStateRouteYields(near));
+    expect(cityTradeYields(state, minorCity(cs))).toEqual(cityStateRouteYields(state, near));
   });
 
   it('walks toward its destination and comes home with its Trader at the end of its term', () => {

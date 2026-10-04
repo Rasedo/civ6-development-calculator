@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, grantCivics, standDistrict } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
-import { applyPolicyEffects, computeUnlocks, computeAdoption, defaultModifiers, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from '../../../cpu/core/effects';
+import { applyPolicyEffects, computeUnlocks, computeAdoption, defaultModifiers, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from '../../../cpu/core/effects';
+import { placeCityStateAt } from '../../../cpu/core/cityStates';
 import { cityBuildingYields } from '../../../cpu/core/yields';
 import { cityDefenseStrength, cityStrikeStrength, barbarianCombatCS } from '../../../cpu/core/combat';
 import { GOVERNMENTS, POLICIES, POLICY_LIST } from '../../../cpu/data/policies';
@@ -201,6 +202,23 @@ describe('the empire-wide channels', () => {
     const m = getModifiers(state, 0);
     expect(m.yieldPctPerSuzerain).toEqual({});
     expect(POLICIES.COLLECTIVE_ACTIVISM.effects.yieldPctPerSuzerain).toEqual({ culture: 0.05 });
+  });
+
+  it('a percent per suzerainty is the PLAYER\'s, on no city (runs/h1_duelw1105 t214)', () => {
+    const state = makeState(makeMap(24, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+    for (const [i, col] of [2, 14, 20].entries()) {
+      const cs = placeCityStateAt(state, i, `CS${i}`, 'cultural', tileAtCoords(state.map, col, 2).index);
+      cs.envoys = { 0: 3 };
+    }
+    const m = defaultModifiers();
+    applyPolicyEffects(m, POLICIES.COLLECTIVE_ACTIVISM.effects);
+    expect(m.yieldPctPerSuzerain).toEqual({ culture: 0.05 });
+    // three suzerainties: the seat's culture x 1.15, its cities' untouched
+    expect(seatYieldMultPerSuzerain(state, 0, m, 'culture')).toBeCloseTo(1.15);
+    expect(seatYieldMultPerSuzerain(state, 0, m, 'science')).toBe(1);
+    expect(computeCityStats(state, city, undefined, m).total.culture)
+      .toBe(computeCityStats(state, city, undefined, defaultModifiers()).total.culture);
   });
 
   it('CARAVANSARIES pays every route this seat runs, not the destination', () => {

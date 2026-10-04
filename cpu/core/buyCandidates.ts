@@ -73,7 +73,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       const dlG = (globalThis as { __diffLog?: string[] }).__diffLog;
       if (dlG) dlG.push(`rg:${actor.seat}:${state.turn}:${-(2 + ci)} f${from.centerIndex} met${gMet ? 1 : 0} has${gHas ? 1 : 0} reach${gRch ? 1 : 0} ctr${cityState.centerIndex}`);
       if (!gMet || gHas || !gRch) continue;
-      const cy = cityStateRouteYields(cityState);
+      const cy = cityStateRouteYields(state, cityState);
       const post = routePostGold(state, actor.seat, cityState.centerIndex);
       const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith + post;
       // the ROUTE decomposition: one line per city-state candidate past the

@@ -63,7 +63,6 @@ def _force_type_cs0(sim, t: int) -> None:
     sim._citystate_item_type[0, 0] = len(kinds) > 0
     for _k in sim._citystate_item_kind:
         sim._citystate_item_kind[_k][0, 0] = _k in kinds
-    sim._citystate_yidx[0, 0] = int(sim.rules.citystate["typeYieldIdx"][t])
     sim.citystate_alive[0, 0] = True
     sim.seat_citystate_met[0, 0, 0] = True
 

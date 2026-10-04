@@ -96,8 +96,11 @@ def main() -> int:
     if int(code[B0]) <= -2:
         d = -int(code[B0]) - 2
         mult = float(sim._congress_cs_route_mult()[B0, d])
-        assert abs(y[2] - sim._minor_cs_route_gold * mult) < 1e-9, f"gold {y[2]}"
-        assert abs(sum(y) - (sim._minor_cs_route_gold + sim._minor_cs_route_spec) * mult) < 1e-9
+        # the destination city's own rows (`cityStateRouteYields`), the path
+        # term on top of its Gold
+        cs6 = (sim._cs_route_y6()[B0, d] * mult).tolist()
+        assert all(abs(y[c] - cs6[c]) < 1e-9 for c in (0, 1, 3, 4, 5)), f"{y} vs {cs6}"
+        assert y[2] >= cs6[2] - 1e-9, f"gold {y[2]}"
     print(f"  3 income OK — {y}")
 
     # -- 4 the walk and the round trip -----------------------------------------

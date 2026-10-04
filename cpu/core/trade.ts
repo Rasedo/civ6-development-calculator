@@ -1,7 +1,7 @@
 /**
- * Trade routes. Domestic routes pay the origin food + production based on
- * the destination's development (Civ 6's domestic-route feel); routes to
- * met city-states pay gold plus the city-state's specialty yield. A
+ * Trade routes. A route pays its origin what `District_TradeRouteYields`
+ * names for the destination city's districts: the domestic column at home,
+ * the international column at a foreign major's or a city-state's city. A
  * city-state runs routes too, from its one city (`minorTrade`).
  */
 
@@ -23,7 +23,7 @@ import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect } from './cityStates';
 import { cityImprovedResourceKinds, completedDistrictCount } from './yields';
-import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
+import { CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
@@ -143,7 +143,7 @@ export function routeChainGold(state: GameState, seat: number, r: TradeRoute): n
  * THE ROUTE'S PATH TERM (Gathering Storm's transportation efficiency): the
  * Gold a route earns from its path, D × min(MAX_RATIO, floor(DENOM × S / n)
  * / DENOM) + T. D is the Gold the destination's own rows pay the leg
- * (`District_TradeRouteYields`, a city-state's flat Gold); n every plot of
+ * (`District_TradeRouteYields`); n every plot of
  * the Trader's path, both ends included; S the path's score — WATER per
  * water plot and RAIL per railroad plot past the origin, PORTAL per portal
  * the Trader takes; T one per foreign city the path crosses that holds this
@@ -490,11 +490,6 @@ export function routeYields(state: GameState, dest: City): Yields {
   return out;
 }
 
-/** cityStateRouteYields' flat gold / specialty amounts — exported for the GPU
- * rules dump (seat CS routes mirror these exactly). */
-export const CITY_STATE_ROUTE_GOLD = 3;
-export const CITY_STATE_ROUTE_SPEC = 1;
-
 /** the largest `cityIntlRouteGold` among the features on the city's plots */
 function cityFeatureIntlGold(state: GameState, city: City): number {
   let g = 0;
@@ -616,6 +611,19 @@ export function cityImprovementCount(state: GameState, city: City, improvement: 
   return n;
 }
 
+/** The routes every OTHER player runs into this city — the majors' and the
+ *  city-states'. */
+export function incomingForeignRoutes(state: GameState, city: City): number {
+  let n = 0;
+  for (const s of [...state.seats, ...state.cityStates]) {
+    if (s.seat === city.seat) continue;
+    for (const r of s.tradeRoutes ?? []) {
+      if (r.toSeat === city.seat && r.toSeatCity === city.id) n += 1;
+    }
+  }
+  return n;
+}
+
 /** The international routes OTHER seats run into this city. */
 export function incomingIntlRoutes(state: GameState, city: City): number {
   let n = 0;
@@ -628,10 +636,24 @@ export function incomingIntlRoutes(state: GameState, city: City): number {
   return n;
 }
 
-export function cityStateRouteYields(cityState: CityState, mult = 1): Yields {
+/** What a city-state's city pays a route sent to it: the international
+ *  column of `District_TradeRouteYields` over its completed districts, the
+ *  centre's Gold 3 among them — the rows a foreign major's city pays
+ *  (runs/h1_duelw1105: Rome's route to Bandar Brunei, centre, Harbor and
+ *  Commercial Hub, paid 9 Gold before its path term; Antananarivo's centre,
+ *  Harbor and Theater 6 Gold and 1 Culture). `mult` is Sovereignty's. */
+export function cityStateRouteYields(state: GameState, cityState: CityState, mult = 1): Yields {
+  // the centre's row stands for every minor (its plot carries no district
+  // mark on a generated map); the rest are the completed districts it built
   const out = emptyYields();
-  out.gold += CITY_STATE_ROUTE_GOLD * mult;
-  out[CITY_STATE_TYPE_YIELD[cityState.type]] += CITY_STATE_ROUTE_SPEC * mult;
+  const centre = DISTRICT_ROUTE_YIELDS.CITY_CENTER?.international;
+  if (centre) addYields(out, centre);
+  for (const d of cityState.districts ?? []) {
+    if (!state.map.tiles[d.tileIndex].districtComplete) continue;
+    const row = DISTRICT_ROUTE_YIELDS[d.type]?.international;
+    if (row) addYields(out, row);
+  }
+  if (mult !== 1) for (const k of Object.keys(out) as YieldKey[]) out[k] *= mult;
   return out;
 }
 
@@ -662,9 +684,9 @@ export function incomingAllyRouteYields(state: GameState, city: City): Yields {
 
 /**
  * What ONE city-state route pays its sender: the destination's own rows —
- * a city-state's flat Gold and specialty (`cityStateRouteYields`, Sovereignty's
- * multiplier on its type), a major's city the international column of
- * `District_TradeRouteYields` over its completed districts. Every other route
+ * the international column of `District_TradeRouteYields` over the
+ * destination city's completed districts, a city-state's under Sovereignty's
+ * multiplier on its type (`cityStateRouteYields`). Every other route
  * adder is a civilization's own (a leader's, a government's, a suzerain's, a
  * Great Person's, a Trading Post's), and a city-state holds none; the rows a
  * destination pays its senders (University of Sankore, a Great Merchant's
@@ -676,7 +698,7 @@ export function incomingAllyRouteYields(state: GameState, city: City): Yields {
 export function minorRouteYields(state: GameState, r: TradeRoute): Yields | null {
   if (r.toCs !== undefined) {
     const dest = state.cityStates.find((c) => c.id === r.toCs);
-    return dest ? cityStateRouteYields(dest, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(dest.type))) : null;
+    return dest ? cityStateRouteYields(state, dest, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(dest.type))) : null;
   }
   const civCity = seatOf(state, r.toSeat ?? NO_SEAT)?.cities.find((c) => c.id === r.toSeatCity);
   return civCity ? districtRouteYields(state, civCity, 'international') : null;
@@ -695,9 +717,10 @@ export function minorRouteOriginYields(state: GameState, minor: Seat, r: TradeRo
 /** What ONE route of seat `owner` pays its DESTINATION city — the per-route
  *  share of the destination's incoming terms in `cityTradeYields`: a
  *  city-state destination Democracy's half on its suzerain's route; a major's
- *  city Democracy's half, and from a foreign major Cleopatra's Gold, the
- *  destination seat's incoming-route rows and the city's Great Person Gold;
- *  every route in the destination seat's improvement rows. Before the
+ *  city Democracy's half, from any other player Trade Policy's Gold, and from
+ *  a foreign major Cleopatra's Gold, the destination seat's incoming-route
+ *  rows and the city's Great Person Gold; every route in the destination
+ *  seat's improvement rows. Before the
  *  destination seat's Letters of Marque cut. */
 export function routeDestYields(state: GameState, owner: number, r: TradeRoute): Yields {
   const out = emptyYields();
@@ -716,6 +739,8 @@ export function routeDestYields(state: GameState, owner: number, r: TradeRoute):
   const dest = seatOf(state, dSeat)?.cities.find((c) => c.id === (r.toSeat !== undefined ? r.toSeatCity : r.to));
   if (!dest || isCityStateSeat(dSeat)) return out;
   allyHalf(dest, undefined);
+  // TRADE POLICY outcome A, on any other player's route in
+  if (owner !== dSeat && r.toSeat === dSeat) out.gold += congressTradeGold(state, dSeat);
   const major = state.seats.some((s) => s.seat === owner);
   const foreign = major && owner !== dSeat && r.toSeat === dSeat;
   if (foreign) {
@@ -733,7 +758,7 @@ export function routeDestYields(state: GameState, owner: number, r: TradeRoute):
 
 /** A seat's Letters of Marque cut on a route's yields, each floored
  *  (`cityTradeYields`' own); a city-state holds none. */
-function routeYieldCut(state: GameState, seat: number, y: Yields): Yields {
+export function routeYieldCut(state: GameState, seat: number, y: Yields): Yields {
   if (isCityStateSeat(seat)) return y;
   const cut = getModifiers(state, seat).routeYieldMult;
   if (cut !== 1) for (const k of Object.keys(y) as (keyof Yields)[]) y[k] = Math.floor(y[k] * cut);
@@ -794,7 +819,7 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       // SOVEREIGNTY outcome A doubles what a minor of the named TYPE pays
       // the route sent to it.
       const csPay = cityStateRouteYields(
-        cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type)));
+        state, cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type)));
       addYields(out, csPay);
       out.gold += routePathGold(state, seat, route, csPay.gold);
       // a SURVIVED City-State Emergency pays its target +2 gold on every
@@ -867,9 +892,6 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       const snd = wonderRouteSenderYields(state, civCity);
       out.science += snd.science;
       out.gold += snd.gold;
-      // TRADE POLICY outcome A pays the SENDER for every route that ends at
-      // the named seat.
-      out.gold += congressTradeGold(state, route.toSeat);
       // CIV6 (Reform the Coinage, Golden face): "International Trade Routes
       // provide +3 Gold per specialty district in the foreign city."
       if (goldenDedication(state, seat, DED_COINAGE)) {
@@ -940,6 +962,10 @@ export function cityTradeYields(state: GameState, city: City): Yields {
   // city receives +2 Gold from foreign Trade Routes"
   const gpForeign = gpCityPermOf(city, 'foreignRouteGold');
   if (gpForeign) out.gold += gpForeign * incomingIntlRoutes(state, city);
+  // TRADE POLICY outcome A: every route another player sends into a city of
+  // the named seat pays that city
+  const policyGold = congressTradeGold(state, seat);
+  if (policyGold) out.gold += policyGold * incomingForeignRoutes(state, city);
   // CIV6 (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_TARGET_CITY,
   // the DESTINATION side): every route ending here pays this seat per
   // named improvement of this city (`ROUTE_IMPROVEMENT_ROWS`)

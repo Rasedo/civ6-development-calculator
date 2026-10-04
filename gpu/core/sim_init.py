@@ -315,9 +315,8 @@ class SimInit:
         # `conquest_turns[b, row]` is the WARLORD'S THRONE window: turns of
         # empire-wide bonus production still to run after a capture.
         self.conquest_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
-        citystate_yidx = rules.citystate["typeYieldIdx"]
+        citystate_yidx = rules.citystate["typeYieldIdx"]  # CS type -> its envoy yield column
         self._cs_type_n = len(citystate_yidx)  # CITY_STATE_TYPES' width
-        self._citystate_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
         citystate_didx = rules.citystate["typeDistrictIdx"]  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] the type's own district
         # the queue kinds a production type's ladder pays toward

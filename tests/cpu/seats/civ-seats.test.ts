@@ -534,7 +534,7 @@ describe('civ CS trade routes', () => {
     expect(tradeCapacity(state, civ.seat)).toBe(0);
   });
 
-  it('seatPhase routes to a met in-range CS; the origin earns gold + specialty', () => {
+  it("seatPhase routes to a met in-range CS; the origin earns its centre's gold", () => {
     const state = makeState();
     const civ = addCiv(state, 8, 8);
     const cityState = addCs(state, 11, 8); // scientific, distance 3
@@ -557,11 +557,10 @@ describe('civ CS trade routes', () => {
       walkTile: civCity.centerIndex, walkLeg: 0, course,
     });
     const y1 = computeCityStats(state, civCity).total;
-    // cityStateRouteYields: +3 gold, +1 science (both tier-scaled; band like the
-    // envoy tests — the phase also grew the city, so compare channels the
-    // route alone moves meaningfully).
+    // cityStateRouteYields: the city-state centre's +3 gold (tier-scaled; a
+    // band like the envoy tests — the phase also grew the city, so compare
+    // the channel the route alone moves).
     expect(y1.gold - y0.gold).toBeGreaterThanOrEqual(2);
-    expect(y1.science - y0.science).toBeGreaterThan(0);
   });
 
   it('captureCityState prunes civ CS routes', () => {

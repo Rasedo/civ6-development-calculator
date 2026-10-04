@@ -6,7 +6,7 @@ import { seatPhase, worldCongress } from '../../../cpu/core/phase';
 import { seededGame } from '../helpers';
 import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION } from '../../../cpu/data/seats';
 import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitBuyMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
-import { congressCancelBannedIntl } from '../../../cpu/core/trade';
+import { cityTradeYields, congressCancelBannedIntl, routeOriginYields } from '../../../cpu/core/trade';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { neighbors } from '../../../world/hex';
@@ -251,11 +251,20 @@ describe('world congress: the wider slate', () => {
     expect(actor.treasury).toBeLessThan(full); // never charged the undiscounted price
   });
 
-  it('Trade Policy pays the sender and widens the target, or ends every international leg', () => {
+  it('Trade Policy pays the target\'s city for every route in and widens the target, or ends every international leg', () => {
     const state = newGame(1);
     state.congress = [{ res: CONGRESS_TRADE_POLICY, outcome: 0, target: 1 }];
     expect(congressTradeGold(state, 1)).toBe(4);
     expect(congressTradeGold(state, 0)).toBe(0);
+    // the route seat 0 sends into seat 1's city pays THAT city, not its sender
+    const a = seatOf(state, 0)!, b = seatOf(state, 1)!;
+    const aBefore = cityTradeYields(state, a.cities[0]).gold;
+    const bBefore = cityTradeYields(state, b.cities[0]).gold;
+    const intlGold = routeOriginYields(state, a.cities[0], { from: a.cities[0].id, to: -1, toSeat: 1, toSeatCity: b.cities[0].id }).gold;
+    a.tradeRoutes = [{ from: a.cities[0].id, to: -1, toSeat: 1, toSeatCity: b.cities[0].id }];
+    expect(cityTradeYields(state, a.cities[0]).gold - aBefore).toBe(intlGold);
+    expect(cityTradeYields(state, b.cities[0]).gold - bBefore).toBe(4);
+    a.tradeRoutes = [];
     expect(congressRouteCapacity(state, 1)).toBe(1);
     expect(congressRouteCapacity(state, 0)).toBe(0);
     expect(congressIntlBanned(state, 1)).toBe(false);

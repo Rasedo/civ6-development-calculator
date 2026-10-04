@@ -1342,24 +1342,29 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
     if (suzerainEffect(state, seat, 'waterDistrictCulture')) mods.waterDistrictCulture = NAN_MADOL_WATER_CULTURE;
     const genevaPct = suzerainSciencePct(state, seat);
     if (genevaPct) mods.yieldMult.science = (mods.yieldMult.science ?? 1) * (1 + genevaPct / 100);
-    // a suzerainty pays a YIELD by the head — `suzerainCount`'s Treaty
-    // Organization weighting is what one pays in FAVOR, not here
-    const suz = state.cityStates.filter((cs) => isSuzerain(state, cs, seat)).length;
-    if (suz) {
-      for (const k of Object.keys(mods.yieldPctPerSuzerain) as YieldKey[]) {
-        const f = mods.yieldPctPerSuzerain[k] ?? 0;
-        if (f) mods.yieldMult[k] = (mods.yieldMult[k] ?? 1) * (1 + f * suz);
-      }
-    }
-    // CIV6 (Surrounded by Glory): "+5% Culture per city-state you are the
-    // Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
-    if (suz) {
-      for (const r of mods.yieldPerSuzerain) {
-        mods.yieldMult[r.yield] = (mods.yieldMult[r.yield] ?? 1) * (1 + (r.pct / 100) * suz);
-      }
-    }
   }
   return mods;
+}
+
+/**
+ * CIV6 (EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY: Collective
+ * Activism, International Space Agency, Surrounded by Glory): the PLAYER's
+ * multiplier on one yield, a percent per city-state it is suzerain of — on
+ * the seat's whole income of the yield, its flat per-suzerainty terms (Raj)
+ * included, and on no city's own yield (runs/h1_duelw1105 t214: China's
+ * three suzerainties under the Space Agency read Science 173.375 = (144.762
+ * of its cities + Raj's 6) x 1.15, every city's own Science unscaled). A
+ * suzerainty counts by the head — `suzerainCount`'s Treaty Organization
+ * weighting is what one pays in FAVOR, not here.
+ */
+export function seatYieldMultPerSuzerain(state: GameState, seat: number, mods: Modifiers, key: YieldKey): number {
+  const suz = (state.cityStates ?? []).filter((cs) => isSuzerain(state, cs, seat)).length;
+  if (!suz) return 1;
+  let mult = 1;
+  const f = mods.yieldPctPerSuzerain[key] ?? 0;
+  if (f) mult *= 1 + f * suz;
+  for (const r of mods.yieldPerSuzerain) if (r.yield === key) mult *= 1 + (r.pct / 100) * suz;
+  return mult;
 }
 
 /**

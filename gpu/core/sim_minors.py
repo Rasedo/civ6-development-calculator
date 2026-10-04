@@ -123,14 +123,14 @@ class SimMinors:
         dcity = torch.full((B,), -1, dtype=torch.long, device=dev)
         dct = torch.full((B,), -1, dtype=torch.long, device=dev)
         mult = self._congress_cs_route_mult()  # [B, S]
-        per_cs = self._minor_cs_route_gold + self._minor_cs_route_spec
+        per_cs = self._cs_route_y6().sum(dim=2) if S > 0 else None  # [B, S]
         for s2 in range(S):
             if s2 == s:
                 continue
             ctr = self.citystate_center[:, s2].clamp(min=0)
             has = (act & (rr[:, :, 1] == -(2 + s2))).any(dim=1)
             ok = (self.citystate_alive[:, s2] & ~has & reach.gather(1, ctr.unsqueeze(1)).squeeze(1))
-            key = per_cs * mult[:, s2].double()
+            key = per_cs[:, s2] * mult[:, s2].double()
             take = ok & (~found | (key > best))
             best = torch.where(take, key, best)
             found = found | take
@@ -213,10 +213,10 @@ class SimMinors:
 
     def _minor_route_k(self, s: int) -> torch.Tensor | None:
         """[B, K, 6] f64 — what each of minor `s`'s routes pays its city
-        (`minorRouteOriginYields`): a city-state destination's flat Gold and
-        specialty under Sovereignty's multiplier, a major city the
-        international column of `District_TradeRouteYields` over its completed
-        districts plus the centre row, and the path term. A destination gone
+        (`minorRouteOriginYields`): the international column of
+        `District_TradeRouteYields` over the destination city's completed
+        districts plus the centre row (a city-state's under Sovereignty's
+        multiplier, `_cs_route_y6`), and the path term. A destination gone
         pays nothing. None with no route."""
         row = self._CITY_MINOR0 + s
         rr = self.seat_routes[:, row]
@@ -234,12 +234,10 @@ class SimMinors:
             css = raw.clamp(min=0, max=S - 1)
             ok_c = act & (rr[:, :, 1] <= -2) & (raw < S) & self.citystate_alive[:, :S].gather(1, css)
             m = self._congress_cs_route_mult().gather(1, css).double() * ok_c.double()  # [B, K]
-            rk[:, :, 2] += self._minor_cs_route_gold * m
-            ycol = self._citystate_yidx[:, :S].gather(1, css)
-            rk.scatter_add_(2, ycol.unsqueeze(2), (self._minor_cs_route_spec * m).unsqueeze(2))
-            # D is every Gold the destination pays the route: the flat Gold,
-            # and the specialty where the minor's type pays Gold
-            _p_d = torch.where(ok_c, (self._minor_cs_route_gold + self._minor_cs_route_spec * (ycol == 2).double()) * m, _p_d)
+            cs6 = self._cs_route_y6().gather(1, css.unsqueeze(2).expand(-1, -1, 6)) * m.unsqueeze(2)
+            rk = rk + cs6
+            # D is every Gold the destination pays the route
+            _p_d = torch.where(ok_c, cs6[:, :, 2], _p_d)
             _p_want = _p_want | ok_c
         rd_c = self.seat_route_dcity[:, row]
         intl = act & (rd_c >= 0)
@@ -591,9 +589,6 @@ class SimMinors:
         self._mb_naval_cls = int(cs["navalClass"])
         # THE LEVY: the army's turns away
         self._levy_turns = int(cs["levyTurns"])
-        # what a city-state destination pays a city-state's route
-        self._minor_cs_route_gold = float(rules.trade["cityStateRouteGold"])
-        self._minor_cs_route_spec = float(rules.trade["cityStateRouteSpec"])
         _lv = {d["level"]: d for d in rules.civ_levels}
         self._minor_any_res = bool(_lv["CITY_STATE"]["ignoresUnitStrategicResourceRequirements"])
         self._free_any_res = bool(_lv["FREE_CITIES"]["ignoresUnitStrategicResourceRequirements"])

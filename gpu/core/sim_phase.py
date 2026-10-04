@@ -2071,7 +2071,9 @@ class SimPhase:
                 _placed = (self.seat_citystate_envoys[:, row, : self.S].double()
                            * self.citystate_alive[:, : self.S].double()).sum(dim=1)
                 s = s + _pe * _placed
-            return s
+            # then the player's percent per suzerainty, on all of the above
+            # (`seatYieldMultPerSuzerain`)
+            return s * self._seat_ymult_per_suz(row, k)
 
         total = self._seat_city_stats(row, record=False)[0]
 

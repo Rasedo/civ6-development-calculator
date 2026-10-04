@@ -5409,6 +5409,27 @@ class SimSeats:
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         return self._suzerain_mask(row)[:, : self.S].double().sum(dim=1)
 
+    def _seat_ymult_per_suz(self, row: int, k: int) -> torch.Tensor:
+        """[B] f64 — `seatYieldMultPerSuzerain`: the PLAYER's multiplier on
+        yield column `k`, a percent per city-state it is suzerain of
+        (Collective Activism, International Space Agency, Surrounded by
+        Glory) — on the seat's whole income of the yield, its flat
+        per-suzerainty terms included, and on no city's own yield."""
+        out = torch.ones(self.B, dtype=torch.float64, device=self.device)
+        suz = self._suzerains_held(row)
+        if not bool((suz > 0).count_nonzero()):
+            return out
+        cz = self._gov_mods(row)[12]["ysuz"][:, k].double()
+        if bool(cz.count_nonzero()):
+            out = out * (1 + cz * suz)
+        for _yc, _yl, _yy, _yp in self._live_rows(row, self._yield_per_suzerain_rows):
+            if _yy != k:
+                continue
+            _yw = self._row_is(row, _yc, _yl)
+            if bool(_yw.count_nonzero()):
+                out = out * (1 + _yw.double() * suz * (_yp / 100.0))
+        return out
+
     def _suz_effect_rows(self, code: int) -> torch.Tensor:
         """`suzerainEffect` for every major row at once — [B, n_majors] bool,
         true where the row holds a suzerain among the live minors whose perk
@@ -6946,15 +6967,9 @@ class SimSeats:
             faith = self.civ_faith[:, row].double() > self.civ_treasury[:, row].double()
             return a + 1, faith.long()
         if name == "TRADE_POLICY":
-            # A pays the SENDER, so a seat names where its own routes go; with
-            # no international leg the vote is harmless and names itself.
-            counts = torch.zeros(B, self.n_majors, dtype=torch.float64, device=dev)
-            ds = self.seat_route_dseat[:, row]
-            for t in range(self.n_majors):
-                counts[:, t] = (ds == t).sum(dim=1).double()
-            best = self._argmax_low(counts)
-            any_intl = (ds >= 0).any(dim=1)
-            return a, torch.where(any_intl, best, me)
+            # A pays the NAMED seat's cities for every route in and widens its
+            # capacity, so a seat names itself.
+            return a, me
         if name == "GOVERNANCE_DOCTRINE":
             # A pays favor for appointing and promoting the named type, B
             # neutralizes it — a seat names the governor its own next title
@@ -7527,8 +7542,9 @@ class SimSeats:
             self._c_plus100, self._c_minus50)
 
     def _congress_trade_gold(self, dseat: torch.Tensor) -> torch.Tensor:
-        """f64, `dseat`-shaped — TRADE POLICY outcome A pays the SENDER this
-        much for every route ending at the named seat."""
+        """f64, `dseat`-shaped — TRADE POLICY outcome A (`congressTradeGold`):
+        the Gold every route another player sends into a city of the named
+        seat pays that city."""
         out, tgt = self._congress_by_id("TRADE_POLICY")
         sh = (slice(None),) + (None,) * (dseat.dim() - 1)
         hit = (out[sh] == 0) & (dseat == tgt[sh])
@@ -8591,6 +8607,15 @@ class SimSeats:
             out = add if out is None else out + add
         return out
 
+    def _cs_route_y6(self) -> torch.Tensor:
+        """[B, S, 6] f64 — `cityStateRouteYields` before Sovereignty: what
+        each city-state's city pays a route sent to it, the INTERNATIONAL
+        column of District_TradeRouteYields over its completed districts (its
+        registry row, column 0) plus the centre row."""
+        reg = self.city_dist_tile[:, self._CITY_MINOR0:self._CITY_MINOR0 + self.S, 0]  # [B, S, nD]
+        comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
+        return self._route_centre_intl.reshape(1, 1, 6) + comp.double() @ self._route_intl_y
+
     def _seat_route_income(self, row: int, per_route: bool = False) -> torch.Tensor | None:
         """cityTradeYields for ANY seat row — per-COLUMN ORIGIN income from this
         row's outgoing routes, [B, cols, 6] double in engine yield
@@ -8602,9 +8627,9 @@ class SimSeats:
         1 / production 1) — plus Messenger of the Gods (the enhancer's
         tradeReligionYields) when the DEST city follows this row's own religion
         — religion ids ARE seat ids, and the seat is the row. A CS leg (dest
-        encoded -(2+cityStateIdx)) pays cityStateRouteGold to gold +
-        cityStateRouteSpec to the CS type's specialty column (_citystate_yidx),
-        gated on citystate_alive — TS removes a captured CS and prunes its
+        encoded -(2+cityStateIdx)) pays the table's INTERNATIONAL column over
+        the city-state city's completed districts plus the centre row
+        (`_cs_route_y6`), gated on citystate_alive — TS removes a captured CS and prunes its
         routes at capture, and this gate is the mirror for the same-turn read.
         An INTERNATIONAL leg (seat_route_dcity >= 0, paired with
         seat_route_dseat) pays the table's INTERNATIONAL column over the
@@ -8656,8 +8681,11 @@ class SimSeats:
         _ally_in = self._incoming_ally_route(row)   # Democracy's destination half, [B, cols, 6] or None
         _fgk = self._gp_city_perm_names.index("foreignRouteGold")
         _fg_in = self.city_gp_perm[:, row, : self.RC, _fgk].double()
+        # TRADE POLICY outcome A names this row: its cities are paid per route in
+        _tp = self._congress_trade_gold(torch.full((self.B,), row, dtype=torch.long, device=self.device))  # [B]
         _dest_rows = (bool(self._row_leads(row, "CLEOPATRA").count_nonzero())
                       or bool(_fg_in.count_nonzero())
+                      or bool(_tp.count_nonzero())
                       or bool(self._live_rows(row, self._incoming_route_yield_rows))
                       or any(r[5] == 1
                              for r in self._live_rows(row, self._route_improvement_rows))
@@ -8782,25 +8810,21 @@ class SimSeats:
                         _rk_add(_kc, tr6[:, _kc].unsqueeze(1) * rel_ok)
         if self.S > 0 and bool(is_cs.count_nonzero()):
             S = self.S
-            _tr = self.rules.trade
-            citystate_gold = float(_tr["cityStateRouteGold"])
-            citystate_spec = float(_tr["cityStateRouteSpec"])
             css = citystate_s.clamp(max=S - 1)
             citystate_ok = self.citystate_alive[:, :S].gather(1, css) & (citystate_s < S)
             pays_c = act & is_cs & has_from & citystate_ok
             # SOVEREIGNTY outcome A doubles the CITY-STATE's own yield to a
             # route sent to a minor of the named TYPE.
             pc = pays_c.double() * self._congress_cs_route_mult().gather(1, css)
-            ycol = self._citystate_yidx[:, :S].gather(1, css)
-            # D is every Gold the destination pays the route: the flat Gold,
-            # and the specialty where the minor's type pays Gold
-            _p_d = torch.where(pays_c, (citystate_gold + citystate_spec * (ycol == 2).double()) * pc, _p_d)
+            # the city-state city's own rows (`cityStateRouteYields`), [B, K, 6]
+            cs6 = self._cs_route_y6().gather(1, css.unsqueeze(2).expand(-1, -1, 6)) * pc.unsqueeze(2)
+            # D is every Gold the destination pays the route
+            _p_d = torch.where(pays_c, cs6[:, :, 2], _p_d)
             _p_want = _p_want | pays_c
+            rk += cs6
             # a SURVIVED City-State Emergency pays its target +2 gold on every
             # minor leg — added AFTER the yield, so Sovereignty does not double it
-            _rk_add(2, citystate_gold * pc
-                             + pays_c.double() * self._emergency_cs_route_gold(row).unsqueeze(1))
-            _rk_add(ycol, citystate_spec * pc)
+            _rk_add(2, pays_c.double() * self._emergency_cs_route_gold(row).unsqueeze(1))
             # CIV6 (Democracy): a route to a minor this seat is SUZERAIN of pays
             # the government's own +4 Food and +4 Production, the same clause the
             # ally leg takes.
@@ -8907,9 +8931,6 @@ class SimSeats:
             gdc = self._golden_ded(row, self._ded_coinage)
             if bool(gdc.count_nonzero()):
                 gold_i = gold_i + self._coinage_spec_gold * spec_dest.double() * gdc.double().unsqueeze(1)
-            # TRADE POLICY outcome A pays the SENDER for every route that ends
-            # at the named seat.
-            gold_i = gold_i + self._congress_trade_gold(self.seat_route_dseat[:, row])
             # the destination's Trading Post gold (`_route_post_gold`)
             _dctr = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
             gold_i = gold_i + self._route_post_gold(row, _dctr).double()
@@ -9152,6 +9173,20 @@ class SimSeats:
             _addf = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
             _addf[:, :, 2] = (_fg_in[:, :cols] * _fcnt * alive.double()).to(inc.dtype)
             inc = inc + _addf.reshape(B, -1)
+        # TRADE POLICY outcome A: every route another player — a major or a
+        # city-state — sends into one of this row's cities pays that city
+        # (`incomingForeignRoutes`)
+        if bool(_tp.count_nonzero()):
+            _tcnt = torch.zeros(B, cols, dtype=torch.double, device=self.device)
+            for r2 in [*range(self.n_majors), *range(self._CITY_MINOR0, self._CITY_MINOR0 + self.S)]:
+                if r2 == row:
+                    continue
+                _thit = (((self.seat_routes[:, r2, :, 0] >= 0) & (self.seat_route_dseat[:, r2] == row)).unsqueeze(2)
+                         & (self.seat_route_dcity[:, r2].unsqueeze(2) == ids.unsqueeze(1)))
+                _tcnt = _tcnt + _thit.sum(dim=1).double()
+            _addt = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
+            _addt[:, :, 2] = (_tp.unsqueeze(1) * _tcnt * alive.double()).to(inc.dtype)
+            inc = inc + _addt.reshape(B, -1)
         # the DESTINATION side of the improvement rows: every route ending in
         # one of this row's cities, own or foreign, pays this row per named
         # improvement of that city (`incomingRoutes` x `cityImprovementCount`)
@@ -14762,7 +14797,8 @@ class SimSeats:
         city, after the destination seat's Letters of Marque cut
         (`routeDestYields`): a city-state destination Democracy's half on its
         suzerain's route; a major's city Democracy's half on an ally's route,
-        and from a foreign major Cleopatra's Gold, the destination seat's
+        Trade Policy's Gold on any other player's route, and from a foreign
+        major Cleopatra's Gold, the destination seat's
         incoming-route rows and the city's Great Person Gold; every route of a
         major the destination seat's improvement rows. One route at a time:
         only plundered routes ask."""
@@ -14796,6 +14832,10 @@ class SimSeats:
             c = int(hitc.long().argmax())
             if major and d != row and bool(self.seat_ally_turns[b, row, d] > 0):
                 y = y + self._gov_mods(row)[12]["allyroute"][b].double()
+            # TRADE POLICY outcome A, on any other player's route in
+            if d != row and dcity >= 0:
+                y[2] += float(self._congress_trade_gold(
+                    torch.full((self.B,), d, dtype=torch.long, device=self.device))[b])
             foreign = major and d != row and dcity >= 0
             if foreign:
                 if bool(self._leads_vec("CLEOPATRA")[b, d]):
@@ -15172,7 +15212,7 @@ class SimSeats:
         on ONE key, the route's TOTAL yields — domestic: routeYields' food +
         production (District_TradeRouteYields' domestic column over the
         dest's completed districts, the centre row, the dest seat's
-        Isolationism term); a city-state's flat gold+specialty; an
+        Isolationism term); a city-state's six-yield `cityStateRouteYields` total; an
         international destination's six-yield table total — each FOREIGN
         key plus `_route_post_gold` at its destination —
         with strictly-greater-beats semantics, so ties keep the FIRST pair
@@ -15218,12 +15258,11 @@ class SimSeats:
         key = torch.where(valid, ysum.unsqueeze(1).expand(B, RC, RC), torch.full((B, RC, RC), -1, dtype=torch.long, device=dev))
         # MET city-states join each origin's candidate list AFTER the domestic
         # dests, matching TS's per-from iteration order (cities asc, then CS
-        # asc); the i-major flat scan preserves it. A CS route's ySum is the flat
-        # cityStateRouteYields total (gold + specialty).
+        # asc); the i-major flat scan preserves it. A CS route's ySum is its
+        # cityStateRouteYields six-yield total.
         W2 = RC
         if S > 0:
-            _tr = self.rules.trade
-            ysum_cs = int(_tr["cityStateRouteGold"]) + int(_tr["cityStateRouteSpec"])
+            ysum_cs = self._cs_route_y6().sum(dim=2).long()  # [B, S]
             csc = self.citystate_center[:, :S].clamp(min=0)  # [B, S]
             citystate_to = -(2 + torch.arange(S, device=dev))  # encoded dest ids
             exists_cs = (
@@ -15238,7 +15277,7 @@ class SimSeats:
                 & want.reshape(B, 1, 1)
             )
             _post_cs = self._route_post_gold(row, csc)                      # [B, S]
-            key_cs = torch.where(valid_cs, ysum_cs + _post_cs.unsqueeze(1).expand(B, RC, S),
+            key_cs = torch.where(valid_cs, (ysum_cs + _post_cs).unsqueeze(1).expand(B, RC, S),
                                  torch.full((B, RC, S), -1, dtype=torch.long, device=dev))
             # the ROUTE decomposition, `routeCandidateRow`'s twin: one line per
             # city-state candidate that PASSED the gates, so a disagreeing pair
@@ -15267,7 +15306,7 @@ class SimSeats:
                                 continue
                             self._diff_events.setdefault(_rb, []).append(
                                 f"rc:{int(self._ROW_SEAT[row])}:{int(self.turn)}:{-(2 + _s)}"
-                                f" f{int(centers[_rb, _j])} y{ysum_cs}"
+                                f" f{int(centers[_rb, _j])} y{int(ysum_cs[_rb, _s])}"
                                 f" post{int(_post_cs[_rb, _s])}"
                                 f" key{int(key_cs[_rb, _j, _s])}")
             key = torch.cat([key, key_cs], dim=2)

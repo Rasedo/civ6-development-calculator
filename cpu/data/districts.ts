@@ -53,7 +53,10 @@ export type AdjacencySource =
   | 'RESOURCE'
   // CIV6 (Seowon): "+4 Science" flat, and the only source that reads no
   // neighbour at all — the district's own tile.
-  | 'SELF';
+  | 'SELF'
+  // CIV6 (Adjacency_YieldChanges Pamukkale_*, AdjacentFeature
+  // FEATURE_PAMUKKALE): per adjacent Pamukkale plot.
+  | 'PAMUKKALE';
 
 export interface AdjacencyRule {
   source: AdjacencySource;
@@ -253,6 +256,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       { source: 'GEOTHERMAL_FISSURE', amount: 2 },
       { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
+      { source: 'PAMUKKALE', amount: 2 },
     ],
     housing: 0,
     maintenance: 1,
@@ -284,6 +288,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'adjacency.4.amount': xml('Adjacency_YieldChanges', 'ID=Government_Science', 'YieldChange'),
       'adjacency.5.source': xml('Adjacency_YieldChanges', 'ID=District_Science', 'OtherDistrictAdjacent', { expect: 'true' }),
       'adjacency.5.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=District_Science', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=District_Science', 'TilesRequired')] },
+      'adjacency.6.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Science', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
+      'adjacency.6.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Science', 'YieldChange'),
       'civVariants.0.cost': xml('Districts', 'DistrictType=DISTRICT_SEOWON', 'Cost'),
       'civVariants.0.housing': xml('Districts', 'DistrictType=DISTRICT_SEOWON', 'Housing'),
       'civVariants.0.amenities': xml('Districts', 'DistrictType=DISTRICT_SEOWON', 'Entertainment'),
@@ -306,6 +312,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
         { source: 'WOODS', amount: 0.5 },
         { source: 'DISTRICT', amount: 0.5 },
         { source: 'GOV_PLAZA', amount: 1 },
+        { source: 'PAMUKKALE', amount: 1 },
       ],
     }],
     plunder: { kind: 'faith', amount: 25 },
@@ -321,6 +328,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       { source: 'WOODS', amount: 0.5 },
       { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
+      { source: 'PAMUKKALE', amount: 1 },
     ],
     housing: 0,
     maintenance: 1,
@@ -350,6 +358,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'adjacency.3.amount': xml('Adjacency_YieldChanges', 'ID=Government_Faith', 'YieldChange'),
       'adjacency.4.source': xml('Adjacency_YieldChanges', 'ID=District_Faith', 'OtherDistrictAdjacent', { expect: 'true' }),
       'adjacency.4.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=District_Faith', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=District_Faith', 'TilesRequired')] },
+      'adjacency.5.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Faith', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
+      'adjacency.5.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Faith', 'YieldChange'),
       'civVariants.0.cost': xml('Districts', 'DistrictType=DISTRICT_LAVRA', 'Cost'),
       'civVariants.0.housing': xml('Districts', 'DistrictType=DISTRICT_LAVRA', 'Housing'),
       'civVariants.0.amenities': xml('Districts', 'DistrictType=DISTRICT_LAVRA', 'Entertainment'),
@@ -363,6 +373,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'civVariants.0.adjacency.3.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=District_Faith', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=District_Faith', 'TilesRequired')] },
       'civVariants.0.adjacency.4.source': xml('Adjacency_YieldChanges', 'ID=Government_Faith', 'AdjacentDistrict', { expect: 'DISTRICT_GOVERNMENT' }),
       'civVariants.0.adjacency.4.amount': xml('Adjacency_YieldChanges', 'ID=Government_Faith', 'YieldChange'),
+      'civVariants.0.adjacency.5.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Faith', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
+      'civVariants.0.adjacency.5.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Faith', 'YieldChange'),
     },
   }),
   THEATER_SQUARE: D({
@@ -380,6 +392,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
         { source: 'CITY_CENTER', amount: 1 },
         { source: 'GOV_PLAZA', amount: 1 },
         { source: 'ENTERTAINMENT_COMPLEX', amount: 2 },
+        { source: 'PAMUKKALE', amount: 2 },
       ],
     }],
     plunder: { kind: 'culture', amount: 25 },
@@ -395,6 +408,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       { source: 'BUILT_WONDER', amount: 2 },
       { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
+      { source: 'PAMUKKALE', amount: 2 },
     ],
     housing: 0,
     maintenance: 1,
@@ -420,6 +434,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'adjacency.1.amount': xml('Adjacency_YieldChanges', 'ID=Government_Culture', 'YieldChange'),
       'adjacency.2.source': xml('Adjacency_YieldChanges', 'ID=District_Culture', 'OtherDistrictAdjacent', { expect: 'true' }),
       'adjacency.2.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=District_Culture', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=District_Culture', 'TilesRequired')] },
+      'adjacency.3.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Culture', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
+      'adjacency.3.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Culture', 'YieldChange'),
       'civVariants.0.cost': xml('Districts', 'DistrictType=DISTRICT_ACROPOLIS', 'Cost'),
       'civVariants.0.housing': xml('Districts', 'DistrictType=DISTRICT_ACROPOLIS', 'Housing'),
       'civVariants.0.amenities': xml('Districts', 'DistrictType=DISTRICT_ACROPOLIS', 'Entertainment'),
@@ -433,6 +449,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'civVariants.0.adjacency.3.amount': xml('Adjacency_YieldChanges', 'ID=Government_Culture', 'YieldChange'),
       'civVariants.0.adjacency.4.source': xml('Adjacency_YieldChanges', 'ID=EntertainmentComplex_Culture', 'AdjacentDistrict', { expect: 'DISTRICT_ENTERTAINMENT_COMPLEX' }),
       'civVariants.0.adjacency.4.amount': xml('Adjacency_YieldChanges', 'ID=EntertainmentComplex_Culture', 'YieldChange'),
+      'civVariants.0.adjacency.5.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Culture', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
+      'civVariants.0.adjacency.5.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Culture', 'YieldChange'),
     },
   }),
   COMMERCIAL_HUB: D({
@@ -445,6 +463,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
         { source: 'HOLY_SITE_DISTRICT', amount: 2 },
         { source: 'DISTRICT', amount: 0.5 },
         { source: 'GOV_PLAZA', amount: 1 },
+        { source: 'PAMUKKALE', amount: 2 },
       ],
     }],
     plunder: { kind: 'gold', amount: 50 },
@@ -459,6 +478,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       { source: 'HARBOR_DISTRICT', amount: 2 },
       { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
+      { source: 'PAMUKKALE', amount: 2 },
     ],
     housing: 0,
     maintenance: 0,
@@ -486,6 +506,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'adjacency.2.amount': xml('Adjacency_YieldChanges', 'ID=Government_Gold', 'YieldChange'),
       'adjacency.3.source': xml('Adjacency_YieldChanges', 'ID=District_Gold', 'OtherDistrictAdjacent', { expect: 'true' }),
       'adjacency.3.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=District_Gold', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=District_Gold', 'TilesRequired')] },
+      'adjacency.4.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Gold', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
+      'adjacency.4.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Gold', 'YieldChange'),
       'civVariants.0.cost': xml('Districts', 'DistrictType=DISTRICT_SUGUBA', 'Cost'),
       'civVariants.0.housing': xml('Districts', 'DistrictType=DISTRICT_SUGUBA', 'Housing'),
       'civVariants.0.amenities': xml('Districts', 'DistrictType=DISTRICT_SUGUBA', 'Entertainment'),
@@ -497,6 +519,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'civVariants.0.adjacency.2.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=District_Gold', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=District_Gold', 'TilesRequired')] },
       'civVariants.0.adjacency.3.source': xml('Adjacency_YieldChanges', 'ID=Government_Gold', 'AdjacentDistrict', { expect: 'DISTRICT_GOVERNMENT' }),
       'civVariants.0.adjacency.3.amount': xml('Adjacency_YieldChanges', 'ID=Government_Gold', 'YieldChange'),
+      'civVariants.0.adjacency.4.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Gold', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
+      'civVariants.0.adjacency.4.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Gold', 'YieldChange'),
     },
   }),
   HARBOR: D({

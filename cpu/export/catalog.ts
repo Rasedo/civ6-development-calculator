@@ -66,7 +66,7 @@ const wonderBit = (i: number): number => {
 // static count — the district's own row carries it.
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
-  'GEOTHERMAL_FISSURE', 'TUNDRA', 'DESERT',
+  'GEOTHERMAL_FISSURE', 'TUNDRA', 'DESERT', 'PAMUKKALE',
 ]);
 
 function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number {
@@ -91,6 +91,7 @@ function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number
         : rule.source === 'GEOTHERMAL_FISSURE' ? n.feature === 'GEOTHERMAL_FISSURE'
         : rule.source === 'TUNDRA' ? n.terrain === 'TUNDRA'
         : rule.source === 'DESERT' ? n.terrain === 'DESERT'
+        : rule.source === 'PAMUKKALE' ? n.feature === 'PAMUKKALE'
         : false;
       if (m) sum += rule.amount;
     }

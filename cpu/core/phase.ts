@@ -25,7 +25,7 @@ import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boos
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
-import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
+import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, cityStateItemProduction, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
@@ -2680,7 +2680,8 @@ export function seatPhase(state: GameState): void {
       if (perSuz) sum += perSuz * state.cityStates.filter((cs) => isSuzerain(state, cs, actor.seat)).length;
       const perEnvoy = sm.seatYieldPerEnvoy[key as YieldKey] ?? 0;
       if (perEnvoy) sum += perEnvoy * state.cityStates.reduce((n, cs) => n + envoysOf(cs, actor.seat), 0);
-      return sum;
+      // then the player's percent per suzerainty, on all of the above
+      return sum * seatYieldMultPerSuzerain(state, actor.seat, sm, key as YieldKey);
     };
     let yields = readYields();
     const rsr = actor.research;

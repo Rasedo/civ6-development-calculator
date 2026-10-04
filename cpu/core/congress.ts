@@ -147,14 +147,10 @@ export function preference(state: GameState, res: number, seat: number,
       // A RAISES the price, so self-interest votes B on the currency this
       // seat actually buys with — the one it holds the most of.
       return { outcome: 1, target: (sx.faith ?? 0) > (sx.treasury ?? 0) ? CONGRESS_CUR_FAITH : CONGRESS_CUR_GOLD };
-    case CONGRESS_TRADE_POLICY: {
-      // A pays the SENDER, so a seat names where its own routes go; with no
-      // international leg the vote is harmless and names itself.
-      const counts = state.seats.map(() => 0);
-      for (const r of sx.tradeRoutes ?? []) if (r.toSeat !== undefined && r.toSeat >= 0) counts[r.toSeat]++;
-      const most = argmaxLow(counts);
-      return { outcome: 0, target: counts[most] > 0 ? most : seat };
-    }
+    case CONGRESS_TRADE_POLICY:
+      // A pays the NAMED seat's cities for every route in and widens its
+      // capacity, so a seat names itself.
+      return { outcome: 0, target: seat };
     case CONGRESS_POLICY_TREATY: {
       // A pays every holder of the card, so a seat names one it has slotted.
       return { outcome: 0, target: ctx.policies.length ? ctx.policies[0] : 0 };
@@ -627,8 +623,11 @@ export function congressUnitBuyMult(state: GameState, currency: number): number 
   return e.outcome === 0 ? CONGRESS_PLUS_100 : CONGRESS_MINUS_50;
 }
 
-/** Trade Policy outcome A: the gold a route pays its SENDER for ending at the
- *  named seat. */
+/** Trade Policy outcome A (INCREASES_TRADE_TO_GOLD,
+ *  MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS): the Gold
+ *  each route ANOTHER player sends into a city of the named seat pays that
+ *  city (runs/h1_duelw1105: Nalanda's routes into Rome and Ostia read 4 Gold
+ *  at their destination while Rome was named, t102-121 and t162-181). */
 export function congressTradeGold(state: GameState, destSeat: number): number {
   const e = congressEffect(state, CONGRESS_TRADE_POLICY);
   return e && e.outcome === 0 && e.target === destSeat ? CONGRESS_TRADE_GOLD : 0;

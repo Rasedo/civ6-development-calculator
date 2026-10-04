@@ -223,3 +223,25 @@ Object.assign(FEATURES, {
   GOBUSTAN: { id: 'GOBUSTAN', name: 'Gobustan', yields: { culture: 3, production: 1 }, ...NW },
   BERMUDA_TRIANGLE: { id: 'BERMUDA_TRIANGLE', name: 'Bermuda Triangle', yields: {}, adjacentYields: { science: 5 }, ...NW },
 } satisfies Record<string, FeatureDef>);
+
+// SIX MORE WONDERS, appended after the Bermuda Triangle; the engines' map
+// generator lays none, an imported world carries them. CIV6
+// (Feature_AdjacentYields, every neighbouring plot paid once per wonder plot
+// it touches): PIOPIOTAHI (three plots) Gold 1 Culture 1, TSINGY Culture 1
+// Science 1, DEVILSTOWER Faith 1 Production 1, GIANTS_CAUSEWAY (two plots)
+// Culture 1 — all four Impassable (runs/h1_duelw1106 Piopiotahi, 1108 Tsingy,
+// 1104 Devil's Tower, 1107 the Causeway: each neighbour reads the rows).
+// LAKE_RETBA (two plots, Lake, passable): Feature_YieldChanges Production 1,
+// Gold 2, Culture 2, its plots' whole yields (runs/h1_duelw1107 read
+// 0F 1P 2G 2C). PAMUKKALE (two plots, Impassable) pays no plot: its
+// `Adjacency_YieldChanges` rows go to the districts beside it (`PAMUKKALE`
+// in `AdjacencySource`). Giant's Causeway's ABILITY_SPEAR_OF_FIONN and
+// Pamukkale's amenities and fresh water are not modelled.
+Object.assign(FEATURES, {
+  PIOPIOTAHI: { id: 'PIOPIOTAHI', name: 'Piopiotahi', yields: {}, impassable: true, adjacentYields: { gold: 1, culture: 1 }, ...NW },
+  TSINGY: { id: 'TSINGY', name: 'Tsingy de Bemaraha', yields: {}, impassable: true, adjacentYields: { culture: 1, science: 1 }, ...NW },
+  DEVILS_TOWER: { id: 'DEVILS_TOWER', name: "Devil's Tower", yields: {}, impassable: true, adjacentYields: { faith: 1, production: 1 }, ...NW },
+  GIANTS_CAUSEWAY: { id: 'GIANTS_CAUSEWAY', name: "Giant's Causeway", yields: {}, impassable: true, adjacentYields: { culture: 1 }, ...NW },
+  LAKE_RETBA: { id: 'LAKE_RETBA', name: 'Lake Retba', yields: { production: 1, gold: 2, culture: 2 }, ...NW },
+  PAMUKKALE: { id: 'PAMUKKALE', name: 'Pamukkale', yields: {}, impassable: true, ...NW },
+} satisfies Record<string, FeatureDef>);

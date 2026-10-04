@@ -26,10 +26,12 @@
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
-import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, TerrainId, Tile, Unit, Yields } from '../core/types';
+import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
+import { stampTradingPost, tradeRouteMinDuration } from '../core/trade';
+import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
 import { governorsOf } from '../core/governors';
@@ -116,6 +118,9 @@ export interface Imported {
    *  gives its flood count (`importFloodCounts`). A read-back column cannot
    *  disagree, so the plot checks leave it out */
   readBack: Map<number, Set<number>>;
+  /** every live trade route of the record, on its owner's `tradeRoutes`,
+   *  beside the game's route table it came from */
+  routes: { owner: number; route: TradeRoute; game: Record<string, unknown> }[];
 }
 
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
@@ -128,7 +133,7 @@ const FEATURE_ID: Record<string, string> = {
   FEATURE_KILIMANJARO: 'MOUNT_KILIMANJARO', FEATURE_EVEREST: 'MOUNT_EVEREST',
   FEATURE_CLIFFS_DOVER: 'CLIFFS_OF_DOVER', FEATURE_BURNING_FOREST: 'BURNING_WOODS',
   FEATURE_BURNT_FOREST: 'BURNT_WOODS', FEATURE_BURNING_JUNGLE: 'BURNING_RAINFOREST',
-  FEATURE_BURNT_JUNGLE: 'BURNT_RAINFOREST',
+  FEATURE_BURNT_JUNGLE: 'BURNT_RAINFOREST', FEATURE_DEVILSTOWER: 'DEVILS_TOWER',
 };
 /** the game's six river / cliff direction bits per plot: 1 = the plot lies NE
  *  of the edge (the edge is its SW side), 2 = NW of it (SE side), 4 = W of it
@@ -392,6 +397,26 @@ export interface History {
    *  across the pairs so far, and the world's (`eraChecks`) */
   moments: Map<number, number[]>;
   momentsWorld: number[];
+  /** the first record each live trade route was seen in, by `routeKey` */
+  routeSeen: Map<string, number>;
+  /** the Trading Posts each player holds, by centre plot: both ends of
+   *  every route that left the records while its Trader lived on (a route
+   *  run to its end; a plundered route takes its Trader with it) */
+  posts: Map<number, Set<number>>;
+}
+
+/** A record route's identity: its Trader and its two cities. */
+function routeKey(r: Record<string, number>): string {
+  return `${r.TraderUnitPlayer}:${r.TraderUnitID}:${r.OriginCityPlayer}:${r.OriginCityID}:${r.DestinationCityPlayer}:${r.DestinationCityID}`;
+}
+
+/** Every trade route a record carries, as the game's route tables. */
+function recordRoutes(rec: TurnRecord): Record<string, number>[] {
+  const out: Record<string, number>[] = [];
+  for (const c of rec.cities) {
+    if (Array.isArray(c.routes)) out.push(...(c.routes as Record<string, number>[]));
+  }
+  return out;
 }
 
 export const AGE_DARK = 0;
@@ -425,7 +450,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
-    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
+    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), posts: new Map() };
 }
 
 /** The copies of a progressive chassis a player's price quotes stand at: the
@@ -693,8 +718,29 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         h.discountDistricts.set(p.id, completedSpecialty(h.last, cat, p.id));
       }
     }
+    // a route gone with its Trader alive ran to its end: its owner holds a
+    // Trading Post at both of its cities
+    const liveNow = new Set(recordRoutes(rec).map(routeKey));
+    const unitsNow = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
+    const centreOf = new Map(h.last.cities.map((c) => [`${c.owner}:${c.id}`, c.y * W + c.x]));
+    for (const r of recordRoutes(h.last)) {
+      if (liveNow.has(routeKey(r)) || !unitsNow.has(`${r.TraderUnitPlayer}:${r.TraderUnitID}`)) continue;
+      const posts = h.posts.get(r.TraderUnitPlayer) ?? new Set<number>();
+      for (const k of [`${r.OriginCityPlayer}:${r.OriginCityID}`, `${r.DestinationCityPlayer}:${r.DestinationCityID}`]) {
+        const at = centreOf.get(k);
+        if (at !== undefined) posts.add(at);
+      }
+      h.posts.set(r.TraderUnitPlayer, posts);
+    }
+  }
+  const live = new Set<string>();
+  for (const r of recordRoutes(rec)) {
+    const k = routeKey(r);
+    live.add(k);
+    if (!h.routeSeen.has(k)) h.routeSeen.set(k, rec.turn);
   }
   h.congressBefore = h.last ? h.last.congress : rec.congress;
+  for (const k of [...h.routeSeen.keys()]) if (!live.has(k)) h.routeSeen.delete(k);
   h.last = rec;
 }
 
@@ -1128,6 +1174,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
 
   importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
+  const routes = importTradeRoutes(rec, state, cityByKey, minorOfPlayer, seatOfGame, history);
 
   // the units
   let nextId = 0;
@@ -1183,7 +1230,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
-    congressGaps, congressOf, queueProgressRead, readBack,
+    congressGaps, congressOf, queueProgressRead, readBack, routes,
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
   };
 }
@@ -1222,6 +1269,52 @@ function importFloodCounts(rec: TurnRecord, state: GameState, cities: Iterable<C
     }
   }
   return readBack;
+}
+
+/**
+ * The record's live trade routes, each on its owner's `tradeRoutes` (a
+ * major's from its city, a city-state's from its one city, id -1), and the
+ * Trading Posts the history saw planted (`History.posts`) with Rome's in each
+ * of its cities (All Roads Lead to Rome). The record names no path, so a
+ * route's course is the one the engine's walk lays from its origin
+ * (`tradeCourse`), and its start the first record that carried it.
+ */
+function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<string, City>,
+  minorOfPlayer: Map<number, CityState>, seatOfGame: (pid: number) => number,
+  history?: History): Imported['routes'] {
+  for (const [pid, posts] of history?.posts ?? []) {
+    const owner = seatOf(state, seatOfGame(pid));
+    if (owner) for (const at of posts) stampTradingPost(owner, at);
+  }
+  for (const s of state.seats) {
+    if (civOf(state, s.seat) === 'ROME') for (const c of s.cities) stampTradingPost(s, c.centerIndex);
+  }
+  const out: Imported['routes'] = [];
+  for (const r of recordRoutes(rec)) {
+    const origin = cityByKey.get(`${r.OriginCityPlayer}:${r.OriginCityID}`);
+    const minorOwner = minorOfPlayer.get(r.OriginCityPlayer);
+    const owner = minorOwner ?? (origin && isCiv(origin.seat) ? seatOf(state, origin.seat) : undefined);
+    if (!owner) continue;
+    const from = minorOwner ? -1 : origin!.id;
+    const originCentre = minorOwner ? minorOwner.centerIndex : origin!.centerIndex;
+    const dest = cityByKey.get(`${r.DestinationCityPlayer}:${r.DestinationCityID}`);
+    const minor = minorOfPlayer.get(r.DestinationCityPlayer);
+    const route: TradeRoute | null = minor ? { from, toCs: minor.id }
+      : !dest ? null
+      : dest.seat === owner.seat ? { from, to: dest.id }
+      : { from, toSeat: dest.seat, toSeatCity: dest.id };
+    if (!route) continue;
+    const destCentre = minor ? minor.centerIndex : dest!.centerIndex;
+    route.course = tradeCourse(tradeReach(state, owner.seat, originCentre), destCentre) ?? [];
+    const seen = history?.routeSeen.get(routeKey(r));
+    if (seen !== undefined) {
+      route.createdTurn = seen;
+      route.expiresTurn = seen + tradeRouteMinDuration(state);
+    }
+    (owner.tradeRoutes ??= []).push(route);
+    out.push({ owner: owner.seat, route, game: r });
+  }
+  return out;
 }
 
 function bitsToIds(bits: string, names: string[], kind: string, prefix: string, known: object, ctx: Ctx): string[] {

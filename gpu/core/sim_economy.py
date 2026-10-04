@@ -7234,32 +7234,11 @@ class SimEconomy:
                 for _wy in (3, 4, 5):  # science, culture, faith
                     total[:, :, _wy] = torch.where(_ww, total[:, :, _wy] * (1.0 + _wyp / 100.0), total[:, :, _wy])
         # CIV6 (Geneva): "+15% Science" in every city while at peace with every
-        # civilization — a percent on `m.yieldMult`, ahead of the two rows that
-        # count suzerain HEADS, which is the order TS composes them in.
+        # civilization — a percent on `m.yieldMult`.
         _gsci = self._suz_science_pct(row)
         if bool((_gsci > 0).count_nonzero()):
             gym = gym.clone()
             gym[:, 3] = gym[:, 3] * (1 + _gsci.to(gym.dtype) / 100.0)
-        # a suzerainty pays CULTURE by the head, not by what Treaty
-        # Organization does to its favor — `suzerainCount`'s weighting is
-        # the favor's, and TS counts `isSuzerain` heads here
-        _suz_n = self._suzerains_held(row)
-        # (Collective Activism, International Space Agency) a fraction of one
-        # yield per suzerainty
-        _cz = self._gov_mods(row)[12]["ysuz"]
-        if bool(_cz.count_nonzero()) and bool((_suz_n > 0).count_nonzero()):
-            gym = gym.clone()
-            for _yk in range(6):
-                if bool(_cz[:, _yk].count_nonzero()):
-                    gym[:, _yk] = gym[:, _yk] * (1 + _cz[:, _yk].to(gym.dtype) * _suz_n.to(gym.dtype))
-        # CIV6 (Surrounded by Glory): "+5% Culture per city-state you are
-        # the Suzerain of" (`YIELD_PER_SUZERAIN_ROWS`)
-        for _yc, _yl, _yy, _yp in self._live_rows(row, self._yield_per_suzerain_rows):
-            _yw = self._row_is(row, _yc, _yl)
-            if not bool(_yw.count_nonzero()):
-                continue
-            gym = gym.clone()
-            gym[:, _yy] = gym[:, _yy] * (1 + _yw.to(gym.dtype) * _suz_n.to(gym.dtype) * (_yp / 100.0))
         gymc = gym.double().unsqueeze(1)
         # The governor's own multipliers are part of `m.yieldMult` on TS —
         # ONE number scales the total, so they fold in before it lands.

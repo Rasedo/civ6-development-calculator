@@ -47,6 +47,10 @@ export const FEATURE_SIGHT_THROUGH: Readonly<Record<string, number>> = {
   EYJAFJALLAJOKULL: srcConst('improvements.featSightThrough.EYJAFJALLAJOKULL', 2, feat('FEATURE_EYJAFJALLAJOKULL')),
   VESUVIUS: srcConst('improvements.featSightThrough.VESUVIUS', 2, feat('FEATURE_VESUVIUS')),
   GOBUSTAN: srcConst('improvements.featSightThrough.GOBUSTAN', 1, feat('FEATURE_GOBUSTAN')),
+  PIOPIOTAHI: srcConst('improvements.featSightThrough.PIOPIOTAHI', 1, feat('FEATURE_PIOPIOTAHI')),
+  TSINGY: srcConst('improvements.featSightThrough.TSINGY', 1, feat('FEATURE_TSINGY')),
+  DEVILS_TOWER: srcConst('improvements.featSightThrough.DEVILS_TOWER', 2, feat('FEATURE_DEVILSTOWER')),
+  PAMUKKALE: srcConst('improvements.featSightThrough.PAMUKKALE', 1, feat('FEATURE_PAMUKKALE')),
 };
 
 /** the farthest any chassis looks — the reach of the static line table both

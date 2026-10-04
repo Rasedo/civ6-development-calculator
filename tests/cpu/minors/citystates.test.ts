@@ -182,14 +182,23 @@ describe('quests and trade', () => {
     expect(cityState.seatQuest[0]).toBeNull();
   });
 
-  it('routes to city-states pay gold plus their specialty', () => {
+  it('routes to city-states pay the international column of their districts', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     city.buildings.push('MARKET'); // capacity 1
     const cityState = addCs(state, 9, 9, { type: 'scientific' });
     const r = addCsTradeRoute(state, city.id, cityState.id, 0);
     expect(r.ok).toBe(true);
-    const y = cityTradeYields(state, city);
+    // the centre alone: its Gold 3, and no specialty yield of the type
+    let y = cityTradeYields(state, city);
+    expect(y.gold).toBe(3);
+    expect(y.science).toBe(0);
+    // a completed Campus beside it pays its Science 1
+    const campus = tileAtCoords(state.map, 9, 10);
+    campus.district = 'CAMPUS';
+    campus.districtComplete = true;
+    cityState.districts = [{ type: 'CAMPUS', tileIndex: campus.index }];
+    y = cityTradeYields(state, city);
     expect(y.gold).toBe(3);
     expect(y.science).toBe(1);
     expect(addCsTradeRoute(state, city.id, cityState.id, 0).ok).toBe(false); // duplicate
