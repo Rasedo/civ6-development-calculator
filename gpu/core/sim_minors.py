@@ -21,7 +21,7 @@ class SimMinors:
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
             alive = self.citystate_alive[:, s]
-            if not bool(alive.any()):
+            if not bool(alive.count_nonzero()):
                 continue
             self._minor_levy_return(s)
             n_mil = self._minor_military_count(s)
@@ -52,10 +52,10 @@ class SimMinors:
         ls = self.citystate_levy_seat[:, s]
         back = alive & (ls >= 0) & ((int(self.turn) >= self.citystate_levy_ends[:, s])
                                     | (self.citystate_suzerain[:, s] != ls))
-        if not bool(back.any()):
+        if not bool(back.count_nonzero()):
             return
         m = self.major_unit_alive & (self.major_unit_levy_src == 100 + s) & back.unsqueeze(1)
-        if bool(m.any()):
+        if bool(m.count_nonzero()):
             self.major_unit_seat[m] = 100 + s
             self.major_unit_levied[m] = False
             self.major_unit_levy_src[m] = -1
@@ -80,8 +80,8 @@ class SimMinors:
         demand = demand + self._laser_power_load * self.city_lasers[:, row, 0].double()
         demand = torch.where(alive, demand, torch.zeros_like(demand))
         supply = torch.zeros(B, dtype=torch.float64, device=dev)
-        if bool((demand > 0).any()):
-            if bool((self._b_power_supply > 0).any()):
+        if bool((demand > 0).count_nonzero()):
+            if bool((self._b_power_supply > 0).count_nonzero()):
                 supply = supply + stand.double() @ self._b_power_supply
             if self._imp_power_any:
                 live = ((self.improvement >= 0) & ~self.pillaged & (self.tile_seat == 100 + s)
@@ -144,7 +144,7 @@ class SimMinors:
             ysum = comp.double() @ self._route_intl_y.sum(dim=1) + float(y6)  # [B, RC]
             for j in range(self.RC):
                 live = self.city_alive[:, r2, j] & free
-                if not bool(live.any()):
+                if not bool(live.count_nonzero()):
                     continue
                 ctr = self.city_center[:, r2, j].clamp(min=0)
                 cid = self.city_id[:, r2, j]
@@ -175,10 +175,10 @@ class SimMinors:
             used = (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1)
             t_has, t_slot, t_tile = self._free_trader(row)
             want = alive & (used < self._trade_capacity(row)) & t_has
-            if bool(want.any()):
+            if bool(want.count_nonzero()):
                 found, code, dseat, dcity, dct = self._minor_route_candidate(s, want)
                 go = want & found
-                if bool(go.any()):
+                if bool(go.count_nonzero()):
                     rows = go.nonzero(as_tuple=True)[0]
                     slot = self._free_route_slot(rows, row)
                     o_ct = self.citystate_center[:, s].clamp(min=0)
@@ -219,7 +219,7 @@ class SimMinors:
         row = self._CITY_MINOR0 + s
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
-        if not bool(act.any()):
+        if not bool(act.count_nonzero()):
             return None
         B, S, dev = self.B, self.S, self.device
         rk = torch.zeros(B, rr.shape[1], 6, dtype=torch.float64, device=dev)
@@ -241,7 +241,7 @@ class SimMinors:
             _p_want = _p_want | ok_c
         rd_c = self.seat_route_dcity[:, row]
         intl = act & (rd_c >= 0)
-        if bool(intl.any()):
+        if bool(intl.count_nonzero()):
             K = rd_c.shape[1]
             RCw = self.city_id.shape[2]
             dr = self.seat_route_dseat[:, row].clamp(min=0)
@@ -258,7 +258,7 @@ class SimMinors:
             rk = rk + intl6 * valid.double().unsqueeze(2)
             _p_d = torch.where(valid, intl6[:, :, 2], _p_d)
             _p_want = _p_want | valid
-        if bool(_p_want.any()):
+        if bool(_p_want.count_nonzero()):
             rk[:, :, 2] += self._route_path_gold(row, _p_d, _p_want)
         return rk
 
@@ -268,7 +268,7 @@ class SimMinors:
         Encampment's), the centre clean, three quiet turns since its last hit;
         the price the HP it puts back, at least 1."""
         row = self._CITY_MINOR0 + s
-        mx = self._walls_tier_hp[self._minor_walls_tier(s)].long()
+        mx = self._walls_tier_hp.take(self._minor_walls_tier(s)).long()
         outer = torch.minimum(self.city_outer_hp[:, row, 0], mx)
         enc_missing = torch.zeros_like(mx)
         if self._encamp_didx >= 0:
@@ -307,20 +307,20 @@ class SimMinors:
         self.improvement[rows, tiles] = -1
         fid = self.feat_id[rows, tiles]
         nofp = (fid < 0) | ~self._fp_feat[fid.clamp(min=0)]
-        if bool(nofp.any()):
+        if bool(nofp.count_nonzero()):
             self._strip_feature_at(rows[nofp], tiles[nofp])
         # the bonus resource goes as a harvest takes it: every baked plane to
         # its resource-free value, so a plot whose district is later gone
         # reads bare ground (TS deleted `tile.resource`)
         fresh_rs = (self.res_priority[rows, tiles] == 1) & ~self.res_stripped[rows, tiles]
-        if bool(fresh_rs.any()):
+        if bool(fresh_rs.count_nonzero()):
             self._drop_resource(rows[fresh_rs], tiles[fresh_rs])
 
     def _minor_military_count(self, s: int) -> torch.Tensor:
         """[B] long — minor `s`'s military units (`minorMilitary`)."""
         mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        return (mine & self._type_military[mt]).sum(dim=1)
+        return (mine & self._type_military.take(mt)).sum(dim=1)
 
     def _minor_economy(self, s: int) -> torch.Tensor:
         """`minorEconomy` — THE MINOR'S ECONOMY, in the order every player's
@@ -341,15 +341,15 @@ class SimMinors:
         self.citystate_tech_prog[:, s] += tot[:, 3] * keep
         self.citystate_civic_prog[:, s] += tot[:, 4] * keep
         gained = self._minor_research(s)
-        if bool((gained > 0).any()):
+        if bool((gained > 0).count_nonzero()):
             fresh = self._seat_city_stats(row, record=False)[0][:, 0]
             tot = torch.where((gained > 0).unsqueeze(1), fresh, tot)
         mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
-        upkeep = (self._type_maintenance[self.major_unit_type.clamp(min=0, max=self.NU - 1)].double()
+        upkeep = (self._type_maintenance.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)).double()
                   * mine.double()).sum(dim=1)
         tre = self.citystate_treasury[:, s] + tot[:, 2] * keep
         paid = torch.where(alive, tre - upkeep, tre)
-        maint = self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)].double()
+        maint = self._type_maintenance.take(self.unit_type.clamp(min=0, max=self.NU - 1)).double()
         self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
         self.citystate_faith[:, s] += tot[:, 5] * keep
         return gained
@@ -423,7 +423,7 @@ class SimMinors:
             # a dead minor receives nothing; a negative difference (a removal)
             # claims nothing and gives nothing back
             want = (env[:, s] - self.city_acquired[bidx, row, col]) * (self.citystate_alive[:, s] & games).long()
-            if not bool((want > 0).any()):
+            if not bool((want > 0).count_nonzero()):
                 continue
             center = self.city_center[bidx, row, col]
             cid = self.city_id[bidx, row, col]
@@ -431,7 +431,7 @@ class SimMinors:
                 ready = want > 0
                 spot_all = self._seat_border_draw(row, center, cid, ready)
                 claim = ready & (spot_all >= 0)
-                if not bool(claim.any()):
+                if not bool(claim.count_nonzero()):
                     break
                 rows = claim.nonzero(as_tuple=True)[0]
                 spot = spot_all[rows]
@@ -463,16 +463,16 @@ class SimMinors:
             (False, self.citystate_civics, self.citystate_civic_prog, rdv.c_cost.to(self.device), self._prereq_c),
         ):
             avail = self._available_mask(have[:, s], pre)
-            if not bool(avail.any()):
+            if not bool(avail.count_nonzero()):
                 continue
             key = torch.where(avail, cost.unsqueeze(0).expand_as(avail),
                               torch.full((1, 1), float("inf"), dtype=torch.float64, device=self.device).expand_as(avail))
             key = key + torch.arange(key.shape[1], device=self.device, dtype=torch.float64) * 1e-6
             pick = key.argmin(dim=1)
-            cval = cost[pick]
+            cval = cost.take(pick)
             fire = alive & avail.any(dim=1) & (prog[:, s] >= cval)
             gained = gained + fire.long()
-            if bool(fire.any()):
+            if bool(fire.count_nonzero()):
                 have[fire, s, pick[fire]] = True
                 prog[fire, s] = prog[fire, s] - cval[fire]
                 # the minor's record now feeds its own yield walk (`_seat_techs`)
@@ -484,7 +484,7 @@ class SimMinors:
     def _minor_urban_fit(self, s: int, hit: torch.Tensor) -> None:
         """`minorResearch`'s Urban Defenses fit: the centre's perimeter and its
         Encampment's own pool arrive at the urban tier's full pool."""
-        if not bool(hit.any()):
+        if not bool(hit.count_nonzero()):
             return
         row = self._CITY_MINOR0 + s
         full = int(self._walls_tier_hp[self._walls_tier_urban])
@@ -545,7 +545,7 @@ class SimMinors:
             & (self.pair_dist[center] <= 3)
         )
         need_clear = (self.tile_ftu >= 0) & ~self.feat_stripped
-        if bool(need_clear.any()):
+        if bool(need_clear.count_nonzero()):
             have = self.citystate_techs[:, s].gather(1, self.tile_ftu.clamp(min=0))
             elig = elig & (~need_clear | have)
         elig[torch.arange(B, device=dev), center] = False
@@ -618,7 +618,7 @@ class SimMinors:
         army cap, then the Builder purchase rate. `citystate_army_cap` -1 is
         the undrawn mark."""
         fresh = self.citystate_alive[:, s] & (self.citystate_army_cap[:, s] < 0)
-        if not bool(fresh.any()):
+        if not bool(fresh.count_nonzero()):
             return
         typ = self.citystate_type[:, s].clamp(min=0)
         sl = self._mb_slots
@@ -729,7 +729,7 @@ class SimMinors:
             # Coastal Lowland tiles."
             ok = ok & (self._city_lowland_count(row)[:, 0] > 0)
         if int(rd.b_walls[bi]) > 0:
-            ok = ok & (self.city_outer_hp[:, row, 0] >= self._walls_tier_hp[self._minor_walls_tier(s)])
+            ok = ok & (self.city_outer_hp[:, row, 0] >= self._walls_tier_hp.take(self._minor_walls_tier(s)))
         return ok
 
     def _minor_train(self, s: int, pay: torch.Tensor, ui: torch.Tensor, cost: torch.Tensor) -> torch.Tensor:
@@ -758,7 +758,7 @@ class SimMinors:
         """The repair where `mask`: the pot takes the turn's Production and the
         building (`target`) completes when the pot covers what is left past
         `MINOR_REPAIR_RESUME_PCT` of its cost (`minorBuild`'s `repairNow`)."""
-        if not bool(mask.any()):
+        if not bool(mask.count_nonzero()):
             return
         toward(mask, 0.0)
         row = self._CITY_MINOR0 + s
@@ -768,7 +768,7 @@ class SimMinors:
             full = torch.where(tc == self._barrier_bidx, self._flood_barrier_cost(row)[:, 0].double(), full)
         cost = full - torch.floor(full * self._mb_repair_resume_pct / 100)
         pay = mask & (self.citystate_prod[:, s] >= cost)
-        if bool(pay.any()):
+        if bool(pay.count_nonzero()):
             rr = pay.nonzero(as_tuple=True)[0]
             self.citystate_prod[rr, s] -= cost[rr]
             self.city_bldg_pillaged[rr, row, 0, tc[rr]] = False
@@ -783,7 +783,7 @@ class SimMinors:
         unless `grants` is off; a Builder counts toward the next one's price.
         Every such unit is trained or bought, so it raises the minor's best
         melee (`_raise_best_melee`). The games where it landed."""
-        if not bool(mask.any()):
+        if not bool(mask.count_nonzero()):
             return torch.zeros_like(mask)
         row = self._CITY_MINOR0 + s
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
@@ -822,7 +822,7 @@ class SimMinors:
         if self.S == 0:
             return
         alive = self.citystate_alive[:, s]
-        if not bool(alive.any()):
+        if not bool(alive.count_nonzero()):
             return
         B, dev = self.B, self.device
         self.citystate_full_power[:, s] = False
@@ -850,8 +850,8 @@ class SimMinors:
         # the minor's units, counted once before the walk
         mine = self.major_unit_alive & (self.major_unit_seat == seat)
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        n_mil = (mine & self._type_military[mt]).sum(dim=1)
-        ucls = self.rules_dev.u_promo_class.to(dev)[mt]
+        n_mil = (mine & self._type_military.take(mt)).sum(dim=1)
+        ucls = self.rules_dev.u_promo_class.to(dev).take(mt)
         n_cls = {c: (mine & (ucls == c)).sum(dim=1) for c in {c for c, _w in self._mb_army} | set(self._mb_cls)}
         n_builder = ((mine & (self.major_unit_type == self._builder_idx)).sum(dim=1) if self._builder_idx >= 0
                      else torch.ones(B, dtype=torch.long, device=dev))
@@ -878,13 +878,13 @@ class SimMinors:
             if self._mb_drawn[r]:
                 fr = self.citystate_build_from[:, s, r]
                 gate = gate & (fr >= 0) & (fr <= self.turn)
-            if not bool(gate.any()):
+            if not bool(gate.count_nonzero()):
                 continue
             if kind == "builder":
                 if self._builder_idx < 0:
                     continue
                 avail = gate & (n_builder == 0)
-                if not bool(avail.any()):
+                if not bool(avail.count_nonzero()):
                     continue
                 toward(avail, self._mb_builder_pct)
                 cost = self._builder_cost(self.citystate_builders_trained[:, s]).double()
@@ -904,7 +904,7 @@ class SimMinors:
                     want = n_mil < self.citystate_army_cap[:, s]
                     ui = self._minor_army_unit(trainable, n_cls)
                 avail = gate & want & (ui >= 0)
-                if not bool(avail.any()):
+                if not bool(avail.count_nonzero()):
                     continue
                 toward(avail, mil_pct)
                 cost = self._type_cost[ui.clamp(min=0)].double()
@@ -922,10 +922,10 @@ class SimMinors:
                 if uc_t >= 0:
                     unl = unl & self.citystate_civics[:, s, uc_t]
                 avail = gate & unl & (self._minor_traders(s) < self._trade_capacity(row))
-                if not bool(avail.any()):
+                if not bool(avail.count_nonzero()):
                     continue
                 avail = avail & self._minor_route_candidate(s, avail)[0]
-                if not bool(avail.any()):
+                if not bool(avail.count_nonzero()):
                     continue
                 toward(avail, 0.0)
                 cost = self._trader_cost(row).double()
@@ -937,12 +937,12 @@ class SimMinors:
             if kind == "repair":
                 ok_r, cost_r = self._minor_repair(s)
                 avail = gate & ok_r
-                if not bool(avail.any()):
+                if not bool(avail.count_nonzero()):
                     continue
                 toward(avail, 0.0)
                 pay = avail & (self.citystate_prod[:, s] >= cost_r)
                 self.citystate_repair_wait[:, s] &= ~pay
-                if bool(pay.any()):
+                if bool(pay.count_nonzero()):
                     rr = pay.nonzero(as_tuple=True)[0]
                     self.citystate_prod[rr, s] -= cost_r[rr]
                     full = self._walls_tier_hp[self._minor_walls_tier(s)]
@@ -950,7 +950,7 @@ class SimMinors:
                     self._fit_encamp_outer(rr, row, torch.zeros_like(rr), full[rr])
                 halt = halt | avail
                 continue
-            item = self._mb_item[r][typ]  # [B] the row's item for each game's minor
+            item = self._mb_item[r].take(typ)  # [B] the row's item for each game's minor
             if kind == "project":
                 for pi in sorted(set(int(x) for x in item[gate].tolist())):
                     if pi < 0:
@@ -961,7 +961,7 @@ class SimMinors:
                     d0 = dt.clamp(min=0)
                     avail = (gate & (item == pi) & (dt >= 0) & self.district_complete[bidx, d0]
                              & ~self._fallout()[bidx, d0])
-                    if not bool(avail.any()):
+                    if not bool(avail.count_nonzero()):
                         continue
                     toward(avail, 0.0)
                     # `projectCost`: the row's own Cost, or `progressCost` over
@@ -974,7 +974,7 @@ class SimMinors:
                         # a project still running lights the next turn's grid
                         self.citystate_full_power[:, s] |= avail & ~pay
                     self.citystate_repair_wait[:, s] &= ~pay
-                    if bool(pay.any()):
+                    if bool(pay.count_nonzero()):
                         self.citystate_prod[:, s] -= torch.where(pay, cost_p, zero_b)
                         yi = int(prow["y"])
                         amt = torch.where(pay, js_round(cost_p * (self._proj_yp[pi] / 100)), zero_b)
@@ -994,7 +994,7 @@ class SimMinors:
                     if bi < 0:
                         continue
                     avail = gate & (items_b == bi) & self._minor_building_ok(s, bi)
-                    if not bool(avail.any()):
+                    if not bool(avail.count_nonzero()):
                         continue
                     is_walls = int(rd.b_walls[bi]) > 0
                     toward(avail, walls_pct if is_walls else 0.0)
@@ -1003,7 +1003,7 @@ class SimMinors:
                               else torch.full_like(zero_b, float(rd.b_cost[bi])))
                     pay = avail & (self.citystate_prod[:, s] >= cost_b)
                     self.citystate_repair_wait[:, s] &= ~pay
-                    if bool(pay.any()):
+                    if bool(pay.count_nonzero()):
                         rr = pay.nonzero(as_tuple=True)[0]
                         self.city_bldg[rr, row, 0, bi] = True
                         self.citystate_prod[rr, s] -= cost_b[rr]
@@ -1040,7 +1040,7 @@ class SimMinors:
                 if plc == 3:
                     splane = splane & (self._adj_center_count() == 0)
                 avail = g & ~held & unlock & cap_ok & splane.any(dim=1)
-                if not bool(avail.any()):
+                if not bool(avail.count_nonzero()):
                     continue
                 pct = (torch.full_like(zero_b, harbor_pct) if dv == int(self._harbor_didx)
                        else torch.where(self._citystate_didx[:, s] == dv, type_pct[typ], zero_b))
@@ -1061,7 +1061,7 @@ class SimMinors:
                             f" pot{int(float(self.citystate_prod[_b, s]))}")
                 pay = avail & (self.citystate_prod[:, s] >= d_cost)
                 self.citystate_repair_wait[:, s] &= ~pay
-                if bool(pay.any()):
+                if bool(pay.count_nonzero()):
                     rr = pay.nonzero(as_tuple=True)[0]
                     tt = splane.long().argmax(dim=1)[rr]
                     self.district[rr, tt] = dv
@@ -1098,7 +1098,7 @@ class SimMinors:
         techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
         for n in range(top):
             act = alive & (gained > n) & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold)
-            if not bool(act.any()):
+            if not bool(act.count_nonzero()):
                 return
             mine = self.major_unit_alive & (self.major_unit_seat == seat)
             ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
@@ -1111,7 +1111,7 @@ class SimMinors:
             own = self.tile_seat.gather(1, tile) == seat
             cand = mine & (nxt >= 0) & ok_t & ok_c & own & (self.major_unit_mp > 0)
             go = act & cand.any(dim=1)
-            if not bool(go.any()):
+            if not bool(go.count_nonzero()):
                 return
             first = cand.long().argmax(dim=1)
             rr = go.nonzero(as_tuple=True)[0]
@@ -1201,19 +1201,19 @@ class SimMinors:
             price_b = self._purchase_step(
                 self._builder_cost(self.citystate_builders_trained[:, s]).double() * gold_mult)
             elig = alive & ~has_b & self._afford(self.citystate_treasury[:, s], price_b)
-            if bool(elig.any()):
+            if bool(elig.count_nonzero()):
                 elig = elig & ~self._minor_trains_builder(s) & self._minor_builder_work(s)
-            if bool(elig.any()):
+            if bool(elig.count_nonzero()):
                 r = self._next_random(elig)
                 buy = elig & (torch.floor(r * 1000).long() < self.citystate_builder_buy[:, s])
-                if bool(buy.any()):
+                if bool(buy.count_nonzero()):
                     landed = self._minor_spawn(s, buy, torch.full((B,), self._builder_idx, dtype=torch.long,
                                                                   device=dev))
                     self.citystate_treasury[:, s] -= torch.where(landed, price_b, torch.zeros_like(price_b))
-        n_mil = (mine & self._type_military[mt]).sum(dim=1)
+        n_mil = (mine & self._type_military.take(mt)).sum(dim=1)
         nt = len(self._mb_buy_bp)
         bp_tab = torch.tensor(self._mb_buy_bp, dtype=torch.long, device=dev)
-        bp = torch.where(n_mil < nt, bp_tab[n_mil.clamp(max=nt - 1)], torch.zeros_like(n_mil))
+        bp = torch.where(n_mil < nt, bp_tab.take(n_mil.clamp(max=nt - 1)), torch.zeros_like(n_mil))
         if self._monk_idx >= 0:
             monk_price = self._purchase_step(
                 js_round(self._type_cost[self._monk_idx].double() * float(self.rules.faith_purchase_mult))
@@ -1223,29 +1223,29 @@ class SimMinors:
             monk_price = torch.zeros(B, dtype=torch.float64, device=dev)
             monk = torch.zeros(B, dtype=torch.bool, device=dev)
         gate = alive & (bp > 0) & (monk | self._afford(self.citystate_treasury[:, s], self._mb_buy_floor))
-        if not bool(gate.any()):
+        if not bool(gate.count_nonzero()):
             return
         lt = self.citystate_loss_turn[:, s]
         recent = (lt >= 0) & ((int(self.turn) - lt) <= self._mb_loss_turns)
         rate = torch.where(recent, bp * self._mb_loss_mult, bp)
         r = self._next_random(gate)
         go = gate & (torch.floor(r * 10000).long() < rate)
-        if not bool(go.any()):
+        if not bool(go.count_nonzero()):
             return
         gm = go & monk
-        if bool(gm.any()):
+        if bool(gm.count_nonzero()):
             landed = self._minor_spawn(s, gm, torch.full((B,), self._monk_idx, dtype=torch.long, device=dev),
                                        grants=False)
             self.citystate_faith[:, s] -= torch.where(landed, monk_price, torch.zeros_like(monk_price))
         gg = go & ~monk
-        if not bool(gg.any()):
+        if not bool(gg.count_nonzero()):
             return
         ucls = self.rules_dev.u_promo_class.to(dev)[mt]
         n_cls = {c: (mine & (ucls == c)).sum(dim=1) for c, _w in self._mb_army}
         ui = self._minor_army_unit(self._minor_trainable(s), n_cls)
         price = self._purchase_step(self._type_cost[ui.clamp(min=0)].double() * gold_mult)
         can = gg & (ui >= 0) & self._afford(self.citystate_treasury[:, s], price)
-        if bool(can.any()):
+        if bool(can.count_nonzero()):
             landed = self._minor_spawn(s, can, ui)
             self.citystate_treasury[:, s] -= torch.where(landed, price, torch.zeros_like(price))
 
@@ -1259,16 +1259,16 @@ class SimMinors:
         alive = self.citystate_alive[:, s]
         mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        has_ship = (mine & self.unit_naval[mt]).any(dim=1)
+        has_ship = (mine & self.unit_naval.take(mt)).any(dim=1)
         ui = self._minor_best_of_class(self._minor_trainable(s, naval=True), self._mb_naval_cls)
-        price = self._purchase_step(self._type_cost[ui.clamp(min=0)].double() * float(self.rules.gold_purchase_mult))
+        price = self._purchase_step(self._type_cost.take(ui.clamp(min=0)).double() * float(self.rules.gold_purchase_mult))
         elig = (alive & ~has_ship & self._naval_capable_minor(s) & (ui >= 0)
                 & self._afford(self.citystate_treasury[:, s], price))
-        if not bool(elig.any()):
+        if not bool(elig.count_nonzero()):
             return
         r = self._next_random(elig)
         go = elig & (torch.floor(r * 10000).long() < self._mb_naval_bp)
-        if bool(go.any()):
+        if bool(go.count_nonzero()):
             landed = self._minor_spawn(s, go, ui)
             self.citystate_treasury[:, s] -= torch.where(landed, price, torch.zeros_like(price))
 
@@ -1308,7 +1308,7 @@ class SimMinors:
         out = torch.zeros_like(home)
         for w, sel in ((w_a, which), (w_b, ~which)):
             n = int(w.numel())
-            plane = torch.where(home < n, w[home.clamp(max=n - 1)], torch.zeros_like(home))
+            plane = torch.where(home < n, w.take(home.clamp(max=n - 1)), torch.zeros_like(home))
             out = torch.where(sel.unsqueeze(1), plane, out)
         return out
 
@@ -1333,9 +1333,9 @@ class SimMinors:
         alive = getattr(self, f"{pre}_unit_alive")
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         cand = (act.unsqueeze(1) & alive & (getattr(self, f"{pre}_unit_seat") == seat)
-                & self._type_military[typ] & ~self.unit_naval[typ] & (self._type_air[typ] <= 0)
+                & self._type_military.take(typ) & ~self.unit_naval.take(typ) & (self._type_air.take(typ) <= 0)
                 & ~getattr(self, f"{pre}_unit_emb"))
-        if not bool(cand.any()):
+        if not bool(cand.count_nonzero()):
             return
         lo = self.POOL_LO[pre]
         ground = self._walk_ground(seat)
@@ -1345,7 +1345,7 @@ class SimMinors:
         for k in range(int(cand.sum(dim=1).max())):
             here_m = cand & (rank == k)
             on = here_m.any(dim=1)
-            if not bool(on.any()):
+            if not bool(on.count_nonzero()):
                 continue
             g = here_m.long().argmax(dim=1) + lo  # the walker's merged slot
             cur = self.unit_tile.gather(1, g.unsqueeze(1)).squeeze(1).clamp(min=0)
@@ -1355,13 +1355,13 @@ class SimMinors:
             x = torch.floor(r * 1000).long()
             kstep = (cum <= x.unsqueeze(1)).sum(dim=1).clamp(max=cum.shape[1] - 1)
             go = on & (kstep > 0)
-            if not bool(go.any()):
+            if not bool(go.count_nonzero()):
                 continue
             ring = (self.pair_dist[cur].long() == kstep.unsqueeze(1)) & ground
             w = torch.where(ring, wplane, torch.zeros_like(wplane))
             total = w.sum(dim=1)
             go = go & (total > 0)
-            if not bool(go.any()):
+            if not bool(go.count_nonzero()):
                 continue
             r2 = self._next_random(go)
             pick = torch.floor(r2 * total.double()).long()
@@ -1370,7 +1370,7 @@ class SimMinors:
             for step in range(int(kstep.max())):
                 mp = self.unit_mp.gather(1, g.unsqueeze(1)).squeeze(1)
                 moving = moving & (step < kstep) & (cur != target) & (mp > 0)
-                if not bool(moving.any()):
+                if not bool(moving.count_nonzero()):
                     break
                 nb = self.neigh[cur]  # [B, 6]
                 nbc = nb.clamp(min=0)
@@ -1499,11 +1499,11 @@ class SimMinors:
             if kind == "unit":
                 ui = self._minor_best_of_class(trainable, c)
                 want = ~halt & ~(near & (bcls == c)).any(dim=1) & (ui >= 0)
-                if not bool(want.any()):
+                if not bool(want.count_nonzero()):
                     continue
                 cost = self._type_cost[ui.clamp(min=0)].double()
                 pay = want & (self.city_free_pot[:, row, j] >= cost)
-                if bool(pay.any()):
+                if bool(pay.count_nonzero()):
                     landed = self._spawn_barb(pay, ctr, ui.clamp(min=0), ladder=False, seat=FREE_SEAT,
                                               home=torch.full((B,), -1, dtype=torch.long, device=dev))
                     self.city_free_pot[:, row, j] -= torch.where(landed, cost, torch.zeros_like(cost))
@@ -1512,10 +1512,10 @@ class SimMinors:
             if kind == "repair":
                 avail, cost = self._free_repair(j)
                 want = ~halt & avail
-                if not bool(want.any()):
+                if not bool(want.count_nonzero()):
                     continue
                 pay = want & (self.city_free_pot[:, row, j] >= cost)
-                if bool(pay.any()):
+                if bool(pay.count_nonzero()):
                     rr = pay.nonzero(as_tuple=True)[0]
                     self.city_free_pot[rr, row, j] -= cost[rr]
                     full = self._free_walls_max(j)
@@ -1528,12 +1528,12 @@ class SimMinors:
                 if bi < 0:
                     continue
                 sel = ~halt & ~chosen & self._free_building_ok(j, bi, techs, civics)
-                if not bool(sel.any()):
+                if not bool(sel.count_nonzero()):
                     continue
                 chosen = chosen | sel
                 cost = float(rd.b_cost[bi])
                 pay = sel & (self.city_free_pot[:, row, j] >= cost)
-                if bool(pay.any()):
+                if bool(pay.count_nonzero()):
                     rr = pay.nonzero(as_tuple=True)[0]
                     self.city_bldg[rr, row, j, bi] = True
                     self.city_free_pot[rr, row, j] -= cost
@@ -1624,7 +1624,7 @@ class SimMinors:
         seat = 100 + s
         mine = (self.major_unit_alive & (self.major_unit_seat == seat)
                 & (self.major_unit_type == self._builder_idx) & (self.major_unit_charges > 0))
-        if not bool(mine.any()):
+        if not bool(mine.count_nonzero()):
             return
         B, T, dev = self.B, self.T, self.device
         K = int(self._imp_unlock.numel())
@@ -1635,7 +1635,7 @@ class SimMinors:
         for k in range(int(mine.sum(dim=1).max())):
             here = mine & (rank == k)
             act = here.any(dim=1) & self.citystate_alive[:, s]
-            if not bool(act.any()):
+            if not bool(act.count_nonzero()):
                 continue
             g = here.long().argmax(dim=1) + lo  # the builder's global slot
             own = self.unit_tile[bidx, g].clamp(min=0)
@@ -1652,11 +1652,11 @@ class SimMinors:
             cand = (self._minor_imp_legal(s) & (base & stand).unsqueeze(2)).reshape(B, T * K)
             n = cand.sum(dim=1)
             go = act & (n > 0)
-            if not bool(go.any()):
+            if not bool(go.count_nonzero()):
                 continue
             r1 = self._next_random(go)
             build = go & (torch.floor(r1 * 1000) < self._mb_builder_rate)
-            if not bool(build.any()):
+            if not bool(build.count_nonzero()):
                 continue
             r2 = self._next_random(build)
             pick = torch.floor(r2 * n.double()).long()
@@ -1780,7 +1780,7 @@ class SimMinors:
         nbc = nb.clamp(min=0)
         hit = ((self.district[:, nbc] == di) & self.district_complete[:, nbc]
                & (nb >= 0).unsqueeze(0))
-        if not bool(hit.any()):
+        if not bool(hit.count_nonzero()):
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         has = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for r in [*range(self.n_majors), self.FREE_ROW]:
@@ -1806,7 +1806,7 @@ class SimMinors:
         live = self.city_alive[:, row] & self.city_is_cap[:, row] & (ctr >= 0)
         for c in range(self.RC):
             k = live[:, c]
-            if bool(k.any()):
+            if bool(k.count_nonzero()):
                 cap[k, ctr[k, c]] = True
         return (cap[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
 

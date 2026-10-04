@@ -500,11 +500,11 @@ def _citizen_rows(sim, row: int, alive: torch.Tensor) -> tuple:
     # and a razed district's plot is workable again without it
     _prio = sim.res_priority[bb, t_v] * (~sim.res_stripped[bb, t_v]).long()
     work = torch.stack([bb, jj, t_v, _prio, locked[bb, jj, mm].long()], dim=1).tolist()
-    if not bool((alive.sum(dim=1) >= 2).any()):
+    if not bool((alive.sum(dim=1) >= 2).count_nonzero()):
         return work, []
     slot = torch.arange(RC, device=sim.device).view(1, RC, 1).expand(B, RC, M)
     ok = sim._swap_tile_ok(row, slot.reshape(B, -1), tiles.reshape(B, -1)).reshape(B, RC, M)
-    if not bool(ok.any()):
+    if not bool(ok.count_nonzero()):
         return work, []
     # the holder: the living sibling whose id the plot carries
     owner = sim.tile_city.gather(1, tf).reshape(B, RC, M)
@@ -665,13 +665,13 @@ def _war_targets(sim, war_row: torch.Tensor) -> tuple:
     territorial owner alike, a barbarian tile never (it is not `owned`)."""
     _ts = sim.tile_seat
     owned = (_ts >= 0) & (_ts < simbase.BARB_SEAT)
-    at_war_t = owned & war_row.gather(1, sim._seat_row[torch.where(owned, _ts, torch.zeros_like(_ts))])
+    at_war_t = owned & war_row.gather(1, sim._seat_row.take(torch.where(owned, _ts, torch.zeros_like(_ts))))
     imps = (sim.improvement >= 0) & ~sim.pillaged & at_war_t
     imps = imps | ((sim.district >= 0) & sim.district_complete & ~sim.district_pillaged & at_war_t)
     B, CB = sim.B, sim.city_center.shape[1]
     live = sim.city_alive.reshape(B, -1) & war_row[:, :CB].repeat_interleave(sim.RC, dim=1)
     bb, cell = live.nonzero(as_tuple=True)
-    rows = torch.stack([bb, sim._march_seatkey[cell] // 2048,
+    rows = torch.stack([bb, sim._march_seatkey.take(cell) // 2048,
                         sim.city_center.reshape(B, -1)[bb, cell]], dim=1).tolist()
     return imps, sorted(rows)
 
@@ -696,17 +696,17 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
     allt = torch.arange(T, device=dev).reshape(1, -1).expand(B, -1)
     planes: dict = {}                                                  # field -> (gate [B], plane [B, T])
     g = holds(sim._builder_idx)
-    if bool(g.any()):
+    if bool(g.count_nonzero()):
         planes["jobs"] = (g, sim._seat_job_mask(row))
     g = holds(getattr(sim, "_eng_idx", -1))
-    if bool(g.any()):
+    if bool(g.count_nonzero()):
         planes["engJobs"] = (g, sim._seat_engineer_job_mask(row))
     relig = no.unsqueeze(1).expand(B, types.shape[1])
     for idx in (sim._missionary_idx, sim._apostle_idx):
         if idx >= 0:
             relig = relig | (types == idx)
     g = (charged & relig).any(dim=1) & sim.civ_religion_done[:, row]
-    if bool(g.any()):
+    if bool(g.count_nonzero()):
         nrow = sim.n_majors
         acc = torch.zeros(B, T, dtype=torch.long, device=dev)
         acc.scatter_add_(1, sim.city_center[:, :nrow].clamp(min=0).reshape(B, -1),
@@ -715,23 +715,23 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
     if sim._settler_idx >= 0 and sim._A_FOUND >= 0:
         g = holds(sim._settler_idx, need_charge=False) \
             & (sim.city_alive[:, row].sum(dim=1) < int(sim.rules.seats["maxCities"]))
-        if bool(g.any()):
+        if bool(g.count_nonzero()):
             planes["foundOk"] = (g, _found_ok(sim, row, g))
     if sim._archaeologist_idx >= 0 and sim._A_EXCAVATE >= 0:
         g = holds(sim._archaeologist_idx)
-        if bool(g.any()):
+        if bool(g.count_nonzero()):
             digs = sim._dig_here(row, allt) & ((sim.tile_seat < 0) | (sim.tile_seat == row))
             planes["digs"] = (g, digs & sim._museum_room(row).unsqueeze(1))
     if sim._naturalist_idx >= 0 and sim._A_PARK >= 0:
         g = holds(sim._naturalist_idx)
-        if bool(g.any()):
+        if bool(g.count_nonzero()):
             planes["parks"] = (g, sim._park_cluster_legal(row, sim._park_cluster(allt)).any(dim=2))
     # a Meteor Site is taken the way a village is: the first unit in
     planes["goody"] = (~no, sim.tile_goody | sim.tile_meteor)
     war_row = sim.war[:, row]
     at_war = war_row.any(dim=1)
     city_rows: list = []
-    if bool(at_war.any()):
+    if bool(at_war.count_nonzero()):
         imps, city_rows = _war_targets(sim, war_row)
         planes["warImps"] = (at_war, imps)
     out = [{f: [] for f, _k in TARGET_FIELDS} for _b in range(B)]
@@ -745,7 +745,7 @@ def _targets(sim, row: int, present: torch.Tensor, cols: dict) -> list:
     # walks toward, listed for the games holding such a person
     gs, ga = cols["gpSite"], cols["gpArg"]
     walk = charged & (gs >= 0) & (gs != 1) & (gs != 9)
-    if bool(walk.any()):
+    if bool(walk.count_nonzero()):
         bb, nn = walk.nonzero(as_tuple=True)
         want = sorted({(s, a, b) for b, s, a in zip(bb.tolist(), gs[bb, nn].tolist(), ga[bb, nn].tolist())})
         rows_: list = []

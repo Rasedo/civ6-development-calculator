@@ -42,7 +42,7 @@ class SimGovernors:
         widest promotion mask this catalog can hold."""
         out = torch.zeros_like(x)
         v = x.clone()
-        while bool((v != 0).any()):
+        while bool(v.count_nonzero()):
             out = out + (v & 1)
             v = v >> 1
         return out
@@ -70,7 +70,7 @@ class SimGovernors:
         # cityless seat, and the tick cleared the governor of the city it had
         # just lost where TS left him seated (seed 9248 t170).
         live = active
-        if not bool(live.any()):
+        if not bool(live.count_nonzero()):
             return
 
         titles = (self._governor_titles_earned(row) - self._governor_titles_spent(row)).clamp(min=0)
@@ -118,13 +118,13 @@ class SimGovernors:
 
         for _ in range(int(titles.max().item()) if titles.numel() else 0):
             act = titles > 0
-            if not bool(act.any()):
+            if not bool(act.count_nonzero()):
                 break
             # (a) APPOINT the first unappointed governor
             unap = act.unsqueeze(1) & ~ap
             take_ap = unap.any(dim=1)
             first = torch.where(take_ap, unap.long().argmax(dim=1), torch.full((self.B,), -1, device=dev))
-            if bool(take_ap.any()):
+            if bool(take_ap.count_nonzero()):
                 rows = take_ap.nonzero(as_tuple=True)[0]
                 ap[rows, first[rows]] = True
                 self._governance_doctrine(row, rows, first[rows])
@@ -132,7 +132,7 @@ class SimGovernors:
             #     governors in catalog order and promotions inside each
             want = act & ~take_ap
             any_legal = torch.zeros_like(act)
-            if bool(want.any()):
+            if bool(want.count_nonzero()):
                 have = ((pr.unsqueeze(2) >> pidx.reshape(1, 1, -1)) & 1).bool()  # [B, NG, NP]
                 # a prerequisite is a bitmask over the promotion list: at least
                 # ONE of the named promotions must be held (0 = none required)
@@ -141,7 +141,7 @@ class SimGovernors:
                 legal = ap.unsqueeze(2) & buyable.unsqueeze(0) & ~have & met
                 flat = legal.reshape(self.B, NG * NP)
                 any_legal = want & flat.any(dim=1)
-                if bool(any_legal.any()):
+                if bool(any_legal.count_nonzero()):
                     rows = any_legal.nonzero(as_tuple=True)[0]
                     pick = flat[rows].long().argmax(dim=1)
                     g, p = pick // NP, pick % NP
@@ -157,7 +157,7 @@ class SimGovernors:
         of this type yields 15 Diplomatic Favor"."""
         out, tgt = self._congress_by_id("GOVERNANCE_DOCTRINE")
         pay = (out[rows] == 0) & (tgt[rows] == governor)
-        if bool(pay.any()):
+        if bool(pay.count_nonzero()):
             hit = rows[pay]
             self.civ_diplo_favor[hit, row] = self.civ_diplo_favor[hit, row] + self._gov_doctrine_favor
 
@@ -179,7 +179,7 @@ class SimGovernors:
             at = self.civ_gov_minor[:, row, g]
             on = (self.civ_gov_appointed[:, row, g] & (at >= 0)
                   & (self.civ_gov_establish[:, row, g] <= 0))
-            if not bool(on.any()):
+            if not bool(on.count_nonzero()):
                 continue
             held = ((self.civ_gov_promos[:, row, g].unsqueeze(1) >> pidx.reshape(1, -1)) & 1).bool()
             val = (tab.reshape(1, -1) * held.double()).sum(dim=1) + tab[int(self._gov_base_promo[g])]
@@ -226,7 +226,7 @@ class SimGovernors:
         if self.S and self.n_governors and ent is not None and simbase.stamp_holds(ent[2], planes):
             return ent[1]
         env = self.seat_citystate_envoys[:, : self.n_majors].to(torch.long)
-        if self.S == 0 or self.n_governors == 0 or not bool((self.civ_gov_minor >= 0).any()):
+        if self.S == 0 or self.n_governors == 0 or not bool((self.civ_gov_minor >= 0).count_nonzero()):
             return env
         ins = (env,) + planes[1:]
         if ent is not None and all(torch.equal(a, b) for a, b in zip(ent[0], ins)):
@@ -257,7 +257,7 @@ class SimGovernors:
             idle = (live & self.civ_gov_appointed[:, row, g] & (self.civ_gov_city[:, row, g] < 0)
                     & (self.civ_gov_minor[:, row, g] < 0) & (self.civ_gov_out[:, row, g] <= 0)
                     & ok.any(dim=1))
-            if not bool(idle.any()):
+            if not bool(idle.count_nonzero()):
                 continue
             rows = idle.nonzero(as_tuple=True)[0]
             self.civ_gov_minor[rows, row, g] = pick[rows]
@@ -285,14 +285,14 @@ class SimGovernors:
         for g in range(NG):
             idle = (live & ap[:, g] & (city[:, g] < 0) & (out[:, g] <= 0)
                     & (self.civ_gov_minor[:, row, g] < 0))
-            if not bool(idle.any()):
+            if not bool(idle.count_nonzero()):
                 continue
             free = alive & ~taken
             key = torch.where(free, q * RC + torch.arange(RC, device=dev).reshape(1, -1),
                               torch.full_like(q, 1 << 40))
             pick = key.argmin(dim=1)
             got = idle & free.any(dim=1)
-            if not bool(got.any()):
+            if not bool(got.count_nonzero()):
                 continue
             rows = got.nonzero(as_tuple=True)[0]
             sl = pick[rows]
@@ -502,7 +502,7 @@ class SimGovernors:
         beside = None
         for r in range(self.n_majors):
             per = self._governor_tile_sum(r, "appealNearFeature")
-            if not bool((per != 0).any()):
+            if not bool(per.count_nonzero()):
                 continue
             if beside is None:
                 _f = self._unimproved_feature()
@@ -514,7 +514,7 @@ class SimGovernors:
         """[B, RC] f64 — CIV6 (Forestry Management): "This city receives +2
         Gold for each unimproved feature", counted over the tiles it OWNS."""
         per = self._governor_sum(row, "goldPerFeature")
-        if not bool((per != 0).any()):
+        if not bool(per.count_nonzero()):
             return per
         slot = self.city_slot_at(row)
         live = self._unimproved_feature() & (slot >= 0)
@@ -528,7 +528,7 @@ class SimGovernors:
         through where its stored course (`seat_route_course`) crosses this
         centre short of both its ends."""
         per = self._governor_sum(row, "passRouteGold")
-        if not bool((per != 0).any()):
+        if not bool(per.count_nonzero()):
             return per
         B, T = self.B, self.T
         cnt = torch.zeros(B, T, dtype=torch.long, device=self.device)
@@ -549,10 +549,10 @@ class SimGovernors:
         city receive 1 extra Promotion when receiving their first promotion" —
         banked on the unit at the buy, `col` being the city column it came
         from."""
-        if not self.n_governors or not bool(landed.any()):
+        if not self.n_governors or not bool(landed.count_nonzero()):
             return
         n = self._governor_sum(row, "firstPromoBonus")
-        if not bool((n != 0).any()):
+        if not bool(n.count_nonzero()):
             return
         rows = landed.nonzero(as_tuple=True)[0]
         slot = getattr(self, self.POOL_NEXT["major"])[rows] - 1
@@ -572,7 +572,7 @@ class SimGovernors:
         for_r = self._gpromo.get("loyaltyToForeign")
         if own_r is None or for_r is None:
             return out
-        if not bool(((own_r[:, 1] != 0) | (for_r[:, 1] != 0)).any()):
+        if not bool(((own_r[:, 1] != 0) | (for_r[:, 1] != 0)).count_nonzero()):
             return out
         here = self.city_center[:, row].clamp(min=0)          # [B, RC]
         alive = self.city_alive[:, row]
@@ -584,7 +584,7 @@ class SimGovernors:
             pay = torch.einsum("bjn,n->bj", mask.double(), amt)     # [B, RC] per SOURCE city
             reach = torch.einsum("bjn,n->bj", mask.double(), rng)
             live = self.city_alive[:, src] & (pay != 0)
-            if not bool(live.any()):
+            if not bool(live.count_nonzero()):
                 continue
             there = self.city_center[:, src].clamp(min=0)      # [B, RC]
             d = self.pair_dist[here.unsqueeze(2), there.unsqueeze(1)].double()  # [B, RC, RC]
@@ -654,9 +654,9 @@ class SimGovernors:
         house = torch.zeros(B, RC, dtype=torch.float64, device=dev)
         amen = torch.zeros(B, RC, dtype=torch.float64, device=dev)
         seated = self._governor_at(row) >= 0
-        if bool((self._b_amen_gov != 0).any()):
+        if bool(self._b_amen_gov.count_nonzero()):
             amen = amen + seated.double() * self._seat_building_sum(row, self._b_amen_gov).double().unsqueeze(1)
-        if bool((self._b_house_gov != 0).any()):
+        if bool(self._b_house_gov.count_nonzero()):
             house = house + seated.double() * self._seat_building_sum(row, self._b_house_gov).double().unsqueeze(1)
         # CIV6 (Civil Prestige, REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES):
         # under an ESTABLISHED governor of at least `min` titles, its first
@@ -669,7 +669,7 @@ class SimGovernors:
                 amen = amen + ok * _am
                 house = house + ok * _ho
         works = self._governor_flag(row, "waterWorks")
-        if bool(works.any()):
+        if bool(works.count_nonzero()):
             cnt = self._dist_counts(row)                                  # [B, RC, nD]
             h = torch.einsum("bjn,n->bj", cnt.double(), self._d_water_house)
             a = torch.einsum("bjn,n->bj", cnt.double(), self._d_water_amen)
@@ -709,7 +709,7 @@ class SimGovernors:
             return out
         for r in range(self.n_majors):
             per = self._governor_sum(r, "cityDefense")
-            if not bool((per != 0).any()):
+            if not bool(per.count_nonzero()):
                 continue
             v = per.gather(1, hcol.clamp(min=0).reshape(self.B, -1)).reshape(hcol.shape)
             out = out + (hrow == r).long() * v.long()

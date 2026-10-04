@@ -29,7 +29,7 @@ class SimSpy:
         for _sc, _sl, _st, _sa in self._live_rows(row, self._spy_capacity_rows):
             n = n + (self._row_is(row, _sc, _sl) & self.civ_techs[:, row, _st]).long() * _sa
         # CIV6 (Intelligence Agency): "+1 Spy and Spy capacity."
-        if bool((self._b_spy_capacity > 0).any()):
+        if bool((self._b_spy_capacity > 0).count_nonzero()):
             n = n + self._seat_building_sum(row, self._b_spy_capacity)
         return n.clamp(max=self._spy_cap_max)
 
@@ -185,7 +185,7 @@ class SimSpy:
         if M == 0 or cols.numel() == 0:
             return out
         base = self._spy_idle_at(sc[:, cols]) & (utype[:, cols] == self._spy_idx)
-        if not bool(base.any()):
+        if not bool(base.count_nonzero()):
             return out
         hrow, hcol = self._spy_here(tc[:, cols])
         mcs = self._spy_minor_centres().gather(1, tc[:, cols].clamp(min=0))
@@ -259,7 +259,7 @@ class SimSpy:
             slot = torch.where(last >= 0, last, slot)
         ok = slot >= 0
         obj = torch.full_like(slot, -1)
-        if bool(ok.any()):
+        if bool(ok.count_nonzero()):
             b = torch.arange(self.B, device=self.device).unsqueeze(1).expand_as(hrow)
             obj = torch.where(ok, self.city_gw_obj[b, hrow.clamp(min=0), hcol.clamp(min=0), slot.clamp(min=0)], obj)
             room = (self._gw_room_by_obj(row) & self.city_alive[:, row].unsqueeze(2)).any(dim=1)  # [B, 8]
@@ -356,14 +356,14 @@ class SimSpy:
         if self._spy_idx < 0:
             return
         busy = self._spies_of(row) & (self.unit_spy_mission != self._spy_idle)
-        if not bool(busy.any()):
+        if not bool(busy.count_nonzero()):
             return
         self.unit_spy_turns[busy] = (self.unit_spy_turns[busy] - 1).clamp(min=0)
         done = busy & (self.unit_spy_turns <= 0)
-        if not bool(done.any()):
+        if not bool(done.count_nonzero()):
             return
         landed = done & (self.unit_spy_mission == self._spy_travelling)
-        if bool(landed.any()):
+        if bool(landed.count_nonzero()):
             g, v = landed.nonzero(as_tuple=True)
             self.unit_tile[g, v] = self.unit_spy_target[g, v]
             self.unit_spy_target[g, v] = -1
@@ -582,10 +582,10 @@ class SimSpy:
         if roll >= v_esc:
             cap = self.city_is_cap[b, row]
             alv = self.city_alive[b, row]
-            if not bool(alv.any()):
+            if not bool(alv.count_nonzero()):
                 self.unit_alive[b, v] = False
                 return
-            slot = int(cap.long().argmax()) if bool(cap.any()) else int(alv.long().argmax())
+            slot = int(cap.long().argmax()) if bool(cap.count_nonzero()) else int(alv.long().argmax())
             self.unit_spy_mission[b, v] = self._spy_travelling
             self.unit_spy_target[b, v] = int(self.city_center[b, row, slot])
             self.unit_spy_turns[b, v] = route["turns"]
@@ -807,7 +807,7 @@ class SimSpy:
         dcount = self._dist_counts(hr)[b]                 # [RC, nD]
         live = dcount[hc]
         n = int((live * self._d_spy_pen).sum())
-        if bool((self._b_spy_pen > 0).any()):
+        if bool((self._b_spy_pen > 0).count_nonzero()):
             stand = self.city_bldg[b, hr, hc] & ~self._bldg_dark(
                 reg.reshape(1, 1, -1), self.city_bldg_pillaged[b, hr, hc].reshape(1, 1, -1))[0, 0]
             n += int((stand.long() * self._b_spy_pen).sum())
@@ -832,7 +832,7 @@ class SimSpy:
         # standing anywhere covers every city of the seat holding a live
         # Encampment. This city's own counted above, so only the others add.
         if (self._encamp_didx >= 0 and int(live[self._encamp_didx]) > 0
-                and bool((self._b_spy_pen_enc > 0).any())):
+                and bool((self._b_spy_pen_enc > 0).count_nonzero())):
             breq = self._b_req_district
             for j in self.city_alive[b, hr].nonzero(as_tuple=True)[0].tolist():
                 if j == hc:
@@ -872,6 +872,6 @@ class SimSpy:
         if di < 0:
             return
         mine = self.city_bldg[b, hr, hc] & (self._b_req_district == di)
-        if bool(mine.any()):
+        if bool(mine.count_nonzero()):
             self.city_bldg_pillaged[b, hr, hc] |= mine
             self._eff_version += 1

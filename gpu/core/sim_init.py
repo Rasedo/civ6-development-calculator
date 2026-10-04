@@ -483,7 +483,7 @@ class SimInit:
                 _next += 1
         self.river_comp = torch.tensor(_comp, dtype=torch.long, device=device)
         self.cliff_mask = torch.tensor([[int(t.get("cm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        self._has_cliffs = bool(self.cliff_mask.any())
+        self._has_cliffs = bool(self.cliff_mask.count_nonzero())
         # Per-tile APPEAL contribution (cpu/core/appeal.ts tileAppeal sums what
         # each NEIGHBOUR contributes). `ap` = static part + the t0 feature term;
         # `apf` isolates that feature term so a chopped tile subtracts
@@ -1418,9 +1418,9 @@ class SimInit:
             "colon": torch.tensor([0] + [int(x["colon"]) for x in _erows], dtype=torch.long, device=device),
         }
         # whether the catalog carries each channel at all
-        self._enh_zeal_any = bool((self._enh["zeal"] != 0).any())
-        self._enh_theo_any = bool((self._enh["theoKeep"] != 0).any())
-        self._enh_hw_any = bool((self._enh["hwHeal"] != 0).any())
+        self._enh_zeal_any = bool((self._enh["zeal"] != 0).count_nonzero())
+        self._enh_theo_any = bool((self._enh["theoKeep"] != 0).count_nonzero())
+        self._enh_hw_any = bool((self._enh["hwHeal"] != 0).count_nonzero())
         self._just_war_range = int(rules.seats["justWarRange"])
         self._enh_combat_any = bool((self._enh["cnear"] != 0).any() or (self._enh["cdef"] != 0).any() or (self._enh["cvs"] != 0).any())
         self._rel_planes_cache = None  # ((turn, _eff_version), (near3 [B,O,T], terr [B,O,T]))
@@ -2044,7 +2044,7 @@ class SimInit:
         self._research_imp_y_any = bool((self._tech_imp_y != 0).any() or (self._civic_imp_y != 0).any())
         # CIV6 (Lumber Mill): "+1 Production if adjacent to River."
         self._imp_river_y = torch.tensor(imp["impRiverY"], dtype=dtype, device=device)
-        self._imp_river_any = bool((self._imp_river_y != 0).any())
+        self._imp_river_any = bool(self._imp_river_y.count_nonzero())
         irows = imp["rows"]
         nI = max(len(ids), 1)
         self._imp_yields = torch.zeros(nI, 6, dtype=dtype, device=device)
@@ -2092,7 +2092,7 @@ class SimInit:
             [int(r["air"]) for r in imp["rows"]], dtype=torch.long, device=device)
         self._imp_appeal_adj = torch.tensor(
             [int(r["appeal"]) for r in imp["rows"]], dtype=torch.long, device=device)
-        self._imp_appeal_any = bool((self._imp_appeal_adj != 0).any())
+        self._imp_appeal_any = bool(self._imp_appeal_adj.count_nonzero())
         # THE UNIQUE IMPROVEMENTS' own columns (`ImprovementDef`'s second
         # half). Every one of these is -1 or 0 on a row that names none.
         _R = imp["rows"]
@@ -2105,26 +2105,26 @@ class SimInit:
         self._imp_appeal_y_any = any(y >= 0 for y, _ in self._imp_appeal_y)
         self._imp_def_cs = torch.tensor([int(r["defCs"]) for r in _R], dtype=torch.long, device=device)
         self._imp_fortify = torch.tensor([int(r["fortify"]) for r in _R], dtype=torch.long, device=device)
-        self._imp_fortify_any = bool((self._imp_fortify > 0).any())
+        self._imp_fortify_any = bool((self._imp_fortify > 0).count_nonzero())
         self._imp_frontier = [bool(r["frontier"]) for r in _R]
         self._imp_req_adj_res = [bool(r["reqAdjRes"]) for r in _R]
         self._imp_move_cost = torch.tensor([int(r["moveCost"]) for r in _R], dtype=torch.long, device=device)
-        self._imp_move_cost_any = bool((self._imp_move_cost > 0).any())
+        self._imp_move_cost_any = bool((self._imp_move_cost > 0).count_nonzero())
         self._imp_adj_land_min = [int(r["adjLandMin"]) for r in _R]
         self._imp_built_by = [int(r["builtBy"]) for r in _R]
         self._imp_outside = [bool(r["outside"]) for r in _R]
         self._imp_heals_after = torch.tensor([bool(r["healsAfter"]) for r in _R], dtype=torch.bool, device=device)
-        self._imp_heals_after_any = bool(self._imp_heals_after.any())
+        self._imp_heals_after_any = bool(self._imp_heals_after.count_nonzero())
         self._imp_loyalty = torch.tensor([float(r["loyalty"]) for r in _R], dtype=torch.float64, device=device)
         self._imp_loyalty_adj_off = torch.tensor(
             [float(r["loyaltyAdjOff"]) for r in _R], dtype=torch.float64, device=device)
-        self._imp_loyalty_any = bool((self._imp_loyalty != 0).any()) or bool((self._imp_loyalty_adj_off != 0).any())
+        self._imp_loyalty_any = bool(self._imp_loyalty.count_nonzero()) or bool(self._imp_loyalty_adj_off.count_nonzero())
         # "additional yields as you advance through the tree": [(tech, civic, [6])]
         self._imp_res_y = [[(int(x["t"]), int(x["c"]), [float(v) for v in x["y"]]) for x in r["resY"]] for r in _R]
         self._imp_res_y_any = any(self._imp_res_y)
         self._imp_off_cont_y = torch.tensor(
             [[float(v) for v in r["offContY"]] for r in _R], dtype=dtype, device=device)
-        self._imp_off_cont_any = bool((self._imp_off_cont_y != 0).any())
+        self._imp_off_cont_any = bool(self._imp_off_cont_y.count_nonzero())
         # the Open-Air Museum's per-terrain-kind yields: [(terrains, [6])]
         self._imp_terr_kind_y = [
             (list(r["terrKindY"]["terr"]), [float(v) for v in r["terrKindY"]["y"]]) if r["terrKindY"] else None
@@ -2135,7 +2135,7 @@ class SimInit:
         # mountain range (the Tunnel, Qhapaq Ñan) — one network per range
         self._imp_portal = torch.tensor([bool(r["portal"]) for r in _R] or [False],
                                         dtype=torch.bool, device=device)
-        self._imp_portal_any = bool(self._imp_portal.any())
+        self._imp_portal_any = bool(self._imp_portal.count_nonzero())
         # CIV6 (`BuildOnAdjacentPlot`): the unit builds onto a bare mountain
         # BESIDE it (`adjacentPlotTarget`)
         self._imp_adj_plot = [bool(r["adjPlot"]) for r in _R]
@@ -2148,12 +2148,12 @@ class SimInit:
         # owning city's governor holds the promotion (Renewable Subsidizer)
         self._imp_gov_power = [(int(r["govPow"][0]), float(r["govPow"][1])) for r in _R]
         self._imp_gov_power_any = any(p >= 0 for p, _ in self._imp_gov_power)
-        self._imp_air_any = bool((self._imp_air_slots > 0).any())
+        self._imp_air_any = bool((self._imp_air_slots > 0).count_nonzero())
         # CIV6 (Solar Farm, Wind Farm): what a RENEWABLE generator supplies the
         # city that owns its plot, per turn.
         self._imp_power = torch.tensor(
             [float(r["power"]) for r in imp["rows"]], dtype=torch.float64, device=device)
-        self._imp_power_any = bool((self._imp_power > 0).any())
+        self._imp_power_any = bool((self._imp_power > 0).count_nonzero())
         # The rows a Builder places on their own catalog GROUND alone — no
         # resource under them, no suzerainty, no appeal bar, not the
         # Engineer's (`validImprovementsIn`'s ground-only arm).
@@ -2180,7 +2180,7 @@ class SimInit:
         # + 1 so a bare plot (-1) reads slot 0, workable
         self._imp_unwork = torch.tensor(
             [False] + [bool(r["unwork"]) for r in imp["rows"]], dtype=torch.bool, device=device)
-        self._imp_unwork_any = bool(self._imp_unwork.any())
+        self._imp_unwork_any = bool(self._imp_unwork.count_nonzero())
         self.res_imp = torch.tensor(
             [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
         )
@@ -2294,7 +2294,7 @@ class SimInit:
         self._appeal_adj = torch.tensor(
             [int(d["appealAdjacent"]) for d in self.districts_cat],
             dtype=torch.long, device=device)  # [nD]
-        self._appeal_adj_any = bool((self._appeal_adj != 0).any())
+        self._appeal_adj_any = bool(self._appeal_adj.count_nonzero())
         self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "NEIGHBORHOOD"), -1)
         # The columns the three per-district-type adjacency sources count.
         self._dam_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "DAM"), -1)
@@ -3051,8 +3051,8 @@ class SimInit:
         # registry keeps ONE tile per type, so these are counted off the tile
         # plane in `_district_counts`; the registry entry is the first of them.
         self._is_repeatable = torch.tensor([bool(d["allowMultiple"]) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
-        self._rep_any = bool(self._is_repeatable.any())
-        if self._rep_any and bool((self._is_repeatable & self._is_specialty).any()):
+        self._rep_any = bool(self._is_repeatable.count_nonzero())
+        if self._rep_any and bool((self._is_repeatable & self._is_specialty).count_nonzero()):
             raise ValueError("a repeatable district that counts toward the specialty cap: "
                              "the cap and the discount both read the registry, which holds one tile per type")
         self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "AQUEDUCT"), -1)
@@ -3149,6 +3149,8 @@ class SimInit:
         self._stats_memo: dict = {}
         # row -> (the recorded reads, the result) — `_border_planes`
         self._border_memo: dict = {}
+        # 0 -> (the recorded reads, the result) — `_tile_appeal`'s body
+        self._appeal_memo: dict = {}
         # ...and `_gov_mods`' inputs, per row (`_gov_mod_inputs`)
         self._gov_in_memo: dict = {}
         # row -> (plane stamp, answer) — `_res_hidden`
@@ -3242,7 +3244,7 @@ class SimInit:
         self._b_req_district = rules.b_req_district.to(device)  # [NB] required district idx (-1 none)
         self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
         self._b_excl_buildings = rules.b_excl_buildings  # exclusive-sibling index lists
-        self._b_has_reqs = bool((self._b_req_district >= 0).any()) or any(len(r) > 0 for r in self._b_req_buildings) or any(len(r) > 0 for r in self._b_excl_buildings)
+        self._b_has_reqs = bool((self._b_req_district >= 0).count_nonzero()) or any(len(r) > 0 for r in self._b_req_buildings) or any(len(r) > 0 for r in self._b_excl_buildings)
         # ...the same two lists as padded [NB, K] index tables, so one gather
         # answers every building's prerequisite (`_seat_buildable`)
         self._b_req_idx, self._b_req_ok = pad_index_lists(self._b_req_buildings, device)
@@ -3288,7 +3290,7 @@ class SimInit:
         # building row, catalog order — `_levy_cost` takes each in turn
         self._levy_discount_rows = [(b, int(p)) for b, p in enumerate(rules.b_levy_discount.tolist()) if int(p) > 0]
         self._b_tourism = rules.b_tourism.to(device)
-        self._b_tour_any = bool((self._b_tourism != 0).any())
+        self._b_tour_any = bool(self._b_tourism.count_nonzero())
         self._b_loy_no_gov = rules.b_loy_no_gov.to(device)
         self._b_amen_gov = rules.b_amen_gov.to(device)
         self._b_house_gov = rules.b_house_gov.to(device)
@@ -3299,9 +3301,9 @@ class SimInit:
         self._b_conquest_pct = rules.b_conquest_pct.to(device)
         self._b_conquest_turns = rules.b_conquest_turns.to(device)
         self._b_heal_kill = rules.b_heal_kill.to(device)
-        self._heal_kill_live = bool((self._b_heal_kill != 0).any())
+        self._heal_kill_live = bool(self._b_heal_kill.count_nonzero())
         self._b_project_charge = rules.b_project_charge.to(device)
-        self._project_charge_live = bool((self._b_project_charge != 0).any())
+        self._project_charge_live = bool(self._b_project_charge.count_nonzero())
         self._bsum_row_cache = None
         self._bldg_version = 0  # every `city_bldg` write moves it
         self._era_version = 0  # every game era a game enters moves it
@@ -3710,11 +3712,11 @@ class SimInit:
         self._type_sight = torch.tensor([int(u["sight"]) for u in ru], dtype=torch.long, device=device)
         # a chassis is not the only hider: Twilight Veil is a PROMOTION.
         _veil = self._pk["STEALTH"]
-        self._stealth_live = bool(self._type_stealth.any()) or (
-            _veil >= 0 and bool((rules.promo_kind == _veil).any()))
+        self._stealth_live = bool(self._type_stealth.count_nonzero()) or (
+            _veil >= 0 and bool((rules.promo_kind == _veil).count_nonzero()))
         self._type_siege_support = torch.tensor([int(u["siegeSupport"]) for u in ru], dtype=torch.long, device=device)
         self._type_siege_max_walls = torch.tensor([int(u["siegeMaxWalls"]) for u in ru], dtype=torch.long, device=device)
-        self._siege_support_any = bool((self._type_siege_support > 0).any())
+        self._siege_support_any = bool((self._type_siege_support > 0).count_nonzero())
         self._siege_support_idx = [i for i, v in enumerate(self._type_siege_support.tolist()) if int(v) > 0]
         self._type_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
         self._type_civic = torch.tensor([u["requiresCivic"] for u in ru], dtype=torch.long, device=device)
@@ -3752,7 +3754,7 @@ class SimInit:
         self._gdr_idx = next((i for i, u in enumerate(ru) if int(u["gdr"])), -1)
         self._spy_idx = next((i for i, u in enumerate(ru) if int(u["spy"])), -1)
         self._type_no_gold = torch.tensor([bool(u["noGold"]) for u in ru], dtype=torch.bool, device=device)
-        self._any_air = bool((self._type_air > 0).any())
+        self._any_air = bool((self._type_air > 0).count_nonzero())
         # THE TWO CLASS SENTENCES THE RULES ACTUALLY SPEAK, named here so no
         # rule has to spell one out of the flags. `_type_military` is the wire
         # column `unitIsMilitary` writes — the military OR air domain — so the

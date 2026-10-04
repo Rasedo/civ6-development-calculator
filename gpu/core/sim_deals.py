@@ -85,13 +85,13 @@ class SimDeals:
             out = z.clone()
             for k in range(3):
                 sel = va == k
-                if not bool(sel.any()):
+                if not bool(sel.count_nonzero()):
                     continue
                 out |= sel & self._gw_gift_ok(giver, taker, k)
             return out
         if kind == self._deal_k_city:
             cell = self._deal_city_cell(giver, va)
-            if not bool(cell.any()):
+            if not bool(cell.count_nonzero()):
                 return z
             col = cell.long().argmax(dim=1)
             rowt = torch.full_like(col, giver)
@@ -116,7 +116,7 @@ class SimDeals:
                 if x in (giver, taker):
                     continue
                 sel = va == x
-                if bool(sel.any()):
+                if bool(sel.count_nonzero()):
                     out |= (sel & civic & self.city_alive[:, x].any(dim=1)
                             & self._joint_war_open(giver, x) & self._joint_war_open(taker, x))
             return out
@@ -137,7 +137,7 @@ class SimDeals:
     def _deal_move_kind(self, kind: int, giver: int, taker: int,
                         va: torch.Tensor, vb: torch.Tensor, ok: torch.Tensor) -> None:
         """Move it. The caller has checked `_deal_kind_ok`. `moveDealItem`'s twin."""
-        if not bool(ok.any()):
+        if not bool(ok.count_nonzero()):
             return
         if kind == self._deal_k_gold:
             paid = torch.where(ok, va.to(self.civ_treasury.dtype), torch.zeros_like(self.civ_treasury[:, giver]))
@@ -155,7 +155,7 @@ class SimDeals:
         elif kind == self._deal_k_gw:
             for k in range(3):
                 sel = ok & (va == k)
-                if bool(sel.any()):
+                if bool(sel.count_nonzero()):
                     self._gift_work(giver, taker, k, sel)
         elif kind == self._deal_k_city:
             cell = self._deal_city_cell(giver, va) & ok.unsqueeze(1)
@@ -168,7 +168,7 @@ class SimDeals:
             lvl = self._spy_cell_release(taker, giver, ok)
             col, live = self._deal_capital_col(taker)
             home = ok & live
-            if bool(home.any()) and self._spy_idx >= 0:
+            if bool(home.count_nonzero()) and self._spy_idx >= 0:
                 at = self.city_center[:, taker].gather(1, col.unsqueeze(1)).squeeze(1)
                 slot0 = getattr(self, self.POOL_NEXT["major"]).clone()
                 got = self._spawn_unit(taker, home, at, self._spy_idx)
@@ -189,7 +189,7 @@ class SimDeals:
                 if x in (giver, taker):
                     continue
                 sel = ok & (va == x)
-                if not bool(sel.any()):
+                if not bool(sel.count_nonzero()):
                     continue
                 for p in (giver, taker):
                     self._declare_war_major(p, x, sel & self._joint_war_open(p, x), kind_vec, agreed=True)
@@ -223,7 +223,7 @@ class SimDeals:
             slot = kind < 0                       # an empty slot asks nothing
             for k in range(len(self._deal_kinds)):
                 sel = kind == k
-                if bool((sel & live).any()):
+                if bool((sel & live).count_nonzero()):
                     slot = slot | (sel & self._deal_kind_ok(k, giver, taker, va, vb))
             good &= slot
         return good
@@ -236,14 +236,14 @@ class SimDeals:
             kind, va, vb = it[:, 0], it[:, 1], it[:, 2]
             for k in range(len(self._deal_kinds)):
                 sel = go & (kind == k)
-                if bool(sel.any()):
+                if bool(sel.count_nonzero()):
                     self._deal_move_kind(k, giver, taker, va, vb, sel)
 
     # ------------------------------------------------------------- the table
     def _deal_offer(self, a: int, b: int, want: torch.Tensor,
                     give: torch.Tensor, ask: torch.Tensor, live: torch.Tensor) -> None:
         """Park a bundle on the table. `setDealOffer`'s twin."""
-        if not bool((want & live).any()):
+        if not bool((want & live).count_nonzero()):
             return
         put = want & live
         self.deal_offer_left[:, a, b] = torch.where(
@@ -260,7 +260,7 @@ class SimDeals:
         peace deal, and the caller makes the peace on the mask this returns."""
         z = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         live = ok & (self.deal_offer_left[:, a, b] > 0)
-        if not bool(live.any()):
+        if not bool(live.count_nonzero()):
             return z
         war = self.war[:, a, b]
         # "You can trade with all the leaders except the ones you're at war
@@ -271,7 +271,7 @@ class SimDeals:
         ask = self.deal_offer_ask[:, a, b]
         go = self._deal_bundle_ok(a, b, give, live)
         go = self._deal_bundle_ok(b, a, ask, go)
-        if not bool(go.any()):
+        if not bool(go.count_nonzero()):
             return z
         self._deal_move_bundle(a, b, give, go)
         self._deal_move_bundle(b, a, ask, go)
@@ -301,11 +301,11 @@ class SimDeals:
                     continue
                 temp |= kind == k
             sel = go & temp
-            if not bool(sel.any()):
+            if not bool(sel.count_nonzero()):
                 continue
             keep[:, s] = torch.where(sel.unsqueeze(1), bundle[:, s], keep[:, s])
             any_kept |= sel
-        if not bool(any_kept.any()):
+        if not bool(any_kept.count_nonzero()):
             return
         self.deal_term_left[:, giver, taker] = torch.where(
             any_kept, torch.full_like(self.deal_term_left[:, giver, taker], self._deal_turns),
@@ -324,12 +324,12 @@ class SimDeals:
                     continue
                 left = self.deal_term_left[:, a, b]
                 run = left > 0
-                if bool(run.any()):
+                if bool(run.count_nonzero()):
                     items = self.deal_term_item[:, a, b]
                     for s in range(self._deal_items):
                         kind, va = items[:, s, 0], items[:, s, 1]
                         pay = run & (kind == self._deal_k_gpt)
-                        if bool(pay.any()):
+                        if bool(pay.count_nonzero()):
                             amt = torch.where(pay, va.to(self.civ_treasury.dtype),
                                               torch.zeros_like(self.civ_treasury[:, a]))
                             self.civ_treasury[:, a] = self.civ_treasury[:, a] - amt
@@ -337,14 +337,14 @@ class SimDeals:
                             self._score_gold_gift(a, b, amt)   # CIV6 (Aid Request, FromGold)
                     self.deal_term_left[:, a, b] = torch.where(run, left - 1, left)
                     done = run & (self.deal_term_left[:, a, b] <= 0)
-                    if bool(done.any()):
+                    if bool(done.count_nonzero()):
                         self._deal_end_term(a, b, items, done)
                 # "All Deals, Demands, and Promises last for 30 turns" says
                 # nothing about how long an OFFER waits, and a record is one
                 # turn's decision: an offer nobody answered was priced against
                 # a state that no longer exists.
                 stale = self.deal_offer_left[:, a, b]
-                if bool((stale > 0).any()):
+                if bool((stale > 0).count_nonzero()):
                     self.deal_offer_left[:, a, b] = (stale - 1).clamp(min=0)
         # CIV6: "All Deals, Demands, and Promises last for 30 turns" -
         # `tickPromises`: every promise, refusal and broken window runs one
@@ -378,10 +378,10 @@ class SimDeals:
                 if p == a:
                     continue
                 for k in range(nk):
-                    if not bool(want[:, p, k].any()):
+                    if not bool(want[:, p, k].count_nonzero()):
                         continue
                     go = want[:, p, k] & self._promise_askable(a, p, k)
-                    if not bool(go.any()):
+                    if not bool(go.count_nonzero()):
                         continue
                     open_[:, a, p, k] = go
                     self.civ_diplo_favor[:, a] = self.civ_diplo_favor[:, a] - torch.where(
@@ -389,18 +389,18 @@ class SimDeals:
         kept = torch.zeros_like(open_)
         for p in sorted(keeps.keys()):
             kept[:, :, p] |= keeps[p] & open_[:, :, p]
-        if not bool(open_.any()):
+        if not bool(open_.count_nonzero()):
             return
         self.seat_promise[kept] = self._promise_turns
         refused = open_ & ~kept
-        if not bool(refused.any()):
+        if not bool(refused.count_nonzero()):
             return
         self.seat_promise[refused] = -self._promise_turns
         for a in range(nrow):
             for p in range(nrow):
                 for k in range(nk):
                     r = refused[:, a, p, k]
-                    if not bool(r.any()):
+                    if not bool(r.count_nonzero()):
                         continue
                     self.civ_diplo_favor[:, a] = self.civ_diplo_favor[:, a] + torch.where(
                         r, self._promises[k][0], 0).to(self.civ_diplo_favor.dtype)
@@ -417,21 +417,21 @@ class SimDeals:
         if victim == actor or victim >= nrow or actor >= nrow:
             return
         hit = n > 0
-        if not bool(hit.any()):
+        if not bool(hit.count_nonzero()):
             return
         v = self.seat_promise[:, victim, actor, kind]
         was_broken = self.seat_promise_broken[:, victim, actor, kind] > 0
         broke = hit & (v > 0)
         cont = hit & (v < 0)
         again = hit & (v == 0) & was_broken
-        if bool(broke.any()):
+        if bool(broke.count_nonzero()):
             self.seat_promise[:, victim, actor, kind] = torch.where(broke, 0, v)
             self.seat_promise_broken[:, victim, actor, kind] = torch.where(
                 broke, self._retribution_turns, self.seat_promise_broken[:, victim, actor, kind])
             self._add_grievance(victim, actor, self._promise_broken_griev, broke)
-        if bool(cont.any()):
+        if bool(cont.count_nonzero()):
             self._add_grievance(victim, actor, n.long() * self._promises[kind][2], cont)
-        if bool(again.any()):
+        if bool(again.count_nonzero()):
             self._add_grievance(
                 victim, actor, torch.div(n.long() * self._promises[kind][2] * self._promise_broken_mult, 100,
                                          rounding_mode="floor"), again)
@@ -459,7 +459,7 @@ class SimDeals:
         for s in range(self._deal_items):
             kind, va, vb = items[:, s, 0], items[:, s, 1], items[:, s, 2]
             sel = done & (kind == self._deal_k_res)
-            if not bool(sel.any()):
+            if not bool(sel.count_nonzero()):
                 continue
             idx = va.clamp(min=0, max=ns - 1).unsqueeze(1)
             held = self.civ_stockpile[:, taker].gather(1, idx).squeeze(1)

@@ -263,7 +263,7 @@ class SimMasks:
         # the table's reach, as `damageOf` holds x: past it every draw clamps
         # to the same damage
         R = self._dmg_reach
-        base = self._dmg_base[(x + R).clamp(0, 2 * R)]
+        base = self._dmg_base.take((x + R).clamp(0, 2 * R))
         # the game's GetRandNum(12): ONE draw mapped to 0..11 — floor(r * 12) is
         # exact in float64 and TS damageRoll computes the identical floor
         roll = torch.floor(r * self._dmg_max_extra).to(torch.long)
@@ -319,7 +319,7 @@ class SimMasks:
         a_t = a_type.clamp(min=0, max=self.NU - 1)
         # CIV6 (Sea Dog, CLASS_CAPTURE_SHIPS): "Can capture defeated enemy naval
         # vessels" — a CHASSIS permission, not the seat's policy row.
-        if bool(self._type_capture_ships.any()):
+        if bool(self._type_capture_ships.count_nonzero()):
             out = out | (self._type_capture_ships[a_t] & self.unit_naval[d_type])
         if not self._capture_rows:
             d_emb0 = self.unit_emb.gather(1, ds).squeeze(1)
@@ -372,7 +372,7 @@ class SimMasks:
         reduction table is keyed on."""
         t = type_idx.clamp(min=0, max=self.NU - 1)
         base = HIT_RANGED if ranged else HIT_MELEE
-        return torch.where(self._type_bombard[t] > 0,
+        return torch.where(self._type_bombard.take(t) > 0,
                            torch.full_like(t, HIT_BOMBARD), torch.full_like(t, base))
 
     def _walls_tier_at(self, row: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
@@ -438,7 +438,7 @@ class SimMasks:
         bl = self.city_bldg[:, row]  # [B, RC, NB]
         for (bi, civ), amt in self._bvar_walls_hp.items():
             who = self._row_plays_idx(row, civ)
-            if not bool(who.any()):
+            if not bool(who.count_nonzero()):
                 continue
             out = out + (bl[:, :, bi] & who.unsqueeze(1)).long() * int(amt)
         return out
@@ -454,7 +454,7 @@ class SimMasks:
     def _walls_max_at(self, row: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
         """`wallsMax` — the size of that tier's perimeter pool, plus whatever a
         unique walls row adds on top of it."""
-        return self._walls_tier_hp[self._walls_tier_at(row, col)] + self._walls_hp_bonus_at(row, col)
+        return self._walls_tier_hp.take(self._walls_tier_at(row, col)) + self._walls_hp_bonus_at(row, col)
 
     def _urban_defenses_fit(self, row: int, hit: torch.Tensor) -> None:
         """`urbanDefensesFit` — CIV6: unlocking Urban Defenses "builds modern
@@ -464,7 +464,7 @@ class SimMasks:
         full pool. A city founded afterwards starts full at that tier
         (`_found_city_at`); the standing ones are written here, because a
         breach they are already carrying is what the fortifications replace."""
-        if self._urban_def_tech < 0 or not bool(hit.any()):
+        if self._urban_def_tech < 0 or not bool(hit.count_nonzero()):
             return
         full = int(self._walls_tier_hp[self._walls_tier_urban])
         oh = self.city_outer_hp[:, row]
@@ -505,7 +505,7 @@ class SimMasks:
 
     def _walls_max_all(self, row: int) -> torch.Tensor:
         """[B, RC] the perimeter pool every one of this row's columns carries."""
-        return self._walls_tier_hp[self._walls_tier_all(row)] + self._walls_hp_bonus_all(row)
+        return self._walls_tier_hp.take(self._walls_tier_all(row)) + self._walls_hp_bonus_all(row)
 
     def _walls_build_ok(self, row: int) -> torch.Tensor:
         """[B, RC] — CIV6: "While city defenses are damaged, you cannot build
@@ -582,7 +582,7 @@ class SimMasks:
         if self._repair_proj_idx < 0:
             return
         head = self._q_head(row) == self.PROJECT_BASE + self._repair_proj_idx
-        if not bool(head.any()):
+        if not bool(head.count_nonzero()):
             return
         gain = (js_round(self.city_progress[:, row, :, 0].double())
                 - js_round(before.double())).long()
@@ -613,7 +613,7 @@ class SimMasks:
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         # CIV6 (Hwacha, ABILITY_NO_MOVE_AND_SHOOT): the same gate, on a chassis
         # that carries no Bombard Strength.
-        out = (self._type_bombard[typ] <= 0) & ~self._type_no_move_shoot[typ]
+        out = (self._type_bombard.take(typ) <= 0) & ~self._type_no_move_shoot.take(typ)
         # each later clause is read only while some slot still waits on it:
         # an OR that every slot already passes cannot change
         if bool(out.all()):
@@ -674,14 +674,14 @@ class SimMasks:
         Encampments are 100% effective" — the penalty waived, and the +30 rides
         in beside it."""
         t = type_idx.clamp(min=0, max=self.NU - 1)
-        naval = self.unit_naval[t]
+        naval = self.unit_naval.take(t)
         pen = torch.full(outer.shape, self._ranged_city_pen,
                          dtype=torch.float64, device=outer.device)
         pen = torch.where(naval & (outer <= 0), torch.zeros_like(pen), pen)
         beam = self._gdr_beam_cs(t, seat).double()
         pen = torch.where(beam > 0, torch.zeros_like(pen), pen)
-        base = self._type_ranged_strength[t].double() + beam - pen
-        return torch.where(self._type_bombard[t] > 0, self._type_bombard[t].double(), base)
+        base = self._type_ranged_strength.take(t).double() + beam - pen
+        return torch.where(self._type_bombard.take(t) > 0, self._type_bombard.take(t).double(), base)
 
     def _wound(self, hp: torch.Tensor, types: torch.Tensor | None = None) -> torch.Tensor:
         """CIV6: "Damage of wounded units is diminished... The formula is
@@ -696,7 +696,7 @@ class SimMasks:
         w = js_round(10.0 - hp.double().clamp(min=0.0) / 10.0)
         if types is None:
             return w
-        return torch.where(self._type_no_wound[types.clamp(min=0, max=self.NU - 1)],
+        return torch.where(self._type_no_wound.take(types.clamp(min=0, max=self.NU - 1)),
                            torch.zeros_like(w), w)
 
     # ---- PROMOTIONS ------------------------------------------------------
@@ -708,7 +708,7 @@ class SimMasks:
         """(kinds, vs, masks, live) — the effect slots a unit actually holds,
         each [B, PCOL, PSLOT] and `live` the bool that says the slot counts."""
         rd = self.rules_dev
-        cls = rd.u_promo_class[utype.clamp(min=0)]
+        cls = rd.u_promo_class.take(utype.clamp(min=0))
         clsc = cls.clamp(min=0)
         kinds = rd.promo_kind[clsc]
         vs = rd.promo_v[clsc]
@@ -735,7 +735,7 @@ class SimMasks:
         k = self._pk.get(kind, -1)
         if k < 0:
             return torch.zeros_like(promos, dtype=torch.bool)
-        return (promos & self._promo_type_table("promo_flag_bits", k)[utype.clamp(min=0)]) != 0
+        return (promos & self._promo_type_table("promo_flag_bits", k).take(utype.clamp(min=0))) != 0
 
     def _promo_type_table(self, name: str, k: int) -> torch.Tensor:
         """The catalog fold `name` (`promo_flag_bits` or `promo_col_val`) of
@@ -851,14 +851,14 @@ class SimMasks:
         if k < 0:
             return val, used
         rd = self.rules_dev
-        cls = rd.u_promo_class[utype.clamp(min=0)]
+        cls = rd.u_promo_class.take(utype.clamp(min=0))
         kinds = rd.promo_kind[cls.clamp(min=0)]
         vs = rd.promo_v[cls.clamp(min=0)]
         done = torch.zeros_like(promos, dtype=torch.bool)
         for c in range(int(rd.promo_cols)):
             hit = (~done & (cls >= 0) & (((promos >> c) & 1) > 0) & (((used >> c) & 1) == 0)
                    & (kinds[:, c] == k).any(dim=1))
-            if not bool(hit.any()):
+            if not bool(hit.count_nonzero()):
                 continue
             v = torch.where(kinds[:, c] == k, vs[:, c], torch.zeros_like(vs[:, c])).sum(dim=1)
             val = torch.where(hit, v, val)
@@ -927,7 +927,7 @@ class SimMasks:
         seat `row` below full health, by merged slot."""
         cap = int(self.rules.combat["unitHp"])
         return (self.unit_alive & (self.unit_seat == row) & (self.unit_hp < cap)
-                & (self._rel_strength[self.unit_type.clamp(min=0)] > 0))
+                & (self._rel_strength.take(self.unit_type.clamp(min=0)) > 0))
 
     def _guru_heal_reach(self, row: int) -> torch.Tensor:
         """[B, T] — would a Guru of seat `row` standing here reach a wounded
@@ -948,7 +948,7 @@ class SimMasks:
         rd = self.rules_dev
         B, N = sc.shape
         cols = torch.arange(rd.promo_cols, device=self.device).view(1, 1, -1)
-        cls = rd.u_promo_class[utype.clamp(min=0)]
+        cls = rd.u_promo_class.take(utype.clamp(min=0))
         clsc = cls.clamp(min=0)
         level = self.unit_level.gather(1, sc)
         xp = self.unit_xp.gather(1, sc)
@@ -957,7 +957,7 @@ class SimMasks:
         need = self._xp_to_next(level)
         ready = (cls >= 0) & (need > 0) & (xp >= need)
         bit = torch.ones_like(held).unsqueeze(2) << cols
-        exists = cols < rd.promo_rows[clsc].unsqueeze(2)
+        exists = cols < rd.promo_rows.take(clsc).unsqueeze(2)
         req = rd.promo_req[clsc]                      # [B, N, PCOL]
         open_row = (req == 0) | ((req & held.unsqueeze(2)) != 0)
         offered = (offer.unsqueeze(2) == 0) | ((offer.unsqueeze(2) & bit) != 0)
@@ -981,7 +981,7 @@ class SimMasks:
         # CIV6 (`Improvements.DefenseModifier`): "is this defensible ground" —
         # a district, or any improvement that shelters its occupant
         # (`improvementIsCover`).
-        out = out | (self._imp_def_cs[self.improvement.gather(1, tc).clamp(min=0)] > 0) & (
+        out = out | (self._imp_def_cs.take(self.improvement.gather(1, tc).clamp(min=0)) > 0) & (
             self.improvement.gather(1, tc) >= 0)
         return out.reshape(tiles.shape)
 
@@ -1043,12 +1043,12 @@ class SimMasks:
             k = pk.get(name, -1)
             if k >= 0:
                 want_mask[k] = True
-        uses = want_mask[kinds.clamp(min=0, max=NK - 1)]
+        uses = want_mask.take(kinds.clamp(min=0, max=NK - 1))
         if foe_type is None:
             bit = torch.zeros(B, dtype=torch.long, device=dev)
         else:
-            fcls = rd.u_promo_class[foe_type.clamp(min=0)]
-            bit = torch.where(fcls >= 0, rd.promo_class_bit[fcls.clamp(min=0)],
+            fcls = rd.u_promo_class.take(foe_type.clamp(min=0))
+            bit = torch.where(fcls >= 0, rd.promo_class_bit.take(fcls.clamp(min=0)),
                               torch.zeros_like(fcls))
         maskhit = (masks & bit.view(B, 1, 1)) != 0
         ok = live & hit & (~uses | maskhit)
@@ -1112,13 +1112,13 @@ class SimMasks:
         mult = self._recon_xp_mult(seat, types, rows)
         if initiated:
             mult = mult * self._suz_xp_mult(seat, rows)
-        return mult.double() * self._type_xp_rate[types.clamp(min=0, max=self.NU - 1)]
+        return mult.double() * self._type_xp_rate.take(types.clamp(min=0, max=self.NU - 1))
 
     def _xp_strength(self, t: torch.Tensor, shooting: bool) -> torch.Tensor:
         """the strength a chassis brings to the XP ratio (`xpStrength`): its
         RAW Ranged column when it is the one shooting — a bomber's Bombard,
         its strike being a bombard — its Combat Strength otherwise."""
-        c = self._type_combat[t.clamp(min=0)].long()
+        c = self._type_combat.take(t.clamp(min=0)).long()
         if not shooting:
             return c
         r = self._type_ranged_strength[t.clamp(min=0)].long()
@@ -1179,7 +1179,7 @@ class SimMasks:
         cls = self.rules_dev.u_promo_class[utype.clamp(min=0)]
         for (bi, civ), (amt, classes) in self._bvar_train_mp.items():
             who = self._row_plays_idx(row, civ)
-            if not bool(who.any()):
+            if not bool(who.count_nonzero()):
                 continue
             in_cls = torch.zeros_like(cls, dtype=torch.bool)
             for c in classes:
@@ -1217,7 +1217,7 @@ class SimMasks:
         CIV6 (World Religion, outcome A): "this outcome also gives Warrior Monks
         +10 Combat Strength", where the monk's religion is its owner's."""
         out, tgt = self._congress_by_id("MILITARY_ADVISORY")
-        cls = self.rules_dev.u_promo_class[utype.clamp(min=0)]
+        cls = self.rules_dev.u_promo_class.take(utype.clamp(min=0))
         sh = (slice(None),) + (None,) * (cls.dim() - 1)
         z = torch.zeros(cls.shape, dtype=torch.long, device=self.device)
         v = torch.where(out[sh] == 0, z + self._c_advisory_cs, z - self._c_advisory_cs)
@@ -1262,10 +1262,10 @@ class SimMasks:
         out = self.work_ok
         for _wc, _wl in self._live_rows(row, self._work_mountain_rows):
             _ww = self._row_is(row, _wc, _wl)
-            if bool(_ww.any()):
+            if bool(_ww.count_nonzero()):
                 out = out | (_ww.unsqueeze(1) & self.tile_mountain & (self.feat_id < 0))
         if self._imp_unwork_any:
-            out = out & ~self._imp_unwork[self.improvement + 1]
+            out = out & ~self._imp_unwork.take(self.improvement + 1)
         return out
 
     def _form_civic_ok(self, row: int, tier: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1282,7 +1282,7 @@ class SimMasks:
             if _ft != tier or _fci < 0:
                 continue
             _fw = self._row_is(row, _fc, _fl)
-            if bool(_fw.any()):
+            if bool(_fw.count_nonzero()):
                 out[_fn] = torch.where(_fw, self.civ_civics[:, row, _fci], out[_fn])
         return out[0], out[1]
 
@@ -1299,7 +1299,7 @@ class SimMasks:
             _fok = self._row_is(row, _fc, _fl)
             if _fv >= 0:
                 _fok = _fok & cv[:, _fv]
-            if bool(_fok.any()):
+            if bool(_fok.count_nonzero()):
                 out = out | (_fok.unsqueeze(1) & (self.terrain == _ft)
                              & (self.hills == bool(_fh))
                              & ~self._feat_blocks_ground())
@@ -1324,7 +1324,7 @@ class SimMasks:
         out = torch.zeros_like(seat)
         for row in range(self.n_majors):
             m = seat == row
-            if not bool(m.any()):
+            if not bool(m.count_nonzero()):
                 continue
             n = self._gov_mods(row)[12]["milpol"]
             out = torch.where(m, n.reshape(-1, *([1] * (out.dim() - 1))).expand_as(out), out)
@@ -1337,7 +1337,7 @@ class SimMasks:
         out = None
         for _pc, _pl, _py, _pa in self._live_rows(row, self._powered_yield_rows):
             _pw = self._row_is(row, _pc, _pl)
-            if not bool(_pw.any()):
+            if not bool(_pw.count_nonzero()):
                 continue
             if out is None:
                 out = torch.zeros(self.B, 6, dtype=torch.float64, device=self.device)
@@ -1388,7 +1388,7 @@ class SimMasks:
                 if _lcs > 0:
                     lv = lv + (levied & self._seat_is(seat, _lc, _ll)).long() * _lcs
         t = utype.clamp(min=0, max=self.NU - 1)
-        combat = (utype >= 0) & (self._type_combat[t] > 0)
+        combat = (utype >= 0) & (self._type_combat.take(t) > 0)
         # CIV6 (TRAIT_TERRITORIAL_WAR_COMBAT, ReligiousOnly false): the flat
         # strength a leader's combat units carry for the turns after a
         # declaration of the row's own war kind — clause-free like the levy
@@ -1399,12 +1399,12 @@ class SimMasks:
         # Person channel on every naval combat unit — the ability's TypeTags
         # are the four CLASS_NAVAL_* classes, and every sea-domain unit with a
         # Combat value carries one of them
-        lv = lv + (combat & self.unit_naval[t]).long() * self._gp_perm_at(seat, "navalCombat").long()
+        lv = lv + (combat & self.unit_naval.take(t)).long() * self._gp_perm_at(seat, "navalCombat").long()
         if not self._combat_cs_rows and not self._formation_rows:
             return lv
-        bit = self.rules_dev.promo_class_bit[self.rules_dev.u_promo_class[t].clamp(min=0)]
+        bit = self.rules_dev.promo_class_bit[self.rules_dev.u_promo_class.take(t).clamp(min=0)]
         tc = tile.clamp(min=0).reshape(self.B, -1)
-        naval = self.unit_naval[t]
+        naval = self.unit_naval.take(t)
         on_coast = torch.where(naval,
                                (self.water.gather(1, tc) & ~self.ocean_tile.gather(1, tc)).reshape(seat.shape),
                                self.coastal_land.gather(1, tc).reshape(seat.shape))
@@ -1455,7 +1455,7 @@ class SimMasks:
         # CIV6 (EFFECT_ADJUST_CORPS_ARMY_MODIFIED_STRENGTH): what this row's own
         # FORMATION adds, for the domain the row names
         if self._formation_rows and formation is not None:
-            naval = self.unit_naval[t]
+            naval = self.unit_naval.take(t)
             for _fc, _fl, _ft, _fn, _fci, _fcs in self._formation_rows:
                 if not _fcs:
                     continue
@@ -1476,7 +1476,7 @@ class SimMasks:
     def _ignore_shores(self, seat: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """bool — `ignoresShores`: no embark/disembark penalty for this unit."""
         # CIV6 (Redcoat): the chassis's own clause, beside the roster rows
-        out = self._type_ignore_shores[utype.clamp(min=0, max=self.NU - 1)].clone()
+        out = self._type_ignore_shores.take(utype.clamp(min=0, max=self.NU - 1)).clone()
         for civ, lead, settler in self._ignore_shores_rows:
             who = self._seat_is(seat, civ, lead)
             if settler:
@@ -1506,7 +1506,7 @@ class SimMasks:
         the FOE's chassis."""
         z = torch.zeros(seat.shape, dtype=torch.long, device=self.device)
         out = z.clone()
-        era = self._type_era[foe_type.clamp(min=0, max=self.NU - 1)]
+        era = self._type_era.take(foe_type.clamp(min=0, max=self.NU - 1))
         for _r in range(self.n_majors):
             fx = self._gov_mods(_r)[12]["eracs"]
             if not fx:
@@ -1529,7 +1529,7 @@ class SimMasks:
         out = z.clone()
         for _r in range(self.n_majors):
             per = self._governor_tile_sum(_r, "territoryCS")
-            if not bool((per != 0).any()):
+            if not bool(per.count_nonzero()):
                 continue
             v = per.gather(1, tc.reshape(self.B, -1)).reshape(tc.shape)
             out = out + ((seat == _r) & own).long() * v.long()
@@ -1544,9 +1544,9 @@ class SimMasks:
         o = own_type.clamp(min=0, max=self.NU - 1)
         f = foe_type.clamp(min=0, max=self.NU - 1)
         out = torch.zeros_like(o)
-        out = torch.where(self._type_melee[o] & self._type_anticav[f],
+        out = torch.where(self._type_melee.take(o) & self._type_anticav.take(f),
                           torch.full_like(out, self._class_melee_vs_anticav), out)
-        out = torch.where((out == 0) & self._type_anticav[o] & self._type_cavalry[f] & ~self._type_chariot[f],
+        out = torch.where((out == 0) & self._type_anticav.take(o) & self._type_cavalry.take(f) & ~self._type_chariot.take(f),
                           torch.full_like(out, self._class_anticav_vs_cav), out)
         return out
 
@@ -1561,7 +1561,7 @@ class SimMasks:
         for s in range(self.S):
             era = torch.where(seat == 100 + s,
                               self._civ_era(self.citystate_techs[:, s], self.citystate_civics[:, s]), era)
-        return self._embarked_def_by_era[era.clamp(min=0, max=self._embarked_def_by_era.numel() - 1)]
+        return self._embarked_def_by_era.take(era.clamp(min=0, max=self._embarked_def_by_era.numel() - 1))
 
     def _civclass_at(self, tiles: torch.Tensor) -> torch.Tensor:
         """The non-military occupant of each tile — the civilian or the
@@ -1584,7 +1584,7 @@ class SimMasks:
         (`shootable`); an AIR strike any but a civilian (`airTarget`)."""
         e = self.embarked_at
         et = self.unit_type.gather(1, e.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-        drop = self._dom_civilian(et) if air else ~self._type_dom_mil[et]
+        drop = self._dom_civilian(et) if air else ~self._type_dom_mil.take(et)
         return torch.where((e >= 0) & drop, torch.full_like(e, -1), e)
 
     def _dom_civilian(self, ut: torch.Tensor) -> torch.Tensor:
@@ -1619,7 +1619,7 @@ class SimMasks:
         t = tiles.unsqueeze(1) if flat else tiles
         c = self.civilian_at.gather(1, t)
         ct = self.unit_type.gather(1, c.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-        c = torch.where((c >= 0) & (self._rel_strength[ct] > 0), torch.full_like(c, -1), c)
+        c = torch.where((c >= 0) & (self._rel_strength.take(ct) > 0), torch.full_like(c, -1), c)
         s = self.support_at.gather(1, t)
         out = torch.where((c >= 0) & (s >= 0), torch.minimum(c, s), torch.where(c >= 0, c, s))
         return out.squeeze(1) if flat else out
@@ -1635,7 +1635,7 @@ class SimMasks:
         occupant), -1 for none. `tiles` is [B], already clamped."""
         c = self.civilian_at.gather(1, tiles.unsqueeze(1)).squeeze(1)
         ct = self.unit_type.gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-        return torch.where((c >= 0) & (self._rel_strength[ct] > 0), c, torch.full_like(c, -1))
+        return torch.where((c >= 0) & (self._rel_strength.take(ct) > 0), c, torch.full_like(c, -1))
 
     def _stack_fold(self, tc: torch.Tensor, seat, mslot: torch.Tensor,
                     m_seat: torch.Tensor, ok_m: torch.Tensor, cslot: torch.Tensor,
@@ -1670,7 +1670,7 @@ class SimMasks:
         take = e_mil & ~ok_m
         if ranged:
             m_type = self.unit_type.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1)
-            cs_m = (self._type_combat[m_type.clamp(min=0, max=self.NU - 1)]
+            cs_m = (self._type_combat.take(m_type.clamp(min=0, max=self.NU - 1))
                     + self._form_cs(mslot) + self._convoy_cs(mslot) - self._fuel_short_cs(mslot))
             take = take | (e_mil & ok_m
                            & (self._embarked_def_cs(e_seat) + self._form_cs(eslot)
@@ -1696,18 +1696,18 @@ class SimMasks:
         all naval units" of the owner named per element by `seat` (`b` its
         batch row where the leading dim is not the batch)."""
         ut = utype.clamp(min=0, max=self.NU - 1)
-        base = self._type_sight[ut]
+        base = self._type_sight.take(ut)
         out = (torch.where(base > 0, base, torch.full_like(base, 2))
                + self._promo_val(utype, promos, "SIGHT"))
         if seat is not None:
-            out = out + (self.unit_naval[ut] & (self._gp_perm_at(seat, "navalSight", b) > 0)).long()
+            out = out + (self.unit_naval.take(ut) & (self._gp_perm_at(seat, "navalSight", b) > 0)).long()
         return out
 
     def _sees_through(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
         """bool — `unitSeesThrough`: Sentry's CanSee on the promotion word, or
         CIV6 (Ngao Mbeba) the chassis's own."""
         return (self._promo_flag(utype, promos, "SEE_THROUGH")
-                | self._type_see_through[utype.clamp(min=0, max=self.NU - 1)])
+                | self._type_see_through.take(utype.clamp(min=0, max=self.NU - 1)))
 
     def _stealth_hidden(self, seat, plane: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] — does this tile hold a STEALTH unit `seat` cannot see?
@@ -1734,8 +1734,8 @@ class SimMasks:
         # carrier, so the unit pool answers before any [B, T] gather.
         ut_all = self.unit_type.clamp(min=0, max=self.NU - 1)
         if not bool((self.unit_alive
-                     & (self._type_stealth[ut_all]
-                        | self._promo_flag(ut_all, self.unit_promos, "STEALTH"))).any()):
+                     & (self._type_stealth.take(ut_all)
+                        | self._promo_flag(ut_all, self.unit_promos, "STEALTH"))).count_nonzero()):
             return hidden
         sc = seat.reshape(self.B, 1) if torch.is_tensor(seat) else seat
         mslot = occ.clamp(min=0)
@@ -1745,7 +1745,7 @@ class SimMasks:
         hid = ((occ >= 0) & (chassis | veil)
                & (self.unit_revealed_turn.gather(1, mslot) < self.turn)
                & (self.unit_seat.gather(1, mslot) != sc))
-        if not bool(hid.any()):
+        if not bool(hid.count_nonzero()):
             return hidden
         tsel = hid.any(dim=0).nonzero(as_tuple=True)[0]
         dist = self.pair_dist[:, tsel].to(torch.long)  # [T, K]
@@ -1922,7 +1922,7 @@ class SimMasks:
         )
         if self._imp_portal_any:
             imp = self.improvement[rows, tiles]
-            out = out | (self._imp_portal[imp.clamp(min=0)] & (imp >= 0))
+            out = out | (self._imp_portal.take(imp.clamp(min=0)) & (imp >= 0))
         return out
 
     def _trade_graphs(self, row: int, games: list[int]) -> dict[int, tuple]:
@@ -1945,7 +1945,7 @@ class SimMasks:
         gi = torch.tensor(games, dtype=torch.long, device=dev)
         n = len(games)
         tiles = torch.arange(T, device=dev).unsqueeze(0).expand(n, T)
-        wl = self._trade_water_level(row)[gi]
+        wl = self._trade_water_level(row).take(gi)
         opn = self._trade_walkable(gi.unsqueeze(1), tiles, wl.unsqueeze(1))
         if row < self.n_majors and self.fog_of_war:
             opn = opn & self.seat_explored[gi, row]
@@ -1984,7 +1984,7 @@ class SimMasks:
         term = torch.where(self.railroad[gi], torch.full_like(land, self._trade_cost_rail), term)
         term = torch.where(centre | portal, torch.zeros_like(land), term)
         exit_ = torch.full((n, T), -1, dtype=torch.long, device=dev)
-        if bool(portal.any()):
+        if bool(portal.count_nonzero()):
             for i in range(n):
                 pt = portal[i].nonzero(as_tuple=True)[0]
                 if len(pt):
@@ -2163,18 +2163,18 @@ class SimMasks:
         if self._imp_move_cost_any:
             _mi = self.improvement.gather(1, d1).squeeze(1)
             _mp = self.pillaged.gather(1, d1).squeeze(1)
-            _mc = self._imp_move_cost[_mi.clamp(min=0)] * ((_mi >= 0) & ~_mp).long()
+            _mc = self._imp_move_cost.take(_mi.clamp(min=0)) * ((_mi >= 0) & ~_mp).long()
             tm = torch.where(_mc > 0, (_mc - 1) * self._mp_scale, tm)
         if utype is not None and promos is not None:
             # CIV6 (Khevsureti, Ngao Mbeba): the same waiver, written on the
             # CHASSIS instead of on a promotion.
             _ut0 = utype.clamp(min=0, max=self.NU - 1)
             hill = self.hills.gather(1, d1).squeeze(1)
-            _hw = self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS") | self._type_no_hill_cost[_ut0]
+            _hw = self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS") | self._type_no_hill_cost.take(_ut0)
             tm = tm - (hill & _hw).long() * self._mp_scale
             if self._woods_feats.numel():
                 wood = self._feature_live(d1, self._woods_feats).squeeze(1)
-                _ww = self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS") | self._type_no_woods_cost[_ut0]
+                _ww = self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS") | self._type_no_woods_cost.take(_ut0)
                 tm = tm - (wood & _ww).long() * self._mp_scale
             tm = tm.clamp(min=0)
         # CIV6 (Missionary Zeal): a religious unit of a seat whose religion
@@ -2191,9 +2191,9 @@ class SimMasks:
         rd = (self.road.gather(1, ends) | rr).all(dim=1)
         step = torch.where(rr.all(dim=1),
                            torch.full_like(tm, self._railroad_mp),
-                           self._road_tier_mp[self.road_tier])
+                           self._road_tier_mp.take(self.road_tier))
         terr = torch.where(rd, step - self._mp_scale, tm)
-        bridged = self._road_tier_bridges[self.road_tier]
+        bridged = self._road_tier_bridges.take(self.road_tier)
         riv = torch.where(rd & bridged, torch.zeros_like(river3), river3)
         if zeal is not None:
             riv = torch.where(zeal, torch.zeros_like(riv), riv)
@@ -2207,8 +2207,8 @@ class SimMasks:
         sr = useat.clamp(min=0, max=NM - 1)
         enh = self.civ_enhancer.gather(1, sr.reshape(self.B, -1)).reshape_as(useat)
         done = self.civ_religion_done.gather(1, sr.reshape(self.B, -1)).reshape_as(useat)
-        z = self._enh["zeal"][enh + 1] > 0
-        rel = self._rel_strength[utype.clamp(min=0, max=self.NU - 1)] > 0
+        z = self._enh["zeal"].take(enh + 1) > 0
+        rel = self._rel_strength.take(utype.clamp(min=0, max=self.NU - 1)) > 0
         return maj & done & z & rel & (utype >= 0)
 
     def _encamp_live(self) -> torch.Tensor:
@@ -2259,7 +2259,7 @@ class SimMasks:
         ent = self._encamp_live_cache
         if ent is None or not simbase.stamp_holds(ent[0], planes):
             _live = self._encamp_live()
-            ent = self._encamp_live_cache = (simbase.plane_stamp(planes), _live, bool(_live.any()))
+            ent = self._encamp_live_cache = (simbase.plane_stamp(planes), _live, bool(_live.count_nonzero()))
         if not ent[2]:
             return torch.zeros_like(tiles, dtype=torch.bool)
         t = tiles.clamp(min=0)
@@ -2299,10 +2299,10 @@ class SimMasks:
         valid = (tiles >= 0).reshape(B, -1)
         foreign = valid & (owner >= 0) & (owner < R) & (owner != row)
         cs_own = valid & (owner >= 100) & (owner < 100 + self.S)
-        if not bool(foreign.any()) and not bool(cs_own.any()):
+        if not bool(foreign.count_nonzero()) and not bool(cs_own.count_nonzero()):
             return zero
         closed = torch.zeros_like(foreign)
-        if bool(foreign.any()):
+        if bool(foreign.count_nonzero()):
             oc = owner.clamp(min=0, max=R - 1)
             civic = self.civ_civics[:, :R, self._open_borders_civic].gather(1, oc)
             at_war = self.war[:, row, :R].gather(1, oc)
@@ -2310,7 +2310,7 @@ class SimMasks:
             # column `row` of the grant matrix: what each GRANTOR gives this seat.
             granted = (self.seat_borders_turns[:, :R, row] > 0).gather(1, oc)
             closed = foreign & civic & ~at_war & ~allied & ~granted
-        if bool(cs_own.any()):
+        if bool(cs_own.count_nonzero()):
             sc = (owner - 100).clamp(min=0, max=self.S - 1)
             civic_cs = self.citystate_civics[:, :, self._open_borders_civic].gather(1, sc)
             suz = self.citystate_suzerain.gather(1, sc) == row
@@ -2318,7 +2318,7 @@ class SimMasks:
             closed = closed | (cs_own & civic_cs & ~suz & ~hostile)
         if utype is not None:
             ut = utype.clamp(min=0).reshape(B, -1)
-            free = (ut == self._trader_idx) | ((self._rel_strength[ut] > 0) & (ut != self._inquisitor_idx))
+            free = (ut == self._trader_idx) | ((self._rel_strength.take(ut) > 0) & (ut != self._inquisitor_idx))
             closed = closed & ~free.expand_as(closed)
         return closed.reshape(tiles.shape)
 
@@ -2342,7 +2342,7 @@ class SimMasks:
             return out
         for r in range(self.n_majors):
             mine = u_seat == r
-            if not bool(mine.any()):
+            if not bool(mine.count_nonzero()):
                 continue
             shut = self._border_closed(dest.unsqueeze(1), r, u_type.unsqueeze(1)).squeeze(1)
             out = out & ~(mine & shut)
@@ -2451,7 +2451,7 @@ class SimMasks:
                                     is_naval=False if naval_mask is None else naval_mask,
                                     is_support=False if sup_mask is None else sup_mask)
         terr = self.passable.gather(1, okc)
-        if naval_mask is not None and bool(naval_mask.any()):
+        if naval_mask is not None and bool(naval_mask.count_nonzero()):
             ocean_ok = ~self.ocean_tile.gather(1, okc)
             if cart is not None:
                 ocean_ok = ocean_ok | cart.unsqueeze(1)
@@ -2543,7 +2543,7 @@ class SimMasks:
         is neither, and a city's own shot is neither."""
         z = torch.zeros(utype.shape, dtype=torch.long, device=self.device)
         ok = (self._gdr_has(utype, seat, self._gdr_u_armor) & (foe_type >= 0)
-              & (self._type_air[foe_type.clamp(min=0, max=self.NU - 1)] == 0))
+              & (self._type_air.take(foe_type.clamp(min=0, max=self.NU - 1)) == 0))
         return z + ok.long() * int(self._gdr_plate_cs)
 
     def _gdr_naval_cs(self, utype: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
@@ -2590,14 +2590,14 @@ class SimMasks:
         one per game; `home` [B] is the id of the Free City a grant comes from
         (`unit_free_city`), -1 on every other spawn. Returns the games where
         the unit landed."""
-        if not bool(mask.any()):
+        if not bool(mask.count_nonzero()):
             return mask & False
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
         # exactly as TS's spawnUnit branches on UNITS[type].naval.
         _nm = torch.ones(self.B, dtype=torch.bool, device=self.device) if naval else None
         found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm)
         can = mask & found
-        if not bool(can.any()):
+        if not bool(can.count_nonzero()):
             return can
         rows = can.nonzero(as_tuple=True)[0]
         slot = self.next_slot[rows]
@@ -2735,7 +2735,7 @@ class SimMasks:
         if self._alliance_shared_vis_rows:
             self._share_fog_with_allies(rows, seat_row, disk)
         cnt = (new & self.nwonder[rows]).sum(dim=1) * self._dracones_disc
-        if bool((cnt > 0).any()):
+        if bool((cnt > 0).count_nonzero()):
             full = torch.zeros(self.B, dtype=torch.long, device=self.device)
             if isinstance(seat_row, int):
                 full.index_add_(0, rows, cnt)
@@ -2743,7 +2743,7 @@ class SimMasks:
             else:
                 for g in range(self.n_majors):
                     m = seat_row == g
-                    if bool(m.any()):
+                    if bool(m.count_nonzero()):
                         full.zero_()
                         full.index_add_(0, rows[m], cnt[m])
                         self._dedication_event(g, self._ded_dracones, full)
@@ -2771,12 +2771,12 @@ class SimMasks:
                 carry = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                 for _c, _l in self._alliance_shared_vis_rows:
                     carry |= self._row_is(g, _c, _l) | self._row_is(o, _c, _l)
-                if not bool(carry.any()):
+                if not bool(carry.count_nonzero()):
                     continue
                 ally = self._allied_with(g, torch.full((self.B,), o, dtype=torch.long,
                                                        device=self.device))
                 ok = (carry & ally)[sel]
-                if not bool(ok.any()):
+                if not bool(ok.count_nonzero()):
                     continue
                 self.seat_explored[sel, o] |= dsk & ok.unsqueeze(1)
 
@@ -2784,7 +2784,7 @@ class SimMasks:
         """[B, T] bool — `portalAt`: a MOUNTAIN_PORTAL row (the Tunnel,
         Qhapaq Ñan) stands here."""
         imp = self.improvement
-        return self._imp_portal[imp.clamp(min=0)] & (imp >= 0)
+        return self._imp_portal.take(imp.clamp(min=0)) & (imp >= 0)
 
     def _portal_exit(self, tiles: torch.Tensor, rows: torch.Tensor | None = None) -> torch.Tensor:
         """[B] (or [n] for the game `rows`, one per tile) — where a portal
@@ -2800,7 +2800,7 @@ class SimMasks:
         if not self._imp_portal_any:
             return out
         plane = self._portal_plane()                             # [B, T]
-        if not bool(plane.any()):
+        if not bool(plane.count_nonzero()):
             return out
         tun = plane if rows is None else plane[rows]             # [n, T]
         rng = self.tile_range if rows is None else self.tile_range[rows]
@@ -2846,7 +2846,7 @@ class SimMasks:
         """`spawnUnit`. `far`: a GRANT, placed on the nearest plot that takes
         the unit however far that is — past the anchor and its ring, the whole
         map by distance, the lower tile index on a tie."""
-        if not bool(mask.any()):
+        if not bool(mask.count_nonzero()):
             return torch.zeros_like(mask)
         if isinstance(type_idx, int):
             type_idx = torch.full((self.B,), type_idx, dtype=torch.long, device=self.device)
@@ -2857,17 +2857,17 @@ class SimMasks:
         # id 100 + s (`minorBuild`); a major's row IS its seat
         seat = int(self._ROW_SEAT[row])
         minor = row >= self.n_majors
-        is_civ_u = self._type_civilian[type_idx.clamp(min=0)]
+        is_civ_u = self._type_civilian.take(type_idx.clamp(min=0))
         ti_n = type_idx.clamp(min=0, max=self.NU - 1)
-        no_hold = (self._type_air[ti_n] > 0) | (ti_n == self._spy_idx)
-        naval_m = self.unit_naval[ti_n] & mask
+        no_hold = (self._type_air.take(ti_n) > 0) | (ti_n == self._spy_idx)
+        naval_m = self.unit_naval.take(ti_n) & mask
         # a minor trains no hull (its build table holds land units alone)
         cart = (torch.zeros(self.B, dtype=torch.bool, device=self.device) if minor
                 else self._row_ocean_open_naval(row))
         found, spot = self._first_free_spot(at_tile, seat, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
                                             utype=type_idx,
-                                            sup_mask=self._type_support[type_idx.clamp(min=0)])
-        if far and bool((mask & ~found).any()):
+                                            sup_mask=self._type_support.take(type_idx.clamp(min=0)))
+        if far and bool((mask & ~found).count_nonzero()):
             _allt = torch.arange(self.T, device=self.device).unsqueeze(0).expand(self.B, self.T)
             _okt = self._spot_free(_allt, seat, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
                                    utype=type_idx, sup_mask=self._type_support[type_idx.clamp(min=0)])
@@ -2877,7 +2877,7 @@ class SimMasks:
             _hit = mask & ~found & _okt.any(dim=1)
             spot = torch.where(_hit, _far, spot)
             found = found | _hit
-        if bool(no_hold.any()):
+        if bool(no_hold.count_nonzero()):
             found = torch.where(no_hold, at_tile >= 0, found)
             spot = torch.where(no_hold, at_tile.clamp(min=0), spot)
         # WHICH RULE ASKED. `_spawn_unit` has a dozen callers and the line
@@ -2892,7 +2892,7 @@ class SimMasks:
                 self._diff_events.setdefault(_sb, []).append(
                     f"sp:{int(self._ROW_SEAT[row])}:{int(self.turn)}"
                     f":{int(at_tile[_sb])}:{int(type_idx[_sb])} none #{_why}")
-        if not bool(can.any()):
+        if not bool(can.count_nonzero()):
             return can
         rows = can.nonzero(as_tuple=True)[0]
         if self._log_diff:
@@ -2903,18 +2903,18 @@ class SimMasks:
                     f":{int(at_tile[_sb])}:{int(type_idx[_sb])}"
                     f" at{int(spot[_sb])} n{_rank} #{_why}")
         nxt = getattr(self, self.POOL_NEXT[pre])
-        slot = nxt[rows]
+        slot = nxt.take(rows)
         assert int(slot.max()) < simbase.MAJOR_POOL_MAX, "major slot pool exhausted — raise simbase.MAJOR_POOL_MAX"
         getattr(self, f"{pre}_unit_alive")[rows, slot] = True
         self.major_unit_seat[rows, slot] = seat
-        getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx[rows]
-        getattr(self, f"{pre}_unit_tile")[rows, slot] = spot[rows]
+        getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx.take(rows)
+        getattr(self, f"{pre}_unit_tile")[rows, slot] = spot.take(rows)
         # revealAround is a MAJOR's alone ("nothing reads a city-state's fog")
         if not minor:
-            self._reveal_around(rows, row, spot[rows],
-                                self._unit_sight(type_idx[rows], torch.zeros_like(slot),
+            self._reveal_around(rows, row, spot.take(rows),
+                                self._unit_sight(type_idx.take(rows), torch.zeros_like(slot),
                                                  torch.full_like(slot, row), rows),
-                                see_through=self._type_see_through[type_idx[rows].clamp(min=0, max=self.NU - 1)])
+                                see_through=self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)])
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat["unitHp"]
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1
@@ -2928,8 +2928,8 @@ class SimMasks:
         # `takePromotion` then zeroes, so nothing carries into the second.
         # CIV6 (Okihtcitaw): "Starts with 1 free Promotion" — the same shape,
         # written on the CHASSIS instead of on the training city's building.
-        _cls = self.rules_dev.u_promo_class[type_idx[rows].clamp(min=0)]
-        _chassis_free = self._type_free_promos[type_idx[rows].clamp(min=0, max=self.NU - 1)] > 0
+        _cls = self.rules_dev.u_promo_class[type_idx.take(rows).clamp(min=0)]
+        _chassis_free = self._type_free_promos[type_idx.take(rows).clamp(min=0, max=self.NU - 1)] > 0
         _free = _chassis_free if free_promo is None else (free_promo[rows] | _chassis_free)
         getattr(self, f"{pre}_unit_xp")[rows, slot] = torch.where(
             _free & (_cls >= 0),
@@ -2985,16 +2985,16 @@ class SimMasks:
         _spy_lvl = torch.zeros_like(slot)
         if self._spy_promo_rows and self._spy_idx >= 0:
             _ti = type_idx if isinstance(type_idx, torch.Tensor) else torch.full_like(slot, int(type_idx))
-            _is_spy = (_ti[rows] if _ti.shape[0] == self.B else _ti) == self._spy_idx
+            _is_spy = (_ti.take(rows) if _ti.shape[0] == self.B else _ti) == self._spy_idx
             for _sc, _sl, _sn in self._live_rows(row, self._spy_promo_rows):
                 _sw = self._row_is(row, _sc, _sl)[rows] & _is_spy
                 _spy_lvl = _spy_lvl + _sw.long() * _sn
         getattr(self, f"{pre}_unit_spy_level")[rows, slot] = _spy_lvl
-        _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
+        _ch = self._type_charges[type_idx.take(rows)] if charges is None else charges[rows]
         # `extraCharges` of a minor is 0: it holds no wonder, card, roster row
         # or governor-held city
         if not minor:
-            _ch = _ch + self._extra_charges(row, type_idx, at_tile)[rows]
+            _ch = _ch + self._extra_charges(row, type_idx, at_tile).take(rows)
         getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch
         off = self.POOL_LO[pre]
         # ONE occupancy writer, the one every other caller uses. `_occ_set`
@@ -3004,9 +3004,9 @@ class SimMasks:
         # the type and the embarked flag this body has already written.
         # An AIRCRAFT and a SPY hold no plot at all (`no_hold`), so they are
         # still kept out of every plane.
-        _hold = rows[~no_hold[rows]]
+        _hold = rows[~no_hold.take(rows)]
         if len(_hold) > 0:
-            self._occ_set(_hold, spot[_hold], nxt[_hold] + off)
+            self._occ_set(_hold, spot.take(_hold), nxt.take(_hold) + off)
         nxt[rows] += 1
         # no chassis a minor or the Free Cities trains climbs in price, so the
         # tally below has no column for them
@@ -3018,7 +3018,7 @@ class SimMasks:
         # one alike. Gated on `can` like TS: a no-spot spawn lands nothing.
         self.civ_unit_acq[:, row].scatter_add_(
             1, ti_n.unsqueeze(1),
-            (can & (self._type_cost_step[ti_n] > 0)).long().unsqueeze(1))
+            (can & (self._type_cost_step.take(ti_n) > 0)).long().unsqueeze(1))
         return can
 
 
@@ -3054,7 +3054,7 @@ class SimMasks:
         The dig is dated by the WORLD era at the moment of the event — CIV6
         dates an Artifact by WHEN its battle happened — while the stored
         civilization is the EVENT's own."""
-        if not bool(mask.any()):
+        if not bool(mask.count_nonzero()):
             return
         t = tile.clamp(min=0)
         era = self._world_era()
@@ -3083,7 +3083,7 @@ class SimMasks:
             # a city-state, so `markAntiquitySite` accepts a death on a
             # minor's centre.
         )
-        if not bool(okr.any()):
+        if not bool(okr.count_nonzero()):
             return
         rows = okr.nonzero(as_tuple=True)[0]
         self.antiquity[rows, t[rows]] = True
@@ -3102,7 +3102,7 @@ class SimMasks:
         are disjoint because one refuses water and the other requires it, so
         a barbarian or a minor sinking a hull leaves a wreck like any
         major's."""
-        if not bool(mask.any()):
+        if not bool(mask.count_nonzero()):
             return
         t = tile.clamp(min=0)
         era = self._world_era()
@@ -3113,7 +3113,7 @@ class SimMasks:
             & self.water.gather(1, t.unsqueeze(1)).squeeze(1)
             & ~self.shipwreck.gather(1, t.unsqueeze(1)).squeeze(1)
         )
-        if not bool(okr.any()):
+        if not bool(okr.count_nonzero()):
             return
         rows = okr.nonzero(as_tuple=True)[0]
         self.shipwreck[rows, t[rows]] = True
@@ -3246,13 +3246,13 @@ class SimMasks:
         di = self.district.gather(1, tc)
         dc = self.district_complete.gather(1, tc)
         live = ~wnd & (di >= 0) & dc
-        if not bool(live.any()):
+        if not bool(live.count_nonzero()):
             return out + extra
         best = torch.zeros_like(tc)
         for r in range(self.n_majors):
             sl = self.city_slot_at(r).gather(1, tc)          # owning city SLOT, -1 = not this row's
             hit = live & (sl >= 0)
-            if not bool(hit.any()):
+            if not bool(hit.count_nonzero()):
                 continue
             slc = sl.clamp(min=0)
             for bi, dix, v in self._band_venue:
@@ -3288,10 +3288,10 @@ class SimMasks:
         """[B, N] bool — the PARK column: a Naturalist standing on a tile that
         anchors at least one legal rhombus."""
         _u0 = utype.clamp(min=0, max=self.NU - 1)
-        _may = self._type_park_builder[_u0]
+        _may = self._type_park_builder.take(_u0)
         if self._naturalist_idx >= 0:
             _may = _may | (utype == self._naturalist_idx)
-        if not bool(_may.any()):
+        if not bool(_may.count_nonzero()):
             return torch.zeros_like(tc, dtype=torch.bool)
         legal = self._park_cluster_legal(row, self._park_cluster(tc)).any(dim=2)
         return _may & legal
@@ -3339,7 +3339,7 @@ class SimMasks:
         # CIV6 (Hic Sunt Dracones, Golden face): "+2 Movement for naval and
         # embarked units."
         emb = getattr(self, f"{pre}_unit_emb", None)
-        nsel = self.unit_naval[typ] if emb is None else (self.unit_naval[typ] | emb)
+        nsel = self.unit_naval[typ] if emb is None else (self.unit_naval.take(typ) | emb)
         holds_d = self._golden_ded_table(self._ded_dracones).gather(1, civ)
         out = torch.where(civ_ok & nsel & holds_d, torch.full_like(out, self._golden_move), out)
         return out
@@ -3381,7 +3381,7 @@ class SimMasks:
         cw = self.water.gather(1, c).unsqueeze(2)             # [B, N, 1]
         nw = self.water.gather(1, flat).reshape(B, N, 6)
         trans = (cw != nw) & (nb6 >= 0)
-        if not bool(trans.any()):
+        if not bool(trans.count_nonzero()):
             return torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
         dirs = torch.arange(6, device=dev).reshape(1, 1, 6)
         land = torch.where(cw, nbc3, c.unsqueeze(2)).reshape(B, N * 6)
@@ -3431,10 +3431,10 @@ class SimMasks:
         gold to the unit's seat and stamps the dig with the order's seat. A
         city-state's unit (a levied one) banks to that city-state's
         treasury, as `seatOf` resolves a city-state seat in TS."""
-        if not bool(mask.any()):
+        if not bool(mask.count_nonzero()):
             return
         hit = mask & (self.camp_tile == tile.unsqueeze(1)).any(dim=1)
-        if not bool(hit.any()):
+        if not bool(hit.count_nonzero()):
             return
         # the outpost was the BARBARIANS' — theirs is the civilization buried
         self._mark_antiquity(hit, tile, torch.full_like(tile, BARB_SEAT))
@@ -3453,7 +3453,7 @@ class SimMasks:
                 if int(self.game_era[b]) <= int(self._mom["campMaxEra"]):
                     _ca = self.city_alive[b, _s]
                     _cd = self.pair_dist[int(tile[b]), self.city_center[b, _s].clamp(min=0)].to(torch.long)
-                    _near = bool((_ca & (_cd <= int(self._mom["campNearRange"]))).any())
+                    _near = bool((_ca & (_cd <= int(self._mom["campNearRange"]))).count_nonzero())
                     _one = torch.zeros(self.B, dtype=torch.long, device=self.device)
                     _one[b] = 1
                     self._add_era_score(_s, int(self._mom["campNear" if _near else "camp"]), _one)
@@ -3485,7 +3485,7 @@ class SimMasks:
         out = civ_ok.unsqueeze(1) & (~need | room)
         # CIV6 (Military Engineer): "can only be built in a city that has an
         # Encampment with an Armory" — the building carries its district.
-        if bool((self._type_req_bldg >= 0).any()):
+        if bool((self._type_req_bldg >= 0).count_nonzero()):
             held = torch.ones(B, C, self._type_req_bldg.shape[0], dtype=torch.bool, device=dev)
             for t in (self._type_req_bldg >= 0).nonzero(as_tuple=True)[0].tolist():
                 held[:, :, t] = self.city_bldg[:, row, :, int(self._type_req_bldg[t])]
@@ -3582,10 +3582,10 @@ class SimMasks:
         c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0)), neg)
         e_seat = torch.where(_es >= 0, self.unit_seat.gather(1, _es.clamp(min=0)), neg)
 
-        is_civ = (self._type_civilian[utype.clamp(min=0)]).unsqueeze(2)
-        is_sup = (self._type_support[utype.clamp(min=0)]).unsqueeze(2)
+        is_civ = (self._type_civilian.take(utype.clamp(min=0))).unsqueeze(2)
+        is_sup = (self._type_support.take(utype.clamp(min=0))).unsqueeze(2)
         passable = self.passable.gather(1, nbc).reshape(B, N, 6)
-        is_nav = self.unit_naval[ut].unsqueeze(2)
+        is_nav = self.unit_naval.take(ut).unsqueeze(2)
         cart = self._row_ocean_open(row).view(B, 1, 1)
         # a HULL floats over enterable water and through a Canal's passage;
         # the OCEAN gate is the seat's Cartography (or Leif Erikson's grant,
@@ -3605,14 +3605,14 @@ class SimMasks:
         terr = torch.where(is_nav, hull, passable | embark)
         # ...and a WATER-WALKING chassis takes both planes at once, with no
         # embark clause of any kind between them.
-        _walk = self.unit_water_walk[ut].unsqueeze(2)
-        if bool(_walk.any()):
+        _walk = self.unit_water_walk.take(ut).unsqueeze(2)
+        if bool(_walk.count_nonzero()):
             terr = torch.where(
                 _walk, passable | self.wpass.gather(1, nbc).reshape(B, N, 6), terr)
         # CIV6 (Enhanced Mobility): the robot "can perform a Jump action to
         # cross over mountain terrain" — one hex of mountain, simply enterable.
         _jmp = ((ut == self._gdr_idx) & self._gdr_row_up(row, self._gdr_u_moves).unsqueeze(1)).unsqueeze(2)
-        if bool(_jmp.any()):
+        if bool(_jmp.count_nonzero()):
             terr = terr | (_jmp & self.tile_mountain.gather(1, nbc).reshape(B, N, 6))
         # CIV6 (Mountain Tunnel, Qhapaq Ñan): "allowing units to move into it"
         # — a portal's mountain is ENTERABLE by anything, and only that. It
@@ -3632,7 +3632,7 @@ class SimMasks:
         has_atk = (self.unit_attacks.gather(1, sc) > 0).unsqueeze(2)
         cliff6 = self._cliff_block_dirs(tc, nb, own_tile,
                                         self._promo_flag(ut, self.unit_promos.gather(1, sc), "CLIFFS")
-                                        | self.unit_naval[ut] | self.unit_water_walk[ut]) & alive
+                                        | self.unit_naval.take(ut) | self.unit_water_walk.take(ut)) & alive
         shut = self._border_closed(nb, row, utype.unsqueeze(2).expand(B, N, 6))
         # THE ESCORT FORMATION. CIV6 (Formations): "A military unit can create a
         # formation with a support or civilian unit at any time" and the pair
@@ -3682,8 +3682,8 @@ class SimMasks:
             _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
             _cst.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
             cs_t = (_cst.gather(1, nbc) & (ctr_nb >= 100)).reshape(B, N, 6)
-        can_fight = (self._type_combat[utype] > 0).unsqueeze(2)
-        melee = (self._type_ranged_strength[ut] <= 0).unsqueeze(2)
+        can_fight = (self._type_combat.take(utype) > 0).unsqueeze(2)
+        melee = (self._type_ranged_strength.take(ut) <= 0).unsqueeze(2)
         # A live enemy Encampment is a target in its own right, melee or shot:
         # CIV6 charges a ranged attack -17 "when attacking city and district
         # defenses", which prices the blow rather than refusing it.
@@ -3767,7 +3767,7 @@ class SimMasks:
         # CIV6 (Legion): "Can build a Roman Fort" — the FORT row on the
         # engineer's ground, with the chassis' own charge and no tech.
         fort_ground = (
-            present & self._type_fort_builder[utype.clamp(min=0, max=self.NU - 1)] & (u_charges > 0)
+            present & self._type_fort_builder.take(utype.clamp(min=0, max=self.NU - 1)) & (u_charges > 0)
             & (own_tile | (self.tile_seat < 0)).gather(1, tc)
             & self.passable.gather(1, tc)
             & ~self.water.gather(1, tc)
@@ -3806,8 +3806,8 @@ class SimMasks:
             # / `_imp_gov_ok` plane builds. The chain mirrors the branch chain
             # below rank for rank.
             _zcol = torch.zeros(B, N, 1, dtype=torch.bool, device=dev)
-            _any_here = bool(here_ok.any())
-            _any_eng = bool(eng_here.any())
+            _any_here = bool(here_ok.count_nonzero())
+            _any_eng = bool(eng_here.count_nonzero())
             _utyp = set(torch.unique(utype[present]).tolist())
             for _k in range(3, self._imp_unlock.numel()):
                 if self.SEASIDE >= 0 and _k == self.SEASIDE:
@@ -3905,7 +3905,7 @@ class SimMasks:
         _ts = self.tile_seat
         _owned = (_ts >= 0) & (_ts < BARB_SEAT)
         _enemy = (_owned & self.war[:, row].gather(
-            1, self._seat_row[torch.where(_owned, _ts, torch.zeros_like(_ts))])).gather(1, tc)
+            1, self._seat_row.take(torch.where(_owned, _ts, torch.zeros_like(_ts))))).gather(1, tc)
         _has_imp = (self.improvement.gather(1, tc) >= 0) & ~self.pillaged.gather(1, tc)
         # CIV6: the Encampment "cannot be pillaged normally" — a melee unit
         # conquers it instead, which is where its pillage is written.
@@ -3916,17 +3916,17 @@ class SimMasks:
             & ~self.district_pillaged.gather(1, tc)
             & (self.centre_slot_at.gather(1, tc) < 0)
         )
-        pillage = present & (self._type_combat[utype] > 0) & _enemy & (_has_imp | _has_dis)
+        pillage = present & (self._type_combat.take(utype) > 0) & _enemy & (_has_imp | _has_dis)
         # CIV6 (Coastal Raid): a NAVAL RAIDER "must be next to the land
         # improvement or district, and must have at least 3 Movement points
         # remaining" — the same column, over the adjacent ring.
-        if bool(self._type_raider.any()):
+        if bool(self._type_raider.count_nonzero()):
             _nb = self.neigh[tc]                              # [B, N, 6]
             _nbc = _nb.clamp(min=0).reshape(B, -1)
             _nts = self.tile_seat.gather(1, _nbc)
             _nown = (_nts >= 0) & (_nts < BARB_SEAT)
             _nwar = _nown & self.war[:, row].gather(
-                1, self._seat_row[torch.where(_nown, _nts, torch.zeros_like(_nts))])
+                1, self._seat_row.take(torch.where(_nown, _nts, torch.zeros_like(_nts))))
             _nimp = (self.improvement.gather(1, _nbc) >= 0) & ~self.pillaged.gather(1, _nbc)
             _ndis = (
                 (self.district.gather(1, _nbc) >= 0)
@@ -3940,15 +3940,15 @@ class SimMasks:
                          & (_nimp | _ndis)).reshape(B, N, 6).any(dim=2)
             # CIV6 (Thunderbolt of the North): "coastal raiding for all naval
             # melee units"
-            raid = (present & (self._type_raider[utype]
-                               | (self._type_naval_melee[utype] & self._row_leads(row, "HARDRADA").unsqueeze(1)))
+            raid = (present & (self._type_raider.take(utype)
+                               | (self._type_naval_melee.take(utype) & self._row_leads(row, "HARDRADA").unsqueeze(1)))
                     & self.water.gather(1, tc)
                     & (self.unit_mp.gather(1, sc) >= 3 * self._mp_scale)
                     & _raidable)
             pillage = pillage | raid
         pillage = pillage.unsqueeze(2)
 
-        rngd = (self._type_ranged_strength[ut] > 0) & (self._type_ranged_range[ut] >= 2)
+        rngd = (self._type_ranged_strength.take(ut) > 0) & (self._type_ranged_range.take(ut) >= 2)
         ring = self.ring2[tc]
         ringc = ring.clamp(min=0).reshape(B, -1)
         _rm = self.military_at.gather(1, ringc)
@@ -4027,7 +4027,7 @@ class SimMasks:
                                   torch.zeros_like(_hm))
             _tier = _h_form.reshape(B, N, 6) + self.unit_formation.gather(1, sc).unsqueeze(2) + 1
             _civ_ok = torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
-            _nav_u = self.unit_naval[utype.clamp(min=0)].unsqueeze(2)
+            _nav_u = self.unit_naval.take(utype.clamp(min=0)).unsqueeze(2)
             for _k in range(1, self._form_max + 1):
                 _land, _sea = self._form_civic_ok(row, _k)
                 _have = torch.where(_nav_u, _sea.view(B, 1, 1).expand_as(_nav_u),
@@ -4067,8 +4067,8 @@ class SimMasks:
             _hs = torch.where(_hr >= 0, self.unit_seat.gather(1, _hr.clamp(min=0)),
                               torch.full_like(tc, -1))
             _hw = self.war[:, row].gather(
-                1, self._seat_row[_hs.clamp(min=0)]) & (_hs >= 0) & (_hs != row)
-            _cd = [(present & (self._type_combat[utype.clamp(min=0)] > 0) & _hw).unsqueeze(2)]
+                1, self._seat_row.take(_hs.clamp(min=0))) & (_hs >= 0) & (_hs != row)
+            _cd = [(present & (self._type_combat.take(utype.clamp(min=0)) > 0) & _hw).unsqueeze(2)]
 
         _rh: list[torch.Tensor] = []
         if self._A_HERESY >= 0 and self._inquisitor_idx >= 0:
@@ -4188,8 +4188,8 @@ class SimMasks:
             _rid = self.res_id.gather(1, tc)
             _nres = int(self._res_harvest_y.numel())
             _ridc = _rid.clamp(min=0, max=max(_nres - 1, 0))
-            _hy = torch.where(_rid >= 0, self._res_harvest_y[_ridc], torch.full_like(_rid, -1))
-            _himp = torch.where(_rid >= 0, self._res_harvest_imp[_ridc], torch.full_like(_rid, -1))
+            _hy = torch.where(_rid >= 0, self._res_harvest_y.take(_ridc), torch.full_like(_rid, -1))
+            _himp = torch.where(_rid >= 0, self._res_harvest_imp.take(_ridc), torch.full_like(_rid, -1))
             # the improvement's own unlock, the way the BUILD columns test it
             _nimp = int(self._imp_unlock.numel())
             # every improvement's unlock in one read: its tech where it names
@@ -4240,7 +4240,7 @@ class SimMasks:
         if self._A_RETURN >= 0:
             _rtb = [(present & (self.unit_patrol.gather(1, sc) >= 0)
                      & (self.unit_mp.gather(1, sc) > 0)
-                     & (self._type_air[ut] > 0)).unsqueeze(2)]
+                     & (self._type_air.take(ut) > 0)).unsqueeze(2)]
         _prt: list[torch.Tensor] = []
         if self._A_PRIORITY >= 0:
             _prt = [present.unsqueeze(2) & (self._priority_targets(row, sc, tc, utype) >= 0)]
@@ -4267,7 +4267,7 @@ class SimMasks:
         # CIV6: distance 3 needs ATTACK RANGE 3 — chassis range plus the
         # RANGE promotion, which is what `unitAttackRange` sums on TS.
         _rt3 = self._promo_val(ut, self.unit_promos.gather(1, sc), "RANGE")
-        rngd3 = (self._type_ranged_strength[ut] > 0) & ((self._type_ranged_range[ut] + _rt3) >= 3)
+        rngd3 = (self._type_ranged_strength.take(ut) > 0) & ((self._type_ranged_range.take(ut) + _rt3) >= 3)
         ring3 = self.ring3[tc]
         ring3c = ring3.clamp(min=0).reshape(B, -1)
         _rm3 = self.military_at.gather(1, ring3c)
@@ -4375,7 +4375,7 @@ class SimMasks:
         W, dev = self._air_strike_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
         ti = utype.clamp(min=0, max=self.NU - 1)
-        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        kind = torch.where(utype >= 0, self._type_air.take(ti), torch.zeros_like(ti))
         cols = self._air_cols(kind)
         if W == 0 or cols.numel() == 0:
             return out
@@ -4462,7 +4462,7 @@ class SimMasks:
         if W == 0 or D == 0 or self._A_NUKE < 0:
             return out
         ti = utype.clamp(min=0, max=self.NU - 1)
-        carry = (utype >= 0) & (self._type_nuke_carry[ti] > 0)
+        carry = (utype >= 0) & (self._type_nuke_carry.take(ti) > 0)
         cols = carry.any(dim=0).nonzero(as_tuple=True)[0]
         if cols.numel() == 0:
             return out
@@ -4490,7 +4490,7 @@ class SimMasks:
         tl = torch.full((B,), -1, dtype=torch.long, device=dev)
         for k in range(self._n_devices):
             room = (self.civ_wmd[:, row, k] > 0) & (kd < 0)
-            if not bool(room.any()):
+            if not bool(room.count_nonzero()):
                 continue
             cand = self._silo_reach(row, k) & self._nuke_offer(row, k) & room.unsqueeze(1)
             has = cand.any(dim=1)
@@ -4523,7 +4523,7 @@ class SimMasks:
         W, dev = self._air_strike_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
         ti = utype.clamp(min=0, max=self.NU - 1)
-        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        kind = torch.where(utype >= 0, self._type_air.take(ti), torch.zeros_like(ti))
         cols = self._air_cols(kind)
         if W == 0 or cols.numel() == 0:
             return out
@@ -4557,7 +4557,7 @@ class SimMasks:
         W, dev = self._air_rebase_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
         ti = utype.clamp(min=0, max=self.NU - 1)
-        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        kind = torch.where(utype >= 0, self._type_air.take(ti), torch.zeros_like(ti))
         cols = self._air_cols(kind)
         if W == 0 or cols.numel() == 0:
             return out
@@ -4588,7 +4588,7 @@ class SimMasks:
         W, dev = self._air_deploy_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
         ti = utype.clamp(min=0, max=self.NU - 1)
-        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        kind = torch.where(utype >= 0, self._type_air.take(ti), torch.zeros_like(ti))
         cols = self._air_cols(kind)
         if W == 0 or cols.numel() == 0:
             return out
@@ -4617,7 +4617,7 @@ class SimMasks:
         W, dev = self._air_strike_cols, self.device
         out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
         ti = utype.clamp(min=0, max=self.NU - 1)
-        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        kind = torch.where(utype >= 0, self._type_air.take(ti), torch.zeros_like(ti))
         cols = self._air_cols(kind)
         if W == 0 or cols.numel() == 0:
             return out
@@ -4651,10 +4651,10 @@ class SimMasks:
         dev = self.device
         nxt = self._up_to_of(row, utype)
         ok = (nxt >= 0) & (utype >= 0)
-        if not bool(ok.any()):
+        if not bool(ok.count_nonzero()):
             return torch.zeros(B, N, dtype=torch.bool, device=dev)
         nc = nxt.clamp(min=0)
-        rt, rc = self._type_tech[nc], self._type_civic[nc]
+        rt, rc = self._type_tech.take(nc), self._type_civic.take(nc)
         have_t = torch.where(rt >= 0, self.civ_techs[:, row].gather(1, rt.clamp(min=0)),
                              torch.ones_like(ok))
         have_c = torch.where(rc >= 0, self.civ_civics[:, row].gather(1, rc.clamp(min=0)),
@@ -4667,8 +4667,8 @@ class SimMasks:
         ok = ok & self._afford(self.civ_treasury[:, row].unsqueeze(1), price)
         # the BANK: the new chassis' charge, and nothing when both rungs ask
         # for the same resource
-        slot, cost = self._type_res_slot[nc], self._upgrade_res_cost(row, self._type_res_cost[nc])
-        same = self._type_res_slot[utype.clamp(min=0)] == slot
+        slot, cost = self._type_res_slot.take(nc), self._upgrade_res_cost(row, self._type_res_cost.take(nc))
+        same = self._type_res_slot.take(utype.clamp(min=0)) == slot
         want = (slot >= 0) & (cost > 0) & ~same
         have = self.civ_stockpile[:, row].gather(1, slot.clamp(min=0).reshape(B, -1)) \
             if self._n_strategic else torch.zeros_like(cost)
@@ -4681,6 +4681,6 @@ class SimMasks:
             a_k = seq[:, :, k].to(torch.long)
             if k > 0:
                 a_k = torch.where(a_k < 6, a_k, torch.full_like(a_k, -1))
-            if not bool((a_k >= 0).any()):
+            if not bool((a_k >= 0).count_nonzero()):
                 return
             self._apply_seat_unit_actions(row, a_k, seq_k=k)

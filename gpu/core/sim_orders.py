@@ -12,7 +12,7 @@ class SimOrders:
         self.unit_mp[r, sc[r]] = 0  # the turn is spent (TS movesLeft = 0)
         # CIV6 (Legion): a military chassis outlives its last charge.
         gone = (self.unit_charges[r, sc[r]] <= 0) & self._type_civilian[self.unit_type[r, sc[r]].clamp(min=0, max=self.NU - 1)]
-        if bool(gone.any()):
+        if bool(gone.count_nonzero()):
             d = r[gone]
             self.unit_alive[d, sc[d]] = False
             self._occ_clear(d, hc[d], sc[d])
@@ -200,14 +200,14 @@ class SimOrders:
             present = (slot >= 0) & ctl & self.unit_alive.gather(1, sc1).squeeze(1)
             a = actions[:, n].to(torch.long)
             act = present & (a >= 0) & (a != 12)
-            if not bool(act.any()):
+            if not bool(act.count_nonzero()):
                 continue
             own_tile = self.tile_seat == row   # live at THIS rank (see the head)
             here = self.unit_tile.gather(1, sc1).squeeze(1)
             hc = here.clamp(min=0)
             utp = self.unit_type.gather(1, sc1).squeeze(1)
             ut = utp.clamp(min=0, max=self.NU - 1)
-            is_civ = self._type_civilian[utp.clamp(min=0)]
+            is_civ = self._type_civilian.take(utp.clamp(min=0))
             u_emb = self.unit_emb.gather(1, sc1).squeeze(1)
             u_charges = self.unit_charges.gather(1, sc1).squeeze(1)
             # a SPENT unit takes no verb (TS returns before any verb when
@@ -218,9 +218,9 @@ class SimOrders:
 
             if _rk_found[n] and self._settler_idx >= 0:
                 fnd = act & (a == self._A_FOUND) & (utp == self._settler_idx)
-                if bool(fnd.any()):
+                if bool(fnd.count_nonzero()):
                     made = self._found_city_at(row, fnd, here)
-                    if bool(made.any()):
+                    if bool(made.count_nonzero()):
                         fr = made.nonzero(as_tuple=True)[0]
                         self._occ_clear(fr, here[fr], sc[fr])
                         self.unit_alive[fr, sc[fr]] = False
@@ -230,19 +230,19 @@ class SimOrders:
                 exc = act & (a == _xc) & self._excavate_ok(
                     row, here.unsqueeze(1), utp.unsqueeze(1),
                     u_charges.unsqueeze(1)).squeeze(1)
-                if bool(exc.any()):
+                if bool(exc.count_nonzero()):
                     self._do_excavate(row, exc, here, sc)
 
             if _rk_park[n] and _pk >= 0:
                 pkm = act & (a == _pk) & self._park_ok(row, here.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
-                if bool(pkm.any()):
+                if bool(pkm.count_nonzero()):
                     self._do_park(row, pkm, here, sc)
 
             if _rk_perform[n] and _pfc >= 0:
                 pfm = act & (a == _pfc) & self._perform_ok(
                     row, here.unsqueeze(1), utp.unsqueeze(1),
                     self.unit_promos.gather(1, sc.unsqueeze(1))).squeeze(1)
-                if bool(pfm.any()):
+                if bool(pfm.count_nonzero()):
                     self._do_concert(row, pfm, here, sc)
 
             # THE ROYAL SOCIETY'S ONE VERB: the whole charge bank in one blow,
@@ -251,7 +251,7 @@ class SimOrders:
             if _rk_boost[n] and _bpc >= 0:
                 _bpm = act & (a == _bpc) & self._boost_ok(
                     row, hc.unsqueeze(1), utp.unsqueeze(1), u_charges.unsqueeze(1)).squeeze(1)
-                if bool(_bpm.any()):
+                if bool(_bpm.count_nonzero()):
                     _r = _bpm.nonzero(as_tuple=True)[0]
                     _c = self._project_boost_slot(row, hc.unsqueeze(1)).squeeze(1)[_r]
                     _pct = self._bsum_by_row("projcharge", self._b_project_charge)[_r, row]
@@ -270,12 +270,12 @@ class SimOrders:
                 # at `movesLeft` 0 (9248 t250: a Corps host, spent by its own
                 # form-up, promoted here only)
                 pmv = act & u_moves & (a >= _pm) & (a < _pm + _pcol)
-                if bool(pmv.any()):
+                if bool(pmv.count_nonzero()):
                     pk_c = (a - _pm).clamp(min=0, max=_pcol - 1)
                     okp = pmv & self._promo_offer_mask(
                         sc.unsqueeze(1), utp.unsqueeze(1)
                     ).squeeze(1).gather(1, pk_c.unsqueeze(1)).squeeze(1)
-                    if bool(okp.any()):
+                    if bool(okp.count_nonzero()):
                         pr = okp.nonzero(as_tuple=True)[0]
                         ps = sc[pr]
                         self.unit_promos[pr, ps] |= torch.ones_like(ps) << pk_c[pr]
@@ -306,7 +306,7 @@ class SimOrders:
                 # class AND the support one.
                 _is_sup = self._type_support[utp.clamp(min=0)]
                 _em = act & (a == _ecc) & (is_civ | _is_sup | u_emb) & (here >= 0)
-                if bool(_em.any()):
+                if bool(_em.count_nonzero()):
                     _mh = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
                     _ms = torch.where(
                         _mh >= 0,
@@ -326,19 +326,19 @@ class SimOrders:
                     _em = _em & ~((_jown >= 0) & (_jown != slot)
                                   & self.unit_escorted.gather(1, _jc).squeeze(1)
                                   & (self.unit_seat.gather(1, _jc).squeeze(1) == row))
-                    if bool(_em.any()):
+                    if bool(_em.count_nonzero()):
                         _r = _em.nonzero(as_tuple=True)[0]
                         self.unit_escorted[_r, sc[_r]] = True
 
             if _rk_unescort[n] and _uec >= 0:
                 _bm = act & (a == _uec)
-                if bool(_bm.any()):
+                if bool(_bm.count_nonzero()):
                     _r = _bm.nonzero(as_tuple=True)[0]
                     self.unit_escorted[_r, sc[_r]] = False
 
             if _rk_form[n] and _fuc >= 0:
                 fum = act & (a >= _fuc) & (a < _fuc + 6)
-                if bool(fum.any()):
+                if bool(fum.count_nonzero()):
                     dfu = (a - _fuc).clamp(min=0, max=5)
                     ftg = nb.gather(1, dfu.unsqueeze(1)).squeeze(1)
                     ftc = ftg.clamp(min=0)
@@ -362,13 +362,13 @@ class SimOrders:
                            & (utp != self._gdr_idx) & (h_type != self._gdr_idx)
                            & (self._type_combat[utp.clamp(min=0)] > 0)
                            & (self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1) > 0) & civ_ok)
-                    if bool(okf.any()):
+                    if bool(okf.count_nonzero()):
                         self._form_up(row, okf, hcl, sc, tier)
 
             if _rk_condemn[n] and _cn >= 0:
                 # CONDEMN HERETIC, on the condemner's OWN tile
                 cdm = act & (a == _cn)
-                if bool(cdm.any()):
+                if bool(cdm.count_nonzero()):
                     ctc = hc
                     rel = self._religious_at(ctc.unsqueeze(1)).squeeze(1)
                     rsx = torch.where(rel >= 0,
@@ -379,7 +379,7 @@ class SimOrders:
                         & (self._type_combat[utp.clamp(min=0)] > 0)
                         & self.war[:, row].gather(1, self._seat_row[rsx.clamp(min=0)].unsqueeze(1)).squeeze(1)
                     )
-                    if bool(okc.any()):
+                    if bool(okc.count_nonzero()):
                         self._condemn_heretic(row, okc, ctc, rel, sc)
 
             if _rk_heresy[n] and _hx >= 0 and self._inquisitor_idx >= 0:
@@ -387,7 +387,7 @@ class SimOrders:
                 hxm = (act & u_moves & (a == _hx) & (utp == self._inquisitor_idx) & (u_charges > 0)
                        & (_cslot >= 0)
                        & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row))
-                if bool(hxm.any()):
+                if bool(hxm.count_nonzero()):
                     hr = hxm.nonzero(as_tuple=True)[0]
                     # CIV6 (GS): an Inquisitor's Remove Heresy leaves "only 75%
                     # presence of other Religions" removed, not all of it.
@@ -415,7 +415,7 @@ class SimOrders:
             if _rk_guru[n] and _ghc >= 0 and self._guru_idx >= 0:
                 ghm = (act & u_moves & (a == _ghc) & (utp == self._guru_idx) & (u_charges > 0)
                        & self._guru_heal_reach(row).gather(1, hc.unsqueeze(1)).squeeze(1))
-                if bool(ghm.any()):
+                if bool(ghm.count_nonzero()):
                     _ut = self.unit_tile
                     _near = (_ut == hc.unsqueeze(1)) | (
                         (_ut.unsqueeze(2) == nb.unsqueeze(1)) & (nb >= 0).unsqueeze(1)).any(dim=2)
@@ -432,7 +432,7 @@ class SimOrders:
                        & (u_charges >= self._launch_inquisition_charges)
                        & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row)
                        & ~self.civ_inquisition[:, row])
-                if bool(lqm.any()):
+                if bool(lqm.count_nonzero()):
                     lr = lqm.nonzero(as_tuple=True)[0]
                     self.civ_inquisition[lr, row] = True
                     self.unit_alive[lr, sc[lr]] = False
@@ -444,7 +444,7 @@ class SimOrders:
             if _rk_evangel[n] and _evc >= 0 and self._apostle_idx >= 0:
                 evm = (act & u_moves & (a == _evc) & (utp == self._apostle_idx)
                        & self._evangelize_ok(row))
-                if bool(evm.any()):
+                if bool(evm.count_nonzero()):
                     er = evm.nonzero(as_tuple=True)[0]
                     self.civ_beliefs_earned[er, row] += 1
                     self.unit_alive[er, sc[er]] = False
@@ -457,12 +457,12 @@ class SimOrders:
                                           "HEATHEN")
                        & (self._barb_unit_plane().gather(1, nb.clamp(min=0).reshape(B, -1))
                           .reshape(B, 6) & (nb >= 0)).any(dim=1))
-                if bool(hnm.any()):
+                if bool(hnm.count_nonzero()):
                     self._convert_heathens(row, hnm, here, sc)
 
             if _rk_upgrade[n] and _ug >= 0:
                 ugm = act & (a == _ug)
-                if bool(ugm.any()):
+                if bool(ugm.count_nonzero()):
                     self._upgrade_units(row, ugm, sc, utp)
 
             # THE MILITARY ENGINEER'S TWO NON-IMPROVEMENT VERBS. Each spends a
@@ -475,7 +475,7 @@ class SimOrders:
                     & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
                     & ~self.road.gather(1, hc.unsqueeze(1)).squeeze(1)
                 )
-                if bool(_rdm.any()):
+                if bool(_rdm.count_nonzero()):
                     _r = _rdm.nonzero(as_tuple=True)[0]
                     self.road[_r, hc[_r]] = True
                     self._spend_build_charge(_r, sc, hc)
@@ -496,7 +496,7 @@ class SimOrders:
                     _rrm = _rrm & techs[:, self._railroad_tech]
                 for _sl, _cn in self._railroad_cost:
                     _rrm = _rrm & (self.civ_stockpile[:, row, _sl] >= _cn)
-                if bool(_rrm.any()):
+                if bool(_rrm.count_nonzero()):
                     _r = _rrm.nonzero(as_tuple=True)[0]
                     for _sl, _cn in self._railroad_cost:
                         self.civ_stockpile[_r, row, _sl] -= _cn
@@ -510,7 +510,7 @@ class SimOrders:
             if _rk_clean[n] and _cfc >= 0:
                 _cfm = (act & (a == _cfc) & (u_charges > 0)
                         & self._fallout().gather(1, hc.unsqueeze(1)).squeeze(1))
-                if bool(_cfm.any()):
+                if bool(_cfm.count_nonzero()):
                     _r = _cfm.nonzero(as_tuple=True)[0]
                     self.tile_fallout[_r, hc[_r]] = 0
                     self._spend_build_charge(_r, sc, hc)
@@ -529,7 +529,7 @@ class SimOrders:
                         & ~self.res_stripped.gather(1, hc.unsqueeze(1)).squeeze(1)
                         & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row)
                         & ~self._row_banned(row, self.BAN_HARVEST))
-                if bool(_hvm.any()):
+                if bool(_hvm.count_nonzero()):
                     _r = _hvm.nonzero(as_tuple=True)[0]
                     _t = hc[_r]
                     # the same progress scale the chop reads, and the same
@@ -573,11 +573,11 @@ class SimOrders:
                 # from another portal at the cost of 2 Movement". The exit is
                 # the mask's own reader, so a legal column cannot land in no arm.
                 _ptm = act & (a == _ptc)
-                if bool(_ptm.any()):
+                if bool(_ptm.count_nonzero()):
                     _pex = self._portal_exit(here)
                     _pmp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                     _ptm = _ptm & (_pex >= 0) & (_pmp >= self._portal_mp * self._mp_scale)
-                    if bool(_ptm.any()):
+                    if bool(_ptm.count_nonzero()):
                         _r = _ptm.nonzero(as_tuple=True)[0]
                         _dst = _pex[_r]
                         self._occ_clear(_r, here[_r], sc[_r])
@@ -595,10 +595,10 @@ class SimOrders:
                 # The site and the era band are the mask's own reader, so a
                 # legal column cannot land in no arm.
                 _wcm = act & (a == _wcc) & (utp == self._builder_idx) & (u_charges > 0)
-                if bool(_wcm.any()):
+                if bool(_wcm.count_nonzero()):
                     _wcol = self._wonder_charge_slot(row, here.unsqueeze(1)).squeeze(1)
                     _wcm = _wcm & (_wcol >= 0)
-                    if bool(_wcm.any()):
+                    if bool(_wcm.count_nonzero()):
                         _r = _wcm.nonzero(as_tuple=True)[0]
                         _c = _wcol[_r]
                         _pct = self._wonder_charge_pct(row, _c, _r)
@@ -613,10 +613,10 @@ class SimOrders:
 
             if _rk_finish[n] and _fnc >= 0 and self._eng_idx >= 0:
                 _fnm = act & (a == _fnc) & (utp == self._eng_idx) & (u_charges > 0)
-                if bool(_fnm.any()):
+                if bool(_fnm.count_nonzero()):
                     _col = self._eng_finish_slot(row, here.unsqueeze(1)).squeeze(1)
                     _fnm = _fnm & (_col >= 0)
-                    if bool(_fnm.any()):
+                    if bool(_fnm.count_nonzero()):
                         _r = _fnm.nonzero(as_tuple=True)[0]
                         _c = _col[_r]
                         # `itemCost`: a district's price locked at queue, a
@@ -631,14 +631,14 @@ class SimOrders:
             if _rk_gp[n] and _gpc >= 0:
                 _gpm = act & (a == _gpc) & self._gp_site_ok(
                     row, sc.unsqueeze(1), hc.unsqueeze(1)).squeeze(1)
-                if bool(_gpm.any()):
+                if bool(_gpm.count_nonzero()):
                     self._gp_apply(row, _gpm, sc, hc)
                     _r = _gpm.nonzero(as_tuple=True)[0]
                     self._spend_build_charge(_r, sc, hc)
 
             if _rk_nuke[n] and _nkc >= 0:
                 nkm = act & (a >= _nkc) & (a < _nkc + _nkw)
-                if bool(nkm.any()):
+                if bool(nkm.count_nonzero()):
                     _cols = self._nuke_targets(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _kk = (a - _nkc).clamp(min=0, max=_nkw - 1)
@@ -646,7 +646,7 @@ class SimOrders:
                     _okN = nkm & (_tg >= 0)
                     for _d in range(self._n_devices):
                         _dm = _okN & (torch.div(_kk, self._nuke_cols, rounding_mode="floor") == _d)
-                        if bool(_dm.any()):
+                        if bool(_dm.count_nonzero()):
                             self._detonate(_dm, row, _d, _tg, carrier=sc)
                     # the carrier spends its whole turn on the delivery
                     _mp = self.unit_mp
@@ -655,7 +655,7 @@ class SimOrders:
 
             if _rk_air[n] and _ar >= 0:
                 asm = act & (a >= _ar) & (a < _ar + _asw)
-                if bool(asm.any()):
+                if bool(asm.count_nonzero()):
                     _cols = self._air_strike_targets(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _k = (a - _ar).clamp(min=0, max=_asw - 1)
@@ -669,7 +669,7 @@ class SimOrders:
 
             if _rk_airpil[n] and _apc >= 0:
                 apm = act & (a >= _apc) & (a < _apc + _asw)
-                if bool(apm.any()):
+                if bool(apm.count_nonzero()):
                     _cols = self._air_pillage_targets(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _k = (a - _apc).clamp(min=0, max=_asw - 1)
@@ -683,7 +683,7 @@ class SimOrders:
 
             if _rk_rebase[n] and _rbc >= 0:
                 rbm = act & (a >= _rbc) & (a < _rbc + _rbw)
-                if bool(rbm.any()):
+                if bool(rbm.count_nonzero()):
                     _cols = self._rebase_targets(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _k = (a - _rbc).clamp(min=0, max=_rbw - 1)
@@ -699,7 +699,7 @@ class SimOrders:
             # with the deployment
             if _rk_deploy[n] and _dpc >= 0:
                 dpm = act & (a >= _dpc) & (a < _dpc + _dpw)
-                if bool(dpm.any()):
+                if bool(dpm.count_nonzero()):
                     _cols = self._deploy_targets(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _k = (a - _dpc).clamp(min=0, max=_dpw - 1)
@@ -722,7 +722,7 @@ class SimOrders:
             # PRIORITY TARGET: the strike aimed at the tile's Support unit
             if _rk_priority[n] and _prc >= 0:
                 prm = act & (a >= _prc) & (a < _prc + _asw)
-                if bool(prm.any()):
+                if bool(prm.count_nonzero()):
                     _cols = self._priority_targets(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _k = (a - _prc).clamp(min=0, max=_asw - 1)
@@ -736,7 +736,7 @@ class SimOrders:
 
             if _rk_travel[n] and _stc >= 0:
                 stm = act & (a >= _stc) & (a < _stc + _stw)
-                if bool(stm.any()):
+                if bool(stm.count_nonzero()):
                     _cols = self._spy_destinations(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _k = (a - _stc).clamp(min=0, max=_stw - 1)
@@ -745,7 +745,7 @@ class SimOrders:
 
             if _rk_mission[n] and _smc >= 0:
                 smm = act & (a >= _smc) & (a < _smc + _smw)
-                if bool(smm.any()):
+                if bool(smm.count_nonzero()):
                     _mk = self._spy_mission_mask(
                         row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                     _k = (a - _smc).clamp(min=0, max=_smw - 1)
@@ -754,16 +754,16 @@ class SimOrders:
                         self._begin_mission(row, _okS & (_k == _m), sc, _m)
 
             mv = act & (a < 6) if _rk_move[n] else None
-            if mv is not None and bool(mv.any()):
+            if mv is not None and bool(mv.count_nonzero()):
                 dirs = a.clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
                 # ONE call with the mover's own class flags: the rule takes
                 # per-unit tensors, so no class needs a call of its own.
-                is_nav = self.unit_naval[ut]
+                is_nav = self.unit_naval.take(ut)
                 blocked = self._blocked_for(
                     tgt.unsqueeze(1), row, is_naval=is_nav,
-                    is_civilian=is_civ, is_support=self._type_support[utp.clamp(min=0)],
+                    is_civilian=is_civ, is_support=self._type_support.take(utp.clamp(min=0)),
                 ).squeeze(1)
                 _tc1 = tc.unsqueeze(1)
                 _pass = self.passable.gather(1, _tc1).squeeze(1)
@@ -786,13 +786,13 @@ class SimOrders:
                         else torch.zeros(B, dtype=torch.bool, device=dev))
                 any_war = self.war[:, row].any(dim=1)
                 terr = torch.where(is_nav, _hull, terr | (_water & ship & ~is_nav & any_war))
-                _wlk = self.unit_water_walk[ut]
-                if bool(_wlk.any()):
+                _wlk = self.unit_water_walk.take(ut)
+                if bool(_wlk.count_nonzero()):
                     terr = torch.where(_wlk, _pass | _wet, terr)
                 # CIV6 (Enhanced Mobility): the robot "can perform a Jump action
                 # to cross over mountain terrain".
                 _jmp = (ut == self._gdr_idx) & self._gdr_row_up(row, self._gdr_u_moves)
-                if bool(_jmp.any()):
+                if bool(_jmp.count_nonzero()):
                     terr = terr | (_jmp & self.tile_mountain.gather(1, _tc1).squeeze(1))
                 # CIV6 (Mountain Tunnel, Qhapaq Ñan): a portal's mountain is
                 # ENTERABLE by anything — `portalAt`'s twin, on the jump's own site
@@ -801,13 +801,13 @@ class SimOrders:
                 _scale = self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "CLIFFS")
                 clf = self._cliff_block_dirs(
                     hc.unsqueeze(1), nb.unsqueeze(1), own_tile,
-                    (_scale | is_nav | self.unit_water_walk[ut]).unsqueeze(1),
+                    (_scale | is_nav | self.unit_water_walk.take(ut)).unsqueeze(1),
                 )[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
                 mp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                 shut = self._border_closed(tgt.unsqueeze(1), row, ut.unsqueeze(1)).squeeze(1)
                 ok = mv & (tgt >= 0) & terr & ~blocked & ~clf & ~shut & (mp > 0)
                 _stepped = (self._step_verb(ok, sc, here, tgt, dirs, row, is_civ)
-                            if bool(ok.any()) else torch.zeros_like(ok))
+                            if bool(ok.count_nonzero()) else torch.zeros_like(ok))
                 # the STEP half of the decomposition log, and it belongs HERE
                 # rather than inside `_step_verb`: a REFUSED step never enters
                 # that body at all, so a log inside it can only ever print the
@@ -838,9 +838,9 @@ class SimOrders:
 
             atk = (
                 act & (a >= 6) & (a < 12)
-                & (self._type_combat[utp.clamp(min=0)] > 0)  # civilians cannot attack
+                & (self._type_combat.take(utp.clamp(min=0)) > 0)  # civilians cannot attack
             ) if _rk_atk[n] else None
-            if atk is not None and bool(atk.any()):
+            if atk is not None and bool(atk.count_nonzero()):
                 dirs = (a - 6).clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
@@ -852,7 +852,7 @@ class SimOrders:
                 _mp_now = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                 _atk_now = self.unit_attacks.gather(1, sc.unsqueeze(1)).squeeze(1)
                 valid = atk & (tgt >= 0) & (_mp_now > 0) & (_atk_now > 0)
-                if bool(u_emb.any()):
+                if bool(u_emb.count_nonzero()):
                     # the amphibious reach: an embarked unit strikes an open
                     # LAND shore, with a MELEE attack, and nothing afloat.
                     valid = valid & (~u_emb | (
@@ -863,7 +863,7 @@ class SimOrders:
                                              "CLIFFS").unsqueeze(1))[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
                         & (self._type_ranged_strength[ut] <= 0)
                     ))
-                if bool(valid.any()):
+                if bool(valid.count_nonzero()):
                     # WHO is on the target tile, and is any of them hostile to
                     # this seat? `unitsHostile` answers for every pair, so no
                     # seat needs a clause of its own.
@@ -874,7 +874,7 @@ class SimOrders:
                     _es = self.embarked_at.gather(1, tc.unsqueeze(1)).squeeze(1)
                     neg = torch.full_like(_ms, -1)
                     _es_t = self.unit_type.gather(1, _es.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-                    _es = torch.where((_es >= 0) & (self._rel_strength[_es_t] > 0), neg, _es)
+                    _es = torch.where((_es >= 0) & (self._rel_strength.take(_es_t) > 0), neg, _es)
                     m_seat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
                     c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
                     e_seat = torch.where(_es >= 0, self.unit_seat.gather(1, _es.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
@@ -886,7 +886,7 @@ class SimOrders:
                     r_seat = torch.where(_rs >= 0, self.unit_seat.gather(1, _rs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
                     host_r = (self._seats_hostile(row, r_seat.unsqueeze(1)).squeeze(1)
                               & ~self.water.gather(1, tc.unsqueeze(1)).squeeze(1)
-                              & ~self.unit_naval[ut])
+                              & ~self.unit_naval.take(ut))
                     ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
                     city_t = self._seats_hostile(
                         row, self._centre_target_seat(ctr).unsqueeze(1)).squeeze(1)
@@ -895,7 +895,7 @@ class SimOrders:
                         _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
                         _cst.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
                         cs_t = _cst.gather(1, tc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
-                    melee = self._type_ranged_strength[ut] <= 0
+                    melee = self._type_ranged_strength.take(ut) <= 0
                     # meleeAttackInner's precedence as DISJOINT arms (a legal
                     # column landing in none of them is a silent no-op):
                     #   1. a live enemy Encampment, WHOEVER stands on it — a
@@ -929,7 +929,7 @@ class SimOrders:
                                 self._melee_city(one, tgt, "major", v)
                             elif bool(cs_hit[b_]):
                                 _csr = self._assault_city_state(one, _css, tgt, "major", v)
-                                if _csr is not None and bool(_csr[2].any()):
+                                if _csr is not None and bool(_csr[2].count_nonzero()):
                                     self._capture_city_state(
                                         _csr[2].nonzero(as_tuple=True)[0], _css, self.unit_seat[:, v])
                             elif bool(unit_hit[b_]):
@@ -952,7 +952,7 @@ class SimOrders:
 
             if _rk_snipe[n]:
                 snp = act & (a >= self._A_SNIPE) & (a < self._A_SNIPE + 12) & ~is_civ
-                if bool(snp.any()):
+                if bool(snp.count_nonzero()):
                     tgt_s = self.ring2[hc].gather(1, (a - self._A_SNIPE).clamp(min=0, max=11).unsqueeze(1)).squeeze(1)
                     ok_s = (
                         snp & (tgt_s >= 0) & ~u_emb
@@ -971,7 +971,7 @@ class SimOrders:
 
                 if self._A_SNIPE3 >= 0:
                     snp3 = act & (a >= self._A_SNIPE3) & (a < self._A_SNIPE3 + 18) & ~is_civ
-                    if bool(snp3.any()):
+                    if bool(snp3.count_nonzero()):
                         tgt_3 = self.ring3[hc].gather(1, (a - self._A_SNIPE3).clamp(min=0, max=17).unsqueeze(1)).squeeze(1)
                         # CIV6: distance 3 needs ATTACK RANGE 3 — chassis
                         # range plus the RANGE promotion (`unitAttackRange`).
@@ -999,7 +999,7 @@ class SimOrders:
                     & ~self.feat_stripped.gather(1, hc.unsqueeze(1)).squeeze(1)
                     & ~self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[0]
                 )
-                if bool(chp.any()):
+                if bool(chp.count_nonzero()):
                     cr = chp.nonzero(as_tuple=True)[0]
                     ct = hc[cr]
                     self.unit_mp[cr, sc[cr]] = 0  # the turn is spent (TS movesLeft = 0)
@@ -1040,7 +1040,7 @@ class SimOrders:
                     self._repair_drip(row, _drip_c)
                     self.unit_charges[cr, sc[cr]] -= 1
                     spent = chp & (self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
-                    if bool(spent.any()):
+                    if bool(spent.count_nonzero()):
                         dr = spent.nonzero(as_tuple=True)[0]
                         self.unit_alive[dr, sc[dr]] = False
                         self._occ_clear(dr, hc[dr], sc[dr])
@@ -1162,7 +1162,7 @@ class SimOrders:
                             _base = _base & own_tile.gather(
                                 1, hc.unsqueeze(1)).squeeze(1)
                     _ok = _base & (a == _col) & _valid
-                    if bool(_ok.any()):
+                    if bool(_ok.count_nonzero()):
                         _r = _ok.nonzero(as_tuple=True)[0]
                         self.improvement[_r, hc[_r]] = _k
                         self.pillaged[_r, hc[_r]] = False
@@ -1196,7 +1196,7 @@ class SimOrders:
                     _who = self._eng_idx if self._imp_eng[_k] else self._builder_idx
                     _twin = (act & (utp == _who) & (u_charges > 0) & (a == self._A_IMP[_k])
                              & _tunl & (_tt >= 0))
-                    if bool(_twin.any()):
+                    if bool(_twin.count_nonzero()):
                         _r = _twin.nonzero(as_tuple=True)[0]
                         self.improvement[_r, _tt[_r]] = _k
                         self.pillaged[_r, _tt[_r]] = False
@@ -1207,22 +1207,22 @@ class SimOrders:
                 # ONE `did` sync for the bomb walk and the charge below: every
                 # row's `_bw` is `did & ...`, so nothing was laid means no row
                 # can fire, and `_culture_bomb` writes tiles, never `did`.
-                _did_any = bool(did.any())
+                _did_any = bool(did.count_nonzero())
                 for _bc, _bl, _bi, _bd in (self._live_rows(row, self._culture_bomb_rows)
                                            if _did_any else ()):
                     if _bi < 0:
                         continue
                     _bw = did & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) == _bi) \
                         & self._row_is(row, _bc, _bl)
-                    if not bool(_bw.any()):
+                    if not bool(_bw.count_nonzero()):
                         continue
                     _br = _bw.nonzero(as_tuple=True)[0]
                     _bcol = self._city_col_at(row, _br, hc[_br])
                     _live = _bcol >= 0
-                    if bool(_live.any()):
+                    if bool(_live.count_nonzero()):
                         self._culture_bomb(row, _br[_live], hc[_br][_live], _bcol[_live])
                 did = did | did_adj
-                if _did_any or bool(did_adj.any()):
+                if _did_any or bool(did_adj.count_nonzero()):
                     _r = did.nonzero(as_tuple=True)[0]
                     self._eff_version += 1
                     self._spend_build_charge(_r, sc, hc)
@@ -1239,7 +1239,7 @@ class SimOrders:
                     )
                 else:
                     _rp = torch.zeros(B, dtype=torch.bool, device=dev)
-                if bool(_rp.any()):
+                if bool(_rp.count_nonzero()):
                     _r = _rp.nonzero(as_tuple=True)[0]
                     _tt = hc[_r]
                     _imp = self.pillaged[_r, _tt]
@@ -1263,7 +1263,7 @@ class SimOrders:
                     )
                 else:
                     _rmv = torch.zeros(B, dtype=torch.bool, device=dev)
-                if bool(_rmv.any()):
+                if bool(_rmv.count_nonzero()):
                     _r = _rmv.nonzero(as_tuple=True)[0]
                     _tt = hc[_r]
                     self.improvement[_r, _tt] = -1
@@ -1307,11 +1307,11 @@ class SimOrders:
                        & (self._type_raid_free[utp.clamp(min=0)]
                           | (self.unit_mp[torch.arange(B, device=self.device), sc] >= 3 * self._mp_scale))
                        & ~(_en & (_hi | _hd)))
-                if bool((_pl | _rd).any()):
+                if bool((_pl | _rd).count_nonzero()):
                     _r = (_pl | _rd).nonzero(as_tuple=True)[0]
                     _tt = hc[_r].clone()
                     _isr = _rd[_r]
-                    if bool(_isr.any()):
+                    if bool(_isr.count_nonzero()):
                         # the raid target: the lowest-index adjacent enemy
                         # LAND tile with an unpillaged improvement, else with
                         # a wreckable district — `phase.ts`' raid arm ranks
@@ -1364,21 +1364,21 @@ class SimOrders:
                     # CIV6 (Grand Master's Chapel): "Pillaging improvements
                     # and Districts provides bonus Faith" — the data's flat
                     # 15 / 30 per wreck, whatever the plunder row says.
-                    if bool((self._b_pill_faith_imp > 0).any()):
+                    if bool((self._b_pill_faith_imp > 0).count_nonzero()):
                         _ownb = self.city_bldg[:, row].any(dim=1)  # [B, NB]
                         _fa_i = (_ownb.long() * self._b_pill_faith_imp.reshape(1, -1)).amax(dim=1)
                         _fa_d = (_ownb.long() * self._b_pill_faith_dist.reshape(1, -1)).amax(dim=1)
                         _fadd = torch.where(_pi, _fa_i[_r], _fa_d[_r])
                         _fr2 = _fadd > 0
-                        if bool(_fr2.any()):
+                        if bool(_fr2.count_nonzero()):
                             self.civ_faith[_r[_fr2], row] += _fadd[_fr2].to(self.dtype)
                     _hl = (_kind == 1) & (_amt > 0)
-                    if bool(_hl.any()):
+                    if bool(_hl.count_nonzero()):
                         _hr = _r[_hl]
                         _cap = int(self.rules.combat["unitHp"])
                         self.unit_hp[_hr, sc[_hr]] = (self.unit_hp[_hr, sc[_hr]] + _amt[_hl]).clamp(max=_cap)
                     _bk = (_kind >= 2) & (_amt > 0)
-                    if bool(_bk.any()):
+                    if bool(_bk.count_nonzero()):
                         # a progress-scaled lump into the pillager's own
                         # purse, times the policy multiplier (`TOTAL_WAR`)
                         _br = _r[_bk]
@@ -1390,17 +1390,17 @@ class SimOrders:
                         for _kv, _purse in ((2, self.civ_treasury), (3, self.civ_faith),
                                             (4, self.civ_tech_prog), (5, self.civ_civic_prog)):
                             _m2 = _kk == _kv
-                            if bool(_m2.any()):
+                            if bool(_m2.count_nonzero()):
                                 _purse[_br[_m2], row] += _lump[_m2]
-                    _shares = [(_br, _tt[_bk], _kk, _lump)] if bool(_bk.any()) else []
+                    _shares = [(_br, _tt[_bk], _kk, _lump)] if bool(_bk.count_nonzero()) else []
                     # CIV6 (Thunderbolt of the North): Science from a Mine,
                     # Culture from a Quarry, Pasture, Plantation or Camp — on
                     # top of the row, scaled the same.
                     _hard = self._row_leads(row, "HARDRADA")[_r]
-                    if bool((_pi & _hard).any()):
+                    if bool((_pi & _hard).count_nonzero()):
                         _hk = torch.where(_pi & _hard, self._hard_plun_kind[_iv], torch.zeros_like(_kind))
                         _hm = _hk > 0
-                        if bool(_hm.any()):
+                        if bool(_hm.count_nonzero()):
                             _hr = _r[_hm]
                             _psc_h = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
                                                                civics.sum(dim=1).double() / 50.0)
@@ -1408,7 +1408,7 @@ class SimOrders:
                             _lump_h = js_round(self._hard_plun_amt[_iv[_hm]].double() * _psc_h[_hr] * _mult_h).to(self.dtype)
                             for _kv, _purse in ((4, self.civ_tech_prog), (5, self.civ_civic_prog)):
                                 _m3 = _hk[_hm] == _kv
-                                if bool(_m3.any()):
+                                if bool(_m3.count_nonzero()):
                                     _purse[_hr[_m3], row] += _lump_h[_m3]
                             _shares.append((_hr, _tt[_hm], _hk[_hm], _lump_h))
                     # CIV6 (Adventures of Enkidu): an ally at war with the
@@ -1419,18 +1419,18 @@ class SimOrders:
                         _part = self._enkidu_allies(_sr, torch.full_like(_sr, row), _foe)  # [n, NM]
                         for _A in _part.any(dim=0).nonzero(as_tuple=True)[0].tolist():
                             _pm = _part[:, _A] & self._units_within(_sr, _st, _A, self._enkidu_range)
-                            if not bool(_pm.any()):
+                            if not bool(_pm.count_nonzero()):
                                 continue
                             for _kv, _purse in ((2, self.civ_treasury), (3, self.civ_faith),
                                                 (4, self.civ_tech_prog), (5, self.civ_civic_prog)):
                                 _m4 = _pm & (_sk == _kv)
-                                if bool(_m4.any()):
+                                if bool(_m4.count_nonzero()):
                                     _purse[_sr[_m4], _A] += _sl[_m4]
                     # CIV6 (Loot): "+50 Gold from coastal raids", flat and on
                     # top of whatever the wrecked target's plunder row pays.
                     _lg = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "RAID_GOLD")
                     _lm = _isr[_live] & (_lg > 0)
-                    if bool(_lm.any()):
+                    if bool(_lm.count_nonzero()):
                         self.civ_treasury[_r[_lm], row] += _lg[_lm].to(self.dtype)
                     # CIV6: pillaging takes "3 Movement Points, or all of
                     # your movement"; Depredation prices it at 1.
@@ -1451,7 +1451,7 @@ class SimOrders:
 
             if _rk_spread[n]:
                 spx = act & (a >= self._A_SPREAD) & (a < self._A_SPREAD + 7)
-                if bool(spx.any()):
+                if bool(spx.count_nonzero()):
                     _relig = torch.zeros_like(spx)
                     if self._missionary_idx >= 0:
                         _relig = _relig | (utp == self._missionary_idx)
@@ -1466,7 +1466,7 @@ class SimOrders:
                         spx & _relig & (tgt_sp >= 0) & (u_charges > 0)
                         & self.civ_religion_done[:, row]
                     )
-                    if bool(ok_sp.any()):
+                    if bool(ok_sp.count_nonzero()):
                         # the minor city rows are spread targets too — a
                         # city-state CAN be converted (`spreadFromUnit` finds
                         # the minor by centre tile the same way)
@@ -1500,7 +1500,7 @@ class SimOrders:
                             # raises the strip to its 75.
                             _st = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "PROSELYTIZER").clamp(min=25)
                             _hit = _st > 0
-                            if bool(_hit.any()):
+                            if bool(_hit.count_nonzero()):
                                 _hb, _hr, _hj, _hs = pb[_hit], pr[_hit], pj[_hit], _st[_hit]
                                 _cur = self.city_pressure[_hb, _hr, _hj]
                                 _keep = torch.div(_cur * (100 - _hs).unsqueeze(1), 100,
@@ -1512,7 +1512,7 @@ class SimOrders:
                             # first time."
                             _now = self._followed_religion(self.city_pressure[pb, pr, pj], self.city_pop[pb, pr, pj])
                             _flip = (_now == row) & (_was != row)
-                            if bool(_flip.any()):
+                            if bool(_flip.count_nonzero()):
                                 _gv, _gu = self._promo_first_use(
                                     utp[pb], self.unit_promos[pb, sc[pb]],
                                     self.unit_promo_used[pb, sc[pb]], "INDULGENCE")
@@ -1521,12 +1521,12 @@ class SimOrders:
                                     _gv > 0, _gu, self.unit_promo_used[pb, sc[pb]])
                                 self.civ_treasury[pb, row] += _gv.to(self.civ_treasury.dtype)
                         landed = pm.reshape(B, -1).any(dim=1)
-                        if bool(landed.any()):
+                        if bool(landed.count_nonzero()):
                             lr = landed.nonzero(as_tuple=True)[0]
                             self.unit_charges[lr, sc[lr]] -= 1
                             self.unit_mp[lr, sc[lr]] = 0
                             dead = landed & (self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
-                            if bool(dead.any()):
+                            if bool(dead.count_nonzero()):
                                 dr = dead.nonzero(as_tuple=True)[0]
                                 self.unit_alive[dr, sc[dr]] = False
                                 self._occ_clear(dr, hc[dr], sc[dr])
@@ -1553,7 +1553,7 @@ class SimOrders:
             return
         alive = self.city_alive[rows, seat_row]  # [n, RC]
         need = alive.any(dim=1) & ~(self.city_is_cap[rows, seat_row] & alive).any(dim=1)  # [n]
-        if not bool(need.any()):
+        if not bool(need.count_nonzero()):
             return
         seq = torch.arange(self.RC, device=self.device).reshape(1, -1).expand_as(alive)
         key = torch.where(alive, self.city_pop[rows, seat_row] * (1 << 20) - seq, torch.full_like(seq, -(1 << 60)))
@@ -1583,7 +1583,7 @@ class SimOrders:
         carried `city_orig_cap == row` stops being the row's first city and
         this one becomes it, which is what the occupied-capital favor penalty
         and the grievance decay read. `moveCapital`'s twin."""
-        if not bool(hit.any()):
+        if not bool(hit.count_nonzero()):
             return
         rows = hit.nonzero(as_tuple=True)[0]
         cc = col[rows]
@@ -1731,7 +1731,7 @@ class SimOrders:
         double-subtract the lent adjacency.
         """
         fresh = ~self.feat_stripped[rows, tiles]
-        if not bool(fresh.any()):
+        if not bool(fresh.count_nonzero()):
             return
         rows, tiles = rows[fresh], tiles[fresh]
         self.feat_stripped[rows, tiles] = True
@@ -1742,7 +1742,7 @@ class SimOrders:
         # bare tile.
         if self.LUMBER >= 0:
             lm = self.improvement[rows, tiles] == self.LUMBER
-            if bool(lm.any()):
+            if bool(lm.count_nonzero()):
                 self.improvement[rows[lm], tiles[lm]] = -1
         self._bare_ground_jobs(rows, tiles)
         # Withdraw BOTH feature classes: every TS strip site that reaches this
@@ -1753,9 +1753,9 @@ class SimOrders:
         for d in range(6):
             n_d = nb[:, d]
             on_map = n_d >= 0
-            if bool(on_map.any()):
+            if bool(on_map.count_nonzero()):
                 om = on_map.nonzero(as_tuple=True)[0]
-                self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
+                self.d_static_adj[rows.take(om), n_d.take(om), :] -= contrib[om]
         self._eff_version += 1
 
     def _bare_ground_jobs(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
@@ -1786,9 +1786,9 @@ class SimOrders:
         _soil = ((self.feat_id[rows, tiles] == self._soil_fid) & ~self.feat_stripped[rows, tiles]
                  & (self.feat_id0[rows, tiles] != self._soil_fid))
         _gone = self.feat_stripped[rows, tiles] | _soil
-        if bool(_gone.any()):
+        if bool(_gone.count_nonzero()):
             self._bare_ground_jobs(rows[_gone], tiles[_gone])
-        if bool(_soil.any()):
+        if bool(_soil.count_nonzero()):
             self.tile_ftr[rows[_soil], tiles[_soil]] = 0
         self._withdraw_sea_adj(rows, tiles)
         self._eff_version += 1
@@ -1805,7 +1805,7 @@ class SimOrders:
         if not len(rows):
             return
         wet = self.water[rows, tiles]
-        if not bool(wet.any()):
+        if not bool(wet.count_nonzero()):
             return
         rows, tiles = rows[wet], tiles[wet]
         contrib = self._dyn_searesource.reshape(1, -1).expand(len(rows), -1)
@@ -1813,7 +1813,7 @@ class SimOrders:
         for d in range(6):
             n_d = nb[:, d]
             on_map = n_d >= 0
-            if bool(on_map.any()):
+            if bool(on_map.count_nonzero()):
                 om = on_map.nonzero(as_tuple=True)[0]
                 self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
         self._eff_version += 1
@@ -1874,10 +1874,10 @@ class SimOrders:
         seat = int(self._ROW_SEAT[row])
         W = maint.shape[1]
         slots = torch.arange(W, device=self.device).unsqueeze(0)  # [1, W]
-        while bool((left > 0).any()):
+        while bool((left > 0).count_nonzero()):
             cand = self.unit_alive & (self.unit_seat == seat) & (maint > 0)
             do_kill = (left > 0) & cand.any(dim=1)
-            if not bool(do_kill.any()):
+            if not bool(do_kill.count_nonzero()):
                 break
             victim = torch.where(cand, slots, torch.full_like(slots, W)).min(dim=1).values
             rows = do_kill.nonzero(as_tuple=True)[0]
@@ -1932,7 +1932,7 @@ class SimOrders:
         """
         self.barb_unit_mp.copy_(torch.where(
             self.barb_unit_seat == BARB_SEAT,
-            self._mp_scale * self._type_moves[self.barb_unit_type.clamp(min=0, max=self.NU - 1)],
+            self._mp_scale * self._type_moves.take(self.barb_unit_type.clamp(min=0, max=self.NU - 1)),
             self.barb_unit_mp))
 
     def _barbarian_phase(self) -> None:
@@ -1973,7 +1973,7 @@ class SimOrders:
         can_roll = any_city & (self.n_camps < self.max_camps)
         r1 = self._next_random(can_roll)
         want = can_roll & (r1 < cb["campSpawnChance"])
-        if bool(want.any()):
+        if bool(want.count_nonzero()):
             wr = want.nonzero(as_tuple=True)[0]
             # campCandidates excludes t.district LIVE: camp_ok is static, but
             # paves are not, and an orphaned pave left over from a razed city
@@ -1999,7 +1999,7 @@ class SimOrders:
             has = torch.zeros_like(want)
             has[wr] = cand_w.any(dim=1)
             r2 = self._next_random(has)
-            if bool(has.any()):
+            if bool(has.count_nonzero()):
                 k_w = torch.floor(r2[wr] * cand_w.sum(dim=1).to(torch.float64)).to(torch.long)
                 cum_w = cand_w.long().cumsum(dim=1)
                 sel_w = cand_w & (cum_w == (k_w + 1).unsqueeze(1))
@@ -2024,7 +2024,7 @@ class SimOrders:
         # the Free Cities', which no camp counts, guards with or sends raiding.
         _barbs = lambda: self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)  # noqa: E731
         pre_alive = _barbs()
-        any_camp = bool((self.camp_tile >= 0).any())
+        any_camp = bool((self.camp_tile >= 0).count_nonzero())
         _k_live: list[int] = []
         if any_camp:
             du_all = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.barb_unit_tile.unsqueeze(1)].to(torch.long)  # [B, K, U]
@@ -2087,7 +2087,7 @@ class SimOrders:
                     _key = torch.where(_free, _nb, torch.full_like(_nb, self.T + 1))
                     _best = _key.min(dim=1).values
                     _nav = _raid & (_best <= self.T)
-                    if bool(_nav.any()):
+                    if bool(_nav.count_nonzero()):
                         self._spawn_barb(_nav, _best.clamp(max=self.T - 1), self._barb_naval_type, naval=True)
                 _land = _raid & ~_nav
                 self._spawn_barb(_land & horse, camp, cav_type)
@@ -2107,7 +2107,7 @@ class SimOrders:
             any_near = near.any(dim=1)
             first = near.long().argmax(dim=1)
             rows = any_near.nonzero(as_tuple=True)[0]
-            guard[rows, first[rows]] = True
+            guard[rows, first.take(rows)] = True
 
         # Raiders act in unit order: attack something adjacent (any city
         # centre, major or minor, any non-barbarian unit, or an Encampment;
@@ -2121,8 +2121,8 @@ class SimOrders:
         # mid-loop and nothing spawns barbarians here, so the snapshot is a
         # superset; ascending order (and thus the TS unit order) is unchanged.
         u_live = _barbs()[:, :u_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if u_high else []
-        u_rngd_all = _barbs() & (self._type_ranged_strength[self.barb_unit_type.clamp(min=0, max=self.NU - 1)] > 0)
-        any_rngd = bool(u_rngd_all.any())
+        u_rngd_all = _barbs() & (self._type_ranged_strength.take(self.barb_unit_type.clamp(min=0, max=self.NU - 1)) > 0)
+        any_rngd = bool(u_rngd_all.count_nonzero())
         # The RANGE promotion is a whole-POOL read, and the ranged arm below
         # asked for the whole pool once per raider only to take one column of
         # it. Memoised on the pool's promotions and types — cloned, `torch.equal`
@@ -2134,7 +2134,7 @@ class SimOrders:
         _rng_tfp = torch.zeros(0, dtype=self.barb_unit_type.dtype, device=dev)
         for u in u_live:
             act = self.barb_unit_alive[:, u] & (self.barb_unit_seat[:, u] == BARB_SEAT) & ~guard[:, u]
-            if not bool(act.any()):
+            if not bool(act.count_nonzero()):
                 continue
             here = self.barb_unit_tile[:, u]
             _here1 = here.unsqueeze(1)
@@ -2178,7 +2178,7 @@ class SimOrders:
             # major's. Gated on `.any()` so a batch with no ranged barbarian
             # pays nothing for the [B, T] scan.
             rngd = u_rngd_all[:, u]
-            if any_rngd and bool((act & rngd).any()):
+            if any_rngd and bool((act & rngd).count_nonzero()):
                 # CIV6 (Forward Observers / Coincidence Rangefinding): "+1
                 # Range" — the only thing that moves a chassis's own.
                 if not (torch.equal(_rng_pfp, self.barb_unit_promos)
@@ -2186,7 +2186,7 @@ class SimOrders:
                     _rng_pfp = self.barb_unit_promos.clone()
                     _rng_tfp = self.barb_unit_type.clone()
                     _rng_val = self._promo_pool_val("barb", "RANGE")
-                rng_u = (self._type_ranged_range[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
+                rng_u = (self._type_ranged_range.take(self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1))
                          + _rng_val[:, u])
                 d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)
                 # a district's defenses are a target at range, priced by the
@@ -2224,9 +2224,9 @@ class SimOrders:
                                    torch.full_like(_mb, -1))
             fight_u = (((_mb >= 0) & (_mb_seat != BARB_SEAT))
                        | (self._melee_class_at(ttc) >= 0)
-                       | ((_eb >= 0) & ~(self._rel_strength[_eb_t] > 0)))
+                       | ((_eb >= 0) & ~(self._rel_strength.take(_eb_t) > 0)))
             rel_u = ((_rb >= 0) & ~self.water.gather(1, ttc.unsqueeze(1)).squeeze(1)
-                     & ~self.unit_naval[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)])
+                     & ~self.unit_naval.take(self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)))
             _enc_here = (
                 self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
                 if self._encamp_didx >= 0
@@ -2242,17 +2242,17 @@ class SimOrders:
             coloc_att = attack & ~rngd & has_u & ~fight_u & rel_u & ~own_mil & ~ctr_here & ~cs_here & ~_enc_here
             enc_att = attack & ~rngd & ~ctr_here & ~cs_here & _enc_here
 
-            if bool(city_att.any()):
+            if bool(city_att.count_nonzero()):
                 self._melee_city(city_att, ttc, "barb", u)
-            if bool(cs_att.any()):
+            if bool(cs_att.count_nonzero()):
                 # the shared assault floors the minor at 1 HP for a barbarian
                 # attacker, so the capture tail it returns is always empty here
                 self._assault_city_state(cs_att, _csi.clamp(min=0), ttc, "barb", u)
-            if bool(unit_att.any()):
+            if bool(unit_att.count_nonzero()):
                 self._hostile_vs_unit(unit_att, ttc, "barb", u)
-            if bool(coloc_att.any()):
+            if bool(coloc_att.count_nonzero()):
                 self._melee_coloc(coloc_att, ttc, "barb", u, BARB_SEAT)
-            if bool(enc_att.any()):
+            if bool(enc_att.count_nonzero()):
                 self._attack_encampment(enc_att, ttc, "barb", u)
             # A blow at a CITY or an Encampment ends the raider's turn
             # outright; the unit arms spend inside their own bodies, where the
@@ -2268,7 +2268,7 @@ class SimOrders:
             # spends nothing, but `attack` still HOLDS the unit, because TS
             # returns from hostileUnitAct before the pillage/march branches.
             rng_att = attack & rngd
-            if any_rngd and bool(rng_att.any()):
+            if any_rngd and bool(rng_att.count_nonzero()):
                 self._hostile_ranged_strike(rng_att, ttc, "barb", u)
 
             # `isTerritorial` — owned by any major OR city-state. ONE read for
@@ -2282,7 +2282,7 @@ class SimOrders:
             h_imp = self.improvement.gather(1, _here1).squeeze(1) >= 0
             h_unpil = ~self.pillaged.gather(1, _here1).squeeze(1)
             pillage = act & ~attack & h_imp & h_unpil & h_owned
-            if bool(pillage.any()):
+            if bool(pillage.count_nonzero()):
                 rows = pillage.nonzero(as_tuple=True)[0]
                 _impv = self.improvement[rows, here[rows]].clamp(min=0)
                 # the plunder row's HEAL pays anyone; a barbarian has no
@@ -2306,7 +2306,7 @@ class SimOrders:
             dist_pillage = (act & ~attack & ~pillage & (h_dist >= 0)
                             & (h_dist != self._encamp_didx)
                             & h_dcomp & h_dunpil & h_owned)
-            if bool(dist_pillage.any()):
+            if bool(dist_pillage.count_nonzero()):
                 rows = dist_pillage.nonzero(as_tuple=True)[0]
                 _dvv = h_dist[rows].clamp(min=0)
                 # a HEAL-plunder district pays its wrecker like a farm
@@ -2323,7 +2323,7 @@ class SimOrders:
                 self._eff_version += 1  # district yields just dropped
 
             march = act & ~attack & ~pillage & ~dist_pillage
-            if not bool(march.any()):
+            if not bool(march.count_nonzero()):
                 continue
             arangeT = self._arangeT
             # `isTerritorial(tileSeat(t))` — owned by any major or
@@ -2362,14 +2362,14 @@ class SimOrders:
             d_cur = d_here.clone()
             gslot = torch.full_like(cur, u + self.POOL_LO["barb"])
             moving = march & has_tgt
-            while bool(moving.any()):
+            while bool(moving.count_nonzero()):
                 nb2 = self.neigh[cur.clamp(min=0)]
                 nb2c = nb2.clamp(min=0)
                 # A NAVAL barbarian walks the WATER plane. Land hulls and water
                 # hulls never share a plane, so the plane swap is the whole
                 # difference (TS's tileFreeForUnit branches on
                 # UNITS[type].naval the same way).
-                _navm = self.unit_naval[self.barb_unit_type[:, u].clamp(min=0)].unsqueeze(1)
+                _navm = self.unit_naval.take(self.barb_unit_type[:, u].clamp(min=0)).unsqueeze(1)
                 _plane = torch.where(
                     _navm,
                     ((self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c))
@@ -2390,7 +2390,7 @@ class SimOrders:
                     gslot, cur, dest, dir_i, BARB_SEAT, torch.zeros_like(moving),
                     clear_camp=False,  # TS clearCampFor no-ops for a barbarian
                 )
-                if not bool(mv.any()):
+                if not bool(mv.count_nonzero()):
                     break
                 mp = self.barb_unit_mp[:, u]
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)

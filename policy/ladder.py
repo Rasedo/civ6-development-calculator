@@ -339,7 +339,7 @@ def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
                       torch.where(st == CARDS_MILITARY, military_first, greedy))
     # the DARK fill is built only when a seat actually wears the style: no
     # draw ever lands on it, so on every ordinary rollout this is free.
-    if dark is not None and bool((style == CARDS_DARK).any()):
+    if dark is not None and bool((style == CARDS_DARK).count_nonzero()):
         dark_first = _lay_by_kind(mask, nslots, kind,
                                   w_first=dark.unsqueeze(0).expand_as(mask))
         out = torch.where(st == CARDS_DARK, dark_first, out)
@@ -690,7 +690,7 @@ def pick_production(
             elif kind == "rot":
                 rolled = mj[:, p1:p2][:, p3]
                 best = torch.where((best < 0) & rolled.any(dim=1),
-                                   p1 + p3[rolled.float().argmax(dim=1)], best)
+                                   p1 + p3.take(rolled.float().argmax(dim=1)), best)
             else:
                 sub = mj[:, p1:p2]
                 if kind == "settler":
@@ -701,7 +701,7 @@ def pick_production(
                                    p1 + sub.float().argmax(dim=1), best)
             # every tier writes only where `best < 0`, so once no row is still
             # undecided the rest of the chain is provably a no-op.
-            if not bool((best < 0).any()):
+            if not bool((best < 0).count_nonzero()):
                 break
 
         out[:, j] = best
@@ -713,9 +713,9 @@ def pick_production(
         n_units = n_units + is_unit.long()
         if roster is not None:
             ui = (best - u_lo).clamp(min=0, max=max(u_hi - u_lo - 1, 0))
-            mil = is_unit & (roster["combat"][ui] > 0)
-            ranged = ranged + (mil & roster["is_ranged"][ui]).long()
-            melee = melee + (mil & ~roster["is_ranged"][ui]).long()
+            mil = is_unit & (roster["combat"].take(ui) > 0)
+            ranged = ranged + (mil & roster["is_ranged"].take(ui)).long()
+            melee = melee + (mil & ~roster["is_ranged"].take(ui)).long()
     return out
 
 

@@ -24,7 +24,7 @@ class SimGp:
                 if 0 <= u < self.NU:
                     tab[u] = cls
             self._unit_gp_cls = tab
-        return tab[utype.clamp(min=0, max=self.NU - 1)]
+        return tab.take(utype.clamp(min=0, max=self.NU - 1))
 
     def _gp_fx(self, cls: torch.Tensor, at: torch.Tensor, name: str) -> torch.Tensor:
         """ONE named column of the person each (cls, at) pair names."""
@@ -89,7 +89,7 @@ class SimGp:
 
         for di, key in ((self._campus_idx, "campusTourism"), (self._iz_idx, "izTourism")):
             per = self._gp_perm(row, key).long()
-            if di < 0 or not bool((per != 0).any()):
+            if di < 0 or not bool(per.count_nonzero()):
                 continue
             out = out + live(di).sum(dim=1) * per
         # CIV6 (WORLD_GAMES_*_TIER_*_TOURISM): per Stadium / Aquatics Center
@@ -98,19 +98,19 @@ class SimGp:
             if pk < 0 or bi < 0 or di < 0 or pk >= self.civ_gp_perm.shape[2]:
                 continue
             per = self.civ_gp_perm[:, row, pk].long()
-            if not bool((per != 0).any()):
+            if not bool(per.count_nonzero()):
                 continue
             has = self.city_bldg[:, row, :, bi] & ~self.city_bldg_pillaged[:, row, :, bi]
             out = out + (live(di) & has).sum(dim=1) * per
         adj = self._gp_city_perm(row, "adjTourism")         # [B, RC]
-        if bool((adj != 0).any()):
+        if bool(adj.count_nonzero()):
             for di, dd in enumerate(self.districts_cat):
                 yc = int(dd["adjYield"])
                 pct = self._gp_adj_tour_pct[yc] if 0 <= yc < len(self._gp_adj_tour_pct) else 0
                 if pct == 0:
                     continue
                 ok = live(di) & (adj != 0)
-                if not bool(ok.any()):
+                if not bool(ok.count_nonzero()):
                     continue
                 v = self._district_adj_seat(row, di).gather(1, dt_all[:, :, di].clamp(min=0)).double()
                 share = torch.floor(v * pct / 100)
@@ -129,7 +129,7 @@ class SimGp:
         from the city that owns it; `_gov_appeal_plane` carries the governor's,
         and TS folds both into `cityAppealResolver`."""
         per = self._gp_city_perm(row, "appeal")
-        if not bool((per != 0).any()):
+        if not bool(per.count_nonzero()):
             return torch.zeros(self.B, self.T, dtype=per.dtype, device=self.device)
         col = self.city_slot_at(row)
         return torch.where(col >= 0, per.gather(1, col.clamp(min=0)), torch.zeros_like(per[:, :1]).expand(self.B, self.T))
@@ -138,7 +138,7 @@ class SimGp:
         """[B, T] — the appeal every owner city grants its own tiles, summed
         over the majors (a tile belongs to at most one of them)."""
         out = torch.zeros(self.B, self.T, dtype=self.city_gp_perm.dtype, device=self.device)
-        if bool((self.city_gp_perm != 0).any()):
+        if bool(self.city_gp_perm.count_nonzero()):
             for r in range(self.n_majors):
                 out = out + self._gp_tile_appeal(r)
         # CIV6 (Roosevelt Corollary): "+1 Appeal to all tiles in a city with a
@@ -147,7 +147,7 @@ class SimGp:
         for _pc, _pl, _pa in self._park_appeal_rows:
             for r in range(self.n_majors):
                 _pw = self._row_is(r, _pc, _pl)
-                if not bool(_pw.any()):
+                if not bool(_pw.count_nonzero()):
                     continue
                 _slot = self.city_slot_at(r)                       # [B, T]
                 _has = self._city_has_park(r)                      # [B, RC]
@@ -168,7 +168,7 @@ class SimGp:
             cnt = (src[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)  # [B, T]
             for r in range(self.n_majors):
                 _fw = self._row_is(r, _fc, _fl)
-                if not bool(_fw.any()):
+                if not bool(_fw.count_nonzero()):
                     continue
                 owned = (self.tile_seat == r) & (self.city_slot_at(r) >= 0)
                 out = out + (owned & _fw.unsqueeze(1)).to(out.dtype) * cnt.to(out.dtype) * _fa
@@ -182,7 +182,7 @@ class SimGp:
         anchor = self.park == torch.arange(self.T, device=self.device).unsqueeze(0)
         slot = self.city_slot_at(row)
         live = anchor & (slot >= 0) & (self.tile_seat == row)
-        if not bool(live.any()):
+        if not bool(live.count_nonzero()):
             return out
         for j in range(self.RC):
             out[:, j] = (live & (slot == j)).any(dim=1)
@@ -197,7 +197,7 @@ class SimGp:
         # mask: with none of them held, each term is +0.0
         _ks = [self._gp_perm_names.index(n) for n in ("militaryProdPct", "spaceProdPct")
                if n in self._gp_perm_names] + [_pk for _pk, _pc in self._gp_unit_prod_classes]
-        if row >= self.n_majors or not _ks or not bool((self.civ_gp_perm[:, row, _ks] != 0).any()):
+        if row >= self.n_majors or not _ks or not bool(self.civ_gp_perm[:, row, _ks].count_nonzero()):
             return torch.zeros(cur.shape, dtype=torch.float64, device=self.device)
         up = self._gp_perm(row, "militaryProdPct").double().reshape(_sh) / 100.0
         spp = self._gp_perm(row, "spaceProdPct").double().reshape(_sh) / 100.0
@@ -247,7 +247,7 @@ class SimGp:
         cls = self._gp_cls_of(self.unit_type.gather(1, sc))
         at = self.unit_gp_at.gather(1, sc)
         ok = (cls >= 0) & (at >= 0) & (self.unit_charges.gather(1, sc) > 0)
-        if not bool(ok.any()):
+        if not bool(ok.count_nonzero()):
             return ok
         site = self._gp_site[cls.clamp(min=0), at.clamp(min=0, max=self._gp_site.shape[1] - 1)]
         sdist = self._gp_site_district[cls.clamp(min=0), at.clamp(min=0, max=self._gp_site.shape[1] - 1)]
@@ -267,7 +267,7 @@ class SimGp:
         # Tzu's Work of Writing)
         a_gw = own & self._gw_activation_room_at(row, cls, at, tc)
         _gwk = self._gp_fx(cls, at, "greatWorkKind").long()
-        if bool(((_gwk >= 0) & ok & (site == 2)).any()):
+        if bool(((_gwk >= 0) & ok & (site == 2)).count_nonzero()):
             _col = self.city_slot_at(row).gather(1, tc)
             _rb = self._gw_room_by_obj(row).reshape(self.B, self.RC * 8)
             for kind in range(3):
@@ -298,7 +298,7 @@ class SimGp:
 
         # 9 anywhere, while a city of this seat has an open Relic slot (Jeanne d'Arc)
         a_relic = torch.zeros_like(a_dist)
-        if bool((ok & (site == 9)).any()):
+        if bool((ok & (site == 9)).count_nonzero()):
             _rr = (self._gw_room(row, 7) & self.city_alive[:, row, :self.RC]).any(dim=1)  # 7 = GWO_RELIC
             a_relic = _rr.unsqueeze(1).expand_as(a_dist)
 
@@ -306,7 +306,7 @@ class SimGp:
             return (plane.gather(1, _nb.clamp(min=0).reshape(tc.shape[0], -1)).reshape_as(_nb) & (_nb >= 0)).any(dim=2)
 
         def wants(k: int) -> bool:
-            return bool((ok & (site == k)).any())
+            return bool((ok & (site == k)).count_nonzero())
 
         _none = torch.zeros_like(a_dist)
         # 10 beside a Mountain (Galileo); 11 on or beside a natural wonder
@@ -358,7 +358,7 @@ class SimGp:
     def _gp_apply(self, row: int, m: torch.Tensor, sc: torch.Tensor, hc: torch.Tensor) -> None:
         """SPEND ONE CHARGE for every game in `m`. The order below is
         `activateGreatPerson`'s, which matters wherever a clause draws."""
-        if not bool(m.any()):
+        if not bool(m.count_nonzero()):
             return
         B, dev, dt = self.B, self.device, torch.float64
         cls = self._gp_cls_of(self.unit_type.gather(1, sc.unsqueeze(1)).squeeze(1))
@@ -385,7 +385,7 @@ class SimGp:
         # CIV6 (Mary Leakey): "Gain 350 Science for every Artifact in this
         # city."
         _asci = col("artifactScience")
-        if bool((_asci != 0).any()):
+        if bool(_asci.count_nonzero()):
             _n = self._gw_counts_by_obj(row)[:, :, 4].gather(1, cc.unsqueeze(1)).squeeze(1)
             self.civ_tech_prog[:, row] = (self.civ_tech_prog[:, row]
                                           + _asci * (_n.to(dt) * has_city.to(dt)))
@@ -393,7 +393,7 @@ class SimGp:
         # slots" — permanent, on the activating tile.
         _asb = col("airSlotBonus")
         _ab = m & (_asb > 0)
-        if bool(_ab.any()):
+        if bool(_ab.count_nonzero()):
             _r = _ab.nonzero(as_tuple=True)[0]
             self.tile_air_bonus[_r, hc[_r]] += _asb[_r].long()
         wrote = torch.zeros_like(m)
@@ -405,7 +405,7 @@ class SimGp:
         self.civ_faith[:, row] = self.civ_faith[:, row] + col("faith")
         self.civ_treasury[:, row] = self.civ_treasury[:, row] + col("gold")
         prod_fx = col("prodCapital")
-        if bool((prod_fx != 0).any()):
+        if bool(prod_fx.count_nonzero()):
             _capa = self.city_is_cap[:, row] & self.city_alive[:, row]
             capm = _capa & (self._q_head(row) >= 0)
             _drip = self.city_progress[:, row, :, 0].clone()
@@ -422,21 +422,21 @@ class SimGp:
         self._gp_boost_draw(row, m, cls, at, era, is_civic=False)
         self._gp_boost_draw(row, m, cls, at, era, is_civic=True)
         _free = self._gp_fx(cls, at, "freeTechRandom").long() * m.long()
-        if bool((_free > 0).any()):
+        if bool((_free > 0).count_nonzero()):
             self._grant_free_research(row, _free, torch.zeros_like(_free))
 
         # ---- the city the charge lands in
         self._gp_instant_buildings(row, has_city, cls, at, cc)
         self._gp_wonder_charge(row, has_city, cls, at, cc, hc)
         _space = self._gp_fx(cls, at, "spaceProduction").double() * has_city.to(dt)
-        if bool((_space != 0).any()) and self._proj_rows:
+        if bool(_space.count_nonzero()) and self._proj_rows:
             _cur = self._q_head(row).gather(1, cc.unsqueeze(1)).squeeze(1)
             _pi = _cur - self.PROJECT_BASE
             _sp_tab = torch.tensor([1 if i in set(self._space_proj_idx) else 0 for i in range(len(self._proj_rows))],
                                    dtype=torch.bool, device=dev)
             _is_space = (_pi >= 0) & (_pi < len(self._proj_rows)) & _sp_tab[_pi.clamp(min=0, max=len(self._proj_rows) - 1)]
             _sm = has_city & _is_space & (_space != 0)
-            if bool(_sm.any()):
+            if bool(_sm.count_nonzero()):
                 _r = _sm.nonzero(as_tuple=True)[0]
                 self.city_progress[_r, row, cc[_r], 0] += _space[_r].to(self.city_progress.dtype)
         self._gp_per_adjacent(row, m, cls, at, hc)
@@ -444,7 +444,7 @@ class SimGp:
         # CIV6 (Sun Tzu): ONE Work of Writing (GREATWORK_SUN_TZU), the general's own
         _gwk = self._gp_fx(cls, at, "greatWorkKind").long()
         _km = has_city & (_gwk >= 0) & ~wrote
-        if bool(_km.any()):
+        if bool(_km.count_nonzero()):
             _obj = torch.full((B,), -1, dtype=torch.long, device=dev)
             for kind in range(3):
                 _obj = torch.where(_gwk == kind, torch.full_like(_obj, self._gw_kind_objs(kind)[0]), _obj)
@@ -454,7 +454,7 @@ class SimGp:
         # CIV6 (Jeanne d'Arc): a Relic, into the seat's first city with room —
         # the site already asked that one has it
         _rel = m & (col("grantRelic") != 0)
-        if bool(_rel.any()):
+        if bool(_rel.count_nonzero()):
             self._gw_place_first(row, _rel, 7)  # 7 = GWO_RELIC
 
         # ---- the seat's own ledgers
@@ -464,11 +464,11 @@ class SimGp:
         # this City-state, then removes all other players' Envoys" — the
         # rivals' bar is read BEFORE the removal, the clause's own order.
         _sz = col("suzerainSeize") != 0
-        if bool(_sz.any()):
+        if bool(_sz.count_nonzero()):
             _cst = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) - 100
             _S = self.seat_citystate_envoys.shape[2]
             _ok = _sz & (_cst >= 0) & (_cst < _S)
-            if bool(_ok.any()):
+            if bool(_ok.count_nonzero()):
                 _r = _ok.nonzero(as_tuple=True)[0]
                 _cs2 = _cst[_r]
                 _env = self.seat_citystate_envoys
@@ -487,7 +487,7 @@ class SimGp:
                 # `activateGreatPerson`'s seize (cpu/core/gpAbility.ts) makes the same call
                 self._minor_envoy_tiles(_ok)
         _gpp = col("gppAll")
-        if bool((_gpp != 0).any()):
+        if bool(_gpp.count_nonzero()):
             self.civ_gpp[:, row] = self.civ_gpp[:, row] + _gpp.unsqueeze(1)
 
         # ---- the unit on the tile
@@ -504,16 +504,16 @@ class SimGp:
         if _np:
             self.civ_gp_perm[:, row] = self.civ_gp_perm[:, row] + _rowfx[:, self._GP_PERM0:self._GP_PERM0 + _np] * m.to(self.civ_gp_perm.dtype).unsqueeze(1)
         _nc = len(self._gp_city_perm_names)
-        if _nc and bool(has_city.any()):
+        if _nc and bool(has_city.count_nonzero()):
             _r = has_city.nonzero(as_tuple=True)[0]
             self.city_gp_perm[_r, row, cc[_r]] += _rowfx[_r, self._GP_CPERM0:self._GP_CPERM0 + _nc].to(self.city_gp_perm.dtype)
             # an APPEAL grant moves `_tile_appeal`, which is version-cached
             if self._gp_appeal_col >= 0 and bool(
-                    (_rowfx[_r, self._GP_CPERM0 + self._gp_appeal_col] != 0).any()):
+                    (_rowfx[_r, self._GP_CPERM0 + self._gp_appeal_col] != 0).count_nonzero()):
                 self._eff_version += 1
         # the install's DISTRICT_IN_TILE attachment: the tile stood on keeps it
         _ntp = len(self._gp_tile_perm_names)
-        if _ntp and bool(m.any()):
+        if _ntp and bool(m.count_nonzero()):
             _r = m.nonzero(as_tuple=True)[0]
             self.tile_gp_perm[_r, hc[_r]] += _rowfx[_r, self._GP_TPERM0:self._GP_TPERM0 + _ntp].long()
 
@@ -558,13 +558,13 @@ class SimGp:
         # CIV6 (Stamford Raffles): the city-state joins the empire — the
         # conquest body (`captureCityStateFor` / `_capture_city_state`)
         ab = m & (self._gp_fx(cls, at, "absorbCityState") > 0)
-        if bool(ab.any()) and self.S:
+        if bool(ab.count_nonzero()) and self.S:
             ts = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1)
             s = ts - 100
             ok = ab & (s >= 0) & (s < self.S)
             sc = s.clamp(min=0, max=self.S - 1)
             ok = ok & self.citystate_alive.gather(1, sc.unsqueeze(1)).squeeze(1)
-            if bool(ok.any()):
+            if bool(ok.count_nonzero()):
                 rows = ok.nonzero(as_tuple=True)[0]
                 c_t = self.citystate_center[rows, sc[rows]].clone()
                 self._capture_city_state(rows, sc, row)
@@ -576,13 +576,13 @@ class SimGp:
         # CIV6 (Boudica): every barbarian unit within 1 changes sides, in ring
         # order — Heathen Conversion's body
         cb = m & (self._gp_fx(cls, at, "convertBarbarians") > 0)
-        if bool(cb.any()):
+        if bool(cb.count_nonzero()):
             self._convert_ring(row, cb.nonzero(as_tuple=True)[0], hc)
         # CIV6 (Tupac Amaru): the chassis once per district of the enemy city
         # whose land this is, in tile order; the spawn probe finds each its spot
         ue = self._gp_granted_chassis(row, self._gp_fx(cls, at, "unitEachDistrict").long())
         te = m & (ue >= 0) & (ue < self.NU)
-        if bool(te.any()):
+        if bool(te.count_nonzero()):
             for b in te.nonzero(as_tuple=True)[0].tolist():
                 for t in self._enemy_district_tiles(b, int(hc[b])):
                     one = torch.zeros(self.B, dtype=torch.bool, device=dev)
@@ -598,7 +598,7 @@ class SimGp:
             return
         want = self._gp_eureka[cls.clamp(min=0), at.clamp(min=0, max=self._gp_eureka.shape[1] - 1)]
         want = want & m.unsqueeze(1)
-        if not bool(want.any()):
+        if not bool(want.count_nonzero()):
             return
         nt = min(want.shape[1], self.civ_techs.shape[2], self.civ_tech_boosted.shape[2])
         w = want[:, :nt]
@@ -607,7 +607,7 @@ class SimGp:
         newly = w & ~held & ~boosted
         done = w & ~held & boosted
         self.civ_tech_boosted[:, row, :nt] |= newly
-        if bool(done.any()):
+        if bool(done.count_nonzero()):
             self.civ_techs[:, row, :nt] |= done
             self.civ_tech_retain[:, row, :nt] = torch.where(
                 done, torch.zeros_like(self.civ_tech_retain[:, row, :nt]), self.civ_tech_retain[:, row, :nt])
@@ -623,7 +623,7 @@ class SimGp:
         """CIV6 (Abdus Salam): every technology of the person's own era at
         once, each one a Free Inquiry event like any other eureka."""
         want = m & (self._gp_fx(cls, at, "eurekaEra") > 0)
-        if not bool(want.any()):
+        if not bool(want.count_nonzero()):
             return
         nt = min(self.civ_tech_boosted.shape[2], self._tech_era.numel())
         band = (self._tech_era[:nt].reshape(1, -1) == era.reshape(-1, 1)) & want.reshape(-1, 1)
@@ -637,7 +637,7 @@ class SimGp:
         in the catalog order the TS filter walks. A row with nothing open
         spends none of the stream."""
         n = self._gp_fx(cls, at, "inspirationRandom" if is_civic else "eurekaRandom").long() * m.long()
-        if not bool((n > 0).any()):
+        if not bool((n > 0).count_nonzero()):
             return
         lo = era + self._gp_fx(cls, at, "eurekaLo").long()
         hi = era + self._gp_fx(cls, at, "eurekaHi").long()
@@ -648,12 +648,12 @@ class SimGp:
         band = (eras[:nk].reshape(1, -1) >= lo.reshape(-1, 1)) & (eras[:nk].reshape(1, -1) <= hi.reshape(-1, 1))
         for k in range(int(n.max())):
             want = n > k
-            if not bool(want.any()):
+            if not bool(want.count_nonzero()):
                 continue
             openm = band & ~done[:, :nk] & ~boosted[:, :nk]
             hit = want & openm.any(dim=1)
             rnd = self._next_random(hit)
-            if not bool(hit.any()):
+            if not bool(hit.count_nonzero()):
                 continue
             pick = self._nth_open(openm, rnd)
             r = hit.nonzero(as_tuple=True)[0]
@@ -664,11 +664,11 @@ class SimGp:
     # ---------------------------------------------------------------- the city
     def _gp_instant_buildings(self, row: int, m: torch.Tensor, cls: torch.Tensor,
                               at: torch.Tensor, cc: torch.Tensor) -> None:
-        if self._gp_bldg.numel() == 0 or not bool(m.any()):
+        if self._gp_bldg.numel() == 0 or not bool(m.count_nonzero()):
             return
         want = self._gp_bldg[cls.clamp(min=0), at.clamp(min=0, max=self._gp_bldg.shape[1] - 1)]
         want = want & m.unsqueeze(1)
-        if not bool(want.any()):
+        if not bool(want.count_nonzero()):
             return
         nb = min(want.shape[1], self.city_bldg.shape[3])
         r = m.nonzero(as_tuple=True)[0]
@@ -688,7 +688,7 @@ class SimGp:
         cur = self.city_current[r, row, col]                  # [m, QD]
         _bi = cur.clamp(min=0, max=nb - 1)
         gone = (cur >= 0) & (cur < nb) & want[r, :nb].gather(1, _bi.reshape(_bi.shape[0], -1)).reshape(_bi.shape)
-        if bool(gone.any()):
+        if bool(gone.count_nonzero()):
             prog = self.city_progress[r, row, col]
             self.city_prod_bank[r, row, col] = (self.city_prod_bank[r, row, col]
                                                 + (prog * gone).sum(dim=1))
@@ -707,7 +707,7 @@ class SimGp:
         # arm rides the same body.
         buyout = self._gp_fx(cls, at, "wonderBuyout").double()
         amt = self._gp_fx(cls, at, "wonderProduction").double()
-        if not bool((((amt != 0) | (buyout != 0)) & m).any()):
+        if not bool((((amt != 0) | (buyout != 0)) & m).count_nonzero()):
             return
         cur = self._q_head(row).gather(1, cc.unsqueeze(1)).squeeze(1)
         wi = cur - self.WONDER_BASE
@@ -718,12 +718,12 @@ class SimGp:
         mult = torch.where((dbl_to >= 0) & (w_era <= dbl_to), 2.0, 1.0).double()
         hit = m & is_w & (amt != 0)
         buy = m & is_w & (buyout != 0)
-        if not bool((hit | buy).any()):
+        if not bool((hit | buy).count_nonzero()):
             return
         r = hit.nonzero(as_tuple=True)[0]
         # at Standard speed on the wire: the whole grant takes the speed
         self.city_progress[r, row, cc[r], 0] += self.rules.scale_by_game_speed(amt[r] * mult[r]).to(self.city_progress.dtype)
-        if bool(buy.any()):
+        if bool(buy.count_nonzero()):
             rb = buy.nonzero(as_tuple=True)[0]
             cb = cc[rb]
             need = (self.city_cost[rb, row, cb, 0].double()
@@ -738,7 +738,7 @@ class SimGp:
         itself when the row says `here`."""
         src = self._gp_fx(cls, at, "perAdjSource").long()
         live = m & (src >= 0)
-        if not bool(live.any()):
+        if not bool(live.count_nonzero()):
             return
         nb = self.neigh[hc]                       # [B, 6]
         nbc = nb.clamp(min=0)
@@ -760,7 +760,7 @@ class SimGp:
         here_on = self._gp_fx(cls, at, "perAdjHere") > 0
         n = n + (hits(hc.unsqueeze(1)).squeeze(1) & here_on).long()
         amount = self._gp_fx(cls, at, "perAdjAmount").double() * n.double() * live.to(torch.float64)
-        if not bool((amount != 0).any()):
+        if not bool(amount.count_nonzero()):
             return
         y = self._gp_fx(cls, at, "perAdjYield").long()
         self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + amount * (y == 0).to(torch.float64)
@@ -777,17 +777,17 @@ class SimGp:
         if self._n_lux > 0:
             lux = self.lux_id.gather(1, hc.clamp(min=0).unsqueeze(1)).squeeze(1)
             pn = self._gp_fx(cls, at, "plotLuxury").long() * (m & (lux >= 0)).long()
-            if bool((pn > 0).any()):
+            if bool((pn > 0).count_nonzero()):
                 self.civ_gp_lux_copies[:, row].scatter_add_(1, lux.clamp(min=0).unsqueeze(1), pn.unsqueeze(1))
         n = self._gp_fx(cls, at, "luxuryCopies").long() * m.long()
-        if not bool((n > 0).any()):
+        if not bool((n > 0).count_nonzero()):
             return
         reach = self._gp_fx(cls, at, "luxuryAmenities").long().clamp(min=1)
         for k in range(int(n.max())):
             want = n > k
             slot = self.civ_gp_lux_n[:, row]
             fits = want & (slot < simbase.GP_LUX_MAX)
-            if not bool(fits.any()):
+            if not bool(fits.count_nonzero()):
                 continue
             r = fits.nonzero(as_tuple=True)[0]
             self.civ_gp_lux[r, row, slot[r]] = reach[r]
@@ -812,32 +812,32 @@ class SimGp:
         # it (`_spawn_unit`'s `far` probe — a hull granted inland goes to water)
         uidx = self._gp_granted_chassis(row, self._gp_fx(cls, at, "unitIdx").long())
         made = m & (uidx >= 0)
-        if bool(made.any()):
+        if bool(made.count_nonzero()):
             _xp = (self._gp_fx(cls, at, "unitPromotions").long() > 0)
             for u in sorted({int(x) for x in uidx[made].tolist()}):
                 hit = made & (uidx == u)
-                if not bool(hit.any()) or not (0 <= u < self.NU):
+                if not bool(hit.count_nonzero()) or not (0 <= u < self.NU):
                     continue
                 born = self._spawn_unit(row, hit, hc, u, far=True)
-                if bool((born & _xp).any()):
+                if bool((born & _xp).count_nonzero()):
                     self._gp_fill_xp(row, born & _xp)
         # CIV6 (Hanno the Navigator): the strongest unlocked chassis of the
         # class, carrying its Movement for life
         bcls = self._gp_fx(cls, at, "unitBestClass").long()
         wantb = m & (bcls >= 0)
-        if bool(wantb.any()):
+        if bool(wantb.count_nonzero()):
             mpb = self._gp_fx(cls, at, "unitMpBonus").long()
             for pc in sorted({int(x) for x in bcls[wantb].tolist()}):
                 best = self._best_unlocked_of_class(row, pc)
                 for u in sorted({int(x) for x in best[wantb & (bcls == pc)].tolist()}):
                     hit = wantb & (bcls == pc) & (best == u)
-                    if u < 0 or not bool(hit.any()):
+                    if u < 0 or not bool(hit.count_nonzero()):
                         continue
                     self._spawn_unit(row, hit, hc, u, init_mp=mpb, far=True)
         # CIV6 (Marco Polo, Zheng He): "a free Trader unit in this city"
         cu = self._gp_fx(cls, at, "cityUnitIdx").long()
         wantc = m & (cu >= 0) & (cu < self.NU) & (ccol >= 0)
-        if bool(wantc.any()):
+        if bool(wantc.count_nonzero()):
             ctr = self.city_center[torch.arange(self.B, device=self.device), row, ccol.clamp(min=0)]
             for u in sorted({int(x) for x in cu[wantc].tolist()}):
                 self._spawn_unit(row, wantc & (cu == u), ctr.clamp(min=0), u)
@@ -845,11 +845,11 @@ class SimGp:
         lvl = self._gp_fx(cls, at, "promotionLevels").long()
         pct = self._gp_fx(cls, at, "xpPct").long()
         touch = m & ((lvl > 0) | (pct > 0))
-        if not bool(touch.any()):
+        if not bool(touch.count_nonzero()):
             return
         tgt = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
         hit = touch & (tgt >= 0)
-        if not bool(hit.any()):
+        if not bool(hit.count_nonzero()):
             return
         r = hit.nonzero(as_tuple=True)[0]
         t = tgt[r]
@@ -891,11 +891,11 @@ class SimGp:
         with it — the `formation` clause of `gpAbility.ts`."""
         tier = self._gp_fx(cls, at, "formation").long()
         touch = m & (tier > 0)
-        if not bool(touch.any()):
+        if not bool(touch.count_nonzero()):
             return
         tgt = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
         hit = touch & (tgt >= 0)
-        if not bool(hit.any()):
+        if not bool(hit.count_nonzero()):
             return
         r = hit.nonzero(as_tuple=True)[0]
         s = tgt[r]

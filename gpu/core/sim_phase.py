@@ -27,7 +27,7 @@ class SimPhase:
             if _dsq is None or row not in _dsq:
                 continue
             walk = self.civ_alive[:, row] & self.seat_ext[:, row]
-            if not bool(walk.any()):
+            if not bool(walk.count_nonzero()):
                 continue
             # Replayed unit acts fire HERE, at the walkers' own position in the
             # phase, never before step(): battles DRAW, so they must consume
@@ -39,7 +39,7 @@ class SimPhase:
             # every at-war seat's units and cities.
             atw = walk & self.war[:, row, :self.n_majors].any(dim=1)
             for _rows in (atw, walk & ~atw):
-                if bool(_rows.any()):
+                if bool(_rows.count_nonzero()):
                     self.apply_seat_unit_sequence(row, torch.where(
                         _rows.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1)))
 
@@ -66,7 +66,7 @@ class SimPhase:
         Every row fires from its centre's standing strength
         (`_centre_strength`, `centreStrength`)."""
         Bn, Tn, dev2 = self.B, self.T, self.device
-        if not bool(fire.any()):
+        if not bool(fire.count_nonzero()):
             return
         bidx = self._bidx
         seat = int(self._ROW_SEAT[row])
@@ -89,7 +89,7 @@ class SimPhase:
         best_key = k.min(dim=1).values
         tt = k.argmin(dim=1)
         strike = fire & (best_key < 10**9)
-        if not bool(strike.any()):
+        if not bool(strike.count_nonzero()):
             return
         # a city strike is a SHOT, so `stackDefender`'s higher-chassis arm picks
         _ms_t, _mq_t, _okm = self._shot_fold(
@@ -105,12 +105,12 @@ class SimPhase:
         def_promo = self._promo_cs(
             d_type, self.unit_promos[bidx, ds0],
             attacking=~_t, ranged=_t, vs_city=_t, tile=tt)
-        def_cs = (self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_promo
-                  + self._formation_cs[self.unit_formation[bidx, ds0].clamp(min=0, max=self._form_max)])
+        def_cs = (self._type_combat.take(d_type) + self._tdef_i(bidx, tt) + def_promo
+                  + self._formation_cs.take(self.unit_formation[bidx, ds0].clamp(min=0, max=self._form_max)))
         # An embarked target (military or civilian; barbs never embark) → the
         # era's normalized CS, no terrain and no support.
         d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
-        if bool(d_emb.any()):
+        if bool(d_emb.count_nonzero()):
             def_cs = torch.where(d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
         # the unique units' position terms, read at the struck tile against a
         # RANGED shot (`chassisAbilityCS` — Ngao Mbeba's +10 included); an
@@ -139,7 +139,7 @@ class SimPhase:
         # Support received by the defender"
         def_e = def_cs - self._wound(def_hp, d_type)
         _def_seat = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
-        _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
+        _def_nav = torch.where(is_vet_mil, self.unit_naval.take(d_type.clamp(min=0, max=self.NU - 1)), torch.zeros_like(d_emb))
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)
         # CIV6 (Military Advisory / Oligarchy / Fascism): a flat unit adder is
         # the unit's own strength wherever it fights, a city's shot included.
@@ -168,13 +168,13 @@ class SimPhase:
             if not (_cy[3] or _cy[4]):
                 continue
             _nc = self.civ_alive[:, row] & ~active & self._row_is(row, _cc, _cl)
-            if bool(_nc.any()):
+            if bool(_nc.count_nonzero()):
                 _ncf = _nc.to(self.civ_tech_prog.dtype)
                 self.civ_tech_prog[:, row] += _ncf * _cy[3]
                 self.civ_civic_prog[:, row] += _ncf * _cy[4]
                 self.seat_science_total[:, row] += _ncf * _cy[3]
                 self.civ_culture[:, row] += _ncf * _cy[4]
-        if not bool(active.any()):
+        if not bool(active.count_nonzero()):
             # TS's eliminated-actor `continue` — but the stashed intents are for
             # THIS turn and must not survive into the next one. Every drain pops
             # unconditionally and applies nothing under an all-False mask.
@@ -308,7 +308,7 @@ class SimPhase:
             hi[:, :row + 1] = False
             for plane in (self.seat_friend_turns, self.seat_ally_turns):
                 run = hi & (plane[:, row] > 0)
-                if plane is self.seat_ally_turns and bool(run.any()):
+                if plane is self.seat_ally_turns and bool(run.count_nonzero()):
                     # a threshold crossing or an expiry changes what the
                     # (turn, _eff_version)-keyed suzerain-share cache answers
                     self._eff_version += 1
@@ -370,7 +370,7 @@ class SimPhase:
                 if plane is self.seat_ally_turns:
                     # the TYPE is the live alliance's; the points stay
                     ended = run & (plane[:, row] == 0)
-                    if bool(ended.any()):
+                    if bool(ended.count_nonzero()):
                         gone = torch.full_like(self.seat_alliance_type[:, row], -1)
                         self.seat_alliance_type[:, row] = torch.where(ended, gone, self.seat_alliance_type[:, row])
                         self.seat_alliance_type[:, :, row] = torch.where(ended, gone, self.seat_alliance_type[:, :, row])
@@ -435,7 +435,7 @@ class SimPhase:
             # per INSTANCE off the tile plane — the registry keeps one per type
             live = self._dist_counts(row) * alive.unsqueeze(2).long()
             out = out + torch.einsum("bjn,n->b", live, self._d_gov_title)
-        if bool((self._b_gov_title > 0).any()):
+        if bool((self._b_gov_title > 0).count_nonzero()):
             out = out + self._seat_building_sum(row, self._b_gov_title)
         # CIV6 (Grand Vizier): "Gain ... a Governor Title when the Gunpowder
         # technology is researched" — RunOnce, and a title is DERIVED on both
@@ -454,7 +454,7 @@ class SimPhase:
         else reads it). `gov` is the loop-top seating, taken before any loyalty
         moved, which is the snapshot `seatTourism` is handed."""
         golden = self._golden_ded(row, self._ded_wish)
-        if not bool(golden.any()):
+        if not bool(golden.count_nonzero()):
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         slot = self.city_slot_at(row)
         return golden.unsqueeze(1) & (slot >= 0) & gov.gather(1, slot.clamp(min=0))
@@ -482,12 +482,12 @@ class SimPhase:
                     & (self.seat_ally_turns[:, row, :nrow] > 0))
         _civ_i = self.row_civ[:, row].clamp(min=0)
         _ph = ((self.row_civ[:, row] >= 0)
-               & self._coastal_home_loyal[_civ_i.clamp(max=max(self._coastal_home_loyal.numel() - 1, 0))])
+               & self._coastal_home_loyal.take(_civ_i.clamp(max=max(self._coastal_home_loyal.numel() - 1, 0))))
         return {
             "rng": int(rr["loyaltyRange"]),
             "lmax": float(rr["loyaltyMax"]),
             "keep": torch.where(cul_ally, torch.zeros_like(keep), keep),
-            "age_p": self._age_pressure[self.civ_age[:, :nrow]],
+            "age_p": self._age_pressure.take(self.civ_age[:, :nrow]),
             "ctr": self.city_center[:, :nrow].reshape(B, -1).clamp(min=0),
             "cong": self._congress_loyalty(row),
             "emg": self._emergency_loyalty(row),
@@ -496,11 +496,11 @@ class SimPhase:
             "gpp": self._gp_city_perm(row, "loyalty"),
             # the Phoenician clause is keyed on the seat's CIVILIZATION; where
             # no game plays one the per-city half is never asked
-            "phoen": _ph if bool(_ph.any()) else None,
+            "phoen": _ph if bool(_ph.count_nonzero()) else None,
             # ...and whether the Audience Chamber clause exists at all is a
             # CATALOG fact; the sum itself stays live in the walk, because a
             # column ahead of this one may have just finished the building
-            "nogov_on": bool((self._b_loy_no_gov != 0).any()),
+            "nogov_on": bool(self._b_loy_no_gov.count_nonzero()),
             "z": torch.zeros(B, dtype=F, device=dev),
         }
 
@@ -554,7 +554,7 @@ class SimPhase:
         foreign = foreign + self._citizen_pressure_from(here, self.FREE_ROW)
         press = self._pressure_term(own, foreign)
         delta = (press
-                 + self._loyalty_amenity[tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
+                 + self._loyalty_amenity.take(tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)).double()
                  + torch.where(gov, torch.full_like(loy_gov, self._gov_loy), loy_gov)
                  + pre["cong"]
                  + self._standing_loyalty(row, bidx, col)
@@ -592,7 +592,7 @@ class SimPhase:
         pop = (self.city_pop[:, row].double() - self._emergency_pressure_cut(row).unsqueeze(1)).clamp(min=0)
         each = self._citizen_press_base + self._citizen_press_cap * self.city_is_cap[:, row].double()
         if row < self.n_majors:
-            each = each + self._age_pressure[self.civ_age[:, row]].unsqueeze(1)
+            each = each + self._age_pressure.take(self.civ_age[:, row]).unsqueeze(1)
         w = (rng + 1 - d).clamp(min=0) * (pop * each) * self.city_alive[:, row].double()
         return w.sum(dim=1)
 
@@ -623,7 +623,7 @@ class SimPhase:
         nrow = self.n_majors
         for j in range(self.RC):
             fl = flip[:, j] & self.city_alive[:, row, j]
-            if not bool(fl.any()):
+            if not bool(fl.count_nonzero()):
                 continue
             for b in fl.nonzero(as_tuple=True)[0].tolist():
                 here = torch.full((self.B,), int(self.city_center[b, row, j]), dtype=torch.long, device=self.device)
@@ -675,7 +675,7 @@ class SimPhase:
         walker moves it (`_free_walk`); it remembers the city that granted it
         (`unit_free_city`), whose join takes it."""
         mask = mask & (unit_type >= 0)
-        if not bool(mask.any()):
+        if not bool(mask.count_nonzero()):
             return
         T = self.T
         ctr = self.city_center[self._bidx, self.FREE_ROW, col.clamp(min=0)].clamp(min=0)
@@ -743,7 +743,7 @@ class SimPhase:
         unit stays Free."""
         row = self.FREE_ROW
         alive = self.city_alive[:, row]
-        if not bool(alive.any()):
+        if not bool(alive.count_nonzero()):
             return
         # a Free City's reactor keeps its clock: the seat resolves no power,
         # so the age is kept here (`ageReactors`)
@@ -768,7 +768,7 @@ class SimPhase:
         # the cities' Production is read again where the shortfall moved what
         # they make (`freeCitiesPhase`)
         moved = self.seat_shortfall[:, row] != short0
-        if bool(moved.any()):
+        if bool(moved.count_nonzero()):
             _yf2 = self._seat_amenity(row)[2]
             prod2 = self._seat_city_walk(row, amen_yf=_yf2, maint=self._seat_housing(row)[0])[:, :, 1]
             prod = torch.where(moved.unsqueeze(1), prod2, prod)
@@ -781,13 +781,13 @@ class SimPhase:
         f_train = self._trainable_in(f_techs, f_civics, self._free_any_res)
         for j in range(self.RC):
             act = alive_c[:, j]
-            if not bool(act.any()):
+            if not bool(act.count_nonzero()):
                 continue
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
             # a grant falls due every `_free_grant_period`th of the city's own
             # turns, the flip turn its first
             due = act & ((int(self.turn) - self.city_freed_turn[:, row, j] + 1) % self._free_grant_period == 0)
-            if bool(due.any()):
+            if bool(due.count_nonzero()):
                 self._grant_free_unit(due, jc, self._free_grant_type(due))
             self._free_city_build(j, act, prod[:, j].double(), f_techs, f_civics, f_train)
             self._city_strikes(row, jc, act)
@@ -811,12 +811,12 @@ class SimPhase:
         self._free_walk(acting)
         for j in range(self.RC):
             jl = joins[:, j] & self.city_alive[:, row, j]
-            if not bool(jl.any()):
+            if not bool(jl.count_nonzero()):
                 continue
             for b in jl.nonzero(as_tuple=True)[0].tolist():
                 race = self.city_free_press[b, row, j, :nrow].double()
                 ok = self.civ_alive[b, :nrow] & self.city_alive[b, :nrow].any(dim=1) & (race > 0)
-                if not bool(ok.any()):
+                if not bool(ok.count_nonzero()):
                     continue
                 win = int(first_argmax(torch.where(ok, race, torch.full_like(race, -1.0)).unsqueeze(0))[0])
                 # the city's grants go with the join (`_transfer_city`)
@@ -847,7 +847,7 @@ class SimPhase:
         the column again (the luxuries re-ranked, the citizens re-placed); the
         rest keep `cul`, the read it grew on."""
         moved = self.city_pop[:, row, j] != pop_before
-        if not bool(moved.any()):
+        if not bool(moved.count_nonzero()):
             return cul
         amen = self._seat_amenity(row)
         again = self._seat_city_walk(row, j, amen_yf=amen[2][:, j:j + 1], amen_tier=amen[0])[:, 0, 4]
@@ -874,16 +874,16 @@ class SimPhase:
         gm = self._gov_mods(row)
         pre["em"] = gm[5] if self._encamp_didx >= 0 else None
         pre["ta"] = self._golden_ded(row, self._ded_to_arms)
-        pre["ta_on"] = bool(pre["ta"].any())
+        pre["ta_on"] = bool(pre["ta"].count_nonzero())
         pre["stm"] = self._golden_ded(row, self._ded_steam)
-        pre["stm_on"] = bool(pre["stm"].any())
+        pre["stm_on"] = bool(pre["stm"].count_nonzero())
         pre["cp"] = self._congress_udt()[0]
         # the two arms of `_prod_mult_rows`, split once: the building/district
         # half above the unit half, each in the table's own order
         brows, urows = [], []
         for r in self._live_rows(row, self._prod_mult_rows):
             who = self._row_is(row, r[0], r[1])
-            if not bool(who.any()):
+            if not bool(who.count_nonzero()):
                 continue
             (urows if (r[4] >= 0 or r[8] >= 0 or r[7] == 2) else brows).append((r, who))
         pre["brows"], pre["urows"] = brows, urows
@@ -891,37 +891,37 @@ class SimPhase:
         _fxp = gm[12]
         for _k in ("raiderprod", "landcost", "projprod", "distprod"):
             _v = _fxp[_k]
-            fx[_k] = _v if bool((_v != 1).any()) else None
+            fx[_k] = _v if bool((_v != 1).count_nonzero()) else None
         pre["pb"] = _fxp["prod"]
         pre["fxrows"] = {"bprod": _fxp["bprod"], "spacep": _fxp["spacep"]}
         _hk = None
         if self._suz_c_proj_prod >= 0 and row < self.n_majors and self._proj_rows:
-            _hk = self._suz_effect(row, self._suz_c_proj_prod)[self._bidx]
-            if not bool(_hk.any()):
+            _hk = self._suz_effect(row, self._suz_c_proj_prod).take(self._bidx)
+            if not bool(_hk.count_nonzero()):
                 _hk = None
         pre["hk"] = _hk
         pre["plaza"] = [(_zp, self._row_is(row, _zc, _zl)[self._bidx])
                         for _zc, _zl, _zp in self._live_rows(row, self._plaza_district_prod_rows)] \
             if (self._plaza_district_prod_rows and self._govplaza_didx >= 0) else []
         _hard = self._row_leads(row, "HARDRADA")
-        pre["hard"] = _hard if bool(_hard.any()) else None
+        pre["hard"] = _hard if bool(_hard.count_nonzero()) else None
         _egypt = self._row_plays(row, "EGYPT")
-        pre["egypt"] = _egypt if bool(_egypt.any()) else None
+        pre["egypt"] = _egypt if bool(_egypt.count_nonzero()) else None
         we = []
         for _fc, _fl, _fs, _fe, _fp in self._live_rows(row, self._wonder_era_prod_rows):
             _fw = self._row_is(row, _fc, _fl)
-            if bool(_fw.any()) and _fs >= 0 and _fe >= 0:
-                we.append((_fs, _fe, _fp, _fw[self._bidx]))
+            if bool(_fw.count_nonzero()) and _fs >= 0 and _fe >= 0:
+                we.append((_fs, _fe, _fp, _fw.take(self._bidx)))
         pre["we"] = we
         pre["river"] = [(_rk, _rp, self._row_is(row, _rc, _rl)[self._bidx])
                         for _rc, _rl, _rk, _rp in self._live_rows(row, self._river_cross_prod_rows)] \
             if self._river_cross_prod_rows else []
-        pre["settler_on"] = bool((self._b_settler_prod != 0).any())
-        pre["conq_on"] = bool((self._b_conquest_pct != 0).any())
+        pre["settler_on"] = bool(self._b_settler_prod.count_nonzero())
+        pre["conq_on"] = bool(self._b_conquest_pct.count_nonzero())
         _m2w = None
         if self._al_m2_mil_prod_pct:
             _m2 = self._allied_type(row, 3, 2)
-            if bool(_m2.any()):
+            if bool(_m2.count_nonzero()):
                 _anyw = self.war.any(dim=2)                          # [B, NS]
                 _m2w = (_m2 & (_anyw[:, row].unsqueeze(1) | _anyw[:, : self.n_majors])).any(dim=1)
         pre["m2w"] = _m2w
@@ -929,7 +929,7 @@ class SimPhase:
         # whether any live Industrial / Militaristic city-state can pay this
         # seat production toward items (only a major sends envoys)
         pre["csi"] = (self.S > 0 and row < self.n_majors
-                      and bool((self.citystate_alive & self._citystate_item_type).any()))
+                      and bool((self.citystate_alive & self._citystate_item_type).count_nonzero()))
         return pre
 
     def _cs_item_prod(self, row: int, col: torch.Tensor, cur: torch.Tensor) -> torch.Tensor:
@@ -954,7 +954,7 @@ class SimPhase:
         for _k, _on in kinds:
             hit = hit | (self._citystate_item_kind[_k] & _on.unsqueeze(1))
         hit = hit & self.citystate_alive
-        if not bool((hit & (env >= min(self._cs_env_bars, default=0))).any()):
+        if not bool((hit & (env >= min(self._cs_env_bars, default=0))).count_nonzero()):
             # no live city-state of the item's kind sees an envoy bar reached:
             # every term below multiplies a zero
             return torch.zeros(B, dtype=torch.float64, device=env.device)
@@ -1005,7 +1005,7 @@ class SimPhase:
         # the head's PLOT, read before the shift takes it away
         qt0 = self.city_qtile[bidx, row, col, 0].clone()
         has_q = act & (cur >= 0)
-        if not bool(has_q.any()):
+        if not bool(has_q.count_nonzero()):
             return
         # ONE multiplier, assembled in phase.ts's own order and applied once:
         # a military unit under To Arms AND a production card takes
@@ -1013,7 +1013,7 @@ class SimPhase:
         _emall = torch.ones_like(prod)
         em = pre["em"]
         if em is not None:
-            _bd = self._b_req_district[cur.clamp(min=0, max=self.NB - 1)]
+            _bd = self._b_req_district.take(cur.clamp(min=0, max=self.NB - 1))
             enc_i = (cur >= 0) & (cur < self.NB) & ((_bd == self._encamp_didx) | (_bd == self._harbor_didx))
             if self._encamp_si >= 0:
                 enc_i = enc_i | (cur == self.DISTRICT_BASE + self._encamp_si)
@@ -1041,7 +1041,7 @@ class SimPhase:
         # multiplier order against VETERANCY cannot re-associate anything.
         _cp = pre["cp"]
         _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp >= 0) \
-            & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _cp)
+            & (self._b_req_district.take(cur.clamp(min=0, max=self.NB - 1)) == _cp)
         _emall = torch.where(_bldg_i, _emall * self._c_prod_mult, _emall)
         # CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows —
         # a named building or every building of a district
@@ -1065,7 +1065,7 @@ class SimPhase:
                 # district, so the slot's own district answers
                 _ds = cur - self.DISTRICT_BASE
                 _in_d = (_ds >= 0) & (_ds < len(self._scaffold))
-                _hit = _in_d & (self._scaffold_di[_ds.clamp(min=0, max=max(len(self._scaffold) - 1, 0))] == _rdi)
+                _hit = _in_d & (self._scaffold_di.take(_ds.clamp(min=0, max=max(len(self._scaffold) - 1, 0))) == _rdi)
             elif _rev == 3:
                 # EVERY district item, whichever scaffold slot it is
                 _ds3 = cur - self.DISTRICT_BASE
@@ -1086,7 +1086,7 @@ class SimPhase:
             nP = len(self._proj_rows)
             pidx = cur - self.PROJECT_BASE
             _pon = (pidx >= 0) & (pidx < nP)
-            if bool(_pon.any()):
+            if bool(_pon.count_nonzero()):
                 for _p in sorted({int(x) for x in pidx[_pon].tolist()}):
                     on = (pidx == _p)
                     _emall = torch.where(on, _emall * self._congress_project_mult(_p), _emall)
@@ -1117,7 +1117,7 @@ class SimPhase:
         # Districts in the city" — per CITY, not per seat.
         if self.n_governors and row < self.n_majors:
             _dm = self._gov_chan(row, "mult", "districtProdMult")[bidx, col].to(_emall.dtype)
-            if bool((_dm != 1).any()):
+            if bool((_dm != 1).count_nonzero()):
                 _dist_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
                 _emall = torch.where(_dist_i, _emall * _dm, _emall)
         # CIV6 (Merchant Republic, GOVERNMENTBONUS_DISTRICT_PRODUCTION): "+15%
@@ -1132,7 +1132,7 @@ class SimPhase:
             _nP = len(self._proj_rows)
             _gpi = cur - self.PROJECT_BASE
             _gon = (_gpi >= 0) & (_gpi < _nP)
-            if bool(_gon.any()):
+            if bool(_gon.count_nonzero()):
                 _gpct = self._governor_vec(row, "projectProdPct")[bidx, col]      # [B, nP]
                 _gpct = _gpct.gather(1, _gpi.clamp(min=0, max=_nP - 1).unsqueeze(1)).squeeze(1)
                 _emall = torch.where(_gon, _emall * (1.0 + _gpct / 100.0).to(_emall.dtype), _emall)
@@ -1190,7 +1190,7 @@ class SimPhase:
             _nw = self._wonder_era.shape[0]
             _wid = (cur - self.WONDER_BASE).clamp(min=0, max=max(_nw - 1, 0))
             _isw = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
-            _band = _isw & (self._wonder_era[_wid] >= _fs) & (self._wonder_era[_wid] <= _fe)
+            _band = _isw & (self._wonder_era.take(_wid) >= _fs) & (self._wonder_era.take(_wid) <= _fe)
             _emall = torch.where(_band & _fw, _emall * (1.0 + _fp / 100.0), _emall)
         # CIV6 (Pearl of the Danube): "+50% Production to Districts and
         # Buildings constructed ACROSS A RIVER from a City Center." A building
@@ -1235,9 +1235,9 @@ class SimPhase:
                 else:
                     _ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
                     _hit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
-                        & ((self._type_cls[_ui] & _cmask) != 0)
+                        & ((self._type_cls.take(_ui) & _cmask) != 0)
                     if _eramax >= 0:
-                        _hit = _hit & (self._type_era[_ui] <= _eramax)
+                        _hit = _hit & (self._type_era.take(_ui) <= _eramax)
                 _add = _add + (_pact & _hit).to(_add.dtype) * _pct
         # CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
         # this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
@@ -1269,7 +1269,7 @@ class SimPhase:
         # CIV6 (Limes, EFFECT_ADJUST_BUILDING_PRODUCTION): percent toward the
         # named buildings
         for _bon, _bb, _bpc in pre["fxrows"]["bprod"]:
-            _add = _add + (_bon[bidx] & (cur == _bb)).to(_add.dtype) * (_bpc / 100)
+            _add = _add + (_bon.take(bidx) & (cur == _bb)).to(_add.dtype) * (_bpc / 100)
         # CIV6 (Integrated Space Cell, EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION):
         # Space Race projects in a city holding one of the buildings, standing
         # and not dark — the clause pays once whichever of them stands
@@ -1280,7 +1280,7 @@ class SimPhase:
                                 dtype=torch.bool, device=self.device)
             _isp = (_pi >= 0) & (_pi < len(self._proj_rows)) & _spm[
                 _pi.clamp(min=0, max=len(self._proj_rows) - 1)]
-            if bool(_isp.any()):
+            if bool(_isp.count_nonzero()):
                 _stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(
                     self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])
                 _seen: dict = {}
@@ -1316,7 +1316,7 @@ class SimPhase:
         self._reprice_live(row)
         cost = self.city_cost[bidx, row, col, 0].clone()
         done = has_q & (self.city_progress[bidx, row, col, 0] >= cost)
-        if not bool(done.any()):
+        if not bool(done.count_nonzero()):
             return
         # queue.shift() — the head goes BEFORE completeQueueItem runs, and the
         # item behind it moves up carrying the hammers it had already earned.
@@ -1340,7 +1340,7 @@ class SimPhase:
                                          | ((cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE))))
 
         made_s = done & (cur == self.SETTLER)
-        if bool(made_s.any()):
+        if bool(made_s.count_nonzero()):
             pop = self.city_pop[bidx, row, col]
             # CIV6 (Provision): "Settlers trained in the city do not consume a
             # Population."
@@ -1355,7 +1355,7 @@ class SimPhase:
                 self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed.long()
 
         made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
-        if bool(made_u.any()):
+        if bool(made_u.count_nonzero()):
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
             xp = self._train_xp_pct(
                 self.city_bldg[bidx, row, col, :] & ~self._bldg_dark(
@@ -1385,7 +1385,7 @@ class SimPhase:
                 else:
                     continue
                 _ew = made_u & _hit & self._row_is(row, _ec, _el)
-                if not bool(_ew.any()):
+                if not bool(_ew.count_nonzero()):
                     continue
                 for _ in range(_en):
                     self._raise_best_melee(
@@ -1398,7 +1398,7 @@ class SimPhase:
                 _pw = made_u & (ui == _pu) & self._row_is(row, _pc, _pl)
                 if _pf:
                     _pw = _pw & (self.city_founder[bidx, row, col] == row)
-                if not bool(_pw.any()):
+                if not bool(_pw.count_nonzero()):
                     continue
                 _pop = self.city_pop[bidx, row, col]
                 self.city_pop[bidx, row, col] = torch.where(
@@ -1408,9 +1408,9 @@ class SimPhase:
                     self._log_pop(_jw, row, col[_jw], "jn")
             # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
             # Purchases are excluded in the real game and take another path.
-            if self._wond_n and bool(self._wond_dupnaval.any()):
+            if self._wond_n and bool(self._wond_dupnaval.count_nonzero()):
                 twin = made_u & self.unit_naval[ui] & self._seat_wonder_any(row, self._wond_dupnaval)
-                if bool(twin.any()):
+                if bool(twin.count_nonzero()):
                     # what was trained arrives twice, tier and all
                     self._raise_best_melee(
                         row, self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui)
@@ -1419,11 +1419,11 @@ class SimPhase:
                 self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + made_b.long()
 
         made_d = done & (cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE)
-        if bool(made_d.any()):
+        if bool(made_d.count_nonzero()):
             self._district_completed(row, col, qt0, made_d)
 
         made_b2 = done & (cur >= 0) & (cur < self.NB)
-        if bool(made_b2.any()):
+        if bool(made_b2.count_nonzero()):
             br = made_b2.nonzero(as_tuple=True)[0]
             bi = cur.clamp(min=0, max=self.NB - 1)
             self.city_bldg[br, row, col[br], bi[br]] = True
@@ -1447,7 +1447,7 @@ class SimPhase:
                 self._repair_behind_barrier(row, col, made_b2 & (bi == self._barrier_bidx))
             # CIV6 (Intelligence Agency): "+1 Spy" — the free unit, at the
             # completing city.
-            if bool((self._b_grant_unit >= 0).any()):
+            if bool((self._b_grant_unit >= 0).count_nonzero()):
                 bg = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
                 bg[br] = self._b_grant_unit[bi[br]]
                 ctr_b = self.city_center[bidx, row, col]
@@ -1457,7 +1457,7 @@ class SimPhase:
 
         if self._wond_n:
             made_w = done & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + self._wond_n)
-            if bool(made_w.any()):
+            if bool(made_w.count_nonzero()):
                 wr = made_w.nonzero(as_tuple=True)[0]
                 wi = (cur - self.WONDER_BASE).clamp(min=0)
                 wt = self.city_wonder[bidx, row, col, :][wr, wi[wr]]
@@ -1483,7 +1483,7 @@ class SimPhase:
                 if int(self._wond_eng_ch.sum()) > 0:
                     _ec = torch.zeros(self.B, dtype=torch.long, device=self.device)
                     _ec[wr] = self._wond_eng_ch[wi[wr]]
-                    if bool((_ec > 0).any()):
+                    if bool((_ec > 0).count_nonzero()):
                         _mine = self.major_unit_alive & (self.major_unit_seat == row)                             & self._engineer_types(self.major_unit_type.clamp(min=0))
                         self.major_unit_charges += torch.where(
                             _mine, _ec.reshape(-1, 1).expand_as(self.major_unit_charges),
@@ -1514,7 +1514,7 @@ class SimPhase:
                 if int((self._wond_boost_era >= 0).sum()) > 0:
                     be = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
                     be[wr] = self._wond_boost_era[wi[wr]]
-                    if bool((be >= 0).any()):
+                    if bool((be >= 0).count_nonzero()):
                         nt = min(self.civ_tech_boosted.shape[2], self._tech_era.numel())
                         want = (self._tech_era[:nt].reshape(1, -1) <= be.reshape(-1, 1)) & (be >= 0).reshape(-1, 1)
                         newly = want & ~self.civ_techs[:, row, :nt] & ~self.civ_tech_boosted[:, row, :nt]
@@ -1529,7 +1529,7 @@ class SimPhase:
                 # CIV6 (MODIFIER_SINGLE_CITY_GRANT_UNIT_IN_CITY: Pyramids'
                 # Builder, Statue of Zeus' army) — at the completing city,
                 # row by row and `count` of each, as TS spawns them.
-                if bool((self._wond_grant[:, :, 0] >= 0).any()):
+                if bool((self._wond_grant[:, :, 0] >= 0).count_nonzero()):
                     ctr_w = self.city_center[bidx, row, col]
                     for _k in range(self._wond_grant.shape[1]):
                         gu = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
@@ -1546,7 +1546,7 @@ class SimPhase:
                     pa = torch.zeros(self.B, dtype=torch.long, device=self.device)
                     pa[wr] = self._wond_popall[wi[wr]]
                     grow = (pa > 0).unsqueeze(1) & self.city_alive[:, row]
-                    if bool(grow.any()):
+                    if bool(grow.count_nonzero()):
                         self.city_pop[:, row] = self.city_pop[:, row] + torch.where(
                             grow, pa.unsqueeze(1), torch.zeros_like(pa).unsqueeze(1)).to(self.city_pop.dtype)
                         _gb, _gc = grow.nonzero(as_tuple=True)
@@ -1554,18 +1554,18 @@ class SimPhase:
                         self._eff_version += 1
                 # CIV6 (Stonehenge): the free Great Prophet, with the
                 # Apostle fallback.
-                if bool(self._wond_grant_prophet.any()):
+                if bool(self._wond_grant_prophet.count_nonzero()):
                     sto = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                     sto[wr] = self._wond_grant_prophet[wi[wr]]
                     self._grant_free_prophet(row, sto & made_w, self.city_center[bidx, row, col])
 
         if self._proj_rows:
             made_p = done & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
-            if bool(made_p.any()):
+            if bool(made_p.count_nonzero()):
                 pi = (cur - self.PROJECT_BASE).clamp(min=0)
                 for pidx, prow in enumerate(self._proj_rows):
                     hit = made_p & (pi == pidx)
-                    if not bool(hit.any()):
+                    if not bool(hit.count_nonzero()):
                         continue
                     # CIV6 (FromProject): a scored competition pays for
                     # "Completing the X project" whatever the project then
@@ -1679,7 +1679,7 @@ class SimPhase:
         cost when finishing buildings." Districts are construction too and the
         page groups them with the buildings; wonders are not. ONE body, so a
         district BOUGHT pays the governor exactly as one BUILT does."""
-        if not self.n_governors or not bool(mask.any()):
+        if not self.n_governors or not bool(mask.count_nonzero()):
             return
         bidx = self._bidx
         _pct = self._gov_chan(row, "sum", "faithOnBuildPct")[bidx, col]
@@ -1705,7 +1705,7 @@ class SimPhase:
         # that just finished — then "the registry names a complete tile"
         # holds exactly when TS's `some(complete)` does.
         _rep = self._is_repeatable[self.district[dr, dt].clamp(min=0)]
-        if bool(_rep.any()):
+        if bool(_rep.count_nonzero()):
             _rr = dr[_rep]
             self.city_dist_tile[_rr, row, col[_rr], self.district[_rr, dt[_rep]]] = dt[_rep]
         # CIV6 (Religious Convert): "Receives an Apostle each time he
@@ -1716,7 +1716,7 @@ class SimPhase:
             _dw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             _dw[dr] = self.district[dr, dt] == _dd
             _dw = _dw & self._row_is(row, _dc, _dl)
-            if bool(_dw.any()):
+            if bool(_dw.count_nonzero()):
                 _dat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
                 _dat[dr] = dt
                 self._spawn_unit(row, _dw, _dat, _du)
@@ -1729,7 +1729,7 @@ class SimPhase:
                 _vw = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                 _vw[dr] = self.district[dr, dt] == _vdi
                 _vw = _vw & self._row_plays_idx(row, _vciv)
-                if not bool(_vw.any()):
+                if not bool(_vw.count_nonzero()):
                     continue
                 _vat = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
                 _vat[dr] = dt
@@ -1758,11 +1758,11 @@ class SimPhase:
         # and it takes FOREIGN tiles too, so it subsumes the Preserve's own
         # and only one of the two ever runs.
         bomb = self._congress_culture_bomb_seat()[dr] == row
-        if bool(bomb.any()):
+        if bool(bomb.count_nonzero()):
             br2 = dr[bomb]
             self._culture_bomb(row, br2, dt[bomb], col[br2])
         own_bomb = ~bomb & self._d_bomb_unowned[self.district[dr, dt].clamp(min=0)]
-        if bool(own_bomb.any()):
+        if bool(own_bomb.count_nonzero()):
             br3 = dr[own_bomb]
             self._culture_bomb(row, br3, dt[own_bomb], col[br3], unowned_only=True)
         # CIV6 (Grote Rivieren): "Culture Bomb adjacent tiles when
@@ -1774,7 +1774,7 @@ class SimPhase:
                 continue
             _bw = ~bomb & ~own_bomb & (self.district[dr, dt] == _bd) & self._row_is(row, _bc, _bl)[dr]
             _rost = _rost | _bw
-            if bool(_bw.any()):
+            if bool(_bw.count_nonzero()):
                 _br = dr[_bw]
                 self._culture_bomb(row, _br, dt[_bw], col[_br])
         # CIV6 (Mimar Sinan, MODIFIER_PLAYER_ADD_CULTURE_BOMB_TRIGGER): the same
@@ -1782,13 +1782,13 @@ class SimPhase:
         if self._iz_idx >= 0:
             _sw = (~bomb & ~own_bomb & ~_rost & (self.district[dr, dt] == self._iz_idx)
                    & (self._gp_perm(row, "izCultureBomb")[dr] > 0))
-            if bool(_sw.any()):
+            if bool(_sw.count_nonzero()):
                 _sr = dr[_sw]
                 self._culture_bomb(row, _sr, dt[_sw], col[_sr])
         # CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
         # Center."
         env = self._d_envoy_centre[self.district[dr, dt].clamp(min=0)]
-        if bool((env > 0).any()):
+        if bool((env > 0).count_nonzero()):
             _ctr = self.city_center[bidx, row, col][dr].clamp(min=0)
             _touch = (self.neigh[dt] == _ctr.unsqueeze(1)).any(dim=1)
             _add = torch.zeros(self.B, dtype=torch.long, device=self.device)
@@ -1821,9 +1821,9 @@ class SimPhase:
         _at = self.unit_type.gather(1, _am.clamp(min=0)).clamp(min=0, max=self.NU - 1)
         _as = torch.where(_am >= 0, self.unit_seat.gather(1, _am.clamp(min=0)), torch.full_like(_am, -1))
         _ap = self.unit_promos.gather(1, _am.clamp(min=0))
-        _apc = self.rules_dev.u_promo_class[_at]
+        _apc = self.rules_dev.u_promo_class.take(_at)
         _no_ex = ((_apc == self._pc_ranged) | (_apc == self._pc_siege)) & ~self._promo_flag(_at, _ap, "ZOC_EXERT")
-        held = self._seats_hostile(int(self._ROW_SEAT[row]), _as) & (_am >= 0) & ~self._type_zoc_none[_at] & ~_no_ex
+        held = self._seats_hostile(int(self._ROW_SEAT[row]), _as) & (_am >= 0) & ~self._type_zoc_none.take(_at) & ~_no_ex
         # the OR runs over the six neighbours, not over the whole map: gather
         # distributes over `|` exactly, and this is a per-city call
         passable = (nbh >= 0) & (self.passable.gather(1, nbc) | self.wpass.gather(1, nbc))
@@ -1884,7 +1884,7 @@ class SimPhase:
                 self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
-            if bool(self.citystate_alive[:, s].any()):
+            if bool(self.citystate_alive[:, s].count_nonzero()):
                 self._city_heal(self._CITY_MINOR0 + s, col0, self.citystate_alive[:, s])
 
     def _city_strikes(self, row: int, col: torch.Tensor, act: torch.Tensor):
@@ -2001,7 +2001,7 @@ class SimPhase:
 
         def read(where: torch.Tensor, total: torch.Tensor) -> torch.Tensor:
             """the cities' yields read again in the games of `where`"""
-            if not bool(where.any()):
+            if not bool(where.count_nonzero()):
                 return total
             fresh = self._seat_city_stats(row, record=False)[0]
             return torch.where(where.view(-1, 1, 1), fresh, total)
@@ -2024,7 +2024,7 @@ class SimPhase:
                     continue
                 _aty = self.seat_alliance_type[:, row, _o]
                 _live = self.seat_ally_turns[:, row, _o] > 0
-                if bool((_live & (_aty >= 0)).any()):
+                if bool((_live & (_aty >= 0)).count_nonzero()):
                     _a0 = _aty.clamp(min=0)
                     _n = (self.seat_route_dseat[:, _o] == row).sum(dim=1).double()
                     _amt = torch.where(_live & (_aty >= 0),
@@ -2033,7 +2033,7 @@ class SimPhase:
                     s = s + torch.where(self._al_route_ycol[_a0] == k, _amt, torch.zeros_like(_amt))
                 if k == 5:
                     _r3 = self._allied_type(row, 4, 3)[:, _o]
-                    if bool(_r3.any()):
+                    if bool(_r3.count_nonzero()):
                         _fol = ((self.city_followed[:, row] == _o) & self.city_alive[:, row]).double()
                         s = s + (_r3.double() * self._al_rel3_faith_pop
                                  * (_fol * self.city_pop[:, row].double()).sum(dim=1))
@@ -2046,7 +2046,7 @@ class SimPhase:
                 if _fy != k:
                     continue
                 _fw = self._row_is(row, _fc, _fl)
-                if not bool(_fw.any()):
+                if not bool(_fw.count_nonzero()):
                     continue
                 _n = torch.div(self._foreign_follower_count(row), max(1, _fp), rounding_mode="floor")
                 s = s + _fw.double() * _n.double() * _fa
@@ -2054,10 +2054,10 @@ class SimPhase:
             # (Merchant Confederation) per envoy placed at a living minor
             _sfx = self._gov_mods(row)[12]
             _ps = _sfx["seatsuz"][:, k]
-            if bool((_ps != 0).any()):
+            if bool(_ps.count_nonzero()):
                 s = s + _ps * self._suzerains_held(row)
             _pe = _sfx["seatenv"][:, k]
-            if bool((_pe != 0).any()) and self.S > 0 and row < self.n_majors:
+            if bool(_pe.count_nonzero()) and self.S > 0 and row < self.n_majors:
                 _placed = (self.seat_citystate_envoys[:, row, : self.S].double()
                            * self.citystate_alive[:, : self.S].double()).sum(dim=1)
                 s = s + _pe * _placed
@@ -2078,7 +2078,7 @@ class SimPhase:
             # CIV6 (Research alliance 3): "+10% of your ally's Science" while
             # researching a tech the ally completed, or the tech the ally is on
             _r3a = self._allied_type(row, 0, 3)[:, _o]
-            if bool(_r3a.any()):
+            if bool(_r3a.count_nonzero()):
                 curt = self.civ_cur_tech[:, row]
                 done_o = self.civ_techs[:, _o].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1)
                 co = (curt >= 0) & (done_o | (self.civ_cur_tech[:, _o] == curt))
@@ -2099,7 +2099,7 @@ class SimPhase:
                 row,
             )
             fin = active & (curt >= 0) & (self.civ_tech_prog[:, row] >= cost_t)
-            if not bool(fin.any()):
+            if not bool(fin.count_nonzero()):
                 break
             tech_done = tech_done | fin
             rows = fin.nonzero(as_tuple=True)[0]
@@ -2109,7 +2109,7 @@ class SimPhase:
                 if _gt < 0 or _gu < 0:
                     continue
                 _gm = fin & (curt == _gt) & self._row_is(row, _gc, _gl)
-                if bool(_gm.any()):
+                if bool(_gm.count_nonzero()):
                     grants.append((_gm, _gu))
             self._urban_defenses_fit(row, fin & (curt == self._urban_def_tech))
             # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
@@ -2139,7 +2139,7 @@ class SimPhase:
         self._seat_upkeep_and_bankruptcy(row, active)
         for _gm, _gu in grants:
             _gm = _gm & (self.civ_cap_tile[:, row] >= 0)
-            if bool(_gm.any()):
+            if bool(_gm.count_nonzero()):
                 self._spawn_unit(row, _gm, self.civ_cap_tile[:, row].clamp(min=0),
                                  torch.full((B,), _gu, dtype=torch.long, device=dev))
 
@@ -2157,7 +2157,7 @@ class SimPhase:
                 continue
             # CIV6 (Cultural alliance 3): "+10% of your ally's Culture".
             _c3a = self._allied_type(row, 1, 3)[:, _o]
-            if bool(_c3a.any()):
+            if bool(_c3a.count_nonzero()):
                 cul_sum = cul_sum + torch.where(
                     _c3a, self._al_c3_cul_pct * self.civ_cul_rate[:, _o], torch.zeros_like(cul_sum))
         _tin = self._tourism_inputs(row, gov)
@@ -2180,7 +2180,7 @@ class SimPhase:
         # CIV6 (Cultural alliance 3): "+20% of your ally's Tourism".
         _c3t = self._allied_type(row, 1, 3)
         for _o in range(self.n_majors):
-            if _o != row and bool(_c3t[:, _o].any()):
+            if _o != row and bool(_c3t[:, _o].count_nonzero()):
                 _nat_gen = _nat_gen + torch.where(
                     _c3t[:, _o],
                     torch.floor(self._al_c3_tour_pct * self.civ_tour_rate[:, _o].double()).long(),
@@ -2234,7 +2234,7 @@ class SimPhase:
                 row, is_civic=True,
             )
             fin = active & (curc >= 0) & (self.civ_civic_prog[:, row] >= cost_c)
-            if not bool(fin.any()):
+            if not bool(fin.count_nonzero()):
                 break
             civic_done = civic_done | fin
             rows = fin.nonzero(as_tuple=True)[0]
@@ -2267,7 +2267,7 @@ class SimPhase:
         # the district discount's count of completed specialty districts,
         # taken when a technology or civic completes — before the cities produce
         _disc_at = tech_done | civic_done
-        if bool(_disc_at.any()):
+        if bool(_disc_at.count_nonzero()):
             self.civ_discount_districts[:, row] = torch.where(
                 _disc_at, self._completed_specialty(row), self.civ_discount_districts[:, row])
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
@@ -2286,7 +2286,7 @@ class SimPhase:
         # every one is known — so "met" is every live major.
         for _pc, _pl, _pa in self._live_rows(row, self._peaceful_founder_rows):
             _pw = self._row_is(row, _pc, _pl)
-            if not bool(_pw.any()):
+            if not bool(_pw.count_nonzero()):
                 continue
             _n = torch.zeros(self.B, dtype=torch.float64, device=self.device)
             for _o in range(self.n_majors):
@@ -2338,7 +2338,7 @@ class SimPhase:
         c2 = torch.zeros(B, self.RC, dtype=torch.float64, device=dev)
         if self._al_c2_gpp:
             c2ally = self._allied_type(row, 1, 2)
-            if bool(c2ally.any()):
+            if bool(c2ally.count_nonzero()):
                 ds = self.seat_route_dseat[:, row]
                 to_ally = (ds >= 0) & (ds < self.n_majors) & c2ally.gather(1, ds.clamp(min=0, max=self.n_majors - 1))
                 ids = self.city_id[:, row]
@@ -2424,7 +2424,7 @@ class SimPhase:
                 if _hcls != cls:
                     continue
                 _hw = self._row_is(row, _hc, _hl)
-                if not bool(_hw.any()):
+                if not bool(_hw.count_nonzero()):
                     continue
                 _reg = self.city_dist_tile[:, row, :, _hd]
                 _stand = ((_reg >= 0) & self.district_complete.gather(1, _reg.clamp(min=0))
@@ -2440,7 +2440,7 @@ class SimPhase:
                 _ban = _ban | self._row_banned(row, self.BAN_GREAT_WRITER)
             if cls == self._prophet_cls:
                 _ban = _ban | self._row_banned(row, self.BAN_GREAT_PROPHET)
-            if bool(_ban.any()):
+            if bool(_ban.count_nonzero()):
                 pts = torch.where(_ban, torch.zeros_like(pts), pts)
                 self.civ_gpp[:, row, cls] = torch.where(
                     _ban, torch.zeros_like(self.civ_gpp[:, row, cls]), self.civ_gpp[:, row, cls])
@@ -2462,14 +2462,14 @@ class SimPhase:
                 # has earned its Great Prophet takes no other — points wait
                 hit = active & has_person & (self.gp_passed_by[:, cls] != row) \
                     & (self.civ_gpp[:, row, cls] >= gcost) & ~_ban & ~self._gp_capped(row, cls)
-                if not bool(hit.any()):
+                if not bool(hit.count_nonzero()):
                     break
                 self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
                 self._gp_claim(row, hit, cls)
             # CIV6: "GPPs that can no longer be used are converted to Faith,
             # in a 1:1 ratio" — the exhausted class's stock and flow alike.
             exh = active & (self.gp_offer[:, cls] == -2) & (self.civ_gpp[:, row, cls] > 0)
-            if bool(exh.any()):
+            if bool(exh.count_nonzero()):
                 self.civ_faith[:, row] = torch.where(
                     exh, self.civ_faith[:, row] + self.civ_gpp[:, row, cls].to(self.dtype),
                     self.civ_faith[:, row])
@@ -2485,7 +2485,7 @@ class SimPhase:
         verdict draws no random (`ensureGpOffer`)."""
         nR = int(self._gp_roster[cls]) if cls < int(self._gp_roster.numel()) else 0
         need = active & (self.gp_offer[:, cls] == -1)
-        if not bool(need.any()) or nR <= 0:
+        if not bool(need.count_nonzero()) or nR <= 0:
             return
         dev = self.device
         world_era = self._world_era()
@@ -2522,14 +2522,14 @@ class SimPhase:
             if _cls < 0 or _cls >= self._gp_nc:
                 continue
             who = active & self._row_is(row, _gc, _gl)
-            if not bool(who.any()):
+            if not bool(who.count_nonzero()):
                 continue
             nR = int(self._gp_roster[_cls]) if _cls < int(self._gp_roster.numel()) else 0
             if nR <= 0:
                 continue
             claimed = self.gp_claimed[:, _cls, :nR].sum(dim=1)
             due = who & (self.civ_gp_earned[:, row, _cls] == 0) & (claimed == nR - 1)
-            if not bool(due.any()):
+            if not bool(due.count_nonzero()):
                 continue
             self._gp_ensure_offer(due, _cls)
             self._gp_claim(row, due & (self.gp_offer[:, _cls] >= 0), _cls)
@@ -2548,7 +2548,7 @@ class SimPhase:
         if no Prophets are available)" — religion founded or the class spent
         pays an Apostle; a standing Prophet with no religion pays nothing;
         otherwise the class's offer is claimed FREE (`grantFreeProphet`)."""
-        if not bool(sto.any()):
+        if not bool(sto.count_nonzero()):
             return
         cls = self._prophet_cls
         if cls < 0 or cls >= self._gp_nc:
@@ -2565,7 +2565,7 @@ class SimPhase:
         free = sto & ~founded & ~standing & (self.gp_offer[:, cls] >= 0) & ~self._gp_capped(row, cls)
         self._gp_claim(row, free, cls)
         apo = sto & ~none_m & ~free
-        if self._apostle_idx >= 0 and bool(apo.any()):
+        if self._apostle_idx >= 0 and bool(apo.count_nonzero()):
             self._spawn_unit(row, apo, centre, self._apostle_idx)
             self._gen_ver += 1
 
@@ -2578,7 +2578,7 @@ class SimPhase:
         tile), the capital otherwise. Nothing is paid out here; the redraw
         waits for the race loop. The ONE draw is the Great Library's — a
         SCIENTIST claim hands every other holder a random boost."""
-        if not bool(hit.any()):
+        if not bool(hit.count_nonzero()):
             return
         maxN = self._gp_effects.shape[1]
         at_c = self.gp_offer[:, cls].clamp(min=0)
@@ -2587,7 +2587,7 @@ class SimPhase:
         # BEFORE the offer is retired below (`GP_REFUND_ROWS`)
         for _rc, _rl, _rp in self._live_rows(row, self._gp_refund_rows):
             _rw = hit & self._row_is(row, _rc, _rl)
-            if not bool(_rw.any()):
+            if not bool(_rw.count_nonzero()):
                 continue
             _back = torch.floor(self.gp_price[:, cls].double() * _rp / 100.0)
             self.civ_gpp[:, row, cls] = torch.where(
@@ -2620,7 +2620,7 @@ class SimPhase:
         # player recruits a Great Scientist" — every OTHER holder of a
         # completed carrier draws one, ascending seat order, so the stream is
         # identical on both engines.
-        if cls == self._gp_scientist and bool(self._wond_rival_sci.any()):
+        if cls == self._gp_scientist and bool(self._wond_rival_sci.count_nonzero()):
             wsel = self._wond_rival_sci.nonzero(as_tuple=True)[0]
             for b in hr.tolist():
                 one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -2629,7 +2629,7 @@ class SimPhase:
                     if o == row:
                         continue
                     reg = self.city_wonder[b, o][:, wsel]
-                    if not bool(((reg >= 0) & self.built_wonder_complete[b, reg.clamp(min=0)]).any()):
+                    if not bool(((reg >= 0) & self.built_wonder_complete[b, reg.clamp(min=0)]).count_nonzero()):
                         continue
                     pool = (~self.civ_techs[b, o] & ~self.civ_tech_boosted[b, o]).nonzero(as_tuple=True)[0]
                     if pool.numel() == 0:
@@ -2673,7 +2673,7 @@ class SimPhase:
         pdue = active & ~self.civ_pantheon_done[:, row] & (self.civ_faith[:, row] >= pfc)
         popen = pdue & (self.pantheon_claimed_n < rr["pantheonPool"])
         rp_ = self._next_random(popen)
-        if bool(popen.any()) and self._bel_any:
+        if bool(popen.count_nonzero()) and self._bel_any:
             n_open = (~self.pan_claimed).sum(dim=1)
             k = torch.floor(rp_ * n_open.to(torch.float64)).to(torch.long)
             cum = (~self.pan_claimed).long().cumsum(dim=1)
@@ -2706,7 +2706,7 @@ class SimPhase:
             has_hs = torch.zeros(B, dtype=torch.bool, device=dev)
         # CIV6 (Stonehenge): "Prophets may found a religion on Stonehenge
         # instead of a Holy Site."
-        if self._wond_n and bool(self._wond_religion_site.any()):
+        if self._wond_n and bool(self._wond_religion_site.count_nonzero()):
             has_hs = has_hs | self._seat_wonder_any(row, self._wond_religion_site)
         # CIV6 (Religious Convert): "May not ... found Religions"
         return (~self.civ_religion_done[:, row] & self.civ_pantheon_done[:, row]
@@ -2800,13 +2800,13 @@ class SimPhase:
                   & (npick == self._belief_picks(row))
                   & ~((cnt > 0) & ~self._enhanceable(row)).any(dim=1))
         ok = found_ok | enh_ok
-        if not bool(ok.any()):
+        if not bool(ok.count_nonzero()):
             return
         for k in range(K):
             pk = ok & present[:, k]
             for ci, (m, ids, n) in enumerate(pools):
                 sel = pk & (cls[:, k] == ci)
-                if n == 0 or not bool(sel.any()):
+                if n == 0 or not bool(sel.count_nonzero()):
                     continue
                 r = sel.nonzero(as_tuple=True)[0]
                 ii = idx[r, k]
@@ -2833,7 +2833,7 @@ class SimPhase:
         # CIV6 (RELIGION_SPREAD_HOLY_CITY_PRESSURE_PER_POP): the Holy City starts
         # with that much of its own faith per citizen — `grantFoundingPressure`
         _gr = found_ok & (_holy >= 0)
-        if bool(_gr.any()):
+        if bool(_gr.count_nonzero()):
             gb = _gr.nonzero(as_tuple=True)[0]
             self.city_pressure[gb, row, _h_slot[gb], row] += self._holy_founding_per_pop * self.city_pop[gb, row, _h_slot[gb]].long()
 
@@ -2972,7 +2972,7 @@ class SimPhase:
             for name in ("city_dist_tile", "city_wonder"):
                 reg = getattr(self, name)[:, row]
                 has = (reg >= 0) & alive
-                if not bool(has.any()):
+                if not bool(has.count_nonzero()):
                     continue
                 # tile_city at the listed tile, per cell
                 rt = self.tile_city.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)  # [B, RC, K]
@@ -2980,7 +2980,7 @@ class SimPhase:
                 bad_fwd = has & (rt != expect)  # (1) registers to a sibling / no one
                 bad_bwd = has & (ra != row_seat)  # (2) tile no longer owned by this seat
                 bad = bad_fwd | bad_bwd
-                if bool(bad.any()):
+                if bool(bad.count_nonzero()):
                     idx = bad.nonzero(as_tuple=False)[0]
                     b, j, k = int(idx[0]), int(idx[1]), int(idx[2])
                     tile = int(reg[b, j, k])

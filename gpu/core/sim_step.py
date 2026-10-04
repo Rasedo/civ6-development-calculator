@@ -41,8 +41,8 @@ class SimStep:
                 _fort = getattr(self, f"{_pre}_unit_fortify")
                 # CIV6: a plane is based inside a city centre, an Aerodrome or a
                 # carrier and a Spy carries no Combat Strength — neither digs in.
-                _mil = ((self._type_combat[_typ] > 0) & ~self.unit_naval[_typ]
-                        & (self._type_air[_typ] == 0))
+                _mil = ((self._type_combat.take(_typ) > 0) & ~self.unit_naval.take(_typ)
+                        & (self._type_air.take(_typ) == 0))
                 _dug = torch.where(
                     _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
                     torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort),
@@ -59,7 +59,7 @@ class SimStep:
                 if self._imp_fortify_any:
                     _it = getattr(self, f"{_pre}_unit_tile").clamp(min=0)
                     _iv = self.improvement.gather(1, _it)
-                    _gf = self._imp_fortify[_iv.clamp(min=0)] * (_iv >= 0).long()
+                    _gf = self._imp_fortify.take(_iv.clamp(min=0)) * (_iv >= 0).long()
                     _dug = torch.where(_alive & _mil, torch.maximum(_dug, _gf.clamp(max=2)), _dug)
                 _fort.copy_(_dug)
             self._refresh_aura_mp()
@@ -77,7 +77,7 @@ class SimStep:
         self.turn += 1
         # a return's Anarchy ends as the turn reaches `civ_gov_anarchy_end`:
         # the government channels change with no record behind them
-        if self._ngov and bool((self.civ_gov_anarchy_end == self.turn).any()):
+        if self._ngov and bool((self.civ_gov_anarchy_end == self.turn).count_nonzero()):
             self._eff_version += 1
         if self.disasters:
             self._disaster_phase()
@@ -104,7 +104,7 @@ class SimStep:
         _alive_m = torch.cat((self.city_alive[:, :self.n_majors],
                               self.city_alive[:, self.FREE_ROW:self.FREE_ROW + 1]), dim=1)
         _hw = (_alive_m.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
-        if bool((_hw > _alive_m.sum(dim=2)).any()):
+        if bool((_hw > _alive_m.sum(dim=2)).count_nonzero()):
             self._reclaim_cities()
         if self.n_majors > 1 and self._civ_city_reg_check:
             self._check_rc_registry_invariant()
@@ -116,14 +116,14 @@ class SimStep:
         # Ties in one turn go to the lowest row (argmax takes the FIRST True),
         # and the victory_type guard keeps an already-won space game's victor.
         fly = self.space_ly >= 0  # [B, n_majors]
-        if bool(fly.any()):
+        if bool(fly.count_nonzero()):
             # ...plus CIV6 (ISS_FIRST_PLACE_SPACESHIP_SPEED) the Space Station winner's +3
             lz = torch.stack([self._laser_speed(r) + self._gp_perm(r, "exoSpeed").long()
                               for r in range(self.n_majors)], dim=1)
             self.space_ly.copy_(torch.where(fly, self.space_ly + 1 + lz, self.space_ly))
             arrive = fly & (self.space_ly >= int(self.rules.space_ly_target))
             landed = arrive.any(dim=1) & (self.victory_type != 3)
-            if bool(landed.any()):
+            if bool(landed.count_nonzero()):
                 first = torch.argmax(arrive.long(), dim=1)
                 self.victory_type.copy_(torch.where(landed, torch.full_like(self.victory_type, 3), self.victory_type))
                 self.victory_row.copy_(torch.where(landed, first, self.victory_row))
@@ -140,7 +140,7 @@ class SimStep:
         # the game with no other victor. `leader()` runs only on a turn where
         # some game of the batch stands ended on the score.
         by_score = self.victory_type == 1
-        lead = self.leader() if bool(by_score.any()) else torch.full_like(dom, -1)
+        lead = self.leader() if bool(by_score.count_nonzero()) else torch.full_like(dom, -1)
         self.victory_row.copy_(torch.where(space_won, self.victory_row, torch.where(dom >= 0, dom, torch.where(rel >= 0, rel, torch.where(cul >= 0, cul, torch.where(dip >= 0, dip, torch.where(by_score, lead, torch.full_like(dom, -1))))))))
 
         # THE POPULATION SNAPSHOT, at the census's own moment and over the

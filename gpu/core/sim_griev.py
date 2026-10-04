@@ -30,7 +30,7 @@ class SimGriev:
             amt = torch.where(amt > 0, torch.div(amt * _mult, 100, rounding_mode="floor"), amt)
         if m is not None:
             amt = torch.where(m, amt, torch.zeros_like(amt))
-        if not bool((amt != 0).any()):
+        if not bool(amt.count_nonzero()):
             return
         self.civ_grievance[:, victim, transgressor] += amt
         self.civ_grievance[:, transgressor, victim] -= amt
@@ -69,7 +69,7 @@ class SimGriev:
         for other in range(row + 1, self.n_majors):
             bal = self._grievance_with(row, other)
             live = (bal != 0) & ~self.war[:, row, other]
-            if not bool(live.any()):
+            if not bool(live.count_nonzero()):
                 continue
             # the victim's side of the pair, per game
             v_is_row = bal > 0
@@ -137,7 +137,7 @@ class SimGriev:
             kk = int(k) if 0 <= int(k) < len(pct) else 0
             full = int(base * pct[kk][0] / 100 + 0.5)
             mk = m & (kind == int(k))
-            if bool((mk & disc).any()):
+            if bool((mk & disc).count_nonzero()):
                 self._spread_grievance(target, declarer, max(0, full - D), mk & disc)
             self._spread_grievance(target, declarer, full, mk & ~disc)
         for s in range(self.n_majors):

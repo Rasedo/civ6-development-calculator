@@ -232,10 +232,10 @@ def _march_targets(st, war: dict, hcs: torch.Tensor) -> tuple:
                            d_s * (T + 1) + cand, torch.full_like(d_s, 10 ** 9))
         imp_min, iwin = ikey.min(dim=2)
         has_imp = imp_min < 10 ** 9
-        imp_tgt = cand[iwin]
+        imp_tgt = cand.take(iwin)
     has_city, city_tgt = no, hcs
     live = war["live"]
-    if bool(live.any()):
+    if bool(live.count_nonzero()):
         cc = war["centre"].clamp(min=0)
         d2 = st.pair_dist[hcs.unsqueeze(2), cc.unsqueeze(1)].to(torch.long)
         key = torch.where(live.unsqueeze(1), d2 * (2048 * 256) + (war["seat"] * 2048 + cc).unsqueeze(1),
@@ -275,7 +275,7 @@ def _unit_view(st, nobs: list, present: torch.Tensor, tiles: torch.Tensor, war: 
     d_nb = torch.where(off, BIG, d_nb)
     at_war = war["at_war"].unsqueeze(1) & present
     war_tgt = torch.full((B, N), -1, dtype=torch.long, device=dev)
-    if bool(at_war.any()):
+    if bool(at_war.count_nonzero()):
         tgt, hi, hc = _march_targets(st, war, tc)
         war_tgt = torch.where((hi | hc) & at_war, tgt, war_tgt)
     has_wt = war_tgt >= 0
@@ -323,9 +323,9 @@ def _nearest(st, plane: torch.Tensor, rows_all: torch.Tensor, tiles: torch.Tenso
         best = key.argmin(dim=1)
         has = rows & plane.gather(1, best.unsqueeze(1)).squeeze(1)
         out[:, n] = torch.where(has, best, out[:, n])
-        if bool(has.any()):
+        if bool(has.count_nonzero()):
             _hr = has.nonzero(as_tuple=True)[0]
-            plane[_hr, best[_hr]] = False
+            plane[_hr, best.take(_hr)] = False
     return out
 
 
@@ -336,7 +336,7 @@ def _charge_jobs(st, idx: int, jobs: torch.Tensor,
     slot is masked out for the later ones, so two units of one type (on one
     tile, or with one nearest job) are not both sent to the same tile — one
     plane per call, as the TS driver keeps one taken set per type."""
-    if idx < 0 or not bool(jobs.any()):
+    if idx < 0 or not bool(jobs.count_nonzero()):
         return out
     rows_all = present & (types.clamp(min=0, max=st.NU - 1) == idx) & (charges > 0)
     return _nearest(st, jobs, rows_all, tiles, out, st.T, taken=True)
@@ -368,7 +368,7 @@ def _gp_jobs(st, nobs: list, units=None) -> torch.Tensor:
         return out
     # site 1 activates where it stands: nothing to walk to
     live = present & (site >= 0) & (site != 1) & (charges > 0)
-    if not bool(live.any()):
+    if not bool(live.count_nonzero()):
         return out
     planes: dict = {}
     for b, o in enumerate(nobs):
@@ -390,7 +390,7 @@ def _spread_targets(st, nobs: list, units=None) -> torch.Tensor:
     present, tiles, types, charges, _gs, _ga = _obs_units(st, nobs) if units is None else units
     out = torch.full(present.shape, -1, dtype=torch.long, device=dev)
     tm = _obs_plane(st, nobs, "spread")
-    if not bool(tm.any()):
+    if not bool(tm.count_nonzero()):
         return out
     vt_all = types.clamp(min=0, max=st.NU - 1)
     relig_all = torch.zeros_like(present)
@@ -410,7 +410,7 @@ def _settle_targets(st, nobs: list, units=None):
     present, tiles, types, _charges, _gs, _ga = _obs_units(st, nobs) if units is None else units
     out = torch.full(present.shape, -1, dtype=torch.long, device=dev)
     ok = _obs_plane(st, nobs, "foundOk")
-    if st.settler < 0 or st.col("FOUND_CITY") < 0 or not bool(ok.any()):
+    if st.settler < 0 or st.col("FOUND_CITY") < 0 or not bool(ok.count_nonzero()):
         return out, ok
     return _nearest(st, ok, present & (types == st.settler), tiles, out, st.T), ok
 
@@ -425,7 +425,7 @@ def _dig_targets(st, nobs: list, units=None) -> torch.Tensor:
     if st.archaeologist < 0 or st.col("EXCAVATE") < 0:
         return out
     digs = _obs_plane(st, nobs, "digs")
-    if not bool(digs.any()):
+    if not bool(digs.count_nonzero()):
         return out
     rows_all = present & (types.clamp(min=0, max=st.NU - 1) == st.archaeologist) & (charges > 0)
     return _nearest(st, digs, rows_all, tiles, out, st.T)
@@ -442,7 +442,7 @@ def _park_targets(st, nobs: list, units=None) -> torch.Tensor:
     if st.naturalist < 0 or st.col("PARK") < 0:
         return out
     anchors = _obs_plane(st, nobs, "parks")
-    if not bool(anchors.any()):
+    if not bool(anchors.count_nonzero()):
         return out
     rows_all = present & (types.clamp(min=0, max=st.NU - 1) == st.naturalist) & (charges > 0)
     return _nearest(st, anchors, rows_all, tiles, out, st.T)
@@ -485,7 +485,7 @@ def _seat_unit_orders(st, seat: int, nobs: list):
     tgt = torch.where(tgt >= 0, tgt, torch.where(dig_t >= 0, dig_t, park_t))
     tgt = torch.where(tgt >= 0, tgt, gp_t)
     walkers = present & (tgt >= 0) & (tiles != tgt)
-    if bool(walkers.any()):
+    if bool(walkers.count_nonzero()):
         nbr_all = st.neigh[tclamp]  # [B, N, 6]
         nbr = nbr_all
         d_cur = st.pair_dist[tclamp, tgt.clamp(min=0)].to(torch.long)
@@ -508,14 +508,14 @@ def _seat_unit_orders(st, seat: int, nobs: list):
         ghut = goody.gather(1, gnb.reshape(B_, -1).clamp(min=0)).reshape(B_, N_, 6)
         ghut = ghut & (gnb >= 0) & um[:, :, 0:6]
         gtake = present & ghut.any(dim=2)
-        if bool(gtake.any()):
+        if bool(gtake.count_nonzero()):
             # the lowest legal direction, the engine's own tie-break
             orders0 = torch.where(gtake, ghut.long().argmax(dim=2), orders0)
     A_SP = st.col("SPREAD_HERE")
-    if A_SP >= 0 and bool((spread_t >= 0).any()):
+    if A_SP >= 0 and bool((spread_t >= 0).count_nonzero()):
         d_sp = st.pair_dist[tclamp, spread_t.clamp(min=0)].to(torch.long)
         close = (spread_t >= 0) & present & (d_sp <= 1)
-        if bool(close.any()):
+        if bool(close.count_nonzero()):
             if nbr_all is None:
                 nbr_all = st.neigh[tclamp]
             nbr = nbr_all
@@ -536,7 +536,7 @@ def _seat_unit_orders(st, seat: int, nobs: list):
     A_F = st.col("FOUND_CITY")
     if st.settler >= 0 and _live(A_F):
         is_settler = present & (_types == st.settler)
-        if bool(is_settler.any()):
+        if bool(is_settler.count_nonzero()):
             # FOUND only where canFoundCity's own terms say yes: the mask
             # column is type-only and the APPLY validates the spot, so an
             # unconditional FOUND pins a settler on illegal ground to a
@@ -689,7 +689,7 @@ def _seat_unit_orders(st, seat: int, nobs: list):
             orders0 = torch.where(present & ~_took & _sm.any(dim=2),
                                   A_SM + _mkey.amin(dim=2), orders0)
 
-    if bool(on_job.any()):
+    if bool(on_job.count_nonzero()):
         # BY NAME, never by column number: the BUILD_* verbs are a RUN in the
         # middle of the action table, so an inserted verb walks a hardcoded
         # range onto the wrong column. `_A_IMP` is that run, roster-ordered.
@@ -749,12 +749,12 @@ def _seat_envoys(nobs: list, device):
     picks_e = []
     for _ke in range(6):
         can_e = met_live_e.any(dim=1) & (avail_e > 0)
-        if not bool(can_e.any()):
+        if not bool(can_e.count_nonzero()):
             break
         blk_e = {"cs": torch.stack([met_live_e.double(), mine6_e, torch.zeros_like(mine6_e)], dim=2)}
         p_e = ladder.pick_envoy(blk_e, met_live_e)
         p_e = torch.where(can_e, p_e, torch.full_like(p_e, -1))
-        if not bool((p_e >= 0).any()):
+        if not bool((p_e >= 0).count_nonzero()):
             break
         picks_e.append(p_e)
         hit_e = p_e >= 0
@@ -770,7 +770,7 @@ def _war_kind_of(war: torch.Tensor, kinds: torch.Tensor) -> torch.Tensor:
     n_opp = kinds.shape[1]
     w = war.to(torch.long)
     on = (w >= 0) & (w < n_opp)
-    if n_opp == 0 or not bool(on.any()):
+    if n_opp == 0 or not bool(on.count_nonzero()):
         return torch.full_like(w, -1)
     pick = kinds.gather(1, w.clamp(min=0, max=n_opp - 1).unsqueeze(1)).squeeze(1)
     return torch.where(on, pick, torch.full_like(pick, -1))
@@ -865,7 +865,7 @@ def _decide_vote(nobs: list, row: int, device):
     cg = _obs_group(nobs, "congress", device)
     slate = _obs_dense(nobs, "congress", "slate", device)
     special = cg["special"]
-    if not bool((slate >= 0).any()) and not bool(cg["dv"].any()) and not bool(special.any()):
+    if not bool((slate >= 0).count_nonzero()) and not bool(cg["dv"].count_nonzero()) and not bool(special.count_nonzero()):
         return None
     pref_o = _obs_dense(nobs, "congress", "pref_outcome", device)
     pref_t = _obs_dense(nobs, "congress", "pref_target", device)
@@ -883,21 +883,21 @@ def _decide_vote(nobs: list, row: int, device):
         out[:, slot, 2] = torch.where(m, zero, out[:, slot, 2])
     lead = cg["leader"]
     ok = cg["dv"] & (lead >= 0)
-    if bool(ok.any()):
+    if bool(ok.count_nonzero()):
         # ALL of it: the curve runs out of favor before it runs out of rungs,
         # so favor/step + 1 is an upper bound on what the bank can buy.
         want = torch.div(cg["favor"], cg["vote_step"].clamp(min=1), rounding_mode="floor") + 1
         out[:, 2, 0] = torch.where(ok, (lead != row).long(), out[:, 2, 0])
         out[:, 2, 1] = torch.where(ok, lead.clamp(min=0), out[:, 2, 1])
         out[:, 2, 2] = torch.where(ok, want, out[:, 2, 2])
-    return out if bool((out[:, :, 0] >= 0).any()) else None
+    return out if bool((out[:, :, 0] >= 0).count_nonzero()) else None
 
 
 def _decide_route(route: dict):
     """The route verb: TAKE the observation's candidate whenever one exists
     — the old eager rule's pacing, now a policy choice on the wire."""
     frm, dst = route["from"], route["dest"]
-    if not bool((frm >= 0).any()):
+    if not bool((frm >= 0).count_nonzero()):
         return None
     return (frm, dst)
 
@@ -1150,7 +1150,7 @@ def _deal_turn(st, geos: list, g: dict, off, acc, alive_row, rstr, prox, prox_ma
     def _put(a: int, b: int, live, give, ask) -> None:
         """Write one seat's offer, first qualifying rival wins."""
         sel = live & ~taken[:, a]
-        if not bool(sel.any()):
+        if not bool(sel.count_nonzero()):
             return
         taken[:, a] |= sel
         off[:, a, 0] = torch.where(sel, torch.full_like(off[:, a, 0], b), off[:, a, 0])
@@ -1236,7 +1236,7 @@ def _deal_turn(st, geos: list, g: dict, off, acc, alive_row, rstr, prox, prox_ma
             if a == b:
                 continue
             standing = alive_row[:, a] & alive_row[:, b] & (offer_left[:, b, a] > 0)
-            if not bool(standing.any()):
+            if not bool(standing.count_nonzero()):
                 continue
             ask = offer_ask[:, b, a]
             owed = torch.zeros(B, dtype=torch.long, device=dev)
@@ -1265,7 +1265,7 @@ def _district_tiles(st, prod: torch.Tensor, sites: dict):
     # WHICH (city, district) pairs anybody picked, in ONE transfer
     si_all = prod - st.district_base
     sel = (si_all >= 0) & (si_all < nS)
-    if not bool(sel.any()):
+    if not bool(sel.count_nonzero()):
         return out
     pairs = sorted({(int(k), int(s)) for (_b, k), s
                     in zip(sel.nonzero(as_tuple=False).tolist(), si_all[sel].tolist())})
@@ -1297,11 +1297,11 @@ def _maybe_form_tier(st, row: int, mask: torch.Tensor, prod: torch.Tensor,
     if seeds is None or mask.shape[2] <= st.form_base:
         return prod
     is_u = (prod >= st.unit_base) & (prod < st.unit_base + st.NU)
-    if not bool(is_u.any()):
+    if not bool(is_u.count_nonzero()):
         return prod
     r = _policy_rng(st.device, seeds, turn, row, 7)
     hit = is_u & (r < ladder.FORM_SHARE).unsqueeze(1)
-    if not bool(hit.any()):
+    if not bool(hit.count_nonzero()):
         return prod
     corps = torch.where(is_u, st.form_base + prod - st.unit_base, prod)
     army = corps + st.NU
@@ -1324,11 +1324,11 @@ def _decide_gp_pass(nobs: list, row: int, seeds, turn, device) -> torch.Tensor |
     offer = _obs_dense(nobs, "gp", "offer", device)
     elig = ((offer >= 0) & (_obs_dense(nobs, "gp", "passed_by", device) < 0)
             & (_obs_dense(nobs, "gp", "points", device) >= _obs_dense(nobs, "gp", "price", device)))
-    if not bool(elig.any()):
+    if not bool(elig.count_nonzero()):
         return None
     r = _policy_rng(device, seeds, turn, row, 8)
     hit = elig.any(dim=1) & (r < ladder.GP_PASS_SHARE)
-    if not bool(hit.any()):
+    if not bool(hit.count_nonzero()):
         return None
     pick = elig.long().argmax(dim=1)
     return torch.where(hit, pick, torch.full_like(pick, -1))
@@ -1376,7 +1376,7 @@ def _decide_beliefs(nobs: list, row: int, seeds, turn, device) -> torch.Tensor |
             take = [want[(s0 + i) % len(want)] for i in range(min(int(o["enhance"]), len(want), 2))]
             for k, c in enumerate(take):
                 out[b, k, 0], out[b, k, 1] = c, draw(o[_BELIEF_CLASSES[c]], r_pick[k][b])
-    if not bool((out >= 0).any()):
+    if not bool((out >= 0).count_nonzero()):
         return None
     return out.to(device)
 
@@ -1461,14 +1461,14 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
     tech_cost = _obs_dense(nobs, "research", "tech_cost", dev)
     civic_cost = _obs_dense(nobs, "research", "civic_cost", dev)
     tech = (ladder.pick_research(tech_cost, tech_cost >= 0, deep)
-            if bool((tech_cost >= 0).any()) else None)
+            if bool((tech_cost >= 0).count_nonzero()) else None)
     civic = (ladder.pick_research(civic_cost, civic_cost >= 0, deep)
-             if bool((civic_cost >= 0).any()) else None)
+             if bool((civic_cost >= 0).count_nonzero()) else None)
     # the SLOTTED CARDS — a decision every turn the seat has a government;
     # None when no card is on offer, which the wire reads as "no decision"
     policies = None
     pol_open = _obs_members(nobs, "policy", "unlocked", st.npol, dev)
-    if bool(pol_open.any()):
+    if bool(pol_open.count_nonzero()):
         # the seat's CARD STYLE: pinned by its style preset, else one persistent
         # draw per game (turn 0, salt 10) — a coherent player, not a coin per turn
         if style["cards"] is not None:
@@ -1544,7 +1544,7 @@ def plan_units(st, row: int, nobs: list, max_steps: int = 4) -> torch.Tensor:
     for _k in range(1, max_steps):
         prev = ranks[-1]
         moving = (prev >= 0) & (prev < 6)
-        if not bool(moving.any()):
+        if not bool(moving.count_nonzero()):
             break
         nb_prev = st.neigh[cur.clamp(min=0)]
         cur = torch.where(moving, nb_prev.gather(2, prev.clamp(min=0, max=5).unsqueeze(2)).squeeze(2), cur)
@@ -1577,7 +1577,7 @@ def plan_units(st, row: int, nobs: list, max_steps: int = 4) -> torch.Tensor:
         has_step = closer.any(dim=2) & ok_all
         nxt = torch.where(has_step, key.argmin(dim=2), nxt)
         ranks.append(nxt)
-        if not bool((nxt >= 0).any()):
+        if not bool((nxt >= 0).count_nonzero()):
             ranks.pop()
             break
     return torch.stack(ranks, dim=2) if len(ranks) > 1 else ranks[0].unsqueeze(2)

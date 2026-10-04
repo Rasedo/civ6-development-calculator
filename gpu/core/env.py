@@ -192,7 +192,7 @@ class BatchEnv:
                 mine.sum(dim=1).to(d) / 10.0,
                 # Army COMPOSITION: the ladder trains ranged while the army
                 # holds melee, so a bare COUNT cannot express the decision.
-                (mine & (s._type_ranged_strength[s.major_unit_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
+                (mine & (s._type_ranged_strength.take(s.major_unit_type.clamp(min=0, max=s.NU - 1)) > 0)).sum(dim=1).to(d) / 10.0,
             ],
             dim=1,
         )  # [B, 15]
@@ -321,7 +321,7 @@ class BatchEnv:
         s = self.sim
         ut = s.major_unit_type.clamp(min=0, max=s.NU - 1)
         mine = s.major_unit_alive & (s.major_unit_seat == row)
-        return s.city_alive[:, row].sum(dim=1) * 8 + (mine.long() * s._type_combat[ut]).sum(dim=1)
+        return s.city_alive[:, row].sum(dim=1) * 8 + (mine.long() * s._type_combat.take(ut)).sum(dim=1)
 
     def _ctx_block(self, row: int) -> torch.Tensor:
         s = self.sim
@@ -334,13 +334,13 @@ class BatchEnv:
         qcur = s._q_unit_of(s._q_head(row))
         q_ty = (qcur - s.UNIT_BASE).clamp(min=0, max=s.NU - 1)
         q_u = alive & (qcur >= s.UNIT_BASE) & (qcur < s.UNIT_BASE + s.NU)
-        q_mil = q_u & (s._type_combat[q_ty] > 0)
+        q_mil = q_u & (s._type_combat.take(q_ty) > 0)
         ut = s.major_unit_type.clamp(min=0, max=s.NU - 1)
         mine = s.major_unit_alive & (s.major_unit_seat == row)
-        mil = mine & (s._type_combat[ut] > 0)
+        mil = mine & (s._type_combat.take(ut) > 0)
         n_units = mine.sum(dim=1) + q_u.sum(dim=1)
-        n_rng = (mil & rng_t[ut]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
-        n_mel = (mil & ~rng_t[ut]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
+        n_rng = (mil & rng_t.take(ut)).sum(dim=1) + (q_mil & rng_t.take(q_ty)).sum(dim=1)
+        n_mel = (mil & ~rng_t.take(ut)).sum(dim=1) + (q_mil & ~rng_t.take(q_ty)).sum(dim=1)
         # atWarWithAny — this row's whole line of the war matrix, majors and
         # city-states alike, because `Seat.wars` holds both and nothing ever
         # enters a war cell against the barbarian row. It feeds BOTH the unit
