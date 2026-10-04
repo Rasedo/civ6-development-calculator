@@ -636,12 +636,15 @@ def _main() -> int:
                   "gpu", "policy", "tools", "tests"]),
         ("pyright", [npx, "pyright"]),
     )
-    _ths = [threading.Thread(target=run, args=(name, cmd), kwargs={"threads": 24}, daemon=True)
-            for name, cmd in _static]
-    for th in _ths:
+    # THE LANES WAIT FOR NONE OF THE CHECKS. They read what `export` writes,
+    # so only lock -> seed -> export sits in front of them; the static checks
+    # and the two ratchets run BESIDE the lanes, and a red among them sets
+    # `failed`, which bails the lanes like any red lane. `_s0_threads` is
+    # joined before the verdict.
+    _s0_threads = [threading.Thread(target=run, args=(name, cmd), kwargs={"threads": 24}, daemon=True)
+                   for name, cmd in _static]
+    for th in _s0_threads:
         th.start()
-    for th in _ths:
-        th.join()
     for name, cmd in (
         # The lock check runs BEFORE seed: `seed` rewrites worlds.lock, so a
         # check placed after it diffs a generation against itself and can
@@ -651,6 +654,11 @@ def _main() -> int:
         ("lock", [npm, "run", "seed:check"]),
         ("seed", [npm, "run", "seed"]),
         ("export", [npm, "run", "export"]),
+    ):
+        if failed.is_set():
+            break
+        run(name, cmd, threads=24)
+    for name, cmd in (
         # THE CONSTANTS AGAINST THE REAL GAME. `export` just wrote
         # provenance.json; the checker re-reads every tagged constant from
         # the install and compares. The ledger (docs/PROVENANCE.md) already
@@ -664,9 +672,11 @@ def _main() -> int:
     ):
         if failed.is_set():
             break
-        run(name, cmd, threads=24)
+        th = threading.Thread(target=run, args=(name, cmd), kwargs={"threads": 24}, daemon=True)
+        th.start()
+        _s0_threads.append(th)
 
-    _s0_wall = time.time() - t0  # the WALL of stage 0, its static checks overlap
+    _s0_wall = time.time() - t0  # the wall in front of the lanes: lock, seed, export
     _serve_names: list[str] = []
     _poke_names: list[str] = []
     # The memory report at the end reads these three. Stage 0 can BAIL before
@@ -996,6 +1006,8 @@ def _main() -> int:
             th.start()
         for th in threads:
             th.join()
+    for th in _s0_threads:
+        th.join()
 
     _mem_stop.set()
     wall = time.time() - t0
