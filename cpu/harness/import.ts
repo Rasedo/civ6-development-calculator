@@ -40,18 +40,18 @@ import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
-import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP } from '../data/units';
+import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP, FORMATION_CS } from '../data/units';
 import { scaleByGameSpeed } from '../data/constants';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
-import { CITY_STATE_TYPES } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES } from '../data/cityStates';
 import { PROMO_CLASSES } from '../data/promotions';
 import { FEATURES, clearableFeatures } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { neighborTile } from '../../world/hex';
+import { hexDistance, neighborTile } from '../../world/hex';
 import { GP_CITY_PERM, GP_CLASSES, GREAT_PEOPLE, gpEffectOf } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
@@ -65,7 +65,7 @@ import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost, unitStepCost } from '../core/game';
-import { builderCost, traderCost } from '../core/units';
+import { builderCost, traderCost, unitDomain } from '../core/units';
 import { computeUnlocks } from '../core/effects';
 import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { districtSiteCost } from '../core/phase';
@@ -327,6 +327,10 @@ export interface History {
   firstTurn: number;
   last: TurnRecord | null;
   bestMelee: Map<number, number>;
+  /** units a major holds levied from a city-state, by `owner:id`, with the
+   *  city-state's player id: a city-state's unit gone at t+1 beside a new
+   *  one of its type under the major */
+  levied: Map<string, number>;
   /** culture expansions by the city's centre plot (a capture keeps them) */
   cultureTaken: Map<number, number>;
   /** Builders each player has gained: a Builder id new at t+1 */
@@ -402,7 +406,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(),
+  return { firstTurn: -1, last: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(),
     unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
 }
@@ -433,10 +437,13 @@ function copiesQuoted(rec: TurnRecord, cat: Catalog, pid: number, unitName: stri
 export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void {
   const W = rec.head.W;
   const uReplace = new Map(cat.unitReplaces);
-  const melee = (idx: number) => {
+  // what a unit new at this record raises its owner's base to
+  // (`raiseBestMelee`): a land or naval fighting unit's Combat with its
+  // formation's strength
+  const made = (idx: number, formation: number) => {
     const id = unitId({ cat, uReplace, gaps: new Map() }, idx);
     const def = id ? UNITS[id] : undefined;
-    return def && def.combat > 0 && !def.ranged ? def.combat : 0;
+    return def && def.combat > 0 && unitDomain(id!) === 'military' ? def.combat + (FORMATION_CS[formation] ?? 0) : 0;
   };
   if (h.last === null) {
     h.firstTurn = rec.turn;
@@ -444,9 +451,18 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   } else {
     const seen = new Set(h.last.units.map((u) => `${u.owner}:${u.id}`));
     const builder = cat.units.indexOf('UNIT_BUILDER');
+    // a unit another player lost this turn: a new one of its type close by is
+    // that unit changing hands (a levy, a capture), which raises nothing
+    const live = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
+    const handed = h.last.units.filter((u) => !live.has(`${u.owner}:${u.id}`));
+    const shape = { width: W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
+    const minors = new Set(rec.players.filter((p) => bool(p.minor)).map((p) => p.id));
     for (const u of rec.units) {
       if (seen.has(`${u.owner}:${u.id}`)) continue;
-      const cs = melee(u.type);
+      const from = handed.find((g) => g.owner !== u.owner && g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
+      // a city-state's unit handed to a major is a levy (`Unit.leviedFrom`)
+      if (from && minors.has(from.owner) && !minors.has(u.owner)) h.levied.set(`${u.owner}:${u.id}`, from.owner);
+      const cs = from ? 0 : made(u.type, Math.max(0, num(u.formation)));
       if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
       if (u.type === builder) h.builders.set(u.owner, (h.builders.get(u.owner) ?? 0) + 1);
     }
@@ -700,8 +716,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     playerOfSeat.set(seat, p.id);
     const kind = strip(inherits.get(String(p.leader)) ?? '', 'LEADER_MINOR_CIV_').toLowerCase();
     if (!CITY_STATE_TYPES.includes(kind as CityStateType)) gap(ctx, 'city-state-type', String(p.leader));
+    // the engine names a city-state as its suzerain-bonus row does
+    // ('Hong Kong' for CIVILIZATION_HONG_KONG), which is what every bonus reads
+    const civName = strip(String(p.civ), 'CIVILIZATION_');
+    const name = Object.keys(CITY_STATE_SUZERAIN_BONUS).find((n) => n.toUpperCase().replace(/[ -]/g, '_') === civName) ?? civName;
     const cs: CityState = {
-      ...emptySeat(seat), id: k, name: strip(String(p.civ), 'CIVILIZATION_'),
+      ...emptySeat(seat), id: k, name,
       type: (CITY_STATE_TYPES.includes(kind as CityStateType) ? kind : 'trade') as CityStateType,
       centerIndex: -1, population: 0, envoys: {}, met: [], suzerain: -1,
     };
@@ -1043,6 +1063,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       ...(num(u.formation) > 0 ? { formation: num(u.formation) } : {}),
       ...(bool(u.embarked) ? { embarked: true } : {}),
     };
+    const levy = history?.levied.get(`${u.owner}:${u.id}`);
+    if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
     state.units.push(unit);
   }
   state.nextUnitId = nextId;

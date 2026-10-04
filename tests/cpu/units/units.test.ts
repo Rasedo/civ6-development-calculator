@@ -165,6 +165,6 @@ describe('builders', () => {
 
   it('builders pay no upkeep', () => {
     const { state } = unitsState();
-    expect(unitUpkeep(getModifiers(state, 0), 'BUILDER')).toBe(0);
+    expect(unitUpkeep(getModifiers(state, 0), { type: 'BUILDER' })).toBe(0);
   });
 });

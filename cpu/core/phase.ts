@@ -63,7 +63,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, garrisonOf } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, completedSpecialtyDistricts, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitPurchaseCost, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
+import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, completedSpecialtyDistricts, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitPurchaseCost, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -777,12 +777,12 @@ function freeCityGrantType(state: GameState): string | null {
  *  runs/bankrupt_m35_20260926T083304Z.jsonl). The roster order is
  *  `state.units`, spawn order, the one order both engines own (the GPU's pool
  *  appends, so its lowest slot is the same unit); nothing is refunded. */
-export function bankruptcy(state: GameState, s: Seat, upkeepOf: (type: string) => number): void {
+export function bankruptcy(state: GameState, s: Seat, upkeepOf: (unit: Unit) => number): void {
   s.goldShortfall = goldShortfall(s.treasury);
   if (s.treasury < 0) s.treasury = 0;
   const n = bankruptDisbands(s.goldShortfall);
   for (let k = 0; k < n; k++) {
-    const victim = state.units.find((u) => u.seat === s.seat && upkeepOf(u.type) > 0);
+    const victim = state.units.find((u) => u.seat === s.seat && upkeepOf(u) > 0);
     if (!victim) return;
     disbandUnit(state, victim.id);
   }
@@ -840,14 +840,14 @@ export function freeCitiesPhase(state: GameState): void {
   let income = 0;
   for (const s of stats) income += s.total.gold;
   free.treasury += income;
-  const upkeep = state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u.type) : 0), 0);
+  const upkeep = state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u) : 0), 0);
   const _dlu = (globalThis as { __diffLog?: string[] }).__diffLog;
   if (_dlu) _dlu.push(`up:${FREE_SEAT}:${state.turn}`
     + ` n${state.units.filter((u) => u.seat === FREE_SEAT).length}`
     + ` cost${upkeep.toFixed(3)} purse${free.treasury.toFixed(3)}`);
   free.treasury -= upkeep;
   const short0 = free.goldShortfall ?? 0;
-  bankruptcy(state, free, (t) => unitUpkeep(mods, t));
+  bankruptcy(state, free, (u) => unitUpkeep(mods, u));
   // the cities' Production is read again where the shortfall moved what they
   // make
   if ((free.goldShortfall ?? 0) !== short0) {
@@ -1661,7 +1661,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         if (id === 'BUILDER') commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0, cost: builderCost(state, actor.seat) });
         // the TRADER prices off ITS escalator the same way (game progress)
         else if (id === 'TRADER') commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0, cost: traderCost(state, actor.seat) });
-        else commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0 });
+        // a COST_PROGRESSION_PREVIOUS_COPIES chassis (the Spy) locks the price
+        // its copies so far set; a flat row prices off its catalog Cost
+        else commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0,
+          ...(UNITS[id].costStep === undefined ? {} : { cost: unitStepCost(id, unitsAcquired(state, actor.seat, id)) }) });
       }
     }
     else if (a >= wonderLo && a < wonderLo + wonders.length) {
@@ -2745,7 +2748,7 @@ export function seatPhase(state: GameState): void {
     actor.treasury += emergencyEnvoyIncome(state, actor.seat);
     const upkMods = getModifiers(state, actor.seat);
     const _upk = state.units.reduce(
-      (s, u) => s + (u.seat === actor.seat ? unitUpkeep(upkMods, u.type) : 0),
+      (s, u) => s + (u.seat === actor.seat ? unitUpkeep(upkMods, u) : 0),
       0,
     );
     // WHAT the seat is charged and for HOW MANY units, before the charge
@@ -2758,7 +2761,7 @@ export function seatPhase(state: GameState): void {
     actor.treasury -= _upk;
     actor.treasury -= wmdUpkeep(state, actor.seat);
     const shortfallBefore = actor.goldShortfall ?? 0;
-    bankruptcy(state, actor, (t) => unitUpkeep(upkMods, t));
+    bankruptcy(state, actor, (u) => unitUpkeep(upkMods, u));
     // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's technology grants, after
     // the upkeep they do not yet owe AND after the bankruptcy that upkeep may
     // force.

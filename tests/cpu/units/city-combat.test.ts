@@ -7,7 +7,7 @@ import { endTurn } from '../../../cpu/core/game';
 import { commitProduction } from '../../../cpu/core/seatTurn';
 import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
-import { ENCAMPMENT_HP, UNITS, WALLS_HP } from '../../../cpu/data/units';
+import { ENCAMPMENT_HP, FORMATION_CS, UNITS, WALLS_HP } from '../../../cpu/data/units';
 import { PALACE_CITY_CS, GARRISON_HP_PER_CS, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../../../cpu/data/constants';
 import { DISTRICTS } from '../../../cpu/data/districts';
 import { tilesWithin } from '../../../world/hex';
@@ -377,8 +377,31 @@ describe('the base: the strongest melee ever trained or bought', () => {
     expect(centreStrength(state, city)).toBe(UNITS.SWORDSMAN.combat - CITY_BASE_MELEE_CUT);
     raiseBestMelee(state, 0, 'WARRIOR');
     expect(seat.bestMeleeCS).toBe(UNITS.SWORDSMAN.combat);
-    // a ranged chassis is no melee
+    // a ranged chassis' melee Combat counts (runs/h1_duelw1106 t195, a
+    // Machine Gun), a Corps' formation strength rides on it, and an aircraft
+    // moves nothing (runs/h1_duelw1107 t247, a Fighter)
     raiseBestMelee(state, 0, 'FIELD_CANNON');
-    expect(seat.bestMeleeCS).toBe(UNITS.SWORDSMAN.combat);
+    expect(seat.bestMeleeCS).toBe(UNITS.FIELD_CANNON.combat);
+    raiseBestMelee(state, 0, 'FIELD_CANNON', 1);
+    expect(seat.bestMeleeCS).toBe(UNITS.FIELD_CANNON.combat + FORMATION_CS[1]);
+    raiseBestMelee(state, 0, 'JET_FIGHTER');
+    expect(seat.bestMeleeCS).toBe(UNITS.FIELD_CANNON.combat + FORMATION_CS[1]);
+  });
+
+  it('an upgrade raises it with the formation the unit stands in', () => {
+    const { state, seat } = scene();
+    const u = spawnUnit(state, 'KNIGHT', tileAtCoords(state.map, 8, 8).index, 0)!;
+    u.formation = 1;
+    raiseBestMelee(state, 0, 'TANK', u.formation);
+    expect(seat.bestMeleeCS).toBe(UNITS.TANK.combat + FORMATION_CS[1]);
+  });
+
+  it('a Corps garrisons with its formation strength', () => {
+    const { state, city, seat } = scene();
+    seat.bestMeleeCS = 65;
+    const g = spawnUnit(state, 'INFANTRY', city.centerIndex, 0)!;
+    const lone = centreStrength(state, city);
+    g.formation = 1;
+    expect(centreStrength(state, city)).toBe(lone + FORMATION_CS[1]);
   });
 });

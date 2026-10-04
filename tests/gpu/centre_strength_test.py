@@ -144,6 +144,11 @@ def test_garrison(sim) -> None:
     assert got == [75, 74, 72.5, 70, 67.5, 66], got
     assert strength(sim, r, j, garrisoned=False) == 55, "the Encampment's read kept the garrison"
     sim.unit_hp[B0, g] = 100
+    # a Corps garrisons with its formation's strength (runs/h1_duelw1107
+    # Taiyuan: a Line Infantry Corps on a base of 55 added 20)
+    sim.unit_formation[B0, g] = 1
+    assert strength(sim, r, j) == 55 + 20 + int(sim._formation_cs[1]), "a Corps garrisoned without its strength"
+    sim.unit_formation[B0, g] = 0
     clear(sim, ctr)
     sim.city_is_cap[B0, r, j] = True
     print("  3 the garrison OK — max(0, Combat - base) x (1 - damage/200), none on the Encampment's read")
@@ -199,9 +204,20 @@ def test_trained_or_bought() -> None:
     sim._raise_best_melee(r, one, torch.full((sim.B,), sword, dtype=torch.long))
     assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[sword])
     sim._raise_best_melee(r, one, sim._warrior_idx)
-    sim._raise_best_melee(r, one, torch.full((sim.B,), cannon, dtype=torch.long))
-    assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[sword]), (
-        "the base fell, or a ranged chassis raised it")
+    assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[sword]), "the base fell"
+    # a ranged chassis' melee Combat counts (runs/h1_duelw1106 t195, a
+    # Machine Gun), and a Corps' formation strength rides on it
+    full = lambda i: torch.full((sim.B,), i, dtype=torch.long)  # noqa: E731
+    sim._raise_best_melee(r, one, full(cannon))
+    assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[cannon]), "a ranged chassis did not raise it"
+    sim._raise_best_melee(r, one, full(cannon), formation=full(1))
+    assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[cannon]) + int(sim._formation_cs[1]), (
+        "a Corps' strength did not ride")
+    # an aircraft moves nothing (runs/h1_duelw1107 t247, a Fighter)
+    jet = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "JET_FIGHTER")
+    was = int(sim.civ_best_melee[B0, r])
+    sim._raise_best_melee(r, one, full(jet))
+    assert int(sim.civ_best_melee[B0, r]) == was, "an aircraft raised the base"
     print("  5 trained or bought OK — a starting or granted unit moves nothing, the base never falls")
 
 

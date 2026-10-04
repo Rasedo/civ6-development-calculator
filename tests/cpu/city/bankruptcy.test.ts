@@ -122,7 +122,7 @@ describe('bankruptcy', () => {
     const mods = getModifiers(state, FREE_SEAT);
     const first = spawnUnit(state, 'SPEARMAN', tileAtCoords(state.map, 2, 12).index, FREE_SEAT)!;
     for (let k = 0; k < 12; k++) spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 3 + k, 13).index, FREE_SEAT);
-    expect(unitUpkeep(mods, 'SPEARMAN')).toBeGreaterThan(0);
+    expect(unitUpkeep(mods, { type: 'SPEARMAN' })).toBeGreaterThan(0);
     free.treasury = 0;
     freeCitiesPhase(state);
     expect(free.treasury).toBe(0);

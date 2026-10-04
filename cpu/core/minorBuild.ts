@@ -43,7 +43,7 @@ import { applyTrainingGrants, centreStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable, spreadReligiousPressure } from './game';
 import { computeCityStats } from './city';
 import { minorCity, suzerainOf } from './cityStates';
-import { computeUnlocksIn, purchaseStep, type Unlocks } from './effects';
+import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
 import { applyLumpYield } from './economy';
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
@@ -161,10 +161,10 @@ export function minorEconomy(state: GameState, cityState: CityState): number {
   const gained = minorResearch(state, cityState);
   if (gained > 0) y = computeCityStats(state, minorCity(cityState)).total;
   let upkeep = 0;
-  for (const u of state.units) if (u.seat === cityState.seat) upkeep += UNITS[u.type]?.maintenance ?? 0;
+  for (const u of state.units) if (u.seat === cityState.seat) upkeep += unitMaintenance(u);
   cityState.treasury += y.gold;
   cityState.treasury -= upkeep;
-  bankruptcy(state, cityState, (t) => UNITS[t]?.maintenance ?? 0);
+  bankruptcy(state, cityState, (u) => unitMaintenance(u));
   cityState.faith += y.faith;
   return gained;
 }
@@ -251,6 +251,7 @@ export function minorUpgrades(state: GameState, cityState: CityState, gained: nu
     cityState.treasury -= MINOR_UPGRADE_GOLD;
     u.type = UNITS[u.type].upgradesTo!;
     u.movesLeft = 0;
+    raiseBestMelee(state, cityState.seat, u.type, u.formation ?? 0);
   }
 }
 

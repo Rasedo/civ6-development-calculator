@@ -151,11 +151,22 @@ export function cityLowlands(state: GameState, city: City): Tile[] {
   return state.map.tiles.filter((t) => t.ownerCity === city.id && t.ownerSeat === city.seat && t.lowland);
 }
 
+/** CIV6 (Flood Barrier): "Initial build cost and per turn maintenance are
+ *  variable based on the number of Coastal Lowlands in this city and the
+ *  current sea level" — the one multiplier of both: the city's coastal
+ *  lowland tiles, once more per flood level (Buildings_XP2
+ *  CostMultiplierPerTile 1, CostMultiplierPerSeaLevel 1). The recorded upkeep
+ *  is the row's Maintenance 1 times the multiplier its price quoted
+ *  (runs/h1_duelw1107: Xian's and Handan's barriers quoted 160 = 40 x 4 and
+ *  cost 4 a turn, Beijing's 200 and 5; h1_duelw1106: 40 and 1, 80 and 2). */
+export function floodBarrierScale(state: GameState, city: City): number {
+  return cityLowlands(state, city).length * (1 + floodLevel(state));
+}
+
 /** CIV6 (Flood Barrier): "(80 x coastal lowland tiles) + (80 x coastal
  *  lowland tiles x flood level)". */
 export function floodBarrierCost(state: GameState, city: City): number {
-  const n = cityLowlands(state, city).length;
-  return FLOOD_BARRIER_PER_TILE * n * (1 + floodLevel(state));
+  return FLOOD_BARRIER_PER_TILE * floodBarrierScale(state, city);
 }
 
 function barrierAt(state: GameState, tile: Tile): boolean {

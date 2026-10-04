@@ -37,6 +37,7 @@ import { hiddenResourcesFor } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
 import { warWearinessLosses } from './weariness';
 import { garrisonOf } from './units';
+import { floodBarrierScale } from './climate';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, gpCityPermOf, gpPermOf, gpTilePermOf } from '../data/greatPeople';
@@ -68,12 +69,13 @@ export interface CityStats {
   maintenance: number;
 }
 
-export function buildingMaintenance(id: string, civ?: string | null): number {
+export function buildingMaintenance(state: GameState, city: City, id: string): number {
   // a unique building may carry no upkeep where the row it replaces does
   // (the Marae), so the SEAT decides which row is being priced
-  const def = effectiveBuilding(civ, id);
+  const def = effectiveBuilding(civOf(state, city.seat), id);
   if (!def) return 0;
-  return def.maintenance;
+  // a Flood Barrier's upkeep scales as its price does
+  return def.floodBarrier ? def.maintenance * floodBarrierScale(state, city) : def.maintenance;
 }
 
 export function districtMaintenance(type: DistrictId): number {
@@ -147,8 +149,7 @@ export function cityMaintenance(state: GameState, city: City): number {
     const t = state.map.tiles[d.tileIndex];
     if (t.districtComplete && !t.districtPillaged) total += districtMaintenance(d.type);
   }
-  const civ = civOf(state, city.seat);
-  for (const b of city.buildings) total += buildingMaintenance(b, civ);
+  for (const b of city.buildings) total += buildingMaintenance(state, city, b);
   return total;
 }
 

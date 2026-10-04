@@ -83,6 +83,7 @@ export const CARBON_RECAPTURE_FAVOR = srcConst('climate.recaptureFavor', 30, {
 });
 
 import { srcConst, xml, type SrcMap } from './provenance';
+import { scaleByGameSpeed } from './constants';
 
 interface ClimatePhase {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
@@ -191,11 +192,12 @@ export function deforestationModifier(level: number): number {
 
 /** CIV6 (Flood Barrier): "The formula is (80 x coastal lowland tiles) + (80 x
  *  coastal lowland tiles x flood level)" — so the price of a barrier climbs
- *  with the sea it holds back. */
-export const FLOOD_BARRIER_PER_TILE = srcConst('climate.barrierPerTile', 80, {
-  pedia: 'the GS Flood Barrier page ("The formula is (80 x coastal lowland tiles) + (80 x coastal '
-    + 'lowland tiles x flood level)")',
-});
+ *  with the sea it holds back. The 80 is the row's own Cost (Buildings_XP2
+ *  CostMultiplierPerTile 1, CostMultiplierPerSeaLevel 1), so it takes the
+ *  speed as every production cost does: 40 a tile online, the step every
+ *  recorded quote climbs by (runs/h1_duelw1104..1108: 40, 80, 120, 160, 200). */
+export const FLOOD_BARRIER_PER_TILE = scaleByGameSpeed(srcConst('climate.barrierPerTile', 80,
+  xml('Buildings', 'BuildingType=BUILDING_FLOOD_BARRIER', 'Cost')));
 
 /**
  * CIV6 (Diplomatic Favor, Losing Favor): "When you're producing too much CO2

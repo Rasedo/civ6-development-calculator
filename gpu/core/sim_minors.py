@@ -347,11 +347,11 @@ class SimMinors:
             fresh = self._seat_city_stats(row, record=False)[0][:, 0]
             tot = torch.where((gained > 0).unsqueeze(1), fresh, tot)
         mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
-        upkeep = (self._type_maintenance.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)).double()
-                  * mine.double()).sum(dim=1)
+        upkeep = (self._unit_maintenance(self.major_unit_type, self.major_unit_formation,
+                                         self.major_unit_levied).double() * mine.double()).sum(dim=1)
         tre = self.citystate_treasury[:, s] + tot[:, 2] * keep
         paid = torch.where(alive, tre - upkeep, tre)
-        maint = self._type_maintenance.take(self.unit_type.clamp(min=0, max=self.NU - 1)).double()
+        maint = self._unit_maintenance(self.unit_type, self.unit_formation, self.unit_levied).double()
         self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
         self.citystate_faith[:, s] += tot[:, 5] * keep
         return gained
@@ -1122,6 +1122,9 @@ class SimMinors:
             self.major_unit_type[rr, u] = nxt[rr, u]
             self.major_unit_mp[rr, u] = 0
             self._gen_ver += 1
+            # the upgraded chassis raises the minor's base (`raiseBestMelee`)
+            self._raise_best_melee(self._CITY_MINOR0 + s, go, nxt.gather(1, first.unsqueeze(1)).squeeze(1),
+                                   formation=self.major_unit_formation.gather(1, first.unsqueeze(1)).squeeze(1))
 
     def _minor_monk_ok(self, s: int) -> torch.Tensor:
         """[B] — `minorMonkOk`: may minor `s`'s city sell a Warrior Monk — its

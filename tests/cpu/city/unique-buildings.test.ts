@@ -98,8 +98,10 @@ describe('effectiveBuilding merges a variant over the row it replaces', () => {
   });
 
   it('gives the Marae no upkeep where the Amphitheater pays one', () => {
-    expect(buildingMaintenance('AMPHITHEATER', 'MAORI')).toBe(0);
-    expect(buildingMaintenance('AMPHITHEATER', 'ROME')).toBe(1);
+    const m = scene('MAORI');
+    const r = scene('ROME');
+    expect(buildingMaintenance(m.state, m.city, 'AMPHITHEATER')).toBe(0);
+    expect(buildingMaintenance(r.state, r.city, 'AMPHITHEATER')).toBe(1);
   });
 
   it('pays the Electronics Factory a fifth Production when POWERED, regionally', () => {

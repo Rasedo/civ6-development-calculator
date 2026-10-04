@@ -29,17 +29,18 @@ import type { City, GameState, Tile } from '../core/types';
 import { borderBestPlots, computeCityStats, tileYieldsForCenter, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
-import { cityDefenseStrength } from '../core/combat';
+import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
-import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost, unitStepCost, unitsAcquired } from '../core/game';
+import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { monumentalityBuyMult } from '../core/eras';
-import { FREE_SEAT, civOf, hiddenResourcesFor, seatOf } from '../core/seats';
+import { FREE_SEAT, hiddenResourcesFor, seatOf } from '../core/seats';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
 import { LOYALTY_MAX } from '../data/seats';
 import { UNITS } from '../data/units';
+import { BUILDINGS } from '../data/buildings';
 import type { DistrictId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
@@ -254,7 +255,8 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     }
     push('city.defense', cityDefenseStrength(state, city) === num((c.districts[0] ?? [])[5] as number),
       num((c.districts[0] ?? [])[5] as number), cityDefenseStrength(state, city),
-      { buildings: city.buildings, districts: city.districts.map((d) => d.type) });
+      { buildings: city.buildings, districts: city.districts.map((d) => d.type), bestMelee: seatOf(state, city.seat)?.bestMeleeCS,
+        bare: centreStrength(state, city, false) });
     // what a following city presses on each city in range a turn
     if (c.pressureOut !== undefined && (city.followedReligion ?? -1) >= 0) {
       const ours = pressureFromCity(state, city, city.followedReligion!);
@@ -283,7 +285,25 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
           }
           continue;
         }
-        buyPush(`buy.buildingCost`, near(buildingCostIn(state, city, id), num(cost), 0.5), num(cost), buildingCostIn(state, city, id), { building: id });
+        // a Flood Barrier is priced off the city's Coastal Lowland plots, which
+        // the record does not carry (the importer's map has only the engine's
+        // own derivation of them)
+        if (BUILDINGS[id]?.floodBarrier) {
+          const ours = buildingCostIn(state, city, id);
+          const ok = near(ours, num(cost), 0.5);
+          out.push({ turn, check: 'buy.buildingCost', subject, ok, game: num(cost), ours,
+            ...(ok ? {} : { gaps: [...(gapsFor(buyGaps, 'buy.buildingCost').gaps ?? []), 'coastal lowland'], state: { building: id } }) });
+        } else {
+          buyPush(`buy.buildingCost`, near(buildingCostIn(state, city, id), num(cost), 0.5), num(cost), buildingCostIn(state, city, id), { building: id });
+        }
+        // a building the seat cannot buy with Gold has no gold price to check:
+        // a row with no PurchaseYield, and the walls a Valletta suzerain buys
+        // with Faith alone (the reader still quotes them, at the suzerain's
+        // discount: runs/h1_duelw1104 China t74+, 80 for 160)
+        if (BUILDINGS[id]?.noPurchase || wallsGoldBlocked(state, city.seat, id)) {
+          out.push({ turn, check: 'buy.buildingGold', subject, ok: true, skip: 'no gold purchase' });
+          continue;
+        }
         const price = goldPrice(state, city.seat, buildingPurchaseCost(state, city.seat, id));
         buyPush(`buy.buildingGold`, price === num(gold), num(gold), price, { building: id });
       } else if (kind === 'U') {
@@ -330,23 +350,27 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
   for (let seat = 0; seat < state.seats.length; seat++) {
     const pid = imp.playerOfSeat.get(seat)!;
     const p = rec.players.find((q) => q.id === pid)!;
-    const civ = civOf(state, seat);
     let b = 0;
     let d = 0;
     for (const city of state.seats[seat].cities) {
-      for (const id of city.buildings) b += buildingMaintenance(id, civ);
+      for (const id of city.buildings) b += buildingMaintenance(state, city, id);
       for (const x of city.districts) {
         const t = state.map.tiles[x.tileIndex];
         if (t.districtComplete && !t.districtPillaged) d += districtMaintenance(x.type);
       }
     }
     const mods = getModifiers(state, seat);
-    const u = state.units.filter((x) => x.seat === seat).reduce((n, x) => n + unitUpkeep(mods, x.type), 0);
+    const u = state.units.filter((x) => x.seat === seat).reduce((n, x) => n + unitUpkeep(mods, x), 0);
     const subject = `seat ${pid} ${String(p.civ)}`;
     const sg = [...(state.seats[seat].civ < 0 ? ['leader'] : []), ...(imp.seatGaps.get(seat) ?? [])];
     for (const [key, c] of imp.cityByKey) if (c.seat === seat) for (const g of imp.cityGaps.get(key) ?? []) sg.push(g);
     const gaps = sg.length ? { gaps: [...new Set(sg)] } : {};
-    out.push({ turn, check: 'seat.maintBuildings', subject, ok: b === num(p.maintBuildings), game: num(p.maintBuildings), ours: b, ...gaps });
+    // a Flood Barrier's upkeep is priced off its city's Coastal Lowland plots,
+    // which the record does not carry
+    const barrier = state.seats[seat].cities.some((c) => c.buildings.some((id) => BUILDINGS[id]?.floodBarrier));
+    const bok = b === num(p.maintBuildings);
+    const bgaps = !bok && barrier ? { gaps: [...new Set([...sg, 'coastal lowland'])] } : gaps;
+    out.push({ turn, check: 'seat.maintBuildings', subject, ok: bok, game: num(p.maintBuildings), ours: b, ...bgaps });
     out.push({ turn, check: 'seat.maintDistricts', subject, ok: d === num(p.maintDistricts), game: num(p.maintDistricts), ours: d, ...gaps });
     out.push({ turn, check: 'seat.maintUnits', subject, ok: u === num(p.maintUnits), game: num(p.maintUnits), ours: u, ...gaps,
       state: { units: state.units.filter((x) => x.seat === seat).map((x) => x.type) } });

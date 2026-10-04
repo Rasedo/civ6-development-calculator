@@ -1232,6 +1232,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   unit.type = next;
   unit.movesLeft = 0;
   unit.movesFull = unitFullMoves(state, unit);
+  raiseBestMelee(state, seat, next, unit.formation ?? 0);
   return { ok: true };
 }
 
@@ -1579,21 +1580,28 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
   return best;
 }
 
-/** A seat TRAINED or BOUGHT `unitType`: the strongest melee it has ever done
- *  so rises to it and never falls (`Seat.bestMeleeCS`, the base its centres
- *  stand on). The live game raised the base at the purchase in every city at
- *  once and kept it after the unit died; a unit merely created, granted,
- *  captured or only buildable moved nothing
- *  (runs/b95t_p1_mech_bought_20260927.jsonl,
+/** A seat TRAINED, BOUGHT or UPGRADED to a land or naval fighting unit: the
+ *  strongest Combat it has so made — a ranged chassis' melee Combat and a
+ *  Corps' or Army's formation strength included — rises to it and never falls
+ *  (`Seat.bestMeleeCS`, the base its centres stand on). The live game raised
+ *  the base at the purchase in every city at once and kept it after the unit
+ *  died; a unit merely created, granted, captured or only buildable moved
+ *  nothing (runs/b95t_p1_mech_bought_20260927.jsonl,
  *  runs/b95t_p0_mech_buy_del_20260927T003125Z.jsonl,
  *  runs/b95t_p1_mech_create_del_20260927T002833Z.jsonl,
  *  runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl,
- *  runs/b95t_p0_tech_only_20260927T003037Z.jsonl). */
-export function raiseBestMelee(state: GameState, seat: number, unitType: string): void {
+ *  runs/b95t_p0_tech_only_20260927T003037Z.jsonl). An upgrade raised it
+ *  (runs/h1_duelw1107 t229: a Pike and Shot Army made an AT Crew Army, 75 + 17;
+ *  h1_duelw1105 t231: a Knight Corps made a Tank Corps, 85 + 10; h1_duelw1106
+ *  t195: a Field Cannon made a Machine Gun, Combat 70; h1_duelw1103 t190: a
+ *  Submarine made a Nuclear Submarine, 80), a merge into a Corps or an Army
+ *  did not (h1_duelw1107 t176), nor did an aircraft (h1_duelw1103 t240: a Jet
+ *  Bomber; h1_duelw1107 t247: a Fighter). */
+export function raiseBestMelee(state: GameState, seat: number, unitType: string, formation = 0): void {
   const def = UNITS[unitType];
-  if (!def || !(def.combat > 0) || def.ranged) return;
+  if (!def || !(def.combat > 0) || unitDomain(unitType) !== 'military') return;
   const owner = seatOf(state, seat);
-  if (owner) owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat);
+  if (owner) owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat + (FORMATION_CS[formation] ?? 0));
 }
 
 /** `far`: a GRANT, which the game places on the nearest plot that takes the

@@ -389,10 +389,10 @@ export function completeQueueItem(
         || allianceFreePromo(state, city.seat);
       const trained = spawnUnit(state, item.unit, where, city.seat);
       if (trained) {
-        applyTrainingGrants(state, city, trained);
-        grantFreePromotion(trained, freePromo);
         // a FORMATION entry arrives at its tier — the whole point of the order
         if (item.formation) trained.formation = item.formation;
+        applyTrainingGrants(state, city, trained);
+        grantFreePromotion(trained, freePromo);
       }
       if (item.unit === 'BUILDER') owner.buildersTrained += 1;
       // CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice. Purchases
@@ -419,18 +419,18 @@ export function completeQueueItem(
       for (let k = 0; k < copies; k++) {
         const extra = spawnUnit(state, item.unit, city.centerIndex, city.seat);
         if (extra) {
+          if (item.formation) extra.formation = item.formation;
           applyTrainingGrants(state, city, extra);
           grantFreePromotion(extra, freePromo);
-          if (item.formation) extra.formation = item.formation;
         }
       }
       if (UNITS[item.unit]?.naval && seatWonderFlag(state, city.seat, 'duplicateNavalTrain')) {
         const twin = spawnUnit(state, item.unit, city.centerIndex, city.seat);
         if (twin) {
-          applyTrainingGrants(state, city, twin);
-          grantFreePromotion(twin, freePromo);
           // what was trained arrives twice, tier and all
           if (item.formation) twin.formation = item.formation;
+          applyTrainingGrants(state, city, twin);
+          grantFreePromotion(twin, freePromo);
         }
       }
       break;

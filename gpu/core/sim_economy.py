@@ -4118,10 +4118,28 @@ class SimEconomy:
         m = self._fx_at_seat("rxp", seat, rows).long()
         return torch.where(self._type_recon.take(types.clamp(min=0, max=self.NU - 1)), m.clamp(min=1), one)
 
-    def _unit_upkeep(self, row: int, types: torch.Tensor) -> torch.Tensor:
-        """The gold each unit costs this seat per turn — Conscription and
-        Levee en Masse take it down, never below free."""
+    def _unit_maintenance(self, types: torch.Tensor, formation: torch.Tensor | None = None,
+                          levied: torch.Tensor | None = None) -> torch.Tensor:
+        """`unitMaintenance` — a unit's own Maintenance before any card: the
+        chassis' row, a Corps' and an Army's at the formation's cost modifier
+        rounded up, nothing for a unit levied from a city-state (`levied`).
+        No `formation` / `levied` reads a lone, unlevied unit of each type."""
+        if formation is None:
+            formation = torch.zeros_like(types)
+        if levied is None:
+            levied = torch.zeros_like(types, dtype=torch.bool)
         base = self._type_maintenance.take(types.clamp(min=0, max=self.NU - 1))
+        mult = self._form_cost_mult.take(formation.clamp(min=0, max=self._form_max)).to(base.dtype)
+        return torch.where(levied, torch.zeros_like(base), torch.ceil(base * mult))
+
+    def _unit_upkeep(self, row: int, types: torch.Tensor, formation: torch.Tensor | None = None,
+                     levied: torch.Tensor | None = None) -> torch.Tensor:
+        """`unitUpkeep` — the gold each unit costs this seat per turn:
+        `_unit_maintenance`, which Conscription and Levee en Masse take down,
+        never below free; a levied unit costs nothing."""
+        if levied is None:
+            levied = torch.zeros_like(types, dtype=torch.bool)
+        base = self._unit_maintenance(types, formation, levied)
         cut = self._gov_mods(row)[12]["mcut"]
         # CIV6 (Elite Forces): "+2 Gold to maintain each military unit."
         add = self._gov_mods(row)[12]["milmaint"]
@@ -4129,7 +4147,7 @@ class SimEconomy:
             cut = cut.unsqueeze(-1)
             add = add.unsqueeze(-1)
         mil = (self._type_combat.take(types.clamp(min=0, max=self.NU - 1)) > 0).to(base.dtype)
-        return (base - cut + add * mil).clamp(min=0)
+        return torch.where(levied, torch.zeros_like(base), (base - cut + add * mil).clamp(min=0))
 
     def _adj_src_count(self, src: int) -> torch.Tensor:
         """[B, T] — how many NEIGHBOURS answer adjacency source `src`, for the

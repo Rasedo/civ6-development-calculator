@@ -1832,7 +1832,7 @@ class SimOrders:
         seat = int(self._ROW_SEAT[row])
         if self.units_mode:
             mine = self.unit_alive & (self.unit_seat == seat)
-            maint = self._unit_upkeep(row, self.unit_type)
+            maint = self._unit_upkeep(row, self.unit_type, self.unit_formation, self.unit_levied)
             upkeep = (maint * mine.to(self.dtype)).sum(dim=1)
         else:
             mine = torch.zeros(self.B, 1, dtype=torch.bool, device=self.device)

@@ -3150,6 +3150,11 @@ class SimSeats:
                                          self._builder_cost(self.civ_builders_trained[:, row]).double(), cost_q)
                 # the TRADER prices off ITS escalator (game progress)
                 cost_q = torch.where(ui == self._trader_idx, self._trader_cost(row).double(), cost_q)
+                # a COST_PROGRESSION_PREVIOUS_COPIES chassis (the Spy) locks the price
+                # its copies so far set (unitStepCost)
+                step_q = self._type_cost_step.gather(0, ui)
+                cost_q = torch.where(step_q > 0, torch.floor(self._type_step_base.gather(0, ui)
+                                     + self.civ_unit_acq[:, row].gather(1, ui.unsqueeze(1)).squeeze(1).double() * step_q), cost_q)
                 self._q_push(row, j, is_u, a, cost_q)
                 for _ui, _sl, _c in self._res_slot_units:
                     self._charge_unit_resource(row, is_u & (ui == _ui), _ui, at=j)
@@ -4096,6 +4101,7 @@ class SimSeats:
         self.unit_mp.scatter_(1, sc.unsqueeze(1),
                               torch.where(ok, torch.zeros_like(here),
                                           self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)).unsqueeze(1))
+        self._raise_best_melee(row, ok, nc, formation=self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
 
     def _seat_charge_upkeep(self, row: int) -> None:
         """`chargeUnitUpkeep` — CIV6 (Resource, GS): "each turn, the unit will
@@ -10059,6 +10065,14 @@ class SimSeats:
         maint = (self._d_maint.double().reshape(1, 1, -1)
                  * self._dist_counts(row)[:, :cols].double()).sum(dim=2)
         maint = maint + torch.einsum("bjn,bn->bj", bldg.double(), self._b_cols(row)["maintenance"])
+        if self._barrier_bidx >= 0 and bool(bldg[:, :, self._barrier_bidx].any()):
+            # a Flood Barrier's upkeep scales as its price does
+            # (`floodBarrierScale`): its row's Maintenance per coastal lowland
+            # tile, once more per flood level
+            fb = self._barrier_bidx
+            scale = (self._city_lowland_count(row)[:, :cols]
+                     * (1 + self._flood_level().unsqueeze(1))).double()
+            maint = maint + bldg[:, :, fb].double() * self._b_cols(row)["maintenance"][:, fb].unsqueeze(1) * (scale - 1)
         maint = maint + float(self.rules.palace_maintenance) * is_cap_a
         # WATER: fresh > coastal > none, then the Aqueduct — a fresh city gains
         # aqFreshBonus, a dry one is raised to aqNoFreshTotal. A pillaged
@@ -12230,8 +12244,9 @@ class SimSeats:
     def _garrison_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
                      seat: torch.Tensor, base: torch.Tensor) -> torch.Tensor:
         """[B] f64 — `garrisonCS`, THE GARRISON TERM: a military unit of the
-        holder on the centre, a hull included, adds max(0, its Combat - damage
-        / 10 - `base`), associated as TS writes it. An aircraft and a passenger
+        holder on the centre, a hull included, adds max(0, its Combat and its
+        formation's strength - damage / 10 - `base`), associated as TS writes
+        it. An aircraft and a passenger
         are no garrison; the tile seats one military unit."""
         bidx = self._bidx
         ctr = self.city_center[bidx, hrow, hcol.clamp(min=0)].clamp(min=0)
@@ -12241,7 +12256,8 @@ class SimSeats:
         gar = ((gslot >= 0) & (self.unit_seat[bidx, gs0] == seat)
                & ~self.unit_emb[bidx, gs0])
         dmg = (int(self.rules.combat["unitHp"]) - self.unit_hp[bidx, gs0]).to(torch.float64)
-        g = (self._type_combat.take(gty).to(torch.float64) - dmg / self._garrison_hp_per_cs
+        form = self._formation_cs.take(self.unit_formation[bidx, gs0].clamp(min=0, max=self._form_max))
+        g = ((self._type_combat.take(gty) + form).to(torch.float64) - dmg / self._garrison_hp_per_cs
              - base.to(torch.float64)).clamp(min=0)
         return torch.where(gar, g, torch.zeros_like(g))
 

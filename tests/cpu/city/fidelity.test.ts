@@ -193,9 +193,11 @@ describe('maintenance', () => {
   });
 
   it('prices every building by its own Maintenance column', () => {
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     // CIV6: the Preserve's two rows and the worship rows write no
     // Maintenance, so they take the schema DEFAULT 0
-    for (const id of ['GROVE', 'SANCTUARY', 'CATHEDRAL', 'PALACE']) expect(buildingMaintenance(id)).toBe(0);
-    expect(buildingMaintenance('UNIVERSITY')).toBe(2);
+    for (const id of ['GROVE', 'SANCTUARY', 'CATHEDRAL', 'PALACE']) expect(buildingMaintenance(state, city, id)).toBe(0);
+    expect(buildingMaintenance(state, city, 'UNIVERSITY')).toBe(2);
   });
 });

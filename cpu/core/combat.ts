@@ -292,7 +292,7 @@ export function trainMovement(
 /** Everything the CITY that trained or bought a unit hands it for life, in one
  *  place, and the seat's strongest melee trained or bought (`raiseBestMelee`). */
 export function applyTrainingGrants(state: GameState, city: City, unit: Unit): void {
-  raiseBestMelee(state, city.seat, unit.type);
+  raiseBestMelee(state, city.seat, unit.type, unit.formation ?? 0);
   const cls = promoClassOf(unit.type);
   unit.xpPct = trainXpPct(state, city, cls);
   const mp = trainMovement(state, city, cls);
@@ -1062,7 +1062,10 @@ function cityBaseSeat(city: City): number {
 /**
  * THE GARRISON TERM — what a military unit of the holder standing on the
  * centre adds: max(0, its Combat - damage / 10 - `base`), measured on the
- * preview (`GARRISON_HP_PER_CS`). A ship in the city garrisons it as a land
+ * preview (`GARRISON_HP_PER_CS`). A Corps or an Army garrisons with its
+ * formation's strength on that Combat (runs/h1_duelw1107, Taiyuan: a
+ * Pike and Shot Army on a base of 55 added 17 t177-182, a Line Infantry
+ * Corps 20 t183-211 and Army 27 t212-235). A ship in the city garrisons it as a land
  * unit does (runs/h1_duelw1103: a Galley, a Caravel, a Battleship). With
  * several on the centre, the strongest by this term. An aircraft and a
  * passenger are no garrison.
@@ -1071,7 +1074,7 @@ function garrisonCS(state: GameState, city: City, base: number): number {
   let best = 0;
   for (const u of unitsAt(state, city.centerIndex)) {
     if (u.seat !== city.seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
-    const g = Math.max(0, (UNITS[u.type]?.combat ?? 0) - (UNIT_HP - u.hp) / GARRISON_HP_PER_CS - base);
+    const g = Math.max(0, ((UNITS[u.type]?.combat ?? 0) + formationCS(u)) - (UNIT_HP - u.hp) / GARRISON_HP_PER_CS - base);
     if (g > best) best = g;
   }
   return best;

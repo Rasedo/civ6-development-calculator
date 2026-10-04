@@ -1370,7 +1370,7 @@ class SimPhase:
             _tr = self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp,
                                    free_promo=fp, formation=form_t,
                                    init_mp=self._train_mp_bonus(_bl_u, ui, row))
-            self._raise_best_melee(row, _tr, ui)
+            self._raise_best_melee(row, _tr, ui, formation=form_t)
             # CIV6 (People of the Steppe): "Receive a second light cavalry
             # unit ... each time you train a light cavalry unit" — a TRAINED
             # one, the Arsenal's own door (`EXTRA_UNIT_COPY_ROWS`)
@@ -1389,7 +1389,8 @@ class SimPhase:
                     continue
                 for _ in range(_en):
                     self._raise_best_melee(
-                        row, self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui)
+                        row, self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui,
+                        formation=form_t)
             # CIV6 (Suleiman's Janissary): the chassis costs the TRAINING city
             # a citizen, in a city this seat founded.
             for _pc, _pl, _pu, _pa, _pf in self._live_rows(row, self._unit_pop_cost_rows):
@@ -1413,7 +1414,8 @@ class SimPhase:
                 if bool(twin.count_nonzero()):
                     # what was trained arrives twice, tier and all
                     self._raise_best_melee(
-                        row, self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui)
+                        row, self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui,
+                        formation=form_t)
             if self._builder_idx >= 0:
                 made_b = made_u & (ui == self._builder_idx)
                 self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + made_b.long()

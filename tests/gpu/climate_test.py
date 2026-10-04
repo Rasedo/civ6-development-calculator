@@ -248,14 +248,23 @@ def main() -> int:
     n = int(low[b, col])
     assert n > 0, "no settled city on this fixture holds a lowland tile"
     # CIV6: "(80 x coastal lowland tiles) + (80 x coastal lowland tiles x
-    # flood level)"
+    # flood level)" — the 80 the row's own Cost, 40 at the online speed
+    per = int(s6._barrier_per_tile)
+    assert per == 40, per
     assert int(s6._flood_level()[b]) == 0
-    assert int(s6._flood_barrier_cost(row)[b, col]) == 80 * n
+    assert int(s6._flood_barrier_cost(row)[b, col]) == per * n
     s6.climate_idx[b] = 1
     assert int(s6._flood_level()[b]) == 1
-    assert int(s6._flood_barrier_cost(row)[b, col]) == 80 * n * 2
+    assert int(s6._flood_barrier_cost(row)[b, col]) == per * n * 2
     bi = torch.full((s6.B,), bidx, dtype=torch.long)
-    assert int(s6._building_cost_in(row, col, bi)[b]) == 80 * n * 2
+    assert int(s6._building_cost_in(row, col, bi)[b]) == per * n * 2
+    # its upkeep scales alike: the row's Maintenance per lowland tile, once
+    # more per flood level (runs/h1_duelw1107: a 160 barrier cost 4 a turn)
+    before = float(s6._seat_housing(row)[0][b, col])
+    s6.city_bldg[b, row, col, bidx] = True
+    m = float(s6.rules.b_maintenance[bidx])
+    assert float(s6._seat_housing(row)[0][b, col]) - before == m * n * 2, "the barrier's upkeep did not scale"
+    s6.city_bldg[b, row, col, bidx] = False
 
     # a city with no lowland is never offered the row
     s6.climate_idx[b] = -1
@@ -268,7 +277,7 @@ def main() -> int:
     assert bool(off) and not bool(s6._seat_buildable(row)[b, col, bidx]), (
         "CIV6: a Flood Barrier 'must be built in a city with one or more "
         "Coastal Lowland tiles'")
-    print(f"  6 barrier cost + gate OK ({n} lowland tiles, 80*n*(1+level))")
+    print(f"  6 barrier cost, upkeep + gate OK ({n} lowland tiles, 40*n*(1+level))")
 
     # --- 7) the barrier holds the sea off, and repairs what went under ----
     s7 = settle_all(fresh(rules, paths[0]))
@@ -407,10 +416,10 @@ def main() -> int:
     col12 = int(s12._city_lowland_count(row)[b].argmax())
     n12 = int(s12._city_lowland_count(row)[b, col12])
     s12.city_current[b, row, col12, 0] = s12._barrier_bidx
-    s12.city_cost[b, row, col12, 0] = 80 * n12
+    s12.city_cost[b, row, col12, 0] = s12._barrier_per_tile * n12
     s12.climate_idx[b] = 1
     s12._reprice_live(row)
-    assert int(s12.city_cost[b, row, col12, 0]) == 80 * n12 * 2, "the sea moved the price"
+    assert int(s12.city_cost[b, row, col12, 0]) == s12._barrier_per_tile * n12 * 2, "the sea moved the price"
 
     plant = s12._plant_bidx[0]
     col13 = next(c for c in range(s12.RC)

@@ -2821,19 +2821,26 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
-    def _raise_best_melee(self, row: int, landed: torch.Tensor, type_idx) -> None:
-        """`raiseBestMelee` — the row TRAINED or BOUGHT `type_idx` in the games
-        of `landed`: its strongest melee so made rises to it and never falls
-        (`civ_best_melee`, a minor's `citystate_best_melee`), read at once by
-        every centre's base. A unit created, granted or captured moves nothing
-        (runs/b95t_p1_mech_bought_20260927.jsonl,
-        runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl). The Free
-        Cities' base is its own flat one, so it keeps no column."""
+    def _raise_best_melee(self, row: int, landed: torch.Tensor, type_idx,
+                          formation: torch.Tensor | None = None) -> None:
+        """`raiseBestMelee` — the row TRAINED, BOUGHT or UPGRADED to `type_idx`
+        in the games of `landed`: a land or naval fighting unit's Combat, a
+        ranged chassis' included, with its formation's strength (`formation`,
+        the tier it was made at) rises to it and never falls (`civ_best_melee`,
+        a minor's `citystate_best_melee`), read at once by every centre's base.
+        A unit created, granted or captured, an aircraft and a merge move
+        nothing (runs/b95t_p1_mech_bought_20260927.jsonl,
+        runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl,
+        runs/h1_duelw1107 t176 and t229). The Free Cities' base is its own flat
+        one, so it keeps no column."""
         if isinstance(type_idx, int):
             type_idx = torch.full((self.B,), type_idx, dtype=torch.long, device=self.device)
         ti = type_idx.clamp(min=0, max=self.NU - 1)
-        cs = torch.where(landed & (type_idx >= 0) & (self._type_ranged_strength[ti] == 0),
-                         self._type_combat[ti], torch.zeros_like(self._type_combat[ti]))
+        fights = (self._type_combat[ti] > 0) & ~self._type_civilian[ti] & (self._type_air[ti] == 0)
+        made = self._type_combat[ti]
+        if formation is not None:
+            made = made + self._formation_cs.take(formation.clamp(min=0, max=self._form_max))
+        cs = torch.where(landed & (type_idx >= 0) & fights, made, torch.zeros_like(made))
         if row < self.n_majors:
             self.civ_best_melee[:, row] = torch.maximum(
                 self.civ_best_melee[:, row], cs.to(self.civ_best_melee.dtype))

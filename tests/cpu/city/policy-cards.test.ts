@@ -105,12 +105,23 @@ describe('production cards', () => {
 describe('the flat channels', () => {
   it('CONSCRIPTION takes a unit’s upkeep down and never below free', () => {
     const m = defaultModifiers();
-    expect(unitUpkeep(m, 'KNIGHT')).toBe(UNITS.KNIGHT.maintenance);
+    expect(unitUpkeep(m, { type: 'KNIGHT' })).toBe(UNITS.KNIGHT.maintenance);
     m.unitMaintenanceCut = 1;
-    expect(unitUpkeep(m, 'KNIGHT')).toBe(UNITS.KNIGHT.maintenance - 1);
+    expect(unitUpkeep(m, { type: 'KNIGHT' })).toBe(UNITS.KNIGHT.maintenance - 1);
     m.unitMaintenanceCut = 99;
-    expect(unitUpkeep(m, 'KNIGHT')).toBe(0);
-    expect(unitUpkeep(m, 'BUILDER')).toBe(0);
+    expect(unitUpkeep(m, { type: 'KNIGHT' })).toBe(0);
+    expect(unitUpkeep(m, { type: 'BUILDER' })).toBe(0);
+  });
+
+  it('a Corps pays its upkeep at 1.5x rounded up, an Army at 2x, a levied unit nothing', () => {
+    // runs/h1_duelw1103..1107: a Corps of 1, 4, 5 and 6 cost 2, 6, 8 and 9; an
+    // Army of 4 and 5 cost 8 and 10; Levee en Masse's 2 comes off the total
+    const m = defaultModifiers();
+    expect(unitUpkeep(m, { type: 'LINE_INFANTRY', formation: 1 })).toBe(Math.ceil(UNITS.LINE_INFANTRY.maintenance * 1.5));
+    expect(unitUpkeep(m, { type: 'LINE_INFANTRY', formation: 2 })).toBe(UNITS.LINE_INFANTRY.maintenance * 2);
+    expect(unitUpkeep(m, { type: 'MUSKETMAN', leviedFrom: 100 })).toBe(0);
+    m.unitMaintenanceCut = 2;
+    expect(unitUpkeep(m, { type: 'LINE_INFANTRY', formation: 1 })).toBe(Math.ceil(UNITS.LINE_INFANTRY.maintenance * 1.5) - 2);
   });
 
   it('BASTIONS raises what a city DEFENDS at and what it FIRES at by different halves', () => {

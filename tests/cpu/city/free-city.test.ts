@@ -333,13 +333,13 @@ describe('the Free City step', () => {
     free.treasury = 50;
     const lux = luxuryAmenities(state, FREE_SEAT);
     const gold = free.cities.reduce((s, c) => s + computeCityStats(state, c, lux, mods).total.gold, 0);
-    const upkeep = state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u.type) : 0), 0);
+    const upkeep = state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u) : 0), 0);
     expect(upkeep).toBeGreaterThan(0);
     freeCitiesPhase(state);
     expect(free.treasury).toBeCloseTo(50 + gold - upkeep, 9);
     // an upkeep the purse cannot meet: the treasury clamps at 0, the shortfall
     // is recorded and ONE unit disbands, the first with upkeep
-    const cost = (): number => state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u.type) : 0), 0);
+    const cost = (): number => state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u) : 0), 0);
     // one unit per free land plot away from the city, until the upkeep
     // outruns the Gold
     for (const t of state.map.tiles) {
@@ -349,7 +349,7 @@ describe('the Free City step', () => {
     }
     expect(cost()).toBeGreaterThan(gold + 20);
     const ids = state.units.filter((u) => u.seat === FREE_SEAT).map((u) => u.id);
-    const first = state.units.find((u) => u.seat === FREE_SEAT && unitUpkeep(mods, u.type) > 0)!.id;
+    const first = state.units.find((u) => u.seat === FREE_SEAT && unitUpkeep(mods, u) > 0)!.id;
     free.treasury = 0;
     freeCitiesPhase(state);
     expect(free.treasury).toBe(0);

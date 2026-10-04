@@ -29,7 +29,7 @@ function scene(): { state: GameState; early: number; late: number } {
   const lateUnit = state.units.find((u) => u.id === late)!;
   const lowId = Math.min(...state.units.map((u) => u.id)) - 1;
   lateUnit.id = lowId;
-  expect(unitUpkeep(getModifiers(state, 0), 'ARCHER')).toBeGreaterThan(0);
+  expect(unitUpkeep(getModifiers(state, 0), { type: 'ARCHER' })).toBeGreaterThan(0);
   seatOf(state, 0)!.treasury = -10;
   return { state, early, late: lowId };
 }
@@ -55,7 +55,7 @@ describe('the bankruptcy victim', () => {
     const cheap = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 8, 6).index, 0)!.id;
     const m = getModifiers(state, 0);
     const dearType = ['SWORDSMAN', 'CATAPULT', 'HEAVY_CHARIOT', 'HORSEMAN', 'KNIGHT', 'MUSKETMAN']
-      .find((t) => unitUpkeep(m, t) > unitUpkeep(m, 'ARCHER'));
+      .find((t) => unitUpkeep(m, { type: t }) > unitUpkeep(m, { type: 'ARCHER' }));
     expect(dearType, 'no pricier chassis in the catalog').toBeDefined();
     const dearUnit = spawnUnit(state, dearType!, tileAtCoords(state.map, 6, 8).index, 0);
     expect(dearUnit, `${dearType} did not spawn`).not.toBeNull();

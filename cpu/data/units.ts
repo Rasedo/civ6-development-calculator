@@ -2282,6 +2282,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'SPY',
       name: 'Spy',
       cost: 225,
+      costStep: 75, // Units.xml CostProgressionParam1
       maintenance: 4,
       // the install's BaseMoves is 1, but this engine's spy never WALKS: it
       // jumps city-to-city over a travel timer, so a movement pool would only
@@ -2294,6 +2295,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       description: 'Runs secret missions in foreign cities and guards your own.',
       src: {
         cost: xml('Units', 'UnitType=UNIT_SPY', 'Cost', { scale: GAME_SPEED }),
+        costStep: xml('Units', 'UnitType=UNIT_SPY', 'CostProgressionParam1', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_SPY', 'Maintenance'),
         moves: { stylized: 'the spy JUMPS between cities on a travel timer, it never steps — a movement pool (install BaseMoves 1) would be spent by nothing' },
         combat: xml('Units', 'UnitType=UNIT_SPY', 'Combat'),
