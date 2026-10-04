@@ -19,7 +19,8 @@ class SimEconomy:
     def _lux_holdings(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, L] held, [B, L] spare) — per luxury, the copies this row holds
         and the copies it can still trade (`luxuryHoldings`). SPARE: its own
-        improved, unpillaged plots, plus those of every city-state it is
+        improved, unpillaged plots and city centres standing on a luxury,
+        plus those of every city-state it is
         suzerain of (CIV6: "Gain ownership of all the city-state's
         resources"), plus the copies a Great Person granted it
         (`civ_gp_lux_copies`), less the copies its running deals send out. HELD: the
@@ -35,7 +36,15 @@ class SimEconomy:
             for s in range(self.S):
                 if bool(suz[:, s].count_nonzero()):
                     mine = mine | ((self.tile_seat == 100 + s) & suz[:, s].unsqueeze(1))
-        improved = (self.lux_id >= 0) & mine & (self.improvement == self.lux_req) & ~self.pillaged
+        # CIV6: a city founded on a luxury holds it — a major's or a live
+        # minor's centre stands in for the improvement
+        centre = self.centre_slot_at >= 0
+        if self.S > 0:
+            cs_ctr = torch.zeros_like(centre)
+            cs_ctr.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0),
+                            self.citystate_alive[:, :self.S])
+            centre = centre | cs_ctr
+        improved = (self.lux_id >= 0) & mine & (centre | ((self.improvement == self.lux_req) & ~self.pillaged))
         spare.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
         if row < self.n_majors:
             spare += self.civ_gp_lux_copies[:, row, :L]

@@ -565,7 +565,8 @@ function govYieldBuildingCount(state: GameState, city: City): number {
 
 /**
  * Per luxury, the copies `seat` holds and the copies it can still trade.
- * SPARE: its own improved, unpillaged plots, plus those of every city-state
+ * SPARE: its own improved, unpillaged plots and city centres standing on a
+ * luxury, plus those of every city-state
  * it is suzerain of (CIV6: "Gain ownership of all the city-state's
  * resources"), plus the copies a Great Person granted it (`gpLuxCopies`),
  * less the copies its running deals send out. HELD: the spare
@@ -576,11 +577,17 @@ export function luxuryHoldings(state: GameState, seat: number): { held: Map<stri
   const spare = new Map<string, number>();
   const add = (m: Map<string, number>, r: string, n: number): void => { m.set(r, (m.get(r) ?? 0) + n); };
   const suz = suzerainMinorSeats(state, seat);
+  const minorCentres = new Set((state.cityStates ?? []).map((c) => c.centerIndex));
   for (const t of state.map.tiles) {
     if (!t.resource || RESOURCES[t.resource].category !== 'luxury') continue;
     const owner = tileSeat(t);
     if (owner !== seat && !suz.has(owner)) continue;
-    if (t.improvement === resourceImprovement(t) && !t.pillaged) add(spare, t.resource, 1);
+    // CIV6: a city founded on a luxury holds it — the centre stands in for
+    // the improvement (runs/h1_duelw1104 Wine, 1106 Diamonds, 1108 Marble:
+    // each seat's record holds one copy more than its improved plots, the
+    // one under its city centre, from the founding turn on)
+    const centre = t.district === 'CITY_CENTER' || minorCentres.has(t.index);
+    if (centre || (t.improvement === resourceImprovement(t) && !t.pillaged)) add(spare, t.resource, 1);
   }
   const granted = seatOf(state, seat)?.gpLuxCopies ?? [];
   granted.forEach((n, i) => { if (n > 0) add(spare, LUXURY_IDS[i]!, n); });

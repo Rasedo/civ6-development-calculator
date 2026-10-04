@@ -13,7 +13,8 @@ course you will get them back". Proven here:
     `_deal_phase`, and then it is back with the giver;
   * a one-copy giver loses the amenity round that copy paid;
   * the item is payable only from a copy the giver can still trade — none,
-    one already out, or one a deal brought in is refused.
+    one already out, or one a deal brought in is refused;
+  * a city centre on a luxury holds the copy as an improvement would.
 """
 
 from __future__ import annotations
@@ -112,6 +113,23 @@ def main() -> int:
     assert not bool(sim._deal_kind_ok(k, 0, 1, va, one)[b]), "the one copy is out, yet payable"
     assert not bool(sim._deal_kind_ok(k, 1, 0, va, one)[b]), "a received copy is payable on"
     print("  3 the item is payable only from a copy the giver can still trade")
+
+    # --- 4) a city founded on a luxury holds it -------------------------------
+    # CIV6: the centre stands in for the improvement (runs/h1_duelw1104 Wine,
+    # 1106 Diamonds, 1108 Marble: the record holds the copy under the centre)
+    sim, lux = scene(rules, path, 0)
+    centres = [t for t in range(sim.T) if int(sim.centre_slot_at[b, t]) >= 0
+               and int(sim.tile_seat[b, t]) == 0]
+    assert centres, "row 0 holds no city"
+    t = centres[0]
+    sim.lux_id[b, t] = lux
+    sim.lux_req[b, t] = 1
+    sim.improvement[b, t] = -1
+    h0, s0 = sim._lux_holdings(0)
+    assert (int(h0[b, lux]), int(s0[b, lux])) == (1, 1), (int(h0[b, lux]), int(s0[b, lux]))
+    va = torch.full((sim.B,), lux, dtype=torch.long)
+    assert bool(sim._deal_kind_ok(sim._deal_k_lux, 0, 1, va, torch.ones(sim.B, dtype=torch.long))[b])
+    print("  4 a city founded on a luxury holds the copy and can trade it")
     print("luxury deal OK")
     return 0
 

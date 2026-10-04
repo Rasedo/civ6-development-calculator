@@ -32,7 +32,7 @@ import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
 import { stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
-import { cityCentreYields, cityPlotBonus, cityYieldCtx, luxuryHoldings } from '../core/city';
+import { cityCentreYields, cityPlotBonus, cityYieldCtx, luxuryAmenities, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
@@ -1173,7 +1173,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     }
   }
 
-  importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
+  const luxUnrecorded = importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
   const routes = importTradeRoutes(rec, state, cityByKey, minorOfPlayer, seatOfGame, history);
 
   // the units
@@ -1219,6 +1219,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const congressOf = (seat: number): NonNullable<GameState['congress']> =>
     active !== undefined && (playerOfSeat.get(seat) ?? Infinity) <= active.id ? now.list : before.list;
   state.congress = now.list;
+  unrecordedLuxuryGaps(ctx, rec, state, luxUnrecorded, seatOfGame, congressOf);
   const congressGaps = [...new Set([...now.gaps, ...before.gaps])];
   // (a queued row the engine lacks is the game's gap, no city's: nothing a
   // check reads comes from the queue)
@@ -1433,9 +1434,14 @@ const PEOPLE = Object.fromEntries(Object.values(GREAT_PEOPLE).flat().map((p) => 
  * person nor the plot (the unit moves and spends within one turn), so the
  * spent class is the evidence; with no history, every unmatched import stays
  * a gap.
+ *
+ * A player the record carries no luxury rows for at all (a dump written
+ * before the dumper read them) is no player holding nothing: its seats come
+ * back for `unrecordedLuxuryGaps`.
  */
 function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], cat: Catalog,
-                           seatOfGame: (pid: number) => number, history?: History): void {
+                           seatOfGame: (pid: number) => number, history?: History): number[] {
+  const unrecorded: number[] = [];
   const grants = new Map<number, number>(); // seat -> copies a spent person may have granted
   for (const [pid, spent] of history?.gpSpent ?? []) {
     let n = 0;
@@ -1455,9 +1461,13 @@ function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], ca
   for (const p of players) {
     const seat = seatOfGame(p.id);
     if (seat === NO_SEAT || !seatOf(state, seat) || !isCiv(seat)) continue;
+    if (p.luxuries === undefined) {
+      unrecorded.push(seat);
+      continue;
+    }
     const spare = luxuryHoldings(state, seat).spare;
     const rows = new Map<string, [number, number]>();
-    for (const [ri, held, exported] of p.luxuries ?? []) rows.set(cat.resources[ri], [held, exported]);
+    for (const [ri, held, exported] of p.luxuries) rows.set(cat.resources[ri], [held, exported]);
     for (const [id, n] of spare) if (n > 0 && !rows.has(`RESOURCE_${id}`)) rows.set(`RESOURCE_${id}`, [0, 0]);
     for (const [rname, [held, exported]] of rows) {
       const id = strip(rname, 'RESOURCE_');
@@ -1497,6 +1507,33 @@ function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], ca
     }
     for (const exp of exports) if (exp.n > 0) remember(exp.seat, `RESOURCE_${id}`, 'luxury-exported');
   }
+  return unrecorded;
+}
+
+/**
+ * The seats with no luxury rows in the record: the copies on the ground are
+ * all the importer can place, so the evidence of a deal or a grant it cannot
+ * name is the cities' own luxury amenities (`GetAmenitiesFromLuxuries`,
+ * amenityParts[0]). Where the seat's sum differs from the engine's
+ * (`luxuryAmenities`, under the congress the seat reads) the seat takes the
+ * `luxuries:not recorded` gap.
+ */
+function unrecordedLuxuryGaps(ctx: Ctx, rec: TurnRecord, state: GameState, seats: number[],
+                              seatOfGame: (pid: number) => number,
+                              congressOf: (seat: number) => NonNullable<GameState['congress']>): void {
+  const was = state.congress;
+  for (const seat of seats) {
+    state.congress = congressOf(seat);
+    let ours = 0;
+    for (const n of luxuryAmenities(state, seat).values()) ours += n;
+    let game = 0;
+    for (const c of rec.cities) if (seatOfGame(c.owner) === seat) game += num(c.amenityParts?.[0] ?? 0);
+    if (ours === game) continue;
+    ctx.scopeSeat = seat;
+    gap(ctx, 'luxuries', 'not recorded');
+    ctx.scopeSeat = undefined;
+  }
+  state.congress = was;
 }
 
 /**

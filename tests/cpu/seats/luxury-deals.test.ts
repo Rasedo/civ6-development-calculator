@@ -106,3 +106,18 @@ describe('a luxury copy on a deal', () => {
     expect(dealItemPayable(state, 2, 0, [DEAL_LUXURY, WINE, 1])).toBe(false);
   });
 });
+
+describe('a city founded on a luxury', () => {
+  // CIV6: the centre stands in for the improvement (runs/h1_duelw1104 Wine,
+  // 1106 Diamonds, 1108 Marble: the record holds the copy under the centre)
+  it('holds the copy under its centre, and can trade it', () => {
+    const state = table(0);
+    const centre = state.map.tiles[state.seats[1].cities[0].centerIndex];
+    centre.resource = 'WINE';
+    centre.improvement = null;
+    expect(luxuryHoldings(state, 1).spare.get('WINE')).toBe(1);
+    expect(luxuryHoldings(state, 1).held.get('WINE')).toBe(1);
+    expect(amen(state, 1)).toBe(1);
+    expect(dealItemPayable(state, 1, 2, [DEAL_LUXURY, WINE, 1])).toBe(true);
+  });
+});

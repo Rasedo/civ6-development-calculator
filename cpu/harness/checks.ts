@@ -109,9 +109,15 @@ const PLOT_BLIND = new Set(['buy.buildingCost', 'buy.buildingGold', 'buy.unitCos
  *  and loyalty they set, its tourism */
 const PARK_READERS = new Set(['city.amenities', 'city.amenityTier', 'city.loyaltyPerTurn', 'city.tourism', 'seat.tourism']);
 
+/** the checks a seat's luxury holdings move: the copies it holds pay its
+ *  cities' amenities, whose tier moves their yields, growth and loyalty */
+const LUXURY_READERS = new Set(['city.amenities', 'city.amenityTier', 'city.loyaltyPerTurn', 'city.yields',
+  'city.foodSurplus', 'step.growth', 'step.border', 'step.loyalty']);
+
 function gapsFor(gaps: string[], check: string): { gaps?: string[] } {
   let g = PLOT_BLIND.has(check) ? gaps.filter((x) => !x.startsWith('plot ') && !x.startsWith('resource:')) : gaps;
   if (!PARK_READERS.has(check)) g = g.filter((x) => !x.startsWith('national-park:'));
+  if (!LUXURY_READERS.has(check)) g = g.filter((x) => !x.startsWith('luxury-') && !x.startsWith('luxuries:'));
   return g.length ? { gaps: g } : {};
 }
 
